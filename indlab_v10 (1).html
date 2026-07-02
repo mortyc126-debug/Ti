@@ -24,11 +24,13 @@
   --red: #C71B52;
   --red-bg: rgba(199,27,82,0.1);
   --red-glow: 0 0 8px rgba(199,27,82,0.6);
-  --orange: #B487F8;
+  --violet: #B487F8;
+  --negative: #FF6A8B;
+  --orange: var(--violet);
   --orange-bg: rgba(244,195,106,0.08);
   --blue: #7CC7FF;
   --blue-bg: rgba(124,199,255,0.08);
-  --yellow: #B487F8;
+  --yellow: var(--violet);
   --grad2: #1A0A30;
   --mono: 'JetBrains Mono', monospace;
   --sans: 'Inter', sans-serif;
@@ -112,10 +114,10 @@ body {
 .pill.buy .pill-dot { background: #60A4A1; }
 .pill.neutral { background: rgba(255,255,255,0.04); color: var(--text3); border-color: var(--border2); }
 .pill.neutral .pill-dot { background: var(--text3); }
-.pill.sell { background: rgba(199,27,82,0.1); color: #FF6A8B; opacity:.85; border-color: rgba(199,27,82,0.2); }
-.pill.sell .pill-dot { background: #C71B52; }
-.pill.sell-strong { background: rgba(199,27,82,0.14); color: #FF6A8B; border-color: rgba(199,27,82,0.35); box-shadow: 0 0 10px rgba(199,27,82,0.18); }
-.pill.sell-strong .pill-dot { background: #C71B52; box-shadow: 0 0 6px rgba(199,27,82,0.7); }
+.pill.sell { background: rgba(199,27,82,0.1); color: var(--negative); opacity:.85; border-color: rgba(199,27,82,0.2); }
+.pill.sell .pill-dot { background: var(--accent); }
+.pill.sell-strong { background: rgba(199,27,82,0.14); color: var(--negative); border-color: rgba(199,27,82,0.35); box-shadow: 0 0 10px rgba(199,27,82,0.18); }
+.pill.sell-strong .pill-dot { background: var(--accent); box-shadow: 0 0 6px rgba(199,27,82,0.7); }
 .pill.warn { background: rgba(96,164,161,0.08); color: #60A4A1; border-color: rgba(96,164,161,0.25); }
 .pill.warn .pill-dot { background: #60A4A1; }
 
@@ -139,7 +141,7 @@ body {
   -webkit-appearance: none; width: 9px; height: 9px; border-radius: 0;
   background: #7A5FBF; transform: rotate(45deg); margin-top: -3.5px; transition: background .12s;
 }
-.slider-combo input[type=range]::-webkit-slider-thumb:hover { background: #B487F8; }
+.slider-combo input[type=range]::-webkit-slider-thumb:hover { background: var(--violet); }
 .num-input {
   width: 68px; background: var(--surface2); border: 1px solid var(--border2);
   border-radius: 3px; padding: 4px 7px; font-family: var(--mono);
@@ -152,7 +154,7 @@ body {
 /* ── Gauge ── */
 .gauge {
   position: relative; height: 3px; border-radius: 2px;
-  background: linear-gradient(to right, #60A4A1 0%, #60A4A1 28%, var(--border2) 32%, var(--border2) 68%, #C71B52 72%, #C71B52 100%);
+  background: linear-gradient(to right, #60A4A1 0%, #60A4A1 28%, var(--border2) 32%, var(--border2) 68%, var(--accent) 72%, var(--accent) 100%);
 }
 .gauge-needle {
   position: absolute; top: -4px; width: 2px; height: 11px;
@@ -284,7 +286,7 @@ input:-webkit-autofill, input:-webkit-autofill:focus {
 input[type=range] { -webkit-appearance: none; appearance: none; background: transparent !important; cursor: pointer; }
 input[type=range]::-webkit-slider-runnable-track { height: 2px; background: rgba(122,95,191,0.35); border-radius: 0; }
 input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 9px; height: 9px; background: #7A5FBF; border-radius: 0; transform: rotate(45deg); margin-top: -3.5px; transition: background .12s; }
-input[type=range]::-webkit-slider-thumb:hover { background: #B487F8; }
+input[type=range]::-webkit-slider-thumb:hover { background: var(--violet); }
 input[type=range]::-webkit-slider-progress { height: 2px; background: rgba(180,135,248,0.55); border-radius: 0; }
 input[type=range]::-moz-range-track { height: 2px; background: rgba(122,95,191,0.35); }
 input[type=range]::-moz-range-thumb { width: 9px; height: 9px; background: #7A5FBF; border: none; border-radius: 0; transform: rotate(45deg); }
@@ -318,7 +320,7 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
 .il-legend-desc { font-size:10.5px; font-family:'JetBrains Mono',monospace; color:#807090; line-height:1.6; white-space:pre-line; padding-left:36px; }
 .analysis-item { font-size: 12px; font-family: 'JetBrains Mono', monospace; display: flex; gap: 6px; padding: 3px 0; color: #D0D0E8; line-height: 1.5; }
 .analysis-bullish .analysis-dot { color: #60A4A1; }
-.analysis-bearish .analysis-dot { color: #FF6A8B; }
+.analysis-bearish .analysis-dot { color: var(--negative); }
 .analysis-neutral .analysis-dot { color: #6F648F; }
 .analysis-tf { margin-top: 6px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px; display: flex; flex-direction: column; gap: 3px; }
 .analysis-tf-label { font-size: 11px; color: #6A6A8A; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
@@ -345,7 +347,7 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
 }
 .cp-tf.active {
   background: rgba(180,135,248,0.16);
-  border-color: rgba(180,135,248,0.45); color: #B487F8;
+  border-color: rgba(180,135,248,0.45); color: var(--violet);
   box-shadow: 0 0 10px rgba(180,135,248,0.1);
 }
 .cp-ind-row {
@@ -361,8 +363,8 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
   transition: all 0.15s;
 }
 .cp-ind-diamond.active {
-  background: #C71B52;
-  border-color: #C71B52;
+  background: var(--accent);
+  border-color: var(--accent);
   box-shadow: 0 0 8px rgba(199,27,82,0.6);
 }
 .cp-ind-alt-diamond-btn {
@@ -372,8 +374,8 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
   transition: all 0.12s; cursor: pointer;
 }
 .cp-ind-alt-diamond-btn.active {
-  background: #C71B52;
-  border-color: #C71B52;
+  background: var(--accent);
+  border-color: var(--accent);
   box-shadow: 0 0 6px rgba(199,27,82,0.55);
 }
 .cp-ind-label { font-size: 11px; color: var(--text2); font-family: var(--mono); }
@@ -414,7 +416,7 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
 }
 .cp-tf.active {
   background:rgba(180,135,248,0.16); border-color:rgba(180,135,248,0.45);
-  color:#B487F8; box-shadow:0 0 10px rgba(180,135,248,0.1);
+  color:var(--violet); box-shadow:0 0 10px rgba(180,135,248,0.1);
 }
 
 /* ═══ Окно отображения (диапазон) + переключатель вида ═══ */
@@ -426,7 +428,7 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
 }
 .cp-range.active, .cp-viewmode.active, #cp-measure-btn.active {
   background:rgba(180,135,248,0.14); border-color:rgba(180,135,248,0.4);
-  color:#B487F8; box-shadow:0 0 8px rgba(180,135,248,0.1);
+  color:var(--violet); box-shadow:0 0 8px rgba(180,135,248,0.1);
 }
 
 /* ═══ Full-width pages ═══ */
@@ -516,7 +518,7 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
     padding: 7px 14px;
     background: rgba(199,27,82,0.12);
     border: none; border-top: 1px solid rgba(199,27,82,0.2);
-    color: #C71B52; font-family: var(--mono); font-size: 11px;
+    color: var(--accent); font-family: var(--mono); font-size: 11px;
     cursor: pointer; letter-spacing: 0.05em;
   }
 
@@ -780,7 +782,7 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
   <!-- Вкладки -->
   <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.06);">
     <button id="an-tab-single" onclick="anSwitchTab('single')"
-      style="padding:7px 16px;font-family:var(--mono);font-size:9px;letter-spacing:0.04em;cursor:pointer;border:none;border-bottom:2px solid #C71B52;background:none;color:#C71B52;">Один тикер</button>
+      style="padding:7px 16px;font-family:var(--mono);font-size:9px;letter-spacing:0.04em;cursor:pointer;border:none;border-bottom:2px solid var(--accent);background:none;color:var(--accent);">Один тикер</button>
     <button id="an-tab-multi" onclick="anSwitchTab('multi')"
       style="padding:7px 16px;font-family:var(--mono);font-size:9px;letter-spacing:0.04em;cursor:pointer;border:none;border-bottom:2px solid transparent;background:none;color:var(--text3);">Несколько тикеров</button>
   </div>
@@ -789,7 +791,7 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
   <div style="display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
     <span style="font-size:9px;color:#5a5070;font-family:var(--mono);margin-right:2px;">ТФ свечи:</span>
     <button class="an-tf"        data-tf="CANDLE_INTERVAL_1_MIN"  data-bm="1"   data-label="1 мин"  onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">1м</button>
-    <button class="an-tf active" data-tf="CANDLE_INTERVAL_5_MIN"  data-bm="5"   data-label="5 мин"  onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(82,242,201,0.4);background:rgba(82,242,201,0.12);color:#52F2C9;">5м</button>
+    <button class="an-tf active" data-tf="CANDLE_INTERVAL_5_MIN"  data-bm="5"   data-label="5 мин"  onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(82,242,201,0.4);background:rgba(82,242,201,0.12);color:var(--green);">5м</button>
     <button class="an-tf"        data-tf="CANDLE_INTERVAL_15_MIN" data-bm="15"  data-label="15 мин" onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">15м</button>
     <button class="an-tf"        data-tf="CANDLE_INTERVAL_30_MIN" data-bm="30"  data-label="30 мин" onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">30м</button>
     <button class="an-tf"        data-tf="CANDLE_INTERVAL_HOUR"   data-bm="60"  data-label="1 час"  onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">1ч</button>
@@ -800,9 +802,9 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
   <div id="an-panel-single">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
       <input id="an-ticker" type="text" placeholder="Тикер (SBER, GAZP…)" style="padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:11px;width:130px;color-scheme:dark;outline:none;">
-      <button onclick="ilRunAnalysis()" style="padding:6px 14px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Запустить</button>
+      <button onclick="ilRunAnalysis()" style="padding:6px 14px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:var(--green);font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Запустить</button>
       <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3);font-family:var(--mono);cursor:pointer;" title="Подбирает период каждого индикатора по бэктесту вместо классического — альт считается уже от подобранного периода">
-        <input type="checkbox" id="an-adaptive" style="accent-color:#B487F8;"> 🎯 адаптивный период (авто)
+        <input type="checkbox" id="an-adaptive" style="accent-color:var(--violet);"> 🎯 адаптивный период (авто)
       </label>
       <span id="an-status" style="font-size:10px;color:var(--text3);font-family:var(--mono);flex:1;"></span>
     </div>
@@ -883,10 +885,10 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
         <div style="display:flex;flex-direction:column;gap:8px;">
           <button onclick="ilRunMultiComp()" style="padding:6px 16px;background:rgba(199,27,82,0.08);border:1px solid rgba(199,27,82,0.3);border-radius:6px;color:var(--accent);font-family:var(--mono);font-size:10px;cursor:pointer;white-space:nowrap;">▷ Запустить</button>
           <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);cursor:pointer;">
-            <input type="checkbox" id="an-multi-altonly" style="accent-color:#B487F8;"> только альт
+            <input type="checkbox" id="an-multi-altonly" style="accent-color:var(--violet);"> только альт
           </label>
           <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);cursor:pointer;">
-            <input type="checkbox" id="an-multi-best" checked style="accent-color:#52F2C9;"> только ≥55%
+            <input type="checkbox" id="an-multi-best" checked style="accent-color:var(--green);"> только ≥55%
           </label>
           <div style="font-size:9px;color:var(--text3);font-family:var(--mono);line-height:1.5;max-width:160px;">σ — насколько универсален индикатор по разным тикерам</div>
         </div>
@@ -1046,8 +1048,8 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
         <div id="cp-nav-btns" style="position:absolute;bottom:6px;right:8px;display:flex;gap:4px;z-index:6;">
           <button onclick="chartCandleW=Math.max(4,chartCandleW-2);chartRedraw();" title="Уменьшить зум (Ctrl+колесо вниз)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,0,110,0.35);background:rgba(20,10,36,0.85);color:#FF4D9D;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">−</button>
           <button onclick="chartCandleW=Math.min(40,chartCandleW+2);chartRedraw();" title="Увеличить зум (Ctrl+колесо вверх)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,0,110,0.35);background:rgba(20,10,36,0.85);color:#FF4D9D;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">+</button>
-          <button onclick="chartOffset=Math.min(chartCandles.length-1,chartOffset+Math.max(10,Math.floor(chartCandles.length/8)));chartRedraw();" title="В прошлое (колесо вниз / свайп влево)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(82,242,201,0.35);background:rgba(20,10,36,0.85);color:#52F2C9;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">◀</button>
-          <button onclick="chartOffset=Math.max(0,chartOffset-Math.max(10,Math.floor(chartCandles.length/8)));chartRedraw();" title="Вперёд к последней свече (колесо вверх / свайп вправо)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(82,242,201,0.35);background:rgba(20,10,36,0.85);color:#52F2C9;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">▶</button>
+          <button onclick="chartOffset=Math.min(chartCandles.length-1,chartOffset+Math.max(10,Math.floor(chartCandles.length/8)));chartRedraw();" title="В прошлое (колесо вниз / свайп влево)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(82,242,201,0.35);background:rgba(20,10,36,0.85);color:var(--green);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">◀</button>
+          <button onclick="chartOffset=Math.max(0,chartOffset-Math.max(10,Math.floor(chartCandles.length/8)));chartRedraw();" title="Вперёд к последней свече (колесо вверх / свайп вправо)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(82,242,201,0.35);background:rgba(20,10,36,0.85);color:var(--green);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">▶</button>
           <button onclick="chartOffset=0;chartRedraw();" title="К последней свече" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(20,10,36,0.85);color:#9090B8;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--mono);">⇥</button>
         </div>
         <!-- Candle info toggle bar -->
@@ -1061,7 +1063,7 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
 
       <!-- Tab bar: Методы / Анализ -->
       <div id="cp-tab-bar" style="display:flex;gap:2px;padding:4px 8px;background:#0A0C18;border-bottom:1px solid rgba(255,255,255,0.06);">
-        <button id="cp-tab-methods" onclick="cpSwitchTab('methods')" style="font-size:10px;font-family:'JetBrains Mono',monospace;padding:3px 10px;border:none;border-radius:3px;cursor:pointer;background:#C71B52;color:#fff;">Методы</button>
+        <button id="cp-tab-methods" onclick="cpSwitchTab('methods')" style="font-size:10px;font-family:'JetBrains Mono',monospace;padding:3px 10px;border:none;border-radius:3px;cursor:pointer;background:var(--accent);color:#fff;">Методы</button>
         <button id="cp-tab-analysis" onclick="cpSwitchTab('analysis')" style="font-size:10px;font-family:'JetBrains Mono',monospace;padding:3px 10px;border:none;border-radius:3px;cursor:pointer;background:rgba(255,255,255,0.05);color:#8080A0;">Анализ</button>
       </div>
       <div id="cp-analysis-panel" style="display:none;overflow-y:auto;padding:8px;flex:1;"></div>
@@ -1316,7 +1318,7 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
               <input type="number" id="cp-global-hz" value="20" min="3" max="300" title="Горизонт (свечей)"
                 style="width:38px;font-size:9px;padding:2px 4px;background:#1A1030;border:1px solid rgba(255,255,255,0.08);border-radius:4px;color:var(--text2);font-family:var(--mono);color-scheme:dark;outline:none;">
               <button onclick="_globalAutoTune()" title="Рассчитать оптимальные параметры для всех индикаторов"
-                style="font-size:9px;padding:2px 8px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.25);border-radius:4px;color:#52F2C9;font-family:var(--mono);cursor:pointer;white-space:nowrap;">▷ Авто</button>
+                style="font-size:9px;padding:2px 8px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.25);border-radius:4px;color:var(--green);font-family:var(--mono);cursor:pointer;white-space:nowrap;">▷ Авто</button>
               <button onclick="_globalAutoReset()" title="Сбросить к классическим параметрам"
                 style="font-size:9px;padding:2px 6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:4px;color:var(--text3);font-family:var(--mono);cursor:pointer;">↺</button>
             </div>
@@ -3445,11 +3447,11 @@ function quickCalc() {
 // FIBONACCI
 // ═══════════════════════════════════════════
 const FIBS=[
-  {pct:0,   label:'0% — максимум волны',          color:'#C71B52'},
+  {pct:0,   label:'0% — максимум волны',          color:'var(--accent)'},
   {pct:23.6,label:'23.6% — первая реакция',       color:'#52A8E0'},
   {pct:38.2,label:'38.2% — стандартная коррекция',color:'#d6e2f0'},
   {pct:50,  label:'50% — середина движения',      color:'#8aa0b6'},
-  {pct:61.8,label:'61.8% — золотое сечение',      color:'#C71B52'},
+  {pct:61.8,label:'61.8% — золотое сечение',      color:'var(--accent)'},
   {pct:78.6,label:'78.6% — глубокая коррекция',   color:'#4cc9f0'},
   {pct:100, label:'100% — основание волны',        color:'#60A4A1'},
 ];
@@ -3924,7 +3926,7 @@ async function oiLoadAndRender() {
     const contractsMap = {};
     for (const t of tickers) contractsMap[t] = await oiFetchTickerHistory(t);
     const totalRows = Object.values(contractsMap).reduce((s,r)=>s+r.length,0);
-    if (!totalRows) { if (resEl) resEl.innerHTML = '<span style="color:#C71B52">Нет данных в oi_daily — тикер не отслеживается cron\'ом воркера или ещё не накопилась история</span>'; return; }
+    if (!totalRows) { if (resEl) resEl.innerHTML = '<span style="color:var(--accent)">Нет данных в oi_daily — тикер не отслеживается cron\'ом воркера или ещё не накопилась история</span>'; return; }
     let rows, refSwitchDates;
     if (tickers.length > 1) {
       const agg = oiAggregateContracts(contractsMap);
@@ -3938,7 +3940,7 @@ async function oiLoadAndRender() {
     oiDraw();
     if (chartCandles.length) chartRedraw();
   } catch (e) {
-    if (resEl) resEl.innerHTML = `<span style="color:#C71B52">Ошибка: ${e.message}</span>`;
+    if (resEl) resEl.innerHTML = `<span style="color:var(--accent)">Ошибка: ${e.message}</span>`;
   }
 }
 
@@ -3948,7 +3950,7 @@ function oiRenderVals(last) {
   const fmt = (v,d=3) => v==null||isNaN(v) ? '—' : v.toFixed(d);
   const row = (label,val,color) => `<div style="display:flex;justify-content:space-between;"><span style="color:var(--text3);">${label}</span><span style="color:${color||'var(--text)'};font-weight:600;">${val}</span></div>`;
   const wi = last.weighted_imbalance;
-  const wiColor = wi==null ? 'var(--text3)' : wi>0.3 ? '#C71B52' : wi<-0.3 ? '#60A4A1' : 'var(--text)';
+  const wiColor = wi==null ? 'var(--text3)' : wi>0.3 ? 'var(--accent)' : wi<-0.3 ? '#60A4A1' : 'var(--text)';
   el.innerHTML = [
     row('Дата', last.date),
     row('NetPhys%', fmt(last.net_phys_pct!=null?last.net_phys_pct*100:null,2)+'%'),
@@ -3978,7 +3980,7 @@ function oiInterpretText(last) {
   if (Math.abs(wi) < 0.5) {
     lines.push('<span style="color:var(--text3)">Нейтрально — перекос физ.лиц не выражен</span>');
   } else if (wi > 0) {
-    lines.push(`<span style="color:#FF6A8B">Физ.лица перегружены лонгом (z=${wi.toFixed(2)}) — контртрендовый риск движения ВНИЗ${last.accumulation_flag?', + признак накопления (узкий диапазон)':''}</span>`);
+    lines.push(`<span style="color:var(--negative)">Физ.лица перегружены лонгом (z=${wi.toFixed(2)}) — контртрендовый риск движения ВНИЗ${last.accumulation_flag?', + признак накопления (узкий диапазон)':''}</span>`);
   } else {
     lines.push(`<span style="color:#60A4A1">Физ.лица перегружены шортом (z=${wi.toFixed(2)}) — контртрендовый риск движения ВВЕРХ${last.accumulation_flag?', + признак накопления (узкий диапазон)':''}</span>`);
   }
@@ -4188,7 +4190,7 @@ const COMBOS = [
   },
   {
     id:'parabolic_macd', name:'Parabolic SAR + MACD',
-    tag:'Тренд + Стоп', tagColor:'#C71B52',
+    tag:'Тренд + Стоп', tagColor:'var(--accent)',
     desc:'MACD определяет направление тренда, SAR — динамический стоп и точка разворота.',
     why:'SAR даёт много разворотов во флэте. MACD фильтрует: торговать SAR только в направлении MACD.',
     inds:['Parabolic SAR','MACD'],
@@ -4342,7 +4344,7 @@ const COMBO_PRESETS = [
     name:'Parabolic SAR + MACD',
     icon: '◆',
     tag:'Тренд + Стоп',
-    tagColor:'#C71B52',
+    tagColor:'var(--accent)',
     short:'MACD фильтрует тренд — SAR торговать только в его направлении.',
     question:'Хочу трейлинг-стоп который не даёт ложных сигналов?',
     chartIds: ['ema', 'macd', 'rsi'],
@@ -4398,7 +4400,7 @@ const COMBO_PRESETS = [
     name: 'Order Flow — Смена агрессии',
     icon: '◆',
     tag: 'Order Flow',
-    tagColor: '#52F2C9',
+    tagColor: 'var(--green)',
     short: 'Дельта резко переключилась за 2 свечи — смена режима агрессии покупателей/продавцов.',
     signal: 'neutral',
     chartIds: ['cum_delta','std_dev','force_idx','bb_width'],
@@ -4411,7 +4413,7 @@ const COMBO_PRESETS = [
     name: 'Price Action — Перекос теней',
     icon: '◆',
     tag: 'Price Action',
-    tagColor: '#C71B52',
+    tagColor: 'var(--accent)',
     short: 'В боковике тени направлены только в одну сторону — предсказывает куда выброс.',
     signal: 'neutral',
     chartIds: ['alligator','mama','atr_w','bb_pct'],
@@ -4510,7 +4512,7 @@ function applyPreset(id) {
     chartInds[k] = !!(indSet[k]);
     const diam = document.getElementById('cpdiam-' + k);
     const btn  = document.getElementById('cpchartbtn-' + k);
-    if (diam) { diam.style.borderColor = chartInds[k]?'#C71B52':'rgba(199,27,82,0.4)'; diam.style.background = chartInds[k]?'#C71B52':'none'; diam.style.boxShadow = chartInds[k]?'0 0 6px rgba(199,27,82,0.5)':'none'; }
+    if (diam) { diam.style.borderColor = chartInds[k]?'var(--accent)':'rgba(199,27,82,0.4)'; diam.style.background = chartInds[k]?'var(--accent)':'none'; diam.style.boxShadow = chartInds[k]?'0 0 6px rgba(199,27,82,0.5)':'none'; }
     if (btn)  btn.textContent = chartInds[k] ? '✓ На графике' : 'На график';
   });
 
@@ -5211,7 +5213,7 @@ function drawGuideCanvas(patternId) {
       });
       // HH/HL markers
       [[2,92,'HL'],[4,104,'HH'],[6,100,'HL'],[8,114,'HH'],[10,110,'HL'],[12,122,'HH']].forEach(([i,v,lbl]) => {
-        const col = lbl.startsWith('H') && lbl[1]==='H' ? 'var(--green)' : '#4cc9f0';
+        const col = lbl.startsWith('H') && lbl[1]==='H' ? '#52F2C9' : '#4cc9f0';
         label(nx(i)-6, toY(v)-(lbl[1]==='H'?10:-4), lbl, col);
       });
       // Trendline
@@ -5226,7 +5228,7 @@ function drawGuideCanvas(patternId) {
         drawCandle(nx(i), toY(o), toY(h), toY(l), toY(c), cw);
       });
       [[1,118,'LH'],[3,114,'LH'],[2,110,'LL'],[4,106,'LL'],[5,110,'LH'],[8,98,'LL']].forEach(([i,v,lbl])=>{
-        const col = lbl[1]==='H'?'var(--red)':'#52A8E0';
+        const col = lbl[1]==='H'?'#C71B52':'#52A8E0';
         label(nx(i)-6, toY(v)+(lbl[1]==='L'?14:-6), lbl, col);
       });
       drawLine([[nx(1),toY(118)],[nx(19),toY(83)]], 'rgba(199,27,82,0.4)', 1, [4,3]);
@@ -5246,7 +5248,7 @@ function drawGuideCanvas(patternId) {
       label(nx(4)-4, toY(96)+14, 'Дно 1', '#4cc9f0', 'center');
       label(nx(14)-2, toY(97)+14, 'Дно 2', '#4cc9f0', 'center');
       // Arrow up
-      ctx.fillStyle='var(--green)'; ctx.font='14px monospace';
+      ctx.fillStyle='#52F2C9'; ctx.font='14px monospace';
       ctx.fillText('↑', nx(18), toY(122));
       break;
     }
@@ -5261,7 +5263,7 @@ function drawGuideCanvas(patternId) {
       label(nx(1), toY(102)-5, 'Шея', 'rgba(255,200,50,0.8)');
       label(nx(4), toY(120)-10, 'Пик 1', '#52A8E0', 'center');
       label(nx(12), toY(119)-10, 'Пик 2', '#52A8E0', 'center');
-      ctx.fillStyle='var(--red)'; ctx.font='14px monospace';
+      ctx.fillStyle='#C71B52'; ctx.font='14px monospace';
       ctx.fillText('↓', nx(18), toY(90));
       break;
     }
@@ -5278,7 +5280,7 @@ function drawGuideCanvas(patternId) {
       ctx.strokeStyle='#60A4A1'; ctx.fillStyle='#60A4A1'; ctx.lineWidth=1;
       ctx.beginPath(); ctx.moveTo(hx,hh); ctx.lineTo(hx,hl); ctx.stroke();
       ctx.fillRect(hx-cw/2, hc, cw, ho-hc);
-      label(hx+8, hh-4, 'Молот', 'var(--green)');
+      label(hx+8, hh-4, 'Молот', '#52F2C9');
       // Recovery
       const post=[97,100,104,108,112,116,118,120,122];
       post.forEach((c,i) => {
@@ -5350,7 +5352,7 @@ function drawGuideCanvas(patternId) {
       drawLine([[nx(0),toY(112)],[nx(14),toY(109)]], 'rgba(255,200,50,0.5)', 1.5, [4,3]);
       ctx.fillStyle='rgba(255,200,50,0.7)'; ctx.font='9px monospace'; ctx.textAlign='center';
       ctx.fillText('Треугольник', nx(7), toY(107));
-      ctx.fillStyle='var(--green)'; ctx.font='12px monospace';
+      ctx.fillStyle='#52F2C9'; ctx.font='12px monospace';
       ctx.fillText('↑', nx(16), toY(116));
       break;
     }
@@ -5365,7 +5367,7 @@ function drawGuideCanvas(patternId) {
       drawLine([[nx(7),toY(112)],[nx(14),toY(108)]], 'rgba(255,200,50,0.5)', 1, [3,3]);
       drawLine([[nx(7),toY(115)],[nx(14),toY(111)]], 'rgba(255,200,50,0.5)', 1, [3,3]);
       label(nx(10), toY(106), 'Флаг', 'rgba(255,200,50,0.8)', 'center');
-      ctx.fillStyle='var(--green)'; ctx.font='12px monospace'; ctx.textAlign='center';
+      ctx.fillStyle='#52F2C9'; ctx.font='12px monospace'; ctx.textAlign='center';
       ctx.fillText('↑ пробой', nx(17), toY(122));
       break;
     }
@@ -5397,7 +5399,7 @@ function drawGuideCanvas(patternId) {
       drawLine(upper.map((v,i)=>[nx(i),toY(v)]), 'rgba(255,159,28,0.4)', 1);
       drawLine(lower.map((v,i)=>[nx(i),toY(v)]), 'rgba(255,159,28,0.4)', 1);
       label(nx(10), toY(100), '← сквиз →', 'rgba(255,159,28,0.7)', 'center');
-      ctx.fillStyle='var(--green)'; ctx.font='bold 14px monospace'; ctx.textAlign='center';
+      ctx.fillStyle='#52F2C9'; ctx.font='bold 14px monospace'; ctx.textAlign='center';
       ctx.fillText('◆', nx(18), toY(104));
       break;
     }
@@ -5709,7 +5711,7 @@ function showDiagResult(contextId, mode) {
       </div>
 
       ${avoidHtml ? `<div style="padding:14px 16px;border-bottom:1px solid var(--border);">
-        <div style="font-size:10px;color:#FF6A8B;font-family:var(--mono);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px;">Избегай в этом контексте</div>
+        <div style="font-size:10px;color:var(--negative);font-family:var(--mono);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px;">Избегай в этом контексте</div>
         ${avoidHtml}
       </div>` : ''}
 
@@ -9209,7 +9211,7 @@ function cpRenderCombos() {
   var sysSignals = (typeof _computeSysSignals === 'function') ? _computeSysSignals() : {};
   el.innerHTML = COMBO_PRESETS.map(c => {
     const isActive = cpActiveCombo === c.id;
-    const SIG_COL = {'buy-strong':'#52F2C9','buy':'#52F2C9','sell':'#FF4D7A','sell-strong':'#FF4D7A','neutral':'#6F648F'};
+    const SIG_COL = {'buy-strong':'var(--green)','buy':'var(--green)','sell':'#FF4D7A','sell-strong':'#FF4D7A','neutral':'#6F648F'};
     const sig = sysSignals[c.id] || c.signal || 'neutral';
     const col = SIG_COL[sig] || '#6F648F';
     const agg = c.inds?.length ? _ilAggVote(c.inds) : { sig: null, items: [] };
@@ -9246,12 +9248,12 @@ function cpRenderCombos() {
             const hasAlt = id && it && it.hasAlt;
             const useAlt = hasAlt && it.useAlt;
             const cDiamStyle = `display:inline-block;width:8px;height:8px;transform:rotate(45deg);vertical-align:middle;margin-right:2px;border:1.5px solid var(--text);background:transparent;cursor:pointer;flex-shrink:0;transition:all .12s;`;
-            const aDiamStyle = `display:inline-block;width:8px;height:8px;transform:rotate(45deg);vertical-align:middle;margin-right:4px;border:1.5px solid ${hasAlt?'#B487F8':'#2a1f3d'};background:${useAlt?'#B487F8':'transparent'};cursor:${hasAlt?'pointer':'default'};flex-shrink:0;transition:all .12s;`;
+            const aDiamStyle = `display:inline-block;width:8px;height:8px;transform:rotate(45deg);vertical-align:middle;margin-right:4px;border:1.5px solid ${hasAlt?'var(--violet)':'#2a1f3d'};background:${useAlt?'var(--violet)':'transparent'};cursor:${hasAlt?'pointer':'default'};flex-shrink:0;transition:all .12s;`;
             const altClick = hasAlt ? `onclick="ilAggToggleAlt('${id}')"` : '';
             return `<div style="display:flex;align-items:center;gap:0;padding:2px 0;">
               <span style="${cDiamStyle}" title="Классика"></span>
               <span ${altClick} style="${aDiamStyle}" title="${hasAlt?'Альт (клик для переключения)':'нет альт-версии'}"></span>
-              <span style="font-size:10px;color:${useAlt?'#B487F8':'var(--text2)'};font-family:var(--mono);">${i}${useAlt?' <span style="font-size:8px;color:#7a5090;">альт</span>':''}</span>
+              <span style="font-size:10px;color:${useAlt?'var(--violet)':'var(--text2)'};font-family:var(--mono);">${i}${useAlt?' <span style="font-size:8px;color:#7a5090;">альт</span>':''}</span>
             </div>`;
           }).join('')}
         </div>` : ''}
@@ -9315,7 +9317,7 @@ const _SYS_OPTIMAL = [
 
 function _sysOptimalSection() {
   const agg = _ilAggVote(_SYS_OPTIMAL.map(it => it.id));
-  const SIG_COL = {'buy-strong':'#52F2C9','buy':'#52F2C9','sell':'#FF4D7A','sell-strong':'#FF4D7A','neutral':'#6F648F'};
+  const SIG_COL = {'buy-strong':'var(--green)','buy':'var(--green)','sell':'#FF4D7A','sell-strong':'#FF4D7A','neutral':'#6F648F'};
   const aggCol = agg.sig ? (SIG_COL[agg.sig] || '#6F648F') : '#6F648F';
   const rows = _SYS_OPTIMAL.map((item, i) => {
     const it = agg.items.find(x => x.id === item.id);
@@ -9346,7 +9348,7 @@ function _sysActivateIds(ids) {
   Object.keys(chartInds).forEach(k => { if(chartInds[k]) cpChartToggle(k); });
   ids.forEach(id => { if(!chartInds[id]) cpChartToggle(id); });
   window._cpBatchToggle = false;
-  showToast('✓ ' + ids.length + ' инд. активированы', '#C71B52');
+  showToast('✓ ' + ids.length + ' инд. активированы', 'var(--accent)');
   setTimeout(() => {
     if (chartCandles.length) chartRedraw();
     cpSwitchTab('analysis');
@@ -9396,8 +9398,8 @@ function _sysRenderStaticSections() {
             + '<span id="sysdiam-c-'+id+'" style="display:inline-block;width:11px;height:11px;transform:rotate(45deg);flex-shrink:0;border:1.5px solid '+cBorder+';background:'+cBg+';transition:all .15s;box-shadow:'+cGlow+';"></span>'
             + '</span>';
           // ромб альт — кликабельный если есть альт
-          const aColor = hasAlt ? '#B487F8' : '#2a1f3d';
-          const aBg = useAlt ? '#B487F8' : 'transparent';
+          const aColor = hasAlt ? 'var(--violet)' : '#2a1f3d';
+          const aBg = useAlt ? 'var(--violet)' : 'transparent';
           const aClick = hasAlt ? 'onclick="event.stopPropagation();ilAggToggleAlt(\''+id+'\');_sysUpdateDiam(\''+id+'\')" title="Переключить классика/альт"' : '';
           // обёртка 28px обеспечивает нормальную кликабельную зону
           const aDiam = '<span '+aClick+' style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;cursor:'+(hasAlt?'pointer':'default')+';">'
@@ -9406,13 +9408,13 @@ function _sysRenderStaticSections() {
           return '<div style="display:flex;align-items:center;gap:0;padding:1px 0;">'
             + cDiam
             + aDiam
-            + '<span id="sysname-'+id+'" style="font-size:10px;color:'+(cOn?'var(--text)':useAlt?'#B487F8':'var(--text2)')+';font-family:var(--mono);">'+name+'</span>'
+            + '<span id="sysname-'+id+'" style="font-size:10px;color:'+(cOn?'var(--text)':useAlt?'var(--violet)':'var(--text2)')+';font-family:var(--mono);">'+name+'</span>'
             + '</div>';
         }).join('')
         + '</div>';
     }
     const btn = idsJson
-      ? '<button onclick="_sysActivateIds(' + idsJson.replace(/"/g,"'") + ')" style="margin-top:4px;width:100%;padding:5px;background:rgba(199,27,82,0.12);border:1px solid rgba(199,27,82,0.3);border-radius:6px;color:#C71B52;font-family:var(--mono);font-size:10px;cursor:pointer;letter-spacing:0.04em;">▶ Активировать на графике · Анализ</button>'
+      ? '<button onclick="_sysActivateIds(' + idsJson.replace(/"/g,"'") + ')" style="margin-top:4px;width:100%;padding:5px;background:rgba(199,27,82,0.12);border:1px solid rgba(199,27,82,0.3);border-radius:6px;color:var(--accent);font-family:var(--mono);font-size:10px;cursor:pointer;letter-spacing:0.04em;">▶ Активировать на графике · Анализ</button>'
       : '';
     return '<details style="margin-bottom:8px;border:1px solid rgba(111,124,168,0.2);border-radius:6px;">'
       + '<summary style="cursor:pointer;padding:6px 10px;font-size:10px;color:#8FA3C8;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;list-style:none;display:flex;align-items:center;gap:6px;">'
@@ -9421,16 +9423,16 @@ function _sysRenderStaticSections() {
       + '</details>';
   }
 
-  const NC = '#C71B52', IND = '#60A4A1', CL = '#6F648F';
+  const NC = 'var(--accent)', IND = '#60A4A1', CL = '#6F648F';
 
   el.innerHTML = [
 
     sec('◆', 'Быстрый сигнал — опережающее комбо', [
-      {label:'Идея', lc:'#52F2C9', text:'Три инструмента без существенного лага: <b>ROC</b> (скорость цены), <b>Volume Spike</b> (аномальный объём), <b>VWAP %</b> (отклонение от справедливой цены дня). Показывают не что было, а что происходит прямо сейчас.'},
+      {label:'Идея', lc:'var(--green)', text:'Три инструмента без существенного лага: <b>ROC</b> (скорость цены), <b>Volume Spike</b> (аномальный объём), <b>VWAP %</b> (отклонение от справедливой цены дня). Показывают не что было, а что происходит прямо сейчас.'},
       {label:'ROC / Скорость', lc:IND, text:'(Close − Close[10]) / Close[10] × 100. Нулевой лаг. Пересечение нуля = смена импульса. Значение > +3% или < −3% = сильный направленный импульс.'},
       {label:'Volume Spike', lc:IND, text:'Текущий объём / MA(20) объёма. ×2 = подтверждение. ×4 = крупный игрок. Всплеск на уровне без движения = поглощение. Всплеск с движением = подтверждение пробоя.'},
       {label:'VWAP %', lc:IND, text:'Отклонение от VWAP. >+2% = перегрев, вероятен откат. <−2% = перепроданность внутри дня. Вблизи нуля = равновесие, жди сигнала направления.'},
-      {label:'Чтение', lc:'#B487F8', text:'Все три в одну сторону = высокое доверие. Два из трёх = рабочий сигнал. Один = предупреждение. Важно: на очень волатильном инструменте Volume Spike без ROC = ещё неизвестно в какую сторону пойдёт.'},
+      {label:'Чтение', lc:'var(--violet)', text:'Все три в одну сторону = высокое доверие. Два из трёх = рабочий сигнал. Один = предупреждение. Важно: на очень волатильном инструменте Volume Spike без ROC = ещё неизвестно в какую сторону пойдёт.'},
     ], ['roc','momentum','volspike','vwap']),
 
     sec('◆', 'VSA · Volume Spread Analysis', [
@@ -9596,7 +9598,7 @@ function _sysRenderMarketStructure() {
   // Режим структуры
   let structMode = 'mixed', structColor = '#9B8BAB', structLabel = '';
   if (hiStruct==='HH' && loStruct==='HL') { structMode='bull'; structColor='#3CB371'; structLabel='HH + HL — восходящая структура'; }
-  else if (hiStruct==='LH' && loStruct==='LL') { structMode='bear'; structColor='#C71B52'; structLabel='LH + LL — нисходящая структура'; }
+  else if (hiStruct==='LH' && loStruct==='LL') { structMode='bear'; structColor='var(--accent)'; structLabel='LH + LL — нисходящая структура'; }
   else if (hiStruct==='HH' && loStruct==='LL') { structMode='broken'; structColor='#7A8CFF'; structLabel='HH + LL — структура сломана (переход)'; }
   else if (hiStruct==='LH' && loStruct==='HL') { structMode='broken'; structColor='#7A8CFF'; structLabel='LH + HL — компрессия (треугольник)'; }
   else { structLabel = `Хаи: ${hiStruct} / Лои: ${loStruct}`; }
@@ -10127,7 +10129,7 @@ function _sysRenderSigPairs() {
   const inactive = pairs.filter(p=>!p.ok);
 
   const groupLabel = { max:'Уверенность 95%+', strong:'Уверенность 85-94%', medium:'Уверенность 75-84%', exit:'Сигнал выхода' };
-  const groupCol   = { max:'#FF6A8B', strong:'#7A8CFF', medium:'#6F7CA8', exit:'#60A4A1' };
+  const groupCol   = { max:'var(--negative)', strong:'#7A8CFF', medium:'#6F7CA8', exit:'#60A4A1' };
 
   let html = '';
   if (active.length === 0) {
@@ -10385,7 +10387,7 @@ function _sysRenderPhaseDetector() {
   const maxScore = Math.max(...scores);
   const bestPhase = scores.indexOf(maxScore);
 
-  const phaseColor = ['#6F7CA8','#7A8CFF','#3CB371','#52A8E0','#C71B52'];
+  const phaseColor = ['#6F7CA8','#7A8CFF','#3CB371','#52A8E0','var(--accent)'];
 
   let html = '';
   phases.forEach((ph, pi) => {
@@ -10511,7 +10513,7 @@ function _sysRenderVoltageMap() {
   const fishExtreme = fisherRsi > 1.5;
 
   let verdict = '', vColor = '#6F648F';
-  if (compressedCount >= 3 && fishExtreme) { verdict = 'МАКСИМАЛЬНОЕ СЖАТИЕ — система на пределе. Методы (VSA/Wyckoff/AMT) покажут куда выпустит.'; vColor='#C71B52'; }
+  if (compressedCount >= 3 && fishExtreme) { verdict = 'МАКСИМАЛЬНОЕ СЖАТИЕ — система на пределе. Методы (VSA/Wyckoff/AMT) покажут куда выпустит.'; vColor='var(--accent)'; }
   else if (compressedCount >= 2) { verdict = 'Умеренное сжатие — энергия накапливается. Следи за пульсом VSA и Choppiness.'; vColor='#7A8CFF'; }
   else { verdict = 'Система в движении или нейтральна — компрессии нет.'; vColor='#60A4A1'; }
 
@@ -10541,12 +10543,12 @@ function _sysUpdateDiam(id) {
   }
   const aEl = document.getElementById('sysdiam-a-' + id);
   if (aEl) {
-    aEl.style.background   = useAlt ? '#B487F8' : 'transparent';
-    aEl.style.borderColor  = hasAlt ? '#B487F8' : '#2a1f3d';
+    aEl.style.background   = useAlt ? 'var(--violet)' : 'transparent';
+    aEl.style.borderColor  = hasAlt ? 'var(--violet)' : '#2a1f3d';
     aEl.style.boxShadow    = useAlt ? '0 0 5px rgba(180,135,248,0.5)' : 'none';
   }
   const nEl = document.getElementById('sysname-' + id);
-  if (nEl) nEl.style.color = cOn ? 'var(--text)' : useAlt ? '#B487F8' : 'var(--text2)';
+  if (nEl) nEl.style.color = cOn ? 'var(--text)' : useAlt ? 'var(--violet)' : 'var(--text2)';
 }
 
 function _sysRenderVP() {
@@ -10606,12 +10608,12 @@ function _sysRenderVP() {
     const isPoc = i===pocIdx;
     const isVA = i>=vaLo && i<=vaHi;
     const isNearPrice = Math.abs(price - lastClose) < step;
-    const barColor = isPoc ? '#C71B52' : isVA ? 'rgba(199,27,82,0.35)' : 'rgba(111,100,143,0.3)';
+    const barColor = isPoc ? 'var(--accent)' : isVA ? 'rgba(199,27,82,0.35)' : 'rgba(111,100,143,0.3)';
     const label = price.toFixed(price<100?2:0);
     chartHtml += `<div class="vp-bar-row" style="${isNearPrice?'outline:1px solid rgba(255,255,100,0.4);':''}">`
       + `<div class="vp-bar-label">${label}</div>`
       + `<div class="vp-bar-fill" style="width:${w}%;background:${barColor};"></div>`
-      + (isPoc?'<span style="font-size:8px;color:#C71B52;margin-left:3px;font-family:var(--mono);">POC</span>':'')
+      + (isPoc?'<span style="font-size:8px;color:var(--accent);margin-left:3px;font-family:var(--mono);">POC</span>':'')
       + '</div>';
   }
   chartHtml += '</div>';
@@ -10767,7 +10769,7 @@ function cpInitIndPanel() {
         : 'Значения параметров — классика (без изменений)';
       const _tuneBadge = (ind.params||[]).length
         ? `<span title="${_tuneTitle}" style="font-size:8px;font-family:var(--mono);padding:1px 4px;border-radius:4px;margin-right:2px;flex-shrink:0;
-            color:${_changedParams.length?'#B487F8':'#6F648F'};background:${_changedParams.length?'rgba(180,135,248,0.12)':'rgba(255,255,255,0.03)'};
+            color:${_changedParams.length?'var(--violet)':'#6F648F'};background:${_changedParams.length?'rgba(180,135,248,0.12)':'rgba(255,255,255,0.03)'};
             border:1px solid ${_changedParams.length?'rgba(180,135,248,0.3)':'rgba(255,255,255,0.06)'};">${_changedParams.length?'🎯 изм.':'классика'}</span>`
         : '';
       html += `
@@ -10783,7 +10785,7 @@ function cpInitIndPanel() {
             class="cp-ind-diamond-btn"
             title="${isChart?'Показать/скрыть на графике':'Развернуть'}"
             style="width:10px;height:10px;transform:rotate(45deg);flex-shrink:0;transition:all 0.12s;cursor:pointer;
-              border:1.5px solid ${on?'#C71B52':'rgba(199,27,82,0.4)'};background:${on?'#C71B52':'none'};
+              border:1.5px solid ${on?'var(--accent)':'rgba(199,27,82,0.4)'};background:${on?'var(--accent)':'none'};
               box-shadow:${on?'0 0 6px rgba(199,27,82,0.5)':'none'};"></div>
           <div id="cpaltdiam-${ind.id}" data-indid="${ind.id}"
             class="cp-ind-alt-diamond-btn" style="display:none;"></div>
@@ -10797,7 +10799,7 @@ function cpInitIndPanel() {
         </div>
         <div id="cpdetail-${ind.id}" style="display:none;padding:6px 8px 8px 20px;background:rgba(255,255,255,0.02);border-radius:0 0 7px 7px;border:1px solid rgba(255,255,255,0.05);border-top:none;margin-top:-2px;">
           <div style="font-size:9px;color:#6F648F;line-height:1.5;margin-bottom:6px;">${ind.desc||''}</div>
-          ${(()=>{const pc=(typeof PROS_CONS!=='undefined')&&PROS_CONS[ind.id];if(!pc)return'';return`<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px;"><div style="background:rgba(96,164,161,0.06);border:1px solid rgba(96,164,161,0.18);border-radius:5px;padding:6px 7px;"><div style="font-size:8px;color:#60A4A1;font-family:var(--mono);letter-spacing:0.05em;margin-bottom:3px;">+ ПЛЮСЫ</div>${pc.pros.map(p=>`<div style="font-size:9px;color:var(--text2);padding:1px 0;line-height:1.4;">· ${p}</div>`).join('')}</div><div style="background:rgba(199,27,82,0.06);border:1px solid rgba(199,27,82,0.18);border-radius:5px;padding:6px 7px;"><div style="font-size:8px;color:#FF6A8B;font-family:var(--mono);letter-spacing:0.05em;margin-bottom:3px;">− МИНУСЫ</div>${pc.cons.map(c=>`<div style="font-size:9px;color:var(--text2);padding:1px 0;line-height:1.4;">· ${c}</div>`).join('')}</div></div>`;})()}
+          ${(()=>{const pc=(typeof PROS_CONS!=='undefined')&&PROS_CONS[ind.id];if(!pc)return'';return`<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px;"><div style="background:rgba(96,164,161,0.06);border:1px solid rgba(96,164,161,0.18);border-radius:5px;padding:6px 7px;"><div style="font-size:8px;color:#60A4A1;font-family:var(--mono);letter-spacing:0.05em;margin-bottom:3px;">+ ПЛЮСЫ</div>${pc.pros.map(p=>`<div style="font-size:9px;color:var(--text2);padding:1px 0;line-height:1.4;">· ${p}</div>`).join('')}</div><div style="background:rgba(199,27,82,0.06);border:1px solid rgba(199,27,82,0.18);border-radius:5px;padding:6px 7px;"><div style="font-size:8px;color:var(--negative);font-family:var(--mono);letter-spacing:0.05em;margin-bottom:3px;">− МИНУСЫ</div>${pc.cons.map(c=>`<div style="font-size:9px;color:var(--text2);padding:1px 0;line-height:1.4;">· ${c}</div>`).join('')}</div></div>`;})()}
           ${(ind.params||[]).length ? `<div style="font-size:8px;color:#5a5080;font-family:var(--mono);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:5px;">Параметры</div>` : ''}
           ${(ind.params||[]).map(p => `
           <div style="margin-bottom:7px;">
@@ -10818,13 +10820,13 @@ function cpInitIndPanel() {
           ${(ind.params||[]).length ? `
           <button onclick="cpToggleAutoForm('${ind.id}')"
             style="width:100%;margin-top:5px;padding:4px 8px;background:rgba(180,135,248,0.07);
-              border:1px solid rgba(180,135,248,0.25);border-radius:6px;color:#B487F8;
+              border:1px solid rgba(180,135,248,0.25);border-radius:6px;color:var(--violet);
               font-family:var(--mono);font-size:9px;cursor:pointer;letter-spacing:0.04em;text-align:left;">
             ◆ Авто-настройка параметров
           </button>
           <div id="cpauto-${ind.id}" style="display:none;margin-top:6px;padding:8px;background:rgba(180,135,248,0.05);
             border:1px solid rgba(180,135,248,0.18);border-radius:6px;">
-            <div style="font-size:9px;color:#B487F8;font-family:var(--mono);margin-bottom:7px;letter-spacing:0.04em;">СТРАТЕГИЯ</div>
+            <div style="font-size:9px;color:var(--violet);font-family:var(--mono);margin-bottom:7px;letter-spacing:0.04em;">СТРАТЕГИЯ</div>
             <div style="display:flex;gap:4px;margin-bottom:8px;">
               <button onclick="cpAutoStyleSel('${ind.id}','breakout',this)"
                 data-auto-style="breakout" id="cpas-${ind.id}-breakout"
@@ -10839,13 +10841,13 @@ function cpInitIndPanel() {
                 Разворот
               </button>
             </div>
-            <div style="font-size:9px;color:#B487F8;font-family:var(--mono);margin-bottom:4px;letter-spacing:0.04em;">ГОРИЗОНТ (свечей)</div>
+            <div style="font-size:9px;color:var(--violet);font-family:var(--mono);margin-bottom:4px;letter-spacing:0.04em;">ГОРИЗОНТ (свечей)</div>
             <input type="number" id="cpah-${ind.id}" value="20" min="3" max="500"
               style="width:100%;background:#1A1030;border:1px solid rgba(180,135,248,0.25);border-radius:4px;
                 padding:3px 6px;color:var(--text);font-family:var(--mono);font-size:10px;outline:none;margin-bottom:8px;">
             <button onclick="cpApplyAuto('${ind.id}')"
               style="width:100%;padding:5px;background:rgba(180,135,248,0.15);border:1px solid rgba(180,135,248,0.4);
-                border-radius:6px;color:#B487F8;font-family:var(--mono);font-size:9px;cursor:pointer;letter-spacing:0.05em;">
+                border-radius:6px;color:var(--violet);font-family:var(--mono);font-size:9px;cursor:pointer;letter-spacing:0.05em;">
               ◆ Рассчитать и применить
             </button>
             <div id="cpautores-${ind.id}" style="font-size:9px;color:var(--text3);line-height:1.5;margin-top:6px;"></div>
@@ -10920,7 +10922,7 @@ function cpAutoStyleSel(id, style, btn) {
     const active = s === style;
     b.style.background = active ? 'rgba(180,135,248,0.18)' : 'rgba(255,255,255,0.04)';
     b.style.borderColor = active ? 'rgba(180,135,248,0.5)' : 'rgba(255,255,255,0.12)';
-    b.style.color = active ? '#B487F8' : 'var(--text3)';
+    b.style.color = active ? 'var(--violet)' : 'var(--text3)';
   });
   btn._selected = true;
 }
@@ -11033,7 +11035,7 @@ function _cpRefreshTuneBadge(ind) {
     ? 'Изменено автотюном: ' + changed.map(p => `${p.label} ${p.def}→${cpIndVals[ind.id][p.id]}`).join(', ')
     : 'Значения параметров — классика (без изменений)';
   el.innerHTML = `<span title="${title}" style="font-size:8px;font-family:var(--mono);padding:1px 4px;border-radius:4px;margin-right:2px;flex-shrink:0;
-    color:${changed.length?'#B487F8':'#6F648F'};background:${changed.length?'rgba(180,135,248,0.12)':'rgba(255,255,255,0.03)'};
+    color:${changed.length?'var(--violet)':'#6F648F'};background:${changed.length?'rgba(180,135,248,0.12)':'rgba(255,255,255,0.03)'};
     border:1px solid ${changed.length?'rgba(180,135,248,0.3)':'rgba(255,255,255,0.06)'};">${changed.length?'🎯 изм.':'классика'}</span>`;
 }
 
@@ -11080,7 +11082,7 @@ function _globalAutoTune() {
   const tfLabel = {'1':'1м','5':'5м','15':'15м','30':'30м','60':'1ч','1440':'1д','10080':'1н'}[String(_tfBm2)] || _tfBm2;
   const info = `TF ${tfLabel} · ${style||'нейтр.'} · горизонт ${hz}св → обновлено полей: ${new Set(applied).size}`;
   if (statusEl) { statusEl.textContent = info; statusEl.style.display = 'block'; }
-  showToast?.('✓ Параметры рассчитаны', '#52F2C9');
+  showToast?.('✓ Параметры рассчитаны', 'var(--green)');
 }
 
 function _globalAutoReset() {
@@ -11099,7 +11101,7 @@ function _globalAutoReset() {
   });
   const statusEl = document.getElementById('cp-global-status');
   if (statusEl) statusEl.style.display = 'none';
-  showToast?.('↺ Параметры сброшены', '#B487F8');
+  showToast?.('↺ Параметры сброшены', 'var(--violet)');
 }
 
 function cpApplyAuto(id) {
@@ -11124,7 +11126,7 @@ function cpApplyAuto(id) {
 
   if (resEl) {
     const changed = Object.entries(res.params).map(([k,v]) => `${k}=${v}`).join(', ');
-    resEl.innerHTML = `<span style="color:#B487F8;">◆ ${changed}</span><br><span style="color:#5a5080;">${res.explain}</span>`;
+    resEl.innerHTML = `<span style="color:var(--violet);">◆ ${changed}</span><br><span style="color:#5a5080;">${res.explain}</span>`;
   }
 }
 
@@ -11223,7 +11225,7 @@ function _cpUpdateIndNow(id) {
     const badgeEl  = document.getElementById('cpbadge-'  + id);
     if (interpEl) {
       interpEl.textContent = res.t || '—';
-      const sigCols = { 'buy-strong':'#52F2C9','buy':'#52F2C9','sell-strong':'#FF4D7A','sell':'#FF4D7A','neutral':'#6F648F','warn':'#52A8E0' };
+      const sigCols = { 'buy-strong':'var(--green)','buy':'var(--green)','sell-strong':'#FF4D7A','sell':'#FF4D7A','neutral':'#6F648F','warn':'#52A8E0' };
       interpEl.style.borderLeftColor = sigCols[res.s] || '#6F648F';
     }
     if (badgeEl) setPill('cpbadge-' + id, res.s);
@@ -11244,7 +11246,7 @@ function cpChartToggle(id) {
   const diam = document.getElementById('cpdiam-' + id);
   const btn  = document.getElementById('cpchartbtn-' + id);
   if (row)  { row.style.borderColor = on?'rgba(255,0,110,0.25)':'transparent'; row.style.background = on?'rgba(255,0,110,0.07)':'transparent'; }
-  if (diam) { diam.style.borderColor = on?'#C71B52':'rgba(199,27,82,0.4)'; diam.style.background = on?'#C71B52':'none'; diam.style.boxShadow = on?'0 0 6px rgba(199,27,82,0.5)':'none'; }
+  if (diam) { diam.style.borderColor = on?'var(--accent)':'rgba(199,27,82,0.4)'; diam.style.background = on?'var(--accent)':'none'; diam.style.boxShadow = on?'0 0 6px rgba(199,27,82,0.5)':'none'; }
   if (btn) {
     btn.textContent = on ? '✓ На графике' : 'На график';
     btn.style.background = on ? 'rgba(255,0,110,0.12)' : 'rgba(255,255,255,0.04)';
@@ -11295,7 +11297,7 @@ chartToggleInd = function(id, rowEl) {
   // sync diamond in new panel
   const on = !!chartInds[id];
   const diam = document.getElementById('cpdiam-' + id);
-  if (diam) { diam.style.borderColor = on?'#C71B52':'rgba(199,27,82,0.4)'; diam.style.background = on?'#C71B52':'none'; diam.style.boxShadow = on?'0 0 6px rgba(199,27,82,0.5)':'none'; }
+  if (diam) { diam.style.borderColor = on?'var(--accent)':'rgba(199,27,82,0.4)'; diam.style.background = on?'var(--accent)':'none'; diam.style.boxShadow = on?'0 0 6px rgba(199,27,82,0.5)':'none'; }
   const btn = document.getElementById('cpchartbtn-' + id);
   if (btn) btn.textContent = on ? '✓ На графике' : 'На график';
 };
@@ -11436,7 +11438,7 @@ function _cpShowTooltip(idx, e, canvas) {
   const isUp = c.close >= c.open;
   const chg = c.open ? ((c.close - c.open) / c.open * 100).toFixed(2) : '0.00';
   const fmtV = v => v >= 1e6 ? (v/1e6).toFixed(2)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : v;
-  const col = isUp ? '#52F2C9' : '#FF4D7A';
+  const col = isUp ? 'var(--green)' : '#FF4D7A';
 
   let h = '<div style="font-size:9px;color:#6F648F;margin-bottom:4px;">';
   if (c.time) {
@@ -11460,11 +11462,11 @@ function _cpShowTooltip(idx, e, canvas) {
     h += `<div style="margin-bottom:3px;"><span style="color:#6F648F">Объём </span><b>${fmtV(c.vol)}</b></div>`;
     const bw = pctBuy;
     h += `<div style="display:flex;height:5px;border-radius:3px;overflow:hidden;gap:1px;margin-bottom:3px;">`;
-    h += `<div style="width:${bw}%;background:#52F2C9;opacity:0.75;"></div>`;
-    h += `<div style="flex:1;background:#C71B52;opacity:0.75;"></div></div>`;
+    h += `<div style="width:${bw}%;background:var(--green);opacity:0.75;"></div>`;
+    h += `<div style="flex:1;background:var(--accent);opacity:0.75;"></div></div>`;
     h += `<div style="display:flex;justify-content:space-between;font-size:9px;">`;
-    h += `<span style="color:#52F2C9">▲${fmtV(buyVol)} (${pctBuy}%)</span>`;
-    h += `<span style="color:#FF6A8B">▼${fmtV(sellVol)} (${100-pctBuy}%)</span>`;
+    h += `<span style="color:var(--green)">▲${fmtV(buyVol)} (${pctBuy}%)</span>`;
+    h += `<span style="color:var(--negative)">▼${fmtV(sellVol)} (${100-pctBuy}%)</span>`;
     h += `</div>`;
   }
 
@@ -11624,12 +11626,12 @@ function _drawXhair(idx, mx, my) {
   if (_hoverMode !== 'vol') {
     html += `<div style="color:var(--text3);margin-bottom:3px;font-size:9px;">${date}</div>`;
     html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px 10px;">`;
-    html += `<div><span style="color:#6F648F">ОТКР</span> <span style="color:${isUp?'#52F2C9':'#FF4D7A'}">${c.open?.toFixed(2)}</span></div>`;
+    html += `<div><span style="color:#6F648F">ОТКР</span> <span style="color:${isUp?'var(--green)':'#FF4D7A'}">${c.open?.toFixed(2)}</span></div>`;
     html += `<div><span style="color:#6F648F">МАКС</span> <span>${c.high?.toFixed(2)}</span></div>`;
-    html += `<div><span style="color:#6F648F">ЗАКР</span> <span style="color:${isUp?'#52F2C9':'#FF4D7A'}">${c.close?.toFixed(2)}</span></div>`;
+    html += `<div><span style="color:#6F648F">ЗАКР</span> <span style="color:${isUp?'var(--green)':'#FF4D7A'}">${c.close?.toFixed(2)}</span></div>`;
     html += `<div><span style="color:#6F648F">МИН</span>  <span>${c.low?.toFixed(2)}</span></div>`;
     html += `</div>`;
-    html += `<div style="font-size:9px;color:${isUp?'#52F2C9':'#FF4D7A'};margin-top:2px;">${isUp?'▲':'▼'} ${chg}%</div>`;
+    html += `<div style="font-size:9px;color:${isUp?'var(--green)':'#FF4D7A'};margin-top:2px;">${isUp?'▲':'▼'} ${chg}%</div>`;
   }
   if (_hoverMode !== 'ohlc') {
     if (html) html += `<div style="border-top:1px solid rgba(255,255,255,0.07);margin:4px 0;"></div>`;
@@ -11638,11 +11640,11 @@ function _drawXhair(idx, mx, my) {
     // Volume bar
     const bw = Math.round(pctBuy);
     html += `<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin:4px 0 2px;gap:1px;">`;
-    html += `<div style="width:${bw}%;background:#52F2C9;opacity:0.7;border-radius:3px 0 0 3px;"></div>`;
-    html += `<div style="flex:1;background:#C71B52;opacity:0.7;border-radius:0 3px 3px 0;"></div></div>`;
+    html += `<div style="width:${bw}%;background:var(--green);opacity:0.7;border-radius:3px 0 0 3px;"></div>`;
+    html += `<div style="flex:1;background:var(--accent);opacity:0.7;border-radius:0 3px 3px 0;"></div></div>`;
     html += `<div style="display:flex;justify-content:space-between;font-size:9px;">`;
-    html += `<span style="color:#52F2C9">▲ ${volFmt(buyVol)} (${pctBuy}%)</span>`;
-    html += `<span style="color:#FF6A8B">▼ ${volFmt(sellVol)} (${100-parseInt(pctBuy)}%)</span></div>`;
+    html += `<span style="color:var(--green)">▲ ${volFmt(buyVol)} (${pctBuy}%)</span>`;
+    html += `<span style="color:var(--negative)">▼ ${volFmt(sellVol)} (${100-parseInt(pctBuy)}%)</span></div>`;
   }
 
   const tip = document.getElementById('chart-tooltip');
@@ -11935,7 +11937,7 @@ renderCmpTable = function() {
   const grid=document.getElementById('cmp-grid'), wrap=document.getElementById('cmp-table-wrap'),
         empty=document.getElementById('cmp-empty'), cnt=document.getElementById('cmp-count');
   if (!grid) return;
-  const COL={buy:'#52F2C9','buy-strong':'#52F2C9',sell:'#FF4D7A','sell-strong':'#FF4D7A',neutral:'#6F648F'};
+  const COL={buy:'var(--green)','buy-strong':'var(--green)',sell:'#FF4D7A','sell-strong':'#FF4D7A',neutral:'#6F648F'};
   const DIR={buy:'↑ Покупка',sell:'↓ Продажа',neutral:'→ Нейтрально'};
   if (!cmpData.length) {
     if(wrap)wrap.style.display='none'; if(empty)empty.style.display='block'; if(cnt)cnt.textContent=''; return;
@@ -11949,7 +11951,7 @@ renderCmpTable = function() {
     return `<div style="background:rgba(26,16,48,0.85);border:1px solid rgba(255,255,255,0.06);border-radius:14px;overflow:hidden;">
       <div style="padding:10px 14px 8px;display:flex;align-items:flex-start;gap:8px;border-bottom:1px solid rgba(255,255,255,0.04);">
         <div style="flex:1;"><div style="font-size:14px;font-weight:700;color:var(--text);font-family:var(--mono);">${item.ticker}</div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);">${item.tf}</div></div>
-        <div style="text-align:right;"><div style="font-size:16px;font-weight:700;color:var(--text);font-family:var(--mono);">${item.price}</div><div style="font-size:11px;font-family:var(--mono);color:${chg>=0?'#52F2C9':'#FF4D7A'};">${chg>=0?'+':''}${item.change}%</div></div>
+        <div style="text-align:right;"><div style="font-size:16px;font-weight:700;color:var(--text);font-family:var(--mono);">${item.price}</div><div style="font-size:11px;font-family:var(--mono);color:${chg>=0?'var(--green)':'#FF4D7A'};">${chg>=0?'+':''}${item.change}%</div></div>
         <button onclick="cmpData.splice(${i},1);renderCmpTable();" style="background:none;border:1px solid rgba(255,255,255,0.07);border-radius:5px;color:var(--text3);font-size:10px;cursor:pointer;padding:2px 7px;flex-shrink:0;">✕</button>
       </div>
       ${item.snapshot?.length?`<div style="padding:6px 10px 0;background:rgba(10,6,21,0.4);"><canvas id="cmp-mini-${i}" height="52" style="width:100%;display:block;border-radius:3px;"></canvas></div>`:''}
@@ -11973,7 +11975,7 @@ renderCmpTable = function() {
       const W=cv.offsetWidth,H=cv.offsetHeight;
       const cl=item.snapshot.map(c=>c.close), mn=Math.min(...cl), mx=Math.max(...cl), rng=mx-mn||1;
       const toY=v=>H-((v-mn)/rng)*H*0.8-H*0.1, toX=(j,n)=>(j/(n-1))*W;
-      const isUp=cl[cl.length-1]>=cl[0], col2=isUp?'#52F2C9':'#FF4D7A';
+      const isUp=cl[cl.length-1]>=cl[0], col2=isUp?'var(--green)':'#FF4D7A';
       ctx.clearRect(0,0,W,H);
       ctx.beginPath(); ctx.moveTo(toX(0,cl.length),toY(cl[0]));
       cl.forEach((v,j)=>ctx.lineTo(toX(j,cl.length),toY(v)));
@@ -11991,7 +11993,7 @@ renderCmpTable = function() {
 // renderGuide override — horizontal cards
 renderGuide = function() {
   const el=document.getElementById('guide-scroll'); if(!el) return;
-  const CAT_COL={trend:'#52F2C9',reversal:'#52A8E0',bounce:'#4cc9f0',breakout:'#FF006E',flat:'#A79BC9'};
+  const CAT_COL={trend:'var(--green)',reversal:'#52A8E0',bounce:'#4cc9f0',breakout:'#FF006E',flat:'#A79BC9'};
   const CAT_LBL={trend:'Тренд',reversal:'Разворот',bounce:'Отскок',breakout:'Пробой',flat:'Флэт'};
   const filtered=GUIDE_PATTERNS.filter(p=>guideFilter==='all'||p.cat===guideFilter);
   el.innerHTML=filtered.map(p=>{
@@ -12001,7 +12003,7 @@ renderGuide = function() {
       <div style="padding:10px 12px 8px;border-bottom:1px solid rgba(255,255,255,0.04);">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
           <span style="font-size:9px;padding:1px 6px;border-radius:8px;background:${col}22;color:${col};font-family:var(--mono);border:1px solid ${col}44;">${CAT_LBL[p.cat]||p.cat}</span>
-          <span style="font-size:9px;color:#52F2C9;font-family:var(--mono);">${rel}</span>
+          <span style="font-size:9px;color:var(--green);font-family:var(--mono);">${rel}</span>
         </div>
         <div style="font-size:12px;font-weight:700;color:var(--text);line-height:1.3;">${p.name}</div>
       </div>
@@ -12061,7 +12063,7 @@ async function cpLoadMoex() {
     else if(chg7>1.5&&chg30<-5)ctx='↗ Восстановление — отскок';
     else if(Math.abs(chg7)<1.5)ctx='↔ Флэт — диапазон, поддержка';
     if(pe)pe.textContent=last.close.toFixed(2);
-    if(ce){ce.textContent=`${chgD>=0?'+':''}${chgD.toFixed(2)}%`;ce.style.color=chgD>=0?'#52F2C9':'#FF4D7A';}
+    if(ce){ce.textContent=`${chgD>=0?'+':''}${chgD.toFixed(2)}%`;ce.style.color=chgD>=0?'var(--green)':'#FF4D7A';}
     if(xe)xe.textContent=`7д: ${chg7>=0?'+':''}${chg7.toFixed(1)}%  30д: ${chg30>=0?'+':''}${chg30.toFixed(1)}%  ·  ${ctx}`;
   }catch(e){if(pe)pe.textContent='—';if(xe)xe.textContent='';}
 }
@@ -12886,7 +12888,7 @@ function ilDetectRegime(closes, c, i) {
   // Стресс
   if(i>=3){const d3=(price-closes[i-3])/closes[i-3]; if(d3<-0.06)labels.push('Распродажа');}
   if(!labels.length)labels.push('— Нейтрально');
-  const color=regime.includes('trend_up')?'#52F2C9':regime.includes('trend_dn')?'#FF4D7A':regime.includes('range')?'#A78BFA':'var(--text3)';
+  const color=regime.includes('trend_up')?'var(--green)':regime.includes('trend_dn')?'#FF4D7A':regime.includes('range')?'#A78BFA':'var(--text3)';
   return {labels,color};
 }
 
@@ -13848,12 +13850,12 @@ function anSwitchTab(tab) {
   if (tab === 'single') {
     if(single) single.style.display = '';
     if(multi)  multi.style.display  = 'none';
-    if(btnS) { btnS.style.borderBottomColor='#C71B52'; btnS.style.color='#C71B52'; }
+    if(btnS) { btnS.style.borderBottomColor='var(--accent)'; btnS.style.color='var(--accent)'; }
     if(btnM) { btnM.style.borderBottomColor='transparent'; btnM.style.color='var(--text3)'; }
   } else {
     if(single) single.style.display = 'none';
     if(multi)  multi.style.display  = '';
-    if(btnM) { btnM.style.borderBottomColor='#C71B52'; btnM.style.color='#C71B52'; }
+    if(btnM) { btnM.style.borderBottomColor='var(--accent)'; btnM.style.color='var(--accent)'; }
     if(btnS) { btnS.style.borderBottomColor='transparent'; btnS.style.color='var(--text3)'; }
   }
 }
@@ -13867,7 +13869,7 @@ function anSetTF(btn) {
   });
   btn.classList.add('active');
   btn.style.background = 'rgba(82,242,201,0.12)';
-  btn.style.color = '#52F2C9';
+  btn.style.color = 'var(--green)';
   btn.style.borderColor = 'rgba(82,242,201,0.4)';
 }
 
@@ -14102,7 +14104,7 @@ async function ilRunAnalysis() {
 // Смысловые группы индикаторов
 const _IL_GROUPS = [
   { label: 'Осциллятор / перекупленность',  color: '#A78BFA', ids: ['rsi','wr','cci','mfi','stoch','cmo','tsi','ult_osc'] },
-  { label: 'Тренд / импульс',               color: '#52F2C9', ids: ['macd','ao','ema','adx','fisher','parabolic','supertrend'] },
+  { label: 'Тренд / импульс',               color: 'var(--green)', ids: ['macd','ao','ema','adx','fisher','parabolic','supertrend'] },
   { label: 'Канал / волатильность',          color: '#FF9F40', ids: ['bb','keltner','envelopes','donchian','hist_vol','bb_pct','bb_width'] },
   { label: 'Объём / деньги',                color: '#60A4A1', ids: ['obv','acc_dist','chaikin_osc','cmf','mfi','elder_ray','force_idx','pvt','vo'] },
   { label: 'Структура / цикл',              color: '#6366F1', ids: ['ichimoku','alligator','zigzag','fractals','dpo','chop','vortex','cyber_cycle','mama','ebs','ssa'] },
@@ -14129,7 +14131,7 @@ function cpInitAltDiamonds() {
 function _ilCopyTable(containerId, fmt) {
   const cont = document.getElementById(containerId);
   const table = cont?.querySelector('table');
-  if (!table) { showToast?.('⚠ Таблица не найдена', '#C71B52'); return; }
+  if (!table) { showToast?.('⚠ Таблица не найдена', 'var(--accent)'); return; }
   const rows = [...table.querySelectorAll('tr')].map(tr =>
     [...tr.querySelectorAll('th,td')].map(c => c.textContent.replace(/\s+/g,' ').trim())
   ).filter(r=>r.length);
@@ -14143,8 +14145,8 @@ function _ilCopyTable(containerId, fmt) {
     text = rows.map(r=>r.join('\t')).join('\n');
   }
   navigator.clipboard.writeText(text).then(
-    ()=>showToast?.('✓ Скопировано ('+(fmt==='md'?'Markdown':'TSV')+')', '#52F2C9'),
-    ()=>showToast?.('⚠ Не удалось скопировать', '#C71B52')
+    ()=>showToast?.('✓ Скопировано ('+(fmt==='md'?'Markdown':'TSV')+')', 'var(--green)'),
+    ()=>showToast?.('⚠ Не удалось скопировать', 'var(--accent)')
   );
 }
 
@@ -14171,7 +14173,7 @@ function ilRenderAnalysis() {
   const h5lbl = hLbl(5), h10lbl = hLbl(10), h15lbl = hLbl(15), h30lbl = hLbl(30);
 
   // Цвета: достаточно яркие для тёмного фона
-  const _accColor=(p)=>p>=62?'#52F2C9':p>=55?'#B487F8':p<=45?'#FF6A8B':'#6a6090';
+  const _accColor=(p)=>p>=62?'var(--green)':p>=55?'var(--violet)':p<=45?'var(--negative)':'#6a6090';
   const acc=(s)=>{
     if(!s||s.acc==null||s.n<5) return '<span style="color:#3a3260">—</span>';
     const p=Math.round(s.acc*100);
@@ -14202,14 +14204,14 @@ function ilRenderAnalysis() {
 
   // Легенда
   html+=`<div style="margin-bottom:14px;font-size:10px;font-family:var(--mono);color:#7870a0;line-height:1.9;">
-    <span style="color:#52F2C9">≥62%</span> — устойчивый сигнал &nbsp;·&nbsp;
-    <span style="color:#B487F8">55–61%</span> — умеренный &nbsp;·&nbsp;
+    <span style="color:var(--green)">≥62%</span> — устойчивый сигнал &nbsp;·&nbsp;
+    <span style="color:var(--violet)">55–61%</span> — умеренный &nbsp;·&nbsp;
     <span style="color:#7870a0">&lt;55%</span> — случайный &nbsp;·&nbsp;
-    <span style="color:#FF6A8B">≤45%</span> — антисигнал<br>
-    <span style="color:#52F2C9">Зелёный</span> Тренд/Бок = лучше в тренде &nbsp;·&nbsp;
+    <span style="color:var(--negative)">≤45%</span> — антисигнал<br>
+    <span style="color:var(--green)">Зелёный</span> Тренд/Бок = лучше в тренде &nbsp;·&nbsp;
     <span style="color:#C9A0FF">Фиолетовый</span> = лучше в боковике<br>
     <span style="color:#6a6090">Горизонты (общая точность):</span> <span style="color:#a898c8">${h5lbl}</span> / <span style="color:#a898c8">${h10lbl}</span> / <span style="color:#a898c8">${h15lbl}</span> / <span style="color:#a898c8">${h30lbl}</span><br>
-    <span style="color:#6a6090">Режимы (точность при горизонте ${h15lbl}):</span> <span style="color:#52F2C9">Тренд</span> · <span style="color:#C9A0FF">Бок</span> · <span style="color:#FF9F40">Выс.вол</span> · <span style="color:#7CC7FF">Низ.вол</span><br>
+    <span style="color:#6a6090">Режимы (точность при горизонте ${h15lbl}):</span> <span style="color:var(--green)">Тренд</span> · <span style="color:#C9A0FF">Бок</span> · <span style="color:#FF9F40">Выс.вол</span> · <span style="color:#7CC7FF">Низ.вол</span><br>
     <span style="color:#6a6090">Строка «↳ альт-сигнал»</span> — своя обоснованная альтернативная формула на категорию (это бэктестируемый числовой ряд, НЕ то же самое, что текстовые заметки «неклассически» на странице «Методы» — там качественные подсказки по VSA/Wyckoff, здесь — отдельная формула с собственной точностью): осцилляторы — дивергенция по экстремумам цены/индикатора; тренд — климакс-истощение серии экстремумов (или истощение изолированного спайка для событийных сигналов типа EMA-кросса); канал — band-walk (серия касаний границы ≠ разворот); объём — VSA-дивергенция цена/объём, привязанная к собственному сигналу индикатора; структура/цикл — инверсия в боковике (Chop≥61.8); DSP-фильтры — непродтверждённый флип знака (с учётом флипа через ноль). У части индикаторов вне этих 6 категорий обоснованной формулы нет — «—» честно, а не подмена.
   </div>`;
 
@@ -14261,7 +14263,7 @@ function ilRenderAnalysis() {
       const d15T=r.stats[id].h15DefT, d15R=r.stats[id].h15DefR, d15HV=r.stats[id].h15DefHV, d15LV=r.stats[id].h15DefLV;
       const adaptP = r.adaptiveChosen && r.adaptiveChosen[id];
       const suffix = adaptP ? `🎯(${adaptP})` : (r.testParams ? _anParamSuffix(id, r.testParams) : '');
-      const nameLbl = `${IL_NAMES[id]||id}<span style="color:${adaptP?'#B487F8':'#7868a8'};font-size:9px;font-family:var(--mono);">${suffix}</span>`;
+      const nameLbl = `${IL_NAMES[id]||id}<span style="color:${adaptP?'var(--violet)':'#7868a8'};font-size:9px;font-family:var(--mono);">${suffix}</span>`;
       const classicLbl = suffix ? `↳ классика` : `↳ альт-сигнал`;
       html+=`<tr style="border-top:1px solid #180f28;">
         <td style="padding:5px 8px;color:#c0b8d8;vertical-align:middle;">${nameLbl}</td>
@@ -14318,7 +14320,7 @@ function ilRenderAnalysis() {
       const d15Tb=r.stats[id].h15DefT,d15Rb=r.stats[id].h15DefR,d15HVb=r.stats[id].h15DefHV,d15LVb=r.stats[id].h15DefLV;
       const adaptP2=r.adaptiveChosen&&r.adaptiveChosen[id];
       const sfx2=adaptP2?`🎯(${adaptP2})`:(r.testParams?_anParamSuffix(id,r.testParams):'');
-      html+=`<tr style="border-top:1px solid #1a1028;"><td style="padding:4px 8px;color:#c0b8d8;vertical-align:middle;">${IL_NAMES[id]||id}<span style="color:${adaptP2?'#B487F8':'#7868a8'};font-size:9px;">${sfx2}</span></td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s5)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s10)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s15)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s30)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;border-left:1px solid #2a1f3d;">${regAcc(s15T)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15R)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15HV)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15LV)}</td></tr>
+      html+=`<tr style="border-top:1px solid #1a1028;"><td style="padding:4px 8px;color:#c0b8d8;vertical-align:middle;">${IL_NAMES[id]||id}<span style="color:${adaptP2?'var(--violet)':'#7868a8'};font-size:9px;">${sfx2}</span></td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s5)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s10)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s15)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s30)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;border-left:1px solid #2a1f3d;">${regAcc(s15T)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15R)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15HV)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15LV)}</td></tr>
       ${hasDef2?`<tr style="border-top:1px dashed #1a1028;"><td style="padding:3px 8px 2px 18px;color:#52a890;font-style:italic;font-size:10px;vertical-align:middle;">↳ классика</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${acc(d5b)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${acc(d10b)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${acc(d15b)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${acc(d30b)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;border-left:1px solid #2a1f3d;">${regAcc(d15Tb)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${regAcc(d15Rb)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${regAcc(d15HVb)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${regAcc(d15LVb)}</td></tr>`:''}
       <tr style="border-top:1px dashed #1a1028;"><td style="padding:3px 8px 6px 18px;color:#7068a0;font-style:italic;font-size:10px;vertical-align:middle;">↳ альт-сигнал</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a5)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a10)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a15)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a30)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;border-left:1px solid #2a1f3d;">${regAccAlt(a15T)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${regAccAlt(a15R)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${regAccAlt(a15HV)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${regAccAlt(a15LV)}</td></tr>`;
     });
@@ -14350,8 +14352,8 @@ function ilRenderAnalysis() {
     const sa=r.statsAlt&&r.statsAlt[id]&&r.statsAlt[id].h15; const pa=sa&&sa.acc!=null&&sa.n>=5?Math.round(sa.acc*100):null;
     const hasAlt=hasAltSet.has(id);
     html+=`<div style="display:flex;align-items:center;gap:7px;padding:3px 10px;font-size:10px;font-family:var(--mono);">
-      ${_diam(id,'an-diam-c','#52F2C9','Классика')}
-      ${hasAlt?_diam(id,'an-diam-a','#B487F8','Альт-сигнал'):'<span style="display:inline-block;width:9px;height:9px;flex-shrink:0;opacity:0;"></span>'}
+      ${_diam(id,'an-diam-c','var(--green)','Классика')}
+      ${hasAlt?_diam(id,'an-diam-a','var(--violet)','Альт-сигнал'):'<span style="display:inline-block;width:9px;height:9px;flex-shrink:0;opacity:0;"></span>'}
       <span style="flex:1;color:var(--text2);">${IL_NAMES[id]||id}</span>
       ${pc!=null?`<span style="color:${_accColor(pc)};min-width:28px;text-align:right;">${pc}%</span>`:''}
       ${hasAlt&&pa!=null?`<span style="color:${_accColor(pa)};min-width:28px;text-align:right;opacity:.7;">${pa}%</span>`:'<span style="min-width:28px;"></span>'}
@@ -14359,8 +14361,8 @@ function ilRenderAnalysis() {
   });
   html+=`</div>
     <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap;">
-      <button onclick="ilSelectBestCombo()" style="padding:4px 10px;background:rgba(82,242,201,0.06);border:1px solid rgba(82,242,201,0.2);border-radius:6px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">Лучшие классика</button>
-      <button onclick="ilSelectBestAltCombo()" style="padding:4px 10px;background:rgba(180,135,248,0.06);border:1px solid rgba(180,135,248,0.2);border-radius:6px;color:#B487F8;font-family:var(--mono);font-size:10px;cursor:pointer;">Лучшие альт</button>
+      <button onclick="ilSelectBestCombo()" style="padding:4px 10px;background:rgba(82,242,201,0.06);border:1px solid rgba(82,242,201,0.2);border-radius:6px;color:var(--green);font-family:var(--mono);font-size:10px;cursor:pointer;">Лучшие классика</button>
+      <button onclick="ilSelectBestAltCombo()" style="padding:4px 10px;background:rgba(180,135,248,0.06);border:1px solid rgba(180,135,248,0.2);border-radius:6px;color:var(--violet);font-family:var(--mono);font-size:10px;cursor:pointer;">Лучшие альт</button>
       <button onclick="ilCalcSelectedCombo()" style="padding:4px 10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:var(--text2);font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Рассчитать</button>
     </div>
     <div id="an-combo-result" style="font-size:10px;font-family:var(--mono);color:var(--text2);min-height:36px;"></div>
@@ -14371,7 +14373,7 @@ function ilRenderAnalysis() {
 function _ilSyncDiamonds() {
   document.querySelectorAll('.an-cb-c,.an-cb-a').forEach(cb=>{
     const cls = cb.classList.contains('an-cb-c') ? 'an-diam-c' : 'an-diam-a';
-    const color = cb.classList.contains('an-cb-c') ? '#52F2C9' : '#B487F8';
+    const color = cb.classList.contains('an-cb-c') ? 'var(--green)' : 'var(--violet)';
     const diam = document.querySelector(`.${cls}[data-id="${cb.dataset.id}"]`);
     if (!diam) return;
     if (cb.checked) { diam.classList.add('on'); diam.style.background=color; diam.style.boxShadow=`0 0 5px ${color}`; }
@@ -14409,12 +14411,12 @@ function ilCalcSelectedCombo() {
   const btRow=(h)=>{
     const s=_ilBtStats(compArr,closes,h,null);
     if(!s.acc||s.n<5)return `H${h}: —`;
-    const c=s.acc>=0.55?'#52F2C9':s.acc>=0.50?'var(--text2)':'#FF4D7A';
-    return `H${h}: <span style="color:${c}">${(s.acc*100).toFixed(0)}%</span> acc, IG <span style="color:${s.ig>0?'#52F2C9':'#FF4D7A'}">${s.ig>0?'+':''}${(s.ig*100).toFixed(1)}%</span> (n=${s.n})`;
+    const c=s.acc>=0.55?'var(--green)':s.acc>=0.50?'var(--text2)':'#FF4D7A';
+    return `H${h}: <span style="color:${c}">${(s.acc*100).toFixed(0)}%</span> acc, IG <span style="color:${s.ig>0?'var(--green)':'#FF4D7A'}">${s.ig>0?'+':''}${(s.ig*100).toFixed(1)}%</span> (n=${s.n})`;
   };
   const parts=[];
-  if(selC.length) parts.push(`<span style="color:#52F2C9">кл: ${selC.map(id=>IL_NAMES[id]||id).join(', ')}</span>`);
-  if(selA.length) parts.push(`<span style="color:#B487F8">альт: ${selA.map(id=>IL_NAMES[id]||id).join(', ')}</span>`);
+  if(selC.length) parts.push(`<span style="color:var(--green)">кл: ${selC.map(id=>IL_NAMES[id]||id).join(', ')}</span>`);
+  if(selA.length) parts.push(`<span style="color:var(--violet)">альт: ${selA.map(id=>IL_NAMES[id]||id).join(', ')}</span>`);
   el.innerHTML=`<div style="margin-bottom:6px;color:var(--text3);font-size:9px;">Выбрано: ${parts.join(' + ')}</div><div>${btRow(5)}</div><div>${btRow(15)}</div><div>${btRow(30)}</div>`;
 }
 
@@ -14516,17 +14518,17 @@ function ilRenderMultiComp(tfLabel) {
   const fmtAcc = (v,bold)=>{
     if(v==null) return '<td style="color:#2a2050;text-align:center;font-size:10px;">—</td>';
     let col='#7870a0';
-    if(v>=62) col='#52F2C9'; else if(v>=55) col='#B487F8'; else if(v<=45) col='#FF6A8B';
+    if(v>=62) col='var(--green)'; else if(v>=55) col='var(--violet)'; else if(v<=45) col='var(--negative)';
     return `<td style="text-align:center;font-size:10px;color:${col};${bold?'font-weight:700;':''}">${v}%</td>`;
   };
   const fmtDelta = (cl,alt)=>{
     if(cl==null||alt==null) return '<td style="color:#2a2050;text-align:center;font-size:9px;">—</td>';
     const d=alt-cl;
-    const col=d>0?'#52F2C9':d<0?'#FF6A8B':'#5a5070';
+    const col=d>0?'var(--green)':d<0?'var(--negative)':'#5a5070';
     return `<td style="text-align:center;font-size:9px;color:${col};">${d>0?'+':''}${d}</td>`;
   };
   const fmtStd = (std)=>{
-    const col=std<=5?'#52F2C9':std<=10?'#B487F8':'#FF6A8B';
+    const col=std<=5?'var(--green)':std<=10?'var(--violet)':'var(--negative)';
     return `<td style="text-align:center;font-size:10px;color:${col};">${std}</td>`;
   };
 
@@ -14567,7 +14569,7 @@ function ilRenderMultiComp(tfLabel) {
         }
       });
       const pct = row.bothCount>0 ? Math.round(row.altWins/row.bothCount*100) : null;
-      const pCol = pct==null?'#3a3060':pct>=60?'#52F2C9':pct<=40?'#FF6A8B':'#7870a0';
+      const pCol = pct==null?'#3a3060':pct>=60?'var(--green)':pct<=40?'var(--negative)':'#7870a0';
       tbody+=`<td style="text-align:center;font-size:10px;color:${pCol};padding:3px 4px;">${pct!=null?pct+'%':'—'}</td></tr>`;
     });
   });
@@ -14586,7 +14588,7 @@ function ilRenderMultiComp(tfLabel) {
         else tbody += fmtAcc(row.clVals[i]) + fmtDelta(row.clVals[i], row.altVals[i]);
       });
       const pct = row.bothCount>0 ? Math.round(row.altWins/row.bothCount*100) : null;
-      const pCol = pct==null?'#3a3060':pct>=60?'#52F2C9':pct<=40?'#FF6A8B':'#7870a0';
+      const pCol = pct==null?'#3a3060':pct>=60?'var(--green)':pct<=40?'var(--negative)':'#7870a0';
       tbody+=`<td style="text-align:center;font-size:10px;color:${pCol};padding:3px 4px;">${pct!=null?pct+'%':'—'}</td></tr>`;
     });
   }
@@ -14603,17 +14605,17 @@ function ilRenderMultiComp(tfLabel) {
     ${hint?`<div style="font-size:9px;color:#4a4060;margin-bottom:5px;">${hint}</div>`:''}
     ${items.length?items.map(r=>`<div style="font-size:10px;color:var(--text2);margin-bottom:2px;">${IL_NAMES[r.id]||r.id} <span style="color:#5a5070;">${r.mean}%${r.std!=null?' σ'+r.std:''}</span></div>`).join(''):'<div style="font-size:10px;color:#3a3060;">—</div>'}
   </div>`;
-  summary+=card('Универсальные (σ≤5, ≥55%)','#52F2C9',universals,'Работают стабильно у всех тикеров');
-  summary+=card('Тикер-специфичные (σ>10)','#FF6A8B',specific,'Поведение сильно зависит от инструмента');
+  summary+=card('Универсальные (σ≤5, ≥55%)','var(--green)',universals,'Работают стабильно у всех тикеров');
+  summary+=card('Тикер-специфичные (σ>10)','var(--negative)',specific,'Поведение сильно зависит от инструмента');
   summary+=card('Альт-формула лучше в большинстве','#7A8CFF',altBetter,'У этих индикаторов альт-интерпретация точнее для ≥50% тикеров');
-  summary+=card('Классика надёжнее','#B487F8',clBetter,'Альт-формула у большинства тикеров хуже классики');
+  summary+=card('Классика надёжнее','var(--violet)',clBetter,'Альт-формула у большинства тикеров хуже классики');
   summary+=`</div>`;
 
   // Легенда колонок
   const legend = `<div style="margin-bottom:8px;font-size:9px;color:#4a4060;font-family:var(--mono);line-height:1.8;">
     ТФ: <span style="color:#a898c8;">${tfLabel||''}</span> · горизонт H15 ·
-    <span style="color:#52F2C9">≥62%</span> устойчивый · <span style="color:#B487F8">55–61%</span> умеренный · <span style="color:#7870a0">&lt;55%</span> случайный · <span style="color:#FF6A8B">≤45%</span> антисигнал<br>
-    <b style="color:var(--text3);">Разброс σ</b>: <span style="color:#52F2C9">≤5</span> = универсальный · <span style="color:#B487F8">6–10</span> = умеренно специфичный · <span style="color:#FF6A8B">&gt;10</span> = тикер-специфичный<br>
+    <span style="color:var(--green)">≥62%</span> устойчивый · <span style="color:var(--violet)">55–61%</span> умеренный · <span style="color:#7870a0">&lt;55%</span> случайный · <span style="color:var(--negative)">≤45%</span> антисигнал<br>
+    <b style="color:var(--text3);">Разброс σ</b>: <span style="color:var(--green)">≤5</span> = универсальный · <span style="color:var(--violet)">6–10</span> = умеренно специфичный · <span style="color:var(--negative)">&gt;10</span> = тикер-специфичный<br>
     ${onlyAlt?'':'<b style="color:var(--text3);">Δ</b> = альт − классика · '}
     <b style="color:var(--text3);">Альт лучше</b>: % тикеров, где альт-формула точнее классики
   </div>`;
@@ -14630,12 +14632,12 @@ function cpSwitchTab(tab) {
   if (tab === 'methods') {
     if (methods) methods.style.display = '';
     if (analysis) analysis.style.display = 'none';
-    if (btnM) { btnM.style.background = '#C71B52'; btnM.style.color = '#fff'; }
+    if (btnM) { btnM.style.background = 'var(--accent)'; btnM.style.color = '#fff'; }
     if (btnA) { btnA.style.background = 'rgba(255,255,255,0.05)'; btnA.style.color = '#8080A0'; }
   } else {
     if (methods) methods.style.display = 'none';
     if (analysis) analysis.style.display = '';
-    if (btnA) { btnA.style.background = '#C71B52'; btnA.style.color = '#fff'; }
+    if (btnA) { btnA.style.background = 'var(--accent)'; btnA.style.color = '#fff'; }
     if (btnM) { btnM.style.background = 'rgba(255,255,255,0.05)'; btnM.style.color = '#8080A0'; }
     renderAnalysis();
   }
@@ -14696,7 +14698,7 @@ function renderAnalysis(force) {
   const key = (typeof chartCandles!=='undefined'?chartCandles.length:0) + '|' + Object.keys(inds).filter(k=>inds[k]).sort().join(',');
   if (!force && _renderAnalysisCache === key && panel.innerHTML) return;
   _renderAnalysisCache = key;
-  try { _renderAnalysisInner(panel); } catch(e) { panel.innerHTML = `<div style="color:#C71B52;font-size:11px;padding:8px;font-family:'JetBrains Mono',monospace;">⚠ Ошибка анализа: ${e.message}<br><small style="opacity:.6">${e.stack ? e.stack.split('\n')[1] : ''}</small></div>`; }
+  try { _renderAnalysisInner(panel); } catch(e) { panel.innerHTML = `<div style="color:var(--accent);font-size:11px;padding:8px;font-family:'JetBrains Mono',monospace;">⚠ Ошибка анализа: ${e.message}<br><small style="opacity:.6">${e.stack ? e.stack.split('\n')[1] : ''}</small></div>`; }
 }
 function _renderAnalysisInner(panel) {
   const candles = typeof chartCandles !== 'undefined' ? chartCandles : [];
@@ -14724,7 +14726,7 @@ function _renderAnalysisInner(panel) {
       if (!s || s.acc==null) return '';
       const pct = Math.round(s.acc*100);
       const mv = s.avgMove!=null ? `·${s.avgMove>=0?'+':''}${s.avgMove.toFixed(2)}%` : '';
-      const col = pct>=65?'#52D8A0':pct>=55?'#B487F8':'#C06070';
+      const col = pct>=65?'#52D8A0':pct>=55?'var(--violet)':'#C06070';
       return `<span class="analysis-tf-chip" style="color:${col};background:rgba(0,0,0,0.25)">${h}св: ${pct}% точн${mv}</span>`;
     }).join('');
     return chips ? `<div class="analysis-tf-row">${chips}</div>` : '';
@@ -14738,7 +14740,7 @@ function _renderAnalysisInner(panel) {
     macd: [
       {name:'MACD', color:'#B45CFF', desc:'Разность EMA(12) и EMA(26). Растёт — импульс набирает силу вверх. Падает — вниз. При сужении линий к нулю — импульс угасает.\n► Стандарт: 12/26/9. Быстрый: 5/13/5 (скальп). Медленный: 19/39/9 (D/W).'},
       {name:'Сигнальная', color:'#FF4D9D', desc:'EMA(9) от самой MACD. Сигнал: MACD пересекает сигнальную снизу вверх = покупка, сверху вниз = продажа. Чем резче пересечение — тем сильнее импульс.'},
-      {name:'Гистограмма ▲ (рост)', color:'#52F2C9', desc:'MACD − Сигнал > 0. Бычье давление. Высота столбца = интенсивность. Уменьшение высоты при положительных значениях = импульс слабеет.'},
+      {name:'Гистограмма ▲ (рост)', color:'var(--green)', desc:'MACD − Сигнал > 0. Бычье давление. Высота столбца = интенсивность. Уменьшение высоты при положительных значениях = импульс слабеет.'},
       {name:'Гистограмма ▼ (падение)', color:'#FF4D7A', desc:'MACD − Сигнал < 0. Медвежье давление. Рост отрицательного столбца = усиление давления вниз. Сжатие к нулю = возможный разворот.'},
     ],
     bb: [
@@ -14753,14 +14755,14 @@ function _renderAnalysisInner(panel) {
     ichimoku: [
       {name:'Tenkan-sen / Поворотная линия', color:'#FF006E', desc:'(Макс + Мин) / 2 за последние 9 свечей. Быстрая «линия баланса». Пересечение с Kijun — TK-крест, основной сигнал. Флэт = нет движения.\n► Период 9→7: чуть быстрее. 9→20: медленнее, меньше ложных пересечений.'},
       {name:'Kijun-sen / Эталонная линия', color:'#3DD9FF', desc:'(Макс + Мин) / 2 за 26 свечей. Мощнейшая динамическая поддержка/сопротивление. Цена выше Kijun = бычий контекст. Возврат к Kijun часто используют для входа.\n► 26→52: долгосрочная опора (недельный TF).'},
-      {name:'Senkou Span A / Пролёт A', color:'#52F2C9', desc:'(Tenkan + Kijun) / 2, сдвинутая на 26 свечей вперёд. Быстрая граница облака. Цена над Span A — бычий сигнал, под ней — медвежий. Наклон = динамика тренда.'},
+      {name:'Senkou Span A / Пролёт A', color:'var(--green)', desc:'(Tenkan + Kijun) / 2, сдвинутая на 26 свечей вперёд. Быстрая граница облака. Цена над Span A — бычий сигнал, под ней — медвежий. Наклон = динамика тренда.'},
       {name:'Senkou Span B / Пролёт B', color:'#7B61FF', desc:'(Макс + Мин) / 2 за 52 свечи, сдвинутая на 26 вперёд. Медленная граница облака — сильнейшая долгосрочная поддержка/сопротивление. Плоская Span B = флэт/консолидация.\n► Облако (Kumo) между A и B: толстое = мощный барьер, тонкое = слабое.'},
       {name:'Chikou Span / Запаздывающая', color:'#D65CFF', desc:'Цена закрытия текущей свечи, отрисованная 26 свечей назад. Подтверждение: если Chikou выше цены того же периода — бычий контекст. Ниже — медвежий. Пересечение прошлой цены = дополнительный сигнал.'},
     ],
     alligator: [
       {name:'Jaw / Челюсть', color:'#3DD9FF', desc:'SMMA(13), смещена на 8 свечей вперёд. Самая медленная линия — «спящий аллигатор», долгосрочный тренд. Когда линии переплетаются — аллигатор спит (флэт, не торгуй).\n► Модификации:\n• 13/8→21/13: тихий аллигатор для недельного TF\n• 13/8→8/5: агрессивный внутри дня\n• 89/55 (фибо): макро-аллигатор, для Monthly'},
       {name:'Teeth / Зубы', color:'#FF4D7A', desc:'SMMA(8), смещена на 5 свечей вперёд. Средняя линия — «зубы». Центр реакции на текущее движение. Пересечение Зубов с Губами — ранний сигнал.\n► При расхождении всех трёх линий с большой скоростью — самый сильный тренд. При сужении — стоп: флэт.'},
-      {name:'Lips / Губы', color:'#52F2C9', desc:'SMMA(5), смещена на 3 свечи вперёд. Быстрейшая линия — «губы» аллигатора. Первой реагирует на разворот или импульс.\n► Порядок линий: Губы > Зубы > Челюсть = сильный рост. Челюсть > Зубы > Губы = сильное падение.\n► SMMA(3,2): ультрабыстрый сигнал, много шума. Хорош только при высокой волатильности.\n► Модифицированный аллигатор 5/3/1 без смещений — скальперский вариант для M1/M5.'},
+      {name:'Lips / Губы', color:'var(--green)', desc:'SMMA(5), смещена на 3 свечи вперёд. Быстрейшая линия — «губы» аллигатора. Первой реагирует на разворот или импульс.\n► Порядок линий: Губы > Зубы > Челюсть = сильный рост. Челюсть > Зубы > Губы = сильное падение.\n► SMMA(3,2): ультрабыстрый сигнал, много шума. Хорош только при высокой волатильности.\n► Модифицированный аллигатор 5/3/1 без смещений — скальперский вариант для M1/M5.'},
     ],
     ma: [
       {name:'SMA — простая скользящая', color:'#FFD166', desc:'Среднее арифметическое за N свечей. Все свечи равновесны. Реагирует плавно, отстаёт от цены.\n► Используй как динамическую поддержку в трендах. Пересечение SMA(50) и SMA(200) = «золотой крест» / «крест смерти».'},
@@ -14768,7 +14770,7 @@ function _renderAnalysisInner(panel) {
     ],
     adx: [
       {name:'ADX — сила тренда', color:'#D65CFF', desc:'Средний индекс направленного движения. Измеряет СИЛУ тренда, не направление. >25 = тренд есть, >50 = сильный тренд, <20 = флэт.\n► Растущий ADX при +DI > -DI = усиливающийся восходящий тренд.'},
-      {name:'+DI — давление покупателей', color:'#52F2C9', desc:'Положительное направленное движение за период. Показывает силу покупателей. +DI > -DI = бычье преимущество. Пересечение +DI над -DI при ADX > 25 = сигнал покупки.'},
+      {name:'+DI — давление покупателей', color:'var(--green)', desc:'Положительное направленное движение за период. Показывает силу покупателей. +DI > -DI = бычье преимущество. Пересечение +DI над -DI при ADX > 25 = сигнал покупки.'},
       {name:'−DI — давление продавцов', color:'#FF4D7A', desc:'Отрицательное направленное движение. Сила продавцов. -DI > +DI = медвежье преимущество. При низком ADX пересечения DI дают много ложных сигналов — фильтруй по ADX > 20.'},
     ],
     keltner: [
@@ -14777,16 +14779,16 @@ function _renderAnalysisInner(panel) {
       {name:'Нижняя граница', color:'#3DD9FF', desc:'EMA(20) − 2×ATR(10). Динамическая поддержка. При нисходящем тренде цена «едет» по нижней границе. Разворот от неё после Squeeze = сигнал.'},
     ],
     elder_ray: [
-      {name:'Bull Power / Сила быков', color:'#52F2C9', desc:'Максимум свечи минус EMA(13). Показывает насколько покупатели подняли цену выше тренда. Уменьшение Bull Power при росте цены = ослабление быков, возможный разворот.'},
+      {name:'Bull Power / Сила быков', color:'var(--green)', desc:'Максимум свечи минус EMA(13). Показывает насколько покупатели подняли цену выше тренда. Уменьшение Bull Power при росте цены = ослабление быков, возможный разворот.'},
       {name:'Bear Power / Сила медведей', color:'#FF4D7A', desc:'Минимум свечи минус EMA(13). Насколько продавцы опустили цену ниже тренда. Уменьшение Bear Power (стремится к нулю) при снижении = медведи слабеют. Покупай когда Bear Power < 0 но растёт.'},
     ],
     vortex: [
-      {name:'V+ — бычий вортекс', color:'#52F2C9', desc:'Сумма движений вверх за 14 свечей, нормированная на ATR. V+ > V- = восходящая сила. Пересечение V+ над V- = сигнал покупки.'},
+      {name:'V+ — бычий вортекс', color:'var(--green)', desc:'Сумма движений вверх за 14 свечей, нормированная на ATR. V+ > V- = восходящая сила. Пересечение V+ над V- = сигнал покупки.'},
       {name:'V− — медвежий вортекс', color:'#FF4D7A', desc:'Сумма движений вниз за 14 свечей, нормированная на ATR. V- > V+ = нисходящая сила. Сильное расхождение линий = сильный тренд.'},
     ],
     dmi: [
       {name:'ADX', color:'#D65CFF', desc:'Сила тренда. >25 = торгуй по тренду, <20 = флэт, избегай трендовых входов.'},
-      {name:'+DI', color:'#52F2C9', desc:'Покупательское давление. Пересечение +DI над -DI при ADX > 25 = сигнал лонга.'},
+      {name:'+DI', color:'var(--green)', desc:'Покупательское давление. Пересечение +DI над -DI при ADX > 25 = сигнал лонга.'},
       {name:'−DI', color:'#FF4D7A', desc:'Продавческое давление. -DI > +DI при ADX > 25 = сигнал шорта.'},
     ],
     mama: [
@@ -14809,7 +14811,7 @@ function _renderAnalysisInner(panel) {
     ],
     bbpb: [
       {name:'%B — процент полос Боллинджера', color:'#D65CFF', desc:'Где находится цена внутри BB. >1 = выше верхней полосы, <0 = ниже нижней, 0.5 = на средней. Дивергенция %B с ценой при новых экстремумах = сильный сигнал разворота.'},
-      {name:'Уровень 1.0 (выход выше BB)', color:'#52F2C9', desc:'Справочная линия. %B > 1 = ценовой выброс выше верхней полосы. В тренде: нормально, продолжение движения. В боковике: возможный разворот.'},
+      {name:'Уровень 1.0 (выход выше BB)', color:'var(--green)', desc:'Справочная линия. %B > 1 = ценовой выброс выше верхней полосы. В тренде: нормально, продолжение движения. В боковике: возможный разворот.'},
       {name:'Уровень 0.0 (выход ниже BB)', color:'#FF4D7A', desc:'%B < 0 = ценовой выброс ниже нижней полосы. В нисходящем тренде = норма. В боковике = возможный отскок.'},
     ],
     tsi: [
@@ -14820,7 +14822,7 @@ function _renderAnalysisInner(panel) {
       {name:'Ultimate Oscillator / Предельный', color:'#B45CFF', desc:'Взвешенное среднее трёх стохастиков: 7, 14, 28 свечей (веса 4:2:1). Менее склонен к ложным дивергенциям. >70 = перекупленность, <30 = перепроданность. Сигнал: дивергенция + пересечение порога.'},
     ],
     elder_imp: [
-      {name:'Бычий импульс (зелёная свеча)', color:'#52F2C9', desc:'EMA(13) растёт И MACD-гистограмма растёт. Двойное подтверждение: держи лонг, не входи в шорт.'},
+      {name:'Бычий импульс (зелёная свеча)', color:'var(--green)', desc:'EMA(13) растёт И MACD-гистограмма растёт. Двойное подтверждение: держи лонг, не входи в шорт.'},
       {name:'Медвежий импульс (красная свеча)', color:'#FF4D7A', desc:'EMA(13) падает И MACD-гистограмма падает. Двойное подтверждение вниз: держи шорт, не входи в лонг.'},
       {name:'Нейтральная свеча (синяя)', color:'#4C4666', desc:'EMA и MACD расходятся — нет чёткого импульса. Зона неопределённости: лучше подождать следующей свечи.'},
     ],
@@ -14833,10 +14835,10 @@ function _renderAnalysisInner(panel) {
       {name:'Лид-синус (опережающий)', color:'#FF8A4C', desc:'EBS сдвинутая на ¼ цикла вперёд. Пересечение Лид-синуса над EBS = начало бычьей фазы цикла. Под = начало медвежьей.'},
     ],
     obv: [
-      {name:'OBV — балансовый объём', color:'#52F2C9', desc:'Нарастающий итог: бычья свеча прибавляет объём, медвежья — вычитает. Тренд OBV подтверждает тренд цены. Дивергенция OBV/цена = ранний сигнал разворота.\n► Рост OBV при боковой цене = накопление, ожидай прорыв вверх.'},
+      {name:'OBV — балансовый объём', color:'var(--green)', desc:'Нарастающий итог: бычья свеча прибавляет объём, медвежья — вычитает. Тренд OBV подтверждает тренд цены. Дивергенция OBV/цена = ранний сигнал разворота.\n► Рост OBV при боковой цене = накопление, ожидай прорыв вверх.'},
     ],
     mfi: [
-      {name:'MFI — индекс потока денег', color:'#52F2C9', desc:'Взвешенный по объёму RSI. Учитывает объём торгов. >80 = перекупленность с подтверждением объёма, <20 = перепроданность. Надёжнее RSI при анализе ликвидных инструментов.\n► Дивергенция MFI и цены при высоком объёме = очень сильный сигнал.'},
+      {name:'MFI — индекс потока денег', color:'var(--green)', desc:'Взвешенный по объёму RSI. Учитывает объём торгов. >80 = перекупленность с подтверждением объёма, <20 = перепроданность. Надёжнее RSI при анализе ликвидных инструментов.\n► Дивергенция MFI и цены при высоком объёме = очень сильный сигнал.'},
     ],
     atr: [
       {name:'ATR — средний истинный диапазон', color:'#FFD166', desc:'Среднее истинного диапазона (Макс−Мин или разрыв с предыдущим закрытием) за 14 свечей. Измеряет волатильность, не направление.\n► Стоп = 1.5–2×ATR от входа. Увеличение ATR = волатильность растёт. Уменьшение = затишье перед бурей. Не меняй размер позиции без учёта ATR.'},
@@ -14851,13 +14853,13 @@ function _renderAnalysisInner(panel) {
       {name:'Williams %R', color:'#D65CFF', desc:'Позиция цены закрытия относительно максимума за 14 свечей. Диапазон от −100 до 0. −80 и ниже = перепроданность, −20 и выше = перекупленность.\n► Работает зеркально: ниже = перепродан. При уходе из зоны >−20 = сигнал продажи. При уходе из <−80 = покупки. Лучше работает в сочетании с трендовым фильтром.'},
     ],
     ao: [
-      {name:'AO — чудесный осциллятор', color:'#52F2C9', desc:'Разность SMA(5) и SMA(34) от средних цен (H+L)/2. Показывает рыночный момент.\n► Пересечение нуля: вверх = бычий импульс, вниз = медвежий. Блюдце (два убывающих бара + растущий) = сигнал продолжения тренда. Твин Пики = дивергенция между двумя пиками/впадинами. Вильям использовал AO совместно с Фракталами и Аллигатором.'},
+      {name:'AO — чудесный осциллятор', color:'var(--green)', desc:'Разность SMA(5) и SMA(34) от средних цен (H+L)/2. Показывает рыночный момент.\n► Пересечение нуля: вверх = бычий импульс, вниз = медвежий. Блюдце (два убывающих бара + растущий) = сигнал продолжения тренда. Твин Пики = дивергенция между двумя пиками/впадинами. Вильям использовал AO совместно с Фракталами и Аллигатором.'},
     ],
     sar: [
       {name:'Parabolic SAR', color:'#FF4D9D', desc:'Параболические точки выше/ниже цены. Точки ниже = бычий тренд, выше = медвежий. Переворот: точки меняют сторону = смена тренда.\n► Фактор ускорения (AF): стандарт 0.02 / макс 0.2. Меньший AF = медленнее реагирует, меньше ложных разворотов. Больший = ближе к цене, частые перевороты. Не используй в боковиках — даст постоянные перевороты.'},
     ],
     supertrend: [
-      {name:'SuperTrend', color:'#52F2C9', desc:'ATR(10)-канал вокруг (H+L)/2 с множителем 3. Меняет цвет при смене тренда. Зелёный = бычий, красный = медвежий.\n► Уменьши множитель до 2 — ближе к цене, больше разворотов. До 4 — реже, только сильные развороты. Период ATR 7 = более чувствительный. 14 = стандарт.'},
+      {name:'SuperTrend', color:'var(--green)', desc:'ATR(10)-канал вокруг (H+L)/2 с множителем 3. Меняет цвет при смене тренда. Зелёный = бычий, красный = медвежий.\n► Уменьши множитель до 2 — ближе к цене, больше разворотов. До 4 — реже, только сильные развороты. Период ATR 7 = более чувствительный. 14 = стандарт.'},
     ],
     fisher: [
       {name:'Fisher Transform / Преобразование Фишера', color:'#D65CFF', desc:'Переводит цены в гауссово распределение через логарифмическую трансформацию. Экстремумы ±2 (±3) = редкие ценовые пики/впадины.\n► Пересечение нуля = смена тренда. Очень высокий Fisher (>2.5) = статистически экстремальная цена, разворот вероятен. Совмести с объёмом для подтверждения.'},
@@ -14878,7 +14880,7 @@ function _renderAnalysisInner(panel) {
       {name:'EOM / Лёгкость движения', color:'#D65CFF', desc:'Отношение изменения цены к объёму. Высокий положительный EOM = цена легко растёт при малом объёме (эффективный рост). Отрицательный = легко падает.\n► EOM близкий к нулю при большом движении цены = цена движется «с трудом», движение неустойчиво.'},
     ],
     pvt: [
-      {name:'PVT / Тренд цена-объём', color:'#52F2C9', desc:'Кумулятивная сумма: объём × (изменение цены в %). Похож на OBV, но учитывает размер движения. Дивергенция PVT/цена = возможный разворот.\n► Рост PVT при боковой цене = скрытое накопление. Падение PVT при боковой = скрытое распределение.'},
+      {name:'PVT / Тренд цена-объём', color:'var(--green)', desc:'Кумулятивная сумма: объём × (изменение цены в %). Похож на OBV, но учитывает размер движения. Дивергенция PVT/цена = возможный разворот.\n► Рост PVT при боковой цене = скрытое накопление. Падение PVT при боковой = скрытое распределение.'},
     ],
     nvi: [
       {name:'NVI / Индекс отрицательного объёма', color:'#D65CFF', desc:'Накапливает изменения цены только в дни с пониженным объёмом. Теория: умные деньги действуют при низком объёме, толпа — при высоком.\n► NVI выше своей EMA(255) = бычий режим (вероятность роста ~95% по историческим данным Fosback). Ниже = осторожно.'},
@@ -14905,25 +14907,25 @@ function _renderAnalysisInner(panel) {
       {name:'Chaikin Volatility / Волатильность Чайкина', color:'#D65CFF', desc:'Изменение ширины диапазона High−Low за 10 свечей, сглаженное EMA(10). Рост = волатильность растёт (часто на разворотах). Падение = сжатие (накопление или вершина).\n► Резкий рост Chaikin Vol у поддержки/сопротивления = панические продажи или прорыв.'},
     ],
     cum_delta: [
-      {name:'Cumulative Delta / Кумулятивная дельта', color:'#52F2C9', desc:'Нарастающая разность покупок и продаж по объёму (оценка через High/Low). Рост = покупки доминируют. Падение = продажи.\n► Дивергенция дельты и цены = давление скрыто. Новый максимум цены + падение дельты = дистрибуция. Новый минимум + рост дельты = накопление.'},
+      {name:'Cumulative Delta / Кумулятивная дельта', color:'var(--green)', desc:'Нарастающая разность покупок и продаж по объёму (оценка через High/Low). Рост = покупки доминируют. Падение = продажи.\n► Дивергенция дельты и цены = давление скрыто. Новый максимум цены + падение дельты = дистрибуция. Новый минимум + рост дельты = накопление.'},
     ],
     tmf: [
-      {name:'TMF / Денежный поток Твиггса', color:'#52F2C9', desc:'Накопленный денежный поток с экспоненциальным затуханием. Более чистый аналог CMF.\n► >0 = накопление (деньги заходят). <0 = распределение (выходят). Сигнал: TMF пересекает ноль при подтверждении ценой.'},
+      {name:'TMF / Денежный поток Твиггса', color:'var(--green)', desc:'Накопленный денежный поток с экспоненциальным затуханием. Более чистый аналог CMF.\n► >0 = накопление (деньги заходят). <0 = распределение (выходят). Сигнал: TMF пересекает ноль при подтверждении ценой.'},
     ],
     chaikosc: [
-      {name:'Chaikin Oscillator / Осциллятор Чайкина', color:'#52F2C9', desc:'Разность EMA(3) и EMA(10) от A/D Line Чайкина. Выше нуля = накопление ускоряется. Ниже = распределение.\n► Пересечение нуля при восходящем тренде = сигнал продолжения. Дивергенция с ценой = предупреждение о развороте.'},
+      {name:'Chaikin Oscillator / Осциллятор Чайкина', color:'var(--green)', desc:'Разность EMA(3) и EMA(10) от A/D Line Чайкина. Выше нуля = накопление ускоряется. Ниже = распределение.\n► Пересечение нуля при восходящем тренде = сигнал продолжения. Дивергенция с ценой = предупреждение о развороте.'},
     ],
     cmf: [
-      {name:'CMF / Индекс денежного потока Чайкина', color:'#52F2C9', desc:'Сумма направленных объёмов, нормированная на общий объём за 20 свечей. Диапазон ±1. >+0.05 = накопление, <−0.05 = распределение.\n► Высокий положительный CMF при прорыве уровня = подтверждение пробоя. Отрицательный CMF при росте цены = скрытая слабость.'},
+      {name:'CMF / Индекс денежного потока Чайкина', color:'var(--green)', desc:'Сумма направленных объёмов, нормированная на общий объём за 20 свечей. Диапазон ±1. >+0.05 = накопление, <−0.05 = распределение.\n► Высокий положительный CMF при прорыве уровня = подтверждение пробоя. Отрицательный CMF при росте цены = скрытая слабость.'},
     ],
     ad: [
-      {name:'A/D Line / Накопление-распределение', color:'#52F2C9', desc:'Кумулятивный индикатор: добавляет или вычитает объём в зависимости от позиции закрытия внутри дневного диапазона.\n► Дивергенция A/D Line с ценой = одно из сильнейших предупреждений о развороте. A/D Line растёт при падении цены = скрытое накопление.'},
+      {name:'A/D Line / Накопление-распределение', color:'var(--green)', desc:'Кумулятивный индикатор: добавляет или вычитает объём в зависимости от позиции закрытия внутри дневного диапазона.\n► Дивергенция A/D Line с ценой = одно из сильнейших предупреждений о развороте. A/D Line растёт при падении цены = скрытое накопление.'},
     ],
     ac: [
-      {name:'AC Oscillator / Осциллятор ускорения', color:'#52F2C9', desc:'Разность AO и SMA(5) от AO. Измеряет ускорение/замедление рыночного момента. Система Вильямса: первый сигнал = два бара одного цвета в направлении сделки.\n► Вход: лонг при двух зелёных барах выше нуля. Шорт при двух красных ниже нуля. Выход по Аллигатору.'},
+      {name:'AC Oscillator / Осциллятор ускорения', color:'var(--green)', desc:'Разность AO и SMA(5) от AO. Измеряет ускорение/замедление рыночного момента. Система Вильямса: первый сигнал = два бара одного цвета в направлении сделки.\n► Вход: лонг при двух зелёных барах выше нуля. Шорт при двух красных ниже нуля. Выход по Аллигатору.'},
     ],
     force_idx: [
-      {name:'Force Index / Индекс силы', color:'#52F2C9', desc:'Объём × изменение цены. Показывает «силу» каждого движения. EMA(2) = краткосрочная сила. EMA(13) = среднесрочная.\n► Пересечение нуля EMA(13) = смена доминирования. Дивергенция с ценой = предупреждение. Высокий Force Index при пробое уровня = подтверждение.'},
+      {name:'Force Index / Индекс силы', color:'var(--green)', desc:'Объём × изменение цены. Показывает «силу» каждого движения. EMA(2) = краткосрочная сила. EMA(13) = среднесрочная.\n► Пересечение нуля EMA(13) = смена доминирования. Дивергенция с ценой = предупреждение. Высокий Force Index при пробое уровня = подтверждение.'},
     ],
     chop: [
       {name:'CHOP Index / Индекс неопределённости', color:'#D65CFF', desc:'Насколько рынок «пилит» vs. трендирует. Значения 61.8–100 = боковик/пила. 38.2–61.8 = нейтраль. <38.2 = сильный тренд.\n► Торгуй пробой когда CHOP падает к 38 — рынок выходит из консолидации. Избегай торговли при CHOP > 60.'},
@@ -14956,7 +14958,7 @@ function _renderAnalysisInner(panel) {
     ],
     cusum: [
       {name:'Точка разворота вверх (CP, бычья)', color:'#60A4A1', desc:'CUSUM зафиксировал накопленное отклонение выше порога в сторону роста — структурный сдвиг среднего значения цены вверх.'},
-      {name:'Точка разворота вниз (CP, медвежья)', color:'#C71B52', desc:'CUSUM зафиксировал накопленное отклонение выше порога в сторону падения — структурный сдвиг среднего значения цены вниз.'},
+      {name:'Точка разворота вниз (CP, медвежья)', color:'var(--accent)', desc:'CUSUM зафиксировал накопленное отклонение выше порога в сторону падения — структурный сдвиг среднего значения цены вниз.'},
     ],
     hmm: [
       {name:'Режим высокой волатильности', color:'#FF4D7A', desc:'Скрытая марковская модель относит текущий бар к состоянию с повышенной волатильностью/риском (на основе матрицы переходов и распределений по состояниям).'},
@@ -14964,15 +14966,15 @@ function _renderAnalysisInner(panel) {
     ],
     hurst: [
       {name:'Антиперсистентный (H < 0.45)', color:'#FF4D7A', desc:'Показатель Хёрста ниже 0.45 — ряд склонен к возврату к среднему (mean-reversion), движения чаще разворачиваются, чем продолжаются.'},
-      {name:'Персистентный (H > 0.55)', color:'#52F2C9', desc:'Показатель Хёрста выше 0.55 — ряд трендовый, движения склонны продолжаться в том же направлении (моментум).'},
+      {name:'Персистентный (H > 0.55)', color:'var(--green)', desc:'Показатель Хёрста выше 0.55 — ряд трендовый, движения склонны продолжаться в том же направлении (моментум).'},
       {name:'Случайное блуждание (H ≈ 0.5)', color:'#9090B8', desc:'Показатель Хёрста около 0.5 — поведение близко к случайному блужданию, предсказуемость минимальна.'},
     ],
     gpr: [
-      {name:'Доверительный интервал GPR', color:'#52F2C9', desc:'Полоса неопределённости гауссовского процесса (Gaussian Process Regression) вокруг прогнозируемого среднего. Расширяется там, где данных меньше или они противоречивы.'},
+      {name:'Доверительный интервал GPR', color:'var(--green)', desc:'Полоса неопределённости гауссовского процесса (Gaussian Process Regression) вокруг прогнозируемого среднего. Расширяется там, где данных меньше или они противоречивы.'},
       {name:'Среднее GPR (прогноз)', color:'#2BA98B', desc:'Байесовская непараметрическая оценка тренда/прогноза. Учитывает ковариационную структуру (ядро) между точками, в отличие от обычной регрессии.'},
     ],
     mprof: [
-      {name:'MOTIF — повторяющийся паттерн', color:'#52F2C9', desc:'Matrix Profile нашёл пару наиболее похожих друг на друга подпоследовательностей (минимальное расстояние) — повторяющийся ценовой паттерн.'},
+      {name:'MOTIF — повторяющийся паттерн', color:'var(--green)', desc:'Matrix Profile нашёл пару наиболее похожих друг на друга подпоследовательностей (минимальное расстояние) — повторяющийся ценовой паттерн.'},
       {name:'ANOMALY — аномалия (discord)', color:'#FF4D7A', desc:'Matrix Profile нашёл подпоследовательность с максимальным расстоянием до ближайшего соседа — нетипичный, аномальный участок ряда.'},
     ],
     te: [
@@ -14986,25 +14988,25 @@ function _renderAnalysisInner(panel) {
       {name:'Грубая (rough, H < 0.2)', color:'#FF8800', desc:'Показатель Хёрста грубой волатильности ниже 0.2 — режим «шероховатой» волатильности, характерный для реальных рынков (всплески, кластеризация).'},
       {name:'Умеренно грубая (0.2 ≤ H < 0.4)', color:'#7A8CFF', desc:'Промежуточный режим грубости волатильности — между классической шероховатой и стандартной броуновской динамикой.'},
       {name:'Стандартная (0.4 ≤ H ≤ 0.6)', color:'#9090B8', desc:'Показатель близок к 0.5 — волатильность ведёт себя близко к классическому броуновскому движению.'},
-      {name:'Персистентная (H > 0.6)', color:'#52F2C9', desc:'Показатель выше 0.6 — волатильность демонстрирует трендовое, персистентное поведение (редко на практике, но возможно в спокойных режимах).'},
+      {name:'Персистентная (H > 0.6)', color:'var(--green)', desc:'Показатель выше 0.6 — волатильность демонстрирует трендовое, персистентное поведение (редко на практике, но возможно в спокойных режимах).'},
     ],
     roc: [
-      {name:'ROC / Скорость цены', color:'#52F2C9', desc:'(Close − Close[10]) / Close[10] × 100. Процентное изменение цены за последние 10 баров.\n► Нулевой лаг — мгновенно реагирует на изменение импульса. Пересечение нуля сверху вниз = потеря восходящего импульса. Экстремумы ROC часто совпадают с разворотными точками. Работает лучше всего вместе с объёмом: ROC вверх + объём выше нормы = подтверждённый импульс.'},
+      {name:'ROC / Скорость цены', color:'var(--green)', desc:'(Close − Close[10]) / Close[10] × 100. Процентное изменение цены за последние 10 баров.\n► Нулевой лаг — мгновенно реагирует на изменение импульса. Пересечение нуля сверху вниз = потеря восходящего импульса. Экстремумы ROC часто совпадают с разворотными точками. Работает лучше всего вместе с объёмом: ROC вверх + объём выше нормы = подтверждённый импульс.'},
     ],
     momentum: [
-      {name:'Momentum / Импульс', color:'#52F2C9', desc:'Close − Close[10]. Абсолютное изменение цены за 10 баров.\n► Показывает «скорость» в единицах цены, а не процентах — удобно сравнивать с историческими уровнями этого же инструмента. Пересечение нуля = смена импульса. Дивергенция с ценой (новый максимум цены при более низком Momentum) = сигнал ослабления тренда.'},
+      {name:'Momentum / Импульс', color:'var(--green)', desc:'Close − Close[10]. Абсолютное изменение цены за 10 баров.\n► Показывает «скорость» в единицах цены, а не процентах — удобно сравнивать с историческими уровнями этого же инструмента. Пересечение нуля = смена импульса. Дивергенция с ценой (новый максимум цены при более низком Momentum) = сигнал ослабления тренда.'},
     ],
     volspike: [
-      {name:'Volume Spike / Аномалия объёма', color:'#B487F8', desc:'Текущий объём / MA(объём, 20). Измеряет кратность отклонения объёма от 20-периодной средней.\n► ×1–×2 = обычная активность (серый). ×2–×4 = повышенная (тёмно-фиолетовый). ×4+ = аномальный всплеск (оранжевый). Аномальный объём без движения цены = накопление/распределение. Аномальный объём + резкое движение = институциональная активность.'},
+      {name:'Volume Spike / Аномалия объёма', color:'var(--violet)', desc:'Текущий объём / MA(объём, 20). Измеряет кратность отклонения объёма от 20-периодной средней.\n► ×1–×2 = обычная активность (серый). ×2–×4 = повышенная (тёмно-фиолетовый). ×4+ = аномальный всплеск (оранжевый). Аномальный объём без движения цены = накопление/распределение. Аномальный объём + резкое движение = институциональная активность.'},
     ],
     vwap_pct: [
       {name:'VWAP % / Отклонение от VWAP', color:'#FFD166', desc:'(Close − VWAP) / VWAP × 100. Насколько цена отклонилась от средневзвешенной по объёму цены за сессию.\n► VWAP — ориентир крупных участников. Цена выше VWAP = инициатива у покупателей, ниже = у продавцов. Значительное отклонение (>1–2%) часто притягивает возврат к VWAP. Особенно актуален в первые часы торговой сессии.'},
     ],
     fast_combo: [
-      {name:'◆ Быстрый сигнал (комбо)', color:'#52F2C9', desc:'Голосование трёх быстрых индикаторов: ROC + Volume Spike + VWAP%. Каждый даёт голос за лонг (+1), шорт (−1) или нейтраль (0).\n► +3 / −3 = единогласный сигнал (сильный). ±2 = большинство согласно (умеренный). ±1 = слабый, противоречивый. Преимущество перед классическими осцилляторами: минимальный лаг, работает на волатильных инструментах где EMA-сигналы запаздывают.'},
+      {name:'◆ Быстрый сигнал (комбо)', color:'var(--green)', desc:'Голосование трёх быстрых индикаторов: ROC + Volume Spike + VWAP%. Каждый даёт голос за лонг (+1), шорт (−1) или нейтраль (0).\n► +3 / −3 = единогласный сигнал (сильный). ±2 = большинство согласно (умеренный). ±1 = слабый, противоречивый. Преимущество перед классическими осцилляторами: минимальный лаг, работает на волатильных инструментах где EMA-сигналы запаздывают.'},
     ],
     volbars: [
-      {name:'Объём (столбцы)', color:'#52F2C9', desc:'Гистограмма объёма по барам. Зелёные столбцы — бар закрылся выше открытия, красные — ниже. Фиолетовая линия — MA(20) объёма.\n► Резкое превышение MA(20) = аномальная активность. Сравнивай объём с движением цены: рост на низком объёме = слабый сигнал, пробой на высоком = сильный. Убывающий объём при тренде = ослабление движения.'},
+      {name:'Объём (столбцы)', color:'var(--green)', desc:'Гистограмма объёма по барам. Зелёные столбцы — бар закрылся выше открытия, красные — ниже. Фиолетовая линия — MA(20) объёма.\n► Резкое превышение MA(20) = аномальная активность. Сравнивай объём с движением цены: рост на низком объёме = слабый сигнал, пробой на высоком = сильный. Убывающий объём при тренде = ослабление движения.'},
     ],
   };
 
@@ -15277,7 +15279,7 @@ function _renderAnalysisInner(panel) {
         <div class="analysis-card-title" style="color:#D65CFF">${_cp.icon||'◈'} ${_cp.name}</div>
         <div class="analysis-items">
           ${rulesHtml}
-          ${_cp.read ? `<div class="analysis-item analysis-neutral" style="margin-top:6px;opacity:.9"><span class="analysis-dot" style="color:#52F2C9">📖</span><span style="white-space:pre-line">${_cp.read}</span></div>` : ''}
+          ${_cp.read ? `<div class="analysis-item analysis-neutral" style="margin-top:6px;opacity:.9"><span class="analysis-dot" style="color:var(--green)">📖</span><span style="white-space:pre-line">${_cp.read}</span></div>` : ''}
         </div></div>`;
     }
   }
@@ -15447,7 +15449,7 @@ function _renderAnalysisInner(panel) {
         const strength = notFlat.length >= 3 ? '3+ независимых — режим точно меняется' : notFlat.length === 2 ? '2 независимых — вероятно готовится движение' : '1 сигнал — наблюдать';
         aHtml += `<div class="analysis-item analysis-bullish"><span class="analysis-dot">●</span><span>Это НЕ боковик? (${strength})</span></div>`;
         notFlat.forEach(s => {
-          aHtml += `<div class="analysis-item analysis-bullish" style="margin-left:8px;opacity:0.9"><span class="analysis-dot" style="color:#52F2C9">▸</span><span>${s.text}</span></div>`;
+          aHtml += `<div class="analysis-item analysis-bullish" style="margin-left:8px;opacity:0.9"><span class="analysis-dot" style="color:var(--green)">▸</span><span>${s.text}</span></div>`;
         });
       }
 
@@ -15498,7 +15500,7 @@ function _renderAnalysisInner(panel) {
     _P.stp!==10||_P.elder!==13||_P.tsil!==25||_P.tsis!==13
   );
   if (_pCustom) {
-    html += `<div style="margin-bottom:8px;padding:6px 10px;background:rgba(82,242,201,0.07);border:1px solid rgba(82,242,201,0.2);border-radius:6px;font-size:9.5px;font-family:var(--mono);color:#52F2C9;">
+    html += `<div style="margin-bottom:8px;padding:6px 10px;background:rgba(82,242,201,0.07);border:1px solid rgba(82,242,201,0.2);border-radius:6px;font-size:9.5px;font-family:var(--mono);color:var(--green);">
       ◆ Анализ с пользовательскими параметрами: RSI(${_P.rsi}) WR(${_P.wr}) CCI(${_P.cci}) MFI(${_P.mfi}) Stoch(${_P.stk},${_P.std}) MACD(${_P.mf},${_P.ms},${_P.msig}) BB(${_P.bbp}) ADX(${_P.adx}) ST(${_P.stp}) ELD(${_P.elder}) TSI(${_P.tsil},${_P.tsis})
     </div>`;
   }
@@ -19414,7 +19416,7 @@ try { cpInitAltDiamonds(); } catch(e) {}
       oninput="_cpOnHexInput(this.value)">
     <button onclick="_cpSaveCurrent()" title="Сохранить цвет"
       style="width:26px;height:26px;background:rgba(180,135,248,0.1);border:1px solid rgba(180,135,248,0.25);
-             border-radius:50%;color:#B487F8;font-size:14px;cursor:pointer;flex-shrink:0;line-height:1;padding:0;">+</button>
+             border-radius:50%;color:var(--violet);font-size:14px;cursor:pointer;flex-shrink:0;line-height:1;padding:0;">+</button>
   </div>
   <!-- RGB sliders -->
   <div id="_cp-sliders" style="margin-top:8px;display:flex;flex-direction:column;gap:4px;">
@@ -19527,7 +19529,7 @@ try { cpInitAltDiamonds(); } catch(e) {}
     el.innerHTML=_cpHistory.map((c,i)=>
       `<div style="position:relative;display:inline-block;" onmouseenter="this.querySelector('.cp-del-btn').style.opacity='1'" onmouseleave="this.querySelector('.cp-del-btn').style.opacity='0'">
         <div onclick="_cpApplySaved('${c}')" style="width:20px;height:20px;border-radius:50%;background:${c};border:1.5px solid rgba(255,255,255,0.15);cursor:pointer;transition:transform .1s;" title="${c}" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform=''"></div>
-        <span class="cp-del-btn" onclick="_cpDeleteSaved(${i})" style="position:absolute;top:-4px;right:-4px;width:11px;height:11px;background:#3a1a3a;border:1px solid rgba(180,135,248,0.3);border-radius:50%;color:#B487F8;font-size:8px;line-height:11px;text-align:center;cursor:pointer;opacity:0;transition:opacity .12s;">×</span>
+        <span class="cp-del-btn" onclick="_cpDeleteSaved(${i})" style="position:absolute;top:-4px;right:-4px;width:11px;height:11px;background:#3a1a3a;border:1px solid rgba(180,135,248,0.3);border-radius:50%;color:var(--violet);font-size:8px;line-height:11px;text-align:center;cursor:pointer;opacity:0;transition:opacity .12s;">×</span>
       </div>`
     ).join('');
   }
