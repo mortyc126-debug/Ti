@@ -1501,6 +1501,7 @@ async function handleDb(path, req, env) {
 
     const priceOf = f => (f?.units ? Number(f.units) + (f.nano || 0) / 1e9 : 0);
     const priceByDate = {}; // date -> {price, vol} — при пересечении дескриптов берём больший объём
+    const rootCandleByDate = {}; // date -> полная свеча front-контракта (по большему объёму)
     const contractsUsed = [];
     for (const inst of contracts) {
       try {
@@ -1532,6 +1533,8 @@ async function handleDb(path, req, env) {
           const date = new Date(r.time * 1000).toISOString().slice(0, 10);
           const existing = priceByDate[date];
           if (!existing || r.vol > existing.vol) priceByDate[date] = { price: r.cl, vol: r.vol };
+          const ex2 = rootCandleByDate[date];
+          if (!ex2 || r.vol > ex2.vol) rootCandleByDate[date] = r;
         }
       } catch(e) { /* этот дескрипт не подтянулся — пробуем остальные */ }
     }
@@ -1545,8 +1548,22 @@ async function handleDb(path, req, env) {
       ));
     }
 
+    // Склеенная root-свеча дня (front-контракт по объёму) — под ключом
+    // root-тикера. Фазовому детектору oi_lab нужны high/low на всей истории,
+    // а свечи дескриптов лежат под их именами и при загрузке root-серии не
+    // находились — фазы на добэкфилленной истории не детектились вовсе.
+    const rcDates = Object.keys(rootCandleByDate);
+    for (let i = 0; i < rcDates.length; i += 100) {
+      await db.batch(rcDates.slice(i, i + 100).map(date => {
+        const r = rootCandleByDate[date];
+        return db.prepare('INSERT OR REPLACE INTO candles(key,ticker,tf,time,o,h,l,cl,vol) VALUES(?,?,?,?,?,?,?,?,?)')
+          .bind(`${rootTicker}__day__${r.time}`, rootTicker, 'day', r.time, r.o, r.h, r.l, r.cl, r.vol);
+      }));
+    }
+
     return json({
       ticker: rootTicker, datesTotal: rootRows.length, datesPriced: dates.length,
+      rootCandles: rcDates.length,
       contractsFound: contracts.map(c => c.ticker), contractsUsed,
     });
   }

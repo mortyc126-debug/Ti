@@ -2512,24 +2512,41 @@ async function _fetchInstrumentRows(proxy, rootTicker, log) {
       // сам находит через T-Invest FindInstrument ВСЕ дескрипты этой серии
       // (включая уже экспирировавшие, которых нет в нашей БД вообще) и пишет
       // цену в oi_daily по датам, где нашлось совпадение — затем перечитываем.
-      // Порог не «цен нет вовсе», а «<80% дней с ценой»: багованный бэкфилл
-      // однажды затёр часть цен нулями (price=0 в REPLACE), и серия с дырами
-      // давала обвал N и медианы вида +7240% на стыках — самолечение
-      // дозаполняет дыры при обычной загрузке пула.
+      // Самолечение серии. Порог не «цен нет вовсе», а долевой:
+      //   <80% дней с ценой — багованный бэкфилл однажды затёр цены нулями,
+      //     серия с дырами давала обвал N и медианы вида +7240%;
+      //   <50% дней с high/low — на добэкфилленной истории нет свечей, и
+      //     фазовый детектор (флэт по H-L) там слеп: N фазовых бинов рухнул.
+      // backfillprice качает свечи всех дескриптов серии из T-Invest и теперь
+      // пишет склеенную дневную свечу под root-ключом — после него
+      // переклеиваем и цену, и H/L.
       const pricedShare = rows.length ? rows.filter(r => r.close > 0).length / rows.length : 0;
-      if (t === sym && pricedShare < 0.8) {
+      const hlShare = rows.length ? rows.filter(r => r.high > 0 && r.low > 0).length / rows.length : 0;
+      if (t === sym && (pricedShare < 0.8 || hlShare < 0.5)) {
         try {
           const bp = await fetch(`${proxy}/db/oidaily/backfillprice?ticker=${encodeURIComponent(t)}`);
           const bpj = bp.ok ? await bp.json() : { error: `HTTP ${bp.status}` };
           _l(`${t}: backfillprice → ${JSON.stringify(bpj).slice(0,300)}`);
-          if (bpj.datesPriced > 0) {
+          if (bpj.datesPriced > 0 || bpj.rootCandles > 0) {
             const r2 = await fetch(`${proxy}/db/oidaily?ticker=${encodeURIComponent(t)}`);
             if (r2.ok) {
               const json2 = await r2.json();
               const rawArr2 = Array.isArray(json2) ? json2 : (json2.rows || json2.data || []);
               rows = rawArr2.map(normalizeRow).filter(r=>r.date);
-              _l(`${t}: после backfillprice строк с ценой = ${rows.filter(r=>r.close>0).length}/${rows.length}`);
             }
+            // Свечи root'а появились/обновились — переклеиваем OHLC к строкам
+            const cr3 = await fetch(`${proxy}/db/candles?ticker=${encodeURIComponent(t)}&tf=day&from=0`);
+            if (cr3.ok) {
+              const cd3 = await cr3.json();
+              const carr3 = Array.isArray(cd3) ? cd3 : (cd3.rows || []);
+              const cmap3 = {};
+              for (const c of carr3) if (c.time) cmap3[_mskDateStr(c.time)] = c;
+              rows = rows.map(r => {
+                const c = cmap3[r.date];
+                return c ? { ...r, close: c.cl || r.close, open: c.o, high: c.h, low: c.l } : r;
+              });
+            }
+            _l(`${t}: после heal цен=${rows.filter(r=>r.close>0).length}, H/L=${rows.filter(r=>r.high>0&&r.low>0).length}/${rows.length}`);
           }
         } catch(e) { _l(`${t}: backfillprice → exception ${e.message}`); }
       }
