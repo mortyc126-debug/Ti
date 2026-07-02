@@ -2631,21 +2631,33 @@ async function labBackfillIntradayPool() {
   const problems = [];
   for (let ti = 0; ti < tickers.length; ti++) {
     const t = tickers[ti];
-    let start = 0, calls = 0;
-    while (calls < 60) { // предохранитель: ~60 вызовов × 40 стр. хватает на годы истории
+    let start = 0, calls = 0, retries = 0;
+    // pages=12 вместо 40: тяжёлый вызов (40 МБ JSON на разбор) убивался CPU-
+    // лимитом бесплатного плана Workers, и Cloudflare отдавал страницу ошибки
+    // без CORS-заголовков — в консоли это выглядело как «CORS policy». Лёгкие
+    // вызовы + пауза между ними + ретрай с бэкоффом на упавших.
+    while (calls < 200) { // предохранитель
       calls++;
       setStatus(`Интрадей-бэкфилл ${t} (${ti+1}/${tickers.length}): вызов ${calls}, offset ${start}, собрано ${totalIntraday} срезов…`);
-      let j;
+      let j = null;
       try {
-        const r = await fetch(`${proxy}/db/oibackfill?tickers=${encodeURIComponent(t)}&days=${days}&pages=40&start=${start}`);
-        j = await r.json();
-      } catch(e) { problems.push(`${t}: сеть — ${e.message}`); break; }
-      if (j.error) { problems.push(`${t}: ${j.error}`); break; }
+        const r = await fetch(`${proxy}/db/oibackfill?tickers=${encodeURIComponent(t)}&days=${days}&pages=12&start=${start}`);
+        if (r.ok) j = await r.json();
+      } catch(e) { /* сеть/CORS — уйдём в ретрай ниже */ }
+      if (!j || j.error) {
+        retries++;
+        if (retries > 4) { problems.push(`${t}: не ожил после 4 ретраев на offset ${start}${j?.error ? ' — ' + j.error : ''}`); break; }
+        setStatus(`Интрадей-бэкфилл ${t}: вызов упал (лимиты воркера), ретрай ${retries}/4 через ${2 ** retries}с…`);
+        await new Promise(r => setTimeout(r, 2 ** retries * 1000));
+        continue; // тот же start — уже записанное не задублируется
+      }
+      retries = 0;
       totalDaily += j.saved || 0;
       totalIntraday += j.savedIntraday || 0;
       if (j.errors && j.errors.length) { problems.push(`${t}: ${j.errors[0]}`); console.warn(`бэкфилл ${t}:`, j.errors); }
       if (j.done || !j.nextStart) break;
       start = j.nextStart;
+      await new Promise(r => setTimeout(r, 400)); // не долбить воркер очередями
     }
   }
   const probNote = problems.length ? ` · проблемы: ${problems.length} (см. консоль)` : '';

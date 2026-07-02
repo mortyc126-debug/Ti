@@ -548,7 +548,9 @@ async function backfillOiHistory(db, env, tickers, days, stepMin = 30, startOffs
     for (let page = 0; page < maxPages; page++) {
       try {
         if (pagesTotal > 0) await new Promise(r => setTimeout(r, 150)); // не дразнить rate-limit
-        const url = `https://apim.moex.com/iss/analyticalproducts/futoi/securities/${encodeURIComponent(sym)}.json?from=${from}&till=${till}&iss.meta=off&limit=1000&start=${start}`;
+        // iss.only + columns: тянем только нужный блок и колонки — JSON в разы
+        // легче, а CPU-время на парсинг (лимит бесплатного плана) — меньше
+        const url = `https://apim.moex.com/iss/analyticalproducts/futoi/securities/${encodeURIComponent(sym)}.json?from=${from}&till=${till}&iss.meta=off&iss.only=futoi&futoi.columns=ticker,tradedate,tradetime,clgroup,pos_long,pos_short,pos_long_num,pos_short_num&limit=1000&start=${start}`;
         const resp = await fetch(url, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
         if (!resp.ok) { failed++; noteErr(`${sym} стр.${page}`, `HTTP ${resp.status} ${(await resp.text().catch(()=>'')).slice(0,120)}`); break; }
         const j = await resp.json();
