@@ -3592,7 +3592,9 @@ async function labSignalScreener(prepend) {
   const thin = thinAll.filter(h => _assetKind(_rootAsset(h.ticker) || h.ticker) !== 'акция');
 
   const th = s => `<th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center;font-weight:400">${s}</th>`;
+  const idxRes = await _getIndexResult(document.getElementById('proxy').value.trim().replace(/\/$/, ''), readCfg());
   let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#B487F8;font-weight:600;margin-bottom:6px">Скринер: активные сигналы прямо сейчас (${hits.length} на ${_lastPoolInstruments.length} инструментах)</summary>`;
+  t += _indexBanner(idxRes);
   if (!hits.length) {
     t += `<div style="font-size:11px;color:#6F648F;margin-bottom:10px">Ни на одном инструменте пула нет активного проверенного сигнала по последнему бару. Это нормальное состояние — сигналы редкие.</div>`;
   } else {
@@ -4451,6 +4453,41 @@ function showTab(name) {
   if (name === 'favs' && _favList().length) labFavsRefresh();
 }
 
+// ── ИНДЕКС-КОНТЕКСТ: состояние рынка целиком (MIX = индекс МосБиржи) ──
+// Весь рынок может двинуться синхронно, когда индекс цепляет важный уровень —
+// в такие дни индивидуальные сигналы по тикерам ненадёжнее обычного.
+let _idxCache = null;
+async function _getIndexResult(proxy, cfg) {
+  const IDX = 'MX';
+  if (_lastPoolInstruments) {
+    const f = _lastPoolInstruments.find(i => i.ticker === IDX);
+    if (f) return f.result;
+  }
+  if (_idxCache) return _idxCache;
+  try { _idxCache = await _loadInstrumentForPool(proxy, IDX, cfg, []); } catch (_) {}
+  return _idxCache;
+}
+
+function _indexBanner(res) {
+  if (!res || res.length < 25) return '';
+  const L = res[res.length - 1];
+  if (!(L.close > 0)) return '';
+  const dPx = k => { const A = res[res.length - 1 - k]; return (A && A.close > 0) ? (L.close - A.close) / A.close * 100 : NaN; };
+  const win = n => res.slice(-n).map(r => r.close).filter(c => c > 0);
+  const lvl = n => { const w = win(n); return { toMax: (Math.max(...w) - L.close) / L.close * 100, toMin: (L.close - Math.min(...w)) / L.close * 100 }; };
+  const l20 = lvl(20), l60 = lvl(60);
+  const nearest = Math.min(l20.toMax, l20.toMin, l60.toMax, l60.toMin);
+  const nearWhat = nearest === l20.toMax ? 'max 20д' : nearest === l20.toMin ? 'min 20д' : nearest === l60.toMax ? 'max 60д' : 'min 60д';
+  const warn = nearest <= 1.0;
+  const pc = v => `<span style="color:${v > 0 ? '#52F2C9' : v < 0 ? '#FF6A8B' : '#A79BC9'}">${v > 0 ? '+' : ''}${v.toFixed(1)}%</span>`;
+  return `<div style="background:${warn ? 'rgba(255,138,76,0.10)' : 'rgba(255,255,255,0.02)'};border:1px solid ${warn ? 'rgba(255,138,76,0.4)' : 'rgba(255,255,255,0.06)'};border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:11px">
+    <b style="color:#B487F8">Индекс МосБиржи</b> · ${Math.round(L.close).toLocaleString('ru-RU')}
+    · 1д ${pc(dPx(1))} · 5д ${pc(dPx(5))}
+    · <span style="font-family:var(--mono);color:#A79BC9">до max20 ${l20.toMax.toFixed(1)}% · до min20 ${l20.toMin.toFixed(1)}% · до max60 ${l60.toMax.toFixed(1)}% · до min60 ${l60.toMin.toFixed(1)}%</span>
+    ${warn ? `<br><b style="color:#FF8A4C">⚠ Индекс у кромки (${nearWhat}, ${nearest.toFixed(1)}%) — возможен синхронный ход всего рынка, индивидуальные сигналы по тикерам сейчас ненадёжнее обычного</b>` : ''}
+  </div>`;
+}
+
 // ── ИЗБРАННОЕ: список root-кодов в localStorage ──
 function _favList() { try { return JSON.parse(localStorage.getItem('oilab_favs') || '[]'); } catch (_) { return []; } }
 function favHas(t) { return _favList().includes(t); }
@@ -4505,6 +4542,13 @@ async function labFavsRefresh() {
   const cfg = readCfg();
   const byT = {};
   if (_lastPoolInstruments) for (const i of _lastPoolInstruments) byT[i.ticker] = i.result;
+  // Индекс: плашка режима рынка + база для корреляции тикеров с рынком
+  const idxRes = await _getIndexResult(proxy, cfg);
+  const idxRetByDate = {};
+  if (idxRes) {
+    const ir = _dailyReturns(idxRes);
+    for (let i = 0; i < idxRes.length; i++) if (isFinite(ir[i])) idxRetByDate[idxRes[i].date] = ir[i];
+  }
   const rows = [];
   for (let i = 0; i < favs.length; i++) {
     const tk = favs[i];
@@ -4514,24 +4558,34 @@ async function labFavsRefresh() {
       try { res = await _loadInstrumentForPool(proxy, tk, cfg, []); } catch (_) {}
     }
     if (!res || res.length < 25) { rows.push({ tk, err: 'нет данных (проверь код серии/бэкфилл)' }); continue; }
-    rows.push(_favRowData(tk, res));
+    const row = _favRowData(tk, res);
+    // Связь с рынком: корреляция дневных доходностей с индексом (общие даты)
+    const tr = _dailyReturns(res);
+    const xs = [], ys = [];
+    for (let i = 0; i < res.length; i++) {
+      const iv = idxRetByDate[res[i].date];
+      if (isFinite(tr[i]) && isFinite(iv)) { xs.push(iv); ys.push(tr[i]); }
+    }
+    row.corr = _pearson(xs, ys);
+    rows.push(row);
   }
 
   const pc = v => !isFinite(v) ? '<span style="color:#6F648F">—</span>' : `<span style="color:${v > 0 ? '#52F2C9' : v < 0 ? '#FF6A8B' : '#A79BC9'}">${v > 0 ? '+' : ''}${v.toFixed(1)}%</span>`;
   const kf = v => !isFinite(v) ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(Math.round(v)).toLocaleString('ru-RU');
   const kcol = v => !isFinite(v) ? '#6F648F' : v > 0 ? '#52F2C9' : v < 0 ? '#FF6A8B' : '#A79BC9';
   const th = s => `<th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center;font-weight:400">${s}</th>`;
-  let html = `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%">
+  let html = _indexBanner(idxRes);
+  html += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%">
   <thead><tr>
     <th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:left">Инструмент</th>
-    ${th('Цена<br>1д · 5д · 20д')}${th('ОИ, 5д')}${th('Физ.лонг Δконтрактов<br>5д · 20д')}${th('Физ.шорт Δконтрактов<br>5д · 20д')}${th('Зоны позиций')}${th('Канун')}${th('Активные сигналы')}${th('★')}
+    ${th('Цена<br>1д · 5д · 20д')}${th('ОИ, 5д')}${th('Физ.лонг Δконтрактов<br>5д · 20д')}${th('Физ.шорт Δконтрактов<br>5д · 20д')}${th('Зоны позиций')}${th('Связь<br>с рынком')}${th('Канун')}${th('Активные сигналы')}${th('★')}
   </tr></thead><tbody>`;
   for (const r of rows) {
     const asset = _rootAsset(r.tk) || r.tk;
     const word = _assetWord(asset);
     if (r.err) {
       html += `<tr><td style="padding:4px 8px;color:#F2F0FF">${asset}${word ? ' · ' + word : ''} <span style="color:#6F648F;font-size:9px">(${r.tk})</span></td>
-        <td colspan="7" style="color:#FF6A8B;padding:4px 8px">${r.err}</td>
+        <td colspan="8" style="color:#FF6A8B;padding:4px 8px">${r.err}</td>
         <td style="text-align:center;cursor:pointer;color:#FF8A4C" onclick="favToggle('${r.tk}')" title="Убрать из избранного">★</td></tr>`;
       continue;
     }
@@ -4551,6 +4605,7 @@ async function labFavsRefresh() {
       <td style="text-align:center;white-space:nowrap;font-family:var(--mono)"><span style="color:${kcol(r.dl5)}">${kf(r.dl5)}</span> · <span style="color:${kcol(r.dl20)}">${kf(r.dl20)}</span></td>
       <td style="text-align:center;white-space:nowrap;font-family:var(--mono)"><span style="color:${kcol(-r.ds5)}">${kf(r.ds5)}</span> · <span style="color:${kcol(-r.ds20)}">${kf(r.ds20)}</span></td>
       <td style="text-align:center;white-space:nowrap;font-size:10px;font-family:var(--mono)">шорт p${isFinite(L.total_short_pctl) ? Math.round(L.total_short_pctl * 100) : '—'}<br>лонг p${isFinite(L.total_long_pctl) ? Math.round(L.total_long_pctl * 100) : '—'}</td>
+      <td style="text-align:center;font-size:10px" title="Корреляция дневных доходностей с индексом МосБиржи (общая история). Высокая — тикер ходит с рынком, и при индексе у кромки его сигналы вторичны; низкая — живёт своей жизнью">${r.corr && isFinite(r.corr.r) ? `<span style="color:${Math.abs(r.corr.r) >= 0.5 ? '#B487F8' : '#6F648F'};font-family:var(--mono)">ρ ${r.corr.r.toFixed(2)}</span><br><span style="color:#6F648F;font-size:9px">${Math.abs(r.corr.r) >= 0.5 ? 'ходит с рынком' : Math.abs(r.corr.r) >= 0.25 ? 'частично' : 'сам по себе'}</span>` : '<span style="color:#6F648F">—</span>'}</td>
       <td style="text-align:center;color:${monCol};font-weight:600" title="Экспресс-монитор кануна: сколько дневных осей профиля совпало (просадка, ход за 5 баров, шорт рынка, разворот потока). Полный монитор с интрадеем — во вкладке «Тикер»">${r.mon.p}/${r.mon.n}</td>
       <td style="padding:4px 8px;font-size:10px">${sigsTxt}</td>
       <td style="text-align:center;cursor:pointer;color:#FF8A4C" onclick="favToggle('${r.tk}')" title="Убрать из избранного">★</td>
