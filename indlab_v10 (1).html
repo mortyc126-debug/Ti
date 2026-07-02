@@ -108,18 +108,18 @@ body {
   letter-spacing: 0.03em; border: 1px solid transparent;
 }
 .pill-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
-.pill.buy-strong { background: rgba(96,164,161,0.12); color: #60A4A1; border-color: rgba(96,164,161,0.3); box-shadow: 0 0 10px rgba(96,164,161,0.15); }
-.pill.buy-strong .pill-dot { background: #60A4A1; box-shadow: 0 0 6px rgba(96,164,161,0.6); }
-.pill.buy { background: rgba(96,164,161,0.08); color: #60A4A1; opacity:.85; border-color: rgba(96,164,161,0.2); }
-.pill.buy .pill-dot { background: #60A4A1; }
+.pill.buy-strong { background: rgba(96,164,161,0.12); color: #6CC9C5; border-color: rgba(96,164,161,0.3); box-shadow: 0 0 10px rgba(96,164,161,0.15); }
+.pill.buy-strong .pill-dot { background: #6CC9C5; box-shadow: 0 0 6px rgba(96,164,161,0.6); }
+.pill.buy { background: rgba(96,164,161,0.08); color: #6CC9C5; opacity:.85; border-color: rgba(96,164,161,0.2); }
+.pill.buy .pill-dot { background: #6CC9C5; }
 .pill.neutral { background: rgba(255,255,255,0.04); color: var(--text3); border-color: var(--border2); }
 .pill.neutral .pill-dot { background: var(--text3); }
 .pill.sell { background: rgba(199,27,82,0.1); color: var(--negative); opacity:.85; border-color: rgba(199,27,82,0.2); }
 .pill.sell .pill-dot { background: var(--accent); }
 .pill.sell-strong { background: rgba(199,27,82,0.14); color: var(--negative); border-color: rgba(199,27,82,0.35); box-shadow: 0 0 10px rgba(199,27,82,0.18); }
 .pill.sell-strong .pill-dot { background: var(--accent); box-shadow: 0 0 6px rgba(199,27,82,0.7); }
-.pill.warn { background: rgba(96,164,161,0.08); color: #60A4A1; border-color: rgba(96,164,161,0.25); }
-.pill.warn .pill-dot { background: #60A4A1; }
+.pill.warn { background: rgba(96,164,161,0.08); color: #6CC9C5; border-color: rgba(96,164,161,0.25); }
+.pill.warn .pill-dot { background: #6CC9C5; }
 
 /* ── Indicator row ── */
 .ind-row {
@@ -154,7 +154,7 @@ body {
 /* ── Gauge ── */
 .gauge {
   position: relative; height: 3px; border-radius: 2px;
-  background: linear-gradient(to right, #60A4A1 0%, #60A4A1 28%, var(--border2) 32%, var(--border2) 68%, var(--accent) 72%, var(--accent) 100%);
+  background: linear-gradient(to right, #6CC9C5 0%, #6CC9C5 28%, var(--border2) 32%, var(--border2) 68%, var(--accent) 72%, var(--accent) 100%);
 }
 .gauge-needle {
   position: absolute; top: -4px; width: 2px; height: 11px;
@@ -301,14 +301,14 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
 .cp-ind-row:hover .cp-ind-del { opacity: 0.5 !important; }
 .cp-ind-row:hover .cp-ind-fav { opacity: 1 !important; }
 .analysis-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; }
-.analysis-card-title { font-size: 12px; color: #9090B8; margin-bottom: 6px; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.06em; display:flex; align-items:center; gap:6px; }
-.il-legend-btn { display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:50%; background:rgba(214,92,255,0.18); border:1px solid rgba(214,92,255,0.45); color:#D65CFF; font-size:9px; cursor:pointer; flex-shrink:0; line-height:1; font-family:sans-serif; font-weight:700; transition:background .15s; user-select:none; }
+.analysis-card-title { font-size: 12px; color: #9090BB; margin-bottom: 6px; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.06em; display:flex; align-items:center; gap:6px; }
+.il-legend-btn { display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:50%; background:rgba(214,92,255,0.18); border:1px solid rgba(214,92,255,0.45); color:#B45CFF; font-size:9px; cursor:pointer; flex-shrink:0; line-height:1; font-family:sans-serif; font-weight:700; transition:background .15s; user-select:none; }
 .il-legend-btn:hover { background:rgba(214,92,255,0.35); }
 /* Модал легенды линий */
 #il-legend-modal { display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); align-items:center; justify-content:center; }
 #il-legend-modal.open { display:flex; }
-#il-legend-box { background:#1A1730; border:1px solid rgba(214,92,255,0.35); border-radius:10px; padding:16px 18px; min-width:280px; max-width:420px; max-height:85vh; overflow-y:auto; box-shadow:0 0 32px rgba(214,92,255,0.25); scrollbar-width:thin; scrollbar-color:#D65CFF #1A1730; }
-#il-legend-title { font-size:11px; color:#D65CFF; font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:.08em; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; }
+#il-legend-box { background:#1A1730; border:1px solid rgba(214,92,255,0.35); border-radius:10px; padding:16px 18px; min-width:280px; max-width:420px; max-height:85vh; overflow-y:auto; box-shadow:0 0 32px rgba(214,92,255,0.25); scrollbar-width:thin; scrollbar-color:#B45CFF #1A1730; }
+#il-legend-title { font-size:11px; color:#B45CFF; font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:.08em; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; }
 #il-legend-close { cursor:pointer; opacity:.6; font-size:14px; line-height:1; flex-shrink:0; }
 #il-legend-close:hover { opacity:1; }
 .il-legend-row { margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:10px; }
@@ -319,14 +319,14 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
 .il-legend-color-inp { width:26px; height:20px; padding:0; border:none; background:none; cursor:pointer; border-radius:3px; flex-shrink:0; }
 .il-legend-desc { font-size:10.5px; font-family:'JetBrains Mono',monospace; color:#807090; line-height:1.6; white-space:pre-line; padding-left:36px; }
 .analysis-item { font-size: 12px; font-family: 'JetBrains Mono', monospace; display: flex; gap: 6px; padding: 3px 0; color: #D0D0E8; line-height: 1.5; }
-.analysis-bullish .analysis-dot { color: #60A4A1; }
+.analysis-bullish .analysis-dot { color: #6CC9C5; }
 .analysis-bearish .analysis-dot { color: var(--negative); }
 .analysis-neutral .analysis-dot { color: #6F648F; }
 .analysis-tf { margin-top: 6px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px; display: flex; flex-direction: column; gap: 3px; }
 .analysis-tf-label { font-size: 11px; color: #6A6A8A; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
 .analysis-tf-row { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
 .analysis-tf-chip { font-size: 12px; font-family: 'JetBrains Mono', monospace; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
-.tf-high  { background: rgba(96,164,161,0.18); color: #60A4A1; }
+.tf-high  { background: rgba(96,164,161,0.18); color: #6CC9C5; }
 .tf-mid   { background: rgba(180,160,80,0.18);  color: #B4A050; }
 .tf-low   { background: rgba(120,80,80,0.20);   color: #C08080; }
 .tf-desc  { font-size: 9px; color: #6A6A8A; font-family: 'JetBrains Mono', monospace; }
@@ -709,7 +709,7 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
       <div class="summary-row"><span class="summary-name">MACD</span><span id="cb-macd" class="pill neutral"><span class="pill-dot"></span><span class="pill-lbl">—</span></span></div>
     </div>
     <button onclick="cmpSaveFromMain()"
-      style="width:100%;margin-top:14px;padding:10px;background:rgba(96,164,161,0.1);border:1px solid rgba(96,164,161,0.3);border-radius:4px;color:#60A4A1;font-family:var(--mono);font-size:12px;cursor:pointer;letter-spacing:0.03em;">
+      style="width:100%;margin-top:14px;padding:10px;background:rgba(96,164,161,0.1);border:1px solid rgba(96,164,161,0.3);border-radius:4px;color:#6CC9C5;font-family:var(--mono);font-size:12px;cursor:pointer;letter-spacing:0.03em;">
       + Сохранить в сравнение
     </button>
   </div>
@@ -1046,11 +1046,11 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
         "></div>
         <!-- Кнопки навигации по графику (зум + скролл) -->
         <div id="cp-nav-btns" style="position:absolute;bottom:6px;right:8px;display:flex;gap:4px;z-index:6;">
-          <button onclick="chartCandleW=Math.max(4,chartCandleW-2);chartRedraw();" title="Уменьшить зум (Ctrl+колесо вниз)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,0,110,0.35);background:rgba(20,10,36,0.85);color:#FF4D9D;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">−</button>
-          <button onclick="chartCandleW=Math.min(40,chartCandleW+2);chartRedraw();" title="Увеличить зум (Ctrl+колесо вверх)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,0,110,0.35);background:rgba(20,10,36,0.85);color:#FF4D9D;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">+</button>
+          <button onclick="chartCandleW=Math.max(4,chartCandleW-2);chartRedraw();" title="Уменьшить зум (Ctrl+колесо вниз)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,0,110,0.35);background:rgba(20,10,36,0.85);color:#FF2FAE;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">−</button>
+          <button onclick="chartCandleW=Math.min(40,chartCandleW+2);chartRedraw();" title="Увеличить зум (Ctrl+колесо вверх)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,0,110,0.35);background:rgba(20,10,36,0.85);color:#FF2FAE;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">+</button>
           <button onclick="chartOffset=Math.min(chartCandles.length-1,chartOffset+Math.max(10,Math.floor(chartCandles.length/8)));chartRedraw();" title="В прошлое (колесо вниз / свайп влево)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(82,242,201,0.35);background:rgba(20,10,36,0.85);color:var(--green);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">◀</button>
           <button onclick="chartOffset=Math.max(0,chartOffset-Math.max(10,Math.floor(chartCandles.length/8)));chartRedraw();" title="Вперёд к последней свече (колесо вверх / свайп вправо)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(82,242,201,0.35);background:rgba(20,10,36,0.85);color:var(--green);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">▶</button>
-          <button onclick="chartOffset=0;chartRedraw();" title="К последней свече" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(20,10,36,0.85);color:#9090B8;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--mono);">⇥</button>
+          <button onclick="chartOffset=0;chartRedraw();" title="К последней свече" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(20,10,36,0.85);color:#9090BB;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--mono);">⇥</button>
         </div>
         <!-- Candle info toggle bar -->
         <div id="cp-candle-toggles" style="position:absolute;bottom:6px;left:8px;display:flex;gap:5px;z-index:5;opacity:0.85;">
@@ -3082,7 +3082,7 @@ function drawMACD(fast, slow, hist) {
     data.forEach((v,i)=>{ const x=i/(pts-1)*W, y=H/2-v/maxV*(H/2-4); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
     ctx.stroke(); ctx.shadowBlur=0;
   };
-  drawML(fD,'#60A4A1'); drawML(sD,'#52A8E0');
+  drawML(fD,'#6CC9C5'); drawML(sD,'#52A8E0');
 }
 
 // ═══════════════════════════════════════════
@@ -3239,7 +3239,7 @@ function drawDragCanvas(canvasId, keys) {
     ctx.fillText('80', 4, H*0.8 - 3);
   }
 
-  const COLORS = { k:'#4cc9f0', d:'#52A8E0', mf:'#60A4A1', ms:'#52A8E0' };
+  const COLORS = { k:'#4cc9f0', d:'#52A8E0', mf:'#6CC9C5', ms:'#52A8E0' };
   const LABELS = { k:'%K', d:'%D', mf:'EMA12', ms:'EMA26' };
 
   // connection line
@@ -3453,7 +3453,7 @@ const FIBS=[
   {pct:50,  label:'50% — середина движения',      color:'#8aa0b6'},
   {pct:61.8,label:'61.8% — золотое сечение',      color:'var(--accent)'},
   {pct:78.6,label:'78.6% — глубокая коррекция',   color:'#4cc9f0'},
-  {pct:100, label:'100% — основание волны',        color:'#60A4A1'},
+  {pct:100, label:'100% — основание волны',        color:'#6CC9C5'},
 ];
 function syncFib(side,from) {
   const sliderEl=document.getElementById(`f${side}-slider`);
@@ -3950,7 +3950,7 @@ function oiRenderVals(last) {
   const fmt = (v,d=3) => v==null||isNaN(v) ? '—' : v.toFixed(d);
   const row = (label,val,color) => `<div style="display:flex;justify-content:space-between;"><span style="color:var(--text3);">${label}</span><span style="color:${color||'var(--text)'};font-weight:600;">${val}</span></div>`;
   const wi = last.weighted_imbalance;
-  const wiColor = wi==null ? 'var(--text3)' : wi>0.3 ? 'var(--accent)' : wi<-0.3 ? '#60A4A1' : 'var(--text)';
+  const wiColor = wi==null ? 'var(--text3)' : wi>0.3 ? 'var(--accent)' : wi<-0.3 ? '#6CC9C5' : 'var(--text)';
   el.innerHTML = [
     row('Дата', last.date),
     row('NetPhys%', fmt(last.net_phys_pct!=null?last.net_phys_pct*100:null,2)+'%'),
@@ -3982,7 +3982,7 @@ function oiInterpretText(last) {
   } else if (wi > 0) {
     lines.push(`<span style="color:var(--negative)">Физ.лица перегружены лонгом (z=${wi.toFixed(2)}) — контртрендовый риск движения ВНИЗ${last.accumulation_flag?', + признак накопления (узкий диапазон)':''}</span>`);
   } else {
-    lines.push(`<span style="color:#60A4A1">Физ.лица перегружены шортом (z=${wi.toFixed(2)}) — контртрендовый риск движения ВВЕРХ${last.accumulation_flag?', + признак накопления (узкий диапазон)':''}</span>`);
+    lines.push(`<span style="color:#6CC9C5">Физ.лица перегружены шортом (z=${wi.toFixed(2)}) — контртрендовый риск движения ВВЕРХ${last.accumulation_flag?', + признак накопления (узкий диапазон)':''}</span>`);
   }
   return lines.join('<br>');
 }
@@ -4098,7 +4098,7 @@ const COMBOS = [
   },
   {
     id:'bb_rsi', name:'Bollinger + RSI',
-    tag:'Флэт + Подтверждение', tagColor:'#60A4A1',
+    tag:'Флэт + Подтверждение', tagColor:'#6CC9C5',
     desc:'BB показывает экстремальные зоны цены, RSI подтверждает перепроданность/перекупленность.',
     why:'BB может ложно сигнализировать при тренде. RSI фильтрует: нижняя полоса BB + RSI < 30 = настоящий сигнал.',
     inds:['Bollinger Bands (20, 2σ)','RSI (14)'],
@@ -4242,7 +4242,7 @@ const COMBO_PRESETS = [
     name:'Bollinger + RSI',
     icon: '◆',
     tag:'Флэт + Разворот',
-    tagColor:'#60A4A1',
+    tagColor:'#6CC9C5',
     short:'BB показывает экстремум — RSI подтверждает что это не тренд.',
     question:'Цена у края канала, думаю о развороте?',
     chartIds: ['bb', 'rsi', 'stoch'],
@@ -4426,7 +4426,7 @@ const COMBO_PRESETS = [
     name: 'Пятислойная компрессия',
     icon: '◆',
     tag: 'Волатильность · Сжатие',
-    tagColor: '#60A4A1',
+    tagColor: '#6CC9C5',
     short: 'Все пять мер волатильности на минимумах одновременно — взрыв неизбежен.',
     signal: 'neutral',
     chartIds: ['bb_width','hist_vol','chaikin_vol','std_dev','atr_w'],
@@ -4452,7 +4452,7 @@ const COMBO_PRESETS = [
     name: 'Оптимальный набор (большое комбо)',
     icon: '◆',
     tag: 'Мастер-стратегия',
-    tagColor: '#60A4A1',
+    tagColor: '#6CC9C5',
     short: '16 инструментов из всех категорий: режим + деньги + тренд + волатильность.',
     signal: 'neutral',
     chartIds: ['dpo','accel_osc','fisher','kvo','force_idx','cmf','adline','eom','nvi','dmi','supertrend','vortex','envelopes','bb_width','hist_vol','chaikin_vol'],
@@ -4475,7 +4475,7 @@ function applyPreset(id) {
     cpActiveCombo = id;
     cpRenderCombos();
     if (chartCandles && chartCandles.length) {
-      showToast('✓ ' + p.name, '#60A4A1');
+      showToast('✓ ' + p.name, '#6CC9C5');
       setTimeout(function(){
         chartRedraw();
         // Автоматически открываем вкладку Анализ
@@ -5147,7 +5147,7 @@ function drawGuideCanvas(patternId) {
 
   const drawCandle = (x, o, h, l, c, w) => {
     const up = c >= o;
-    const col = up ? '#60A4A1' : '#C71B52';
+    const col = up ? '#6CC9C5' : '#C71B52';
     ctx.strokeStyle = col; ctx.fillStyle = col;
     ctx.lineWidth = 1;
     // wick
@@ -5277,7 +5277,7 @@ function drawGuideCanvas(patternId) {
       });
       // Hammer candle
       const hx=nx(11), ho=toY(94), hc=toY(96), hh=toY(97), hl=toY(83);
-      ctx.strokeStyle='#60A4A1'; ctx.fillStyle='#60A4A1'; ctx.lineWidth=1;
+      ctx.strokeStyle='#6CC9C5'; ctx.fillStyle='#6CC9C5'; ctx.lineWidth=1;
       ctx.beginPath(); ctx.moveTo(hx,hh); ctx.lineTo(hx,hl); ctx.stroke();
       ctx.fillRect(hx-cw/2, hc, cw, ho-hc);
       label(hx+8, hh-4, 'Молот', '#52F2C9');
@@ -5701,7 +5701,7 @@ function showDiagResult(contextId, mode) {
       </div>
 
       <div style="padding:14px 16px;border-bottom:1px solid var(--border);">
-        <div style="font-size:10px;color:#60A4A1;font-family:var(--mono);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px;">Как читать индикаторы в этом контексте</div>
+        <div style="font-size:10px;color:#6CC9C5;font-family:var(--mono);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px;">Как читать индикаторы в этом контексте</div>
         <div style="font-size:12px;color:var(--text2);line-height:1.6;">${ctx.read}</div>
       </div>
 
@@ -5838,48 +5838,48 @@ function cpToggleSettings() {
   const b = document.getElementById('cp-settings-btn');
   const open = d.style.display === 'none';
   d.style.display = open ? 'flex' : 'none';
-  b.style.color = open ? '#FF4D9D' : '#6F648F';
+  b.style.color = open ? '#FF2FAE' : '#6F648F';
   b.style.borderColor = open ? 'rgba(255,77,157,0.4)' : 'rgba(255,255,255,0.1)';
 }
 
 // ─── Глобальный хелпер: цвет линии индикатора (с учётом пользовательских настроек) ──
 // Дефолты совпадают с _IL_LINE_DEFS, но переопределяются через il_line_colors_v1
 const _IL_COLOR_DEFAULTS = {
-  macd:      ['#B45CFF','#FF4D9D','#52F2C9','#FF4D7A'],
-  bb:        ['#3DD9FF','#FFD166','#3DD9FF'],
-  stoch:     ['#D65CFF','#FFB84D'],
-  ichimoku:  ['#FF006E','#3DD9FF','#52F2C9','#7B61FF','#D65CFF'],
+  macd:      ['#B45CFF','#FF2FAE','#52F2C9','#FF4D7A'],
+  bb:        ['#3DD9FF','#FF8800','#3DD9FF'],
+  stoch:     ['#B45CFF','#FF8800'],
+  ichimoku:  ['#FF006E','#3DD9FF','#52F2C9','#7B61FF','#B45CFF'],
   alligator: ['#3DD9FF','#FF4D7A','#52F2C9'],
-  ma:        ['#FFD166','#FF8A4C'],
-  adx:       ['#D65CFF','#52F2C9','#FF4D7A'],
-  keltner:   ['#3DD9FF','#FFD166','#3DD9FF'],
+  ma:        ['#FF2FAE','#FF8A4C'],
+  adx:       ['#B45CFF','#52F2C9','#FF4D7A'],
+  keltner:   ['#3DD9FF','#FF8800','#3DD9FF'],
   elder_ray: ['#52F2C9','#FF4D7A'],
   vortex:    ['#52F2C9','#FF4D7A'],
-  dmi:       ['#D65CFF','#52F2C9','#FF4D7A'],
+  dmi:       ['#B45CFF','#52F2C9','#FF4D7A'],
   mama:      ['#FF006E','#3DD9FF'],
-  kvo:       ['#B45CFF','#FF4D9D'],
+  kvo:       ['#B45CFF','#FF2FAE'],
   donchian:  ['#3DD9FF','#A79BC9','#3DD9FF'],
-  nw:        ['#FFD23F','#FF8800'],
+  nw:        ['#7B61FF','#FF8800'],
   kalman:    ['#3DD9FF','#7B61FF'],
   gpr:       ['#52F2C9','#2BA98B'],
-  envelopes: ['#3DD9FF','#FFD166','#3DD9FF'],
-  tsi:       ['#D65CFF','#FFB84D'],
+  envelopes: ['#3DD9FF','#FF8800','#3DD9FF'],
+  tsi:       ['#B45CFF','#FF8800'],
   cyber_cyc: ['#FF006E','#3DD9FF'],
-  ebs:       ['#D65CFF','#FF8A4C'],
-  cusum:     ['#60A4A1','#C71B52'],
-  hmm:       ['#FF4D7A','#60A4A1'],
-  hurst:     ['#FF4D7A','#52F2C9','#9090B8'],
+  ebs:       ['#B45CFF','#FF8A4C'],
+  cusum:     ['#6CC9C5','#C71B52'],
+  hmm:       ['#FF4D7A','#6CC9C5'],
+  hurst:     ['#FF4D7A','#52F2C9','#9090BB'],
   mprof:     ['#52F2C9','#FF4D7A'],
-  te:        ['#FFD23F','#9090B8'],
+  te:        ['#7B61FF','#9090BB'],
   ssa:       ['#FF8800'],
-  rough:     ['#FF8800','#FFD23F','#9090B8','#52F2C9'],
+  rough:     ['#FF8800','#7B61FF','#9090BB','#52F2C9'],
 };
 function _ilC(key, idx) {
   try {
     const saved = JSON.parse(localStorage.getItem('il_line_colors_v1') || '{}');
     if (saved[key] && saved[key][idx] != null) return saved[key][idx];
   } catch(e) {}
-  return (_IL_COLOR_DEFAULTS[key] || [])[idx] || '#9090B8';
+  return (_IL_COLOR_DEFAULTS[key] || [])[idx] || '#9090BB';
 }
 
 function chartSaveToken() {
@@ -6244,7 +6244,7 @@ function _chartDrawAltInd() {
   if (!allWithAlt.length) { panel.style.display = 'none'; return; }
 
   const activeAlt = allWithAlt.filter(x => x.it.useAlt);
-  const palette = ['#FF006E','#52F2C9','#3DD9FF','#FFD166','#D65CFF','#FFB84D','#7B61FF','#52D8A0','#FF9F40','#A78BFA'];
+  const palette = ['#FF006E','#52F2C9','#3DD9FF','#FF8800','#B45CFF','#9090BB','#7B61FF','#52D8A0','#FF9F40','#A78BFA'];
 
   if (legend) {
     if (activeAlt.length) {
@@ -7031,8 +7031,8 @@ function _chartDrawMain() {
     vis.forEach((c, i) => {
       const x=xOf(i), op=toY(c.open), cl=toY(c.close), hi2=toY(c.high), lo2=toY(c.low);
       const bull = c.close >= c.open;
-      ctx.strokeStyle = bull ? '#60A4A1' : '#C71B52';
-      ctx.fillStyle   = bull ? '#60A4A1' : '#C71B52';
+      ctx.strokeStyle = bull ? '#6CC9C5' : '#C71B52';
+      ctx.fillStyle   = bull ? '#6CC9C5' : '#C71B52';
       // Wick
       ctx.lineWidth=1;
       ctx.beginPath(); ctx.moveTo(x, hi2); ctx.lineTo(x, lo2); ctx.stroke();
@@ -7145,7 +7145,7 @@ function _chartDrawMain() {
       ctx.strokeStyle = price>_lastClose2 ? 'rgba(192,128,128,0.55)' : 'rgba(96,164,161,0.55)';
       ctx.lineWidth=1;
       ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = price>_lastClose2 ? '#C08080' : '#60A4A1'; ctx.font='8px monospace'; ctx.textAlign='left';
+      ctx.fillStyle = price>_lastClose2 ? '#C08080' : '#6CC9C5'; ctx.font='8px monospace'; ctx.textAlign='left';
       ctx.fillText(`${price.toFixed(price<100?2:0)} (${cnt})`, 4, y-2);
       ctx.restore();
     });
@@ -8794,7 +8794,7 @@ function _cpDrawMeasurePts(pt1, pt2, W, H) {
   // Точки
   [pt1, pt2].forEach((p, i) => {
     ctx.beginPath(); ctx.arc(p.xPx, p.yPx, 4, 0, Math.PI*2);
-    ctx.fillStyle = i===0 ? '#FFD166' : col; ctx.fill();
+    ctx.fillStyle = i===0 ? '#FF8800' : col; ctx.fill();
   });
 
   // Метка
@@ -9235,7 +9235,7 @@ function cpRenderCombos() {
       <div id="cpcombodet-${c.id}" style="display:${isActive ? 'block' : 'none'};padding:0 10px 10px;border-top:1px solid rgba(255,255,255,0.05);">
         <div style="font-size:10px;color:var(--text2);line-height:1.5;margin:8px 0 6px;">${c.desc||c.short||''}</div>
         ${c.why ? `<div style="font-size:9px;color:#52A8E0;line-height:1.4;margin-bottom:7px;padding:4px 7px;background:rgba(82,168,224,0.06);border-radius:5px;border-left:2px solid #52A8E044;">${c.why}</div>` : ''}
-        ${c.question ? `<div style="font-size:9px;color:#FFD166;line-height:1.4;margin-bottom:6px;padding:4px 7px;background:rgba(255,209,102,0.05);border-radius:5px;border-left:2px solid rgba(255,209,102,0.3);">❓ ${c.question}</div>` : ''}
+        ${c.question ? `<div style="font-size:9px;color:#FF8800;line-height:1.4;margin-bottom:6px;padding:4px 7px;background:rgba(255,209,102,0.05);border-radius:5px;border-left:2px solid rgba(255,209,102,0.3);">❓ ${c.question}</div>` : ''}
         ${c.fields?.length ? `<div style="margin-bottom:7px;">${c.fields.map(ff=>`<div style="margin-bottom:6px;"><div style="font-size:9px;color:var(--text2);margin-bottom:2px;">${ff.label}</div><div style="font-size:9px;color:var(--text3);line-height:1.4;">${ff.hint}</div></div>`).join('')}</div>` : ''}
         ${c.inds?.length ? `
         <div style="font-size:9px;color:#6F648F;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">
@@ -9332,14 +9332,14 @@ function _sysOptimalSection() {
       + '</div>';
   }).join('');
   return '<details style="margin-bottom:8px;border:1px solid rgba(96,164,161,0.3);border-radius:6px;">'
-    + '<summary style="cursor:pointer;padding:6px 10px;font-size:10px;color:#60A4A1;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;list-style:none;display:flex;align-items:center;gap:6px;">'
+    + '<summary style="cursor:pointer;padding:6px 10px;font-size:10px;color:#6CC9C5;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;list-style:none;display:flex;align-items:center;gap:6px;">'
     + '<span style="font-size:12px;">◆</span>Оптимальный набор'
     + (agg.sig ? ('<span title="Агрегированный сигнал по классике/альт выбору" style="font-size:9px;padding:1px 6px;border-radius:6px;background:' + aggCol + '22;color:' + aggCol + ';border:1px dashed ' + aggCol + '66;margin-left:auto;">Σ ' + agg.sig.replace('-',' ') + '</span>') : '')
     + '</summary>'
     + '<div style="padding:8px 10px 10px;">'
     + '<div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:8px;">Накапливается из всех категорий. Метка клас/альт у строки — клик переключает формулу для агрегированного сигнала (Σ выше). Активировать = включить все на графике.</div>'
     + rows
-    + '<button onclick="_sysActivateOptimal()" style="margin-top:10px;width:100%;padding:5px;background:rgba(96,164,161,0.12);border:1px solid rgba(96,164,161,0.35);border-radius:6px;color:#60A4A1;font-family:var(--mono);font-size:10px;cursor:pointer;letter-spacing:0.04em;">▶ Активировать всё на графике</button>'
+    + '<button onclick="_sysActivateOptimal()" style="margin-top:10px;width:100%;padding:5px;background:rgba(96,164,161,0.12);border:1px solid rgba(96,164,161,0.35);border-radius:6px;color:#6CC9C5;font-family:var(--mono);font-size:10px;cursor:pointer;letter-spacing:0.04em;">▶ Активировать всё на графике</button>'
     + '</div></details>';
 }
 
@@ -9360,7 +9360,7 @@ function _sysActivateOptimal() {
   Object.keys(chartInds).forEach(k => { if(chartInds[k]) cpChartToggle(k); });
   _SYS_OPTIMAL.forEach(item => { if(!chartInds[item.id]) cpChartToggle(item.id); });
   window._cpBatchToggle = false;
-  showToast('✓ Оптимальный набор активирован (' + _SYS_OPTIMAL.length + ' инструментов)', '#60A4A1');
+  showToast('✓ Оптимальный набор активирован (' + _SYS_OPTIMAL.length + ' инструментов)', '#6CC9C5');
   // Одна перерисовка после всех переключений
   setTimeout(() => {
     if (chartCandles.length) chartRedraw();
@@ -9423,7 +9423,7 @@ function _sysRenderStaticSections() {
       + '</details>';
   }
 
-  const NC = 'var(--accent)', IND = '#60A4A1', CL = '#6F648F';
+  const NC = 'var(--accent)', IND = '#6CC9C5', CL = '#6F648F';
 
   el.innerHTML = [
 
@@ -10129,7 +10129,7 @@ function _sysRenderSigPairs() {
   const inactive = pairs.filter(p=>!p.ok);
 
   const groupLabel = { max:'Уверенность 95%+', strong:'Уверенность 85-94%', medium:'Уверенность 75-84%', exit:'Сигнал выхода' };
-  const groupCol   = { max:'var(--negative)', strong:'#7A8CFF', medium:'#6F7CA8', exit:'#60A4A1' };
+  const groupCol   = { max:'var(--negative)', strong:'#7A8CFF', medium:'#6F7CA8', exit:'#6CC9C5' };
 
   let html = '';
   if (active.length === 0) {
@@ -10492,19 +10492,19 @@ function _sysRenderVoltageMap() {
   // High choppiness = compressed, low ATR = compressed, high BB squeeze ratio <1 = squeeze, Z-score ~0 = neutral
   const scores = {
     'Choppiness':  { val: chop.toFixed(0),  unit:'', compressed: chop>61.8, trending: chop<38.2,
-      color: chop>61.8?'#C08080':chop<38.2?'#60A4A1':'#B4A050',
+      color: chop>61.8?'#C08080':chop<38.2?'#6CC9C5':'#B4A050',
       note: chop>61.8?'сжатие (↑61.8) — энергия копится':chop<38.2?'тренд (↓38.2) — движение идёт':'нейтральная зона' },
     'ATR rel.':    { val: (atrRatio*100).toFixed(0), unit:'%',
-      color: atrRatio<0.7?'#C08080':atrRatio>1.3?'#60A4A1':'#B4A050',
+      color: atrRatio<0.7?'#C08080':atrRatio>1.3?'#6CC9C5':'#B4A050',
       note: atrRatio<0.7?'спреды малы (↓70%) — рынок спит':atrRatio>1.3?'спреды большие (↑130%) — движение идёт':'нормальная волатильность' },
     'BB Squeeze':  { val: (bbSqueeze*100).toFixed(0), unit:'%',
-      color: bbSqueeze<0.7?'#C08080':bbSqueeze>1.3?'#60A4A1':'#B4A050',
+      color: bbSqueeze<0.7?'#C08080':bbSqueeze>1.3?'#6CC9C5':'#B4A050',
       note: bbSqueeze<0.7?'сильный сквиз (↓70% avg) — взрыв близко':bbSqueeze>1.3?'полосы расширены — движение в процессе':'нормальная ширина' },
     'Z-score':     { val: zscore.toFixed(2), unit:'',
-      color: zscore<0.5?'#C08080':zscore>2?'#60A4A1':'#B4A050',
+      color: zscore<0.5?'#C08080':zscore>2?'#6CC9C5':'#B4A050',
       note: zscore<0.5?'движение случайное — энергия не выпущена':zscore>2?'статистический экстремум — движение значимо':'умеренное отклонение' },
     'Fisher RSI':  { val: fisherRsi.toFixed(2), unit:'',
-      color: fisherRsi>1.5?'#C08080':fisherRsi<0.5?'#B4A050':'#60A4A1',
+      color: fisherRsi>1.5?'#C08080':fisherRsi<0.5?'#B4A050':'#6CC9C5',
       note: fisherRsi>1.5?'крайность — перегрето, вот-вот разворот':fisherRsi<0.5?'нейтральное состояние':'умеренное напряжение' },
   };
 
@@ -10515,7 +10515,7 @@ function _sysRenderVoltageMap() {
   let verdict = '', vColor = '#6F648F';
   if (compressedCount >= 3 && fishExtreme) { verdict = 'МАКСИМАЛЬНОЕ СЖАТИЕ — система на пределе. Методы (VSA/Wyckoff/AMT) покажут куда выпустит.'; vColor='var(--accent)'; }
   else if (compressedCount >= 2) { verdict = 'Умеренное сжатие — энергия накапливается. Следи за пульсом VSA и Choppiness.'; vColor='#7A8CFF'; }
-  else { verdict = 'Система в движении или нейтральна — компрессии нет.'; vColor='#60A4A1'; }
+  else { verdict = 'Система в движении или нейтральна — компрессии нет.'; vColor='#6CC9C5'; }
 
   const rows = Object.entries(scores).map(([name,s]) =>
     '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
@@ -10701,7 +10701,7 @@ function _sysRenderHLevels() {
     const price = key*bucketSize;
     const rel = price > lastClose ? '↑ сопр.' : price < lastClose ? '↓ подд.' : '= текущая';
     const dist = ((price-lastClose)/lastClose*100).toFixed(2);
-    txt += `<span style="color:${price>lastClose?'#C08080':'#60A4A1'};">${price.toFixed(price<100?2:0)}</span> — ${cnt} касаний, ${rel} (${dist>0?'+':''}${dist}%)<br>`;
+    txt += `<span style="color:${price>lastClose?'#C08080':'#6CC9C5'};">${price.toFixed(price<100?2:0)}</span> — ${cnt} касаний, ${rel} (${dist>0?'+':''}${dist}%)<br>`;
   });
   txt += `<br><span style="color:var(--text3);">Неклас: уровень силён, если касался 3+ раза без пробоя. При первом пробое с объёмом — смена роли. Кластер из 2+ соседних зон = сильная поддержка/сопротивление.</span>`;
   el.innerHTML = `<span style="color:var(--text2);">${txt}</span>`;
@@ -10799,7 +10799,7 @@ function cpInitIndPanel() {
         </div>
         <div id="cpdetail-${ind.id}" style="display:none;padding:6px 8px 8px 20px;background:rgba(255,255,255,0.02);border-radius:0 0 7px 7px;border:1px solid rgba(255,255,255,0.05);border-top:none;margin-top:-2px;">
           <div style="font-size:9px;color:#6F648F;line-height:1.5;margin-bottom:6px;">${ind.desc||''}</div>
-          ${(()=>{const pc=(typeof PROS_CONS!=='undefined')&&PROS_CONS[ind.id];if(!pc)return'';return`<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px;"><div style="background:rgba(96,164,161,0.06);border:1px solid rgba(96,164,161,0.18);border-radius:5px;padding:6px 7px;"><div style="font-size:8px;color:#60A4A1;font-family:var(--mono);letter-spacing:0.05em;margin-bottom:3px;">+ ПЛЮСЫ</div>${pc.pros.map(p=>`<div style="font-size:9px;color:var(--text2);padding:1px 0;line-height:1.4;">· ${p}</div>`).join('')}</div><div style="background:rgba(199,27,82,0.06);border:1px solid rgba(199,27,82,0.18);border-radius:5px;padding:6px 7px;"><div style="font-size:8px;color:var(--negative);font-family:var(--mono);letter-spacing:0.05em;margin-bottom:3px;">− МИНУСЫ</div>${pc.cons.map(c=>`<div style="font-size:9px;color:var(--text2);padding:1px 0;line-height:1.4;">· ${c}</div>`).join('')}</div></div>`;})()}
+          ${(()=>{const pc=(typeof PROS_CONS!=='undefined')&&PROS_CONS[ind.id];if(!pc)return'';return`<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px;"><div style="background:rgba(96,164,161,0.06);border:1px solid rgba(96,164,161,0.18);border-radius:5px;padding:6px 7px;"><div style="font-size:8px;color:#6CC9C5;font-family:var(--mono);letter-spacing:0.05em;margin-bottom:3px;">+ ПЛЮСЫ</div>${pc.pros.map(p=>`<div style="font-size:9px;color:var(--text2);padding:1px 0;line-height:1.4;">· ${p}</div>`).join('')}</div><div style="background:rgba(199,27,82,0.06);border:1px solid rgba(199,27,82,0.18);border-radius:5px;padding:6px 7px;"><div style="font-size:8px;color:var(--negative);font-family:var(--mono);letter-spacing:0.05em;margin-bottom:3px;">− МИНУСЫ</div>${pc.cons.map(c=>`<div style="font-size:9px;color:var(--text2);padding:1px 0;line-height:1.4;">· ${c}</div>`).join('')}</div></div>`;})()}
           ${(ind.params||[]).length ? `<div style="font-size:8px;color:#5a5080;font-family:var(--mono);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:5px;">Параметры</div>` : ''}
           ${(ind.params||[]).map(p => `
           <div style="margin-bottom:7px;">
@@ -14106,10 +14106,10 @@ const _IL_GROUPS = [
   { label: 'Осциллятор / перекупленность',  color: '#A78BFA', ids: ['rsi','wr','cci','mfi','stoch','cmo','tsi','ult_osc'] },
   { label: 'Тренд / импульс',               color: 'var(--green)', ids: ['macd','ao','ema','adx','fisher','parabolic','supertrend'] },
   { label: 'Канал / волатильность',          color: '#FF9F40', ids: ['bb','keltner','envelopes','donchian','hist_vol','bb_pct','bb_width'] },
-  { label: 'Объём / деньги',                color: '#60A4A1', ids: ['obv','acc_dist','chaikin_osc','cmf','mfi','elder_ray','force_idx','pvt','vo'] },
+  { label: 'Объём / деньги',                color: '#6CC9C5', ids: ['obv','acc_dist','chaikin_osc','cmf','mfi','elder_ray','force_idx','pvt','vo'] },
   { label: 'Структура / цикл',              color: '#6366F1', ids: ['ichimoku','alligator','zigzag','fractals','dpo','chop','vortex','cyber_cycle','mama','ebs','ssa'] },
   { label: 'Продвинутая статистика / DSP',  color: '#7A8CFF', ids: ['nw','kalman','gpr','cusum','tmf','cum_delta','bb_pct'] },
-  { label: 'Режим рынка (без винрейта)',    color: '#9090B8', ids: ['hmm','hurst','mprof','te','rough','frac_dim','efficiency_ratio','entropy'] },
+  { label: 'Режим рынка (без винрейта)',    color: '#9090BB', ids: ['hmm','hurst','mprof','te','rough','frac_dim','efficiency_ratio','entropy'] },
 ];
 
 // Показывает/скрывает и стилизует alt-ромбики — вызывается после того как
@@ -14735,29 +14735,29 @@ function _renderAnalysisInner(panel) {
   // ─── Цвета линий по ключу индикатора (Neon Magenta Terminal) ──────────────────────
   const _IL_LINE_DEFS = {
     rsi: [
-      {name:'RSI (14)', color:'#D65CFF', desc:'Индекс относительной силы. Сравнивает средние приросты и падения за 14 свечей. Диапазон 0–100. Выше 70 — перекупленность, ниже 30 — перепроданность.\n► Изменить период: 7 = реагирует вдвое быстрее, больше ложных сигналов. 21 = сглаженнее, подходит для D/W. 2 = экстремальный скальпинг.'},
+      {name:'RSI (14)', color:'#B45CFF', desc:'Индекс относительной силы. Сравнивает средние приросты и падения за 14 свечей. Диапазон 0–100. Выше 70 — перекупленность, ниже 30 — перепроданность.\n► Изменить период: 7 = реагирует вдвое быстрее, больше ложных сигналов. 21 = сглаженнее, подходит для D/W. 2 = экстремальный скальпинг.'},
     ],
     macd: [
       {name:'MACD', color:'#B45CFF', desc:'Разность EMA(12) и EMA(26). Растёт — импульс набирает силу вверх. Падает — вниз. При сужении линий к нулю — импульс угасает.\n► Стандарт: 12/26/9. Быстрый: 5/13/5 (скальп). Медленный: 19/39/9 (D/W).'},
-      {name:'Сигнальная', color:'#FF4D9D', desc:'EMA(9) от самой MACD. Сигнал: MACD пересекает сигнальную снизу вверх = покупка, сверху вниз = продажа. Чем резче пересечение — тем сильнее импульс.'},
+      {name:'Сигнальная', color:'#FF2FAE', desc:'EMA(9) от самой MACD. Сигнал: MACD пересекает сигнальную снизу вверх = покупка, сверху вниз = продажа. Чем резче пересечение — тем сильнее импульс.'},
       {name:'Гистограмма ▲ (рост)', color:'var(--green)', desc:'MACD − Сигнал > 0. Бычье давление. Высота столбца = интенсивность. Уменьшение высоты при положительных значениях = импульс слабеет.'},
       {name:'Гистограмма ▼ (падение)', color:'#FF4D7A', desc:'MACD − Сигнал < 0. Медвежье давление. Рост отрицательного столбца = усиление давления вниз. Сжатие к нулю = возможный разворот.'},
     ],
     bb: [
       {name:'Верхняя полоса', color:'#3DD9FF', desc:'SMA(20) + 2 стандартных отклонения. ~95% цен статистически должно быть внутри. Касание верхней при тренде — НЕ сигнал продажи, это признак силы. Пробой вверх = импульсный выброс.\n► Уменьши множитель до 1.5 — канал уже, больше ложных прорывов. Увеличь до 3 — только экстремальные выбросы.'},
-      {name:'Средняя (SMA 20)', color:'#FFD166', desc:'Простая скользящая за 20 свечей. Магнит для цены: после сильных движений цена возвращается к ней. Наклон показывает краткосрочный тренд.\n► Период 10 = быстрый отклик. 50 = долгосрочный контекст.'},
+      {name:'Средняя (SMA 20)', color:'#FF8800', desc:'Простая скользящая за 20 свечей. Магнит для цены: после сильных движений цена возвращается к ней. Наклон показывает краткосрочный тренд.\n► Период 10 = быстрый отклик. 50 = долгосрочный контекст.'},
       {name:'Нижняя полоса', color:'#3DD9FF', desc:'SMA(20) − 2σ. Касание нижней при нисходящем тренде — не сигнал покупки сам по себе. Squeeze (сужение канала до минимума) перед расширением = накопление, взрыв близко.'},
     ],
     stoch: [
-      {name:'%K — быстрый стохастик', color:'#D65CFF', desc:'Позиция цены закрытия относительно диапазона за 14 свечей. 0–100. Реагирует первым.\n► Период 14→5: ультрабыстрый, много шума. 14→21: сглаженнее.'},
-      {name:'%D — сигнальная (SMA 3 от %K)', color:'#FFB84D', desc:'Скользящая средняя за 3 от %K. Медленнее, фильтрует шум. Пересечение %K над %D выше 20 = бычий сигнал. Дивергенция %D с ценой = сильный сигнал разворота.'},
+      {name:'%K — быстрый стохастик', color:'#B45CFF', desc:'Позиция цены закрытия относительно диапазона за 14 свечей. 0–100. Реагирует первым.\n► Период 14→5: ультрабыстрый, много шума. 14→21: сглаженнее.'},
+      {name:'%D — сигнальная (SMA 3 от %K)', color:'#FF8800', desc:'Скользящая средняя за 3 от %K. Медленнее, фильтрует шум. Пересечение %K над %D выше 20 = бычий сигнал. Дивергенция %D с ценой = сильный сигнал разворота.'},
     ],
     ichimoku: [
       {name:'Tenkan-sen / Поворотная линия', color:'#FF006E', desc:'(Макс + Мин) / 2 за последние 9 свечей. Быстрая «линия баланса». Пересечение с Kijun — TK-крест, основной сигнал. Флэт = нет движения.\n► Период 9→7: чуть быстрее. 9→20: медленнее, меньше ложных пересечений.'},
       {name:'Kijun-sen / Эталонная линия', color:'#3DD9FF', desc:'(Макс + Мин) / 2 за 26 свечей. Мощнейшая динамическая поддержка/сопротивление. Цена выше Kijun = бычий контекст. Возврат к Kijun часто используют для входа.\n► 26→52: долгосрочная опора (недельный TF).'},
       {name:'Senkou Span A / Пролёт A', color:'var(--green)', desc:'(Tenkan + Kijun) / 2, сдвинутая на 26 свечей вперёд. Быстрая граница облака. Цена над Span A — бычий сигнал, под ней — медвежий. Наклон = динамика тренда.'},
       {name:'Senkou Span B / Пролёт B', color:'#7B61FF', desc:'(Макс + Мин) / 2 за 52 свечи, сдвинутая на 26 вперёд. Медленная граница облака — сильнейшая долгосрочная поддержка/сопротивление. Плоская Span B = флэт/консолидация.\n► Облако (Kumo) между A и B: толстое = мощный барьер, тонкое = слабое.'},
-      {name:'Chikou Span / Запаздывающая', color:'#D65CFF', desc:'Цена закрытия текущей свечи, отрисованная 26 свечей назад. Подтверждение: если Chikou выше цены того же периода — бычий контекст. Ниже — медвежий. Пересечение прошлой цены = дополнительный сигнал.'},
+      {name:'Chikou Span / Запаздывающая', color:'#B45CFF', desc:'Цена закрытия текущей свечи, отрисованная 26 свечей назад. Подтверждение: если Chikou выше цены того же периода — бычий контекст. Ниже — медвежий. Пересечение прошлой цены = дополнительный сигнал.'},
     ],
     alligator: [
       {name:'Jaw / Челюсть', color:'#3DD9FF', desc:'SMMA(13), смещена на 8 свечей вперёд. Самая медленная линия — «спящий аллигатор», долгосрочный тренд. Когда линии переплетаются — аллигатор спит (флэт, не торгуй).\n► Модификации:\n• 13/8→21/13: тихий аллигатор для недельного TF\n• 13/8→8/5: агрессивный внутри дня\n• 89/55 (фибо): макро-аллигатор, для Monthly'},
@@ -14765,17 +14765,17 @@ function _renderAnalysisInner(panel) {
       {name:'Lips / Губы', color:'var(--green)', desc:'SMMA(5), смещена на 3 свечи вперёд. Быстрейшая линия — «губы» аллигатора. Первой реагирует на разворот или импульс.\n► Порядок линий: Губы > Зубы > Челюсть = сильный рост. Челюсть > Зубы > Губы = сильное падение.\n► SMMA(3,2): ультрабыстрый сигнал, много шума. Хорош только при высокой волатильности.\n► Модифицированный аллигатор 5/3/1 без смещений — скальперский вариант для M1/M5.'},
     ],
     ma: [
-      {name:'SMA — простая скользящая', color:'#FFD166', desc:'Среднее арифметическое за N свечей. Все свечи равновесны. Реагирует плавно, отстаёт от цены.\n► Используй как динамическую поддержку в трендах. Пересечение SMA(50) и SMA(200) = «золотой крест» / «крест смерти».'},
+      {name:'SMA — простая скользящая', color:'#FF8800', desc:'Среднее арифметическое за N свечей. Все свечи равновесны. Реагирует плавно, отстаёт от цены.\n► Используй как динамическую поддержку в трендах. Пересечение SMA(50) и SMA(200) = «золотой крест» / «крест смерти».'},
       {name:'EMA — экспоненциальная', color:'#FF8A4C', desc:'Взвешенное среднее: последние свечи имеют больший вес. Реагирует быстрее SMA.\n► EMA(9): быстрая. EMA(21): краткосрочный тренд. EMA(50): среднесрочный. EMA(200): долгосрочный. Разрыв EMA(9) и EMA(21) = ускорение тренда.'},
     ],
     adx: [
-      {name:'ADX — сила тренда', color:'#D65CFF', desc:'Средний индекс направленного движения. Измеряет СИЛУ тренда, не направление. >25 = тренд есть, >50 = сильный тренд, <20 = флэт.\n► Растущий ADX при +DI > -DI = усиливающийся восходящий тренд.'},
+      {name:'ADX — сила тренда', color:'#B45CFF', desc:'Средний индекс направленного движения. Измеряет СИЛУ тренда, не направление. >25 = тренд есть, >50 = сильный тренд, <20 = флэт.\n► Растущий ADX при +DI > -DI = усиливающийся восходящий тренд.'},
       {name:'+DI — давление покупателей', color:'var(--green)', desc:'Положительное направленное движение за период. Показывает силу покупателей. +DI > -DI = бычье преимущество. Пересечение +DI над -DI при ADX > 25 = сигнал покупки.'},
       {name:'−DI — давление продавцов', color:'#FF4D7A', desc:'Отрицательное направленное движение. Сила продавцов. -DI > +DI = медвежье преимущество. При низком ADX пересечения DI дают много ложных сигналов — фильтруй по ADX > 20.'},
     ],
     keltner: [
       {name:'Верхняя граница', color:'#3DD9FF', desc:'EMA(20) + 2×ATR(10). Динамическое сопротивление. Цена выше верхней → сильный импульс (не перекупленность!). Squeeze: когда BB уже Keltner → взрыв близко.'},
-      {name:'Средняя (EMA 20)', color:'#FFD166', desc:'Центр канала Келтнера. Возврат к средней — нормальное поведение после выброса.'},
+      {name:'Средняя (EMA 20)', color:'#FF8800', desc:'Центр канала Келтнера. Возврат к средней — нормальное поведение после выброса.'},
       {name:'Нижняя граница', color:'#3DD9FF', desc:'EMA(20) − 2×ATR(10). Динамическая поддержка. При нисходящем тренде цена «едет» по нижней границе. Разворот от неё после Squeeze = сигнал.'},
     ],
     elder_ray: [
@@ -14787,7 +14787,7 @@ function _renderAnalysisInner(panel) {
       {name:'V− — медвежий вортекс', color:'#FF4D7A', desc:'Сумма движений вниз за 14 свечей, нормированная на ATR. V- > V+ = нисходящая сила. Сильное расхождение линий = сильный тренд.'},
     ],
     dmi: [
-      {name:'ADX', color:'#D65CFF', desc:'Сила тренда. >25 = торгуй по тренду, <20 = флэт, избегай трендовых входов.'},
+      {name:'ADX', color:'#B45CFF', desc:'Сила тренда. >25 = торгуй по тренду, <20 = флэт, избегай трендовых входов.'},
       {name:'+DI', color:'var(--green)', desc:'Покупательское давление. Пересечение +DI над -DI при ADX > 25 = сигнал лонга.'},
       {name:'−DI', color:'#FF4D7A', desc:'Продавческое давление. -DI > +DI при ADX > 25 = сигнал шорта.'},
     ],
@@ -14797,7 +14797,7 @@ function _renderAnalysisInner(panel) {
     ],
     kvo: [
       {name:'KVO — осциллятор объёма', color:'#B45CFF', desc:'Разность быстрой и медленной EMA от «объёмной силы» (учитывает направление движения HL и объём). Пересечение нуля = смена тренда объёма.'},
-      {name:'Сигнал KVO', color:'#FF4D9D', desc:'EMA(13) от KVO. Пересечение KVO над сигнальной = бычий сигнал по объёму. Дивергенция KVO с ценой — сильный предупреждающий сигнал.'},
+      {name:'Сигнал KVO', color:'#FF2FAE', desc:'EMA(13) от KVO. Пересечение KVO над сигнальной = бычий сигнал по объёму. Дивергенция KVO с ценой — сильный предупреждающий сигнал.'},
     ],
     donchian: [
       {name:'Верхняя (максимум 20 свечей)', color:'#3DD9FF', desc:'Максимальный High за 20 свечей. Пробой вверх = новый 20-барный максимум, сигнал тренда по Дончиану. Основа черепашьей торговли.'},
@@ -14806,17 +14806,17 @@ function _renderAnalysisInner(panel) {
     ],
     envelopes: [
       {name:'Верхний конверт', color:'#3DD9FF', desc:'EMA + N%. Зона перекупленности: цена у верхней границы при боковике = сигнал к продаже, при тренде = импульс. Ширина конверта подбирается под волатильность инструмента.'},
-      {name:'EMA (центр)', color:'#FFD166', desc:'Базовая экспоненциальная средняя. Поддержка/сопротивление при трендовых откатах.'},
+      {name:'EMA (центр)', color:'#FF8800', desc:'Базовая экспоненциальная средняя. Поддержка/сопротивление при трендовых откатах.'},
       {name:'Нижний конверт', color:'#3DD9FF', desc:'EMA − N%. Зона перепроданности в боковике. В тренде цена «едет» у нижней границы. Отскок от нижнего конверта при боковике = возможный лонг.'},
     ],
     bbpb: [
-      {name:'%B — процент полос Боллинджера', color:'#D65CFF', desc:'Где находится цена внутри BB. >1 = выше верхней полосы, <0 = ниже нижней, 0.5 = на средней. Дивергенция %B с ценой при новых экстремумах = сильный сигнал разворота.'},
+      {name:'%B — процент полос Боллинджера', color:'#B45CFF', desc:'Где находится цена внутри BB. >1 = выше верхней полосы, <0 = ниже нижней, 0.5 = на средней. Дивергенция %B с ценой при новых экстремумах = сильный сигнал разворота.'},
       {name:'Уровень 1.0 (выход выше BB)', color:'var(--green)', desc:'Справочная линия. %B > 1 = ценовой выброс выше верхней полосы. В тренде: нормально, продолжение движения. В боковике: возможный разворот.'},
       {name:'Уровень 0.0 (выход ниже BB)', color:'#FF4D7A', desc:'%B < 0 = ценовой выброс ниже нижней полосы. В нисходящем тренде = норма. В боковике = возможный отскок.'},
     ],
     tsi: [
-      {name:'TSI — индекс истинной силы', color:'#D65CFF', desc:'Двойное сглаживание (EMA от EMA) изменений цены. Диапазон −100…+100. Центровой осциллятор: выше нуля = бычий момент, ниже = медвежий. Медленнее RSI, меньше ложных сигналов.'},
-      {name:'Сигнал TSI', color:'#FFB84D', desc:'EMA(7) от TSI. Пересечение TSI над сигнальной = бычий сигнал. Дивергенция особенно эффективна на TSI из-за двойного сглаживания.'},
+      {name:'TSI — индекс истинной силы', color:'#B45CFF', desc:'Двойное сглаживание (EMA от EMA) изменений цены. Диапазон −100…+100. Центровой осциллятор: выше нуля = бычий момент, ниже = медвежий. Медленнее RSI, меньше ложных сигналов.'},
+      {name:'Сигнал TSI', color:'#FF8800', desc:'EMA(7) от TSI. Пересечение TSI над сигнальной = бычий сигнал. Дивергенция особенно эффективна на TSI из-за двойного сглаживания.'},
     ],
     uo: [
       {name:'Ultimate Oscillator / Предельный', color:'#B45CFF', desc:'Взвешенное среднее трёх стохастиков: 7, 14, 28 свечей (веса 4:2:1). Менее склонен к ложным дивергенциям. >70 = перекупленность, <30 = перепроданность. Сигнал: дивергенция + пересечение порога.'},
@@ -14831,7 +14831,7 @@ function _renderAnalysisInner(panel) {
       {name:'Триггер (Cyber Cycle сдвинутый на −1)', color:'#3DD9FF', desc:'Cyber Cycle со смещением на 1 бар назад. Пересечение основной линии над триггером = покупка. Под — продажа. Работает лучше в рынках с чётким циклом.'},
     ],
     ebs: [
-      {name:'EBS синус (Even Better Sinewave)', color:'#D65CFF', desc:'Улучшенная синусоида Элерса. Показывает фазу рыночного цикла. Движется от −1 до +1. Экстремумы — точки входа против цикла.'},
+      {name:'EBS синус (Even Better Sinewave)', color:'#B45CFF', desc:'Улучшенная синусоида Элерса. Показывает фазу рыночного цикла. Движется от −1 до +1. Экстремумы — точки входа против цикла.'},
       {name:'Лид-синус (опережающий)', color:'#FF8A4C', desc:'EBS сдвинутая на ¼ цикла вперёд. Пересечение Лид-синуса над EBS = начало бычьей фазы цикла. Под = начало медвежьей.'},
     ],
     obv: [
@@ -14841,52 +14841,52 @@ function _renderAnalysisInner(panel) {
       {name:'MFI — индекс потока денег', color:'var(--green)', desc:'Взвешенный по объёму RSI. Учитывает объём торгов. >80 = перекупленность с подтверждением объёма, <20 = перепроданность. Надёжнее RSI при анализе ликвидных инструментов.\n► Дивергенция MFI и цены при высоком объёме = очень сильный сигнал.'},
     ],
     atr: [
-      {name:'ATR — средний истинный диапазон', color:'#FFD166', desc:'Среднее истинного диапазона (Макс−Мин или разрыв с предыдущим закрытием) за 14 свечей. Измеряет волатильность, не направление.\n► Стоп = 1.5–2×ATR от входа. Увеличение ATR = волатильность растёт. Уменьшение = затишье перед бурей. Не меняй размер позиции без учёта ATR.'},
+      {name:'ATR — средний истинный диапазон', color:'#FF8800', desc:'Среднее истинного диапазона (Макс−Мин или разрыв с предыдущим закрытием) за 14 свечей. Измеряет волатильность, не направление.\n► Стоп = 1.5–2×ATR от входа. Увеличение ATR = волатильность растёт. Уменьшение = затишье перед бурей. Не меняй размер позиции без учёта ATR.'},
     ],
     cci: [
-      {name:'CCI — индекс товарного канала', color:'#FFD166', desc:'Отклонение типичной цены от её скользящей средней, нормированное на волатильность. Диапазон: теоретически неограничен. ±100 = сигнальные уровни.\n► >+100 = выход из нормального диапазона, сильный бычий сигнал. <−100 = медвежий. Уход к ±200 = экстремум, часто предшествует откату.'},
+      {name:'CCI — индекс товарного канала', color:'#FF8800', desc:'Отклонение типичной цены от её скользящей средней, нормированное на волатильность. Диапазон: теоретически неограничен. ±100 = сигнальные уровни.\n► >+100 = выход из нормального диапазона, сильный бычий сигнал. <−100 = медвежий. Уход к ±200 = экстремум, часто предшествует откату.'},
     ],
     vwap: [
-      {name:'VWAP — средневзвешенная по объёму', color:'#FFD166', desc:'Средняя цена за день, взвешенная по объёму. Институциональный бенчмарк: крупные игроки оценивают свои сделки относительно VWAP.\n► Цена выше VWAP = дорого относительно сделок дня. Ниже = дёшево. Возврат к VWAP после отклонения >2% — часто надёжная сделка. Не работает на недельных/месячных данных.'},
+      {name:'VWAP — средневзвешенная по объёму', color:'#FF8800', desc:'Средняя цена за день, взвешенная по объёму. Институциональный бенчмарк: крупные игроки оценивают свои сделки относительно VWAP.\n► Цена выше VWAP = дорого относительно сделок дня. Ниже = дёшево. Возврат к VWAP после отклонения >2% — часто надёжная сделка. Не работает на недельных/месячных данных.'},
     ],
     williams: [
-      {name:'Williams %R', color:'#D65CFF', desc:'Позиция цены закрытия относительно максимума за 14 свечей. Диапазон от −100 до 0. −80 и ниже = перепроданность, −20 и выше = перекупленность.\n► Работает зеркально: ниже = перепродан. При уходе из зоны >−20 = сигнал продажи. При уходе из <−80 = покупки. Лучше работает в сочетании с трендовым фильтром.'},
+      {name:'Williams %R', color:'#B45CFF', desc:'Позиция цены закрытия относительно максимума за 14 свечей. Диапазон от −100 до 0. −80 и ниже = перепроданность, −20 и выше = перекупленность.\n► Работает зеркально: ниже = перепродан. При уходе из зоны >−20 = сигнал продажи. При уходе из <−80 = покупки. Лучше работает в сочетании с трендовым фильтром.'},
     ],
     ao: [
       {name:'AO — чудесный осциллятор', color:'var(--green)', desc:'Разность SMA(5) и SMA(34) от средних цен (H+L)/2. Показывает рыночный момент.\n► Пересечение нуля: вверх = бычий импульс, вниз = медвежий. Блюдце (два убывающих бара + растущий) = сигнал продолжения тренда. Твин Пики = дивергенция между двумя пиками/впадинами. Вильям использовал AO совместно с Фракталами и Аллигатором.'},
     ],
     sar: [
-      {name:'Parabolic SAR', color:'#FF4D9D', desc:'Параболические точки выше/ниже цены. Точки ниже = бычий тренд, выше = медвежий. Переворот: точки меняют сторону = смена тренда.\n► Фактор ускорения (AF): стандарт 0.02 / макс 0.2. Меньший AF = медленнее реагирует, меньше ложных разворотов. Больший = ближе к цене, частые перевороты. Не используй в боковиках — даст постоянные перевороты.'},
+      {name:'Parabolic SAR', color:'#FF2FAE', desc:'Параболические точки выше/ниже цены. Точки ниже = бычий тренд, выше = медвежий. Переворот: точки меняют сторону = смена тренда.\n► Фактор ускорения (AF): стандарт 0.02 / макс 0.2. Меньший AF = медленнее реагирует, меньше ложных разворотов. Больший = ближе к цене, частые перевороты. Не используй в боковиках — даст постоянные перевороты.'},
     ],
     supertrend: [
       {name:'SuperTrend', color:'var(--green)', desc:'ATR(10)-канал вокруг (H+L)/2 с множителем 3. Меняет цвет при смене тренда. Зелёный = бычий, красный = медвежий.\n► Уменьши множитель до 2 — ближе к цене, больше разворотов. До 4 — реже, только сильные развороты. Период ATR 7 = более чувствительный. 14 = стандарт.'},
     ],
     fisher: [
-      {name:'Fisher Transform / Преобразование Фишера', color:'#D65CFF', desc:'Переводит цены в гауссово распределение через логарифмическую трансформацию. Экстремумы ±2 (±3) = редкие ценовые пики/впадины.\n► Пересечение нуля = смена тренда. Очень высокий Fisher (>2.5) = статистически экстремальная цена, разворот вероятен. Совмести с объёмом для подтверждения.'},
+      {name:'Fisher Transform / Преобразование Фишера', color:'#B45CFF', desc:'Переводит цены в гауссово распределение через логарифмическую трансформацию. Экстремумы ±2 (±3) = редкие ценовые пики/впадины.\n► Пересечение нуля = смена тренда. Очень высокий Fisher (>2.5) = статистически экстремальная цена, разворот вероятен. Совмести с объёмом для подтверждения.'},
     ],
     pivot: [
-      {name:'Pivot Points / Опорные точки', color:'#FFD166', desc:'Классический расчёт: PP = (H+L+C)/3 предыдущего периода. R1/R2/R3 = сопротивления, S1/S2/S3 = поддержки.\n► Сильнее всего работают на дневных/недельных данных. Цена между S1 и PP = бычья зона, между R1 и выше = перекупленность. Прорыв R1 с объёмом = сильный сигнал.'},
+      {name:'Pivot Points / Опорные точки', color:'#FF8800', desc:'Классический расчёт: PP = (H+L+C)/3 предыдущего периода. R1/R2/R3 = сопротивления, S1/S2/S3 = поддержки.\n► Сильнее всего работают на дневных/недельных данных. Цена между S1 и PP = бычья зона, между R1 и выше = перекупленность. Прорыв R1 с объёмом = сильный сигнал.'},
     ],
     zigzag: [
-      {name:'ZigZag / Зигзаг', color:'#FFD166', desc:'Соединяет значимые максимумы и минимумы, игнорируя колебания < 5%. Помогает визуализировать волны и структуру.\n► НЕ является сигнальным индикатором — перерисовывается на последнем движении. Используй только для разметки структуры в прошлом. Чем выше % — тем крупнее волны.'},
+      {name:'ZigZag / Зигзаг', color:'#FF8800', desc:'Соединяет значимые максимумы и минимумы, игнорируя колебания < 5%. Помогает визуализировать волны и структуру.\n► НЕ является сигнальным индикатором — перерисовывается на последнем движении. Используй только для разметки структуры в прошлом. Чем выше % — тем крупнее волны.'},
     ],
     hv: [
-      {name:'Историческая волатильность (HV)', color:'#D65CFF', desc:'Стандартное отклонение логарифмических доходностей за 20 свечей, в % годовых. >40% = высокая волатильность. <15% = низкая.\n► Высокая HV = большие стопы, меньший размер позиции. Низкая HV + накопление = взрыв близко. Сравни с IV (опционами) если доступно.'},
+      {name:'Историческая волатильность (HV)', color:'#B45CFF', desc:'Стандартное отклонение логарифмических доходностей за 20 свечей, в % годовых. >40% = высокая волатильность. <15% = низкая.\n► Высокая HV = большие стопы, меньший размер позиции. Низкая HV + накопление = взрыв близко. Сравни с IV (опционами) если доступно.'},
     ],
     cmo: [
-      {name:'CMO / Моментум Чанде', color:'#D65CFF', desc:'Разность суммы бычьих и медвежьих изменений за 14 свечей. Диапазон ±100. Выше +50 = сильный бычий тренд, ниже −50 = медвежий. Пересечение нуля = смена импульса.\n► Абсолютное значение CMO = сила тренда (аналог ADX). Чем больше |CMO| — тем чётче направление.'},
+      {name:'CMO / Моментум Чанде', color:'#B45CFF', desc:'Разность суммы бычьих и медвежьих изменений за 14 свечей. Диапазон ±100. Выше +50 = сильный бычий тренд, ниже −50 = медвежий. Пересечение нуля = смена импульса.\n► Абсолютное значение CMO = сила тренда (аналог ADX). Чем больше |CMO| — тем чётче направление.'},
     ],
     eom: [
-      {name:'EOM / Лёгкость движения', color:'#D65CFF', desc:'Отношение изменения цены к объёму. Высокий положительный EOM = цена легко растёт при малом объёме (эффективный рост). Отрицательный = легко падает.\n► EOM близкий к нулю при большом движении цены = цена движется «с трудом», движение неустойчиво.'},
+      {name:'EOM / Лёгкость движения', color:'#B45CFF', desc:'Отношение изменения цены к объёму. Высокий положительный EOM = цена легко растёт при малом объёме (эффективный рост). Отрицательный = легко падает.\n► EOM близкий к нулю при большом движении цены = цена движется «с трудом», движение неустойчиво.'},
     ],
     pvt: [
       {name:'PVT / Тренд цена-объём', color:'var(--green)', desc:'Кумулятивная сумма: объём × (изменение цены в %). Похож на OBV, но учитывает размер движения. Дивергенция PVT/цена = возможный разворот.\n► Рост PVT при боковой цене = скрытое накопление. Падение PVT при боковой = скрытое распределение.'},
     ],
     nvi: [
-      {name:'NVI / Индекс отрицательного объёма', color:'#D65CFF', desc:'Накапливает изменения цены только в дни с пониженным объёмом. Теория: умные деньги действуют при низком объёме, толпа — при высоком.\n► NVI выше своей EMA(255) = бычий режим (вероятность роста ~95% по историческим данным Fosback). Ниже = осторожно.'},
+      {name:'NVI / Индекс отрицательного объёма', color:'#B45CFF', desc:'Накапливает изменения цены только в дни с пониженным объёмом. Теория: умные деньги действуют при низком объёме, толпа — при высоком.\n► NVI выше своей EMA(255) = бычий режим (вероятность роста ~95% по историческим данным Fosback). Ниже = осторожно.'},
     ],
     volosc: [
-      {name:'Volume Oscillator / Осциллятор объёма', color:'#D65CFF', desc:'Разность быстрой (5) и медленной (10) EMA объёма. Выше нуля = объём ускоряется (тренд подтверждён). Ниже нуля = объём иссякает.\n► Дивергенция: цена растёт но VO падает = объём не подтверждает рост, осторожно с лонгами.'},
+      {name:'Volume Oscillator / Осциллятор объёма', color:'#B45CFF', desc:'Разность быстрой (5) и медленной (10) EMA объёма. Выше нуля = объём ускоряется (тренд подтверждён). Ниже нуля = объём иссякает.\n► Дивергенция: цена растёт но VO падает = объём не подтверждает рост, осторожно с лонгами.'},
     ],
     vwma: [
       {name:'VWMA / Взвешенная по объёму MA', color:'#FF8A4C', desc:'Скользящая средняя, где каждая свеча весит пропорционально своему объёму. Быстрее реагирует на движения с большим объёмом (значимые).\n► VWMA выше SMA = объём преобладал при росте. Ниже SMA = при падении. Расхождение VWMA и SMA = распределение или накопление.'},
@@ -14895,16 +14895,16 @@ function _renderAnalysisInner(panel) {
       {name:'McGinley Dynamic / Динамика Макгинли', color:'#FF8A4C', desc:'Самонастраивающаяся средняя: автоматически регулирует скорость в зависимости от рынка. Почти не отстаёт от цены в тренде, медленнее в боковике.\n► Не требует подбора периода в отличие от EMA/SMA. Хороша как динамическая поддержка. Пересечение цены сверху вниз = слабость.'},
     ],
     stddev: [
-      {name:'Стандартное отклонение', color:'#D65CFF', desc:'Волатильность цены за N свечей. Высокое σ = широкие движения, большие стопы. Низкое σ = рынок сжат, взрыв приближается.\n► После длинного периода низкого σ (Squeeze) — торгуй прорыв с подтверждением объёма. Не указывает направление, только масштаб движения.'},
+      {name:'Стандартное отклонение', color:'#B45CFF', desc:'Волатильность цены за N свечей. Высокое σ = широкие движения, большие стопы. Низкое σ = рынок сжат, взрыв приближается.\n► После длинного периода низкого σ (Squeeze) — торгуй прорыв с подтверждением объёма. Не указывает направление, только масштаб движения.'},
     ],
     fractals: [
-      {name:'Fractals / Фракталы Вильямса', color:'#FFD166', desc:'Локальный максимум/минимум: свеча с максимальным High / минимальным Low среди 5 свечей (по 2 с каждой стороны). Вильям использовал фракталы как уровни стопа в системе с Аллигатором.\n► Фрактал выше Аллигатора = потенциальный вход в лонг после пробоя. Ниже = шорт. Перерисовывается на последних 2 свечах!'},
+      {name:'Fractals / Фракталы Вильямса', color:'#FF8800', desc:'Локальный максимум/минимум: свеча с максимальным High / минимальным Low среди 5 свечей (по 2 с каждой стороны). Вильям использовал фракталы как уровни стопа в системе с Аллигатором.\n► Фрактал выше Аллигатора = потенциальный вход в лонг после пробоя. Ниже = шорт. Перерисовывается на последних 2 свечах!'},
     ],
     dpo: [
-      {name:'DPO / Детрендовый осциллятор', color:'#D65CFF', desc:'Убирает тренд из цены, показывая только циклические колебания. Смещение на N/2+1 убирает текущий тренд.\n► Используй для измерения длины цикла: расстояние между пиками DPO = приблизительная длина цикла. Не работает как трендовый индикатор.'},
+      {name:'DPO / Детрендовый осциллятор', color:'#B45CFF', desc:'Убирает тренд из цены, показывая только циклические колебания. Смещение на N/2+1 убирает текущий тренд.\n► Используй для измерения длины цикла: расстояние между пиками DPO = приблизительная длина цикла. Не работает как трендовый индикатор.'},
     ],
     chaikvol: [
-      {name:'Chaikin Volatility / Волатильность Чайкина', color:'#D65CFF', desc:'Изменение ширины диапазона High−Low за 10 свечей, сглаженное EMA(10). Рост = волатильность растёт (часто на разворотах). Падение = сжатие (накопление или вершина).\n► Резкий рост Chaikin Vol у поддержки/сопротивления = панические продажи или прорыв.'},
+      {name:'Chaikin Volatility / Волатильность Чайкина', color:'#B45CFF', desc:'Изменение ширины диапазона High−Low за 10 свечей, сглаженное EMA(10). Рост = волатильность растёт (часто на разворотах). Падение = сжатие (накопление или вершина).\n► Резкий рост Chaikin Vol у поддержки/сопротивления = панические продажи или прорыв.'},
     ],
     cum_delta: [
       {name:'Cumulative Delta / Кумулятивная дельта', color:'var(--green)', desc:'Нарастающая разность покупок и продаж по объёму (оценка через High/Low). Рост = покупки доминируют. Падение = продажи.\n► Дивергенция дельты и цены = давление скрыто. Новый максимум цены + падение дельты = дистрибуция. Новый минимум + рост дельты = накопление.'},
@@ -14928,25 +14928,25 @@ function _renderAnalysisInner(panel) {
       {name:'Force Index / Индекс силы', color:'var(--green)', desc:'Объём × изменение цены. Показывает «силу» каждого движения. EMA(2) = краткосрочная сила. EMA(13) = среднесрочная.\n► Пересечение нуля EMA(13) = смена доминирования. Дивергенция с ценой = предупреждение. Высокий Force Index при пробое уровня = подтверждение.'},
     ],
     chop: [
-      {name:'CHOP Index / Индекс неопределённости', color:'#D65CFF', desc:'Насколько рынок «пилит» vs. трендирует. Значения 61.8–100 = боковик/пила. 38.2–61.8 = нейтраль. <38.2 = сильный тренд.\n► Торгуй пробой когда CHOP падает к 38 — рынок выходит из консолидации. Избегай торговли при CHOP > 60.'},
+      {name:'CHOP Index / Индекс неопределённости', color:'#B45CFF', desc:'Насколько рынок «пилит» vs. трендирует. Значения 61.8–100 = боковик/пила. 38.2–61.8 = нейтраль. <38.2 = сильный тренд.\n► Торгуй пробой когда CHOP падает к 38 — рынок выходит из консолидации. Избегай торговли при CHOP > 60.'},
     ],
     atr_stop: [
-      {name:'ATR Stop / Стоп по ATR', color:'#FF4D9D', desc:'Динамический стоп-уровень: EMA(20) ± 2×ATR(14). Визуализирует зону где стоп имеет смысл ставить.\n► Выше цены = стоп для шорта. Ниже = стоп для лонга. При высоком ATR линия отдаляется от цены — автоматически уменьшай размер позиции.'},
+      {name:'ATR Stop / Стоп по ATR', color:'#FF2FAE', desc:'Динамический стоп-уровень: EMA(20) ± 2×ATR(14). Визуализирует зону где стоп имеет смысл ставить.\n► Выше цены = стоп для шорта. Ниже = стоп для лонга. При высоком ATR линия отдаляется от цены — автоматически уменьшай размер позиции.'},
     ],
     ichi_tk: [
       {name:'TK Cross / TK-пересечение', color:'#FF006E', desc:'Tenkan (9 свечей) пересекает Kijun (26 свечей). Бычье: Tenkan > Kijun выше облака = сильный сигнал. Внутри облака = слабый. Ниже облака = осторожно.\n► Золотое правило Ишимоку: все 3 события (TK, цена/Kumo, Chikou) должны совпасть для сильного сигнала.'},
     ],
     ma_chan: [
-      {name:'MA Channel / Канал скользящих', color:'#FFD166', desc:'Динамический канал из двух скользящих средних разных периодов. Ширина канала = зона неопределённости. Цена выше — бычий контекст.\n► При сужении канала = рынок находится в балансе. Расширение = начало направленного движения.'},
+      {name:'MA Channel / Канал скользящих', color:'#FF8800', desc:'Динамический канал из двух скользящих средних разных периодов. Ширина канала = зона неопределённости. Цена выше — бычий контекст.\n► При сужении канала = рынок находится в балансе. Расширение = начало направленного движения.'},
     ],
     rsi_wil: [
-      {name:'RSI Wilder / RSI Уайлдера (оригинал)', color:'#D65CFF', desc:'Оригинальный RSI Дж. Уайлдера с его методом сглаживания (SMMA, не EMA). Чуть медленнее стандартного RSI.\n► Уайлдер рекомендовал 14 дней для дневных данных. Уровни 30/70 — его оригинальные зоны. Некоторые трейдеры предпочитают 40/60 при сильном тренде.'},
+      {name:'RSI Wilder / RSI Уайлдера (оригинал)', color:'#B45CFF', desc:'Оригинальный RSI Дж. Уайлдера с его методом сглаживания (SMMA, не EMA). Чуть медленнее стандартного RSI.\n► Уайлдер рекомендовал 14 дней для дневных данных. Уровни 30/70 — его оригинальные зоны. Некоторые трейдеры предпочитают 40/60 при сильном тренде.'},
     ],
     bbw: [
-      {name:'BB Width / Ширина полос Боллинджера', color:'#D65CFF', desc:'(Верхняя BB − Нижняя BB) / Средняя BB. Измеряет относительную ширину канала. Минимум BBW = «Squeeze», предшествует взрыву волатильности.\n► Направление взрыва определяй по другим индикаторам (объём, тренд EMA). BBW сам по себе не говорит — вверх или вниз.'},
+      {name:'BB Width / Ширина полос Боллинджера', color:'#B45CFF', desc:'(Верхняя BB − Нижняя BB) / Средняя BB. Измеряет относительную ширину канала. Минимум BBW = «Squeeze», предшествует взрыву волатильности.\n► Направление взрыва определяй по другим индикаторам (объём, тренд EMA). BBW сам по себе не говорит — вверх или вниз.'},
     ],
     fisher: [
-      {name:'Fisher Transform / Преобразование Фишера', color:'#D65CFF', desc:'Переводит цены в гауссово распределение. Экстремумы ±2…±3 = статистически редкие события.\n► Пересечение нуля = смена тренда. Высокий Fisher (>2.5) + дивергенция с ценой = сильный разворотный сигнал. Работает лучше на ликвидных инструментах.'},
+      {name:'Fisher Transform / Преобразование Фишера', color:'#B45CFF', desc:'Переводит цены в гауссово распределение. Экстремумы ±2…±3 = статистически редкие события.\n► Пересечение нуля = смена тренда. Высокий Fisher (>2.5) + дивергенция с ценой = сильный разворотный сигнал. Работает лучше на ликвидных инструментах.'},
     ],
     nw: [
       {name:'Доверительная огибающая', color:'#7A8CFF', desc:'Ширина полосы вокруг ядерной (Nadaraya-Watson) регрессии — оценка локальной неопределённости тренда. Расширение полосы = рост волатильности/неопределённости.'},
@@ -14957,17 +14957,17 @@ function _renderAnalysisInner(panel) {
       {name:'Отфильтрованная линия', color:'#7B61FF', desc:'Оптимальная байесовская оценка «истинной» цены, очищенная от шума измерений. Меньше лага, чем у MA, при сильном шумоподавлении.'},
     ],
     cusum: [
-      {name:'Точка разворота вверх (CP, бычья)', color:'#60A4A1', desc:'CUSUM зафиксировал накопленное отклонение выше порога в сторону роста — структурный сдвиг среднего значения цены вверх.'},
+      {name:'Точка разворота вверх (CP, бычья)', color:'#6CC9C5', desc:'CUSUM зафиксировал накопленное отклонение выше порога в сторону роста — структурный сдвиг среднего значения цены вверх.'},
       {name:'Точка разворота вниз (CP, медвежья)', color:'var(--accent)', desc:'CUSUM зафиксировал накопленное отклонение выше порога в сторону падения — структурный сдвиг среднего значения цены вниз.'},
     ],
     hmm: [
       {name:'Режим высокой волатильности', color:'#FF4D7A', desc:'Скрытая марковская модель относит текущий бар к состоянию с повышенной волатильностью/риском (на основе матрицы переходов и распределений по состояниям).'},
-      {name:'Режим спокойного рынка', color:'#60A4A1', desc:'HMM относит текущий бар к низковолатильному/«спокойному» состоянию. Переключение между режимами часто предшествует изменению поведения цены.'},
+      {name:'Режим спокойного рынка', color:'#6CC9C5', desc:'HMM относит текущий бар к низковолатильному/«спокойному» состоянию. Переключение между режимами часто предшествует изменению поведения цены.'},
     ],
     hurst: [
       {name:'Антиперсистентный (H < 0.45)', color:'#FF4D7A', desc:'Показатель Хёрста ниже 0.45 — ряд склонен к возврату к среднему (mean-reversion), движения чаще разворачиваются, чем продолжаются.'},
       {name:'Персистентный (H > 0.55)', color:'var(--green)', desc:'Показатель Хёрста выше 0.55 — ряд трендовый, движения склонны продолжаться в том же направлении (моментум).'},
-      {name:'Случайное блуждание (H ≈ 0.5)', color:'#9090B8', desc:'Показатель Хёрста около 0.5 — поведение близко к случайному блужданию, предсказуемость минимальна.'},
+      {name:'Случайное блуждание (H ≈ 0.5)', color:'#9090BB', desc:'Показатель Хёрста около 0.5 — поведение близко к случайному блужданию, предсказуемость минимальна.'},
     ],
     gpr: [
       {name:'Доверительный интервал GPR', color:'var(--green)', desc:'Полоса неопределённости гауссовского процесса (Gaussian Process Regression) вокруг прогнозируемого среднего. Расширяется там, где данных меньше или они противоречивы.'},
@@ -14979,7 +14979,7 @@ function _renderAnalysisInner(panel) {
     ],
     te: [
       {name:'Значимый перенос информации', color:'#7A8CFF', desc:'Transfer Entropy выше порога значимости — есть статистически заметный направленный информационный поток между рядами (предсказуемость одного по другому).'},
-      {name:'Незначимый перенос', color:'#9090B8', desc:'Transfer Entropy ниже порога — направленная связь между рядами не подтверждается, вероятно шум.'},
+      {name:'Незначимый перенос', color:'#9090BB', desc:'Transfer Entropy ниже порога — направленная связь между рядами не подтверждается, вероятно шум.'},
     ],
     ssa: [
       {name:'Восстановленный тренд (SSA)', color:'#FF8800', desc:'Главная(е) компонента(ы) сингулярного спектрального анализа (Singular Spectrum Analysis) — выделенный низкочастотный тренд без шумовых гармоник.'},
@@ -14987,7 +14987,7 @@ function _renderAnalysisInner(panel) {
     rough: [
       {name:'Грубая (rough, H < 0.2)', color:'#FF8800', desc:'Показатель Хёрста грубой волатильности ниже 0.2 — режим «шероховатой» волатильности, характерный для реальных рынков (всплески, кластеризация).'},
       {name:'Умеренно грубая (0.2 ≤ H < 0.4)', color:'#7A8CFF', desc:'Промежуточный режим грубости волатильности — между классической шероховатой и стандартной броуновской динамикой.'},
-      {name:'Стандартная (0.4 ≤ H ≤ 0.6)', color:'#9090B8', desc:'Показатель близок к 0.5 — волатильность ведёт себя близко к классическому броуновскому движению.'},
+      {name:'Стандартная (0.4 ≤ H ≤ 0.6)', color:'#9090BB', desc:'Показатель близок к 0.5 — волатильность ведёт себя близко к классическому броуновскому движению.'},
       {name:'Персистентная (H > 0.6)', color:'var(--green)', desc:'Показатель выше 0.6 — волатильность демонстрирует трендовое, персистентное поведение (редко на практике, но возможно в спокойных режимах).'},
     ],
     roc: [
@@ -15000,7 +15000,7 @@ function _renderAnalysisInner(panel) {
       {name:'Volume Spike / Аномалия объёма', color:'var(--violet)', desc:'Текущий объём / MA(объём, 20). Измеряет кратность отклонения объёма от 20-периодной средней.\n► ×1–×2 = обычная активность (серый). ×2–×4 = повышенная (тёмно-фиолетовый). ×4+ = аномальный всплеск (оранжевый). Аномальный объём без движения цены = накопление/распределение. Аномальный объём + резкое движение = институциональная активность.'},
     ],
     vwap_pct: [
-      {name:'VWAP % / Отклонение от VWAP', color:'#FFD166', desc:'(Close − VWAP) / VWAP × 100. Насколько цена отклонилась от средневзвешенной по объёму цены за сессию.\n► VWAP — ориентир крупных участников. Цена выше VWAP = инициатива у покупателей, ниже = у продавцов. Значительное отклонение (>1–2%) часто притягивает возврат к VWAP. Особенно актуален в первые часы торговой сессии.'},
+      {name:'VWAP % / Отклонение от VWAP', color:'#FF8800', desc:'(Close − VWAP) / VWAP × 100. Насколько цена отклонилась от средневзвешенной по объёму цены за сессию.\n► VWAP — ориентир крупных участников. Цена выше VWAP = инициатива у покупателей, ниже = у продавцов. Значительное отклонение (>1–2%) часто притягивает возврат к VWAP. Особенно актуален в первые часы торговой сессии.'},
     ],
     fast_combo: [
       {name:'◆ Быстрый сигнал (комбо)', color:'var(--green)', desc:'Голосование трёх быстрых индикаторов: ROC + Volume Spike + VWAP%. Каждый даёт голос за лонг (+1), шорт (−1) или нейтраль (0).\n► +3 / −3 = единогласный сигнал (сильный). ±2 = большинство согласно (умеренный). ±1 = слабый, противоречивый. Преимущество перед классическими осцилляторами: минимальный лаг, работает на волатильных инструментах где EMA-сигналы запаздывают.'},
@@ -15276,7 +15276,7 @@ function _renderAnalysisInner(panel) {
     if (_cp) {
       const rulesHtml = (_cp.rules || []).map(r => `<div class="analysis-item analysis-neutral" style="margin-left:4px"><span class="analysis-dot" style="color:#7B61FF">▸</span><span>${r}</span></div>`).join('');
       html += `<div class="analysis-card" style="border-left-color:#7B61FF;margin-bottom:10px">
-        <div class="analysis-card-title" style="color:#D65CFF">${_cp.icon||'◈'} ${_cp.name}</div>
+        <div class="analysis-card-title" style="color:#B45CFF">${_cp.icon||'◈'} ${_cp.name}</div>
         <div class="analysis-items">
           ${rulesHtml}
           ${_cp.read ? `<div class="analysis-item analysis-neutral" style="margin-top:6px;opacity:.9"><span class="analysis-dot" style="color:var(--green)">📖</span><span style="white-space:pre-line">${_cp.read}</span></div>` : ''}
@@ -19325,7 +19325,7 @@ function _renderAnalysisInner(panel) {
         const type = s == null ? 'neutral' : s >= 1 ? 'bullish' : s <= -1 ? 'bearish' : s > 0 ? 'bullish' : s < 0 ? 'bearish' : 'neutral';
         const label = (typeof IL_NAMES !== 'undefined' && IL_NAMES[aid]) || aid;
         const txt = s == null ? `${label} (альт): нет данных` : `${label} (альт): score ${s>0?'+':''}${s.toFixed(2)} — ${s>=1?'сильный бычий контекст':s>0?'слабый бычий контекст':s<=-1?'сильный медвежий контекст':s<0?'слабый медвежий контекст':'нейтрально'}`;
-        const descTxt = it.altDesc ? `<div style="margin-left:14px;margin-top:3px;font-size:11px;color:#9090B8;line-height:1.5;">↳ ${it.altDesc}</div>` : '';
+        const descTxt = it.altDesc ? `<div style="margin-left:14px;margin-top:3px;font-size:11px;color:#9090BB;line-height:1.5;">↳ ${it.altDesc}</div>` : '';
         return `<div class="analysis-item analysis-${type}"><span class="analysis-dot">●</span><span>${txt}</span></div>${descTxt}`;
       }).filter(Boolean);
       if (altRows.length) {
