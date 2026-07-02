@@ -1091,7 +1091,7 @@ async function handleDb(path, req, env) {
         const fb = await fr.json();
         const rootRe = new RegExp(`^${rootTicker}[FGHJKMNQUVXZ]\\d$`, 'i');
         contracts = (fb.instruments || []).filter(i => rootRe.test(i.ticker || ''));
-        globalThis._fiCache[rootTicker] = contracts;
+        if (contracts.length) globalThis._fiCache[rootTicker] = contracts;
       } catch (e) { return json({ error: 'FindInstrument: ' + e.message }, 502); }
     }
     if (!contracts.length) return json({ ticker: rootTicker, error: 'дескрипты серии не найдены', saved: 0, nextCidx: null });
@@ -1166,10 +1166,12 @@ async function handleDb(path, req, env) {
         const fb = await fr.json();
         const rootRe = new RegExp(`^${rootTicker}[FGHJKMNQUVXZ]\\d$`, 'i');
         contracts = (fb.instruments || []).filter(i => rootRe.test(i.ticker || ''));
-        globalThis._fiCache[rootTicker] = contracts;
+        // Пустой список НЕ кэшируем: разовый сбой T-Invest иначе прилипает
+        // к изоляту на часы, и все последующие запросы серии отдают пусто
+        if (contracts.length) globalThis._fiCache[rootTicker] = contracts;
       } catch (e) { return json({ error: 'FindInstrument: ' + e.message }, 502); }
     }
-    if (!contracts.length) return json({ ticker: rootTicker, date, type, secid: null, rows: [] });
+    if (!contracts.length) return json({ ticker: rootTicker, date, type, secid: null, rows: [], reason: 'FindInstrument не нашёл контрактов серии' });
     let best = null;
     const gotDates = new Set();
     for (const inst of contracts.slice(0, 6)) {
@@ -1193,7 +1195,9 @@ async function handleDb(path, req, env) {
       } catch (_) {}
       await new Promise(r => setTimeout(r, 150));
     }
-    if (!best) return json({ ticker: rootTicker, date, type, secid: null, rows: [], gotDates: [...gotDates] });
+    if (!best) return json({ ticker: rootTicker, date, type, secid: null, rows: [],
+      gotDates: [...gotDates], contractsTried: contracts.slice(0, 6).map(c => c.ticker),
+      reason: gotDates.size ? 'данные пришли, но за другие даты (from/till не сработал?)' : 'контракты не дали строк за эту дату' });
     return json({ ticker: rootTicker, date, type, secid: best.secid, rows: best.rows });
   }
 
