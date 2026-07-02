@@ -25,7 +25,9 @@
 //   /db/oidaily?ticker=               GET  — вся история снэпшотов тикера (для слоёв позиций)
 //   /db/oibackfill?tickers=&days=     GET  — разовый backfill истории FutOI юр/физ за прошлые
 //                                            даты (date= в futoi API); без tickers — берёт
-//                                            текущий отслеживаемый список из oi_tracked_state
+//                                            текущий отслеживаемый список из oi_tracked_state.
+//                                            Пишет и дневной итог в oi_daily, и ВСЕ внутри-
+//                                            дневные снэпшоты даты (10-мин срезы) в oi_hourly
 //   /db/oidaily/backfillprice?ticker= GET  — ретроактивно проставить price в oi_daily root-
 //                                            тикера (там всегда 0): ищет все дескрипты серии
 //                                            через T-Invest FindInstrument (не только уже
@@ -508,7 +510,7 @@ async function backfillOiHistory(db, env, tickers, days) {
     dates.push(d.toISOString().slice(0, 10));
     d.setDate(d.getDate() - 1);
   }
-  let saved = 0, empty = 0, failed = 0;
+  let saved = 0, empty = 0, failed = 0, savedIntraday = 0;
   for (const ticker of tickers) {
     const sym = futoi2sym(ticker);
     for (const date of dates) {
@@ -526,6 +528,45 @@ async function backfillOiHistory(db, env, tickers, days) {
           if (g !== 'YUR' && g !== 'FIZ') return;
           if (!byGroup[g] || (o.tradetime || '') > (byGroup[g].tradetime || '')) byGroup[g] = o;
         });
+
+        // ВСЕ внутридневные снэпшоты этой даты → oi_hourly. Раньше бэкфилл
+        // схлопывал ответ в одну последнюю запись дня, хотя futoi за прошлые
+        // даты отдаёт 10-минутные срезы глубиной в несколько месяцев (дальше
+        // MOEX сам хранит реже) — вся эта история выбрасывалась, и интрадей
+        // копился только live-кроном с момента его запуска. Ключ — в том же
+        // формате, что у крона (ticker__date__time), чтобы бэкфилл и live
+        // не плодили дубли одного снэпшота.
+        const byTime = {};
+        for (const o of rows) {
+          const g = (o.clgroup || '').toUpperCase();
+          if (g !== 'YUR' && g !== 'FIZ') continue;
+          const tt = o.tradetime || '00:00:00';
+          if (!byTime[tt]) byTime[tt] = {};
+          byTime[tt][g] = o;
+        }
+        const hourlyStmts = [];
+        for (const [tt, groups] of Object.entries(byTime)) {
+          const Y = groups.YUR, F = groups.FIZ;
+          const td = (Y || F)?.tradedate || date;
+          const ts = new Date(`${td}T${tt}+03:00`).getTime(); // tradetime в МСК
+          if (!isFinite(ts)) continue;
+          hourlyStmts.push(db.prepare(
+            `INSERT OR REPLACE INTO oi_hourly
+               (key,ticker,ts,price,yur_long,yur_short,fiz_long,fiz_short,
+                yur_long_num,yur_short_num,fiz_long_num,fiz_short_num)
+             VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`
+          ).bind(
+            `${ticker}__${td}__${tt}`, ticker, ts, 0,
+            Number(Y?.pos_long || 0), Math.abs(Number(Y?.pos_short || 0)),
+            Number(F?.pos_long || 0), Math.abs(Number(F?.pos_short || 0)),
+            Number(Y?.pos_long_num || 0), Number(Y?.pos_short_num || 0),
+            Number(F?.pos_long_num || 0), Number(F?.pos_short_num || 0),
+          ));
+        }
+        for (let i = 0; i < hourlyStmts.length; i += 50) {
+          await db.batch(hourlyStmts.slice(i, i + 50));
+        }
+        savedIntraday += hourlyStmts.length;
         const tradedate = (byGroup.YUR || byGroup.FIZ || {}).tradedate || date;
         await upsertOiDaily(db, {
           ticker, tradedate, price: 0,
@@ -542,7 +583,7 @@ async function backfillOiHistory(db, env, tickers, days) {
       } catch (e) { failed++; }
     }
   }
-  return { tickers: tickers.length, days, saved, empty, failed };
+  return { tickers: tickers.length, days, saved, savedIntraday, empty, failed };
 }
 
 async function handleDb(path, req, env) {
