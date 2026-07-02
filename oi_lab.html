@@ -202,6 +202,7 @@ details.panel .panel-body{padding-top:12px}
     <div class="row" style="margin:0;gap:6px">
       <button class="sec tiny" onclick="setChartMode('daily')">День</button>
       <button class="sec tiny" onclick="setChartMode('hourly')">Час</button>
+      <button class="sec tiny" id="btn-idx-ovl" onclick="toggleIdxOverlay()" title="Наложить индекс МосБиржи на график цены: пунктир — индекс (своя шкала), полоска сверху — индекс у кромки диапазона 20д">Индекс</button>
     </div>
   </div>
   <div class="panel-body">
@@ -286,6 +287,7 @@ details.panel .panel-body{padding-top:12px}
       <button class="sec" onclick="labAnalyzeSqueezeFactors()">Признаки шорт-сквиза</button>
       <button class="sec" onclick="labSignalScreener()">Скринер сигналов</button>
       <button class="sec" onclick="labSpikeAutopsy()">Перед выбросами</button>
+      <button class="sec" onclick="labIndexEffect()">Влияние индекса</button>
     </div>
 
     <div id="pool-out" style="color:var(--text3);font-size:11px;margin-top:10px">Нажми «Заполнить всеми из базы» (или впиши тикеры вручную), затем «Рассчитать по пулу».</div>
@@ -1708,6 +1710,8 @@ function drawPrice(result) {
     }
   }
 
+  _drawIdxOverlay(ctx, valid, xStep, W, H);
+
   // Labels
   ctx.fillStyle='#6F648F'; ctx.font='10px sans-serif';
   const step = Math.max(1,Math.floor(n/8));
@@ -1797,10 +1801,12 @@ function drawPrice(result) {
       row.ref_switch ? '⚠ ролл контракта' : '',
     ].filter(Boolean).join(' · ');
     const pRank = v => isFinite(v) ? 'p' + Math.round(v * 100) : '—';
+    const irg = _chartShowIdx && _idxOvl ? _idxOvl.regByDate[String(row.date).slice(0, 10)] : null;
     tip.innerHTML = `<b>${row.date}</b> · цена <b>${row.close?.toFixed(2)}</b>
       <br>Перекос физ: <b>${isFinite(row.net_phys_pct)?(row.net_phys_pct*100).toFixed(1)+'%':'—'}</b> (${pRank(row.net_phys_pct_rank)})
        · давление: <b>${isFinite(row.squeeze_pressure)?row.squeeze_pressure.toFixed(2):'—'}</b> (${pRank(row.squeeze_pressure_rank)})
       <br>Шорт рынка: ${pRank(row.total_short_pctl)} · лонг рынка: ${pRank(row.total_long_pctl)} · ОИ: ${isFinite(row.total_oi)?Math.round(row.total_oi).toLocaleString('ru-RU'):'—'}
+      ${irg ? `<br>Индекс: до max20 ${irg.toMax.toFixed(1)}% · до min20 ${irg.toMin.toFixed(1)}%${irg.brk ? ` · <b style="color:#FF8A4C">пробой ${irg.brk === 1 ? '↑' : '↓'}</b>` : irg.reg !== 'mid' ? ' · <b style="color:#FF8A4C">у кромки</b>' : ''}` : ''}
       ${flags ? '<br>' + flags : ''}
       ${calibTip ? '<br>' + calibTip : ''}
       ${realTip ? '<br>' + realTip : ''}`;
@@ -1899,6 +1905,8 @@ function drawPriceStatic(valid, vmin, vmax, xStep, W, H, hoverIdx) {
     i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
   }
   ctx.stroke();
+
+  _drawIdxOverlay(ctx, valid, xStep, W, H);
 
   // Тренд-истощение: треугольник над/под ценой — контрарный сигнал разворота
   // (после N баров тренда позиция физлиц у исторического экстремума)
@@ -4468,13 +4476,57 @@ async function _getIndexResult(proxy, cfg) {
   return _idxCache;
 }
 
+// «Непрерывная» серия закрытий: в день ролла контракта доходность = 0,
+// иначе смена месяца выглядит как скачок и ломает уровни/диапазоны индекса
+function _adjCloses(res) {
+  const adj = new Array(res.length).fill(NaN);
+  let acc = NaN, prev = NaN;
+  for (let i = 0; i < res.length; i++) {
+    const c = res[i].close;
+    if (!(c > 0)) continue;
+    if (!isFinite(acc)) acc = c;
+    else acc *= res[i].ref_switch ? 1 : c / prev;
+    prev = c;
+    adj[i] = acc;
+  }
+  return adj;
+}
+
+// Режим индекса по датам: где закрытие относительно диапазона последних W дней.
+// reg: 'top' (≤edge% до max20 или пробой вверх), 'bottom' (аналогично вниз), 'mid'.
+// brk: 1/-1 в день пробоя max/min предыдущего окна, иначе 0.
+function _indexRegimes(idxRes, W, edgePct) {
+  W = W || 20; edgePct = edgePct || 1.0;
+  const adj = _adjCloses(idxRes);
+  const out = {};
+  let prevRaw = 0; // в устойчивом тренде каждый день — новый max: пробоем считаем только ПЕРВЫЙ день серии
+  for (let i = 0; i < idxRes.length; i++) {
+    if (!isFinite(adj[i])) continue;
+    const win = [];
+    for (let j = Math.max(0, i - W); j < i; j++) if (isFinite(adj[j])) win.push(adj[j]);
+    if (win.length < 10) continue;
+    const mx = Math.max(...win), mn = Math.min(...win);
+    const toMax = (mx - adj[i]) / adj[i] * 100, toMin = (adj[i] - mn) / adj[i] * 100;
+    const raw = adj[i] > mx ? 1 : adj[i] < mn ? -1 : 0;
+    const brk = raw !== 0 && raw !== prevRaw ? raw : 0;
+    prevRaw = raw;
+    const reg = raw === 1 || toMax <= edgePct ? 'top' : raw === -1 || toMin <= edgePct ? 'bottom' : 'mid';
+    out[String(idxRes[i].date).slice(0, 10)] = { reg, brk, toMax, toMin };
+  }
+  return out;
+}
+
 function _indexBanner(res) {
   if (!res || res.length < 25) return '';
   const L = res[res.length - 1];
   if (!(L.close > 0)) return '';
-  const dPx = k => { const A = res[res.length - 1 - k]; return (A && A.close > 0) ? (L.close - A.close) / A.close * 100 : NaN; };
-  const win = n => res.slice(-n).map(r => r.close).filter(c => c > 0);
-  const lvl = n => { const w = win(n); return { toMax: (Math.max(...w) - L.close) / L.close * 100, toMin: (L.close - Math.min(...w)) / L.close * 100 }; };
+  // Дистанции и ходы — по непрерывной серии: роллы MX внутри окна 20/60 дней
+  // иначе смещают max/min на величину контанго
+  const adjAll = _adjCloses(res);
+  const fin = adjAll.filter(isFinite);
+  const aL = fin[fin.length - 1];
+  const dPx = k => fin.length > k ? (aL - fin[fin.length - 1 - k]) / fin[fin.length - 1 - k] * 100 : NaN;
+  const lvl = n => { const w = fin.slice(-n); return { toMax: (Math.max(...w) - aL) / aL * 100, toMin: (aL - Math.min(...w)) / aL * 100 }; };
   const l20 = lvl(20), l60 = lvl(60);
   const nearest = Math.min(l20.toMax, l20.toMin, l60.toMax, l60.toMin);
   const nearWhat = nearest === l20.toMax ? 'max 20д' : nearest === l20.toMin ? 'min 20д' : nearest === l60.toMax ? 'max 60д' : 'min 60д';
@@ -4486,6 +4538,199 @@ function _indexBanner(res) {
     · <span style="font-family:var(--mono);color:#A79BC9">до max20 ${l20.toMax.toFixed(1)}% · до min20 ${l20.toMin.toFixed(1)}% · до max60 ${l60.toMax.toFixed(1)}% · до min60 ${l60.toMin.toFixed(1)}%</span>
     ${warn ? `<br><b style="color:#FF8A4C">⚠ Индекс у кромки (${nearWhat}, ${nearest.toFixed(1)}%) — возможен синхронный ход всего рынка, индивидуальные сигналы по тикерам сейчас ненадёжнее обычного</b>` : ''}
   </div>`;
+}
+
+// ── ВЛИЯНИЕ ИНДЕКСА: работают ли сигналы иначе, когда рынок у уровня ──
+// Три вопроса: 1) меняется ли точность подтверждённых сигналов от положения
+// индекса в диапазоне; 2) правда ли после пробоя уровня индексом весь пул
+// ходит синхронно; 3) что делает сам индекс после касания кромки — пробивает
+// или отбивается (годится ли это как самостоятельный метод).
+async function labIndexEffect() {
+  if (!_lastPoolInstruments || !_lastPoolInstruments.length) { setStatus('Влияние индекса считается по пулу — сначала «Рассчитать по пулу»', 'err'); return; }
+  const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
+  setStatus('Влияние индекса: считаю…');
+  const idxRes = await _getIndexResult(proxy, readCfg());
+  if (!idxRes || idxRes.length < 60) { setStatus('Нет данных индекса (MX) в базе — без него анализ невозможен', 'err'); return; }
+  const reg = _indexRegimes(idxRes);
+  const insts = _lastPoolInstruments.filter(i => i.ticker !== 'MX');
+  const med = a => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y); return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2; };
+  const dkey = d => String(d).slice(0, 10);
+
+  // 1. Дни каждого сигнала раскладываем по режиму индекса в этот день
+  const sigRows = [];
+  for (const def of _SCREEN_SIGNALS) {
+    const bucket = { top: [], mid: [], bottom: [] };
+    for (const inst of insts) {
+      for (let i = 0; i < inst.result.length; i++) {
+        if (!def.match(inst.result[i])) continue;
+        const v = inst.fwd[3][i]; if (!isFinite(v)) continue;
+        const rg = reg[dkey(inst.result[i].date)];
+        if (rg) bucket[rg.reg].push(v);
+      }
+    }
+    sigRows.push({ def, bucket });
+  }
+  // Фон: ВСЕ дни пула по тем же режимам — виден дрейф самого режима
+  const base = { top: [], mid: [], bottom: [] };
+  for (const inst of insts) for (let i = 0; i < inst.result.length; i++) {
+    const v = inst.fwd[3][i]; if (!isFinite(v)) continue;
+    const rg = reg[dkey(inst.result[i].date)];
+    if (rg) base[rg.reg].push(v);
+  }
+
+  // 2. Синхронность: ход тикеров за 3д после дня пробоя уровня индексом
+  const dateIdx = insts.map(inst => { const m = {}; inst.result.forEach((r, i) => { m[dkey(r.date)] = i; }); return m; });
+  const sync = { up: [], dn: [], mid: [] };
+  for (const d in reg) {
+    const key = reg[d].brk === 1 ? 'up' : reg[d].brk === -1 ? 'dn' : reg[d].reg === 'mid' ? 'mid' : null;
+    if (!key) continue;
+    for (let k = 0; k < insts.length; k++) {
+      const i = dateIdx[k][d];
+      if (i === undefined) continue;
+      const v = insts[k].fwd[3][i];
+      if (isFinite(v)) sync[key].push(v);
+    }
+  }
+
+  // 3. Сам индекс: продолжение после пробоя / отбой после касания без пробоя
+  const idxFwd = _fwdReturns(idxRes, [3, 5]);
+  const self = { brkUp: { f3: [], f5: [] }, brkDn: { f3: [], f5: [] }, touchTop: { f3: [], f5: [] }, touchBot: { f3: [], f5: [] } };
+  for (let i = 0; i < idxRes.length; i++) {
+    const rg = reg[dkey(idxRes[i].date)]; if (!rg) continue;
+    const k = rg.brk === 1 ? 'brkUp' : rg.brk === -1 ? 'brkDn' : rg.reg === 'top' ? 'touchTop' : rg.reg === 'bottom' ? 'touchBot' : null;
+    if (!k) continue;
+    if (isFinite(idxFwd[3][i])) self[k].f3.push(idxFwd[3][i]);
+    if (isFinite(idxFwd[5][i])) self[k].f5.push(idxFwd[5][i]);
+  }
+
+  const th = s => `<th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center;font-weight:400">${s}</th>`;
+  const cell = (vals, dir) => {
+    if (vals.length < 5) return `<td style="text-align:center;color:#6F648F">— <span style="font-size:9px">N${vals.length}</span></td>`;
+    const acc = vals.filter(v => dir > 0 ? v > 0 : v < 0).length / vals.length * 100;
+    const m = med(vals);
+    const c = acc >= 60 ? '#52F2C9' : acc < 45 ? '#FF6A8B' : '#F2F0FF';
+    return `<td style="text-align:center;white-space:nowrap;padding:4px 8px"><span style="color:${c}">${acc.toFixed(0)}%</span> · <span style="color:${m > 0 ? '#52F2C9' : '#FF6A8B'}">${m > 0 ? '+' : ''}${m.toFixed(1)}%</span> <span style="color:#6F648F;font-size:9px">N${vals.length}${vals.length < 30 ? ' ⚠' : ''}</span></td>`;
+  };
+  const baseCell = vals => !vals.length ? '<td style="text-align:center;color:#6F648F">—</td>'
+    : `<td style="text-align:center;color:#A79BC9;padding:4px 8px">${med(vals) > 0 ? '+' : ''}${med(vals).toFixed(1)}% · вниз ${(vals.filter(v => v < 0).length / vals.length * 100).toFixed(0)}% <span style="font-size:9px;color:#6F648F">N${vals.length}</span></td>`;
+  let t1 = `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:4px">
+  <thead><tr><th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:left">Сигнал (ход за 3д)</th>${th('индекс у max20')}${th('середина диапазона')}${th('индекс у min20')}</tr></thead><tbody>`;
+  for (const { def, bucket } of sigRows)
+    t1 += `<tr style="background:#140A24"><td style="padding:4px 8px;color:#F2F0FF">${def.name}</td>${cell(bucket.top, def.dir)}${cell(bucket.mid, def.dir)}${cell(bucket.bottom, def.dir)}</tr>`;
+  t1 += `<tr style="background:#140A24"><td style="padding:4px 8px;color:#6F648F">Фон: все дни пула (медиана · доля вниз)</td>${baseCell(base.top)}${baseCell(base.mid)}${baseCell(base.bottom)}</tr></tbody></table></div>`;
+
+  const syncCell = (vals, favUp) => {
+    if (vals.length < 10) return `<td style="text-align:center;color:#6F648F">— <span style="font-size:9px">N${vals.length}</span></td>`;
+    const up = vals.filter(v => v > 0).length / vals.length * 100;
+    const m = med(vals);
+    const share = favUp === null ? up : favUp ? up : 100 - up;
+    const c = share >= 58 ? '#52F2C9' : share <= 42 ? '#FF6A8B' : '#F2F0FF';
+    return `<td style="text-align:center;white-space:nowrap;padding:4px 8px"><span style="color:${m > 0 ? '#52F2C9' : '#FF6A8B'}">${m > 0 ? '+' : ''}${m.toFixed(1)}%</span> · <span style="color:${c}">вслед ${share.toFixed(0)}%</span> <span style="color:#6F648F;font-size:9px">N${vals.length}</span></td>`;
+  };
+  const t2 = `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:4px">
+  <thead><tr><th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:left">День индекса</th>${th('тикеры пула за следующие 3д<br>медиана · доля вслед за индексом')}</tr></thead><tbody>
+  <tr style="background:#140A24"><td style="padding:4px 8px;color:#F2F0FF">Пробой max20 вверх</td>${syncCell(sync.up, true)}</tr>
+  <tr style="background:#140A24"><td style="padding:4px 8px;color:#F2F0FF">Пробой min20 вниз</td>${syncCell(sync.dn, false)}</tr>
+  <tr style="background:#140A24"><td style="padding:4px 8px;color:#6F648F">Контроль: индекс в середине диапазона</td>${syncCell(sync.mid, null)}</tr></tbody></table></div>`;
+
+  const selfCell = (arr, favUp) => {
+    if (arr.length < 5) return `<td style="text-align:center;color:#6F648F">— <span style="font-size:9px">N${arr.length}</span></td>`;
+    const up = arr.filter(v => v > 0).length / arr.length * 100;
+    const share = favUp ? up : 100 - up;
+    const m = med(arr);
+    const c = share >= 58 ? '#52F2C9' : share <= 42 ? '#FF6A8B' : '#F2F0FF';
+    return `<td style="text-align:center;white-space:nowrap;padding:4px 8px"><span style="color:${c}">${share.toFixed(0)}%</span> · <span style="color:${m > 0 ? '#52F2C9' : '#FF6A8B'}">${m > 0 ? '+' : ''}${m.toFixed(1)}%</span> <span style="color:#6F648F;font-size:9px">N${arr.length}</span></td>`;
+  };
+  const selfRow = (name, k, favUp) => `<tr style="background:#140A24"><td style="padding:4px 8px;color:#F2F0FF">${name}</td>${selfCell(self[k].f3, favUp)}${selfCell(self[k].f5, favUp)}</tr>`;
+  const t3 = `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:4px">
+  <thead><tr><th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:left">Состояние индекса</th>${th('продолжение за 3д<br>доля · медиана')}${th('продолжение за 5д<br>доля · медиана')}</tr></thead><tbody>
+  ${selfRow('Пробил max20 вверх → продолжил вверх?', 'brkUp', true)}
+  ${selfRow('Пробил min20 вниз → продолжил вниз?', 'brkDn', false)}
+  ${selfRow('Коснулся max20 без пробоя → всё же пробил вверх?', 'touchTop', true)}
+  ${selfRow('Коснулся min20 без пробоя → всё же пробил вниз?', 'touchBot', false)}</tbody></table></div>`;
+
+  const cap = s => `<div style="font-size:12px;color:#B487F8;font-weight:600;margin:10px 0 4px">${s}</div>`;
+  const html = `<details open style="margin-bottom:14px"><summary style="cursor:pointer;font-size:12px;color:#B487F8;font-weight:600">Влияние индекса на сигналы — ${dkey(idxRes[idxRes.length - 1].date)}</summary>
+  ${cap('1 · Точность сигналов в зависимости от режима индекса')}
+  <div style="font-size:10px;color:#6F648F;margin-bottom:4px">«У кромки» = закрытие индекса ближе 1% к max/min за 20 дней (роллы MX склеены). В ячейке: точность сигнала · медианный ход за 3д · N дней сигнала. Влияние реально, если колонки расходятся на ≥7 п.п. при N≥30; при N&lt;30 (⚠) — не вывод, а намёк.</div>
+  ${t1}
+  ${cap('2 · Синхронность: весь ли рынок ходит за индексом после пробоя уровня')}
+  <div style="font-size:10px;color:#6F648F;margin-bottom:4px">Каждое наблюдение = один тикер в один день пробоя. «Вслед» = доля тикеров, ушедших за 3д в сторону пробоя. Если ≥58% и медиана заметно отличается от контрольной строки — в дни пробоя рынком правит индекс, а не позиции физлиц в конкретном тикере.</div>
+  ${t2}
+  ${cap('3 · Сам индекс у уровней: пробой продолжается или кромка отбивает')}
+  <div style="font-size:10px;color:#6F648F;margin-bottom:4px">«Продолжение» = доля случаев, когда индекс через 3/5 дней был дальше в сторону уровня. ≥58% — уровни пробиваются, импульс можно брать; ≤42% — кромка работает отбойником, у неё выгоднее контр-ход; между — монетка, метода нет.</div>
+  ${t3}</details>`;
+
+  const el = document.getElementById('pool-out');
+  el.innerHTML = html + el.innerHTML;
+  const nSig = sigRows.reduce((s, r) => s + r.bucket.top.length + r.bucket.mid.length + r.bucket.bottom.length, 0);
+  setStatus(`Влияние индекса: ${nSig} дней сигналов разложено по режимам, пробоев вверх ${self.brkUp.f3.length}, вниз ${self.brkDn.f3.length}`, 'ok');
+}
+
+// ── Наложение индекса на график цены тикера ──
+let _chartShowIdx = localStorage.getItem('oilab_chartidx') === '1';
+let _idxOvl = null; // {adjByDate, regByDate}
+async function _ensureIdxOverlay() {
+  if (_idxOvl) return _idxOvl;
+  const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
+  const idxRes = await _getIndexResult(proxy, readCfg());
+  if (!idxRes || idxRes.length < 25) return null;
+  const adj = _adjCloses(idxRes);
+  const adjByDate = {};
+  for (let i = 0; i < idxRes.length; i++) if (isFinite(adj[i])) adjByDate[String(idxRes[i].date).slice(0, 10)] = adj[i];
+  _idxOvl = { adjByDate, regByDate: _indexRegimes(idxRes) };
+  return _idxOvl;
+}
+async function toggleIdxOverlay() {
+  _chartShowIdx = !_chartShowIdx;
+  localStorage.setItem('oilab_chartidx', _chartShowIdx ? '1' : '0');
+  _idxOvlBtnState();
+  if (_chartShowIdx) {
+    setStatus('Индекс: загружаю…');
+    const o = await _ensureIdxOverlay();
+    setStatus(o ? 'Индекс наложен: пунктир — сам индекс (своя шкала); полоска сверху: мятная — у max20, оранжевая — у min20' : 'Индекс: нет данных MX в базе', o ? 'ok' : 'err');
+  }
+  if (_lastResult) drawPrice(_lastResult);
+}
+function _idxOvlBtnState() {
+  const b = document.getElementById('btn-idx-ovl');
+  if (b) { b.style.borderColor = _chartShowIdx ? '#B487F8' : ''; b.style.color = _chartShowIdx ? '#B487F8' : ''; }
+}
+// Индекс масштабируется в свою полосу 12-84% высоты: важна форма и совпадение
+// поворотов с тикером, а не абсолютные уровни
+let _idxOvlLoading = false;
+function _drawIdxOverlay(ctx, valid, xStep, W, H) {
+  if (!_chartShowIdx) return;
+  // оверлей был включён в прошлой сессии — данные индекса подтянутся фоном
+  if (!_idxOvl) {
+    if (!_idxOvlLoading) {
+      _idxOvlLoading = true;
+      _ensureIdxOverlay().then(o => { if (o && _lastResult) drawPrice(_lastResult); });
+    }
+    return;
+  }
+  const pts = valid.map(r => _idxOvl.adjByDate[String(r.date).slice(0, 10)]);
+  const fin = pts.filter(isFinite);
+  if (fin.length < 5) return;
+  const mn = Math.min(...fin), mx = Math.max(...fin);
+  const map = v => H * 0.12 + (mx > mn ? (mx - v) / (mx - mn) : 0.5) * H * 0.72;
+  ctx.strokeStyle = 'rgba(180,135,248,0.85)'; ctx.lineWidth = 1; ctx.setLineDash([6, 3]);
+  ctx.beginPath(); let st = false;
+  for (let i = 0; i < valid.length; i++) {
+    if (!isFinite(pts[i])) { st = false; continue; }
+    const x = (i + 0.5) * xStep, y = map(pts[i]);
+    if (!st) { ctx.moveTo(x, y); st = true; } else ctx.lineTo(x, y);
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+  for (let i = 0; i < valid.length; i++) {
+    const rg = _idxOvl.regByDate[String(valid[i].date).slice(0, 10)];
+    if (rg && rg.reg !== 'mid') {
+      ctx.fillStyle = rg.reg === 'top' ? 'rgba(82,242,201,0.55)' : 'rgba(255,138,76,0.6)';
+      ctx.fillRect(i * xStep, 0, xStep, 4);
+    }
+  }
+  ctx.fillStyle = 'rgba(180,135,248,0.9)'; ctx.font = '9px sans-serif';
+  ctx.fillText('индекс', 6, 14);
 }
 
 // ── ИЗБРАННОЕ: список root-кодов в localStorage ──
@@ -4650,6 +4895,7 @@ document.getElementById('proxy').addEventListener('change', e=>{
   localStorage.setItem('oilab_proxy', e.target.value.trim());
 });
 showTab(localStorage.getItem('oilab_tab') || 'screener');
+_idxOvlBtnState(); // подсветка кнопки «Индекс», если оверлей был включён в прошлый раз
 </script>
 </body>
 </html>
