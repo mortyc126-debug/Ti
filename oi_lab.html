@@ -1920,12 +1920,29 @@ function _calcEventTable(results, cfg) {
     const hitOf = e => dir > 0 ? isFinite(e.dtUp) : dir < 0 ? isFinite(e.dtDown) : (isFinite(e.dtUp) || isFinite(e.dtDown));
     const dtOf  = e => dir > 0 ? e.dtUp : dir < 0 ? e.dtDown
       : Math.min(isFinite(e.dtUp) ? e.dtUp : Infinity, isFinite(e.dtDown) ? e.dtDown : Infinity);
-    const hits = events.filter(hitOf).length;
+    const hitEv = events.filter(hitOf), missEv = events.filter(e => !hitOf(e));
+    const p = hitEv.length / events.length * 100;
+    // Разбивка попадание/промах — в СТОРОНУ сигнала (для ↓-бинов знак
+    // перевёрнут): медиана MFE по всем эпизодам вперемешку прячет бимодальность
+    // «редко, но крупно ловит / чаще понемногу теряет», из-за чего бин с
+    // P(выброс) x3 к базе выглядел слабым (+0.7% медиана по 6 попаданиям и
+    // 9 промахам разом). EV — грубая оценка матожидания хода.
+    const favOf = e => dir > 0 ? e.hi : -e.lo;
+    const advOf = e => dir > 0 ? e.lo : -e.hi;
+    let favHitMed = NaN, advMissMed = NaN, ev = NaN;
+    if (dir !== 0) {
+      favHitMed = _median(hitEv.map(favOf));
+      advMissMed = _median(missEv.map(advOf));
+      const f = isFinite(favHitMed) ? favHitMed : 0;
+      const a = isFinite(advMissMed) ? advMissMed : 0;
+      if (isFinite(favHitMed) || isFinite(advMissMed)) ev = p/100 * f + (1 - p/100) * a;
+    }
     return {
-      evaluated: events.length, hits, p: hits / events.length * 100,
+      evaluated: events.length, hits: hitEv.length, p,
       mfeMed: _median(events.map(e=>e.hi)),
       maeMed: _median(events.map(e=>e.lo)),
       daysToMed: _median(events.map(dtOf).filter(isFinite)),
+      favHitMed, advMissMed, ev,
     };
   };
 
@@ -1975,7 +1992,7 @@ function _renderEventTable(ev, title) {
   <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
   <thead><tr>
     <th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Бин</th>
-    ${th('дней')}${th('эпизодов')}${th(`P(выброс за ${ev.k} баров)`)}${th('× к базе')}${th('MFE ↑ мед')}${th('MAE ↓ мед')}${th('баров до выброса')}
+    ${th('дней')}${th('эпизодов')}${th(`P(выброс за ${ev.k} баров)`)}${th('× к базе')}${th('MFE ↑ мед')}${th('MAE ↓ мед')}${th('ход при попадании')}${th('ход при промахе')}${th('EV')}${th('баров до выброса')}
   </tr></thead><tbody>`;
   const b = ev.base;
   const bTxt = ['up','down','any'].map(kk => {
@@ -1990,6 +2007,9 @@ function _renderEventTable(ev, title) {
     <td style="text-align:center;color:#6c7086">—</td>
     <td style="text-align:center;color:#a6e3a1">${b.any ? fmt1(b.any.mfeMed) : '—'}</td>
     <td style="text-align:center;color:#f38ba8">${b.any ? fmt1(b.any.maeMed) : '—'}</td>
+    <td style="text-align:center;color:#6c7086">—</td>
+    <td style="text-align:center;color:#6c7086">—</td>
+    <td style="text-align:center;color:#6c7086">—</td>
     <td style="text-align:center;color:#6c7086">—</td>
   </tr>`;
   for (const row of ev.rows) {
@@ -2008,11 +2028,14 @@ function _renderEventTable(ev, title) {
       <td style="text-align:center;color:${liftCol}" title="Во сколько раз чаще базы; ✓ = 95% ДИ разницы не пересекает 0">${liftTxt}</td>
       <td style="text-align:center;color:#a6e3a1">${s ? fmt1(s.mfeMed) : '—'}</td>
       <td style="text-align:center;color:#f38ba8">${s ? fmt1(s.maeMed) : '—'}</td>
+      <td style="text-align:center;color:#a6e3a1" title="Медиана хода В СТОРОНУ сигнала среди эпизодов, где выброс пойман">${s && isFinite(s.favHitMed) ? fmt1(s.favHitMed) : '—'}</td>
+      <td style="text-align:center;color:#f38ba8" title="Медиана хода ПРОТИВ сигнала среди эпизодов без выброса">${s && isFinite(s.advMissMed) ? fmt1(s.advMissMed) : '—'}</td>
+      <td style="text-align:center;color:${s && isFinite(s.ev) ? (s.ev >= 0.5 ? '#a6e3a1' : s.ev <= -0.5 ? '#f38ba8' : '#cdd6f4') : '#6c7086'};font-weight:600" title="P·ход_при_попадании + (1−P)·ход_при_промахе — грубое матожидание в сторону сигнала">${s && isFinite(s.ev) ? fmt1(s.ev) : '—'}</td>
       <td style="text-align:center;color:#cdd6f4">${s && isFinite(s.daysToMed) ? s.daysToMed.toFixed(0) : '—'}</td>
     </tr>`;
   }
   t += `</tbody></table></div>
-  <div style="font-size:10px;color:#6c7086;margin:-4px 0 10px">Читать так: у полезного сигнала P(выброс) заметно выше базы (× ≥ 1.3 с ✓), MFE больше |MAE| (вход асимметричен в твою пользу), «баров до выброса» говорит, сколько ждать. Тусклые строки — меньше 10 эпизодов.</div>
+  <div style="font-size:10px;color:#6c7086;margin:-4px 0 10px">Читать так: у полезного сигнала P(выброс) заметно выше базы (× ≥ 1.3 с ✓) и EV &gt; 0. «Ход при попадании/промахе» — в СТОРОНУ сигнала (для ↓-бинов знак перевёрнут): общая медиана MFE прячет бимодальность «редко, но крупно / часто понемногу против». Тусклые строки — меньше 10 эпизодов.</div>
   </details>`;
   return t;
 }
