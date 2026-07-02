@@ -1058,6 +1058,76 @@ async function handleDb(path, req, env) {
     return json(results);
   }
 
+  // ── Бэкфилл ЧАСОВЫХ свечей root-серии: /db/candles/backfillroot ──
+  // ?ticker=AF&days=100&cidx=0. Для часовой калибровки сигналов нужны часовые
+  // ЦЕНЫ на ту же глубину, что часовые позиции (oi_hourly уже собран).
+  // T-Invest отдаёт часовые свечи окнами не шире недели, контрактов в серии
+  // несколько — за один вызов обрабатывается ОДИН контракт (лимит 50
+  // сабзапросов), клиент листает cidx до nextCidx=null. Свечи склеиваются
+  // под root-ключом (ticker=root, tf=hour): при пересечении контрактов
+  // побеждает больший объём часа (front-контракт) через ON CONFLICT...WHERE.
+  if (p === '/candles/backfillroot' && req.method === 'GET') {
+    const u = new URL(req.url);
+    const rootTicker = u.searchParams.get('ticker');
+    if (!rootTicker) return json({ error: 'ticker required' }, 400);
+    const token = env.TINVEST_TOKEN;
+    if (!token) return json({ error: 'TINVEST_TOKEN secret не задан' }, 503);
+    const days = Math.min(Number(u.searchParams.get('days')) || 100, 365);
+    const cidx = Math.max(0, Number(u.searchParams.get('cidx')) || 0);
+    const fromMs = Date.now() - days * 86400 * 1000;
+
+    let contracts;
+    try {
+      const fr = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: rootTicker, instrumentKind: 'INSTRUMENT_TYPE_FUTURES', apiTradeAvailableFlag: false }),
+      });
+      if (!fr.ok) return json({ error: `T-Invest FindInstrument HTTP ${fr.status}` }, 502);
+      const fb = await fr.json();
+      const rootRe = new RegExp(`^${rootTicker}[FGHJKMNQUVXZ]\\d$`, 'i');
+      contracts = (fb.instruments || []).filter(i => rootRe.test(i.ticker || ''));
+    } catch (e) { return json({ error: 'FindInstrument: ' + e.message }, 502); }
+    if (!contracts.length) return json({ ticker: rootTicker, error: 'дескрипты серии не найдены', saved: 0, nextCidx: null });
+    if (cidx >= contracts.length) return json({ ticker: rootTicker, saved: 0, nextCidx: null, done: true });
+
+    const inst = contracts[cidx];
+    const priceOf = f => (f?.units ? Number(f.units) + (f.nano || 0) / 1e9 : 0);
+    let windows = 0, fetched = 0;
+    const stmts = [];
+    for (let wEnd = Date.now(); wEnd > fromMs && windows < 16; ) {
+      const wStart = Math.max(fromMs, wEnd - 7 * 86400 * 1000);
+      windows++;
+      try {
+        const resp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ figi: inst.figi, from: new Date(wStart).toISOString(), to: new Date(wEnd).toISOString(), interval: 'CANDLE_INTERVAL_HOUR' }),
+        });
+        if (resp.ok) {
+          const body = await resp.json();
+          for (const c of (body.candles || [])) {
+            const ts = Math.floor(new Date(c.time).getTime() / 1000);
+            fetched++;
+            stmts.push(db.prepare(
+              `INSERT INTO candles(key,ticker,tf,time,o,h,l,cl,vol) VALUES(?,?,?,?,?,?,?,?,?)
+               ON CONFLICT(key) DO UPDATE SET
+                 o=excluded.o, h=excluded.h, l=excluded.l, cl=excluded.cl, vol=excluded.vol
+               WHERE excluded.vol > candles.vol`
+            ).bind(`${rootTicker}__hour__${ts}`, rootTicker, 'hour', ts,
+                   priceOf(c.open), priceOf(c.high), priceOf(c.low), priceOf(c.close), c.volume ?? 0));
+          }
+        }
+      } catch (_) { /* окно не подтянулось — идём дальше, следующий прогон доберёт */ }
+      wEnd = wStart;
+      await new Promise(r => setTimeout(r, 120));
+    }
+    for (let i = 0; i < stmts.length; i += 80) await db.batch(stmts.slice(i, i + 80));
+    return json({ ticker: rootTicker, contract: inst.ticker, cidx, contractsTotal: contracts.length,
+      windows, fetched, saved: stmts.length,
+      nextCidx: cidx + 1 < contracts.length ? cidx + 1 : null });
+  }
+
   // ── Человеческие имена root-тикеров: /db/rootnames ──
   // FutOI оперирует 2-буквенными кодами серий (AF, SR, GD), а в терминале
   // пользователь видит коды базового актива (AFLT, SBER, GOLD). Публичный

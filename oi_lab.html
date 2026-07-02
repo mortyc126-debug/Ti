@@ -134,6 +134,7 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
     <button class="sec" onclick="labSignalScreener()">🎯 Скринер сигналов</button>
     <button class="sec" onclick="labSpikeAutopsy()">🔎 Перед выбросами</button>
     <button class="sec" onclick="labBackfillIntradayPool()">📥 Интрадей-бэкфилл пула</button>
+    <button class="sec" onclick="labBackfillHourlyCandles()">🕐 Часовые свечи пула</button>
     <button class="sec" onclick="labFetchAssetClasses()">🏷 Классифицировать тикеры (T-Invest)</button>
   </div>
   <div id="pool-out" style="color:#6c7086;font-size:11px">Нажми «Заполнить всеми из базы» (или впиши тикеры вручную), затем «Рассчитать по пулу».</div>
@@ -2761,6 +2762,48 @@ async function labBackfillIntradayPool() {
   const probNote = problems.length ? ` · проблемы: ${problems.length} (см. консоль)` : '';
   if (problems.length) console.warn('Интрадей-бэкфилл, проблемы:', problems);
   setStatus(`Интрадей-бэкфилл готов: дней собрано ${daysDone}, скипнуто ${daysSkipped}, +${totalIntraday} интрадей-срезов (тикеров в ответах: ${maxSymsSeen})${probNote}`, problems.length ? 'err' : 'ok');
+}
+
+// ── Бэкфилл часовых свечей по всем тикерам пула ──
+// Часовые ПОЗИЦИИ (oi_hourly) уже собраны; для часовой калибровки сигналов
+// нужны ещё часовые ЦЕНЫ на ту же глубину. Воркер обрабатывает один контракт
+// серии за вызов (T-Invest отдаёт часовые свечи окнами не шире недели, а
+// у воркера лимит сабзапросов) — клиент листает cidx по контрактам и тикерам.
+async function labBackfillHourlyCandles() {
+  const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
+  if (!proxy) { setStatus('Укажи прокси-URL', 'err'); return; }
+  const tickers = document.getElementById('pool-tickers').value.trim().split(',').map(s=>s.trim()).filter(Boolean);
+  if (!tickers.length) { setStatus('Заполни тикеры пула — «Заполнить всеми из базы»', 'err'); return; }
+  const days = parseInt(document.getElementById('bf-days').value) || 100;
+  let totalSaved = 0;
+  const problems = [];
+  for (let ti = 0; ti < tickers.length; ti++) {
+    const t = tickers[ti];
+    let cidx = 0, retries = 0, guard = 0;
+    while (guard++ < 20) {
+      setStatus(`Часовые свечи ${t} (${ti+1}/${tickers.length}): контракт ${cidx+1}, собрано ${totalSaved} свечей…`);
+      let j = null;
+      try {
+        const r = await fetch(`${proxy}/db/candles/backfillroot?ticker=${encodeURIComponent(t)}&days=${days}&cidx=${cidx}`);
+        if (r.ok) j = await r.json();
+      } catch(_) {}
+      if (!j || j.error) {
+        retries++;
+        if (retries > 4) { problems.push(`${t}: ${j?.error || 'не ожил после 4 ретраев'}`); break; }
+        setStatus(`Часовые свечи ${t}: вызов упал, ретрай ${retries}/4 через ${2 ** retries}с…`);
+        await new Promise(r => setTimeout(r, 2 ** retries * 1000));
+        continue;
+      }
+      retries = 0;
+      totalSaved += j.saved || 0;
+      if (j.nextCidx === null || j.nextCidx === undefined) break;
+      cidx = j.nextCidx;
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
+  const probNote = problems.length ? ` · проблемы: ${problems.length} (см. консоль)` : '';
+  if (problems.length) console.warn('Часовые свечи, проблемы:', problems);
+  setStatus(`Часовые свечи готовы: +${totalSaved} свечей по ${tickers.length} тикерам${probNote}`, problems.length ? 'err' : 'ok');
 }
 
 // Человеческие имена root-кодов (AF → AFLT/Аэрофлот) — грузятся с MOEX один раз
