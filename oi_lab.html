@@ -3356,14 +3356,25 @@ async function labSignalScreener(prepend) {
       poolAgg[def.id].c3 += c3; poolAgg[def.id].n3 += n3;
       const lastRow = res[res.length - 1];
       if (lastRow && def.active(lastRow)) {
-        const raw = rawByTicker[inst.ticker];
-        const lastRaw = raw && raw[raw.length - 1];
+        const raw = rawByTicker[inst.ticker] || [];
+        const lastRaw = raw[raw.length - 1];
+        const prevRaw = raw[raw.length - 6]; // ~5 торговых дней назад
+        const pct5 = (cur, prev) => (isFinite(cur) && prev > 0) ? (cur - prev) / prev * 100 : NaN;
+        // Асимметрия исхода на +3д: сколько даёт медианно, когда сигнал прав,
+        // и сколько забирает, когда неправ — риск виден сразу, а не «в среднем»
+        const fav3 = _median(v3.filter(v => def.dir > 0 ? v > 0 : v < 0).map(Math.abs));
+        const adv3 = _median(v3.filter(v => def.dir > 0 ? v <= 0 : v >= 0).map(Math.abs));
         hits.push({ ticker: inst.ticker, def,
           acc1: n1 ? c1 / n1 * 100 : NaN, n1, med1: _median(v1),
           acc3: n3 ? c3 / n3 * 100 : NaN, n3, med3: _median(v3),
+          fav3, adv3,
           lastDate: lastRow.date,
           fl: lastRaw ? lastRaw.phys_long_contracts : NaN,
           fs: lastRaw ? lastRaw.phys_short_contracts : NaN,
+          flMed: _median(raw.slice(-60).map(r => r.phys_long_contracts)),
+          fsMed: _median(raw.slice(-60).map(r => r.phys_short_contracts)),
+          flD5: pct5(lastRaw?.phys_long_contracts, prevRaw?.phys_long_contracts),
+          fsD5: pct5(lastRaw?.phys_short_contracts, prevRaw?.phys_short_contracts),
           plP: lastRow.phys_long_pctl, psP: lastRow.phys_short_pctl });
       }
     }
@@ -3405,17 +3416,22 @@ async function labSignalScreener(prepend) {
           ${word ? `<br><span style="color:#cdd6f4;font-size:10px">${word}</span>` : ''}
           <br><span style="color:#6c7086;font-size:9px">код серии: ${h.ticker}</span></td>
         <td style="text-align:center">${dirTxt}</td>
-        <td style="text-align:center;white-space:nowrap;font-size:10px">
-          <span style="color:#a6e3a1">▲ ${fmtK(h.fl)}</span> ${pctlSpan(h.plP)}<br>
-          <span style="color:#f38ba8">▼ ${fmtK(h.fs)}</span> ${pctlSpan(h.psP)}</td>
+        <td style="text-align:center;white-space:nowrap;font-size:10px" title="Норма (медиана 60 дней): лонг ${fmtK(h.flMed)}, шорт ${fmtK(h.fsMed)}">
+          <span style="color:#a6e3a1">▲ ${fmtK(h.fl)}</span> ${pctlSpan(h.plP)} <span style="color:${h.flD5 > 0 ? '#a6e3a1' : '#f38ba8'};font-size:9px">${isFinite(h.flD5) ? (h.flD5 > 0 ? '+' : '') + h.flD5.toFixed(0) + '%/5д' : ''}</span><br>
+          <span style="color:#f38ba8">▼ ${fmtK(h.fs)}</span> ${pctlSpan(h.psP)} <span style="color:${h.fsD5 > 0 ? '#a6e3a1' : '#f38ba8'};font-size:9px">${isFinite(h.fsD5) ? (h.fsD5 > 0 ? '+' : '') + h.fsD5.toFixed(0) + '%/5д' : ''}</span></td>
         ${hCell(h.acc1, h.med1, h.n1)}
-        ${hCell(h.acc3, h.med3, h.n3)}
+        ${!isFinite(h.acc3) ? '<td style="text-align:center;color:#6c7086">—</td>' : `<td style="text-align:center;white-space:nowrap">
+          <span style="color:${h.acc3 >= 60 ? '#a6e3a1' : h.acc3 < 45 ? '#f38ba8' : '#cdd6f4'}">${h.acc3.toFixed(0)}%</span> · <span style="color:${h.med3 > 0 ? '#a6e3a1' : '#f38ba8'}">${isFinite(h.med3) ? (h.med3 > 0 ? '+' : '') + h.med3.toFixed(1) + '%' : '—'}</span> <span style="color:#6c7086;font-size:9px">N${h.n3}</span><br>
+          <span style="font-size:9px" title="Медианный ход, когда сигнал оказался прав / когда неправ — асимметрия выигрыша и риска">
+            <span style="color:#a6e3a1">прав: ${isFinite(h.fav3) ? '+' + h.fav3.toFixed(1) + '%' : '—'}</span> ·
+            <span style="color:#f38ba8">неправ: ${isFinite(h.adv3) ? '−' + h.adv3.toFixed(1) + '%' : '—'}</span>
+          </span></td>`}
         <td style="text-align:center;color:#6c7086">${isFinite(pAcc) ? pAcc.toFixed(0) + '%' : '—'} <span style="font-size:9px">N${poolAgg[h.def.id].n3}</span>${thin ? ' ⚠' : ''}</td>
         <td style="text-align:center;color:#6c7086">${h.lastDate}</td>
       </tr>`;
     }
     t += `</tbody></table></div>
-    <div style="font-size:10px;color:#6c7086;margin-bottom:10px">Как читать: на инструменте активен сигнал; «точность · ход цены» — как часто цена шла в сторону сигнала за 1/3 дня в истории ЭТОГО тикера и её медианное изменение (N — сколько раз сигнал встречался). «Физлица сейчас» — контракты в лонге ▲ и шорте ▼ на последнем срезе; pXX — где этот объём относительно последних ~60 дней тикера (<span style="color:#f38ba8">p85+</span> — у максимума, <span style="color:#89b4fa">p15-</span> — у минимума). Сортировка по 3-дневной точности (своя при N≥8, иначе пуловая ⚠). Подсветка — ≥65% на собственной истории.</div>`;
+    <div style="font-size:10px;color:#6c7086;margin-bottom:10px">Как читать: «точность · ход» — как часто цена шла в сторону сигнала за 1/3 дня в истории ЭТОГО тикера и медианное изменение (N — сколько раз сигнал встречался). Вторая строка 3-дневной ячейки — асимметрия: <span style="color:#a6e3a1">прав</span> = медианный ход, когда сигнал сработал, <span style="color:#f38ba8">неправ</span> = когда нет (это твой риск). «Физлица сейчас»: ▲ лонг ▼ шорт в контрактах, pXX — место объёма на шкале последних ~60 дней тикера (<span style="color:#f38ba8">p85+</span> у максимума, <span style="color:#89b4fa">p15-</span> у минимума), ±%/5д — изменение за 5 дней; норма (медиана 60д) — в подсказке при наведении. Сортировка по 3-дневной точности (своя при N≥8, иначе пуловая ⚠), подсветка — ≥65%.</div>`;
   }
   t += `</details>`;
   const el = document.getElementById('screener-out');
