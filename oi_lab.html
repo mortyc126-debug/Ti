@@ -2315,7 +2315,7 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
       ${H.map(h=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center" colspan="3">${hLbl(h)}</th>`).join('')}
     </tr><tr>
       <th style="background:#181825"></th>
-      ${H.map(()=>'<th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">медиана</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">точность</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">N</th>').join('')}
+      ${H.map(()=>'<th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center" title="Медианное изменение ЦЕНЫ за этот горизонт после попадания бара в бин">ход цены (мед.)</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center" title="Как часто цена шла в сторону прогноза бина">точность</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center" title="Сколько баров истории попало в бин">N</th>').join('')}
     </tr></thead><tbody>`;
     // База уже посчитана на уровне renderCalibration — общая для таблиц и вердиктов
     t += `<tr style="background:#1e1e2e;border-top:1px solid #313244"><td style="padding:4px 8px;color:#cba6f7;font-weight:600;white-space:nowrap">📐 Базовый уровень</td>`;
@@ -2763,6 +2763,16 @@ async function labBackfillIntradayPool() {
   setStatus(`Интрадей-бэкфилл готов: дней собрано ${daysDone}, скипнуто ${daysSkipped}, +${totalIntraday} интрадей-срезов (тикеров в ответах: ${maxSymsSeen})${probNote}`, problems.length ? 'err' : 'ok');
 }
 
+// Человеческие имена root-кодов (AF → AFLT/Аэрофлот) — грузятся с MOEX один раз
+let _rootNames = null;
+async function _getRootNames(proxy) {
+  if (_rootNames || !proxy) return _rootNames || {};
+  try { const r = await fetch(`${proxy}/db/rootnames`); if (r.ok) _rootNames = await r.json(); } catch(_) {}
+  return _rootNames || {};
+}
+const _rootAsset = t => (_rootNames && _rootNames[t] && _rootNames[t].asset) || '';
+const _rootTitle = t => (_rootNames && _rootNames[t] && _rootNames[t].name) || t;
+
 // ── МОНИТОР КАНУНА: похож ли СЕГОДНЯШНИЙ день на канун выброса? ──
 // Честный ответ на вопрос «когда выброс на МОЁМ тикере»: предсказать дату
 // по дневному ОИ нельзя (3-4 выброса на 65 дней — статистики нет), но можно
@@ -2867,11 +2877,12 @@ const _SCREEN_SIGNALS = [
     active: r => r.spike_setup && r.trend_exhaust !== 1 },
 ];
 
-function labSignalScreener(prepend) {
+async function labSignalScreener(prepend) {
   if (!_lastPoolInstruments || !_lastPoolInstruments.length) {
     setStatus('Скринер работает по рассчитанному пулу — сначала «🧮 Рассчитать по пулу»', 'err');
     return;
   }
+  await _getRootNames(document.getElementById('proxy').value.trim().replace(/\/$/, ''));
   const H3 = 3;
   const hits = [];
   const poolAgg = {};
@@ -2908,7 +2919,7 @@ function labSignalScreener(prepend) {
     t += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:6px">
     <thead><tr>
       <th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Сигнал</th>
-      ${th('Тикер')}${th('Направление')}${th('Точность тикера +3д')}${th('Медиана +3д (тикер)')}${th('Точность пула +3д')}${th('Бар')}
+      ${th('Инструмент')}${th('Направление')}${th('Точность направления<br>за 3 дня (этот тикер)')}${th('Типичный ход цены<br>за 3 дня после сигнала')}${th('Точность по пулу<br>(все тикеры)')}${th('Последние данные')}
     </tr></thead><tbody>`;
     for (const h of hits) {
       const dirTxt = h.def.dir > 0 ? '🟢 лонг' : '🔴 шорт';
@@ -2918,7 +2929,7 @@ function labSignalScreener(prepend) {
       const thin = !(isFinite(h.accT) && h.nT >= 8);
       t += `<tr style="background:${strong ? (h.def.dir > 0 ? '#1a2e1a' : '#2e1a1a') : '#1e2030'}"${thin ? ' title="Мало собственной истории сигнала у тикера — ориентируйся на пуловую точность"' : ''}>
         <td style="padding:4px 8px;color:#cdd6f4">${h.def.emoji} ${h.def.name}</td>
-        <td style="text-align:center;color:#cba6f7;font-weight:700;font-size:12px">${h.ticker}</td>
+        <td style="text-align:center" title="${_rootTitle(h.ticker)}"><span style="color:#cba6f7;font-weight:700;font-size:12px">${_rootAsset(h.ticker) || h.ticker}</span><br><span style="color:#6c7086;font-size:9px">код серии: ${h.ticker}</span></td>
         <td style="text-align:center">${dirTxt}</td>
         <td style="text-align:center;color:${strong ? '#a6e3a1' : '#cdd6f4'}">${accTxt}${thin ? ' ⚠' : ''}</td>
         <td style="text-align:center;color:${isFinite(h.medT) ? (h.medT > 0 ? '#a6e3a1' : '#f38ba8') : '#6c7086'}">${isFinite(h.medT) ? (h.medT > 0 ? '+' : '') + h.medT.toFixed(1) + '%' : '—'}</td>
@@ -2927,7 +2938,7 @@ function labSignalScreener(prepend) {
       </tr>`;
     }
     t += `</tbody></table></div>
-    <div style="font-size:10px;color:#6c7086;margin-bottom:10px">Сортировка по точности (своя при N≥8, иначе пуловая). Подсветка — тикеры, где сигнал исторически ≥65% на собственной истории. ⚠ — у тикера мало своей истории этого сигнала. «Бар» — дата последнего снэпшота: если она старше вчерашней, данные несвежие.</div>`;
+    <div style="font-size:10px;color:#6c7086;margin-bottom:10px">Как читать строку: на этом инструменте сейчас активен сигнал; исторически после него <b>цена этого тикера</b> в течение 3 торговых дней шла в сторону сигнала в указанном проценте случаев (N — сколько раз сигнал встречался в его истории). «Типичный ход» — медианное изменение цены за те же 3 дня. Сортировка по точности (своя при N≥8, иначе пуловая), подсветка — ≥65% на собственной истории, ⚠ — своей истории мало, ориентируйся на пул. «Последние данные» старше вчерашних = данные несвежие.</div>`;
   }
   t += `</details>`;
   const el = document.getElementById('pool-out');
@@ -3017,6 +3028,8 @@ async function labCalibratePool() {
 
   // Событийная оценка по всему пулу: у каждого инструмента свой порог выброса
   const poolEvents = _calcEventTable(instruments.map(i=>i.result), cfg);
+
+  await _getRootNames(proxy); // человеческие имена тикеров для шапок таблиц
 
   renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInstrumentSp, perInstrumentPhase, phaseDateOverlap, poolEvents);
   labSignalScreener(); // скринер активных сигналов — сразу сверху, без лишнего клика
@@ -3631,7 +3644,7 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
       ${HORIZONS.map(h=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center" colspan="3">${hLbl(h)}</th>`).join('')}
     </tr><tr>
       <th style="background:#181825"></th>
-      ${HORIZONS.map(()=>'<th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">медиана</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">точность</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">N</th>').join('')}
+      ${HORIZONS.map(()=>'<th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center" title="Медианное изменение ЦЕНЫ за этот горизонт после попадания дня в бин">ход цены (мед.)</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center" title="Как часто цена шла в сторону прогноза бина">точность</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center" title="Сколько дней истории попало в бин">N</th>').join('')}
     </tr></thead><tbody>`;
     // Базовый уровень пула — все форвардные доходности по всем инструментам сразу
     // (не среднее локальных базовых уровней — иначе инструменты с большим N
@@ -3691,7 +3704,7 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
     let t = `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title} — разбивка по инструментам на ${hLbl(h)}</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
     <thead><tr><th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Бин · горизонт ${hLbl(h)}</th>
-      ${instruments.map(i=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">${i.ticker}</th>`).join('')}
+      ${instruments.map(i=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center" title="${_rootTitle(i.ticker)}">${_rootAsset(i.ticker) || i.ticker}</th>`).join('')}
     </tr></thead><tbody>`;
     const nBins = perInstrumentStats[0].length;
     for (let binIdx=0; binIdx<nBins; binIdx++) {

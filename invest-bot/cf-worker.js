@@ -1058,6 +1058,32 @@ async function handleDb(path, req, env) {
     return json(results);
   }
 
+  // ── Человеческие имена root-тикеров: /db/rootnames ──
+  // FutOI оперирует 2-буквенными кодами серий (AF, SR, GD), а в терминале
+  // пользователь видит коды базового актива (AFLT, SBER, GOLD). Публичный
+  // ISS отдаёт ASSETCODE/SHORTNAME по каждому контракту — маппим root →
+  // базовый актив по самому ликвидному контракту серии.
+  if (p === '/rootnames' && req.method === 'GET') {
+    const secResp = await fetch('https://iss.moex.com/iss/engines/futures/markets/forts/securities.json?iss.meta=off&iss.only=securities&securities.columns=SECID,SHORTNAME,SECNAME,ASSETCODE,VOLTODAY');
+    if (!secResp.ok) return json({ error: `ISS HTTP ${secResp.status}` }, 502);
+    const sj = await secResp.json();
+    const rows = issBlockToObjects(sj.securities);
+    const best = {};
+    for (const r of rows) {
+      if (!r.SECID) continue;
+      const root = futoi2sym(r.SECID);
+      const vol = Number(r.VOLTODAY || 0);
+      if (!best[root] || vol > best[root].vol) {
+        best[root] = { vol,
+          asset: r.ASSETCODE || '',
+          name: String(r.SECNAME || r.SHORTNAME || '').replace(/^Фьючерсный контракт\s*/i, '').trim() };
+      }
+    }
+    const out = {};
+    for (const [root, v] of Object.entries(best)) out[root] = { asset: v.asset, name: v.name };
+    return json(out);
+  }
+
   // ── Диагностика: /db/oitest?ticker=SSU6&date=2026-06-25 — ответ FutOI API ──
   // extra= — произвольные параметры к URL MOEX (url-encoded, напр.
   // extra=start%3D1000%26interval%3D60) — для подбора рабочей пагинации.
