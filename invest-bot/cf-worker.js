@@ -1140,6 +1140,55 @@ async function handleDb(path, req, env) {
       nextCidx: cidx + 1 < contracts.length ? cidx + 1 : null });
   }
 
+  // ── AlgoPack: 5-минутки одного дня одной серии: /db/apfetch ──
+  // ?ticker=NR&date=2026-05-28&type=tradestats|obstats. Per-secid путь
+  // требует полное имя контракта (NRU6), а не root — резолвим контракты
+  // серии через кэшированный FindInstrument и берём тот, где больше объём
+  // (front). Возвращаем сырые 5-мин строки — анализ на клиенте.
+  if (p === '/apfetch' && req.method === 'GET') {
+    const u = new URL(req.url);
+    const moexKey = env.MOEX_KEY;
+    const token = env.TINVEST_TOKEN;
+    const rootTicker = u.searchParams.get('ticker');
+    const date = u.searchParams.get('date');
+    const type = (u.searchParams.get('type') || 'tradestats').replace(/[^a-z]/g, '');
+    if (!rootTicker || !date) return json({ error: 'ticker и date обязательны' }, 400);
+    if (!moexKey || !token) return json({ error: 'MOEX_KEY/TINVEST_TOKEN не заданы' }, 503);
+    let contracts = (globalThis._fiCache = globalThis._fiCache || {})[rootTicker];
+    if (!contracts) {
+      try {
+        const fr = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: rootTicker, instrumentKind: 'INSTRUMENT_TYPE_FUTURES', apiTradeAvailableFlag: false }),
+        });
+        if (!fr.ok) return json({ error: `FindInstrument HTTP ${fr.status}` }, 502);
+        const fb = await fr.json();
+        const rootRe = new RegExp(`^${rootTicker}[FGHJKMNQUVXZ]\\d$`, 'i');
+        contracts = (fb.instruments || []).filter(i => rootRe.test(i.ticker || ''));
+        globalThis._fiCache[rootTicker] = contracts;
+      } catch (e) { return json({ error: 'FindInstrument: ' + e.message }, 502); }
+    }
+    if (!contracts.length) return json({ ticker: rootTicker, date, type, secid: null, rows: [] });
+    let best = null;
+    for (const inst of contracts.slice(0, 6)) {
+      try {
+        const r2 = await fetch(`https://apim.moex.com/iss/datashop/algopack/fo/${type}/${encodeURIComponent(inst.ticker)}.json?date=${date}&iss.meta=off&limit=1000`,
+          { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
+        if (!r2.ok) continue;
+        const j2 = await r2.json();
+        const bk = j2.data || j2[Object.keys(j2).find(k => k !== 'metadata' && !k.endsWith('.cursor') && !k.endsWith('.dates'))];
+        const rows2 = issBlockToObjects(bk);
+        if (!rows2.length) continue;
+        const vol = rows2.reduce((s, r) => s + (Number(r.vol) || (Number(r.vol_b_l10) || 0) + (Number(r.vol_s_l10) || 0)), 0);
+        if (!best || vol > best.vol) best = { secid: inst.ticker, vol, rows: rows2 };
+      } catch (_) {}
+      await new Promise(r => setTimeout(r, 150));
+    }
+    if (!best) return json({ ticker: rootTicker, date, type, secid: null, rows: [] });
+    return json({ ticker: rootTicker, date, type, secid: best.secid, rows: best.rows });
+  }
+
   // ── Разведчик AlgoPack: /db/aptest?type=tradestats&date=&ticker=&sec=fo ──
   // Проверка по факту, что отдаёт ключ по датасетам AlgoPack для фьючерсов:
   // tradestats (агрегаты сделок: агрессивные покупки/продажи), obstats

@@ -74,6 +74,7 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
   <button class="sec" onclick="labFetchCandles('hour')">📈 Свечи 1h</button>
   <button class="sec" onclick="labDiag()">🩺 Диагностика</button>
   <button class="sec" onclick="labSpikeMonitor()">🧨 Монитор кануна</button>
+  <button class="sec" onclick="labOrderflowAutopsy()">🧬 Стакан у выбросов</button>
 </div>
 
 <div id="status" class="status">—</div>
@@ -2841,6 +2842,140 @@ const _ASSET_WORDS = {
   GLDRUBF:'Золото/рубль (вечный)', GAZPF:'Газпром (вечный)', SBERF:'Сбербанк (вечный)',
 };
 const _assetWord = a => _ASSET_WORDS[a] || '';
+
+// ── СТАКАН И АГРЕССОРЫ ВОКРУГ ВЫБРОСОВ (AlgoPack fo/tradestats + fo/obstats) ──
+// Проверка двух механик на 5-минутных данных (история AlgoPack — с 2020):
+//   1) агрессоры: дисбаланс рыночных покупок/продаж в канун и в последние
+//      2 часа кануна — начинается ли крытие «по любой» заранее;
+//   2) тонкость: глубина офферов (vol_s_l5) и её динамика к вечеру кануна —
+//      подтверждение «рынок тонкий сверху, покупателю не с кем торговаться».
+// Сравнение: кануны выбросов против контрольных дней того же тикера.
+async function labOrderflowAutopsy() {
+  const result = _lastResult;
+  if (!result || result.length < 30) { setStatus('Сначала загрузи тикер («Загрузить»)', 'err'); return; }
+  const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
+  if (!proxy) { setStatus('Укажи прокси-URL', 'err'); return; }
+  const sym = (document.getElementById('tickers').value.trim().match(/^([A-Za-z]{2})/) || [])[1];
+  if (!sym) { setStatus('Не удалось определить root-код из поля тикера', 'err'); return; }
+  const cfg = readCfg();
+  const q = Math.min(0.995, Math.max(0.55, cfg.spike_quantile || 0.95));
+  const dayRet = _dailyReturns(result);
+  const thr = _spikeThresholds(dayRet, q);
+  if (!thr) { setStatus('Мало истории для порога выброса', 'err'); return; }
+  const spikeIdx = [];
+  for (let i = 1; i < result.length; i++) if (isFinite(dayRet[i]) && dayRet[i] >= thr.up) spikeIdx.push(i);
+  if (!spikeIdx.length) { setStatus(`Выбросов вверх (≥ +${thr.up.toFixed(1)}%/д) в истории не нашлось`, 'err'); return; }
+  const spikes = spikeIdx.slice(-8); // не больше 8 — по два датасета на день
+  const spikeSet = new Set(spikeIdx);
+  const controls = [];
+  for (let i = result.length - 2; i > 1 && controls.length < 8; i -= 6) {
+    if (!spikeSet.has(i) && !spikeSet.has(i + 1)) controls.push(i);
+  }
+
+  const fetchAp = async (type, date) => {
+    for (let a = 0; a < 2; a++) {
+      try {
+        const r = await fetch(`${proxy}/db/apfetch?ticker=${encodeURIComponent(sym)}&date=${date}&type=${type}`);
+        if (r.ok) { const j = await r.json(); if (!j.error) return j.rows || []; }
+      } catch (_) {}
+      await new Promise(r => setTimeout(r, 3000));
+    }
+    return [];
+  };
+  // Признаки одного дня из 5-минуток
+  const featsOf = async (date) => {
+    const ts = await fetchAp('tradestats', date);
+    const ob = await fetchAp('obstats', date);
+    const f = {};
+    if (ts.length >= 12) {
+      const sum = (rows, k) => rows.reduce((s, r) => s + (Number(r[k]) || 0), 0);
+      const disb = rows => { const b = sum(rows, 'val_b'), s = sum(rows, 'val_s'); return (b + s) > 0 ? (b - s) / (b + s) : NaN; };
+      f.disbDay = disb(ts);
+      f.disbLast2h = disb(ts.slice(-24));
+      f.volLast2hShare = sum(ts, 'vol') > 0 ? sum(ts.slice(-24), 'vol') / sum(ts, 'vol') : NaN;
+    }
+    if (ob.length >= 12) {
+      const med = arr => _median(arr.filter(isFinite));
+      const askL5 = ob.map(r => Number(r.vol_s_l5)).filter(v => isFinite(v) && v > 0);
+      const bidL5 = ob.map(r => Number(r.vol_b_l5)).filter(v => isFinite(v) && v > 0);
+      f.askShareL5 = med(ob.map(r => {
+        const a = Number(r.vol_s_l5), b = Number(r.vol_b_l5);
+        return (a + b) > 0 ? a / (a + b) : NaN;
+      }));
+      const mornAsk = med(ob.slice(0, 24).map(r => Number(r.vol_s_l5)));
+      const eveAsk = med(ob.slice(-24).map(r => Number(r.vol_s_l5)));
+      f.askEveMorn = (mornAsk > 0 && isFinite(eveAsk)) ? eveAsk / mornAsk : NaN;
+      f.spreadMed = med(ob.map(r => Number(r.spread_l1)));
+      f.askL5Med = med(askL5);
+      f.bidL5Med = med(bidL5);
+    }
+    return f;
+  };
+
+  const IFX = [
+    { key: 'disbDay',       lbl: 'Дисбаланс агрессоров за день (+1 = все покупали)', dec: 2 },
+    { key: 'disbLast2h',    lbl: 'Дисбаланс агрессоров в последние 2 часа', dec: 2 },
+    { key: 'volLast2hShare',lbl: 'Доля дневного объёма в последние 2 часа', dec: 2 },
+    { key: 'askShareL5',    lbl: 'Доля офферов в стакане L5 (>0.5 = продавцов больше)', dec: 2 },
+    { key: 'askEveMorn',    lbl: 'Офферы вечером / утром (<1 = сверху тончает)', dec: 2 },
+    { key: 'spreadMed',     lbl: 'Спред L1 (медиана дня)', dec: 1 },
+  ];
+  const pre = {}, ctl = {};
+  for (const fx of IFX) { pre[fx.key] = []; ctl[fx.key] = []; }
+  const perSpike = [];
+  let done = 0;
+  const total = spikes.length + controls.length;
+  for (const i of spikes) {
+    const eveDate = result[i - 1].date;
+    done++;
+    setStatus(`Стакан у выбросов: канун ${eveDate} (${done}/${total})…`);
+    const f = await featsOf(eveDate);
+    for (const fx of IFX) if (isFinite(f[fx.key])) pre[fx.key].push(f[fx.key]);
+    perSpike.push({ date: result[i].date, ret: dayRet[i], f });
+  }
+  for (const i of controls) {
+    const d = result[i].date;
+    done++;
+    setStatus(`Стакан у выбросов: контрольный ${d} (${done}/${total})…`);
+    const f = await featsOf(d);
+    for (const fx of IFX) if (isFinite(f[fx.key])) ctl[fx.key].push(f[fx.key]);
+  }
+
+  const th = s => `<th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:center;font-weight:400">${s}</th>`;
+  let rowsH = '';
+  for (const fx of IFX) {
+    const a = _median(pre[fx.key]), b = _median(ctl[fx.key]);
+    const d = isFinite(a) && isFinite(b) ? a - b : NaN;
+    rowsH += `<tr>
+      <td style="padding:4px 8px;color:#cdd6f4">${fx.lbl}</td>
+      <td style="text-align:center;color:#cba6f7;font-weight:600">${isFinite(a) ? a.toFixed(fx.dec) : '—'} <span style="color:#6c7086;font-size:9px">N${pre[fx.key].length}</span></td>
+      <td style="text-align:center;color:#6c7086">${isFinite(b) ? b.toFixed(fx.dec) : '—'} <span style="font-size:9px">N${ctl[fx.key].length}</span></td>
+      <td style="text-align:center;color:${!isFinite(d) ? '#6c7086' : d > 0 ? '#a6e3a1' : '#f38ba8'}">${isFinite(d) ? (d > 0 ? '+' : '') + d.toFixed(fx.dec) : '—'}</td>
+    </tr>`;
+  }
+  const spikesH = perSpike.map(s => `<tr>
+    <td style="padding:3px 8px;color:#cdd6f4">${s.date}</td>
+    <td style="text-align:center;color:#a6e3a1">+${s.ret.toFixed(1)}%</td>
+    <td style="text-align:center">${isFinite(s.f.disbDay) ? s.f.disbDay.toFixed(2) : '—'}</td>
+    <td style="text-align:center">${isFinite(s.f.disbLast2h) ? s.f.disbLast2h.toFixed(2) : '—'}</td>
+    <td style="text-align:center">${isFinite(s.f.askEveMorn) ? s.f.askEveMorn.toFixed(2) : '—'}</td>
+  </tr>`).join('');
+
+  const html = `<details open><summary style="cursor:pointer;font-size:12px;color:#cba6f7;font-weight:600;margin-bottom:6px">🧬 Стакан и агрессоры в кануны выбросов — ${sym} (${spikes.length} канунов против ${controls.length} контрольных)</summary>
+  <div style="font-size:10px;color:#6c7086;margin-bottom:6px">Источник: AlgoPack fo/tradestats + fo/obstats, 5-минутки front-контракта. Порог выброса: ход за день ≥ +${thr.up.toFixed(1)}%.</div>
+  <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:8px">
+  <thead><tr><th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Признак (в канун)</th>${th('медиана канунов')}${th('медиана контрольных')}${th('разница')}</tr></thead>
+  <tbody>${rowsH}</tbody></table></div>
+  <details><summary style="cursor:pointer;font-size:11px;color:#7287fd;margin-bottom:4px">По каждому выбросу</summary>
+  <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:8px">
+  <thead><tr><th style="padding:3px 8px;background:#181825;color:#a6adc8;text-align:left">Дата выброса</th>${th('ход')}${th('дисб. агрессоров канун')}${th('дисб. последние 2ч')}${th('офферы вечер/утро')}</tr></thead>
+  <tbody>${spikesH}</tbody></table></div></details>
+  </details>`;
+
+  const el = document.getElementById('calib-out');
+  el.innerHTML = html + el.innerHTML;
+  setStatus(`Стакан у выбросов: готово (${spikes.length} канунов, ${controls.length} контрольных)`, 'ok');
+}
 
 // ── МОНИТОР КАНУНА: похож ли СЕГОДНЯШНИЙ день на канун выброса? ──
 // Честный ответ на вопрос «когда выброс на МОЁМ тикере»: предсказать дату
