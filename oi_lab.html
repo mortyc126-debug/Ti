@@ -1258,6 +1258,7 @@ function computeIndicator(rows, cfg, refSwitchDates) {
   return rows.map((r,i)=>({
     date: r.date,
     close: close[i],
+    ref_switch: !!(r.ref_switch || refSwitchSet.has(r.date)),
     net_phys_pct: netPhysPct[i],
     net_phys_pct_rank: netPhysPctRank[i],
     total_oi: totalOI[i],
@@ -1886,6 +1887,7 @@ const EVENT_DEFS = [
 function _dailyReturns(result) {
   const out = new Array(result.length).fill(NaN);
   for (let i=1; i<result.length; i++) {
+    if (result[i].ref_switch) continue; // ролл контракта — скачок без рынка
     const a = result[i-1].close, b = result[i].close;
     if (a > 0 && b > 0) out[i] = (b - a) / a * 100;
   }
@@ -2103,6 +2105,7 @@ function labCalibrate() {
   for (const h of HORIZONS) {
     fwd[h] = result.map((r, i) => {
       if (i + h >= n) return NaN;
+      for (let j = i + 1; j <= i + h; j++) if (result[j].ref_switch) return NaN; // ролл в окне
       const c0 = result[i].close, c1 = result[i+h].close;
       return (c0 > 0 && c1 > 0) ? (c1 - c0) / c0 * 100 : NaN;
     });
@@ -2571,7 +2574,7 @@ async function _fetchInstrumentRows(proxy, rootTicker, log) {
         for (const c of carr) if (c.time) candleMap[_mskDateStr(c.time)] = c;
         rows = rows.map(r => {
           const c = candleMap[r.date];
-          return c ? { ...r, close: c.cl || r.close, open: c.o, high: c.h, low: c.l } : r;
+          return c ? { ...r, close: c.cl || r.close, open: c.o, high: c.h, low: c.l, roll_secid: c.secid || null } : r;
         });
       }
       // t сам является root-кодом (2 буквы) и обычная подтяжка свечей не дала
@@ -2591,7 +2594,11 @@ async function _fetchInstrumentRows(proxy, rootTicker, log) {
       // переклеиваем и цену, и H/L.
       const pricedShare = rows.length ? rows.filter(r => r.close > 0).length / rows.length : 0;
       const hlShare = rows.length ? rows.filter(r => r.high > 0 && r.low > 0).length / rows.length : 0;
-      if (t === sym && (pricedShare < 0.8 || hlShare < 0.5)) {
+      // secidShare: старые root-свечи (до починки склейки контрактов) не несут
+      // secid — их надо пересобрать, иначе фейковые роллы останутся непомеченными
+      const withHl = rows.filter(r => r.high > 0 && r.low > 0);
+      const secidShare = withHl.length ? withHl.filter(r => r.roll_secid).length / withHl.length : 1;
+      if (t === sym && (pricedShare < 0.8 || hlShare < 0.5 || secidShare < 0.5)) {
         try {
           const bp = await fetch(`${proxy}/db/oidaily/backfillprice?ticker=${encodeURIComponent(t)}`);
           const bpj = bp.ok ? await bp.json() : { error: `HTTP ${bp.status}` };
@@ -2612,7 +2619,7 @@ async function _fetchInstrumentRows(proxy, rootTicker, log) {
               for (const c of carr3) if (c.time) cmap3[_mskDateStr(c.time)] = c;
               rows = rows.map(r => {
                 const c = cmap3[r.date];
-                return c ? { ...r, close: c.cl || r.close, open: c.o, high: c.h, low: c.l } : r;
+                return c ? { ...r, close: c.cl || r.close, open: c.o, high: c.h, low: c.l, roll_secid: c.secid || null } : r;
               });
             }
             _l(`${t}: после heal цен=${rows.filter(r=>r.close>0).length}, H/L=${rows.filter(r=>r.high>0&&r.low>0).length}/${rows.length}`);
@@ -2624,7 +2631,20 @@ async function _fetchInstrumentRows(proxy, rootTicker, log) {
   }
   if (!Object.keys(contractsMap).length) { _l('итог: ни один тикер семьи не дал строк oidaily'); return null; }
   let rows, refSwitchDates;
-  if (Object.keys(contractsMap).length === 1) { rows = Object.values(contractsMap)[0]; refSwitchDates = []; }
+  if (Object.keys(contractsMap).length === 1) {
+    rows = Object.values(contractsMap)[0];
+    // Дни ролла склеенной root-серии: смена контракта-источника свечи =
+    // ценовой скачок без рынка (контанго/бэквордация между месяцами).
+    // Эти даты исключаются из доходностей — иначе они выглядели бы как
+    // «выбросы +30-50%» (ровно это и случилось с газом NR).
+    refSwitchDates = [];
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i].roll_secid && rows[i-1].roll_secid && rows[i].roll_secid !== rows[i-1].roll_secid) {
+        refSwitchDates.push(rows[i].date);
+        _l(`${rows[i].date}: ролл ${rows[i-1].roll_secid} → ${rows[i].roll_secid}`);
+      }
+    }
+  }
   else ({ rows, refSwitchDates } = aggregateContracts(contractsMap));
   _l(`после склейки (с ценой): строк = ${rows ? rows.length : 0}`);
   if (!rows || rows.length < 15) return null;
@@ -2643,6 +2663,8 @@ function _fwdReturns(result, HORIZONS) {
   for (const h of HORIZONS) {
     fwd[h] = result.map((r,i) => {
       if (i + h >= n) return NaN;
+      // Окно, пересекающее ролл контракта, содержит нерыночный скачок
+      for (let j = i + 1; j <= i + h; j++) if (result[j].ref_switch) return NaN;
       const c0 = result[i].close, c1 = result[i+h].close;
       return (c0 > 0 && c1 > 0) ? (c1 - c0) / c0 * 100 : NaN;
     });

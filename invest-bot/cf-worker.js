@@ -1688,6 +1688,9 @@ async function handleDb(path, req, env) {
     const token = env.TINVEST_TOKEN;
     if (!token) return json({ error: 'TINVEST_TOKEN secret не задан' }, 503);
 
+    // Колонка secid: из какого контракта взята склеенная root-свеча дня —
+    // нужна клиенту, чтобы помечать дни переключения контрактов (ролл)
+    try { await db.prepare('ALTER TABLE candles ADD COLUMN secid TEXT').run(); } catch (_) {}
     const { results: rootRows } = await db.prepare(
       'SELECT tradedate FROM oi_daily WHERE ticker=? ORDER BY tradedate ASC'
     ).bind(rootTicker).all();
@@ -1713,8 +1716,7 @@ async function handleDb(path, req, env) {
     }
 
     const priceOf = f => (f?.units ? Number(f.units) + (f.nano || 0) / 1e9 : 0);
-    const priceByDate = {}; // date -> {price, vol} — при пересечении дескриптов берём больший объём
-    const rootCandleByDate = {}; // date -> полная свеча front-контракта (по большему объёму)
+    const candByDate = {}; // date -> [{secid, r}] — кандидаты со всех контрактов
     const contractsUsed = [];
     for (const inst of contracts) {
       try {
@@ -1744,38 +1746,46 @@ async function handleDb(path, req, env) {
         }
         for (const r of rows) {
           const date = new Date(r.time * 1000).toISOString().slice(0, 10);
-          const existing = priceByDate[date];
-          if (!existing || r.vol > existing.vol) priceByDate[date] = { price: r.cl, vol: r.vol };
-          const ex2 = rootCandleByDate[date];
-          if (!ex2 || r.vol > ex2.vol) rootCandleByDate[date] = r;
+          (candByDate[date] = candByDate[date] || []).push({ secid: inst.ticker, r });
         }
       } catch(e) { /* этот дескрипт не подтянулся — пробуем остальные */ }
     }
 
-    const dates = Object.keys(priceByDate);
-    for (let i = 0; i < dates.length; i += 50) {
-      const chunk = dates.slice(i, i + 50);
-      await db.batch(chunk.map(date =>
+    // Выбор контракта дня — С НЕПРЕРЫВНОСТЬЮ, а не «max объёма каждый день».
+    // Контракты разных месяцев стоят по-разному (у газа летний 3.2 и зимний
+    // 4.5+), и прыжки выбора между ними рисовали в root-серии фейковые
+    // ±30-50% за день — они попадали в статистику как «мегавыбросы».
+    // Держимся выбранного контракта, пока у него есть свечи; переключаемся
+    // (на max-объёмный кандидат) только когда он закончился — это ролл на
+    // экспирации, и такие дни помечаются secid'ом для клиентской пометки.
+    const rcDates = Object.keys(candByDate).sort();
+    const chosen = {}; // date -> {secid, r}
+    let curSecid = null;
+    for (const date of rcDates) {
+      const cands = candByDate[date];
+      let pick = curSecid ? cands.find(c => c.secid === curSecid) : null;
+      if (!pick) {
+        pick = cands.reduce((a, b) => (b.r.vol > (a?.r.vol ?? -1) ? b : a), null);
+        curSecid = pick.secid;
+      }
+      chosen[date] = pick;
+    }
+    for (let i = 0; i < rcDates.length; i += 50) {
+      await db.batch(rcDates.slice(i, i + 50).map(date =>
         db.prepare('UPDATE oi_daily SET price=? WHERE ticker=? AND tradedate=?')
-          .bind(priceByDate[date].price, rootTicker, date)
+          .bind(chosen[date].r.cl, rootTicker, date)
       ));
     }
-
-    // Склеенная root-свеча дня (front-контракт по объёму) — под ключом
-    // root-тикера. Фазовому детектору oi_lab нужны high/low на всей истории,
-    // а свечи дескриптов лежат под их именами и при загрузке root-серии не
-    // находились — фазы на добэкфилленной истории не детектились вовсе.
-    const rcDates = Object.keys(rootCandleByDate);
-    for (let i = 0; i < rcDates.length; i += 100) {
-      await db.batch(rcDates.slice(i, i + 100).map(date => {
-        const r = rootCandleByDate[date];
-        return db.prepare('INSERT OR REPLACE INTO candles(key,ticker,tf,time,o,h,l,cl,vol) VALUES(?,?,?,?,?,?,?,?,?)')
-          .bind(`${rootTicker}__day__${r.time}`, rootTicker, 'day', r.time, r.o, r.h, r.l, r.cl, r.vol);
+    for (let i = 0; i < rcDates.length; i += 80) {
+      await db.batch(rcDates.slice(i, i + 80).map(date => {
+        const { secid, r } = chosen[date];
+        return db.prepare('INSERT OR REPLACE INTO candles(key,ticker,tf,time,o,h,l,cl,vol,secid) VALUES(?,?,?,?,?,?,?,?,?,?)')
+          .bind(`${rootTicker}__day__${r.time}`, rootTicker, 'day', r.time, r.o, r.h, r.l, r.cl, r.vol, secid);
       }));
     }
 
     return json({
-      ticker: rootTicker, datesTotal: rootRows.length, datesPriced: dates.length,
+      ticker: rootTicker, datesTotal: rootRows.length, datesPriced: rcDates.length,
       rootCandles: rcDates.length,
       contractsFound: contracts.map(c => c.ticker), contractsUsed,
     });
