@@ -1036,19 +1036,36 @@ async function handleDb(path, req, env) {
     return json(results);
   }
 
-  // ── Диагностика: /db/oitest?ticker=SSU6&date=2026-06-25 — сырой ответ FutOI API ──
+  // ── Диагностика: /db/oitest?ticker=SSU6&date=2026-06-25 — ответ FutOI API ──
+  // extra= — произвольные параметры к URL MOEX (url-encoded, напр.
+  // extra=start%3D1000%26interval%3D60) — для подбора рабочей пагинации.
+  // series=1 — тестировать серийный endpoint securities/{sym} вместо коллекции.
+  // full=1 — вернуть сырой body (иначе краткая сводка: число строк и края).
   if (p === '/oitest' && req.method === 'GET') {
     const u = new URL(req.url);
     const ticker = u.searchParams.get('ticker');
     const date   = u.searchParams.get('date') || new Date().toISOString().slice(0, 10);
     if (!ticker) return json({ error: 'ticker required' }, 400);
     const sym = futoi2sym(ticker);
-    const url = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(sym)}&date=${date}&iss.meta=off&limit=1000`;
+    const extra = u.searchParams.get('extra') ? `&${u.searchParams.get('extra')}` : '';
+    const base = u.searchParams.get('series') === '1'
+      ? `https://apim.moex.com/iss/analyticalproducts/futoi/securities/${encodeURIComponent(sym)}.json?iss.meta=off&limit=1000`
+      : `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(sym)}&date=${date}&iss.meta=off&limit=1000`;
+    const url = base + extra;
     const moexKey = env.MOEX_KEY;
     const resp = await fetch(url, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
     const text = await resp.text();
     let body; try { body = JSON.parse(text); } catch(_) { body = text; }
-    return json({ sym, date, status: resp.status, body });
+    if (u.searchParams.get('full') === '1' || typeof body === 'string') {
+      return json({ sym, date, url, status: resp.status, body });
+    }
+    const block = body.futoi || body[Object.keys(body).find(k => k !== 'metadata' && k !== 'history' && k !== 'futoi.dates')];
+    const rows = issBlockToObjects(block);
+    const f = rows[0], l = rows[rows.length - 1];
+    return json({ sym, date, url, status: resp.status, rowCount: rows.length,
+      first: f ? `${f.tradedate} ${f.tradetime} ${f.ticker}/${f.clgroup}` : null,
+      last:  l ? `${l.tradedate} ${l.tradetime} ${l.ticker}/${l.clgroup}` : null,
+      blocks: Object.keys(body) });
   }
 
   // ── Разовый backfill одной даты: /db/oibackfill?date=2026-06-25[&all=1|&tickers=X] ──
@@ -1103,7 +1120,7 @@ async function handleDb(path, req, env) {
         // вызова (лимит 50 сабзапросов) — возвращаем nextPstart, клиент
         // продолжает ту же дату следующим вызовом.
         const allRows = [];
-        let pages = 0, start2 = pstart, finished = false;
+        let pages = 0, start2 = pstart, finished = false, lastPageSig = '';
         for (; pages < 12; ) {
           const url2 = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?ticker=SS&date=${singleDate}&iss.meta=off&iss.only=futoi&futoi.columns=ticker,tradedate,tradetime,clgroup,pos_long,pos_short,pos_long_num,pos_short_num&limit=1000&start=${start2}`;
           const resp = await fetch(url2, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
@@ -1112,6 +1129,15 @@ async function handleDb(path, req, env) {
           const rows2 = issBlockToObjects(j2.futoi || j2[Object.keys(j2).find(k => k !== 'metadata' && k !== 'history' && k !== 'futoi.dates')]);
           pages++;
           if (!rows2.length) { finished = true; break; }
+          // Залипшая пагинация: MOEX может игнорировать start= на этом
+          // endpoint и возвращать одну и ту же первую страницу бесконечно —
+          // без стопа pstart улетал в миллионы на одной дате. Сигнатура
+          // страницы = первая строка: повторилась — дальше листать нечем.
+          const sig = `${rows2[0].tradedate}_${rows2[0].tradetime}_${rows2[0].ticker}_${rows2[0].clgroup}`;
+          if (pages > 1 && sig === lastPageSig) {
+            return json({ date: singleDate, error: 'пагинация не двигается: MOEX игнорирует start= на этом endpoint', fatal: true, pstart: start2 }, 200);
+          }
+          lastPageSig = sig;
           allRows.push(...rows2);
           start2 += rows2.length;
           if (rows2.length < 1000) { finished = true; break; }

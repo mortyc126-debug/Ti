@@ -2642,6 +2642,7 @@ async function labBackfillIntradayPool() {
         const r = await fetch(`${proxy}/db/oibackfill?date=${date}&all=1&intraday=1&skipdone=1&pstart=${pstart}`);
         if (r.ok) j = await r.json();
       } catch(e) { /* сеть — в ретрай */ }
+      if (j && j.fatal) { problems.push(`${date}: ${j.error}`); break; } // ретраить бессмысленно
       if (!j || j.error) {
         retries++;
         if (retries > 4) { problems.push(`${date}: не ожил после 4 ретраев${j?.error ? ' — ' + j.error : ''}`); break; }
