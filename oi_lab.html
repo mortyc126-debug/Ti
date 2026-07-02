@@ -73,6 +73,7 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
   <button class="sec" onclick="labFetchCandles('day')">📈 Свечи день</button>
   <button class="sec" onclick="labFetchCandles('hour')">📈 Свечи 1h</button>
   <button class="sec" onclick="labDiag()">🩺 Диагностика</button>
+  <button class="sec" onclick="labSpikeMonitor()">🧨 Монитор кануна</button>
 </div>
 
 <div id="status" class="status">—</div>
@@ -2760,6 +2761,88 @@ async function labBackfillIntradayPool() {
   const probNote = problems.length ? ` · проблемы: ${problems.length} (см. консоль)` : '';
   if (problems.length) console.warn('Интрадей-бэкфилл, проблемы:', problems);
   setStatus(`Интрадей-бэкфилл готов: дней собрано ${daysDone}, скипнуто ${daysSkipped}, +${totalIntraday} интрадей-срезов (тикеров в ответах: ${maxSymsSeen})${probNote}`, problems.length ? 'err' : 'ok');
+}
+
+// ── МОНИТОР КАНУНА: похож ли СЕГОДНЯШНИЙ день на канун выброса? ──
+// Честный ответ на вопрос «когда выброс на МОЁМ тикере»: предсказать дату
+// по дневному ОИ нельзя (3-4 выброса на 65 дней — статистики нет), но можно
+// сравнить текущее состояние с ИЗМЕРЕННЫМ профилем канунов из case-control
+// по пулу (141 канун против ~4700 фоновых дней): просадка, ход, позиции,
+// поток и внутридневной отток розницы. Совпадение по большинству осей —
+// повод следить; это фильтр состояния, а не таймер.
+const _PRESPIKE_PROFILE = { // медианы: [канун, фон] — прогон 07.2026
+  drawdown:   { pre: -10.2, bg: -6.0,  lbl: 'Просадка от max за 20 баров, %',  pass: v => v <= -8 },
+  trendRet:   { pre: -3.5,  bg: -0.6,  lbl: 'Ход за 5 баров, %',               pass: v => v <= -2.5 },
+  shortPctl:  { pre: 69,    bg: 62,    lbl: 'Шорт всего рынка, pctl',          pass: v => v >= 66 },
+  flowRank:   { pre: 58,    bg: 66,    lbl: 'Ранг давления (поток к лонгу — ниже)', pass: v => v <= 60 },
+  outflow:    { pre: -0.43, bg: +0.06, lbl: '⏱ Отток розницы сегодня, % ОИ',   pass: v => v <= -0.15 },
+};
+
+async function labSpikeMonitor() {
+  const result = _lastResult;
+  if (!result || result.length < 30) { setStatus('Сначала загрузи тикер («Загрузить»)', 'err'); return; }
+  const last = result[result.length - 1];
+  const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
+
+  const cur = {
+    drawdown:  isFinite(last.drawdown) ? last.drawdown * 100 : NaN,
+    trendRet:  isFinite(last.trend_return) ? last.trend_return * 100 : NaN,
+    shortPctl: isFinite(last.total_short_pctl) ? last.total_short_pctl * 100 : NaN,
+    flowRank:  isFinite(last.squeeze_pressure_rank) ? last.squeeze_pressure_rank * 100 : NaN,
+    outflow:   NaN,
+  };
+  // Интрадей сегодня: отток позиций физлиц с утра (по 30-мин срезам)
+  const sym = (document.getElementById('tickers').value.trim().match(/^([A-Za-z]{2})/) || [])[1] || '';
+  if (proxy && sym) {
+    try {
+      const r = await fetch(`${proxy}/db/oihourly?ticker=${encodeURIComponent(sym)}&days=3`);
+      if (r.ok) {
+        const hrows = await r.json();
+        const today = new Date(Date.now() + 3*3600*1000).toISOString().slice(0, 10);
+        const marks = (Array.isArray(hrows) ? hrows : []).filter(h => new Date(h.ts + 3*3600*1000).toISOString().slice(0,10) === today).sort((a,b)=>a.ts-b.ts);
+        if (marks.length >= 3) {
+          const F = marks[0], L = marks[marks.length - 1];
+          const oiBase = (Number(L.fiz_long)+Number(L.fiz_short)+Number(L.yur_long)+Number(L.yur_short)) / 2;
+          if (oiBase > 0) cur.outflow = (L.fiz_short - F.fiz_short + L.fiz_long - F.fiz_long) / oiBase * 100;
+        }
+      }
+    } catch(_) {}
+  }
+
+  let passed = 0, total = 0, rowsH = '';
+  for (const [k, p] of Object.entries(_PRESPIKE_PROFILE)) {
+    const v = cur[k];
+    const has = isFinite(v);
+    const ok = has && p.pass(v);
+    if (has) { total++; if (ok) passed++; }
+    rowsH += `<tr>
+      <td style="padding:4px 8px;color:#cdd6f4">${p.lbl}</td>
+      <td style="text-align:center;color:#cba6f7;font-weight:600">${has ? (v>0?'+':'')+v.toFixed(k==='outflow'?2:1) : '— нет данных'}</td>
+      <td style="text-align:center;color:#6c7086">${p.pre>0?'+':''}${p.pre}</td>
+      <td style="text-align:center;color:#6c7086">${p.bg>0?'+':''}${p.bg}</td>
+      <td style="text-align:center">${has ? (ok ? '<span style="color:#a6e3a1">✓</span>' : '<span style="color:#6c7086">✗</span>') : '—'}</td>
+    </tr>`;
+  }
+  const bonus = [];
+  if (last.trend_exhaust === 1) bonus.push('🟠 тренд-истощение (сквиз ↑) активен');
+  if (last.spike_setup) bonus.push('🧨 сетап выброса активен');
+
+  const verdict = passed >= 4 ? ['#a6e3a1', `🧨 ПОХОЖЕ НА КАНУН: ${passed}/${total} осей профиля совпали${bonus.length ? ' + ' + bonus.join(' + ') : ''}. Это не гарантия и не дата — но исторически именно так выглядел день перед выбросом.`]
+    : passed >= 3 ? ['#f9e2af', `Частичное совпадение: ${passed}/${total} осей.${bonus.length ? ' ' + bonus.join(', ') + '.' : ''} Следить, но профиль кануна неполный.`]
+    : ['#6c7086', `Не похоже на канун: ${passed}/${total} осей. ${bonus.length ? bonus.join(', ') + ', но ' : ''}профиль состояния далёк от исторических канунов выброса.`];
+
+  const th = s => `<th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:center;font-weight:400">${s}</th>`;
+  const html = `<details open><summary style="cursor:pointer;font-size:12px;color:#cba6f7;font-weight:600;margin-bottom:6px">🧨 Монитор кануна — ${last.date}</summary>
+  <div style="padding:8px 10px;margin-bottom:6px;background:${verdict[0]}22;border-left:3px solid ${verdict[0]};border-radius:4px;font-size:12px;color:${verdict[0]}">${verdict[1]}</div>
+  <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:6px">
+  <thead><tr><th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Ось профиля</th>${th('сейчас')}${th('медиана канунов')}${th('медиана фона')}${th('совпадение')}</tr></thead>
+  <tbody>${rowsH}</tbody></table></div>
+  <div style="font-size:10px;color:#6c7086;margin-bottom:10px">Профиль — case-control по пулу (141 канун), прогон 07.2026. Монитор отвечает «похоже ли сегодня на канун», а не «когда выброс»: дату по дневному ОИ предсказать нельзя в принципе — мало событий на тикер. Обновляй после закрытия дня.</div>
+  </details>`;
+
+  const el = document.getElementById('calib-out');
+  el.innerHTML = html + el.innerHTML;
+  setStatus(`Монитор кануна: ${passed}/${total} осей совпало`, passed >= 4 ? 'ok' : '');
 }
 
 // ── СКРИНЕР СИГНАЛОВ: кто в пуле даёт проверенный сигнал ПРЯМО СЕЙЧАС ──
