@@ -3329,6 +3329,37 @@ const _SCREEN_SIGNALS = [
     active: r => r.spike_setup && r.trend_exhaust === 1 },
 ];
 
+// Одна строка таблицы скринера — общая для «торгуемых», «против статистики»
+// и «мало истории», чтобы группы не расходились в оформлении
+function _screenRowHtml(h, poolAcc3, poolAgg, fmtK, pctlSpan, hCell) {
+  const dirTxt = h.def.dir > 0 ? '🟢 лонг' : '🔴 шорт';
+  const hl = isFinite(h.acc3) && h.n3 >= 8 && h.acc3 >= 65;
+  const thin = !(isFinite(h.acc3) && h.n3 >= 8);
+  const asset = _rootAsset(h.ticker) || h.ticker;
+  const word = _assetWord(asset);
+  const pAcc = poolAcc3(h.def.id);
+  return `<tr style="background:${hl ? (h.def.dir > 0 ? '#1a2e1a' : '#2e1a1a') : '#1e2030'}"${thin ? ' title="Мало собственной истории сигнала у тикера — ориентируйся на пуловую точность"' : ''}>
+    <td style="padding:4px 8px;color:#cdd6f4">${h.def.emoji} ${h.def.name}</td>
+    <td style="text-align:center" title="${_rootTitle(h.ticker)}">
+      <span style="color:#cba6f7;font-weight:700;font-size:12px">${asset}</span>
+      ${word ? `<br><span style="color:#cdd6f4;font-size:10px">${word}</span>` : ''}
+      <br><span style="color:#6c7086;font-size:9px">код серии: ${h.ticker}</span></td>
+    <td style="text-align:center">${dirTxt}</td>
+    <td style="text-align:center;white-space:nowrap;font-size:10px" title="Норма (медиана 60 дней): лонг ${fmtK(h.flMed)}, шорт ${fmtK(h.fsMed)}">
+      <span style="color:#a6e3a1">▲ ${fmtK(h.fl)}</span> ${pctlSpan(h.plP)} <span style="color:${h.flD5 > 0 ? '#a6e3a1' : '#f38ba8'};font-size:9px">${isFinite(h.flD5) ? (h.flD5 > 0 ? '+' : '') + h.flD5.toFixed(0) + '%/5д' : ''}</span><br>
+      <span style="color:#f38ba8">▼ ${fmtK(h.fs)}</span> ${pctlSpan(h.psP)} <span style="color:${h.fsD5 > 0 ? '#a6e3a1' : '#f38ba8'};font-size:9px">${isFinite(h.fsD5) ? (h.fsD5 > 0 ? '+' : '') + h.fsD5.toFixed(0) + '%/5д' : ''}</span></td>
+    ${hCell(h.acc1, h.med1, h.n1)}
+    ${!isFinite(h.acc3) ? '<td style="text-align:center;color:#6c7086">—</td>' : `<td style="text-align:center;white-space:nowrap">
+      <span style="color:${h.acc3 >= 60 ? '#a6e3a1' : h.acc3 < 45 ? '#f38ba8' : '#cdd6f4'}">${h.acc3.toFixed(0)}%</span> · <span style="color:${h.med3 > 0 ? '#a6e3a1' : '#f38ba8'}">${isFinite(h.med3) ? (h.med3 > 0 ? '+' : '') + h.med3.toFixed(1) + '%' : '—'}</span> <span style="color:#6c7086;font-size:9px">N${h.n3}</span><br>
+      <span style="font-size:9px" title="Медианный ход, когда сигнал оказался прав / когда неправ — асимметрия выигрыша и риска">
+        <span style="color:#a6e3a1">прав: ${isFinite(h.fav3) ? '+' + h.fav3.toFixed(1) + '%' : '—'}</span> ·
+        <span style="color:#f38ba8">неправ: ${isFinite(h.adv3) ? '−' + h.adv3.toFixed(1) + '%' : '—'}</span>
+      </span></td>`}
+    <td style="text-align:center;color:#6c7086">${isFinite(pAcc) ? pAcc.toFixed(0) + '%' : '—'} <span style="font-size:9px">N${poolAgg[h.def.id].n3}</span>${thin ? ' ⚠' : ''}</td>
+    <td style="text-align:center;color:#6c7086">${h.lastDate}</td>
+  </tr>`;
+}
+
 async function labSignalScreener(prepend) {
   if (!_lastPoolInstruments || !_lastPoolInstruments.length) {
     setStatus('Скринер работает по рассчитанному пулу — сначала «🧮 Рассчитать по пулу»', 'err');
@@ -3392,46 +3423,40 @@ async function labSignalScreener(prepend) {
   const hCell = (acc, med, n) => !isFinite(acc) ? '<td style="text-align:center;color:#6c7086">—</td>'
     : `<td style="text-align:center;white-space:nowrap"><span style="color:${acc >= 60 ? '#a6e3a1' : acc < 45 ? '#f38ba8' : '#cdd6f4'}">${acc.toFixed(0)}%</span> · <span style="color:${med > 0 ? '#a6e3a1' : '#f38ba8'}">${isFinite(med) ? (med > 0 ? '+' : '') + med.toFixed(1) + '%' : '—'}</span> <span style="color:#6c7086;font-size:9px">N${n}</span></td>`;
 
+  // Три группы: решение принимается по «торгуемым» (своя история N>=8 и
+  // точность >=60); «против статистики» — сигнал есть, но на этом тикере
+  // исторически не работает (явное НЕ торговать); «мало истории» — шум N<8,
+  // который раньше визуально хоронил рабочий верх таблицы.
+  const strong = hits.filter(h => isFinite(h.acc3) && h.n3 >= 8 && h.acc3 >= 60);
+  const weak   = hits.filter(h => isFinite(h.acc3) && h.n3 >= 8 && h.acc3 < 60);
+  const thin   = hits.filter(h => !(isFinite(h.acc3) && h.n3 >= 8));
+
   const th = s => `<th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:center;font-weight:400">${s}</th>`;
   let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#cba6f7;font-weight:600;margin-bottom:6px">🎯 Скринер: активные сигналы прямо сейчас (${hits.length} на ${_lastPoolInstruments.length} инструментах)</summary>`;
   if (!hits.length) {
     t += `<div style="font-size:11px;color:#6c7086;margin-bottom:10px">Ни на одном инструменте пула нет активного проверенного сигнала по последнему бару. Это нормальное состояние — сигналы редкие.</div>`;
   } else {
-    t += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:6px">
-    <thead><tr>
+    const header = `<thead><tr>
       <th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Сигнал</th>
       ${th('Инструмент')}${th('Направление')}${th('Физлица сейчас<br>лонг / шорт (контракты)')}${th('Точность · ход цены<br>за 1 день')}${th('Точность · ход цены<br>за 3 дня')}${th('Пул, 3д')}${th('Последние данные')}
-    </tr></thead><tbody>`;
-    for (const h of hits) {
-      const dirTxt = h.def.dir > 0 ? '🟢 лонг' : '🔴 шорт';
-      const strong = isFinite(h.acc3) && h.n3 >= 8 && h.acc3 >= 65;
-      const thin = !(isFinite(h.acc3) && h.n3 >= 8);
-      const asset = _rootAsset(h.ticker) || h.ticker;
-      const word = _assetWord(asset);
-      const pAcc = poolAcc3(h.def.id);
-      t += `<tr style="background:${strong ? (h.def.dir > 0 ? '#1a2e1a' : '#2e1a1a') : '#1e2030'}"${thin ? ' title="Мало собственной истории сигнала у тикера — ориентируйся на пуловую точность"' : ''}>
-        <td style="padding:4px 8px;color:#cdd6f4">${h.def.emoji} ${h.def.name}</td>
-        <td style="text-align:center" title="${_rootTitle(h.ticker)}">
-          <span style="color:#cba6f7;font-weight:700;font-size:12px">${asset}</span>
-          ${word ? `<br><span style="color:#cdd6f4;font-size:10px">${word}</span>` : ''}
-          <br><span style="color:#6c7086;font-size:9px">код серии: ${h.ticker}</span></td>
-        <td style="text-align:center">${dirTxt}</td>
-        <td style="text-align:center;white-space:nowrap;font-size:10px" title="Норма (медиана 60 дней): лонг ${fmtK(h.flMed)}, шорт ${fmtK(h.fsMed)}">
-          <span style="color:#a6e3a1">▲ ${fmtK(h.fl)}</span> ${pctlSpan(h.plP)} <span style="color:${h.flD5 > 0 ? '#a6e3a1' : '#f38ba8'};font-size:9px">${isFinite(h.flD5) ? (h.flD5 > 0 ? '+' : '') + h.flD5.toFixed(0) + '%/5д' : ''}</span><br>
-          <span style="color:#f38ba8">▼ ${fmtK(h.fs)}</span> ${pctlSpan(h.psP)} <span style="color:${h.fsD5 > 0 ? '#a6e3a1' : '#f38ba8'};font-size:9px">${isFinite(h.fsD5) ? (h.fsD5 > 0 ? '+' : '') + h.fsD5.toFixed(0) + '%/5д' : ''}</span></td>
-        ${hCell(h.acc1, h.med1, h.n1)}
-        ${!isFinite(h.acc3) ? '<td style="text-align:center;color:#6c7086">—</td>' : `<td style="text-align:center;white-space:nowrap">
-          <span style="color:${h.acc3 >= 60 ? '#a6e3a1' : h.acc3 < 45 ? '#f38ba8' : '#cdd6f4'}">${h.acc3.toFixed(0)}%</span> · <span style="color:${h.med3 > 0 ? '#a6e3a1' : '#f38ba8'}">${isFinite(h.med3) ? (h.med3 > 0 ? '+' : '') + h.med3.toFixed(1) + '%' : '—'}</span> <span style="color:#6c7086;font-size:9px">N${h.n3}</span><br>
-          <span style="font-size:9px" title="Медианный ход, когда сигнал оказался прав / когда неправ — асимметрия выигрыша и риска">
-            <span style="color:#a6e3a1">прав: ${isFinite(h.fav3) ? '+' + h.fav3.toFixed(1) + '%' : '—'}</span> ·
-            <span style="color:#f38ba8">неправ: ${isFinite(h.adv3) ? '−' + h.adv3.toFixed(1) + '%' : '—'}</span>
-          </span></td>`}
-        <td style="text-align:center;color:#6c7086">${isFinite(pAcc) ? pAcc.toFixed(0) + '%' : '—'} <span style="font-size:9px">N${poolAgg[h.def.id].n3}</span>${thin ? ' ⚠' : ''}</td>
-        <td style="text-align:center;color:#6c7086">${h.lastDate}</td>
-      </tr>`;
+    </tr></thead>`;
+    t += strong.length
+      ? `<div style="font-size:11px;color:#a6e3a1;margin-bottom:6px">✅ Торгуемое сегодня (сигнал активен И исторически работает на этом тикере: точность ≥60% при N≥8): <b>${strong.map(h=>_rootAsset(h.ticker)||h.ticker).join(', ')}</b></div>`
+      : `<div style="font-size:11px;color:#6c7086;margin-bottom:6px">Сегодня нет ни одного сигнала, который был бы активен И исторически работал на своём тикере (точность ≥60% при N≥8). Остальное ниже — кандидаты и шум, торговых решений из них не делать.</div>`;
+    t += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:6px">
+    ${header}<tbody>`;
+    const rowsOf = arr => arr.map(h => _screenRowHtml(h, poolAcc3, poolAgg, fmtK, pctlSpan, hCell)).join('');
+    t += rowsOf(strong);
+    t += `</tbody></table></div>`;
+    if (weak.length) {
+      t += `<details><summary style="cursor:pointer;font-size:11px;color:#f38ba8;margin:4px 0">⛔ Сигнал активен, но на этих тикерах исторически НЕ работает — не торговать (${weak.length})</summary>
+      <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:6px">${header}<tbody>${rowsOf(weak)}</tbody></table></div></details>`;
     }
-    t += `</tbody></table></div>
-    <div style="font-size:10px;color:#6c7086;margin-bottom:10px">Как читать: «точность · ход» — как часто цена шла в сторону сигнала за 1/3 дня в истории ЭТОГО тикера и медианное изменение (N — сколько раз сигнал встречался). Вторая строка 3-дневной ячейки — асимметрия: <span style="color:#a6e3a1">прав</span> = медианный ход, когда сигнал сработал, <span style="color:#f38ba8">неправ</span> = когда нет (это твой риск). «Физлица сейчас»: ▲ лонг ▼ шорт в контрактах, pXX — место объёма на шкале последних ~60 дней тикера (<span style="color:#f38ba8">p85+</span> у максимума, <span style="color:#89b4fa">p15-</span> у минимума), ±%/5д — изменение за 5 дней; норма (медиана 60д) — в подсказке при наведении. Сортировка по 3-дневной точности (своя при N≥8, иначе пуловая ⚠), подсветка — ≥65%.</div>`;
+    if (thin.length) {
+      t += `<details><summary style="cursor:pointer;font-size:11px;color:#6c7086;margin:4px 0">⚠ Мало собственной истории (N&lt;8) — только пуловая точность, решений не принимать (${thin.length})</summary>
+      <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:6px">${header}<tbody>${rowsOf(thin)}</tbody></table></div></details>`;
+    }
+    t += `<div style="font-size:10px;color:#6c7086;margin-bottom:10px">Как читать: «точность · ход» — как часто цена шла в сторону сигнала за 1/3 дня в истории ЭТОГО тикера и медианное изменение (N — сколько раз сигнал встречался). Вторая строка 3-дневной ячейки — асимметрия: <span style="color:#a6e3a1">прав</span> = медианный ход, когда сигнал сработал, <span style="color:#f38ba8">неправ</span> = когда нет (это твой риск). «Физлица сейчас»: ▲ лонг ▼ шорт в контрактах, pXX — место объёма на шкале последних ~60 дней тикера (<span style="color:#f38ba8">p85+</span> у максимума, <span style="color:#89b4fa">p15-</span> у минимума), ±%/5д — изменение за 5 дней; норма (медиана 60д) — в подсказке при наведении. Сортировка по 3-дневной точности (своя при N≥8, иначе пуловая ⚠), подсветка — ≥65%.</div>`;
   }
   t += `</details>`;
   const el = document.getElementById('screener-out');
