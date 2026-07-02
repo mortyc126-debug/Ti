@@ -32,6 +32,12 @@ body{background:linear-gradient(180deg,#0A0615 0%,#0D0718 35%,#12091F 100%);back
 .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:baseline;gap:10px;padding:12px 16px;background:rgba(11,6,19,.97);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);border-top:2px solid var(--accent)}
 
 .topbar-brand{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.tabs{margin-left:auto;display:flex;gap:4px}
+.tab-btn{background:transparent;color:var(--text2);border:1px solid transparent;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer}
+.tab-btn:hover{color:var(--text);filter:none;background:var(--surface2)}
+.tab-btn.active{background:var(--surface2);color:var(--text);border-color:var(--border2)}
+.tabpane{display:none}
+.tabpane.active{display:flex;flex-direction:column;gap:10px}
 .topbar-sub{font-size:11px;color:var(--text3);font-family:var(--mono)}
 .app{width:100%;padding:10px 14px 40px;display:flex;flex-direction:column;gap:10px}
 
@@ -103,19 +109,39 @@ details.panel .panel-body{padding-top:12px}
 
 <div class="topbar">
   <div class="topbar-brand">🔬 OI Lab</div>
-  <div class="topbar-sub">индикатор дисбаланса физ/юр · v3</div>
+  <div class="topbar-sub">дисбаланс физ/юр · v3</div>
+  <div class="tabs">
+    <button class="tab-btn" data-tab="screener" onclick="showTab('screener')">🎯 Скринер</button>
+    <button class="tab-btn" data-tab="ticker" onclick="showTab('ticker')">📈 Тикер</button>
+    <button class="tab-btn" data-tab="pool" onclick="showTab('pool')">🧮 Пул</button>
+    <button class="tab-btn" data-tab="service" onclick="showTab('service')" title="Прокси, диагностика базы, настройки индикатора">⚙ Сервис</button>
+  </div>
 </div>
 
 <div class="app">
 
+<div id="status" class="status">—</div>
+
+<!-- ── ВКЛАДКА: СКРИНЕР — первое, что видно: топ сигналов по инструментам ── -->
+<div class="tabpane" id="tab-screener">
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-title">Топ сигналов прямо сейчас</div>
+      <button class="tiny" onclick="labScreenerRefresh()">🔄 Пересчитать</button>
+    </div>
+    <div class="panel-body">
+      <div id="screener-out" class="hint" style="margin:0">Нажми «Пересчитать»: соберёт пул (≈минута) и покажет, на каких инструментах активны проверенные сигналы — отсортировано по исторической точности этого тикера, с направлением и типичным ходом.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── ВКЛАДКА: ТИКЕР — одиночный инструмент ── -->
+<div class="tabpane" id="tab-ticker">
 <!-- Источник данных: тикер(ы), режим, загрузка в графики/таблицу ниже -->
 <div class="panel" id="sec-load">
   <div class="panel-head"><div class="panel-title">1 · Источник и загрузка</div></div>
   <div class="panel-body">
     <div class="row">
-      <label>Прокси-URL (invest-bot)
-        <input id="proxy" type="text" placeholder="https://your-worker.workers.dev" value="">
-      </label>
       <label>Тикер(ы) фьючерса
         <input id="tickers" type="text" placeholder="SBRF6 или SBRF6,SBRF9" value="">
       </label>
@@ -144,35 +170,13 @@ details.panel .panel-body{padding-top:12px}
   </div>
 </div>
 
-<div id="status" class="status">—</div>
-
-<!-- Диагностика базы: чисто служебное, отдельно от расчётов -->
-<div class="panel">
-  <div class="panel-head">
-    <div class="panel-title">Диагностика базы</div>
-    <button class="sec tiny" onclick="labDiag()">🩺 Проверить</button>
-  </div>
-  <div class="panel-body">
-    <div class="hint" style="margin-bottom:0">Что реально лежит в базе по введённым тикерам: покрытие oi_daily/oi_hourly и последний сырой снэпшот ОИ — для разбора, почему график/бэкфилл выглядит не так, как ожидалось.</div>
-    <div id="diag-out" style="display:none;margin-top:10px"></div>
-  </div>
-</div>
-
-<div id="chart-tooltip" style="display:none;position:fixed;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:8px 12px;font-size:11px;color:var(--text);pointer-events:none;z-index:999;line-height:1.7"></div>
-
-<!-- Конфиг -->
-<details class="panel">
-  <summary>⚙ Настройки индикатора</summary>
-  <div class="panel-body">
-    <div class="cfg-grid" id="cfg-grid"></div>
-  </div>
-</details>
 
 <!-- Метрики последнего бара -->
 <div class="panel-row" id="metrics-row"></div>
 
 <!-- Интерпретация -->
 <div id="interp" style="display:none"></div>
+
 
 <!-- Графики -->
 <div class="panel" id="sec-charts">
@@ -193,6 +197,7 @@ details.panel .panel-body{padding-top:12px}
   </div>
 </div>
 
+
 <!-- Точность на истории текущего тикера: все три кнопки пишут в одну ленту calib-out -->
 <div class="panel" id="sec-calib">
   <div class="panel-head"><div class="panel-title">3 · Точность на истории (текущий тикер)</div></div>
@@ -207,6 +212,25 @@ details.panel .panel-body{padding-top:12px}
   </div>
 </div>
 
+
+<!-- Таблица данных -->
+<div class="panel" id="sec-data">
+  <div class="panel-head">
+    <div class="panel-title">Данные</div>
+    <button class="sec tiny" onclick="labExportCsv()">⬇ CSV</button>
+  </div>
+  <div class="panel-body">
+    <div style="max-height:260px;overflow-y:auto">
+      <table id="tbl"><thead><tr></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+
+</div>
+
+<!-- ── ВКЛАДКА: ПУЛ — калибровка и исследования ── -->
+<div class="tabpane" id="tab-pool">
 <!-- Калибровка по пулу инструментов: сначала подготовка данных, потом анализ — обе группы пишут в pool-out -->
 <div class="panel" id="sec-pool">
   <div class="panel-head"><div class="panel-title">4 · Калибровка по пулу инструментов</div></div>
@@ -244,17 +268,41 @@ details.panel .panel-body{padding-top:12px}
   </div>
 </div>
 
-<!-- Таблица данных -->
-<div class="panel" id="sec-data">
-  <div class="panel-head">
-    <div class="panel-title">Данные</div>
-    <button class="sec tiny" onclick="labExportCsv()">⬇ CSV</button>
-  </div>
-  <div class="panel-body">
-    <div style="max-height:260px;overflow-y:auto">
-      <table id="tbl"><thead><tr></tr></thead><tbody></tbody></table>
+
+</div>
+
+<!-- ── ВКЛАДКА: СЕРВИС — прокси, диагностика, настройки ── -->
+<div class="tabpane" id="tab-service">
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">Подключение</div></div>
+    <div class="panel-body">
+      <label>Прокси-URL (invest-bot)
+        <input id="proxy" type="text" placeholder="https://your-worker.workers.dev" value="">
+      </label>
     </div>
   </div>
+<!-- Диагностика базы: чисто служебное, отдельно от расчётов -->
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Диагностика базы</div>
+    <button class="sec tiny" onclick="labDiag()">🩺 Проверить</button>
+  </div>
+  <div class="panel-body">
+    <div class="hint" style="margin-bottom:0">Что реально лежит в базе по введённым тикерам: покрытие oi_daily/oi_hourly и последний сырой снэпшот ОИ — для разбора, почему график/бэкфилл выглядит не так, как ожидалось.</div>
+    <div id="diag-out" style="display:none;margin-top:10px"></div>
+  </div>
+</div>
+
+
+<!-- Конфиг -->
+<details class="panel">
+  <summary>⚙ Настройки индикатора</summary>
+  <div class="panel-body">
+    <div class="cfg-grid" id="cfg-grid"></div>
+  </div>
+</details>
+
+
 </div>
 
 </div>
@@ -1423,29 +1471,72 @@ function fmt(v, dec=3) {
   return v.toFixed(dec);
 }
 
+// Карточки последнего бара: сгруппированы по смыслу, каждая — со значением,
+// зоной (перцентиль против последних ~60 дней ЭТОГО тикера) и строкой «что
+// это значит и с каким проверенным сигналом связано». Ответ на «сферический
+// в вакууме»: без диапазона голое число ни о чём не говорит.
 function renderMetrics(result) {
-  const last = result.filter(r=>isFinite(r.weighted_imbalance)).at(-1);
+  const last = result.filter(r=>isFinite(r.net_phys_pct)).at(-1);
   if (!last) return;
-  const cards = [
-    { lbl:'Сигнал', val: fmt(last.weighted_imbalance,3), sub:'+ = физики шортят (рост?), − = в лонге (падение?)', color: last.weighted_imbalance>0?'#a6e3a1':'#f38ba8' },
-    { lbl:'Давление сжатия', val: fmt(last.squeeze_pressure,3), sub:'z-score перевеса потока шорт/лонг за 10 баров (сжато tanh): +1≈сильно шорт, −1≈сильно лонг', color: last.squeeze_pressure>0.1?'#a6e3a1':last.squeeze_pressure<-0.1?'#f38ba8':'#cdd6f4' },
-    { lbl:'Z-давления', val: fmt(last.squeeze_pressure_z,2), sub:'аномальность текущего набора позиций vs история', color: Math.abs(last.squeeze_pressure_z||0)>1.5?'#f9e2af':'#cdd6f4' },
-    { lbl:'Перекос физ. лиц', val: fmt(last.net_phys_pct*100,1)+'%', sub:'статичный снэпшот: их нетто-позиция от ОИ', color: last.net_phys_pct>0?'#f38ba8':'#a6e3a1' },
-    { lbl:'Z-оценка дисбаланса', val: fmt(last.imbalance_z,2), sub:'насколько перекос отличается от нормы (±1 = умеренно)', color: '#cdd6f4' },
-    { lbl:'Надёжность', val: fmt(last.liquidity_conf,2), sub:'0→1: чем больше участников, тем надёжнее сигнал', color: last.liquidity_conf<0.3?'#f38ba8':'#a6e3a1' },
-    { lbl:'Потенциал выхода', val: fmt(last.phase_potential,3), sub:'anchor×release; знак = направление выброса', color: last.phase_potential>0?'#a6e3a1':last.phase_potential<0?'#f38ba8':'#cba6f7' },
-    { lbl:'Выброс за диапазон', val: last.breakout_dir===1?`↑ +${fmt(last.stress_dist*100,1)}%`:last.breakout_dir===-1?`↓ −${fmt(last.stress_dist*100,1)}%`:'внутри', sub:'насколько цена вышла за флэт-диапазон', color: last.stress_dist>0.005?'#f9e2af':'#6c7086' },
-    { lbl:'Сила выброса', val: fmt(last.release_factor,3), sub:'как далеко цена от опорного уровня (больше = острее)', color: '#fab387' },
-    { lbl:'Фаза накопления', val: last.accum_flag?'ДА':'нет', sub:'флэт + имбаланс = позиции набираются', color: last.accum_flag?'#89dceb':'#6c7086' },
-    { lbl:'Тренд-истощение', val: last.trend_exhaust===1?'↑ шорты у экстремума':last.trend_exhaust===-1?'↓ лонги у экстремума':'нет', sub:`ход за окно: ${fmt(last.trend_return*100,1)}%`, color: last.trend_exhaust!==0?'#fab387':'#6c7086' },
-    { lbl:'Открытый интерес', val: Math.round(last.total_oi).toLocaleString(), sub:'всего контрактов в рынке', color: '#cdd6f4' },
+  const zone = (p, hiWord, loWord) => {
+    if (!isFinite(p)) return '';
+    const pc = Math.round(p * 100);
+    const col = p >= 0.85 ? 'var(--accent)' : p <= 0.15 ? '#7aa2f7' : 'var(--text3)';
+    const word = p >= 0.85 ? hiWord : p <= 0.15 ? loWord : 'в норме';
+    return `<div style="color:${col};font-size:10px;font-family:var(--mono);margin:1px 0">p${pc} · ${word}</div>`;
+  };
+  const groups = [
+    { title: 'Позиции — кто и сколько держит (зона = место на шкале последних ~60 дней тикера)', cards: [
+      { lbl:'Перекос физлиц', val: fmt(last.net_phys_pct*100,1)+'%',
+        chip: zone(last.net_phys_pct_rank, 'максимально в лонг', 'максимально в шорт'),
+        sub:'нетто физлиц от всего ОИ: + лонг, − шорт. Сам по себе направление НЕ предсказывает (проверено)' },
+      { lbl:'Шорт всего рынка', val: isFinite(last.total_short_pctl) ? 'p'+Math.round(last.total_short_pctl*100) : '—',
+        chip: zone(last.total_short_pctl, 'перегруз шортами', 'шортов почти нет'),
+        sub:'объём шортов физ+юр против собственной истории' },
+      { lbl:'Лонг всего рынка', val: isFinite(last.total_long_pctl) ? 'p'+Math.round(last.total_long_pctl*100) : '—',
+        chip: zone(last.total_long_pctl, 'перегруз лонгами', 'лонгов почти нет'),
+        sub:'перегруз лонгами + рост позади = сигнал 🟠↓ коррекции (70% на +3д)' },
+      { lbl:'Открытый интерес', val: Math.round(last.total_oi).toLocaleString('ru-RU'),
+        chip: zone(last.liquidity_conf, 'участников максимум', 'участников мало — сигналы ненадёжны'),
+        sub:'контрактов в рынке; зона — активность участников' },
+    ]},
+    { title: 'Поток — кто набирал позиции последние ~10 баров', cards: [
+      { lbl:'Давление сжатия', val: fmt(last.squeeze_pressure,2),
+        chip: zone(last.squeeze_pressure_rank, 'шорт набирали как никогда', 'лонг набирали как никогда'),
+        sub:'+1 = набирали шорт, −1 = лонг. Ниже p20 = сигнал 📉 шорт (65% на +3д); выше p80 — «пристегнуться», НЕ лонг' },
+      { lbl:'Аномальность потока', val: isFinite(last.squeeze_pressure_z) ? fmt(last.squeeze_pressure_z,1)+'σ' : '—',
+        chip: '',
+        sub:'на сколько сигм сегодняшний набор отличается от обычного; за ±2σ — редкое событие' },
+    ]},
+    { title: 'Цена и фаза', cards: [
+      { lbl:'Просадка от max20', val: isFinite(last.drawdown) ? fmt(last.drawdown*100,1)+'%' : '—',
+        chip: zone(isFinite(last.drawdown_rank) ? 1 - last.drawdown_rank : NaN, 'глубочайшая за период', 'цена у максимумов'),
+        sub:'насколько цена ниже максимума за 20 баров' },
+      { lbl:'Ход за 5 баров', val: isFinite(last.trend_return) ? fmt(last.trend_return*100,1)+'%' : '—',
+        chip: '',
+        sub:'недельный импульс; резкий ход при позициях у экстремума включает тренд-истощение' },
+      { lbl:'Фаза накопления', val: last.accum_flag ? 'ДА' : 'нет',
+        chip: '',
+        sub:'флэт с перекосом позиций — состояние ожидания, НЕ прогноз (×1.0 к базе на 667 эпизодах)' },
+      { lbl:'Выброс из диапазона', val: last.breakout_dir===1 ? '↑ +'+fmt(last.stress_dist*100,1)+'%' : last.breakout_dir===-1 ? '↓ −'+fmt(last.stress_dist*100,1)+'%' : 'внутри',
+        chip: '',
+        sub:'пробой флэта; ↑ по позиции физлиц = сигнал 🔴 шорт-истощение (67% на +3д, N=443)' },
+      { lbl:'Тренд-истощение', val: last.trend_exhaust===1 ? '↑ есть (не торгуем)' : last.trend_exhaust===-1 ? '↓ коррекция' : 'нет',
+        chip: '',
+        sub:'↓ = подтверждённый шорт 🟠 (70% на +3д); ↑ на чистых данных не подтверждён' },
+    ]},
   ];
   const row = document.getElementById('metrics-row');
-  row.innerHTML = cards.map(c=>`
-    <div class="card">
-      <div class="lbl">${c.lbl}</div>
-      <div class="val" style="color:${c.color}">${c.val}</div>
-      <div class="sub">${c.sub}</div>
+  row.innerHTML = groups.map(g => `
+    <div style="width:100%">
+      <div class="group-header" style="margin-top:4px">${g.title}</div>
+      <div class="panel-row">${g.cards.map(c => `
+        <div class="card" style="flex:1;min-width:150px;max-width:270px">
+          <div class="lbl">${c.lbl}</div>
+          <div class="val">${c.val}</div>
+          ${c.chip}
+          <div class="sub">${c.sub}</div>
+        </div>`).join('')}</div>
     </div>`).join('');
 }
 
@@ -3327,9 +3418,9 @@ async function labSignalScreener(prepend) {
     <div style="font-size:10px;color:#6c7086;margin-bottom:10px">Как читать: на инструменте активен сигнал; «точность · ход цены» — как часто цена шла в сторону сигнала за 1/3 дня в истории ЭТОГО тикера и её медианное изменение (N — сколько раз сигнал встречался). «Физлица сейчас» — контракты в лонге ▲ и шорте ▼ на последнем срезе; pXX — где этот объём относительно последних ~60 дней тикера (<span style="color:#f38ba8">p85+</span> — у максимума, <span style="color:#89b4fa">p15-</span> — у минимума). Сортировка по 3-дневной точности (своя при N≥8, иначе пуловая ⚠). Подсветка — ≥65% на собственной истории.</div>`;
   }
   t += `</details>`;
-  const el = document.getElementById('pool-out');
+  const el = document.getElementById('screener-out');
   if (prepend === false) return t;
-  el.innerHTML = t + el.innerHTML;
+  el.innerHTML = t;
   setStatus(`Скринер: активных сигналов ${hits.length}`, 'ok');
 }
 
@@ -4145,6 +4236,24 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
   el.innerHTML = html;
 }
 
+// ── Вкладки ──
+function showTab(name) {
+  document.querySelectorAll('.tabpane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  localStorage.setItem('oilab_tab', name);
+  // canvas в скрытой вкладке рисуется в нулевую ширину — перерисовать при входе
+  if (name === 'ticker' && _lastResult) requestAnimationFrame(() => renderAll(_lastResult));
+}
+
+// Кнопка вкладки «Скринер»: собрать пул (если надо) и показать топ
+async function labScreenerRefresh() {
+  const proxy = document.getElementById('proxy').value.trim();
+  if (!proxy) { setStatus('Укажи прокси-URL во вкладке «⚙ Сервис»', 'err'); return; }
+  if (_lastPoolInstruments && _lastPoolInstruments.length) { await labSignalScreener(); return; }
+  if (!document.getElementById('pool-tickers').value.trim()) await poolFillAllTickers();
+  await labCalibratePool(); // сам отрисует и пуловые таблицы, и скринер
+}
+
 // Перерисовка при ресайзе
 window.addEventListener('resize', ()=>{ if (_lastResult) renderAll(_lastResult); });
 
@@ -4154,6 +4263,7 @@ if (savedProxy) document.getElementById('proxy').value = savedProxy;
 document.getElementById('proxy').addEventListener('change', e=>{
   localStorage.setItem('oilab_proxy', e.target.value.trim());
 });
+showTab(localStorage.getItem('oilab_tab') || 'screener');
 </script>
 </body>
 </html>
