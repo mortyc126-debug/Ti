@@ -2178,7 +2178,38 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
   const isHourly = _lastMode === 'hourly';
   const H = isHourly ? [1, 2, 4, 8, 24] : [1, 2, 3, 5];
   const hLbl = h => isHourly ? `+${h}ч` : `+${h}д`;
-  const fmtPct = v => isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—';
+  // Часовые ходы — сотые доли процента: с одним знаком всё выглядело «0.0%»
+  const fmtPct = v => isFinite(v) ? (v>0?'+':'')+v.toFixed(isHourly ? 2 : 1)+'%' : '—';
+
+  // База по горизонтам — нужна и таблицам, и вердиктам карточек прогноза
+  const baseStats = {};
+  for (const h of H) {
+    const all = fwd[h].filter(isFinite);
+    if (!all.length) { baseStats[h] = null; continue; }
+    const sorted = [...all].sort((a,b)=>a-b);
+    const med = sorted.length % 2 === 0
+      ? (sorted[sorted.length/2-1] + sorted[sorted.length/2]) / 2
+      : sorted[Math.floor(sorted.length/2)];
+    baseStats[h] = { median: med, pctDown: all.filter(v=>v<0).length / all.length * 100, n: all.length };
+  }
+
+  // Вердикт карточки: не «вот тебе проценты», а прямой ответ — куда, к какому
+  // горизонту и есть ли edge над базой вообще. Лучший горизонт — по edge;
+  // без edge >= 5пп при N >= 30 честно пишем, что сигнала нет.
+  function _verdict(dir, stats) {
+    if (!dir) return '';
+    let best = null;
+    for (const h of H) {
+      const s = stats[h], b = baseStats[h];
+      if (!s || !b || !isFinite(s.accuracy) || s.n < 30) continue;
+      const baseAcc = dir < 0 ? b.pctDown : 100 - b.pctDown;
+      const edge = s.accuracy - baseAcc;
+      if (!best || edge > best.edge) best = { h, edge, s, baseAcc };
+    }
+    if (!best) return `<div style="margin-top:6px;padding:6px 8px;background:#181825;border-radius:5px;font-size:11px;color:#6c7086">⚪ Мало данных для вердикта (нужно N≥30 на горизонте)</div>`;
+    if (best.edge < 5) return `<div style="margin-top:6px;padding:6px 8px;background:#181825;border-radius:5px;font-size:11px;color:#6c7086">⚪ Edge над базой нет (${best.edge>0?'+':''}${best.edge.toFixed(0)} пп на ${hLbl(best.h)}) — торгового сигнала из этого бина сейчас НЕТ, проценты выше повторяют фон рынка</div>`;
+    return `<div style="margin-top:6px;padding:6px 8px;background:${dir>0?'#1a2e1a':'#2e1a1a'};border-radius:5px;font-size:11px;color:${dir>0?'#a6e3a1':'#f38ba8'};font-weight:600">${dir>0?'🟢 ЖДЁМ РОСТ':'🔴 ЖДЁМ ПАДЕНИЕ'} к ${hLbl(best.h)}: точность ${best.s.accuracy.toFixed(0)}% против базы ${best.baseAcc.toFixed(0)}% (edge +${best.edge.toFixed(0)} пп), медианный ход ${fmtPct(best.s.median)}, N=${best.s.n}</div>`;
+  }
 
   function _forecastBlock(bin, label, subtitle) {
     if (!bin) return '';
@@ -2189,6 +2220,7 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
       <div style="margin-top:5px;display:flex;gap:12px;flex-wrap:wrap;font-size:11px">
         ${H.map(h => { const s=bin.stats[h]; return s?`<span>${hLbl(h)}: медиана <b style="color:${color}">${fmtPct(s.median)}</b>, точность <b>${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</b>, N=${s.n}</span>`:''; }).filter(Boolean).join('')}
       </div>
+      ${_verdict(bin.dir, bin.stats)}
     </div>`;
   }
 
@@ -2214,6 +2246,7 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
       <div style="margin-top:5px;display:flex;gap:12px;flex-wrap:wrap;font-size:11px">
         ${H.map(h => { const s=bin.stats[h]; return s?`<span>${hLbl(h)}: медиана <b style="color:${color}">${fmtPct(s.median)}</b>, точность <b>${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</b>, N=${s.n}</span>`:''; }).filter(Boolean).join('')}
       </div>
+      ${_verdict(bin.dir, bin.stats)}
     </div>`;
   }
 
@@ -2239,18 +2272,7 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
       <th style="background:#181825"></th>
       ${H.map(()=>'<th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">медиана</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">точность</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">N</th>').join('')}
     </tr></thead><tbody>`;
-    // Базовый уровень — все конечные доходности за период
-    const baseStats = {};
-    for (const h of H) {
-      const all = fwd[h].filter(isFinite);
-      if (!all.length) { baseStats[h] = null; continue; }
-      const sorted = [...all].sort((a,b)=>a-b);
-      const med = sorted.length % 2 === 0
-        ? (sorted[sorted.length/2-1] + sorted[sorted.length/2]) / 2
-        : sorted[Math.floor(sorted.length/2)];
-      const pctDown = (all.filter(v=>v<0).length / all.length * 100);
-      baseStats[h] = { median: med, pctDown, n: all.length };
-    }
+    // База уже посчитана на уровне renderCalibration — общая для таблиц и вердиктов
     t += `<tr style="background:#1e1e2e;border-top:1px solid #313244"><td style="padding:4px 8px;color:#cba6f7;font-weight:600;white-space:nowrap">📐 Базовый уровень</td>`;
     for (const h of H) {
       const b = baseStats[h];
