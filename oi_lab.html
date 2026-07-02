@@ -115,6 +115,7 @@ details.panel .panel-body{padding-top:12px}
   <div class="topbar-sub">дисбаланс физ/юр · v3</div>
   <div class="tabs">
     <button class="tab-btn" data-tab="screener" onclick="showTab('screener')">Скринер</button>
+    <button class="tab-btn" data-tab="favs" onclick="showTab('favs')">Избранное</button>
     <button class="tab-btn" data-tab="ticker" onclick="showTab('ticker')">Тикер</button>
     <button class="tab-btn" data-tab="pool" onclick="showTab('pool')">Пул</button>
     <button class="tab-btn" data-tab="service" onclick="showTab('service')" title="Прокси, диагностика базы, настройки индикатора">Сервис</button>
@@ -134,6 +135,19 @@ details.panel .panel-body{padding-top:12px}
     </div>
     <div class="panel-body">
       <div id="screener-out" class="hint" style="margin:0">Нажми «Пересчитать»: соберёт пул (≈минута) и покажет, на каких инструментах активны проверенные сигналы — отсортировано по исторической точности этого тикера, с направлением и типичным ходом.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── ВКЛАДКА: ИЗБРАННОЕ — отслеживание нескольких инструментов разом ── -->
+<div class="tabpane" id="tab-favs">
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-title">Избранное — отслеживание позиций</div>
+      <button class="tiny" onclick="labFavsRefresh()">Обновить</button>
+    </div>
+    <div class="panel-body">
+      <div id="favs-out" class="hint" style="margin:0">Отмечай тикеры звёздочкой ★ в скринере или во вкладке «Тикер». Здесь по всем сразу: изменение цены и позиций на горизонтах 1/5/20 баров, экспресс-монитор кануна и активные сигналы — без раскопок по каждому.</div>
     </div>
   </div>
 </div>
@@ -158,7 +172,8 @@ details.panel .panel-body{padding-top:12px}
           <option value="hourly">Часовой (OI дня + 1h свечи)</option>
         </select>
       </label>
-      <button onclick="labLoad()">▶ Загрузить</button>
+      <button onclick="labLoad()">Загрузить</button>
+      <button class="sec" onclick="favToggleFromInput()" title="Добавить/убрать текущий тикер в «Избранное»">★ Избранное</button>
     </div>
     <div class="group-header">Обновить данные в базе для этих тикеров</div>
     <div class="hint">Подтягивает историю ОИ и свечи с MOEX/T-Invest перед первой загрузкой тикера — жми, если «Загрузить» выше ругается на отсутствие данных или график обрывается раньше нужного.</div>
@@ -183,7 +198,12 @@ details.panel .panel-body{padding-top:12px}
 
 <!-- Графики -->
 <div class="panel" id="sec-charts">
-  <div class="panel-head"><div class="panel-title">2 · Графики</div></div>
+  <div class="panel-head"><div class="panel-title">2 · Графики</div>
+    <div class="row" style="margin:0;gap:6px">
+      <button class="sec tiny" onclick="setChartMode('daily')">День</button>
+      <button class="sec tiny" onclick="setChartMode('hourly')">Час</button>
+    </div>
+  </div>
   <div class="panel-body">
     <div class="chart-block">
       <div class="group-header chart-cap">Цена + фазы накопления · синий фон = флэт с имбалансом; пунктир = диапазон фазы; оранж. = тренд-истощение · <b>зажми и протяни по графику — измерит отрезок</b></div>
@@ -3476,6 +3496,8 @@ function _screenRowHtml(h, poolAcc3, poolAgg, fmtK, pctlSpan, hCell) {
     <td style="text-align:center;cursor:pointer" onclick="openTicker('${h.ticker}')" title="${_rootTitle(h.ticker)} — клик: открыть во вкладке «Тикер» с графиками и монитором"
         onmouseover="this.style.background='rgba(180,135,248,0.12)'" onmouseout="this.style.background=''">
       <span style="color:#B487F8;font-weight:700;font-size:12px;border-bottom:1px dashed #B487F866">${asset} ↗</span>
+      <span onclick="event.stopPropagation();favToggle('${h.ticker}');this.style.color=favHas('${h.ticker}')?'#FF8A4C':'#6F648F'"
+            style="cursor:pointer;color:${favHas(h.ticker) ? '#FF8A4C' : '#6F648F'};margin-left:5px" title="В избранное / убрать">★</span>
       ${word ? `<br><span style="color:#F2F0FF;font-size:10px">${word}</span>` : ''}
       <br><span style="color:#6F648F;font-size:9px">код серии: ${h.ticker}</span></td>
     <td style="text-align:center">${dirTxt}</td>
@@ -4426,6 +4448,125 @@ function showTab(name) {
   localStorage.setItem('oilab_tab', name);
   // canvas в скрытой вкладке рисуется в нулевую ширину — перерисовать при входе
   if (name === 'ticker' && _lastResult) requestAnimationFrame(() => renderAll(_lastResult));
+  if (name === 'favs' && _favList().length) labFavsRefresh();
+}
+
+// ── ИЗБРАННОЕ: список root-кодов в localStorage ──
+function _favList() { try { return JSON.parse(localStorage.getItem('oilab_favs') || '[]'); } catch (_) { return []; } }
+function favHas(t) { return _favList().includes(t); }
+function favToggle(tk) {
+  const l = _favList();
+  const i = l.indexOf(tk);
+  if (i >= 0) l.splice(i, 1); else l.push(tk);
+  localStorage.setItem('oilab_favs', JSON.stringify(l));
+  setStatus(i >= 0 ? `${tk}: убран из избранного` : `${tk}: добавлен в избранное (★)`, 'ok');
+  const pane = document.getElementById('tab-favs');
+  if (pane && pane.classList.contains('active')) labFavsRefresh();
+}
+function favToggleFromInput() {
+  const sym = (document.getElementById('tickers').value.trim().match(/^([A-Za-z]{2})/) || [])[1];
+  if (!sym) { setStatus('Не разобрал root-код из поля тикера', 'err'); return; }
+  favToggle(sym);
+}
+
+// Экспресс-монитор кануна по дневным осям (без интрадей-оттока — он в полном
+// мониторе на вкладке «Тикер»): сколько осей профиля кануна совпало
+function _monitorQuick(L) {
+  const checks = [
+    isFinite(L.drawdown) && L.drawdown * 100 <= -8,
+    isFinite(L.trend_return) && L.trend_return * 100 <= -2.5,
+    isFinite(L.total_short_pctl) && L.total_short_pctl * 100 >= 66,
+    isFinite(L.squeeze_pressure_rank) && L.squeeze_pressure_rank * 100 <= 60,
+  ];
+  return { p: checks.filter(Boolean).length, n: 4 };
+}
+
+// Сводная строка избранного: цена/ОИ/позиции на горизонтах + сигналы
+function _favRowData(tk, res) {
+  const L = res[res.length - 1];
+  const dPx = k => { const A = res[res.length - 1 - k]; return (A && A.close > 0 && L.close > 0) ? (L.close - A.close) / A.close * 100 : NaN; };
+  const dOi = k => { const A = res[res.length - 1 - k]; return (A && A.total_oi > 0 && L.total_oi > 0) ? (L.total_oi - A.total_oi) / A.total_oi * 100 : NaN; };
+  const sumD = (key, k) => { let s = 0, any = false; for (let i = Math.max(1, res.length - k); i < res.length; i++) { const v = res[i][key]; if (isFinite(v)) { s += v; any = true; } } return any ? s : NaN; };
+  const sigs = _SCREEN_SIGNALS.filter(d => d.active(L));
+  return { tk, L, px1: dPx(1), px5: dPx(5), px20: dPx(20), oi5: dOi(5),
+    dl5: sumD('d_long', 5), ds5: sumD('d_short', 5), dl20: sumD('d_long', 20), ds20: sumD('d_short', 20),
+    mon: _monitorQuick(L), sigs };
+}
+
+// Сводная таблица по всем избранным: данные из кэша пула, недостающие
+// тикеры дозагружаются поштучно
+async function labFavsRefresh() {
+  const el = document.getElementById('favs-out');
+  const favs = _favList();
+  if (!favs.length) { el.innerHTML = 'Пусто. Отмечай тикеры звёздочкой ★ в скринере или во вкладке «Тикер».'; return; }
+  const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
+  if (!proxy) { setStatus('Укажи прокси-URL во вкладке «Сервис»', 'err'); return; }
+  await _getRootNames(proxy);
+  const cfg = readCfg();
+  const byT = {};
+  if (_lastPoolInstruments) for (const i of _lastPoolInstruments) byT[i.ticker] = i.result;
+  const rows = [];
+  for (let i = 0; i < favs.length; i++) {
+    const tk = favs[i];
+    let res = byT[tk];
+    if (!res) {
+      setStatus(`Избранное: загружаю ${tk} (${i + 1}/${favs.length})…`);
+      try { res = await _loadInstrumentForPool(proxy, tk, cfg, []); } catch (_) {}
+    }
+    if (!res || res.length < 25) { rows.push({ tk, err: 'нет данных (проверь код серии/бэкфилл)' }); continue; }
+    rows.push(_favRowData(tk, res));
+  }
+
+  const pc = v => !isFinite(v) ? '<span style="color:#6F648F">—</span>' : `<span style="color:${v > 0 ? '#52F2C9' : v < 0 ? '#FF6A8B' : '#A79BC9'}">${v > 0 ? '+' : ''}${v.toFixed(1)}%</span>`;
+  const kf = v => !isFinite(v) ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(Math.round(v)).toLocaleString('ru-RU');
+  const kcol = v => !isFinite(v) ? '#6F648F' : v > 0 ? '#52F2C9' : v < 0 ? '#FF6A8B' : '#A79BC9';
+  const th = s => `<th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center;font-weight:400">${s}</th>`;
+  let html = `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%">
+  <thead><tr>
+    <th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:left">Инструмент</th>
+    ${th('Цена<br>1д · 5д · 20д')}${th('ОИ, 5д')}${th('Физ.лонг Δконтрактов<br>5д · 20д')}${th('Физ.шорт Δконтрактов<br>5д · 20д')}${th('Зоны позиций')}${th('Канун')}${th('Активные сигналы')}${th('★')}
+  </tr></thead><tbody>`;
+  for (const r of rows) {
+    const asset = _rootAsset(r.tk) || r.tk;
+    const word = _assetWord(asset);
+    if (r.err) {
+      html += `<tr><td style="padding:4px 8px;color:#F2F0FF">${asset}${word ? ' · ' + word : ''} <span style="color:#6F648F;font-size:9px">(${r.tk})</span></td>
+        <td colspan="7" style="color:#FF6A8B;padding:4px 8px">${r.err}</td>
+        <td style="text-align:center;cursor:pointer;color:#FF8A4C" onclick="favToggle('${r.tk}')" title="Убрать из избранного">★</td></tr>`;
+      continue;
+    }
+    const L = r.L;
+    const monCol = r.mon.p >= 3 ? '#FF8A4C' : r.mon.p >= 2 ? '#B487F8' : '#6F648F';
+    const sigsTxt = r.sigs.length
+      ? r.sigs.map(d => `<span style="color:${d.dir > 0 ? '#52F2C9' : '#FF6A8B'}">${d.name}</span>`).join('<br>')
+      : '<span style="color:#6F648F">нет</span>';
+    html += `<tr>
+      <td style="padding:4px 8px;cursor:pointer" onclick="openTicker('${r.tk}')" title="${_rootTitle(r.tk)} — клик: открыть во вкладке «Тикер»"
+          onmouseover="this.style.background='rgba(180,135,248,0.12)'" onmouseout="this.style.background=''">
+        <span style="color:#B487F8;font-weight:700;border-bottom:1px dashed #B487F866">${asset} ↗</span>
+        ${word ? `<br><span style="font-size:10px;color:#F2F0FF">${word}</span>` : ''}
+        <br><span style="color:#6F648F;font-size:9px">${r.tk} · ${L.date}</span></td>
+      <td style="text-align:center;white-space:nowrap;font-family:var(--mono)">${pc(r.px1)} · ${pc(r.px5)} · ${pc(r.px20)}</td>
+      <td style="text-align:center">${pc(r.oi5)}</td>
+      <td style="text-align:center;white-space:nowrap;font-family:var(--mono)"><span style="color:${kcol(r.dl5)}">${kf(r.dl5)}</span> · <span style="color:${kcol(r.dl20)}">${kf(r.dl20)}</span></td>
+      <td style="text-align:center;white-space:nowrap;font-family:var(--mono)"><span style="color:${kcol(-r.ds5)}">${kf(r.ds5)}</span> · <span style="color:${kcol(-r.ds20)}">${kf(r.ds20)}</span></td>
+      <td style="text-align:center;white-space:nowrap;font-size:10px;font-family:var(--mono)">шорт p${isFinite(L.total_short_pctl) ? Math.round(L.total_short_pctl * 100) : '—'}<br>лонг p${isFinite(L.total_long_pctl) ? Math.round(L.total_long_pctl * 100) : '—'}</td>
+      <td style="text-align:center;color:${monCol};font-weight:600" title="Экспресс-монитор кануна: сколько дневных осей профиля совпало (просадка, ход за 5 баров, шорт рынка, разворот потока). Полный монитор с интрадеем — во вкладке «Тикер»">${r.mon.p}/${r.mon.n}</td>
+      <td style="padding:4px 8px;font-size:10px">${sigsTxt}</td>
+      <td style="text-align:center;cursor:pointer;color:#FF8A4C" onclick="favToggle('${r.tk}')" title="Убрать из избранного">★</td>
+    </tr>`;
+  }
+  html += `</tbody></table></div>
+  <div style="font-size:10px;color:#6F648F;margin-top:6px">Δконтрактов — суммарный набор(+)/сброс(−) позиций физлиц за 5 и 20 баров. «Канун» — экспресс-оценка похожести на канун выброса (3-4/4 — присмотреться, полный разбор — клик по тикеру → Монитор кануна). Клик по названию открывает тикер, ★ — убрать.</div>`;
+  el.innerHTML = html;
+  setStatus(`Избранное: ${rows.length} инструментов обновлено`, 'ok');
+}
+
+// Быстрый переключатель интервала графиков (линейка работает в обоих)
+async function setChartMode(m) {
+  document.getElementById('mode').value = m;
+  if (document.getElementById('tickers').value.trim()) await labLoad();
+  else setStatus('Сначала укажи тикер', 'err');
 }
 
 // Клик по тикеру в скринере: открыть вкладку «Тикер» с этим инструментом
