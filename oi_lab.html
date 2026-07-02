@@ -2656,6 +2656,9 @@ async function labBackfillIntradayPool() {
       }
       retries = 0;
       if (j.till) chainTill = j.till;
+      // Видимость глубины: без дат в статусе не отличить «легитимно копает
+      // плотную серию» от «улетел в 2020 год» (см. историю с AF/offset 780k)
+      if (j.matchedDates) setStatus(`Интрадей-бэкфилл ${t} (${ti+1}/${tickers.length}): вызов ${calls}, копает ${j.matchedDates[0]}…${j.matchedDates[1]}, собрано ${totalIntraday} срезов`);
       totalDaily += j.saved || 0;
       totalIntraday += j.savedIntraday || 0;
       if (j.errors && j.errors.length) { problems.push(`${t}: ${j.errors[0]}`); console.warn(`бэкфилл ${t}:`, j.errors); }

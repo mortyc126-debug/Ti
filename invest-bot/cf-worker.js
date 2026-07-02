@@ -608,7 +608,11 @@ async function backfillOiHistory(db, env, tickers, days, stepMin = 30, startOffs
     for (const o of rowsAll) {
       const g = (o.clgroup || '').toUpperCase();
       if (g !== 'YUR' && g !== 'FIZ') continue;
-      const k = `${o.tradedate}__${o.tradetime || '00:00:00'}`;
+      // Время среза нормализуется до минуты: серия local отдаёт обновления
+      // чаще раза в минуту, и без нормализации каждый секундный тик внутри
+      // «минуты шага» плодил бы отдельную запись (при 30-мин шаге — по 5-6
+      // почти одинаковых строк на точку). Берётся последнее значение минуты.
+      const k = `${o.tradedate}__${(o.tradetime || '00:00:00').slice(0, 5)}:00`;
       (byKey[k] = byKey[k] || {})[g] = o;
     }
 
