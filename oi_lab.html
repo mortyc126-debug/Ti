@@ -30,29 +30,25 @@ body{background:linear-gradient(180deg,#0A0615 0%,#0D0718 35%,#12091F 100%);back
 
 /* ── шапка ── */
 .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:baseline;gap:10px;padding:12px 16px;background:rgba(11,6,19,.97);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);border-top:2px solid var(--accent)}
-.topbar-nav{margin-left:auto;display:flex;gap:2px;flex-wrap:wrap}
-.topbar-nav a{color:var(--text2,#a6adc8);text-decoration:none;font-size:11px;padding:4px 9px;border-radius:5px;white-space:nowrap}
-.topbar-nav a:hover{background:var(--panel,#1e2030);color:#fff}
-.panel,#metrics-row,#interp{scroll-margin-top:64px}
-html{scroll-behavior:smooth}
+
 .topbar-brand{font-size:14px;font-weight:600;letter-spacing:-.01em}
 .topbar-sub{font-size:11px;color:var(--text3);font-family:var(--mono)}
-.app{max-width:1180px;margin:0 auto;padding:14px 16px 40px;display:flex;flex-direction:column;gap:14px}
+.app{width:100%;padding:10px 14px 40px;display:flex;flex-direction:column;gap:10px}
 
 /* ── карточки-разделы ── */
 .panel{background:var(--surface);border:1px solid var(--border);border-radius:8px}
-.panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--border)}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:6px 12px;border-bottom:1px solid var(--border)}
 .panel-title{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);font-family:var(--mono)}
-.panel-body{padding:12px 14px}
+.panel-body{padding:8px 12px}
 .group-header{font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;padding-bottom:5px;margin:12px 0 4px;border-bottom:1px solid var(--border)}
 .group-header:first-child{margin-top:0}
-.hint{font-size:11px;color:var(--text3);line-height:1.55;margin-bottom:9px;max-width:70ch}
+.hint{font-size:11px;color:var(--text3);line-height:1.45;margin-bottom:6px}
 
 /* ── формы ── */
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px}
 .row:last-child{margin-bottom:0}
 label{display:flex;flex-direction:column;gap:4px;color:var(--text2);font-size:11px}
-input,select{background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:5px;padding:6px 9px;font-size:12px;font-family:var(--mono);outline:none;min-width:160px}
+input,select{background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:5px;padding:5px 8px;font-size:12px;font-family:var(--mono);outline:none;min-width:130px}
 input:focus,select:focus{border-color:var(--accent)}
 button{background:var(--accent);color:#fff;border:none;border-radius:5px;padding:7px 14px;cursor:pointer;font-size:12px;font-family:var(--sans);font-weight:500;transition:filter .12s}
 button:hover{filter:brightness(1.15)}
@@ -65,9 +61,9 @@ button.tiny{font-size:10px;padding:3px 9px}
 
 /* ── метрики ── */
 .panel-row{display:flex;gap:10px;flex-wrap:wrap}
-.card{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 13px;min-width:140px}
-.card .lbl{font-size:10px;color:var(--text3);margin-bottom:2px}
-.card .val{font-size:18px;font-weight:600;color:var(--text)}
+.card{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;min-width:118px}
+.card .lbl{font-size:10px;color:var(--text3);margin-bottom:1px}
+.card .val{font-size:15px;font-weight:600;color:var(--text)}
 .card .sub{font-size:10px;color:var(--text3)}
 
 /* ── графики ── */
@@ -108,14 +104,6 @@ details.panel .panel-body{padding-top:12px}
 <div class="topbar">
   <div class="topbar-brand">🔬 OI Lab</div>
   <div class="topbar-sub">индикатор дисбаланса физ/юр · v3</div>
-  <div class="topbar-nav">
-    <a href="#sec-load">Загрузка</a>
-    <a href="#metrics-row">Прогноз</a>
-    <a href="#sec-charts">Графики</a>
-    <a href="#sec-calib">Тикер</a>
-    <a href="#sec-pool">Пул · Скринер</a>
-    <a href="#sec-data">Данные</a>
-  </div>
 </div>
 
 <div class="app">
