@@ -2995,6 +2995,10 @@ async function labSpikeAutopsy() {
     { key: 'dYurShort',  lbl: '⏱ Δ шорта юрлиц за канун, % ОИ' },
     { key: 'eveFizShort',lbl: '⏱ Δ шорта физлиц в последние 3ч кануна, % ОИ' },
     { key: 'eveFizLong', lbl: '⏱ Δ лонга физлиц в последние 3ч кануна, % ОИ' },
+    // Разбор по пулу показал: накануне выброса физики сокращают ОБЕ стороны
+    // (лонг даже сильнее шорта) — не «крытие шортов», а уход розницы из
+    // инструмента. Сводный отток контрастнее любой из сторон по отдельности.
+    { key: 'dFizTotal',  lbl: '⏱ Отток розницы за канун (Δ лонг+шорт физлиц), % ОИ' },
   ];
   const ipre = {}, ictl = {};
   for (const f of IFEATS) { ipre[f.key] = []; ictl[f.key] = []; }
@@ -3035,6 +3039,7 @@ async function labSpikeAutopsy() {
           dYurShort:   (L.yur_short - F.yur_short) / oiBase * 100,
           eveFizShort: M3 ? (L.fiz_short - M3.fiz_short) / oiBase * 100 : NaN,
           eveFizLong:  M3 ? (L.fiz_long  - M3.fiz_long)  / oiBase * 100 : NaN,
+          dFizTotal: (L.fiz_short - F.fiz_short + L.fiz_long - F.fiz_long) / oiBase * 100,
         };
         const bucket = preDates.has(d) ? ipre : ictl;
         for (const f of IFEATS) bucket[f.key].push(fv[f.key]);
