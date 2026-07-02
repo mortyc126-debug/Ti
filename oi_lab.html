@@ -2786,19 +2786,24 @@ async function labBackfillHourlyCandles() {
       try {
         const r = await fetch(`${proxy}/db/candles/backfillroot?ticker=${encodeURIComponent(t)}&days=${days}&cidx=${cidx}`);
         if (r.ok) j = await r.json();
+        else console.warn(`свечи ${t} cidx=${cidx}: HTTP ${r.status}`, (await r.text().catch(()=>'')).slice(0,200));
       } catch(_) {}
       if (!j || j.error) {
         retries++;
+        // Бэкофф длинный: рейт-лимит T-Invest минутный, короткие паузы не помогают
+        const waits = [5, 15, 30, 60];
         if (retries > 4) { problems.push(`${t}: ${j?.error || 'не ожил после 4 ретраев'}`); break; }
-        setStatus(`Часовые свечи ${t}: вызов упал, ретрай ${retries}/4 через ${2 ** retries}с…`);
-        await new Promise(r => setTimeout(r, 2 ** retries * 1000));
+        setStatus(`Часовые свечи ${t}: вызов упал (вероятно, рейт-лимит), ретрай ${retries}/4 через ${waits[retries-1]}с…`);
+        await new Promise(r => setTimeout(r, waits[retries-1] * 1000));
         continue;
       }
       retries = 0;
       totalSaved += j.saved || 0;
+      if (j.errs && j.errs.length) console.warn(`свечи ${t} ${j.contract}:`, j.errs);
       if (j.nextCidx === null || j.nextCidx === undefined) break;
       cidx = j.nextCidx;
-      await new Promise(r => setTimeout(r, 300));
+      // Пауза между контрактами; после сигнала о рейт-лимите — остыть подольше
+      await new Promise(r => setTimeout(r, j.rateLimited ? 20000 : 1200));
     }
   }
   const probNote = problems.length ? ` · проблемы: ${problems.length} (см. консоль)` : '';

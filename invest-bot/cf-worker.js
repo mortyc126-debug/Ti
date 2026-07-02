@@ -1076,35 +1076,46 @@ async function handleDb(path, req, env) {
     const cidx = Math.max(0, Number(u.searchParams.get('cidx')) || 0);
     const fromMs = Date.now() - days * 86400 * 1000;
 
-    let contracts;
-    try {
-      const fr = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: rootTicker, instrumentKind: 'INSTRUMENT_TYPE_FUTURES', apiTradeAvailableFlag: false }),
-      });
-      if (!fr.ok) return json({ error: `T-Invest FindInstrument HTTP ${fr.status}` }, 502);
-      const fb = await fr.json();
-      const rootRe = new RegExp(`^${rootTicker}[FGHJKMNQUVXZ]\\d$`, 'i');
-      contracts = (fb.instruments || []).filter(i => rootRe.test(i.ticker || ''));
-    } catch (e) { return json({ error: 'FindInstrument: ' + e.message }, 502); }
+    // Кэш поиска контрактов в изоляте: клиент листает cidx той же серии
+    // подряд, и без кэша каждый вызов заново бил FindInstrument — лишний
+    // вклад в рейт-лимит T-Invest (наблюдались 503/CORS на массовом сборе)
+    let contracts = (globalThis._fiCache = globalThis._fiCache || {})[rootTicker];
+    if (!contracts) {
+      try {
+        const fr = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: rootTicker, instrumentKind: 'INSTRUMENT_TYPE_FUTURES', apiTradeAvailableFlag: false }),
+        });
+        if (!fr.ok) return json({ error: `T-Invest FindInstrument HTTP ${fr.status}` }, 502);
+        const fb = await fr.json();
+        const rootRe = new RegExp(`^${rootTicker}[FGHJKMNQUVXZ]\\d$`, 'i');
+        contracts = (fb.instruments || []).filter(i => rootRe.test(i.ticker || ''));
+        globalThis._fiCache[rootTicker] = contracts;
+      } catch (e) { return json({ error: 'FindInstrument: ' + e.message }, 502); }
+    }
     if (!contracts.length) return json({ ticker: rootTicker, error: 'дескрипты серии не найдены', saved: 0, nextCidx: null });
     if (cidx >= contracts.length) return json({ ticker: rootTicker, saved: 0, nextCidx: null, done: true });
 
     const inst = contracts[cidx];
     const priceOf = f => (f?.units ? Number(f.units) + (f.nano || 0) / 1e9 : 0);
-    let windows = 0, fetched = 0;
+    let windows = 0, fetched = 0, rateLimited = false;
+    const errs = [];
     const stmts = [];
     for (let wEnd = Date.now(); wEnd > fromMs && windows < 16; ) {
       const wStart = Math.max(fromMs, wEnd - 7 * 86400 * 1000);
       windows++;
-      try {
-        const resp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ figi: inst.figi, from: new Date(wStart).toISOString(), to: new Date(wEnd).toISOString(), interval: 'CANDLE_INTERVAL_HOUR' }),
-        });
-        if (resp.ok) {
+      // До 3 попыток на окно: T-Invest при массовом сборе отвечает 429
+      // (RESOURCE_EXHAUSTED), окно надо повторить после паузы, а не терять
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const resp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ figi: inst.figi, from: new Date(wStart).toISOString(), to: new Date(wEnd).toISOString(), interval: 'CANDLE_INTERVAL_HOUR' }),
+          });
+          if (resp.status === 429) { rateLimited = true; await new Promise(r => setTimeout(r, 1500)); continue; }
+          if (!resp.ok) { if (errs.length < 3) errs.push(`окно ${new Date(wStart).toISOString().slice(0,10)}: HTTP ${resp.status}`); break; }
           const body = await resp.json();
           for (const c of (body.candles || [])) {
             const ts = Math.floor(new Date(c.time).getTime() / 1000);
@@ -1117,14 +1128,15 @@ async function handleDb(path, req, env) {
             ).bind(`${rootTicker}__hour__${ts}`, rootTicker, 'hour', ts,
                    priceOf(c.open), priceOf(c.high), priceOf(c.low), priceOf(c.close), c.volume ?? 0));
           }
-        }
-      } catch (_) { /* окно не подтянулось — идём дальше, следующий прогон доберёт */ }
+          break;
+        } catch (e) { if (errs.length < 3) errs.push(`окно: ${e.message.slice(0, 60)}`); break; }
+      }
       wEnd = wStart;
-      await new Promise(r => setTimeout(r, 120));
+      await new Promise(r => setTimeout(r, 350)); // вежливая пауза к T-Invest
     }
     for (let i = 0; i < stmts.length; i += 80) await db.batch(stmts.slice(i, i + 80));
     return json({ ticker: rootTicker, contract: inst.ticker, cidx, contractsTotal: contracts.length,
-      windows, fetched, saved: stmts.length,
+      windows, fetched, saved: stmts.length, rateLimited, errs,
       nextCidx: cidx + 1 < contracts.length ? cidx + 1 : null });
   }
 
