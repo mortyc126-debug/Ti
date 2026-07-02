@@ -3479,9 +3479,9 @@ function _screenRowHtml(h, poolAcc3, poolAgg, fmtK, pctlSpan, hCell) {
       ${word ? `<br><span style="color:#F2F0FF;font-size:10px">${word}</span>` : ''}
       <br><span style="color:#6F648F;font-size:9px">код серии: ${h.ticker}</span></td>
     <td style="text-align:center">${dirTxt}</td>
-    <td style="text-align:center;white-space:nowrap;font-size:10px" title="Норма (медиана 60 дней): лонг ${fmtK(h.flMed)}, шорт ${fmtK(h.fsMed)}">
-      <span style="color:#52F2C9">▲ ${fmtK(h.fl)}</span> ${pctlSpan(h.plP)} <span style="color:${h.flD5 > 0 ? '#52F2C9' : '#FF6A8B'};font-size:9px">${isFinite(h.flD5) ? (h.flD5 > 0 ? '+' : '') + h.flD5.toFixed(0) + '%/5д' : ''}</span><br>
-      <span style="color:#FF6A8B">▼ ${fmtK(h.fs)}</span> ${pctlSpan(h.psP)} <span style="color:${h.fsD5 > 0 ? '#52F2C9' : '#FF6A8B'};font-size:9px">${isFinite(h.fsD5) ? (h.fsD5 > 0 ? '+' : '') + h.fsD5.toFixed(0) + '%/5д' : ''}</span></td>
+    <td style="text-align:left;white-space:nowrap;font-size:10px;font-family:var(--mono)" title="Норма (медиана 60 дней): лонг ${fmtK(h.flMed)}, шорт ${fmtK(h.fsMed)}">
+      <span style="display:inline-block;min-width:86px;color:#52F2C9">▲ ${fmtK(h.fl)}</span><span style="display:inline-block;min-width:34px">${pctlSpan(h.plP)}</span><span style="color:${h.flD5 > 0 ? '#52F2C9' : '#FF6A8B'};font-size:9px;margin-left:8px">${isFinite(h.flD5) ? (h.flD5 > 0 ? '+' : '') + h.flD5.toFixed(0) + '% за 5д' : ''}</span><br>
+      <span style="display:inline-block;min-width:86px;color:#FF6A8B">▼ ${fmtK(h.fs)}</span><span style="display:inline-block;min-width:34px">${pctlSpan(h.psP)}</span><span style="color:${h.fsD5 > 0 ? '#52F2C9' : '#FF6A8B'};font-size:9px;margin-left:8px">${isFinite(h.fsD5) ? (h.fsD5 > 0 ? '+' : '') + h.fsD5.toFixed(0) + '% за 5д' : ''}</span></td>
     ${hCell(h.acc1, h.med1, h.n1)}
     ${!isFinite(h.acc3) ? '<td style="text-align:center;color:#6F648F">—</td>' : `<td style="text-align:center;white-space:nowrap">
       <span style="color:${h.acc3 >= 60 ? '#52F2C9' : h.acc3 < 45 ? '#FF6A8B' : '#F2F0FF'}">${h.acc3.toFixed(0)}%</span> · <span style="color:${h.med3 > 0 ? '#52F2C9' : '#FF6A8B'}">${isFinite(h.med3) ? (h.med3 > 0 ? '+' : '') + h.med3.toFixed(1) + '%' : '—'}</span> <span style="color:#6F648F;font-size:9px">N${h.n3}</span><br>
