@@ -288,6 +288,7 @@ details.panel .panel-body{padding-top:12px}
       <button class="sec" onclick="labSignalScreener()">Скринер сигналов</button>
       <button class="sec" onclick="labSpikeAutopsy()">Перед выбросами</button>
       <button class="sec" onclick="labIndexEffect()">Влияние индекса</button>
+      <button class="sec" onclick="labHourlyEventCalib()">Часовая событийка</button>
     </div>
 
     <div id="pool-out" style="color:var(--text3);font-size:11px;margin-top:10px">Нажми «Заполнить всеми из базы» (или впиши тикеры вручную), затем «Рассчитать по пулу».</div>
@@ -4665,6 +4666,108 @@ async function labIndexEffect() {
   el.innerHTML = html + el.innerHTML;
   const nSig = sigRows.reduce((s, r) => s + r.bucket.top.length + r.bucket.mid.length + r.bucket.bottom.length, 0);
   setStatus(`Влияние индекса: ${nSig} дней сигналов разложено по режимам, пробоев вверх ${self.brkUp.f3.length}, вниз ${self.brkDn.f3.length}`, 'ok');
+}
+
+// ── ЧАСОВАЯ СОБЫТИЙНАЯ КАЛИБРОВКА: тот же вход (день сигнала), но путь
+// вперёд по часовым свечам — видно, КОГДА внутри 3 дней приходит ход:
+// сколько торговых часов до лучшей цены, где по пути худшая точка,
+// и на каком часе точность максимальна (когда снимать позицию).
+async function labHourlyEventCalib() {
+  if (!_lastPoolInstruments || !_lastPoolInstruments.length) { setStatus('Часовая калибровка идёт по пулу — сначала «Рассчитать по пулу»', 'err'); return; }
+  const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
+  const HB = [2, 4, 7, 14, 28, 42]; // торговые часы вперёд; сессия ≈14 час. баров → 14≈1д, 42≈3д
+  const buckets = {}; // id → массив путей (кумулятивный % по часам от входа)
+  for (const def of _SCREEN_SIGNALS) buckets[def.id] = [];
+  const basePaths = [];
+  const noHourly = [];
+  let covered = 0;
+  for (let ti = 0; ti < _lastPoolInstruments.length; ti++) {
+    const inst = _lastPoolInstruments[ti];
+    setStatus(`Часовая калибровка: ${inst.ticker} (${ti + 1}/${_lastPoolInstruments.length})…`);
+    let hc = [];
+    try {
+      const r = await fetch(`${proxy}/db/candles?ticker=${encodeURIComponent(inst.ticker)}&tf=hour&from=0`);
+      if (r.ok) { const d = await r.json(); hc = (Array.isArray(d) ? d : (d.rows || [])).filter(c => c.cl > 0); }
+    } catch (_) {}
+    if (hc.length < 50) { noHourly.push(inst.ticker); continue; }
+    covered++;
+    hc.sort((a, b) => a.time - b.time);
+    const lastBarOfDate = {};
+    hc.forEach((c, i) => { lastBarOfDate[_mskDateStr(c.time)] = i; });
+    const res = inst.result;
+    // Путь от закрытия дня i на 42 часовых бара вперёд; окна через ролл
+    // уже отфильтрованы условием isFinite(fwd[3]) на дневной серии
+    const pathFrom = i => {
+      if (!isFinite(inst.fwd[3][i])) return null;
+      const e = lastBarOfDate[String(res[i].date).slice(0, 10)];
+      if (e === undefined) return null;
+      const c0 = hc[e].cl;
+      const p = [];
+      for (let k = 1; k <= 42 && e + k < hc.length; k++) p.push((hc[e + k].cl - c0) / c0 * 100);
+      return p.length >= 14 ? p : null; // хотя бы день пути
+    };
+    for (const def of _SCREEN_SIGNALS) {
+      for (let i = 1; i < res.length; i++) {
+        if (!def.match(res[i]) || def.match(res[i - 1])) continue; // вход = первый день эпизода
+        const p = pathFrom(i);
+        if (p) buckets[def.id].push(p);
+      }
+    }
+    for (let i = 1; i < res.length; i++) { const p = pathFrom(i); if (p) basePaths.push(p); }
+  }
+  if (!covered) { setStatus('Ни у одного тикера пула нет часовых свечей — сначала «Часовые свечи пула»', 'err'); return; }
+
+  const med = a => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y); return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2; };
+  const th = s => `<th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center;font-weight:400">${s}</th>`;
+  const hCell = (paths, h, dir) => {
+    const vals = paths.map(p => p[h - 1]).filter(isFinite);
+    if (vals.length < 5) return '<td style="text-align:center;color:#6F648F">—</td>';
+    const acc = vals.filter(v => dir > 0 ? v > 0 : v < 0).length / vals.length * 100;
+    const m = med(vals);
+    const c = acc >= 60 ? '#52F2C9' : acc < 45 ? '#FF6A8B' : '#F2F0FF';
+    return `<td style="text-align:center;white-space:nowrap;padding:4px 8px"><span style="color:${c}">${acc.toFixed(0)}%</span> · <span style="color:${m > 0 ? '#52F2C9' : '#FF6A8B'}">${m > 0 ? '+' : ''}${m.toFixed(1)}%</span></td>`;
+  };
+  // Часы до лучшей и худшей точки пути (в сторону сигнала) + их медианные величины
+  const excursions = (paths, dir) => {
+    const tF = [], vF = [], tA = [], vA = [];
+    for (const p of paths) {
+      let fi = 0, fv = -Infinity, ai = 0, av = Infinity;
+      for (let j = 0; j < p.length; j++) {
+        const v = dir > 0 ? p[j] : -p[j]; // в сторону сигнала
+        if (v > fv) { fv = v; fi = j; }
+        if (v < av) { av = v; ai = j; }
+      }
+      tF.push(fi + 1); vF.push(fv); tA.push(ai + 1); vA.push(av);
+    }
+    return { tF: med(tF), vF: med(vF), tA: med(tA), vA: med(vA) };
+  };
+  let rows = '';
+  for (const def of _SCREEN_SIGNALS) {
+    const paths = buckets[def.id];
+    if (!paths.length) continue;
+    const ex = excursions(paths, def.dir);
+    rows += `<tr style="background:#140A24"><td style="padding:4px 8px;color:#F2F0FF">${def.name} <span style="color:#6F648F;font-size:9px">N${paths.length}${paths.length < 20 ? ' ⚠' : ''}</span></td>
+      ${HB.map(h => hCell(paths, h, def.dir)).join('')}
+      <td style="text-align:center;white-space:nowrap;padding:4px 8px"><span style="color:#52F2C9">+${ex.vF.toFixed(1)}%</span> на ${Math.round(ex.tF)}ч</td>
+      <td style="text-align:center;white-space:nowrap;padding:4px 8px"><span style="color:#FF6A8B">${ex.vA.toFixed(1)}%</span> на ${Math.round(ex.tA)}ч</td></tr>`;
+  }
+  const baseCellH = h => {
+    const vals = basePaths.map(p => p[h - 1]).filter(isFinite);
+    if (!vals.length) return '<td style="text-align:center;color:#6F648F">—</td>';
+    return `<td style="text-align:center;color:#A79BC9;padding:4px 8px">${(vals.filter(v => v < 0).length / vals.length * 100).toFixed(0)}% · ${med(vals) > 0 ? '+' : ''}${med(vals).toFixed(1)}%</td>`;
+  };
+  const html = `<details open style="margin-bottom:14px"><summary style="cursor:pointer;font-size:12px;color:#B487F8;font-weight:600">Часовая событийная калибровка — куда и когда идёт цена после входа</summary>
+  <div style="font-size:10px;color:#6F648F;margin:6px 0 4px">Вход = закрытие ПЕРВОГО дня эпизода сигнала, путь — по часовым свечам. Горизонты в ТОРГОВЫХ часах: сессия ≈14 час. баров, т.е. 14ч ≈ 1 день, 42ч ≈ 3 дня. В ячейке: точность (доля путей в сторону сигнала к этому часу) · медианный ход. «Лучшая/худшая точка» — медианы по всем путям: сколько сигнал даёт взять при идеальном выходе и сколько терпеть по дороге. Окна, пересекающие ролл контракта, исключены. Часовая история короче дневной — N здесь меньше, чем в дневной событийке: ⚠ при N&lt;20 — это набросок, не статистика.</div>
+  <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:4px">
+  <thead><tr><th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:left">Сигнал (вход по закрытию дня)</th>${HB.map(h => th('+' + h + 'ч' + (h === 14 ? '<br>≈1д' : h === 28 ? '<br>≈2д' : h === 42 ? '<br>≈3д' : ''))).join('')}${th('лучшая точка<br>(мед. ход · час)')}${th('худшая точка<br>(мед. ход · час)')}</tr></thead>
+  <tbody>${rows}
+  <tr style="background:#140A24"><td style="padding:4px 8px;color:#6F648F">Фон: любой день (доля вниз · медиана)</td>${HB.map(baseCellH).join('')}<td style="text-align:center;color:#6F648F">—</td><td style="text-align:center;color:#6F648F">—</td></tr></tbody></table></div>
+  <div style="font-size:10px;color:#6F648F">Как применять: если точность растёт к 28-42ч — ход приходит на 2-3 день и торопиться с выходом не надо; если пик на 7-14ч и дальше спад — снимать в тот же/следующий день. «Худшая точка» подсказывает, где стоп не выбьет: медианный откат против позиции по дороге к цели.</div>
+  </details>`;
+  const el = document.getElementById('pool-out');
+  el.innerHTML = html + el.innerHTML;
+  const nAll = Object.values(buckets).reduce((s, a) => s + a.length, 0);
+  setStatus(`Часовая калибровка: ${nAll} входов по ${covered} тикерам с часами${noHourly.length ? `; без часовых свечей: ${noHourly.join(', ')}` : ''}`, 'ok');
 }
 
 // ── Наложение индекса на график цены тикера ──
