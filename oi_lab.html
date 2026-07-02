@@ -1821,10 +1821,18 @@ const EVENT_DEFS = [
   ...PHASE_DEFS,
   { label: '📈 Давление: шорт набирали агрессивно (>p80)', dir: 1,
     match: r => isFinite(r.squeeze_pressure_rank) && r.squeeze_pressure_rank >= 0.8 },
-  { label: '📉 Давление: лонг набирали агрессивно (<p20)', dir: -1,
+  { label: '📉 Давление: лонг набирали агрессивно (&lt;p20)', dir: -1,
     match: r => isFinite(r.squeeze_pressure_rank) && r.squeeze_pressure_rank <= 0.2 },
   { label: '🧨 Сетап выброса: глубокая просадка + поток развернулся в лонг', dir: 1,
     match: r => r.spike_setup },
+  // Пересечение двух лонговых сквиз-сигналов: на пуле каждый по отдельности
+  // дал lift ~×1.4 с хорошей асимметрией (MFE +3.3/-1.2 и +2.4/-1.4), но
+  // порознь не добрал значимости. Они собраны из РАЗНЫХ компонент (позиция
+  // у экстремума + резкий ход vs просадка + разворот потока) — если совпадение
+  // обоих усиливает edge, это видно здесь; если N пересечения мизерный,
+  // строка сама потускнеет.
+  { label: '🧨🟠 Оба сквиз-сигнала разом: сетап выброса И тренд-истощение', dir: 1,
+    match: r => r.spike_setup && r.trend_exhaust === 1 },
 ];
 
 function _dailyReturns(result) {
@@ -2038,7 +2046,7 @@ function labCalibrate() {
     () => `Физики p60-80 → пад. ↓`,
     () => `Нейтраль p40-60`,
     () => `Физики p20-40 → рост ↑`,
-    () => `Физики <p20 в шорте → рост ↑↑`,
+    () => `Физики &lt;p20 в шорте → рост ↑↑`,
   ]);
 
   // Бины 2: динамика накопления (squeeze_pressure = tanh(z-score потока шорт-лонг))
@@ -2056,7 +2064,7 @@ function labCalibrate() {
     () => `Шорт набирали умеренно p60-80 → рост ↑`,
     () => `Баланс p40-60`,
     () => `Лонг набирали p20-40 → пад. ↓`,
-    () => `Лонг набирали агрессивно <p20 → пад. ↓↓`,
+    () => `Лонг набирали агрессивно &lt;p20 → пад. ↓↓`,
   ], 1);
 
   const binStatsNpp = _calcBinStats(BINS_NPP, r => r.net_phys_pct_rank, result, fwd, HORIZONS);
@@ -2072,7 +2080,7 @@ function labCalibrate() {
   const LEVEL_ZONES = [
     { lbl: 'Шорт высокий >p66', minL: 0.66, maxL: Infinity },
     { lbl: 'Шорт средний p33-66', minL: 0.33, maxL: 0.66 },
-    { lbl: 'Шорт низкий <p33', minL: -Infinity, maxL: 0.33 },
+    { lbl: 'Шорт низкий &lt;p33', minL: -Infinity, maxL: 0.33 },
   ];
   const DYN_ZONES = [
     { lbl: 'Шорт набирали', minD: 0.66, maxD: Infinity, dir: 1 },
@@ -2630,7 +2638,7 @@ async function labCalibratePool() {
       () => `Шорт набирали умеренно p60-80 → рост ↑`,
       () => `Баланс p40-60`,
       () => `Лонг набирали p20-40 → пад. ↓`,
-      () => `Лонг набирали агрессивно <p20 → пад. ↓↓`,
+      () => `Лонг набирали агрессивно &lt;p20 → пад. ↓↓`,
     ], 1);
     perInstrumentSp.push(_calcBinStats(BINS_SP, r => r.squeeze_pressure_rank, inst.result, inst.fwd, HORIZONS));
     perInstrumentPhase.push(_calcCategoricalStats(PHASE_DEFS, inst.result, inst.fwd, HORIZONS));
@@ -2641,7 +2649,7 @@ async function labCalibratePool() {
     'Шорт набирали умеренно p60-80 → рост ↑',
     'Баланс p40-60',
     'Лонг набирали p20-40 → пад. ↓',
-    'Лонг набирали агрессивно <p20 → пад. ↓↓',
+    'Лонг набирали агрессивно &lt;p20 → пад. ↓↓',
   ];
   const poolSp    = _poolBinStats(perInstrumentSp, HORIZONS, SP_GENERIC_LABELS);
   const poolPhase = _poolBinStats(perInstrumentPhase, HORIZONS);
