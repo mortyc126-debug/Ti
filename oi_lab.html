@@ -185,6 +185,11 @@ const CFG_DEFAULTS = {
   // редкие дни +10-13%) направление/медиана слепы — меряем ловлю выбросов.
   event_horizon: 5,      // окно (баров) от входа: MFE/MAE и поимка выброса
   spike_quantile: 0.95,  // квантиль дневных ходов инструмента = порог «дня-выброса»
+  // Сетап выброса вверх — из case-control разбора по пулу (140 выбросов):
+  // канун отличают глубокая просадка и уже развернувшийся к лонгу поток.
+  spike_setup_dd_window: 20,  // окно локального максимума для просадки
+  spike_setup_dd_pctl: 0.8,   // просадка глубже, чем в 80% собственной истории
+  spike_setup_flow_max: 0.35, // ранг давления ниже → шорты уже кроются
 };
 
 const CFG_LABELS = {
@@ -218,6 +223,9 @@ const CFG_LABELS = {
   trend_exhaust_pctl_long: 'Перцентиль экстрем. (лонг)',
   event_horizon: 'Окно событий (баров)',
   spike_quantile: 'Квантиль дня-выброса',
+  spike_setup_dd_window: 'Окно просадки (сетап)',
+  spike_setup_dd_pctl: 'Глубина просадки (сетап)',
+  spike_setup_flow_max: 'Макс. ранг потока (сетап)',
 };
 
 function buildCfgUI() {
@@ -1217,6 +1225,31 @@ function computeIndicator(rows, cfg, refSwitchDates) {
     }
   }
 
+  // Сетап выброса вверх. Case-control разбор по пулу (140 дней-выбросов
+  // против 4733 фоновых) показал: канун выброса отличают (а) глубокая
+  // просадка от локального максимума (медиана -9.8% против -5.7% фона) и
+  // (б) уже развернувшийся поток позиций (ранг давления 57% против 67% —
+  // шорты кроются заранее). Оба условия адаптивные: глубина просадки —
+  // перцентиль СОБСТВЕННОЙ истории (у Si «глубоко» это -3%, у спайкового
+  // тикера -25%), фиксированный процент не работал бы для обоих сразу.
+  // «Слом серии красных дней» на пуле НЕ подтвердился — в сетап не входит.
+  const ddw = Math.max(2, Math.round(cfg.spike_setup_dd_window || 20));
+  const drawdown = new Array(n).fill(NaN);
+  for (let i=0; i<n; i++) {
+    if (!(close[i] > 0)) continue;
+    let mx = -Infinity;
+    for (let j=Math.max(0, i-ddw+1); j<=i; j++) if (close[j] > 0) mx = Math.max(mx, close[j]);
+    if (mx > 0) drawdown[i] = (close[i]-mx)/mx;
+  }
+  const drawdownRank = _percentileRank(drawdown, cfg.liquidity_window);
+  const ddThr = 1 - (cfg.spike_setup_dd_pctl ?? 0.8);
+  const flowMax = cfg.spike_setup_flow_max ?? 0.35;
+  const spikeSetup = new Array(n).fill(false);
+  for (let i=0; i<n; i++) {
+    spikeSetup[i] = isFinite(drawdownRank[i]) && drawdownRank[i] <= ddThr
+      && isFinite(squeezePressureRank[i]) && squeezePressureRank[i] <= flowMax;
+  }
+
   return rows.map((r,i)=>({
     date: r.date,
     close: close[i],
@@ -1252,6 +1285,9 @@ function computeIndicator(rows, cfg, refSwitchDates) {
     phys_long_pctl:  physLPctl[i],
     total_short_pctl: totalShortPctl[i],
     total_long_pctl:  totalLongPctl[i],
+    drawdown: drawdown[i],
+    drawdown_rank: drawdownRank[i],
+    spike_setup: spikeSetup[i],
   }));
 }
 
@@ -1787,6 +1823,8 @@ const EVENT_DEFS = [
     match: r => isFinite(r.squeeze_pressure_rank) && r.squeeze_pressure_rank >= 0.8 },
   { label: '📉 Давление: лонг набирали агрессивно (<p20)', dir: -1,
     match: r => isFinite(r.squeeze_pressure_rank) && r.squeeze_pressure_rank <= 0.2 },
+  { label: '🧨 Сетап выброса: глубокая просадка + поток развернулся в лонг', dir: 1,
+    match: r => r.spike_setup },
 ];
 
 function _dailyReturns(result) {
@@ -2803,6 +2841,7 @@ function labSpikeAutopsy() {
   const FLAG_FEATS = [
     { key: '_te_up', lbl: '🟠 Тренд-истощение (сквиз ↑) активен' },
     { key: 'accum_flag', lbl: '🔵 Фаза накопления активна' },
+    { key: 'spike_setup', lbl: '🧨 Сетап выброса активен' },
   ];
 
   const pre = {}, ctl = {};   // массивы значений признаков: накануне выброса / фон
@@ -2830,6 +2869,7 @@ function labSpikeAutopsy() {
         trend_return: isFinite(r.trend_return) ? r.trend_return*100 : NaN,
         _streak: streak, _dd20: dd,
         _te_up: r.trend_exhaust === 1 ? 1 : 0, accum_flag: r.accum_flag ? 1 : 0,
+        spike_setup: r.spike_setup ? 1 : 0,
       };
     };
     for (let t = 1; t < res.length; t++) {
@@ -2841,7 +2881,7 @@ function labSpikeAutopsy() {
       if (isSpike) {
         nSpikes++;
         topSpikes.push({ ticker: inst.ticker, date: res[t].date, ret: dayRet[t],
-          shortPctl: fv.total_short_pctl, trendRet: fv.trend_return, dd: fv._dd20, te: fv._te_up });
+          shortPctl: fv.total_short_pctl, trendRet: fv.trend_return, dd: fv._dd20, te: fv._te_up, setup: fv.spike_setup });
       } else nCtl++;
     }
   }
@@ -2881,6 +2921,7 @@ function labSpikeAutopsy() {
     <td style="text-align:center;color:${sk.trendRet<0?'#f38ba8':'#a6e3a1'}">${isFinite(sk.trendRet)?(sk.trendRet>0?'+':'')+sk.trendRet.toFixed(1)+'%':'—'}</td>
     <td style="text-align:center;color:#f38ba8">${isFinite(sk.dd)?sk.dd.toFixed(1)+'%':'—'}</td>
     <td style="text-align:center;color:${sk.te?'#fab387':'#6c7086'}">${sk.te?'🟠 да':'нет'}</td>
+    <td style="text-align:center;color:${sk.setup?'#a6e3a1':'#6c7086'}">${sk.setup?'🧨 да':'нет'}</td>
   </tr>`).join('');
 
   const thStyle = 'padding:4px 8px;background:#181825;color:#a6adc8;text-align:center;font-weight:400';
@@ -2903,6 +2944,7 @@ function labSpikeAutopsy() {
     <th style="${thStyle}">ход за ${cfg.trend_exhaust_window} баров до</th>
     <th style="${thStyle}">просадка от max20</th>
     <th style="${thStyle}">тренд-истощ. ↑</th>
+    <th style="${thStyle}">сетап 🧨</th>
   </tr></thead><tbody>${topHtml}</tbody></table></div></details>
   </details>`;
 
