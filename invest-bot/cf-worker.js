@@ -1174,7 +1174,12 @@ async function handleDb(path, req, env) {
     if (!contracts.length) return json({ ticker: rootTicker, date, type, secid: null, rows: [], reason: 'FindInstrument не нашёл контрактов серии' });
     let best = null;
     const gotDates = new Set();
-    for (const inst of contracts.slice(0, 6)) {
+    // Перебираем ВСЕ контракты серии (до 12), а не первые 6: для старых дат
+    // front-контракт — уже экспирировавший, и он приходил в хвосте списка
+    // FindInstrument. Из-за slice(0,6) кануны марта-апреля оставались без
+    // tradestats, а obstats подхватывал мёртвый дальний контракт с пустым
+    // стаканом (фейковый спред 141 против 41 у контрольных).
+    for (const inst of contracts.slice(0, 12)) {
       try {
         // ВАЖНО: per-secid путь datashop ИГНОРИРУЕТ date= и отдаёт последний
         // доступный день (поймано: три разных кануна вернули идентичные
@@ -1196,7 +1201,7 @@ async function handleDb(path, req, env) {
       await new Promise(r => setTimeout(r, 150));
     }
     if (!best) return json({ ticker: rootTicker, date, type, secid: null, rows: [],
-      gotDates: [...gotDates], contractsTried: contracts.slice(0, 6).map(c => c.ticker),
+      gotDates: [...gotDates], contractsTried: contracts.slice(0, 12).map(c => c.ticker),
       reason: gotDates.size ? 'данные пришли, но за другие даты (from/till не сработал?)' : 'контракты не дали строк за эту дату' });
     return json({ ticker: rootTicker, date, type, secid: best.secid, rows: best.rows });
   }
