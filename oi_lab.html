@@ -130,6 +130,7 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
     <button class="sec" onclick="labCalibratePool()">🧮 Рассчитать по пулу</button>
     <button class="sec" onclick="labSweepPool()">🔬 Перебор порогов trend_exhaust</button>
     <button class="sec" onclick="labAnalyzeSqueezeFactors()">🧬 Признаки шорт-сквиза</button>
+    <button class="sec" onclick="labSpikeAutopsy()">🔎 Перед выбросами</button>
     <button class="sec" onclick="labFetchAssetClasses()">🏷 Классифицировать тикеры (T-Invest)</button>
   </div>
   <div id="pool-out" style="color:#6c7086;font-size:11px">Нажми «Заполнить всеми из базы» (или впиши тикеры вручную), затем «Рассчитать по пулу».</div>
@@ -180,6 +181,10 @@ const CFG_DEFAULTS = {
   trend_exhaust_move_pctl_long: 0.86,  // перцентиль хода цены ВВЕРХ перед лонг-коррекцией
   trend_exhaust_pctl_short: 0.9,       // перцентиль позиции (шорт физлиц), выше которого — «крайняя»
   trend_exhaust_pctl_long: 0.9,        // перцентиль позиции (лонг физлиц), выше которого — «крайняя»
+  // Событийная оценка: на спайковых инструментах (много мелких минусов +
+  // редкие дни +10-13%) направление/медиана слепы — меряем ловлю выбросов.
+  event_horizon: 5,      // окно (баров) от входа: MFE/MAE и поимка выброса
+  spike_quantile: 0.95,  // квантиль дневных ходов инструмента = порог «дня-выброса»
 };
 
 const CFG_LABELS = {
@@ -211,6 +216,8 @@ const CFG_LABELS = {
   trend_exhaust_move_pctl_long: 'Перцентиль хода (лонг→коррекция)',
   trend_exhaust_pctl_short: 'Перцентиль экстрем. (шорт)',
   trend_exhaust_pctl_long: 'Перцентиль экстрем. (лонг)',
+  event_horizon: 'Окно событий (баров)',
+  spike_quantile: 'Квантиль дня-выброса',
 };
 
 function buildCfgUI() {
@@ -1243,6 +1250,8 @@ function computeIndicator(rows, cfg, refSwitchDates) {
     squeeze_pressure_rank: squeezePressureRank[i],
     phys_short_pctl: physSPctl[i],
     phys_long_pctl:  physLPctl[i],
+    total_short_pctl: totalShortPctl[i],
+    total_long_pctl:  totalLongPctl[i],
   }));
 }
 
@@ -1761,6 +1770,207 @@ const PHASE_DEFS = [
     match: r => r.trend_exhaust === -1 },
 ];
 
+// ===== СОБЫТИЙНАЯ ОЦЕНКА: ловля выбросов =====
+// Спайковый профиль (много мелких минусов + редкие дни +10-13%) непроверяем
+// метриками направления: медиана игнорирует хвост, точность считает +0.1% и
+// +13% одинаковым «ростом». Здесь меряем то, чем такой профиль живёт:
+// вероятность поймать день-выброс за k баров, лучший/худший накопленный ход
+// от входа (MFE/MAE) и задержку до выброса. Вход — только ПЕРВЫЙ день
+// эпизода: сигнал-состояние, горящий 13 дней подряд, — одно событие, а не 13.
+
+// Бины для событийной оценки: фазовые + крайние бины давления сжатия.
+// dir задаёт, какой выброс ловим: ↑, ↓ или любой (dir=0 у накопления —
+// пробой из флэта интересен в обе стороны).
+const EVENT_DEFS = [
+  ...PHASE_DEFS,
+  { label: '📈 Давление: шорт набирали агрессивно (>p80)', dir: 1,
+    match: r => isFinite(r.squeeze_pressure_rank) && r.squeeze_pressure_rank >= 0.8 },
+  { label: '📉 Давление: лонг набирали агрессивно (<p20)', dir: -1,
+    match: r => isFinite(r.squeeze_pressure_rank) && r.squeeze_pressure_rank <= 0.2 },
+];
+
+function _dailyReturns(result) {
+  const out = new Array(result.length).fill(NaN);
+  for (let i=1; i<result.length; i++) {
+    const a = result[i-1].close, b = result[i].close;
+    if (a > 0 && b > 0) out[i] = (b - a) / a * 100;
+  }
+  return out;
+}
+
+// Порог «дня-выброса» — квантиль |дневного хода| самого инструмента: у Si
+// выброс это ±2%, у спайкового тикера ±10%. Именно модуль, а не знаковый
+// квантиль: на инструменте с дрейфом вниз p95 знаковых доходностей может
+// оказаться отрицательным, и «выбросом вверх» стал бы любой день слабее
+// обычного минуса. Полная история сознательно: это определение МЕТКИ
+// (что считать выбросом для этого инструмента), а не торгового сигнала —
+// утечки из будущего в прогноз здесь нет.
+function _spikeThresholds(dayRet, q) {
+  const abs = dayRet.filter(isFinite).map(Math.abs).sort((a,b)=>a-b);
+  if (abs.length < 20) return null;
+  const thr = abs[Math.min(abs.length-1, Math.floor(abs.length*q))];
+  return thr > 0 ? { up: thr, down: -thr } : null;
+}
+
+// Первые дни эпизодов (подряд идущие совпадения схлопнуты в одно событие).
+function _matchEpisodes(result, matchFn) {
+  const firsts = []; let prev = false, nDays = 0;
+  for (let i=0; i<result.length; i++) {
+    const m = !!matchFn(result[i]);
+    if (m) { nDays++; if (!prev) firsts.push(i); }
+    prev = m;
+  }
+  return { firsts, nDays };
+}
+
+// Для каждой точки входа: лучший/худший накопленный ход за k баров (по close)
+// и задержка до первого дня-выброса вверх/вниз.
+function _entryEvents(result, dayRet, entries, k, thr) {
+  const n = result.length, out = [];
+  for (const i of entries) {
+    const c0 = result[i].close;
+    if (!(c0 > 0) || i+1 >= n) continue;
+    let hi = -Infinity, lo = Infinity, dtUp = NaN, dtDown = NaN, any = false;
+    for (let j=i+1; j<=Math.min(i+k, n-1); j++) {
+      const c = result[j].close;
+      if (c > 0) { const r = (c-c0)/c0*100; if (r>hi) hi=r; if (r<lo) lo=r; any = true; }
+      const d = dayRet[j];
+      if (isFinite(d)) {
+        if (d >= thr.up   && !isFinite(dtUp))   dtUp = j - i;
+        if (d <= thr.down && !isFinite(dtDown)) dtDown = j - i;
+      }
+    }
+    if (any) out.push({ hi, lo, dtUp, dtDown });
+  }
+  return out;
+}
+
+// Событийная таблица по списку инструментов. Сэмплы объединяются СЫРЫМИ
+// (не усреднением по-инструментных процентов) — вероятности и медианы
+// автоматически взвешены по числу эпизодов каждого инструмента.
+function _calcEventTable(results, cfg) {
+  const k = Math.max(1, Math.round(cfg.event_horizon || 5));
+  const q = Math.min(0.995, Math.max(0.55, cfg.spike_quantile || 0.95));
+  const per = results.map(res => {
+    const dayRet = _dailyReturns(res);
+    const thr = _spikeThresholds(dayRet, q);
+    return thr ? { res, dayRet, thr } : null;
+  }).filter(Boolean);
+  if (!per.length) return null;
+
+  const collect = (matchFn) => {
+    let nDays = 0, nEp = 0;
+    const events = [];
+    for (const p of per) {
+      const ep = _matchEpisodes(p.res, matchFn);
+      nDays += ep.nDays; nEp += ep.firsts.length;
+      events.push(..._entryEvents(p.res, p.dayRet, ep.firsts, k, p.thr));
+    }
+    return { nDays, nEp, events };
+  };
+
+  const statsFrom = (events, dir) => {
+    if (!events.length) return null;
+    const hitOf = e => dir > 0 ? isFinite(e.dtUp) : dir < 0 ? isFinite(e.dtDown) : (isFinite(e.dtUp) || isFinite(e.dtDown));
+    const dtOf  = e => dir > 0 ? e.dtUp : dir < 0 ? e.dtDown
+      : Math.min(isFinite(e.dtUp) ? e.dtUp : Infinity, isFinite(e.dtDown) ? e.dtDown : Infinity);
+    const hits = events.filter(hitOf).length;
+    return {
+      evaluated: events.length, hits, p: hits / events.length * 100,
+      mfeMed: _median(events.map(e=>e.hi)),
+      maeMed: _median(events.map(e=>e.lo)),
+      daysToMed: _median(events.map(dtOf).filter(isFinite)),
+    };
+  };
+
+  // База — вход в КАЖДЫЙ день, БЕЗ схлопывания в эпизоды (иначе вся история
+  // слиплась бы в один «эпизод» и база была бы посчитана по одной точке):
+  // безусловная вероятность увидеть выброс в ближайшие k баров.
+  const baseEvents = [];
+  for (const p of per) {
+    baseEvents.push(..._entryEvents(p.res, p.dayRet, p.res.map((_,i)=>i), k, p.thr));
+  }
+  const base = {
+    up: statsFrom(baseEvents, 1),
+    down: statsFrom(baseEvents, -1),
+    any: statsFrom(baseEvents, 0),
+  };
+
+  const rows = EVENT_DEFS.map(def => {
+    const c = collect(def.match);
+    const s = statsFrom(c.events, def.dir);
+    const b = def.dir > 0 ? base.up : def.dir < 0 ? base.down : base.any;
+    let lift = null, sig = false;
+    if (s && b && b.p > 0) {
+      lift = s.p / b.p;
+      // Значимость lift: 95%-й ДИ разницы двух биномиальных пропорций —
+      // тот же критерий, что в переборе порогов (иначе «×3 к базе» на 4
+      // эпизодах выглядит убедительнее, чем есть).
+      const p1 = s.p/100, p0 = b.p/100;
+      const se = Math.sqrt(p1*(1-p1)/s.evaluated + p0*(1-p0)/b.evaluated) * 100;
+      sig = isFinite(se) && se > 0 && Math.abs(s.p - b.p) > 1.96 * se;
+    }
+    return { label: def.label, dir: def.dir, nDays: c.nDays, nEp: c.nEp, s, lift, sig };
+  });
+
+  const thrNote = per.length === 1
+    ? `порог выброса: ход за бар ≥ ±${per[0].thr.up.toFixed(1)}% (квантиль ${q} от |дневного хода|)`
+    : `порог выброса — свой у каждого инструмента (квантиль ${q} его |дневных ходов|); медиана порогов: ±${_median(per.map(p=>p.thr.up)).toFixed(1)}%/бар`;
+  return { k, q, base, rows, thrNote, nInstruments: per.length };
+}
+
+function _renderEventTable(ev, title) {
+  if (!ev) return '';
+  const fmt1 = v => isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—';
+  const arrow = d => d > 0 ? '↑' : d < 0 ? '↓' : '↕';
+  const th = s => `<th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:center;font-weight:400">${s}</th>`;
+  let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title}</summary>
+  <div style="font-size:10px;color:#6c7086;margin-bottom:6px">${ev.thrNote} · окно ${ev.k} баров · вход = ПЕРВЫЙ день эпизода (серия подряд идущих сигнальных дней — одно событие) · MFE/MAE = лучший/худший накопленный ход от входа</div>
+  <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
+  <thead><tr>
+    <th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Бин</th>
+    ${th('дней')}${th('эпизодов')}${th(`P(выброс за ${ev.k} баров)`)}${th('× к базе')}${th('MFE ↑ мед')}${th('MAE ↓ мед')}${th('баров до выброса')}
+  </tr></thead><tbody>`;
+  const b = ev.base;
+  const bTxt = ['up','down','any'].map(kk => {
+    const s = b[kk]; if (!s) return '';
+    return `${arrow(kk==='up'?1:kk==='down'?-1:0)} ${s.p.toFixed(0)}%`;
+  }).filter(Boolean).join(' · ');
+  t += `<tr style="background:#1e1e2e;border-top:1px solid #313244">
+    <td style="padding:4px 8px;color:#cba6f7;font-weight:600">📐 База (вход в любой день)</td>
+    <td style="text-align:center;color:#6c7086">${b.any ? b.any.evaluated : '—'}</td>
+    <td style="text-align:center;color:#6c7086">—</td>
+    <td style="text-align:center;color:#cdd6f4">${bTxt}</td>
+    <td style="text-align:center;color:#6c7086">—</td>
+    <td style="text-align:center;color:#a6e3a1">${b.any ? fmt1(b.any.mfeMed) : '—'}</td>
+    <td style="text-align:center;color:#f38ba8">${b.any ? fmt1(b.any.maeMed) : '—'}</td>
+    <td style="text-align:center;color:#6c7086">—</td>
+  </tr>`;
+  for (const row of ev.rows) {
+    if (!row.nEp) continue;
+    const s = row.s;
+    const rc = row.dir > 0 ? '#1a2e1a' : row.dir < 0 ? '#2e1a1a' : '#1e2030';
+    const lc = row.dir > 0 ? '#a6e3a1' : row.dir < 0 ? '#f38ba8' : '#cdd6f4';
+    const liftCol = row.sig ? (row.lift >= 1.3 ? '#a6e3a1' : row.lift <= 0.7 ? '#f38ba8' : '#cdd6f4') : '#6c7086';
+    const liftTxt = isFinite(row.lift) ? `×${row.lift.toFixed(1)}${row.sig ? ' ✓' : ''}` : '—';
+    const thin = row.nEp < 10;
+    t += `<tr style="background:${rc};opacity:${thin?0.6:1}"${thin?' title="Меньше 10 эпизодов — не вывод, а намёк"':''}>
+      <td style="padding:4px 8px;color:${lc}">${row.label} ${arrow(row.dir)}</td>
+      <td style="text-align:center;color:#6c7086">${row.nDays}</td>
+      <td style="text-align:center;color:#cdd6f4">${row.nEp}</td>
+      <td style="text-align:center;color:${liftCol}">${s ? s.p.toFixed(0)+'%' : '—'} <span style="color:#6c7086;font-size:9px">(${s?s.hits:0}/${s?s.evaluated:0})</span></td>
+      <td style="text-align:center;color:${liftCol}" title="Во сколько раз чаще базы; ✓ = 95% ДИ разницы не пересекает 0">${liftTxt}</td>
+      <td style="text-align:center;color:#a6e3a1">${s ? fmt1(s.mfeMed) : '—'}</td>
+      <td style="text-align:center;color:#f38ba8">${s ? fmt1(s.maeMed) : '—'}</td>
+      <td style="text-align:center;color:#cdd6f4">${s && isFinite(s.daysToMed) ? s.daysToMed.toFixed(0) : '—'}</td>
+    </tr>`;
+  }
+  t += `</tbody></table></div>
+  <div style="font-size:10px;color:#6c7086;margin:-4px 0 10px">Читать так: у полезного сигнала P(выброс) заметно выше базы (× ≥ 1.3 с ✓), MFE больше |MAE| (вход асимметричен в твою пользу), «баров до выброса» говорит, сколько ждать. Тусклые строки — меньше 10 эпизодов.</div>
+  </details>`;
+  return t;
+}
+
 function labCalibrate() {
   const result = _lastResult;
   if (!result || result.length < 15) { setStatus('Сначала загрузи данные', 'err'); return; }
@@ -1884,13 +2094,16 @@ function labCalibrate() {
     last.squeeze_pressure_rank >= b.minD && last.squeeze_pressure_rank < b.maxD
   ) : null;
 
+  // Событийная оценка: ловля выбросов (эпизоды, MFE/MAE, P(выброс за k баров))
+  const eventTable = _calcEventTable([result], readCfg());
+
   // Для тултипа используем squeeze_pressure (динамика важнее снэпшота)
   _lastCalibStats = binStatsSp;
   _lastCalibFwd   = fwd;
-  renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last, curBinNpp, curBinSp, curBin2D, fwd, result);
+  renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last, curBinNpp, curBinSp, curBin2D, fwd, result, eventTable);
 }
 
-function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last, curBinNpp, curBinSp, curBin2D, fwd, result) {
+function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last, curBinNpp, curBinSp, curBin2D, fwd, result, eventTable) {
   const el = document.getElementById('calib-out');
   const isHourly = _lastMode === 'hourly';
   const H = isHourly ? [1, 2, 4, 8, 24] : [1, 2, 3, 5];
@@ -2054,6 +2267,7 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
     html += t + '</tbody></table></div></details>';
   })();
 
+  html += _renderEventTable(eventTable, '🎯 Событийная оценка — ловля выбросов (главная метрика для спайковых инструментов)');
   html += _binTable(binStatsPhase, '🔵📤 Точность по фазам (накопление/выброс + тренд-истощение)');
   html += _binTable(binStatsSp, '📈 Точность по динамике набора (давление сжатия)');
   html += _binTable(binStatsNpp, '📊 Точность по снэпшоту позиции (перекос)');
@@ -2335,6 +2549,9 @@ async function poolFillAllTickers() {
 // Позволяет labSweepPool пересчитывать computeIndicator с другими cfg без
 // повторных походов в сеть (самая дорогая часть загрузки пула).
 let _lastPoolRawData = null;
+// Посчитанные инструменты последнего пула — [{ticker, result, fwd}] — для
+// разбора «что было перед выбросами» без пересчёта.
+let _lastPoolInstruments = null;
 
 async function labCalibratePool() {
   const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
@@ -2364,6 +2581,7 @@ async function labCalibratePool() {
     return;
   }
   _lastPoolRawData = rawData;
+  _lastPoolInstruments = instruments;
 
   // Считаем per-инструмент статистику по тем же бинам, что и одиночная калибровка
   const perInstrumentSp    = [];
@@ -2406,7 +2624,10 @@ async function labCalibratePool() {
     return { label: def.label, totalMatches, uniqueDates: dates.size };
   });
 
-  renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInstrumentSp, perInstrumentPhase, phaseDateOverlap);
+  // Событийная оценка по всему пулу: у каждого инструмента свой порог выброса
+  const poolEvents = _calcEventTable(instruments.map(i=>i.result), cfg);
+
+  renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInstrumentSp, perInstrumentPhase, phaseDateOverlap, poolEvents);
   setStatus(`Пул: рассчитано по ${instruments.length}/${rootTickers.length} инструментам (${instruments.map(i=>i.ticker).join(', ')})`, 'ok');
 }
 
@@ -2554,6 +2775,140 @@ function renderPoolSweep(axes, baseCfg) {
   html += _axisTable(longPctlPoints, '🔵 Лонг→коррекция: перцентиль позиции (trend_exhaust_pctl_long)', 'pctl позиции', 'longEdge', 'longSE', 'longSig', 'longN', 'Лонг→коррекция edge');
   html += _axisTable(longMovePoints, '🔵 Лонг→коррекция: перцентиль хода цены (trend_exhaust_move_pctl_long)', 'pctl хода', 'longEdge', 'longSE', 'longSig', 'longN', 'Лонг→коррекция edge');
   el.innerHTML = html + el.innerHTML;
+}
+
+// ===== ОБРАТНЫЙ РАЗБОР: что было перед выбросами (case-control) =====
+// Прямая калибровка отвечает «что случилось после сигнала», а этот разбор —
+// «что индикатор показывал НАКАНУНЕ дней-выбросов». Берём все дни с ходом
+// ≥ порога вверх, смотрим признаки за день до, и сравниваем с медианой тех
+// же признаков во все остальные дни. Если признак реально предсказывает
+// выброс — его распределение накануне должно заметно отличаться от фона.
+function labSpikeAutopsy() {
+  const insts = (_lastPoolInstruments && _lastPoolInstruments.length)
+    ? _lastPoolInstruments
+    : (_lastResult ? [{ ticker: document.getElementById('tickers').value.trim() || '—', result: _lastResult }] : null);
+  if (!insts) { setStatus('Сначала загрузи инструмент или рассчитай пул', 'err'); return; }
+  const cfg = readCfg();
+  const q = Math.min(0.995, Math.max(0.55, cfg.spike_quantile || 0.95));
+
+  const NUM_FEATS = [
+    { key: 'total_short_pctl',      lbl: 'Шорт всего рынка (физ+юр), pctl', pct: true },
+    { key: 'phys_short_pctl',       lbl: 'Шорт физлиц, pctl', pct: true },
+    { key: 'squeeze_pressure_rank', lbl: 'Ранг давления сжатия (шорт-лонг поток)', pct: true },
+    { key: 'net_phys_pct_rank',     lbl: 'Ранг перекоса физлиц', pct: true },
+    { key: 'trend_return',          lbl: `Ход за ${cfg.trend_exhaust_window} баров, %` },
+    { key: '_streak',               lbl: 'Дней падения подряд' },
+    { key: '_dd20',                 lbl: 'Просадка от max за 20 баров, %' },
+  ];
+  const FLAG_FEATS = [
+    { key: '_te_up', lbl: '🟠 Тренд-истощение (сквиз ↑) активен' },
+    { key: 'accum_flag', lbl: '🔵 Фаза накопления активна' },
+  ];
+
+  const pre = {}, ctl = {};   // массивы значений признаков: накануне выброса / фон
+  for (const f of [...NUM_FEATS, ...FLAG_FEATS]) { pre[f.key] = []; ctl[f.key] = []; }
+  const topSpikes = [];
+  let nSpikes = 0, nCtl = 0, usable = 0;
+
+  for (const inst of insts) {
+    const res = inst.result;
+    const dayRet = _dailyReturns(res);
+    const thr = _spikeThresholds(dayRet, q);
+    if (!thr) continue;
+    usable++;
+    const closes = res.map(r=>r.close);
+    const featAt = (i) => {
+      const r = res[i];
+      let streak = 0;
+      for (let j=i; j>0 && isFinite(dayRet[j]) && dayRet[j] < 0; j--) streak++;
+      let mx = -Infinity;
+      for (let j=Math.max(0,i-19); j<=i; j++) if (closes[j] > 0) mx = Math.max(mx, closes[j]);
+      const dd = (mx > 0 && closes[i] > 0) ? (closes[i]-mx)/mx*100 : NaN;
+      return {
+        total_short_pctl: r.total_short_pctl, phys_short_pctl: r.phys_short_pctl,
+        squeeze_pressure_rank: r.squeeze_pressure_rank, net_phys_pct_rank: r.net_phys_pct_rank,
+        trend_return: isFinite(r.trend_return) ? r.trend_return*100 : NaN,
+        _streak: streak, _dd20: dd,
+        _te_up: r.trend_exhaust === 1 ? 1 : 0, accum_flag: r.accum_flag ? 1 : 0,
+      };
+    };
+    for (let t = 1; t < res.length; t++) {
+      if (!isFinite(dayRet[t])) continue;
+      const isSpike = dayRet[t] >= thr.up;
+      const fv = featAt(t-1);
+      const bucket = isSpike ? pre : ctl;
+      for (const f of [...NUM_FEATS, ...FLAG_FEATS]) bucket[f.key].push(fv[f.key]);
+      if (isSpike) {
+        nSpikes++;
+        topSpikes.push({ ticker: inst.ticker, date: res[t].date, ret: dayRet[t],
+          shortPctl: fv.total_short_pctl, trendRet: fv.trend_return, dd: fv._dd20, te: fv._te_up });
+      } else nCtl++;
+    }
+  }
+  if (!nSpikes) { setStatus('Выбросов по текущему порогу не нашлось — снизь квантиль дня-выброса в настройках', 'err'); return; }
+
+  const fmtV = (f, v) => !isFinite(v) ? '—' : f.pct && Math.abs(v) <= 1 ? (v*100).toFixed(0)+'%' : v.toFixed(1);
+  let rowsHtml = '';
+  for (const f of NUM_FEATS) {
+    const a = _median(pre[f.key]), b = _median(ctl[f.key]);
+    const diff = isFinite(a) && isFinite(b) ? a - b : NaN;
+    const dc = !isFinite(diff) ? '#6c7086' : Math.abs(diff) < 1e-9 ? '#6c7086' : diff > 0 ? '#a6e3a1' : '#f38ba8';
+    rowsHtml += `<tr>
+      <td style="padding:4px 8px;color:#cdd6f4">${f.lbl}</td>
+      <td style="text-align:center;color:#cba6f7;font-weight:600">${fmtV(f, a)}</td>
+      <td style="text-align:center;color:#6c7086">${fmtV(f, b)}</td>
+      <td style="text-align:center;color:${dc}">${isFinite(diff) ? (diff>0?'+':'')+fmtV(f, diff).replace('%','')+(f.pct && Math.abs(diff)<=1?' пп':'') : '—'}</td>
+    </tr>`;
+  }
+  for (const f of FLAG_FEATS) {
+    const a = pre[f.key].filter(v=>v===1).length / Math.max(1, pre[f.key].length) * 100;
+    const b = ctl[f.key].filter(v=>v===1).length / Math.max(1, ctl[f.key].length) * 100;
+    const diff = a - b;
+    rowsHtml += `<tr>
+      <td style="padding:4px 8px;color:#cdd6f4">${f.lbl} — доля дней</td>
+      <td style="text-align:center;color:#cba6f7;font-weight:600">${a.toFixed(0)}%</td>
+      <td style="text-align:center;color:#6c7086">${b.toFixed(0)}%</td>
+      <td style="text-align:center;color:${diff>0?'#a6e3a1':diff<0?'#f38ba8':'#6c7086'}">${(diff>0?'+':'')+diff.toFixed(0)} пп</td>
+    </tr>`;
+  }
+
+  topSpikes.sort((x,y)=>y.ret-x.ret);
+  const topHtml = topSpikes.slice(0, 12).map(sk => `<tr>
+    <td style="padding:3px 8px;color:#cdd6f4">${sk.ticker}</td>
+    <td style="padding:3px 8px;color:#cdd6f4">${sk.date}</td>
+    <td style="text-align:center;color:#a6e3a1;font-weight:600">+${sk.ret.toFixed(1)}%</td>
+    <td style="text-align:center;color:#cdd6f4">${isFinite(sk.shortPctl)?(sk.shortPctl*100).toFixed(0)+'%':'—'}</td>
+    <td style="text-align:center;color:${sk.trendRet<0?'#f38ba8':'#a6e3a1'}">${isFinite(sk.trendRet)?(sk.trendRet>0?'+':'')+sk.trendRet.toFixed(1)+'%':'—'}</td>
+    <td style="text-align:center;color:#f38ba8">${isFinite(sk.dd)?sk.dd.toFixed(1)+'%':'—'}</td>
+    <td style="text-align:center;color:${sk.te?'#fab387':'#6c7086'}">${sk.te?'🟠 да':'нет'}</td>
+  </tr>`).join('');
+
+  const thStyle = 'padding:4px 8px;background:#181825;color:#a6adc8;text-align:center;font-weight:400';
+  const html = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">🔎 Что было перед выбросами — ${nSpikes} дней-выбросов на ${usable} инструментах (порог: квантиль ${q} дневных ходов каждого)</summary>
+  <div style="font-size:10px;color:#6c7086;margin-bottom:6px">Признаки взяты ЗА ДЕНЬ ДО выброса и сравнены с теми же признаками во все остальные дни (${nCtl}). Большая разница = признак реально отличает канун выброса от фона.</div>
+  <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
+  <thead><tr>
+    <th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Признак (накануне)</th>
+    <th style="${thStyle}">медиана перед выбросом<br>(N=${nSpikes})</th>
+    <th style="${thStyle}">медиана в остальные дни<br>(N=${nCtl})</th>
+    <th style="${thStyle}">разница</th>
+  </tr></thead><tbody>${rowsHtml}</tbody></table></div>
+  <details><summary style="cursor:pointer;font-size:11px;color:#7287fd;margin-bottom:4px">Топ-12 выбросов и что было накануне</summary>
+  <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
+  <thead><tr>
+    <th style="padding:3px 8px;background:#181825;color:#a6adc8;text-align:left">Тикер</th>
+    <th style="padding:3px 8px;background:#181825;color:#a6adc8;text-align:left">Дата</th>
+    <th style="${thStyle}">ход за день</th>
+    <th style="${thStyle}">шорт рынка pctl</th>
+    <th style="${thStyle}">ход за ${cfg.trend_exhaust_window} баров до</th>
+    <th style="${thStyle}">просадка от max20</th>
+    <th style="${thStyle}">тренд-истощ. ↑</th>
+  </tr></thead><tbody>${topHtml}</tbody></table></div></details>
+  </details>`;
+
+  const el = document.getElementById('pool-out');
+  el.innerHTML = html + el.innerHTML;
+  setStatus(`Разбор перед выбросами: ${nSpikes} выбросов на ${usable} инструментах`, 'ok');
 }
 
 // Разбивка по инструментам показала: лонг→коррекция срабатывает почти
@@ -2785,7 +3140,7 @@ function renderSqueezeFactors(rows, corr, minN, classCompare) {
   el.innerHTML = html + el.innerHTML;
 }
 
-function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInstrumentSp, perInstrumentPhase, phaseDateOverlap) {
+function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInstrumentSp, perInstrumentPhase, phaseDateOverlap, poolEvents) {
   const el = document.getElementById('pool-out');
   const hLbl = h => `+${h}д`;
   const fmtPct = v => isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—';
@@ -2857,7 +3212,7 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
   function _breakdownTable(perInstrumentStats, title, h) {
     let t = `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title} — разбивка по инструментам на ${hLbl(h)}</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
-    <thead><tr><th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Бин</th>
+    <thead><tr><th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Бин · горизонт ${hLbl(h)}</th>
       ${instruments.map(i=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">${i.ticker}</th>`).join('')}
     </tr></thead><tbody>`;
     const nBins = perInstrumentStats[0].length;
@@ -2885,6 +3240,7 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
   html += _poolTable(poolPhase, '🔵📤 Пул — фазы и тренд-истощение');
   html += _breakdownTable(perInstrumentPhase, '🔵📤 Фазы и тренд-истощение', 1);
   html += _breakdownTable(perInstrumentPhase, '🔵📤 Фазы и тренд-истощение', 3);
+  html += _renderEventTable(poolEvents, '🎯 Событийная оценка по пулу — ловля выбросов (по эпизодам, а не дням)');
 
   if (phaseDateOverlap) {
     let t = `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">🔁 Проверка на пересечение дат (не раздуто ли N синхронными движениями по многим инструментам)</summary>
