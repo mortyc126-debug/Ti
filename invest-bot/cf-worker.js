@@ -513,6 +513,18 @@ async function scheduledCollectOi(env) {
 async function backfillOiHistory(db, env, tickers, days, stepMin = 30) {
   const moexKey = env.MOEX_KEY;
   if (!moexKey) return { error: 'secret MOEX_KEY не задан' };
+  // Базы, созданные до появления oi_hourly, не имеют этой таблицы, если
+  // /db/init с тех пор не перезапускался — бэкфилл тогда падает на каждой
+  // записи с «no such table». Создаём сами, IF NOT EXISTS безопасен.
+  await db.prepare(`CREATE TABLE IF NOT EXISTS oi_hourly (
+    key TEXT PRIMARY KEY, ticker TEXT NOT NULL, ts INTEGER NOT NULL,
+    price REAL DEFAULT 0,
+    yur_long REAL DEFAULT 0, yur_short REAL DEFAULT 0,
+    fiz_long REAL DEFAULT 0, fiz_short REAL DEFAULT 0,
+    yur_long_num REAL DEFAULT 0, yur_short_num REAL DEFAULT 0,
+    fiz_long_num REAL DEFAULT 0, fiz_short_num REAL DEFAULT 0
+  )`).run();
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_oihourly_ticker ON oi_hourly(ticker, ts)`).run();
   const from = new Date(Date.now() - days * 86400 * 1000).toISOString().slice(0, 10);
   const till = new Date().toISOString().slice(0, 10);
   let saved = 0, savedIntraday = 0, failed = 0, pagesTotal = 0;
