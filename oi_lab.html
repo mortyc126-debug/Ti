@@ -2512,7 +2512,12 @@ async function _fetchInstrumentRows(proxy, rootTicker, log) {
       // сам находит через T-Invest FindInstrument ВСЕ дескрипты этой серии
       // (включая уже экспирировавшие, которых нет в нашей БД вообще) и пишет
       // цену в oi_daily по датам, где нашлось совпадение — затем перечитываем.
-      if (t === sym && !rows.some(r => r.close > 0)) {
+      // Порог не «цен нет вовсе», а «<80% дней с ценой»: багованный бэкфилл
+      // однажды затёр часть цен нулями (price=0 в REPLACE), и серия с дырами
+      // давала обвал N и медианы вида +7240% на стыках — самолечение
+      // дозаполняет дыры при обычной загрузке пула.
+      const pricedShare = rows.length ? rows.filter(r => r.close > 0).length / rows.length : 0;
+      if (t === sym && pricedShare < 0.8) {
         try {
           const bp = await fetch(`${proxy}/db/oidaily/backfillprice?ticker=${encodeURIComponent(t)}`);
           const bpj = bp.ok ? await bp.json() : { error: `HTTP ${bp.status}` };

@@ -261,9 +261,17 @@ async function upsertOiHourly(db, r) {
 // ── Upsert одного снэпшока в oi_daily (общий код для /db/oidaily и cron) ──
 async function upsertOiDaily(db, r) {
   await db.prepare(
-    `INSERT OR REPLACE INTO oi_daily(key,ticker,tradedate,price,yur_long,yur_short,fiz_long,fiz_short,
-       yur_long_num,yur_short_num,fiz_long_num,fiz_short_num,updated_at)
-     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
+    `INSERT INTO oi_daily
+             (key,ticker,tradedate,price,yur_long,yur_short,fiz_long,fiz_short,
+              yur_long_num,yur_short_num,fiz_long_num,fiz_short_num,updated_at)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+           ON CONFLICT(key) DO UPDATE SET
+             price=CASE WHEN excluded.price>0 THEN excluded.price ELSE oi_daily.price END,
+             yur_long=excluded.yur_long, yur_short=excluded.yur_short,
+             fiz_long=excluded.fiz_long, fiz_short=excluded.fiz_short,
+             yur_long_num=excluded.yur_long_num, yur_short_num=excluded.yur_short_num,
+             fiz_long_num=excluded.fiz_long_num, fiz_short_num=excluded.fiz_short_num,
+             updated_at=excluded.updated_at`
   ).bind(
     `${r.ticker}__${r.tradedate}`, r.ticker, r.tradedate, r.price ?? 0,
     r.yur_long ?? 0, r.yur_short ?? 0, r.fiz_long ?? 0, r.fiz_short ?? 0,
@@ -455,10 +463,17 @@ async function scheduledCollectOi(env) {
       await db.batch(chunk.map(rec => {
         const key = `${rec.ticker}__${rec.tradedate}`;
         return db.prepare(
-          `INSERT OR REPLACE INTO oi_daily
+          `INSERT INTO oi_daily
              (key,ticker,tradedate,price,yur_long,yur_short,fiz_long,fiz_short,
               yur_long_num,yur_short_num,fiz_long_num,fiz_short_num,updated_at)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+           ON CONFLICT(key) DO UPDATE SET
+             price=CASE WHEN excluded.price>0 THEN excluded.price ELSE oi_daily.price END,
+             yur_long=excluded.yur_long, yur_short=excluded.yur_short,
+             fiz_long=excluded.fiz_long, fiz_short=excluded.fiz_short,
+             yur_long_num=excluded.yur_long_num, yur_short_num=excluded.yur_short_num,
+             fiz_long_num=excluded.fiz_long_num, fiz_short_num=excluded.fiz_short_num,
+             updated_at=excluded.updated_at`
         ).bind(key, rec.ticker, rec.tradedate, rec.price,
                rec.yur_long, rec.yur_short, rec.fiz_long, rec.fiz_short,
                rec.yur_long_num, rec.yur_short_num, rec.fiz_long_num, rec.fiz_short_num,
@@ -649,10 +664,17 @@ async function backfillOiHistory(db, env, tickers, days, stepMin = 30, startOffs
     const dailyStmts = Object.entries(lastOfDay).map(([td, { groups }]) => {
       const Y = groups.YUR, F = groups.FIZ;
       return db.prepare(
-        `INSERT OR REPLACE INTO oi_daily
-           (key,ticker,tradedate,price,yur_long,yur_short,fiz_long,fiz_short,
-            yur_long_num,yur_short_num,fiz_long_num,fiz_short_num,updated_at)
-         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
+        `INSERT INTO oi_daily
+             (key,ticker,tradedate,price,yur_long,yur_short,fiz_long,fiz_short,
+              yur_long_num,yur_short_num,fiz_long_num,fiz_short_num,updated_at)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+           ON CONFLICT(key) DO UPDATE SET
+             price=CASE WHEN excluded.price>0 THEN excluded.price ELSE oi_daily.price END,
+             yur_long=excluded.yur_long, yur_short=excluded.yur_short,
+             fiz_long=excluded.fiz_long, fiz_short=excluded.fiz_short,
+             yur_long_num=excluded.yur_long_num, yur_short_num=excluded.yur_short_num,
+             fiz_long_num=excluded.fiz_long_num, fiz_short_num=excluded.fiz_short_num,
+             updated_at=excluded.updated_at`
       ).bind(
         `${ticker}__${td}`, ticker, td, 0,
         Number(Y?.pos_long || 0), Math.abs(Number(Y?.pos_short || 0)),
@@ -1310,10 +1332,17 @@ async function handleDb(path, req, env) {
           const rec = bySymTime[k];
           const Y = rec.YUR, F = rec.FIZ;
           return db.prepare(
-            `INSERT OR REPLACE INTO oi_daily
-               (key,ticker,tradedate,price,yur_long,yur_short,fiz_long,fiz_short,
-                yur_long_num,yur_short_num,fiz_long_num,fiz_short_num,updated_at)
-             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
+            `INSERT INTO oi_daily
+             (key,ticker,tradedate,price,yur_long,yur_short,fiz_long,fiz_short,
+              yur_long_num,yur_short_num,fiz_long_num,fiz_short_num,updated_at)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+           ON CONFLICT(key) DO UPDATE SET
+             price=CASE WHEN excluded.price>0 THEN excluded.price ELSE oi_daily.price END,
+             yur_long=excluded.yur_long, yur_short=excluded.yur_short,
+             fiz_long=excluded.fiz_long, fiz_short=excluded.fiz_short,
+             yur_long_num=excluded.yur_long_num, yur_short_num=excluded.yur_short_num,
+             fiz_long_num=excluded.fiz_long_num, fiz_short_num=excluded.fiz_short_num,
+             updated_at=excluded.updated_at`
           ).bind(
             `${s}__${singleDate}`, s, singleDate, 0,
             Number(Y?.pos_long || 0), Math.abs(Number(Y?.pos_short || 0)),
