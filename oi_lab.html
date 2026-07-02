@@ -30,6 +30,11 @@ body{background:linear-gradient(180deg,#0A0615 0%,#0D0718 35%,#12091F 100%);back
 
 /* ── шапка ── */
 .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:baseline;gap:10px;padding:12px 16px;background:rgba(11,6,19,.97);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);border-top:2px solid var(--accent)}
+.topbar-nav{margin-left:auto;display:flex;gap:2px;flex-wrap:wrap}
+.topbar-nav a{color:var(--text2,#a6adc8);text-decoration:none;font-size:11px;padding:4px 9px;border-radius:5px;white-space:nowrap}
+.topbar-nav a:hover{background:var(--panel,#1e2030);color:#fff}
+.panel,#metrics-row,#interp{scroll-margin-top:64px}
+html{scroll-behavior:smooth}
 .topbar-brand{font-size:14px;font-weight:600;letter-spacing:-.01em}
 .topbar-sub{font-size:11px;color:var(--text3);font-family:var(--mono)}
 .app{max-width:1180px;margin:0 auto;padding:14px 16px 40px;display:flex;flex-direction:column;gap:14px}
@@ -103,12 +108,20 @@ details.panel .panel-body{padding-top:12px}
 <div class="topbar">
   <div class="topbar-brand">🔬 OI Lab</div>
   <div class="topbar-sub">индикатор дисбаланса физ/юр · v3</div>
+  <div class="topbar-nav">
+    <a href="#sec-load">Загрузка</a>
+    <a href="#metrics-row">Прогноз</a>
+    <a href="#sec-charts">Графики</a>
+    <a href="#sec-calib">Тикер</a>
+    <a href="#sec-pool">Пул · Скринер</a>
+    <a href="#sec-data">Данные</a>
+  </div>
 </div>
 
 <div class="app">
 
 <!-- Источник данных: тикер(ы), режим, загрузка в графики/таблицу ниже -->
-<div class="panel">
+<div class="panel" id="sec-load">
   <div class="panel-head"><div class="panel-title">1 · Источник и загрузка</div></div>
   <div class="panel-body">
     <div class="row">
@@ -174,7 +187,7 @@ details.panel .panel-body{padding-top:12px}
 <div id="interp" style="display:none"></div>
 
 <!-- Графики -->
-<div class="panel">
+<div class="panel" id="sec-charts">
   <div class="panel-head"><div class="panel-title">2 · Графики</div></div>
   <div class="panel-body">
     <div class="chart-block">
@@ -193,7 +206,7 @@ details.panel .panel-body{padding-top:12px}
 </div>
 
 <!-- Точность на истории текущего тикера: все три кнопки пишут в одну ленту calib-out -->
-<div class="panel">
+<div class="panel" id="sec-calib">
   <div class="panel-head"><div class="panel-title">3 · Точность на истории (текущий тикер)</div></div>
   <div class="panel-body">
     <div class="hint">Три разбора одного и того же загруженного тикера — результат каждого добавляется в общую ленту ниже.</div>
@@ -207,7 +220,7 @@ details.panel .panel-body{padding-top:12px}
 </div>
 
 <!-- Калибровка по пулу инструментов: сначала подготовка данных, потом анализ — обе группы пишут в pool-out -->
-<div class="panel">
+<div class="panel" id="sec-pool">
   <div class="panel-head"><div class="panel-title">4 · Калибровка по пулу инструментов</div></div>
   <div class="panel-body">
     <div class="hint">Каждый тикер — отдельный независимый инструмент, не роллируется вместе с остальными; проценты/z-score считаются по своей истории каждого — пул усиливает статистику, а не смешивает масштабы.</div>
@@ -244,7 +257,7 @@ details.panel .panel-body{padding-top:12px}
 </div>
 
 <!-- Таблица данных -->
-<div class="panel">
+<div class="panel" id="sec-data">
   <div class="panel-head">
     <div class="panel-title">Данные</div>
     <button class="sec tiny" onclick="labExportCsv()">⬇ CSV</button>
@@ -2415,7 +2428,7 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
 
   // Вспомогательная функция рендера таблицы точности
   function _binTable(bStats, title) {
-    let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title}</summary>
+    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title}</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
     <thead><tr>
       <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Уровень</th>
@@ -2465,7 +2478,7 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
     const levelLabels = [...new Set(bins2D.map(b => b.levelLbl))];
     const dynLabels   = [...new Set(bins2D.map(b => b.dynLbl))];
     const firstH = H[0];
-    let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">🎯 2D: уровень шортов × динамика набора (медиана/точность/${hLbl(firstH)}; ⚡/〰️ в первой колонке — профиль скорости хода: быстрый ход vs растянутый)</summary>
+    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">🎯 2D: уровень шортов × динамика набора (медиана/точность/${hLbl(firstH)}; ⚡/〰️ в первой колонке — профиль скорости хода: быстрый ход vs растянутый)</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
     <thead><tr>
       <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Уровень \\ Динамика</th>
@@ -4022,7 +4035,7 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
   const fmtPct = v => isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—';
 
   function _poolTable(poolStats, title) {
-    let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title}</summary>
+    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title}</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
     <thead><tr>
       <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Бин (пул из ${instruments.length} инструментов)</th>
