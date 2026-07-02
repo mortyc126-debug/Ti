@@ -2719,8 +2719,10 @@ async function labBackfillIntradayPool() {
   const tickers = document.getElementById('pool-tickers').value.trim().split(',').map(s=>s.trim()).filter(Boolean);
   if (!tickers.length) { setStatus('Заполни тикеры пула — кнопка «Заполнить всеми из базы»', 'err'); return; }
   const days = parseInt(document.getElementById('bf-days').value) || 90;
+  if (!_collectorStart('📥 интрадей-бэкфилл')) return;
   let totalIntraday = 0, daysDone = 0, daysSkipped = 0, maxSymsSeen = 0;
   const problems = [];
+  try {
 
   const runChain = async (t, ti, tn) => {
     let cursor = null, pstart = 0, calls = 0, retries = 0;
@@ -2763,6 +2765,22 @@ async function labBackfillIntradayPool() {
   const probNote = problems.length ? ` · проблемы: ${problems.length} (см. консоль)` : '';
   if (problems.length) console.warn('Интрадей-бэкфилл, проблемы:', problems);
   setStatus(`Интрадей-бэкфилл готов: дней собрано ${daysDone}, скипнуто ${daysSkipped}, +${totalIntraday} интрадей-срезов (тикеров в ответах: ${maxSymsSeen})${probNote}`, problems.length ? 'err' : 'ok');
+  } finally { _collectorBusy = null; }
+}
+
+// Замок долгих сборщиков: повторный клик по кнопке, пока первый прогон
+// «молчит» в паузе остывания, запускал ВТОРОЙ параллельный цикл — статусы
+// перебивали друг друга (прыжки 12/55 → 46/55), а суммарный темп запросов
+// вдвое превышал рейт-лимиты. Данным параллельность не вредит (записи
+// идемпотентны), но смысла в ней ноль.
+let _collectorBusy = null;
+function _collectorStart(name) {
+  if (_collectorBusy) {
+    setStatus(`Уже идёт «${_collectorBusy}» — дождись окончания (повторный запуск только путает статус и душит лимиты)`, 'err');
+    return false;
+  }
+  _collectorBusy = name;
+  return true;
 }
 
 // ── Бэкфилл часовых свечей по всем тикерам пула ──
@@ -2776,8 +2794,10 @@ async function labBackfillHourlyCandles() {
   const tickers = document.getElementById('pool-tickers').value.trim().split(',').map(s=>s.trim()).filter(Boolean);
   if (!tickers.length) { setStatus('Заполни тикеры пула — «Заполнить всеми из базы»', 'err'); return; }
   const days = parseInt(document.getElementById('bf-days').value) || 100;
+  if (!_collectorStart('🕐 часовые свечи')) return;
   let totalSaved = 0;
   const problems = [];
+  try {
   for (let ti = 0; ti < tickers.length; ti++) {
     const t = tickers[ti];
     let cidx = 0, retries = 0, guard = 0;
@@ -2810,6 +2830,7 @@ async function labBackfillHourlyCandles() {
   const probNote = problems.length ? ` · проблемы: ${problems.length} (см. консоль)` : '';
   if (problems.length) console.warn('Часовые свечи, проблемы:', problems);
   setStatus(`Часовые свечи готовы: +${totalSaved} свечей по ${tickers.length} тикерам${probNote}`, problems.length ? 'err' : 'ok');
+  } finally { _collectorBusy = null; }
 }
 
 // Человеческие имена root-кодов (AF → AFLT/Аэрофлот) — грузятся с MOEX один раз
@@ -2865,6 +2886,7 @@ async function labOrderflowAutopsy() {
   const spikeIdx = [];
   for (let i = 1; i < result.length; i++) if (isFinite(dayRet[i]) && dayRet[i] >= thr.up) spikeIdx.push(i);
   if (!spikeIdx.length) { setStatus(`Выбросов вверх (≥ +${thr.up.toFixed(1)}%/д) в истории не нашлось`, 'err'); return; }
+  if (!_collectorStart('🧬 стакан у выбросов')) return;
   const spikes = spikeIdx.slice(-8); // не больше 8 — по два датасета на день
   const spikeSet = new Set(spikeIdx);
   const controls = [];
@@ -2975,6 +2997,7 @@ async function labOrderflowAutopsy() {
   const el = document.getElementById('calib-out');
   el.innerHTML = html + el.innerHTML;
   setStatus(`Стакан у выбросов: готово (${spikes.length} канунов, ${controls.length} контрольных)`, 'ok');
+  _collectorBusy = null;
 }
 
 // ── МОНИТОР КАНУНА: похож ли СЕГОДНЯШНИЙ день на канун выброса? ──
