@@ -314,7 +314,7 @@ async function labDiag() {
     for (const t of symList.slice(0, 8)) {
       try {
         const sym = t.match(/^([A-Za-z]{2})/)?.[1] || t;
-        const r = await fetch(`${proxy}/db/oihourly?ticker=${encodeURIComponent(t)}&days=30`);
+        const r = await fetch(`${proxy}/db/oihourly?ticker=${encodeURIComponent(t)}&days=150`);
         if (!r.ok) { hourlyStats.push({ ticker: t, n: 0, from: '—', to: '—', lastFiz: null }); continue; }
         const rows = await r.json();
         const arr = Array.isArray(rows) ? rows : [];
@@ -356,7 +356,7 @@ async function labDiag() {
     html += '</div>';
 
     // oi_hourly coverage
-    html += `<div style="margin-bottom:10px"><span style="color:#a6adc8;font-weight:600">oi_hourly — 5-мин снэпшоты (последние 30 дней):</span>`;
+    html += `<div style="margin-bottom:10px"><span style="color:#a6adc8;font-weight:600">oi_hourly — интрадей-срезы (до 150 дней; root-код = бэкфилл, полное имя контракта = live-cron):</span>`;
     const hasHourly = hourlyStats.some(s => s.n > 0);
     if (!hasHourly) {
       html += `<div style="color:#f38ba8;margin-top:6px">⚠️ Данных нет — cron ещё не запускался или воркер не задеплоен с новым кодом.<br>
