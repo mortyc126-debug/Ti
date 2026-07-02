@@ -1171,21 +1171,29 @@ async function handleDb(path, req, env) {
     }
     if (!contracts.length) return json({ ticker: rootTicker, date, type, secid: null, rows: [] });
     let best = null;
+    const gotDates = new Set();
     for (const inst of contracts.slice(0, 6)) {
       try {
-        const r2 = await fetch(`https://apim.moex.com/iss/datashop/algopack/fo/${type}/${encodeURIComponent(inst.ticker)}.json?date=${date}&iss.meta=off&limit=1000`,
+        // ВАЖНО: per-secid путь datashop ИГНОРИРУЕТ date= и отдаёт последний
+        // доступный день (поймано: три разных кануна вернули идентичные
+        // данные до сотых). Как и у futoi-серии, диапазон задаётся from/till.
+        // Плюс жёсткая проверка tradedate — молча анализировать чужой день
+        // нельзя.
+        const r2 = await fetch(`https://apim.moex.com/iss/datashop/algopack/fo/${type}/${encodeURIComponent(inst.ticker)}.json?from=${date}&till=${date}&iss.meta=off&limit=1000`,
           { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
         if (!r2.ok) continue;
         const j2 = await r2.json();
         const bk = j2.data || j2[Object.keys(j2).find(k => k !== 'metadata' && !k.endsWith('.cursor') && !k.endsWith('.dates'))];
-        const rows2 = issBlockToObjects(bk);
+        let rows2 = issBlockToObjects(bk);
+        for (const r of rows2) if (r.tradedate) gotDates.add(r.tradedate);
+        rows2 = rows2.filter(r => r.tradedate === date);
         if (!rows2.length) continue;
         const vol = rows2.reduce((s, r) => s + (Number(r.vol) || (Number(r.vol_b_l10) || 0) + (Number(r.vol_s_l10) || 0)), 0);
         if (!best || vol > best.vol) best = { secid: inst.ticker, vol, rows: rows2 };
       } catch (_) {}
       await new Promise(r => setTimeout(r, 150));
     }
-    if (!best) return json({ ticker: rootTicker, date, type, secid: null, rows: [] });
+    if (!best) return json({ ticker: rootTicker, date, type, secid: null, rows: [], gotDates: [...gotDates] });
     return json({ ticker: rootTicker, date, type, secid: best.secid, rows: best.rows });
   }
 
