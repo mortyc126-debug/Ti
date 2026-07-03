@@ -1652,7 +1652,12 @@ def run_backtest_one(
                      "rejection_stats": rej,
                      "method_stats": _method_stats_from_trades(fixed_trades),
                      "method_stats_by_regime": _method_stats_by_regime_from_trades(fixed_trades),
-                     "trades_list": _trades_list_compact(fixed_trades), **fixed})
+                     "trades_list": _trades_list_compact(fixed_trades),
+                     # Обученные за прогон веса методов (холодный старт → эволюция),
+                     # снятые до восстановления в backtest_scan_signals — для
+                     # просмотра/снимка/применения к боту с дашборда.
+                     "method_weights": getattr(strategy, "last_backtest_weights", None),
+                     **fixed})
 
         # Walk-forward, не full-history sweep: подбор лучшей (tk, sk) по сигналам
         # ДО текущего дня, торговля день — той же парой, что увидел бы живой
@@ -2515,6 +2520,10 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button id="btnDashView" class="btn-pill btn-sm ghost" onclick="toggleDashView()" title="Переключить между видом таблицы и видом дашборда с панелями">⊞ дашборд</button>
   <button class="btn-pill btn-sm ok" onclick="calibrateMethodWeights(this)" title="Рассчитать мультипликаторы весов методов из атрибуции и сохранить в data/ticker_method_weights.json">💾 веса методов</button>
   <button id="btnResetWeights" class="btn-pill btn-sm warn" onclick="resetWeights()" title="Сбросить Hedge-веса методов в oi_weights.json до 0.30 (консервативный старт). IC-prior не затрагивается.">🔄 сброс весов</button>
+  <button class="btn-pill btn-sm ghost" onclick="showTrainedWeights()" title="Обученные ЗА ПРОГОН веса методов (холодный старт → эволюция по сделкам), отсортированы по весу: сверху самые точные, снизу неточные и инвертированные (отрицательный вес)">🏋 обученные веса</button>
+  <button class="btn-pill btn-sm ok" onclick="saveWeightsSnapshot()" title="Сохранить обученные веса прогона в отдельный файл (data/weights_snapshots) — боевого бота НЕ трогает">💾 снимок весов</button>
+  <select id="weights_snapshot_select" onclick="refreshWeightsSnapshots()" style="font-size:11px;padding:3px 6px;background:var(--bg2);color:var(--txt2);border:1px solid var(--border2);border-radius:4px;"><option value="">— снимок весов —</option></select>
+  <button class="btn-pill btn-sm warn" onclick="applyWeightsSnapshotConfirm()" title="Применить выбранный снимок к боевому oi_weights.json — с окном подтверждения. Бэкап в oi_weights.json.bak.">⚠️ применить к боту</button>
   <span id="status"></span>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:11px;color:var(--txt3);">
     <label><input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть нулевые</label>
@@ -2541,6 +2550,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <div id="compare_block" style="display:none;margin-top:8px"></div>
   <div id="mfe_stats_out" style="display:none;margin-top:12px;"></div>
   <div id="run_weights_out" style="display:none;margin-top:12px;"></div>
+  <div id="trained_weights_out" style="display:none;margin-top:12px;"></div>
   <div id="global_method_stats" style="display:none;margin-top:14px;"></div>
 </div>
 
@@ -4558,6 +4568,96 @@ function showRunWeights() {{
   if (out.style.display === 'block') {{
     out.innerHTML = title + runWeightsSummaryToHtml(rows);
   }}
+}}
+
+// ── Обученные веса прогона + снимки (сохранить/применить к боту) ─────────────
+function _collectRunWeights() {{
+  const w = {{}};
+  for (const r of _backtestRows) {{
+    if (r.method_weights && r.method_weights.global) w[r.ticker] = r.method_weights;
+  }}
+  return w;
+}}
+
+function showTrainedWeights() {{
+  const out = document.getElementById('trained_weights_out');
+  const w = _collectRunWeights();
+  const tickers = Object.keys(w);
+  refreshWeightsSnapshots();
+  if (!tickers.length) {{
+    out.style.display = 'block';
+    out.innerHTML = '<span style="color:var(--txt3);font-size:11px">Нет обученных весов — запусти бэктест (веса снимаются по ходу прогона).</span>';
+    return;
+  }}
+  out.style.display = out.style.display === 'block' ? 'none' : 'block';
+  if (out.style.display !== 'block') return;
+  const agg = {{}};
+  for (const tk of tickers) {{
+    const g = w[tk].global || {{}};
+    for (const name in g) {{
+      if (!agg[name]) agg[name] = {{sum: 0, n: 0, tot: 0}};
+      agg[name].sum += g[name].weight;
+      agg[name].n += 1;
+      agg[name].tot += (g[name].total || 0);
+    }}
+  }}
+  const list = Object.keys(agg).map(name => ({{name: name, w: agg[name].sum / agg[name].n, n: agg[name].n, tot: agg[name].tot}}));
+  list.sort((a, b) => b.w - a.w);
+  let html = '<div style="font-size:12px;font-weight:bold;margin:4px 0">🏋 Обученные веса прогона (среднее по ' + tickers.length + ' тик., сорт по весу — сверху точные, снизу инвертированные)</div>';
+  html += '<table style="border-collapse:collapse;font-size:11px"><tr style="color:var(--txt3)"><th style="text-align:left;padding:2px 8px">Метод</th><th style="padding:2px 8px">Вес</th><th style="padding:2px 8px">Тикеров</th><th style="padding:2px 8px">Сделок</th></tr>';
+  for (const m of list) {{
+    let col = 'var(--txt2)';
+    if (m.w < 0) col = '#e07070';
+    else if (m.w >= 0.6) col = '#7dcc7d';
+    else if (m.w <= 0.1) col = 'var(--txt3)';
+    const inv = m.w < 0 ? ' <span style="font-size:9px;color:#e07070">инверт</span>' : '';
+    html += '<tr><td style="padding:2px 8px;color:var(--txt2);cursor:help" title="' + (_METHOD_RU[m.name] || m.name) + '">' + m.name + inv + '</td>'
+         + '<td style="padding:2px 8px;text-align:right;color:' + col + ';font-weight:600">' + m.w.toFixed(3) + '</td>'
+         + '<td style="padding:2px 8px;text-align:center;color:var(--txt3)">' + m.n + '</td>'
+         + '<td style="padding:2px 8px;text-align:center;color:var(--txt3)">' + m.tot + '</td></tr>';
+  }}
+  html += '</table>';
+  out.innerHTML = html;
+}}
+
+function saveWeightsSnapshot() {{
+  const w = _collectRunWeights();
+  if (!Object.keys(w).length) {{ alert('Нет обученных весов — сначала запусти бэктест.'); return; }}
+  const name = (prompt('Имя снимка весов:') || '').trim();
+  if (!name) return;
+  fetch('/api/weights_snapshot_save', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{name: name, weights: w}})}})
+    .then(r => r.json()).then(d => {{
+      if (d.error) {{ alert('Ошибка: ' + d.error); return; }}
+      alert('Снимок сохранён: ' + name + ' (' + d.tickers + ' тик.). Бота не трогает.');
+      refreshWeightsSnapshots();
+    }}).catch(() => {{}});
+}}
+
+function refreshWeightsSnapshots() {{
+  fetch('/api/weights_snapshots').then(r => r.json()).then(d => {{
+    const sel = document.getElementById('weights_snapshot_select');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— снимок весов —</option>';
+    (d.snapshots || []).forEach(s => {{
+      const o = document.createElement('option');
+      o.value = s.name; o.textContent = s.name + ' (' + (s.tickers || []).length + ' тик.)';
+      sel.appendChild(o);
+    }});
+    if (cur) sel.value = cur;
+  }}).catch(() => {{}});
+}}
+
+function applyWeightsSnapshotConfirm() {{
+  const sel = document.getElementById('weights_snapshot_select');
+  if (!sel || !sel.value) {{ alert('Выбери снимок весов из списка.'); return; }}
+  const name = sel.value;
+  if (!confirm('Применить веса снимка «' + name + '» к БОЕВОМУ боту?\\n\\nЭто перезапишет oi_weights.json — бот начнёт торговать с этими весами.\\nРезервная копия останется в oi_weights.json.bak.\\n\\nТочно применить?')) return;
+  fetch('/api/weights_snapshot_apply', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{name: name}})}})
+    .then(r => r.json()).then(d => {{
+      if (d.error) {{ alert('Ошибка: ' + d.error); return; }}
+      alert('Применено к боту: ' + d.applied + ' тик.\\nБэкап: ' + d.backup);
+    }}).catch(() => {{}});
 }}
 
 // ── Dashboard grid view ──────────────────────────────────────────────────────
@@ -7194,6 +7294,91 @@ def delete_method_preset(name: str) -> None:
             json.dump(presets, f, ensure_ascii=False, indent=2)
 
 
+# ── Снимки обученных весов (data/weights_snapshots/*.json) ──────────────────
+WEIGHTS_SNAPSHOTS_DIR = "data/weights_snapshots"
+OI_WEIGHTS_FILE = "oi_weights.json"
+
+
+def _safe_snap_name(name: str) -> str:
+    """Безопасное имя файла из произвольной строки (только буквы/цифры/пробел/-_.)."""
+    keep = "".join(c for c in (name or "") if c.isalnum() or c in " _-.").strip()
+    return keep or "snapshot"
+
+
+def list_weights_snapshots() -> list:
+    """[{name, saved_at, tickers}] — по файлам в WEIGHTS_SNAPSHOTS_DIR."""
+    out = []
+    try:
+        files = sorted(f for f in os.listdir(WEIGHTS_SNAPSHOTS_DIR) if f.endswith(".json"))
+    except FileNotFoundError:
+        return out
+    for fn in files:
+        try:
+            with open(os.path.join(WEIGHTS_SNAPSHOTS_DIR, fn), encoding="utf-8") as f:
+                d = json.load(f)
+            out.append({
+                "name": fn[:-5],
+                "saved_at": d.get("saved_at"),
+                "tickers": list((d.get("weights") or {}).keys()),
+            })
+        except Exception:
+            pass
+    return out
+
+
+def save_weights_snapshot(name: str, weights: dict) -> dict:
+    """Пишет обученные за прогон веса в отдельный файл — бота НЕ трогает."""
+    if not (name or "").strip():
+        return {"error": "пустое имя снимка"}
+    if not weights:
+        return {"error": "нет весов для сохранения (сначала прогон)"}
+    os.makedirs(WEIGHTS_SNAPSHOTS_DIR, exist_ok=True)
+    path = os.path.join(WEIGHTS_SNAPSHOTS_DIR, _safe_snap_name(name) + ".json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"saved_at": time.time(), "weights": weights}, f, ensure_ascii=False, indent=2)
+    return {"ok": True, "tickers": len(weights)}
+
+
+def apply_weights_snapshot(name: str) -> dict:
+    """Вливает веса снимка в боевой oi_weights.json (перезапись global+regimes
+    по каждому figi). Делает бэкап oi_weights.json.bak. Влияет на бота —
+    на фронте перед вызовом стоит подтверждение."""
+    path = os.path.join(WEIGHTS_SNAPSHOTS_DIR, _safe_snap_name(name) + ".json")
+    if not os.path.exists(path):
+        return {"error": "снимок не найден"}
+    with open(path, encoding="utf-8") as f:
+        weights = (json.load(f) or {}).get("weights") or {}
+    data = {}
+    if os.path.exists(OI_WEIGHTS_FILE):
+        with open(OI_WEIGHTS_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        # бэкап перед перезаписью боевого файла
+        with open(OI_WEIGHTS_FILE + ".bak", "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    applied = 0
+    for mw in weights.values():
+        figi = mw.get("figi")
+        if not figi:
+            continue
+        entry = data.setdefault(figi, {})
+        for method, wd in (mw.get("global") or {}).items():
+            entry[method] = {"weight": wd.get("weight", 0.3), "total": wd.get("total", 0),
+                             "sum_quality": wd.get("sum_quality", 0.0)}
+        if mw.get("regimes"):
+            reg = entry.setdefault("__regimes__", {})
+            for rg, methods in mw["regimes"].items():
+                rgentry = reg.setdefault(rg, {})
+                for method, wd in methods.items():
+                    rgentry[method] = {"weight": wd.get("weight", 0.3), "total": wd.get("total", 0),
+                                       "sum_quality": wd.get("sum_quality", 0.0)}
+        applied += 1
+    tmp = OI_WEIGHTS_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, OI_WEIGHTS_FILE)
+    return {"ok": True, "applied": applied, "backup": OI_WEIGHTS_FILE + ".bak"}
+
+
 def save_overrides_payload(payload: dict) -> dict | None:
     """
     Возвращает None при успехе, {"error": ...} если запрошен переход в боевой
@@ -7476,6 +7661,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(sorted(_all_settings_by_ticker().keys()))
         elif self.path == "/api/method_presets":
             self._send_json(get_method_presets())
+        elif self.path == "/api/weights_snapshots":
+            self._send_json({"snapshots": list_weights_snapshots()})
         elif self.path.startswith("/api/bar_rules_load"):
             from urllib.parse import urlparse, parse_qs
             qs = parse_qs(urlparse(self.path).query)
@@ -7752,6 +7939,10 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/method_presets_delete":
             delete_method_preset(payload.get("name", ""))
             self._send_json({"ok": True})
+        elif self.path == "/api/weights_snapshot_save":
+            self._send_json(save_weights_snapshot(payload.get("name"), payload.get("weights") or {}))
+        elif self.path == "/api/weights_snapshot_apply":
+            self._send_json(apply_weights_snapshot(payload.get("name", "")))
         elif self.path == "/api/equity_analysis":
             tickers = payload.get("tickers", [])
             days = int(payload.get("days", 60))

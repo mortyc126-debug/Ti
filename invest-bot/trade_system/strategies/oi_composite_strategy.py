@@ -7214,6 +7214,23 @@ class OICompositeStrategy(IStrategy):
                 })
                 i += max(1, len(window))  # не пересекать виртуальные сделки
         finally:
+            # Снимок ОБУЧЕННЫХ за прогон весов — ДО восстановления исходных.
+            # Бэктест стартует с холодных равномерных весов и эволюционирует их
+            # причинно; здесь фиксируем результат, чтобы дашборд мог показать/
+            # сохранить/применить его (иначе эти веса просто выбрасываются ниже).
+            try:
+                def _wsnap(wd):
+                    return {n: {"weight": round(w.weight, 4), "total": w.total,
+                                "sum_quality": round(w.sum_quality, 4)}
+                            for n, w in wd.items()}
+                self.last_backtest_weights = {
+                    "figi": self.__settings.figi,
+                    "ticker": self.__settings.ticker,
+                    "global": _wsnap(self.__weights),
+                    "regimes": {rg: _wsnap(m) for rg, m in self.__regime_weights.items()},
+                }
+            except Exception:
+                self.last_backtest_weights = None
             self.__candles = saved_candles
             self.__score_history = saved_score_history
             (self.__l1_buffer, self.__l1_pct, self.__l1_above_ma50,
