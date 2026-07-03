@@ -485,6 +485,26 @@ class Trader:
                     f"{[s.settings.ticker for s in added_futures.values()]}"
                 )
 
+            # Торгуем ФЬЮЧЕРСОМ ВМЕСТО акции (см. докстринг __build_futures_strategies) —
+            # но .update() выше добавляет фьючерс по ключу FIGI, который отличается
+            # от FIGI акции, поэтому исходная акция без этой чистки оставалась бы
+            # в today_trade_strategies и торговалась бы ПАРАЛЛЕЛЬНО со своим
+            # фьючерсом. Убираем акции по тикерам из BASE_TICKERS независимо от
+            # того, нашёлся ли сегодня для них контракт (не нашёлся — тикер просто
+            # не торгуется вовсе, а не откатывается на акцию).
+            base_tickers_set = set(self.__futures_trading_settings.base_tickers)
+            stale_shares = [
+                figi for figi, s in today_trade_strategies.items()
+                if not s.settings.is_future and s.settings.ticker in base_tickers_set
+            ]
+            for figi in stale_shares:
+                del today_trade_strategies[figi]
+            if stale_shares:
+                logger.info(
+                    f"FUTURES: акции исключены из торговли (заменены фьючерсом) — "
+                    f"{len(stale_shares)} шт."
+                )
+
         self.__blogger.mega_alerts_message(
             tracked_hits, [t for t in candidate_tickers if t not in [s.settings.ticker for s in added_strategies.values()]]
         )
