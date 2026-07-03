@@ -1611,9 +1611,25 @@ def run_backtest_one(
         long_take = Decimal(s.get("LONG_TAKE", "1.015"))
         long_stop = Decimal(s.get("LONG_STOP", "0.985"))
 
+        # OI-провайдеры (INST_OI / RETAIL_CONTRA / DELTA_QUADRANT / OI_ABSORPTION /
+        # OI_SQUEEZE) из исторического FutOI (data/oi_daily.json, см. backfill_oi.py).
+        # Раньше основной прогон их НЕ подключал (в отличие от save-истории и
+        # trade-chart) — методы ОИ молчали (score=0) и не попадали ни в сделки,
+        # ни в атрибуцию. Теперь так же, как в _save_backtest_history_one.
+        from oi_layers import OiBacktestProvider
+        oi_prov = OiBacktestProvider.load()
+        oi_hook = None
+        if oi_prov.has_data(ticker):
+            strategy.set_inst_oi_provider(oi_prov.inst_oi_score)
+            strategy.set_retail_contra_provider(oi_prov.retail_contra_score)
+            strategy.set_delta_quadrant_provider(oi_prov.delta_quadrant_score)
+            strategy.set_oi_absorption_provider(oi_prov.absorption_score)
+            strategy.set_squeeze_provider(oi_prov.squeeze_score)
+            oi_hook = oi_prov.set_date
+
         t1 = time.monotonic()
         signals = strategy.backtest_scan_signals(candles, adaptive_narrative=adaptive_narrative,
-                                                   block_ranging=block_ranging)
+                                                   block_ranging=block_ranging, oi_date_hook=oi_hook)
         rej = dict(strategy.rejection_stats)
         logger.info(f"{ticker}: {len(signals)} сигналов, скан занял {time.monotonic() - t1:.1f}с"
                     + (" (адаптивная калибровка narrative)" if adaptive_narrative else "")
@@ -1827,8 +1843,21 @@ def _portfolio_sim_one_ticker(
             _set_progress(progress, ticker, "нет истории")
             return [], None
 
+        # OI-провайдеры из исторического FutOI — как в run_backtest_one/save-пути,
+        # чтобы портфельная симуляция считала те же сделки, что увидел бы бот.
+        from oi_layers import OiBacktestProvider
+        oi_prov = OiBacktestProvider.load()
+        oi_hook = None
+        if oi_prov.has_data(ticker):
+            strategy.set_inst_oi_provider(oi_prov.inst_oi_score)
+            strategy.set_retail_contra_provider(oi_prov.retail_contra_score)
+            strategy.set_delta_quadrant_provider(oi_prov.delta_quadrant_score)
+            strategy.set_oi_absorption_provider(oi_prov.absorption_score)
+            strategy.set_squeeze_provider(oi_prov.squeeze_score)
+            oi_hook = oi_prov.set_date
+
         _set_progress(progress, ticker, f"скан сигналов ({len(candles)} свечей)")
-        signals = strategy.backtest_scan_signals(candles)
+        signals = strategy.backtest_scan_signals(candles, oi_date_hook=oi_hook)
         trades: list[dict] = []
 
         if mode == "atr":
