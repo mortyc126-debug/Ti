@@ -689,9 +689,11 @@ MIN_ATR_FACTOR = 1.5               # ATR должен быть >= комисси
 # чтобы увидеть что ranging-сделки убыточны — они не попадут ни в WR ни в
 # качество бэктеста, как и не попадут в реальную торговлю.
 _ebr_bt = os.getenv("ENTRY_BLOCKED_REGIMES", None)
+# trending_up убран синхронно с trader.py (см. комментарий там): блок резал
+# и лонги в отскоке от дна, а старая атрибуция не разделяла направления.
 BACKTEST_BLOCKED_REGIMES: frozenset[str] = frozenset(
     r.strip() for r in _ebr_bt.split(",") if r.strip()
-) if _ebr_bt is not None else frozenset({"stress", "ranging", "trending_up"})
+) if _ebr_bt is not None else frozenset({"stress", "ranging"})
 
 # ── Комиссия Т-Инвестиций по тарифам (round-trip = вход+выход) ──────────────
 # Акции/облигации/ETF/расписки — фикс. % от суммы сделки. Фьючерсы — % от
