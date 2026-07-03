@@ -533,7 +533,28 @@ class Trader:
             )
 
         db_for_history = DbApiClient(self.__mega_alerts_settings.db_api_url, self.__mega_alerts_settings.db_api_key)
+        # Индексный контекст: положение IMOEX к своим дневным уровням, раз в
+        # день (index_context.py). Контрарно у уровней (апогей падения у
+        # поддержки → лонг-байас), инерция между ними. Один bias на всех —
+        # это состояние рынка, не тикера; вес метода INDEX_CONTEXT у каждого
+        # тикера обучится своим Hedge'ом. Ошибка расчёта не валит день.
+        index_bias = 0.0
+        try:
+            _imoex = self.__instrument_service.future_by_base_ticker("IMOEX")
+            if _imoex:
+                _ifs, _ifigi = _imoex
+                _icandles = get_candles_cached(
+                    _ifs.ticker, _ifigi, 90, self.__market_data_service, db_for_history)
+                import index_context as _ixc
+                index_bias = _ixc.compute_index_bias(_ixc.daily_from_intraday(_icandles or []))
+                logger.info(f"INDEX_CONTEXT: bias={index_bias:+.3f} по {_ifs.ticker}")
+        except Exception as e:
+            logger.warning(f"INDEX_CONTEXT: не посчитан ({e}) — метод молчит сегодня")
+
         for strategy in today_trade_strategies.values():
+            if hasattr(strategy, "set_index_context_provider"):
+                strategy.set_index_context_provider(
+                    (lambda ticker, _b=index_bias: _b) if index_bias else None)
             if hasattr(strategy, "set_squeeze_provider"):
                 strategy.set_squeeze_provider(self.__oi_layers.squeeze_score)
             if hasattr(strategy, "set_inst_oi_provider"):

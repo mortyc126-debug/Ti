@@ -138,6 +138,29 @@ def _get_backtest_candles(ticker: str, settings, days: int, offset_days: int = 0
     )
 
 
+def _index_context_provider_for_backtest(days: int, offset_days: int = 0):
+    """IndexContextBacktestProvider на дневках фьюча IMOEX (склейка контрактов
+    через futures_chain). Дневки агрегируются из 5-мин кэша; +75 дней запаса —
+    на LEVEL_LOOKBACK/MIN_DAILY_BARS до начала окна бэктеста. None, если
+    контракта IMOEX нет в кэше фьючерсов или нет свечей — метод просто молчит."""
+    try:
+        from index_context import IndexContextBacktestProvider, daily_from_intraday
+        contracts, _age = _futures_cache_from_disk()
+        info = (contracts or {}).get("IMOEX")
+        if not info or not info.get("figi"):
+            return None
+        candles = get_candles_cached_futures_chain(
+            info["ticker"], info["figi"], days + 75, _market_data, _db,
+            _instrument_service, candle_interval_min=5, offset_days=offset_days)
+        if not candles:
+            return None
+        prov = IndexContextBacktestProvider(daily_from_intraday(candles))
+        return prov if prov.has_data() else None
+    except Exception as e:
+        logger.warning(f"INDEX_CONTEXT (backtest): не построен — {e}")
+        return None
+
+
 def _backtest_strategy_settings(settings) -> "StrategySettings":
     """Для фьючерсов в историческом бэктесте мы всегда грузим 5-мин свечи
     (Tinkoff отдаёт 1-мин только за последние ~7 дней, D1 хранит только 5-мин).
@@ -1635,6 +1658,20 @@ def run_backtest_one(
             strategy.set_squeeze_provider(oi_prov.squeeze_score)
             oi_hook = oi_prov.set_date
 
+        # INDEX_CONTEXT: положение IMOEX к своим дневным уровням, по датам,
+        # без подглядывания (bias дня D — по дневкам до D). Один date-hook
+        # двигает и OI-провайдер, и индексный.
+        idx_prov = _index_context_provider_for_backtest(days, offset_days)
+        if idx_prov is not None and hasattr(strategy, "set_index_context_provider"):
+            strategy.set_index_context_provider(idx_prov.score)
+            if oi_hook is None:
+                oi_hook = idx_prov.set_date
+            else:
+                _oi_hook0 = oi_hook
+                def oi_hook(d, _h0=_oi_hook0, _p=idx_prov):
+                    _h0(d)
+                    _p.set_date(d)
+
         t1 = time.monotonic()
         signals = strategy.backtest_scan_signals(candles, adaptive_narrative=adaptive_narrative,
                                                    block_ranging=block_ranging, oi_date_hook=oi_hook)
@@ -1878,6 +1915,17 @@ def _portfolio_sim_one_ticker(
             strategy.set_oi_absorption_provider(oi_prov.absorption_score)
             strategy.set_squeeze_provider(oi_prov.squeeze_score)
             oi_hook = oi_prov.set_date
+
+        idx_prov = _index_context_provider_for_backtest(days)
+        if idx_prov is not None and hasattr(strategy, "set_index_context_provider"):
+            strategy.set_index_context_provider(idx_prov.score)
+            if oi_hook is None:
+                oi_hook = idx_prov.set_date
+            else:
+                _oi_hook0 = oi_hook
+                def oi_hook(d, _h0=_oi_hook0, _p=idx_prov):
+                    _h0(d)
+                    _p.set_date(d)
 
         _set_progress(progress, ticker, f"скан сигналов ({len(candles)} свечей)")
         signals = strategy.backtest_scan_signals(candles, oi_date_hook=oi_hook)
@@ -3683,6 +3731,7 @@ const _METHOD_CATALOG = [
   ["Микроструктура (tradestats) — провайдер","CANCEL_SIGNAL","отмены заявок",0],
   ["Прочее","CHANGE_POINT","точка излома (CUSUM/PELT)",0],
   ["Прочее","MULTI_TICKER","межинструментальный",0],
+  ["Прочее","INDEX_CONTEXT","индекс к своим уровням",0],
   ["Диагностика — в композит НЕ входят","M1_CLUSTER","M1 (кластерная модель)",0],
   ["Диагностика — в композит НЕ входят","M2_CLUSTER","M2 (кластерная модель)",0],
   ["Диагностика — в композит НЕ входят","M3_CLUSTER","M3 (кластерная модель)",0]
