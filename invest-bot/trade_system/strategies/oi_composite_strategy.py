@@ -689,9 +689,11 @@ MIN_ATR_FACTOR = 1.5               # ATR должен быть >= комисси
 # чтобы увидеть что ranging-сделки убыточны — они не попадут ни в WR ни в
 # качество бэктеста, как и не попадут в реальную торговлю.
 _ebr_bt = os.getenv("ENTRY_BLOCKED_REGIMES", None)
+# trending_up убран синхронно с trader.py (см. комментарий там): блок резал
+# и лонги в отскоке от дна, а старая атрибуция не разделяла направления.
 BACKTEST_BLOCKED_REGIMES: frozenset[str] = frozenset(
     r.strip() for r in _ebr_bt.split(",") if r.strip()
-) if _ebr_bt is not None else frozenset({"stress", "ranging", "trending_up"})
+) if _ebr_bt is not None else frozenset({"stress", "ranging"})
 
 # ── Комиссия Т-Инвестиций по тарифам (round-trip = вход+выход) ──────────────
 # Акции/облигации/ETF/расписки — фикс. % от суммы сделки. Фьючерсы — % от
@@ -3463,6 +3465,28 @@ def _compute_playbooks(sd: dict[str, float], regime: str,
             active.append("EXHAUSTION_DIV")
             scores.append(-d * min(0.7, strength))
 
+    # ── Плейбук 7: ОИ-консенсус ──────────────────────────────────────────────
+    # Несколько ОИ-признаков сложились в одну сторону = качественно другое
+    # событие, чем один сильный (юр/физ картина согласована по всем срезам).
+    # Требование: ≥3 активных (|s|≥0.15) из 5 ОИ-скоров одного знака и НИ
+    # ОДНОГО активного против. Буст скромный (cap 0.6): все пять считаются из
+    # ОДНОГО FutOI-снэпшота — это не пять независимых свидетелей, а пять
+    # взглядов на одну таблицу (INST_OI и RETAIL_CONTRA почти дублируются).
+    # Как плейбук получает статистику по режимам и авто-отключение бесплатно.
+    oi_votes = [g(n) for n in ("OI_SQUEEZE", "INST_OI", "RETAIL_CONTRA",
+                               "DELTA_QUADRANT", "OI_ABSORPTION")]
+    oi_active = [v for v in oi_votes if abs(v) >= 0.15]
+    if len(oi_active) >= 3:
+        pos_n = sum(1 for v in oi_active if v > 0)
+        neg_n = len(oi_active) - pos_n
+        if pos_n == 0 or neg_n == 0:
+            d = 1 if pos_n else -1
+            avg_str = sum(abs(v) for v in oi_active) / len(oi_active)
+            # 3 признака → ×1.0, 4 → ×1.15, 5 → ×1.3
+            count_mult = 1.0 + 0.15 * (len(oi_active) - 3)
+            active.append("OI_CONSENSUS")
+            scores.append(d * min(0.6, avg_str * count_mult))
+
     if not scores:
         return 0.0, []
 
@@ -5801,6 +5825,10 @@ INST_OI_NAME = "INST_OI"
 RETAIL_CONTRA_NAME = "RETAIL_CONTRA"
 DELTA_QUADRANT_NAME = "DELTA_QUADRANT"
 OI_ABSORPTION_NAME = "OI_ABSORPTION"
+# Положение индекса (IMOEX) к своим дневным уровням: контрарно у уровней
+# (апогей падения у поддержки → лонг-байас), инерция между ними. Провайдерный,
+# как INST_OI — считает index_context.py, подключает Trader/дашборд.
+INDEX_CONTEXT_NAME = "INDEX_CONTEXT"
 # Методы микроструктуры (tradestats/obstats/orderstats, см. tradestats.py).
 # Имена соответствуют ключам TradeStatsService.SCORE_FUNCS.
 TRADESTATS_METHOD_NAMES = [
@@ -5821,6 +5849,7 @@ BASE_METHOD_NAMES = (
     [name for name, _ in METHODS]
     + STRUCTURAL_METHOD_NAMES
     + [OI_SQUEEZE_NAME, INST_OI_NAME, RETAIL_CONTRA_NAME, DELTA_QUADRANT_NAME, OI_ABSORPTION_NAME]
+    + [INDEX_CONTEXT_NAME]
     + TRADESTATS_METHOD_NAMES
     + [CHANGE_POINT_NAME, MULTI_TICKER_NAME]
 )
@@ -6202,6 +6231,7 @@ class OICompositeStrategy(IStrategy):
         self.__retail_contra_provider: Optional[ScoreProvider] = None
         self.__delta_quadrant_provider: Optional[ScoreProvider] = None
         self.__oi_absorption_provider: Optional[ScoreProvider] = None
+        self.__index_context_provider: Optional[ScoreProvider] = None
         self.__tradestats_provider: Optional[TradeStatsProvider] = None
         self.__multi_ticker_provider: Optional[MultiTickerProvider] = None
         self.__regime_confidence: float = 1.0
@@ -6350,6 +6380,31 @@ class OICompositeStrategy(IStrategy):
     def is_signal_only(self) -> bool:
         return self.__signal_only
 
+    def reset_weights_cold(self) -> None:
+        """Сброс Hedge-весов (глобальных и режимных) в холодный старт — для
+        бэктеста, где обучение (в backtest_barriers) должно идти с нуля, а не
+        от загруженных из oi_weights.json живых весов. Инстанс бэктеста
+        одноразовый, live-файл не трогается."""
+        self.__weights = {name: MethodWeight() for name in ALL_METHOD_NAMES}
+        self.__regime_weights = {regime: {name: MethodWeight() for name in ALL_METHOD_NAMES}
+                                 for regime in REGIMES}
+        self.__rolling_quality = 0.5
+
+    def weights_snapshot(self) -> dict:
+        """Текущее состояние Hedge-весов (global + по режимам) — снимается
+        дашбордом ПОСЛЕ обучающего прохода backtest_barriers (обучение весов
+        живёт именно там, не в backtest_scan_signals)."""
+        def _wsnap(wd):
+            return {n: {"weight": round(w.weight, 4), "total": w.total,
+                        "sum_quality": round(w.sum_quality, 4)}
+                    for n, w in wd.items()}
+        return {
+            "figi": self.__settings.figi,
+            "ticker": self.__settings.ticker,
+            "global": _wsnap(self.__weights),
+            "regimes": {rg: _wsnap(m) for rg, m in self.__regime_weights.items()},
+        }
+
     def set_disabled_methods(self, names: list[str] | set[str]) -> None:
         """Отключить указанные методы голосования для прогона бэктеста."""
         self._disabled_methods = set(names)
@@ -6404,6 +6459,11 @@ class OICompositeStrategy(IStrategy):
     def set_oi_absorption_provider(self, provider: Optional[ScoreProvider]) -> None:
         """provider(ticker) -> OI_ABSORPTION score, см. oi_layers.py.OiLayersService.absorption_score."""
         self.__oi_absorption_provider = provider
+
+    def set_index_context_provider(self, provider: Optional[ScoreProvider]) -> None:
+        """provider(ticker) -> INDEX_CONTEXT score: положение индекса к своим
+        дневным уровням (index_context.py). Без провайдера метод молчит."""
+        self.__index_context_provider = provider
 
     def set_tradestats_provider(self, provider: Optional[TradeStatsProvider]) -> None:
         """provider(ticker, method_name) -> score, см. tradestats.py.TradeStatsService.score."""
@@ -7541,9 +7601,19 @@ class OICompositeStrategy(IStrategy):
             extreme = entry   # лучший экстремум хода (high для LONG, low для SHORT)
             trail_active = False
             trail_stop_price = None
+            # Реальные MFE/MAE по ходу симуляции — для непрерывного quality
+            # в Hedge-обучении (см. ниже), вместо бинарного win→1.0/lose→0.0.
+            real_mfe = 0.0
+            real_mae = 0.0
             for c in window:
                 h = _to_f(c.high)
                 lo = _to_f(c.low)
+                if direction == SignalType.LONG:
+                    real_mfe = max(real_mfe, (h - entry) / entry)
+                    real_mae = max(real_mae, (entry - lo) / entry)
+                else:
+                    real_mfe = max(real_mfe, (entry - lo) / entry)
+                    real_mae = max(real_mae, (h - entry) / entry)
                 if direction == SignalType.LONG:
                     hit_take = h >= take_price
                     hit_stop = lo <= stop_price
@@ -7598,13 +7668,16 @@ class OICompositeStrategy(IStrategy):
             win = net_pct > 0
             results.append((win, r_multiple, net_pct))
 
-            # Hedge-обучение весов в бэктесте — точная копия логики close_trade:
+            # Hedge-обучение весов в бэктесте — та же логика, что close_trade:
             # aligned метод получает quality как target, opposed — 1-quality.
-            # Без разделения aligned/opposed при 50% win rate веса взаимно
-            # компенсируют и не двигаются с 0.5, даже при сотнях сделок.
-            _approx_mfe_h = take_dist if win else 0.0
-            _approx_mae_h = 0.0 if win else stop_dist
-            _quality_h = _approx_mfe_h / (_approx_mfe_h + _approx_mae_h + 1e-9)
+            # Quality — непрерывный MFE/(MFE+MAE) из реального хода цены в окне
+            # симуляции (как в live), а НЕ бинарный win→1.0/lose→0.0: прежняя
+            # аппроксимация take_dist/stop_dist награждала таймаут с копеечным
+            # плюсом как полный тейк и делала веса бэктеста экстремальнее живых.
+            if real_mfe > 0 or real_mae > 0:
+                _quality_h = real_mfe / (real_mfe + real_mae + 1e-9)
+            else:
+                _quality_h = 1.0 if win else 0.0  # пустое окно — прежний фолбэк
             _neutral_h = max(0.20, min(0.80, self.__rolling_quality))
             self.__rolling_quality = 0.95 * self.__rolling_quality + 0.05 * _quality_h
             _ms = sig.get("method_scores") or {}
@@ -7612,8 +7685,14 @@ class OICompositeStrategy(IStrategy):
                 _sc = _ms.get(_name, 0.0)
                 if abs(_sc) < 0.05:
                     continue
-                _aligned = (_sc > 0 and direction == SignalType.LONG) or \
-                           (_sc < 0 and direction == SignalType.SHORT)
+                # Согласованность с фактическим голосом в композите: если IC
+                # инвертировал метод, судим по инвертированному скору — иначе
+                # Hedge продолжал бы штрафовать метод по сырому знаку, загонял
+                # вес в минус и вторая инверсия (минус-вес × минус-скор)
+                # возвращала бы голос в исходное плохое направление.
+                _eff_sc = -_sc if self.__ic(_name).invert else _sc
+                _aligned = (_eff_sc > 0 and direction == SignalType.LONG) or \
+                           (_eff_sc < 0 and direction == SignalType.SHORT)
                 _target = _quality_h if _aligned else 1.0 - _quality_h
                 _ic_acc = min(1.0, abs(_sc))
                 self.__weights[_name].update(_target, _ic_acc, neutral=_neutral_h)
@@ -7951,6 +8030,7 @@ class OICompositeStrategy(IStrategy):
             self.__score_provider(self.__retail_contra_provider),
             self.__score_provider(self.__delta_quadrant_provider),
             self.__score_provider(self.__oi_absorption_provider),
+            self.__score_provider(self.__index_context_provider),
         ] + [self.__score_tradestats(name) for name in TRADESTATS_METHOD_NAMES] \
           + [self.__cached_change_point, self.__score_multi_ticker()]
 
@@ -8849,6 +8929,17 @@ class OICompositeStrategy(IStrategy):
         su = self.__system_uncertainty()
         if su > 0.3:
             thr *= (1.0 + 0.5 * su)
+        # ОИ-консенсус ПРОТИВ направления: ≥3 активных ОИ-скора и все против —
+        # юр/физ картина согласованно противоречит свечам. Не вето (у уровня
+        # перенабранная толпа — топливо разворота, см. плейбук OI_CONSENSUS),
+        # а ужесточение порога ×1.25 — в стиле warmup/low-quality тормозов.
+        _oi_act = [v for v in (
+            self.__last_scores.get(n, 0.0)
+            for n in ("OI_SQUEEZE", "INST_OI", "RETAIL_CONTRA",
+                      "DELTA_QUADRANT", "OI_ABSORPTION")
+        ) if abs(v) >= 0.15]
+        if len(_oi_act) >= 3 and all(v * sign_val < 0 for v in _oi_act):
+            thr *= 1.25
         return thr
 
     def __recalc_auto_atr(self) -> None:
@@ -9122,8 +9213,13 @@ class OICompositeStrategy(IStrategy):
             score = self.__open_trade.method_scores.get(name, 0.0)
             if abs(score) < 0.05:
                 continue
-            aligned = (score > 0 and self.__open_trade.signal_type == SignalType.LONG) or \
-                      (score < 0 and self.__open_trade.signal_type == SignalType.SHORT)
+            # aligned — по ЭФФЕКТИВНОМУ скору (после IC-инверсии), как метод
+            # реально голосовал в композите. Иначе IC.invert и отрицательный
+            # Hedge-вес учатся на одном и том же свойстве и, сработав вместе,
+            # дают двойную инверсию — голос возвращается в плохое направление.
+            eff_score = -score if self.__ic(name).invert else score
+            aligned = (eff_score > 0 and self.__open_trade.signal_type == SignalType.LONG) or \
+                      (eff_score < 0 and self.__open_trade.signal_type == SignalType.SHORT)
             target = quality if aligned else 1.0 - quality
             # Мультипликатор обновления = IC-точность метода, а не abs(score).
             # abs(score) отражает "громкость" — уверенные но плохие методы

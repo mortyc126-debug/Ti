@@ -7,8 +7,9 @@ from collections import deque
 from decimal import Decimal
 
 # Консилиум агентов: Cerebras-based ИИ-совет перед входом в позицию.
-# Выключается через COUNCIL=0, работает только если задан CEREBRAS_API_KEY.
-_COUNCIL_ENABLED = os.getenv("COUNCIL", "1") == "1"
+# Включённость проверяется в рантайме через council.is_enabled() — env COUNCIL=0/1
+# имеет приоритет, иначе [COUNCIL] ENABLED из settings.ini. Работает только если
+# задан CEREBRAS_API_KEY.
 
 # В sandbox-режиме включаем стакан по умолчанию — на реальном стриме данные
 # актуальны, и imbalance-фильтр + squeeze работают полноценно.
@@ -116,11 +117,12 @@ TRANCHE2_MAX_ADVERSE_ATR = float(os.getenv("TRANCHE2_MAX_ADV_ATR", "0.5"))  # м
 # Фильтр режима при входе: сигналы в этих режимах игнорируются.
 # "ranging" — боковик без тренда, momentum-стратегия там статистически убыточна.
 # "stress" — аномальная волатильность, паттерны ломаются, соотношение сигнал/шум падает.
-# "trending_up" — атрибуция 150 дней по 8 тикерам даёт 35-44% WR (хуже случайности);
-#                 trending_down — 50-60% WR. Логика: в растущем тренде шорты не работают,
-#                 а лонги перебиваются коррекциями быстрее, чем успевают закрыться.
-# Отключить: ENTRY_BLOCKED_REGIMES=
-_ENTRY_BLOCKED_REGIMES_DEFAULT = {"ranging", "stress", "trending_up"}
+# "trending_up" УБРАН из блок-листа: он резал ВСЕ входы в растущем рынке,
+# включая лонги в отскоке от дна — сильнейший паттерн рынка РФ. Старая
+# атрибуция (35-44% WR) считалась ДО появления INDEX_CONTEXT и OI_CONSENSUS
+# и не разделяла лонги/шорты — часть плохого WR могла быть от шортов против
+# отскока. Вернуть: ENTRY_BLOCKED_REGIMES=ranging,stress,trending_up (env).
+_ENTRY_BLOCKED_REGIMES_DEFAULT = {"ranging", "stress"}
 _ebr_env = os.getenv("ENTRY_BLOCKED_REGIMES", None)
 ENTRY_BLOCKED_REGIMES: set[str] = (
     set(r.strip() for r in _ebr_env.split(",") if r.strip())
@@ -557,7 +559,28 @@ class Trader:
             )
 
         db_for_history = DbApiClient(self.__mega_alerts_settings.db_api_url, self.__mega_alerts_settings.db_api_key)
+        # Индексный контекст: положение IMOEX к своим дневным уровням, раз в
+        # день (index_context.py). Контрарно у уровней (апогей падения у
+        # поддержки → лонг-байас), инерция между ними. Один bias на всех —
+        # это состояние рынка, не тикера; вес метода INDEX_CONTEXT у каждого
+        # тикера обучится своим Hedge'ом. Ошибка расчёта не валит день.
+        index_bias = 0.0
+        try:
+            _imoex = self.__instrument_service.future_by_base_ticker("IMOEX")
+            if _imoex:
+                _ifs, _ifigi = _imoex
+                _icandles = get_candles_cached(
+                    _ifs.ticker, _ifigi, 90, self.__market_data_service, db_for_history)
+                import index_context as _ixc
+                index_bias = _ixc.compute_index_bias(_ixc.daily_from_intraday(_icandles or []))
+                logger.info(f"INDEX_CONTEXT: bias={index_bias:+.3f} по {_ifs.ticker}")
+        except Exception as e:
+            logger.warning(f"INDEX_CONTEXT: не посчитан ({e}) — метод молчит сегодня")
+
         for strategy in today_trade_strategies.values():
+            if hasattr(strategy, "set_index_context_provider"):
+                strategy.set_index_context_provider(
+                    (lambda ticker, _b=index_bias: _b) if index_bias else None)
             if hasattr(strategy, "set_squeeze_provider"):
                 strategy.set_squeeze_provider(self.__oi_layers.squeeze_score)
             if hasattr(strategy, "set_inst_oi_provider"):
@@ -1574,11 +1597,20 @@ class Trader:
 
         # Консилиум: ИИ-совет перед входом (Альфа + Скептик + опционально Модератор).
         # Если council говорит "skip" — ордер не выставляется, торговлю не блокирует.
-        # Работает только при COUNCIL=1 и наличии CEREBRAS_API_KEY.
-        if _COUNCIL_ENABLED:
+        # Работает при COUNCIL=1 (env) / [COUNCIL] ENABLED=1 (ini) и наличии CEREBRAS_API_KEY.
+        if council.is_enabled():
             try:
                 _snap = strategy.last_snapshot() if hasattr(strategy, "last_snapshot") else {}
                 _analytics = trade_analytics.full_report_for_council(risk_ticker)
+                # Новостной контекст по тикеру (news.py): свежие новости + историческая
+                # точность прогнозов Cerebras — агентам как «что говорит новостной фон».
+                try:
+                    import news
+                    _news_ctx = news.news_council_summary(risk_ticker)
+                    if _news_ctx:
+                        _analytics = (_analytics + "\n\n" + _news_ctx) if _analytics else _news_ctx
+                except Exception as _ne:
+                    logger.debug(f"news context для консилиума недоступен ({risk_ticker}): {_ne}")
                 _cr = await council.consult_signal(
                     ticker=risk_ticker,
                     direction=direction,
@@ -2999,11 +3031,11 @@ class Trader:
         ближайший по экспирации фьючерс (FORTS) и торгует ИМ вместо акции —
         сигнальные настройки (threshold/take/stop) переиспользуются из
         STRATEGY_<TICKER>_SETTINGS той же акции в settings.ini, если она
-        сконфигурирована, иначе берутся дефолты из [MEGA_ALERTS]. Размер
-        позиции считается отдельно, по ГО (см. __liquidity-аналог в
+        сконфигурирована, иначе берутся дефолты из [FUTURES_DEFAULTS]
+        (индексные/валютные/товарные базовые активы без акции-родителя).
+        Размер позиции считается отдельно, по ГО (см. __liquidity-аналог в
         __open_position_lots_count и место вызова в __trading).
         """
-        cfg = self.__mega_alerts_settings
         ft_cfg = self.__futures_trading_settings
         result: list[IStrategy] = []
 
@@ -3044,14 +3076,14 @@ class Trader:
                 max_lots_per_order = base_strategy.settings.max_lots_per_order
             else:
                 settings_dict = {
-                    "SIGNAL_THRESHOLD": cfg.signal_threshold,
-                    "LONG_TAKE": cfg.long_take,
-                    "LONG_STOP": cfg.long_stop,
-                    "SHORT_TAKE": cfg.short_take,
-                    "SHORT_STOP": cfg.short_stop,
-                    "SIGNAL_ONLY": cfg.signal_only,
+                    "SIGNAL_THRESHOLD": ft_cfg.signal_threshold,
+                    "LONG_TAKE": ft_cfg.long_take,
+                    "LONG_STOP": ft_cfg.long_stop,
+                    "SHORT_TAKE": ft_cfg.short_take,
+                    "SHORT_STOP": ft_cfg.short_stop,
+                    "SIGNAL_ONLY": ft_cfg.signal_only,
                 }
-                max_lots_per_order = cfg.max_lots_per_order
+                max_lots_per_order = ft_cfg.max_lots_per_order
 
             settings = StrategySettings(
                 name="OICompositeStrategy",
@@ -3062,7 +3094,13 @@ class Trader:
                 lot_size=future_settings.lot,
                 short_enabled_flag=future_settings.short_enabled_flag,
                 is_future=True,
-                margin_per_lot=future_settings.margin_per_lot
+                margin_per_lot=future_settings.margin_per_lot,
+                # Стоимость пункта цены контракта (min_price_increment_amount /
+                # min_price_increment) — уже посчитана в future_by_base_ticker.
+                # Без её передачи risk.py считал бы R/stop_dist для фьючерса как
+                # для акции (1 пункт = 1 ₽), хотя код риска point_value полностью
+                # поддерживает — просто сюда значение раньше не доходило.
+                point_value=future_settings.point_value
             )
             strategy = StrategyFactory.new_factory("OICompositeStrategy", settings)
             if not strategy:
@@ -3084,6 +3122,27 @@ class Trader:
         today_trade_strategy: dict[str, IStrategy] = dict()
 
         for strategy in strategies:
+            # Защита от пустого/дублирующего FIGI: без неё две стратегии с
+            # figi="" (напр. недорезолвленный фьючерс из settings.ini) легли бы
+            # под один ключ в dict — вторая молча затёрла бы первую, а сам ""
+            # ушёл бы в gRPC-подписку стрима как валидный инструмент.
+            if not strategy.settings.figi:
+                logger.warning(
+                    f"Пропуск стратегии {strategy.settings.ticker}: пустой FIGI "
+                    f"(контракт не резолвлен). Проверь settings.ini / find_futures.py."
+                )
+                self.__blogger.send_raw(
+                    f"⚠️ {strategy.settings.ticker}: пустой FIGI — не торгуется. "
+                    f"Обнови контракт (find_futures.py) или базовый актив в [FUTURES_TRADING]."
+                )
+                continue
+            if strategy.settings.figi in today_trade_strategy:
+                logger.warning(
+                    f"Пропуск стратегии {strategy.settings.ticker}: FIGI "
+                    f"{strategy.settings.figi} уже занят "
+                    f"{today_trade_strategy[strategy.settings.figi].settings.ticker}."
+                )
+                continue
             if strategy.settings.is_future:
                 # фьючерс уже проверен на торгуемость в future_by_base_ticker
                 # (api_trade_available_flag) — share-специфичных полей у него нет.

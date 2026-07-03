@@ -682,3 +682,26 @@ def get_price_impact_summary(ticker: str) -> dict:
         out[f"median_{k}"] = median(buckets[k])
         out[f"samples_{k}"] = len(buckets[k])
     return out
+
+
+def news_council_summary(ticker: str, n: int = 3) -> str:
+    """
+    Компактный новостной блок для консилиума (council.consult_signal, поле
+    analytics_text): свежие N новостей с прогнозом/фактикой + историческая
+    точность прогнозов Cerebras на 1-дневном горизонте (сколько сделано и
+    какой % верного направления). Пустая строка, если новостей по тикеру нет —
+    тогда в консилиум ничего лишнего не уходит.
+    """
+    recent = read_recent_news(ticker, n=n)
+    if not recent:
+        return ""
+
+    acc = get_prediction_accuracy(ticker)
+    acc_line = ""
+    # 1d — самый показательный горизонт для внутридневной торговли
+    d1 = acc.get("direction_accuracy_1d")
+    n1 = acc.get("samples_1d") or 0
+    if d1 is not None and n1 >= 5:
+        acc_line = f"\nИсторическая точность прогнозов новостей (1д): {d1:.0f}% на {n1} наблюдениях."
+
+    return f"🗞 Новостной фон по {ticker} (свежие {n}):\n{recent}{acc_line}"

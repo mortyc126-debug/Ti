@@ -140,6 +140,29 @@ def _get_backtest_candles(ticker: str, settings, days: int, offset_days: int = 0
     )
 
 
+def _index_context_provider_for_backtest(days: int, offset_days: int = 0):
+    """IndexContextBacktestProvider на дневках фьюча IMOEX (склейка контрактов
+    через futures_chain). Дневки агрегируются из 5-мин кэша; +75 дней запаса —
+    на LEVEL_LOOKBACK/MIN_DAILY_BARS до начала окна бэктеста. None, если
+    контракта IMOEX нет в кэше фьючерсов или нет свечей — метод просто молчит."""
+    try:
+        from index_context import IndexContextBacktestProvider, daily_from_intraday
+        contracts, _age = _futures_cache_from_disk()
+        info = (contracts or {}).get("IMOEX")
+        if not info or not info.get("figi"):
+            return None
+        candles = get_candles_cached_futures_chain(
+            info["ticker"], info["figi"], days + 75, _market_data, _db,
+            _instrument_service, candle_interval_min=5, offset_days=offset_days)
+        if not candles:
+            return None
+        prov = IndexContextBacktestProvider(daily_from_intraday(candles))
+        return prov if prov.has_data() else None
+    except Exception as e:
+        logger.warning(f"INDEX_CONTEXT (backtest): не построен — {e}")
+        return None
+
+
 def _backtest_strategy_settings(settings) -> "StrategySettings":
     """Для фьючерсов в историческом бэктесте мы всегда грузим 5-мин свечи
     (Tinkoff отдаёт 1-мин только за последние ~7 дней, D1 хранит только 5-мин).
@@ -1439,8 +1462,16 @@ def _trades_list_compact(trades: list[dict]) -> list[dict]:
             "tp": round(t.get("take_price") or 0.0, 4),
             "sp": round(t.get("stop_price") or 0.0, 4),
             "l1pct": round(t.get("l1_pct") or -1.0, 3),  # позиция цены в дневном hi-lo [0..1], -1 если нет
+            "xr": t.get("exit_reason", ""),  # почему закрыли: take / stop / timeout
             "fa": [[n, round(s, 2)] for n, s in for_m],
             "ag": [[n, round(s, 2)] for n, s in against_m],
+            # Полный разбор по ВСЕМ методам, высказавшимся на входе (|score|>=0.02) —
+            # чтобы «за/против» было видно целиком (тултип на экране) и полностью
+            # попадало в кнопку копирования, а не только топ-3/5.
+            "ms": sorted(
+                [[n, round(v, 2)] for n, v in (t.get("method_scores") or {}).items() if abs(v) >= 0.02],
+                key=lambda x: -x[1]
+            ),
         })
     return out
 
@@ -1613,16 +1644,57 @@ def run_backtest_one(
         long_take = Decimal(s.get("LONG_TAKE", "1.015"))
         long_stop = Decimal(s.get("LONG_STOP", "0.985"))
 
+        # OI-провайдеры (INST_OI / RETAIL_CONTRA / DELTA_QUADRANT / OI_ABSORPTION /
+        # OI_SQUEEZE) из исторического FutOI (data/oi_daily.json, см. backfill_oi.py).
+        # Раньше основной прогон их НЕ подключал (в отличие от save-истории и
+        # trade-chart) — методы ОИ молчали (score=0) и не попадали ни в сделки,
+        # ни в атрибуцию. Теперь так же, как в _save_backtest_history_one.
+        from oi_layers import OiBacktestProvider
+        oi_prov = OiBacktestProvider.load()
+        oi_hook = None
+        if oi_prov.has_data(ticker):
+            strategy.set_inst_oi_provider(oi_prov.inst_oi_score)
+            strategy.set_retail_contra_provider(oi_prov.retail_contra_score)
+            strategy.set_delta_quadrant_provider(oi_prov.delta_quadrant_score)
+            strategy.set_oi_absorption_provider(oi_prov.absorption_score)
+            strategy.set_squeeze_provider(oi_prov.squeeze_score)
+            oi_hook = oi_prov.set_date
+
+        # INDEX_CONTEXT: положение IMOEX к своим дневным уровням, по датам,
+        # без подглядывания (bias дня D — по дневкам до D). Один date-hook
+        # двигает и OI-провайдер, и индексный.
+        idx_prov = _index_context_provider_for_backtest(days, offset_days)
+        if idx_prov is not None and hasattr(strategy, "set_index_context_provider"):
+            strategy.set_index_context_provider(idx_prov.score)
+            if oi_hook is None:
+                oi_hook = idx_prov.set_date
+            else:
+                _oi_hook0 = oi_hook
+                def oi_hook(d, _h0=_oi_hook0, _p=idx_prov):
+                    _h0(d)
+                    _p.set_date(d)
+
         t1 = time.monotonic()
         signals = strategy.backtest_scan_signals(candles, adaptive_narrative=adaptive_narrative,
-                                                   block_ranging=block_ranging)
+                                                   block_ranging=block_ranging, oi_date_hook=oi_hook)
         rej = dict(strategy.rejection_stats)
         logger.info(f"{ticker}: {len(signals)} сигналов, скан занял {time.monotonic() - t1:.1f}с"
                     + (" (адаптивная калибровка narrative)" if adaptive_narrative else "")
                     + f" | отклонений: порог={rej['below_threshold']} методы={rej['methods_disagree']} M3_veto={rej.get('gate_m3_veto', 0)} объём={rej['liquidity']}")
 
+        # Холодный старт весов перед обучающим проходом: Hedge-обучение живёт в
+        # backtest_barriers (не в scan), и без сброса оно стартовало бы от живых
+        # весов из oi_weights.json — снапшот был бы смесью live+прогон, а не
+        # «обученным за прогон». Сигналы уже собраны сканом — на входы сброс
+        # не влияет, только на эволюцию весов и отчётные hedge_weight.
+        if hasattr(strategy, "reset_weights_cold"):
+            strategy.reset_weights_cold()
         fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop,
                                             return_trades=True, tariff=tariff, adaptive_lasso=adaptive_lasso)
+        # Снимаем обученные веса СРАЗУ после первого (fixed) прохода — дальше
+        # walk-forward ATR-подбор гоняет barriers ещё десятки раз по тем же
+        # сигналам и дообучал бы веса повторно на пересекающихся сделках.
+        trained_weights = strategy.weights_snapshot() if hasattr(strategy, "weights_snapshot") else None
         fixed_trades = fixed.pop("trades", [])
         _ticker_full_trades = fixed_trades  # вернём как третий элемент tuple
         fixed_pct = fixed.get("expectancy_pct", 0.0)
@@ -1630,7 +1702,11 @@ def run_backtest_one(
                      "rejection_stats": rej,
                      "method_stats": _method_stats_from_trades(fixed_trades),
                      "method_stats_by_regime": _method_stats_by_regime_from_trades(fixed_trades),
-                     "trades_list": _trades_list_compact(fixed_trades), **fixed})
+                     "trades_list": _trades_list_compact(fixed_trades),
+                     # Обученные за прогон веса методов (холодный старт → эволюция
+                     # в backtest_barriers) — для просмотра/снимка/применения к боту.
+                     "method_weights": trained_weights,
+                     **fixed})
 
         # Walk-forward, не full-history sweep: подбор лучшей (tk, sk) по сигналам
         # ДО текущего дня, торговля день — той же парой, что увидел бы живой
@@ -1829,8 +1905,32 @@ def _portfolio_sim_one_ticker(
             _set_progress(progress, ticker, "нет истории")
             return [], None
 
+        # OI-провайдеры из исторического FutOI — как в run_backtest_one/save-пути,
+        # чтобы портфельная симуляция считала те же сделки, что увидел бы бот.
+        from oi_layers import OiBacktestProvider
+        oi_prov = OiBacktestProvider.load()
+        oi_hook = None
+        if oi_prov.has_data(ticker):
+            strategy.set_inst_oi_provider(oi_prov.inst_oi_score)
+            strategy.set_retail_contra_provider(oi_prov.retail_contra_score)
+            strategy.set_delta_quadrant_provider(oi_prov.delta_quadrant_score)
+            strategy.set_oi_absorption_provider(oi_prov.absorption_score)
+            strategy.set_squeeze_provider(oi_prov.squeeze_score)
+            oi_hook = oi_prov.set_date
+
+        idx_prov = _index_context_provider_for_backtest(days)
+        if idx_prov is not None and hasattr(strategy, "set_index_context_provider"):
+            strategy.set_index_context_provider(idx_prov.score)
+            if oi_hook is None:
+                oi_hook = idx_prov.set_date
+            else:
+                _oi_hook0 = oi_hook
+                def oi_hook(d, _h0=_oi_hook0, _p=idx_prov):
+                    _h0(d)
+                    _p.set_date(d)
+
         _set_progress(progress, ticker, f"скан сигналов ({len(candles)} свечей)")
-        signals = strategy.backtest_scan_signals(candles)
+        signals = strategy.backtest_scan_signals(candles, oi_date_hook=oi_hook)
         trades: list[dict] = []
 
         if mode == "atr":
@@ -2432,7 +2532,13 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
         <span id="disabled_count" style="font-size:10px;color:var(--neg);"></span>
       </div>
       <div id="method_disable_panel" style="display:none;margin-top:6px;">
-        <div style="font-size:10px;color:var(--txt3);margin-bottom:6px;">Отмеченные методы будут давать 0 в голосовании (как будто не существуют). Удобно для тестирования без худших методов.</div>
+        <div style="font-size:10px;color:var(--txt3);margin-bottom:6px;">Отмеченные методы будут давать 0 в голосовании (как будто не существуют). Кнопка ↔ — использовать метод как контр-индикатор (инвертировать скор). «инфо» — метод считается, но выключить его отсюда нельзя (провайдерный/структурный/диагностика).</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+          <button class="btn-pill btn-xs ghost" onclick="saveMethodPreset()" style="font-size:10px;padding:2px 8px;" title="Сохранить текущий набор откл/инверсий под именем — переживёт перезапуск дашборда">💾 сохранить пресет</button>
+          <select id="method_preset_select" onchange="applyMethodPreset()" style="font-size:10px;padding:2px 6px;background:var(--bg2);color:var(--txt2);border:1px solid var(--border2);border-radius:4px;"><option value="">— загрузить пресет —</option></select>
+          <button class="btn-pill btn-xs ghost" onclick="deleteMethodPreset()" style="font-size:10px;padding:2px 8px;" title="Удалить выбранный пресет">🗑</button>
+          <span id="method_preset_msg" style="font-size:10px;color:var(--txt3);"></span>
+        </div>
         <div id="method_checkboxes" style="display:flex;flex-wrap:wrap;gap:4px 10px;"></div>
       </div>
     </div>
@@ -2474,6 +2580,10 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button id="btnDashView" class="btn-pill btn-sm ghost" onclick="toggleDashView()" title="Переключить между видом таблицы и видом дашборда с панелями">⊞ дашборд</button>
   <button class="btn-pill btn-sm ok" onclick="calibrateMethodWeights(this)" title="Рассчитать мультипликаторы весов методов из атрибуции и сохранить в data/ticker_method_weights.json">💾 веса методов</button>
   <button id="btnResetWeights" class="btn-pill btn-sm warn" onclick="resetWeights()" title="Сбросить Hedge-веса методов в oi_weights.json до 0.30 (консервативный старт). IC-prior не затрагивается.">🔄 сброс весов</button>
+  <button class="btn-pill btn-sm ghost" onclick="showTrainedWeights()" title="Обученные ЗА ПРОГОН веса методов (холодный старт → эволюция по сделкам), отсортированы по весу: сверху самые точные, снизу неточные и инвертированные (отрицательный вес)">🏋 обученные веса</button>
+  <button class="btn-pill btn-sm ok" onclick="saveWeightsSnapshot()" title="Сохранить обученные веса прогона в отдельный файл (data/weights_snapshots) — боевого бота НЕ трогает">💾 снимок весов</button>
+  <select id="weights_snapshot_select" onclick="refreshWeightsSnapshots()" style="font-size:11px;padding:3px 6px;background:var(--bg2);color:var(--txt2);border:1px solid var(--border2);border-radius:4px;"><option value="">— снимок весов —</option></select>
+  <button class="btn-pill btn-sm warn" onclick="applyWeightsSnapshotConfirm()" title="Применить выбранный снимок к боевому oi_weights.json — с окном подтверждения. Бэкап в oi_weights.json.bak.">⚠️ применить к боту</button>
   <span id="status"></span>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:11px;color:var(--txt3);">
     <label><input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть нулевые</label>
@@ -2500,6 +2610,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <div id="compare_block" style="display:none;margin-top:8px"></div>
   <div id="mfe_stats_out" style="display:none;margin-top:12px;"></div>
   <div id="run_weights_out" style="display:none;margin-top:12px;"></div>
+  <div id="trained_weights_out" style="display:none;margin-top:12px;"></div>
   <div id="global_method_stats" style="display:none;margin-top:14px;"></div>
 </div>
 
@@ -3484,6 +3595,7 @@ function tradesListToHtml(trades, overallWr) {{
   html += '<tr style="color:var(--txt3);font-size:11px">'
     + '<th style="padding:3px 6px">#</th><th style="padding:3px 8px">Дата</th><th style="padding:3px 6px">Dir</th><th style="padding:3px 6px">Win</th><th style="padding:3px 8px">R</th><th style="padding:3px 8px">cumR</th>'
     + '<th style="padding:3px 8px">MFE%</th><th style="padding:3px 8px">MAE%</th>'
+    + '<th style="padding:3px 6px" title="Почему закрыли: тейк / стоп / таймаут">Выход</th>'
     + (hasEp ? '<th title="Вход → Выход / Тейк / Стоп">Вход/Тейк/Стоп</th>' : '')
     + '<th title="Позиция цены входа в дневном хай-лой: 0%=у лоя, 100%=у хая">Hi-Lo%</th>'
     + '<th style="min-width:60px">roll WR(10)</th><th>Топ ЗА</th><th>Топ ПРОТИВ</th></tr>';
@@ -3505,8 +3617,16 @@ function tradesListToHtml(trades, overallWr) {{
     const maePct = t.mae != null ? t.mae.toFixed(2) + '%' : '—';
     const mfeColor = (t.mfe != null && t.mae != null && t.mfe > t.mae) ? '#7dcc7d' : 'var(--txt3)';
     const maeColor = (t.mfe != null && t.mae != null && t.mae > t.mfe) ? '#e07070' : 'var(--txt3)';
-    const forStr = t.fa.map(([n, s]) => `<span title="${{n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
-    const againstStr = t.ag.map(([n, s]) => `<span title="${{n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
+    const _xrMap = {{take: 'тейк', stop: 'стоп', timeout: 'таймаут'}};
+    const xrTxt = _xrMap[t.xr] || t.xr || '—';
+    const xrColor = t.xr === 'take' ? '#7dcc7d' : (t.xr === 'stop' ? '#e07070' : 'var(--txt3)');
+    const forStr = t.fa.map(([n, s]) => `<span title="${{_METHOD_RU[n]||n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
+    const againstStr = t.ag.map(([n, s]) => `<span title="${{_METHOD_RU[n]||n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
+    // Полный список за/против (все методы) — в тултип ячейки, чтобы видеть целиком.
+    const _dir = t.d === 'L' ? 1 : -1;
+    const _ms = t.ms || [];
+    const allForTitle = 'ЗА (все): ' + (_ms.filter(([n, s]) => s * _dir > 0).map(([n, s]) => (_METHOD_RU[n]||n) + ' ' + s.toFixed(2)).join(', ') || '—');
+    const allAgTitle = 'ПРОТИВ (все): ' + (_ms.filter(([n, s]) => s * _dir < 0).map(([n, s]) => (_METHOD_RU[n]||n) + ' ' + s.toFixed(2)).join(', ') || '—');
     const bg = i % 2 === 0 ? 'background:var(--bg2)' : '';
     // Блок цен: ep→xp | tp ✓ | sp ✗
     let priceCell = '';
@@ -3542,11 +3662,12 @@ function tradesListToHtml(trades, overallWr) {{
       ${td('color:'+cumRColor)}${{cumR.toFixed(2)}}${_td}
       ${td('color:'+mfeColor)}${{mfePct}}${_td}
       ${td('color:'+maeColor)}${{maePct}}${_td}
+      ${td('color:'+xrColor+';font-size:10px;white-space:nowrap')}${{xrTxt}}${_td}
       ${{priceCell}}
       <td style="padding:2px 4px">${{l1bar}}</td>
       ${td('color:'+rwrColor)}${{rwrPct}}${_td}
-      ${td('color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden')}${{forStr}}${_td}
-      ${td('color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden')}${{againstStr}}${_td}
+      <td style="padding:2px 8px;color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden;cursor:help" title="${{allForTitle}}">${{forStr}}</td>
+      <td style="padding:2px 8px;color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden;cursor:help" title="${{allAgTitle}}">${{againstStr}}</td>
     </tr>`;
   }}
   html += '</table></div>';
@@ -3604,42 +3725,136 @@ function bestWorstMethodsToHtml(methodStats) {{
 
 // ===== Глобальная статистика методов =====
 
-const _ALL_METHODS = [
-  "PRICE_TREND","VOL_MOMENTUM","VWAP_SIGNAL","BS_PRESSURE","CANDLE_PATTERN",
-  "ADAPTIVE_MA","TREND_QUALITY","FRACTAL","ENTROPY","FISHER_RSI","KLINGER","VZO",
-  "DONCHIAN","TWIGGS","RMI","ZSCORE","ZLEMA_SIGNAL","T3_SIGNAL","SINEWAVE_SIGNAL",
-  "SSA_SIGNAL","HAWKES_SIGNAL","VSA","WICK_REJECTION","TRIANGLE","PRICE_ACCEL",
-  "CUMUL_DELTA","AMT_POC","VSA_ABSORPTION","CASCADE","IMPULSE_PULLBACK",
-  "WANING_IMPULSES","VOL_COMPRESSION","FALSE_BREAKOUT","LEVEL_ABSORPTION",
-  "ICHIMOKU_SIGNAL","BB_KELTNER_SQUEEZE","MA_TENSION","RSI_DIVERGENCE",
-  "ATR_EXHAUSTION","ALLIGATOR","MAMA_FAMA","EHLERS_MODE","CYBER_PHASE"
+// Полный каталог методов. Единый источник; держать в синхроне с ALL_METHOD_NAMES
+// (oi_composite_strategy.py). Строка: [группа, имя, рус.подпись, переключаемый].
+// переключаемый=1 → checkbox + кнопка инверсии (это 50 методов METHODS — только
+// их видят set_disabled_methods/set_inverted_methods). переключаемый=0 → метод
+// считается, но выключить/инвертировать отсюда нельзя: провайдерные (OI /
+// микроструктура) молчат без данных, структурные считаются отдельно, а M1/M2/M3 —
+// диагностика (в живой композит не входят). Показаны, чтобы список был полным —
+// раньше половины этих методов в списке не было вовсе.
+const _METHOD_CATALOG = [
+  ["Тренд / MA","PRICE_TREND","тренд цены (линрег)",1],
+  ["Тренд / MA","TREND_QUALITY","качество тренда (TQI)",1],
+  ["Тренд / MA","ADAPTIVE_MA","отклонение от KAMA",1],
+  ["Тренд / MA","ZLEMA_SIGNAL","ZLEMA (без лага)",1],
+  ["Тренд / MA","T3_SIGNAL","T3-скользящая",1],
+  ["Тренд / MA","MAMA_FAMA","MAMA / FAMA",1],
+  ["Тренд / MA","ALLIGATOR","аллигатор Вильямса",1],
+  ["Тренд / MA","MA_ENVELOPE","конверт скользящей",1],
+  ["Тренд / MA","MA_TENSION","натяжение к MA",1],
+  ["Тренд / MA","ICHIMOKU_SIGNAL","облако Ишимоку",1],
+  ["Объём","VOL_MOMENTUM","объём × направление",1],
+  ["Объём","KLINGER","осциллятор Клингера",1],
+  ["Объём","VZO","Volume Zone Oscillator",1],
+  ["Объём","TWIGGS","Twiggs Money Flow",1],
+  ["Объём","CUMUL_DELTA","кумулятивная дельта",1],
+  ["Объём","AMT_POC","POC / профиль объёма",1],
+  ["Объём","VSA","VSA (объём-спред-анализ)",1],
+  ["Объём","VSA_ABSORPTION","VSA-поглощение",1],
+  ["Осцилляторы / возврат","VWAP_SIGNAL","отклонение от VWAP",1],
+  ["Осцилляторы / возврат","RMI","Relative Momentum Index",1],
+  ["Осцилляторы / возврат","FISHER_RSI","преобразование Фишера от RSI",1],
+  ["Осцилляторы / возврат","ZSCORE","z-score (возврат к среднему)",1],
+  ["Осцилляторы / возврат","RSI_DIVERGENCE","дивергенция RSI",1],
+  ["Осцилляторы / возврат","DONCHIAN","канал Дончиана",1],
+  ["Осцилляторы / возврат","BB_KELTNER_SQUEEZE","сжатие BB / Keltner",1],
+  ["Циклы (Ehlers/DSP)","SINEWAVE_SIGNAL","синусоида Ehlers (EBSW)",1],
+  ["Циклы (Ehlers/DSP)","EHLERS_MODE","режим тренд/цикл (Ehlers)",1],
+  ["Циклы (Ehlers/DSP)","CYBER_PHASE","фаза Cyber Cycle",1],
+  ["Циклы (Ehlers/DSP)","SSA_SIGNAL","SSA-тренд (сингулярный спектр)",1],
+  ["Свечи / паттерны","CANDLE_PATTERN","свечные паттерны",1],
+  ["Свечи / паттерны","WICK_REJECTION","отбой фитилём",1],
+  ["Свечи / паттерны","TRIANGLE","треугольник",1],
+  ["Свечи / паттерны","BS_PRESSURE","давление тела свечи",1],
+  ["Импульс / движение","PRICE_ACCEL","ускорение цены",1],
+  ["Импульс / движение","IMPULSE_PULLBACK","откат от импульса",1],
+  ["Импульс / движение","WANING_IMPULSES","затухание импульсов",1],
+  ["Импульс / движение","CASCADE","каскад (лавина)",1],
+  ["Импульс / движение","VOL_COMPRESSION","сжатие волатильности",1],
+  ["Импульс / движение","FALSE_BREAKOUT","ложный пробой",1],
+  ["Импульс / движение","LEVEL_ABSORPTION","поглощение на уровне",1],
+  ["Импульс / движение","ATR_EXHAUSTION","истощение по ATR",1],
+  ["Фракталы / матстат","FRACTAL","фрактал (FDI/Hurst/PFE)",1],
+  ["Фракталы / матстат","ENTROPY","энтропия движения",1],
+  ["Фракталы / матстат","HAWKES_SIGNAL","процесс Хоукса",1],
+  ["Фракталы / матстат","NADARAYA_WATSON","ядерная регрессия",1],
+  ["Фракталы / матстат","FRACTIONAL_DIFF","дробное дифференцирование",1],
+  ["Уровни / SMC","LEVEL_QUALITY","качество уровня (3 из 5)",1],
+  ["Уровни / SMC","FVG","гэп справедливой цены (FVG)",1],
+  ["Уровни / SMC","ORDER_BLOCK","ордер-блок",1],
+  ["Уровни / SMC","LIQUIDITY_SWEEP","снятие ликвидности",1],
+  ["Структура (MTF) — не выключается","LEVEL_CONTEXT","контекст уровней",0],
+  ["Структура (MTF) — не выключается","MKT_STRUCTURE","структура рынка (HH/HL)",0],
+  ["Структура (MTF) — не выключается","SPRING","пружина Вайкоффа",0],
+  ["Открытый интерес (FutOI) — провайдер","OI_SQUEEZE","сквиз открытого интереса",0],
+  ["Открытый интерес (FutOI) — провайдер","INST_OI","нетто-позиция юрлиц",0],
+  ["Открытый интерес (FutOI) — провайдер","RETAIL_CONTRA","контр-сигнал физлиц",0],
+  ["Открытый интерес (FutOI) — провайдер","DELTA_QUADRANT","квадрант дельты ОИ",0],
+  ["Открытый интерес (FutOI) — провайдер","OI_ABSORPTION","поглощение по ОИ",0],
+  ["Микроструктура (tradestats) — провайдер","BS_PRESSURE_TS","давление сделок",0],
+  ["Микроструктура (tradestats) — провайдер","AGGRESSOR_FLOW","поток агрессора",0],
+  ["Микроструктура (tradestats) — провайдер","LARGE_IMPACT","перекос крупных сделок",0],
+  ["Микроструктура (tradestats) — провайдер","VWAP_SIGNAL_TS","внутридневной VWAP",0],
+  ["Микроструктура (tradestats) — провайдер","VOL_MOMENTUM_TS","аномальный объём",0],
+  ["Микроструктура (tradestats) — провайдер","OB_IMBALANCE","дисбаланс стакана",0],
+  ["Микроструктура (tradestats) — провайдер","CANCEL_SIGNAL","отмены заявок",0],
+  ["Прочее","CHANGE_POINT","точка излома (CUSUM/PELT)",0],
+  ["Прочее","MULTI_TICKER","межинструментальный",0],
+  ["Прочее","INDEX_CONTEXT","индекс к своим уровням",0],
+  ["Диагностика — в композит НЕ входят","M1_CLUSTER","M1 (кластерная модель)",0],
+  ["Диагностика — в композит НЕ входят","M2_CLUSTER","M2 (кластерная модель)",0],
+  ["Диагностика — в композит НЕ входят","M3_CLUSTER","M3 (кластерная модель)",0]
 ];
+const _ALL_METHODS = _METHOD_CATALOG.filter(r => r[3]).map(r => r[1]);
+// имя метода → русская подпись (для тултипов в атрибуции сделок)
+const _METHOD_RU = {{}};
+_METHOD_CATALOG.forEach(r => {{ _METHOD_RU[r[1]] = r[2]; }});
 
 function initMethodCheckboxes() {{
   const box = document.getElementById('method_checkboxes');
   if (!box || box.children.length) return;
-  for (const name of _ALL_METHODS) {{
+  let curGroup = '';
+  for (const row of _METHOD_CATALOG) {{
+    const grp = row[0], name = row[1], ru = row[2], toggl = row[3];
+    if (grp !== curGroup) {{
+      curGroup = grp;
+      const h = document.createElement('div');
+      h.textContent = grp;
+      h.style.cssText = 'width:100%;font-size:9px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin:6px 0 2px;border-bottom:1px solid var(--border2);padding-bottom:1px;';
+      box.appendChild(h);
+    }}
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:1px;';
+    wrap.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:1px;min-width:155px;';
     const lbl = document.createElement('label');
-    lbl.style.cssText = 'display:flex;align-items:center;gap:3px;font-size:10px;color:var(--txt2);white-space:nowrap;cursor:pointer;flex:1;';
-    const cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.value = name; cb.id = 'dm_' + name;
-    cb.onchange = updateDisabledCount;
-    lbl.append(cb, name.replace(/_/g,' '));
-    // кнопка инверсии
-    const inv = document.createElement('button');
-    inv.textContent = '↔'; inv.title = 'Использовать как контр-индикатор (инвертировать скор)';
-    inv.id = 'inv_' + name;
-    inv.style.cssText = 'font-size:9px;padding:0 5px;border-radius:3px;border:1px solid var(--border2);background:transparent;color:var(--txt3);cursor:pointer;line-height:14px;';
-    inv.onclick = () => toggleInvertMethod(name);
-    wrap.append(lbl, inv);
+    lbl.style.cssText = 'display:flex;align-items:center;gap:3px;font-size:10px;color:var(--txt2);white-space:nowrap;flex:1;cursor:' + (toggl ? 'pointer' : 'default') + ';' + (toggl ? '' : 'opacity:.6;');
+    const cap = name + ' — ' + ru;
+    if (toggl) {{
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.value = name; cb.id = 'dm_' + name;
+      cb.onchange = updateDisabledCount;
+      lbl.append(cb, cap);
+      const inv = document.createElement('button');
+      inv.textContent = '↔'; inv.title = 'Использовать как контр-индикатор (инвертировать скор)';
+      inv.id = 'inv_' + name;
+      inv.style.cssText = 'font-size:9px;padding:0 5px;border-radius:3px;border:1px solid var(--border2);background:transparent;color:var(--txt3);cursor:pointer;line-height:14px;';
+      inv.onclick = () => toggleInvertMethod(name);
+      wrap.append(lbl, inv);
+    }} else {{
+      lbl.append(cap);
+      const tag = document.createElement('span');
+      tag.textContent = 'инфо';
+      tag.title = 'Метод считается, но отключить/инвертировать его отсюда нельзя';
+      tag.style.cssText = 'font-size:8px;padding:0 4px;border-radius:3px;border:1px solid var(--border2);color:var(--txt3);line-height:14px;';
+      wrap.append(lbl, tag);
+    }}
     box.appendChild(wrap);
   }}
 }}
 
 function toggleMethodDisable() {{
   initMethodCheckboxes();
+  refreshMethodPresets();
   const p = document.getElementById('method_disable_panel');
   p.style.display = p.style.display === 'none' ? '' : 'none';
 }}
@@ -3687,6 +3902,73 @@ function updateDisabledCount() {{
 
 function getDisabledMethods() {{
   return Array.from(document.querySelectorAll('#method_checkboxes input[type=checkbox]:checked')).map(cb => cb.value);
+}}
+
+// ── Пресеты методов (data/method_presets.json на сервере) ──────────────────
+let _methodPresets = {{}};
+
+function refreshMethodPresets() {{
+  fetch('/api/method_presets').then(r => r.json()).then(d => {{
+    _methodPresets = d || {{}};
+    const sel = document.getElementById('method_preset_select');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— загрузить пресет —</option>';
+    Object.keys(_methodPresets).sort().forEach(name => {{
+      const o = document.createElement('option');
+      o.value = name; o.textContent = name;
+      sel.appendChild(o);
+    }});
+    if (cur && _methodPresets[cur]) sel.value = cur;
+  }}).catch(() => {{}});
+}}
+
+function saveMethodPreset() {{
+  const name = (prompt('Имя пресета:') || '').trim();
+  if (!name) return;
+  const body = JSON.stringify({{name: name, disabled: getDisabledMethods(), inverted: getInvertedMethods()}});
+  fetch('/api/method_presets_save', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: body}})
+    .then(r => r.json()).then(d => {{
+      const msg = document.getElementById('method_preset_msg');
+      if (d.error) {{ if (msg) msg.textContent = 'ошибка: ' + d.error; return; }}
+      if (msg) msg.textContent = 'сохранён: ' + name;
+      refreshMethodPresets();
+      const sel = document.getElementById('method_preset_select');
+      if (sel) sel.value = name;
+    }}).catch(() => {{}});
+}}
+
+function applyMethodPreset() {{
+  const sel = document.getElementById('method_preset_select');
+  if (!sel || !sel.value) return;
+  const p = _methodPresets[sel.value];
+  if (!p) return;
+  initMethodCheckboxes();
+  clearDisabledMethods();
+  (p.disabled || []).forEach(name => {{
+    const cb = document.getElementById('dm_' + name);
+    if (cb) cb.checked = true;
+  }});
+  (p.inverted || []).forEach(name => {{
+    const btn = document.getElementById('inv_' + name);
+    if (btn && btn.dataset.active !== '1') toggleInvertMethod(name);
+  }});
+  updateDisabledCount();
+  const msg = document.getElementById('method_preset_msg');
+  if (msg) msg.textContent = 'применён: ' + sel.value;
+}}
+
+function deleteMethodPreset() {{
+  const sel = document.getElementById('method_preset_select');
+  if (!sel || !sel.value) return;
+  const name = sel.value;
+  if (!confirm('Удалить пресет «' + name + '»?')) return;
+  fetch('/api/method_presets_delete', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{name: name}})}})
+    .then(() => {{
+      const msg = document.getElementById('method_preset_msg');
+      if (msg) msg.textContent = 'удалён: ' + name;
+      refreshMethodPresets();
+    }}).catch(() => {{}});
 }}
 
 // Агрегирует method_stats по всем строкам _backtestRows и рисует глобальную таблицу
@@ -4092,6 +4374,24 @@ async function copyAllResults(btn) {{
         text += `${{r.ticker}}\t${{t.t}}\t${{t.d}}\t${{t.w?'W':'L'}}\t${{t.r.toFixed(2)}}\t${{t.mfe!=null?t.mfe.toFixed(2)+'%':'—'}}\t${{t.mae!=null?t.mae.toFixed(2)+'%':'—'}}\t${{t.ep||'—'}}\t${{t.xp||'—'}}\t${{t.tp||'—'}}\t${{t.sp||'—'}}\t${{l1}}\\n`;
       }}
     }}
+    // Полный разбор по методам (за/против, знак приведён к направлению сделки) +
+    // причина выхода — по каждой сделке отдельной строкой.
+    const _xrRu = {{take: 'тейк', stop: 'стоп', timeout: 'таймаут'}};
+    text += '\\n--- За / Против по методам (все, знак к направлению) ---\\n';
+    for (const r of rowsWithTrades) {{
+      for (const t of r.trades_list) {{
+        const dir = t.d === 'L' ? 1 : -1;
+        const ms = t.ms || [];
+        const forL = ms.filter(([n, s]) => s * dir > 0)
+          .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+          .map(([n, s]) => n + ' ' + (s > 0 ? '+' : '') + s.toFixed(2));
+        const agL = ms.filter(([n, s]) => s * dir < 0)
+          .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+          .map(([n, s]) => n + ' ' + s.toFixed(2));
+        const xr = _xrRu[t.xr] || t.xr || '—';
+        text += `${{r.ticker}}\t${{t.t}}\t${{t.d}}\tвыход:${{xr}}\tЗА: ${{forL.join(', ') || '—'}}\tПРОТИВ: ${{agL.join(', ') || '—'}}\\n`;
+      }}
+    }}
   }}
   // Добавляем MFE/MAE если есть
   try {{
@@ -4397,6 +4697,96 @@ function showRunWeights() {{
   if (out.style.display === 'block') {{
     out.innerHTML = title + runWeightsSummaryToHtml(rows);
   }}
+}}
+
+// ── Обученные веса прогона + снимки (сохранить/применить к боту) ─────────────
+function _collectRunWeights() {{
+  const w = {{}};
+  for (const r of _backtestRows) {{
+    if (r.method_weights && r.method_weights.global) w[r.ticker] = r.method_weights;
+  }}
+  return w;
+}}
+
+function showTrainedWeights() {{
+  const out = document.getElementById('trained_weights_out');
+  const w = _collectRunWeights();
+  const tickers = Object.keys(w);
+  refreshWeightsSnapshots();
+  if (!tickers.length) {{
+    out.style.display = 'block';
+    out.innerHTML = '<span style="color:var(--txt3);font-size:11px">Нет обученных весов — запусти бэктест (веса снимаются по ходу прогона).</span>';
+    return;
+  }}
+  out.style.display = out.style.display === 'block' ? 'none' : 'block';
+  if (out.style.display !== 'block') return;
+  const agg = {{}};
+  for (const tk of tickers) {{
+    const g = w[tk].global || {{}};
+    for (const name in g) {{
+      if (!agg[name]) agg[name] = {{sum: 0, n: 0, tot: 0}};
+      agg[name].sum += g[name].weight;
+      agg[name].n += 1;
+      agg[name].tot += (g[name].total || 0);
+    }}
+  }}
+  const list = Object.keys(agg).map(name => ({{name: name, w: agg[name].sum / agg[name].n, n: agg[name].n, tot: agg[name].tot}}));
+  list.sort((a, b) => b.w - a.w);
+  let html = '<div style="font-size:12px;font-weight:bold;margin:4px 0">🏋 Обученные веса прогона (среднее по ' + tickers.length + ' тик., сорт по весу — сверху точные, снизу инвертированные)</div>';
+  html += '<table style="border-collapse:collapse;font-size:11px"><tr style="color:var(--txt3)"><th style="text-align:left;padding:2px 8px">Метод</th><th style="padding:2px 8px">Вес</th><th style="padding:2px 8px">Тикеров</th><th style="padding:2px 8px">Сделок</th></tr>';
+  for (const m of list) {{
+    let col = 'var(--txt2)';
+    if (m.w < 0) col = '#e07070';
+    else if (m.w >= 0.6) col = '#7dcc7d';
+    else if (m.w <= 0.1) col = 'var(--txt3)';
+    const inv = m.w < 0 ? ' <span style="font-size:9px;color:#e07070">инверт</span>' : '';
+    html += '<tr><td style="padding:2px 8px;color:var(--txt2);cursor:help" title="' + (_METHOD_RU[m.name] || m.name) + '">' + m.name + inv + '</td>'
+         + '<td style="padding:2px 8px;text-align:right;color:' + col + ';font-weight:600">' + m.w.toFixed(3) + '</td>'
+         + '<td style="padding:2px 8px;text-align:center;color:var(--txt3)">' + m.n + '</td>'
+         + '<td style="padding:2px 8px;text-align:center;color:var(--txt3)">' + m.tot + '</td></tr>';
+  }}
+  html += '</table>';
+  out.innerHTML = html;
+}}
+
+function saveWeightsSnapshot() {{
+  const w = _collectRunWeights();
+  if (!Object.keys(w).length) {{ alert('Нет обученных весов — сначала запусти бэктест.'); return; }}
+  const name = (prompt('Имя снимка весов:') || '').trim();
+  if (!name) return;
+  fetch('/api/weights_snapshot_save', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{name: name, weights: w}})}})
+    .then(r => r.json()).then(d => {{
+      if (d.error) {{ alert('Ошибка: ' + d.error); return; }}
+      alert('Снимок сохранён: ' + name + ' (' + d.tickers + ' тик.). Бота не трогает.');
+      refreshWeightsSnapshots();
+    }}).catch(() => {{}});
+}}
+
+function refreshWeightsSnapshots() {{
+  fetch('/api/weights_snapshots').then(r => r.json()).then(d => {{
+    const sel = document.getElementById('weights_snapshot_select');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— снимок весов —</option>';
+    (d.snapshots || []).forEach(s => {{
+      const o = document.createElement('option');
+      o.value = s.name; o.textContent = s.name + ' (' + (s.tickers || []).length + ' тик.)';
+      sel.appendChild(o);
+    }});
+    if (cur) sel.value = cur;
+  }}).catch(() => {{}});
+}}
+
+function applyWeightsSnapshotConfirm() {{
+  const sel = document.getElementById('weights_snapshot_select');
+  if (!sel || !sel.value) {{ alert('Выбери снимок весов из списка.'); return; }}
+  const name = sel.value;
+  if (!confirm('Применить веса снимка «' + name + '» к БОЕВОМУ боту?\\n\\nЭто перезапишет oi_weights.json — бот начнёт торговать с этими весами.\\nРезервная копия останется в oi_weights.json.bak.\\n\\nТочно применить?')) return;
+  fetch('/api/weights_snapshot_apply', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{name: name}})}})
+    .then(r => r.json()).then(d => {{
+      if (d.error) {{ alert('Ошибка: ' + d.error); return; }}
+      alert('Применено к боту: ' + d.applied + ' тик.\\nБэкап: ' + d.backup);
+    }}).catch(() => {{}});
 }}
 
 // ── Dashboard grid view ──────────────────────────────────────────────────────
@@ -7260,6 +7650,136 @@ def bot_control_action(action: str, ticker: str = "") -> dict:
     return {"ok": True, "paused": data.get("paused", False)}
 
 
+METHOD_PRESETS_FILE = "data/method_presets.json"
+
+
+def get_method_presets() -> dict:
+    """Все сохранённые пресеты методов {имя: {disabled, inverted, saved_at}}."""
+    try:
+        with open(METHOD_PRESETS_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def save_method_preset(name: str, disabled: list, inverted: list) -> dict | None:
+    """Сохраняет набор disabled/inverted под именем — переживает рестарт дашборда.
+    Возвращает None при успехе, {"error"} при пустом имени."""
+    name = (name or "").strip()
+    if not name:
+        return {"error": "пустое имя пресета"}
+    presets = get_method_presets()
+    presets[name] = {
+        "disabled": sorted(set(disabled or [])),
+        "inverted": sorted(set(inverted or [])),
+        "saved_at": time.time(),
+    }
+    os.makedirs(os.path.dirname(METHOD_PRESETS_FILE), exist_ok=True)
+    with open(METHOD_PRESETS_FILE, "w", encoding="utf-8") as f:
+        json.dump(presets, f, ensure_ascii=False, indent=2)
+    return None
+
+
+def delete_method_preset(name: str) -> None:
+    presets = get_method_presets()
+    if name in presets:
+        del presets[name]
+        with open(METHOD_PRESETS_FILE, "w", encoding="utf-8") as f:
+            json.dump(presets, f, ensure_ascii=False, indent=2)
+
+
+# ── Снимки обученных весов (data/weights_snapshots/*.json) ──────────────────
+WEIGHTS_SNAPSHOTS_DIR = "data/weights_snapshots"
+OI_WEIGHTS_FILE = "oi_weights.json"
+
+
+def _safe_snap_name(name: str) -> str:
+    """Безопасное имя файла из произвольной строки (только буквы/цифры/пробел/-_.)."""
+    keep = "".join(c for c in (name or "") if c.isalnum() or c in " _-.").strip()
+    return keep or "snapshot"
+
+
+def list_weights_snapshots() -> list:
+    """[{name, saved_at, tickers}] — по файлам в WEIGHTS_SNAPSHOTS_DIR."""
+    out = []
+    try:
+        files = sorted(f for f in os.listdir(WEIGHTS_SNAPSHOTS_DIR) if f.endswith(".json"))
+    except FileNotFoundError:
+        return out
+    for fn in files:
+        try:
+            with open(os.path.join(WEIGHTS_SNAPSHOTS_DIR, fn), encoding="utf-8") as f:
+                d = json.load(f)
+            out.append({
+                "name": fn[:-5],
+                "saved_at": d.get("saved_at"),
+                "tickers": list((d.get("weights") or {}).keys()),
+            })
+        except Exception:
+            pass
+    return out
+
+
+def save_weights_snapshot(name: str, weights: dict) -> dict:
+    """Пишет обученные за прогон веса в отдельный файл — бота НЕ трогает."""
+    if not (name or "").strip():
+        return {"error": "пустое имя снимка"}
+    if not weights:
+        return {"error": "нет весов для сохранения (сначала прогон)"}
+    os.makedirs(WEIGHTS_SNAPSHOTS_DIR, exist_ok=True)
+    path = os.path.join(WEIGHTS_SNAPSHOTS_DIR, _safe_snap_name(name) + ".json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"saved_at": time.time(), "weights": weights}, f, ensure_ascii=False, indent=2)
+    return {"ok": True, "tickers": len(weights)}
+
+
+def apply_weights_snapshot(name: str) -> dict:
+    """Вливает веса снимка в боевой oi_weights.json (перезапись global+regimes
+    по каждому figi). Делает бэкап oi_weights.json.bak. Влияет на бота —
+    на фронте перед вызовом стоит подтверждение."""
+    path = os.path.join(WEIGHTS_SNAPSHOTS_DIR, _safe_snap_name(name) + ".json")
+    if not os.path.exists(path):
+        return {"error": "снимок не найден"}
+    with open(path, encoding="utf-8") as f:
+        weights = (json.load(f) or {}).get("weights") or {}
+    data = {}
+    if os.path.exists(OI_WEIGHTS_FILE):
+        with open(OI_WEIGHTS_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        # бэкап перед перезаписью боевого файла
+        with open(OI_WEIGHTS_FILE + ".bak", "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    applied = 0
+    for mw in weights.values():
+        figi = mw.get("figi")
+        if not figi:
+            continue
+        entry = data.setdefault(figi, {})
+        for method, wd in (mw.get("global") or {}).items():
+            # total==0 — метод в прогоне не обучался (молчал: микроструктура и
+            # MULTI_TICKER в бэктесте без данных, редкие методы без голосов).
+            # Затирать его ЖИВОЙ накопленный вес холодным стартом нельзя.
+            if not wd.get("total"):
+                continue
+            entry[method] = {"weight": wd.get("weight", 0.3), "total": wd.get("total", 0),
+                             "sum_quality": wd.get("sum_quality", 0.0)}
+        if mw.get("regimes"):
+            reg = entry.setdefault("__regimes__", {})
+            for rg, methods in mw["regimes"].items():
+                rgentry = reg.setdefault(rg, {})
+                for method, wd in methods.items():
+                    if not wd.get("total"):
+                        continue
+                    rgentry[method] = {"weight": wd.get("weight", 0.3), "total": wd.get("total", 0),
+                                       "sum_quality": wd.get("sum_quality", 0.0)}
+        applied += 1
+    tmp = OI_WEIGHTS_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, OI_WEIGHTS_FILE)
+    return {"ok": True, "applied": applied, "backup": OI_WEIGHTS_FILE + ".bak"}
+
+
 def save_overrides_payload(payload: dict) -> dict | None:
     """
     Возвращает None при успехе, {"error": ...} если запрошен переход в боевой
@@ -7548,6 +8068,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(get_oi_backfill_status())
         elif self.path == "/api/tickers_list":
             self._send_json(sorted(_all_settings_by_ticker().keys()))
+        elif self.path == "/api/method_presets":
+            self._send_json(get_method_presets())
+        elif self.path == "/api/weights_snapshots":
+            self._send_json({"snapshots": list_weights_snapshots()})
         elif self.path.startswith("/api/bar_rules_load"):
             from urllib.parse import urlparse, parse_qs
             qs = parse_qs(urlparse(self.path).query)
@@ -7818,6 +8342,16 @@ class Handler(BaseHTTPRequestHandler):
             started = _start_futures_reload_bg()
             running = _futures_reload_running.is_set()
             self._send_json({"started": started, "running": running})
+        elif self.path == "/api/method_presets_save":
+            err = save_method_preset(payload.get("name"), payload.get("disabled"), payload.get("inverted"))
+            self._send_json(err if err else {"ok": True})
+        elif self.path == "/api/method_presets_delete":
+            delete_method_preset(payload.get("name", ""))
+            self._send_json({"ok": True})
+        elif self.path == "/api/weights_snapshot_save":
+            self._send_json(save_weights_snapshot(payload.get("name"), payload.get("weights") or {}))
+        elif self.path == "/api/weights_snapshot_apply":
+            self._send_json(apply_weights_snapshot(payload.get("name", "")))
         elif self.path == "/api/equity_analysis":
             tickers = payload.get("tickers", [])
             days = int(payload.get("days", 60))
