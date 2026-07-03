@@ -1437,6 +1437,7 @@ def _trades_list_compact(trades: list[dict]) -> list[dict]:
             "tp": round(t.get("take_price") or 0.0, 4),
             "sp": round(t.get("stop_price") or 0.0, 4),
             "l1pct": round(t.get("l1_pct") or -1.0, 3),  # позиция цены в дневном hi-lo [0..1], -1 если нет
+            "xr": t.get("exit_reason", ""),  # почему закрыли: take / stop / timeout
             "fa": [[n, round(s, 2)] for n, s in for_m],
             "ag": [[n, round(s, 2)] for n, s in against_m],
         })
@@ -3449,6 +3450,7 @@ function tradesListToHtml(trades, overallWr) {{
   html += '<tr style="color:var(--txt3);font-size:11px">'
     + '<th style="padding:3px 6px">#</th><th style="padding:3px 8px">Дата</th><th style="padding:3px 6px">Dir</th><th style="padding:3px 6px">Win</th><th style="padding:3px 8px">R</th><th style="padding:3px 8px">cumR</th>'
     + '<th style="padding:3px 8px">MFE%</th><th style="padding:3px 8px">MAE%</th>'
+    + '<th style="padding:3px 6px" title="Почему закрыли: тейк / стоп / таймаут">Выход</th>'
     + (hasEp ? '<th title="Вход → Выход / Тейк / Стоп">Вход/Тейк/Стоп</th>' : '')
     + '<th title="Позиция цены входа в дневном хай-лой: 0%=у лоя, 100%=у хая">Hi-Lo%</th>'
     + '<th style="min-width:60px">roll WR(10)</th><th>Топ ЗА</th><th>Топ ПРОТИВ</th></tr>';
@@ -3470,8 +3472,11 @@ function tradesListToHtml(trades, overallWr) {{
     const maePct = t.mae != null ? t.mae.toFixed(2) + '%' : '—';
     const mfeColor = (t.mfe != null && t.mae != null && t.mfe > t.mae) ? '#7dcc7d' : 'var(--txt3)';
     const maeColor = (t.mfe != null && t.mae != null && t.mae > t.mfe) ? '#e07070' : 'var(--txt3)';
-    const forStr = t.fa.map(([n, s]) => `<span title="${{n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
-    const againstStr = t.ag.map(([n, s]) => `<span title="${{n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
+    const _xrMap = {{take: 'тейк', stop: 'стоп', timeout: 'таймаут'}};
+    const xrTxt = _xrMap[t.xr] || t.xr || '—';
+    const xrColor = t.xr === 'take' ? '#7dcc7d' : (t.xr === 'stop' ? '#e07070' : 'var(--txt3)');
+    const forStr = t.fa.map(([n, s]) => `<span title="${{_METHOD_RU[n]||n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
+    const againstStr = t.ag.map(([n, s]) => `<span title="${{_METHOD_RU[n]||n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
     const bg = i % 2 === 0 ? 'background:var(--bg2)' : '';
     // Блок цен: ep→xp | tp ✓ | sp ✗
     let priceCell = '';
@@ -3507,6 +3512,7 @@ function tradesListToHtml(trades, overallWr) {{
       ${td('color:'+cumRColor)}${{cumR.toFixed(2)}}${_td}
       ${td('color:'+mfeColor)}${{mfePct}}${_td}
       ${td('color:'+maeColor)}${{maePct}}${_td}
+      ${td('color:'+xrColor+';font-size:10px;white-space:nowrap')}${{xrTxt}}${_td}
       ${{priceCell}}
       <td style="padding:2px 4px">${{l1bar}}</td>
       ${td('color:'+rwrColor)}${{rwrPct}}${_td}
@@ -3650,6 +3656,9 @@ const _METHOD_CATALOG = [
   ["Диагностика — в композит НЕ входят","M3_CLUSTER","M3 (кластерная модель)",0]
 ];
 const _ALL_METHODS = _METHOD_CATALOG.filter(r => r[3]).map(r => r[1]);
+// имя метода → русская подпись (для тултипов в атрибуции сделок)
+const _METHOD_RU = {{}};
+_METHOD_CATALOG.forEach(r => {{ _METHOD_RU[r[1]] = r[2]; }});
 
 function initMethodCheckboxes() {{
   const box = document.getElementById('method_checkboxes');
