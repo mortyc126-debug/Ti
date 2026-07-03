@@ -584,7 +584,14 @@ def _stock_oi_sym(stock_ticker: str) -> str:
 
 def _worker_get(base_url: str, path: str, timeout: int = 20):
     url = base_url.rstrip("/") + path
-    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    req = urllib.request.Request(url, headers={
+        "Accept": "application/json",
+        # Без явного User-Agent urllib шлёт "Python-urllib/x.y" — Cloudflare/edge
+        # блокирует это 403 раньше, чем запрос дойдёт до кода воркера (этот
+        # OI-воркер, в отличие от cf-collector, вообще без своей авторизации —
+        # единственная защита на пути была as-is, и её сносило edge).
+        "User-Agent": "Mozilla/5.0 (compatible; invest-bot/1.0)",
+    })
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.load(resp)
 
