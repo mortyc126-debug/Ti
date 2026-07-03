@@ -8021,15 +8021,20 @@ class OICompositeStrategy(IStrategy):
 
         _dm = self._disabled_methods
         _inv = self._inverted_methods
+        # OI-методы считаются отдельно от METHODS (провайдерные скоры), поэтому
+        # раньше их нельзя было выключить/инвертировать из панели. Теперь, когда
+        # данные ОИ приходят из воркера, пропускаем их через тот же гейт.
+        def _gate(name, val):
+            return 0.0 if name in _dm else (-val if name in _inv else val)
         base_scores = [(0.0 if name in _dm else (-fn(window) if name in _inv else fn(window))) for name, fn in METHODS] + [
             self.__score_level_context_mtf(),
             self.__score_market_structure_mtf(),
             self.__score_spring_mtf(),
-            self.__score_oi_squeeze(),
-            self.__score_provider(self.__inst_oi_provider),
-            self.__score_provider(self.__retail_contra_provider),
-            self.__score_provider(self.__delta_quadrant_provider),
-            self.__score_provider(self.__oi_absorption_provider),
+            _gate("OI_SQUEEZE", self.__score_oi_squeeze()),
+            _gate("INST_OI", self.__score_provider(self.__inst_oi_provider)),
+            _gate("RETAIL_CONTRA", self.__score_provider(self.__retail_contra_provider)),
+            _gate("DELTA_QUADRANT", self.__score_provider(self.__delta_quadrant_provider)),
+            _gate("OI_ABSORPTION", self.__score_provider(self.__oi_absorption_provider)),
             self.__score_provider(self.__index_context_provider),
         ] + [self.__score_tradestats(name) for name in TRADESTATS_METHOD_NAMES] \
           + [self.__cached_change_point, self.__score_multi_ticker()]
