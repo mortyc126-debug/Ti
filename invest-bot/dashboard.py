@@ -3139,6 +3139,12 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <button class="btn-pill btn-sm" onclick="ovBulk('enabled',false)">⏸ Все паузу</button>
     <button class="btn-pill btn-sm" onclick="ovBulk('signal_only',true)">🔔 Все сигнал</button>
     <button class="btn-pill btn-sm" onclick="ovBulk('signal_only',false)">💸 Все торговля</button>
+    <button class="btn-pill btn-sm warn" onclick="pruneStaleOiTickers()" title="Убрать тикеры, которых нет в settings.ini/[FUTURES_TRADING] И по которым никогда не считался бэктест на этой машине — старый мусор из oi_tickers.json (импорт oi-signal-v10.html)">🧹 Убрать хлам (OI-импорт без истории)</button>
+  </div>
+  <div style="font-size:11px;color:var(--txt3);margin:-4px 0 8px;">
+    Бейдж <b>OI-импорт</b> — тикер попал в список только из oi_tickers.json (старый экспорт oi-signal-v10.html),
+    не из settings.ini. «✗» — по нему нет ни одного локально закэшированного бэктеста. Бейдж <b>ini</b> —
+    сконфигурирован в settings.ini или резолвится как фьючерс [FUTURES_TRADING], удалять тут нечего.
   </div>
   <table class="scen-table">
     <thead><tr>
@@ -5631,12 +5637,23 @@ async function runPortfolioSim() {{
   document.getElementById('pf_trades').innerHTML = trh;
 }}
 
-function ovRowHtml(ticker, t) {{
+function ovRowHtml(ticker, t, oiInfo) {{
   t = t || {{}};
   const en = t.enabled !== false;
   const so = t.signal_only === true ? 'sandbox' : (t.signal_only === false ? 'live' : 'auto');
+  // oiInfo задан только для тикеров, которые держатся ИСКЛЮЧИТЕЛЬНО на старом
+  // импорте oi_tickers.json (не в settings.ini, не резолвятся как фьючерс) —
+  // для settings.ini/[FUTURES_TRADING] удалять нечего, они появятся заново.
+  let srcBadge, delBtn = '';
+  if (oiInfo) {{
+    const cacheNote = oiInfo.has_cache ? '' : ' — нет локального кэша свечей (никогда не считался)';
+    srcBadge = `<span title="Только импорт oi_tickers.json (oi-signal-v10.html), не в settings.ini${{cacheNote}}" style="font-size:8px;padding:0 4px;border:1px solid #a05a2c;border-radius:6px;color:#d08a4a;white-space:nowrap">OI-импорт${{oiInfo.has_cache ? '' : ' ✗'}}</span>`;
+    delBtn = `<button onclick="removeOiTicker('${{ticker}}', this)" title="Убрать из oi_tickers.json — тикер держится только на старом импорте" style="font-size:10px;padding:1px 6px;border:1px solid var(--border2);border-radius:4px;background:transparent;color:var(--txt3);cursor:pointer;margin-left:4px">🗑</button>`;
+  }} else {{
+    srcBadge = `<span title="Из settings.ini или резолвится как фьючерс [FUTURES_TRADING]" style="font-size:8px;padding:0 4px;border:1px solid var(--border2);border-radius:6px;color:var(--txt3)">ini</span>`;
+  }}
   return `<tr data-ticker="${{ticker}}">
-    <td>${{ticker}}</td>
+    <td>${{ticker}} ${{srcBadge}}${{delBtn}}</td>
     <td><input type="checkbox" class="ov_enabled" ${{en ? 'checked' : ''}}> торгуется</td>
     <td><select class="inp ov_signal_only">
       <option value="auto" ${{so === 'auto' ? 'selected' : ''}}>как в settings.ini</option>
@@ -5648,6 +5665,26 @@ function ovRowHtml(ticker, t) {{
     <td><input type="text" class="inp ov_short_take" style="width:70px" value="${{t.short_take ?? ''}}" placeholder="—"></td>
     <td><input type="text" class="inp ov_short_stop" style="width:70px" value="${{t.short_stop ?? ''}}" placeholder="—"></td>
   </tr>`;
+}}
+
+function removeOiTicker(ticker, btn) {{
+  if (!confirm(`Убрать «${{ticker}}» из oi_tickers.json? Он больше не будет появляться в списках, пока не импортируешь заново.`)) return;
+  fetch('/api/oi_ticker_remove', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{ticker: ticker}})}})
+    .then(r => r.json()).then(d => {{
+      if (!d.ok) {{ alert('ошибка: ' + (d.error || '?')); return; }}
+      const row = document.querySelector(`#ov_table tr[data-ticker="${{ticker}}"]`);
+      if (row) row.remove();
+    }}).catch(() => alert('ошибка сети'));
+}}
+
+function pruneStaleOiTickers() {{
+  if (!confirm('Убрать из oi_tickers.json все тикеры без settings.ini/[FUTURES_TRADING] И без локального кэша свечей (ни разу не считались на этой машине)?')) return;
+  fetch('/api/oi_tickers_prune_stale', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: '{{}}'}})
+    .then(r => r.json()).then(d => {{
+      if (!d.ok) {{ alert('ошибка'); return; }}
+      alert(`Убрано: ${{d.count}}` + (d.count ? `\\n${{d.removed.join(', ')}}` : ''));
+      loadOverrides();
+    }}).catch(() => alert('ошибка сети'));
 }}
 
 async function loadBotStatus() {{
@@ -6460,7 +6497,8 @@ async function loadOverrides() {{
   document.getElementById('ov_weekly_loss').value = data.weekly_max_loss_pct ?? '';
   document.getElementById('ov_monthly_loss').value = data.monthly_max_loss_pct ?? '';
   const tbody = document.getElementById('ov_table');
-  tbody.innerHTML = data.tickers_all.map(t => ovRowHtml(t, data.tickers[t])).join('');
+  const oiImportOnly = data.oi_import_only || {{}};
+  tbody.innerHTML = data.tickers_all.map(t => ovRowHtml(t, data.tickers[t], oiImportOnly[t])).join('');
   document.getElementById('ov_status').textContent = 'загружено';
 }}
 
@@ -7687,10 +7725,31 @@ async function bsLoadFiles() {{
 """
 
 
+def _oi_import_tickers_only() -> set[str]:
+    """Тикеры, которые попадают в общий список ТОЛЬКО из-за старого импорта
+    oi_tickers.json (merge_oi_tickers, экспорт из oi-signal-v10.html) — не
+    сконфигурированы ни в settings.ini STRATEGY_*, ни резолвятся как
+    фьючерс из [FUTURES_TRADING]. Импорт ничего не удаляет и не устаревает
+    сам — это единственный способ их отличить от «настоящих» тикеров."""
+    ini_tickers = {s.ticker for s in _config.trade_strategy_settings}
+    futures_tickers = set(_futures_settings_by_ticker().keys())
+    return set(load_oi_tickers().keys()) - ini_tickers - futures_tickers
+
+
 def get_overrides_payload() -> dict:
     """Текущий data/bot_overrides.json + полный список тикеров (settings.ini + OI) для таблицы."""
     data = load_overrides()
+    oi_only = _oi_import_tickers_only()
     tickers_all = sorted(set(_all_settings_by_ticker().keys()) | set(load_oi_tickers().keys()))
+    # Источник тикера — чтобы в таблице было видно, откуда он взялся, и чтобы
+    # предложить удаление только для тех, что держатся исключительно на
+    # старом импорте (settings.ini/FUTURES_TRADING трогать нет смысла — они
+    # просто появятся заново на следующей перезагрузке страницы).
+    from candle_archive import _local_cache_path
+    oi_removable = {}
+    for t in oi_only:
+        has_cache = os.path.exists(_local_cache_path(t)) or os.path.exists(_local_cache_path(t, 1))
+        oi_removable[t] = {"has_cache": has_cache}
     return {
         "global_signal_only": data.get("global_signal_only"),
         "partial_tp_enabled": data.get("partial_tp_enabled"),
@@ -7702,7 +7761,46 @@ def get_overrides_payload() -> dict:
         "monthly_max_loss_pct": data.get("monthly_max_loss_pct"),
         "tickers": data.get("tickers", {}),
         "tickers_all": tickers_all,
+        # {ticker: {has_cache}} — только для тикеров, держащихся исключительно
+        # на импорте oi_tickers.json (кандидаты на удаление из UI).
+        "oi_import_only": oi_removable,
     }
+
+
+def delete_oi_ticker(ticker: str) -> dict:
+    """Убирает один тикер из oi_tickers.json (единственный способ его туда
+    когда-либо попавший — merge_oi_tickers). Не трогает settings.ini/кэш
+    фьючерсов — если тикер сконфигурирован там, он и не был бы в oi_tickers
+    единственным источником, см. _oi_import_tickers_only."""
+    current = load_oi_tickers()
+    if ticker not in current:
+        return {"ok": False, "error": "тикер не найден в oi_tickers.json"}
+    del current[ticker]
+    with open(OI_TICKERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(current, f, ensure_ascii=False, indent=2)
+    return {"ok": True}
+
+
+def prune_stale_oi_tickers() -> dict:
+    """Массово убирает из oi_tickers.json тикеры, которые (а) держатся только
+    на этом импорте (не в settings.ini/FUTURES_TRADING) и (б) не имеют ни
+    одного локально закэшированного файла свечей — то есть по ним никогда
+    не гонялся бэктест/график на этой машине. Это и есть тот самый «хлам без
+    истории» — импортирован когда-то из oi-signal-v10.html, ни разу не
+    использован, с тех пор просто занимает строку в каждом списке тикеров."""
+    from candle_archive import _local_cache_path
+    oi_only = _oi_import_tickers_only()
+    current = load_oi_tickers()
+    removed = []
+    for t in oi_only:
+        has_cache = os.path.exists(_local_cache_path(t)) or os.path.exists(_local_cache_path(t, 1))
+        if not has_cache and t in current:
+            del current[t]
+            removed.append(t)
+    if removed:
+        with open(OI_TICKERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(current, f, ensure_ascii=False, indent=2)
+    return {"ok": True, "removed": sorted(removed), "count": len(removed)}
 
 
 def get_live_chart(ticker: str, days: int = 7) -> dict:
@@ -8871,6 +8969,10 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/overrides":
             error = save_overrides_payload(payload)
             self._send_json(error if error else {"ok": True})
+        elif self.path == "/api/oi_ticker_remove":
+            self._send_json(delete_oi_ticker(payload.get("ticker", "")))
+        elif self.path == "/api/oi_tickers_prune_stale":
+            self._send_json(prune_stale_oi_tickers())
         elif self.path == "/api/reload_futures":
             started = _start_futures_reload_bg()
             running = _futures_reload_running.is_set()
