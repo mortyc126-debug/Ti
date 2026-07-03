@@ -5321,7 +5321,7 @@ async function councilAsk() {{
       dialog ? `Альфа: ${{dialog}}` : '',
       skeptic ? `Бета: ${{skeptic}}` : '',
       mod ? `Модератор: ${{mod}}` : '',
-    ].filter(Boolean).join('\n\n');
+    ].filter(Boolean).join('\\n\\n');
     statusEl.textContent = '';
     resultEl.style.display = '';
   }} catch(e) {{ statusEl.textContent = '⚠ ' + e; }}
