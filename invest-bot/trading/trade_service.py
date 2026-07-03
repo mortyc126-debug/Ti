@@ -16,7 +16,14 @@ from invest_api.services.market_data_stream_service import MarketDataStreamServi
 from mega_alerts import MegaAlertsService
 from trade_system.strategies.base_strategy import IStrategy
 from trading.trader import Trader, BotShutdownRequested
+import runtime_overrides
 import sandbox_monitor
+
+# Между чанками длинного сна (ночь/выходные/ожидание открытия рынка) —
+# проверка дашбордовского shutdown_requested. 30с — тот же порядок величины,
+# что и мягкая остановка внутри торгового дня (флаг читается на каждой свече,
+# т.е. ~раз в минуту), не нагружает диск (один stat/json.load раз в 30с).
+SLEEP_CHECK_INTERVAL_SEC = 30
 
 __all__ = ("TradeService")
 
@@ -154,8 +161,19 @@ class TradeService:
             except Exception as ex:
                 logger.error(f"Start trading today error: {repr(ex)}")
 
-            logger.info("Sleep to next morning")
-            await TradeService.__sleep_to_next_morning()
+            # Отдельный try: ночной сон должен произойти в ЛЮБОМ случае выше
+            # (успех, "не торговый день" или обычная ошибка) — иначе после
+            # Exception цикл тут же вернётся к проверке расписания без паузы
+            # (риск горячего цикла ретраев при устойчивой ошибке API/сети).
+            # BotShutdownRequested здесь ловится отдельно, а не общим except
+            # Exception выше — иначе он ушёл бы в лог как обычная ошибка вместо
+            # чистой остановки.
+            try:
+                logger.info("Sleep to next morning")
+                await TradeService.__sleep_to_next_morning()
+            except BotShutdownRequested:
+                logger.info("Остановка с дашборда: завершаю __working_loop (во время ночного сна)")
+                return
 
     @staticmethod
     async def __sleep_to_next_morning() -> None:
@@ -167,10 +185,27 @@ class TradeService:
 
     @staticmethod
     async def __sleep_to(next_time: datetime) -> None:
+        """Чанкованный сон вместо одного долгого asyncio.sleep — иначе
+        мягкая остановка с дашборда (bot_supervisor.stop_bot →
+        shutdown_requested) не работала здесь вообще: Trader.pop_shutdown_
+        requested() проверяется только внутри __trading (на свечах активной
+        торговой сессии), а этот сон покрывает и ночь/выходные (до ~60ч), и
+        ожидание открытия рынка внутри торгового дня — раньше в оба окна
+        флаг с дашборда игнорировался, единственным способом остановить
+        бота там был force_kill (SIGKILL/taskkill)."""
         now = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
 
         logger.debug(f"Sleep from {now} to {next_time}")
         total_seconds = (next_time - now).total_seconds()
 
-        if total_seconds > 0:
-            await asyncio.sleep(total_seconds)
+        while total_seconds > 0:
+            chunk = min(total_seconds, SLEEP_CHECK_INTERVAL_SEC)
+            await asyncio.sleep(chunk)
+            total_seconds -= chunk
+
+            data = runtime_overrides.load_overrides()
+            if data.get("shutdown_requested"):
+                data["shutdown_requested"] = False
+                runtime_overrides.save_overrides(data)
+                logger.info("Остановка с дашборда: обнаружена во время сна (ночь/выходные/ожидание открытия)")
+                raise BotShutdownRequested()

@@ -23,12 +23,34 @@ from decimal import Decimal
 from tinkoff.invest.exceptions import RequestError
 
 from configuration.configuration import ProgramConfiguration
+from invest_api.services.instruments_service import InstrumentService
 from invest_api.services.market_data_service import MarketDataService
 from trade_system.strategies.strategy_factory import StrategyFactory
 
 CONFIG_FILE = "settings.ini"
 
 logging.basicConfig(level=logging.WARNING)
+
+
+def _load_index_context_provider(instrument_service: InstrumentService,
+                                  market_data: MarketDataService, days: int):
+    """IndexContextBacktestProvider на дневках фьюча IMOEX — тот же провайдер,
+    что использует dashboard.py, но без D1-кэша (разовый скрипт, прямые
+    запросы к Tinkoff). None, если IMOEX не резолвится — метод просто молчит."""
+    try:
+        from index_context import IndexContextBacktestProvider, daily_from_intraday
+        resolved = instrument_service.future_by_base_ticker("IMOEX")
+        if not resolved:
+            return None
+        future_settings, figi = resolved
+        candles = market_data.get_candles_history(figi, days=days + 75)
+        if not candles:
+            return None
+        prov = IndexContextBacktestProvider(daily_from_intraday(candles))
+        return prov if prov.has_data() else None
+    except Exception as e:
+        logging.warning(f"INDEX_CONTEXT: не построен — {e}")
+        return None
 
 
 def main() -> None:
@@ -43,6 +65,15 @@ def main() -> None:
 
     config = ProgramConfiguration(CONFIG_FILE)
     market_data = MarketDataService(config.tinkoff_token, config.tinkoff_app_name)
+    instrument_service = InstrumentService(config.tinkoff_token, config.tinkoff_app_name)
+
+    # OI-провайдер (data/oi_daily.json, без сети) + INDEX_CONTEXT (IMOEX,
+    # один запрос на весь прогон) — раньше этот скрипт вообще не подключал
+    # ни один из провайдерных методов композита: fixed vs ATR сравнивалось
+    # на неполном композите (без 6 из ~71 метода), не так, как видит бот.
+    from oi_layers import OiBacktestProvider
+    oi_prov = OiBacktestProvider.load()
+    idx_prov = _load_index_context_provider(instrument_service, market_data, args.days)
 
     print(f"{'TICKER':<8}{'mode':<14}{'trades':>7}{'win%':>7}{'avg_R':>8}{'exp%':>8}")
     for strategy_settings in config.trade_strategy_settings:
@@ -63,9 +94,27 @@ def main() -> None:
         long_take = Decimal(s.get("LONG_TAKE", "1.015"))
         long_stop = Decimal(s.get("LONG_STOP", "0.985"))
 
+        oi_hook = None
+        if oi_prov.has_data(strategy_settings.ticker):
+            strategy.set_inst_oi_provider(oi_prov.inst_oi_score)
+            strategy.set_retail_contra_provider(oi_prov.retail_contra_score)
+            strategy.set_delta_quadrant_provider(oi_prov.delta_quadrant_score)
+            strategy.set_oi_absorption_provider(oi_prov.absorption_score)
+            strategy.set_squeeze_provider(oi_prov.squeeze_score)
+            oi_hook = oi_prov.set_date
+        if idx_prov is not None and hasattr(strategy, "set_index_context_provider"):
+            strategy.set_index_context_provider(idx_prov.score)
+            if oi_hook is None:
+                oi_hook = idx_prov.set_date
+            else:
+                _oi_hook0 = oi_hook
+                def oi_hook(d, _h0=_oi_hook0, _p=idx_prov):
+                    _h0(d)
+                    _p.set_date(d)
+
         # Дорогой проход (Hawkes-MLE и т.п.) делаем один раз на тикер,
         # а не на каждую из 10 комбинаций take/stop.
-        signals = strategy.backtest_scan_signals(candles)
+        signals = strategy.backtest_scan_signals(candles, oi_date_hook=oi_hook)
 
         fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop)
         _print_row(strategy_settings.ticker, "fixed", fixed)
