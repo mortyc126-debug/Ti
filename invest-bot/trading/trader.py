@@ -3042,7 +3042,13 @@ class Trader:
                 lot_size=future_settings.lot,
                 short_enabled_flag=future_settings.short_enabled_flag,
                 is_future=True,
-                margin_per_lot=future_settings.margin_per_lot
+                margin_per_lot=future_settings.margin_per_lot,
+                # Стоимость пункта цены контракта (min_price_increment_amount /
+                # min_price_increment) — уже посчитана в future_by_base_ticker.
+                # Без её передачи risk.py считал бы R/stop_dist для фьючерса как
+                # для акции (1 пункт = 1 ₽), хотя код риска point_value полностью
+                # поддерживает — просто сюда значение раньше не доходило.
+                point_value=future_settings.point_value
             )
             strategy = StrategyFactory.new_factory("OICompositeStrategy", settings)
             if not strategy:
