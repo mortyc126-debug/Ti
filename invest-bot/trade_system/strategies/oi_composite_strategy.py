@@ -673,6 +673,17 @@ QUALITY_ALPHA = 0.15               # скорость EWA для rolling quality
 LAG_PENALTY_BARS = 5
 LAG_PENALTY_MIN = 0.6              # confidence-множитель сразу после смены режима
 
+# Гистерезис дискретной метки режима (Schmitt-триггер + dwell) — против дребезга
+# argmax на границе двух близких режимов. Раньше committed-метка присваивалась
+# argmax'ом каждый бар, и вход-гейт (ranging/stress) щёлкал туда-сюда от шума в
+# один тик; кэш и lag-penalty это лишь маскировали, но не убирали. Метка
+# переключается, только если новый режим либо доминирует по вероятности хотя бы
+# на MARGIN, либо продержался argmax'ом DWELL свежих (heavy) оценок подряд
+# (страховка от вечного залипания в ranging при устойчивом малоконтрастном тренде).
+# Смесь весов (regime_mods) гистерезиса не касается — она берёт всё распределение.
+REGIME_HYST_MARGIN = 0.10
+REGIME_HYST_DWELL = 2
+
 # ── ATR-exhaustion: подавление входов когда дневной ATR почти исчерпан ───────
 _ATR_EX_SOFT      = 0.50   # 50% ATR от свинга → начало демпфирования
 _ATR_EX_HARD      = 0.80   # 80% ATR → жёсткое демпфирование (импульс почти исчерпан)
@@ -6243,6 +6254,9 @@ class OICompositeStrategy(IStrategy):
         self.__regime_confidence: float = 1.0
         self.__last_regime: str = "ranging"
         self.__regime_stable_bars: int = 0
+        # Гистерезис метки: кандидат на смену и сколько свежих оценок подряд он держится.
+        self.__regime_cand: str = "ranging"
+        self.__regime_cand_bars: int = 0
         self.__last_scores: dict[str, float] = {}
         # Теневые скоры: то же самое, но БЕЗ гейта по _disabled_methods (только
         # инверсия) — нужны, чтобы видеть гипотетический винрейт выключенного
@@ -8037,6 +8051,41 @@ class OICompositeStrategy(IStrategy):
 
     # ── Внутренние методы ─────────────────────────────────────────────────────
 
+    def __commit_regime_label(self, argmax_regime: str, regime_probs: dict, do_heavy: bool) -> str:
+        """Гистерезис committed-метки режима (Schmitt-триггер + dwell).
+
+        До этого self.__last_regime = argmax присваивался каждый бар → на границе
+        двух близких режимов метка дребезжала от шума в один тик, и дискретные
+        потребители (вход-гейт ranging/stress, порог, нарратив) щёлкали туда-сюда.
+
+        Оцениваем смену ТОЛЬКО на свежих вероятностях (do_heavy): между heavy-барами
+        regime_probs берётся из кэша — повторный счёт того же снэпшота накручивал бы
+        dwell вхолостую. Переключаемся, если новый режим либо уверенно доминирует
+        (перевес по вероятности >= REGIME_HYST_MARGIN), либо продержался argmax'ом
+        REGIME_HYST_DWELL свежих оценок подряд (страховка от вечного залипания в
+        ranging при устойчивом, но малоконтрастном тренде). См. REGIME_HYST_*.
+        """
+        prev = self.__last_regime
+        if not do_heavy:
+            return prev  # нет свежих данных — держим прежнюю committed-метку
+        if argmax_regime == prev:
+            self.__regime_cand = prev
+            self.__regime_cand_bars = 0
+            return prev
+        # argmax отличается от текущей метки — копим подтверждение свежими оценками
+        if argmax_regime == self.__regime_cand:
+            self.__regime_cand_bars += 1
+        else:
+            self.__regime_cand = argmax_regime
+            self.__regime_cand_bars = 1
+        decisive = (regime_probs.get(argmax_regime, 0.0)
+                    - regime_probs.get(prev, 0.0)) >= REGIME_HYST_MARGIN
+        persistent = self.__regime_cand_bars >= REGIME_HYST_DWELL
+        if decisive or persistent:
+            self.__regime_cand_bars = 0
+            return argmax_regime
+        return prev
+
     def __compute_composite(self) -> tuple[float, list[float]]:
         window = self.__candles
         vhf_mult = score_volatility_regime(window)
@@ -8161,14 +8210,18 @@ class OICompositeStrategy(IStrategy):
             _inv_only("OI_ABSORPTION", oi_raw["OI_ABSORPTION"]),
         ] + _tail_scores[3:]
 
-        # Layer 0: непрерывное распределение по всем режимам.
-        regime = max(regime_probs, key=regime_probs.get)
+        # Layer 0: непрерывное распределение по всем режимам. Дискретную метку
+        # (argmax) для гейта/порога/нарратива прогоняем через гистерезис —
+        # __commit_regime_label. Смесь весов (regime_mods) ниже берёт ВСЁ
+        # распределение и гистерезиса не касается.
+        argmax_regime = max(regime_probs, key=regime_probs.get)
+        regime = self.__commit_regime_label(argmax_regime, regime_probs, do_heavy)
         # BOCD-дисконт свежего излома (кэш из heavy-блока): faithful к classify_regime,
         # где confidence *= 0.7 при недавней смене режима. Влияет и на composite
         # (confidence_mult), и на __regime_confidence → regime_unstable/нарратив.
         regime_conf = regime_probs[regime] * self.__cached_bocd_discount
 
-        # Lag-penalty: считаем бары подряд в одном (argmax) режиме до его смены.
+        # Lag-penalty: считаем бары подряд в одном (committed) режиме до его смены.
         if regime == self.__last_regime:
             self.__regime_stable_bars = min(self.__regime_stable_bars + 1, LAG_PENALTY_BARS)
         else:
