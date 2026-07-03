@@ -3563,36 +3563,125 @@ function bestWorstMethodsToHtml(methodStats) {{
 
 // ===== Глобальная статистика методов =====
 
-const _ALL_METHODS = [
-  "PRICE_TREND","VOL_MOMENTUM","VWAP_SIGNAL","BS_PRESSURE","CANDLE_PATTERN",
-  "ADAPTIVE_MA","TREND_QUALITY","FRACTAL","ENTROPY","FISHER_RSI","KLINGER","VZO",
-  "DONCHIAN","TWIGGS","RMI","ZSCORE","ZLEMA_SIGNAL","T3_SIGNAL","SINEWAVE_SIGNAL",
-  "SSA_SIGNAL","HAWKES_SIGNAL","VSA","WICK_REJECTION","TRIANGLE","PRICE_ACCEL",
-  "CUMUL_DELTA","AMT_POC","VSA_ABSORPTION","CASCADE","IMPULSE_PULLBACK",
-  "WANING_IMPULSES","VOL_COMPRESSION","FALSE_BREAKOUT","LEVEL_ABSORPTION",
-  "ICHIMOKU_SIGNAL","BB_KELTNER_SQUEEZE","MA_TENSION","RSI_DIVERGENCE",
-  "ATR_EXHAUSTION","ALLIGATOR","MAMA_FAMA","EHLERS_MODE","CYBER_PHASE"
+// Полный каталог методов. Единый источник; держать в синхроне с ALL_METHOD_NAMES
+// (oi_composite_strategy.py). Строка: [группа, имя, рус.подпись, переключаемый].
+// переключаемый=1 → checkbox + кнопка инверсии (это 50 методов METHODS — только
+// их видят set_disabled_methods/set_inverted_methods). переключаемый=0 → метод
+// считается, но выключить/инвертировать отсюда нельзя: провайдерные (OI /
+// микроструктура) молчат без данных, структурные считаются отдельно, а M1/M2/M3 —
+// диагностика (в живой композит не входят). Показаны, чтобы список был полным —
+// раньше половины этих методов в списке не было вовсе.
+const _METHOD_CATALOG = [
+  ["Тренд / MA","PRICE_TREND","тренд цены (линрег)",1],
+  ["Тренд / MA","TREND_QUALITY","качество тренда (TQI)",1],
+  ["Тренд / MA","ADAPTIVE_MA","отклонение от KAMA",1],
+  ["Тренд / MA","ZLEMA_SIGNAL","ZLEMA (без лага)",1],
+  ["Тренд / MA","T3_SIGNAL","T3-скользящая",1],
+  ["Тренд / MA","MAMA_FAMA","MAMA / FAMA",1],
+  ["Тренд / MA","ALLIGATOR","аллигатор Вильямса",1],
+  ["Тренд / MA","MA_ENVELOPE","конверт скользящей",1],
+  ["Тренд / MA","MA_TENSION","натяжение к MA",1],
+  ["Тренд / MA","ICHIMOKU_SIGNAL","облако Ишимоку",1],
+  ["Объём","VOL_MOMENTUM","объём × направление",1],
+  ["Объём","KLINGER","осциллятор Клингера",1],
+  ["Объём","VZO","Volume Zone Oscillator",1],
+  ["Объём","TWIGGS","Twiggs Money Flow",1],
+  ["Объём","CUMUL_DELTA","кумулятивная дельта",1],
+  ["Объём","AMT_POC","POC / профиль объёма",1],
+  ["Объём","VSA","VSA (объём-спред-анализ)",1],
+  ["Объём","VSA_ABSORPTION","VSA-поглощение",1],
+  ["Осцилляторы / возврат","VWAP_SIGNAL","отклонение от VWAP",1],
+  ["Осцилляторы / возврат","RMI","Relative Momentum Index",1],
+  ["Осцилляторы / возврат","FISHER_RSI","преобразование Фишера от RSI",1],
+  ["Осцилляторы / возврат","ZSCORE","z-score (возврат к среднему)",1],
+  ["Осцилляторы / возврат","RSI_DIVERGENCE","дивергенция RSI",1],
+  ["Осцилляторы / возврат","DONCHIAN","канал Дончиана",1],
+  ["Осцилляторы / возврат","BB_KELTNER_SQUEEZE","сжатие BB / Keltner",1],
+  ["Циклы (Ehlers/DSP)","SINEWAVE_SIGNAL","синусоида Ehlers (EBSW)",1],
+  ["Циклы (Ehlers/DSP)","EHLERS_MODE","режим тренд/цикл (Ehlers)",1],
+  ["Циклы (Ehlers/DSP)","CYBER_PHASE","фаза Cyber Cycle",1],
+  ["Циклы (Ehlers/DSP)","SSA_SIGNAL","SSA-тренд (сингулярный спектр)",1],
+  ["Свечи / паттерны","CANDLE_PATTERN","свечные паттерны",1],
+  ["Свечи / паттерны","WICK_REJECTION","отбой фитилём",1],
+  ["Свечи / паттерны","TRIANGLE","треугольник",1],
+  ["Свечи / паттерны","BS_PRESSURE","давление тела свечи",1],
+  ["Импульс / движение","PRICE_ACCEL","ускорение цены",1],
+  ["Импульс / движение","IMPULSE_PULLBACK","откат от импульса",1],
+  ["Импульс / движение","WANING_IMPULSES","затухание импульсов",1],
+  ["Импульс / движение","CASCADE","каскад (лавина)",1],
+  ["Импульс / движение","VOL_COMPRESSION","сжатие волатильности",1],
+  ["Импульс / движение","FALSE_BREAKOUT","ложный пробой",1],
+  ["Импульс / движение","LEVEL_ABSORPTION","поглощение на уровне",1],
+  ["Импульс / движение","ATR_EXHAUSTION","истощение по ATR",1],
+  ["Фракталы / матстат","FRACTAL","фрактал (FDI/Hurst/PFE)",1],
+  ["Фракталы / матстат","ENTROPY","энтропия движения",1],
+  ["Фракталы / матстат","HAWKES_SIGNAL","процесс Хоукса",1],
+  ["Фракталы / матстат","NADARAYA_WATSON","ядерная регрессия",1],
+  ["Фракталы / матстат","FRACTIONAL_DIFF","дробное дифференцирование",1],
+  ["Уровни / SMC","LEVEL_QUALITY","качество уровня (3 из 5)",1],
+  ["Уровни / SMC","FVG","гэп справедливой цены (FVG)",1],
+  ["Уровни / SMC","ORDER_BLOCK","ордер-блок",1],
+  ["Уровни / SMC","LIQUIDITY_SWEEP","снятие ликвидности",1],
+  ["Структура (MTF) — не выключается","LEVEL_CONTEXT","контекст уровней",0],
+  ["Структура (MTF) — не выключается","MKT_STRUCTURE","структура рынка (HH/HL)",0],
+  ["Структура (MTF) — не выключается","SPRING","пружина Вайкоффа",0],
+  ["Открытый интерес (FutOI) — провайдер","OI_SQUEEZE","сквиз открытого интереса",0],
+  ["Открытый интерес (FutOI) — провайдер","INST_OI","нетто-позиция юрлиц",0],
+  ["Открытый интерес (FutOI) — провайдер","RETAIL_CONTRA","контр-сигнал физлиц",0],
+  ["Открытый интерес (FutOI) — провайдер","DELTA_QUADRANT","квадрант дельты ОИ",0],
+  ["Открытый интерес (FutOI) — провайдер","OI_ABSORPTION","поглощение по ОИ",0],
+  ["Микроструктура (tradestats) — провайдер","BS_PRESSURE_TS","давление сделок",0],
+  ["Микроструктура (tradestats) — провайдер","AGGRESSOR_FLOW","поток агрессора",0],
+  ["Микроструктура (tradestats) — провайдер","LARGE_IMPACT","перекос крупных сделок",0],
+  ["Микроструктура (tradestats) — провайдер","VWAP_SIGNAL_TS","внутридневной VWAP",0],
+  ["Микроструктура (tradestats) — провайдер","VOL_MOMENTUM_TS","аномальный объём",0],
+  ["Микроструктура (tradestats) — провайдер","OB_IMBALANCE","дисбаланс стакана",0],
+  ["Микроструктура (tradestats) — провайдер","CANCEL_SIGNAL","отмены заявок",0],
+  ["Прочее","CHANGE_POINT","точка излома (CUSUM/PELT)",0],
+  ["Прочее","MULTI_TICKER","межинструментальный",0],
+  ["Диагностика — в композит НЕ входят","M1_CLUSTER","M1 (кластерная модель)",0],
+  ["Диагностика — в композит НЕ входят","M2_CLUSTER","M2 (кластерная модель)",0],
+  ["Диагностика — в композит НЕ входят","M3_CLUSTER","M3 (кластерная модель)",0]
 ];
+const _ALL_METHODS = _METHOD_CATALOG.filter(r => r[3]).map(r => r[1]);
 
 function initMethodCheckboxes() {{
   const box = document.getElementById('method_checkboxes');
   if (!box || box.children.length) return;
-  for (const name of _ALL_METHODS) {{
+  let curGroup = '';
+  for (const row of _METHOD_CATALOG) {{
+    const grp = row[0], name = row[1], ru = row[2], toggl = row[3];
+    if (grp !== curGroup) {{
+      curGroup = grp;
+      const h = document.createElement('div');
+      h.textContent = grp;
+      h.style.cssText = 'width:100%;font-size:9px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.4px;margin:6px 0 2px;border-bottom:1px solid var(--border2);padding-bottom:1px;';
+      box.appendChild(h);
+    }}
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:1px;';
+    wrap.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:1px;min-width:155px;';
     const lbl = document.createElement('label');
-    lbl.style.cssText = 'display:flex;align-items:center;gap:3px;font-size:10px;color:var(--txt2);white-space:nowrap;cursor:pointer;flex:1;';
-    const cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.value = name; cb.id = 'dm_' + name;
-    cb.onchange = updateDisabledCount;
-    lbl.append(cb, name.replace(/_/g,' '));
-    // кнопка инверсии
-    const inv = document.createElement('button');
-    inv.textContent = '↔'; inv.title = 'Использовать как контр-индикатор (инвертировать скор)';
-    inv.id = 'inv_' + name;
-    inv.style.cssText = 'font-size:9px;padding:0 5px;border-radius:3px;border:1px solid var(--border2);background:transparent;color:var(--txt3);cursor:pointer;line-height:14px;';
-    inv.onclick = () => toggleInvertMethod(name);
-    wrap.append(lbl, inv);
+    lbl.style.cssText = 'display:flex;align-items:center;gap:3px;font-size:10px;color:var(--txt2);white-space:nowrap;flex:1;cursor:' + (toggl ? 'pointer' : 'default') + ';' + (toggl ? '' : 'opacity:.6;');
+    const cap = name + ' — ' + ru;
+    if (toggl) {{
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.value = name; cb.id = 'dm_' + name;
+      cb.onchange = updateDisabledCount;
+      lbl.append(cb, cap);
+      const inv = document.createElement('button');
+      inv.textContent = '↔'; inv.title = 'Использовать как контр-индикатор (инвертировать скор)';
+      inv.id = 'inv_' + name;
+      inv.style.cssText = 'font-size:9px;padding:0 5px;border-radius:3px;border:1px solid var(--border2);background:transparent;color:var(--txt3);cursor:pointer;line-height:14px;';
+      inv.onclick = () => toggleInvertMethod(name);
+      wrap.append(lbl, inv);
+    }} else {{
+      lbl.append(cap);
+      const tag = document.createElement('span');
+      tag.textContent = 'инфо';
+      tag.title = 'Метод считается, но отключить/инвертировать его отсюда нельзя';
+      tag.style.cssText = 'font-size:8px;padding:0 4px;border-radius:3px;border:1px solid var(--border2);color:var(--txt3);line-height:14px;';
+      wrap.append(lbl, tag);
+    }}
     box.appendChild(wrap);
   }}
 }}
