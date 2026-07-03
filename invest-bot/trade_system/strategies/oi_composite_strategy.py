@@ -6350,6 +6350,31 @@ class OICompositeStrategy(IStrategy):
     def is_signal_only(self) -> bool:
         return self.__signal_only
 
+    def reset_weights_cold(self) -> None:
+        """Сброс Hedge-весов (глобальных и режимных) в холодный старт — для
+        бэктеста, где обучение (в backtest_barriers) должно идти с нуля, а не
+        от загруженных из oi_weights.json живых весов. Инстанс бэктеста
+        одноразовый, live-файл не трогается."""
+        self.__weights = {name: MethodWeight() for name in ALL_METHOD_NAMES}
+        self.__regime_weights = {regime: {name: MethodWeight() for name in ALL_METHOD_NAMES}
+                                 for regime in REGIMES}
+        self.__rolling_quality = 0.5
+
+    def weights_snapshot(self) -> dict:
+        """Текущее состояние Hedge-весов (global + по режимам) — снимается
+        дашбордом ПОСЛЕ обучающего прохода backtest_barriers (обучение весов
+        живёт именно там, не в backtest_scan_signals)."""
+        def _wsnap(wd):
+            return {n: {"weight": round(w.weight, 4), "total": w.total,
+                        "sum_quality": round(w.sum_quality, 4)}
+                    for n, w in wd.items()}
+        return {
+            "figi": self.__settings.figi,
+            "ticker": self.__settings.ticker,
+            "global": _wsnap(self.__weights),
+            "regimes": {rg: _wsnap(m) for rg, m in self.__regime_weights.items()},
+        }
+
     def set_disabled_methods(self, names: list[str] | set[str]) -> None:
         """Отключить указанные методы голосования для прогона бэктеста."""
         self._disabled_methods = set(names)
@@ -7214,23 +7239,6 @@ class OICompositeStrategy(IStrategy):
                 })
                 i += max(1, len(window))  # не пересекать виртуальные сделки
         finally:
-            # Снимок ОБУЧЕННЫХ за прогон весов — ДО восстановления исходных.
-            # Бэктест стартует с холодных равномерных весов и эволюционирует их
-            # причинно; здесь фиксируем результат, чтобы дашборд мог показать/
-            # сохранить/применить его (иначе эти веса просто выбрасываются ниже).
-            try:
-                def _wsnap(wd):
-                    return {n: {"weight": round(w.weight, 4), "total": w.total,
-                                "sum_quality": round(w.sum_quality, 4)}
-                            for n, w in wd.items()}
-                self.last_backtest_weights = {
-                    "figi": self.__settings.figi,
-                    "ticker": self.__settings.ticker,
-                    "global": _wsnap(self.__weights),
-                    "regimes": {rg: _wsnap(m) for rg, m in self.__regime_weights.items()},
-                }
-            except Exception:
-                self.last_backtest_weights = None
             self.__candles = saved_candles
             self.__score_history = saved_score_history
             (self.__l1_buffer, self.__l1_pct, self.__l1_above_ma50,

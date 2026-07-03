@@ -1643,8 +1643,19 @@ def run_backtest_one(
                     + (" (адаптивная калибровка narrative)" if adaptive_narrative else "")
                     + f" | отклонений: порог={rej['below_threshold']} методы={rej['methods_disagree']} M3_veto={rej.get('gate_m3_veto', 0)} объём={rej['liquidity']}")
 
+        # Холодный старт весов перед обучающим проходом: Hedge-обучение живёт в
+        # backtest_barriers (не в scan), и без сброса оно стартовало бы от живых
+        # весов из oi_weights.json — снапшот был бы смесью live+прогон, а не
+        # «обученным за прогон». Сигналы уже собраны сканом — на входы сброс
+        # не влияет, только на эволюцию весов и отчётные hedge_weight.
+        if hasattr(strategy, "reset_weights_cold"):
+            strategy.reset_weights_cold()
         fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop,
                                             return_trades=True, tariff=tariff, adaptive_lasso=adaptive_lasso)
+        # Снимаем обученные веса СРАЗУ после первого (fixed) прохода — дальше
+        # walk-forward ATR-подбор гоняет barriers ещё десятки раз по тем же
+        # сигналам и дообучал бы веса повторно на пересекающихся сделках.
+        trained_weights = strategy.weights_snapshot() if hasattr(strategy, "weights_snapshot") else None
         fixed_trades = fixed.pop("trades", [])
         _ticker_full_trades = fixed_trades  # вернём как третий элемент tuple
         fixed_pct = fixed.get("expectancy_pct", 0.0)
@@ -1653,10 +1664,9 @@ def run_backtest_one(
                      "method_stats": _method_stats_from_trades(fixed_trades),
                      "method_stats_by_regime": _method_stats_by_regime_from_trades(fixed_trades),
                      "trades_list": _trades_list_compact(fixed_trades),
-                     # Обученные за прогон веса методов (холодный старт → эволюция),
-                     # снятые до восстановления в backtest_scan_signals — для
-                     # просмотра/снимка/применения к боту с дашборда.
-                     "method_weights": getattr(strategy, "last_backtest_weights", None),
+                     # Обученные за прогон веса методов (холодный старт → эволюция
+                     # в backtest_barriers) — для просмотра/снимка/применения к боту.
+                     "method_weights": trained_weights,
                      **fixed})
 
         # Walk-forward, не full-history sweep: подбор лучшей (tk, sk) по сигналам
@@ -7362,6 +7372,11 @@ def apply_weights_snapshot(name: str) -> dict:
             continue
         entry = data.setdefault(figi, {})
         for method, wd in (mw.get("global") or {}).items():
+            # total==0 — метод в прогоне не обучался (молчал: микроструктура и
+            # MULTI_TICKER в бэктесте без данных, редкие методы без голосов).
+            # Затирать его ЖИВОЙ накопленный вес холодным стартом нельзя.
+            if not wd.get("total"):
+                continue
             entry[method] = {"weight": wd.get("weight", 0.3), "total": wd.get("total", 0),
                              "sum_quality": wd.get("sum_quality", 0.0)}
         if mw.get("regimes"):
@@ -7369,6 +7384,8 @@ def apply_weights_snapshot(name: str) -> dict:
             for rg, methods in mw["regimes"].items():
                 rgentry = reg.setdefault(rg, {})
                 for method, wd in methods.items():
+                    if not wd.get("total"):
+                        continue
                     rgentry[method] = {"weight": wd.get("weight", 0.3), "total": wd.get("total", 0),
                                        "sum_quality": wd.get("sum_quality", 0.0)}
         applied += 1
