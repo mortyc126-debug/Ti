@@ -198,13 +198,25 @@ def _save_backtest_history_one(
         _set_progress(progress, ticker, f"скан сигналов ({len(candles)} свечей)")
         from oi_layers import OiBacktestProvider
         oi_prov = OiBacktestProvider.load()
+        oi_hook = None
         if oi_prov.has_data(ticker):
             strategy.set_inst_oi_provider(oi_prov.inst_oi_score)
             strategy.set_retail_contra_provider(oi_prov.retail_contra_score)
             strategy.set_delta_quadrant_provider(oi_prov.delta_quadrant_score)
             strategy.set_oi_absorption_provider(oi_prov.absorption_score)
             strategy.set_squeeze_provider(oi_prov.squeeze_score)
-        strategy.backtest_barriers(candles, oi_date_hook=oi_prov.set_date if oi_prov.has_data(ticker) else None)
+            oi_hook = oi_prov.set_date
+        idx_prov = _index_context_provider_for_backtest(days, offset_days)
+        if idx_prov is not None and hasattr(strategy, "set_index_context_provider"):
+            strategy.set_index_context_provider(idx_prov.score)
+            if oi_hook is None:
+                oi_hook = idx_prov.set_date
+            else:
+                _oi_hook0 = oi_hook
+                def oi_hook(d, _h0=_oi_hook0, _p=idx_prov):
+                    _h0(d)
+                    _p.set_date(d)
+        strategy.backtest_barriers(candles, oi_date_hook=oi_hook)
         hist = bt_store._data.get(ticker, {})
         n_trades = sum(len(day.get("trades", [])) for day in hist.values())
         _set_progress(progress, ticker, "готово")
@@ -1044,6 +1056,17 @@ def get_trade_chart(ticker: str, days: int, atr_take: float, atr_stop: float) ->
         oi_hook = oi_prov.set_date
     else:
         oi_hook = None
+
+    idx_prov = _index_context_provider_for_backtest(days)
+    if idx_prov is not None and hasattr(strategy, "set_index_context_provider"):
+        strategy.set_index_context_provider(idx_prov.score)
+        if oi_hook is None:
+            oi_hook = idx_prov.set_date
+        else:
+            _oi_hook0 = oi_hook
+            def oi_hook(d, _h0=_oi_hook0, _p=idx_prov):
+                _h0(d)
+                _p.set_date(d)
 
     signals = strategy.backtest_scan_signals(candles, oi_date_hook=oi_hook)
     result = strategy.backtest_barriers(

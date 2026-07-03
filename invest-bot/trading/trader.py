@@ -229,6 +229,15 @@ class Trader:
         self.__blogger = blogger
         self.__mega_alerts_settings = mega_alerts_settings
         self.__futures_trading_settings = futures_trading_settings
+        # Неизменный ini-список BASE_TICKERS — на случай, если ticker_universe.json
+        # когда-либо вернёт пустой resolved_tickers (переключение на "manual" с
+        # пустым списком, ошибка расчёта и т.п.). Раньше resolved_base_tickers()
+        # получал fallback=self.__futures_trading_settings.base_tickers — то же
+        # поле, которое мутируется строкой ниже КАЖДЫЙ день; после первого дня
+        # с непустым resolved_tickers исходный ini-список терялся навсегда, и
+        # "откат к ini при пустом resolved_tickers" на деле откатывался к
+        # вчерашнему resolved-списку, а не к settings.ini.
+        self.__futures_base_tickers_ini = list(futures_trading_settings.base_tickers)
         self.__risk = RiskManager()
         self.__last_prices: dict[str, float] = {}
         self.__oi_layers = OiLayersService(price_getter=lambda t: self.__last_prices.get(t))
@@ -460,7 +469,7 @@ class Trader:
         # BASE_TICKERS из settings.ini, как раньше.
         if self.__futures_trading_settings.enabled:
             new_base_tickers = ticker_universe.resolved_base_tickers(
-                fallback=self.__futures_trading_settings.base_tickers
+                fallback=self.__futures_base_tickers_ini
             )
             if new_base_tickers != self.__futures_trading_settings.base_tickers:
                 logger.info(
