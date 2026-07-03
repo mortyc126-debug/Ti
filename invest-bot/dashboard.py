@@ -2459,7 +2459,13 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
         <span id="disabled_count" style="font-size:10px;color:var(--neg);"></span>
       </div>
       <div id="method_disable_panel" style="display:none;margin-top:6px;">
-        <div style="font-size:10px;color:var(--txt3);margin-bottom:6px;">Отмеченные методы будут давать 0 в голосовании (как будто не существуют). Удобно для тестирования без худших методов.</div>
+        <div style="font-size:10px;color:var(--txt3);margin-bottom:6px;">Отмеченные методы будут давать 0 в голосовании (как будто не существуют). Кнопка ↔ — использовать метод как контр-индикатор (инвертировать скор). «инфо» — метод считается, но выключить его отсюда нельзя (провайдерный/структурный/диагностика).</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+          <button class="btn-pill btn-xs ghost" onclick="saveMethodPreset()" style="font-size:10px;padding:2px 8px;" title="Сохранить текущий набор откл/инверсий под именем — переживёт перезапуск дашборда">💾 сохранить пресет</button>
+          <select id="method_preset_select" onchange="applyMethodPreset()" style="font-size:10px;padding:2px 6px;background:var(--bg2);color:var(--txt2);border:1px solid var(--border2);border-radius:4px;"><option value="">— загрузить пресет —</option></select>
+          <button class="btn-pill btn-xs ghost" onclick="deleteMethodPreset()" style="font-size:10px;padding:2px 8px;" title="Удалить выбранный пресет">🗑</button>
+          <span id="method_preset_msg" style="font-size:10px;color:var(--txt3);"></span>
+        </div>
         <div id="method_checkboxes" style="display:flex;flex-wrap:wrap;gap:4px 10px;"></div>
       </div>
     </div>
@@ -3688,6 +3694,7 @@ function initMethodCheckboxes() {{
 
 function toggleMethodDisable() {{
   initMethodCheckboxes();
+  refreshMethodPresets();
   const p = document.getElementById('method_disable_panel');
   p.style.display = p.style.display === 'none' ? '' : 'none';
 }}
@@ -3735,6 +3742,73 @@ function updateDisabledCount() {{
 
 function getDisabledMethods() {{
   return Array.from(document.querySelectorAll('#method_checkboxes input[type=checkbox]:checked')).map(cb => cb.value);
+}}
+
+// ── Пресеты методов (data/method_presets.json на сервере) ──────────────────
+let _methodPresets = {{}};
+
+function refreshMethodPresets() {{
+  fetch('/api/method_presets').then(r => r.json()).then(d => {{
+    _methodPresets = d || {{}};
+    const sel = document.getElementById('method_preset_select');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— загрузить пресет —</option>';
+    Object.keys(_methodPresets).sort().forEach(name => {{
+      const o = document.createElement('option');
+      o.value = name; o.textContent = name;
+      sel.appendChild(o);
+    }});
+    if (cur && _methodPresets[cur]) sel.value = cur;
+  }}).catch(() => {{}});
+}}
+
+function saveMethodPreset() {{
+  const name = (prompt('Имя пресета:') || '').trim();
+  if (!name) return;
+  const body = JSON.stringify({{name: name, disabled: getDisabledMethods(), inverted: getInvertedMethods()}});
+  fetch('/api/method_presets_save', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: body}})
+    .then(r => r.json()).then(d => {{
+      const msg = document.getElementById('method_preset_msg');
+      if (d.error) {{ if (msg) msg.textContent = 'ошибка: ' + d.error; return; }}
+      if (msg) msg.textContent = 'сохранён: ' + name;
+      refreshMethodPresets();
+      const sel = document.getElementById('method_preset_select');
+      if (sel) sel.value = name;
+    }}).catch(() => {{}});
+}}
+
+function applyMethodPreset() {{
+  const sel = document.getElementById('method_preset_select');
+  if (!sel || !sel.value) return;
+  const p = _methodPresets[sel.value];
+  if (!p) return;
+  initMethodCheckboxes();
+  clearDisabledMethods();
+  (p.disabled || []).forEach(name => {{
+    const cb = document.getElementById('dm_' + name);
+    if (cb) cb.checked = true;
+  }});
+  (p.inverted || []).forEach(name => {{
+    const btn = document.getElementById('inv_' + name);
+    if (btn && btn.dataset.active !== '1') toggleInvertMethod(name);
+  }});
+  updateDisabledCount();
+  const msg = document.getElementById('method_preset_msg');
+  if (msg) msg.textContent = 'применён: ' + sel.value;
+}}
+
+function deleteMethodPreset() {{
+  const sel = document.getElementById('method_preset_select');
+  if (!sel || !sel.value) return;
+  const name = sel.value;
+  if (!confirm('Удалить пресет «' + name + '»?')) return;
+  fetch('/api/method_presets_delete', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{name: name}})}})
+    .then(() => {{
+      const msg = document.getElementById('method_preset_msg');
+      if (msg) msg.textContent = 'удалён: ' + name;
+      refreshMethodPresets();
+    }}).catch(() => {{}});
 }}
 
 // Агрегирует method_stats по всем строкам _backtestRows и рисует глобальную таблицу
@@ -7043,6 +7117,44 @@ def bot_control_action(action: str, ticker: str = "") -> dict:
     return {"ok": True, "paused": data.get("paused", False)}
 
 
+METHOD_PRESETS_FILE = "data/method_presets.json"
+
+
+def get_method_presets() -> dict:
+    """Все сохранённые пресеты методов {имя: {disabled, inverted, saved_at}}."""
+    try:
+        with open(METHOD_PRESETS_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def save_method_preset(name: str, disabled: list, inverted: list) -> dict | None:
+    """Сохраняет набор disabled/inverted под именем — переживает рестарт дашборда.
+    Возвращает None при успехе, {"error"} при пустом имени."""
+    name = (name or "").strip()
+    if not name:
+        return {"error": "пустое имя пресета"}
+    presets = get_method_presets()
+    presets[name] = {
+        "disabled": sorted(set(disabled or [])),
+        "inverted": sorted(set(inverted or [])),
+        "saved_at": time.time(),
+    }
+    os.makedirs(os.path.dirname(METHOD_PRESETS_FILE), exist_ok=True)
+    with open(METHOD_PRESETS_FILE, "w", encoding="utf-8") as f:
+        json.dump(presets, f, ensure_ascii=False, indent=2)
+    return None
+
+
+def delete_method_preset(name: str) -> None:
+    presets = get_method_presets()
+    if name in presets:
+        del presets[name]
+        with open(METHOD_PRESETS_FILE, "w", encoding="utf-8") as f:
+            json.dump(presets, f, ensure_ascii=False, indent=2)
+
+
 def save_overrides_payload(payload: dict) -> dict | None:
     """
     Возвращает None при успехе, {"error": ...} если запрошен переход в боевой
@@ -7323,6 +7435,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(get_oi_backfill_status())
         elif self.path == "/api/tickers_list":
             self._send_json(sorted(_all_settings_by_ticker().keys()))
+        elif self.path == "/api/method_presets":
+            self._send_json(get_method_presets())
         elif self.path.startswith("/api/bar_rules_load"):
             from urllib.parse import urlparse, parse_qs
             qs = parse_qs(urlparse(self.path).query)
@@ -7593,6 +7707,12 @@ class Handler(BaseHTTPRequestHandler):
             started = _start_futures_reload_bg()
             running = _futures_reload_running.is_set()
             self._send_json({"started": started, "running": running})
+        elif self.path == "/api/method_presets_save":
+            err = save_method_preset(payload.get("name"), payload.get("disabled"), payload.get("inverted"))
+            self._send_json(err if err else {"ok": True})
+        elif self.path == "/api/method_presets_delete":
+            delete_method_preset(payload.get("name", ""))
+            self._send_json({"ok": True})
         elif self.path == "/api/equity_analysis":
             tickers = payload.get("tickers", [])
             days = int(payload.get("days", 60))
