@@ -1440,6 +1440,13 @@ def _trades_list_compact(trades: list[dict]) -> list[dict]:
             "xr": t.get("exit_reason", ""),  # почему закрыли: take / stop / timeout
             "fa": [[n, round(s, 2)] for n, s in for_m],
             "ag": [[n, round(s, 2)] for n, s in against_m],
+            # Полный разбор по ВСЕМ методам, высказавшимся на входе (|score|>=0.02) —
+            # чтобы «за/против» было видно целиком (тултип на экране) и полностью
+            # попадало в кнопку копирования, а не только топ-3/5.
+            "ms": sorted(
+                [[n, round(v, 2)] for n, v in (t.get("method_scores") or {}).items() if abs(v) >= 0.02],
+                key=lambda x: -x[1]
+            ),
         })
     return out
 
@@ -3477,6 +3484,11 @@ function tradesListToHtml(trades, overallWr) {{
     const xrColor = t.xr === 'take' ? '#7dcc7d' : (t.xr === 'stop' ? '#e07070' : 'var(--txt3)');
     const forStr = t.fa.map(([n, s]) => `<span title="${{_METHOD_RU[n]||n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
     const againstStr = t.ag.map(([n, s]) => `<span title="${{_METHOD_RU[n]||n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
+    // Полный список за/против (все методы) — в тултип ячейки, чтобы видеть целиком.
+    const _dir = t.d === 'L' ? 1 : -1;
+    const _ms = t.ms || [];
+    const allForTitle = 'ЗА (все): ' + (_ms.filter(([n, s]) => s * _dir > 0).map(([n, s]) => (_METHOD_RU[n]||n) + ' ' + s.toFixed(2)).join(', ') || '—');
+    const allAgTitle = 'ПРОТИВ (все): ' + (_ms.filter(([n, s]) => s * _dir < 0).map(([n, s]) => (_METHOD_RU[n]||n) + ' ' + s.toFixed(2)).join(', ') || '—');
     const bg = i % 2 === 0 ? 'background:var(--bg2)' : '';
     // Блок цен: ep→xp | tp ✓ | sp ✗
     let priceCell = '';
@@ -3516,8 +3528,8 @@ function tradesListToHtml(trades, overallWr) {{
       ${{priceCell}}
       <td style="padding:2px 4px">${{l1bar}}</td>
       ${td('color:'+rwrColor)}${{rwrPct}}${_td}
-      ${td('color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden')}${{forStr}}${_td}
-      ${td('color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden')}${{againstStr}}${_td}
+      <td style="padding:2px 8px;color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden;cursor:help" title="${{allForTitle}}">${{forStr}}</td>
+      <td style="padding:2px 8px;color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden;cursor:help" title="${{allAgTitle}}">${{againstStr}}</td>
     </tr>`;
   }}
   html += '</table></div>';
@@ -4221,6 +4233,24 @@ async function copyAllResults(btn) {{
       for (const t of r.trades_list) {{
         const l1 = t.l1pct != null && t.l1pct >= 0 ? (t.l1pct*100).toFixed(0)+'%' : '—';
         text += `${{r.ticker}}\t${{t.t}}\t${{t.d}}\t${{t.w?'W':'L'}}\t${{t.r.toFixed(2)}}\t${{t.mfe!=null?t.mfe.toFixed(2)+'%':'—'}}\t${{t.mae!=null?t.mae.toFixed(2)+'%':'—'}}\t${{t.ep||'—'}}\t${{t.xp||'—'}}\t${{t.tp||'—'}}\t${{t.sp||'—'}}\t${{l1}}\\n`;
+      }}
+    }}
+    // Полный разбор по методам (за/против, знак приведён к направлению сделки) +
+    // причина выхода — по каждой сделке отдельной строкой.
+    const _xrRu = {{take: 'тейк', stop: 'стоп', timeout: 'таймаут'}};
+    text += '\\n--- За / Против по методам (все, знак к направлению) ---\\n';
+    for (const r of rowsWithTrades) {{
+      for (const t of r.trades_list) {{
+        const dir = t.d === 'L' ? 1 : -1;
+        const ms = t.ms || [];
+        const forL = ms.filter(([n, s]) => s * dir > 0)
+          .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+          .map(([n, s]) => n + ' ' + (s > 0 ? '+' : '') + s.toFixed(2));
+        const agL = ms.filter(([n, s]) => s * dir < 0)
+          .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+          .map(([n, s]) => n + ' ' + s.toFixed(2));
+        const xr = _xrRu[t.xr] || t.xr || '—';
+        text += `${{r.ticker}}\t${{t.t}}\t${{t.d}}\tвыход:${{xr}}\tЗА: ${{forL.join(', ') || '—'}}\tПРОТИВ: ${{agL.join(', ') || '—'}}\\n`;
       }}
     }}
   }}
