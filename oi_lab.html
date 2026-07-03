@@ -289,6 +289,7 @@ details.panel .panel-body{padding-top:12px}
       <button class="sec" onclick="labSpikeAutopsy()">Перед выбросами</button>
       <button class="sec" onclick="labIndexEffect()">Влияние индекса</button>
       <button class="sec" onclick="labHourlyEventCalib()">Часовая событийка</button>
+      <button class="sec" onclick="labBotReconcile()">Сверка с ботом</button>
     </div>
 
     <div id="pool-out" style="color:var(--text3);font-size:11px;margin-top:10px">Нажми «Заполнить всеми из базы» (или впиши тикеры вручную), затем «Рассчитать по пулу».</div>
@@ -3529,8 +3530,14 @@ function _screenRowHtml(h, poolAcc3, poolAgg, fmtK, pctlSpan, hCell) {
   const asset = _rootAsset(h.ticker) || h.ticker;
   const word = _assetWord(asset);
   const pAcc = poolAcc3(h.def.id);
+  const botChip = h.bot && h.bot.n >= 3 ? (() => {
+    const w = h.bot.wins / h.bot.n;
+    const c = w >= 0.55 ? '#52F2C9' : w < 0.45 ? '#FF6A8B' : '#A79BC9';
+    const dead = h.bot.n >= 5 && w < 0.45;
+    return `<br><span style="font-size:9px;color:${c}" title="Входы бота в сторону этого сигнала на этом тикере (из «Сверки с ботом» на вкладке Пул): побед/входов">бот: ${h.bot.wins}/${h.bot.n}${dead ? ' — по факту не работает' : ''}</span>`;
+  })() : '';
   return `<tr style="background:${hl ? (h.def.dir > 0 ? 'rgba(82,242,201,0.08)' : 'rgba(199,27,82,0.12)') : '#140A24'}"${thin ? ' title="Мало собственной истории сигнала у тикера — ориентируйся на пуловую точность"' : ''}>
-    <td style="padding:4px 8px;color:#F2F0FF">${h.def.emoji ? h.def.emoji + ' ' : ''}${h.def.name}</td>
+    <td style="padding:4px 8px;color:#F2F0FF">${h.def.emoji ? h.def.emoji + ' ' : ''}${h.def.name}${botChip}</td>
     <td style="text-align:center;cursor:pointer" onclick="openTicker('${h.ticker}')" title="${_rootTitle(h.ticker)} — клик: открыть во вкладке «Тикер» с графиками и монитором"
         onmouseover="this.style.background='rgba(180,135,248,0.12)'" onmouseout="this.style.background=''">
       <span style="color:#B487F8;font-weight:700;font-size:12px;border-bottom:1px dashed #B487F866">${asset} ↗</span>
@@ -3606,6 +3613,11 @@ async function labSignalScreener(prepend) {
   }
   const poolAcc3 = id => poolAgg[id].n3 ? poolAgg[id].c3 / poolAgg[id].n3 * 100 : NaN;
   const poolAcc1 = id => poolAgg[id].n1 ? poolAgg[id].c1 / poolAgg[id].n1 * 100 : NaN;
+  // Факт из прогонов бота (кнопка «Сверка с ботом» на вкладке Пул):
+  // подтверждает или опровергает сигнал реальными входами на этом тикере
+  let botStats = {};
+  try { botStats = JSON.parse(localStorage.getItem('oilab_botstats') || '{}'); } catch (_) {}
+  for (const h of hits) h.bot = botStats[`${h.ticker}__${h.def.id}`] || null;
   for (const h of hits) h.score = (isFinite(h.acc3) && h.n3 >= 8) ? h.acc3 : poolAcc3(h.def.id);
   hits.sort((a, b) => (b.score || 0) - (a.score || 0));
 
@@ -3706,6 +3718,7 @@ async function labCalibratePool() {
   }
   _lastPoolRawData = rawData;
   _lastPoolInstruments = instruments;
+  _publishOiStates(proxy, instruments); // мост «лаба → бот», фоном, некритично
 
   // Считаем per-инструмент статистику по тем же бинам, что и одиночная калибровка
   const perInstrumentSp    = [];
@@ -4695,6 +4708,123 @@ async function labIndexEffect() {
   el.innerHTML = html + el.innerHTML;
   const nSig = sigRows.reduce((s, r) => s + r.bucket.top.length + r.bucket.mid.length + r.bucket.bottom.length, 0);
   setStatus(`Влияние индекса: ${nSig} дней сигналов разложено по режимам, пробоев вверх ${self.brkUp.f3.length}, вниз ${self.brkDn.f3.length}`, 'ok');
+}
+
+// ── МОСТ «ЛАБА → БОТ»: публикация состояний OI-сигналов в D1 ──
+// Бот читает /db/oistates?date= и может подмешивать OI-сигналы как метод —
+// его адаптивные веса на тестовых прогонах сами выяснят, где они помогают.
+async function _publishOiStates(proxy, instruments) {
+  try {
+    const rows = instruments.map(inst => {
+      const L = inst.result[inst.result.length - 1];
+      if (!L) return null;
+      const act = _SCREEN_SIGNALS.filter(d => d.active(L));
+      return { ticker: inst.ticker, date: String(L.date).slice(0, 10), payload: {
+        signals: act.map(d => ({ id: d.id, dir: d.dir })),
+        pressure_rank: L.squeeze_pressure_rank, short_pctl: L.total_short_pctl,
+        long_pctl: L.total_long_pctl, drawdown: L.drawdown, trend_return: L.trend_return,
+        monitor_axes: _monitorQuick(L).p,
+      } };
+    }).filter(Boolean);
+    const r = await fetch(`${proxy}/db/oistates`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows }) });
+    if (r.ok) console.log(`oistates: опубликовано ${rows.length} состояний для бота`);
+  } catch (_) { /* мост некритичен для расчёта */ }
+}
+
+// ── МОСТ «БОТ → ЛАБА»: сверка resolved-сигналов бота с OI-сигналами ──
+// Читает исходы бота (mfe/mae/quality) и раскладывает: когда бот входил
+// В СТОРОНУ активного OI-сигнала — выигрывал ли чаще своего среднего?
+// Результат пишется в localStorage и подсвечивается в скринере: по каким
+// тикерам сигнал подтверждён реальными прогонами, а где по факту сливает.
+async function labBotReconcile() {
+  if (!_lastPoolInstruments || !_lastPoolInstruments.length) { setStatus('Сверка идёт по рассчитанному пулу — сначала «Рассчитать по пулу»', 'err'); return; }
+  const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
+  setStatus('Сверка с ботом: читаю resolved-сигналы…');
+  let bot = [];
+  try { const r = await fetch(`${proxy}/db/signals?resolved=1`); if (r.ok) bot = await r.json(); } catch (_) {}
+  if (!Array.isArray(bot) || !bot.length) { setStatus('В базе нет resolved-сигналов бота (/db/signals?resolved=1 пуст) — прогони бота/бэктест сначала', 'err'); return; }
+  await _getRootNames(proxy);
+
+  // Маппинг тикера бота → root пула: сперва по коду базового актива
+  // (SMLT → SS), затем по 2-буквенному префиксу дескрипта (SiZ5 → Si)
+  const roots = new Set(_lastPoolInstruments.map(i => i.ticker));
+  const assetToRoot = {};
+  for (const i of _lastPoolInstruments) { const a = _rootAsset(i.ticker); if (a) assetToRoot[String(a).toUpperCase()] = i.ticker; }
+  const mapRoot = t => { const s = String(t || ''); return assetToRoot[s.toUpperCase()] || (roots.has(s.slice(0, 2)) ? s.slice(0, 2) : null); };
+
+  // Победа: quality если бот его посчитал, иначе |MFE| против |MAE|
+  // (mae у бота может храниться и с минусом, и модулем — берём Math.abs)
+  const winOf = s => (isFinite(s.quality) && s.quality !== 0) ? s.quality > 0 : (+s.mfe || 0) > Math.abs(+s.mae || 0);
+  const dirOf = s => s.dir === 'long' ? 1 : s.dir === 'short' ? -1 : 0;
+
+  const dateIdxByRoot = {};
+  const instByRoot = {};
+  for (const inst of _lastPoolInstruments) {
+    instByRoot[inst.ticker] = inst;
+    const m = {}; inst.result.forEach((r, i) => { m[String(r.date).slice(0, 10)] = i; });
+    dateIdxByRoot[inst.ticker] = m;
+  }
+
+  const buckets = {}; // defId → {same: [win...], opp: [win...], perT: {root: {n, wins}}}
+  for (const def of _SCREEN_SIGNALS) buckets[def.id] = { same: [], opp: [], perT: {} };
+  const baseline = [];
+  let unmapped = 0, unmatched = 0;
+  for (const s of bot) {
+    const root = mapRoot(s.ticker);
+    if (!root) { unmapped++; continue; }
+    const d = String(s.ts || '').slice(0, 10);
+    const i = dateIdxByRoot[root][d];
+    if (i === undefined) { unmatched++; continue; }
+    const win = winOf(s) ? 1 : 0;
+    const bd = dirOf(s);
+    baseline.push(win);
+    const row = instByRoot[root].result[i];
+    for (const def of _SCREEN_SIGNALS) {
+      if (!def.match(row)) continue;
+      if (bd === 0) continue; // нейтральные входы бота не относим ни к «за», ни к «против»
+      const side = bd === def.dir ? 'same' : 'opp';
+      buckets[def.id][side].push(win);
+      if (side === 'same') {
+        const pt = buckets[def.id].perT[root] || (buckets[def.id].perT[root] = { n: 0, wins: 0 });
+        pt.n++; pt.wins += win;
+      }
+    }
+  }
+  if (!baseline.length) { setStatus(`Сверка: ${bot.length} сигналов бота, но ни один не совпал с пулом по тикеру+дате (не смаплено: ${unmapped}, вне дат: ${unmatched})`, 'err'); return; }
+
+  // Адаптация: скринер подсвечивает факт бота по (тикер × сигнал)
+  const store = {};
+  for (const def of _SCREEN_SIGNALS) for (const root in buckets[def.id].perT) store[`${root}__${def.id}`] = buckets[def.id].perT[root];
+  localStorage.setItem('oilab_botstats', JSON.stringify(store));
+
+  const wr = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length * 100 : NaN;
+  const baseWr = wr(baseline);
+  const th = s => `<th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center;font-weight:400">${s}</th>`;
+  const cell = (a) => {
+    if (a.length < 3) return `<td style="text-align:center;color:#6F648F">— <span style="font-size:9px">N${a.length}</span></td>`;
+    const w = wr(a);
+    const c = w >= baseWr + 7 ? '#52F2C9' : w <= baseWr - 7 ? '#FF6A8B' : '#F2F0FF';
+    return `<td style="text-align:center;white-space:nowrap;padding:4px 8px"><span style="color:${c}">${w.toFixed(0)}%</span> <span style="color:#6F648F;font-size:9px">N${a.length}${a.length < 10 ? ' ⚠' : ''}</span></td>`;
+  };
+  let rows = '';
+  for (const def of _SCREEN_SIGNALS) {
+    const b = buckets[def.id];
+    if (!b.same.length && !b.opp.length) continue;
+    const perT = Object.entries(b.perT).filter(([, v]) => v.n >= 2)
+      .map(([r, v]) => `${(typeof _rootAsset === 'function' && _rootAsset(r)) || r} ${v.wins}/${v.n}`).join(' · ');
+    rows += `<tr style="background:#140A24"><td style="padding:4px 8px;color:#F2F0FF">${def.name}${perT ? `<br><span style="font-size:9px;color:#6F648F">${perT}</span>` : ''}</td>${cell(b.same)}${cell(b.opp)}</tr>`;
+  }
+  const html = `<details open style="margin-bottom:14px"><summary style="cursor:pointer;font-size:12px;color:#B487F8;font-weight:600">Сверка с ботом — подтверждают ли прогоны бота OI-сигналы</summary>
+  <div style="font-size:10px;color:#6F648F;margin:6px 0 4px">Каждый resolved-сигнал бота сматчен с состоянием OI-сигналов в день входа. «Победа» = quality &gt; 0 (или |MFE| &gt; |MAE|, если quality не посчитан). Средний винрейт бота по совпавшим дням: <b style="color:#F2F0FF">${baseWr.toFixed(0)}%</b> (N${baseline.length}). Если в колонке «в сторону сигнала» винрейт заметно выше среднего — OI-сигнал добавляет боту edge; если ниже — на этих тикерах сигналу верить нельзя. Не смаплено тикеров: ${unmapped}, вне дат пула: ${unmatched}.</div>
+  <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:4px">
+  <thead><tr><th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:left">OI-сигнал (под именем — тикеры: побед/входов)</th>${th('бот входил В СТОРОНУ сигнала<br>винрейт')}${th('бот входил ПРОТИВ<br>винрейт')}</tr></thead>
+  <tbody>${rows || '<tr><td colspan="3" style="padding:6px;color:#6F648F">Ни один вход бота не пришёлся на день активного OI-сигнала</td></tr>'}</tbody></table></div>
+  <div style="font-size:10px;color:#6F648F">Результат сохранён: скринер теперь показывает у сигналов метку «бот: X/Y» по этому тикеру, а при ≥5 входах с винрейтом &lt;45% — прямое «по факту не работает». Пересчитывай сверку после новых прогонов бота.</div>
+  </details>`;
+  const el = document.getElementById('pool-out');
+  el.innerHTML = html + el.innerHTML;
+  setStatus(`Сверка с ботом: ${baseline.length} входов сматчено, средний винрейт ${baseWr.toFixed(0)}%`, 'ok');
 }
 
 // ── ЧАСОВАЯ СОБЫТИЙНАЯ КАЛИБРОВКА: тот же вход (день сигнала), но путь

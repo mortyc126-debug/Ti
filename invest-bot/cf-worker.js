@@ -35,6 +35,8 @@
 //                                            цену по датам, где нашлось совпадение
 //   /db/instruments/assetclass?ticker=    GET  — класс актива ОДНОГО root-тикера (акция/валюта/
 //                                            товар/индекс) через T-Invest FindInstrument+FutureBy
+//   /db/oistates                      POST — снэпшоты OI-сигналов из oi_lab (мост «лаба → бот»)
+//   /db/oistates?date=|ticker=&days=  GET  — состояния для бота: активные OI-сигналы по тикерам
 //
 // Cron (scheduled): ежедневный автосбор oi_daily по всем ликвидным фьючерсам
 // FORTS — без участия браузера. Настройка:
@@ -860,6 +862,49 @@ async function handleDb(path, req, env) {
     if (!ticker) return json({ error: 'ticker required' }, 400);
     const { results } = await db.prepare('SELECT * FROM weights WHERE ticker=?').bind(ticker).all();
     return json(results);
+  }
+
+  // ── OI-состояния из oi_lab: мост «лаба → бот» ──
+  // После пересчёта пула лаборатория публикует по каждому root-тикеру активные
+  // OI-сигналы и ключевые метрики последнего бара. Бот читает их по дате и
+  // может подмешивать как метод — его адаптивные веса сами выяснят, каким
+  // тикерам OI-сигналы помогают, а каким нет.
+  if (p === '/oistates' && req.method === 'POST') {
+    const body = await req.json();
+    const rows = Array.isArray(body) ? body : (body.rows || []);
+    if (!rows.length) return json({ ok: true, saved: 0 });
+    await db.prepare(`CREATE TABLE IF NOT EXISTS oi_states (
+      key        TEXT PRIMARY KEY,
+      ticker     TEXT NOT NULL,
+      tradedate  TEXT NOT NULL,
+      payload    TEXT NOT NULL,
+      updated_at INTEGER DEFAULT 0
+    )`).run();
+    for (let i = 0; i < rows.length; i += 50) {
+      const chunk = rows.slice(i, i + 50).filter(r => r.ticker && r.date);
+      if (!chunk.length) continue;
+      await db.batch(chunk.map(r =>
+        db.prepare('INSERT OR REPLACE INTO oi_states(key,ticker,tradedate,payload,updated_at) VALUES(?,?,?,?,?)')
+          .bind(`${r.ticker}__${r.date}`, r.ticker, r.date, JSON.stringify(r.payload || {}), Date.now())
+      ));
+    }
+    return json({ ok: true, saved: rows.length });
+  }
+
+  if (p === '/oistates' && req.method === 'GET') {
+    const u = new URL(req.url);
+    const date   = u.searchParams.get('date');
+    const ticker = u.searchParams.get('ticker');
+    const days   = Math.min(400, parseInt(u.searchParams.get('days') || '30'));
+    try {
+      let q = 'SELECT * FROM oi_states WHERE 1=1'; const b = [];
+      if (date)   { q += ' AND tradedate=?'; b.push(date); }
+      if (ticker) { q += ' AND ticker=?';    b.push(ticker); }
+      q += ' ORDER BY tradedate DESC LIMIT ?'; b.push(date ? 200 : Math.min(5000, days * 60));
+      const { results } = await db.prepare(q).bind(...b).all();
+      results.forEach(r => { try { r.payload = JSON.parse(r.payload); } catch(_){} });
+      return json(results);
+    } catch (_) { return json([]); } // таблицы ещё нет — лаба ни разу не публиковала
   }
 
   // ── AlgoPack history ──
