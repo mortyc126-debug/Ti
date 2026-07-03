@@ -201,6 +201,7 @@ def classify_regime_probs(closes: list[float], volumes: list[float] | None = Non
     if len(closes) < 10:
         return {r: (1.0 if r == "ranging" else 0.0) for r in REGIMES}
 
+    n = len(closes)
     trend, direction = _trend_strength(closes)
     rets = _returns(closes)
     if len(rets) >= 5:
@@ -223,9 +224,41 @@ def classify_regime_probs(closes: list[float], volumes: list[float] | None = Non
     s1 = _smoothstep(trend, 0.3, 0.45)   # 0..1: выход из vol-режимов (high/low_vol) в ranging
     s2 = _smoothstep(trend, 0.45, 0.6)   # 0..1: выход из ranging в trending
 
+    # ── Отличаем ТРЕНД от ОТСКОКА и СКВИЗА ───────────────────────────────────
+    # Наклон на всём окне ещё не тренд. Классическая ошибка: рост на последних
+    # барах ВНУТРИ падающей структуры — это контртрендовый отскок, а не тренд.
+    # На реальных сделках именно trending_up-лонги давали -135 net при WR 39%
+    # (метка была инвертирована: «за» трендом проигрывало, «против» выигрывало),
+    # тогда как trending_down оставался честным. Причина — у классификатора нет
+    # структурного контекста: он смотрит одно короткое окно.
+    #
+    # structural_align: 1 если ранняя (2/3) и поздняя (1/3) часть окна смотрят в
+    # одну сторону (настоящий тренд), 0 если противоположны (отскок/разворот) —
+    # тогда наклон уводится в ranging (а ranging заблокирован для входа).
+    # Симметрично: честный trending_down не страдает (обе части вниз → align=1).
+    _STR_MIN = 0.15  # ниже — часть окна считаем безнаправленной (шум у нуля)
+    _cut = max(5, n * 2 // 3)
+    head, tail = closes[:_cut], closes[-max(5, n // 3):]
+    str_head, dir_head = _trend_strength(head)
+    str_tail, dir_tail = _trend_strength(tail)
+    d_head = dir_head if str_head > _STR_MIN else 0.0
+    d_tail = dir_tail if str_tail > _STR_MIN else 0.0
+    structural_align = 0.0 if (d_head and d_tail and d_head != d_tail) else 1.0
+
+    # squeeze_factor: настоящий тренд идёт с РАСШИРЕНИЕМ хода; сквиз — компрессия
+    # с ложным наклоном. Сравниваем диапазон НА БАР (иначе более короткое tail-окно
+    # всегда «уже» — и любой линейный тренд ложно читался бы как сжатие). 0 при
+    # сильном сжатии недавнего хода, 1 при равном/расширяющемся.
+    rng_recent = (max(tail) - min(tail)) / max(1, len(tail) - 1)
+    rng_early = (max(head) - min(head)) / max(1, len(head) - 1) or 1e-9
+    squeeze_factor = _smoothstep(rng_recent / (rng_early or 1e-9), 0.4, 0.9)
+
+    trend_quality = structural_align * squeeze_factor  # [0,1]
+
     p_low_trend = 1 - s1
-    p_ranging = s1 * (1 - s2)
-    p_trend = s2
+    # мАсса «псевдотренда» (отскок/сквиз) уходит в боковик, а не в trending_*
+    p_trend = s2 * trend_quality
+    p_ranging = s1 * (1 - s2) + s2 * (1 - trend_quality)
 
     direction_up = 1.0 if direction > 0 else 0.0
     direction_down = 1.0 if direction < 0 else 0.0

@@ -6300,6 +6300,12 @@ class OICompositeStrategy(IStrategy):
         self.__daily_low: float = float("inf")
         self.__daily_atr_buf: list[float] = []   # буфер последних 10 дневных ATR
         self.__daily_atr: float = 0.0            # скользящее среднее дневного ATR (%)
+        # Дневной режим (старший ТФ) — контекст для DAILY_TREND_GATE в trader.py.
+        # Накапливаем закрытия ПО ДНЯМ на смене дня и классифицируем тем же
+        # classify_regime, что и внутридневной. Пока дней < минимума — режим "" и
+        # гейт не срабатывает (как и было, пока ключ вообще не заполнялся).
+        self.__daily_close_buf: list[float] = []  # закрытия последних дней
+        self.__daily_regime: str = ""
         # Кэш тяжёлых операций: пересчитываем раз в N баров, между ними — старое значение.
         # RQA O(n²), wavelet O(n log n), regime (CUSUM+PELT+Z-score) — всё CPU-bound.
         # На 1м-свечах N=5 (обновление каждые 5 минут), на 5м — N=3.
@@ -6637,6 +6643,13 @@ class OICompositeStrategy(IStrategy):
                     if len(self.__daily_atr_buf) > 10:
                         self.__daily_atr_buf.pop(0)
                     self.__daily_atr = sum(self.__daily_atr_buf) / len(self.__daily_atr_buf)
+                # закрытие завершившегося дня → буфер дневных закрытий, режим старшего ТФ
+                if self.__daily_open_price > 0:
+                    self.__daily_close_buf.append(_to_f(last_c.open))  # open нового дня ≈ close прошлого
+                    if len(self.__daily_close_buf) > 60:
+                        self.__daily_close_buf.pop(0)
+                    if len(self.__daily_close_buf) >= 10:
+                        self.__daily_regime, _ = classify_regime(self.__daily_close_buf)
                 self.__daily_open_date = cur_day
                 self.__daily_open_price = _to_f(last_c.open)
                 self.__daily_high = _to_f(last_c.high)
@@ -8436,6 +8449,7 @@ class OICompositeStrategy(IStrategy):
             "composite": self.__last_composite,
             "scores": dict(self.__last_scores),
             "regime": self.__last_regime,
+            "daily_regime": self.__daily_regime,
             "regime_confidence": self.__regime_confidence,
             "regime_unstable": self.__regime_confidence < BOCD_NARRATIVE_SYNC_THR,
             "rolling_quality": self.__rolling_quality,
