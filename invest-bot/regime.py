@@ -141,16 +141,6 @@ def _trend_strength(closes: list[float]) -> tuple[float, float]:
     return min(1.0, abs(norm)), (1.0 if norm > 0 else (-1.0 if norm < 0 else 0.0))
 
 
-def _vol_regime(closes: list[float]) -> str:
-    """high_vol / low_vol по перцентилю стандартного отклонения возвратов в собственной истории."""
-    rets = _returns(closes)
-    if len(rets) < 5:
-        return "low_vol"
-    sd = statistics.pstdev(rets)
-    median_abs = statistics.median(abs(r) for r in rets) or 1e-9
-    return "high_vol" if sd > median_abs * 2.5 else "low_vol"
-
-
 def _bocd_change_prob(closes: list[float]) -> float:
     """
     Вероятность того, что режим только что сменился, по последним 50 closes

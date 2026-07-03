@@ -2036,6 +2036,12 @@ def score_volatility_regime(candles: list[HistoricCandle]) -> float:
     VHF-подобный индикатор: высокое значение = тренд (сигналы надёжнее),
     низкое = боковик (режим).
     Возвращает множитель [-0.5..0.5]: не самостоятельный сигнал, а усиление/ослабление.
+
+    Намеренно ОТДЕЛЬНЫЙ фильтр от vol_ratio в regime.py, а не дубль: этот масштабирует
+    АМПЛИТУДУ composite (composite *= 0.6 + 0.4·vhf), а vol_ratio классифицирует
+    high_vol/low_vol для смеси весов и порога входа. Разные точки приложения — не
+    двойной учёт. Считаем эффективность пути (диапазон / суммарный ход), а не разброс
+    возвратов, поэтому меры дополняют друг друга, а не повторяют.
     """
     if len(candles) < 5:
         return 0.0
@@ -6311,6 +6317,11 @@ class OICompositeStrategy(IStrategy):
         # classify_regime, что и внутридневной. Пока дней < минимума — режим "" и
         # гейт не срабатывает (как и было, пока ключ вообще не заполнялся).
         self.__daily_close_buf: list[float] = []  # закрытия последних дней
+        # суммарный объём тех же дней (выровнен с __daily_close_buf) — даёт
+        # vol_spike в дневном classify_regime; без него дневной стресс-детектор
+        # работал вполсилы (объёмная половина сигнала всегда была 0).
+        self.__daily_vol_buf: list[float] = []
+        self.__daily_vol_accum: float = 0.0       # накопитель объёма текущего дня
         self.__daily_regime: str = ""
         # Кэш тяжёлых операций: пересчитываем раз в N баров, между ними — старое значение.
         # RQA O(n²), wavelet O(n log n), regime (CUSUM+PELT+Z-score) — всё CPU-bound.
@@ -6652,20 +6663,27 @@ class OICompositeStrategy(IStrategy):
                     if len(self.__daily_atr_buf) > 10:
                         self.__daily_atr_buf.pop(0)
                     self.__daily_atr = sum(self.__daily_atr_buf) / len(self.__daily_atr_buf)
-                # закрытие завершившегося дня → буфер дневных закрытий, режим старшего ТФ
+                # закрытие завершившегося дня → буфер дневных закрытий+объёмов, режим старшего ТФ
                 if self.__daily_open_price > 0:
                     self.__daily_close_buf.append(_to_f(last_c.open))  # open нового дня ≈ close прошлого
+                    self.__daily_vol_buf.append(self.__daily_vol_accum)  # суммарный объём завершённого дня
                     if len(self.__daily_close_buf) > 60:
                         self.__daily_close_buf.pop(0)
+                    if len(self.__daily_vol_buf) > 60:
+                        self.__daily_vol_buf.pop(0)
                     if len(self.__daily_close_buf) >= 10:
-                        self.__daily_regime, _ = classify_regime(self.__daily_close_buf)
+                        # объёмы выровнены с закрытиями (append в паре) → дневной
+                        # classify_regime теперь видит vol_spike, а не только цену.
+                        self.__daily_regime, _ = classify_regime(self.__daily_close_buf, self.__daily_vol_buf)
                 self.__daily_open_date = cur_day
                 self.__daily_open_price = _to_f(last_c.open)
                 self.__daily_high = _to_f(last_c.high)
                 self.__daily_low = _to_f(last_c.low)
+                self.__daily_vol_accum = float(last_c.volume)  # первый бар нового дня
             else:
                 self.__daily_high = max(self.__daily_high, _to_f(last_c.high))
                 self.__daily_low = min(self.__daily_low, _to_f(last_c.low))
+                self.__daily_vol_accum += float(last_c.volume)
             close_px = _to_f(last_c.close)
             if self.__daily_open_price > 0:
                 self.__day_move_pct = (close_px - self.__daily_open_price) / self.__daily_open_price * 100
