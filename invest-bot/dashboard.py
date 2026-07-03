@@ -1501,11 +1501,14 @@ def _trades_list_compact(trades: list[dict]) -> list[dict]:
 
 def _method_stats_from_trades(trades: list[dict]) -> dict:
     """Per-method agree/disagree attribution из списка сделок.
-    Каждая сделка должна иметь method_scores (dict метод→скор) и direction/win."""
+    Каждая сделка должна иметь method_scores (dict метод→скор) и direction/win.
+    Берём method_scores_shadow, если есть — для включённых методов он совпадает
+    с method_scores, а для выключенных показывает гипотетический винрейт (метод
+    не голосовал и не обучался, но статистика по нему всё равно видна)."""
     tally: dict[str, dict] = {}
     for t in trades:
         dir_sign = 1 if t["direction"] == "LONG" else -1
-        for mname, m_sc in t.get("method_scores", {}).items():
+        for mname, m_sc in (t.get("method_scores_shadow") or t.get("method_scores", {})).items():
             if abs(m_sc) < 0.02:
                 continue
             e = tally.setdefault(mname, {"agree_n": 0, "agree_win": 0, "disagree_n": 0, "disagree_win": 0})
@@ -3475,8 +3478,13 @@ function methodStatsToHtml(ms) {{
     const hw = s.hedge_weight != null ? s.hedge_weight : null;
     const hwStyle = hw != null ? (hw > 1.1 ? 'color:var(--pos)' : hw < 0.9 ? 'color:var(--neg)' : 'color:var(--txt3)') : '';
     const hint = _METHOD_HINTS[name] || '';
-    html += `<tr title="${{hint}}"><td style="padding:1px 6px">${{name.replace(/_/g,' ')}}</td>`
-          + (hasHedge ? `<td style="text-align:right;padding:1px 6px;${{hwStyle}}">${{hw != null ? hw.toFixed(3) : '—'}}</td>` : '')
+    // disabled=true: метод выключен из голосования/обучения весов — winrate
+    // здесь теневой (гипотетический, "что если бы он был активен"), вес не
+    // обучается (hedge_weight застыл на последнем значении до выключения).
+    const dis = !!s.disabled;
+    const nameHtml = dis ? `<span style="opacity:.55" title="Метод выключен: скор не голосует и не обучает вес. Винрейт ниже — теневой (гипотетический)">👻 ${{name.replace(/_/g,' ')}}</span>` : name.replace(/_/g,' ');
+    html += `<tr title="${{hint}}" style="${{dis ? 'opacity:.65' : ''}}"><td style="padding:1px 6px">${{nameHtml}}</td>`
+          + (hasHedge ? `<td style="text-align:right;padding:1px 6px;${{hwStyle}}">${{dis ? '—' : (hw != null ? hw.toFixed(3) : '—')}}</td>` : '')
           + `<td style="text-align:right;padding:1px 6px">${{s.agree_n}}</td>`
           + `<td style="text-align:right;padding:1px 6px;${{agStyle}}">${{agWr}}</td>`
           + `<td style="text-align:right;padding:1px 6px">${{s.disagree_n}}</td>`

@@ -6238,6 +6238,12 @@ class OICompositeStrategy(IStrategy):
         self.__last_regime: str = "ranging"
         self.__regime_stable_bars: int = 0
         self.__last_scores: dict[str, float] = {}
+        # Теневые скоры: то же самое, но БЕЗ гейта по _disabled_methods (только
+        # инверсия) — нужны, чтобы видеть гипотетический винрейт выключенного
+        # метода в статистике, не давая ему при этом голосовать в композите
+        # или участвовать в обучении весов (Hedge/IC/Lasso используют
+        # __last_scores, не это поле).
+        self.__last_scores_shadow: dict[str, float] = {}
         self.__last_composite: float = 0.0
         self.__composite_history: list[float] = []   # буфер для gate условия 3
         self.__last_playbooks: list[str] = []
@@ -7262,6 +7268,10 @@ class OICompositeStrategy(IStrategy):
                     "entry_time": candles[i].time,
                     "m1": m1_sc, "m2": m2_sc, "m3": m3_sc,
                     "method_scores": dict(self.__last_scores),
+                    # Теневые скоры (без гейта по _disabled_methods) — только для
+                    # статистики "что теряется, если метод не активен"; НЕ должны
+                    # использоваться для обучения весов/лассо/нарратива.
+                    "method_scores_shadow": dict(self.__last_scores_shadow),
                     "regime": self.__last_regime,
                     "noise_scale": self.__noise_stop_scale(),
                     # L1-контекст на момент входа
@@ -7767,9 +7777,13 @@ class OICompositeStrategy(IStrategy):
                     tally["disagree_win"] += int(win)
                     tally["disagree_dur"] += duration_min
 
-            # Per-method attribution: скоры из method_scores сигнала,
-            # исключая M1/M2/M3 (они агрегаты, а не самостоятельные методы).
-            for mname, m_sc in sig.get("method_scores", {}).items():
+            # Per-method attribution: берём ТЕНЕВЫЕ скоры (method_scores_shadow) —
+            # для активных методов они совпадают с method_scores, а для выключенных
+            # показывают гипотетический винрейт ("что теряется, если метод не
+            # активен"), не участвуя при этом в обучении весов (см. __record_outcome/
+            # Hedge-цикл выше — те читают именно method_scores, не shadow).
+            # Исключаем M1/M2/M3 (они агрегаты, а не самостоятельные методы).
+            for mname, m_sc in (sig.get("method_scores_shadow") or sig.get("method_scores", {})).items():
                 if mname in {M1_NAME, M2_NAME, M3_NAME}:
                     continue
                 if abs(m_sc) < 0.02:  # метод промолчал — не считаем
@@ -7854,6 +7868,9 @@ class OICompositeStrategy(IStrategy):
                     "top_agree": top_agree,
                     "top_against": top_against,
                     "method_scores": ms,
+                    # Теневые скоры (без гейта по _disabled_methods) — для
+                    # статистики выключенных методов, см. _method_stats_from_trades.
+                    "method_scores_shadow": sig.get("method_scores_shadow", {}),
                     # L1-контекст на момент входа (None если данных не было)
                     "atr_pct": sig.get("atr_pct"),
                     "l1_pct": sig.get("l1_pct"),
@@ -7909,6 +7926,9 @@ class OICompositeStrategy(IStrategy):
                 "disagree_n": t["disagree_n"],
                 "disagree_win_rate": t["disagree_win"] / t["disagree_n"] if t["disagree_n"] else None,
                 "hedge_weight": round(self.__weights[mname].weight, 4) if mname in self.__weights else None,
+                # Метод выключен из голосования/обучения весов — winrate выше
+                # посчитан по теневым (shadow) скорам, т.е. гипотетический.
+                "disabled": mname in self._disabled_methods,
             }
             for mname, t in method_tally.items()
         }
@@ -8043,35 +8063,71 @@ class OICompositeStrategy(IStrategy):
         # данные ОИ приходят из воркера, пропускаем их через тот же гейт.
         def _gate(name, val):
             return 0.0 if name in _dm else (-val if name in _inv else val)
-        base_scores = [(0.0 if name in _dm else (-fn(window) if name in _inv else fn(window))) for name, fn in METHODS] + [
-            self.__score_level_context_mtf(),
-            self.__score_market_structure_mtf(),
-            self.__score_spring_mtf(),
-            _gate("OI_SQUEEZE", self.__score_oi_squeeze()),
-            _gate("INST_OI", self.__score_provider(self.__inst_oi_provider)),
-            _gate("RETAIL_CONTRA", self.__score_provider(self.__retail_contra_provider)),
-            _gate("DELTA_QUADRANT", self.__score_provider(self.__delta_quadrant_provider)),
-            _gate("OI_ABSORPTION", self.__score_provider(self.__oi_absorption_provider)),
-            self.__score_provider(self.__index_context_provider),
-        ] + [self.__score_tradestats(name) for name in TRADESTATS_METHOD_NAMES] \
-          + [self.__cached_change_point, self.__score_multi_ticker()]
+        def _inv_only(name, val):
+            # Инверсия без учёта _dm — для теневой (shadow) статистики: метод
+            # выключен из голосования, но его "было бы" значение всё равно
+            # инвертируется, если инверсия включена (это настройка знака,
+            # а не активности).
+            return -val if name in _inv else val
+
+        # Скор каждого METHODS считаем ВСЕГДА, даже для выключенных — иначе
+        # неоткуда взять теневой (shadow) скор для статистики "что теряется,
+        # если метод не активен". Гейт по _dm применяется отдельно, ниже.
+        _method_vals = [fn(window) for _, fn in METHODS]
 
         # Адаптивные параметры индикаторов: заменяем скор tunable-метода
-        # откалиброванной под тикер функцией (MethodCalibrator).
+        # откалиброванной под тикер функцией (MethodCalibrator). Считаем для
+        # ВСЕХ методов (не только включённых) — иначе теневой скор
+        # выключенного метода не отражал бы его калибровку.
         if self.__method_calibrator is not None:
             _mc_ticker = self.__settings.ticker
             _mc_highs   = [_to_f(c.high)  for c in window]
             _mc_lows    = [_to_f(c.low)   for c in window]
             for _mc_i, (_mc_name, _) in enumerate(METHODS):
-                if _mc_name in _dm:
-                    continue
                 _cfn = self.__method_calibrator.get_fn(_mc_ticker, _mc_name)
                 if _cfn is not None:
                     try:
-                        _cv = _cfn(closes, _mc_highs, _mc_lows, volumes)
-                        base_scores[_mc_i] = -_cv if _mc_name in _inv else _cv
+                        _method_vals[_mc_i] = _cfn(closes, _mc_highs, _mc_lows, volumes)
                     except Exception:
                         pass
+
+        oi_raw = {
+            "OI_SQUEEZE": self.__score_oi_squeeze(),
+            "INST_OI": self.__score_provider(self.__inst_oi_provider),
+            "RETAIL_CONTRA": self.__score_provider(self.__retail_contra_provider),
+            "DELTA_QUADRANT": self.__score_provider(self.__delta_quadrant_provider),
+            "OI_ABSORPTION": self.__score_provider(self.__oi_absorption_provider),
+        }
+        _tail_scores = (
+            [self.__score_level_context_mtf(), self.__score_market_structure_mtf(), self.__score_spring_mtf()]
+            + [self.__score_provider(self.__index_context_provider)]
+            + [self.__score_tradestats(name) for name in TRADESTATS_METHOD_NAMES]
+            + [self.__cached_change_point, self.__score_multi_ticker()]
+        )
+        base_scores = [
+            (0.0 if name in _dm else _inv_only(name, v)) for (name, _), v in zip(METHODS, _method_vals)
+        ] + [
+            _tail_scores[0], _tail_scores[1], _tail_scores[2],
+            _gate("OI_SQUEEZE", oi_raw["OI_SQUEEZE"]),
+            _gate("INST_OI", oi_raw["INST_OI"]),
+            _gate("RETAIL_CONTRA", oi_raw["RETAIL_CONTRA"]),
+            _gate("DELTA_QUADRANT", oi_raw["DELTA_QUADRANT"]),
+            _gate("OI_ABSORPTION", oi_raw["OI_ABSORPTION"]),
+        ] + _tail_scores[3:]
+
+        # Теневые скоры METHODS + OI: инверсия без гейта по _dm (см. _inv_only).
+        # Остальные (структурные/tradestats/индекс/M1-3) сейчас не переключаемы
+        # через _dm, поэтому для них shadow == base.
+        _shadow_scores = [
+            _inv_only(name, v) for (name, _), v in zip(METHODS, _method_vals)
+        ] + [
+            _tail_scores[0], _tail_scores[1], _tail_scores[2],
+            _inv_only("OI_SQUEEZE", oi_raw["OI_SQUEEZE"]),
+            _inv_only("INST_OI", oi_raw["INST_OI"]),
+            _inv_only("RETAIL_CONTRA", oi_raw["RETAIL_CONTRA"]),
+            _inv_only("DELTA_QUADRANT", oi_raw["DELTA_QUADRANT"]),
+            _inv_only("OI_ABSORPTION", oi_raw["OI_ABSORPTION"]),
+        ] + _tail_scores[3:]
 
         # Layer 0: непрерывное распределение по всем режимам.
         regime = max(regime_probs, key=regime_probs.get)
@@ -8090,6 +8146,11 @@ class OICompositeStrategy(IStrategy):
             [name for name, _ in METHODS]
             + STRUCTURAL_METHOD_NAMES
             + [OI_SQUEEZE_NAME, INST_OI_NAME, RETAIL_CONTRA_NAME, DELTA_QUADRANT_NAME, OI_ABSORPTION_NAME]
+            # INDEX_CONTEXT_NAME — тут, а не после TRADESTATS: в base_scores он
+            # стоит именно на этой позиции (см. _tail_scores/BASE_METHOD_NAMES).
+            # Без него zip молча сдвигал все имена TRADESTATS/CHANGE_POINT/
+            # MULTI_TICKER на 1 позицию относительно их реальных скоров.
+            + [INDEX_CONTEXT_NAME]
             + TRADESTATS_METHOD_NAMES
             + [CHANGE_POINT_NAME, MULTI_TICKER_NAME],
             base_scores
@@ -8099,6 +8160,7 @@ class OICompositeStrategy(IStrategy):
         m1_sc = m2_sc = m3_sc = 0.0
 
         scores = base_scores + [m1_sc, m2_sc, m3_sc]
+        scores_shadow = _shadow_scores + [m1_sc, m2_sc, m3_sc]
 
         # Накапливаем буфер для IC-калибровки. P1: запас под максимальный
         # per-method лаг (трендовые методы могут смотреть на ~120мин вперёд).
@@ -8412,8 +8474,13 @@ class OICompositeStrategy(IStrategy):
 
         self.__last_regime = regime
         self.__regime_confidence = regime_conf
-        # __last_scores хранит сырые скоры — для архива и диагностики
+        # __last_scores хранит скоры ПОСЛЕ гейта по _disabled_methods (выключенный
+        # метод здесь всегда 0.0) — то, что реально участвовало в композите и
+        # получит доступ к обучению весов. __last_scores_shadow — то же самое,
+        # но без гейта (только инверсия), для теневой статистики выключенных
+        # методов (см. _last_scores_shadow в __init__).
         self.__last_scores = dict(zip(ALL_METHOD_NAMES, scores))
+        self.__last_scores_shadow = dict(zip(ALL_METHOD_NAMES, scores_shadow))
         self.__last_composite = composite
         self.__composite_history.append(composite)
         # P2: знаковой стабильности нужно больше истории, чем прежним 5+2 барам.
