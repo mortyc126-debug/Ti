@@ -506,6 +506,217 @@ class OiBacktestProvider:
     def has_data(self, ticker: str) -> bool:
         return ticker in self._history and bool(self._history[ticker])
 
+    def coverage(self, ticker: str) -> dict:
+        """Покрытие истории FutOI по тикеру — для отображения в дашборде:
+        сколько дней, за какой диапазон дат. Пусто → OI-методы молчат."""
+        rows = self._history.get(ticker, [])
+        if not rows:
+            return {"has": False, "days": 0, "from": None, "to": None}
+        dates = sorted(str(r.get("tradedate", "")) for r in rows if r.get("tradedate"))
+        return {"has": True, "days": len(rows),
+                "from": dates[0] if dates else None,
+                "to": dates[-1] if dates else None}
+
+
+# ── Мост: тянуть oi_daily из OI-воркера (Cloudflare D1) в локальный формат ──
+# Воркер (invest-bot/cf-worker.js, база oi_signal1) собирает ОИ по cron и хранит
+# его под ПОЛНЫМ фьючерсным кодом (SECID: SRU6, AEU6, SiZ6 …) — тем же, чем
+# ключует бэктест фьючерсов. Поэтому сначала матчим ТОЧНЫЙ код, а если его нет —
+# собираем по корню (contractRoot) со сшивкой контрактов по датам (фронт-месяц),
+# чтобы длинная история не рвалась на границах роллирования. Для акционных
+# тикеров остаётся фолбэк через FUTOI_FULL_MAP. Кладём в data/oi_daily.json —
+# тот же файл, что читает OiBacktestProvider.
+
+# Порт FUTOI_FULL_MAP из cf-worker.js::futoi2sym — акция → короткий код FutOI.
+_FUTOI_FULL_MAP = {
+    "SBER": "SBERF", "GAZP": "GAZPF", "LKOH": "LKOHF", "GMKN": "GMKNF",
+    "NVTK": "NVTKF", "ROSN": "ROSNF", "TATN": "TATNF", "MGNT": "MGNTF",
+    "YNDX": "YDEX", "YDEX": "YD", "IMOEX": "IMOEXF", "GLDR": "GLDRUBF",
+    "EURR": "EURRUBF", "CNYR": "CNYRUBF", "USDR": "USDRUBF",
+}
+
+# Месяц-код фьючерса → номер месяца (F=янв … Z=дек).
+_FUT_MONTH = {"F": 1, "G": 2, "H": 3, "J": 4, "K": 5, "M": 6,
+             "N": 7, "Q": 8, "U": 9, "V": 10, "X": 11, "Z": 12}
+import re as _re
+_CONTRACT_RE = _re.compile(r"^([A-Za-z]+)([FGHJKMNQUVXZ])(\d)$")
+
+
+def _contract_root(ticker: str) -> str:
+    """Порт contractRoot из cf-worker.js: SRU6→SR, AEU6→AE, SiZ6→Si. Иначе сам тикер."""
+    m = _CONTRACT_RE.match(ticker or "")
+    return m.group(1) if m else (ticker or "")
+
+
+def _contract_expiry_ym(ticker: str) -> int | None:
+    """Месяц экспирации контракта как год*12+месяц (для выбора фронт-месяца).
+    Год — одна цифра → ближайший к текущему (…5→2025, 6→2026)."""
+    m = _CONTRACT_RE.match(ticker or "")
+    if not m:
+        return None
+    mon = _FUT_MONTH.get(m.group(2).upper())
+    if not mon:
+        return None
+    d = int(m.group(3))
+    base = (date.today().year // 10) * 10
+    year = base + d
+    if year < date.today().year - 3:   # цифра указывает на следующее десятилетие
+        year += 10
+    return year * 12 + mon
+
+
+def _futoi2sym(ticker: str) -> str:
+    """Порт futoi2sym из cf-worker.js: FutOI-тикер → короткий код серии."""
+    up = (ticker or "").upper()
+    for k, v in _FUTOI_FULL_MAP.items():
+        if up.startswith(k):
+            return v
+    return up[:2] if len(up) >= 2 else up
+
+
+def _stock_oi_sym(stock_ticker: str) -> str:
+    """Короткий код FutOI для акционного тикера (как ключует воркер)."""
+    up = (stock_ticker or "").upper()
+    if up in _FUTOI_FULL_MAP:
+        return _FUTOI_FULL_MAP[up]
+    return up[:2] if len(up) >= 2 else up
+
+
+def _worker_get(base_url: str, path: str, timeout: int = 20):
+    url = base_url.rstrip("/") + path
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.load(resp)
+
+
+def _map_worker_rows(rows: list[dict], src: str) -> list[dict]:
+    """Строки D1 oi_daily → локальный формат."""
+    out = []
+    for r in rows or []:
+        yl = float(r.get("yur_long") or 0);  ys = float(r.get("yur_short") or 0)
+        fl = float(r.get("fiz_long") or 0);  fs = float(r.get("fiz_short") or 0)
+        td = str(r.get("tradedate") or "")
+        if not td:
+            continue
+        out.append({
+            "tradedate": td, "price": float(r.get("price") or 0),
+            "yur_long": yl, "yur_short": ys, "fiz_long": fl, "fiz_short": fs,
+            "long": yl + fl, "short": ys + fs, "src_ticker": src,
+        })
+    return out
+
+
+def _worker_catalog_keys(base_url: str, timeout: int = 20) -> list[str]:
+    try:
+        catalog = _worker_get(base_url, "/db/tickers", timeout)
+    except Exception as e:
+        logger.warning(f"OI-воркер /db/tickers упал: {e}")
+        return []
+    return [str(r.get("ticker") or "") for r in (catalog or []) if r.get("ticker")]
+
+
+def fetch_worker_oi_daily(base_url: str, ticker: str, timeout: int = 20) -> list[dict]:
+    """История oi_daily по тикеру из OI-воркера в локальном формате. Тикер может
+    быть полным фьючерсным кодом (AEU6) или акционным (SBER). [] если нет."""
+    if not base_url:
+        return []
+    keys = _worker_catalog_keys(base_url, timeout)
+    if not keys:
+        return []
+    up = (ticker or "").upper()
+    kmap = {k.upper(): k for k in keys}
+
+    # 1. Точное совпадение кода (бэктест фьючерсов ключует ровно так же).
+    if up in kmap:
+        try:
+            rows = _worker_get(base_url, "/db/oidaily?ticker=" + urllib.parse.quote(kmap[up]), timeout)
+            return sorted(_map_worker_rows(rows, kmap[up]), key=lambda x: x["tradedate"])
+        except Exception as e:
+            logger.warning(f"OI-воркер /db/oidaily?ticker={kmap[up]} упал: {e}")
+            return []
+
+    # 2. Сборка по корню контракта со сшивкой по датам (фронт-месяц на день).
+    root = _contract_root(ticker)
+    same_root = [k for k in keys if _contract_root(k).upper() == root.upper()] if _CONTRACT_RE.match(up) else []
+    # 3. Для акций — совпадение по короткому коду серии futoi2sym.
+    if not same_root:
+        target = _stock_oi_sym(ticker)
+        same_root = [k for k in keys if _futoi2sym(k) == target] \
+                    or [k for k in keys if k.upper().startswith(target)]
+    if not same_root:
+        return []
+
+    # Тянем каждый контракт и сшиваем: на каждую дату — контракт-фронт (ближайшая
+    # экспирация >= даты; если все истекли — самый поздний). Один код → просто он.
+    by_date: dict[str, tuple[int, dict]] = {}
+    fetched_any = False
+    for k in same_root:
+        try:
+            rows = _worker_get(base_url, "/db/oidaily?ticker=" + urllib.parse.quote(k), timeout)
+        except Exception as e:
+            logger.warning(f"OI-воркер /db/oidaily?ticker={k} упал: {e}")
+            continue
+        fetched_any = True
+        exp = _contract_expiry_ym(k) or 10 ** 9
+        for r in _map_worker_rows(rows, k):
+            td = r["tradedate"]
+            try:
+                td_ym = int(td[:4]) * 12 + int(td[5:7])
+            except Exception:
+                td_ym = 0
+            # приоритет: контракт, ещё не истёкший на дату, с ближайшей экспирацией
+            not_expired = exp >= td_ym
+            rank = (0 if not_expired else 1, exp)
+            prev = by_date.get(td)
+            if prev is None or rank < prev[0]:
+                by_date[td] = (rank, r)
+    if not fetched_any:
+        return []
+    return [v[1] for _, v in sorted(by_date.items())]
+
+
+def sync_worker_oi(base_url: str, tickers: list[str], path: str = HISTORY_FILE,
+                   timeout: int = 20) -> dict:
+    """Тянет oi_daily из воркера по списку акционных тикеров и пишет в локальный
+    data/oi_daily.json (ключ = акционный тикер, как ждёт бэктест). Возвращает
+    сводку {ticker: дней}. Существующие тикеры без данных в воркере не трогаем."""
+    if os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                history = json.load(f)
+        except Exception:
+            history = {}
+    else:
+        history = {}
+    summary: dict[str, int] = {}
+    log: list[str] = []
+    for tk in tickers:
+        key = tk.upper()
+        rows = fetch_worker_oi_daily(base_url, tk, timeout)
+        if not rows:
+            summary[key] = len(history.get(key, []))
+            log.append(f"{tk}: в воркере нет данных (локально {summary[key]} дн.)")
+            continue
+        # Дозапись: сливаем по tradedate, свежие строки воркера перекрывают
+        # старые той же даты, локальные дни, которых нет в воркере, сохраняем.
+        by_date = {str(r.get("tradedate")): r for r in history.get(key, []) if r.get("tradedate")}
+        added = 0
+        for r in rows:
+            d = r["tradedate"]
+            if d not in by_date:
+                added += 1
+            by_date[d] = r
+        merged = sorted(by_date.values(), key=lambda x: str(x.get("tradedate")))
+        history[key] = merged
+        summary[key] = len(merged)
+        log.append(f"{tk}: +{added} нов., всего {len(merged)} дн. (воркер, ключ {rows[0].get('src_ticker')})")
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False)
+    os.replace(tmp, path)
+    return {"summary": summary, "total": sum(summary.values()), "log": log}
+
 
 class OiLayersService:
     """

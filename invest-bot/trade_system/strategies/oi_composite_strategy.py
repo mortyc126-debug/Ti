@@ -74,7 +74,7 @@ from trade_system.signal import Signal, SignalType
 from trade_system.strategies.base_strategy import IStrategy
 # regime импортируется первым: его модуль-уровневый код кладёт ../formulas в
 # sys.path, поэтому ниже научные модули из formulas/ становятся импортируемы.
-from regime import REGIMES, classify_regime, classify_regime_probs, REGIME_WEIGHT_MODS, change_point_score, classify_phase, PHASE_WEIGHT_MODS
+from regime import REGIMES, classify_regime, classify_regime_probs, REGIME_WEIGHT_MODS, change_point_score, classify_phase, PHASE_WEIGHT_MODS, squeeze_adjust
 from cluster_models import ClusterModels
 from narrative import (
     NarrativeState, NarrativeWeights, NarrativeThresholds, classify_directional,
@@ -6300,6 +6300,12 @@ class OICompositeStrategy(IStrategy):
         self.__daily_low: float = float("inf")
         self.__daily_atr_buf: list[float] = []   # буфер последних 10 дневных ATR
         self.__daily_atr: float = 0.0            # скользящее среднее дневного ATR (%)
+        # Дневной режим (старший ТФ) — контекст для DAILY_TREND_GATE в trader.py.
+        # Накапливаем закрытия ПО ДНЯМ на смене дня и классифицируем тем же
+        # classify_regime, что и внутридневной. Пока дней < минимума — режим "" и
+        # гейт не срабатывает (как и было, пока ключ вообще не заполнялся).
+        self.__daily_close_buf: list[float] = []  # закрытия последних дней
+        self.__daily_regime: str = ""
         # Кэш тяжёлых операций: пересчитываем раз в N баров, между ними — старое значение.
         # RQA O(n²), wavelet O(n log n), regime (CUSUM+PELT+Z-score) — всё CPU-bound.
         # На 1м-свечах N=5 (обновление каждые 5 минут), на 5м — N=3.
@@ -6637,6 +6643,13 @@ class OICompositeStrategy(IStrategy):
                     if len(self.__daily_atr_buf) > 10:
                         self.__daily_atr_buf.pop(0)
                     self.__daily_atr = sum(self.__daily_atr_buf) / len(self.__daily_atr_buf)
+                # закрытие завершившегося дня → буфер дневных закрытий, режим старшего ТФ
+                if self.__daily_open_price > 0:
+                    self.__daily_close_buf.append(_to_f(last_c.open))  # open нового дня ≈ close прошлого
+                    if len(self.__daily_close_buf) > 60:
+                        self.__daily_close_buf.pop(0)
+                    if len(self.__daily_close_buf) >= 10:
+                        self.__daily_regime, _ = classify_regime(self.__daily_close_buf)
                 self.__daily_open_date = cur_day
                 self.__daily_open_price = _to_f(last_c.open)
                 self.__daily_high = _to_f(last_c.high)
@@ -7842,6 +7855,7 @@ class OICompositeStrategy(IStrategy):
                     "top_against": top_against,
                     "method_scores": ms,
                     # L1-контекст на момент входа (None если данных не было)
+                    "atr_pct": sig.get("atr_pct"),
                     "l1_pct": sig.get("l1_pct"),
                     "l1_above_ma50": sig.get("l1_above_ma50"),
                     "l1_trending_up": sig.get("l1_trending_up"),
@@ -8017,19 +8031,27 @@ class OICompositeStrategy(IStrategy):
                     self.__mtf5_momentum_buf = self.__mtf5_momentum_buf[-(_MTF5_MOMENTUM_LEN + 2):]
             self.__recalc_l1_context()
 
-        regime_probs = self.__cached_regime_probs
+        # Дневной контекст: внутридневной «тренд» против дневного = сквиз →
+        # уводим в ranging (питает и argmax-режим, и веса методов). Пока дневного
+        # режима нет ("") — no-op. См. squeeze_adjust в regime.py.
+        regime_probs = squeeze_adjust(self.__cached_regime_probs, self.__daily_regime)
 
         _dm = self._disabled_methods
         _inv = self._inverted_methods
+        # OI-методы считаются отдельно от METHODS (провайдерные скоры), поэтому
+        # раньше их нельзя было выключить/инвертировать из панели. Теперь, когда
+        # данные ОИ приходят из воркера, пропускаем их через тот же гейт.
+        def _gate(name, val):
+            return 0.0 if name in _dm else (-val if name in _inv else val)
         base_scores = [(0.0 if name in _dm else (-fn(window) if name in _inv else fn(window))) for name, fn in METHODS] + [
             self.__score_level_context_mtf(),
             self.__score_market_structure_mtf(),
             self.__score_spring_mtf(),
-            self.__score_oi_squeeze(),
-            self.__score_provider(self.__inst_oi_provider),
-            self.__score_provider(self.__retail_contra_provider),
-            self.__score_provider(self.__delta_quadrant_provider),
-            self.__score_provider(self.__oi_absorption_provider),
+            _gate("OI_SQUEEZE", self.__score_oi_squeeze()),
+            _gate("INST_OI", self.__score_provider(self.__inst_oi_provider)),
+            _gate("RETAIL_CONTRA", self.__score_provider(self.__retail_contra_provider)),
+            _gate("DELTA_QUADRANT", self.__score_provider(self.__delta_quadrant_provider)),
+            _gate("OI_ABSORPTION", self.__score_provider(self.__oi_absorption_provider)),
             self.__score_provider(self.__index_context_provider),
         ] + [self.__score_tradestats(name) for name in TRADESTATS_METHOD_NAMES] \
           + [self.__cached_change_point, self.__score_multi_ticker()]
@@ -8212,10 +8234,28 @@ class OICompositeStrategy(IStrategy):
         # просуммированы, повторное сложение было бы двойным счётом.
         n_base = len(BASE_METHOD_NAMES)
 
+        # Методы без подключённого источника данных (провайдер = None) структурно
+        # молчат — score=0 всегда. Их НЕЛЬЗЯ держать в знаменателе: иначе
+        # «отсутствующий» метод считается как голос, и его вечный 0 делит сумму на
+        # пустые веса, систематически занижая композит (в проде без OI/tradestats
+        # так молчит ~половина методов). Метод, который посчитался и вернул 0 —
+        # это реальная нейтраль, он в знаменателе остаётся.
+        _absent = set()
+        if self.__squeeze_provider is None:        _absent.add("OI_SQUEEZE")
+        if self.__inst_oi_provider is None:        _absent.add("INST_OI")
+        if self.__retail_contra_provider is None:  _absent.add("RETAIL_CONTRA")
+        if self.__delta_quadrant_provider is None: _absent.add("DELTA_QUADRANT")
+        if self.__oi_absorption_provider is None:  _absent.add("OI_ABSORPTION")
+        if self.__index_context_provider is None:  _absent.add("INDEX_CONTEXT")
+        if self.__tradestats_provider is None:     _absent.update(TRADESTATS_METHOD_NAMES)
+        if self.__multi_ticker_provider is None:   _absent.add("MULTI_TICKER")
+
         weighted = sum(s * w for s, w in zip(scores_for_composite[:n_base], weights[:n_base]))
         # Нормируем на sum(|w|), а не sum(w): отрицательные веса вредных методов
         # корректно инвертируют их голос, не схлопывая знаменатель в ноль.
-        weight_sum = sum(abs(w) for w in weights[:n_base]) or 1.0
+        # Исключаем структурно отсутствующие методы (нет источника данных).
+        weight_sum = sum(abs(w) for name, w in zip(BASE_METHOD_NAMES[:n_base], weights[:n_base])
+                         if name not in _absent) or 1.0
         linear_raw = weighted / weight_sum
 
         # Плейбуки: нелинейные конъюнкции — при активации берут 60% итога.
@@ -8412,6 +8452,7 @@ class OICompositeStrategy(IStrategy):
             "composite": self.__last_composite,
             "scores": dict(self.__last_scores),
             "regime": self.__last_regime,
+            "daily_regime": self.__daily_regime,
             "regime_confidence": self.__regime_confidence,
             "regime_unstable": self.__regime_confidence < BOCD_NARRATIVE_SYNC_THR,
             "rolling_quality": self.__rolling_quality,

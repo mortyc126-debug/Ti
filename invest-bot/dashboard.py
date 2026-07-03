@@ -1723,6 +1723,9 @@ def run_backtest_one(
         fixed_pct = fixed.get("expectancy_pct", 0.0)
         rows.append({"ticker": ticker, "mode": "fixed", "what_if": _what_if_from_trades(fixed_trades),
                      "rejection_stats": rej,
+                     # Покрытие истории OI — чтобы в UI было видно: методы ОИ
+                     # используются (has=true) или молчат из-за отсутствия данных.
+                     "oi_cov": oi_prov.coverage(ticker),
                      "method_stats": _method_stats_from_trades(fixed_trades),
                      "method_stats_by_regime": _method_stats_by_regime_from_trades(fixed_trades),
                      "trades_list": _trades_list_compact(fixed_trades),
@@ -1843,6 +1846,8 @@ def run_backtest(
     progress = _get_progress_proxy()
     for ticker in tickers:
         _set_progress(progress, ticker, "в очереди")
+
+    ensure_oi_synced(tickers)  # свежий ОИ из воркера до прогонов
 
     if len(tickers) <= 1:
         rows: list[dict] = []
@@ -2052,6 +2057,8 @@ def run_portfolio_sim(
     progress = _get_progress_proxy()
     for ticker in tickers:
         _set_progress(progress, ticker, "в очереди")
+
+    ensure_oi_synced(tickers)  # свежий ОИ из воркера до прогонов
 
     if len(tickers) <= 1:
         results = []
@@ -3306,8 +3313,12 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
       <input type="text" class="inp mid" id="oi_bf_tickers" placeholder="пусто = все из settings.ini" style="width:240px;">
     </label>
     <div style="display:flex;flex-direction:column;gap:6px;padding-top:16px;">
-      <button class="btn-pill" onclick="oiBackfill()" id="oi_bf_btn">⬇ Запустить загрузку</button>
+      <button class="btn-pill" onclick="oiBackfill()" id="oi_bf_btn">⬇ Загрузить с MOEX</button>
       <button class="btn-pill btn-sm" onclick="oiBackfillStatus()">⟳ Статус</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;padding-top:16px;">
+      <button class="btn-pill" onclick="oiSyncWorker()" id="oi_sync_btn" title="Забрать уже собранный ОИ из Cloudflare D1-воркера (быстро, без MOEX) в локальный файл, который читает бэктест">⚡ Забрать из воркера (D1)</button>
+      <button class="btn-pill btn-sm" onclick="oiWorkerCatalog()" id="oi_cat_btn" title="Показать, что реально лежит в воркере и находится ли матч под наши тикеры">🔎 что в воркере</button>
     </div>
   </div>
   <div id="oi_bf_status" style="font-size:12px;color:var(--txt2);padding:8px;background:var(--card);border-radius:6px;border:1px solid var(--border2);min-height:30px;">
@@ -3538,6 +3549,31 @@ function methodStatsByRegimeToHtml(msr) {{
   return html;
 }}
 
+// Бейдж покрытия истории OI по тикеру: есть данные (сколько дней/диапазон) или нет.
+function _oiCovBadge(cov) {{
+  if (!cov) return '';
+  if (!cov.has || !cov.days) {{
+    return `<span title="Нет истории FutOI для этого тикера — методы ОИ (OI_SQUEEZE/INST_OI/RETAIL_CONTRA/…) молчат. Собери данные кнопкой «OI Backfill»." style="font-size:8px;padding:0 4px;border:1px solid #a05a2c;border-radius:6px;color:#d08a4a;white-space:nowrap">OI ✗</span>`;
+  }}
+  const range = (cov.from && cov.to) ? `${{cov.from}} → ${{cov.to}}` : '';
+  return `<span title="История FutOI: ${{cov.days}} дн. ${{range}}. Методы ОИ участвуют в сигналах." style="font-size:8px;padding:0 4px;border:1px solid #2c7a4a;border-radius:6px;color:#5cbf85;white-space:nowrap">OI ✓ ${{cov.days}}д</span>`;
+}}
+
+// Баннер над таблицей: если у части тикеров нет истории OI — методы ОИ молчат,
+// это не «выключено», а нет данных. Подсказываем, как собрать.
+function _oiCovBanner(rows) {{
+  const withCov = rows.filter(r => r.oi_cov);
+  if (!withCov.length) return '';
+  const missing = withCov.filter(r => !r.oi_cov.has || !r.oi_cov.days).map(r => r.ticker);
+  if (!missing.length) return '';
+  const uniq = [...new Set(missing)];
+  return `<tr><td colspan="7" style="padding:6px 10px;background:rgba(160,90,44,.12);border-left:2px solid #a05a2c;font-size:11px;color:var(--txt2)">
+    ⚠ Методы открытого интереса молчат — нет истории FutOI для: <b>${{uniq.join(', ')}}</b>.
+    Это не «выключено», а отсутствие данных. Собери: вкладка <b>Live → OI → «⬇ Запустить загрузку»</b>
+    (нужен токен <code>[MOEX] TOKEN</code>, он уже прописан). Живой бот дособирает ОИ сам по мере торговли.
+  </td></tr>`;
+}}
+
 function rowsToHtml(rows) {{
   let html = '';
   for (const r of rows) {{
@@ -3558,7 +3594,8 @@ function rowsToHtml(rows) {{
     const avgR = r.avg_r !== undefined ? r.avg_r.toFixed(2) : '';
     const models = modelStatsToHtml(r.model_stats);
     const clickStyle = 'cursor:pointer;' + (r.trades_list && r.trades_list.length ? 'border-left:2px solid var(--accent);' : '');
-    html += `<tr onclick="selectTicker('${{r.ticker}}')" title="Кликни — загрузить график" style="${{clickStyle}}"><td><span class="sdot ok"></span>${{r.ticker}}</td><td>${{r.mode}}</td><td>${{r.n_trades ?? ''}}</td><td>${{winPct}}</td><td>${{avgR}}</td><td>${{exp}}</td><td style="font-size:10px;color:var(--txt3);">${{models}}</td></tr>`;
+    const oiBadge = _oiCovBadge(r.oi_cov);
+    html += `<tr onclick="selectTicker('${{r.ticker}}')" title="Кликни — загрузить график" style="${{clickStyle}}"><td><span class="sdot ok"></span>${{r.ticker}} ${{oiBadge}}</td><td>${{r.mode}}</td><td>${{r.n_trades ?? ''}}</td><td>${{winPct}}</td><td>${{avgR}}</td><td>${{exp}}</td><td style="font-size:10px;color:var(--txt3);">${{models}}</td></tr>`;
     if (r.what_if) {{
       const wi = whatIfToHtml(r.what_if);
       if (wi) {{
@@ -3595,9 +3632,10 @@ function rowsToHtml(rows) {{
       const bw = bestWorstTradesToHtml(r.trades_list);
       const bwm = bestWorstMethodsToHtml(r.method_stats);
       let detailHtml = '';
+      detailHtml += `<div style="margin:2px 0 6px"><button onclick="copyTicker('${{r.ticker}}', this)" class="btn-pill btn-xs info" style="font-size:9px;padding:1px 8px" title="Вердикт + точность методов + все сделки со всеми методами">📋 копировать тикер целиком</button></div>`;
       if (bw) detailHtml += `<details style="font-size:11px;margin-bottom:4px"><summary style="cursor:pointer;color:var(--txt3)">▲▼ лучшие / худшие сделки</summary>${{bw}}</details>`;
       if (bwm) detailHtml += `<details style="font-size:11px;margin-bottom:4px"><summary style="cursor:pointer;color:var(--txt3)">▲▼ методы</summary>${{bwm}}</details>`;
-      detailHtml += `<details style="font-size:11px"><summary style="cursor:pointer;color:var(--accent)">📈 все сделки (n=${{r.trades_list.length}})</summary>${{tradesListToHtml(r.trades_list, r.win_rate)}}</details>`;
+      detailHtml += `<details style="font-size:11px"><summary style="cursor:pointer;color:var(--accent)">📈 все сделки (n=${{r.trades_list.length}})</summary>${{tradesListToHtml(r.trades_list, r.win_rate, r.ticker)}}</details>`;
       html += `<tr><td></td><td colspan="6">${{detailHtml}}</td></tr>`;
     }}
   }}
@@ -3626,10 +3664,11 @@ function _l1pctBar(l1pct, dir) {{
   </span>`;
 }}
 
-function tradesListToHtml(trades, overallWr) {{
+function tradesListToHtml(trades, overallWr, ticker) {{
   const W = 10;
   let cumR = 0;
   const hasEp = trades.some(t => t.ep && t.ep > 0);
+  const colN = hasEp ? 14 : 13;  // число колонок для colspan детальной строки
   let html = '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:12px;width:100%;border-spacing:0">';
   html += '<tr style="color:var(--txt3);font-size:11px">'
     + '<th style="padding:3px 6px">#</th><th style="padding:3px 8px">Дата</th><th style="padding:3px 6px">Dir</th><th style="padding:3px 6px">Win</th><th style="padding:3px 8px">R</th><th style="padding:3px 8px">cumR</th>'
@@ -3693,8 +3732,12 @@ function tradesListToHtml(trades, overallWr) {{
     const timePart = dtParts[1] ? dtParts[1].substring(0,5) : '';
     const dtFmt = datePart + (timePart ? ' ' + timePart : '');
     const td = s => `<td style="padding:2px 8px;${s||''}">`; const _td = '</td>';
+    // Регистрируем сделку — для раскрытия «все методы» и копирования по одной.
+    const uid = (ticker || 'tk') + '_' + i;
+    _tradeReg[uid] = {{ticker: ticker || '', t, i}};
+    const nMs = (t.ms || []).length;
     html += `<tr style="${{bg}}">
-      ${td('color:var(--txt3)')}${{i+1}}${_td}
+      ${td('color:var(--txt3);white-space:nowrap')}${{i+1}} <button onclick="toggleTradeMethods('${{uid}}', this)" title="Показать все ${{nMs}} методов сделки" style="font-size:8px;padding:0 4px;border:1px solid var(--border2);border-radius:3px;background:transparent;color:var(--txt3);cursor:pointer">▾ методы</button>${_td}
       ${td('white-space:nowrap;letter-spacing:.01em')}${{dtFmt}}${_td}
       ${td('font-weight:600')}${{t.d}}${_td}${td('')}${{winMark}}${_td}
       ${td('color:'+rColor+';font-weight:600')}${{t.r.toFixed(2)}}${_td}
@@ -3707,6 +3750,12 @@ function tradesListToHtml(trades, overallWr) {{
       ${td('color:'+rwrColor)}${{rwrPct}}${_td}
       <td style="padding:2px 8px;color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden;cursor:help" title="${{allForTitle}}">${{forStr}}</td>
       <td style="padding:2px 8px;color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden;cursor:help" title="${{allAgTitle}}">${{againstStr}}</td>
+    </tr>
+    <tr id="tmrow_${{uid}}" style="display:none;${{bg}}">
+      <td colspan="${{colN}}" style="padding:4px 10px;border-bottom:1px solid var(--border2)">
+        ${{_tradeFullMethodsHtml(t)}}
+        <button onclick="copyTrade('${{uid}}', this)" class="btn-pill btn-xs info" style="font-size:9px;padding:1px 8px;margin-top:2px">📋 копировать сделку</button>
+      </td>
     </tr>`;
   }}
   html += '</table></div>';
@@ -3766,12 +3815,13 @@ function bestWorstMethodsToHtml(methodStats) {{
 
 // Полный каталог методов. Единый источник; держать в синхроне с ALL_METHOD_NAMES
 // (oi_composite_strategy.py). Строка: [группа, имя, рус.подпись, переключаемый].
-// переключаемый=1 → checkbox + кнопка инверсии (это 50 методов METHODS — только
-// их видят set_disabled_methods/set_inverted_methods). переключаемый=0 → метод
-// считается, но выключить/инвертировать отсюда нельзя: провайдерные (OI /
-// микроструктура) молчат без данных, структурные считаются отдельно, а M1/M2/M3 —
-// диагностика (в живой композит не входят). Показаны, чтобы список был полным —
-// раньше половины этих методов в списке не было вовсе.
+// переключаемый=1 → checkbox + кнопка инверсии (set_disabled_methods/
+// set_inverted_methods их видят). OI-методы теперь тоже переключаемы —
+// их скоры пропускаются через тот же гейт в стратегии (данные идут из
+// воркера). переключаемый=0 → метод считается, но выключить/инвертировать
+// отсюда нельзя: микроструктура (tradestats) молчит без данных, структурные
+// (MTF) считаются отдельно, а M1/M2/M3 — диагностика (в живой композит не
+// входят). Показаны, чтобы список был полным.
 const _METHOD_CATALOG = [
   ["Тренд / MA","PRICE_TREND","тренд цены (линрег)",1],
   ["Тренд / MA","TREND_QUALITY","качество тренда (TQI)",1],
@@ -3826,11 +3876,11 @@ const _METHOD_CATALOG = [
   ["Структура (MTF) — не выключается","LEVEL_CONTEXT","контекст уровней",0],
   ["Структура (MTF) — не выключается","MKT_STRUCTURE","структура рынка (HH/HL)",0],
   ["Структура (MTF) — не выключается","SPRING","пружина Вайкоффа",0],
-  ["Открытый интерес (FutOI) — провайдер","OI_SQUEEZE","сквиз открытого интереса",0],
-  ["Открытый интерес (FutOI) — провайдер","INST_OI","нетто-позиция юрлиц",0],
-  ["Открытый интерес (FutOI) — провайдер","RETAIL_CONTRA","контр-сигнал физлиц",0],
-  ["Открытый интерес (FutOI) — провайдер","DELTA_QUADRANT","квадрант дельты ОИ",0],
-  ["Открытый интерес (FutOI) — провайдер","OI_ABSORPTION","поглощение по ОИ",0],
+  ["Открытый интерес (FutOI)","OI_SQUEEZE","сквиз открытого интереса",1],
+  ["Открытый интерес (FutOI)","INST_OI","нетто-позиция юрлиц",1],
+  ["Открытый интерес (FutOI)","RETAIL_CONTRA","контр-сигнал физлиц",1],
+  ["Открытый интерес (FutOI)","DELTA_QUADRANT","квадрант дельты ОИ",1],
+  ["Открытый интерес (FutOI)","OI_ABSORPTION","поглощение по ОИ",1],
   ["Микроструктура (tradestats) — провайдер","BS_PRESSURE_TS","давление сделок",0],
   ["Микроструктура (tradestats) — провайдер","AGGRESSOR_FLOW","поток агрессора",0],
   ["Микроструктура (tradestats) — провайдер","LARGE_IMPACT","перекос крупных сделок",0],
@@ -4010,7 +4060,11 @@ function deleteMethodPreset() {{
     }}).catch(() => {{}});
 }}
 
-// Агрегирует method_stats по всем строкам _backtestRows и рисует глобальную таблицу
+// Агрегирует method_stats по всем строкам _backtestRows и рисует глобальную таблицу.
+// Показываем ВЕСЬ каталог методов (_METHOD_CATALOG), а не только те, что набрали
+// ≥5 сделок — иначе половина списка «исчезает» и непонятно, что вообще считалось.
+// Плюс отдельный блок «почему входим / почему выходим»: агрегат драйверов входа
+// (топ-методы «за» на входе) и распределение причин выхода (тейк/стоп/таймаут).
 function renderGlobalMethodStats() {{
   const agg = {{}};
   for (const r of _backtestRows) {{
@@ -4023,18 +4077,48 @@ function renderGlobalMethodStats() {{
       agg[name].dw += s.disagree_win || 0;
     }}
   }}
-  const rows = Object.entries(agg)
-    .filter(([, s]) => s.an + s.dn >= 5)
-    .map(([name, s]) => {{
-      const fwr = s.an > 0 ? s.aw / s.an : null;
-      const awr = s.dn > 0 ? s.dw / s.dn : null;
-      return {{name, fwr, awr, fn: s.an, dn: s.dn}};
-    }})
-    .filter(r => r.fwr !== null)
-    .sort((a, b) => b.fwr - a.fwr);
+
+  // ── Агрегат входов/выходов из компактных trades_list ──
+  const exitAgg = {{}};      // xr -> {{n, win}}
+  const entryDrivers = {{}};  // method -> {{n, win}} по появлению в топ-«за» на входе
+  let nTrades = 0;
+  for (const r of _backtestRows) {{
+    if (!r.trades_list) continue;
+    for (const t of r.trades_list) {{
+      nTrades++;
+      const xr = t.xr || '—';
+      if (!exitAgg[xr]) exitAgg[xr] = {{n: 0, win: 0}};
+      exitAgg[xr].n++; exitAgg[xr].win += (t.w ? 1 : 0);
+      for (const pair of (t.fa || [])) {{
+        const nm = pair[0];
+        if (!entryDrivers[nm]) entryDrivers[nm] = {{n: 0, win: 0}};
+        entryDrivers[nm].n++; entryDrivers[nm].win += (t.w ? 1 : 0);
+      }}
+    }}
+  }}
 
   const el = document.getElementById('global_method_stats');
-  if (!rows.length) {{ el.style.display = 'none'; return; }}
+  const hasAny = Object.keys(agg).length || nTrades;
+  if (!hasAny) {{ el.style.display = 'none'; return; }}
+
+  // Все методы из каталога + подхватываем те, что вдруг есть в agg, но выпали из каталога.
+  const catNames = _METHOD_CATALOG.map(r => r[1]);
+  const allNames = catNames.slice();
+  for (const nm of Object.keys(agg)) if (!allNames.includes(nm)) allNames.push(nm);
+
+  const rows = allNames.map(name => {{
+    const s = agg[name] || {{an: 0, aw: 0, dn: 0, dw: 0}};
+    const fwr = s.an > 0 ? s.aw / s.an : null;
+    const awr = s.dn > 0 ? s.dw / s.dn : null;
+    return {{name, fwr, awr, fn: s.an, dn: s.dn, tot: s.an + s.dn}};
+  }});
+  // Сортировка: сначала методы с данными (по чистому% убыв.), «немые» — в конце.
+  rows.sort((a, b) => {{
+    if ((a.tot > 0) !== (b.tot > 0)) return a.tot > 0 ? -1 : 1;
+    const na = a.fwr != null ? (a.awr != null ? a.fwr - a.awr : a.fwr - 0.5) : -99;
+    const nb = b.fwr != null ? (b.awr != null ? b.fwr - b.awr : b.fwr - 0.5) : -99;
+    return nb - na;
+  }});
 
   const pct = v => v != null ? (v * 100).toFixed(0) + '%' : '—';
   const col = v => v == null ? 'var(--txt3)' : v >= 0.60 ? '#7dcc7d' : v <= 0.42 ? '#e07070' : 'var(--txt2)';
@@ -4044,12 +4128,15 @@ function renderGlobalMethodStats() {{
   const trs = rows.map(r => {{
     const disabled = getDisabledMethods().includes(r.name);
     const inverted = getInvertedMethods().includes(r.name);
-    // чистый% = ЗА win% минус ПРОТИВ win% (насколько метод лучше когда в большинстве)
+    const mute = r.tot === 0;                 // метод ни разу не высказался
+    const lowN = !mute && r.tot < 5;          // мало сделок — цифры ненадёжны
     const net = (r.fwr != null && r.awr != null) ? r.fwr - r.awr : (r.fwr != null ? r.fwr - 0.5 : null);
-    return `<tr style="${{disabled ? 'opacity:.45;' : inverted ? 'background:rgba(107,76,0,.15);' : ''}}">
-      <td style="padding:2px 8px;font-size:10px;white-space:nowrap;">${{r.name.replace(/_/g,' ')}}${{inverted ? ' <span style="color:#f0a030;font-size:9px;">↔</span>' : ''}}</td>
-      <td style="padding:2px 8px;font-size:10px;color:${{col(r.fwr)}};text-align:right;">${{pct(r.fwr)}} <span style="color:var(--txt3)">n=${{r.fn}}</span></td>
-      <td style="padding:2px 8px;font-size:10px;color:${{col(r.awr)}};text-align:right;">${{pct(r.awr)}} <span style="color:var(--txt3)">n=${{r.dn}}</span></td>
+    const rowStyle = disabled ? 'opacity:.45;' : inverted ? 'background:rgba(107,76,0,.15);' : mute ? 'opacity:.5;' : '';
+    const nStyle = lowN ? 'color:#c99a4a' : 'color:var(--txt3)';
+    return `<tr style="${{rowStyle}}">
+      <td style="padding:2px 8px;font-size:10px;white-space:nowrap;">${{r.name.replace(/_/g,' ')}}${{inverted ? ' <span style="color:#f0a030;font-size:9px;">↔</span>' : ''}}${{mute ? ' <span style="color:var(--txt3);font-size:8px;">нет сделок</span>' : ''}}</td>
+      <td style="padding:2px 8px;font-size:10px;color:${{col(r.fwr)}};text-align:right;">${{pct(r.fwr)}} <span style="${{nStyle}}">n=${{r.fn}}</span></td>
+      <td style="padding:2px 8px;font-size:10px;color:${{col(r.awr)}};text-align:right;">${{pct(r.awr)}} <span style="${{nStyle}}">n=${{r.dn}}</span></td>
       <td style="padding:2px 8px;font-size:10px;color:${{netCol(net)}};text-align:right;font-weight:600;">${{netPct(net)}}</td>
       <td style="padding:2px 4px;display:flex;gap:3px;">
         <button class="btn-pill btn-xs ghost" onclick="toggleMethodInRun('${{r.name}}')" style="font-size:9px;padding:1px 6px;">${{disabled ? '✓ вкл' : '✗ откл'}}</button>
@@ -4057,11 +4144,41 @@ function renderGlobalMethodStats() {{
       </td>
     </tr>`;
   }}).join('');
+  const nShown = rows.filter(r => r.tot > 0).length;
+
+  // ── Блок «почему входим» ──
+  const XR_LABELS = {{take: '✅ тейк', stop: '🛑 стоп', timeout: '⏱ таймаут'}};
+  const drv = Object.entries(entryDrivers).sort((a, b) => b[1].n - a[1].n).slice(0, 10);
+  const drvHtml = drv.length ? drv.map(([nm, s]) => {{
+    const wr = s.n > 0 ? s.win / s.n : null;
+    return `<span style="display:inline-block;font-size:10px;padding:2px 7px;margin:2px;border:1px solid var(--border2);border-radius:10px;">`
+      + `${{nm.replace(/_/g,' ')}} <span style="color:var(--txt3)">×${{s.n}}</span> `
+      + `<span style="color:${{col(wr)}}">${{pct(wr)}}</span></span>`;
+  }}).join('') : '<span style="color:var(--txt3);font-size:10px;">нет данных о входах</span>';
+
+  // ── Блок «почему выходим» ──
+  const xrOrder = ['take', 'stop', 'timeout'];
+  const xrRank = k => {{ const i = xrOrder.indexOf(k); return i < 0 ? 99 : i; }};
+  const xrKeys = Object.keys(exitAgg).sort((a, b) => xrRank(a) - xrRank(b) || exitAgg[b].n - exitAgg[a].n);
+  const exitHtml = nTrades ? xrKeys.map(k => {{
+    const s = exitAgg[k];
+    const share = nTrades > 0 ? s.n / nTrades : 0;
+    const wr = s.n > 0 ? s.win / s.n : null;
+    return `<span style="display:inline-block;font-size:10px;padding:2px 7px;margin:2px;border:1px solid var(--border2);border-radius:10px;">`
+      + `${{XR_LABELS[k] || k}} <span style="color:var(--txt3)">${{(share*100).toFixed(0)}}% · n=${{s.n}}</span> `
+      + `<span style="color:${{col(wr)}}">win ${{pct(wr)}}</span></span>`;
+  }}).join('') : '<span style="color:var(--txt3);font-size:10px;">нет закрытых сделок</span>';
 
   el.style.display = '';
   el.innerHTML = `
     <div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--txt2);margin-bottom:8px;border-bottom:1px solid var(--border2);padding-bottom:6px;">
       📊 Глобальная статистика методов (все тикеры агрегированно)
+    </div>
+    <div style="margin-bottom:10px;">
+      <div style="font-size:10px;font-weight:600;color:var(--txt2);margin-bottom:3px;">🎯 Что заставляет входить (топ-методы «за» на входе, ×раз · win%)</div>
+      <div>${{drvHtml}}</div>
+      <div style="font-size:10px;font-weight:600;color:var(--txt2);margin:8px 0 3px;">🚪 Почему закрываются сделки (доля · win%)</div>
+      <div>${{exitHtml}}</div>
     </div>
     <table style="border-collapse:collapse;width:100%;max-width:580px;">
       <thead><tr>
@@ -4073,7 +4190,7 @@ function renderGlobalMethodStats() {{
       </tr></thead>
       <tbody>${{trs}}</tbody>
     </table>
-    <div style="font-size:9px;color:var(--txt3);margin-top:6px;">«Против» = когда метод в меньшинстве. Чистый% = ЗА − ПРОТИВ (насколько метод предсказывает лучше случайного). Зелёный ≥60% / +8%, красный ≤42% / −5%.</div>
+    <div style="font-size:9px;color:var(--txt3);margin-top:6px;">Показаны все ${{rows.length}} методов каталога (${{nShown}} с данными, остальные «нет сделок» — молчали или без провайдерных данных). «Против» = когда метод в меньшинстве. Чистый% = ЗА − ПРОТИВ. Зелёный ≥60% / +8%, красный ≤42% / −5%. Оранжевый n — мало сделок (&lt;5), цифры ненадёжны.</div>
     <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
       <button class="btn-pill btn-sm ghost" onclick="autoDisableWeakMethods()" title="Выключить методы с win% ЗА ≤25% (минимум 5 сделок в роли)">⛔ выкл слабые (≤25%)</button>
       <button class="btn-pill btn-sm ghost" onclick="autoInvertAntisignals()" title="Инвертировать методы где ПРОТИВ win% > ЗА win% + 10% (антисигналы)">↔ инверт анти-сигналы</button>
@@ -4204,6 +4321,8 @@ function droppedToHtml(dropped) {{
 // строка) без повторного запроса к серверу.
 let _backtestRows = [];
 let _droppedRows = [];
+// Реестр сделок для раскрытия «все методы» и покопийной выгрузки. uid → {{ticker, t}}.
+let _tradeReg = {{}};
 
 function _isZeroResult(r) {{
   // "нулевой результат" — тикер досчитан, но сделок не нашлось (n_trades===0),
@@ -4325,6 +4444,7 @@ function renderResultsTable() {{
   const errors = _backtestRows.filter(r => r.error !== undefined && r.n_trades === undefined);
   let html = '<tr><th>Тикер</th><th>Режим</th><th>Сделок</th><th>Win%</th><th>avg R</th><th>Exp%</th><th>M1/M2/M3 win% (когда согласны)</th></tr>';
   html += droppedToHtml(_droppedRows);
+  html += _oiCovBanner(shown);
   html += rowsToHtml(errors.concat(shown));
   html += summaryRowToHtml(shown);
   table.innerHTML = html;
@@ -4398,10 +4518,133 @@ function _rowToText(r) {{
   return lines.join('\\n');
 }}
 
+// ── Общий помощник копирования в буфер ──
+async function _copyToClipboard(text, btn, okLabel) {{
+  const orig = btn ? btn.textContent : '';
+  try {{
+    await navigator.clipboard.writeText(text);
+  }} catch(e) {{
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  }}
+  if (btn) {{ btn.textContent = okLabel || '✓ скопировано'; setTimeout(() => btn.textContent = orig, 1500); }}
+}}
+
+// Все методы сделки, приведённые к направлению: ЗА (>0), ПРОТИВ (<0), молчали (=0).
+function _tradeMethodsSplit(t) {{
+  const dir = t.d === 'L' ? 1 : -1;
+  const ms = (t.ms || []).slice().sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  return {{
+    forL: ms.filter(([, s]) => s * dir > 0),
+    agL:  ms.filter(([, s]) => s * dir < 0),
+    neu:  ms.filter(([, s]) => s * dir === 0),
+    n: ms.length,
+  }};
+}}
+
+function _tradeFullMethodsHtml(t) {{
+  const sp = _tradeMethodsSplit(t);
+  const chip = (arr, cls) => arr.length
+    ? arr.map(([n, s]) => `<span title="${{_METHOD_RU[n]||n}}" style="display:inline-block;font-size:10px;padding:1px 6px;margin:1px;border:1px solid var(--border2);border-radius:9px;color:${{cls}}">${{n.replace(/_/g,' ')}} ${{s>=0?'+':''}}${{s.toFixed(2)}}</span>`).join('')
+    : '<span style="color:var(--txt3);font-size:10px">—</span>';
+  return `<div style="padding:4px 2px">
+    <div style="font-size:10px;color:var(--txt2);margin:2px 0"><b>ЗА (${{sp.forL.length}}):</b> ${{chip(sp.forL, '#7dcc7d')}}</div>
+    <div style="font-size:10px;color:var(--txt2);margin:2px 0"><b>ПРОТИВ (${{sp.agL.length}}):</b> ${{chip(sp.agL, '#e07070')}}</div>
+    ${{sp.neu.length ? `<div style="font-size:10px;color:var(--txt3);margin:2px 0"><b>молчали (${{sp.neu.length}}):</b> ${{sp.neu.map(([n])=>n.replace(/_/g,' ')).join(', ')}}</div>` : ''}}
+  </div>`;
+}}
+
+// Текст одной сделки со всеми методами — для копирования.
+function _tradeFullMethodsText(ticker, t, idx) {{
+  const sp = _tradeMethodsSplit(t);
+  const xrRu = {{take: 'тейк', stop: 'стоп', timeout: 'таймаут'}};
+  const f = arr => arr.map(([n, s]) => `${{n}} ${{s>=0?'+':''}}${{s.toFixed(2)}}`).join(', ') || '—';
+  const L = [];
+  L.push(`${{ticker||''}} #${{idx!=null?idx+1:''}} ${{t.t}} ${{t.d}} ${{t.w?'WIN':'LOSS'}} R=${{t.r.toFixed(2)}} выход=${{xrRu[t.xr]||t.xr||'—'}}`);
+  if (t.ep) L.push(`  цены: вход ${{t.ep}} → выход ${{t.xp}} | тейк ${{t.tp}} стоп ${{t.sp}}  MFE ${{t.mfe!=null?t.mfe.toFixed(2)+'%':'—'}} MAE ${{t.mae!=null?t.mae.toFixed(2)+'%':'—'}}`);
+  L.push(`  ЗА (${{sp.forL.length}}): ${{f(sp.forL)}}`);
+  L.push(`  ПРОТИВ (${{sp.agL.length}}): ${{f(sp.agL)}}`);
+  if (sp.neu.length) L.push(`  молчали (${{sp.neu.length}}): ${{sp.neu.map(([n])=>n).join(', ')}}`);
+  return L.join('\\n');
+}}
+
+function toggleTradeMethods(uid, btn) {{
+  const el = document.getElementById('tmrow_' + uid);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : '';
+  if (btn) btn.textContent = open ? '▾ методы' : '▴ скрыть';
+}}
+
+function copyTrade(uid, btn) {{
+  const rec = _tradeReg[uid];
+  if (!rec) return;
+  _copyToClipboard(_tradeFullMethodsText(rec.ticker, rec.t, rec.i), btn, '✓');
+}}
+
+// Вердикт по тикеру: сводка + точность методов (лучшие/худшие) + причины выходов.
+function _tickerVerdictLines(r) {{
+  const L = [];
+  const winPct = r.win_rate !== undefined ? (r.win_rate*100).toFixed(1)+'%' : '—';
+  const exp = r.expectancy_pct !== undefined ? (r.expectancy_pct*100).toFixed(2)+'%' : '—';
+  const avgR = r.avg_r !== undefined ? r.avg_r.toFixed(2) : '—';
+  L.push(`ВЕРДИКТ ${{r.ticker}} [${{r.mode}}]: сделок ${{r.n_trades??0}}, win ${{winPct}}, avg R ${{avgR}}, ожидание ${{exp}}`);
+  // Причины выхода по этому тикеру
+  if (r.trades_list && r.trades_list.length) {{
+    const ex = {{}};
+    for (const t of r.trades_list) {{ const k=t.xr||'—'; if(!ex[k])ex[k]={{n:0,w:0}}; ex[k].n++; ex[k].w+=(t.w?1:0); }}
+    const xrRu = {{take:'тейк',stop:'стоп',timeout:'таймаут'}};
+    const parts = Object.entries(ex).map(([k,s])=>`${{xrRu[k]||k}} ${{s.n}} (win ${{(s.w/s.n*100).toFixed(0)}}%)`);
+    L.push(`  выходы: ${{parts.join(' · ')}}`);
+  }}
+  // Точность методов: лучшие/худшие по ЗА win% (n≥3)
+  if (r.method_stats) {{
+    const rows = Object.entries(r.method_stats)
+      .filter(([,s]) => (s.agree_n||0) >= 3 && s.agree_win_rate != null)
+      .map(([n,s]) => ({{n, fwr:s.agree_win_rate, fn:s.agree_n}}));
+    if (rows.length) {{
+      const best = [...rows].sort((a,b)=>b.fwr-a.fwr).slice(0,5);
+      const worst = [...rows].sort((a,b)=>a.fwr-b.fwr).slice(0,5);
+      L.push(`  лучшие методы: ${{best.map(x=>`${{x.n}} ${{(x.fwr*100).toFixed(0)}}% (n=${{x.fn}})`).join(', ')}}`);
+      L.push(`  худшие методы: ${{worst.map(x=>`${{x.n}} ${{(x.fwr*100).toFixed(0)}}% (n=${{x.fn}})`).join(', ')}}`);
+    }}
+  }}
+  return L;
+}}
+
+// Полный текст по одному тикеру: вердикт + attribution + все сделки со всеми методами.
+function _tickerFullText(r) {{
+  const L = [];
+  L.push('='.repeat(60));
+  L.push(..._tickerVerdictLines(r));
+  L.push('');
+  L.push(_rowToText(r));  // attribution-таблицы + сделки (топ)
+  if (r.trades_list && r.trades_list.length) {{
+    L.push('');
+    L.push('  --- Каждая сделка: все методы ЗА/ПРОТИВ ---');
+    r.trades_list.forEach((t, i) => L.push(_tradeFullMethodsText(r.ticker, t, i)));
+  }}
+  return L.join('\\n');
+}}
+
+function copyTicker(ticker, btn) {{
+  const r = _backtestRows.find(x => x.ticker === ticker);
+  if (!r) {{ if(btn) btn.textContent='нет данных'; return; }}
+  _copyToClipboard(_tickerFullText(r), btn, '✓ тикер');
+}}
+
 async function copyAllResults(btn) {{
   if (!_backtestRows.length) {{ alert('Нет результатов'); return; }}
+  // Блок вердиктов по каждому тикеру (сводка + точность методов + выходы) в начале.
+  let text = '=== ВЕРДИКТЫ ПО ТИКЕРАМ ===\\n';
+  for (const r of _backtestRows) {{
+    if (r.n_trades === undefined) continue;
+    text += _tickerVerdictLines(r).join('\\n') + '\\n';
+  }}
+  text += '\\n=== ТАБЛИЦА ===\\n';
   const header = 'Тикер\tРежим\tСделок\tWin%\tavg R\tExp%\tM1/M2/M3';
-  let text = header + '\\n' + _backtestRows.map(_rowToText).join('\\n') + '\\n';
+  text += header + '\\n' + _backtestRows.map(_rowToText).join('\\n') + '\\n';
   // Добавляем сделки по каждому тикеру
   const rowsWithTrades = _backtestRows.filter(r => r.trades_list && r.trades_list.length);
   if (rowsWithTrades.length) {{
@@ -4951,9 +5194,10 @@ function dgShowDetails(r) {{
   const wr = r.win_rate !== undefined ? (r.win_rate*100).toFixed(1)+'%' : '—';
   const avgR = r.avg_r !== undefined ? r.avg_r.toFixed(2)+'R' : '';
   const exp = r.expectancy_pct !== undefined ? (r.expectancy_pct*100).toFixed(2)+'%' : '';
-  hdr.innerHTML = `<b style="color:var(--mem)">${{r.ticker}}</b> &nbsp; ${{n}} сделок &nbsp; WR <b>${{wr}}</b> &nbsp; avg ${{avgR}} &nbsp; exp ${{exp}}`;
+  hdr.innerHTML = `<b style="color:var(--mem)">${{r.ticker}}</b> &nbsp; ${{n}} сделок &nbsp; WR <b>${{wr}}</b> &nbsp; avg ${{avgR}} &nbsp; exp ${{exp}}`
+    + ` &nbsp; <button onclick="copyTicker('${{r.ticker}}', this)" class="btn-pill btn-xs info" style="font-size:9px;padding:1px 8px" title="Вердикт + точность методов + все сделки со всеми методами">📋 копировать тикер</button>`;
   body.innerHTML = r.trades_list && r.trades_list.length
-    ? tradesListToHtml(r.trades_list, r.win_rate)
+    ? tradesListToHtml(r.trades_list, r.win_rate, r.ticker)
     : '<span style="color:var(--txt3);font-size:11px;padding:8px">Нет данных о сделках</span>';
 
   // Best/Worst
@@ -5795,6 +6039,61 @@ async function oiBackfill() {{
       }}
     }}, 5000);
   }} catch(e) {{ status.textContent = '⚠ ' + e; if(btn) btn.disabled=false; }}
+}}
+
+// Забрать уже собранный ОИ из воркера (D1) в локальный data/oi_daily.json.
+async function oiSyncWorker() {{
+  const tickers = document.getElementById('oi_bf_tickers').value.trim();
+  const status  = document.getElementById('oi_bf_status');
+  const btn     = document.getElementById('oi_sync_btn');
+  status.textContent = '⚡ тяну из воркера...';
+  if (btn) btn.disabled = true;
+  try {{
+    const body = {{}};
+    if (tickers) body.tickers = tickers;
+    const d = await fetch('/api/oi_sync_worker', {{
+      method: 'POST', headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify(body),
+    }}).then(r => r.json());
+    if (!d.ok) {{ status.textContent = '⚠ ' + (d.error || 'не удалось'); return; }}
+    status.textContent = `✅ из воркера: ${{d.total}} дней всего`;
+    const log = document.getElementById('oi_bf_log');
+    if (log && d.log && d.log.length) {{
+      log.innerHTML = d.log.map(l => `<div>${{l}}</div>`).join('');
+      log.style.display = '';
+    }}
+  }} catch(e) {{ status.textContent = '⚠ ' + e; }}
+  finally {{ if (btn) btn.disabled = false; }}
+}}
+
+// Диагностика: что лежит в воркере и матчатся ли наши тикеры.
+async function oiWorkerCatalog() {{
+  const tickers = document.getElementById('oi_bf_tickers').value.trim();
+  const status  = document.getElementById('oi_bf_status');
+  const log     = document.getElementById('oi_bf_log');
+  const btn     = document.getElementById('oi_cat_btn');
+  status.textContent = '🔎 спрашиваю воркер...';
+  if (btn) btn.disabled = true;
+  try {{
+    const body = {{}};
+    if (tickers) body.tickers = tickers;
+    const d = await fetch('/api/oi_worker_catalog', {{
+      method: 'POST', headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify(body),
+    }}).then(r => r.json());
+    if (!d.ok) {{ status.textContent = '⚠ ' + (d.error || 'не удалось'); return; }}
+    status.textContent = `в воркере ${{d.catalog_n}} тикеров (кодов) в oi_daily`;
+    let html = '<div style="font-weight:600;margin:4px 0">Матч под наши тикеры:</div>';
+    html += (d.probes || []).map(p =>
+      `<div>${{p.matched ? '✅' : '❌'}} ${{p.ticker}} <span style="color:var(--txt3)">корень ${{p.root}}</span> → ` +
+      (p.matched ? `${{p.src}} · ${{p.days}} дн.` : 'нет в воркере') +
+      (p.error ? ' <span style="color:#e07070">'+p.error+'</span>' : '') + `</div>`).join('');
+    html += '<div style="font-weight:600;margin:8px 0 4px">Всё, что есть в воркере (код · дней · период):</div>';
+    html += (d.catalog || []).map(c =>
+      `<div style="color:var(--txt3)">${{c.ticker}} · ${{c.days}} · ${{c.from_date||'?'}}→${{c.to_date||'?'}}</div>`).join('');
+    if (log) {{ log.innerHTML = html; log.style.display = ''; }}
+  }} catch(e) {{ status.textContent = '⚠ ' + e; }}
+  finally {{ if (btn) btn.disabled = false; }}
 }}
 
 async function oiBackfillStatus() {{
@@ -7563,6 +7862,96 @@ def get_oi_backfill_status() -> dict:
         return dict(_oi_backfill_job)
 
 
+def _get_oi_api_url() -> str:
+    """URL OI-воркера из env OI_API_URL или settings.ini [OI_API] URL=."""
+    url = os.getenv("OI_API_URL")
+    if url:
+        return url.strip()
+    ini = __import__("configparser").ConfigParser()
+    ini.read(os.path.join(os.path.dirname(__file__), "settings.ini"), encoding="utf-8")
+    return (ini.get("OI_API", "URL", fallback="") or "").strip()
+
+
+_oi_autosync_at: dict = {}  # ticker(upper) -> monotonic ts последней авто-подтяжки
+_oi_autosync_lock = __import__("threading").Lock()
+OI_AUTOSYNC_TTL_SEC = 300   # не дёргать воркер по тому же тикеру чаще, чем раз в 5 мин
+
+
+def ensure_oi_synced(tickers: list[str]) -> None:
+    """Перед бэктестом дозабирает свежий ОИ из воркера в data/oi_daily.json.
+    Best-effort: нет URL / сеть упала — молча идём на том, что есть локально.
+    Троттлинг по тикеру (TTL), чтобы не дёргать воркер на каждый прогон.
+    Вызывать в РОДИТЕЛЬСКОМ процессе один раз до запуска пула (подпроцессы
+    читают уже готовый файл)."""
+    url = _get_oi_api_url()
+    if not url or not tickers:
+        return
+    now = time.monotonic()
+    with _oi_autosync_lock:
+        due = [t for t in tickers
+               if now - _oi_autosync_at.get(t.upper(), 0.0) > OI_AUTOSYNC_TTL_SEC]
+        for t in due:
+            _oi_autosync_at[t.upper()] = now
+    if not due:
+        return
+    try:
+        import oi_layers
+        res = oi_layers.sync_worker_oi(
+            url, due, path=os.path.join(os.path.dirname(__file__), "data", "oi_daily.json"))
+        logger.info(f"OI автоподтяжка из воркера: {res.get('total')} дней всего по {len(due)} тик.")
+    except Exception as e:
+        logger.warning(f"OI автоподтяжка не удалась (идём на локальных данных): {e}")
+
+
+def oi_worker_catalog(tickers: list[str] | None = None) -> dict:
+    """Диагностика: что реально лежит в OI-воркере (/db/tickers) и находится ли
+    матч под наши тикеры. Помогает понять расхождение форматов кодов."""
+    import oi_layers
+    import backfill_oi
+    url = _get_oi_api_url()
+    if not url:
+        return {"ok": False, "error": "URL OI-воркера не задан ([OI_API] URL=)"}
+    try:
+        catalog = oi_layers._worker_get(url, "/db/tickers")
+    except Exception as e:
+        return {"ok": False, "error": f"/db/tickers упал: {e}"}
+    catalog = catalog or []
+    target = tickers or backfill_oi._get_strategy_tickers()
+    probes = []
+    for tk in (target or []):
+        try:
+            rows = oi_layers.fetch_worker_oi_daily(url, tk)
+        except Exception as e:
+            probes.append({"ticker": tk, "matched": False, "days": 0, "error": str(e)})
+            continue
+        probes.append({
+            "ticker": tk, "matched": bool(rows), "days": len(rows),
+            "src": (rows[0].get("src_ticker") if rows else None),
+            "root": oi_layers._contract_root(tk),
+        })
+    return {"ok": True, "catalog": catalog, "probes": probes,
+            "catalog_n": len(catalog)}
+
+
+def oi_sync_from_worker(tickers: list[str] | None = None) -> dict:
+    """Тянет oi_daily из OI-воркера (D1) в локальный data/oi_daily.json.
+    Без tickers — берёт акционные тикеры из STRATEGY_* секций settings.ini."""
+    import oi_layers
+    import backfill_oi
+    url = _get_oi_api_url()
+    if not url:
+        return {"ok": False, "error": "URL OI-воркера не задан ([OI_API] URL= в settings.ini)"}
+    target = tickers or backfill_oi._get_strategy_tickers()
+    if not target:
+        return {"ok": False, "error": "Нет тикеров: добавь STRATEGY_* в settings.ini или укажи вручную"}
+    try:
+        res = oi_layers.sync_worker_oi(url, target,
+                                       path=os.path.join(os.path.dirname(__file__), "data", "oi_daily.json"))
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True, "total": res["total"], "summary": res["summary"], "log": res["log"]}
+
+
 # ── Управление процессом бота (старт/стоп) ───────────────────────────────────
 
 def supervisor_start(sandbox: bool) -> dict:
@@ -8383,6 +8772,10 @@ class Handler(BaseHTTPRequestHandler):
                     pass
                 return
 
+            # Свежий ОИ из воркера (D1) в data/oi_daily.json до старта пула —
+            # подпроцессы дальше читают уже готовый файл.
+            ensure_oi_synced(tickers)
+
             pool = ProcessPoolExecutor(max_workers=min(BACKTEST_WORKERS, len(tickers)))
             _register_pool(pool)
             try:
@@ -8619,6 +9012,14 @@ class Handler(BaseHTTPRequestHandler):
             raw_t = payload.get("tickers") or None
             tickers = [t.strip().upper() for t in raw_t.split(",") if t.strip()] if isinstance(raw_t, str) and raw_t.strip() else (raw_t if isinstance(raw_t, list) else None)
             self._send_json(run_oi_backfill(months, tickers))
+        elif self.path == "/api/oi_sync_worker":
+            raw_t = payload.get("tickers") or None
+            tickers = [t.strip().upper() for t in raw_t.split(",") if t.strip()] if isinstance(raw_t, str) and raw_t.strip() else (raw_t if isinstance(raw_t, list) else None)
+            self._send_json(oi_sync_from_worker(tickers))
+        elif self.path == "/api/oi_worker_catalog":
+            raw_t = payload.get("tickers") or None
+            tickers = [t.strip().upper() for t in raw_t.split(",") if t.strip()] if isinstance(raw_t, str) and raw_t.strip() else (raw_t if isinstance(raw_t, list) else None)
+            self._send_json(oi_worker_catalog(tickers))
         elif self.path == "/api/council_ask":
             self._send_json(council_ask_sync(payload.get("ticker","").upper(), payload.get("question",""), payload.get("direction","LONG").upper()))
         elif self.path == "/api/bot_adopt":
