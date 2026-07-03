@@ -37,6 +37,7 @@ from configuration.settings import TradingSettings, MegaAlertsSettings, Strategy
 from trade_system.strategies.strategy_factory import StrategyFactory
 from risk import RiskManager
 from oi_layers import OiLayersService
+from signal_gate import SignalGate, OI_HISTORY_FILE
 from orderbook import OrderBookService
 from tradestats import TradeStatsService
 from mega_alerts import MegaAlertsService
@@ -221,6 +222,13 @@ class Trader:
         self.__last_prices: dict[str, float] = {}
         self.__oi_layers = OiLayersService(price_getter=lambda t: self.__last_prices.get(t))
         self.__oi_task: asyncio.Task | None = None
+        # Гейт качества сигнала (порт labSignalScreener из oi_lab.html) —
+        # калибруется раз в торговый день из уже собранной истории
+        # data/oi_daily.json (тот же файл, что пишет __oi_layers), новых
+        # запросов к MOEX не требует. Живёт отдельно от 29-методного
+        # composite-скора: не участвует в весах, только блокирует вход, если
+        # активный сейчас триггер на этом тикере исторически не работал.
+        self.__signal_gate = SignalGate()
         self.__orderbook = OrderBookService()
         self.__orderbook_task: asyncio.Task | None = None
         self.__tradestats = TradeStatsService()
@@ -486,6 +494,17 @@ class Trader:
         tracked_tickers = [s.settings.ticker for s in today_trade_strategies.values()]
         self.__oi_task = asyncio.create_task(self.__oi_layers.poll_loop(tracked_tickers))
         self.__tradestats_task = asyncio.create_task(self.__tradestats.poll_loop(tracked_tickers))
+        # Пересчёт гейта раз в торговый день из уже накопленной истории
+        # data/oi_daily.json — читаем файл напрямую (не self.__oi_layers,
+        # у него своя приватная история), пуловая статистика строится по
+        # ВСЕМ тикерам с данными в файле, не только сегодняшним tracked_tickers.
+        try:
+            with open(OI_HISTORY_FILE, encoding="utf-8") as f:
+                oi_history_for_gate = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            logger.warning(f"signal_gate: не удалось прочитать {OI_HISTORY_FILE} для калибровки: {e}")
+            oi_history_for_gate = {}
+        self.__signal_gate.recalibrate(oi_history_for_gate)
         if self.__overrides.orderbook_enabled(ORDERBOOK_DEFAULT_ENABLED):
             figi_to_ticker = {s.settings.figi: s.settings.ticker for s in today_trade_strategies.values()}
             self.__orderbook_task = asyncio.create_task(
@@ -1213,6 +1232,12 @@ class Trader:
                                     f"стакан против: {imbalance:.2f}"
                                 )
                                 return
+
+                    gate_ok, gate_why = self.__signal_gate.evaluate(risk_ticker, direction)
+                    if not gate_ok:
+                        logger.info(f"New signal has been skipped. Signal gate: {gate_why}")
+                        self.__record_skip(risk_ticker, signal_new, f"гейт: {gate_why}")
+                        return
 
                     risk_ok, risk_why = self.__risk.can_open(risk_ticker, direction, confidence)
                     if not risk_ok:

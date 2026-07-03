@@ -235,11 +235,22 @@ def _fetch_futoi_snapshot(sym: str) -> dict | None:
     yur_short = abs(float(by_group.get("YUR", {}).get("pos_short") or 0))
     fiz_long = float(by_group.get("FIZ", {}).get("pos_long") or 0)
     fiz_short = abs(float(by_group.get("FIZ", {}).get("pos_short") or 0))
+    # Число лиц (не контрактов) по сторонам — тот же столбец MOEX FutOI,
+    # что использует oi_lab.html (pos_long_num/pos_short_num). Текущий
+    # signal_gate.py их не использует (гейт считает только по contracts —
+    # conviction/liquidity в него не портированы, см. signal_gate.py docstring),
+    # но раз уж запрос к этому же endpoint'у всё равно идёт — сохраняем про запас.
+    yur_long_num = float(by_group.get("YUR", {}).get("pos_long_num") or 0)
+    yur_short_num = float(by_group.get("YUR", {}).get("pos_short_num") or 0)
+    fiz_long_num = float(by_group.get("FIZ", {}).get("pos_long_num") or 0)
+    fiz_short_num = float(by_group.get("FIZ", {}).get("pos_short_num") or 0)
     return {
         "tradedate": tradedate,
         "long": yur_long + fiz_long, "short": yur_short + fiz_short,
         "yur_long": yur_long, "yur_short": yur_short,
         "fiz_long": fiz_long, "fiz_short": fiz_short,
+        "yur_long_num": yur_long_num, "yur_short_num": yur_short_num,
+        "fiz_long_num": fiz_long_num, "fiz_short_num": fiz_short_num,
     }
 
 
@@ -541,6 +552,10 @@ class OiLayersService:
             snap = await asyncio.to_thread(_fetch_futoi_snapshot, sym)
             if not snap:
                 continue
+            # Символ контракта — signal_gate.py метит день роллом (ref_switch),
+            # если символ сменился день-в-день, и вырезает такие окна из
+            # forward-returns (нерыночный скачок цены при переходе на новый контракт).
+            snap["contract"] = sym
             price = self.price_getter(ticker)
             # Цена нужна слоям (entry price для pnl%) и дивергенции ОИ/цены —
             # без неё слои всегда были бы "куплены по нулю" и squeeze не считался.
