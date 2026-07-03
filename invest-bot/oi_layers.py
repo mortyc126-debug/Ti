@@ -510,9 +510,12 @@ class OiBacktestProvider:
 
 # ── Мост: тянуть oi_daily из OI-воркера (Cloudflare D1) в локальный формат ──
 # Воркер (invest-bot/cf-worker.js, база oi_signal1) собирает ОИ по cron и хранит
-# его под ФЬЮЧЕРСНЫМ кодом (SBER→SBERF и т.п.), а бэктест ключует по АКЦИОННОМУ
-# тикеру. Здесь маппим одно в другое (порт futoi2sym из воркера) и складываем
-# в data/oi_daily.json — тот же файл, что читает OiBacktestProvider.
+# его под ПОЛНЫМ фьючерсным кодом (SECID: SRU6, AEU6, SiZ6 …) — тем же, чем
+# ключует бэктест фьючерсов. Поэтому сначала матчим ТОЧНЫЙ код, а если его нет —
+# собираем по корню (contractRoot) со сшивкой контрактов по датам (фронт-месяц),
+# чтобы длинная история не рвалась на границах роллирования. Для акционных
+# тикеров остаётся фолбэк через FUTOI_FULL_MAP. Кладём в data/oi_daily.json —
+# тот же файл, что читает OiBacktestProvider.
 
 # Порт FUTOI_FULL_MAP из cf-worker.js::futoi2sym — акция → короткий код FutOI.
 _FUTOI_FULL_MAP = {
@@ -521,6 +524,35 @@ _FUTOI_FULL_MAP = {
     "YNDX": "YDEX", "YDEX": "YD", "IMOEX": "IMOEXF", "GLDR": "GLDRUBF",
     "EURR": "EURRUBF", "CNYR": "CNYRUBF", "USDR": "USDRUBF",
 }
+
+# Месяц-код фьючерса → номер месяца (F=янв … Z=дек).
+_FUT_MONTH = {"F": 1, "G": 2, "H": 3, "J": 4, "K": 5, "M": 6,
+             "N": 7, "Q": 8, "U": 9, "V": 10, "X": 11, "Z": 12}
+import re as _re
+_CONTRACT_RE = _re.compile(r"^([A-Za-z]+)([FGHJKMNQUVXZ])(\d)$")
+
+
+def _contract_root(ticker: str) -> str:
+    """Порт contractRoot из cf-worker.js: SRU6→SR, AEU6→AE, SiZ6→Si. Иначе сам тикер."""
+    m = _CONTRACT_RE.match(ticker or "")
+    return m.group(1) if m else (ticker or "")
+
+
+def _contract_expiry_ym(ticker: str) -> int | None:
+    """Месяц экспирации контракта как год*12+месяц (для выбора фронт-месяца).
+    Год — одна цифра → ближайший к текущему (…5→2025, 6→2026)."""
+    m = _CONTRACT_RE.match(ticker or "")
+    if not m:
+        return None
+    mon = _FUT_MONTH.get(m.group(2).upper())
+    if not mon:
+        return None
+    d = int(m.group(3))
+    base = (date.today().year // 10) * 10
+    year = base + d
+    if year < date.today().year - 3:   # цифра указывает на следующее десятилетие
+        year += 10
+    return year * 12 + mon
 
 
 def _futoi2sym(ticker: str) -> str:
@@ -547,47 +579,90 @@ def _worker_get(base_url: str, path: str, timeout: int = 20):
         return json.load(resp)
 
 
-def fetch_worker_oi_daily(base_url: str, stock_ticker: str, timeout: int = 20) -> list[dict]:
-    """Забирает историю oi_daily по акционному тикеру из OI-воркера и приводит
-    к локальному формату (tradedate/price/yur_*/fiz_*/long/short). [] если нет."""
-    if not base_url:
-        return []
-    target = _stock_oi_sym(stock_ticker)
-    # 1. Список тикеров в D1 → находим ключ, чей код серии совпадает с target.
+def _map_worker_rows(rows: list[dict], src: str) -> list[dict]:
+    """Строки D1 oi_daily → локальный формат."""
+    out = []
+    for r in rows or []:
+        yl = float(r.get("yur_long") or 0);  ys = float(r.get("yur_short") or 0)
+        fl = float(r.get("fiz_long") or 0);  fs = float(r.get("fiz_short") or 0)
+        td = str(r.get("tradedate") or "")
+        if not td:
+            continue
+        out.append({
+            "tradedate": td, "price": float(r.get("price") or 0),
+            "yur_long": yl, "yur_short": ys, "fiz_long": fl, "fiz_short": fs,
+            "long": yl + fl, "short": ys + fs, "src_ticker": src,
+        })
+    return out
+
+
+def _worker_catalog_keys(base_url: str, timeout: int = 20) -> list[str]:
     try:
         catalog = _worker_get(base_url, "/db/tickers", timeout)
     except Exception as e:
         logger.warning(f"OI-воркер /db/tickers упал: {e}")
         return []
-    keys = [str(r.get("ticker") or "") for r in (catalog or []) if r.get("ticker")]
-    matched = [k for k in keys if _futoi2sym(k) == target]
-    if not matched:  # запасной путь — префиксное совпадение
-        matched = [k for k in keys if k.upper().startswith(target) or target.startswith(k.upper()[:2])]
-    if not matched:
+    return [str(r.get("ticker") or "") for r in (catalog or []) if r.get("ticker")]
+
+
+def fetch_worker_oi_daily(base_url: str, ticker: str, timeout: int = 20) -> list[dict]:
+    """История oi_daily по тикеру из OI-воркера в локальном формате. Тикер может
+    быть полным фьючерсным кодом (AEU6) или акционным (SBER). [] если нет."""
+    if not base_url:
         return []
-    # Если несколько ключей на серию — берём с наибольшим числом дней.
-    days_by_key = {str(r.get("ticker")): int(r.get("days") or 0) for r in catalog}
-    key = max(matched, key=lambda k: days_by_key.get(k, 0))
-    # 2. Полная история по найденному ключу.
-    try:
-        rows = _worker_get(base_url, "/db/oidaily?ticker=" + urllib.parse.quote(key), timeout)
-    except Exception as e:
-        logger.warning(f"OI-воркер /db/oidaily?ticker={key} упал: {e}")
+    keys = _worker_catalog_keys(base_url, timeout)
+    if not keys:
         return []
-    out = []
-    for r in rows or []:
-        yl = float(r.get("yur_long") or 0);  ys = float(r.get("yur_short") or 0)
-        fl = float(r.get("fiz_long") or 0);  fs = float(r.get("fiz_short") or 0)
-        out.append({
-            "tradedate": str(r.get("tradedate") or ""),
-            "price": float(r.get("price") or 0),
-            "yur_long": yl, "yur_short": ys, "fiz_long": fl, "fiz_short": fs,
-            "long": yl + fl, "short": ys + fs,
-            "src_ticker": key,
-        })
-    out = [r for r in out if r["tradedate"]]
-    out.sort(key=lambda x: x["tradedate"])
-    return out
+    up = (ticker or "").upper()
+    kmap = {k.upper(): k for k in keys}
+
+    # 1. Точное совпадение кода (бэктест фьючерсов ключует ровно так же).
+    if up in kmap:
+        try:
+            rows = _worker_get(base_url, "/db/oidaily?ticker=" + urllib.parse.quote(kmap[up]), timeout)
+            return sorted(_map_worker_rows(rows, kmap[up]), key=lambda x: x["tradedate"])
+        except Exception as e:
+            logger.warning(f"OI-воркер /db/oidaily?ticker={kmap[up]} упал: {e}")
+            return []
+
+    # 2. Сборка по корню контракта со сшивкой по датам (фронт-месяц на день).
+    root = _contract_root(ticker)
+    same_root = [k for k in keys if _contract_root(k).upper() == root.upper()] if _CONTRACT_RE.match(up) else []
+    # 3. Для акций — совпадение по короткому коду серии futoi2sym.
+    if not same_root:
+        target = _stock_oi_sym(ticker)
+        same_root = [k for k in keys if _futoi2sym(k) == target] \
+                    or [k for k in keys if k.upper().startswith(target)]
+    if not same_root:
+        return []
+
+    # Тянем каждый контракт и сшиваем: на каждую дату — контракт-фронт (ближайшая
+    # экспирация >= даты; если все истекли — самый поздний). Один код → просто он.
+    by_date: dict[str, tuple[int, dict]] = {}
+    fetched_any = False
+    for k in same_root:
+        try:
+            rows = _worker_get(base_url, "/db/oidaily?ticker=" + urllib.parse.quote(k), timeout)
+        except Exception as e:
+            logger.warning(f"OI-воркер /db/oidaily?ticker={k} упал: {e}")
+            continue
+        fetched_any = True
+        exp = _contract_expiry_ym(k) or 10 ** 9
+        for r in _map_worker_rows(rows, k):
+            td = r["tradedate"]
+            try:
+                td_ym = int(td[:4]) * 12 + int(td[5:7])
+            except Exception:
+                td_ym = 0
+            # приоритет: контракт, ещё не истёкший на дату, с ближайшей экспирацией
+            not_expired = exp >= td_ym
+            rank = (0 if not_expired else 1, exp)
+            prev = by_date.get(td)
+            if prev is None or rank < prev[0]:
+                by_date[td] = (rank, r)
+    if not fetched_any:
+        return []
+    return [v[1] for _, v in sorted(by_date.items())]
 
 
 def sync_worker_oi(base_url: str, tickers: list[str], path: str = HISTORY_FILE,

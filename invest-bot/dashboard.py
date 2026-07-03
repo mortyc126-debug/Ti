@@ -3279,6 +3279,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     </div>
     <div style="display:flex;flex-direction:column;gap:6px;padding-top:16px;">
       <button class="btn-pill" onclick="oiSyncWorker()" id="oi_sync_btn" title="Забрать уже собранный ОИ из Cloudflare D1-воркера (быстро, без MOEX) в локальный файл, который читает бэктест">⚡ Забрать из воркера (D1)</button>
+      <button class="btn-pill btn-sm" onclick="oiWorkerCatalog()" id="oi_cat_btn" title="Показать, что реально лежит в воркере и находится ли матч под наши тикеры">🔎 что в воркере</button>
     </div>
   </div>
   <div id="oi_bf_status" style="font-size:12px;color:var(--txt2);padding:8px;background:var(--card);border-radius:6px;border:1px solid var(--border2);min-height:30px;">
@@ -5995,6 +5996,36 @@ async function oiSyncWorker() {{
   finally {{ if (btn) btn.disabled = false; }}
 }}
 
+// Диагностика: что лежит в воркере и матчатся ли наши тикеры.
+async function oiWorkerCatalog() {{
+  const tickers = document.getElementById('oi_bf_tickers').value.trim();
+  const status  = document.getElementById('oi_bf_status');
+  const log     = document.getElementById('oi_bf_log');
+  const btn     = document.getElementById('oi_cat_btn');
+  status.textContent = '🔎 спрашиваю воркер...';
+  if (btn) btn.disabled = true;
+  try {{
+    const body = {{}};
+    if (tickers) body.tickers = tickers;
+    const d = await fetch('/api/oi_worker_catalog', {{
+      method: 'POST', headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify(body),
+    }}).then(r => r.json());
+    if (!d.ok) {{ status.textContent = '⚠ ' + (d.error || 'не удалось'); return; }}
+    status.textContent = `в воркере ${{d.catalog_n}} тикеров (кодов) в oi_daily`;
+    let html = '<div style="font-weight:600;margin:4px 0">Матч под наши тикеры:</div>';
+    html += (d.probes || []).map(p =>
+      `<div>${{p.matched ? '✅' : '❌'}} ${{p.ticker}} <span style="color:var(--txt3)">корень ${{p.root}}</span> → ` +
+      (p.matched ? `${{p.src}} · ${{p.days}} дн.` : 'нет в воркере') +
+      (p.error ? ' <span style="color:#e07070">'+p.error+'</span>' : '') + `</div>`).join('');
+    html += '<div style="font-weight:600;margin:8px 0 4px">Всё, что есть в воркере (код · дней · период):</div>';
+    html += (d.catalog || []).map(c =>
+      `<div style="color:var(--txt3)">${{c.ticker}} · ${{c.days}} · ${{c.from_date||'?'}}→${{c.to_date||'?'}}</div>`).join('');
+    if (log) {{ log.innerHTML = html; log.style.display = ''; }}
+  }} catch(e) {{ status.textContent = '⚠ ' + e; }}
+  finally {{ if (btn) btn.disabled = false; }}
+}}
+
 async function oiBackfillStatus() {{
   const status = document.getElementById('oi_bf_status');
   try {{
@@ -7802,6 +7833,36 @@ def ensure_oi_synced(tickers: list[str]) -> None:
         logger.warning(f"OI автоподтяжка не удалась (идём на локальных данных): {e}")
 
 
+def oi_worker_catalog(tickers: list[str] | None = None) -> dict:
+    """Диагностика: что реально лежит в OI-воркере (/db/tickers) и находится ли
+    матч под наши тикеры. Помогает понять расхождение форматов кодов."""
+    import oi_layers
+    import backfill_oi
+    url = _get_oi_api_url()
+    if not url:
+        return {"ok": False, "error": "URL OI-воркера не задан ([OI_API] URL=)"}
+    try:
+        catalog = oi_layers._worker_get(url, "/db/tickers")
+    except Exception as e:
+        return {"ok": False, "error": f"/db/tickers упал: {e}"}
+    catalog = catalog or []
+    target = tickers or backfill_oi._get_strategy_tickers()
+    probes = []
+    for tk in (target or []):
+        try:
+            rows = oi_layers.fetch_worker_oi_daily(url, tk)
+        except Exception as e:
+            probes.append({"ticker": tk, "matched": False, "days": 0, "error": str(e)})
+            continue
+        probes.append({
+            "ticker": tk, "matched": bool(rows), "days": len(rows),
+            "src": (rows[0].get("src_ticker") if rows else None),
+            "root": oi_layers._contract_root(tk),
+        })
+    return {"ok": True, "catalog": catalog, "probes": probes,
+            "catalog_n": len(catalog)}
+
+
 def oi_sync_from_worker(tickers: list[str] | None = None) -> dict:
     """Тянет oi_daily из OI-воркера (D1) в локальный data/oi_daily.json.
     Без tickers — берёт акционные тикеры из STRATEGY_* секций settings.ini."""
@@ -8813,6 +8874,10 @@ class Handler(BaseHTTPRequestHandler):
             raw_t = payload.get("tickers") or None
             tickers = [t.strip().upper() for t in raw_t.split(",") if t.strip()] if isinstance(raw_t, str) and raw_t.strip() else (raw_t if isinstance(raw_t, list) else None)
             self._send_json(oi_sync_from_worker(tickers))
+        elif self.path == "/api/oi_worker_catalog":
+            raw_t = payload.get("tickers") or None
+            tickers = [t.strip().upper() for t in raw_t.split(",") if t.strip()] if isinstance(raw_t, str) and raw_t.strip() else (raw_t if isinstance(raw_t, list) else None)
+            self._send_json(oi_worker_catalog(tickers))
         elif self.path == "/api/council_ask":
             self._send_json(council_ask_sync(payload.get("ticker","").upper(), payload.get("question",""), payload.get("direction","LONG").upper()))
         elif self.path == "/api/bot_adopt":
