@@ -3270,8 +3270,11 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
       <input type="text" class="inp mid" id="oi_bf_tickers" placeholder="пусто = все из settings.ini" style="width:240px;">
     </label>
     <div style="display:flex;flex-direction:column;gap:6px;padding-top:16px;">
-      <button class="btn-pill" onclick="oiBackfill()" id="oi_bf_btn">⬇ Запустить загрузку</button>
+      <button class="btn-pill" onclick="oiBackfill()" id="oi_bf_btn">⬇ Загрузить с MOEX</button>
       <button class="btn-pill btn-sm" onclick="oiBackfillStatus()">⟳ Статус</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;padding-top:16px;">
+      <button class="btn-pill" onclick="oiSyncWorker()" id="oi_sync_btn" title="Забрать уже собранный ОИ из Cloudflare D1-воркера (быстро, без MOEX) в локальный файл, который читает бэктест">⚡ Забрать из воркера (D1)</button>
     </div>
   </div>
   <div id="oi_bf_status" style="font-size:12px;color:var(--txt2);padding:8px;background:var(--card);border-radius:6px;border:1px solid var(--border2);min-height:30px;">
@@ -5962,6 +5965,31 @@ async function oiBackfill() {{
   }} catch(e) {{ status.textContent = '⚠ ' + e; if(btn) btn.disabled=false; }}
 }}
 
+// Забрать уже собранный ОИ из воркера (D1) в локальный data/oi_daily.json.
+async function oiSyncWorker() {{
+  const tickers = document.getElementById('oi_bf_tickers').value.trim();
+  const status  = document.getElementById('oi_bf_status');
+  const btn     = document.getElementById('oi_sync_btn');
+  status.textContent = '⚡ тяну из воркера...';
+  if (btn) btn.disabled = true;
+  try {{
+    const body = {{}};
+    if (tickers) body.tickers = tickers;
+    const d = await fetch('/api/oi_sync_worker', {{
+      method: 'POST', headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify(body),
+    }}).then(r => r.json());
+    if (!d.ok) {{ status.textContent = '⚠ ' + (d.error || 'не удалось'); return; }}
+    status.textContent = `✅ из воркера: ${{d.total}} дней всего`;
+    const log = document.getElementById('oi_bf_log');
+    if (log && d.log && d.log.length) {{
+      log.innerHTML = d.log.map(l => `<div>${{l}}</div>`).join('');
+      log.style.display = '';
+    }}
+  }} catch(e) {{ status.textContent = '⚠ ' + e; }}
+  finally {{ if (btn) btn.disabled = false; }}
+}}
+
 async function oiBackfillStatus() {{
   const status = document.getElementById('oi_bf_status');
   try {{
@@ -7728,6 +7756,35 @@ def get_oi_backfill_status() -> dict:
         return dict(_oi_backfill_job)
 
 
+def _get_oi_api_url() -> str:
+    """URL OI-воркера из env OI_API_URL или settings.ini [OI_API] URL=."""
+    url = os.getenv("OI_API_URL")
+    if url:
+        return url.strip()
+    ini = __import__("configparser").ConfigParser()
+    ini.read(os.path.join(os.path.dirname(__file__), "settings.ini"), encoding="utf-8")
+    return (ini.get("OI_API", "URL", fallback="") or "").strip()
+
+
+def oi_sync_from_worker(tickers: list[str] | None = None) -> dict:
+    """Тянет oi_daily из OI-воркера (D1) в локальный data/oi_daily.json.
+    Без tickers — берёт акционные тикеры из STRATEGY_* секций settings.ini."""
+    import oi_layers
+    import backfill_oi
+    url = _get_oi_api_url()
+    if not url:
+        return {"ok": False, "error": "URL OI-воркера не задан ([OI_API] URL= в settings.ini)"}
+    target = tickers or backfill_oi._get_strategy_tickers()
+    if not target:
+        return {"ok": False, "error": "Нет тикеров: добавь STRATEGY_* в settings.ini или укажи вручную"}
+    try:
+        res = oi_layers.sync_worker_oi(url, target,
+                                       path=os.path.join(os.path.dirname(__file__), "data", "oi_daily.json"))
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True, "total": res["total"], "summary": res["summary"], "log": res["log"]}
+
+
 # ── Управление процессом бота (старт/стоп) ───────────────────────────────────
 
 def supervisor_start(sandbox: bool) -> dict:
@@ -8712,6 +8769,10 @@ class Handler(BaseHTTPRequestHandler):
             raw_t = payload.get("tickers") or None
             tickers = [t.strip().upper() for t in raw_t.split(",") if t.strip()] if isinstance(raw_t, str) and raw_t.strip() else (raw_t if isinstance(raw_t, list) else None)
             self._send_json(run_oi_backfill(months, tickers))
+        elif self.path == "/api/oi_sync_worker":
+            raw_t = payload.get("tickers") or None
+            tickers = [t.strip().upper() for t in raw_t.split(",") if t.strip()] if isinstance(raw_t, str) and raw_t.strip() else (raw_t if isinstance(raw_t, list) else None)
+            self._send_json(oi_sync_from_worker(tickers))
         elif self.path == "/api/council_ask":
             self._send_json(council_ask_sync(payload.get("ticker","").upper(), payload.get("question",""), payload.get("direction","LONG").upper()))
         elif self.path == "/api/bot_adopt":

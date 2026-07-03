@@ -508,6 +508,120 @@ class OiBacktestProvider:
                 "to": dates[-1] if dates else None}
 
 
+# ── Мост: тянуть oi_daily из OI-воркера (Cloudflare D1) в локальный формат ──
+# Воркер (invest-bot/cf-worker.js, база oi_signal1) собирает ОИ по cron и хранит
+# его под ФЬЮЧЕРСНЫМ кодом (SBER→SBERF и т.п.), а бэктест ключует по АКЦИОННОМУ
+# тикеру. Здесь маппим одно в другое (порт futoi2sym из воркера) и складываем
+# в data/oi_daily.json — тот же файл, что читает OiBacktestProvider.
+
+# Порт FUTOI_FULL_MAP из cf-worker.js::futoi2sym — акция → короткий код FutOI.
+_FUTOI_FULL_MAP = {
+    "SBER": "SBERF", "GAZP": "GAZPF", "LKOH": "LKOHF", "GMKN": "GMKNF",
+    "NVTK": "NVTKF", "ROSN": "ROSNF", "TATN": "TATNF", "MGNT": "MGNTF",
+    "YNDX": "YDEX", "YDEX": "YD", "IMOEX": "IMOEXF", "GLDR": "GLDRUBF",
+    "EURR": "EURRUBF", "CNYR": "CNYRUBF", "USDR": "USDRUBF",
+}
+
+
+def _futoi2sym(ticker: str) -> str:
+    """Порт futoi2sym из cf-worker.js: FutOI-тикер → короткий код серии."""
+    up = (ticker or "").upper()
+    for k, v in _FUTOI_FULL_MAP.items():
+        if up.startswith(k):
+            return v
+    return up[:2] if len(up) >= 2 else up
+
+
+def _stock_oi_sym(stock_ticker: str) -> str:
+    """Короткий код FutOI для акционного тикера (как ключует воркер)."""
+    up = (stock_ticker or "").upper()
+    if up in _FUTOI_FULL_MAP:
+        return _FUTOI_FULL_MAP[up]
+    return up[:2] if len(up) >= 2 else up
+
+
+def _worker_get(base_url: str, path: str, timeout: int = 20):
+    url = base_url.rstrip("/") + path
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.load(resp)
+
+
+def fetch_worker_oi_daily(base_url: str, stock_ticker: str, timeout: int = 20) -> list[dict]:
+    """Забирает историю oi_daily по акционному тикеру из OI-воркера и приводит
+    к локальному формату (tradedate/price/yur_*/fiz_*/long/short). [] если нет."""
+    if not base_url:
+        return []
+    target = _stock_oi_sym(stock_ticker)
+    # 1. Список тикеров в D1 → находим ключ, чей код серии совпадает с target.
+    try:
+        catalog = _worker_get(base_url, "/db/tickers", timeout)
+    except Exception as e:
+        logger.warning(f"OI-воркер /db/tickers упал: {e}")
+        return []
+    keys = [str(r.get("ticker") or "") for r in (catalog or []) if r.get("ticker")]
+    matched = [k for k in keys if _futoi2sym(k) == target]
+    if not matched:  # запасной путь — префиксное совпадение
+        matched = [k for k in keys if k.upper().startswith(target) or target.startswith(k.upper()[:2])]
+    if not matched:
+        return []
+    # Если несколько ключей на серию — берём с наибольшим числом дней.
+    days_by_key = {str(r.get("ticker")): int(r.get("days") or 0) for r in catalog}
+    key = max(matched, key=lambda k: days_by_key.get(k, 0))
+    # 2. Полная история по найденному ключу.
+    try:
+        rows = _worker_get(base_url, "/db/oidaily?ticker=" + urllib.parse.quote(key), timeout)
+    except Exception as e:
+        logger.warning(f"OI-воркер /db/oidaily?ticker={key} упал: {e}")
+        return []
+    out = []
+    for r in rows or []:
+        yl = float(r.get("yur_long") or 0);  ys = float(r.get("yur_short") or 0)
+        fl = float(r.get("fiz_long") or 0);  fs = float(r.get("fiz_short") or 0)
+        out.append({
+            "tradedate": str(r.get("tradedate") or ""),
+            "price": float(r.get("price") or 0),
+            "yur_long": yl, "yur_short": ys, "fiz_long": fl, "fiz_short": fs,
+            "long": yl + fl, "short": ys + fs,
+            "src_ticker": key,
+        })
+    out = [r for r in out if r["tradedate"]]
+    out.sort(key=lambda x: x["tradedate"])
+    return out
+
+
+def sync_worker_oi(base_url: str, tickers: list[str], path: str = HISTORY_FILE,
+                   timeout: int = 20) -> dict:
+    """Тянет oi_daily из воркера по списку акционных тикеров и пишет в локальный
+    data/oi_daily.json (ключ = акционный тикер, как ждёт бэктест). Возвращает
+    сводку {ticker: дней}. Существующие тикеры без данных в воркере не трогаем."""
+    if os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                history = json.load(f)
+        except Exception:
+            history = {}
+    else:
+        history = {}
+    summary: dict[str, int] = {}
+    log: list[str] = []
+    for tk in tickers:
+        rows = fetch_worker_oi_daily(base_url, tk, timeout)
+        if rows:
+            history[tk.upper()] = rows
+            summary[tk.upper()] = len(rows)
+            log.append(f"{tk}: {len(rows)} дн. (из воркера, ключ {rows[0].get('src_ticker')})")
+        else:
+            summary[tk.upper()] = 0
+            log.append(f"{tk}: в воркере нет данных")
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False)
+    os.replace(tmp, path)
+    return {"summary": summary, "total": sum(summary.values()), "log": log}
+
+
 class OiLayersService:
     """
     Фоновый поллер ОИ. Запускается на торговый день (asyncio.create_task),
