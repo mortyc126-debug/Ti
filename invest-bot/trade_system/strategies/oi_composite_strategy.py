@@ -74,7 +74,7 @@ from trade_system.signal import Signal, SignalType
 from trade_system.strategies.base_strategy import IStrategy
 # regime импортируется первым: его модуль-уровневый код кладёт ../formulas в
 # sys.path, поэтому ниже научные модули из formulas/ становятся импортируемы.
-from regime import REGIMES, classify_regime, classify_regime_probs, REGIME_WEIGHT_MODS, change_point_score, classify_phase, PHASE_WEIGHT_MODS, squeeze_adjust
+from regime import REGIMES, classify_regime, classify_regime_probs, REGIME_WEIGHT_MODS, change_point_score, classify_phase, PHASE_WEIGHT_MODS, squeeze_adjust, bocd_change_prob
 from cluster_models import ClusterModels
 from narrative import (
     NarrativeState, NarrativeWeights, NarrativeThresholds, classify_directional,
@@ -6320,6 +6320,9 @@ class OICompositeStrategy(IStrategy):
         self.__cached_rqa_mult: float = 1.0
         self.__cached_wavelet_mult: float = 1.0
         self.__cached_regime_probs: dict = {"ranging": 1.0}
+        # BOCD-дисконт доверия к режиму (свежий излом → ×0.7). Кэшируем вместе с
+        # regime_probs: сам BOCD тяжёлый (numpy), считать каждый бар незачем.
+        self.__cached_bocd_discount: float = 1.0
         self.__cached_phase: str = "accumulation"
         self.__cached_phase_conf: float = 0.3
         self.__cached_change_point: float = 0.0
@@ -8038,6 +8041,12 @@ class OICompositeStrategy(IStrategy):
 
         if do_heavy:
             self.__cached_regime_probs = classify_regime_probs(closes, volumes)
+            # BOCD-дисконт: classify_regime_probs (в отличие от classify_regime)
+            # не применяет штраф за свежий излом сам. На внутридневном пути это
+            # был единственный слой, полностью проходивший мимо BOCD — теперь
+            # свежая смена режима (>0.5) режет доверие к нему на 30%, как и в
+            # классическом classify_regime. Тяжёлый numpy — считаем в heavy-блоке.
+            self.__cached_bocd_discount = 0.7 if bocd_change_prob(closes) > 0.5 else 1.0
             # Инвертируем: алгоритмы детектируют излом с запозданием, движение
             # уже состоялось — сигнал теперь против нового направления (разворот).
             self.__cached_change_point = -change_point_score(closes)
@@ -8136,7 +8145,10 @@ class OICompositeStrategy(IStrategy):
 
         # Layer 0: непрерывное распределение по всем режимам.
         regime = max(regime_probs, key=regime_probs.get)
-        regime_conf = regime_probs[regime]
+        # BOCD-дисконт свежего излома (кэш из heavy-блока): faithful к classify_regime,
+        # где confidence *= 0.7 при недавней смене режима. Влияет и на composite
+        # (confidence_mult), и на __regime_confidence → regime_unstable/нарратив.
+        regime_conf = regime_probs[regime] * self.__cached_bocd_discount
 
         # Lag-penalty: считаем бары подряд в одном (argmax) режиме до его смены.
         if regime == self.__last_regime:

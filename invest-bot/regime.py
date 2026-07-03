@@ -18,7 +18,7 @@ import statistics
 
 __all__ = ("classify_regime", "classify_regime_probs", "REGIME_WEIGHT_MODS",
            "change_point_score", "classify_phase", "PHASE_WEIGHT_MODS",
-           "squeeze_adjust")
+           "squeeze_adjust", "bocd_change_prob")
 
 # formulas/ лежит рядом с invest-bot/ (на уровень выше cwd). Добавляем в путь
 # один раз, чтобы тяжёлые научные модули (BOCD, Hawkes, RQA, Kalman ...) были
@@ -179,6 +179,15 @@ def _bocd_change_prob(closes: list[float]) -> float:
         return float(max(0.0, min(1.0, last.hazard_mass)))
     except Exception:
         return 0.0
+
+
+def bocd_change_prob(closes: list[float]) -> float:
+    """Публичная обёртка над _bocd_change_prob: вероятность [0,1] того, что режим
+    только что сменился (свежий излом), по BOCD. Нужна внутридневному пути в
+    oi_composite_strategy, который работает с распределением (classify_regime_probs)
+    в обход classify_regime и потому сам по себе не получал бы BOCD-дисконт
+    доверия к режиму. См. classify_regime, где тот же признак снижает confidence."""
+    return _bocd_change_prob(closes)
 
 
 def _smoothstep(x: float, lo: float, hi: float) -> float:
