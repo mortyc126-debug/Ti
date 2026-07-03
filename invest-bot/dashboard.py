@@ -3971,7 +3971,11 @@ function deleteMethodPreset() {{
     }}).catch(() => {{}});
 }}
 
-// Агрегирует method_stats по всем строкам _backtestRows и рисует глобальную таблицу
+// Агрегирует method_stats по всем строкам _backtestRows и рисует глобальную таблицу.
+// Показываем ВЕСЬ каталог методов (_METHOD_CATALOG), а не только те, что набрали
+// ≥5 сделок — иначе половина списка «исчезает» и непонятно, что вообще считалось.
+// Плюс отдельный блок «почему входим / почему выходим»: агрегат драйверов входа
+// (топ-методы «за» на входе) и распределение причин выхода (тейк/стоп/таймаут).
 function renderGlobalMethodStats() {{
   const agg = {{}};
   for (const r of _backtestRows) {{
@@ -3984,18 +3988,48 @@ function renderGlobalMethodStats() {{
       agg[name].dw += s.disagree_win || 0;
     }}
   }}
-  const rows = Object.entries(agg)
-    .filter(([, s]) => s.an + s.dn >= 5)
-    .map(([name, s]) => {{
-      const fwr = s.an > 0 ? s.aw / s.an : null;
-      const awr = s.dn > 0 ? s.dw / s.dn : null;
-      return {{name, fwr, awr, fn: s.an, dn: s.dn}};
-    }})
-    .filter(r => r.fwr !== null)
-    .sort((a, b) => b.fwr - a.fwr);
+
+  // ── Агрегат входов/выходов из компактных trades_list ──
+  const exitAgg = {{}};      // xr -> {{n, win}}
+  const entryDrivers = {{}};  // method -> {{n, win}} по появлению в топ-«за» на входе
+  let nTrades = 0;
+  for (const r of _backtestRows) {{
+    if (!r.trades_list) continue;
+    for (const t of r.trades_list) {{
+      nTrades++;
+      const xr = t.xr || '—';
+      if (!exitAgg[xr]) exitAgg[xr] = {{n: 0, win: 0}};
+      exitAgg[xr].n++; exitAgg[xr].win += (t.w ? 1 : 0);
+      for (const pair of (t.fa || [])) {{
+        const nm = pair[0];
+        if (!entryDrivers[nm]) entryDrivers[nm] = {{n: 0, win: 0}};
+        entryDrivers[nm].n++; entryDrivers[nm].win += (t.w ? 1 : 0);
+      }}
+    }}
+  }}
 
   const el = document.getElementById('global_method_stats');
-  if (!rows.length) {{ el.style.display = 'none'; return; }}
+  const hasAny = Object.keys(agg).length || nTrades;
+  if (!hasAny) {{ el.style.display = 'none'; return; }}
+
+  // Все методы из каталога + подхватываем те, что вдруг есть в agg, но выпали из каталога.
+  const catNames = _METHOD_CATALOG.map(r => r[1]);
+  const allNames = catNames.slice();
+  for (const nm of Object.keys(agg)) if (!allNames.includes(nm)) allNames.push(nm);
+
+  const rows = allNames.map(name => {{
+    const s = agg[name] || {{an: 0, aw: 0, dn: 0, dw: 0}};
+    const fwr = s.an > 0 ? s.aw / s.an : null;
+    const awr = s.dn > 0 ? s.dw / s.dn : null;
+    return {{name, fwr, awr, fn: s.an, dn: s.dn, tot: s.an + s.dn}};
+  }});
+  // Сортировка: сначала методы с данными (по чистому% убыв.), «немые» — в конце.
+  rows.sort((a, b) => {{
+    if ((a.tot > 0) !== (b.tot > 0)) return a.tot > 0 ? -1 : 1;
+    const na = a.fwr != null ? (a.awr != null ? a.fwr - a.awr : a.fwr - 0.5) : -99;
+    const nb = b.fwr != null ? (b.awr != null ? b.fwr - b.awr : b.fwr - 0.5) : -99;
+    return nb - na;
+  }});
 
   const pct = v => v != null ? (v * 100).toFixed(0) + '%' : '—';
   const col = v => v == null ? 'var(--txt3)' : v >= 0.60 ? '#7dcc7d' : v <= 0.42 ? '#e07070' : 'var(--txt2)';
@@ -4005,12 +4039,15 @@ function renderGlobalMethodStats() {{
   const trs = rows.map(r => {{
     const disabled = getDisabledMethods().includes(r.name);
     const inverted = getInvertedMethods().includes(r.name);
-    // чистый% = ЗА win% минус ПРОТИВ win% (насколько метод лучше когда в большинстве)
+    const mute = r.tot === 0;                 // метод ни разу не высказался
+    const lowN = !mute && r.tot < 5;          // мало сделок — цифры ненадёжны
     const net = (r.fwr != null && r.awr != null) ? r.fwr - r.awr : (r.fwr != null ? r.fwr - 0.5 : null);
-    return `<tr style="${{disabled ? 'opacity:.45;' : inverted ? 'background:rgba(107,76,0,.15);' : ''}}">
-      <td style="padding:2px 8px;font-size:10px;white-space:nowrap;">${{r.name.replace(/_/g,' ')}}${{inverted ? ' <span style="color:#f0a030;font-size:9px;">↔</span>' : ''}}</td>
-      <td style="padding:2px 8px;font-size:10px;color:${{col(r.fwr)}};text-align:right;">${{pct(r.fwr)}} <span style="color:var(--txt3)">n=${{r.fn}}</span></td>
-      <td style="padding:2px 8px;font-size:10px;color:${{col(r.awr)}};text-align:right;">${{pct(r.awr)}} <span style="color:var(--txt3)">n=${{r.dn}}</span></td>
+    const rowStyle = disabled ? 'opacity:.45;' : inverted ? 'background:rgba(107,76,0,.15);' : mute ? 'opacity:.5;' : '';
+    const nStyle = lowN ? 'color:#c99a4a' : 'color:var(--txt3)';
+    return `<tr style="${{rowStyle}}">
+      <td style="padding:2px 8px;font-size:10px;white-space:nowrap;">${{r.name.replace(/_/g,' ')}}${{inverted ? ' <span style="color:#f0a030;font-size:9px;">↔</span>' : ''}}${{mute ? ' <span style="color:var(--txt3);font-size:8px;">нет сделок</span>' : ''}}</td>
+      <td style="padding:2px 8px;font-size:10px;color:${{col(r.fwr)}};text-align:right;">${{pct(r.fwr)}} <span style="${{nStyle}}">n=${{r.fn}}</span></td>
+      <td style="padding:2px 8px;font-size:10px;color:${{col(r.awr)}};text-align:right;">${{pct(r.awr)}} <span style="${{nStyle}}">n=${{r.dn}}</span></td>
       <td style="padding:2px 8px;font-size:10px;color:${{netCol(net)}};text-align:right;font-weight:600;">${{netPct(net)}}</td>
       <td style="padding:2px 4px;display:flex;gap:3px;">
         <button class="btn-pill btn-xs ghost" onclick="toggleMethodInRun('${{r.name}}')" style="font-size:9px;padding:1px 6px;">${{disabled ? '✓ вкл' : '✗ откл'}}</button>
@@ -4018,11 +4055,41 @@ function renderGlobalMethodStats() {{
       </td>
     </tr>`;
   }}).join('');
+  const nShown = rows.filter(r => r.tot > 0).length;
+
+  // ── Блок «почему входим» ──
+  const XR_LABELS = {{take: '✅ тейк', stop: '🛑 стоп', timeout: '⏱ таймаут'}};
+  const drv = Object.entries(entryDrivers).sort((a, b) => b[1].n - a[1].n).slice(0, 10);
+  const drvHtml = drv.length ? drv.map(([nm, s]) => {{
+    const wr = s.n > 0 ? s.win / s.n : null;
+    return `<span style="display:inline-block;font-size:10px;padding:2px 7px;margin:2px;border:1px solid var(--border2);border-radius:10px;">`
+      + `${{nm.replace(/_/g,' ')}} <span style="color:var(--txt3)">×${{s.n}}</span> `
+      + `<span style="color:${{col(wr)}}">${{pct(wr)}}</span></span>`;
+  }}).join('') : '<span style="color:var(--txt3);font-size:10px;">нет данных о входах</span>';
+
+  // ── Блок «почему выходим» ──
+  const xrOrder = ['take', 'stop', 'timeout'];
+  const xrRank = k => {{ const i = xrOrder.indexOf(k); return i < 0 ? 99 : i; }};
+  const xrKeys = Object.keys(exitAgg).sort((a, b) => xrRank(a) - xrRank(b) || exitAgg[b].n - exitAgg[a].n);
+  const exitHtml = nTrades ? xrKeys.map(k => {{
+    const s = exitAgg[k];
+    const share = nTrades > 0 ? s.n / nTrades : 0;
+    const wr = s.n > 0 ? s.win / s.n : null;
+    return `<span style="display:inline-block;font-size:10px;padding:2px 7px;margin:2px;border:1px solid var(--border2);border-radius:10px;">`
+      + `${{XR_LABELS[k] || k}} <span style="color:var(--txt3)">${{(share*100).toFixed(0)}}% · n=${{s.n}}</span> `
+      + `<span style="color:${{col(wr)}}">win ${{pct(wr)}}</span></span>`;
+  }}).join('') : '<span style="color:var(--txt3);font-size:10px;">нет закрытых сделок</span>';
 
   el.style.display = '';
   el.innerHTML = `
     <div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--txt2);margin-bottom:8px;border-bottom:1px solid var(--border2);padding-bottom:6px;">
       📊 Глобальная статистика методов (все тикеры агрегированно)
+    </div>
+    <div style="margin-bottom:10px;">
+      <div style="font-size:10px;font-weight:600;color:var(--txt2);margin-bottom:3px;">🎯 Что заставляет входить (топ-методы «за» на входе, ×раз · win%)</div>
+      <div>${{drvHtml}}</div>
+      <div style="font-size:10px;font-weight:600;color:var(--txt2);margin:8px 0 3px;">🚪 Почему закрываются сделки (доля · win%)</div>
+      <div>${{exitHtml}}</div>
     </div>
     <table style="border-collapse:collapse;width:100%;max-width:580px;">
       <thead><tr>
@@ -4034,7 +4101,7 @@ function renderGlobalMethodStats() {{
       </tr></thead>
       <tbody>${{trs}}</tbody>
     </table>
-    <div style="font-size:9px;color:var(--txt3);margin-top:6px;">«Против» = когда метод в меньшинстве. Чистый% = ЗА − ПРОТИВ (насколько метод предсказывает лучше случайного). Зелёный ≥60% / +8%, красный ≤42% / −5%.</div>
+    <div style="font-size:9px;color:var(--txt3);margin-top:6px;">Показаны все ${{rows.length}} методов каталога (${{nShown}} с данными, остальные «нет сделок» — молчали или без провайдерных данных). «Против» = когда метод в меньшинстве. Чистый% = ЗА − ПРОТИВ. Зелёный ≥60% / +8%, красный ≤42% / −5%. Оранжевый n — мало сделок (&lt;5), цифры ненадёжны.</div>
     <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
       <button class="btn-pill btn-sm ghost" onclick="autoDisableWeakMethods()" title="Выключить методы с win% ЗА ≤25% (минимум 5 сделок в роли)">⛔ выкл слабые (≤25%)</button>
       <button class="btn-pill btn-sm ghost" onclick="autoInvertAntisignals()" title="Инвертировать методы где ПРОТИВ win% > ЗА win% + 10% (антисигналы)">↔ инверт анти-сигналы</button>
