@@ -53,6 +53,13 @@ check("шорт-сквиз БЕЗ дневного контекста", squeeze,
 check("шорт-сквиз в дневном даунтренде", squeeze, "ranging", daily="trending_down")
 # здоровый тренд: внутридневной рост совпал с дневным → остаётся trending_up.
 check("рост в дневном аптренде", squeeze, "trending_up", daily="trending_up")
+# дневной STRESS: внутридневной тренд (любого знака) уводится в ranging —
+# старший ТФ ломается, momentum-вход опасен.
+check("рост при дневном стрессе", squeeze, "ranging", daily="stress")
+check("падение при дневном стрессе",
+      [100 - i * 0.8 for i in range(N)], "ranging", daily="stress")
+# дневной high_vol НЕ блокирует внутридневной импульс (осознанно, см. squeeze_adjust).
+check("рост при дневном high_vol", squeeze, "trending_up", daily="high_vol")
 
 if _fails:
     print(f"\n{len(_fails)} FAIL: {', '.join(_fails)}")

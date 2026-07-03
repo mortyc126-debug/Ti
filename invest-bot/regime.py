@@ -293,7 +293,26 @@ def squeeze_adjust(regime_probs: dict[str, float], daily_regime: str) -> dict[st
 
     Симметрично: здоровый откат (внутридневной down внутри дневного up) тоже
     уводится в ranging — не шортим коррекцию в тренде. Если дневного режима ещё
-    нет ("" — мало дней) — возвращаем распределение как есть."""
+    нет ("" — мало дней) — возвращаем распределение как есть.
+
+    Дневной STRESS — отдельный случай (стал достижим, когда в дневной
+    classify_regime подключили объёмы): старший ТФ ломается, внутридневные
+    trend-метки ненадёжны, momentum-вход опасен → уводим ОБА внутридневных
+    тренда в ranging. Это частично возвращает роль усечённого при порте
+    стресс-детектора (стакан/OI в определении режима нет). Что здесь НЕ трогаем
+    и почему: дневные ranging/low_vol закрывает отдельный DAILY_TREND_GATE в
+    trader.py (двойного учёта не нужно); дневной high_vol не блокируем —
+    высокая дневная волатильность сама по себе не повод пропускать любой
+    внутридневной импульс."""
+    if daily_regime == "stress":
+        moved = regime_probs.get("trending_up", 0.0) + regime_probs.get("trending_down", 0.0)
+        if moved <= 0.0:
+            return regime_probs
+        out = dict(regime_probs)
+        out["ranging"] = out.get("ranging", 0.0) + moved
+        out["trending_up"] = 0.0
+        out["trending_down"] = 0.0
+        return out
     conflict = {"trending_up": "trending_down",
                 "trending_down": "trending_up"}.get(daily_regime)
     if not conflict:
