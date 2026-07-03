@@ -1824,6 +1824,8 @@ def run_backtest(
     for ticker in tickers:
         _set_progress(progress, ticker, "в очереди")
 
+    ensure_oi_synced(tickers)  # свежий ОИ из воркера до прогонов
+
     if len(tickers) <= 1:
         rows: list[dict] = []
         hist_by_ticker: dict[str, dict] = {}
@@ -2032,6 +2034,8 @@ def run_portfolio_sim(
     progress = _get_progress_proxy()
     for ticker in tickers:
         _set_progress(progress, ticker, "в очереди")
+
+    ensure_oi_synced(tickers)  # свежий ОИ из воркера до прогонов
 
     if len(tickers) <= 1:
         results = []
@@ -7766,6 +7770,37 @@ def _get_oi_api_url() -> str:
     return (ini.get("OI_API", "URL", fallback="") or "").strip()
 
 
+_oi_autosync_at: dict = {}  # ticker(upper) -> monotonic ts последней авто-подтяжки
+_oi_autosync_lock = __import__("threading").Lock()
+OI_AUTOSYNC_TTL_SEC = 300   # не дёргать воркер по тому же тикеру чаще, чем раз в 5 мин
+
+
+def ensure_oi_synced(tickers: list[str]) -> None:
+    """Перед бэктестом дозабирает свежий ОИ из воркера в data/oi_daily.json.
+    Best-effort: нет URL / сеть упала — молча идём на том, что есть локально.
+    Троттлинг по тикеру (TTL), чтобы не дёргать воркер на каждый прогон.
+    Вызывать в РОДИТЕЛЬСКОМ процессе один раз до запуска пула (подпроцессы
+    читают уже готовый файл)."""
+    url = _get_oi_api_url()
+    if not url or not tickers:
+        return
+    now = time.monotonic()
+    with _oi_autosync_lock:
+        due = [t for t in tickers
+               if now - _oi_autosync_at.get(t.upper(), 0.0) > OI_AUTOSYNC_TTL_SEC]
+        for t in due:
+            _oi_autosync_at[t.upper()] = now
+    if not due:
+        return
+    try:
+        import oi_layers
+        res = oi_layers.sync_worker_oi(
+            url, due, path=os.path.join(os.path.dirname(__file__), "data", "oi_daily.json"))
+        logger.info(f"OI автоподтяжка из воркера: {res.get('total')} дней всего по {len(due)} тик.")
+    except Exception as e:
+        logger.warning(f"OI автоподтяжка не удалась (идём на локальных данных): {e}")
+
+
 def oi_sync_from_worker(tickers: list[str] | None = None) -> dict:
     """Тянет oi_daily из OI-воркера (D1) в локальный data/oi_daily.json.
     Без tickers — берёт акционные тикеры из STRATEGY_* секций settings.ini."""
@@ -8534,6 +8569,10 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception:
                     pass
                 return
+
+            # Свежий ОИ из воркера (D1) в data/oi_daily.json до старта пула —
+            # подпроцессы дальше читают уже готовый файл.
+            ensure_oi_synced(tickers)
 
             pool = ProcessPoolExecutor(max_workers=min(BACKTEST_WORKERS, len(tickers)))
             _register_pool(pool)

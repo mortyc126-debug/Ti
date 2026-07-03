@@ -606,14 +606,25 @@ def sync_worker_oi(base_url: str, tickers: list[str], path: str = HISTORY_FILE,
     summary: dict[str, int] = {}
     log: list[str] = []
     for tk in tickers:
+        key = tk.upper()
         rows = fetch_worker_oi_daily(base_url, tk, timeout)
-        if rows:
-            history[tk.upper()] = rows
-            summary[tk.upper()] = len(rows)
-            log.append(f"{tk}: {len(rows)} дн. (из воркера, ключ {rows[0].get('src_ticker')})")
-        else:
-            summary[tk.upper()] = 0
-            log.append(f"{tk}: в воркере нет данных")
+        if not rows:
+            summary[key] = len(history.get(key, []))
+            log.append(f"{tk}: в воркере нет данных (локально {summary[key]} дн.)")
+            continue
+        # Дозапись: сливаем по tradedate, свежие строки воркера перекрывают
+        # старые той же даты, локальные дни, которых нет в воркере, сохраняем.
+        by_date = {str(r.get("tradedate")): r for r in history.get(key, []) if r.get("tradedate")}
+        added = 0
+        for r in rows:
+            d = r["tradedate"]
+            if d not in by_date:
+                added += 1
+            by_date[d] = r
+        merged = sorted(by_date.values(), key=lambda x: str(x.get("tradedate")))
+        history[key] = merged
+        summary[key] = len(merged)
+        log.append(f"{tk}: +{added} нов., всего {len(merged)} дн. (воркер, ключ {rows[0].get('src_ticker')})")
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
