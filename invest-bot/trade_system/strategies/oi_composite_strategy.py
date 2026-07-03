@@ -7374,6 +7374,11 @@ class OICompositeStrategy(IStrategy):
         closes = [_to_f(c.close) for c in window]
         volumes = [float(c.volume) for c in window]
         regime_probs = classify_regime_probs(closes, volumes)
+        # Тот же дневной контекст, что и на живом пути (__compute_composite:
+        # squeeze_adjust). Без него дашборд-диагностика показывала бы trending_up
+        # там, где живой вход-гейт уже видит ranging (внутридневной сквиз против
+        # дневного тренда) — и пользователь не понимал бы, почему сделки нет.
+        regime_probs = squeeze_adjust(regime_probs, self.__daily_regime)
         regime = max(regime_probs, key=regime_probs.get)
 
         regime_mods: dict[str, float] = {}
