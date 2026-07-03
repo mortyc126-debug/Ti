@@ -3935,13 +3935,13 @@ function initMethodCheckboxes() {{
     if (toggl) {{
       const cb = document.createElement('input');
       cb.type = 'checkbox'; cb.value = name; cb.id = 'dm_' + name;
-      cb.onchange = updateDisabledCount;
+      cb.onchange = () => {{ updateDisabledCount(); renderGlobalMethodStats(); }};
       lbl.append(cb, cap);
       const inv = document.createElement('button');
       inv.textContent = '↔'; inv.title = 'Использовать как контр-индикатор (инвертировать скор)';
       inv.id = 'inv_' + name;
       inv.style.cssText = 'font-size:9px;padding:0 5px;border-radius:3px;border:1px solid var(--border2);background:transparent;color:var(--txt3);cursor:pointer;line-height:14px;';
-      inv.onclick = () => toggleInvertMethod(name);
+      inv.onclick = () => {{ toggleInvertMethod(name); renderGlobalMethodStats(); }};
       wrap.append(lbl, inv);
     }} else {{
       lbl.append(cap);
@@ -3969,6 +3969,7 @@ function clearDisabledMethods() {{
     b.dataset.active = '';
   }});
   updateDisabledCount();
+  renderGlobalMethodStats();
 }}
 
 function toggleInvertMethod(name) {{
@@ -4057,6 +4058,7 @@ function applyMethodPreset() {{
     if (btn && btn.dataset.active !== '1') toggleInvertMethod(name);
   }});
   updateDisabledCount();
+  renderGlobalMethodStats();
   const msg = document.getElementById('method_preset_msg');
   if (msg) msg.textContent = 'применён: ' + sel.value;
 }}
@@ -4148,12 +4150,12 @@ function renderGlobalMethodStats() {{
     const rowStyle = disabled ? 'opacity:.45;' : inverted ? 'background:rgba(107,76,0,.15);' : mute ? 'opacity:.5;' : '';
     const nStyle = lowN ? 'color:#c99a4a' : 'color:var(--txt3)';
     return `<tr style="${{rowStyle}}">
-      <td style="padding:2px 8px;font-size:10px;white-space:nowrap;">${{r.name.replace(/_/g,' ')}}${{inverted ? ' <span style="color:#f0a030;font-size:9px;">↔</span>' : ''}}${{mute ? ' <span style="color:var(--txt3);font-size:8px;">нет сделок</span>' : ''}}</td>
+      <td style="padding:2px 8px;font-size:10px;white-space:nowrap;">${{r.name.replace(/_/g,' ')}}${{disabled ? ' <span style="color:#e07070;font-size:9px;font-weight:600;">⛔ выкл (для след. прогона)</span>' : ''}}${{inverted ? ' <span style="color:#f0a030;font-size:9px;">↔</span>' : ''}}${{mute ? ' <span style="color:var(--txt3);font-size:8px;">нет сделок</span>' : ''}}</td>
       <td style="padding:2px 8px;font-size:10px;color:${{col(r.fwr)}};text-align:right;">${{pct(r.fwr)}} <span style="${{nStyle}}">n=${{r.fn}}</span></td>
       <td style="padding:2px 8px;font-size:10px;color:${{col(r.awr)}};text-align:right;">${{pct(r.awr)}} <span style="${{nStyle}}">n=${{r.dn}}</span></td>
       <td style="padding:2px 8px;font-size:10px;color:${{netCol(net)}};text-align:right;font-weight:600;">${{netPct(net)}}</td>
       <td style="padding:2px 4px;display:flex;gap:3px;">
-        <button class="btn-pill btn-xs ghost" onclick="toggleMethodInRun('${{r.name}}')" style="font-size:9px;padding:1px 6px;">${{disabled ? '✓ вкл' : '✗ откл'}}</button>
+        <button class="btn-pill btn-xs ghost" onclick="toggleMethodInRun('${{r.name}}')" title="${{disabled ? 'Сейчас: выключен. Нажми, чтобы включить в следующем прогоне' : 'Сейчас: включён. Нажми, чтобы выключить в следующем прогоне'}}" style="font-size:9px;padding:1px 6px;${{disabled ? 'color:#7dcc7d;' : 'color:#e07070;'}}">${{disabled ? '▶ включить' : '⏸ выключить'}}</button>
         <button class="btn-pill btn-xs ghost" onclick="toggleInvertMethodFromStats('${{r.name}}')" style="font-size:9px;padding:1px 6px;color:${{inverted ? '#f0a030' : 'var(--txt3)'}};">↔</button>
       </td>
     </tr>`;
@@ -4205,6 +4207,7 @@ function renderGlobalMethodStats() {{
       <tbody>${{trs}}</tbody>
     </table>
     <div style="font-size:9px;color:var(--txt3);margin-top:6px;">Показаны все ${{rows.length}} методов каталога (${{nShown}} с данными, остальные «нет сделок» — молчали или без провайдерных данных). «Против» = когда метод в меньшинстве. Чистый% = ЗА − ПРОТИВ. Зелёный ≥60% / +8%, красный ≤42% / −5%. Оранжевый n — мало сделок (&lt;5), цифры ненадёжны.</div>
+    <div style="font-size:9px;color:#c99a4a;margin-top:4px;">⚠ Кнопки «включить/выключить» и «отключить методы для прогона» наверху меняют настройку для СЛЕДУЮЩЕГО прогона. Цифры в таблице выше уже посчитаны прошлым прогоном и не пересчитываются на лету — нажми «Запустить» ещё раз, чтобы применить изменения.</div>
     <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
       <button class="btn-pill btn-sm ghost" onclick="autoDisableWeakMethods()" title="Выключить методы с win% ЗА ≤25% (минимум 5 сделок в роли)">⛔ выкл слабые (≤25%)</button>
       <button class="btn-pill btn-sm ghost" onclick="autoInvertAntisignals()" title="Инвертировать методы где ПРОТИВ win% > ЗА win% + 10% (антисигналы)">↔ инверт анти-сигналы</button>
