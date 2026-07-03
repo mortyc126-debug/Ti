@@ -5028,6 +5028,11 @@ document.getElementById('proxy').addEventListener('change', e=>{
 });
 showTab(localStorage.getItem('oilab_tab') || 'screener');
 _idxOvlBtnState(); // подсветка кнопки «Индекс», если оверлей был включён в прошлый раз
+
+// Тихие отказы — в статус: async-onclick, упавший без catch, раньше просто
+// молчал («ничего не грузится»), и понять причину можно было только по консоли
+window.addEventListener('error', e => setStatus(`JS-ошибка: ${e.message || '?'} (строка ${e.lineno || '?'})`, 'err'));
+window.addEventListener('unhandledrejection', e => setStatus('Ошибка: ' + String(e.reason && e.reason.message || e.reason).slice(0, 200), 'err'));
 </script>
 </body>
 </html>
