@@ -17,7 +17,8 @@ import sys
 import statistics
 
 __all__ = ("classify_regime", "classify_regime_probs", "REGIME_WEIGHT_MODS",
-           "change_point_score", "classify_phase", "PHASE_WEIGHT_MODS")
+           "change_point_score", "classify_phase", "PHASE_WEIGHT_MODS",
+           "squeeze_adjust")
 
 # formulas/ лежит рядом с invest-bot/ (на уровень выше cwd). Добавляем в путь
 # один раз, чтобы тяжёлые научные модули (BOCD, Hawkes, RQA, Kalman ...) были
@@ -279,6 +280,32 @@ def classify_regime_probs(closes: list[float], volumes: list[float] | None = Non
 
     total = sum(probs.values()) or 1.0
     return {r: probs.get(r, 0.0) / total for r in REGIMES}
+
+
+def squeeze_adjust(regime_probs: dict[str, float], daily_regime: str) -> dict[str, float]:
+    """Дневной контекст поверх внутридневного распределения режимов.
+
+    Внутри одного короткого окна СКВИЗ (шорт-сквиз/медвежий отскок) от настоящего
+    тренда неотличим: чистый рост на день-два в падающем рынке выглядит идеальным
+    трендом (инструмент вылетает +24%, а месячный итог всё равно -30%). Отличает
+    их только СТАРШИЙ ТФ. Если внутридневной тренд направлен ПРОТИВ дневного —
+    это сжатая пружина, а не тренд: переносим его массу в ranging (заблокирован
+    для входа), чтобы не купить вершину сквиза и не словить вынос стопа шортом.
+
+    Симметрично: здоровый откат (внутридневной down внутри дневного up) тоже
+    уводится в ranging — не шортим коррекцию в тренде. Если дневного режима ещё
+    нет ("" — мало дней) — возвращаем распределение как есть."""
+    conflict = {"trending_up": "trending_down",
+                "trending_down": "trending_up"}.get(daily_regime)
+    if not conflict:
+        return regime_probs
+    cp = regime_probs.get(conflict, 0.0)
+    if cp <= 0.0:
+        return regime_probs
+    out = dict(regime_probs)
+    out["ranging"] = out.get("ranging", 0.0) + cp
+    out[conflict] = 0.0
+    return out
 
 
 def classify_regime(closes: list[float], volumes: list[float] | None = None) -> tuple[str, float]:

@@ -74,7 +74,7 @@ from trade_system.signal import Signal, SignalType
 from trade_system.strategies.base_strategy import IStrategy
 # regime импортируется первым: его модуль-уровневый код кладёт ../formulas в
 # sys.path, поэтому ниже научные модули из formulas/ становятся импортируемы.
-from regime import REGIMES, classify_regime, classify_regime_probs, REGIME_WEIGHT_MODS, change_point_score, classify_phase, PHASE_WEIGHT_MODS
+from regime import REGIMES, classify_regime, classify_regime_probs, REGIME_WEIGHT_MODS, change_point_score, classify_phase, PHASE_WEIGHT_MODS, squeeze_adjust
 from cluster_models import ClusterModels
 from narrative import (
     NarrativeState, NarrativeWeights, NarrativeThresholds, classify_directional,
@@ -8031,7 +8031,10 @@ class OICompositeStrategy(IStrategy):
                     self.__mtf5_momentum_buf = self.__mtf5_momentum_buf[-(_MTF5_MOMENTUM_LEN + 2):]
             self.__recalc_l1_context()
 
-        regime_probs = self.__cached_regime_probs
+        # Дневной контекст: внутридневной «тренд» против дневного = сквиз →
+        # уводим в ranging (питает и argmax-режим, и веса методов). Пока дневного
+        # режима нет ("") — no-op. См. squeeze_adjust в regime.py.
+        regime_probs = squeeze_adjust(self.__cached_regime_probs, self.__daily_regime)
 
         _dm = self._disabled_methods
         _inv = self._inverted_methods
