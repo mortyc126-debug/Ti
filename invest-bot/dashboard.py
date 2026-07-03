@@ -1700,6 +1700,9 @@ def run_backtest_one(
         fixed_pct = fixed.get("expectancy_pct", 0.0)
         rows.append({"ticker": ticker, "mode": "fixed", "what_if": _what_if_from_trades(fixed_trades),
                      "rejection_stats": rej,
+                     # Покрытие истории OI — чтобы в UI было видно: методы ОИ
+                     # используются (has=true) или молчат из-за отсутствия данных.
+                     "oi_cov": oi_prov.coverage(ticker),
                      "method_stats": _method_stats_from_trades(fixed_trades),
                      "method_stats_by_regime": _method_stats_by_regime_from_trades(fixed_trades),
                      "trades_list": _trades_list_compact(fixed_trades),
@@ -3499,6 +3502,31 @@ function methodStatsByRegimeToHtml(msr) {{
   return html;
 }}
 
+// Бейдж покрытия истории OI по тикеру: есть данные (сколько дней/диапазон) или нет.
+function _oiCovBadge(cov) {{
+  if (!cov) return '';
+  if (!cov.has || !cov.days) {{
+    return `<span title="Нет истории FutOI для этого тикера — методы ОИ (OI_SQUEEZE/INST_OI/RETAIL_CONTRA/…) молчат. Собери данные кнопкой «OI Backfill»." style="font-size:8px;padding:0 4px;border:1px solid #a05a2c;border-radius:6px;color:#d08a4a;white-space:nowrap">OI ✗</span>`;
+  }}
+  const range = (cov.from && cov.to) ? `${{cov.from}} → ${{cov.to}}` : '';
+  return `<span title="История FutOI: ${{cov.days}} дн. ${{range}}. Методы ОИ участвуют в сигналах." style="font-size:8px;padding:0 4px;border:1px solid #2c7a4a;border-radius:6px;color:#5cbf85;white-space:nowrap">OI ✓ ${{cov.days}}д</span>`;
+}}
+
+// Баннер над таблицей: если у части тикеров нет истории OI — методы ОИ молчат,
+// это не «выключено», а нет данных. Подсказываем, как собрать.
+function _oiCovBanner(rows) {{
+  const withCov = rows.filter(r => r.oi_cov);
+  if (!withCov.length) return '';
+  const missing = withCov.filter(r => !r.oi_cov.has || !r.oi_cov.days).map(r => r.ticker);
+  if (!missing.length) return '';
+  const uniq = [...new Set(missing)];
+  return `<tr><td colspan="7" style="padding:6px 10px;background:rgba(160,90,44,.12);border-left:2px solid #a05a2c;font-size:11px;color:var(--txt2)">
+    ⚠ Методы открытого интереса молчат — нет истории FutOI для: <b>${{uniq.join(', ')}}</b>.
+    Это не «выключено», а отсутствие данных. Собери: вкладка <b>Live → OI → «⬇ Запустить загрузку»</b>
+    (нужен токен <code>[MOEX] TOKEN</code>, он уже прописан). Живой бот дособирает ОИ сам по мере торговли.
+  </td></tr>`;
+}}
+
 function rowsToHtml(rows) {{
   let html = '';
   for (const r of rows) {{
@@ -3519,7 +3547,8 @@ function rowsToHtml(rows) {{
     const avgR = r.avg_r !== undefined ? r.avg_r.toFixed(2) : '';
     const models = modelStatsToHtml(r.model_stats);
     const clickStyle = 'cursor:pointer;' + (r.trades_list && r.trades_list.length ? 'border-left:2px solid var(--accent);' : '');
-    html += `<tr onclick="selectTicker('${{r.ticker}}')" title="Кликни — загрузить график" style="${{clickStyle}}"><td><span class="sdot ok"></span>${{r.ticker}}</td><td>${{r.mode}}</td><td>${{r.n_trades ?? ''}}</td><td>${{winPct}}</td><td>${{avgR}}</td><td>${{exp}}</td><td style="font-size:10px;color:var(--txt3);">${{models}}</td></tr>`;
+    const oiBadge = _oiCovBadge(r.oi_cov);
+    html += `<tr onclick="selectTicker('${{r.ticker}}')" title="Кликни — загрузить график" style="${{clickStyle}}"><td><span class="sdot ok"></span>${{r.ticker}} ${{oiBadge}}</td><td>${{r.mode}}</td><td>${{r.n_trades ?? ''}}</td><td>${{winPct}}</td><td>${{avgR}}</td><td>${{exp}}</td><td style="font-size:10px;color:var(--txt3);">${{models}}</td></tr>`;
     if (r.what_if) {{
       const wi = whatIfToHtml(r.what_if);
       if (wi) {{
@@ -4367,6 +4396,7 @@ function renderResultsTable() {{
   const errors = _backtestRows.filter(r => r.error !== undefined && r.n_trades === undefined);
   let html = '<tr><th>Тикер</th><th>Режим</th><th>Сделок</th><th>Win%</th><th>avg R</th><th>Exp%</th><th>M1/M2/M3 win% (когда согласны)</th></tr>';
   html += droppedToHtml(_droppedRows);
+  html += _oiCovBanner(shown);
   html += rowsToHtml(errors.concat(shown));
   html += summaryRowToHtml(shown);
   table.innerHTML = html;

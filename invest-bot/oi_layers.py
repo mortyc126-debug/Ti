@@ -496,6 +496,17 @@ class OiBacktestProvider:
     def has_data(self, ticker: str) -> bool:
         return ticker in self._history and bool(self._history[ticker])
 
+    def coverage(self, ticker: str) -> dict:
+        """Покрытие истории FutOI по тикеру — для отображения в дашборде:
+        сколько дней, за какой диапазон дат. Пусто → OI-методы молчат."""
+        rows = self._history.get(ticker, [])
+        if not rows:
+            return {"has": False, "days": 0, "from": None, "to": None}
+        dates = sorted(str(r.get("tradedate", "")) for r in rows if r.get("tradedate"))
+        return {"has": True, "days": len(rows),
+                "from": dates[0] if dates else None,
+                "to": dates[-1] if dates else None}
+
 
 class OiLayersService:
     """
