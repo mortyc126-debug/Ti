@@ -2286,30 +2286,35 @@ function _entryEvents(result, dayRet, entries, k, thr) {
 // Событийная таблица по списку инструментов. Сэмплы объединяются СЫРЫМИ
 // (не усреднением по-инструментных процентов) — вероятности и медианы
 // автоматически взвешены по числу эпизодов каждого инструмента.
-function _calcEventTable(results, cfg) {
+function _calcEventTable(results, cfg, labels) {
   const k = Math.max(1, Math.round(cfg.event_horizon || 5));
   const q = Math.min(0.995, Math.max(0.55, cfg.spike_quantile || 0.95));
-  const per = results.map(res => {
+  const per = results.map((res, idx) => {
     const dayRet = _dailyReturns(res);
     const thr = _spikeThresholds(dayRet, q);
-    return thr ? { res, dayRet, thr } : null;
+    return thr ? { res, dayRet, thr, label: labels ? labels[idx] : null } : null;
   }).filter(Boolean);
   if (!per.length) return null;
+
+  const _hitOf = (e, dir) => dir > 0 ? isFinite(e.dtUp) : dir < 0 ? isFinite(e.dtDown) : (isFinite(e.dtUp) || isFinite(e.dtDown));
 
   const collect = (matchFn) => {
     let nDays = 0, nEp = 0;
     const events = [];
+    const perInst = []; // разбивка по тикерам — ответ на «к чему это всё относится»
     for (const p of per) {
       const ep = _matchEpisodes(p.res, matchFn);
       nDays += ep.nDays; nEp += ep.firsts.length;
-      events.push(..._entryEvents(p.res, p.dayRet, ep.firsts, k, p.thr));
+      const evs = _entryEvents(p.res, p.dayRet, ep.firsts, k, p.thr);
+      events.push(...evs);
+      perInst.push({ label: p.label, events: evs });
     }
-    return { nDays, nEp, events };
+    return { nDays, nEp, events, perInst };
   };
 
   const statsFrom = (events, dir) => {
     if (!events.length) return null;
-    const hitOf = e => dir > 0 ? isFinite(e.dtUp) : dir < 0 ? isFinite(e.dtDown) : (isFinite(e.dtUp) || isFinite(e.dtDown));
+    const hitOf = e => _hitOf(e, dir);
     const dtOf  = e => dir > 0 ? e.dtUp : dir < 0 ? e.dtDown
       : Math.min(isFinite(e.dtUp) ? e.dtUp : Infinity, isFinite(e.dtDown) ? e.dtDown : Infinity);
     const hitEv = events.filter(hitOf), missEv = events.filter(e => !hitOf(e));
@@ -2365,13 +2370,17 @@ function _calcEventTable(results, cfg) {
       const se = Math.sqrt(p1*(1-p1)/s.evaluated + p0*(1-p0)/b.evaluated) * 100;
       sig = isFinite(se) && se > 0 && Math.abs(s.p - b.p) > 1.96 * se;
     }
-    return { label: def.label, dir: def.dir, nDays: c.nDays, nEp: c.nEp, s, lift, sig };
+    const byTicker = labels ? c.perInst.map(pi => ({
+      label: pi.label, ev: pi.events.length,
+      hits: pi.events.filter(e => _hitOf(e, def.dir)).length,
+    })) : null;
+    return { label: def.label, dir: def.dir, nDays: c.nDays, nEp: c.nEp, s, lift, sig, byTicker };
   });
 
   const thrNote = per.length === 1
     ? `порог выброса: ход за бар ≥ ±${per[0].thr.up.toFixed(1)}% (квантиль ${q} от |дневного хода|)`
     : `порог выброса — свой у каждого инструмента (квантиль ${q} его |дневных ходов|); медиана порогов: ±${_median(per.map(p=>p.thr.up)).toFixed(1)}%/бар`;
-  return { k, q, base, rows, thrNote, nInstruments: per.length };
+  return { k, q, base, rows, thrNote, nInstruments: per.length, labels: labels ? per.map(p => p.label) : null };
 }
 
 function _renderEventTable(ev, title) {
@@ -2427,8 +2436,28 @@ function _renderEventTable(ev, title) {
     </tr>`;
   }
   t += `</tbody></table></div>
-  <div style="font-size:10px;color:#6F648F;margin:-4px 0 10px">Читать так: у полезного сигнала P(выброс) заметно выше базы (× ≥ 1.3 с ✓) и EV &gt; 0. «Ход при попадании/промахе» — в СТОРОНУ сигнала (для ↓-бинов знак перевёрнут): общая медиана MFE прячет бимодальность «редко, но крупно / часто понемногу против». Тусклые строки — меньше 10 эпизодов.</div>
-  </details>`;
+  <div style="font-size:10px;color:#6F648F;margin:-4px 0 10px">Читать так: у полезного сигнала P(выброс) заметно выше базы (× ≥ 1.3 с ✓) и EV &gt; 0. «Ход при попадании/промахе» — в СТОРОНУ сигнала (для ↓-бинов знак перевёрнут): общая медиана MFE прячет бимодальность «редко, но крупно / часто понемногу против». Тусклые строки — меньше 10 эпизодов.</div>`;
+
+  // Разбивка по тикерам: на ком именно сигнал ловит выбросы, а на ком — пустой
+  if (ev.labels && ev.rows.some(r => r.byTicker && r.nEp)) {
+    const hdr = ev.labels.map(l => `<th style="padding:3px 5px;background:#1A1030;color:#A79BC9;font-weight:400;font-size:9px" title="код серии: ${l}">${(typeof _rootAsset === 'function' && _rootAsset(l)) || l}</th>`).join('');
+    let body = '';
+    for (const row of ev.rows) {
+      if (!row.nEp || !row.byTicker) continue;
+      const cells = row.byTicker.map(bt => {
+        if (!bt.ev) return '<td style="text-align:center;color:#2a1f3d">—</td>';
+        const p = bt.hits / bt.ev;
+        const col = bt.ev < 3 ? '#6F648F' : p >= 0.3 ? '#52F2C9' : bt.hits === 0 ? '#FF6A8B' : '#F2F0FF';
+        return `<td style="text-align:center;white-space:nowrap;color:${col}" title="выбросов поймано ${bt.hits} из ${bt.ev} эпизодов${bt.ev < 3 ? ' — слишком мало, не показатель' : ` (${(p * 100).toFixed(0)}%)`}">${bt.hits}/${bt.ev}</td>`;
+      }).join('');
+      body += `<tr style="background:#140A24"><td style="padding:3px 8px;color:#F2F0FF;white-space:nowrap">${row.label} ${arrow(row.dir)}</td>${cells}</tr>`;
+    }
+    t += `<details><summary style="cursor:pointer;font-size:11px;color:#7CC7FF;margin-bottom:4px">Разбивка по тикерам: поймано/эпизодов — на ком сигнал реально работает</summary>
+    <div style="font-size:10px;color:#6F648F;margin:4px 0">Ячейка = выбросов поймано / эпизодов сигнала у этого тикера. Мятное — ловит ≥30% при ≥3 эпизодах, красное — 0 попаданий при ≥3, серое — меньше 3 эпизодов (не показатель). Пустая клетка — сигнал на тикере не срабатывал вовсе.</div>
+    <div style="overflow-x:auto"><table style="font-size:10px;border-collapse:collapse;margin-bottom:10px">
+    <thead><tr><th style="padding:3px 8px;background:#1A1030;color:#A79BC9;text-align:left;font-weight:400">Бин</th>${hdr}</tr></thead><tbody>${body}</tbody></table></div></details>`;
+  }
+  t += `</details>`;
   return t;
 }
 
@@ -3720,7 +3749,7 @@ async function labCalibratePool() {
   });
 
   // Событийная оценка по всему пулу: у каждого инструмента свой порог выброса
-  const poolEvents = _calcEventTable(instruments.map(i=>i.result), cfg);
+  const poolEvents = _calcEventTable(instruments.map(i=>i.result), cfg, instruments.map(i=>i.ticker));
 
   await _getRootNames(proxy); // человеческие имена тикеров для шапок таблиц
 
