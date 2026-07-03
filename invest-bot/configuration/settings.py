@@ -72,6 +72,19 @@ class FuturesTradingSettings:
     # Фьючерсы ниже порога — пропускаются (шум, нет edge).
     # 0 = фильтр отключён (поведение по умолчанию).
     min_avg_volume: int = 0
+    # Дефолты сигнала для фьючерса, у которого НЕТ своей STRATEGY_<TICKER>_SETTINGS
+    # (индексные/валютные/товарные базовые активы — без акции-родителя в settings.ini).
+    # Раньше эти дефолты молча брались из [MEGA_ALERTS] — теперь отдельная секция
+    # [FUTURES_DEFAULTS], чтобы правка автоторговли аномалий не задевала параметры
+    # фьючерсов и наоборот (configuration.py при отсутствии секции подставляет
+    # значения из [MEGA_ALERTS] — полная обратная совместимость).
+    signal_threshold: str = "0.25"
+    long_take: str = "1.015"
+    long_stop: str = "0.985"
+    short_take: str = "0.985"
+    short_stop: str = "1.015"
+    signal_only: str = "1"
+    max_lots_per_order: int = 1
 
 
 @dataclass(eq=False, repr=True)

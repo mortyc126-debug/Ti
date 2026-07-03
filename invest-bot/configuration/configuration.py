@@ -67,10 +67,23 @@ class ProgramConfiguration:
             ft = config["FUTURES_TRADING"]
             raw = ft.get("BASE_TICKERS", "").replace("\n", ",").replace("\r", "")
             base_tickers = [t.strip() for t in raw.split(",") if t.strip()]
+            # Дефолты сигнала фьючерсов без своей STRATEGY_*_SETTINGS: секция
+            # [FUTURES_DEFAULTS]; если её нет — значения из [MEGA_ALERTS] (как
+            # было раньше, когда __build_futures_strategies читал их оттуда) —
+            # полная обратная совместимость для конфигов без новой секции.
+            ma = self.__mega_alerts_settings
+            fd = config["FUTURES_DEFAULTS"] if "FUTURES_DEFAULTS" in config else {}
             self.__futures_trading_settings = FuturesTradingSettings(
                 enabled=ft.get("ENABLED", "0") == "1",
                 base_tickers=base_tickers,
                 min_avg_volume=int(ft.get("MIN_AVG_VOLUME", "0")),
+                signal_threshold=fd.get("SIGNAL_THRESHOLD", ma.signal_threshold),
+                long_take=fd.get("LONG_TAKE", ma.long_take),
+                long_stop=fd.get("LONG_STOP", ma.long_stop),
+                short_take=fd.get("SHORT_TAKE", ma.short_take),
+                short_stop=fd.get("SHORT_STOP", ma.short_stop),
+                signal_only=fd.get("SIGNAL_ONLY", ma.signal_only),
+                max_lots_per_order=int(fd.get("MAX_LOTS_PER_ORDER", ma.max_lots_per_order)),
             )
         else:
             self.__futures_trading_settings = FuturesTradingSettings()

@@ -27,6 +27,27 @@ from news_config import CEREBRAS_API_KEY
 
 logger = logging.getLogger(__name__)
 
+
+def is_enabled() -> bool:
+    """
+    Включён ли консилиум. Приоритет: env-переменная COUNCIL (0/1) —
+    если задана, она решает; иначе секция [COUNCIL] ENABLED из settings.ini;
+    иначе включён по умолчанию (при наличии ключа Cerebras).
+    Раньше [COUNCIL] ENABLED не читался кодом вообще (управлялось только env) —
+    теперь ini-настройка тоже работает.
+    """
+    env = os.getenv("COUNCIL")
+    if env is not None:
+        return env == "1"
+    try:
+        from configparser import ConfigParser
+        ini = ConfigParser()
+        ini.read("settings.ini", encoding="utf-8")
+        return ini.get("COUNCIL", "ENABLED", fallback="1") == "1"
+    except Exception:
+        return True
+
+
 LESSONS_FILE = "data/council_lessons.json"
 MAX_LESSONS = 30          # храним последние N уроков в файле
 MAX_LESSONS_TO_SHOW = 5  # показываем агентам только N последних
