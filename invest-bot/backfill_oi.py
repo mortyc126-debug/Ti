@@ -35,6 +35,12 @@ MOEX_ISS  = "https://iss.moex.com/iss"
 HISTORY_FILE = "data/oi_daily.json"
 PAUSE_SEC = 0.4   # пауза между запросами к AlgoPack
 
+# Ошибки сетевых запросов внутри _fetch_futures_contracts на последний вызов
+# per-тикер — чтобы backfill() мог показать их в своей строке лога (иначе
+# дашборд видел бы то же "контракты не найдены", что и для честного "MOEX
+# ничего не отдал", не отличая сетевую проблему от реального отсутствия данных).
+_last_fetch_errors: dict[str, list[str]] = {}
+
 
 def _get_token() -> str | None:
     token = os.getenv("MOEX_TOKEN")
@@ -70,6 +76,23 @@ def _fetch_futures_contracts(stock_ticker: str) -> list[dict]:
     # Сначала пробуем активные на FORTS (RFUD — квартальные фьючерсы).
     contracts: dict[str, str] = {}  # secid -> lasttradedate
 
+    # Для части тикеров реальный корень серии FutOI НЕ является префиксом
+    # самого акционного тикера (YDEX → "YD", короче самого "YDEX" — обычный
+    # startswith(stock_ticker) физически не может совпасть ни с одним secid).
+    # Портированная карта из oi_layers._FUTOI_FULL_MAP — пробуем оба префикса.
+    try:
+        from oi_layers import _FUTOI_FULL_MAP
+        _alt_prefix = _FUTOI_FULL_MAP.get(stock_ticker.upper())
+    except Exception:
+        _alt_prefix = None
+    _prefixes = [stock_ticker.upper()] + ([_alt_prefix.upper()] if _alt_prefix else [])
+    # Ошибки самих запросов раньше глотались на уровне debug — если ОБА запроса
+    # упали по сети/парсингу, наружу уходило то же "не нашли контракты", что и
+    # для честного "MOEX действительно ничего не отдал". Разница критична для
+    # диагностики (сеть vs реально нет данных), поэтому теперь фиксируем и
+    # поднимаем в warning + пробрасываем в лог бэкфилла (см. backfill()).
+    errors: list[str] = []
+
     # 1. Активные контракты из стакана фьючерсов FORTS
     try:
         url = (f"{MOEX_ISS}/engines/futures/markets/forts/boards/RFUD/securities.json"
@@ -86,10 +109,12 @@ def _fetch_futures_contracts(stock_ticker: str) -> list[dict]:
             for row in rows:
                 sid = str(row[secid_i] or "")
                 ltd = str(row[ltd_i] or "")
-                if sid.upper().startswith(stock_ticker.upper()) and ltd:
+                if any(sid.upper().startswith(pfx) for pfx in _prefixes) and ltd:
                     contracts[sid] = ltd[:10]  # берём только дату YYYY-MM-DD
     except Exception as e:
-        logger.debug(f"ISS RFUD запрос упал: {e}")
+        msg = f"ISS RFUD запрос упал: {e!r}"
+        logger.warning(f"{stock_ticker}: {msg}")
+        errors.append(msg)
 
     # 2. Поиск через /securities.json — покрывает истёкшие контракты за последние годы
     try:
@@ -111,13 +136,21 @@ def _fetch_futures_contracts(stock_ticker: str) -> list[dict]:
                 mat  = str(row[mat_i] or "")
                 typ  = str(row[type_i] or "") if type_i >= 0 else ""
                 # фьючерсы = type 'futures', secid начинается на тикер
-                if sid.upper().startswith(stock_ticker.upper()) and mat and "future" in typ.lower():
+                if any(sid.upper().startswith(pfx) for pfx in _prefixes) and mat and "future" in typ.lower():
                     contracts.setdefault(sid, mat[:10])
     except Exception as e:
-        logger.debug(f"ISS securities search упал: {e}")
+        msg = f"ISS securities search упал: {e!r}"
+        logger.warning(f"{stock_ticker}: {msg}")
+        errors.append(msg)
 
+    _last_fetch_errors[stock_ticker] = errors
     if not contracts:
-        logger.warning(f"{stock_ticker}: не нашли фьючерсных контрактов на MOEX ISS")
+        if errors:
+            logger.warning(f"{stock_ticker}: не нашли фьючерсных контрактов на MOEX ISS "
+                           f"(оба запроса упали: {'; '.join(errors)})")
+        else:
+            logger.warning(f"{stock_ticker}: не нашли фьючерсных контрактов на MOEX ISS "
+                           f"(запросы прошли успешно, но совпадений по префиксу '{stock_ticker.upper()}' нет)")
         return []
 
     result = sorted(
@@ -259,7 +292,10 @@ def backfill(tickers: list[str], months: int, token: str) -> dict:
         # Получаем реальные фьючерсные контракты с MOEX ISS
         contracts = _fetch_futures_contracts(stock_ticker)
         if not contracts:
-            msg = f"{stock_ticker}: контракты не найдены на MOEX ISS — пропущен"
+            fetch_errs = _last_fetch_errors.get(stock_ticker) or []
+            detail = f" (ошибки запроса: {'; '.join(fetch_errs)})" if fetch_errs \
+                else " (запросы прошли, совпадений по префиксу нет — не сеть, а формат тикера)"
+            msg = f"{stock_ticker}: контракты не найдены на MOEX ISS — пропущен{detail}"
             logger.warning(msg); log_lines.append(msg)
             continue
 
