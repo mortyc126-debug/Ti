@@ -71,12 +71,26 @@ async def start_asyncio_trading(
         token, chat_id = control_listener_creds
         control_task = asyncio.create_task(run_control_listener(token, chat_id))
 
-    await blog_task
-    await trade_task
-    if news_task:
-        await news_task
-    if control_task:
-        await control_task
+    # Раньше здесь было последовательное `await blog_task; await trade_task; ...` —
+    # blog_task (обработка очереди сообщений) не завершается сам по себе, поэтому
+    # `await blog_task` блокировал бы НАВСЕГДА, даже если trade_task уже закончил
+    # работу (например, по запросу мягкой остановки с дашборда,
+    # trading/trader.py::BotShutdownRequested) — процесс никогда бы не завершался.
+    # Ждём, пока ЛЮБАЯ из задач закончится, остальные отменяем — тогда
+    # asyncio.run(...) в __main__ реально возвращает управление, и процесс
+    # завершается (bot_supervisor.py со стороны дашборда видит, что PID умер).
+    all_tasks = [t for t in (blog_task, trade_task, news_task, control_task) if t is not None]
+    done, pending = await asyncio.wait(all_tasks, return_when=asyncio.FIRST_COMPLETED)
+
+    for task in pending:
+        task.cancel()
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
+
+    for task in done:
+        exc = task.exception()
+        if exc is not None:
+            logger.error(f"start_asyncio_trading: задача {task.get_name()} завершилась с ошибкой: {repr(exc)}")
 
 
 def prepare_logs() -> None:

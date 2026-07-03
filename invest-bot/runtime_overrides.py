@@ -14,6 +14,8 @@ set_take_stop_overrides). Изменения take/stop влияют только
   "adaptive_exit_enabled": null | true | false, // null — берём дефолт из ADAPTIVE_EXIT_ENABLED (trader.py)
   "orderbook_enabled": null | true | false,     // null — берём дефолт из ORDERBOOK_DEFAULT_ENABLED (trader.py)
   "paused": false,                              // true — пауза: новые позиции не открываются (как /pause в ТГ)
+  "shutdown_requested": false,                  // true — дашборд просит мягко остановить процесс (bot_supervisor.py);
+                                                 // бот сам сбрасывает обратно в false, как только увидел флаг
   "close_requests": [],                         // тикеры или "ALL" — срочное закрытие, бот очищает после исполнения
   "tickers": {
     "SBER": {
@@ -52,6 +54,7 @@ def load_overrides(path: str = OVERRIDES_FILE) -> dict:
     data.setdefault("adaptive_exit_enabled", None)
     data.setdefault("orderbook_enabled", None)
     data.setdefault("paused", False)
+    data.setdefault("shutdown_requested", False)
     data.setdefault("close_requests", [])
     data.setdefault("tickers", {})
     data.setdefault("daily_max_loss_pct", None)
@@ -120,6 +123,17 @@ class RuntimeOverrides:
 
     def is_paused(self) -> bool:
         return bool(self.__data.get("paused", False))
+
+    def pop_shutdown_requested(self) -> bool:
+        """True один раз, когда дашборд попросил остановку — и сразу сбрасывает
+        флаг в файле, чтобы следующий запуск main.py не завершился мгновенно
+        из-за протухшего flag'а с прошлой сессии (bot_supervisor.py тоже
+        подчищает флаг перед стартом — эта чистка ещё и подстраховка)."""
+        if not self.__data.get("shutdown_requested"):
+            return False
+        self.__data["shutdown_requested"] = False
+        save_overrides(self.__data, self.__path)
+        return True
 
     def pop_close_requests(self) -> set[str]:
         """Возвращает набор тикеров/ALL и очищает список в файле."""

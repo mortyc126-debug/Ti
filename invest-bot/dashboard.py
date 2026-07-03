@@ -64,6 +64,8 @@ from invest_api.services.instruments_service import InstrumentService
 from invest_api.services.market_data_service import MarketDataService
 from mega_alerts import MegaAlertsService
 from runtime_overrides import load_overrides, save_overrides
+import bot_supervisor
+import ticker_universe
 from trade_system.issuer_filter import issuer_key, select_top_tickers
 from trade_system.strategies.oi_composite_strategy import (
     AUTO_ATR_MIN_TRADES, AUTO_ATR_SCALE_EXPS, AUTO_ATR_STOP_KS, AUTO_ATR_TAKE_KS,
@@ -2854,6 +2856,31 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 
 <!-- ══ СУБ-ТАБ: УПРАВЛЕНИЕ ══ -->
 <div id="live-sub-ctrl">
+<div class="panel" id="supervisor_panel">
+  <div class="sec-lg">Процесс бота (main.py)</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;">
+    Дашборд и торговый цикл — разные процессы. Здесь — запуск/остановка самого
+    main.py, отдельно от паузы ниже (пауза просто не даёт уже запущенному боту
+    открывать новые позиции).
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+    <span id="sup_state_dot" class="sdot"></span>
+    <span id="sup_state_label" style="font-size:12px;font-weight:600;color:var(--txt2);">загружаем...</span>
+    <select class="inp mid" id="sup_mode_sel" style="width:150px;">
+      <option value="sandbox" selected>🏖 Песочница (виртуально)</option>
+      <option value="live">💸 Боевой (реальные деньги)</option>
+    </select>
+    <button class="btn-pill btn-sm" id="btn_sup_start" onclick="supervisorStart()">▶ Запустить</button>
+    <button class="btn-pill btn-sm danger" id="btn_sup_stop" onclick="supervisorStop()" style="display:none;">⏹ Остановить</button>
+    <button class="btn-pill btn-sm danger" id="btn_sup_kill" onclick="supervisorKill()" style="display:none;">✕ Принудительно</button>
+    <button class="btn-pill btn-sm" onclick="loadSupervisorStatus()">⟳</button>
+  </div>
+  <div id="sup_status" style="font-size:11px;color:var(--txt3);"></div>
+  <details style="margin-top:10px;">
+    <summary style="cursor:pointer;font-size:11px;color:var(--txt3);">Лог процесса (data/bot_run.log, последние строки)</summary>
+    <pre id="sup_log" style="font-size:10px;color:var(--txt2);white-space:pre-wrap;max-height:220px;overflow-y:auto;background:var(--panel);border-radius:8px;padding:8px;margin-top:6px;"></pre>
+  </details>
+</div>
 <div class="panel">
   <div class="sec-lg">Статус и управление</div>
   <div id="bot_status_bar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
@@ -2979,6 +3006,49 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     </tr></thead>
     <tbody id="ov_table"></tbody>
   </table>
+</div>
+
+<div class="panel" id="universe_panel">
+  <div class="sec-lg">Тикеры для торговли (фьючерсы)</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;">
+    Что попадёт в [FUTURES_TRADING] BASE_TICKERS. Применяется со СЛЕДУЮЩЕГО
+    торгового дня (список читается раз в день, не мгновенно посреди сессии) —
+    см. ticker_universe.py.
+  </div>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
+    <label class="cfg-check"><input type="radio" name="uv_mode" value="manual" onchange="universeModeChanged()"> Ручной список</label>
+    <label class="cfg-check"><input type="radio" name="uv_mode" value="top_n" onchange="universeModeChanged()"> Топ-N по востребованности</label>
+  </div>
+
+  <div id="uv_manual_block">
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--txt2);">
+      Тикеры через запятую (как basic_asset — тикер акции или человекочитаемое
+      имя вроде «Brent», «Золото», «USD/RUB»)
+      <textarea id="uv_manual_tickers" style="height:70px;" placeholder="SBER,GAZP,LKOH,IMOEX,Золото"></textarea>
+    </label>
+  </div>
+
+  <div id="uv_topn_block" style="display:none;">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;">
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--txt2);">
+        N (сколько взять)
+        <input type="number" class="inp mid" id="uv_n" value="20" min="1" max="150" style="width:70px;">
+      </label>
+      <button class="btn-pill btn-sm" onclick="universeCompute()">📊 Посчитать востребованность</button>
+      <span id="uv_compute_status" style="font-size:11px;color:var(--txt3);"></span>
+    </div>
+    <div style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Типы активов (включить)</div>
+    <div id="uv_types" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;"></div>
+    <div id="uv_preview" style="font-size:11px;color:var(--txt2);"></div>
+  </div>
+
+  <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border2);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <button class="btn-pill" onclick="universeSave()">💾 Сохранить и применить со следующего дня</button>
+    <span id="uv_save_status" style="font-size:11px;color:var(--txt3);"></span>
+  </div>
+  <div style="margin-top:8px;font-size:11px;color:var(--txt3);">
+    Сейчас в BASE_TICKERS: <span id="uv_resolved_current" style="color:var(--txt2);">—</span>
+  </div>
 </div>
 
 </div><!-- /live-sub-cfg -->
@@ -3145,8 +3215,8 @@ function showTab(name) {{
   event.currentTarget.classList.add('active');
   if (name === 'live') {{
     liveSub('ctrl');
-    loadBotStatus(); loadOverrides(); loadAutoAtr();
-    if (!_statusPollTimer) _statusPollTimer = setInterval(loadBotStatus, 30000);
+    loadBotStatus(); loadOverrides(); loadAutoAtr(); loadSupervisorStatus(); loadUniverse();
+    if (!_statusPollTimer) _statusPollTimer = setInterval(() => {{ loadBotStatus(); loadSupervisorStatus(); }}, 30000);
   }} else {{
     if (_statusPollTimer) {{ clearInterval(_statusPollTimer); _statusPollTimer = null; }}
   }}
@@ -5368,6 +5438,176 @@ async function loadLiveScorecard() {{
   }}
 }}
 
+// ── Управление процессом бота (старт/стоп) ──────────────────────────
+async function loadSupervisorStatus() {{
+  const data = await fetch('/api/supervisor/status').then(r => r.json()).catch(() => ({{running:false}}));
+  const dot = document.getElementById('sup_state_dot');
+  const lbl = document.getElementById('sup_state_label');
+  const btnStart = document.getElementById('btn_sup_start');
+  const btnStop = document.getElementById('btn_sup_stop');
+  const btnKill = document.getElementById('btn_sup_kill');
+  const modeSel = document.getElementById('sup_mode_sel');
+  if (data.running) {{
+    const modeTxt = data.sandbox ? '🏖 песочница' : '💸 БОЕВОЙ';
+    dot.className = 'sdot ok';
+    lbl.textContent = `▶ Запущен (PID ${{data.pid}}, ${{modeTxt}})`;
+    btnStart.style.display = 'none'; modeSel.disabled = true;
+    btnStop.style.display = ''; btnKill.style.display = '';
+    if (_supStopRequestedAt && Date.now() - _supStopRequestedAt > 8000) {{
+      btnKill.style.opacity = '1';
+    }}
+  }} else {{
+    dot.className = 'sdot err';
+    lbl.textContent = 'Остановлен';
+    btnStart.style.display = ''; modeSel.disabled = false;
+    btnStop.style.display = 'none'; btnKill.style.display = 'none';
+    _supStopRequestedAt = null;
+  }}
+}}
+
+async function supervisorStart() {{
+  const sandbox = document.getElementById('sup_mode_sel').value === 'sandbox';
+  const status = document.getElementById('sup_status');
+  if (!sandbox && !confirm('Запустить БОЕВОЙ режим — реальные деньги, реальные ордера. Точно?')) return;
+  status.textContent = '⏳ запускаю...';
+  const r = await fetch('/api/supervisor/start', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{sandbox}})}}).then(r=>r.json());
+  status.textContent = r.ok ? `✓ запущен (PID ${{r.pid}})` : ('⚠ ' + (r.error || 'ошибка'));
+  await loadSupervisorStatus();
+}}
+
+let _supStopRequestedAt = null;
+let _supPollAfterStop = null;
+
+async function supervisorStop() {{
+  const status = document.getElementById('sup_status');
+  status.textContent = '⏳ отправляю запрос на остановку (сработает на ближайшей свече)...';
+  const r = await fetch('/api/supervisor/stop', {{method:'POST'}}).then(r=>r.json());
+  if (!r.ok && !r.already_stopped) {{ status.textContent = '⚠ ' + (r.error || 'ошибка'); return; }}
+  _supStopRequestedAt = Date.now();
+  status.textContent = 'Остановка запрошена — жду завершения...';
+  if (_supPollAfterStop) clearInterval(_supPollAfterStop);
+  _supPollAfterStop = setInterval(async () => {{
+    const s = await fetch('/api/supervisor/status').then(r=>r.json());
+    if (!s.running) {{
+      clearInterval(_supPollAfterStop); _supPollAfterStop = null;
+      status.textContent = '✓ остановлен';
+      await loadSupervisorStatus();
+    }}
+  }}, 2000);
+  await loadSupervisorStatus();
+}}
+
+async function supervisorKill() {{
+  if (!confirm('Принудительно завершить процесс? Незавершённые действия бота (например, отправка ордера) могут прерваться на середине.')) return;
+  const status = document.getElementById('sup_status');
+  status.textContent = '⏳ завершаю принудительно...';
+  const r = await fetch('/api/supervisor/force_kill', {{method:'POST'}}).then(r=>r.json());
+  status.textContent = r.ok ? '✓ завершён' : '⚠ не удалось завершить';
+  if (_supPollAfterStop) {{ clearInterval(_supPollAfterStop); _supPollAfterStop = null; }}
+  await loadSupervisorStatus();
+}}
+
+async function loadSupervisorLog() {{
+  const r = await fetch('/api/supervisor/log?n=200').then(r=>r.json()).catch(() => ({{log:''}}));
+  document.getElementById('sup_log').textContent = r.log || '(пусто)';
+}}
+document.addEventListener('DOMContentLoaded', () => {{
+  const det = document.querySelector('#supervisor_panel details');
+  if (det) det.addEventListener('toggle', () => {{ if (det.open) loadSupervisorLog(); }});
+}});
+
+// ── Гибкий выбор тикеров (ticker_universe.py) ───────────────────────
+let _uvCatalog = [];
+let _uvClassify = {{}};
+const UV_TYPE_LABELS = {{stock:'Акции',currency:'Валюта',metal:'Металлы',commodity:'Сырьё',index:'Индексы',foreign:'Иностранные/крипто'}};
+
+function universeModeChanged() {{
+  const mode = document.querySelector('input[name=uv_mode]:checked')?.value || 'manual';
+  document.getElementById('uv_manual_block').style.display = mode === 'manual' ? '' : 'none';
+  document.getElementById('uv_topn_block').style.display = mode === 'top_n' ? '' : 'none';
+}}
+
+async function loadUniverse() {{
+  const cfg = await fetch('/api/universe').then(r=>r.json()).catch(() => null);
+  if (!cfg) return;
+  _uvCatalog = cfg.candidates_catalog || [];
+  _uvClassify = cfg.classify || {{}};
+
+  document.querySelector(`input[name=uv_mode][value="${{cfg.mode}}"]`).checked = true;
+  universeModeChanged();
+  document.getElementById('uv_manual_tickers').value = (cfg.manual_tickers || []).join(',');
+  document.getElementById('uv_n').value = cfg.top_n?.n || 20;
+
+  const include = new Set(cfg.top_n?.include_types || Object.keys(UV_TYPE_LABELS));
+  document.getElementById('uv_types').innerHTML = Object.entries(UV_TYPE_LABELS).map(([type, label]) => `
+    <label class="cfg-check"><input type="checkbox" class="uv-type-cb" value="${{type}}" ${{include.has(type) ? 'checked' : ''}}> ${{label}}</label>
+  `).join('');
+
+  document.getElementById('uv_resolved_current').textContent = (cfg.resolved_tickers || []).length
+    ? cfg.resolved_tickers.join(', ') : '(пусто — используется BASE_TICKERS из settings.ini)';
+
+  if (cfg.last_scores && Object.keys(cfg.last_scores).length) {{
+    _uvRenderPreview(cfg.last_scores, cfg.computed_at);
+  }}
+  if (cfg.computing) {{
+    document.getElementById('uv_compute_status').textContent = '⏳ расчёт идёт в фоне...';
+    setTimeout(loadUniverse, 3000);
+  }}
+}}
+
+function _uvSelectedTypes() {{
+  return Array.from(document.querySelectorAll('.uv-type-cb:checked')).map(cb => cb.value);
+}}
+
+function _uvRenderPreview(scores, computedAt) {{
+  const include = new Set(_uvSelectedTypes());
+  const n = parseInt(document.getElementById('uv_n').value) || 20;
+  const rows = Object.entries(scores)
+    .filter(([base, s]) => !s.error && include.has(_uvClassify[base] || 'stock'))
+    .sort((a, b) => b[1].score - a[1].score);
+  const top = rows.slice(0, n);
+  const el = document.getElementById('uv_preview');
+  const ts = computedAt ? new Date(computedAt).toLocaleString('ru-RU') : '';
+  el.innerHTML = `<div style="color:var(--txt3);margin-bottom:4px;">Посчитано: ${{ts}} · пройдёт фильтр: ${{rows.length}} · возьмём топ-${{n}}:</div>` +
+    top.map(([base, s], i) => `
+      <div style="display:flex;gap:8px;padding:2px 0;border-bottom:1px solid var(--border2);">
+        <span style="color:var(--txt3);width:20px;">${{i+1}}</span>
+        <b style="min-width:110px;">${{base}}</b>
+        <span style="color:var(--txt3);width:80px;">${{UV_TYPE_LABELS[_uvClassify[base]] || '?'}}</span>
+        <span>score ${{s.score}}</span>
+        <span style="color:var(--txt3);">об. ${{Math.round(s.avg_volume)}}</span>
+        ${{s.alerts ? `<span style="color:var(--accent);">🔔${{s.alerts}}</span>` : ''}}
+      </div>
+    `).join('');
+}}
+
+async function universeCompute() {{
+  const status = document.getElementById('uv_compute_status');
+  status.textContent = '⏳ считаю по всему каталогу (' + _uvCatalog.length + ' кандидатов, может занять пару минут)...';
+  const r = await fetch('/api/universe/compute', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{candidates:_uvCatalog}})}}).then(r=>r.json());
+  if (!r.ok) {{ status.textContent = '⚠ ' + (r.error || 'ошибка'); return; }}
+  status.textContent = '⏳ считаю в фоне...';
+  setTimeout(loadUniverse, 3000);
+}}
+
+async function universeSave() {{
+  const status = document.getElementById('uv_save_status');
+  const mode = document.querySelector('input[name=uv_mode]:checked')?.value || 'manual';
+  const payload = {{
+    mode,
+    manual_tickers: document.getElementById('uv_manual_tickers').value.split(',').map(s=>s.trim()).filter(Boolean),
+    top_n: {{
+      n: parseInt(document.getElementById('uv_n').value) || 20,
+      include_types: _uvSelectedTypes(),
+      exclude_types: [],
+    }},
+  }};
+  status.textContent = '⏳ сохраняю...';
+  const r = await fetch('/api/universe/save', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(payload)}}).then(r=>r.json());
+  status.textContent = r.ok ? `✓ сохранено (${{r.resolved_tickers.length}} тикеров) — применится со следующего торгового дня` : ('⚠ ' + (r.error || 'ошибка'));
+  await loadUniverse();
+}}
+
 async function botPause() {{
   await fetch('/api/bot_control', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{action:'pause'}})}});
   await loadBotStatus();
@@ -6863,6 +7103,101 @@ def get_oi_backfill_status() -> dict:
         return dict(_oi_backfill_job)
 
 
+# ── Управление процессом бота (старт/стоп) ───────────────────────────────────
+
+def supervisor_start(sandbox: bool) -> dict:
+    return bot_supervisor.start_bot(sandbox)
+
+
+def supervisor_stop() -> dict:
+    return bot_supervisor.stop_bot()
+
+
+def supervisor_force_kill() -> dict:
+    return bot_supervisor.force_kill_bot()
+
+
+def supervisor_status() -> dict:
+    return bot_supervisor.status()
+
+
+def supervisor_log(n_lines: int = 200) -> dict:
+    return {"log": bot_supervisor.tail_log(n_lines)}
+
+
+# ── Гибкий выбор тикеров (ticker_universe.py) ────────────────────────────────
+
+_universe_compute_running = threading.Event()
+_universe_compute_lock = threading.Lock()
+
+
+def universe_get() -> dict:
+    cfg = ticker_universe.load_universe()
+    cfg["candidates_catalog"] = ticker_universe.candidates_catalog(cfg.get("extra_candidates"))
+    cfg["classify"] = {b: ticker_universe.classify(b) for b in cfg["candidates_catalog"]}
+    cfg["computing"] = _universe_compute_running.is_set()
+    return cfg
+
+
+def _universe_compute_bg(candidates: list[str]) -> None:
+    try:
+        ma = MegaAlertsService()
+        hits = ma.hits_last_days(7)
+        scores = ticker_universe.compute_demand_scores(
+            candidates, _instrument_service, _market_data, hits,
+        )
+        cfg = ticker_universe.load_universe()
+        cfg["last_scores"] = scores
+        cfg["computed_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        ticker_universe.save_universe(cfg)
+        logger.info(f"ticker_universe: посчитан спрос для {len(scores)} кандидатов")
+    except Exception as e:
+        logger.error(f"ticker_universe: расчёт упал: {repr(e)}")
+    finally:
+        _universe_compute_running.clear()
+
+
+def universe_compute(candidates: list[str] | None) -> dict:
+    if _universe_compute_running.is_set():
+        return {"ok": False, "error": "расчёт уже идёт"}
+    cfg = ticker_universe.load_universe()
+    pool = candidates or ticker_universe.candidates_catalog(cfg.get("extra_candidates"))
+    _universe_compute_running.set()
+    threading.Thread(target=_universe_compute_bg, args=(pool,), daemon=True).start()
+    return {"ok": True, "started": True, "n_candidates": len(pool)}
+
+
+def universe_save(payload: dict) -> dict:
+    cfg = ticker_universe.load_universe()
+    mode = payload.get("mode", cfg["mode"])
+    if mode not in ("manual", "top_n"):
+        return {"ok": False, "error": f"неизвестный режим: {mode}"}
+    cfg["mode"] = mode
+    if "manual_tickers" in payload:
+        cfg["manual_tickers"] = [t.strip() for t in payload["manual_tickers"] if str(t).strip()]
+    if "top_n" in payload:
+        tn = payload["top_n"]
+        cfg["top_n"] = {
+            "n": max(1, int(tn.get("n", cfg["top_n"]["n"]))),
+            "include_types": tn.get("include_types", cfg["top_n"]["include_types"]),
+            "exclude_types": tn.get("exclude_types", cfg["top_n"]["exclude_types"]),
+        }
+    if "extra_candidates" in payload:
+        cfg["extra_candidates"] = [t.strip() for t in payload["extra_candidates"] if str(t).strip()]
+
+    if mode == "manual":
+        cfg["resolved_tickers"] = list(cfg["manual_tickers"])
+    else:
+        scores = cfg.get("last_scores") or {}
+        if not scores:
+            return {"ok": False, "error": "сначала нажми «Посчитать» — нет данных для топ-N"}
+        cfg["resolved_tickers"] = ticker_universe.resolve_top_n(
+            scores, cfg["top_n"]["n"], cfg["top_n"]["include_types"], cfg["top_n"]["exclude_types"]
+        )
+    ticker_universe.save_universe(cfg)
+    return {"ok": True, "resolved_tickers": cfg["resolved_tickers"]}
+
+
 def get_bot_status() -> dict:
     """data/bot_status.json — живой снимок, который бот обновляет на каждой свече."""
     path = "data/bot_status.json"
@@ -7192,6 +7527,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": str(e)})
         elif self.path == "/api/bot_status":
             self._send_json(get_bot_status())
+        elif self.path == "/api/supervisor/status":
+            self._send_json(supervisor_status())
+        elif self.path.startswith("/api/supervisor/log"):
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            n = int(qs.get("n", ["200"])[0])
+            self._send_json(supervisor_log(n))
+        elif self.path == "/api/universe":
+            self._send_json(universe_get())
         elif self.path.startswith("/api/live_chart"):
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             ticker = qs.get("ticker", [""])[0].upper()
@@ -7585,6 +7928,16 @@ class Handler(BaseHTTPRequestHandler):
             action = payload.get("action", "")
             ticker = payload.get("ticker", "")
             self._send_json(bot_control_action(action, ticker))
+        elif self.path == "/api/supervisor/start":
+            self._send_json(supervisor_start(bool(payload.get("sandbox", True))))
+        elif self.path == "/api/supervisor/stop":
+            self._send_json(supervisor_stop())
+        elif self.path == "/api/supervisor/force_kill":
+            self._send_json(supervisor_force_kill())
+        elif self.path == "/api/universe/compute":
+            self._send_json(universe_compute(payload.get("candidates")))
+        elif self.path == "/api/universe/save":
+            self._send_json(universe_save(payload))
         elif self.path == "/api/oi_backfill":
             months = int(payload.get("months", 12))
             raw_t = payload.get("tickers") or None

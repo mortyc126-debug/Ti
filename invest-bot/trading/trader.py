@@ -38,6 +38,7 @@ from trade_system.strategies.strategy_factory import StrategyFactory
 from risk import RiskManager
 from oi_layers import OiLayersService
 from signal_gate import SignalGate, OI_HISTORY_FILE
+import ticker_universe
 from orderbook import OrderBookService
 from tradestats import TradeStatsService
 from mega_alerts import MegaAlertsService
@@ -50,6 +51,14 @@ from db_api_client import DbApiClient
 from runtime_overrides import RuntimeOverrides
 import bot_control
 import lasso_calibration
+
+
+class BotShutdownRequested(Exception):
+    """Дашборд (bot_supervisor.py) попросил мягко остановить процесс —
+    выбрасывается из __trading при обнаружении shutdown_requested в
+    data/bot_overrides.json, ловится в TradeService.__working_loop
+    (trading/trade_service.py), которая завершает worker() и даёт
+    main.py корректно закончить asyncio.run(...)."""
 
 __all__ = ("Trader")
 
@@ -441,6 +450,22 @@ class Trader:
         logger.info("Start preparations for trading today")
         self.__trading_settings = trading_settings
         self.__dead_zone_parsed = _parse_dead_zone(trading_settings.intraday_dead_zone_utc)
+        # Список базовых активов для FUTURES_TRADING читаем заново каждый
+        # торговый день (не только один раз при старте процесса) — так
+        # изменения, сделанные с дашборда (ticker_universe.py), применяются
+        # начиная со следующей сессии без перезапуска main.py. Без файла
+        # data/ticker_universe.json (или с пустым resolved_tickers) — обычный
+        # BASE_TICKERS из settings.ini, как раньше.
+        if self.__futures_trading_settings.enabled:
+            new_base_tickers = ticker_universe.resolved_base_tickers(
+                fallback=self.__futures_trading_settings.base_tickers
+            )
+            if new_base_tickers != self.__futures_trading_settings.base_tickers:
+                logger.info(
+                    f"FUTURES: список базовых активов обновлён из ticker_universe.json "
+                    f"({len(new_base_tickers)} шт.)"
+                )
+            self.__futures_trading_settings.base_tickers = new_base_tickers
         # Очищаем MFE/MAE трекер между торговыми днями: иначе max_fav/max_adv
         # накапливаются бессрочно и показывают «лучший максимум» из прошлых дней.
         self.__pos_tracking.clear()
@@ -582,6 +607,8 @@ class Trader:
             logger.debug("Test Results:")
             logger.debug(f"Current: {self.__today_trade_results.get_current_open_orders()}")
             logger.debug(f"Old: {self.__today_trade_results.get_closed_orders()}")
+        except BotShutdownRequested:
+            raise  # не глотать — должно дойти до TradeService.__working_loop и завершить процесс
         except Exception as ex:
             logger.error(f"Trading error: {repr(ex)}")
         finally:
@@ -878,6 +905,9 @@ class Trader:
             # Настройки с дашборда (live/sandbox, take/stop, пауза) — перечитываем
             # дёшево (stat()), применяем к стратегиям только если файл менялся.
             if self.__overrides.maybe_reload():
+                if self.__overrides.pop_shutdown_requested():
+                    logger.info("Остановка запрошена с дашборда (bot_supervisor.py) — завершаю торговый день")
+                    raise BotShutdownRequested()
                 self.__apply_overrides(strategies)
                 # close_requests из файла — добавляем к in-memory и сразу обрабатываем
                 file_reqs = self.__overrides.pop_close_requests()
