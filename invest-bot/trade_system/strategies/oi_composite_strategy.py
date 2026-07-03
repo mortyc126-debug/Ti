@@ -7842,6 +7842,7 @@ class OICompositeStrategy(IStrategy):
                     "top_against": top_against,
                     "method_scores": ms,
                     # L1-контекст на момент входа (None если данных не было)
+                    "atr_pct": sig.get("atr_pct"),
                     "l1_pct": sig.get("l1_pct"),
                     "l1_above_ma50": sig.get("l1_above_ma50"),
                     "l1_trending_up": sig.get("l1_trending_up"),
