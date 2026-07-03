@@ -8218,10 +8218,28 @@ class OICompositeStrategy(IStrategy):
         # просуммированы, повторное сложение было бы двойным счётом.
         n_base = len(BASE_METHOD_NAMES)
 
+        # Методы без подключённого источника данных (провайдер = None) структурно
+        # молчат — score=0 всегда. Их НЕЛЬЗЯ держать в знаменателе: иначе
+        # «отсутствующий» метод считается как голос, и его вечный 0 делит сумму на
+        # пустые веса, систематически занижая композит (в проде без OI/tradestats
+        # так молчит ~половина методов). Метод, который посчитался и вернул 0 —
+        # это реальная нейтраль, он в знаменателе остаётся.
+        _absent = set()
+        if self.__squeeze_provider is None:        _absent.add("OI_SQUEEZE")
+        if self.__inst_oi_provider is None:        _absent.add("INST_OI")
+        if self.__retail_contra_provider is None:  _absent.add("RETAIL_CONTRA")
+        if self.__delta_quadrant_provider is None: _absent.add("DELTA_QUADRANT")
+        if self.__oi_absorption_provider is None:  _absent.add("OI_ABSORPTION")
+        if self.__index_context_provider is None:  _absent.add("INDEX_CONTEXT")
+        if self.__tradestats_provider is None:     _absent.update(TRADESTATS_METHOD_NAMES)
+        if self.__multi_ticker_provider is None:   _absent.add("MULTI_TICKER")
+
         weighted = sum(s * w for s, w in zip(scores_for_composite[:n_base], weights[:n_base]))
         # Нормируем на sum(|w|), а не sum(w): отрицательные веса вредных методов
         # корректно инвертируют их голос, не схлопывая знаменатель в ноль.
-        weight_sum = sum(abs(w) for w in weights[:n_base]) or 1.0
+        # Исключаем структурно отсутствующие методы (нет источника данных).
+        weight_sum = sum(abs(w) for name, w in zip(BASE_METHOD_NAMES[:n_base], weights[:n_base])
+                         if name not in _absent) or 1.0
         linear_raw = weighted / weight_sum
 
         # Плейбуки: нелинейные конъюнкции — при активации берут 60% итога.
