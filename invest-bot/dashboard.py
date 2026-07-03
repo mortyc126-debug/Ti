@@ -3248,11 +3248,27 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 <!-- ══ СУБ-ТАБ: OI ══ -->
 <div id="live-sub-oi" style="display:none;">
 <div class="panel">
+  <div class="sec-lg">Токен MOEX AlgoPack</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;">
+    Все ОИ/микроструктурные методы (squeeze, INST_OI, tradestats, MEGA-ALERTS, бэкфилл ниже)
+    ходят по этому ключу. Смена здесь пишет прямо в <code>settings.ini [MOEX] TOKEN=</code>
+    (точечно, комментарии файла не трогает) — живые поллеры подхватывают новый ключ на
+    следующем цикле (до 5 мин), рестарт бота не нужен.
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
+    <span id="moex_token_status" style="font-size:12px;color:var(--txt2);">…</span>
+    <input type="password" class="inp mid" id="moex_token_input" placeholder="новый токен AlgoPack" style="width:340px;" autocomplete="off">
+    <button class="btn-pill btn-sm ok" onclick="saveMoexToken()">Сохранить</button>
+    <button class="btn-pill btn-sm ghost" onclick="toggleMoexTokenVisible()">👁</button>
+  </div>
+  <div id="moex_token_msg" style="font-size:11px;color:var(--txt3);"></div>
+</div>
+<div class="panel">
   <div class="sec-lg">Исторический OI (AlgoPack)</div>
   <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;">
     Загружает данные открытого интереса (юр/физ) с MOEX AlgoPack за выбранный период.
     Тикеры фьючерсных контрактов запрашиваются автоматически с MOEX ISS по каждой дате.
-    Требует токен <code>[MOEX] TOKEN=</code> в settings.ini.
+    Требует токен <code>[MOEX] TOKEN=</code> в settings.ini (см. панель выше).
   </div>
   <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
     <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">Период
@@ -5669,7 +5685,38 @@ function liveSub(name) {{
   // подгружаем данные при первом открытии
   if (name === 'chart') {{ _lcInitTickers(); loadLiveScorecard(); }}
   if (name === 'council') loadCouncilLog();
-  if (name === 'oi') oiBackfillStatus();
+  if (name === 'oi') {{ oiBackfillStatus(); refreshMoexTokenStatus(); }}
+}}
+
+// ── Токен MOEX AlgoPack ──────────────────────────────────────────────
+function refreshMoexTokenStatus() {{
+  fetch('/api/moex_token_status').then(r => r.json()).then(d => {{
+    const el = document.getElementById('moex_token_status');
+    if (!el) return;
+    el.textContent = d.configured
+      ? `✓ настроен (${{d.masked}}, источник: ${{d.source}})`
+      : '⚠ токен не задан';
+    el.style.color = d.configured ? 'var(--pos, #7dcc7d)' : 'var(--neg, #e07070)';
+  }}).catch(() => {{}});
+}}
+
+function toggleMoexTokenVisible() {{
+  const inp = document.getElementById('moex_token_input');
+  if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+}}
+
+function saveMoexToken() {{
+  const inp = document.getElementById('moex_token_input');
+  const msg = document.getElementById('moex_token_msg');
+  const token = (inp?.value || '').trim();
+  if (!token) {{ if (msg) msg.textContent = 'введи новый токен'; return; }}
+  fetch('/api/moex_token_save', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{token: token}})}})
+    .then(r => r.json()).then(d => {{
+      if (d.error) {{ if (msg) msg.textContent = 'ошибка: ' + d.error; return; }}
+      if (msg) msg.textContent = 'сохранён (' + d.masked + ')' + (d.warning ? ' — ⚠ ' + d.warning : '');
+      if (inp) inp.value = '';
+      refreshMoexTokenStatus();
+    }}).catch(() => {{ if (msg) msg.textContent = 'ошибка сети'; }});
 }}
 
 // ── Bulk-действия для таблицы тикеров ───────────────────────────────
@@ -7650,6 +7697,74 @@ def bot_control_action(action: str, ticker: str = "") -> dict:
     return {"ok": True, "paused": data.get("paused", False)}
 
 
+# ── MOEX AlgoPack токен: смена с дашборда без правки settings.ini руками ────
+# Живые поллеры (oi_layers.py/mega_alerts.py/tradestats.py) читают токен
+# заново на каждый запрос (env MOEX_TOKEN в приоритете, иначе этот файл) —
+# правка ниже подхватывается их обычным циклом (до 5 мин), рестарт не нужен.
+SETTINGS_INI_PATH = "settings.ini"
+
+
+def get_moex_token_status() -> dict:
+    """{configured, masked, source} — не отдаёт токен целиком на фронт."""
+    import os as _os
+    env_token = _os.getenv("MOEX_TOKEN")
+    if env_token:
+        return {"configured": True, "masked": f"…{env_token[-6:]}", "source": "env (приоритет над settings.ini)"}
+    try:
+        from configparser import ConfigParser
+        ini = ConfigParser()
+        ini.read(SETTINGS_INI_PATH, encoding="utf-8")
+        token = ini.get("MOEX", "TOKEN", fallback="") or ""
+    except Exception:
+        token = ""
+    if not token:
+        return {"configured": False, "masked": "", "source": ""}
+    return {"configured": True, "masked": f"…{token[-6:]}", "source": "settings.ini [MOEX] TOKEN="}
+
+
+def save_moex_token(new_token: str) -> dict:
+    """Точечная текстовая замена TOKEN= внутри [MOEX] — НЕ через ConfigParser,
+    иначе он перезапишет весь файл и уничтожит все комментарии settings.ini
+    (там держится вся эксплуатационная документация проекта). Если задан env
+    MOEX_TOKEN — он всё равно будет иметь приоритет над файлом при следующем
+    чтении (тот же порядок, что везде в проекте); предупреждаем об этом."""
+    import os as _os
+    new_token = (new_token or "").strip()
+    if not new_token:
+        return {"error": "пустой токен"}
+    try:
+        with open(SETTINGS_INI_PATH, encoding="utf-8") as f:
+            lines = f.readlines()
+    except OSError as e:
+        return {"error": f"не удалось прочитать {SETTINGS_INI_PATH}: {e}"}
+
+    in_moex = False
+    replaced = False
+    out_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            in_moex = (stripped == "[MOEX]")
+        if in_moex and stripped.startswith("TOKEN=") and not replaced:
+            out_lines.append(f"TOKEN={new_token}\n")
+            replaced = True
+            continue
+        out_lines.append(line)
+
+    if not replaced:
+        return {"error": "секция [MOEX] TOKEN= не найдена в settings.ini — впиши её вручную один раз"}
+
+    tmp = SETTINGS_INI_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.writelines(out_lines)
+    _os.replace(tmp, SETTINGS_INI_PATH)
+
+    warning = None
+    if _os.getenv("MOEX_TOKEN"):
+        warning = "env MOEX_TOKEN тоже задан и имеет приоритет — новый токен из файла не будет использован, пока не убрана переменная окружения"
+    return {"ok": True, "masked": f"…{new_token[-6:]}", "warning": warning}
+
+
 METHOD_PRESETS_FILE = "data/method_presets.json"
 
 
@@ -8070,6 +8185,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(sorted(_all_settings_by_ticker().keys()))
         elif self.path == "/api/method_presets":
             self._send_json(get_method_presets())
+        elif self.path == "/api/moex_token_status":
+            self._send_json(get_moex_token_status())
         elif self.path == "/api/weights_snapshots":
             self._send_json({"snapshots": list_weights_snapshots()})
         elif self.path.startswith("/api/bar_rules_load"):
@@ -8342,6 +8459,8 @@ class Handler(BaseHTTPRequestHandler):
             started = _start_futures_reload_bg()
             running = _futures_reload_running.is_set()
             self._send_json({"started": started, "running": running})
+        elif self.path == "/api/moex_token_save":
+            self._send_json(save_moex_token(payload.get("token", "")))
         elif self.path == "/api/method_presets_save":
             err = save_method_preset(payload.get("name"), payload.get("disabled"), payload.get("inverted"))
             self._send_json(err if err else {"ok": True})

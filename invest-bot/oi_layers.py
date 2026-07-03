@@ -126,7 +126,6 @@ def _load_moex_token() -> str | None:
     except Exception:
         return None
 
-MOEX_TOKEN = _load_moex_token()
 FUTOI_URL = "https://apim.moex.com/iss/analyticalproducts/futoi/securities.json"
 
 
@@ -200,13 +199,17 @@ def _squeeze_from_layers(layers: dict, last_date: str, cur_price: float) -> dict
 
 
 def _fetch_futoi_snapshot(sym: str) -> dict | None:
-    """Синхронный (блокирующий) HTTP-запрос — звать только через asyncio.to_thread."""
-    if not MOEX_TOKEN:
+    """Синхронный (блокирующий) HTTP-запрос — звать только через asyncio.to_thread.
+    Токен читается заново на каждый вызов (не кэшируется на импорте модуля) —
+    правку [MOEX] TOKEN= с дашборда подхватывает следующий цикл поллинга
+    (до 5 минут), без перезапуска процесса бота."""
+    token = _load_moex_token()
+    if not token:
         logger.warning("oi_layers: MOEX_TOKEN не задан — squeeze-сигнал недоступен")
         return None
     url = f"{FUTOI_URL}?{urllib.parse.urlencode({'ticker': sym, 'iss.meta': 'off', 'limit': 1000})}"
     req = urllib.request.Request(url, headers={
-        "Authorization": f"Bearer {MOEX_TOKEN}", "Accept": "application/json",
+        "Authorization": f"Bearer {token}", "Accept": "application/json",
         # Без явного User-Agent urllib шлёт "Python-urllib/x.y" — Cloudflare/edge
         # иногда блокирует это 403 раньше, чем запрос дойдёт до MOEX API.
         "User-Agent": "Mozilla/5.0 (compatible; invest-bot/1.0)",

@@ -25,18 +25,34 @@ logger = logging.getLogger(__name__)
 MARKETS = ("eq", "fo")
 HISTORY_FILE = "data/mega_alerts.json"
 DAYS_KEPT = 14
-MOEX_TOKEN = os.getenv("MOEX_TOKEN")
 ALERTS_URL_TMPL = "https://apim.moex.com/iss/datashop/algopack/{market}/alerts.json"
+
+
+def _load_moex_token() -> str | None:
+    """env MOEX_TOKEN в приоритете, иначе settings.ini [MOEX] TOKEN=. Читается
+    заново на каждый вызов (не кэшируется на импорте) — правку токена с
+    дашборда подхватывает следующий суточный цикл, без рестарта процесса."""
+    token = os.getenv("MOEX_TOKEN")
+    if token:
+        return token
+    try:
+        from configparser import ConfigParser
+        ini = ConfigParser()
+        ini.read("settings.ini", encoding="utf-8")
+        return ini.get("MOEX", "TOKEN", fallback=None) or None
+    except Exception:
+        return None
 
 
 def _fetch_alerts(market: str, trade_date: str) -> list[dict]:
     """Синхронный (блокирующий) HTTP-запрос — звать только через asyncio.to_thread."""
-    if not MOEX_TOKEN:
+    token = _load_moex_token()
+    if not token:
         logger.warning("mega_alerts: MOEX_TOKEN не задан — alerts недоступны")
         return []
     url = f"{ALERTS_URL_TMPL.format(market=market)}?date={trade_date}&iss.meta=off"
     req = urllib.request.Request(url, headers={
-        "Authorization": f"Bearer {MOEX_TOKEN}", "Accept": "application/json",
+        "Authorization": f"Bearer {token}", "Accept": "application/json",
         # Без явного User-Agent urllib шлёт "Python-urllib/x.y" — Cloudflare/edge
         # иногда блокирует это 403 раньше, чем запрос дойдёт до MOEX API.
         "User-Agent": "Mozilla/5.0 (compatible; invest-bot/1.0)",
