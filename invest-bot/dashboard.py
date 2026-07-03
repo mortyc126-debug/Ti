@@ -3556,9 +3556,10 @@ function rowsToHtml(rows) {{
       const bw = bestWorstTradesToHtml(r.trades_list);
       const bwm = bestWorstMethodsToHtml(r.method_stats);
       let detailHtml = '';
+      detailHtml += `<div style="margin:2px 0 6px"><button onclick="copyTicker('${{r.ticker}}', this)" class="btn-pill btn-xs info" style="font-size:9px;padding:1px 8px" title="Вердикт + точность методов + все сделки со всеми методами">📋 копировать тикер целиком</button></div>`;
       if (bw) detailHtml += `<details style="font-size:11px;margin-bottom:4px"><summary style="cursor:pointer;color:var(--txt3)">▲▼ лучшие / худшие сделки</summary>${{bw}}</details>`;
       if (bwm) detailHtml += `<details style="font-size:11px;margin-bottom:4px"><summary style="cursor:pointer;color:var(--txt3)">▲▼ методы</summary>${{bwm}}</details>`;
-      detailHtml += `<details style="font-size:11px"><summary style="cursor:pointer;color:var(--accent)">📈 все сделки (n=${{r.trades_list.length}})</summary>${{tradesListToHtml(r.trades_list, r.win_rate)}}</details>`;
+      detailHtml += `<details style="font-size:11px"><summary style="cursor:pointer;color:var(--accent)">📈 все сделки (n=${{r.trades_list.length}})</summary>${{tradesListToHtml(r.trades_list, r.win_rate, r.ticker)}}</details>`;
       html += `<tr><td></td><td colspan="6">${{detailHtml}}</td></tr>`;
     }}
   }}
@@ -3587,10 +3588,11 @@ function _l1pctBar(l1pct, dir) {{
   </span>`;
 }}
 
-function tradesListToHtml(trades, overallWr) {{
+function tradesListToHtml(trades, overallWr, ticker) {{
   const W = 10;
   let cumR = 0;
   const hasEp = trades.some(t => t.ep && t.ep > 0);
+  const colN = hasEp ? 14 : 13;  // число колонок для colspan детальной строки
   let html = '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:12px;width:100%;border-spacing:0">';
   html += '<tr style="color:var(--txt3);font-size:11px">'
     + '<th style="padding:3px 6px">#</th><th style="padding:3px 8px">Дата</th><th style="padding:3px 6px">Dir</th><th style="padding:3px 6px">Win</th><th style="padding:3px 8px">R</th><th style="padding:3px 8px">cumR</th>'
@@ -3654,8 +3656,12 @@ function tradesListToHtml(trades, overallWr) {{
     const timePart = dtParts[1] ? dtParts[1].substring(0,5) : '';
     const dtFmt = datePart + (timePart ? ' ' + timePart : '');
     const td = s => `<td style="padding:2px 8px;${s||''}">`; const _td = '</td>';
+    // Регистрируем сделку — для раскрытия «все методы» и копирования по одной.
+    const uid = (ticker || 'tk') + '_' + i;
+    _tradeReg[uid] = {{ticker: ticker || '', t, i}};
+    const nMs = (t.ms || []).length;
     html += `<tr style="${{bg}}">
-      ${td('color:var(--txt3)')}${{i+1}}${_td}
+      ${td('color:var(--txt3);white-space:nowrap')}${{i+1}} <button onclick="toggleTradeMethods('${{uid}}', this)" title="Показать все ${{nMs}} методов сделки" style="font-size:8px;padding:0 4px;border:1px solid var(--border2);border-radius:3px;background:transparent;color:var(--txt3);cursor:pointer">▾ методы</button>${_td}
       ${td('white-space:nowrap;letter-spacing:.01em')}${{dtFmt}}${_td}
       ${td('font-weight:600')}${{t.d}}${_td}${td('')}${{winMark}}${_td}
       ${td('color:'+rColor+';font-weight:600')}${{t.r.toFixed(2)}}${_td}
@@ -3668,6 +3674,12 @@ function tradesListToHtml(trades, overallWr) {{
       ${td('color:'+rwrColor)}${{rwrPct}}${_td}
       <td style="padding:2px 8px;color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden;cursor:help" title="${{allForTitle}}">${{forStr}}</td>
       <td style="padding:2px 8px;color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden;cursor:help" title="${{allAgTitle}}">${{againstStr}}</td>
+    </tr>
+    <tr id="tmrow_${{uid}}" style="display:none;${{bg}}">
+      <td colspan="${{colN}}" style="padding:4px 10px;border-bottom:1px solid var(--border2)">
+        ${{_tradeFullMethodsHtml(t)}}
+        <button onclick="copyTrade('${{uid}}', this)" class="btn-pill btn-xs info" style="font-size:9px;padding:1px 8px;margin-top:2px">📋 копировать сделку</button>
+      </td>
     </tr>`;
   }}
   html += '</table></div>';
@@ -4232,6 +4244,8 @@ function droppedToHtml(dropped) {{
 // строка) без повторного запроса к серверу.
 let _backtestRows = [];
 let _droppedRows = [];
+// Реестр сделок для раскрытия «все методы» и покопийной выгрузки. uid → {{ticker, t}}.
+let _tradeReg = {{}};
 
 function _isZeroResult(r) {{
   // "нулевой результат" — тикер досчитан, но сделок не нашлось (n_trades===0),
@@ -4426,10 +4440,133 @@ function _rowToText(r) {{
   return lines.join('\\n');
 }}
 
+// ── Общий помощник копирования в буфер ──
+async function _copyToClipboard(text, btn, okLabel) {{
+  const orig = btn ? btn.textContent : '';
+  try {{
+    await navigator.clipboard.writeText(text);
+  }} catch(e) {{
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  }}
+  if (btn) {{ btn.textContent = okLabel || '✓ скопировано'; setTimeout(() => btn.textContent = orig, 1500); }}
+}}
+
+// Все методы сделки, приведённые к направлению: ЗА (>0), ПРОТИВ (<0), молчали (=0).
+function _tradeMethodsSplit(t) {{
+  const dir = t.d === 'L' ? 1 : -1;
+  const ms = (t.ms || []).slice().sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  return {{
+    forL: ms.filter(([, s]) => s * dir > 0),
+    agL:  ms.filter(([, s]) => s * dir < 0),
+    neu:  ms.filter(([, s]) => s * dir === 0),
+    n: ms.length,
+  }};
+}}
+
+function _tradeFullMethodsHtml(t) {{
+  const sp = _tradeMethodsSplit(t);
+  const chip = (arr, cls) => arr.length
+    ? arr.map(([n, s]) => `<span title="${{_METHOD_RU[n]||n}}" style="display:inline-block;font-size:10px;padding:1px 6px;margin:1px;border:1px solid var(--border2);border-radius:9px;color:${{cls}}">${{n.replace(/_/g,' ')}} ${{s>=0?'+':''}}${{s.toFixed(2)}}</span>`).join('')
+    : '<span style="color:var(--txt3);font-size:10px">—</span>';
+  return `<div style="padding:4px 2px">
+    <div style="font-size:10px;color:var(--txt2);margin:2px 0"><b>ЗА (${{sp.forL.length}}):</b> ${{chip(sp.forL, '#7dcc7d')}}</div>
+    <div style="font-size:10px;color:var(--txt2);margin:2px 0"><b>ПРОТИВ (${{sp.agL.length}}):</b> ${{chip(sp.agL, '#e07070')}}</div>
+    ${{sp.neu.length ? `<div style="font-size:10px;color:var(--txt3);margin:2px 0"><b>молчали (${{sp.neu.length}}):</b> ${{sp.neu.map(([n])=>n.replace(/_/g,' ')).join(', ')}}</div>` : ''}}
+  </div>`;
+}}
+
+// Текст одной сделки со всеми методами — для копирования.
+function _tradeFullMethodsText(ticker, t, idx) {{
+  const sp = _tradeMethodsSplit(t);
+  const xrRu = {{take: 'тейк', stop: 'стоп', timeout: 'таймаут'}};
+  const f = arr => arr.map(([n, s]) => `${{n}} ${{s>=0?'+':''}}${{s.toFixed(2)}}`).join(', ') || '—';
+  const L = [];
+  L.push(`${{ticker||''}} #${{idx!=null?idx+1:''}} ${{t.t}} ${{t.d}} ${{t.w?'WIN':'LOSS'}} R=${{t.r.toFixed(2)}} выход=${{xrRu[t.xr]||t.xr||'—'}}`);
+  if (t.ep) L.push(`  цены: вход ${{t.ep}} → выход ${{t.xp}} | тейк ${{t.tp}} стоп ${{t.sp}}  MFE ${{t.mfe!=null?t.mfe.toFixed(2)+'%':'—'}} MAE ${{t.mae!=null?t.mae.toFixed(2)+'%':'—'}}`);
+  L.push(`  ЗА (${{sp.forL.length}}): ${{f(sp.forL)}}`);
+  L.push(`  ПРОТИВ (${{sp.agL.length}}): ${{f(sp.agL)}}`);
+  if (sp.neu.length) L.push(`  молчали (${{sp.neu.length}}): ${{sp.neu.map(([n])=>n).join(', ')}}`);
+  return L.join('\\n');
+}}
+
+function toggleTradeMethods(uid, btn) {{
+  const el = document.getElementById('tmrow_' + uid);
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : '';
+  if (btn) btn.textContent = open ? '▾ методы' : '▴ скрыть';
+}}
+
+function copyTrade(uid, btn) {{
+  const rec = _tradeReg[uid];
+  if (!rec) return;
+  _copyToClipboard(_tradeFullMethodsText(rec.ticker, rec.t, rec.i), btn, '✓');
+}}
+
+// Вердикт по тикеру: сводка + точность методов (лучшие/худшие) + причины выходов.
+function _tickerVerdictLines(r) {{
+  const L = [];
+  const winPct = r.win_rate !== undefined ? (r.win_rate*100).toFixed(1)+'%' : '—';
+  const exp = r.expectancy_pct !== undefined ? (r.expectancy_pct*100).toFixed(2)+'%' : '—';
+  const avgR = r.avg_r !== undefined ? r.avg_r.toFixed(2) : '—';
+  L.push(`ВЕРДИКТ ${{r.ticker}} [${{r.mode}}]: сделок ${{r.n_trades??0}}, win ${{winPct}}, avg R ${{avgR}}, ожидание ${{exp}}`);
+  // Причины выхода по этому тикеру
+  if (r.trades_list && r.trades_list.length) {{
+    const ex = {{}};
+    for (const t of r.trades_list) {{ const k=t.xr||'—'; if(!ex[k])ex[k]={{n:0,w:0}}; ex[k].n++; ex[k].w+=(t.w?1:0); }}
+    const xrRu = {{take:'тейк',stop:'стоп',timeout:'таймаут'}};
+    const parts = Object.entries(ex).map(([k,s])=>`${{xrRu[k]||k}} ${{s.n}} (win ${{(s.w/s.n*100).toFixed(0)}}%)`);
+    L.push(`  выходы: ${{parts.join(' · ')}}`);
+  }}
+  // Точность методов: лучшие/худшие по ЗА win% (n≥3)
+  if (r.method_stats) {{
+    const rows = Object.entries(r.method_stats)
+      .filter(([,s]) => (s.agree_n||0) >= 3 && s.agree_win_rate != null)
+      .map(([n,s]) => ({{n, fwr:s.agree_win_rate, fn:s.agree_n}}));
+    if (rows.length) {{
+      const best = [...rows].sort((a,b)=>b.fwr-a.fwr).slice(0,5);
+      const worst = [...rows].sort((a,b)=>a.fwr-b.fwr).slice(0,5);
+      L.push(`  лучшие методы: ${{best.map(x=>`${{x.n}} ${{(x.fwr*100).toFixed(0)}}% (n=${{x.fn}})`).join(', ')}}`);
+      L.push(`  худшие методы: ${{worst.map(x=>`${{x.n}} ${{(x.fwr*100).toFixed(0)}}% (n=${{x.fn}})`).join(', ')}}`);
+    }}
+  }}
+  return L;
+}}
+
+// Полный текст по одному тикеру: вердикт + attribution + все сделки со всеми методами.
+function _tickerFullText(r) {{
+  const L = [];
+  L.push('='.repeat(60));
+  L.push(..._tickerVerdictLines(r));
+  L.push('');
+  L.push(_rowToText(r));  // attribution-таблицы + сделки (топ)
+  if (r.trades_list && r.trades_list.length) {{
+    L.push('');
+    L.push('  --- Каждая сделка: все методы ЗА/ПРОТИВ ---');
+    r.trades_list.forEach((t, i) => L.push(_tradeFullMethodsText(r.ticker, t, i)));
+  }}
+  return L.join('\\n');
+}}
+
+function copyTicker(ticker, btn) {{
+  const r = _backtestRows.find(x => x.ticker === ticker);
+  if (!r) {{ if(btn) btn.textContent='нет данных'; return; }}
+  _copyToClipboard(_tickerFullText(r), btn, '✓ тикер');
+}}
+
 async function copyAllResults(btn) {{
   if (!_backtestRows.length) {{ alert('Нет результатов'); return; }}
+  // Блок вердиктов по каждому тикеру (сводка + точность методов + выходы) в начале.
+  let text = '=== ВЕРДИКТЫ ПО ТИКЕРАМ ===\\n';
+  for (const r of _backtestRows) {{
+    if (r.n_trades === undefined) continue;
+    text += _tickerVerdictLines(r).join('\\n') + '\\n';
+  }}
+  text += '\\n=== ТАБЛИЦА ===\\n';
   const header = 'Тикер\tРежим\tСделок\tWin%\tavg R\tExp%\tM1/M2/M3';
-  let text = header + '\\n' + _backtestRows.map(_rowToText).join('\\n') + '\\n';
+  text += header + '\\n' + _backtestRows.map(_rowToText).join('\\n') + '\\n';
   // Добавляем сделки по каждому тикеру
   const rowsWithTrades = _backtestRows.filter(r => r.trades_list && r.trades_list.length);
   if (rowsWithTrades.length) {{
@@ -4979,9 +5116,10 @@ function dgShowDetails(r) {{
   const wr = r.win_rate !== undefined ? (r.win_rate*100).toFixed(1)+'%' : '—';
   const avgR = r.avg_r !== undefined ? r.avg_r.toFixed(2)+'R' : '';
   const exp = r.expectancy_pct !== undefined ? (r.expectancy_pct*100).toFixed(2)+'%' : '';
-  hdr.innerHTML = `<b style="color:var(--mem)">${{r.ticker}}</b> &nbsp; ${{n}} сделок &nbsp; WR <b>${{wr}}</b> &nbsp; avg ${{avgR}} &nbsp; exp ${{exp}}`;
+  hdr.innerHTML = `<b style="color:var(--mem)">${{r.ticker}}</b> &nbsp; ${{n}} сделок &nbsp; WR <b>${{wr}}</b> &nbsp; avg ${{avgR}} &nbsp; exp ${{exp}}`
+    + ` &nbsp; <button onclick="copyTicker('${{r.ticker}}', this)" class="btn-pill btn-xs info" style="font-size:9px;padding:1px 8px" title="Вердикт + точность методов + все сделки со всеми методами">📋 копировать тикер</button>`;
   body.innerHTML = r.trades_list && r.trades_list.length
-    ? tradesListToHtml(r.trades_list, r.win_rate)
+    ? tradesListToHtml(r.trades_list, r.win_rate, r.ticker)
     : '<span style="color:var(--txt3);font-size:11px;padding:8px">Нет данных о сделках</span>';
 
   // Best/Worst
