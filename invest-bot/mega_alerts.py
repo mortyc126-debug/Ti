@@ -131,3 +131,21 @@ class MegaAlertsService:
         for m in markets:
             out.extend(row for row in self._by_date[latest].get(m, []) if _secid(row) == ticker.upper())
         return out
+
+    def hits_last_days(self, days: int = 7, market: str | None = None) -> dict[str, int]:
+        """Сколько раз каждый secid отметился аномалией за последние days дней
+        загруженной истории (не календарных — сколько реально накоплено в
+        data/mega_alerts.json, максимум DAYS_KEPT). Используется как бонус
+        «востребованности» при ранжировании топ-N (ticker_universe.py) —
+        грубее объёма, но ловит то, что появилось внезапно."""
+        counts: dict[str, int] = {}
+        if not self._by_date:
+            return counts
+        markets = (market,) if market else MARKETS
+        for date in sorted(self._by_date, reverse=True)[:days]:
+            for m in markets:
+                for row in self._by_date[date].get(m, []):
+                    sid = _secid(row)
+                    if sid:
+                        counts[sid] = counts.get(sid, 0) + 1
+        return counts

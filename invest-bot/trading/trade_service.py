@@ -15,7 +15,7 @@ from invest_api.services.stop_orders_service import StopOrderService
 from invest_api.services.market_data_stream_service import MarketDataStreamService
 from mega_alerts import MegaAlertsService
 from trade_system.strategies.base_strategy import IStrategy
-from trading.trader import Trader
+from trading.trader import Trader, BotShutdownRequested
 import sandbox_monitor
 
 __all__ = ("TradeService")
@@ -148,6 +148,9 @@ class TradeService:
                     logger.info("Trading day has been completed")
                 else:
                     logger.info("Today is not trading day. Sleep on next morning")
+            except BotShutdownRequested:
+                logger.info("Остановка с дашборда: завершаю __working_loop")
+                return
             except Exception as ex:
                 logger.error(f"Start trading today error: {repr(ex)}")
 
