@@ -53,7 +53,8 @@ def _fetch_iss_contracts(stock_ticker: str) -> list[dict]:
     try:
         url = (f"{MOEX_ISS}/engines/futures/markets/forts/boards/RFUD/securities.json"
                f"?iss.meta=off&securities.columns=SECID,LASTTRADEDATE")
-        with urllib.request.urlopen(url, timeout=15) as resp:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; invest-bot/1.0)"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.load(resp)
         block = data.get("securities", {})
         cols = block.get("columns", [])
@@ -73,7 +74,8 @@ def _fetch_iss_contracts(stock_ticker: str) -> list[dict]:
         params = urllib.parse.urlencode({"q": stock_ticker, "iss.meta": "off",
                                          "securities.columns": "secid,matdate,type"})
         url = f"{MOEX_ISS}/securities.json?{params}"
-        with urllib.request.urlopen(url, timeout=15) as resp:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; invest-bot/1.0)"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.load(resp)
         block = data.get("securities", {})
         cols = block.get("columns", [])
@@ -203,7 +205,12 @@ def _fetch_futoi_snapshot(sym: str) -> dict | None:
         logger.warning("oi_layers: MOEX_TOKEN не задан — squeeze-сигнал недоступен")
         return None
     url = f"{FUTOI_URL}?{urllib.parse.urlencode({'ticker': sym, 'iss.meta': 'off', 'limit': 1000})}"
-    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {MOEX_TOKEN}", "Accept": "application/json"})
+    req = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {MOEX_TOKEN}", "Accept": "application/json",
+        # Без явного User-Agent urllib шлёт "Python-urllib/x.y" — Cloudflare/edge
+        # иногда блокирует это 403 раньше, чем запрос дойдёт до MOEX API.
+        "User-Agent": "Mozilla/5.0 (compatible; invest-bot/1.0)",
+    })
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.load(resp)

@@ -58,7 +58,12 @@ def _fetch_stats(metric: str, ticker: str) -> list[dict]:
     today = date.today().isoformat().replace("-", "")
     params = {"secid": ticker, "iss.meta": "off", "limit": 1000, "from": today, "till": today}
     url = f"{BASE_URL}/{metric}.json?{urllib.parse.urlencode(params)}"
-    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {MOEX_TOKEN}", "Accept": "application/json"})
+    req = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {MOEX_TOKEN}", "Accept": "application/json",
+        # Без явного User-Agent urllib шлёт "Python-urllib/x.y" — Cloudflare/edge
+        # иногда блокирует это 403 раньше, чем запрос дойдёт до MOEX API.
+        "User-Agent": "Mozilla/5.0 (compatible; invest-bot/1.0)",
+    })
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.load(resp)
