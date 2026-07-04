@@ -12,7 +12,7 @@ test_regime.py — сторож поведения классификатора 
 Без pytest (его в проекте нет) — голые assert'ы.
 """
 import sys
-from regime import classify_regime_probs, squeeze_adjust
+from regime import classify_regime_probs, squeeze_adjust, oi_instability_adjust, OI_INSTABILITY_MAX_BOOST
 
 _fails = []
 
@@ -60,6 +60,30 @@ check("падение при дневном стрессе",
       [100 - i * 0.8 for i in range(N)], "ranging", daily="stress")
 # дневной high_vol НЕ блокирует внутридневной импульс (осознанно, см. squeeze_adjust).
 check("рост при дневном high_vol", squeeze, "trending_up", daily="high_vol")
+
+# ── OI-нестабильность → подмешивание в stress ────────────────────────────────
+def _check_oi():
+    base = classify_regime_probs([100 + i * 0.8 for i in range(N)])  # trending_up
+    # instability=0 → без изменений
+    if oi_instability_adjust(base, 0.0) != base:
+        _fails.append("oi instability=0 меняет распределение"); print("[FAIL] oi instab=0")
+    else:
+        print("[OK ] oi instability=0 — no-op")
+    # instability=1 → stress вырос ровно на max_boost, сумма сохранилась
+    out = oi_instability_adjust(base, 1.0)
+    d_stress = out["stress"] - base.get("stress", 0.0)
+    ok = abs(d_stress - OI_INSTABILITY_MAX_BOOST) < 1e-9 and abs(sum(out.values()) - 1.0) < 1e-9
+    print(f"[{'OK ' if ok else 'FAIL'}] oi instability=1 → +stress={d_stress:.3f} (ждём {OI_INSTABILITY_MAX_BOOST}), сумма={sum(out.values()):.3f}")
+    if not ok:
+        _fails.append("oi instability=1 неверно двигает stress/сумму")
+    # монотонность: больше instability → больше stress
+    s = [oi_instability_adjust(base, x)["stress"] for x in (0.0, 0.3, 0.6, 1.0)]
+    mono = all(s[i] <= s[i+1] for i in range(len(s)-1))
+    print(f"[{'OK ' if mono else 'FAIL'}] oi stress монотонен по instability: {[round(x,3) for x in s]}")
+    if not mono:
+        _fails.append("oi stress не монотонен")
+
+_check_oi()
 
 if _fails:
     print(f"\n{len(_fails)} FAIL: {', '.join(_fails)}")

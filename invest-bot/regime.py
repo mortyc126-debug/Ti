@@ -18,7 +18,7 @@ import statistics
 
 __all__ = ("classify_regime", "classify_regime_probs", "REGIME_WEIGHT_MODS",
            "change_point_score", "classify_phase", "PHASE_WEIGHT_MODS",
-           "squeeze_adjust", "bocd_change_prob")
+           "squeeze_adjust", "bocd_change_prob", "oi_instability_adjust")
 
 # formulas/ лежит рядом с invest-bot/ (на уровень выше cwd). Добавляем в путь
 # один раз, чтобы тяжёлые научные модули (BOCD, Hawkes, RQA, Kalman ...) были
@@ -323,6 +323,39 @@ def squeeze_adjust(regime_probs: dict[str, float], daily_regime: str) -> dict[st
     out = dict(regime_probs)
     out["ranging"] = out.get("ranging", 0.0) + cp
     out[conflict] = 0.0
+    return out
+
+
+# Максимум массы, перекидываемой в stress при instability=1. Консервативно:
+# при типичной instability 0.3-0.5 сдвиг ~0.05-0.08, при экстремуме — 0.15.
+OI_INSTABILITY_MAX_BOOST = 0.15
+
+
+def oi_instability_adjust(regime_probs: dict[str, float], instability: float,
+                          max_boost: float = OI_INSTABILITY_MAX_BOOST) -> dict[str, float]:
+    """Открытый интерес как НЕ-направленный индикатор нестабильности режима.
+
+    Определение режима строится только на цене/объёме короткого окна и слепо к
+    ПОЗИЦИОНИРОВАНИЮ. ОИ его дополняет тем, чего в ценах нет: экстремальная
+    перегруженность позиций (высокий squeeze-риск в любую сторону + сильное
+    absorption = ОИ растёт, а цена стоит) означает риск резкого выброса =
+    нестабильность рынка. Подмешиваем это в stress пропорционально instability
+    (0..1): stress поднимает порог входа (_adaptive_threshold ×1.40) и уводит от
+    трендовых весов — это осторожность, БЕЗ выбора направления (направление
+    дают сами OI-методы INST_OI/DELTA_QUADRANT/…, здесь только «оцепенеть»).
+
+    Частично возвращает усечённый при порте стресс-детектор: в оригинале HTML
+    стресс считался в т.ч. из OI/стакана, а в Python-порте от него осталась
+    только цена/объём. instability считается вызывающей стороной из тех же
+    OI-скоров (см. OiCompositeStrategy.__oi_instability). Не-направленность —
+    ключевое отличие от «fade сквиза»: мы не спорим с OI-методами о направлении,
+    а лишь повышаем общую осторожность при перегретом позиционировании."""
+    if instability <= 0.0:
+        return regime_probs
+    boost = max_boost * min(1.0, instability)
+    # Масштабируем всё на (1-boost) и добавляем boost к stress — сумма сохраняется.
+    out = {r: v * (1.0 - boost) for r, v in regime_probs.items()}
+    out["stress"] = out.get("stress", 0.0) + boost
     return out
 
 

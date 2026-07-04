@@ -74,7 +74,7 @@ from trade_system.signal import Signal, SignalType
 from trade_system.strategies.base_strategy import IStrategy
 # regime импортируется первым: его модуль-уровневый код кладёт ../formulas в
 # sys.path, поэтому ниже научные модули из formulas/ становятся импортируемы.
-from regime import REGIMES, classify_regime, classify_regime_probs, REGIME_WEIGHT_MODS, change_point_score, classify_phase, PHASE_WEIGHT_MODS, squeeze_adjust, bocd_change_prob
+from regime import REGIMES, classify_regime, classify_regime_probs, REGIME_WEIGHT_MODS, change_point_score, classify_phase, PHASE_WEIGHT_MODS, squeeze_adjust, bocd_change_prob, oi_instability_adjust
 from cluster_models import ClusterModels
 from narrative import (
     NarrativeState, NarrativeWeights, NarrativeThresholds, classify_directional,
@@ -7391,6 +7391,8 @@ class OICompositeStrategy(IStrategy):
         # там, где живой вход-гейт уже видит ranging (внутридневной сквиз против
         # дневного тренда) — и пользователь не понимал бы, почему сделки нет.
         regime_probs = squeeze_adjust(regime_probs, self.__daily_regime)
+        # То же, что на живом пути: OI-нестабильность подмешивается в stress.
+        regime_probs = oi_instability_adjust(regime_probs, self.__oi_instability())
         regime = max(regime_probs, key=regime_probs.get)
 
         regime_mods: dict[str, float] = {}
@@ -8113,6 +8115,11 @@ class OICompositeStrategy(IStrategy):
         # уводим в ranging (питает и argmax-режим, и веса методов). Пока дневного
         # режима нет ("") — no-op. См. squeeze_adjust в regime.py.
         regime_probs = squeeze_adjust(self.__cached_regime_probs, self.__daily_regime)
+        # OI-контекст: перегретое позиционирование (squeeze-риск + absorption) →
+        # подмешиваем нестабильность в stress. Это единственное место, где ОИ
+        # входит в САМ режим, а не только в направленные OI-методы. Без OI-данных
+        # (__oi_instability вернёт 0) — no-op. См. oi_instability_adjust.
+        regime_probs = oi_instability_adjust(regime_probs, self.__oi_instability())
 
         _dm = self._disabled_methods
         _inv = self._inverted_methods
@@ -8665,6 +8672,24 @@ class OICompositeStrategy(IStrategy):
         # m_SQUEEZE_RISK (oi-signal-v10.html): tanh-нелинейность, не линейный клип —
         # риск растёт резко после ~0.2-0.3 разницы, а не равномерно до 1.0.
         return math.tanh((squeeze_up - squeeze_down) * 2.5)
+
+    def __oi_instability(self) -> float:
+        """НЕ-направленная нестабильность позиционирования по ОИ, [0,1], для
+        oi_instability_adjust (подмешивает её в stress-режим). Считается из тех же
+        провайдеров, что уже подключены (squeeze/absorption) — отдельная проводка
+        не нужна. Направление тут сознательно отброшено (|absorption|, max по обеим
+        сторонам сквиза): режим — про осторожность, направление дают OI-методы.
+        Без провайдеров ОИ — 0.0 (no-op, режим считается как раньше по цене/объёму)."""
+        if not self.__squeeze_provider and self.__oi_absorption_provider is None:
+            return 0.0
+        ticker = self.__settings.ticker
+        squeeze = 0.0
+        if self.__squeeze_provider:
+            su = self.__squeeze_provider(ticker, "short")   # риск выноса шортов вверх
+            sd = self.__squeeze_provider(ticker, "long")    # риск выноса лонгов вниз
+            squeeze = max(su, sd)
+        absorb = abs(self.__score_provider(self.__oi_absorption_provider))  # ОИ растёт, цена стоит
+        return max(0.0, min(1.0, 0.6 * squeeze + 0.4 * absorb))
 
     def __score_provider(self, provider: Optional[ScoreProvider]) -> float:
         """m_INST_OI / m_RETAIL_CONTRA: без подключённого провайдера метод молчит (score=0)."""
