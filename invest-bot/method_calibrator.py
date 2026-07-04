@@ -47,6 +47,13 @@ HORIZON_MAX = 20
 # Это привязанная к реальности величина, а не абстрактный порог: ход, не
 # перекрывающий издержки, для торговли бесполезен и в expectancy уходит в минус.
 CALIB_COST = 0.0004
+# Стоп в метрике — не фикс-уровень, а КРАТНОЕ локального ATR инструмента на баре
+# сигнала (per-signal, per-ticker): на спокойном рынке узкий, на волатильном
+# широкий — автоматически, без подгонки под отрезок. Множитель — универсальная
+# риск-конвенция, а не рыночный паттерн; его устойчивость проверяется тестом
+# чувствительности (ранжирование не должно переворачиваться на 1.0…2.5 ATR).
+STOP_ATR_MULT = 1.5
+STOP_ATR_WIN = 14      # окно ATR (баров), причинно
 # Гейт — по НИЖНЕЙ доверительной границе expectancy (edge-пространство), а не
 # по точечной оценке: и сам выбранный > 0 после издержек, и парно > классики.
 # Абсолютных «магических» порогов нет — критерий чисто статистический (LCB>0).
@@ -413,21 +420,46 @@ def _horizon_for_params(params: dict) -> int:
     return int(max(HORIZON_MIN, min(HORIZON_MAX, round(per * HORIZON_FACTOR))))
 
 
+def _atr_frac_series(highs: list[float], lows: list[float], closes: list[float],
+                     win: int = STOP_ATR_WIN) -> list[float]:
+    """Причинный ATR как доля цены: atr[i]/close[i], скользящее среднее True Range
+    по последним win барам (только прошлое до i включительно)."""
+    n = len(closes)
+    tr = [0.0] * n
+    for j in range(1, n):
+        tr[j] = max(highs[j] - lows[j],
+                    abs(highs[j] - closes[j - 1]),
+                    abs(lows[j] - closes[j - 1]))
+    out = [0.0] * n
+    run = 0.0
+    for i in range(1, n):
+        run += tr[i]
+        if i > win:
+            run -= tr[i - win]
+        denom = min(i, win)
+        atr = run / denom if denom > 0 else 0.0
+        out[i] = atr / closes[i] if closes[i] else 0.0
+    return out
+
+
 def _edge_range(scores: list[Optional[float]], closes: list[float],
-                horizon: int, lo: int, hi: int) -> tuple[Optional[float], int]:
+                highs: list[float], lows: list[float], atr_frac: list[float],
+                horizon: int, lo: int, hi: int,
+                stop_mult: float = STOP_ATR_MULT) -> tuple[Optional[float], int]:
     """
     РИСК/ИЗДЕРЖКО-осознанная ожидаемая доходность на сигнал (expectancy) в
-    диапазоне [lo, hi). Для каждого бара с ненулевым скором:
-        pnl = sign(score) * (close[i+H] − close[i]) / close[i]  −  CALIB_COST
-    edge = среднее pnl по сигналам. В отличие от hit-rate это учитывает РАЗМЕР
-    хода (крупная верная сделка ценнее мелкой; крупная ошибочная штрафуется
-    сильнее — метод «часто прав по мелочи, изредка катастрофа» уходит в минус)
-    и издержки (суб-costный ход бесполезен). Причинно: close[i+H], i+H < hi.
+    диапазоне [lo, hi), СО СТОПОМ по пути. Для каждого бара с ненулевым скором
+    симулируется удержание позиции в сторону знака до H баров:
+      • стоп = stop_mult · ATR_local / price — per-signal, per-ticker, из
+        собственной волатильности инструмента на этом баре (не фикс-уровень);
+      • если по пути [i+1, i+H] неблагоприятный экскурс (low для лонга / high
+        для шорта) достигает −стопа — выходим по стопу (−стоп), иначе по close[i+H];
+      • pnl = реализованный ход в сторону знака − CALIB_COST.
+    Так метрика перестаёт переоценивать сигналы, которые «нырнули на −5% и
+    вернулись к H»: реальная сделка со стопом вышла бы в минусе.
 
-    Де-бета: сравнение всегда парное «выбранный − классика того же метода» (см.
-    _finalize_method), а у обоих вариантов одного индикатора схожая направленная
-    экспозиция, поэтому общий дрейф рынка в разнице сокращается — остаётся навык.
-
+    Причинно: путь читает бары только до i+H < hi (капается ниже). ATR — из
+    прошлого. Де-бета — парным сравнением с классикой (см. _finalize_method).
     Возвращает (edge | None, число сигналов).
     """
     n = len(closes)
@@ -441,9 +473,23 @@ def _edge_range(scores: list[Optional[float]], closes: list[float],
         s = scores[i]
         if s is None or s == 0.0:
             continue
-        fwd = (closes[i + horizon] - c0) / c0
-        pnl = (fwd if s > 0 else -fwd) - CALIB_COST
-        pnl_sum += pnl
+        stop_frac = stop_mult * atr_frac[i]
+        long_ = s > 0
+        exit_ret = None
+        if stop_frac > 0:
+            for j in range(i + 1, i + horizon + 1):
+                if long_:
+                    if (lows[j] - c0) / c0 <= -stop_frac:
+                        exit_ret = -stop_frac
+                        break
+                else:
+                    if (highs[j] - c0) / c0 >= stop_frac:
+                        exit_ret = -stop_frac
+                        break
+        if exit_ret is None:
+            fwd = (closes[i + horizon] - c0) / c0
+            exit_ret = fwd if long_ else -fwd
+        pnl_sum += exit_ret - CALIB_COST
         total += 1
     if total == 0:
         return None, 0
@@ -606,6 +652,9 @@ class MethodCalibrator:
             return
 
         closes = [c["close"] for c in candles_raw]
+        highs  = [c["high"]  for c in candles_raw]
+        lows   = [c["low"]   for c in candles_raw]
+        atr_frac = _atr_frac_series(highs, lows, closes)   # причинный ATR/цена
         today = datetime.date.today().isoformat()
         result = {}
 
@@ -648,7 +697,8 @@ class MethodCalibrator:
                 best = None
                 best_edge = -1e9
                 for v in variants:
-                    ed, tot = _edge_range(v["series"], closes, v["H"], eval_start, bound - v["H"])
+                    ed, tot = _edge_range(v["series"], closes, highs, lows, atr_frac,
+                                          v["H"], eval_start, bound - v["H"])
                     if ed is None or tot < CALIB_MIN_BARS:
                         continue
                     if ed > best_edge:
@@ -656,8 +706,10 @@ class MethodCalibrator:
                         best = v
                 if best is None:
                     continue
-                ig_ch, tot_ch = _edge_range(best["series"], closes, best["H"], bound, test_hi)
-                ig_bs, tot_bs = _edge_range(classic["series"], closes, classic["H"], bound, test_hi)
+                ig_ch, tot_ch = _edge_range(best["series"], closes, highs, lows, atr_frac,
+                                            best["H"], bound, test_hi)
+                ig_bs, tot_bs = _edge_range(classic["series"], closes, highs, lows, atr_frac,
+                                            classic["H"], bound, test_hi)
                 if ig_ch is None or ig_bs is None or tot_ch < CALIB_FOLD_MIN_OBS:
                     continue
                 oos_chosen.append(ig_ch)
