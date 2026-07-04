@@ -2335,7 +2335,7 @@ const IND_GROUPS = [
         }
       },
       { id:'rsi_w', name:'RSI / ИОС', full:'Relative Strength Index — Индекс относительной силы (Уайлдер)',
-        desc:'Тот же RSI 14 — изобретён Уайлдером. Включён для полноты справочника.',
+        desc:'RSI(7) с настоящим рекурсивным сглаживанием Уайлдера (SMMA, не простое окно): старое движение ЗАТУХАЕТ, а не ОБРЫВАЕТСЯ при выходе за окно — в отличие от обычного RSI(14) здесь нет скачка из-за выпавшего старого бара. Период 7 — быстрее реагирует.',
         params:[{id:'val', label:'RSI значение', min:0, max:100, def:50}],
         interpret: v => {
           const x = v.val;
@@ -11500,9 +11500,13 @@ function _cpUpdatePanelVals(idx) {
   const set = (id, val) => { const el = document.getElementById('chart-' + id + '-val'); if (el) el.textContent = val; };
 
   try {
-    if (chartInds.rsi || chartInds.rsi_w) {
+    if (chartInds.rsi) {
       const r = _chartCalcRSI ? _chartCalcRSI(closes, 14) : null;
-      if (r && r[idx] != null) { set('rsi', fmt1(r[idx])); set('rsi_w', fmt1(r[idx])); }
+      if (r && r[idx] != null) set('rsi', fmt1(r[idx]));
+    }
+    if (chartInds.rsi_w) {
+      const rw = _chartCalcRSIWilder ? _chartCalcRSIWilder(closes, 7) : null;   // настоящий Уайлдер(7)
+      if (rw && rw[idx] != null) set('rsi_w', fmt1(rw[idx]));
     }
     if (chartInds.macd) {
       const m = _chartCalcMACD ? _chartCalcMACD(closes, 12, 26, 9) : null;
@@ -11675,7 +11679,8 @@ function _panelValAt(id, idx) {
   if (idx < 0 || !chartCandles[idx]) return null;
   const cn = chartCandles, closes = cn.map(c=>c.close);
   try {
-    if (id==='rsi'||id==='rsi_w') { const r=_chartCalcRSI(closes,14); return r[idx]!=null?r[idx].toFixed(1):null; }
+    if (id==='rsi') { const r=_chartCalcRSI(closes,14); return r[idx]!=null?r[idx].toFixed(1):null; }
+    if (id==='rsi_w') { const r=_chartCalcRSIWilder(closes,7); return r[idx]!=null?r[idx].toFixed(1):null; }
     if (id==='macd') { const m=_chartCalcMACD(closes,12,26,9); return m.macd[idx]!=null?m.macd[idx].toFixed(3):null; }
     if (id==='stoch') { const r=_chartCalcStoch(cn,14,3); return r[idx]!=null?r[idx].k.toFixed(1):null; }
     if (id==='cci') { const r=_chartCalcCCI(cn,20); return r[idx]!=null?r[idx].toFixed(0):null; }
@@ -12734,7 +12739,28 @@ function ilCalcBBWidth(closes,period=20,mult=2){
   const bb=_chartCalcBB(closes,period,mult);
   return bb.map(b=>b&&b.mid?((b.upper-b.lower)/b.mid*100):null);
 }
-function ilCalcRSIW(closes,period=7){ return _chartCalcRSI(closes,period); }
+// Настоящий RSI Уайлдера — рекурсивное сглаживание (SMMA), портировано из
+// стратегии (indicators_ehlers.rsi). В отличие от _chartCalcRSI (простое
+// фикс-окно, пересчёт с нуля) здесь старое движение ЗАТУХАЕТ, а не ОБРЫВАЕТСЯ
+// при выходе за окно — нет артефакта скачка RSI из-за выпавшего старого бара
+// (см. ТЗ 2.1/2.2). Раньше ilCalcRSIW = _chartCalcRSI, т.е. «Уайлдер» был чисто
+// номинальным ярлыком — фактическая ошибка описания.
+function _chartCalcRSIWilder(closes, period){
+  const n = closes.length, out = new Array(n).fill(null);
+  if (n <= period) return out;
+  let ag = 0, al = 0;
+  for (let i=1; i<=period; i++){ const d = closes[i]-closes[i-1]; if (d>0) ag+=d; else al-=d; }
+  ag /= period; al /= period;
+  out[period] = al===0 ? 100 : 100 - 100/(1 + ag/al);
+  for (let i=period+1; i<n; i++){
+    const d = closes[i]-closes[i-1], gain = d>0?d:0, loss = d<0?-d:0;
+    ag = (ag*(period-1) + gain)/period;
+    al = (al*(period-1) + loss)/period;
+    out[i] = al===0 ? 100 : 100 - 100/(1 + ag/al);
+  }
+  return out;
+}
+function ilCalcRSIW(closes,period=7){ return _chartCalcRSIWilder(closes,period); }
 function ilCalcOHLCVol(c){
   return c.map(x=>{
     const hl=x.high>0?Math.log(x.high/x.low)**2/2:0;
