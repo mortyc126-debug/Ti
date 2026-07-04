@@ -1853,7 +1853,7 @@ def run_backtest(
     for ticker in tickers:
         _set_progress(progress, ticker, "в очереди")
 
-    ensure_oi_synced(tickers)  # свежий ОИ из воркера до прогонов
+    ensure_oi_synced(tickers, days=days, offset_days=offset_days)  # свежий ОИ (воркер + прямой MOEX по коду) до прогонов
 
     if len(tickers) <= 1:
         rows: list[dict] = []
@@ -2065,7 +2065,7 @@ def run_portfolio_sim(
     for ticker in tickers:
         _set_progress(progress, ticker, "в очереди")
 
-    ensure_oi_synced(tickers)  # свежий ОИ из воркера до прогонов
+    ensure_oi_synced(tickers, days=days)  # свежий ОИ (воркер + прямой MOEX по коду) до прогонов
 
     if len(tickers) <= 1:
         results = []
@@ -8079,30 +8079,98 @@ _oi_autosync_lock = __import__("threading").Lock()
 OI_AUTOSYNC_TTL_SEC = 300   # не дёргать воркер по тому же тикеру чаще, чем раз в 5 мин
 
 
-def ensure_oi_synced(tickers: list[str]) -> None:
-    """Перед бэктестом дозабирает свежий ОИ из воркера в data/oi_daily.json.
+def _oi_base_resolver():
+    """Офлайн-резолвер: код фьючерса → базовый актив/имя для спеки OI (жалоба
+    «непонятно какая база»). Источники по убыванию точности, всё с диска, сеть
+    не трогаем: futures_cache.json (base→контракт, реверс по КОРНЮ) →
+    oi_tickers.json[code].name. Нет совпадения → None (в сводке покажется корень)."""
+    import oi_layers
+    root2base: dict[str, str] = {}
+    try:
+        contracts, _ = _futures_cache_from_disk()
+        for base, info in (contracts or {}).items():
+            tk = (info or {}).get("ticker") or ""
+            if tk:
+                root2base[oi_layers._contract_root(tk).upper()] = base
+    except Exception:
+        pass
+    names: dict[str, str] = {}
+    try:
+        names = {k.upper(): (v.get("name") or "") for k, v in load_oi_tickers().items()}
+    except Exception:
+        pass
+
+    def resolve(code: str):
+        up = (code or "").upper()
+        r = oi_layers._contract_root(code).upper()
+        if r in root2base:
+            return root2base[r]
+        nm = names.get(up, "")
+        return nm if nm and nm.upper() != up else None
+    return resolve
+
+
+def ensure_oi_synced(tickers: list[str], days: int | None = None, offset_days: int = 0) -> None:
+    """Перед бэктестом дозабирает свежий ОИ в data/oi_daily.json.
     Best-effort: нет URL / сеть упала — молча идём на том, что есть локально.
     Троттлинг по тикеру (TTL), чтобы не дёргать воркер на каждый прогон.
     Вызывать в РОДИТЕЛЬСКОМ процессе один раз до запуска пула (подпроцессы
-    читают уже готовый файл)."""
+    читают уже готовый файл).
+
+    days/offset_days: если заданы (период прогона) и настроен MOEX-токен —
+    непокрытые воркером коды дособираются ПРЯМО с MOEX по коду контракта
+    (backfill_oi.backfill_by_codes). Именно этого не хватало: авто-поток ходил
+    только в предсобранный воркер, а на MOEX за произвольным фьючерсом — нет,
+    поэтому OI по нестандартной вселенной был всегда пуст. Первый прогон новой
+    вселенной может занять минуты (инкрементально — дальше быстро)."""
+    import oi_layers
+    _oi_path = os.path.join(os.path.dirname(__file__), "data", "oi_daily.json")
     url = _get_oi_api_url()
-    if not url or not tickers:
-        return
-    now = time.monotonic()
-    with _oi_autosync_lock:
-        due = [t for t in tickers
-               if now - _oi_autosync_at.get(t.upper(), 0.0) > OI_AUTOSYNC_TTL_SEC]
-        for t in due:
-            _oi_autosync_at[t.upper()] = now
-    if not due:
-        return
+    _base_res = _oi_base_resolver()
+    if url and tickers:
+        now = time.monotonic()
+        with _oi_autosync_lock:
+            due = [t for t in tickers
+                   if now - _oi_autosync_at.get(t.upper(), 0.0) > OI_AUTOSYNC_TTL_SEC]
+            for t in due:
+                _oi_autosync_at[t.upper()] = now
+        if due:
+            try:
+                res = oi_layers.sync_worker_oi(url, due, path=_oi_path)
+                logger.info(f"OI автоподтяжка из воркера: {res.get('total')} дней всего по {len(due)} тик.")
+            except Exception as e:
+                logger.warning(f"OI автоподтяжка не удалась (идём на локальных данных): {e}")
+    # Спека покрытия — на КАЖДОМ прогоне в лог, даже если синк пропущен (нет URL/
+    # троттлинг): чтобы отсутствие OI по вселенной было видно сразу, а не по нулям
+    # скоров постфактум. Сеть не трогает — читает уже собранный файл.
     try:
-        import oi_layers
-        res = oi_layers.sync_worker_oi(
-            url, due, path=os.path.join(os.path.dirname(__file__), "data", "oi_daily.json"))
-        logger.info(f"OI автоподтяжка из воркера: {res.get('total')} дней всего по {len(due)} тик.")
-    except Exception as e:
-        logger.warning(f"OI автоподтяжка не удалась (идём на локальных данных): {e}")
+        spec = oi_layers.build_oi_spec(tickers, path=_oi_path, base_resolver=_base_res)
+        logger.info(oi_layers.oi_coverage_summary(spec))
+    except Exception:
+        spec = []
+
+    # Прямой сбор с MOEX по коду для непокрытых воркером — если знаем период прогона
+    # и есть MOEX-токен. Best-effort: любая ошибка → идём на том, что есть.
+    if days:
+        try:
+            import backfill_oi
+            token = backfill_oi._get_token()
+            uncovered = [s["code"] for s in spec if not s["has_oi"]]
+            if token and uncovered:
+                date_till = datetime.date.today() - datetime.timedelta(days=int(offset_days or 0))
+                # +260 кал.дней запаса на прогрев перцентильных окон signal_gate (60/60).
+                date_from = date_till - datetime.timedelta(days=int(days) + 260)
+                logger.info(f"OI: прямой сбор с MOEX по {len(uncovered)} непокрытым кодам "
+                            f"за {date_from}…{date_till} (первый раз может занять минуты)")
+                res = backfill_oi.backfill_by_codes(uncovered, date_from, date_till, token)
+                spec2 = oi_layers.build_oi_spec(tickers, path=_oi_path, base_resolver=_base_res)
+                logger.info(f"OI прямой сбор: +{res.get('added_total')} дней · "
+                            + oi_layers.oi_coverage_summary(spec2))
+            elif uncovered and not token:
+                logger.warning(f"OI: {len(uncovered)} кодов без покрытия, но MOEX-токен не задан "
+                               f"([MOEX] TOKEN=) — прямой сбор пропущен")
+        except Exception as e:
+            logger.warning(f"OI прямой сбор с MOEX не удался (идём на том, что есть): {e}")
 
 
 def oi_worker_catalog(tickers: list[str] | None = None) -> dict:
@@ -9030,7 +9098,7 @@ class Handler(BaseHTTPRequestHandler):
 
             # Свежий ОИ из воркера (D1) в data/oi_daily.json до старта пула —
             # подпроцессы дальше читают уже готовый файл.
-            ensure_oi_synced(tickers)
+            ensure_oi_synced(tickers, days=days, offset_days=offset_days)
 
             pool = ProcessPoolExecutor(max_workers=min(BACKTEST_WORKERS, len(tickers)))
             _register_pool(pool)

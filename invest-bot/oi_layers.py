@@ -738,6 +738,68 @@ def sync_worker_oi(base_url: str, tickers: list[str], path: str = HISTORY_FILE,
     return {"summary": summary, "total": sum(summary.values()), "log": log}
 
 
+def build_oi_spec(universe: list[str], history: dict | None = None,
+                  path: str = HISTORY_FILE, base_resolver=None) -> list[dict]:
+    """Авто-спека покрытия OI для вселенной прогона — собирается на КАЖДОМ запуске
+    (вселенная динамическая, заранее коды неизвестны). Для каждого кода:
+      root  — корень контракта (IBU6→IB); ключ OI по варианту B, от базы не зависит;
+      base  — базовый актив, если передан base_resolver (сетевой T-Invest, best-effort);
+      has_oi/days — есть ли уже собранные FutOI-данные под этим кодом/корнем.
+    Сеть сама НЕ трогает (кроме опционального base_resolver): читает data/oi_daily.json.
+    Нужна, чтобы (1) «куча» кодов стала читаемой, (2) на каждом прогоне было видно,
+    у кого OI есть, а у кого нет — а не по нулям постфактум."""
+    if history is None:
+        history = {}
+        if os.path.exists(path):
+            try:
+                with open(path, encoding="utf-8") as fh:
+                    history = json.load(fh)
+            except (json.JSONDecodeError, OSError):
+                history = {}
+    keys = list(history)
+    upmap = {k.upper(): k for k in keys}
+    spec = []
+    for code in universe:
+        up = (code or "").upper()
+        root = _contract_root(code)
+        key = upmap.get(up)
+        if key is None and _CONTRACT_RE.match(up):
+            # матч по корню контракта (как в fetch_worker_oi_daily)
+            for k in keys:
+                if _contract_root(k).upper() == root.upper():
+                    key = k
+                    break
+        rows = (history.get(key) or []) if key else []
+        base = None
+        if base_resolver:
+            try:
+                base = base_resolver(code)
+            except Exception:
+                base = None
+        spec.append({"code": code, "root": root, "base": base,
+                     "oi_key": key, "has_oi": bool(rows), "days": len(rows)})
+    return spec
+
+
+def _spec_label(s: dict) -> str:
+    """Код + базовый актив, если резолвнулся (иначе корень) — читаемая подпись."""
+    if s.get("base"):
+        return f"{s['code']}→{s['base']}"
+    return f"{s['code']}({s['root']})"
+
+
+def oi_coverage_summary(spec: list[dict]) -> str:
+    """Однострочная сводка покрытия OI по спеке (для лога/статуса прогона).
+    Пишет и базовый актив (жалоба «непонятно какая база»), если резолвнулся."""
+    have = [s for s in spec if s["has_oi"]]
+    miss = [s for s in spec if not s["has_oi"]]
+    parts = [f"OI покрытие: {len(have)}/{len(spec)} тик. с данными"]
+    if miss:
+        parts.append("без OI: " + ", ".join(_spec_label(s) for s in miss[:20])
+                     + (" …" if len(miss) > 20 else ""))
+    return " · ".join(parts)
+
+
 class OiLayersService:
     """
     Фоновый поллер ОИ. Запускается на торговый день (asyncio.create_task),
