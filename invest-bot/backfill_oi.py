@@ -336,6 +336,59 @@ def backfill(tickers: list[str], months: int, token: str) -> dict:
     return {"total_new": total_new, "tickers": len(tickers), "log": log_lines}
 
 
+def backfill_by_codes(codes: list[str], date_from: "date", date_till: "date",
+                      token: str, progress: dict | None = None) -> dict:
+    """Прямой сбор FutOI с MOEX по КОДАМ контрактов (вариант B) за [date_from,
+    date_till]. Нужен, когда вселенная прогона — произвольные фьючерсы, которых
+    нет в предсобранном воркере: авто-поток раньше в MOEX за ними не ходил вовсе.
+
+    Для каждого кода: корень контракта (GKU6→GK) → все контракты корня с MOEX ISS
+    → фронт-месяц на каждую дату (_pick_contract — так же стыкует свечная цепочка
+    бэктеста) → _fetch_day. Кладём под ключ = ИСХОДНЫЙ код, чтобы has_data(code)
+    сматчил (вариант B). Инкрементально: известные даты не перезапрашиваем.
+
+    Ограничения (те же, что у стокового backfill): MOEX ISS отдаёт текущие
+    контракты, поэтому для давно экспирировавших фронтов старые даты могут не
+    подтянуться. Цена (close) не тянется — signal_gate.oi_regime_instability
+    мягко деградирует до flow_extremity (см. его докстринг)."""
+    from oi_layers import _contract_root
+    days = _trading_days(date_from, date_till)
+    history = _load_existing()
+    summary: dict[str, dict] = {}
+    for code in codes:
+        root = _contract_root(code)
+        contracts = _fetch_futures_contracts(root)
+        if not contracts:
+            summary[code] = {"days": len(history.get(code, [])), "added": 0,
+                             "reason": f"нет контрактов по корню {root}"}
+            continue
+        existing_dates = {r["tradedate"] for r in history.get(code, [])}
+        new_rows: list[dict] = []
+        for d in days:
+            ds = d.isoformat()
+            if ds in existing_dates:
+                continue
+            fut_sym = _pick_contract(contracts, ds)
+            if not fut_sym:
+                continue
+            row = _fetch_day(fut_sym, token, ds)
+            if row:
+                row["contract"] = fut_sym   # для ref_switch в signal_gate/_prepare_rows
+                new_rows.append(row)
+            time.sleep(PAUSE_SEC)
+        merged = _merge(history.get(code, []), new_rows)
+        history[code] = merged
+        summary[code] = {"days": len(merged), "added": len(new_rows), "reason": None}
+        _save(history)   # прогресс переживает обрыв
+        if progress is not None:
+            try:
+                progress[code] = f"OI собран: +{len(new_rows)} дн. (всего {len(merged)})"
+            except Exception:
+                pass
+    return {"summary": summary, "codes": len(codes),
+            "added_total": sum(v["added"] for v in summary.values())}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--months",  type=int, default=12)
