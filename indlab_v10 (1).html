@@ -9152,14 +9152,25 @@ const _IL_ALT_FAMILY_DESC = {
   structure: 'Активна только в боковике (Choppiness ≥ 61.8): структурный сигнал инвертируется, потому что в шуме такие индикаторы дают ложную «пилу».',
   dsp:       'Первая смена направления сглаженного ряда игнорируется — она чаще оказывается ложной. Сигнал засчитывается только если направление удерживается второй бар подряд.',
 };
-function _ilAltFamilyDesc(id) { const fam = _ilAltFamilyOf(id); return fam ? _IL_ALT_FAMILY_DESC[fam] : null; }
+// Индивидуальные описания альта там, где формула не общая для семейства (ТЗ Часть 2).
+const _IL_ALT_ID_DESC = {
+  rsi: 'По СЫРОМУ RSI(14), не по дискретному скору. Три вещи специфичные для RSI: '
+     + '(1) failure swing — двухпиковая структура (пик >70 → откат → второй пик ниже '
+     + 'при равной/выше цене) как самостоятельный разворот; (2) обрыв фикс-окна — '
+     + 'крупный старый бар, выпавший из 14-барного окна, скачком двигает RSI без связи '
+     + 'с сегодняшней ценой, такой бар глушится; (3) сжатие RSI в 45–55 → «жди пробоя».',
+};
+function _ilAltFamilyDesc(id) {
+  if (_IL_ALT_ID_DESC[id]) return _IL_ALT_ID_DESC[id];
+  const fam = _ilAltFamilyOf(id); return fam ? _IL_ALT_FAMILY_DESC[fam] : null;
+}
 // Возвращает {id, hasAlt, score} по id из IL_INDICATORS с учётом выбора альт/классика.
 function _ilAggIndScore(id, cache) {
   if (!IL_INDICATORS.includes(id)) return null;
   const hasAlt = _ilAltFamilyOf(id) != null;
   const useAlt = hasAlt && _ilAltPrefGet(id);
   const score = _ilAggLastScore(useAlt ? cache.ssAlt[id] : cache.ss[id]);
-  return { id, hasAlt, useAlt, score, altDesc: hasAlt ? _IL_ALT_FAMILY_DESC[_ilAltFamilyOf(id)] : null };
+  return { id, hasAlt, useAlt, score, altDesc: hasAlt ? _ilAltFamilyDesc(id) : null };
 }
 // Голосование по списку id (или человекочитаемых названий из COMBO_PRESETS.inds).
 function _ilAggVote(labelsOrIds) {
@@ -13689,6 +13700,75 @@ function _ilAltOscDivergence(scoreArr, closes, lookback) {
   return out;
 }
 
+// RSI-специфичный альт (ТЗ 2.1): работает по СЫРОМУ RSI, а не по дискретному
+// скору, и учитывает два артефакта именно этой реализации RSI:
+//  • failure swing — двухпиковая структура (пик >70 → откат → второй пик ниже
+//    при равной/новой цене), самостоятельный сигнал разворота, не «дивергенция»;
+//  • обрыв фиксированного окна — _chartCalcRSI пересчитывает окно с нуля, так
+//    что крупный старый бар, выпавший из окна, скачком двигает RSI без связи с
+//    сегодняшней ценой; такой бар помечаем нейтралью (движение нерыночное);
+//  • сжатие — std(RSI,10) мал и RSI в 45..55: «жди пробоя», не сторона.
+function _ilRsiFailureSwing(rsi, closes, i, lookback) {
+  const lo = Math.max(1, i - 2 * lookback);
+  const peaks = [], troughs = [];
+  for (let k = lo + 1; k < i; k++) {
+    if (rsi[k] == null || rsi[k-1] == null || rsi[k+1] == null) continue;
+    if (rsi[k] >= rsi[k-1] && rsi[k] > rsi[k+1]) peaks.push(k);
+    if (rsi[k] <= rsi[k-1] && rsi[k] < rsi[k+1]) troughs.push(k);
+  }
+  if (peaks.length >= 2) {                        // медвежий failure swing
+    const p1 = peaks[peaks.length-2], p2 = peaks[peaks.length-1];
+    if (rsi[p1] > 70 && rsi[p2] < rsi[p1] && closes[p2] >= closes[p1] * 0.999)
+      return -Math.min(1, (rsi[p1] - rsi[p2]) / 15);
+  }
+  if (troughs.length >= 2) {                      // бычий failure swing
+    const t1 = troughs[troughs.length-2], t2 = troughs[troughs.length-1];
+    if (rsi[t1] < 30 && rsi[t2] > rsi[t1] && closes[t2] <= closes[t1] * 1.001)
+      return Math.min(1, (rsi[t2] - rsi[t1]) / 15);
+  }
+  return 0;
+}
+
+function _ilAltRSI(closes, period, lookback) {
+  period = period || 14; lookback = lookback || 10;
+  const rsi = _chartCalcRSI(closes, period);
+  const n = closes.length;
+  const out = new Array(n).fill(null);
+  for (let i = period + lookback + 2; i < n; i++) {
+    // 1) Обрыв окна: бар, выпавший из окна на переходе i-1→i, был крупнее
+    //    сегодняшнего вдвое → сегодняшнее движение RSI не рыночное → нейтраль.
+    const dropIdx = i - period;
+    if (dropIdx - 1 >= 0) {
+      const oldMove = Math.abs(closes[dropIdx] - closes[dropIdx-1]);
+      const nowMove = Math.abs(closes[i] - closes[i-1]) || 1e-9;
+      if (oldMove > 2 * nowMove) { out[i] = 0; continue; }
+    }
+    const r = rsi[i];
+    if (r == null) { out[i] = 0; continue; }
+    // 2) Сжатие: узкий std RSI + удержание в середине → флаг «жди пробоя».
+    const wr = rsi.slice(i-9, i+1).filter(v => v != null);
+    if (wr.length >= 8) {
+      const m = wr.reduce((a,b)=>a+b,0) / wr.length;
+      const sd = Math.sqrt(wr.reduce((a,x)=>a+(x-m)*(x-m),0) / wr.length);
+      if (sd < 4 && wr.every(v => v >= 42 && v <= 58)) { out[i] = 0; continue; }
+    }
+    // 3) Failure swing по сырому RSI (сильнее обычной дивергенции).
+    const fs = _ilRsiFailureSwing(rsi, closes, i, lookback);
+    if (fs !== 0) { out[i] = fs; continue; }
+    // 4) Дивергенция по СЫРОМУ RSI (не по дискретному скору −2/2).
+    let ph=-Infinity, pl=Infinity, rh=-Infinity, rl=Infinity;
+    for (let j = i-lookback; j < i; j++) {
+      if (closes[j] > ph) ph = closes[j];
+      if (closes[j] < pl) pl = closes[j];
+      if (rsi[j] != null) { if (rsi[j] > rh) rh = rsi[j]; if (rsi[j] < rl) rl = rsi[j]; }
+    }
+    if (closes[i] >= ph && r < rh) out[i] = -0.6;
+    else if (closes[i] <= pl && r > rl) out[i] = 0.6;
+    else out[i] = 0;
+  }
+  return out;
+}
+
 // 2/3. Тренд и Канал: «истощение/band-walk» — если классический скор держится
 // streakLen баров подряд на своём собственном максимуме по модулю (а не на
 // жёстком ±2 — у Parabolic/SuperTrend шкала ±1, у MACD/ADX ±2, формула сама
@@ -13817,6 +13897,8 @@ function _ilAltFamilyOf(id) {
 }
 
 function _ilAltScoreSeries(id, ss, closes, candles, chopArr) {
+  // RSI — своя формула по сырому RSI (ТЗ 2.1), а не общий осц-дивердженс по скору.
+  if (id === 'rsi') return _ilAltRSI(closes, 14, 10);
   const fam = _ilAltFamilyOf(id);
   const scoreArr = ss[id];
   switch (fam) {
@@ -14198,7 +14280,7 @@ function cpInitAltDiamonds() {
     el.style.display = 'block';
     const on = _ilAltPrefGet(id);
     el.classList.toggle('active', !!on);
-    const desc = _IL_ALT_FAMILY_DESC[fam] || 'Альт-интерпретация';
+    const desc = _ilAltFamilyDesc(id) || 'Альт-интерпретация';
     el.title = 'Альт-режим: ' + desc;
   });
 }
