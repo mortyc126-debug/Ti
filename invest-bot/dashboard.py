@@ -8085,24 +8085,30 @@ def ensure_oi_synced(tickers: list[str]) -> None:
     Троттлинг по тикеру (TTL), чтобы не дёргать воркер на каждый прогон.
     Вызывать в РОДИТЕЛЬСКОМ процессе один раз до запуска пула (подпроцессы
     читают уже готовый файл)."""
+    import oi_layers
+    _oi_path = os.path.join(os.path.dirname(__file__), "data", "oi_daily.json")
     url = _get_oi_api_url()
-    if not url or not tickers:
-        return
-    now = time.monotonic()
-    with _oi_autosync_lock:
-        due = [t for t in tickers
-               if now - _oi_autosync_at.get(t.upper(), 0.0) > OI_AUTOSYNC_TTL_SEC]
-        for t in due:
-            _oi_autosync_at[t.upper()] = now
-    if not due:
-        return
+    if url and tickers:
+        now = time.monotonic()
+        with _oi_autosync_lock:
+            due = [t for t in tickers
+                   if now - _oi_autosync_at.get(t.upper(), 0.0) > OI_AUTOSYNC_TTL_SEC]
+            for t in due:
+                _oi_autosync_at[t.upper()] = now
+        if due:
+            try:
+                res = oi_layers.sync_worker_oi(url, due, path=_oi_path)
+                logger.info(f"OI автоподтяжка из воркера: {res.get('total')} дней всего по {len(due)} тик.")
+            except Exception as e:
+                logger.warning(f"OI автоподтяжка не удалась (идём на локальных данных): {e}")
+    # Спека покрытия — на КАЖДОМ прогоне в лог, даже если синк пропущен (нет URL/
+    # троттлинг): чтобы отсутствие OI по вселенной было видно сразу, а не по нулям
+    # скоров постфактум. Сеть не трогает — читает уже собранный файл.
     try:
-        import oi_layers
-        res = oi_layers.sync_worker_oi(
-            url, due, path=os.path.join(os.path.dirname(__file__), "data", "oi_daily.json"))
-        logger.info(f"OI автоподтяжка из воркера: {res.get('total')} дней всего по {len(due)} тик.")
-    except Exception as e:
-        logger.warning(f"OI автоподтяжка не удалась (идём на локальных данных): {e}")
+        spec = oi_layers.build_oi_spec(tickers, path=_oi_path)
+        logger.info(oi_layers.oi_coverage_summary(spec))
+    except Exception:
+        pass
 
 
 def oi_worker_catalog(tickers: list[str] | None = None) -> dict:
