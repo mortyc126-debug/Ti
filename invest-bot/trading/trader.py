@@ -600,6 +600,8 @@ class Trader:
                 strategy.set_delta_quadrant_provider(self.__oi_layers.delta_quadrant_score)
             if hasattr(strategy, "set_oi_absorption_provider"):
                 strategy.set_oi_absorption_provider(self.__oi_layers.absorption_score)
+            if hasattr(strategy, "set_oi_regime_provider"):
+                strategy.set_oi_regime_provider(self.__oi_layers.oi_instability_score)
             if hasattr(strategy, "set_tradestats_provider"):
                 strategy.set_tradestats_provider(self.__tradestats.score)
             if hasattr(strategy, "set_atr_history_provider"):

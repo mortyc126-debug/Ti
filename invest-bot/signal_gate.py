@@ -48,7 +48,7 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
-__all__ = ("SignalGate", "compute_indicator", "DEFAULT_CFG")
+__all__ = ("SignalGate", "compute_indicator", "DEFAULT_CFG", "oi_regime_instability")
 
 GATE_FILE = "data/signal_gate.json"
 OI_HISTORY_FILE = "data/oi_daily.json"  # тот же файл, что читает/пишет oi_layers.py
@@ -536,6 +536,51 @@ class GateCalibration:
         }
         return cls(per_ticker=per_ticker, pool_acc3=data.get("pool_acc3") or {},
                     computed_at=data.get("computed_at") or "")
+
+
+def oi_regime_instability(raw_rows: list[dict], cfg: dict = None) -> float:
+    """ОИ как НЕ-направленный индикатор нестабильности РЕЖИМА, [0,1].
+
+    Отдельная роль от гейта (SignalGate.evaluate — жёсткий «не входить») и от
+    направленных OI-методов композита: здесь только «оцепенеть» — насколько
+    позиционирование перегрето и рынок склонён к резкому выбросу. Результат идёт
+    в regime.oi_instability_adjust (подмешивает в stress). Считаем по последней
+    строке того же организованного compute_indicator (порт oi_lab), что и гейт —
+    не изобретаем свою метрику, а берём edge-осмысленные ранг-нормированные поля:
+
+      flow_extremity — насколько ОДНА сторона агрессивно набирает поток ΔОИ.
+        Берём НЕ линейное |rank−0.5|·2 (перцентильный ранг одного дня почти
+        равномерен на [0,1] → шумит около 0.5 и давал бы ложный базовый уровень),
+        а рамп ТОЛЬКО в хвостах: ранг ≤0.2 или ≥0.8 (тот же порог, что у oi_lab
+        longAggr) → от 0 до 1. Середина [0.2,0.8] = 0. Чистый OI-поток, робастен
+        даже без цены (close в oi_daily может быть 0, если price_getter молчал).
+      reversal_setup = 1, если trend_exhaust ≠ 0 — edge-валидированный сетап
+        разворота (перекос позиций у исторического экстремума + истощение хода).
+        Требует цены; без неё тихо 0 — тогда несёт только flow_extremity, мягкая
+        деградация вместо мусора.
+
+    0.6·flow + 0.4·reversal. Мало истории (<MIN_ROWS_FOR_CALC) или нет
+    squeeze_pressure_rank → 0.0 (no-op: режим считается по цене/объёму как раньше).
+    Направление отброшено сознательно — им заведуют OI-методы, режим лишь
+    повышает общую осторожность (потому нет спора с методом OI_SQUEEZE)."""
+    if len(raw_rows) < MIN_ROWS_FOR_CALC:
+        return 0.0
+    try:
+        result = compute_indicator(_prepare_rows(raw_rows), cfg)
+    except Exception:
+        logger.exception("oi_regime_instability: расчёт индикатора упал")
+        return 0.0
+    if not result:
+        return 0.0
+    last = result[-1]
+    spr = last.get("squeeze_pressure_rank")
+    if not _fin(spr):
+        return 0.0
+    d = abs(spr - 0.5) * 2.0                       # 0 в центре, 1 на краях ранга
+    # рамп только в хвостах: 0 при ранге в [0.2,0.8] (d<=0.6), 1 при ранге 0/1.
+    flow_extremity = max(0.0, min(1.0, (d - 0.6) / 0.4))
+    reversal_setup = 1.0 if last.get("trend_exhaust", 0) != 0 else 0.0
+    return max(0.0, min(1.0, 0.6 * flow_extremity + 0.4 * reversal_setup))
 
 
 def _prepare_rows(raw_rows: list[dict]) -> list[dict]:

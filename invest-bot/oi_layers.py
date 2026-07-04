@@ -26,6 +26,10 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
+# Нестабильность режима считаем через организованный порт oi_lab (signal_gate),
+# а не отдельной метрикой. signal_gate тянет только stdlib → цикла импортов нет.
+from signal_gate import oi_regime_instability
+
 __all__ = ("OiLayersService",)
 
 logger = logging.getLogger(__name__)
@@ -431,6 +435,7 @@ class OiBacktestProvider:
         strategy.set_delta_quadrant_provider(prov.delta_quadrant_score)
         strategy.set_oi_absorption_provider(prov.absorption_score)
         strategy.set_squeeze_provider(prov.squeeze_score)
+        strategy.set_oi_regime_provider(prov.oi_instability_score)
         signals = strategy.backtest_scan_signals(candles, oi_date_hook=prov.set_date)
     """
 
@@ -484,6 +489,9 @@ class OiBacktestProvider:
             sq = _squeeze_from_layers(layers, last["tradedate"], price)
             s["squeeze_up"] = sq["squeeze_up"]
             s["squeeze_down"] = sq["squeeze_down"]
+        # Нестабильность режима по signal_gate (порт oi_lab) — на тех же rows
+        # (<= current_date, без lookahead), кэшируется этой же записью на дату.
+        s["instability"] = oi_regime_instability(rows)
         self._cache[ticker] = s
         return s
 
@@ -502,6 +510,11 @@ class OiBacktestProvider:
     def squeeze_score(self, ticker: str, direction: str) -> float:
         s = self._scores_for(ticker)
         return s.get("squeeze_up", 0.0) if direction == "short" else s.get("squeeze_down", 0.0)
+
+    def oi_instability_score(self, ticker: str) -> float:
+        """[0,1] нестабильность режима по ОИ (signal_gate.oi_regime_instability),
+        без lookahead (rows <= current_date). Для regime.oi_instability_adjust."""
+        return self._scores_for(ticker).get("instability", 0.0)
 
     def has_data(self, ticker: str) -> bool:
         return ticker in self._history and bool(self._history[ticker])
@@ -806,6 +819,9 @@ class OiLayersService:
             scores["retail_contra"] = _retail_contra_score(hist)
             scores["delta_quadrant"] = _delta_quadrant_score(hist)
             scores["absorption"] = _absorption_score(hist)
+            # Нестабильность режима по signal_gate (порт oi_lab) — считаем на поле,
+            # раз в цикл поллинга; на каждый бар стратегия читает уже готовое.
+            scores["instability"] = oi_regime_instability(hist)
             self._scores[ticker] = scores
         self._save()
 
@@ -832,6 +848,11 @@ class OiLayersService:
 
     def is_squeeze_risk(self, ticker: str, direction: str, threshold: float = 0.5) -> bool:
         return self.squeeze_score(ticker, direction) >= threshold
+
+    def oi_instability_score(self, ticker: str) -> float:
+        """[0,1] нестабильность режима по ОИ (signal_gate.oi_regime_instability).
+        0.0 если данных нет. Для regime.oi_instability_adjust."""
+        return self._scores.get(ticker, {}).get("instability", 0.0)
 
     def inst_oi_score(self, ticker: str) -> float:
         """m_INST_OI: нетто-позиция юрлиц (>0 — лонг, <0 — шорт). 0.0 если данных нет."""

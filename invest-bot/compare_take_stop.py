@@ -101,6 +101,7 @@ def main() -> None:
             strategy.set_delta_quadrant_provider(oi_prov.delta_quadrant_score)
             strategy.set_oi_absorption_provider(oi_prov.absorption_score)
             strategy.set_squeeze_provider(oi_prov.squeeze_score)
+            strategy.set_oi_regime_provider(oi_prov.oi_instability_score)
             oi_hook = oi_prov.set_date
         if idx_prov is not None and hasattr(strategy, "set_index_context_provider"):
             strategy.set_index_context_provider(idx_prov.score)

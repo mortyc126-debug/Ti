@@ -85,6 +85,37 @@ def _check_oi():
 
 _check_oi()
 
+
+# ── OI-нестабильность из signal_gate (порт oi_lab): базовый уровень на шуме ──
+# должен быть низким, а агрессивный односторонний набор шорта в хвосте — выше.
+def _check_oi_instability():
+    import random, statistics
+    from signal_gate import oi_regime_instability
+    def build(seed, tail_bias):
+        random.seed(seed); rows=[]; fl=fs=100000; px=100.0
+        for i in range(120):
+            fl += random.randint(-300, 300); fs += random.randint(-300, 300)
+            if i >= 112: fs += tail_bias
+            px += random.uniform(-0.5, 0.5)
+            rows.append({"tradedate": f"2025-{(i//28)+1:02d}-{(i%28)+1:02d}", "price": px,
+                         "fiz_long": fl, "fiz_short": fs, "yur_long": 0, "yur_short": 0,
+                         "contract": "SRU5"})
+        return rows
+    calm = statistics.median(oi_regime_instability(build(s, 0)) for s in range(30))
+    tail = statistics.median(oi_regime_instability(build(s, 1500)) for s in range(30))
+    thin = oi_regime_instability(build(0, 0)[:15])
+    ok_base = calm <= 0.15           # шум не должен давать ложный высокий базовый уровень
+    ok_sep = tail >= calm + 0.15     # squeeze-хвост заметно выше шума
+    ok_thin = thin == 0.0            # мало истории → no-op
+    print(f"[{'OK ' if ok_base else 'FAIL'}] OI instab базовый уровень на шуме: median={calm:.3f} (<=0.15)")
+    print(f"[{'OK ' if ok_sep else 'FAIL'}] OI instab шорт-хвост выше шума: {tail:.3f} vs {calm:.3f}")
+    print(f"[{'OK ' if ok_thin else 'FAIL'}] OI instab мало истории → 0: {thin}")
+    for ok, nm in ((ok_base, "oi instab базовый уровень"), (ok_sep, "oi instab разделение"),
+                   (ok_thin, "oi instab мало истории")):
+        if not ok: _fails.append(nm)
+
+_check_oi_instability()
+
 if _fails:
     print(f"\n{len(_fails)} FAIL: {', '.join(_fails)}")
     sys.exit(1)

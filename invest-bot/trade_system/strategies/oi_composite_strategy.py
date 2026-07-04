@@ -6225,6 +6225,10 @@ class OICompositeStrategy(IStrategy):
         self.__retail_contra_provider: Optional[ScoreProvider] = None
         self.__delta_quadrant_provider: Optional[ScoreProvider] = None
         self.__oi_absorption_provider: Optional[ScoreProvider] = None
+        # provider(ticker) -> [0,1] нестабильность режима по ОИ (signal_gate). В
+        # ОТЛИЧИЕ от провайдеров выше (направленные скоры методов) этот кормит сам
+        # РЕЖИМ (oi_instability_adjust), а не голос метода.
+        self.__oi_regime_provider: Optional[ScoreProvider] = None
         self.__index_context_provider: Optional[ScoreProvider] = None
         self.__tradestats_provider: Optional[TradeStatsProvider] = None
         self.__multi_ticker_provider: Optional[MultiTickerProvider] = None
@@ -6476,6 +6480,11 @@ class OICompositeStrategy(IStrategy):
     def set_oi_absorption_provider(self, provider: Optional[ScoreProvider]) -> None:
         """provider(ticker) -> OI_ABSORPTION score, см. oi_layers.py.OiLayersService.absorption_score."""
         self.__oi_absorption_provider = provider
+
+    def set_oi_regime_provider(self, provider: Optional[ScoreProvider]) -> None:
+        """provider(ticker) -> [0,1] нестабильность РЕЖИМА по ОИ (не голос метода).
+        Питает oi_instability_adjust. См. oi_layers.*.oi_instability_score."""
+        self.__oi_regime_provider = provider
 
     def set_index_context_provider(self, provider: Optional[ScoreProvider]) -> None:
         """provider(ticker) -> INDEX_CONTEXT score: положение индекса к своим
@@ -7448,6 +7457,9 @@ class OICompositeStrategy(IStrategy):
             "ready": True,
             "regime": regime,
             "regime_probs": {r: round(p, 3) for r, p in regime_probs.items()},
+            # [0,1] нестабильность по ОИ, уже подмешанная в stress выше — отдаём
+            # отдельным числом, чтобы на дашборде было видно, ЧТО толкает stress.
+            "oi_instability": round(self.__oi_instability(), 3),
             "phase": self.__cached_phase,
             "phase_conf": round(self.__cached_phase_conf, 3),
             "rolling_quality": round(self.__rolling_quality, 4),
@@ -8674,22 +8686,18 @@ class OICompositeStrategy(IStrategy):
         return math.tanh((squeeze_up - squeeze_down) * 2.5)
 
     def __oi_instability(self) -> float:
-        """НЕ-направленная нестабильность позиционирования по ОИ, [0,1], для
-        oi_instability_adjust (подмешивает её в stress-режим). Считается из тех же
-        провайдеров, что уже подключены (squeeze/absorption) — отдельная проводка
-        не нужна. Направление тут сознательно отброшено (|absorption|, max по обеим
-        сторонам сквиза): режим — про осторожность, направление дают OI-методы.
-        Без провайдеров ОИ — 0.0 (no-op, режим считается как раньше по цене/объёму)."""
-        if not self.__squeeze_provider and self.__oi_absorption_provider is None:
+        """НЕ-направленная нестабильность режима по ОИ, [0,1], для
+        oi_instability_adjust (подмешивает её в stress-режим). Источник —
+        signal_gate.oi_regime_instability (порт oi_lab), прокинутый провайдером
+        (OiLayersService/OiBacktestProvider.oi_instability_score): ранг-нормированный
+        поток ΔОИ + edge-валидированный сетап разворота, а не сырой скор. Без
+        провайдера — 0.0 (no-op, режим считается по цене/объёму как раньше)."""
+        if not self.__oi_regime_provider:
             return 0.0
-        ticker = self.__settings.ticker
-        squeeze = 0.0
-        if self.__squeeze_provider:
-            su = self.__squeeze_provider(ticker, "short")   # риск выноса шортов вверх
-            sd = self.__squeeze_provider(ticker, "long")    # риск выноса лонгов вниз
-            squeeze = max(su, sd)
-        absorb = abs(self.__score_provider(self.__oi_absorption_provider))  # ОИ растёт, цена стоит
-        return max(0.0, min(1.0, 0.6 * squeeze + 0.4 * absorb))
+        try:
+            return float(self.__oi_regime_provider(self.__settings.ticker) or 0.0)
+        except Exception:
+            return 0.0
 
     def __score_provider(self, provider: Optional[ScoreProvider]) -> float:
         """m_INST_OI / m_RETAIL_CONTRA: без подключённого провайдера метод молчит (score=0)."""

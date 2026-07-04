@@ -205,6 +205,7 @@ def _save_backtest_history_one(
             strategy.set_delta_quadrant_provider(oi_prov.delta_quadrant_score)
             strategy.set_oi_absorption_provider(oi_prov.absorption_score)
             strategy.set_squeeze_provider(oi_prov.squeeze_score)
+            strategy.set_oi_regime_provider(oi_prov.oi_instability_score)
             oi_hook = oi_prov.set_date
         idx_prov = _index_context_provider_for_backtest(days, offset_days)
         if idx_prov is not None and hasattr(strategy, "set_index_context_provider"):
@@ -1053,6 +1054,7 @@ def get_trade_chart(ticker: str, days: int, atr_take: float, atr_stop: float) ->
         strategy.set_delta_quadrant_provider(oi_prov.delta_quadrant_score)
         strategy.set_oi_absorption_provider(oi_prov.absorption_score)
         strategy.set_squeeze_provider(oi_prov.squeeze_score)
+        strategy.set_oi_regime_provider(oi_prov.oi_instability_score)
         oi_hook = oi_prov.set_date
     else:
         oi_hook = None
@@ -1684,6 +1686,7 @@ def run_backtest_one(
             strategy.set_delta_quadrant_provider(oi_prov.delta_quadrant_score)
             strategy.set_oi_absorption_provider(oi_prov.absorption_score)
             strategy.set_squeeze_provider(oi_prov.squeeze_score)
+            strategy.set_oi_regime_provider(oi_prov.oi_instability_score)
             oi_hook = oi_prov.set_date
 
         # INDEX_CONTEXT: положение IMOEX к своим дневным уровням, по датам,
@@ -1947,6 +1950,7 @@ def _portfolio_sim_one_ticker(
             strategy.set_delta_quadrant_provider(oi_prov.delta_quadrant_score)
             strategy.set_oi_absorption_provider(oi_prov.absorption_score)
             strategy.set_squeeze_provider(oi_prov.squeeze_score)
+            strategy.set_oi_regime_provider(oi_prov.oi_instability_score)
             oi_hook = oi_prov.set_date
 
         idx_prov = _index_context_provider_for_backtest(days)
