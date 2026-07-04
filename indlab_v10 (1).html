@@ -9169,6 +9169,9 @@ const _IL_ALT_ID_DESC = {
      + 'разворотом/флэтом). Контрсигнал против текущего направления, сила ∝ скорости '
      + 'сближения DI-линий, а не уровню ADX. Общий стрик-фейд смотрел только на итоговый '
      + 'ADX и не видел, какая из линий доминирует.',
+  cci: 'Экстремум CCI при НЕСТАБИЛЬНОМ знаменателе (среднее отклонение ниже своей '
+     + '20-барной медианы) — чаще от деления на почти-ноль, чем от реального движения; '
+     + 'такой выброс гасится, а не читается как обычная перекупленность/перепроданность.',
 };
 function _ilAltFamilyDesc(id) {
   if (_IL_ALT_ID_DESC[id]) return _IL_ALT_ID_DESC[id];
@@ -13879,6 +13882,33 @@ function _ilAltADX(candles, period, lookback){
   return out;
 }
 
+// CCI-специфичный альт (ТЗ 2.6): экстремум CCI при НЕСТАБИЛЬНОМ знаменателе (среднее
+// отклонение md ниже своей 20-барной медианы) — чаще от деления на почти-ноль, чем
+// от реального движения; такой выброс гасим, а не читаем как обычный экстремум.
+function _ilAltCCI(candles, period, mdLb){
+  period = period||20; mdLb = mdLb||20;
+  const tp = candles.map(x=>(x.high+x.low+x.close)/3);
+  const n = candles.length;
+  const cci = new Array(n).fill(null), md = new Array(n).fill(null);
+  for (let i=period-1; i<n; i++){
+    const slice = tp.slice(i-period+1, i+1);
+    const sma = slice.reduce((a,v)=>a+v,0)/period;
+    const m = slice.reduce((a,v)=>a+Math.abs(v-sma),0)/period;
+    md[i] = m; cci[i] = m===0 ? 0 : (tp[i]-sma)/(0.015*m);
+  }
+  const out = new Array(n).fill(null);
+  for (let i=period-1+mdLb; i<n; i++){
+    const c = cci[i];
+    if (c==null){ out[i]=0; continue; }
+    const base = ilScore.cci(c);                    // контрарианский скор на экстремумах
+    if (base===0){ out[i]=0; continue; }
+    const win = md.slice(i-mdLb, i).filter(v=>v!=null).sort((a,b)=>a-b);
+    const median = win.length ? win[win.length>>1] : md[i];
+    out[i] = (md[i] < median) ? 0 : base;           // база ниже своей медианы → выброс ненадёжен
+  }
+  return out;
+}
+
 // 2/3. Тренд и Канал: «истощение/band-walk» — если классический скор держится
 // streakLen баров подряд на своём собственном максимуме по модулю (а не на
 // жёстком ±2 — у Parabolic/SuperTrend шкала ±1, у MACD/ADX ±2, формула сама
@@ -14013,6 +14043,8 @@ function _ilAltScoreSeries(id, ss, closes, candles, chopArr) {
   if (id === 'fisher') return _ilAltFisher(candles, 10, 10);
   // ADX — через сходимость +DI/−DI (ТЗ 2.5), а не итоговый ADX-скор.
   if (id === 'adx') return _ilAltADX(candles, 14, 4);
+  // CCI — гасим экстремумы при нестабильном знаменателе (ТЗ 2.6).
+  if (id === 'cci') return _ilAltCCI(candles, 20, 20);
   const fam = _ilAltFamilyOf(id);
   const scoreArr = ss[id];
   switch (fam) {
@@ -14280,7 +14312,18 @@ function _ilAdaptiveSeries(candles, closes, baseSS) {
   pick('rsi', _IL_ADAPTIVE_GRID, p => _chartCalcRSI(closes, p).map(v => v==null?null:ilScore.rsi(v)));
   pick('wr',  _IL_ADAPTIVE_GRID, p => ilCalcWR(candles, p).map(v => v==null?null:ilScore.wr(v)));
   pick('cci', _IL_CCI_GRID, p => ilCalcCCI(candles, p).map(v => v==null?null:ilScore.cci(v)));  // ТЗ 2.6: без p<10
-  pick('mfi', _IL_ADAPTIVE_GRID, p => ilCalcMFI(candles, p).map(v => v==null?null:ilScore.mfi(v)));
+  // MFI (ТЗ 2.7): гейт ликвидности перед подбором периода. НЕ абсолютный «порог
+  // объёма» (он был бы магической величиной, разной у каждого тикера), а
+  // СТРУКТУРНАЯ проверка вырожденности объёма: если объём почти везде нулевой
+  // или практически без разброса (CV<0.1) — объёмный подбор периода это подгонка
+  // под шум, оставляем дефолт. CV — относительная величина, per-ticker по сути.
+  const _mfiVol = candles.map(c=>c.volume||0);
+  const _mfiNz = _mfiVol.filter(v=>v>0).length;
+  const _mfiMean = _mfiVol.reduce((a,b)=>a+b,0)/(_mfiVol.length||1);
+  const _mfiSd = Math.sqrt(_mfiVol.reduce((a,v)=>a+(v-_mfiMean)*(v-_mfiMean),0)/(_mfiVol.length||1));
+  const _mfiCV = _mfiMean>0 ? _mfiSd/_mfiMean : 0;
+  if (_mfiNz > _mfiVol.length*0.8 && _mfiCV > 0.1)
+    pick('mfi', _IL_ADAPTIVE_GRID, p => ilCalcMFI(candles, p).map(v => v==null?null:ilScore.mfi(v)));
   pick('adx', _IL_ADX_GRID, p => ilCalcADX(candles, p).map((_,i,a) => ilScoreADX(a,i)));  // ТЗ 2.5: без коротких периодов
   // BB (ТЗ 2.8): двумерный перебор период×множитель (раньше множитель был заморожен ×2).
   pick2D('bb', [14,20,26], [1.5,2,2.5,3],
