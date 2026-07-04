@@ -9159,6 +9159,11 @@ const _IL_ALT_ID_DESC = {
      + 'при равной/выше цене) как самостоятельный разворот; (2) обрыв фикс-окна — '
      + 'крупный старый бар, выпавший из 14-барного окна, скачком двигает RSI без связи '
      + 'с сегодняшней ценой, такой бар глушится; (3) сжатие RSI в 45–55 → «жди пробоя».',
+  fisher: 'Родная механика Ehlers, не порог 1.5: разворот по пересечению Fisher со '
+     + 'своей задержанной на 1 бар версией (триггер-линия) в перегреве/перепроданности; '
+     + 'сила непрерывна по z-score амплитуды спайка относительно собственного разброса '
+     + '(а не бинарные ±2); плюс подтверждение ЦЕНОЙ — разворот на вершине засчитывается, '
+     + 'только если цена не пробила свой недавний диапазон (пробой глушит сигнал вдвое).',
 };
 function _ilAltFamilyDesc(id) {
   if (_IL_ALT_ID_DESC[id]) return _IL_ALT_ID_DESC[id];
@@ -13795,6 +13800,47 @@ function _ilAltRSI(closes, period, lookback) {
   return out;
 }
 
+// Fisher-специфичный альт (ТЗ 2.3): родная механика Ehlers вместо общего
+// стрик-фейда. Портировано из стратегии (indicators_ehlers.fisher_score_core,
+// блок 3), проверенной синтетикой:
+//  • разворот по ТРИГГЕР-ЛИНИИ Ehlers (Fisher пересекает свой лаг на 1 бар,
+//    будучи в перегреве/перепроданности: c<b при b>0 / c>b при b<0), а не по
+//    внешнему порогу 1.5;
+//  • сила НЕПРЕРЫВНА по z-score амплитуды спайка относительно СОБСТВЕННОГО
+//    20-барного разброса Fisher, а не бинарные ±2;
+//  • подтверждение ЦЕНОЙ (внешняя проверка, не самоссылка): разворот на вершине
+//    засчитывается полным весом, только если цена НЕ пробила свой недавний
+//    диапазон; реальный пробой глушит подозрительный разворот вдвое.
+function _ilAltFisher(candles, period, lookback){
+  period = period||10; lookback = lookback||10;
+  const fr = ilCalcFisher(candles, period);
+  const n = candles.length;
+  const out = new Array(n).fill(null);
+  for (let i=Math.max(period+2, 22); i<n; i++){
+    const b = fr[i-1], c = fr[i];
+    if (b==null || c==null){ out[i]=0; continue; }
+    const turnedDown = c < b && b > 0;      // триггер-кроссовер в перегреве
+    const turnedUp   = c > b && b < 0;
+    if (!turnedDown && !turnedUp){ out[i]=0; continue; }
+    const win=[]; for (let k=Math.max(0,i-20); k<i; k++) if (fr[k]!=null) win.push(fr[k]);
+    let z = 0;
+    if (win.length>=5){
+      const m = win.reduce((a,x)=>a+x,0)/win.length;
+      const sd = Math.sqrt(win.reduce((a,x)=>a+(x-m)*(x-m),0)/win.length);
+      z = sd>1e-9 ? Math.abs(b)/sd : 0;
+    }
+    const spike = Math.max(0, Math.min(1, (z-1)/1.5));  // z<1 рядовой → 0, z≈2.5 → 1
+    if (spike<=0){ out[i]=0; continue; }
+    let ph=-Infinity, pl=Infinity;
+    for (let k=i-lookback; k<i; k++){ if(candles[k].high>ph)ph=candles[k].high; if(candles[k].low<pl)pl=candles[k].low; }
+    let conf = 1;
+    if (turnedDown && candles[i].high>ph) conf = 0.5;   // цена пробила максимум → подозрительно
+    if (turnedUp && candles[i].low<pl) conf = 0.5;
+    out[i] = (turnedDown ? -1 : 1) * spike * conf * 2;  // масштаб ±2 как у скора тренд-группы
+  }
+  return out;
+}
+
 // 2/3. Тренд и Канал: «истощение/band-walk» — если классический скор держится
 // streakLen баров подряд на своём собственном максимуме по модулю (а не на
 // жёстком ±2 — у Parabolic/SuperTrend шкала ±1, у MACD/ADX ±2, формула сама
@@ -13925,6 +13971,8 @@ function _ilAltFamilyOf(id) {
 function _ilAltScoreSeries(id, ss, closes, candles, chopArr) {
   // RSI — своя формула по сырому RSI (ТЗ 2.1), а не общий осц-дивердженс по скору.
   if (id === 'rsi') return _ilAltRSI(closes, 14, 10);
+  // Fisher — родная механика Ehlers (ТЗ 2.3), а не общий стрик-фейд тренд-группы.
+  if (id === 'fisher') return _ilAltFisher(candles, 10, 10);
   const fam = _ilAltFamilyOf(id);
   const scoreArr = ss[id];
   switch (fam) {
