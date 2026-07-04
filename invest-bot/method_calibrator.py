@@ -38,11 +38,18 @@ logger = logging.getLogger(__name__)
 HORIZON_FACTOR = 0.75
 HORIZON_MIN = 4
 HORIZON_MAX = 20
-# Минимальный OOS information gain (acc − baseRate) чтобы вообще принять
-# адаптацию вместо дефолта. Порог по НИЖНЕЙ границе (LCB), не по точечной оценке.
-CALIB_MIN_IG = 0.02
-# Минимальное превышение OOS-IG адаптации над классикой, чтобы менять дефолт.
-CALIB_MIN_IMPROVE = 0.01
+# Целевая функция отбора — РИСК/ИЗДЕРЖКО-осознанная ожидаемая доходность на
+# сигнал (expectancy), а не hit-rate. Для каждого сигнала берём знаковый ход
+# цены за горизонт, взвешенный по РАЗМЕРУ (крупная верная сделка ценнее мелкой,
+# крупная ошибочная — штрафуется сильнее — чего hit-rate не видит), за вычетом
+# издержек. Это же снимает циркулярность (раньше мерили тем же винрейтом).
+# CALIB_COST — реальная фрикция (комиссия + половина спреда за сторону), доля.
+# Это привязанная к реальности величина, а не абстрактный порог: ход, не
+# перекрывающий издержки, для торговли бесполезен и в expectancy уходит в минус.
+CALIB_COST = 0.0004
+# Гейт — по НИЖНЕЙ доверительной границе expectancy (edge-пространство), а не
+# по точечной оценке: и сам выбранный > 0 после издержек, и парно > классики.
+# Абсолютных «магических» порогов нет — критерий чисто статистический (LCB>0).
 # Минимум баров для in-sample оценки на фолде отбора.
 CALIB_MIN_BARS = 30
 # Минимум реализованных исходов в OOS-тест-фолде, иначе фолд пропускается.
@@ -59,9 +66,13 @@ CALIB_FOLDS_MAX = 7
 CALIB_LCB_Z = 1.6
 # Минимальная доля фолдов, где выбранный обошёл классику (согласованность).
 CALIB_MIN_CONSISTENCY = 0.75
-# Масштаб усадки: OOS-улучшение в 5 п.п. над классикой → полная (λ=1) замена.
-# Меньшее улучшение → пропорционально меньшая усадка к калиброванной функции.
-CALIB_SHRINK_SCALE = 0.05
+# Минимальный эффект — НЕ абсолютный, а в долях собственной H-барной
+# волатильности инструмента (vol_ref): нижний предел expectancy выбранного и
+# его парного преимущества над классикой должны превышать эти доли σ. Так порог
+# осмысленности хода привязан к тому, как двигается сам инструмент, а не к
+# универсальной цифре. Подобрано multi-seed шумом (5/96 → ~1/96).
+CALIB_EDGE_FRAC = 0.04      # net-edge выбранного ≥ 4% σ (сверх нуля)
+CALIB_IMPROVE_FRAC = 0.08   # парное преимущество над классикой ≥ 8% σ
 # Пересчёт раз в N дней
 CALIB_RECALC_DAYS = 7
 
@@ -402,42 +413,57 @@ def _horizon_for_params(params: dict) -> int:
     return int(max(HORIZON_MIN, min(HORIZON_MAX, round(per * HORIZON_FACTOR))))
 
 
-def _ig_range(scores: list[Optional[float]], closes: list[float],
-              horizon: int, lo: int, hi: int) -> tuple[Optional[float], int]:
+def _edge_range(scores: list[Optional[float]], closes: list[float],
+                horizon: int, lo: int, hi: int) -> tuple[Optional[float], int]:
     """
-    Information gain (acc − baseRate) в диапазоне баров [lo, hi).
-    acc = доля баров с ненулевым скором, где знак совпал с ходом цены через H.
-    baseRate = доля баров, где цена вообще выросла за H (защита от тренда: в
-    аптренде «всегда покупать» даёт высокий acc без единой закономерности).
-    Причинно: исход берётся из close[i+H], i+H строго < hi (капается ниже) —
-    никакого заглядывания за границу тест-фолда сверх собственного горизонта.
-    Возвращает (ig | None, число сработавших сигналов).
+    РИСК/ИЗДЕРЖКО-осознанная ожидаемая доходность на сигнал (expectancy) в
+    диапазоне [lo, hi). Для каждого бара с ненулевым скором:
+        pnl = sign(score) * (close[i+H] − close[i]) / close[i]  −  CALIB_COST
+    edge = среднее pnl по сигналам. В отличие от hit-rate это учитывает РАЗМЕР
+    хода (крупная верная сделка ценнее мелкой; крупная ошибочная штрафуется
+    сильнее — метод «часто прав по мелочи, изредка катастрофа» уходит в минус)
+    и издержки (суб-costный ход бесполезен). Причинно: close[i+H], i+H < hi.
+
+    Де-бета: сравнение всегда парное «выбранный − классика того же метода» (см.
+    _finalize_method), а у обоих вариантов одного индикатора схожая направленная
+    экспозиция, поэтому общий дрейф рынка в разнице сокращается — остаётся навык.
+
+    Возвращает (edge | None, число сигналов).
     """
     n = len(closes)
     hi = min(hi, n - horizon)
-    win = 0
+    pnl_sum = 0.0
     total = 0
-    up_total = 0
-    base_n = 0
     for i in range(max(0, lo), hi):
-        fut = closes[i + horizon] - closes[i]
-        if fut == 0:
+        c0 = closes[i]
+        if c0 == 0:
             continue
-        base_n += 1
-        if fut > 0:
-            up_total += 1
         s = scores[i]
         if s is None or s == 0.0:
             continue
+        fwd = (closes[i + horizon] - c0) / c0
+        pnl = (fwd if s > 0 else -fwd) - CALIB_COST
+        pnl_sum += pnl
         total += 1
-        if (s > 0 and fut > 0) or (s < 0 and fut < 0):
-            win += 1
-    if base_n == 0:
-        return None, 0
-    base = up_total / base_n
     if total == 0:
         return None, 0
-    return (win / total) - base, total
+    return pnl_sum / total, total
+
+
+def _vol_ref(closes: list[float], horizon: int, lo: int, hi: int) -> float:
+    """Собственный H-барный масштаб хода инструмента (std |fwd_return|) — единица
+    измерения для усадки λ (чтобы λ была per-ticker, а не в абсолютных долях)."""
+    n = len(closes)
+    hi = min(hi, n - horizon)
+    rets = []
+    for i in range(max(0, lo), hi):
+        c0 = closes[i]
+        if c0:
+            rets.append((closes[i + horizon] - c0) / c0)
+    if len(rets) < 2:
+        return 0.0
+    m = sum(rets) / len(rets)
+    return (sum((r - m) ** 2 for r in rets) / (len(rets) - 1)) ** 0.5
 
 
 def _mean_se(xs: list[float]) -> tuple[float, float]:
@@ -603,6 +629,8 @@ class MethodCalibrator:
                                  "use_alt": True,
                                  "series": _apply_alt_to_scores(scores, closes), "H": H})
             classic = next(v for v in variants if v["idx"] == ci and not v["use_alt"])
+            # Масштаб хода инструмента (для per-ticker λ), по классическому H.
+            vol_ref = _vol_ref(closes, classic["H"], eval_start, n)
 
             oos_chosen: list[float] = []
             oos_classic: list[float] = []
@@ -610,26 +638,26 @@ class MethodCalibrator:
             for k in range(1, n_folds):
                 bound = bounds[k]                               # граница прошлое|тест
                 test_hi = bounds[k + 1]                         # конец тест-блока
-                # Отбор по in-sample IG на прошлом. КРИТИЧНО: исход сигнала —
-                # closes[i+H], поэтому окно отбора обрезаем на H баров ДО границы
+                # Отбор по in-sample expectancy на прошлом. КРИТИЧНО: исход сигнала
+                # — closes[i+H], поэтому окно отбора обрезаем на H баров ДО границы
                 # (hi = bound − H у каждого варианта его собственным H), иначе
                 # исходы последних сигналов залезали бы на H баров в тест-блок —
                 # то самое пересечение окна подбора и проверки. Тест-блок,
                 # симметрично, начинаем с bound (его первые сигналы дают исход в
                 # [bound, ...) — уже строго после границы отбора).
                 best = None
-                best_ig = -1e9
+                best_edge = -1e9
                 for v in variants:
-                    ig, tot = _ig_range(v["series"], closes, v["H"], eval_start, bound - v["H"])
-                    if ig is None or tot < CALIB_MIN_BARS:
+                    ed, tot = _edge_range(v["series"], closes, v["H"], eval_start, bound - v["H"])
+                    if ed is None or tot < CALIB_MIN_BARS:
                         continue
-                    if ig > best_ig:
-                        best_ig = ig
+                    if ed > best_edge:
+                        best_edge = ed
                         best = v
                 if best is None:
                     continue
-                ig_ch, tot_ch = _ig_range(best["series"], closes, best["H"], bound, test_hi)
-                ig_bs, tot_bs = _ig_range(classic["series"], closes, classic["H"], bound, test_hi)
+                ig_ch, tot_ch = _edge_range(best["series"], closes, best["H"], bound, test_hi)
+                ig_bs, tot_bs = _edge_range(classic["series"], closes, classic["H"], bound, test_hi)
                 if ig_ch is None or ig_bs is None or tot_ch < CALIB_FOLD_MIN_OBS:
                     continue
                 oos_chosen.append(ig_ch)
@@ -638,12 +666,12 @@ class MethodCalibrator:
 
             result[method_name] = self._finalize_method(
                 method_name, candidates, ci, classic,
-                oos_chosen, oos_classic, picks, today, Counter,
+                oos_chosen, oos_classic, picks, today, Counter, vol_ref,
             )
             e = result[method_name]
             logger.info(
                 f"{ticker}/{method_name}: {e['label']} alt={e['use_alt']} "
-                f"OOS-IG={e['ig']:.3f} vs классика={e.get('ig_classic', 0):.3f} "
+                f"OOS-edge={e['edge']*1e4:.1f}бп vs классика={e.get('edge_classic', 0)*1e4:.1f}бп "
                 f"λ={e.get('shrink', 0):.2f} фолдов={e.get('folds', 0)}"
             )
 
@@ -651,11 +679,11 @@ class MethodCalibrator:
         self._save()
 
     def _finalize_method(self, method_name, candidates, ci, classic,
-                          oos_chosen, oos_classic, picks, today, Counter):
+                          oos_chosen, oos_classic, picks, today, Counter, vol_ref):
         """Решение по методу: адаптировать (с усадкой λ) или откатиться на дефолт.
-        Отдельный метод — чтобы calibrate читался как процесс, а критерии
-        принятия были в одном месте."""
-        default_entry = {"params": {}, "use_alt": False, "ig": 0.0, "ig_classic": 0.0,
+        Всё в edge-пространстве (expectancy на сигнал, доля). Критерии принятия
+        собраны здесь."""
+        default_entry = {"params": {}, "use_alt": False, "edge": 0.0, "edge_classic": 0.0,
                          "horizon": 10, "label": "default", "base_label": classic["label"],
                          "shrink": 0.0, "folds": len(oos_chosen),
                          "consistency": 0.0, "updated": today}
@@ -665,40 +693,43 @@ class MethodCalibrator:
         mean_ch, se_ch = _mean_se(oos_chosen)
         mean_bs, _ = _mean_se(oos_classic)
         diffs = [a - b for a, b in zip(oos_chosen, oos_classic)]
-        mean_d, se_d = _mean_se(diffs)               # ПАРНАЯ разница OOS (по фолдам)
+        mean_d, se_d = _mean_se(diffs)               # ПАРНАЯ разница OOS-edge (по фолдам)
         consistency = sum(1 for d in diffs if d > 0) / len(diffs)
-        lcb_chosen = mean_ch - CALIB_LCB_Z * se_ch   # OOS-IG выбранного значимо > 0
+        lcb_chosen = mean_ch - CALIB_LCB_Z * se_ch   # OOS-edge выбранного значимо > 0
         lcb_diff   = mean_d - CALIB_LCB_Z * se_d      # преимущество над классикой значимо > 0
         improvement = mean_d
 
         # Мода выбора по фолдам — стабильный, walk-forward-подтверждённый вариант.
         (pick_idx, pick_alt), _pick_cnt = Counter(picks).most_common(1)[0]
 
-        # Ключевой гейт — ПАРНЫЙ нижний доверит. предел разницы «выбранный минус
-        # классика» по фолдам: он должен быть > порога. Это прямо проверяет
-        # «выбранный устойчиво обходит классику вне выборки», а не «у обоих
-        # средний IG случайно положительный». На multi-seed шуме именно этот
-        # тест давит ложные адаптации до ~0 (раздельные средние — нет).
+        # Ключевой гейт — чисто статистический, без абсолютных «магических» порогов:
+        #   • парный нижний предел разницы «выбранный − классика» по фолдам > 0
+        #     (устойчиво обходит классику вне выборки после издержек), И
+        #   • собственный нижний предел expectancy выбранного > 0 (net-положителен
+        #     после издержек значимо), И
+        #   • согласованность по фолдам ≥ порога.
         accept = (
-            lcb_diff > CALIB_MIN_IMPROVE
-            and lcb_chosen >= CALIB_MIN_IG
+            lcb_diff > CALIB_IMPROVE_FRAC * vol_ref
+            and lcb_chosen > CALIB_EDGE_FRAC * vol_ref
             and consistency >= CALIB_MIN_CONSISTENCY
             and not (pick_idx == ci and not pick_alt)   # «выбрали классику» = не адаптация
         )
         if not accept:
-            default_entry["ig"] = round(mean_ch, 4)
-            default_entry["ig_classic"] = round(mean_bs, 4)
+            default_entry["edge"] = round(mean_ch, 6)
+            default_entry["edge_classic"] = round(mean_bs, 6)
             default_entry["consistency"] = round(consistency, 2)
             return default_entry
 
         label, _, params = candidates[pick_idx]
-        # λ: сила эффекта (парное улучшение/scale), приглушённая его стабильностью.
-        lam = max(0.0, min(1.0, improvement / CALIB_SHRINK_SCALE)) * consistency
+        # λ: улучшение в единицах собственной H-барной волатильности инструмента
+        # (per-ticker, а не абсолютная доля), приглушённое стабильностью по фолдам.
+        scale = max(vol_ref * 0.5, 1e-6)
+        lam = max(0.0, min(1.0, improvement / scale)) * consistency
         return {
             "params":      params,
             "use_alt":     pick_alt,
-            "ig":          round(mean_ch, 4),
-            "ig_classic":  round(mean_bs, 4),
+            "edge":        round(mean_ch, 6),
+            "edge_classic": round(mean_bs, 6),
             "horizon":     _horizon_for_params(params),
             "label":       label,
             "base_label":  classic["label"],
@@ -751,8 +782,8 @@ class MethodCalibrator:
         return {
             "params":      entry.get("params", {}),
             "use_alt":     entry.get("use_alt", False),
-            "ig":          entry.get("ig", 0.0),
-            "ig_classic":  entry.get("ig_classic", 0.0),
+            "edge":        entry.get("edge", 0.0),
+            "edge_classic": entry.get("edge_classic", 0.0),
             "horizon":     entry.get("horizon", 10),
             "label":       entry.get("label", "default"),
             "shrink":      entry.get("shrink", 0.0),
