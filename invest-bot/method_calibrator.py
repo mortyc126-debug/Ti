@@ -848,3 +848,37 @@ class MethodCalibrator:
         return {m: self.get_params(ticker, m)
                 for m in TUNABLE_REGISTRY
                 if ticker in self._data and m in self._data[ticker]}
+
+    def report(self) -> dict:
+        """Диагностика калибровки на РЕАЛЬНЫХ данных (из method_params.json):
+        по каждому тикеру — что адаптировалось, OOS-edge выбранного vs классики
+        (в базисных пунктах), улучшение, усадка λ, согласованность по фолдам,
+        горизонт, дата. Для дашборда — чтобы глазами оценить, осмысленны ли
+        адаптации на живом рынке. edge* могут отсутствовать у записей старой
+        схемы (до перехода на expectancy) — тогда None."""
+        out = {}
+        for ticker, methods in self._data.items():
+            rows = []
+            for m, e in methods.items():
+                edge = e.get("edge")
+                edge_c = e.get("edge_classic")
+                improve = (edge - edge_c) * 1e4 if (edge is not None and edge_c is not None) else None
+                rows.append({
+                    "method":       m,
+                    "adapted":      e.get("label", "default") != "default",
+                    "label":        e.get("label", "default"),
+                    "params":       e.get("params", {}),
+                    "use_alt":      e.get("use_alt", False),
+                    "edge_bp":      round(edge * 1e4, 1) if edge is not None else None,
+                    "edge_classic_bp": round(edge_c * 1e4, 1) if edge_c is not None else None,
+                    "improve_bp":   round(improve, 1) if improve is not None else None,
+                    "shrink":       e.get("shrink", 0.0),
+                    "consistency":  e.get("consistency", 0.0),
+                    "folds":        e.get("folds", 0),
+                    "horizon":      e.get("horizon", 0),
+                    "updated":      e.get("updated", ""),
+                })
+            # Адаптированные сверху, внутри — по убыванию улучшения над классикой.
+            rows.sort(key=lambda r: (not r["adapted"], -(r["improve_bp"] or -1e9)))
+            out[ticker] = rows
+        return out

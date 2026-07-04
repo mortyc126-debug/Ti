@@ -2581,6 +2581,15 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     </div>
 
     <div class="cfg-group">
+      <div class="cfg-group-title" style="display:flex;align-items:center;gap:8px;">
+        Адаптивная калибровка индикаторов (по тикерам)
+        <button class="btn-pill btn-xs ghost" onclick="loadMethodCalibration()" style="font-size:10px;padding:2px 8px;">показать что адаптировалось</button>
+      </div>
+      <div style="font-size:10px;color:var(--txt3);margin-bottom:4px;">Из method_params.json — что бот подобрал под каждый тикер на РЕАЛЬНЫХ данных (walk-forward, expectancy со стопом). edge — ожидаемая доходность на сигнал в б.п.; λ — усадка к классике; согл. — доля фолдов, где выбранный обошёл классику.</div>
+      <div id="method_calib_panel" style="display:none;margin-top:4px;"></div>
+    </div>
+
+    <div class="cfg-group">
       <div class="cfg-group-title">Параметры стратегии</div>
       <label>ATR_TAKE_K <input type="text" class="inp mid" id="atr_take" value="2,3,4"></label>
       <label>ATR_STOP_K <input type="text" class="inp mid" id="atr_stop" value="1,1.5,2"></label>
@@ -3964,6 +3973,50 @@ function toggleMethodDisable() {{
   refreshMethodPresets();
   const p = document.getElementById('method_disable_panel');
   p.style.display = p.style.display === 'none' ? '' : 'none';
+}}
+
+// Диагностика адаптивной калибровки на реальных данных (method_params.json).
+function loadMethodCalibration() {{
+  const panel = document.getElementById('method_calib_panel');
+  panel.style.display = '';
+  panel.innerHTML = '<span style="font-size:10px;color:var(--txt3)">загрузка…</span>';
+  fetch('/api/method_calibration').then(r => r.json()).then(d => {{
+    if (d.error) {{ panel.innerHTML = `<span style="font-size:11px;color:var(--neg)">${{d.error}}</span>`; return; }}
+    const tickers = d.tickers || {{}};
+    const names = Object.keys(tickers).sort();
+    if (!names.length) {{ panel.innerHTML = '<span style="font-size:11px;color:var(--txt3)">пусто — бот ещё не калибровал</span>'; return; }}
+    let html = '';
+    for (const tk of names) {{
+      const rows = tickers[tk] || [];
+      const nAd = rows.filter(r => r.adapted).length;
+      html += `<div style="margin:8px 0 2px;font-size:11px;font-weight:700;color:var(--txt2)">${{tk}} <span style="color:var(--txt3);font-weight:400">— адаптировано ${{nAd}}/${{rows.length}}</span></div>`;
+      html += '<table style="border-collapse:collapse;width:100%;max-width:640px;font-size:10px"><tr style="color:var(--txt3)">'
+            + '<th style="text-align:left;padding:1px 6px">метод</th><th style="padding:1px 6px">выбор</th>'
+            + '<th style="padding:1px 6px" title="ожидаемая доходность на сигнал, б.п.">edge</th>'
+            + '<th style="padding:1px 6px">классика</th><th style="padding:1px 6px" title="улучшение над классикой">Δ</th>'
+            + '<th style="padding:1px 6px" title="усадка к классике 0..1">λ</th>'
+            + '<th style="padding:1px 6px" title="доля фолдов, где выбранный обошёл классику">согл.</th>'
+            + '<th style="padding:1px 6px">H</th></tr>';
+      for (const r of rows) {{
+        const bp = v => v === null || v === undefined ? '—' : (v >= 0 ? '+' : '') + v.toFixed(1);
+        const dCol = r.improve_bp == null ? 'var(--txt3)' : r.improve_bp > 0 ? 'var(--pos)' : 'var(--neg)';
+        const lbl = r.adapted
+          ? `<span style="color:var(--pos)">${{r.label}}${{r.use_alt ? ' ↔alt' : ''}}</span>`
+          : '<span style="color:var(--txt3)">default</span>';
+        html += `<tr style="${{r.adapted ? '' : 'opacity:.5'}}">`
+              + `<td style="padding:1px 6px">${{r.method.replace(/_/g,' ')}}</td>`
+              + `<td style="padding:1px 6px">${{lbl}}</td>`
+              + `<td style="text-align:right;padding:1px 6px">${{bp(r.edge_bp)}}</td>`
+              + `<td style="text-align:right;padding:1px 6px;color:var(--txt3)">${{bp(r.edge_classic_bp)}}</td>`
+              + `<td style="text-align:right;padding:1px 6px;color:${{dCol}}">${{bp(r.improve_bp)}}</td>`
+              + `<td style="text-align:right;padding:1px 6px">${{r.adapted ? (r.shrink||0).toFixed(2) : '—'}}</td>`
+              + `<td style="text-align:right;padding:1px 6px">${{r.adapted ? Math.round((r.consistency||0)*100)+'%' : '—'}}</td>`
+              + `<td style="text-align:right;padding:1px 6px;color:var(--txt3)">${{r.horizon||''}}</td></tr>`;
+      }}
+      html += '</table>';
+    }}
+    panel.innerHTML = html;
+  }}).catch(e => {{ panel.innerHTML = `<span style="font-size:11px;color:var(--neg)">${{e}}</span>`; }});
 }}
 
 function clearDisabledMethods() {{
@@ -8392,6 +8445,28 @@ def save_method_toggle_state(disabled: list, inverted: list) -> None:
         )
 
 
+def get_method_calibration() -> dict:
+    """Диагностика адаптивной калибровки индикаторов на РЕАЛЬНЫХ данных: читает
+    method_params.json (его пишет бот при еженедельном пересчёте) и возвращает
+    по каждому тикеру, что адаптировалось, OOS-edge выбранного vs классики, λ,
+    согласованность. Позволяет глазами оценить осмысленность адаптаций на живом
+    рынке — то, что синтетика проверить не может."""
+    try:
+        from method_calibrator import MethodCalibrator
+    except Exception as exc:
+        return {"error": f"калибратор недоступен: {exc}", "tickers": {}}
+    # Тот же файл, что пишет бот (репозиторный корень = каталог dashboard.py).
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "method_params.json")
+    if not os.path.exists(path):
+        return {"error": "method_params.json ещё не создан — бот не пересчитывал калибровку",
+                "tickers": {}}
+    try:
+        cal = MethodCalibrator(store_path=path)
+        return {"tickers": cal.report()}
+    except Exception as exc:
+        return {"error": f"не удалось прочитать калибровку: {exc}", "tickers": {}}
+
+
 # ── Снимки обученных весов (data/weights_snapshots/*.json) ──────────────────
 WEIGHTS_SNAPSHOTS_DIR = "data/weights_snapshots"
 OI_WEIGHTS_FILE = "oi_weights.json"
@@ -8776,6 +8851,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(get_method_presets())
         elif self.path == "/api/method_toggle_state":
             self._send_json(get_method_toggle_state())
+        elif self.path == "/api/method_calibration":
+            self._send_json(get_method_calibration())
         elif self.path == "/api/moex_token_status":
             self._send_json(get_moex_token_status())
         elif self.path == "/api/weights_snapshots":
