@@ -14172,6 +14172,10 @@ const _IL_ADAPTIVE_GRID = [7,9,11,14,18,21,25,30];
 // ADX — сглаженный фильтр СИЛЫ тренда; короткие периоды (<14) противоречат его
 // цели (сам становится шумным и пилит) — исключены из сетки (ТЗ 2.5).
 const _IL_ADX_GRID = [14,18,21,25,30];
+// CCI — на коротких окнах (7-9) знаменатель (среднее отклонение) мал и
+// нестабилен, экстремумы CCI чаще от деления на почти-ноль, чем от движения;
+// нижняя граница поднята до 10 (ТЗ 2.6).
+const _IL_CCI_GRID = [10,14,18,20,25,30];
 // ── Walk-forward подбор периода (портировано из method_calibrator.py) ─────────
 // Часть 0 ТЗ: без этой методологии любая локальная правка индикатора наследует
 // системный оверфит. Заменяет прежний argmax по СЫРОМУ acc на фикс-горизонте 15
@@ -14215,21 +14219,19 @@ function _ilAdaptiveSeries(candles, closes, baseSS) {
   const chosen = {};
   const n = closes.length;
   const evalStart = 60;
-  const pick = (id, grid, calcFn) => {
-    const classicP = _IL_CLASSIC_P[id];
-    if (classicP == null) return;
-    if (n < evalStart + _IL_HMAX + 40) return;          // мало данных → классика
+  // Ядро walk-forward: variants = [{key, arr, H}], classicKey/classicArr/classicH
+  // — якорь. Работает и для 1D (период), и для 2D (период×множитель) сеток.
+  const runWF = (id, variants, classicKey, classicArr, classicH) => {
+    if (n < evalStart + _IL_HMAX + 40) return;            // мало данных → классика
     const span = n - evalStart, usable = span - _IL_HMAX;
     const nFolds = Math.max(3, Math.min(7, Math.floor(usable / 45)));
     const bounds = [];
     for (let k=0; k<=nFolds; k++) bounds.push(evalStart + Math.round(span*k/nFolds));
-    const variants = grid.map(p => ({ p, arr: calcFn(p), H: _ilHorizonFor(p) }));
-    const classicArr = calcFn(classicP), classicH = _ilHorizonFor(classicP);
     const oosCh=[], oosCl=[], picks=[];
     for (let k=1; k<nFolds; k++){
       const bound = bounds[k], testHi = bounds[k+1];
       let best=null, bestIg=-1e9;
-      for (const v of variants){                         // отбор на ПРОШЛОМ
+      for (const v of variants){                          // отбор на ПРОШЛОМ
         const r = _ilIgRange(v.arr, closes, v.H, evalStart, bound - v.H); // −H: без утечки в тест
         if (r.ig==null || r.n<30) continue;
         if (r.ig>bestIg){ bestIg=r.ig; best=v; }
@@ -14238,38 +14240,61 @@ function _ilAdaptiveSeries(candles, closes, baseSS) {
       const ch = _ilIgRange(best.arr, closes, best.H, bound, testHi);       // OOS
       const cl = _ilIgRange(classicArr, closes, classicH, bound, testHi);
       if (ch.ig==null || cl.ig==null || ch.n<15) continue;
-      oosCh.push(ch.ig); oosCl.push(cl.ig); picks.push(best.p);
+      oosCh.push(ch.ig); oosCl.push(cl.ig); picks.push(String(best.key));
     }
     if (oosCh.length < 2) return;
     const diffs = oosCh.map((x,i)=>x - oosCl[i]);
     const md = _ilMeanSe(diffs), mc = _ilMeanSe(oosCh);
     const consistency = diffs.filter(d=>d>0).length / diffs.length;
     const lcbDiff = md.m - 1.6*md.se, lcbCh = mc.m - 1.6*mc.se;
-    if (!(lcbDiff > 0.01 && lcbCh > 0.02 && consistency >= 0.75)) return;   // плацебо-стойкий гейт
+    // Поправка на множественные сравнения (ТЗ 0.3/2.8): чем больше сетка, тем
+    // строже порог парного преимущества — иначе 2D-перебор оверфитится быстрее.
+    const mcMult = Math.max(1, variants.length / 8);
+    if (!(lcbDiff > 0.01*mcMult && lcbCh > 0.02 && consistency >= 0.75)) return;
     const cnt={}; picks.forEach(p=>cnt[p]=(cnt[p]||0)+1);
-    const pickP = +Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0];
-    if (pickP === classicP) return;                       // «выбрали классику» = не адаптация
+    const pickKey = Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0];
+    if (pickKey === String(classicKey)) return;           // «выбрали классику» = не адаптация
+    const chosenV = variants.find(v => String(v.key) === pickKey);
+    if (!chosenV) return;
     const lam = Math.max(0, Math.min(1, md.m / 0.05)) * consistency;
     if (lam <= 0.001) return;
-    const chosenArr = calcFn(pickP);
-    ss[id] = chosenArr.map((s,i)=>{                        // усадка к классике на уровне скора
+    ss[id] = chosenV.arr.map((s,i)=>{                      // усадка к классике на уровне скора
       const b = classicArr[i];
       if (s==null && b==null) return null;
       return lam*(s==null?0:s) + (1-lam)*(b==null?0:b);
     });
-    chosen[id] = lam>=0.999 ? `${pickP}` : `${pickP}·λ${lam.toFixed(2)}`;
+    chosen[id] = lam>=0.999 ? `${pickKey}` : `${pickKey}·λ${lam.toFixed(2)}`;
+  };
+  const pick = (id, grid, calcFn) => {                    // 1D: адаптируем период
+    const classicP = _IL_CLASSIC_P[id];
+    if (classicP == null) return;
+    const variants = grid.map(p => ({ key: p, arr: calcFn(p), H: _ilHorizonFor(p) }));
+    runWF(id, variants, classicP, calcFn(classicP), _ilHorizonFor(classicP));
+  };
+  const pick2D = (id, gridA, gridB, calcFn, classicA, classicB) => {   // 2D: A(период)×B(рычаг)
+    const variants = [];
+    for (const a of gridA) for (const b of gridB)
+      variants.push({ key: `${a}×${b}`, arr: calcFn(a,b), H: _ilHorizonFor(a) });
+    runWF(id, variants, `${classicA}×${classicB}`, calcFn(classicA, classicB), _ilHorizonFor(classicA));
   };
   pick('rsi', _IL_ADAPTIVE_GRID, p => _chartCalcRSI(closes, p).map(v => v==null?null:ilScore.rsi(v)));
   pick('wr',  _IL_ADAPTIVE_GRID, p => ilCalcWR(candles, p).map(v => v==null?null:ilScore.wr(v)));
-  pick('cci', _IL_ADAPTIVE_GRID, p => ilCalcCCI(candles, p).map(v => v==null?null:ilScore.cci(v)));
+  pick('cci', _IL_CCI_GRID, p => ilCalcCCI(candles, p).map(v => v==null?null:ilScore.cci(v)));  // ТЗ 2.6: без p<10
   pick('mfi', _IL_ADAPTIVE_GRID, p => ilCalcMFI(candles, p).map(v => v==null?null:ilScore.mfi(v)));
   pick('adx', _IL_ADX_GRID, p => ilCalcADX(candles, p).map((_,i,a) => ilScoreADX(a,i)));  // ТЗ 2.5: без коротких периодов
-  pick('bb',  _IL_ADAPTIVE_GRID, p => { const b=_chartCalcBB(closes,p,2); return b.map((bb,i) => bb==null?null:ilScore.bb((closes[i]-bb.lower)/((bb.upper-bb.lower)||1)*100)); });
-  pick('stoch', _IL_ADAPTIVE_GRID, p => { const s=ilCalcStoch(candles,p,3); return s.map(v => (v.k==null||v.d==null)?null:ilScoreStoch(v.k,v.d)); });
-  pick('supertrend', _IL_ADAPTIVE_GRID, p => ilCalcSuperTrend(candles, p, 3).map((_,i,a) => ilScoreSuperTrend(a,i)));
+  // BB (ТЗ 2.8): двумерный перебор период×множитель (раньше множитель был заморожен ×2).
+  pick2D('bb', [14,20,26], [1.5,2,2.5,3],
+    (p,m)=>{ const b=_chartCalcBB(closes,p,m); return b.map((bb,i)=>bb==null?null:ilScore.bb((closes[i]-bb.lower)/((bb.upper-bb.lower)||1)*100)); }, 20, 2);
+  // Stochastic (ТЗ 2.9): %D-сглаживание тоже в переборе (раньше заморожено =3).
+  pick2D('stoch', [9,14,21], [3,5],
+    (k,d)=>{ const s=ilCalcStoch(candles,k,d); return s.map(v=>(v.k==null||v.d==null)?null:ilScoreStoch(v.k,v.d)); }, 14, 3);
+  // SuperTrend (ТЗ 2.10): множитель ATR — более важный рычаг, чем период; адаптируем оба.
+  pick2D('supertrend', [7,10,14], [2,2.5,3,3.5],
+    (p,m)=>ilCalcSuperTrend(candles,p,m).map((_,i,a)=>ilScoreSuperTrend(a,i)), 10, 3);
   pick('elder_ray', _IL_ADAPTIVE_GRID, p => ilCalcElderRay(closes, candles, p).map(v => ilScoreElderRay(v)));
   pick('elder_impulse', _IL_ADAPTIVE_GRID, p => ilCalcElderImpulse(closes, candles, p).map(v => ilScoreElderImpulse(v)));
-  pick('tsi', _IL_ADAPTIVE_GRID, p => ilCalcTSI(closes, p, 13).map(v => ilScoreTSI(v)));
+  // TSI (ТЗ 2.11): smooth масштабируется от len (≈len/2), а не заморожен =13.
+  pick('tsi', _IL_ADAPTIVE_GRID, p => ilCalcTSI(closes, p, Math.max(3, Math.round(p/2))).map(v => ilScoreTSI(v)));
   return { ss, chosen };
 }
 
