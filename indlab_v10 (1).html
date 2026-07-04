@@ -13973,17 +13973,92 @@ function _anParamSuffix(id, p) {
 // Подбирает по бэктесту лучший период для каждого индикатора (вместо классического),
 // альт-серия считается потом от ss[id] — т.е. наследует подобранный период автоматически.
 const _IL_ADAPTIVE_GRID = [7,9,11,14,18,21,25,30];
+// ── Walk-forward подбор периода (портировано из method_calibrator.py) ─────────
+// Часть 0 ТЗ: без этой методологии любая локальная правка индикатора наследует
+// системный оверфит. Заменяет прежний argmax по СЫРОМУ acc на фикс-горизонте 15
+// (in-sample, n>=10, жёсткая замена) на честный отбор:
+//   • по IG (acc − baseRate), а не по acc (прежде IG считался и игнорировался);
+//   • несколько walk-forward фолдов: период выбирается на прошлом, качество
+//     меряется на СЛЕДУЮЩЕМ невиданном блоке (OOS);
+//   • значимость: парный нижний доверит. предел (chosen−classic) и собственный
+//     предел IG > порога + согласованность по фолдам ≥ 0.75 — иначе дефолт;
+//   • горизонт = f(period), не константа 15;
+//   • усадка к классике λ (блендинг скор-массивов), а не жёсткий argmax.
+const _IL_HFACTOR = 0.75, _IL_HMIN = 4, _IL_HMAX = 20;
+const _IL_CLASSIC_P = {rsi:14, wr:14, cci:20, mfi:14, stoch:14, bb:20, adx:14,
+                       supertrend:10, tsi:25, elder_ray:13, elder_impulse:13};
+function _ilHorizonFor(p){ return Math.max(_IL_HMIN, Math.min(_IL_HMAX, Math.round(p*_IL_HFACTOR))); }
+function _ilIgRange(arr, closes, horizon, lo, hi){
+  const n = closes.length; hi = Math.min(hi, n - horizon);
+  let win=0, total=0, up=0, baseN=0;
+  for(let i=Math.max(0,lo); i<hi; i++){
+    const fut = closes[i+horizon] - closes[i];
+    if(fut===0) continue;
+    baseN++; if(fut>0) up++;
+    const s = arr[i];
+    if(s==null || s===0) continue;
+    total++;
+    if((s>0&&fut>0)||(s<0&&fut<0)) win++;
+  }
+  if(baseN===0 || total===0) return {ig:null, n:0};
+  return {ig: win/total - up/baseN, n: total};
+}
+function _ilMeanSe(xs){
+  const k = xs.length; if(!k) return {m:0, se:0};
+  const m = xs.reduce((a,b)=>a+b,0)/k;
+  if(k<2) return {m, se:0};
+  const v = xs.reduce((a,x)=>a+(x-m)*(x-m),0)/(k-1);
+  return {m, se: Math.sqrt(v)/Math.sqrt(k)};
+}
+
 function _ilAdaptiveSeries(candles, closes, baseSS) {
   const ss = Object.assign({}, baseSS);
   const chosen = {};
+  const n = closes.length;
+  const evalStart = 60;
   const pick = (id, grid, calcFn) => {
-    let best = null, bestAcc = -1;
-    grid.forEach(p => {
-      const arr = calcFn(p);
-      const st = _ilBtStats(arr, closes, 15, null);
-      if (st.n >= 10 && st.acc != null && st.acc > bestAcc) { bestAcc = st.acc; best = { period: p, arr }; }
+    const classicP = _IL_CLASSIC_P[id];
+    if (classicP == null) return;
+    if (n < evalStart + _IL_HMAX + 40) return;          // мало данных → классика
+    const span = n - evalStart, usable = span - _IL_HMAX;
+    const nFolds = Math.max(3, Math.min(7, Math.floor(usable / 45)));
+    const bounds = [];
+    for (let k=0; k<=nFolds; k++) bounds.push(evalStart + Math.round(span*k/nFolds));
+    const variants = grid.map(p => ({ p, arr: calcFn(p), H: _ilHorizonFor(p) }));
+    const classicArr = calcFn(classicP), classicH = _ilHorizonFor(classicP);
+    const oosCh=[], oosCl=[], picks=[];
+    for (let k=1; k<nFolds; k++){
+      const bound = bounds[k], testHi = bounds[k+1];
+      let best=null, bestIg=-1e9;
+      for (const v of variants){                         // отбор на ПРОШЛОМ
+        const r = _ilIgRange(v.arr, closes, v.H, evalStart, bound - v.H); // −H: без утечки в тест
+        if (r.ig==null || r.n<30) continue;
+        if (r.ig>bestIg){ bestIg=r.ig; best=v; }
+      }
+      if (!best) continue;
+      const ch = _ilIgRange(best.arr, closes, best.H, bound, testHi);       // OOS
+      const cl = _ilIgRange(classicArr, closes, classicH, bound, testHi);
+      if (ch.ig==null || cl.ig==null || ch.n<15) continue;
+      oosCh.push(ch.ig); oosCl.push(cl.ig); picks.push(best.p);
+    }
+    if (oosCh.length < 2) return;
+    const diffs = oosCh.map((x,i)=>x - oosCl[i]);
+    const md = _ilMeanSe(diffs), mc = _ilMeanSe(oosCh);
+    const consistency = diffs.filter(d=>d>0).length / diffs.length;
+    const lcbDiff = md.m - 1.6*md.se, lcbCh = mc.m - 1.6*mc.se;
+    if (!(lcbDiff > 0.01 && lcbCh > 0.02 && consistency >= 0.75)) return;   // плацебо-стойкий гейт
+    const cnt={}; picks.forEach(p=>cnt[p]=(cnt[p]||0)+1);
+    const pickP = +Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0];
+    if (pickP === classicP) return;                       // «выбрали классику» = не адаптация
+    const lam = Math.max(0, Math.min(1, md.m / 0.05)) * consistency;
+    if (lam <= 0.001) return;
+    const chosenArr = calcFn(pickP);
+    ss[id] = chosenArr.map((s,i)=>{                        // усадка к классике на уровне скора
+      const b = classicArr[i];
+      if (s==null && b==null) return null;
+      return lam*(s==null?0:s) + (1-lam)*(b==null?0:b);
     });
-    if (best) { ss[id] = best.arr; chosen[id] = best.period; }
+    chosen[id] = lam>=0.999 ? `${pickP}` : `${pickP}·λ${lam.toFixed(2)}`;
   };
   pick('rsi', _IL_ADAPTIVE_GRID, p => _chartCalcRSI(closes, p).map(v => v==null?null:ilScore.rsi(v)));
   pick('wr',  _IL_ADAPTIVE_GRID, p => ilCalcWR(candles, p).map(v => v==null?null:ilScore.wr(v)));
