@@ -31,14 +31,50 @@ from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
-# Горизонты для оценки точности (в барах)
-CALIB_HORIZONS = [5, 10, 15, 20]
-# Минимальный information gain чтобы принять candidate vs default
+# Горизонт оценки привязан к периоду индикатора, а не фиксирован: ждать
+# реализацию сигнала периода-30 за те же 15 баров, что и период-5 —
+# методологически неверно (это половина собственного окна медленного
+# индикатора). H = clamp(period * HORIZON_FACTOR, HORIZON_MIN, HORIZON_MAX).
+HORIZON_FACTOR = 0.75
+HORIZON_MIN = 4
+HORIZON_MAX = 20
+# Минимальный OOS information gain (acc − baseRate) чтобы вообще принять
+# адаптацию вместо дефолта. Порог по НИЖНЕЙ границе (LCB), не по точечной оценке.
 CALIB_MIN_IG = 0.02
-# Минимум баров для оценки
+# Минимальное превышение OOS-IG адаптации над классикой, чтобы менять дефолт.
+CALIB_MIN_IMPROVE = 0.01
+# Минимум баров для in-sample оценки на фолде отбора.
 CALIB_MIN_BARS = 30
+# Минимум реализованных исходов в OOS-тест-фолде, иначе фолд пропускается.
+CALIB_FOLD_MIN_OBS = 15
+# Целевое число баров на один walk-forward фолд (определяет число фолдов).
+CALIB_FOLD_TARGET_LEN = 45
+# Границы числа фолдов.
+CALIB_FOLDS_MIN = 3
+CALIB_FOLDS_MAX = 7
+# Z для нижней доверительной границы OOS-IG (≈1.0 → ~84% односторонний).
+# Осознанно мягкий: жёстче — и почти никто не проходит на 250-360 барах.
+CALIB_LCB_Z = 1.0
+# Масштаб усадки: OOS-улучшение в 5 п.п. над классикой → полная (λ=1) замена.
+# Меньшее улучшение → пропорционально меньшая усадка к калиброванной функции.
+CALIB_SHRINK_SCALE = 0.05
 # Пересчёт раз в N дней
 CALIB_RECALC_DAYS = 7
+
+# Канонический («классический») набор параметров каждого метода — якорь усадки.
+# Адаптация не заменяет дефолт целиком, а сдвигается к нему пропорционально
+# силе и стабильности OOS-преимущества (см. calibrate/get_fn). Значения обязаны
+# присутствовать в TUNABLE_REGISTRY как один из кандидатов.
+CLASSIC_PARAMS = {
+    "FISHER_RSI":   {"period": 10},
+    "RMI":          {"period": 14, "momentum": 5},
+    "ZSCORE":       {"period": 20},
+    "ZLEMA_SIGNAL": {"period": 14},
+    "T3_SIGNAL":    {"period": 5},
+    "TWIGGS":       {"period": 21},
+    "KLINGER":      {"fast": 34, "slow": 55},
+    "VZO":          {"period": 14},
+}
 
 
 # ─── Параметрические фабрики ──────────────────────────────────────────────────
@@ -381,33 +417,102 @@ def _score_series(fn: Callable, candles_raw: list, window: int) -> list[Optional
     return scores
 
 
-def _accuracy(scores: list[Optional[float]], closes: list[float],
-               horizon: int) -> tuple[float, float, int]:
+def _horizon_for_params(params: dict) -> int:
+    """Горизонт оценки, привязанный к периоду индикатора (не фиксированный)."""
+    per = params.get("slow") or params.get("period") or params.get("len") or 14
+    return int(max(HORIZON_MIN, min(HORIZON_MAX, round(per * HORIZON_FACTOR))))
+
+
+def _ig_range(scores: list[Optional[float]], closes: list[float],
+              horizon: int, lo: int, hi: int) -> tuple[Optional[float], int]:
     """
-    accuracy = доля баров где sign(score)==sign(close[i+H]-close[i]).
-    Возвращает (accuracy, baseRate, n).
+    Information gain (acc − baseRate) в диапазоне баров [lo, hi).
+    acc = доля баров с ненулевым скором, где знак совпал с ходом цены через H.
+    baseRate = доля баров, где цена вообще выросла за H (защита от тренда: в
+    аптренде «всегда покупать» даёт высокий acc без единой закономерности).
+    Причинно: исход берётся из close[i+H], i+H строго < hi (капается ниже) —
+    никакого заглядывания за границу тест-фолда сверх собственного горизонта.
+    Возвращает (ig | None, число сработавших сигналов).
     """
     n = len(closes)
+    hi = min(hi, n - horizon)
     win = 0
     total = 0
     up_total = 0
     base_n = 0
-    for i in range(n - horizon):
-        s = scores[i]
+    for i in range(max(0, lo), hi):
         fut = closes[i + horizon] - closes[i]
         if fut == 0:
             continue
         base_n += 1
-        if closes[i + horizon] > closes[i]:
+        if fut > 0:
             up_total += 1
+        s = scores[i]
         if s is None or s == 0.0:
             continue
         total += 1
         if (s > 0 and fut > 0) or (s < 0 and fut < 0):
             win += 1
-    acc = win / total if total >= CALIB_MIN_BARS else None
-    base = up_total / base_n if base_n > 0 else 0.5
-    return acc, base, total
+    if base_n == 0:
+        return None, 0
+    base = up_total / base_n
+    if total == 0:
+        return None, 0
+    return (win / total) - base, total
+
+
+def _mean_se(xs: list[float]) -> tuple[float, float]:
+    """Среднее и стандартная ошибка среднего (SE = std / sqrt(n))."""
+    k = len(xs)
+    if k == 0:
+        return 0.0, 0.0
+    m = sum(xs) / k
+    if k < 2:
+        return m, 0.0
+    var = sum((x - m) ** 2 for x in xs) / (k - 1)
+    return m, (var ** 0.5) / (k ** 0.5)
+
+
+def _classic_index(method_name: str, candidates: list) -> int:
+    """Индекс канонического («классического») кандидата — якоря усадки."""
+    want = CLASSIC_PARAMS.get(method_name)
+    if want:
+        for idx, (label, fn, params) in enumerate(candidates):
+            if all(params.get(k) == v for k, v in want.items()):
+                return idx
+    return len(candidates) // 2   # фолбэк — средний по сетке
+
+
+def _make_alt_fn(base_fn: Callable, lookback: int = 10) -> Callable:
+    """Оборачивает базовую функцию в причинную alt-трансформацию (буфер прошлого)."""
+    _score_buf: list[float] = []
+    _close_buf: list[float] = []
+
+    def alt_fn(closes, highs, lows, vols):
+        s = base_fn(closes, highs, lows, vols)
+        _score_buf.append(s if s is not None else 0.0)
+        _close_buf.append(closes[-1] if closes else 0.0)
+        if len(_score_buf) < lookback:
+            return s or 0.0
+        alt_scores = _apply_alt_to_scores(
+            _score_buf[-lookback - 1:], _close_buf[-lookback - 1:], lookback=lookback
+        )
+        return alt_scores[-1]
+
+    return alt_fn
+
+
+def _blend_fn(chosen_fn: Callable, classic_fn: Callable, lam: float) -> Callable:
+    """Усадка к классике: λ·калиброванная + (1−λ)·классическая на уровне СКОРА,
+    а не периода — иначе пришлось бы прыгать между дискретными периодами (14↔30)
+    от одного случайного бара разницы. λ отражает силу и стабильность OOS-эффекта."""
+    def blended(closes, highs, lows, vols):
+        a = chosen_fn(closes, highs, lows, vols)
+        b = classic_fn(closes, highs, lows, vols)
+        a = a if a is not None else 0.0
+        b = b if b is not None else 0.0
+        return lam * a + (1.0 - lam) * b
+    return blended
 
 
 # ─── Основной класс ───────────────────────────────────────────────────────────
@@ -430,6 +535,11 @@ class MethodCalibrator:
         self._window = window          # размер окна (баров) для вычисления скора
         self._data: dict = self._load()
         # {ticker: {method: {params, use_alt, ig, horizon, updated}}}
+        # Кэш собранных fn: alt-вариант причинно-буферный (копит прошлое между
+        # вызовами), а стратегия дёргает get_fn на каждом баре — без кэша буфер
+        # пересоздавался бы каждый бар и alt никогда бы не набирался (тихо
+        # деградировал в сырой скор). Ключ инвалидируется при смене записи.
+        self._fn_cache: dict = {}
 
     def _load(self) -> dict:
         if os.path.exists(self._store_path):
@@ -468,120 +578,194 @@ class MethodCalibrator:
     def calibrate(self, ticker: str, candles_raw: list) -> None:
         """
         candles_raw: список dict {"close": float, "high": float, "low": float, "vol": float}
-        Запускает подбор параметров по всем TUNABLE_REGISTRY методам.
+
+        Walk-forward подбор параметров под конкретный тикер, БЕЗ заглядывания в
+        будущее и без подгонки на тех же данных, где применяется:
+          • история делится на N_folds последовательных блоков;
+          • на каждом тест-фолде вариант выбирается ТОЛЬКО по прошлым барам
+            (in-sample IG на [начало, граница фолда));
+          • качество выбранного меряется на СЛЕДУЮЩЕМ, невиданном блоке (OOS);
+          • адаптация принимается лишь если OOS-IG устойчиво (нижняя доверит.
+            граница) превосходит классику — иначе честно откатываемся на дефолт;
+          • принятая адаптация не заменяет дефолт целиком, а усаживается к нему
+            (λ) пропорционально силе и стабильности OOS-преимущества.
+        Для многих тикеров честный ответ — «default»: адаптация не обобщилась.
         """
         import datetime
+        from collections import Counter
+
         n = len(candles_raw)
-        if n < self._window + max(CALIB_HORIZONS) + CALIB_MIN_BARS:
-            logger.info(f"{ticker}: мало свечей для method calibration ({n}), пропуск")
+        min_needed = self._window + HORIZON_MAX + CALIB_MIN_BARS + CALIB_FOLD_TARGET_LEN
+        if n < min_needed:
+            logger.info(f"{ticker}: мало свечей для method calibration ({n} < {min_needed}), пропуск")
             return
 
         closes = [c["close"] for c in candles_raw]
         today = datetime.date.today().isoformat()
         result = {}
 
+        eval_start = self._window
+        span = n - eval_start
+        usable = span - HORIZON_MAX
+        n_folds = max(CALIB_FOLDS_MIN, min(CALIB_FOLDS_MAX, usable // CALIB_FOLD_TARGET_LEN))
+        bounds = [eval_start + round(span * k / n_folds) for k in range(n_folds + 1)]
+
         for method_name, candidates in TUNABLE_REGISTRY.items():
-            best_ig = -1.0
-            best_label = None
-            best_params = {}
-            best_use_alt = False
-            best_horizon = CALIB_HORIZONS[0]
+            ci = _classic_index(method_name, candidates)
 
-            for label, fn, params in candidates:
+            # Предвычисляем причинные серии всех вариантов один раз (классика+alt).
+            variants = []
+            for idx, (label, fn, params) in enumerate(candidates):
                 scores = _score_series(fn, candles_raw, self._window)
-                scores_alt = _apply_alt_to_scores(scores, closes)
+                H = _horizon_for_params(params)
+                variants.append({"idx": idx, "label": label, "params": params,
+                                 "use_alt": False, "series": scores, "H": H})
+                variants.append({"idx": idx, "label": label, "params": params,
+                                 "use_alt": True,
+                                 "series": _apply_alt_to_scores(scores, closes), "H": H})
+            classic = next(v for v in variants if v["idx"] == ci and not v["use_alt"])
 
-                for H in CALIB_HORIZONS:
-                    # классика
-                    acc, base, n_obs = _accuracy(scores, closes, H)
-                    if acc is not None:
-                        ig = acc - base
-                        if ig > best_ig:
-                            best_ig = ig
-                            best_label = label
-                            best_params = params
-                            best_use_alt = False
-                            best_horizon = H
+            oos_chosen: list[float] = []
+            oos_classic: list[float] = []
+            picks: list[tuple] = []
+            for k in range(1, n_folds):
+                hist_lo, hist_hi = eval_start, bounds[k]        # только прошлое
+                test_lo, test_hi = bounds[k], bounds[k + 1]     # невиданный блок
+                # отбор по in-sample IG на прошлом
+                best = None
+                best_ig = -1e9
+                for v in variants:
+                    ig, tot = _ig_range(v["series"], closes, v["H"], hist_lo, hist_hi)
+                    if ig is None or tot < CALIB_MIN_BARS:
+                        continue
+                    if ig > best_ig:
+                        best_ig = ig
+                        best = v
+                if best is None:
+                    continue
+                ig_ch, tot_ch = _ig_range(best["series"], closes, best["H"], test_lo, test_hi)
+                ig_bs, tot_bs = _ig_range(classic["series"], closes, classic["H"], test_lo, test_hi)
+                if ig_ch is None or ig_bs is None or tot_ch < CALIB_FOLD_MIN_OBS:
+                    continue
+                oos_chosen.append(ig_ch)
+                oos_classic.append(ig_bs)
+                picks.append((best["idx"], best["use_alt"]))
 
-                    # alt
-                    acc_alt, base_alt, n_alt = _accuracy(scores_alt, closes, H)
-                    if acc_alt is not None:
-                        ig_alt = acc_alt - base_alt
-                        if ig_alt > best_ig:
-                            best_ig = ig_alt
-                            best_label = label
-                            best_params = params
-                            best_use_alt = True
-                            best_horizon = H
-
-            if best_label is not None and best_ig >= CALIB_MIN_IG:
-                result[method_name] = {
-                    "params":    best_params,
-                    "use_alt":   best_use_alt,
-                    "ig":        round(best_ig, 4),
-                    "horizon":   best_horizon,
-                    "label":     best_label,
-                    "updated":   today,
-                }
-                logger.info(
-                    f"{ticker}/{method_name}: best={best_label} alt={best_use_alt} "
-                    f"ig={best_ig:.3f} H={best_horizon}"
-                )
-            else:
-                # не нашли ничего лучше дефолта — сохраняем дефолт чтобы не пересчитывать
-                result[method_name] = {"params": {}, "use_alt": False,
-                                       "ig": 0.0, "horizon": 10,
-                                       "label": "default", "updated": today}
+            result[method_name] = self._finalize_method(
+                method_name, candidates, ci, classic,
+                oos_chosen, oos_classic, picks, today, Counter,
+            )
+            e = result[method_name]
+            logger.info(
+                f"{ticker}/{method_name}: {e['label']} alt={e['use_alt']} "
+                f"OOS-IG={e['ig']:.3f} vs классика={e.get('ig_classic', 0):.3f} "
+                f"λ={e.get('shrink', 0):.2f} фолдов={e.get('folds', 0)}"
+            )
 
         self._data[ticker] = result
         self._save()
 
+    def _finalize_method(self, method_name, candidates, ci, classic,
+                          oos_chosen, oos_classic, picks, today, Counter):
+        """Решение по методу: адаптировать (с усадкой λ) или откатиться на дефолт.
+        Отдельный метод — чтобы calibrate читался как процесс, а критерии
+        принятия были в одном месте."""
+        default_entry = {"params": {}, "use_alt": False, "ig": 0.0, "ig_classic": 0.0,
+                         "horizon": 10, "label": "default", "base_label": classic["label"],
+                         "shrink": 0.0, "folds": len(oos_chosen),
+                         "consistency": 0.0, "updated": today}
+        if len(oos_chosen) < 2:
+            return default_entry
+
+        mean_ch, se_ch = _mean_se(oos_chosen)
+        mean_bs, _ = _mean_se(oos_classic)
+        diffs = [a - b for a, b in zip(oos_chosen, oos_classic)]
+        consistency = sum(1 for d in diffs if d > 0) / len(diffs)
+        lcb = mean_ch - CALIB_LCB_Z * se_ch          # нижняя доверит. граница OOS-IG
+        improvement = mean_ch - mean_bs
+
+        # Мода выбора по фолдам — стабильный, walk-forward-подтверждённый вариант.
+        (pick_idx, pick_alt), _pick_cnt = Counter(picks).most_common(1)[0]
+
+        accept = (
+            improvement >= CALIB_MIN_IMPROVE
+            and lcb >= CALIB_MIN_IG
+            and consistency >= 0.5
+            and not (pick_idx == ci and not pick_alt)   # «выбрали классику» = не адаптация
+        )
+        if not accept:
+            default_entry["ig"] = round(mean_ch, 4)
+            default_entry["ig_classic"] = round(mean_bs, 4)
+            default_entry["consistency"] = round(consistency, 2)
+            return default_entry
+
+        label, _, params = candidates[pick_idx]
+        # λ: сила эффекта (improvement/scale), приглушённая его стабильностью.
+        lam = max(0.0, min(1.0, improvement / CALIB_SHRINK_SCALE)) * consistency
+        return {
+            "params":      params,
+            "use_alt":     pick_alt,
+            "ig":          round(mean_ch, 4),
+            "ig_classic":  round(mean_bs, 4),
+            "horizon":     _horizon_for_params(params),
+            "label":       label,
+            "base_label":  classic["label"],
+            "shrink":      round(lam, 3),
+            "folds":       len(oos_chosen),
+            "consistency": round(consistency, 2),
+            "updated":     today,
+        }
+
     def get_fn(self, ticker: str, method_name: str) -> Optional[Callable]:
         """
-        Возвращает лучшую функцию (closes, highs, lows, vols) -> float
-        для данного тикера/метода, или None если метод не в реестре.
+        Возвращает калиброванную функцию (closes, highs, lows, vols) -> float
+        для тикера/метода, УЖЕ усаженную к классике (λ), или None если адаптация
+        не принята (стратегия возьмёт дефолт). λ=1 → чистая калибровка,
+        0<λ<1 → блендинг калибровки с классикой, λ≤0 → как дефолт (None).
         """
         entry = self._data.get(ticker, {}).get(method_name)
         if entry is None or entry.get("label") == "default":
-            return None  # стратегия будет использовать дефолтную реализацию
+            return None
+
+        label = entry["label"]
+        lam = float(entry.get("shrink", 1.0))
+        if lam <= 0.001:
+            return None  # усадка увела адаптацию к нулю — это и есть дефолт
+
+        # Кэш стабильной fn: пересобираем только при смене записи (sig).
+        sig = (label, bool(entry.get("use_alt")), round(lam, 3), entry.get("base_label"))
+        cached = self._fn_cache.get((ticker, method_name))
+        if cached is not None and cached[0] == sig:
+            return cached[1]
 
         candidates = TUNABLE_REGISTRY.get(method_name, [])
-        label = entry["label"]
-        for lbl, fn, params in candidates:
-            if lbl == label:
-                if entry.get("use_alt"):
-                    # оборачиваем в alt-трансформацию
-                    def make_alt_fn(base_fn, lookback=10):
-                        _score_buf: list[float] = []
-                        _close_buf: list[float] = []
+        by_label = {lbl: fn for lbl, fn, _ in candidates}
+        base_fn = by_label.get(label)
+        if base_fn is None:
+            return None
+        chosen_fn = _make_alt_fn(base_fn) if entry.get("use_alt") else base_fn
 
-                        def alt_fn(closes, highs, lows, vols):
-                            s = base_fn(closes, highs, lows, vols)
-                            _score_buf.append(s if s is not None else 0.0)
-                            _close_buf.append(closes[-1] if closes else 0.0)
-                            if len(_score_buf) < lookback:
-                                return s or 0.0
-                            alt_scores = _apply_alt_to_scores(
-                                _score_buf[-lookback - 1:], _close_buf[-lookback - 1:],
-                                lookback=lookback
-                            )
-                            return alt_scores[-1]
-
-                        return alt_fn
-
-                    return make_alt_fn(fn)
-                return fn
-        return None
+        classic_fn = by_label.get(entry.get("base_label"))
+        if classic_fn is None or lam >= 0.999:
+            built = chosen_fn  # некуда усаживать или усадка полная
+        else:
+            built = _blend_fn(chosen_fn, classic_fn, lam)
+        self._fn_cache[(ticker, method_name)] = (sig, built)
+        return built
 
     def get_params(self, ticker: str, method_name: str) -> dict:
         """Только параметры (без fn) — для логов/диагностики."""
         entry = self._data.get(ticker, {}).get(method_name, {})
         return {
-            "params":  entry.get("params", {}),
-            "use_alt": entry.get("use_alt", False),
-            "ig":      entry.get("ig", 0.0),
-            "horizon": entry.get("horizon", 10),
-            "label":   entry.get("label", "default"),
+            "params":      entry.get("params", {}),
+            "use_alt":     entry.get("use_alt", False),
+            "ig":          entry.get("ig", 0.0),
+            "ig_classic":  entry.get("ig_classic", 0.0),
+            "horizon":     entry.get("horizon", 10),
+            "label":       entry.get("label", "default"),
+            "shrink":      entry.get("shrink", 0.0),
+            "consistency": entry.get("consistency", 0.0),
+            "folds":       entry.get("folds", 0),
         }
 
     def summary(self, ticker: str) -> dict:
