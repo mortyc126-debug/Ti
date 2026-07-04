@@ -52,9 +52,13 @@ CALIB_FOLD_TARGET_LEN = 45
 # Границы числа фолдов.
 CALIB_FOLDS_MIN = 3
 CALIB_FOLDS_MAX = 7
-# Z для нижней доверительной границы OOS-IG (≈1.0 → ~84% односторонний).
-# Осознанно мягкий: жёстче — и почти никто не проходит на 250-360 барах.
-CALIB_LCB_Z = 1.0
+# Z для нижней доверительной границы OOS-IG. 1.6 ≈ ~95% односторонний.
+# Проверено multi-seed рандом-уоком: при 1.0 на шуме ложно адаптировалось ~11%
+# метод-инстансов (значимость была косметической), при 1.6 + парном тесте
+# (см. _finalize_method) — ~0%.
+CALIB_LCB_Z = 1.6
+# Минимальная доля фолдов, где выбранный обошёл классику (согласованность).
+CALIB_MIN_CONSISTENCY = 0.75
 # Масштаб усадки: OOS-улучшение в 5 п.п. над классикой → полная (λ=1) замена.
 # Меньшее улучшение → пропорционально меньшая усадка к калиброванной функции.
 CALIB_SHRINK_SCALE = 0.05
@@ -604,13 +608,19 @@ class MethodCalibrator:
             oos_classic: list[float] = []
             picks: list[tuple] = []
             for k in range(1, n_folds):
-                hist_lo, hist_hi = eval_start, bounds[k]        # только прошлое
-                test_lo, test_hi = bounds[k], bounds[k + 1]     # невиданный блок
-                # отбор по in-sample IG на прошлом
+                bound = bounds[k]                               # граница прошлое|тест
+                test_hi = bounds[k + 1]                         # конец тест-блока
+                # Отбор по in-sample IG на прошлом. КРИТИЧНО: исход сигнала —
+                # closes[i+H], поэтому окно отбора обрезаем на H баров ДО границы
+                # (hi = bound − H у каждого варианта его собственным H), иначе
+                # исходы последних сигналов залезали бы на H баров в тест-блок —
+                # то самое пересечение окна подбора и проверки. Тест-блок,
+                # симметрично, начинаем с bound (его первые сигналы дают исход в
+                # [bound, ...) — уже строго после границы отбора).
                 best = None
                 best_ig = -1e9
                 for v in variants:
-                    ig, tot = _ig_range(v["series"], closes, v["H"], hist_lo, hist_hi)
+                    ig, tot = _ig_range(v["series"], closes, v["H"], eval_start, bound - v["H"])
                     if ig is None or tot < CALIB_MIN_BARS:
                         continue
                     if ig > best_ig:
@@ -618,8 +628,8 @@ class MethodCalibrator:
                         best = v
                 if best is None:
                     continue
-                ig_ch, tot_ch = _ig_range(best["series"], closes, best["H"], test_lo, test_hi)
-                ig_bs, tot_bs = _ig_range(classic["series"], closes, classic["H"], test_lo, test_hi)
+                ig_ch, tot_ch = _ig_range(best["series"], closes, best["H"], bound, test_hi)
+                ig_bs, tot_bs = _ig_range(classic["series"], closes, classic["H"], bound, test_hi)
                 if ig_ch is None or ig_bs is None or tot_ch < CALIB_FOLD_MIN_OBS:
                     continue
                 oos_chosen.append(ig_ch)
@@ -655,17 +665,24 @@ class MethodCalibrator:
         mean_ch, se_ch = _mean_se(oos_chosen)
         mean_bs, _ = _mean_se(oos_classic)
         diffs = [a - b for a, b in zip(oos_chosen, oos_classic)]
+        mean_d, se_d = _mean_se(diffs)               # ПАРНАЯ разница OOS (по фолдам)
         consistency = sum(1 for d in diffs if d > 0) / len(diffs)
-        lcb = mean_ch - CALIB_LCB_Z * se_ch          # нижняя доверит. граница OOS-IG
-        improvement = mean_ch - mean_bs
+        lcb_chosen = mean_ch - CALIB_LCB_Z * se_ch   # OOS-IG выбранного значимо > 0
+        lcb_diff   = mean_d - CALIB_LCB_Z * se_d      # преимущество над классикой значимо > 0
+        improvement = mean_d
 
         # Мода выбора по фолдам — стабильный, walk-forward-подтверждённый вариант.
         (pick_idx, pick_alt), _pick_cnt = Counter(picks).most_common(1)[0]
 
+        # Ключевой гейт — ПАРНЫЙ нижний доверит. предел разницы «выбранный минус
+        # классика» по фолдам: он должен быть > порога. Это прямо проверяет
+        # «выбранный устойчиво обходит классику вне выборки», а не «у обоих
+        # средний IG случайно положительный». На multi-seed шуме именно этот
+        # тест давит ложные адаптации до ~0 (раздельные средние — нет).
         accept = (
-            improvement >= CALIB_MIN_IMPROVE
-            and lcb >= CALIB_MIN_IG
-            and consistency >= 0.5
+            lcb_diff > CALIB_MIN_IMPROVE
+            and lcb_chosen >= CALIB_MIN_IG
+            and consistency >= CALIB_MIN_CONSISTENCY
             and not (pick_idx == ci and not pick_alt)   # «выбрали классику» = не адаптация
         )
         if not accept:
@@ -675,7 +692,7 @@ class MethodCalibrator:
             return default_entry
 
         label, _, params = candidates[pick_idx]
-        # λ: сила эффекта (improvement/scale), приглушённая его стабильностью.
+        # λ: сила эффекта (парное улучшение/scale), приглушённая его стабильностью.
         lam = max(0.0, min(1.0, improvement / CALIB_SHRINK_SCALE)) * consistency
         return {
             "params":      params,
