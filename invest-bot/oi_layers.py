@@ -781,13 +781,21 @@ def build_oi_spec(universe: list[str], history: dict | None = None,
     return spec
 
 
+def _spec_label(s: dict) -> str:
+    """Код + базовый актив, если резолвнулся (иначе корень) — читаемая подпись."""
+    if s.get("base"):
+        return f"{s['code']}→{s['base']}"
+    return f"{s['code']}({s['root']})"
+
+
 def oi_coverage_summary(spec: list[dict]) -> str:
-    """Однострочная сводка покрытия OI по спеке (для лога/статуса прогона)."""
+    """Однострочная сводка покрытия OI по спеке (для лога/статуса прогона).
+    Пишет и базовый актив (жалоба «непонятно какая база»), если резолвнулся."""
     have = [s for s in spec if s["has_oi"]]
     miss = [s for s in spec if not s["has_oi"]]
     parts = [f"OI покрытие: {len(have)}/{len(spec)} тик. с данными"]
     if miss:
-        parts.append("без OI: " + ", ".join(f"{s['code']}({s['root']})" for s in miss[:20])
+        parts.append("без OI: " + ", ".join(_spec_label(s) for s in miss[:20])
                      + (" …" if len(miss) > 20 else ""))
     return " · ".join(parts)
 

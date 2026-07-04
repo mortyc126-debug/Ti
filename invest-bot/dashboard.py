@@ -8079,6 +8079,37 @@ _oi_autosync_lock = __import__("threading").Lock()
 OI_AUTOSYNC_TTL_SEC = 300   # не дёргать воркер по тому же тикеру чаще, чем раз в 5 мин
 
 
+def _oi_base_resolver():
+    """Офлайн-резолвер: код фьючерса → базовый актив/имя для спеки OI (жалоба
+    «непонятно какая база»). Источники по убыванию точности, всё с диска, сеть
+    не трогаем: futures_cache.json (base→контракт, реверс по КОРНЮ) →
+    oi_tickers.json[code].name. Нет совпадения → None (в сводке покажется корень)."""
+    import oi_layers
+    root2base: dict[str, str] = {}
+    try:
+        contracts, _ = _futures_cache_from_disk()
+        for base, info in (contracts or {}).items():
+            tk = (info or {}).get("ticker") or ""
+            if tk:
+                root2base[oi_layers._contract_root(tk).upper()] = base
+    except Exception:
+        pass
+    names: dict[str, str] = {}
+    try:
+        names = {k.upper(): (v.get("name") or "") for k, v in load_oi_tickers().items()}
+    except Exception:
+        pass
+
+    def resolve(code: str):
+        up = (code or "").upper()
+        r = oi_layers._contract_root(code).upper()
+        if r in root2base:
+            return root2base[r]
+        nm = names.get(up, "")
+        return nm if nm and nm.upper() != up else None
+    return resolve
+
+
 def ensure_oi_synced(tickers: list[str]) -> None:
     """Перед бэктестом дозабирает свежий ОИ из воркера в data/oi_daily.json.
     Best-effort: нет URL / сеть упала — молча идём на том, что есть локально.
@@ -8088,6 +8119,7 @@ def ensure_oi_synced(tickers: list[str]) -> None:
     import oi_layers
     _oi_path = os.path.join(os.path.dirname(__file__), "data", "oi_daily.json")
     url = _get_oi_api_url()
+    _base_res = _oi_base_resolver()
     if url and tickers:
         now = time.monotonic()
         with _oi_autosync_lock:
@@ -8105,7 +8137,7 @@ def ensure_oi_synced(tickers: list[str]) -> None:
     # троттлинг): чтобы отсутствие OI по вселенной было видно сразу, а не по нулям
     # скоров постфактум. Сеть не трогает — читает уже собранный файл.
     try:
-        spec = oi_layers.build_oi_spec(tickers, path=_oi_path)
+        spec = oi_layers.build_oi_spec(tickers, path=_oi_path, base_resolver=_base_res)
         logger.info(oi_layers.oi_coverage_summary(spec))
     except Exception:
         pass
