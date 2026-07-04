@@ -82,39 +82,14 @@ CLASSIC_PARAMS = {
 # с нужными параметрами. Все принимают raw float-списки, не HistoricCandle.
 
 def _factory_fisher_rsi(period: int):
-    from indicators_ehlers import fisher_rsi as _fisher_rsi
+    # Единый источник с live-стратегией (score_fisher_rsi_candle): родная
+    # механика Ehlers (триггер-линия + z-сила спайка + подтверждение ценой),
+    # без порога 1.8 и бинарного ±2. Иначе калибровка отбирала бы период по
+    # одной формуле, а торговля считала бы Fisher по другой.
+    from indicators_ehlers import fisher_score_core
 
     def fn(closes, highs, lows, volumes):
-        n = len(closes)
-        if n < period + 5:
-            return 0.0
-        p = min(period, n - 1)
-        fr = _fisher_rsi(closes, period=p)
-        if len(fr) < 5:
-            return 0.0
-        v, prev = fr[-1], fr[-2]
-        EXTREME = 1.8
-        at_top = v > EXTREME
-        at_bottom = v < -EXTREME
-        turning_down = at_top and v < prev
-        turning_up = at_bottom and v > prev
-        if turning_down:
-            return -min(1.0, abs(v) / 3.0)
-        if turning_up:
-            return min(1.0, abs(v) / 3.0)
-        if at_top:
-            return -0.4
-        if at_bottom:
-            return 0.4
-        # дивергенция
-        lb = min(p, n - 1)
-        price_move = closes[-1] - closes[-lb]
-        fr_move = fr[-1] - fr[-lb]
-        if price_move > 0 and fr_move < 0:
-            return -0.5
-        if price_move < 0 and fr_move > 0:
-            return 0.5
-        return 0.0
+        return fisher_score_core(closes, highs, lows, period=period)
 
     return fn
 

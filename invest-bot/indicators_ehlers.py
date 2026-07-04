@@ -122,6 +122,87 @@ def fisher_rsi(closes: list[float], period: int = 10) -> list[float]:
     return out
 
 
+def fisher_score_core(closes: list[float], highs: list[float], lows: list[float],
+                      period: int = 10) -> float:
+    """
+    Скор Fisher-RSI по РОДНОЙ механике индикатора (Ehlers), без универсальных
+    порогов вроде «>1.8» и без бинарного ±2:
+
+    1. Разворот — по триггер-линии Ehlers (Fisher против своего лага на 1 бар):
+       локальная вершина/впадина на баре -2 (b>a & c<b / b<a & c>b), а НЕ
+       пересечение внешнего порога. Порог >1.5 в исходнике — это упрощение
+       метода, а не сам метод.
+    2. Сила — непрерывная, по z-score амплитуды спайка относительно СОБСТВЕННОГО
+       недавнего разброса Fisher (|fisher[-2]| / stdev). Fisher растёт
+       гиперболически у ±1, так что двукратный и десятикратный выброс должны
+       различаться, а не оба давать ±2. z привязан к инструменту (его же stdev),
+       а не к абсолютной величине.
+    3. Подтверждение ЦЕНОЙ (внешняя проверка, а не самоссылка): если Fisher
+       развернулся на вершине, а цена НЕ пробила свой недавний диапазон — это
+       настоящее истощение (полный вес). Если цена всё же пробила (реальный
+       пробой) — разворот подозрителен, вес глушится.
+    """
+    n = len(closes)
+    if n < max(15, period + 5):
+        return 0.0
+    fr = fisher_rsi(closes, period=min(period, n - 1))
+    if len(fr) < 5:
+        return 0.0
+
+    # Триггер-линия Ehlers = Fisher, задержанный на 1 бар (trigger = fr[-2]).
+    # Сигнал = Fisher пересекает свой триггер, находясь в перегреве/перепроданности:
+    #   вниз  — c < b при b>0 (упал ниже лага, будучи наверху);
+    #   вверх — c > b при b<0.
+    # Строгая локальная вершина (b>a) пропускала бы плато Fisher у ±потолка, где
+    # соседние бары равны (RSI≈100 → Fisher насыщается ~3.8). Насколько это был
+    # реальный экстремум, а не рядовой переход — решает z-сила спайка ниже.
+    b, c = fr[-2], fr[-1]
+    turned_down = c < b and b > 0.0
+    turned_up   = c > b and b < 0.0
+
+    # Сила спайка: z-score |fisher[-2]| относительно собственного разброса.
+    win = fr[-20:]
+    if len(win) >= 5:
+        m = sum(win) / len(win)
+        sd = (sum((x - m) ** 2 for x in win) / len(win)) ** 0.5
+    else:
+        sd = 0.0
+    z = abs(b) / (sd + 1e-9) if sd > 1e-9 else 0.0
+    # z<1 — рядовой всплеск (0), z≈2.5 — экстремальный (1). Порог в z-шкале
+    # (относительно собственного разброса), не в абсолютной величине Fisher.
+    spike = max(0.0, min(1.0, (z - 1.0) / 1.5))
+
+    # Подтверждение непробоя ценой.
+    lb = min(10, n - 1)
+    conf = 1.0
+    if lb >= 2 and highs and lows:
+        prior_high = max(highs[-lb:-1]) if len(highs) >= lb else highs[-1]
+        prior_low  = min(lows[-lb:-1])  if len(lows)  >= lb else lows[-1]
+        if turned_down and highs[-1] > prior_high:
+            conf = 0.5      # цена пробила максимум вверх — медвежий разворот подозрителен
+        elif turned_up and lows[-1] < prior_low:
+            conf = 0.5      # цена пробила минимум вниз — бычий разворот подозрителен
+
+    if turned_down:
+        base = -spike * conf
+    elif turned_up:
+        base = spike * conf
+    else:
+        base = math.tanh(c * 0.5) * 0.35   # нет разворота — слабый momentum по знаку
+
+    # Дивергенция по ЦЕНЕ (вторичный вклад, тоже не самоссылка).
+    lb2 = min(20, n - 1)
+    price_chg = closes[-1] - closes[-lb2]
+    fr_chg = fr[-1] - fr[-lb2]
+    div = 0.0
+    if price_chg < -1e-4 and fr_chg > 0.3:
+        div = min(0.4, fr_chg * 0.25)
+    elif price_chg > 1e-4 and fr_chg < -0.3:
+        div = max(-0.4, fr_chg * 0.25)
+
+    return max(-1.0, min(1.0, base + div * 0.4))
+
+
 def _score_fisher(v: float) -> float:
     """Порт ilScoreFisher, нормировано из [-2,2] в [-1,1]."""
     if v > 1.5:

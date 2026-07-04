@@ -85,7 +85,7 @@ from indicators import score_adaptive_ma, score_trend_quality, zlema, t3, mmi
 from indicators_fractal import score_fractal, score_entropy_regime, chop_energy_mult
 from indicators_ehlers import (
     score_cyber_cycle, score_decycler, score_fisher_rsi, score_ebsw, even_better_sinewave,
-    score_mama_fama, score_ehlers_mode, score_cyber_phase, fisher_rsi,
+    score_mama_fama, score_ehlers_mode, score_cyber_phase, fisher_rsi, fisher_score_core,
 )
 from indicators_volume import (
     score_klinger, score_vzo, score_twiggs, score_rmi, score_zscore,  # совместимость
@@ -1526,83 +1526,18 @@ def score_decycler_candle(candles: list[HistoricCandle]) -> float:
 
 def score_fisher_rsi_candle(candles: list[HistoricCandle]) -> float:
     """
-    FISHER_RSI: Fisher-преобразование RSI — состояние перегрева/перепроданности.
-
-    Классические пороги удалены — Fisher нелинеен, в крайностях очень резкий.
-
-    1. Крайность состояния: Fisher > +2 / < -2 = физическое перегревание.
-       Когда начинает возвращаться из крайности — сигнал начала выброса/разворота.
-    2. "Честность" движения: цена движется но Fisher не в экстремуме и уже откатывает → ловушка.
-    3. Дивергенция: цена новый экстремум, Fisher нет → энергия уже развернулась.
-    4. Зависание в нейтрали (-0.5..+0.5) при движущейся цене → шум, не тренд.
-    5. Скорость выхода из крайности: резкое → режим меняется агрессивно.
+    FISHER_RSI по родной механике Ehlers — разворот триггер-линии + непрерывная
+    сила по z-score спайка + подтверждение непробоя ценой (fisher_score_core).
+    Единый источник со calibrator'ом (method_calibrator._factory_fisher_rsi),
+    чтобы live и калибровка считали Fisher одинаково.
     """
-    closes = [_to_f(c.close) for c in candles]
-    n = len(closes)
+    n = len(candles)
     if n < 15:
         return 0.0
-    period = min(10, n - 1)
-    fr = fisher_rsi(closes, period=period)
-    if len(fr) < 5:
-        return 0.0
-
-    v = fr[-1]
-    prev = fr[-2]
-
-    # 1. Крайность + поворот из неё
-    EXTREME = 1.8
-    at_top    = v > EXTREME
-    at_bottom = v < -EXTREME
-    turning_down = at_top    and v < prev   # поворачивает вниз из перегрева
-    turning_up   = at_bottom and v > prev   # поворачивает вверх из перепроданности
-
-    if turning_up:
-        phase = 0.90
-    elif turning_down:
-        phase = -0.90
-    elif at_top:
-        phase = 0.30    # ещё в крайности, пока не повернул — слабый сигнал продолжения
-    elif at_bottom:
-        phase = -0.30
-    else:
-        phase = math.tanh(v * 0.5) * 0.4   # в середине — слабый сигнал по направлению
-
-    # 2. Нейтральное зависание при движущейся цене → антисигнал (шум)
-    lb = min(10, n - 1)
-    price_move = abs(closes[-1] - closes[-lb]) / (closes[-lb] + 1e-9)
-    neutral_zone = abs(v) < 0.5
-    trap_penalty = 0.0
-    if neutral_zone and price_move > 0.005:   # цена движется, Fisher в нейтрали
-        trap_penalty = -math.copysign(0.25, closes[-1] - closes[-lb])
-
-    # 3. Дивергенция: цена на новом экстремуме, Fisher нет
-    lb2 = min(20, n - 1)
-    price_chg = closes[-1] - closes[-lb2]
-    fr_chg    = fr[-1] - fr[-lb2]
-    divergence = 0.0
-    if price_chg < -1e-4 and fr_chg > 0.3:    # цена вниз, Fisher разворачивается вверх
-        divergence = min(0.5, fr_chg * 0.3)
-    elif price_chg > 1e-4 and fr_chg < -0.3:  # цена вверх, Fisher разворачивается вниз
-        divergence = max(-0.5, fr_chg * 0.3)
-
-    # 4. Скорость выхода из крайности (крутой разворот = агрессивная смена режима)
-    speed = abs(v - fr[-3]) if len(fr) >= 3 else 0.0
-    speed_mult = 1.0 + min(0.20, speed * 0.15)
-
-    # 5. Нитка в крайности: сколько баров подряд Fisher держался у порога
-    streak = 0
-    for val in reversed(fr[:-1]):
-        if abs(val) > EXTREME:
-            streak += 1
-        else:
-            break
-    # Первый поворот после длинного зависания = выброс
-    if (turning_up or turning_down) and streak >= 2:
-        streak_mult = 1.0 + min(0.50, streak * 0.15)
-        phase *= streak_mult
-
-    result = phase * speed_mult + trap_penalty + divergence * 0.4
-    return max(-1.0, min(1.0, result))
+    closes = [_to_f(c.close) for c in candles]
+    highs  = [_to_f(c.high)  for c in candles]
+    lows   = [_to_f(c.low)   for c in candles]
+    return fisher_score_core(closes, highs, lows, period=min(10, n - 1))
 
 
 def score_ebsw_candle(candles: list[HistoricCandle]) -> float:
