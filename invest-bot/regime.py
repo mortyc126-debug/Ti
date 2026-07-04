@@ -221,6 +221,10 @@ def classify_regime_probs(closes: list[float], volumes: list[float] | None = Non
     # тот же признак, но непрерывный: доля "режим=high_vol" растёт с vol_ratio гладко
     vol_high_prob = _smoothstep(vol_ratio, 1.5, 3.5)
 
+    # ВАЖНО: диапазоны s1 и s2 СМЕЖНЫ и не пересекаются (s1 кончается на 0.45,
+    # s2 с 0.45 начинается). На этом держится нормировка: pre_stress суммируется
+    # ровно в 1 только пока нет trend, где одновременно s1<1 и s2>0. Если сдвинуть
+    # пороги внахлёст — сумма поедет, и финальный /total тихо исказит распределение.
     s1 = _smoothstep(trend, 0.3, 0.45)   # 0..1: выход из vol-режимов (high/low_vol) в ranging
     s2 = _smoothstep(trend, 0.45, 0.6)   # 0..1: выход из ranging в trending
 
@@ -236,14 +240,23 @@ def classify_regime_probs(closes: list[float], volumes: list[float] | None = Non
     # одну сторону (настоящий тренд), 0 если противоположны (отскок/разворот) —
     # тогда наклон уводится в ranging (а ranging заблокирован для входа).
     # Симметрично: честный trending_down не страдает (обе части вниз → align=1).
-    _STR_MIN = 0.15  # ниже — часть окна считаем безнаправленной (шум у нуля)
     _cut = max(5, n * 2 // 3)
     head, tail = closes[:_cut], closes[-max(5, n // 3):]
     str_head, dir_head = _trend_strength(head)
     str_tail, dir_tail = _trend_strength(tail)
-    d_head = dir_head if str_head > _STR_MIN else 0.0
-    d_tail = dir_tail if str_tail > _STR_MIN else 0.0
-    structural_align = 0.0 if (d_head and d_tail and d_head != d_tail) else 1.0
+    # structural_align НЕПРЕРЫВЕН. Раньше был бинарным (0/1) с жёстким гейтом
+    # str > _STR_MIN=0.15 — а это cliff внутри «гладкого» распределения: смена
+    # знака половины или переход str через 0.15 скачком роняли align, и метка
+    # могла мигать у границы (то самое, ради устранения чего писался модуль).
+    # Теперь при ПРОТИВОПОЛОЖНЫХ направлениях половин штраф растёт плавно с
+    # уверенностью СЛАБЕЙШЕЙ половины через узкую полосу вокруг прежнего порога
+    # 0.15 (0.10..0.20): рабочая точка та же (обе половины уверенно против →
+    # align→0 → отскок/разворот уходит в ranging), но без разрыва. Согласные или
+    # шумовые (у нуля) половины → align=1, настоящий тренд не страдает.
+    if dir_head and dir_tail and dir_head != dir_tail:
+        structural_align = 1.0 - _smoothstep(min(str_head, str_tail), 0.10, 0.20)
+    else:
+        structural_align = 1.0
 
     # squeeze_factor: настоящий тренд идёт с РАСШИРЕНИЕМ хода; сквиз — компрессия
     # с ложным наклоном. Сравниваем диапазон НА БАР (иначе более короткое tail-окно
