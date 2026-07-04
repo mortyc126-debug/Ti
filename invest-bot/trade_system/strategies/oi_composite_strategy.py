@@ -85,7 +85,7 @@ from indicators import score_adaptive_ma, score_trend_quality, zlema, t3, mmi
 from indicators_fractal import score_fractal, score_entropy_regime, chop_energy_mult
 from indicators_ehlers import (
     score_cyber_cycle, score_decycler, score_fisher_rsi, score_ebsw, even_better_sinewave,
-    score_mama_fama, score_ehlers_mode, score_cyber_phase, fisher_rsi,
+    score_mama_fama, score_ehlers_mode, score_cyber_phase, fisher_rsi, fisher_score_core,
 )
 from indicators_volume import (
     score_klinger, score_vzo, score_twiggs, score_rmi, score_zscore,  # совместимость
@@ -340,7 +340,18 @@ _ALT_NONE: frozenset = frozenset({
 
 _ALT_LOOKBACK = 10   # окно дивергенции для осцилляторов и объёма
 _ALT_STREAK   = 4    # баров подряд на экстремуме для тренда
-_ALT_CHOP_THR = 61.8 # порог Choppiness Index для структурного инвертирования
+# Объёмное подтверждение — БЕЗ универсального множителя (был ×0.7 на все
+# тикеры/режимы: для ликвидной бумаги 0.7 от средней — шум, для неликвида —
+# реальная аномалия). Вместо этого перцентиль объёма в СВО�ём распределении:
+# «низкий» = попал в нижние _ALT_VOL_PCTL своей же недавней истории. Порог по
+# перцентилю привязан к инструменту по построению, а не к абсолютной величине.
+_ALT_VOL_LB   = 20    # окно распределения объёма (баров)
+_ALT_VOL_PCTL = 0.30  # объём в нижних 30% своего распределения = нет подтверждения
+# Структурный чоп — БЕЗ универсального порога Choppiness 61.8 (распределение CI
+# у форекс-пары и неликвидной акции разное). Вместо этого перцентиль текущего
+# CI в СВОём недавнем распределении: «боковик» = CI в верхних (1−_ALT_CHOP_PCTL).
+_ALT_CHOP_HIST = 24   # окно распределения Choppiness (баров)
+_ALT_CHOP_PCTL = 0.70 # CI выше 70-го перцентиля своей истории = боковик
 
 
 def _choppiness_index(candles: list, period: int = 14) -> float:
@@ -369,6 +380,25 @@ def _choppiness_index(candles: list, period: int = 14) -> float:
         return 50.0
 
 
+def _chop_percentile(candles: list, period: int = 14, hist: int = 24) -> tuple:
+    """Текущий Choppiness Index и его перцентиль-ранг в собственном недавнем
+    распределении (0..1, 1 = самый «боковой» за последние hist баров). Позволяет
+    судить о боковике относительно того, насколько инструмент С�ам обычно чоппит,
+    а не по универсальному порогу 61.8. Причинно: берёт только прошлые окна."""
+    n = len(candles)
+    start = max(period + 1, n - hist)
+    vals = [_choppiness_index(candles[:j], period) for j in range(start, n + 1)]
+    if not vals:
+        return 50.0, 0.5
+    now = vals[-1]
+    prior = vals[:-1] or vals
+    # Строгое «<»: доля недавних окон, где CI был НИЖЕ текущего. Стационарно
+    # чоппящий инструмент на своём обычном уровне → pct≈0 (не фейдим без нужды);
+    # фейд только когда чоп ПОДНЯЛСЯ относительно собственной недавней нормы.
+    pct = sum(1 for v in prior if v < now) / len(prior)
+    return now, pct
+
+
 def _apply_alt_transforms(
     names: list,
     scores_fc: list,
@@ -380,7 +410,16 @@ def _apply_alt_transforms(
     Применяет alt-трансформации к scores_for_composite.
     Возвращает новый список той же длины.
     """
-    chop = _choppiness_index(candles)
+    # Чоп считаем один раз на бар — с перцентилем в собственном распределении
+    # (per-ticker), а не сравнением с универсальным 61.8.
+    _chop_now, _chop_pct = _chop_percentile(candles, hist=_ALT_CHOP_HIST)
+    # Объём: перцентиль текущего в собственном недавнем распределении — один раз.
+    _vol_pct = None
+    if candles and len(candles) >= _ALT_VOL_LB + 1:
+        _vols = [float(c.volume) if hasattr(c, 'volume') else 0.0 for c in candles]
+        _vol_prior = _vols[-_ALT_VOL_LB - 1:-1]
+        if _vol_prior:
+            _vol_pct = sum(1 for v in _vol_prior if v <= _vols[-1]) / len(_vol_prior)
     result = list(scores_fc)
 
     for i, name in enumerate(names):
@@ -417,17 +456,20 @@ def _apply_alt_transforms(
                             result[i] =  max_abs
 
         elif name in _ALT_VOLUME:
-            # Нет подтверждения объёмом → антисигнал
-            if s != 0 and candles and len(candles) >= _ALT_LOOKBACK + 1:
-                vols = [float(c.volume) if hasattr(c, 'volume') else 0.0 for c in candles]
-                vol_avg = sum(vols[-_ALT_LOOKBACK-1:-1]) / _ALT_LOOKBACK if _ALT_LOOKBACK > 0 else 0.0
-                if vol_avg > 0 and vols[-1] < vol_avg * 0.7:
-                    result[i] = -s   # сигнал без объёмного подтверждения
+            # Нет подтверждения объёмом → антисигнал. Порог — перцентиль объёма
+            # в СВОём распределении (per-ticker), сила фейда градуирована глубиной
+            # аномалии, а не бинарный флип.
+            if s != 0 and _vol_pct is not None and _vol_pct < _ALT_VOL_PCTL:
+                depth = (_ALT_VOL_PCTL - _vol_pct) / _ALT_VOL_PCTL   # 0..1
+                result[i] = -s * (0.4 + 0.6 * depth)
 
         elif name in _ALT_STRUCTURE:
-            # Боковик (Chop ≥ 61.8) → инвертируем структурный сигнал
-            if chop >= _ALT_CHOP_THR and s != 0:
-                result[i] = -s
+            # Боковик → инвертируем структурный сигнал. «Боковик» = CI выше
+            # _ALT_CHOP_PCTL-перцентиля собственной истории (per-ticker), сила
+            # градуирована тем, насколько глубоко в чоп зашли.
+            if s != 0 and _chop_pct >= _ALT_CHOP_PCTL:
+                depth = (_chop_pct - _ALT_CHOP_PCTL) / (1.0 - _ALT_CHOP_PCTL + 1e-9)
+                result[i] = -s * (0.4 + 0.6 * min(1.0, depth))
 
         elif name in _ALT_DSP:
             # Первый разворот знака DSP-фильтра → антисигнал (ложный флип)
@@ -1495,83 +1537,18 @@ def score_decycler_candle(candles: list[HistoricCandle]) -> float:
 
 def score_fisher_rsi_candle(candles: list[HistoricCandle]) -> float:
     """
-    FISHER_RSI: Fisher-преобразование RSI — состояние перегрева/перепроданности.
-
-    Классические пороги удалены — Fisher нелинеен, в крайностях очень резкий.
-
-    1. Крайность состояния: Fisher > +2 / < -2 = физическое перегревание.
-       Когда начинает возвращаться из крайности — сигнал начала выброса/разворота.
-    2. "Честность" движения: цена движется но Fisher не в экстремуме и уже откатывает → ловушка.
-    3. Дивергенция: цена новый экстремум, Fisher нет → энергия уже развернулась.
-    4. Зависание в нейтрали (-0.5..+0.5) при движущейся цене → шум, не тренд.
-    5. Скорость выхода из крайности: резкое → режим меняется агрессивно.
+    FISHER_RSI по родной механике Ehlers — разворот триггер-линии + непрерывная
+    сила по z-score спайка + подтверждение непробоя ценой (fisher_score_core).
+    Единый источник со calibrator'ом (method_calibrator._factory_fisher_rsi),
+    чтобы live и калибровка считали Fisher одинаково.
     """
-    closes = [_to_f(c.close) for c in candles]
-    n = len(closes)
+    n = len(candles)
     if n < 15:
         return 0.0
-    period = min(10, n - 1)
-    fr = fisher_rsi(closes, period=period)
-    if len(fr) < 5:
-        return 0.0
-
-    v = fr[-1]
-    prev = fr[-2]
-
-    # 1. Крайность + поворот из неё
-    EXTREME = 1.8
-    at_top    = v > EXTREME
-    at_bottom = v < -EXTREME
-    turning_down = at_top    and v < prev   # поворачивает вниз из перегрева
-    turning_up   = at_bottom and v > prev   # поворачивает вверх из перепроданности
-
-    if turning_up:
-        phase = 0.90
-    elif turning_down:
-        phase = -0.90
-    elif at_top:
-        phase = 0.30    # ещё в крайности, пока не повернул — слабый сигнал продолжения
-    elif at_bottom:
-        phase = -0.30
-    else:
-        phase = math.tanh(v * 0.5) * 0.4   # в середине — слабый сигнал по направлению
-
-    # 2. Нейтральное зависание при движущейся цене → антисигнал (шум)
-    lb = min(10, n - 1)
-    price_move = abs(closes[-1] - closes[-lb]) / (closes[-lb] + 1e-9)
-    neutral_zone = abs(v) < 0.5
-    trap_penalty = 0.0
-    if neutral_zone and price_move > 0.005:   # цена движется, Fisher в нейтрали
-        trap_penalty = -math.copysign(0.25, closes[-1] - closes[-lb])
-
-    # 3. Дивергенция: цена на новом экстремуме, Fisher нет
-    lb2 = min(20, n - 1)
-    price_chg = closes[-1] - closes[-lb2]
-    fr_chg    = fr[-1] - fr[-lb2]
-    divergence = 0.0
-    if price_chg < -1e-4 and fr_chg > 0.3:    # цена вниз, Fisher разворачивается вверх
-        divergence = min(0.5, fr_chg * 0.3)
-    elif price_chg > 1e-4 and fr_chg < -0.3:  # цена вверх, Fisher разворачивается вниз
-        divergence = max(-0.5, fr_chg * 0.3)
-
-    # 4. Скорость выхода из крайности (крутой разворот = агрессивная смена режима)
-    speed = abs(v - fr[-3]) if len(fr) >= 3 else 0.0
-    speed_mult = 1.0 + min(0.20, speed * 0.15)
-
-    # 5. Нитка в крайности: сколько баров подряд Fisher держался у порога
-    streak = 0
-    for val in reversed(fr[:-1]):
-        if abs(val) > EXTREME:
-            streak += 1
-        else:
-            break
-    # Первый поворот после длинного зависания = выброс
-    if (turning_up or turning_down) and streak >= 2:
-        streak_mult = 1.0 + min(0.50, streak * 0.15)
-        phase *= streak_mult
-
-    result = phase * speed_mult + trap_penalty + divergence * 0.4
-    return max(-1.0, min(1.0, result))
+    closes = [_to_f(c.close) for c in candles]
+    highs  = [_to_f(c.high)  for c in candles]
+    lows   = [_to_f(c.low)   for c in candles]
+    return fisher_score_core(closes, highs, lows, period=min(10, n - 1))
 
 
 def score_ebsw_candle(candles: list[HistoricCandle]) -> float:

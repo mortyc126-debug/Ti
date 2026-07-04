@@ -3984,8 +3984,9 @@ function toggleInvertMethod(name) {{
   // снять "отключён" если включаем инверсию
   if (!active) {{
     const cb = document.getElementById('dm_' + name);
-    if (cb) {{ cb.checked = false; updateDisabledCount(); }}
+    if (cb) cb.checked = false;
   }}
+  updateDisabledCount();
 }}
 
 function getInvertedMethods() {{
@@ -3994,6 +3995,7 @@ function getInvertedMethods() {{
     .map(b => b.id.replace('inv_', ''));
 }}
 
+let _methodToggleSaveTimer = null;
 function updateDisabledCount() {{
   const nd = getDisabledMethods().length;
   const ni = getInvertedMethods().length;
@@ -4002,10 +4004,39 @@ function updateDisabledCount() {{
   if (nd) parts.push(`откл: ${{nd}}`);
   if (ni) parts.push(`↔ инв: ${{ni}}`);
   el.textContent = parts.join(' · ');
+  // Автосохранение на сервер — переживает перезагрузку страницы (см.
+  // restoreMethodToggleState). Дебаунс, чтобы серия быстрых кликов (напр.
+  // autoDisableWeakMethods по 10+ методам подряд) не слала 10+ запросов.
+  clearTimeout(_methodToggleSaveTimer);
+  _methodToggleSaveTimer = setTimeout(() => {{
+    fetch('/api/method_toggle_state_save', {{
+      method: 'POST', headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{disabled: getDisabledMethods(), inverted: getInvertedMethods()}}),
+    }}).catch(() => {{}});
+  }}, 400);
 }}
 
 function getDisabledMethods() {{
   return Array.from(document.querySelectorAll('#method_checkboxes input[type=checkbox]:checked')).map(cb => cb.value);
+}}
+
+// Восстанавливает вкл/выкл методов из последнего автосохранённого состояния —
+// вызывается один раз при загрузке страницы (DOMContentLoaded), чтобы верхняя
+// панель сразу показывала то, что реально включено в этой сессии, а не пустой
+// список до первого клика по "показать/скрыть".
+function restoreMethodToggleState() {{
+  fetch('/api/method_toggle_state').then(r => r.json()).then(st => {{
+    initMethodCheckboxes();
+    (st.disabled || []).forEach(name => {{
+      const cb = document.getElementById('dm_' + name);
+      if (cb) cb.checked = true;
+    }});
+    (st.inverted || []).forEach(name => {{
+      const btn = document.getElementById('inv_' + name);
+      if (btn && btn.dataset.active !== '1') toggleInvertMethod(name);
+    }});
+    updateDisabledCount();
+  }}).catch(() => {{}});
 }}
 
 // ── Пресеты методов (data/method_presets.json на сервере) ──────────────────
@@ -6321,6 +6352,11 @@ async function loadSupervisorLog() {{
 document.addEventListener('DOMContentLoaded', () => {{
   const det = document.querySelector('#supervisor_panel details');
   if (det) det.addEventListener('toggle', () => {{ if (det.open) loadSupervisorLog(); }});
+  // Восстанавливаем вкл/выкл методов сразу при загрузке страницы — иначе
+  // верхняя панель чекбоксов стартует пустой (initMethodCheckboxes ленивый,
+  // вызывается только при первом открытии панели), и до первого клика по
+  // "показать/скрыть" непонятно, что реально выключено сейчас.
+  restoreMethodToggleState();
 }});
 
 // ── Гибкий выбор тикеров (ticker_universe.py) ───────────────────────
@@ -8324,6 +8360,34 @@ def delete_method_preset(name: str) -> None:
             json.dump(presets, f, ensure_ascii=False, indent=2)
 
 
+# ── Текущее состояние вкл/выкл методов (переживает перезагрузку страницы) ──
+# В отличие от именованных пресетов (сохраняются вручную кнопкой), это —
+# автосохранение при каждом изменении чекбоксов. Раньше чекбоксы верхней
+# панели всегда стартовали пустыми при загрузке страницы, а низ (глобальная
+# статистика прогона) держал disabled-флаг из уже посчитанных результатов —
+# после reload это расходилось: внизу метод показан выключенным, вверху
+# чекбокс снят, и непонятно, что реально применится в следующем прогоне.
+METHOD_TOGGLE_STATE_FILE = "data/method_toggle_state.json"
+
+
+def get_method_toggle_state() -> dict:
+    try:
+        with open(METHOD_TOGGLE_STATE_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        return {"disabled": data.get("disabled") or [], "inverted": data.get("inverted") or []}
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"disabled": [], "inverted": []}
+
+
+def save_method_toggle_state(disabled: list, inverted: list) -> None:
+    os.makedirs(os.path.dirname(METHOD_TOGGLE_STATE_FILE), exist_ok=True)
+    with open(METHOD_TOGGLE_STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump(
+            {"disabled": sorted(set(disabled or [])), "inverted": sorted(set(inverted or []))},
+            f, ensure_ascii=False, indent=2,
+        )
+
+
 # ── Снимки обученных весов (data/weights_snapshots/*.json) ──────────────────
 WEIGHTS_SNAPSHOTS_DIR = "data/weights_snapshots"
 OI_WEIGHTS_FILE = "oi_weights.json"
@@ -8706,6 +8770,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(sorted(_all_settings_by_ticker().keys()))
         elif self.path == "/api/method_presets":
             self._send_json(get_method_presets())
+        elif self.path == "/api/method_toggle_state":
+            self._send_json(get_method_toggle_state())
         elif self.path == "/api/moex_token_status":
             self._send_json(get_moex_token_status())
         elif self.path == "/api/weights_snapshots":
@@ -8995,6 +9061,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(err if err else {"ok": True})
         elif self.path == "/api/method_presets_delete":
             delete_method_preset(payload.get("name", ""))
+            self._send_json({"ok": True})
+        elif self.path == "/api/method_toggle_state_save":
+            save_method_toggle_state(payload.get("disabled") or [], payload.get("inverted") or [])
             self._send_json({"ok": True})
         elif self.path == "/api/weights_snapshot_save":
             self._send_json(save_weights_snapshot(payload.get("name"), payload.get("weights") or {}))
