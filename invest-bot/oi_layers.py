@@ -21,6 +21,7 @@ import json
 import logging
 import math
 import os
+import ssl
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
@@ -33,6 +34,24 @@ from signal_gate import oi_regime_instability
 __all__ = ("OiLayersService",)
 
 logger = logging.getLogger(__name__)
+
+_SSL_CTX = None
+
+
+def _ssl_ctx():
+    """SSL-контекст с валидным CA-бандлом. На части машин системный CA-стор
+    битый/пустой → 'unable to get local issuer certificate' на iss.moex.com/
+    apim.moex.com. certifi несёт свой актуальный бандл — используем его, если
+    установлен (он и так тянется как транзитивная зависимость); иначе дефолт.
+    Кэшируем — создание контекста не бесплатно."""
+    global _SSL_CTX
+    if _SSL_CTX is None:
+        try:
+            import certifi
+            _SSL_CTX = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            _SSL_CTX = ssl.create_default_context()
+    return _SSL_CTX
 
 POLL_MINUTES = 5     # ОИ обновляется раз в 5 минут на границах :00/:05
 FRESH_DAYS = 5        # слой младше — "свежий"
@@ -58,7 +77,7 @@ def _fetch_iss_contracts(stock_ticker: str) -> list[dict]:
         url = (f"{MOEX_ISS}/engines/futures/markets/forts/boards/RFUD/securities.json"
                f"?iss.meta=off&securities.columns=SECID,LASTTRADEDATE")
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; invest-bot/1.0)"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15, context=_ssl_ctx()) as resp:
             data = json.load(resp)
         block = data.get("securities", {})
         cols = block.get("columns", [])
@@ -79,7 +98,7 @@ def _fetch_iss_contracts(stock_ticker: str) -> list[dict]:
                                          "securities.columns": "secid,matdate,type"})
         url = f"{MOEX_ISS}/securities.json?{params}"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; invest-bot/1.0)"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15, context=_ssl_ctx()) as resp:
             data = json.load(resp)
         block = data.get("securities", {})
         cols = block.get("columns", [])
@@ -219,7 +238,7 @@ def _fetch_futoi_snapshot(sym: str) -> dict | None:
         "User-Agent": "Mozilla/5.0 (compatible; invest-bot/1.0)",
     })
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15, context=_ssl_ctx()) as resp:
             data = json.load(resp)
     except Exception as e:
         logger.warning(f"oi_layers: futoi запрос {sym} упал: {e}")
@@ -605,7 +624,7 @@ def _worker_get(base_url: str, path: str, timeout: int = 20):
         # единственная защита на пути была as-is, и её сносило edge).
         "User-Agent": "Mozilla/5.0 (compatible; invest-bot/1.0)",
     })
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx()) as resp:
         return json.load(resp)
 
 
