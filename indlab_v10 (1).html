@@ -9164,6 +9164,11 @@ const _IL_ALT_ID_DESC = {
      + 'сила непрерывна по z-score амплитуды спайка относительно собственного разброса '
      + '(а не бинарные ±2); плюс подтверждение ЦЕНОЙ — разворот на вершине засчитывается, '
      + 'только если цена не пробила свой недавний диапазон (пробой глушит сигнал вдвое).',
+  adx: 'Растущий ADX при СХОДЯЩИХСЯ +DI/−DI — не подтверждение тренда, а признак '
+     + 'истощения направления: сила тренда растёт, а направление слабеет (типично перед '
+     + 'разворотом/флэтом). Контрсигнал против текущего направления, сила ∝ скорости '
+     + 'сближения DI-линий, а не уровню ADX. Общий стрик-фейд смотрел только на итоговый '
+     + 'ADX и не видел, какая из линий доминирует.',
 };
 function _ilAltFamilyDesc(id) {
   if (_IL_ALT_ID_DESC[id]) return _IL_ALT_ID_DESC[id];
@@ -13841,6 +13846,39 @@ function _ilAltFisher(candles, period, lookback){
   return out;
 }
 
+// ADX-специфичный альт (ТЗ 2.5): ADX — сглаженный индекс СИЛЫ тренда со своей
+// направленной парой +DI/−DI, которую общий стрик-фейд игнорировал (смотрел
+// только на итоговый ADX-скор). Растущий ADX при СХОДЯЩИХСЯ +DI/−DI — сила
+// тренда растёт, а направление слабеет: типично перед разворотом/флэтом. Даём
+// КОНТРсигнал против текущего направления, сила ∝ скорости сближения DI (а не
+// абсолютному уровню ADX).
+function _ilAltADX(candles, period, lookback){
+  period = period||14; lookback = lookback||4;
+  const arr = ilCalcADX(candles, period);
+  const n = candles.length;
+  const out = new Array(n).fill(null);
+  for (let i=lookback+2; i<n; i++){
+    const a = arr[i], aPrev = arr[i-lookback];
+    if (!a || a.adx==null || !aPrev || aPrev.adx==null){ out[i] = (a&&a.adx!=null)?0:null; continue; }
+    const adxRising = a.adx > aPrev.adx;
+    const gapNow = Math.abs(a.diPlus - a.diMinus);
+    const gapPrev = Math.abs(aPrev.diPlus - aPrev.diMinus);
+    // Сходятся несколько баров подряд: разрыв сейчас меньше, чем lookback назад,
+    // И промежуточный бар тоже был шире (монотонность приближённо).
+    const aMid = arr[i - (lookback>>1)];
+    const gapMid = aMid && aMid.adx!=null ? Math.abs(aMid.diPlus - aMid.diMinus) : gapPrev;
+    const converging = gapNow < gapMid && gapMid <= gapPrev;
+    if (adxRising && converging && a.adx >= 20 && gapPrev > 1e-6){
+      const dir = a.diPlus > a.diMinus ? 1 : -1;                 // текущее направление
+      const conv = Math.max(0, Math.min(1, (gapPrev - gapNow) / gapPrev)); // скорость сближения
+      out[i] = -dir * 2 * conv;                                  // контрсигнал, сила ∝ conv
+    } else {
+      out[i] = 0;
+    }
+  }
+  return out;
+}
+
 // 2/3. Тренд и Канал: «истощение/band-walk» — если классический скор держится
 // streakLen баров подряд на своём собственном максимуме по модулю (а не на
 // жёстком ±2 — у Parabolic/SuperTrend шкала ±1, у MACD/ADX ±2, формула сама
@@ -13973,6 +14011,8 @@ function _ilAltScoreSeries(id, ss, closes, candles, chopArr) {
   if (id === 'rsi') return _ilAltRSI(closes, 14, 10);
   // Fisher — родная механика Ehlers (ТЗ 2.3), а не общий стрик-фейд тренд-группы.
   if (id === 'fisher') return _ilAltFisher(candles, 10, 10);
+  // ADX — через сходимость +DI/−DI (ТЗ 2.5), а не итоговый ADX-скор.
+  if (id === 'adx') return _ilAltADX(candles, 14, 4);
   const fam = _ilAltFamilyOf(id);
   const scoreArr = ss[id];
   switch (fam) {
@@ -14129,6 +14169,9 @@ function _anParamSuffix(id, p) {
 // Подбирает по бэктесту лучший период для каждого индикатора (вместо классического),
 // альт-серия считается потом от ss[id] — т.е. наследует подобранный период автоматически.
 const _IL_ADAPTIVE_GRID = [7,9,11,14,18,21,25,30];
+// ADX — сглаженный фильтр СИЛЫ тренда; короткие периоды (<14) противоречат его
+// цели (сам становится шумным и пилит) — исключены из сетки (ТЗ 2.5).
+const _IL_ADX_GRID = [14,18,21,25,30];
 // ── Walk-forward подбор периода (портировано из method_calibrator.py) ─────────
 // Часть 0 ТЗ: без этой методологии любая локальная правка индикатора наследует
 // системный оверфит. Заменяет прежний argmax по СЫРОМУ acc на фикс-горизонте 15
@@ -14220,7 +14263,7 @@ function _ilAdaptiveSeries(candles, closes, baseSS) {
   pick('wr',  _IL_ADAPTIVE_GRID, p => ilCalcWR(candles, p).map(v => v==null?null:ilScore.wr(v)));
   pick('cci', _IL_ADAPTIVE_GRID, p => ilCalcCCI(candles, p).map(v => v==null?null:ilScore.cci(v)));
   pick('mfi', _IL_ADAPTIVE_GRID, p => ilCalcMFI(candles, p).map(v => v==null?null:ilScore.mfi(v)));
-  pick('adx', _IL_ADAPTIVE_GRID, p => ilCalcADX(candles, p).map((_,i,a) => ilScoreADX(a,i)));
+  pick('adx', _IL_ADX_GRID, p => ilCalcADX(candles, p).map((_,i,a) => ilScoreADX(a,i)));  // ТЗ 2.5: без коротких периодов
   pick('bb',  _IL_ADAPTIVE_GRID, p => { const b=_chartCalcBB(closes,p,2); return b.map((bb,i) => bb==null?null:ilScore.bb((closes[i]-bb.lower)/((bb.upper-bb.lower)||1)*100)); });
   pick('stoch', _IL_ADAPTIVE_GRID, p => { const s=ilCalcStoch(candles,p,3); return s.map(v => (v.k==null||v.d==null)?null:ilScoreStoch(v.k,v.d)); });
   pick('supertrend', _IL_ADAPTIVE_GRID, p => ilCalcSuperTrend(candles, p, 3).map((_,i,a) => ilScoreSuperTrend(a,i)));
