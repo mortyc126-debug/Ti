@@ -9172,6 +9172,21 @@ const _IL_ALT_ID_DESC = {
   cci: 'Экстремум CCI при НЕСТАБИЛЬНОМ знаменателе (среднее отклонение ниже своей '
      + '20-барной медианы) — чаще от деления на почти-ноль, чем от реального движения; '
      + 'такой выброс гасится, а не читается как обычная перекупленность/перепроданность.',
+  elder_ray: 'Обусловленное направлением EMA чтение (методика Элдера): в АПТРЕНДЕ '
+     + 'следим за bear power — если он ушёл в плюс, покупатели потеряли способность '
+     + 'толкать вниз в откате (тревога). В ДАУНТРЕНДЕ — за bull power, ушедшим в минус. '
+     + 'Плюс нормировка на ATR14 — работает на любой волатильности без магических порогов. '
+     + 'Плоский снимок 2×2 (старое) не различал ситуацию с трендом и без него.',
+  elder_impulse: 'Фильтр-разрешение по Элдеру (зелёный/красный/синий), не самостоятельный '
+     + 'предиктор: ±2 когда EMA и MACD-гистограмма СОГЛАСНЫ по направлению за LAG=3 бара '
+     + 'подряд минимум HYST=2 бара; 0 при разногласии («синий» блокирует полностью, а не '
+     + 'усредняется в слабый сигнал). Амплитуда модулирует силу только ВНУТРИ уже '
+     + 'согласованного состояния. Однобарные signs (старое) дёргались у разворотов.',
+  donchian: 'Не позиция в канале (у Donchian pos∈[0,100] по построению — band-walk '
+     + 'ФИЗИЧЕСКИ невозможен), а СВЕЖЕСТЬ пробоя (turtle-breakout): новый экстремум high/low '
+     + 'даёт ±1 или ±2 (сильнее если пробой из сжатия — ширина канала ниже собственного '
+     + '60-барного фона С ЛАГОМ 10 баров). Затухание за 5 баров после пробоя. Без лага '
+     + 'фон подглядывал бы сам себя, задирая базовую линию.',
 };
 function _ilAltFamilyDesc(id) {
   if (_IL_ALT_ID_DESC[id]) return _IL_ALT_ID_DESC[id];
@@ -13935,6 +13950,159 @@ function _ilAltCCI(candles, period, mdLb){
   return out;
 }
 
+// Elder Ray-специфичный альт (ТЗ Часть Д 3.4): классическая методика Элдера —
+// не статичный снимок пары (bull, bear), а ОБУСЛОВЛЕННОЕ направлением EMA
+// чтение: в аптренде тревога — bear power, ушедший в плюс (импульс покупателей
+// иссяк); в даунтренде — bull power, ушедший в минус. Плюс нормировка на ATR
+// вместо жёстких порогов — чтобы формула работала на инструментах с разной
+// волатильностью без магических констант.
+// Альтернативу с дивергенцией (bear/bull относительно прошлого экстремума)
+// ТЗ явно отвергло: это тот же ряд, прочитанный двумя способами — иллюзия
+// консенсуса, не два независимых свидетеля.
+function _ilAltElderRay(closes, candles, period){
+  period = period || 13;
+  const n = candles.length;
+  const ema = _chartCalcEMA(closes, period);
+  const atr = ilCalcATR(candles, 14);
+  const out = new Array(n).fill(null);
+  for (let i = 3; i < n; i++){
+    if (ema[i]==null || ema[i-3]==null || atr[i]==null || atr[i]<=0){ out[i]=0; continue; }
+    const trendDir = ema[i] > ema[i-3] ? 1 : (ema[i] < ema[i-3] ? -1 : 0);
+    if (trendDir === 0){ out[i]=0; continue; }
+    const bull = candles[i].high - ema[i];
+    const bear = candles[i].low  - ema[i];
+    // В аптренде читаем bear (тревога = bear ушёл в плюс, потерял способность
+    // толкать вниз в откате), в даунтренде — bull (тревога = bull в минусе).
+    const power = trendDir === 1 ? bear : bull;
+    // Смещение trendDir·2 = базовый уклон по тренду, power/ATR — модификатор.
+    // При power против тренда (напр., bull<0 в даунтренде) итог усиливает минус.
+    const raw = trendDir * 2 + power / atr[i];
+    out[i] = Math.max(-2, Math.min(2, raw));
+  }
+  return out;
+}
+
+// Elder Impulse-специфичный альт (ТЗ Часть Д 3.5): сирота (в argmax, но не в
+// _IL_GROUPS — Б.3). Оригинальная методика — фильтр-разрешение (зелёный/красный/
+// синий), не самостоятельный предиктор. Однобарные emaDir/macdDir дёрганы у
+// разворотов, поэтому используем разность за LAG=3 барa, а окончательное
+// решение подтверждаем HYST=2 бара удержания — чтобы шум одного бара не
+// протаскивал ложный флип. Амплитуда модулирует силу только ВНУТРИ уже
+// согласованного состояния; жёсткий 0 при разногласии сохраняется.
+// Отвергнуто ТЗ: непрерывная сумма emaTrendCont+macdTrendCont — тихо стирает
+// «синий»-случай (несогласие) в слабый сигнал.
+function _ilAltElderImpulse(closes, candles, period){
+  period = period || 13;
+  const LAG = 3, HYST = 2;
+  const n = candles.length;
+  const ema = _chartCalcEMA(closes, period);
+  const macdR = _chartCalcMACD(closes, 12, 26, 9);
+  const hist = macdR.hist;
+  // sRaw ∈ {-2, 0, +2}
+  const sRaw = new Array(n).fill(0);
+  for (let i = LAG; i < n; i++){
+    if (ema[i]==null || ema[i-LAG]==null || hist[i]==null || hist[i-LAG]==null){ sRaw[i]=0; continue; }
+    const emaSign  = Math.sign(ema[i]  - ema[i-LAG]);
+    const macdSign = Math.sign(hist[i] - hist[i-LAG]);
+    sRaw[i] = emaSign + macdSign;
+  }
+  // Гистерезис: подтверждённое s меняется только если HYST баров подряд один знак.
+  const sConf = new Array(n).fill(0);
+  for (let i = HYST; i < n; i++){
+    const win = sRaw.slice(i - HYST + 1, i + 1);
+    if (win.every(v => v === sRaw[i]) && sRaw[i] !== 0) sConf[i] = sRaw[i];
+    else sConf[i] = sConf[i-1] || 0;
+  }
+  // Локальный масштаб наклонов — свой per-tick пол.
+  function slopeFloor(arr, win, ratio){
+    return (i) => {
+      let sSh=0, cSh=0, sLo=0, cLo=0;
+      for (let j = Math.max(1, i-win+1); j <= i; j++){ if(arr[j]!=null && arr[j-1]!=null){ sSh += Math.abs(arr[j]-arr[j-1]); cSh++; } }
+      for (let j = Math.max(1, i-100+1); j <= i; j++){ if(arr[j]!=null && arr[j-1]!=null){ sLo += Math.abs(arr[j]-arr[j-1]); cLo++; } }
+      const shortAvg = cSh>0 ? sSh/cSh : 0;
+      const longAvg  = cLo>0 ? sLo/cLo : 0;
+      return Math.max(shortAvg, ratio * longAvg, 1e-9);
+    };
+  }
+  const emaFloor  = slopeFloor(ema,  20, 0.1);
+  const macdFloor = slopeFloor(hist, 20, 0.1);
+  const out = new Array(n).fill(null);
+  for (let i = LAG + HYST; i < n; i++){
+    if (sConf[i] === 0){ out[i] = 0; continue; }
+    if (ema[i]==null || ema[i-1]==null || hist[i]==null || hist[i-1]==null){ out[i]=0; continue; }
+    const ampEma  = Math.abs(ema[i]  - ema[i-1])  / emaFloor(i);
+    const ampMacd = Math.abs(hist[i] - hist[i-1]) / macdFloor(i);
+    const amp = (ampEma + ampMacd) / 2;
+    out[i] = Math.sign(sConf[i]) * Math.max(0, Math.min(2, amp));
+  }
+  return out;
+}
+
+// Donchian-специфичный альт (ТЗ Часть Д 3.7): у Donchian pos∈[0,100] ВСЕГДА,
+// потому что hh включает high[i] и ll включает low[i] (окно содержит текущий
+// бар). Band-walk в BB-смысле физически невозможен — стрик на maxAbs — не
+// редкое статистическое событие, а почти дефолт любого ровного тренда.
+// Классическая методика Donchian (turtle-breakout) — не про позицию в канале,
+// а про СОБЫТИЕ: сделан ли новый экстремум. Ширина канала как контекст
+// пробоя (пробой из сжатия сильнее), с ЛАГОМ — чтобы надвигающийся пробой не
+// подглядывал сам себя, задирая свою же базовую линию.
+function _ilAltDonchian(candles, period){
+  period = period || 20;
+  const n = candles.length;
+  const highs = candles.map(x => x.high);
+  const lows  = candles.map(x => x.low);
+  const closes = candles.map(x => x.close);
+  const hh = new Array(n).fill(null), ll = new Array(n).fill(null);
+  for (let i = period-1; i < n; i++){
+    let mh = -Infinity, ml = Infinity;
+    for (let j = i-period+1; j <= i; j++){ if(highs[j]>mh) mh=highs[j]; if(lows[j]<ml) ml=lows[j]; }
+    hh[i]=mh; ll[i]=ml;
+  }
+  // width_norm[i] = (hh - ll) / close — нормировано на цену (per-ticker)
+  const widthNorm = new Array(n).fill(null);
+  for (let i = period-1; i < n; i++){
+    if (closes[i] > 0) widthNorm[i] = (hh[i] - ll[i]) / closes[i];
+  }
+  const out = new Array(n).fill(null);
+  let barsSinceFreshHigh = 999, barsSinceFreshLow = 999;
+  let lastHiStr = 0, lastLoStr = 0;
+  for (let i = period; i < n; i++){
+    if (hh[i]==null || hh[i-1]==null || ll[i]==null || ll[i-1]==null){ out[i]=0; continue; }
+    const freshHigh = hh[i] > hh[i-1];
+    const freshLow  = ll[i] < ll[i-1];
+    // Фон ширины считаем С ЛАГОМ [i-60 .. i-10], а не [i-50 .. i-1]
+    let wsum = 0, wcnt = 0;
+    for (let j = Math.max(period-1, i-60); j <= i-10; j++){
+      if (widthNorm[j] != null){ wsum += widthNorm[j]; wcnt++; }
+    }
+    const widthAvg = wcnt > 0 ? wsum / wcnt : null;
+    const currentWidth = widthNorm[i];
+    if (freshHigh){
+      const compress = (widthAvg != null && currentWidth < 0.7 * widthAvg);
+      lastHiStr = compress ? 2 : 1;   // пробой из сжатия сильнее
+      barsSinceFreshHigh = 0;
+      out[i] = lastHiStr;
+    } else if (freshLow){
+      const compress = (widthAvg != null && currentWidth < 0.7 * widthAvg);
+      lastLoStr = compress ? 2 : 1;
+      barsSinceFreshLow = 0;
+      out[i] = -lastLoStr;
+    } else {
+      barsSinceFreshHigh++;
+      barsSinceFreshLow++;
+      // Линейное затухание от собственной силы за 5 баров.
+      if (barsSinceFreshHigh <= 5 && barsSinceFreshHigh > 0){
+        out[i] = lastHiStr * (1 - barsSinceFreshHigh / 5);
+      } else if (barsSinceFreshLow <= 5 && barsSinceFreshLow > 0){
+        out[i] = -lastLoStr * (1 - barsSinceFreshLow / 5);
+      } else {
+        out[i] = 0;
+      }
+    }
+  }
+  return out;
+}
+
 // 2/3. Тренд и Канал: «истощение/band-walk» — если классический скор держится
 // streakLen баров подряд на своём собственном максимуме по модулю (а не на
 // жёстком ±2 — у Parabolic/SuperTrend шкала ±1, у MACD/ADX ±2, формула сама
@@ -14100,6 +14268,13 @@ function _ilAltScoreSeries(id, ss, closes, candles, chopArr) {
   if (id === 'adx') return _ilAltADX(candles, 14, 4);
   // CCI — гасим экстремумы при нестабильном знаменателе (ТЗ 2.6).
   if (id === 'cci') return _ilAltCCI(candles, 20, 20);
+  // Elder Ray — обусловленное направлением EMA чтение bear/bull (ТЗ Часть Д 3.4).
+  if (id === 'elder_ray') return _ilAltElderRay(closes, candles, 13);
+  // Elder Impulse — LAG=3, HYST=2 гистерезис + амплитуда как модулятор (ТЗ Часть Д 3.5).
+  if (id === 'elder_impulse') return _ilAltElderImpulse(closes, candles, 13);
+  // Donchian — свежесть пробоя + ширина канала с лагом (ТЗ Часть Д 3.7). У Donchian
+  // pos∈[0,100] всегда — band-walk невозможен, унаследованный от 2.8 фикс здесь неверен.
+  if (id === 'donchian') return _ilAltDonchian(candles, 20);
   const fam = _ilAltFamilyOf(id);
   const scoreArr = ss[id];
   switch (fam) {
