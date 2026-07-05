@@ -92,23 +92,61 @@ def _resolve_creds(args_url: Optional[str], args_key: Optional[str],
     return url.rstrip("/"), key
 
 
-def _fetch_candles(base_url: str, api_key: str, ticker: str,
-                    date_from: str, date_to: str, timeout: int = 60) -> list[dict]:
-    """GET /candles/<ticker>?from=&to= — тот же контракт, что db_api_client.get_candles."""
+def _fetch_chunk(base_url: str, api_key: str, ticker: str,
+                  date_from: str, date_to: str, timeout: int = 60) -> list[dict]:
+    """Один GET /candles/<ticker>?from=&to= с двумя попытками (D1 иногда
+    отдаёт «холодный старт» ощутимо медленнее — как и db_api_client.get_candles)."""
     url = f"{base_url}/candles/{ticker}?from={date_from}&to={date_to}"
-    req = urllib.request.Request(url, method="GET", headers={
+    headers = {
         "X-API-Key": api_key,
         "User-Agent": "Mozilla/5.0 (compatible; tpcolor-dataset/1.0)",
-    })
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.load(resp)
-    except urllib.error.HTTPError as ex:
-        body = ex.read().decode("utf-8", errors="replace")[:300]
-        sys.exit(f"HTTP {ex.code} от коллектора: {body}")
-    except (urllib.error.URLError, TimeoutError, ConnectionError) as ex:
-        sys.exit(f"не смог достучаться до коллектора: {ex}")
-    rows = data.get("candles", [])
+    }
+    last_err: Optional[str] = None
+    for attempt in range(3):
+        req = urllib.request.Request(url, method="GET", headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.load(resp).get("candles", [])
+        except urllib.error.HTTPError as ex:
+            body = ex.read().decode("utf-8", errors="replace")[:300]
+            sys.exit(f"HTTP {ex.code} от коллектора: {body}")
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as ex:
+            last_err = str(ex)
+            if attempt < 2:
+                # 2s, 6s — линейный бэкофф, воркеру дать очнуться
+                import time as _t
+                _t.sleep(2 * (attempt + 1) ** 2)
+    sys.exit(f"не смог достучаться до коллектора ({date_from}..{date_to}): {last_err}")
+
+
+def _fetch_candles(base_url: str, api_key: str, ticker: str,
+                    date_from: str, date_to: str,
+                    chunk_days: int = 30, timeout: int = 60) -> list[dict]:
+    """Тянет период по чанкам ~chunk_days — большой одиночный GET воркер
+    иногда режет по CPU-таймауту (те же грабли, что в db_api_client при
+    150+ днях), и мы получаем read timeout вместо данных. Чанкование
+    даёт стабильные быстрые ответы + прогресс в stderr."""
+    df = datetime.strptime(date_from, "%Y-%m-%d").date()
+    dt = datetime.strptime(date_to, "%Y-%m-%d").date()
+    rows: list[dict] = []
+    seen: set[str] = set()
+    cur = df
+    total_days = (dt - df).days + 1
+    done = 0
+    while cur <= dt:
+        chunk_to = min(cur + timedelta(days=chunk_days - 1), dt)
+        got = _fetch_chunk(base_url, api_key, ticker,
+                            cur.isoformat(), chunk_to.isoformat(), timeout)
+        added = 0
+        for r in got:
+            if r["time"] not in seen:
+                seen.add(r["time"])
+                rows.append(r)
+                added += 1
+        done += (chunk_to - cur).days + 1
+        print(f"  чанк {cur}..{chunk_to}: {added} свечей  ({done}/{total_days} дней)",
+              file=sys.stderr)
+        cur = chunk_to + timedelta(days=1)
     if not rows:
         sys.exit(f"{ticker}: коллектор вернул 0 свечей за {date_from}..{date_to}")
     rows.sort(key=lambda r: r["time"])
@@ -372,6 +410,10 @@ def main() -> None:
     ap.add_argument("--min-volume", type=float, default=0.0)
     ap.add_argument("--out", default=None, help="путь к CSV (иначе только сводка)")
     ap.add_argument("--plot", action="store_true")
+    ap.add_argument("--chunk-days", type=int, default=30,
+                     help="размер чанка HTTP-запросов к коллектору (default 30)")
+    ap.add_argument("--timeout", type=int, default=60,
+                     help="таймаут одного HTTP-запроса, сек (default 60)")
     args = ap.parse_args()
 
     base_url, api_key = _resolve_creds(args.url, args.api_key, args.settings)
@@ -384,7 +426,8 @@ def main() -> None:
     print(f"→ GET {base_url}/candles/{args.ticker}?from={from_date}&to={to_date}",
           file=sys.stderr)
     candles = _fetch_candles(base_url, api_key, args.ticker,
-                              from_date.isoformat(), to_date.isoformat())
+                              from_date.isoformat(), to_date.isoformat(),
+                              chunk_days=args.chunk_days, timeout=args.timeout)
     print(f"  получено {len(candles)} свечей", file=sys.stderr)
 
     if len(candles) < max(args.n_macro, args.w_norm) + args.k + 5:
