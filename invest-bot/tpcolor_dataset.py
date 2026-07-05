@@ -403,19 +403,39 @@ def _print_split(label: str, pos: list[float], neg: list[float]) -> None:
               f"    Δmean={ma-mb:+.4f}   Welch-t={t:+.2f}")
 
 
-def _quadrant_report(rows: list[dict], t_lo: float, p_hi: float,
+def _percentile(xs_sorted: list[float], p: float) -> Optional[float]:
+    """Линейная интерполяция между соседними точками отсортированного списка."""
+    if not xs_sorted:
+        return None
+    k = (len(xs_sorted) - 1) * p / 100.0
+    lo = int(math.floor(k))
+    hi = int(math.ceil(k))
+    if lo == hi:
+        return xs_sorted[lo]
+    return xs_sorted[lo] + (xs_sorted[hi] - xs_sorted[lo]) * (k - lo)
+
+
+def _local_thresholds(rows: list[dict], t_pctl: float, p_pctl: float
+                        ) -> tuple[Optional[float], Optional[float]]:
+    """(t_lo, p_hi), где t_lo = t_pctl-й процентиль T̂ по rows, p_hi = p_pctl-й
+    процентиль P̂. Percentile берётся ЛОКАЛЬНО (по конкретному тикеру или пулу)."""
+    t_vals = sorted(r["T_hat"] for r in rows if r["T_hat"] is not None)
+    p_vals = sorted(r["P_hat"] for r in rows if r["P_hat"] is not None)
+    return _percentile(t_vals, t_pctl), _percentile(p_vals, p_pctl)
+
+
+def _quadrant_report(rows: list[dict], filter_fn, filter_desc: str,
                       title: str) -> dict:
-    """§8.3: baseline (все валидные бары) vs квадрант (T̂<t_lo & P̂>p_hi),
+    """§8.3: baseline (все валидные бары) vs квадрант (filter_fn(row)==True),
     в каждом делит по знаку color̂ и печатает статистику fwd_ret_k."""
     print(f"\n=== §8.3 quadrant-check: {title} ===")
-    print(f"пороги: T̂ < {t_lo:+.2f}   P̂ > {p_hi:+.2f}")
+    print(f"пороги: {filter_desc}")
 
     base_pos, base_neg = _split_by_color(rows, lambda r: True)
-    quad_pos, quad_neg = _split_by_color(
-        rows, lambda r: r["T_hat"] < t_lo and r["P_hat"] > p_hi)
+    quad_pos, quad_neg = _split_by_color(rows, filter_fn)
 
-    _print_split("baseline (без T/P-фильтра):", base_pos, base_neg)
-    _print_split(f"квадрант (низкая T, высокая P):", quad_pos, quad_neg)
+    _print_split("baseline (без фильтра):", base_pos, base_neg)
+    _print_split("квадрант (низкая T, высокая P):", quad_pos, quad_neg)
 
     _, d_base = _welch(base_pos, base_neg)
     _, d_quad = _welch(quad_pos, quad_neg)
@@ -437,36 +457,60 @@ def _quadrant_report(rows: list[dict], t_lo: float, p_hi: float,
     }
 
 
-def _quadrant_d(rows: list[dict], t_lo: float, p_hi: float) -> tuple[int, Optional[float]]:
+def _quadrant_d(rows: list[dict], filter_fn) -> tuple[int, Optional[float]]:
     """Тихий вариант _quadrant_report: только количество и d_quad."""
-    quad_pos, quad_neg = _split_by_color(
-        rows, lambda r: r["T_hat"] < t_lo and r["P_hat"] > p_hi)
+    quad_pos, quad_neg = _split_by_color(rows, filter_fn)
     _, d = _welch(quad_pos, quad_neg)
     return len(quad_pos) + len(quad_neg), d
 
 
-def _sweep_report(rows: list[dict], title: str,
-                    t_grid: list[float], p_grid: list[float]) -> None:
-    """Сетка (t_lo, p_hi) × Cohen's d в квадранте. Растёт ли d при
-    ужесточении границ — сигнал структурный; падает — часть эффекта была
-    шумом на границе."""
-    print(f"\n=== §8.3 sweep порогов: {title} ===")
+def _sweep_report(rows: list[dict], title: str, mode: str) -> None:
+    """Сетка (t, p) × Cohen's d в квадранте. Растёт ли d при ужесточении
+    границ — сигнал структурный; падает — часть эффекта была шумом на границе.
+
+    mode="abs" — сетка в глобальных z-скорах (одна и та же для всех).
+    mode="pctl" — сетка в процентилях: границы считаются от локального
+    распределения rows (для одного тикера — по нему; для пула — по пулу).
+    """
+    print(f"\n=== §8.3 sweep порогов: {title} ({mode}) ===")
     _, d_base = _welch(*_split_by_color(rows, lambda r: True))
     print(f"baseline |d| = {abs(d_base):.4f}" if d_base is not None else "baseline |d| = n/a")
-    header = "T̂ \\ P̂  |" + "".join(f"  P>{p:+.2f}   " for p in p_grid)
+
+    if mode == "abs":
+        t_grid = [-0.25, -0.5, -1.0, -1.5]
+        p_grid = [+0.25, +0.5, +1.0, +1.5]
+        t_labels = [f"T<{t:+.2f}" for t in t_grid]
+        p_labels = [f"P>{p:+.2f}" for p in p_grid]
+        t_cuts = t_grid
+        p_cuts = p_grid
+    else:  # pctl — процентили нижнего T̂ и верхнего P̂
+        t_pctls = [10.0, 5.0, 2.5, 1.0]
+        p_pctls = [75.0, 90.0, 95.0, 99.0]
+        t_vals = sorted(r["T_hat"] for r in rows if r["T_hat"] is not None)
+        p_vals = sorted(r["P_hat"] for r in rows if r["P_hat"] is not None)
+        t_cuts = [_percentile(t_vals, q) for q in t_pctls]
+        p_cuts = [_percentile(p_vals, q) for q in p_pctls]
+        t_labels = [f"T<p{q:>4}" for q in t_pctls]
+        p_labels = [f"P>p{q:>4}" for q in p_pctls]
+
+    header = "T̂ \\ P̂    |" + "".join(f"  {lbl}    " for lbl in p_labels)
     print(header)
     print("-" * len(header))
-    for t in t_grid:
+    for t_lbl, t_cut in zip(t_labels, t_cuts):
         cells = []
-        for p in p_grid:
-            n, d = _quadrant_d(rows, t, p)
+        for p_cut in p_cuts:
+            if t_cut is None or p_cut is None:
+                cells.append("    n/a    ")
+                continue
+            n, d = _quadrant_d(rows, lambda r, tc=t_cut, pc=p_cut:
+                                r["T_hat"] < tc and r["P_hat"] > pc)
             if d is None or n < 200:
                 cells.append(f"    n={n:>5}")
             else:
                 ratio = abs(d) / abs(d_base) if d_base and abs(d_base) > 1e-9 else float("inf")
                 cells.append(f"{d:+.3f}×{ratio:>4.1f}")
-        print(f"T<{t:+.2f} |" + "  ".join(cells))
-    print("  (клетка «d × ratio»; клетка «n=N» — точек мало, d ненадёжен)")
+        print(f"{t_lbl:<10}|" + "  ".join(cells))
+    print("  (клетка «d × ratio»; «n=N» — точек мало, d ненадёжен)")
 
 
 def _report(rows: list[dict], ticker: str, k: int) -> None:
@@ -552,7 +596,16 @@ def main() -> None:
     ap.add_argument("--quadrant-per-ticker", default=None,
                      help="только ALL: CSV с d_quad по каждому тикеру "
                           "(проверка, что эффект размазан, а не держится на 5 ликвидах).")
+    ap.add_argument("--t-pctl", type=float, default=None,
+                     help="ЛОКАЛЬНЫЙ порог: нижний процентиль T̂ у каждого "
+                          "тикера (напр. 5 → нижние 5%%). Переопределяет --t-lo.")
+    ap.add_argument("--p-pctl", type=float, default=None,
+                     help="ЛОКАЛЬНЫЙ порог: верхний процентиль P̂ у каждого "
+                          "тикера (напр. 90 → верхние 10%%). Переопределяет --p-hi.")
     args = ap.parse_args()
+
+    if (args.t_pctl is None) != (args.p_pctl is None):
+        sys.exit("--t-pctl и --p-pctl либо оба заданы, либо оба нет.")
 
     if args.ticker.upper() == "ALL":
         _run_all(args)
@@ -605,11 +658,18 @@ def _run_single(args, ticker: str) -> None:
     _report(rows, ticker, args.k)
 
     if args.quadrant_check or args.quadrant_sweep:
-        _quadrant_report(rows, args.t_lo, args.p_hi, ticker)
+        if args.t_pctl is not None:
+            t_lo, p_hi = _local_thresholds(rows, args.t_pctl, args.p_pctl)
+            desc = (f"T̂ < p{args.t_pctl}={t_lo:+.2f}   "
+                    f"P̂ > p{args.p_pctl}={p_hi:+.2f} (локальные)")
+        else:
+            t_lo, p_hi = args.t_lo, args.p_hi
+            desc = f"T̂ < {t_lo:+.2f}   P̂ > {p_hi:+.2f}"
+        if t_lo is not None and p_hi is not None:
+            filter_fn = lambda r, tc=t_lo, pc=p_hi: r["T_hat"] < tc and r["P_hat"] > pc
+            _quadrant_report(rows, filter_fn, desc, ticker)
     if args.quadrant_sweep:
-        _sweep_report(rows, ticker,
-                       t_grid=[-0.25, -0.5, -1.0, -1.5],
-                       p_grid=[+0.25, +0.5, +1.0, +1.5])
+        _sweep_report(rows, ticker, mode="pctl" if args.t_pctl is not None else "abs")
 
     if args.plot:
         _plot(rows, ticker)
@@ -683,13 +743,36 @@ def _run_all(args) -> None:
                     "color_hat": r["color_hat"], "fwd_ret_k": r["fwd_ret_k"],
                     "outcome_known": 1,
                 })
-            if args.quadrant_check or args.quadrant_sweep:
+
+            # Локальные пороги: у каждого тикера свои (по его собственному
+            # распределению T̂,P̂). Это отвечает на «оси адаптируются, а не
+            # применяются одним глобальным z для всех».
+            if args.t_pctl is not None:
+                t_lo_i, p_hi_i = _local_thresholds(ticker_rows,
+                                                     args.t_pctl, args.p_pctl)
+            else:
+                t_lo_i, p_hi_i = args.t_lo, args.p_hi
+
+            if (args.quadrant_check or args.quadrant_sweep) and t_lo_i is not None:
+                # В pctl-режиме навешиваем in_quadrant заранее, по локальным
+                # порогам — иначе pool quadrant_check измерит по глобальному
+                # z, обесценив весь смысл процентилей.
+                mark_quad = args.t_pctl is not None
+                for r in ticker_rows:
+                    if mark_quad:
+                        r["in_quadrant"] = (r["T_hat"] < t_lo_i
+                                            and r["P_hat"] > p_hi_i)
                 pooled_rows.extend(ticker_rows)
-            if args.quadrant_per_ticker:
-                n_q, d_q = _quadrant_d(ticker_rows, args.t_lo, args.p_hi)
+
+            if args.quadrant_per_ticker and t_lo_i is not None:
+                filter_i = lambda r, tc=t_lo_i, pc=p_hi_i: (r["T_hat"] < tc
+                                                            and r["P_hat"] > pc)
+                n_q, d_q = _quadrant_d(ticker_rows, filter_i)
                 _, d_b = _welch(*_split_by_color(ticker_rows, lambda r: True))
                 per_ticker_d.append({
                     "ticker": ticker,
+                    "t_lo": round(t_lo_i, 3) if t_lo_i is not None else "",
+                    "p_hi": round(p_hi_i, 3) if p_hi_i is not None else "",
                     "n_quad": n_q,
                     "d_quad": d_q if d_q is not None else "",
                     "d_base": d_b if d_b is not None else "",
@@ -730,18 +813,26 @@ def _run_all(args) -> None:
                   f"|·|>0.7: {sum(1 for v in vals if abs(v) > 0.7)}/{len(vals)}")
 
     if (args.quadrant_check or args.quadrant_sweep) and pooled_rows:
-        _quadrant_report(pooled_rows, args.t_lo, args.p_hi,
-                          f"пул из {len(ok)} тикеров, {len(pooled_rows)} валидных баров")
+        title = f"пул из {len(ok)} тикеров, {len(pooled_rows)} валидных баров"
+        if args.t_pctl is not None:
+            filter_fn = lambda r: r.get("in_quadrant", False)
+            desc = (f"per-ticker p{args.t_pctl}×p{args.p_pctl} "
+                    f"(у каждого тикера свои локальные пороги T̂/P̂)")
+        else:
+            t_lo, p_hi = args.t_lo, args.p_hi
+            filter_fn = lambda r, tc=t_lo, pc=p_hi: r["T_hat"] < tc and r["P_hat"] > pc
+            desc = f"T̂ < {t_lo:+.2f}   P̂ > {p_hi:+.2f} (глобальные)"
+        _quadrant_report(pooled_rows, filter_fn, desc, title)
     if args.quadrant_sweep and pooled_rows:
         _sweep_report(pooled_rows, f"пул из {len(ok)} тикеров",
-                       t_grid=[-0.25, -0.5, -1.0, -1.5],
-                       p_grid=[+0.25, +0.5, +1.0, +1.5])
+                       mode="pctl" if args.t_pctl is not None else "abs")
 
     if args.quadrant_per_ticker and per_ticker_d:
         per_ticker_d.sort(key=lambda r: (abs(r["d_quad"]) if isinstance(r["d_quad"], float) else -1),
                             reverse=True)
         with open(args.quadrant_per_ticker, "w", encoding="utf-8", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=["ticker", "n_quad", "d_quad", "d_base", "ratio"])
+            fields = ["ticker", "t_lo", "p_hi", "n_quad", "d_quad", "d_base", "ratio"]
+            w = csv.DictWriter(f, fieldnames=fields)
             w.writeheader()
             w.writerows(per_ticker_d)
         # короткая распечатка топ-10 и итог: сколько тикеров вообще имеют
