@@ -9195,6 +9195,18 @@ const _IL_ALT_ID_DESC = {
      + '(posterior std гауссовского процесса). Широкий интервал в момент флипа = высокая '
      + 'неопределённость модели → сигнал глушится к 0. std нормируется на собственный '
      + '60-барный фон — per-ticker, без магических порогов.',
+  wr: 'Гейт стабильности диапазона (hh−ll ниже своей 20-барной медианы → WR улетает в '
+     + 'экстремум от мелких движений, гасим) + устойчивый экстремум ≥5 баров = '
+     + 'ПРОДОЛЖЕНИЕ тренда (WR держится у верха → бычье, у низа → медвежье), а не разворот, '
+     + 'как читал бы общий осц-дивердженс.',
+  cmo: 'CMO ≡ 2·RSI(простое окно) − 100 (доказуемое тождество), поэтому артефакт обрыва '
+     + 'окна из RSI переносится сюда: крупный старый бар, выпавший из 14-барного окна, '
+     + 'скачком двигает CMO без связи с сегодняшней ценой → бар глушится. Плюс дивергенция '
+     + 'по сырому CMO, а не по дискретному скору.',
+  ult_osc: 'Не дивергенция по единому смешанному UO, а РАССОГЛАСОВАНИЕ трёх горизонтов '
+     + '(raw7/raw14/raw28 = BP/TR за 7/14/28): краткосрочный перегрев без среднесрочного '
+     + 'подтверждения → слабее полного разворота; коррекция в устойчивом долгосрочном '
+     + 'тренде → вход, не разворот.',
 };
 function _ilAltFamilyDesc(id) {
   if (_IL_ALT_ID_DESC[id]) return _IL_ALT_ID_DESC[id];
@@ -14312,6 +14324,87 @@ function _ilAltGprFlip(scoreArr, closes){
   return out;
 }
 
+// WR-специфичный альт (ТЗ 3.1): (1) гейт стабильности диапазона (hh-ll) —
+// симметрично CCI: на схлопнутом диапазоне WR улетает в экстремум от мелких
+// движений; (2) устойчивый экстремум ≥5 баров = ПРОДОЛЖЕНИЕ тренда (переиспользуем
+// критерий barsInTop/Bot, уже в карточке), а не разворот, как читал бы общий
+// осц-дивердженс. WR>-20 у верха диапазона (сила покупателей), <-80 у низа.
+function _ilAltWR(candles, period){
+  period = period||14;
+  const n = candles.length;
+  const wr = ilCalcWR(candles, period);
+  const rng = new Array(n).fill(null);
+  for (let i=period-1; i<n; i++){
+    let hh=-Infinity, ll=Infinity;
+    for (let j=i-period+1; j<=i; j++){ if(candles[j].high>hh)hh=candles[j].high; if(candles[j].low<ll)ll=candles[j].low; }
+    rng[i]=hh-ll;
+  }
+  const out = new Array(n).fill(null);
+  for (let i=period+20; i<n; i++){
+    if (wr[i]==null){ out[i]=0; continue; }
+    const rw = rng.slice(i-20,i).filter(v=>v!=null).sort((a,b)=>a-b);
+    const rmed = rw.length ? rw[rw.length>>1] : rng[i];
+    if (rng[i]!=null && rmed!=null && rng[i] < 0.5*rmed){ out[i]=0; continue; }  // диапазон схлопнулся
+    let topN=0, botN=0;
+    for (let k=i; k>=Math.max(0,i-6); k--){ if(wr[k]!=null && wr[k]>-20) topN++; else break; }
+    for (let k=i; k>=Math.max(0,i-6); k--){ if(wr[k]!=null && wr[k]<-80) botN++; else break; }
+    if (topN>=5) out[i]=2;             // держится у верха → бычье продолжение
+    else if (botN>=5) out[i]=-2;       // держится у низа → медвежье продолжение
+    else out[i]=0;
+  }
+  return out;
+}
+
+// CMO-специфичный альт (ТЗ 3.2 + Б.8): CMO ≡ 2·RSI(простое окно) − 100 —
+// доказуемое тождество, поэтому артефакт «обрыва окна» из RSI 2.1 переносится
+// сюда без изменений: крупный старый бар, выпавший из окна period, скачком
+// двигает CMO без связи с сегодняшней ценой → бар глушим. Плюс дивергенция по
+// сырому CMO (не по дискретному скору).
+function _ilAltCMO(closes, period, lookback){
+  period = period||14; lookback = lookback||10;
+  const cmo = ilCalcCMO(closes, period);
+  const n = closes.length;
+  const out = new Array(n).fill(null);
+  for (let i=period+lookback+1; i<n; i++){
+    const dropIdx = i-period;
+    if (dropIdx-1>=0){
+      const oldMove = Math.abs(closes[dropIdx]-closes[dropIdx-1]);
+      const nowMove = Math.abs(closes[i]-closes[i-1]) || 1e-9;
+      if (oldMove > 2*nowMove){ out[i]=0; continue; }
+    }
+    const c = cmo[i];
+    if (c==null){ out[i]=0; continue; }
+    let ph=-Infinity, pl=Infinity, ch=-Infinity, clo=Infinity;
+    for (let j=i-lookback; j<i; j++){
+      if(closes[j]>ph)ph=closes[j]; if(closes[j]<pl)pl=closes[j];
+      if(cmo[j]!=null){ if(cmo[j]>ch)ch=cmo[j]; if(cmo[j]<clo)clo=cmo[j]; }
+    }
+    if (closes[i]>=ph && c<ch) out[i]=-0.6;
+    else if (closes[i]<=pl && c>clo) out[i]=0.6;
+    else out[i]=0;
+  }
+  return out;
+}
+
+// Ultimate Oscillator-специфичный альт (ТЗ 3.3): вместо дивергенции по единому
+// смешанному UO — использовать РАССОГЛАСОВАНИЕ трёх горизонтов (raw7/raw14/raw28
+// = BP/TR за 7/14/28), которое карточка уже считает продуктивно.
+function _ilAltUO(candles){
+  const n = candles.length;
+  const bp = candles.map((x,i)=>i?x.close-Math.min(x.low,candles[i-1].close):null);
+  const tr = candles.map((x,i)=>i?Math.max(x.high,candles[i-1].close)-Math.min(x.low,candles[i-1].close):null);
+  const rawAt = (i,p)=>{ let sb=0,st=0; for(let j=i-p+1;j<=i;j++){ sb+=bp[j]??0; st+=tr[j]??0; } return st?sb/st:0.5; };
+  const out = new Array(n).fill(null);
+  for (let i=28; i<n; i++){
+    const raw7=rawAt(i,7), raw14=rawAt(i,14), raw28=rawAt(i,28);
+    if (raw7>0.65 && raw14<0.45) out[i]=-1;       // краткосрочный перегрев без среднесрочного подтверждения
+    else if (raw28>0.6 && raw7<0.4) out[i]=1;      // коррекция в устойчивом долгосрочном тренде
+    else if (raw28<0.4 && raw7>0.6) out[i]=-1;     // отскок против медвежьего долгосрочного фона
+    else out[i]=0;
+  }
+  return out;
+}
+
 // Явные исключения: индикатор формально состоит в двух группах сразу
 // (mfi — и осциллятор, и объём; bb_pct — и канал, и DSP). Без этого
 // победила бы первая по порядку группа, и более содержательная трактовка
@@ -14354,6 +14447,12 @@ function _ilAltScoreSeries(id, ss, closes, candles, chopArr) {
   if (id === 'kalman') return _ilAltKalmanFlip(ss[id], closes);
   // GPR — флип модулируется шириной доверит. интервала (ТЗ 2.12/Б.7).
   if (id === 'gpr') return _ilAltGprFlip(ss[id], closes);
+  // WR — гейт стабильности диапазона + устойчивый экстремум = продолжение (ТЗ 3.1).
+  if (id === 'wr') return _ilAltWR(candles, 14);
+  // CMO — обрыв окна (CMO≡2·RSI−100) + дивергенция по сырому CMO (ТЗ 3.2).
+  if (id === 'cmo') return _ilAltCMO(closes, 14, 10);
+  // Ultimate Oscillator — рассогласование трёх горизонтов raw7/14/28 (ТЗ 3.3).
+  if (id === 'ult_osc') return _ilAltUO(candles);
   const fam = _ilAltFamilyOf(id);
   const scoreArr = ss[id];
   switch (fam) {
