@@ -1506,11 +1506,20 @@ def _method_stats_from_trades(trades: list[dict]) -> dict:
     Каждая сделка должна иметь method_scores (dict метод→скор) и direction/win.
     Берём method_scores_shadow, если есть — для включённых методов он совпадает
     с method_scores, а для выключенных показывает гипотетический винрейт (метод
-    не голосовал и не обучался, но статистика по нему всё равно видна)."""
+    не голосовал и не обучался, но статистика по нему всё равно видна).
+
+    Молчаливые методы (появлялись во входе, но всегда со скором <0.02) тоже
+    включаются в результат с нулевыми счётчиками — чтобы дашборд мог показать
+    статус «не голосовал в этой сессии» отдельно от «нет провайдера» и «выкл».
+    """
     tally: dict[str, dict] = {}
+    seen: set[str] = set()   # все имена методов, встречавшиеся в method_scores,
+                             # даже если ни разу не преодолели порог 0.02
     for t in trades:
         dir_sign = 1 if t["direction"] == "LONG" else -1
-        for mname, m_sc in (t.get("method_scores_shadow") or t.get("method_scores", {})).items():
+        scores = (t.get("method_scores_shadow") or t.get("method_scores", {}))
+        for mname, m_sc in scores.items():
+            seen.add(mname)
             if abs(m_sc) < 0.02:
                 continue
             e = tally.setdefault(mname, {"agree_n": 0, "agree_win": 0, "disagree_n": 0, "disagree_win": 0})
@@ -1520,6 +1529,8 @@ def _method_stats_from_trades(trades: list[dict]) -> dict:
             else:
                 e["disagree_n"] += 1
                 e["disagree_win"] += int(t["win"])
+    for mname in seen:
+        tally.setdefault(mname, {"agree_n": 0, "agree_win": 0, "disagree_n": 0, "disagree_win": 0})
     return {
         mname: {
             "agree_n": e["agree_n"],
@@ -1531,6 +1542,23 @@ def _method_stats_from_trades(trades: list[dict]) -> dict:
         }
         for mname, e in tally.items()
     }
+
+
+def _merge_strategy_method_meta(stats: dict, strategy_ms: dict | None) -> dict:
+    """Обогащает stats из _method_stats_from_trades полями `hedge_weight` и
+    `disabled` из method_stats стратегии (у неё есть доступ к весам и списку
+    выключенных, у per-trade подсчёта — нет). Для методов, которых нет в стратегии,
+    значения остаются None — на дашборде они видны со статусом «не голосовал»."""
+    if not strategy_ms:
+        return stats
+    for name, s in strategy_ms.items():
+        target = stats.setdefault(name, {"agree_n": 0, "agree_win": 0, "agree_win_rate": None,
+                                          "disagree_n": 0, "disagree_win": 0, "disagree_win_rate": None})
+        if s.get("hedge_weight") is not None:
+            target["hedge_weight"] = s["hedge_weight"]
+        if "disabled" in s:
+            target["disabled"] = s["disabled"]
+    return stats
 
 
 def _method_stats_by_regime_from_trades(trades: list[dict]) -> dict:
@@ -1732,7 +1760,8 @@ def run_backtest_one(
                      # Покрытие истории OI — чтобы в UI было видно: методы ОИ
                      # используются (has=true) или молчат из-за отсутствия данных.
                      "oi_cov": oi_prov.coverage(ticker),
-                     "method_stats": _method_stats_from_trades(fixed_trades),
+                     "method_stats": _merge_strategy_method_meta(
+                         _method_stats_from_trades(fixed_trades), fixed.get("method_stats")),
                      "method_stats_by_regime": _method_stats_by_regime_from_trades(fixed_trades),
                      "trades_list": _trades_list_compact(fixed_trades),
                      # Обученные за прогон веса методов (холодный старт → эволюция
@@ -1809,7 +1838,9 @@ def run_backtest_one(
                     "avg_r": sum(t["r_multiple"] for t in wf_trades) / n_total,
                     "expectancy_pct": sum(t["net_pct"] for t in wf_trades) / n_total,
                     "model_stats": _model_stats_from_trades(wf_trades),
-                    "method_stats": _method_stats_from_trades(wf_trades),
+                    "method_stats": _merge_strategy_method_meta(
+                        _method_stats_from_trades(wf_trades),
+                        (wf_results[-1].get("method_stats") if wf_results else None)),
                     "method_stats_by_regime": _method_stats_by_regime_from_trades(wf_trades),
                 }
                 rows.append({"ticker": ticker, "mode": "ATR walk-forward",
@@ -3471,19 +3502,56 @@ const _METHOD_HINTS = {{
   M3_NAME: 'ML-кластер M3: третья модель — режимный фильтр',
 }};
 
+// Провайдерно-зависимые методы: если бот запущен без OI-провайдера или без
+// tradestats — эти методы структурно молчат в этом прогоне, не потому что их
+// выключили, а потому что нет данных. Пользователю важно различать: «выкл» vs
+// «нет провайдера» vs «просто не голосовал в этой сессии».
+const _PROVIDER_METHODS = new Set([
+  'OI_SQUEEZE','INST_OI','RETAIL_CONTRA','DELTA_QUADRANT','OI_ABSORPTION',
+  'BS_PRESSURE_TS','AGGRESSOR_FLOW','LARGE_IMPACT','VWAP_SIGNAL_TS',
+  'VOL_MOMENTUM_TS','OB_IMBALANCE','CANCEL_SIGNAL',
+  'INDEX_CONTEXT','MULTI_TICKER'
+]);
+
+// Определение статуса метода: работает / выкл вручную / нет провайдера /
+// не голосовал в этой сессии (сработала фильтрация порогами).
+function _methodStatusOf(name, s){
+  const dis = !!s.disabled;
+  const n = (s.agree_n||0) + (s.disagree_n||0);
+  if (dis) return {icon:'👻', label:'выкл вручную', hint:'Метод выключен из панели «Отключить методы». Скор=0, вес не обучается. Винрейт ниже — теневой (что было бы если бы работал).', order:2};
+  if (n === 0){
+    if (_PROVIDER_METHODS.has(name)) return {icon:'🚫', label:'нет провайдера', hint:'Метод требует OI/tradestats/index/multi-ticker провайдера. В этой сессии данные не подключены — метод структурно молчит.', order:3};
+    return {icon:'💤', label:'не голосовал', hint:'Метод считается, но за весь прогон ни разу не преодолел порог |скор|≥0.02 в момент входа. Возможные причины: слишком тихий рынок, слишком строгий порог метода, или порог входа в сделки настолько высокий, что этот метод просто не имел возможности проявиться.', order:4};
+  }
+  return {icon:'🟢', label:'работает', hint:`Метод активен, участвовал в ${{n}} сделках.`, order:1};
+}
+
 function methodStatsToHtml(ms) {{
   if (!ms || !Object.keys(ms).length) return '';
-  const rows = Object.entries(ms)
-    .filter(([, s]) => s.agree_n > 0 || s.disagree_n > 0)
-    .sort((a, b) => (b[1].agree_n + b[1].disagree_n) - (a[1].agree_n + a[1].disagree_n));
+  // Раньше метод без сделок молча пропадал (filter agree>0||disagree>0) —
+  // теперь виден со статусом, чтобы было понятно ПОЧЕМУ он не даёт цифр.
+  const rows = Object.entries(ms).sort((a,b)=>{{
+    const sa=_methodStatusOf(a[0],a[1]), sb=_methodStatusOf(b[0],b[1]);
+    if (sa.order!==sb.order) return sa.order-sb.order;
+    return (b[1].agree_n+b[1].disagree_n) - (a[1].agree_n+a[1].disagree_n);
+  }});
   if (!rows.length) return '';
   const hasHedge = rows.some(([, s]) => s.hedge_weight != null);
-  let html = '<table style="font-size:11px;border-collapse:collapse;width:100%;margin-top:4px">';
-  html += '<tr style="color:var(--txt3)"><th style="text-align:left;padding:1px 6px">метод</th>'
+  // Сводка по статусам сверху таблицы
+  const summary = {{'работает':0,'выкл вручную':0,'нет провайдера':0,'не голосовал':0}};
+  rows.forEach(([n,s])=>{{ summary[_methodStatusOf(n,s).label]++; }});
+  let html = '<div style="font-size:10px;color:var(--txt3);margin-top:8px;margin-bottom:2px">'
+           + Object.entries(summary).filter(([_,v])=>v>0)
+                .map(([k,v])=>`${{k}}: <b style="color:var(--txt2)">${{v}}</b>`).join(' · ')
+           + '</div>';
+  html += '<table style="font-size:11px;border-collapse:collapse;width:100%;margin-top:2px">';
+  html += '<tr style="color:var(--txt3)"><th style="text-align:left;padding:1px 6px" title="🟢 работает · 👻 выкл вручную · 🚫 нет провайдера · 💤 считался, но не голосовал">•</th>'
+        + '<th style="text-align:left;padding:1px 6px">метод</th>'
         + (hasHedge ? '<th style="padding:1px 6px" title="Hedge-вес [0..2]: обученный мультипликатор метода. 1.0=нейтральный, >1=усилен, <1=ослаблен">вес</th>' : '')
         + '<th style="padding:1px 6px">за n</th><th style="padding:1px 6px">за win%</th>'
         + '<th style="padding:1px 6px">против n</th><th style="padding:1px 6px">против win%</th></tr>';
   for (const [name, s] of rows) {{
+    const st = _methodStatusOf(name, s);
     const agWr = s.agree_win_rate !== null && s.agree_win_rate !== undefined ? (s.agree_win_rate*100).toFixed(0)+'%' : '—';
     const disWr = s.disagree_win_rate !== null && s.disagree_win_rate !== undefined ? (s.disagree_win_rate*100).toFixed(0)+'%' : '—';
     const agStyle = s.agree_win_rate !== null && s.agree_win_rate > 0.6 ? 'color:var(--pos)' : (s.agree_win_rate !== null && s.agree_win_rate < 0.4 ? 'color:var(--neg)' : '');
@@ -3491,13 +3559,12 @@ function methodStatsToHtml(ms) {{
     const hw = s.hedge_weight != null ? s.hedge_weight : null;
     const hwStyle = hw != null ? (hw > 1.1 ? 'color:var(--pos)' : hw < 0.9 ? 'color:var(--neg)' : 'color:var(--txt3)') : '';
     const hint = _METHOD_HINTS[name] || '';
-    // disabled=true: метод выключен из голосования/обучения весов — winrate
-    // здесь теневой (гипотетический, "что если бы он был активен"), вес не
-    // обучается (hedge_weight застыл на последнем значении до выключения).
-    const dis = !!s.disabled;
-    const nameHtml = dis ? `<span style="opacity:.55" title="Метод выключен: скор не голосует и не обучает вес. Винрейт ниже — теневой (гипотетический)">👻 ${{name.replace(/_/g,' ')}}</span>` : name.replace(/_/g,' ');
-    html += `<tr title="${{hint}}" style="${{dis ? 'opacity:.65' : ''}}"><td style="padding:1px 6px">${{nameHtml}}</td>`
-          + (hasHedge ? `<td style="text-align:right;padding:1px 6px;${{hwStyle}}">${{dis ? '—' : (hw != null ? hw.toFixed(3) : '—')}}</td>` : '')
+    const rowOpacity = st.order===1 ? '' : (st.order===2 ? 'opacity:.65' : 'opacity:.45');
+    const nameLbl = name.replace(/_/g,' ');
+    html += `<tr title="${{hint}}" style="${{rowOpacity}}">`
+          + `<td style="padding:1px 4px;cursor:help" title="${{st.hint.replace(/"/g,'&quot;')}}">${{st.icon}}</td>`
+          + `<td style="padding:1px 6px">${{nameLbl}}</td>`
+          + (hasHedge ? `<td style="text-align:right;padding:1px 6px;${{hwStyle}}">${{st.order===2 ? '—' : (hw != null ? hw.toFixed(3) : '—')}}</td>` : '')
           + `<td style="text-align:right;padding:1px 6px">${{s.agree_n}}</td>`
           + `<td style="text-align:right;padding:1px 6px;${{agStyle}}">${{agWr}}</td>`
           + `<td style="text-align:right;padding:1px 6px">${{s.disagree_n}}</td>`
