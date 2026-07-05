@@ -339,6 +339,104 @@ def _fmt_corr(x: Optional[float]) -> str:
     return f"{x:+.3f}" if x is not None else "n/a"
 
 
+def _mean_std(xs: list[float]) -> tuple[float, float]:
+    n = len(xs)
+    if n == 0:
+        return 0.0, 0.0
+    m = sum(xs) / n
+    var = sum((x - m) ** 2 for x in xs) / max(n - 1, 1)
+    return m, math.sqrt(max(var, 0.0))
+
+
+def _welch(a: list[float], b: list[float]) -> tuple[Optional[float], Optional[float]]:
+    """(t-статистика Welch, Cohen's d по объединённому SD). p-value не считаю —
+    при n в десятки тысяч он всегда ~0 и ничего не различает; смысла больше в
+    Cohen's d (величина эффекта), которая от n не зависит."""
+    na, nb = len(a), len(b)
+    if na < 2 or nb < 2:
+        return None, None
+    ma, sa = _mean_std(a)
+    mb, sb = _mean_std(b)
+    se = math.sqrt(sa * sa / na + sb * sb / nb)
+    if se <= 0:
+        return None, None
+    t = (ma - mb) / se
+    pooled = math.sqrt(((na - 1) * sa * sa + (nb - 1) * sb * sb) / max(na + nb - 2, 1))
+    d = (ma - mb) / pooled if pooled > 0 else None
+    return t, d
+
+
+def _split_by_color(rows: list[dict], filt) -> tuple[list[float], list[float]]:
+    """Возвращает (fwd_ret для color̂>0, fwd_ret для color̂<0). filt — предикат,
+    отсекающий бары дополнительно (например, квадрантный фильтр). Обязательно:
+    T_hat/P_hat/color_hat/fwd_ret_k валидны, outcome_known=1."""
+    pos: list[float] = []
+    neg: list[float] = []
+    for r in rows:
+        if r["T_hat"] is None or r["P_hat"] is None or r["color_hat"] is None:
+            continue
+        if r["fwd_ret_k"] is None or r["outcome_known"] != 1:
+            continue
+        if not filt(r):
+            continue
+        if r["color_hat"] > 0:
+            pos.append(r["fwd_ret_k"])
+        elif r["color_hat"] < 0:
+            neg.append(r["fwd_ret_k"])
+    return pos, neg
+
+
+def _print_split(label: str, pos: list[float], neg: list[float]) -> None:
+    ma, sa = _mean_std(pos)
+    mb, sb = _mean_std(neg)
+    win_pos = sum(1 for x in pos if x > 0) / max(len(pos), 1)
+    win_neg = sum(1 for x in neg if x > 0) / max(len(neg), 1)
+    t, d = _welch(pos, neg)
+    print(f"  {label}")
+    print(f"    color̂>0: n={len(pos):>7}  mean(fwd_ret_k)={ma:+.4f}  "
+          f"std={sa:.4f}  win-rate={win_pos:.3f}")
+    print(f"    color̂<0: n={len(neg):>7}  mean(fwd_ret_k)={mb:+.4f}  "
+          f"std={sb:.4f}  win-rate={win_neg:.3f}")
+    if t is not None:
+        print(f"    Δmean={ma-mb:+.4f}   Welch-t={t:+.2f}   Cohen's d={d:+.3f}"
+              if d is not None else
+              f"    Δmean={ma-mb:+.4f}   Welch-t={t:+.2f}")
+
+
+def _quadrant_report(rows: list[dict], t_lo: float, p_hi: float,
+                      title: str) -> dict:
+    """§8.3: baseline (все валидные бары) vs квадрант (T̂<t_lo & P̂>p_hi),
+    в каждом делит по знаку color̂ и печатает статистику fwd_ret_k."""
+    print(f"\n=== §8.3 quadrant-check: {title} ===")
+    print(f"пороги: T̂ < {t_lo:+.2f}   P̂ > {p_hi:+.2f}")
+
+    base_pos, base_neg = _split_by_color(rows, lambda r: True)
+    quad_pos, quad_neg = _split_by_color(
+        rows, lambda r: r["T_hat"] < t_lo and r["P_hat"] > p_hi)
+
+    _print_split("baseline (без T/P-фильтра):", base_pos, base_neg)
+    _print_split(f"квадрант (низкая T, высокая P):", quad_pos, quad_neg)
+
+    _, d_base = _welch(base_pos, base_neg)
+    _, d_quad = _welch(quad_pos, quad_neg)
+    verdict = None
+    if d_base is not None and d_quad is not None:
+        ratio = (abs(d_quad) / abs(d_base)) if abs(d_base) > 1e-9 else float("inf")
+        print(f"\n  |d| квадрант / |d| baseline = {ratio:.2f}")
+        if ratio > 1.5 and len(quad_pos) + len(quad_neg) >= 200:
+            verdict = ("да", "color̂ в квадранте разделяет заметно сильнее — гипотеза §8.3 подтверждается")
+        elif ratio < 1.1:
+            verdict = ("нет", "color̂ работает одинаково везде — квадрант не гетерогенен по color̂")
+        else:
+            verdict = ("частично", "разделение чуть сильнее в квадранте, но не в разы")
+        print(f"  вердикт: {verdict[0]} — {verdict[1]}")
+    return {
+        "n_base": len(base_pos) + len(base_neg),
+        "n_quad": len(quad_pos) + len(quad_neg),
+        "d_base": d_base, "d_quad": d_quad,
+    }
+
+
 def _report(rows: list[dict], ticker: str, k: int) -> None:
     s = _summary(rows)
     print(f"=== {ticker} ===")
@@ -407,6 +505,14 @@ def main() -> None:
     ap.add_argument("--per-ticker-dir", default=None,
                      help="только для ALL: сохранять полный датасет каждого тикера "
                           "в DIR/<ticker>.csv")
+    ap.add_argument("--quadrant-check", action="store_true",
+                     help="§8.3: сравнить fwd_ret в квадранте (низкая T, высокая P), "
+                          "разбитом по знаку color̂, с baseline (без T/P-фильтра). "
+                          "Работает и в одиночном, и в ALL режимах.")
+    ap.add_argument("--t-lo", type=float, default=-0.5,
+                     help="верхняя граница T̂ для «низкой T» (default -0.5)")
+    ap.add_argument("--p-hi", type=float, default=+0.5,
+                     help="нижняя граница P̂ для «высокой P» (default +0.5)")
     args = ap.parse_args()
 
     if args.ticker.upper() == "ALL":
@@ -459,6 +565,9 @@ def _run_single(args, ticker: str) -> None:
 
     _report(rows, ticker, args.k)
 
+    if args.quadrant_check:
+        _quadrant_report(rows, args.t_lo, args.p_hi, ticker)
+
     if args.plot:
         _plot(rows, ticker)
 
@@ -483,6 +592,7 @@ def _run_all(args) -> None:
         os.makedirs(per_dir, exist_ok=True)
 
     summaries: list[dict] = []
+    pooled_rows: list[dict] = []                # для --quadrant-check в ALL
     skipped = 0
     for idx, ticker in enumerate(tickers, 1):
         try:
@@ -512,6 +622,21 @@ def _run_all(args) -> None:
             "date_from": from_str, "date_to": to_str,
             **s, "status": "ok",
         })
+        if args.quadrant_check:
+            # pooled — только нужные поля, чтобы не держать в памяти 30+ колонок
+            # на весь пул (иначе на ALL --all это гигабайты).
+            for r in rows:
+                if r["T_hat"] is None or r["P_hat"] is None:
+                    continue
+                if r["color_hat"] is None or r["fwd_ret_k"] is None:
+                    continue
+                if r["outcome_known"] != 1:
+                    continue
+                pooled_rows.append({
+                    "T_hat": r["T_hat"], "P_hat": r["P_hat"],
+                    "color_hat": r["color_hat"], "fwd_ret_k": r["fwd_ret_k"],
+                    "outcome_known": 1,
+                })
         if per_dir:
             with open(os.path.join(per_dir, f"{ticker}.csv"),
                       "w", encoding="utf-8", newline="") as f:
@@ -545,6 +670,10 @@ def _run_all(args) -> None:
                 continue
             print(f"  {name:<8}  медиана {_fmt_corr(_median(vals))}  "
                   f"|·|>0.7: {sum(1 for v in vals if abs(v) > 0.7)}/{len(vals)}")
+
+    if args.quadrant_check and pooled_rows:
+        _quadrant_report(pooled_rows, args.t_lo, args.p_hi,
+                          f"пул из {len(ok)} тикеров, {len(pooled_rows)} валидных баров")
 
 
 if __name__ == "__main__":
