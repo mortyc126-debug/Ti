@@ -21,6 +21,7 @@ import argparse
 import json
 import logging
 import os
+import ssl
 import time
 import urllib.parse
 import urllib.request
@@ -29,6 +30,22 @@ from datetime import date, timedelta
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
+
+_SSL_CTX = None
+
+
+def _ssl_ctx():
+    """SSL-контекст с валидным CA (certifi, если есть) — против
+    'unable to get local issuer certificate' на iss.moex.com/apim.moex.com,
+    когда системный CA-стор битый/пустой. Кэшируем."""
+    global _SSL_CTX
+    if _SSL_CTX is None:
+        try:
+            import certifi
+            _SSL_CTX = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            _SSL_CTX = ssl.create_default_context()
+    return _SSL_CTX
 
 FUTOI_URL = "https://apim.moex.com/iss/analyticalproducts/futoi/securities.json"
 MOEX_ISS  = "https://iss.moex.com/iss"
@@ -98,7 +115,7 @@ def _fetch_futures_contracts(stock_ticker: str) -> list[dict]:
         url = (f"{MOEX_ISS}/engines/futures/markets/forts/boards/RFUD/securities.json"
                f"?iss.meta=off&securities.columns=SECID,LASTTRADEDATE")
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; invest-bot/1.0)"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15, context=_ssl_ctx()) as resp:
             data = json.load(resp)
         block = data.get("securities", {})
         cols = block.get("columns", [])
@@ -122,7 +139,7 @@ def _fetch_futures_contracts(stock_ticker: str) -> list[dict]:
                                          "securities.columns": "secid,matdate,type"})
         url = f"{MOEX_ISS}/securities.json?{params}"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; invest-bot/1.0)"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15, context=_ssl_ctx()) as resp:
             data = json.load(resp)
         block = data.get("securities", {})
         cols = block.get("columns", [])
@@ -203,7 +220,7 @@ def _fetch_day(sym: str, token: str, trade_date: str) -> dict | None:
         },
     )
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
+        with urllib.request.urlopen(req, timeout=20, context=_ssl_ctx()) as resp:
             data = json.load(resp)
     except Exception as e:
         logger.debug(f"  {sym} {trade_date}: ошибка запроса: {e}")
