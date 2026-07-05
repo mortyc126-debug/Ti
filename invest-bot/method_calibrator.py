@@ -719,6 +719,7 @@ class MethodCalibrator:
             result[method_name] = self._finalize_method(
                 method_name, candidates, ci, classic,
                 oos_chosen, oos_classic, picks, today, Counter, vol_ref,
+                n_variants=len(variants),
             )
             e = result[method_name]
             logger.info(
@@ -731,7 +732,8 @@ class MethodCalibrator:
         self._save()
 
     def _finalize_method(self, method_name, candidates, ci, classic,
-                          oos_chosen, oos_classic, picks, today, Counter, vol_ref):
+                          oos_chosen, oos_classic, picks, today, Counter, vol_ref,
+                          n_variants=8):
         """Решение по методу: адаптировать (с усадкой λ) или откатиться на дефолт.
         Всё в edge-пространстве (expectancy на сигнал, доля). Критерии принятия
         собраны здесь."""
@@ -760,8 +762,14 @@ class MethodCalibrator:
         #   • собственный нижний предел expectancy выбранного > 0 (net-положителен
         #     после издержек значимо), И
         #   • согласованность по фолдам ≥ порога.
+        # Поправка на множественные сравнения (портировано из indlab): чем больше
+        # вариантов в сетке — тем строже порог парного преимущества. У KLINGER 4
+        # пары (fast,slow), у RMI 5 пар (period,momentum) + alt-версии = 8–10
+        # вариантов; при базовой сетке ~8 mc_mult=1. У методов побольше (например,
+        # если добавят двумерную сетку) — порог автоматически ужесточается.
+        mc_mult = max(1.0, n_variants / 8.0)
         accept = (
-            lcb_diff > CALIB_IMPROVE_FRAC * vol_ref
+            lcb_diff > CALIB_IMPROVE_FRAC * vol_ref * mc_mult
             and lcb_chosen > CALIB_EDGE_FRAC * vol_ref
             and consistency >= CALIB_MIN_CONSISTENCY
             and not (pick_idx == ci and not pick_alt)   # «выбрали классику» = не адаптация
