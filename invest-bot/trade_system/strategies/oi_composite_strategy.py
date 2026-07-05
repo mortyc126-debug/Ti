@@ -6245,6 +6245,9 @@ class OICompositeStrategy(IStrategy):
         # или участвовать в обучении весов (Hedge/IC/Lasso используют
         # __last_scores, не это поле).
         self.__last_scores_shadow: dict[str, float] = {}
+        # Классические скоры (до alt-трансформации) — снапшот для сравнения в
+        # дашборде: увидеть, где alt перевернул знак или сильно изменил силу.
+        self.__last_scores_classic: dict[str, float] = {}
         self.__last_composite: float = 0.0
         self.__composite_history: list[float] = []   # буфер для gate условия 3
         self.__last_playbooks: list[str] = []
@@ -7293,6 +7296,9 @@ class OICompositeStrategy(IStrategy):
                     # статистики "что теряется, если метод не активен"; НЕ должны
                     # использоваться для обучения весов/лассо/нарратива.
                     "method_scores_shadow": dict(self.__last_scores_shadow),
+                    # Классические скоры (до alt-трансформации) — для видимости
+                    # в дашборде: где alt перевернул знак или сильно изменил силу.
+                    "method_scores_classic": dict(self.__last_scores_classic),
                     "regime": self.__last_regime,
                     "noise_scale": self.__noise_stop_scale(),
                     # L1-контекст на момент входа
@@ -7902,6 +7908,9 @@ class OICompositeStrategy(IStrategy):
                     # Теневые скоры (без гейта по _disabled_methods) — для
                     # статистики выключенных методов, см. _method_stats_from_trades.
                     "method_scores_shadow": sig.get("method_scores_shadow", {}),
+                    # Классические скоры (до alt-трансформации) — для сравнения
+                    # с method_scores (после alt) в дашборде.
+                    "method_scores_classic": sig.get("method_scores_classic", {}),
                     # L1-контекст на момент входа (None если данных не было)
                     "atr_pct": sig.get("atr_pct"),
                     "l1_pct": sig.get("l1_pct"),
@@ -8290,6 +8299,9 @@ class OICompositeStrategy(IStrategy):
         # применяются к нормализованным скорам, до взвешивания.
         # История берётся из __ic_score_buf (raw), что корректно:
         # трансформация работает с тем, что метод "думал" раньше.
+        # Сохраняем классический (pre-alt) снимок для видимости в дашборде:
+        # какие методы поменяли знак/силу из-за alt-трансформации и на сколько.
+        _pre_alt = list(scores_for_composite)
         if self.__candles and len(self.__candles) >= _ALT_LOOKBACK:
             _closes_for_alt = [_to_f(c.close) for c in self.__candles]
             scores_for_composite = _apply_alt_transforms(
@@ -8299,6 +8311,8 @@ class OICompositeStrategy(IStrategy):
                 _closes_for_alt,
                 self.__candles,
             )
+        # Классические скоры (до alt-трансформации) — для сравнения в дашборде.
+        self.__last_scores_classic = dict(zip(ALL_METHOD_NAMES, _pre_alt))
 
         # Layer 2: режимные мультипликаторы — взвешенная смесь по ВСЕМ режимам
         # (regime_probs), а не жёсткий выбор одного. Динамические (из истории)

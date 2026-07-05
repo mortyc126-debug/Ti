@@ -1512,17 +1512,34 @@ def _method_stats_from_trades(trades: list[dict]) -> dict:
     включаются в результат с нулевыми счётчиками — чтобы дашборд мог показать
     статус «не голосовал в этой сессии» отдельно от «нет провайдера» и «выкл».
     """
+    def _empty():
+        return {"agree_n": 0, "agree_win": 0, "disagree_n": 0, "disagree_win": 0,
+                "alt_flips": 0, "alt_stronger": 0, "classic_stronger": 0, "alt_compared": 0}
     tally: dict[str, dict] = {}
     seen: set[str] = set()   # все имена методов, встречавшиеся в method_scores,
                              # даже если ни разу не преодолели порог 0.02
     for t in trades:
         dir_sign = 1 if t["direction"] == "LONG" else -1
         scores = (t.get("method_scores_shadow") or t.get("method_scores", {}))
+        classic = t.get("method_scores_classic") or {}
         for mname, m_sc in scores.items():
             seen.add(mname)
+            e = tally.setdefault(mname, _empty())
+            # Сравнение классика vs альт (если стратегия прислала classic-снапшот).
+            # alt_flips = процент сделок, где alt перевернул знак классики;
+            # alt_stronger / classic_stronger = кто сильнее по модулю.
+            if mname in classic:
+                cs = classic[mname]
+                if abs(cs) >= 0.02 or abs(m_sc) >= 0.02:
+                    e["alt_compared"] += 1
+                    if (cs > 0) != (m_sc > 0) and cs != 0 and m_sc != 0:
+                        e["alt_flips"] += 1
+                    if abs(m_sc) > abs(cs) + 0.01:
+                        e["alt_stronger"] += 1
+                    elif abs(cs) > abs(m_sc) + 0.01:
+                        e["classic_stronger"] += 1
             if abs(m_sc) < 0.02:
                 continue
-            e = tally.setdefault(mname, {"agree_n": 0, "agree_win": 0, "disagree_n": 0, "disagree_win": 0})
             if (m_sc > 0) == (dir_sign > 0):
                 e["agree_n"] += 1
                 e["agree_win"] += int(t["win"])
@@ -1530,7 +1547,7 @@ def _method_stats_from_trades(trades: list[dict]) -> dict:
                 e["disagree_n"] += 1
                 e["disagree_win"] += int(t["win"])
     for mname in seen:
-        tally.setdefault(mname, {"agree_n": 0, "agree_win": 0, "disagree_n": 0, "disagree_win": 0})
+        tally.setdefault(mname, _empty())
     return {
         mname: {
             "agree_n": e["agree_n"],
@@ -1539,6 +1556,10 @@ def _method_stats_from_trades(trades: list[dict]) -> dict:
             "disagree_n": e["disagree_n"],
             "disagree_win": e["disagree_win"],
             "disagree_win_rate": e["disagree_win"] / e["disagree_n"] if e["disagree_n"] else None,
+            "alt_flip_rate": (e["alt_flips"] / e["alt_compared"]) if e["alt_compared"] else None,
+            "alt_stronger_rate": (e["alt_stronger"] / e["alt_compared"]) if e["alt_compared"] else None,
+            "classic_stronger_rate": (e["classic_stronger"] / e["alt_compared"]) if e["alt_compared"] else None,
+            "alt_compared": e["alt_compared"],
         }
         for mname, e in tally.items()
     }
@@ -3544,10 +3565,12 @@ function methodStatsToHtml(ms) {{
            + Object.entries(summary).filter(([_,v])=>v>0)
                 .map(([k,v])=>`${{k}}: <b style="color:var(--txt2)">${{v}}</b>`).join(' · ')
            + '</div>';
+  const hasAltCompare = rows.some(([, s]) => s.alt_compared > 0);
   html += '<table style="font-size:11px;border-collapse:collapse;width:100%;margin-top:2px">';
   html += '<tr style="color:var(--txt3)"><th style="text-align:left;padding:1px 6px" title="🟢 работает · 👻 выкл вручную · 🚫 нет провайдера · 💤 считался, но не голосовал">•</th>'
         + '<th style="text-align:left;padding:1px 6px">метод</th>'
         + (hasHedge ? '<th style="padding:1px 6px" title="Hedge-вес [0..2]: обученный мультипликатор метода. 1.0=нейтральный, >1=усилен, <1=ослаблен">вес</th>' : '')
+        + (hasAltCompare ? '<th style="padding:1px 6px" title="Alt-трансформация vs классика: 🔄N% = перевернул знак; ▲N% = alt сильнее классики; ▽N% = классика сильнее">alt vs классика</th>' : '')
         + '<th style="padding:1px 6px">за n</th><th style="padding:1px 6px">за win%</th>'
         + '<th style="padding:1px 6px">против n</th><th style="padding:1px 6px">против win%</th></tr>';
   for (const [name, s] of rows) {{
@@ -3561,10 +3584,25 @@ function methodStatsToHtml(ms) {{
     const hint = _METHOD_HINTS[name] || '';
     const rowOpacity = st.order===1 ? '' : (st.order===2 ? 'opacity:.65' : 'opacity:.45');
     const nameLbl = name.replace(/_/g,' ');
+    // Ячейка alt vs классика: три компактных метрики или «—» если сравнения не было.
+    let altCell = '—';
+    if (s.alt_compared > 0){{
+      const fr = s.alt_flip_rate!=null ? Math.round(s.alt_flip_rate*100) : 0;
+      const asr = s.alt_stronger_rate!=null ? Math.round(s.alt_stronger_rate*100) : 0;
+      const csr = s.classic_stronger_rate!=null ? Math.round(s.classic_stronger_rate*100) : 0;
+      const parts = [];
+      if (fr>0) parts.push(`<span style="color:var(--warn)" title="Alt перевернул знак классики в ${{fr}}% сделок">🔄${{fr}}%</span>`);
+      if (asr>0) parts.push(`<span style="color:var(--pos)" title="Alt сильнее классики (|score|) в ${{asr}}% сделок">▲${{asr}}%</span>`);
+      if (csr>0) parts.push(`<span style="color:var(--txt3)" title="Классика сильнее alt в ${{csr}}% сделок">▽${{csr}}%</span>`);
+      altCell = parts.length ? parts.join(' ') : `<span style="color:var(--txt3)">= ${{s.alt_compared}}</span>`;
+    }} else {{
+      altCell = '<span style="color:var(--txt3)" title="У метода нет alt-семейства (структурный/OI/tradestats/M1-3) или прогон без alt-снимка">—</span>';
+    }}
     html += `<tr title="${{hint}}" style="${{rowOpacity}}">`
           + `<td style="padding:1px 4px;cursor:help" title="${{st.hint.replace(/"/g,'&quot;')}}">${{st.icon}}</td>`
           + `<td style="padding:1px 6px">${{nameLbl}}</td>`
           + (hasHedge ? `<td style="text-align:right;padding:1px 6px;${{hwStyle}}">${{st.order===2 ? '—' : (hw != null ? hw.toFixed(3) : '—')}}</td>` : '')
+          + (hasAltCompare ? `<td style="text-align:center;padding:1px 6px;font-size:10px">${{altCell}}</td>` : '')
           + `<td style="text-align:right;padding:1px 6px">${{s.agree_n}}</td>`
           + `<td style="text-align:right;padding:1px 6px;${{agStyle}}">${{agWr}}</td>`
           + `<td style="text-align:right;padding:1px 6px">${{s.disagree_n}}</td>`
