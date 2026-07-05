@@ -13106,7 +13106,11 @@ function ilCalcCUSUM(closes){
     const k=0.5*sd,h=4*sd;
     Sp=Math.max(0,Sp+(lrets[i]-mu)-k); Sm=Math.min(0,Sm+(lrets[i]-mu)+k);
     if((Sp>h||Sm<-h)&&i-lastCp>5){ curDir=Sp>h?1:-1; Sp=0;Sm=0;lastCp=i; }
-    dirArr[i]=(i-lastCp<=15)?curDir:0; // сигнал затухает через 15 баров после CP
+    // ТЗ 2.13: раньше dirArr ∈ {-1,0,1} (плоско), у остальных DSP шкала ±2/±1/0.
+    // Градуируем силу по СВЕЖЕСТИ смены режима (i-lastCp, уже вычислена), приводя
+    // к общей шкале: только что произошёл сдвиг → ±2, затухает → ±1, старый → 0.
+    const age=i-lastCp;
+    dirArr[i]=age<=3?curDir*2:(age<=15?curDir:0);
   }
   return dirArr;
 }
