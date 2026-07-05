@@ -9187,6 +9187,14 @@ const _IL_ALT_ID_DESC = {
      + 'даёт ±1 или ±2 (сильнее если пробой из сжатия — ширина канала ниже собственного '
      + '60-барного фона С ЛАГОМ 10 баров). Затухание за 5 баров после пробоя. Без лага '
      + 'фон подглядывал бы сам себя, задирая базовую линию.',
+  kalman: 'Флип-фейд, но сила модулируется коэффициентом усиления K (после фикса '
+     + 'скользящего R/Q — раньше K был константой 0.2 и не нёс информации). Низкий K = '
+     + 'фильтр стабилен, доверяет истории → флип цены против него значим, фейдим уверенно. '
+     + 'Высокий K = фильтр дёргается на волатильности → флип это шум, сигнал слаб.',
+  gpr: 'Флип-фейд, но сила модулируется шириной доверительного интервала прогноза '
+     + '(posterior std гауссовского процесса). Широкий интервал в момент флипа = высокая '
+     + 'неопределённость модели → сигнал глушится к 0. std нормируется на собственный '
+     + '60-барный фон — per-ticker, без магических порогов.',
 };
 function _ilAltFamilyDesc(id) {
   if (_IL_ALT_ID_DESC[id]) return _IL_ALT_ID_DESC[id];
@@ -13068,7 +13076,7 @@ function ilCalcKalman(closes){
   const KWIN=30;
   const n=closes.length, rets=new Array(n).fill(0);
   for(let i=1;i<n;i++) rets[i]=closes[i]-closes[i-1];
-  const x=new Array(n); let xv=closes[0],P=1e-6;
+  const x=new Array(n), Karr=new Array(n).fill(null); let xv=closes[0],P=1e-6;
   for(let i=0;i<n;i++){
     const j0=Math.max(1, i-KWIN+1), j1=Math.max(1, i);
     let cnt=0, sum=0, sum2=0;
@@ -13080,8 +13088,9 @@ function ilCalcKalman(closes){
     const K=PPred/(PPred+R);
     xv=xPred+K*(closes[i]-xPred);
     P=(1-K)*PPred;
-    x[i]=xv;
+    x[i]=xv; Karr[i]=K;
   }
+  x.K=Karr;    // ТЗ 2.12: gain K доступен для альт-формулы (модулятор силы флипа)
   return x;
 }
 function ilScoreKalman(close,kx){ if(kx==null)return null; const d=(close-kx)/kx*100; return d>0.8?2:d>0.15?1:d<-0.8?-2:d<-0.15?-1:0; }
@@ -13104,6 +13113,13 @@ function ilCalcCUSUM(closes){
 function ilScoreCUSUM(v){ return v==null?null:v; }
 function ilCalcGPR(closes){
   const winN=60, lenScale=winN/6, mean=new Array(closes.length).fill(null);
+  // ТЗ Б.7: posterior variance уже была реализована в карточке «Методы», но не
+  // в scoring-пути. Считаем её здесь (переиспользуя те же Kinv/kvec), кладём в
+  // mean.std — существующие потребители читают mean[i] по числовому индексу и не
+  // ломаются, а альт-формула (2.12) берёт mean.std[i]. Дублирования матричной
+  // инверсии нет. У GPR окно скользящее (60), variance реально меняется во
+  // времени (в отличие от Kalman K, см. Б.6) — сюда переносить безопасно.
+  const std=new Array(closes.length).fill(null);
   const kern=(a,b)=>Math.exp(-((a-b)*(a-b))/(2*lenScale*lenScale));
   for(let i=0;i<closes.length;i++){
     const j0=Math.max(0,i-winN+1); const xs=[],ys=[];
@@ -13126,7 +13142,13 @@ function ilCalcGPR(closes){
     for(let a=0;a<n;a++) for(let b=0;b<n;b++) alpha[a]+=Kinv[a][b]*ysC[b];
     let meanC=0; for(let a=0;a<n;a++) meanC+=kvec[a]*alpha[a];
     mean[i]=meanC+my;
+    // posterior variance = kxx − kvec·Kinv·kvec (kxx = sigF2·kern(xi,xi)+obsNoise)
+    let kKinvk=0;
+    for(let a=0;a<n;a++){ let s=0; for(let b=0;b<n;b++) s+=Kinv[a][b]*kvec[b]; kKinvk+=kvec[a]*s; }
+    const varPred=Math.max(0, sigF2+obsNoise - kKinvk);
+    std[i]=Math.sqrt(varPred);
   }
+  mean.std=std;
   return mean;
 }
 function ilScoreGPR(close,gm){ if(gm==null)return null; const d=(close-gm)/gm*100; return d>1?2:d>0.2?1:d<-1?-2:d<-0.2?-1:0; }
@@ -14237,6 +14259,55 @@ function _ilAltDspFlipFade(scoreArr) {
   return out;
 }
 
+// Kalman-специфичный альт (ТЗ 2.12 + Б.6): флип-фейд, но СИЛА модулируется
+// коэффициентом усиления K. Работает только после фикса Б.6 (rolling R/Q) —
+// раньше K был константой 0.2 и любой множитель на его основе был бы плоским.
+// Низкий K = фильтр стабилен (доверяет истории) → флип цены против него значим,
+// фейдим уверенно. Высокий K (фильтр «дёргается» на волатильности) → флип это
+// шум, сигнал слаб.
+function _ilAltKalmanFlip(scoreArr, closes){
+  const kx = ilCalcKalman(closes);
+  const K = kx.K || [];
+  const out = new Array(scoreArr.length).fill(null);
+  let lastSign = 0;
+  for (let i = 0; i < scoreArr.length; i++){
+    const cur = scoreArr[i];
+    if (cur == null){ out[i]=null; continue; }
+    const sCur = Math.sign(cur);
+    if (sCur!==0 && lastSign!==0 && sCur!==lastSign){
+      const k = K[i]!=null ? K[i] : 0.5;
+      out[i] = -sCur * Math.max(0, Math.min(1, 1 - k)) * 2;   // низкий K → сильнее
+    } else out[i] = 0;
+    if (sCur !== 0) lastSign = sCur;
+  }
+  return out;
+}
+
+// GPR-специфичный альт (ТЗ 2.12 + Б.7): флип-фейд, но СИЛА модулируется шириной
+// доверительного интервала прогноза (posterior std из ilCalcGPR.std). Широкий
+// интервал в момент флипа = высокая неопределённость → сигнал глушится к 0.
+// std нормируется на собственный 60-барный фон (per-ticker, без магии).
+function _ilAltGprFlip(scoreArr, closes){
+  const gm = ilCalcGPR(closes);
+  const std = gm.std || [];
+  const out = new Array(scoreArr.length).fill(null);
+  let lastSign = 0;
+  for (let i = 0; i < scoreArr.length; i++){
+    const cur = scoreArr[i];
+    if (cur == null){ out[i]=null; continue; }
+    const sCur = Math.sign(cur);
+    if (sCur!==0 && lastSign!==0 && sCur!==lastSign){
+      let s=0, c=0;
+      for (let j=Math.max(0,i-59); j<=i; j++){ if(std[j]!=null){ s+=std[j]; c++; } }
+      const stdAvg = c>0 ? s/c : (std[i]||1);
+      const ratio = (stdAvg>0 && std[i]!=null) ? std[i]/stdAvg : 1;
+      out[i] = -sCur * Math.max(0, Math.min(2, 2 - ratio));   // широкий интервал → к 0
+    } else out[i] = 0;
+    if (sCur !== 0) lastSign = sCur;
+  }
+  return out;
+}
+
 // Явные исключения: индикатор формально состоит в двух группах сразу
 // (mfi — и осциллятор, и объём; bb_pct — и канал, и DSP). Без этого
 // победила бы первая по порядку группа, и более содержательная трактовка
@@ -14275,6 +14346,10 @@ function _ilAltScoreSeries(id, ss, closes, candles, chopArr) {
   // Donchian — свежесть пробоя + ширина канала с лагом (ТЗ Часть Д 3.7). У Donchian
   // pos∈[0,100] всегда — band-walk невозможен, унаследованный от 2.8 фикс здесь неверен.
   if (id === 'donchian') return _ilAltDonchian(candles, 20);
+  // Kalman — флип модулируется gain K (ТЗ 2.12; работает после фикса Б.6).
+  if (id === 'kalman') return _ilAltKalmanFlip(ss[id], closes);
+  // GPR — флип модулируется шириной доверит. интервала (ТЗ 2.12/Б.7).
+  if (id === 'gpr') return _ilAltGprFlip(ss[id], closes);
   const fam = _ilAltFamilyOf(id);
   const scoreArr = ss[id];
   switch (fam) {
