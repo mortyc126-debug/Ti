@@ -2,12 +2,11 @@
 tpcolor_dataset.py — сборка датасета для концепции T/P/color
 (kontseptsiya_temperatura_davlenie_pamyat_2.md).
 
-Читает свечи из общей базы D1 через HTTP-эндпоинт коллектора
-(cf-collector/worker.js: GET /candles/<ticker>?from=&to= — тот же
-источник, что дёргает db_api_client.py). URL и API-ключ берутся из
-settings.ini секции [DB_API] (или флагами --url/--api-key, или из
-переменных окружения DB_API_URL/DB_API_KEY). Ответ воркера — список
-{time, open, high, low, close, volume} по возрастанию времени.
+Читает свечи из локального кэша, который наполняет candle_archive.py при
+работе бота: data/candle_cache/<TICKER>.json — 5-мин, <TICKER>_1m.json —
+1-мин, отсортированный список {time, open, high, low, close, volume}.
+Сеть скрипту не нужна вообще: у SBER на диске легко бывает 20 МБ (годы
+истории), запросы через D1-воркер были бы медленнее и без явной пользы.
 
 По каждому бару считаются:
 
@@ -38,18 +37,19 @@ CSV со всеми колонками → --out <path>.  Печатается �
 
 Только stdlib для основной работы; никаких pandas/numpy.
 
-Запуск (из invest-bot/, settings.ini подхватится автоматически):
+Запуск (из invest-bot/):
     python tpcolor_dataset.py SBER --days 180 --n 20 --k 12 --out sber_tpc.csv
     python tpcolor_dataset.py SBER --days 180 --plot        # + 3D-скаттер
+    python tpcolor_dataset.py SBER --all --interval 1       # все 1-мин свечи из кэша
 
 Аргументы:
-    ticker            — тикер (SBER, GAZP, ...)
-    --days D          — глубина периода в календарных днях, default 180
+    ticker            — тикер (SBER, GAZP, ...) — имя файла кэша без .json
+    --cache DIR       — путь к data/candle_cache (default: рядом со скриптом)
+    --interval M      — 5 или 1 (SBER.json vs SBER_1m.json), default 5
+    --days D          — глубина периода от --to назад в днях, default 180
     --from YYYY-MM-DD — явная дата начала (перекрывает --days)
-    --to   YYYY-MM-DD — явная дата конца (default: сегодня, UTC)
-    --url URL         — URL коллектора (иначе settings.ini [DB_API] URL или env DB_API_URL)
-    --api-key K       — X-API-Key (иначе settings.ini [DB_API] API_KEY или env DB_API_KEY)
-    --settings PATH   — путь к settings.ini (default: рядом со скриптом)
+    --to   YYYY-MM-DD — явная дата конца (default: последний бар из кэша)
+    --all             — взять весь кэш, игнорируя --days/--from/--to
     --n N             — базовое окно Layer 1 (ATR/ER/ROC), default 20
     --n-macro N       — окно макро-контекста, default 200
     --w-norm W        — окно каузальной z-нормализации, default 500
@@ -61,95 +61,40 @@ CSV со всеми колонками → --out <path>.  Печатается �
 from __future__ import annotations
 
 import argparse
-import configparser
 import csv
 import json
 import math
 import os
 import sys
-import urllib.error
-import urllib.request
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 
-def _resolve_creds(args_url: Optional[str], args_key: Optional[str],
-                    settings_path: str) -> tuple[str, str]:
-    """Приоритет: CLI-флаги > env > settings.ini. Возвращает (url, api_key)."""
-    url = args_url or os.environ.get("DB_API_URL")
-    key = args_key or os.environ.get("DB_API_KEY")
-    if (not url or not key) and os.path.exists(settings_path):
-        cfg = configparser.ConfigParser()
-        cfg.read(settings_path, encoding="utf-8")
-        if cfg.has_section("DB_API"):
-            url = url or cfg.get("DB_API", "URL", fallback="") or None
-            key = key or cfg.get("DB_API", "API_KEY", fallback="") or None
-    if not url or not key:
-        sys.exit(
-            "не найден URL/API_KEY для коллектора. Задай флагами --url/--api-key, "
-            "переменными DB_API_URL/DB_API_KEY, либо секцией [DB_API] в settings.ini."
-        )
-    return url.rstrip("/"), key
-
-
-def _fetch_chunk(base_url: str, api_key: str, ticker: str,
-                  date_from: str, date_to: str, timeout: int = 60) -> list[dict]:
-    """Один GET /candles/<ticker>?from=&to= с двумя попытками (D1 иногда
-    отдаёт «холодный старт» ощутимо медленнее — как и db_api_client.get_candles)."""
-    url = f"{base_url}/candles/{ticker}?from={date_from}&to={date_to}"
-    headers = {
-        "X-API-Key": api_key,
-        "User-Agent": "Mozilla/5.0 (compatible; tpcolor-dataset/1.0)",
-    }
-    last_err: Optional[str] = None
-    for attempt in range(3):
-        req = urllib.request.Request(url, method="GET", headers=headers)
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                return json.load(resp).get("candles", [])
-        except urllib.error.HTTPError as ex:
-            body = ex.read().decode("utf-8", errors="replace")[:300]
-            sys.exit(f"HTTP {ex.code} от коллектора: {body}")
-        except (urllib.error.URLError, TimeoutError, ConnectionError) as ex:
-            last_err = str(ex)
-            if attempt < 2:
-                # 2s, 6s — линейный бэкофф, воркеру дать очнуться
-                import time as _t
-                _t.sleep(2 * (attempt + 1) ** 2)
-    sys.exit(f"не смог достучаться до коллектора ({date_from}..{date_to}): {last_err}")
-
-
-def _fetch_candles(base_url: str, api_key: str, ticker: str,
-                    date_from: str, date_to: str,
-                    chunk_days: int = 30, timeout: int = 60) -> list[dict]:
-    """Тянет период по чанкам ~chunk_days — большой одиночный GET воркер
-    иногда режет по CPU-таймауту (те же грабли, что в db_api_client при
-    150+ днях), и мы получаем read timeout вместо данных. Чанкование
-    даёт стабильные быстрые ответы + прогресс в stderr."""
-    df = datetime.strptime(date_from, "%Y-%m-%d").date()
-    dt = datetime.strptime(date_to, "%Y-%m-%d").date()
-    rows: list[dict] = []
-    seen: set[str] = set()
-    cur = df
-    total_days = (dt - df).days + 1
-    done = 0
-    while cur <= dt:
-        chunk_to = min(cur + timedelta(days=chunk_days - 1), dt)
-        got = _fetch_chunk(base_url, api_key, ticker,
-                            cur.isoformat(), chunk_to.isoformat(), timeout)
-        added = 0
-        for r in got:
-            if r["time"] not in seen:
-                seen.add(r["time"])
-                rows.append(r)
-                added += 1
-        done += (chunk_to - cur).days + 1
-        print(f"  чанк {cur}..{chunk_to}: {added} свечей  ({done}/{total_days} дней)",
-              file=sys.stderr)
-        cur = chunk_to + timedelta(days=1)
-    if not rows:
-        sys.exit(f"{ticker}: коллектор вернул 0 свечей за {date_from}..{date_to}")
+def _load_from_cache(ticker: str, cache_dir: str, interval_min: int) -> list[dict]:
+    suffix = "" if interval_min == 5 else f"_{interval_min}m"
+    path = os.path.join(cache_dir, f"{ticker}{suffix}.json")
+    if not os.path.exists(path):
+        sys.exit(f"нет файла кэша: {path}")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            rows = json.load(f)
+    except json.JSONDecodeError as ex:
+        sys.exit(f"кэш повреждён ({path}): {ex}")
+    if not isinstance(rows, list) or not rows:
+        sys.exit(f"кэш пустой: {path} (в списке эмитентов такое встречается — "
+                 f"воркер не собирал этот тикер)")
     rows.sort(key=lambda r: r["time"])
+    return rows
+
+
+def _filter_by_dates(rows: list[dict],
+                      date_from: Optional[str],
+                      date_to: Optional[str]) -> list[dict]:
+    """Отсекает по префиксу времени (ISO YYYY-MM-DD...). date_to включительно."""
+    if date_from:
+        rows = [r for r in rows if r["time"][:10] >= date_from]
+    if date_to:
+        rows = [r for r in rows if r["time"][:10] <= date_to]
     return rows
 
 
@@ -396,13 +341,14 @@ def _plot(rows: list[dict], ticker: str) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Датасет T/P/color для концепции.")
     ap.add_argument("ticker")
+    ap.add_argument("--cache", default=os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "data", "candle_cache"))
+    ap.add_argument("--interval", type=int, default=5, choices=(1, 5))
     ap.add_argument("--days", type=int, default=180)
     ap.add_argument("--from", dest="date_from", default=None)
     ap.add_argument("--to", dest="date_to", default=None)
-    ap.add_argument("--url", default=None)
-    ap.add_argument("--api-key", dest="api_key", default=None)
-    ap.add_argument("--settings", default=os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "settings.ini"))
+    ap.add_argument("--all", action="store_true",
+                     help="взять весь кэш, игнорируя --days/--from/--to")
     ap.add_argument("--n", type=int, default=20)
     ap.add_argument("--n-macro", type=int, default=200)
     ap.add_argument("--w-norm", type=int, default=500)
@@ -410,25 +356,28 @@ def main() -> None:
     ap.add_argument("--min-volume", type=float, default=0.0)
     ap.add_argument("--out", default=None, help="путь к CSV (иначе только сводка)")
     ap.add_argument("--plot", action="store_true")
-    ap.add_argument("--chunk-days", type=int, default=30,
-                     help="размер чанка HTTP-запросов к коллектору (default 30)")
-    ap.add_argument("--timeout", type=int, default=60,
-                     help="таймаут одного HTTP-запроса, сек (default 60)")
     args = ap.parse_args()
 
-    base_url, api_key = _resolve_creds(args.url, args.api_key, args.settings)
+    all_rows = _load_from_cache(args.ticker, args.cache, args.interval)
+    latest_date = all_rows[-1]["time"][:10]
 
-    to_date = (datetime.strptime(args.date_to, "%Y-%m-%d").date()
-               if args.date_to else datetime.now(timezone.utc).date())
-    from_date = (datetime.strptime(args.date_from, "%Y-%m-%d").date()
-                 if args.date_from else to_date - timedelta(days=args.days))
+    if args.all:
+        candles = all_rows
+        from_str, to_str = all_rows[0]["time"][:10], latest_date
+    else:
+        # --to по умолчанию — последний бар в кэше, а не сегодня: если кэш
+        # холодный (бот давно не работал), «сегодня−N дней» даст пустую вырезку.
+        to_str = args.date_to or latest_date
+        if args.date_from:
+            from_str = args.date_from
+        else:
+            to_d = datetime.strptime(to_str, "%Y-%m-%d").date()
+            from_str = (to_d - timedelta(days=args.days)).isoformat()
+        candles = _filter_by_dates(all_rows, from_str, to_str)
 
-    print(f"→ GET {base_url}/candles/{args.ticker}?from={from_date}&to={to_date}",
-          file=sys.stderr)
-    candles = _fetch_candles(base_url, api_key, args.ticker,
-                              from_date.isoformat(), to_date.isoformat(),
-                              chunk_days=args.chunk_days, timeout=args.timeout)
-    print(f"  получено {len(candles)} свечей", file=sys.stderr)
+    print(f"кэш: {args.ticker} ({args.interval}м), всего {len(all_rows)} баров "
+          f"({all_rows[0]['time'][:10]}..{latest_date})", file=sys.stderr)
+    print(f"взял: {len(candles)} баров за {from_str}..{to_str}", file=sys.stderr)
 
     if len(candles) < max(args.n_macro, args.w_norm) + args.k + 5:
         sys.exit(
