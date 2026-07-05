@@ -12955,14 +12955,23 @@ function ilScoreChaikinOsc(v,prev){ if(v==null)return null; const rising=prev!=n
 function ilScoreChaikinVol(v){ return null; } // волатильность — не дирекциональная
 function ilScoreAccelOsc(arr,i){ return ilScoreAO(arr,i); }
 function ilScoreElderRay(v){
+  // ТЗ Часть Д 3.4: старая ветка `-1` (bull≤0 & bear≥0) арифметически недостижима
+  // на реальных ценах: bear≥0 ⟹ low≥EMA ⟹ high≥low≥EMA ⟹ bull≥0. Реальных
+  // состояний три: весь бар выше EMA (2), охватывает EMA (1), весь ниже (-2).
   if(!v)return null;
-  if(v.bull>0&&v.bear>0)return 2; if(v.bull>0&&v.bear<=0)return 1;
-  if(v.bull<=0&&v.bear<0)return -2; return -1;
+  if(v.bull>0&&v.bear>=0)return 2;      // весь бар выше EMA
+  if(v.bull<=0&&v.bear<0)return -2;     // весь бар ниже EMA
+  return 1;                              // бар охватывает EMA (bull>0, bear<0)
 }
 function ilScoreElderImpulse(v){
+  // ТЗ Часть Д 3.5: старые ветки `s===1`/`s===-1` арифметически недостижимы —
+  // сумма двух значений из {-1,+1} может быть только {-2,0,2}. По оригинальной
+  // методике Элдера это фильтр-разрешение (зелёный/красный/синий), а не
+  // самостоятельный направленный предиктор — сохраняем эту семантику: ±2 при
+  // согласии обоих компонентов, 0 при разногласии (синий).
   if(!v)return null;
   const s=v.emaDir+v.macdDir;
-  return s===2?2:s===-2?-2:s===1?1:s===-1?-1:0;
+  return s===2?2:s===-2?-2:0;
 }
 function ilScoreEOM(v){ if(v==null)return null; return v>0.5?2:v>0?1:v<-0.5?-2:v<0?-1:0; }
 function ilScoreNVI(arr,i,period=255){
@@ -13035,12 +13044,29 @@ function ilCalcNW(closes){
 }
 function ilScoreNW(close,nw){ if(nw==null)return null; const d=(close-nw)/nw*100; return d>1?2:d>0.2?1:d<-1?-2:d<-0.2?-1:0; }
 function ilCalcKalman(closes){
-  const rets=[]; for(let i=1;i<closes.length;i++) rets.push(closes[i]-closes[i-1]);
-  const mR=rets.reduce((a,b)=>a+b,0)/(rets.length||1);
-  const R=rets.reduce((a,b)=>a+(b-mR)*(b-mR),0)/(rets.length||1)||1e-6;
-  const Q=R*0.05;
-  const x=new Array(closes.length); let xv=closes[0],P=R;
-  for(let i=0;i<closes.length;i++){const xPred=xv,PPred=P+Q;const K=PPred/(PPred+R);xv=xPred+K*(closes[i]-xPred);P=(1-K)*PPred;x[i]=xv;}
+  // ТЗ Б.6: R и Q считались один раз по всей истории → K сходится к константе
+  // 0.2 за 15–20 баров, дальше не меняется вообще независимо от данных. Это
+  // делало любое использование K (например, «как силу флипа») применением
+  // константы. Переведено на СКОЛЬЗЯЩЕЕ окно 30 баров: R[i] отражает локальную
+  // волатильность, K[i] реально варьируется от бара к бару. Стартовый прогрев
+  // (первые 30 баров) использует расширяющееся окно, дальше — фиксированное 30.
+  const KWIN=30;
+  const n=closes.length, rets=new Array(n).fill(0);
+  for(let i=1;i<n;i++) rets[i]=closes[i]-closes[i-1];
+  const x=new Array(n); let xv=closes[0],P=1e-6;
+  for(let i=0;i<n;i++){
+    const j0=Math.max(1, i-KWIN+1), j1=Math.max(1, i);
+    let cnt=0, sum=0, sum2=0;
+    for(let j=j0; j<=j1; j++){ sum+=rets[j]; sum2+=rets[j]*rets[j]; cnt++; }
+    const mR = cnt>0 ? sum/cnt : 0;
+    const R = cnt>0 ? Math.max(sum2/cnt - mR*mR, 1e-9) : 1e-6;   // локальная дисперсия
+    const Q = R*0.05;
+    const xPred=xv, PPred=P+Q;
+    const K=PPred/(PPred+R);
+    xv=xPred+K*(closes[i]-xPred);
+    P=(1-K)*PPred;
+    x[i]=xv;
+  }
   return x;
 }
 function ilScoreKalman(close,kx){ if(kx==null)return null; const d=(close-kx)/kx*100; return d>0.8?2:d>0.15?1:d<-0.8?-2:d<-0.15?-1:0; }
@@ -19149,16 +19175,21 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL === 'rsi_w') {
       const n = candles.length;
-      if (n >= 14) {
+      if (n >= 8) {
         const items = [];
-        const rsi=_chartCalcRSI(closes, 14);
+        // ТЗ Б.4: было _chartCalcRSI(closes, 14) — фактическая ошибка: карточка
+        // называлась «RSI Wilder / RSI(7)», а считала обычный RSI(14). Три
+        // источника расходились: ilCalcRSIW(period=7) как Уайлдер, IL_NAMES.rsi_w
+        // = 'RSI(7)', карточка = RSI(14). Приведено к настоящему Уайлдеру(7),
+        // который теперь физически отличен от RSI(14) (см. _chartCalcRSIWilder).
+        const rsi=_chartCalcRSIWilder(closes, 7);
         const val=rsi[n-1];
         if(val!==null) {
-          if(val>=70) items.push({type:'bullish', text:`RSI(Wilder) = ${val.toFixed(1)} — в тренде остаётся выше 70 долго: продавать рано`});
-          else if(val<=30) items.push({type:'bearish', text:`RSI(Wilder) = ${val.toFixed(1)} — перепродан; в тренде прилипает к 30`});
-          else items.push({type:'neutral', text:`RSI(Wilder) = ${val.toFixed(1)}`});
+          if(val>=70) items.push({type:'bullish', text:`RSI Wilder(7) = ${val.toFixed(1)} — в тренде остаётся выше 70 долго: продавать рано`});
+          else if(val<=30) items.push({type:'bearish', text:`RSI Wilder(7) = ${val.toFixed(1)} — перепродан; в тренде прилипает к 30`});
+          else items.push({type:'neutral', text:`RSI Wilder(7) = ${val.toFixed(1)} (рекурсивное сглаживание, нет обрыва окна)`});
         }
-        html += makeCard('RSI Wilder / RSI Уайлдера (неклассически)', items, 'rsi_wil');
+        html += makeCard('RSI Wilder(7) / RSI Уайлдера (неклассически)', items, 'rsi_wil');
       }
     } else if (idL === 'nw') {
       const n = candles.length;
