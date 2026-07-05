@@ -271,9 +271,11 @@ BOCD_NARRATIVE_SYNC_THR = 0.60
 _GATE_GROUPS: dict[str, frozenset] = {
     "trend": frozenset({"PRICE_TREND", "TREND_QUALITY", "ZLEMA_SIGNAL", "T3_SIGNAL",
                         "ADAPTIVE_MA", "SINEWAVE_SIGNAL", "SSA_SIGNAL",
-                        "NADARAYA_WATSON", "FRACTIONAL_DIFF"}),
+                        "NADARAYA_WATSON", "FRACTIONAL_DIFF",
+                        "ADX_DI_CONVERGENCE"}),  # тренд-семейство (истощение направления)
     "volume": frozenset({"VOL_MOMENTUM", "KLINGER", "VZO", "TWIGGS", "BS_PRESSURE"}),
-    "oscillator": frozenset({"FISHER_RSI", "RMI", "ZSCORE"}),
+    "oscillator": frozenset({"FISHER_RSI", "RMI", "ZSCORE",
+                              "ULT_OSC_DISAGREEMENT"}),  # мульти-таймфрейм осциллятор
     "structure": frozenset({"VWAP_SIGNAL", "CHANGE_POINT", "WICK_REJECTION", "VSA",
                              "DONCHIAN", "MA_ENVELOPE",
                              "CANDLE_PATTERN", "TRIANGLE", "FRACTAL", "ENTROPY",
@@ -1851,6 +1853,165 @@ def score_donchian_candle(candles: list[HistoricCandle]) -> float:
         signal *= 1.20
 
     return max(-1.0, min(1.0, signal * (0.5 + strength * 0.5)))
+
+
+def score_adx_di_convergence(candles: list[HistoricCandle]) -> float:
+    """
+    ADX_DI_CONVERGENCE: сила тренда растёт, но направление слабеет — истощение.
+
+    Портировано из indlab _ilAltADX (ТЗ 2.5). Уникальный сигнал: ADX — индекс СИЛЫ
+    тренда со своей направленной парой +DI/−DI. Обычные трендовые методы (Fisher,
+    ZLEMA, T3, TREND_QUALITY) следят за направлением, но не видят «тренд крепнет, а
+    +DI/−DI сходятся» — это классический признак разворота/флэта, ортогональный
+    имеющимся методам.
+
+    Логика:
+      • ADX(14) растёт vs 4 бара назад (сила тренда крепнет);
+      • |+DI − −DI| УМЕНЬШАЕТСЯ монотонно (промежуточный gap меньше прошлого,
+        текущий меньше промежуточного) — линии направления реально сходятся;
+      • ADX ≥ 20 (тренд достаточно выражен, чтобы говорить о его истощении);
+      • сигнал = КОНТРА против доминирующего направления (dir=sign(+DI−−DI));
+      • сила = скорость сближения (gap_prev − gap_now) / gap_prev, [0..1].
+    """
+    n = len(candles)
+    if n < 30:
+        return 0.0
+    period = 14
+    lookback = 4
+    highs = [_to_f(c.high) for c in candles]
+    lows = [_to_f(c.low) for c in candles]
+    closes = [_to_f(c.close) for c in candles]
+
+    # +DM/−DM/TR
+    plus_dm, minus_dm, tr = [0.0], [0.0], [0.0]
+    for i in range(1, n):
+        up = highs[i] - highs[i - 1]
+        dn = lows[i - 1] - lows[i]
+        plus_dm.append(up if up > dn and up > 0 else 0.0)
+        minus_dm.append(dn if dn > up and dn > 0 else 0.0)
+        tr.append(max(highs[i] - lows[i], abs(highs[i] - closes[i - 1]), abs(lows[i] - closes[i - 1])))
+
+    # Wilder-сглаживание (SMMA/RMA): рекурсивно avg[i] = (avg[i-1]*(p−1) + x[i])/p.
+    # Стандарт ADX (не SMA): при простом SMA ADX реагирует слишком быстро и падает
+    # ровно в момент сходимости DI — сигнал сходимости никогда не срабатывал бы.
+    # Wilder-сглаживание даёт длинную память → ADX держится сильным дольше, что
+    # соответствует классической трейдерской интерпретации «ADX peaked, DI cross».
+    def _wilder(arr: list[float], p: int) -> list[float]:
+        out = [0.0] * len(arr)
+        if len(arr) < p:
+            return out
+        seed = sum(arr[1:p + 1]) / p
+        out[p] = seed
+        for i in range(p + 1, len(arr)):
+            out[i] = (out[i - 1] * (p - 1) + arr[i]) / p
+        return out
+
+    atr_s = _wilder(tr, period)
+    pdi_s = _wilder(plus_dm, period)
+    mdi_s = _wilder(minus_dm, period)
+
+    # +DI, −DI, DX по каждому бару
+    dx = [0.0] * n
+    di_plus = [0.0] * n
+    di_minus = [0.0] * n
+    for i in range(period, n):
+        if atr_s[i] <= 0:
+            continue
+        dp = pdi_s[i] / atr_s[i] * 100.0
+        dm = mdi_s[i] / atr_s[i] * 100.0
+        di_plus[i] = dp
+        di_minus[i] = dm
+        s = dp + dm
+        dx[i] = abs(dp - dm) / s * 100.0 if s > 0 else 0.0
+
+    adx = _wilder(dx, period)
+
+    # Смотрим на бары i (текущий), i-lookback//2, i-lookback — проверка монотонности
+    i, i_mid, i_prev = n - 1, n - 1 - (lookback // 2), n - 1 - lookback
+    if i_prev < 2 * period:
+        return 0.0
+    # ADX должен быть >= 20 (тренд выражен). Условие "ADX ещё растёт" не работает
+    # даже с Wilder-сглаживанием у самой точки сходимости — ADX начинает падать
+    # ровно в этот момент. Классическая интерпретация: тренд БЫЛ силён и DI
+    # сходятся — сигнал разворота. Не требуем «ADX ещё растёт».
+    if adx[i] < 20:
+        return 0.0
+    gap_now = abs(di_plus[i] - di_minus[i])
+    gap_mid = abs(di_plus[i_mid] - di_minus[i_mid])
+    gap_prev = abs(di_plus[i_prev] - di_minus[i_prev])
+    if gap_prev < 1e-6:
+        return 0.0
+    converging = gap_now < gap_mid and gap_mid <= gap_prev
+    if not converging:
+        return 0.0
+    direction = 1 if di_plus[i] > di_minus[i] else -1
+    conv_speed = max(0.0, min(1.0, (gap_prev - gap_now) / gap_prev))
+    if conv_speed < 0.15:  # слабое сближение — не сигнал
+        return 0.0
+    return -direction * conv_speed   # контрсигнал против доминанты
+
+
+def score_ult_osc_disagreement(candles: list[HistoricCandle]) -> float:
+    """
+    ULT_OSC_DISAGREEMENT: рассогласование трёх горизонтов моментума.
+
+    Портировано из indlab _ilAltUO (ТЗ 3.3). Ultimate Oscillator по построению
+    смотрит на BP/TR за 3 периода (7/14/28) и линейно смешивает. Уникальный
+    сигнал — не финальное смешанное число, а расхождение трёх периодов между собой:
+      • raw7 = сумма BP за 7 баров / сумма TR за 7 баров (крайне-краткосрочный);
+      • raw14 (среднесрочный), raw28 (долгосрочный) — то же.
+    Ортогонально существующим методам: FISHER_RSI/RMI/ZSCORE смотрят на ОДИН
+    период и одну шкалу, а здесь суть в рассогласовании ТРЁХ таймфреймов.
+
+    Логика:
+      • raw7 > 0.65 & raw14 < 0.45 → краткосрочный перегрев без среднесрочного
+        подтверждения → медвежий сигнал (слабый разворот, −1);
+      • raw28 > 0.6 & raw7 < 0.4 → коррекция в устойчивом долгосрочном аптренде
+        → вход в тренд, +1;
+      • raw28 < 0.4 & raw7 > 0.6 → отскок против медвежьего фона, −1;
+      • иначе 0 (нет рассогласования).
+    """
+    n = len(candles)
+    if n < 30:
+        return 0.0
+    highs = [_to_f(c.high) for c in candles]
+    lows = [_to_f(c.low) for c in candles]
+    closes = [_to_f(c.close) for c in candles]
+
+    # BP = close − min(low_i, close_{i-1}); TR = max(high, prev_close) − min(low, prev_close)
+    bp = [0.0] * n
+    tr = [0.0] * n
+    for i in range(1, n):
+        pc = closes[i - 1]
+        lo_i = min(lows[i], pc)
+        hi_i = max(highs[i], pc)
+        bp[i] = closes[i] - lo_i
+        tr[i] = hi_i - lo_i
+
+    def _raw(period: int) -> float:
+        sb = sum(bp[n - period:n])
+        st = sum(tr[n - period:n])
+        return sb / st if st > 0 else 0.5
+
+    raw7, raw14, raw28 = _raw(7), _raw(14), _raw(28)
+
+    # Логика через РАЗРЫВ между таймфреймами (raw28 vs raw7), а не через
+    # экстремумы всех трёх — раньше пороги ТЗ (raw14<0.45 и т.п.) почти никогда
+    # не срабатывали, требуя моно-тренда во всём 14/28-барном окне.
+    gap_short_long = raw7 - raw28
+    if raw7 > 0.65 and gap_short_long >= 0.15:
+        # краткосрочный перегрев на 15+пп выше долгосрочного →
+        # среднесрочный не подтвердил → слабый разворот вниз
+        return -min(0.8, 0.4 + gap_short_long * 1.5)
+    if raw28 > 0.6 and -gap_short_long >= 0.15:
+        # устойчивый долгосрочный аптренд, краткосрочная просадка на 15+пп ниже →
+        # коррекция в тренде, а не разворот → сигнал вверх
+        return min(0.8, 0.4 + (-gap_short_long) * 1.5)
+    if raw28 < 0.4 and gap_short_long >= 0.15:
+        # устойчивый долгосрочный даунтренд, краткосрочный отскок →
+        # медвежий сигнал (отскок против фона, не разворот)
+        return -min(0.8, 0.4 + gap_short_long * 1.5)
+    return 0.0
 
 
 def score_twiggs_candle(candles: list[HistoricCandle]) -> float:
@@ -5760,6 +5921,12 @@ METHODS = [
     ("KLINGER",        score_klinger_candle),
     ("VZO",            score_vzo_candle),
     ("DONCHIAN",       score_donchian_candle),
+    # Портировано из indlab (проверено плацебо+синтетика): дают ортогональный
+    # сигнал к существующим — ADX-DI сходимость видит истощение направления
+    # при крепнущей силе тренда (не покрыто Fisher/ZLEMA/TREND_QUALITY);
+    # UO-рассогласование смотрит на несогласие 3 таймфреймов моментума.
+    ("ADX_DI_CONVERGENCE", score_adx_di_convergence),
+    ("ULT_OSC_DISAGREEMENT", score_ult_osc_disagreement),
     ("TWIGGS",         score_twiggs_candle),
     ("RMI",            score_rmi_candle),
     ("ZSCORE",         score_zscore_candle),
@@ -5875,6 +6042,8 @@ METHOD_TF_CONFIG: dict[str, dict] = {
     "KLINGER":        {"min_bars": 15, "weight_5m": 1.10},
     "VZO":            {"min_bars": 15, "weight_5m": 1.05},
     "DONCHIAN":       {"min_bars": 20, "weight_5m": 1.10},  # структура боковика лучше на 5м
+    "ADX_DI_CONVERGENCE": {"min_bars": 30, "weight_5m": 1.05},  # тренд на 5м яснее, но 1м даёт больше сигналов
+    "ULT_OSC_DISAGREEMENT": {"min_bars": 30, "weight_5m": 1.05},  # ~то же по обеим ТФ
     "MA_ENVELOPE":    {"min_bars": 22, "weight_5m": 1.10},
     "TWIGGS":         {"min_bars": 15, "weight_5m": 1.05},
     "HAWKES_SIGNAL":     {"min_bars": 25, "weight_5m": 1.30},
