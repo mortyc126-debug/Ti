@@ -437,6 +437,38 @@ def _quadrant_report(rows: list[dict], t_lo: float, p_hi: float,
     }
 
 
+def _quadrant_d(rows: list[dict], t_lo: float, p_hi: float) -> tuple[int, Optional[float]]:
+    """Тихий вариант _quadrant_report: только количество и d_quad."""
+    quad_pos, quad_neg = _split_by_color(
+        rows, lambda r: r["T_hat"] < t_lo and r["P_hat"] > p_hi)
+    _, d = _welch(quad_pos, quad_neg)
+    return len(quad_pos) + len(quad_neg), d
+
+
+def _sweep_report(rows: list[dict], title: str,
+                    t_grid: list[float], p_grid: list[float]) -> None:
+    """Сетка (t_lo, p_hi) × Cohen's d в квадранте. Растёт ли d при
+    ужесточении границ — сигнал структурный; падает — часть эффекта была
+    шумом на границе."""
+    print(f"\n=== §8.3 sweep порогов: {title} ===")
+    _, d_base = _welch(*_split_by_color(rows, lambda r: True))
+    print(f"baseline |d| = {abs(d_base):.4f}" if d_base is not None else "baseline |d| = n/a")
+    header = "T̂ \\ P̂  |" + "".join(f"  P>{p:+.2f}   " for p in p_grid)
+    print(header)
+    print("-" * len(header))
+    for t in t_grid:
+        cells = []
+        for p in p_grid:
+            n, d = _quadrant_d(rows, t, p)
+            if d is None or n < 200:
+                cells.append(f"    n={n:>5}")
+            else:
+                ratio = abs(d) / abs(d_base) if d_base and abs(d_base) > 1e-9 else float("inf")
+                cells.append(f"{d:+.3f}×{ratio:>4.1f}")
+        print(f"T<{t:+.2f} |" + "  ".join(cells))
+    print("  (клетка «d × ratio»; клетка «n=N» — точек мало, d ненадёжен)")
+
+
 def _report(rows: list[dict], ticker: str, k: int) -> None:
     s = _summary(rows)
     print(f"=== {ticker} ===")
@@ -513,6 +545,13 @@ def main() -> None:
                      help="верхняя граница T̂ для «низкой T» (default -0.5)")
     ap.add_argument("--p-hi", type=float, default=+0.5,
                      help="нижняя граница P̂ для «высокой P» (default +0.5)")
+    ap.add_argument("--quadrant-sweep", action="store_true",
+                     help="§8.3 robustness: прогнать grid (T̂,P̂)-порогов "
+                          "и показать, как d_quad меняется. Импликует "
+                          "--quadrant-check.")
+    ap.add_argument("--quadrant-per-ticker", default=None,
+                     help="только ALL: CSV с d_quad по каждому тикеру "
+                          "(проверка, что эффект размазан, а не держится на 5 ликвидах).")
     args = ap.parse_args()
 
     if args.ticker.upper() == "ALL":
@@ -565,8 +604,12 @@ def _run_single(args, ticker: str) -> None:
 
     _report(rows, ticker, args.k)
 
-    if args.quadrant_check:
+    if args.quadrant_check or args.quadrant_sweep:
         _quadrant_report(rows, args.t_lo, args.p_hi, ticker)
+    if args.quadrant_sweep:
+        _sweep_report(rows, ticker,
+                       t_grid=[-0.25, -0.5, -1.0, -1.5],
+                       p_grid=[+0.25, +0.5, +1.0, +1.5])
 
     if args.plot:
         _plot(rows, ticker)
@@ -592,7 +635,9 @@ def _run_all(args) -> None:
         os.makedirs(per_dir, exist_ok=True)
 
     summaries: list[dict] = []
-    pooled_rows: list[dict] = []                # для --quadrant-check в ALL
+    pooled_rows: list[dict] = []                # для --quadrant-check/sweep в ALL
+    per_ticker_d: list[dict] = []               # для --quadrant-per-ticker
+    need_quadrant = args.quadrant_check or args.quadrant_sweep or args.quadrant_per_ticker
     skipped = 0
     for idx, ticker in enumerate(tickers, 1):
         try:
@@ -622,9 +667,10 @@ def _run_all(args) -> None:
             "date_from": from_str, "date_to": to_str,
             **s, "status": "ok",
         })
-        if args.quadrant_check:
+        if need_quadrant:
             # pooled — только нужные поля, чтобы не держать в памяти 30+ колонок
             # на весь пул (иначе на ALL --all это гигабайты).
+            ticker_rows: list[dict] = []
             for r in rows:
                 if r["T_hat"] is None or r["P_hat"] is None:
                     continue
@@ -632,10 +678,22 @@ def _run_all(args) -> None:
                     continue
                 if r["outcome_known"] != 1:
                     continue
-                pooled_rows.append({
+                ticker_rows.append({
                     "T_hat": r["T_hat"], "P_hat": r["P_hat"],
                     "color_hat": r["color_hat"], "fwd_ret_k": r["fwd_ret_k"],
                     "outcome_known": 1,
+                })
+            if args.quadrant_check or args.quadrant_sweep:
+                pooled_rows.extend(ticker_rows)
+            if args.quadrant_per_ticker:
+                n_q, d_q = _quadrant_d(ticker_rows, args.t_lo, args.p_hi)
+                _, d_b = _welch(*_split_by_color(ticker_rows, lambda r: True))
+                per_ticker_d.append({
+                    "ticker": ticker,
+                    "n_quad": n_q,
+                    "d_quad": d_q if d_q is not None else "",
+                    "d_base": d_b if d_b is not None else "",
+                    "ratio": (abs(d_q) / abs(d_b)) if (d_q is not None and d_b and abs(d_b) > 1e-9) else "",
                 })
         if per_dir:
             with open(os.path.join(per_dir, f"{ticker}.csv"),
@@ -671,9 +729,35 @@ def _run_all(args) -> None:
             print(f"  {name:<8}  медиана {_fmt_corr(_median(vals))}  "
                   f"|·|>0.7: {sum(1 for v in vals if abs(v) > 0.7)}/{len(vals)}")
 
-    if args.quadrant_check and pooled_rows:
+    if (args.quadrant_check or args.quadrant_sweep) and pooled_rows:
         _quadrant_report(pooled_rows, args.t_lo, args.p_hi,
                           f"пул из {len(ok)} тикеров, {len(pooled_rows)} валидных баров")
+    if args.quadrant_sweep and pooled_rows:
+        _sweep_report(pooled_rows, f"пул из {len(ok)} тикеров",
+                       t_grid=[-0.25, -0.5, -1.0, -1.5],
+                       p_grid=[+0.25, +0.5, +1.0, +1.5])
+
+    if args.quadrant_per_ticker and per_ticker_d:
+        per_ticker_d.sort(key=lambda r: (abs(r["d_quad"]) if isinstance(r["d_quad"], float) else -1),
+                            reverse=True)
+        with open(args.quadrant_per_ticker, "w", encoding="utf-8", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=["ticker", "n_quad", "d_quad", "d_base", "ratio"])
+            w.writeheader()
+            w.writerows(per_ticker_d)
+        # короткая распечатка топ-10 и итог: сколько тикеров вообще имеют
+        # d_quad заметно отличный от baseline (эффект размазан или сфокусирован).
+        valid = [r for r in per_ticker_d if isinstance(r["d_quad"], float) and r["n_quad"] >= 200]
+        n_strong = sum(1 for r in valid if isinstance(r["ratio"], float) and r["ratio"] > 2)
+        print()
+        print(f"per-ticker: {args.quadrant_per_ticker}  ({len(per_ticker_d)} строк, "
+              f"из них с n_quad>=200: {len(valid)}, с ratio>2: {n_strong})")
+        if valid:
+            print("  топ-10 по |d_quad| (правильный знак = отрицательный):")
+            for r in valid[:10]:
+                print(f"    {r['ticker']:<10} n_q={r['n_quad']:>5}  "
+                      f"d_quad={r['d_quad']:+.3f}  d_base={r['d_base']:+.4f}  "
+                      f"ratio={r['ratio']:.1f}" if isinstance(r['ratio'], float)
+                      else f"    {r['ticker']:<10} n_q={r['n_quad']:>5}  d_quad={r['d_quad']:+.3f}")
 
 
 if __name__ == "__main__":
