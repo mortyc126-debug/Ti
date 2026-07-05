@@ -13954,6 +13954,35 @@ function _ilAltStreakFade(scoreArr, streakLen) {
   return out;
 }
 
+// Band-walk для канальной группы (ТЗ Б.5 — прямое самопротиворечие в коде).
+// _ilAltStreakFade при устойчивом стрике у границы возвращал -maxAbs (разворот),
+// но КОММЕНТАРИЙ над ней (13692–13700) явно называет это ошибкой для BB/Keltner/
+// Donchian: «многократное касание границы при сильном тренде ПОДТВЕРЖДАЕТ
+// продолжение, а не разворот». Плюс качественный слой карточки BB (line 15741)
+// уже пишет обратное альт-формуле: 3 подряд закрытия за полосой = bullish/bearish
+// «настоящий каскад идёт вдоль полосы». Три независимых источника (комментарий,
+// карточка, здравый смысл) сходятся, а старая формула делала противоположное.
+// Здесь streak у границы = ПОДТВЕРЖДЕНИЕ движения (тот же знак, что и стрик).
+// Требует «внезапно вернулось внутрь» как отдельный флип-сигнал разворота —
+// но это уже про НЕ-streak состояние, обрабатывается генериком по-другому.
+function _ilAltBandWalk(scoreArr, streakLen) {
+  streakLen = streakLen || 3;
+  let maxAbs = 0;
+  for (const v of scoreArr) if (v!=null && Math.abs(v)>maxAbs) maxAbs = Math.abs(v);
+  const out = new Array(scoreArr.length).fill(null);
+  if (maxAbs === 0) return out;
+  for (let i = 0; i < scoreArr.length; i++) {
+    if (scoreArr[i] == null) { out[i] = null; continue; }
+    if (i < streakLen-1) { out[i] = 0; continue; }
+    const win = scoreArr.slice(i-streakLen+1, i+1);
+    if (win.some(v=>v==null)) { out[i] = 0; continue; }
+    if (win.every(v=>v>=maxAbs)) out[i] = maxAbs;         // ← +, не -: подтверждение
+    else if (win.every(v=>v<=-maxAbs)) out[i] = -maxAbs;
+    else out[i] = 0;
+  }
+  return out;
+}
+
 // 4. Объём/деньги: VSA «no demand / no supply», но применённый к ТЕКУЩЕМУ
 // сигналу конкретного индикатора, а не как общий ряд на всю категорию —
 // иначе у OBV/CMF/Elder Ray/Force Index/PVT/VO была бы идентичная неклассика.
@@ -14050,7 +14079,7 @@ function _ilAltScoreSeries(id, ss, closes, candles, chopArr) {
   switch (fam) {
     case 'osc':       return _ilAltOscDivergence(scoreArr, closes, 10);
     case 'trend':     return _ilAltStreakFade(scoreArr, 4);
-    case 'channel':   return _ilAltStreakFade(scoreArr, 3);
+    case 'channel':   return _ilAltBandWalk(scoreArr, 3);
     case 'volume':    return _ilAltVolDivergence(scoreArr, closes, candles, 10);
     case 'structure': return _ilAltStructureChopFade(scoreArr, chopArr, 61.8);
     case 'dsp':       return _ilAltDspFlipFade(scoreArr);
