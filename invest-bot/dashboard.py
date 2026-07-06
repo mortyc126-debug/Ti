@@ -6450,7 +6450,26 @@ async function loadSupervisorStatus() {{
   if (data.running) {{
     const modeTxt = data.sandbox ? '🏖 песочница' : '💸 БОЕВОЙ';
     dot.className = 'sdot ok';
-    lbl.textContent = `▶ Запущен (PID ${{data.pid}}, ${{modeTxt}})`;
+    // Фаза: помогает понять, что бот СЕЙЧАС делает — не «висит», а
+    // спит по расписанию МОЕХ. Иконка перед фазой намекает на состояние.
+    let phaseTag = '';
+    if (data.phase && data.phase_msg) {{
+      const icons = {{
+        trading: '🟢', waiting_open: '🟡', sleeping_night: '💤',
+        starting: '⏳', unknown: '❔'
+      }};
+      const ic = icons[data.phase] || '❔';
+      let sleep = '';
+      if (data.sleep_until_iso) {{
+        try {{
+          const dt = new Date(data.sleep_until_iso);
+          sleep = ` (до ${{dt.toLocaleString('ru-RU', {{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}})}} MSK)`;
+        }} catch(e) {{}}
+      }}
+      phaseTag = `<br><span style="font-size:10px;color:var(--txt3);">${{ic}} ${{data.phase_msg}}${{sleep}}</span>`;
+    }}
+    dot.className = 'sdot ok';
+    lbl.innerHTML = `▶ Запущен (PID ${{data.pid}}, ${{modeTxt}})${{phaseTag}}`;
     btnStart.style.display = 'none'; modeSel.disabled = true;
     btnStop.style.display = ''; btnKill.style.display = '';
     if (_supStopRequestedAt && Date.now() - _supStopRequestedAt > 8000) {{

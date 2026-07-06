@@ -19,6 +19,7 @@ import datetime
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 
@@ -88,11 +89,100 @@ def _force_kill(pid: int) -> bool:
         return False
 
 
+def _parse_phase_from_log(tail_lines: list[str]) -> dict:
+    """Определяет фазу работы бота из последних строк bot_run.log.
+
+    Возвращает {phase, phase_msg, sleep_until_iso}. Фазы:
+    - "trading" — торговая сессия идёт (последнее событие Trading day started).
+    - "waiting_open" — торговый день, ждём открытия сессии (Trading will start after X).
+    - "sleeping_night" — не торговый день/сессия кончилась, спим до утра.
+    - "starting" — только-только стартанул, ещё не дошёл до расписания.
+    - "unknown" — не смогли определить (лог пустой/старый формат).
+
+    Логика на маркерах, а не regex: строки лога стабильные,
+    Sleep to next morning / Today is trading day и т.п. — всё
+    trade_service.py::__working_loop. sleep_until в UTC.
+    """
+    result = {"phase": "unknown", "phase_msg": None, "sleep_until_iso": None}
+
+    # Идём от последних к первым — первое совпадение выигрывает.
+    trading_start_re = re.compile(
+        r"Trading day has been started")
+    trading_done_re = re.compile(
+        r"Trading day has been completed")
+    # start_time от Tinkoff API форматируется как datetime.__str__ —
+    # «2026-07-06 07:00:00+00:00» (с пробелом внутри). Захватываем до конца
+    # строки, потом чистим trailing whitespace.
+    waiting_re = re.compile(
+        r"Today is trading day\. Trading will start after (.+)$")
+    not_trading_re = re.compile(
+        r"Today is not trading day\. Sleep on next morning")
+    sleep_re = re.compile(r"Sleep to next morning")
+    check_sched_re = re.compile(r"Check trading schedule on today")
+
+    for line in reversed(tail_lines):
+        if trading_done_re.search(line):
+            result["phase"] = "waiting_open"
+            result["phase_msg"] = "торговый день завершён, ждём завтра"
+            return result
+        if trading_start_re.search(line):
+            result["phase"] = "trading"
+            result["phase_msg"] = "торговая сессия"
+            return result
+        m = waiting_re.search(line)
+        if m:
+            raw = m.group(1).strip()
+            # Формат "2026-07-06 07:00:00+00:00" → нормализуем к ISO
+            iso = raw.replace(" ", "T", 1) if " " in raw else raw
+            result["phase"] = "waiting_open"
+            result["phase_msg"] = f"торговый день, откроется {raw}"
+            result["sleep_until_iso"] = iso
+            return result
+        if not_trading_re.search(line):
+            result["phase"] = "sleeping_night"
+            result["phase_msg"] = "не торговый день (выходной/праздник), спит до утра"
+            # Следующее пробуждение — 06:00 UTC следующего дня
+            tomorrow = (datetime.datetime.now(datetime.timezone.utc)
+                        + datetime.timedelta(days=1))
+            wake = tomorrow.replace(hour=6, minute=0, second=0, microsecond=0)
+            result["sleep_until_iso"] = wake.isoformat()
+            return result
+        if sleep_re.search(line):
+            result["phase"] = "sleeping_night"
+            result["phase_msg"] = "сессия закончилась, спит до утра"
+            tomorrow = (datetime.datetime.now(datetime.timezone.utc)
+                        + datetime.timedelta(days=1))
+            wake = tomorrow.replace(hour=6, minute=0, second=0, microsecond=0)
+            result["sleep_until_iso"] = wake.isoformat()
+            return result
+        if check_sched_re.search(line):
+            result["phase"] = "starting"
+            result["phase_msg"] = "получаю расписание МОЕХ"
+            return result
+    return result
+
+
+def _read_log_tail(n: int = 200) -> list[str]:
+    """Читает последние N строк bot_run.log. При отсутствии/ошибке возвращает []."""
+    if not os.path.exists(LOG_FILE):
+        return []
+    try:
+        with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
+            # Простой хвост — файл обычно небольшой (<10 МБ). При росте
+            # можно перейти на mmap+seek, но пока не нужно.
+            lines = f.readlines()
+    except OSError:
+        return []
+    return lines[-n:]
+
+
 def status() -> dict:
     """Текущее состояние процесса бота для UI дашборда."""
     info = _read_process_info()
     if not info:
-        return {"running": False, "sandbox": None, "started_at": None, "uptime_sec": None, "pid": None}
+        return {"running": False, "sandbox": None, "started_at": None,
+                 "uptime_sec": None, "pid": None,
+                 "phase": None, "phase_msg": None, "sleep_until_iso": None}
     alive = _pid_alive(info["pid"])
     uptime = None
     if alive and info.get("started_at"):
@@ -101,12 +191,17 @@ def status() -> dict:
             uptime = (datetime.datetime.now(datetime.timezone.utc) - started).total_seconds()
         except ValueError:
             pass
+    # Фазу считаем только если бот сейчас живой — иначе бессмысленно.
+    phase_info = {"phase": None, "phase_msg": None, "sleep_until_iso": None}
+    if alive:
+        phase_info = _parse_phase_from_log(_read_log_tail(200))
     return {
         "running": alive,
         "pid": info.get("pid"),
         "sandbox": info.get("sandbox"),
         "started_at": info.get("started_at"),
         "uptime_sec": uptime,
+        **phase_info,
     }
 
 
