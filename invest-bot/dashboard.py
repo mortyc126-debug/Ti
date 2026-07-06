@@ -3208,6 +3208,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <button class="btn-pill btn-sm" onclick="ovBulk('signal_only',true)">🔔 Все сигнал</button>
     <button class="btn-pill btn-sm" onclick="ovBulk('signal_only',false)">💸 Все торговля</button>
     <button class="btn-pill btn-sm warn" onclick="pruneStaleOiTickers()" title="Убрать тикеры, которых нет в settings.ini/[FUTURES_TRADING] И по которым никогда не считался бэктест на этой машине — старый мусор из oi_tickers.json (импорт oi-signal-v10.html)">🧹 Убрать хлам (OI-импорт без истории)</button>
+    <button class="btn-pill btn-sm warn" onclick="pruneFailedOiTickers()" title="Из последнего прогона убрать тикеры со статусом «нет истории»/«ошибка API»/«ошибка» — те, что стабильно ломаются раз за разом и висят в списке впустую. settings.ini/FUTURES_TRADING не тронется.">🧹 Убрать упавшие в последнем прогоне</button>
   </div>
   <div style="font-size:11px;color:var(--txt3);margin:-4px 0 8px;">
     Бейдж <b>OI-импорт</b> — тикер попал в список только из oi_tickers.json (старый экспорт oi-signal-v10.html),
@@ -5891,6 +5892,43 @@ function pruneStaleOiTickers() {{
     }}).catch(() => alert('ошибка сети'));
 }}
 
+async function pruneFailedOiTickers() {{
+  // Читаем актуальный прогресс с сервера, не из DOM — таблица прогресса
+  // рендерится в разных местах (главный прогон / калибровка / weekly), но
+  // /api/progress один. Так надёжнее: работает даже если пользователь
+  // сейчас на другой вкладке.
+  const failedStatuses = new Set(['нет истории', 'ошибка API', 'ошибка']);
+  let progress = {{}};
+  try {{
+    const r = await fetch('/api/progress');
+    progress = await r.json();
+  }} catch(e) {{
+    alert('не удалось прочитать /api/progress'); return;
+  }}
+  const snap = {{}};
+  for (const tk in progress) {{
+    const st = (progress[tk] && progress[tk].status) || '';
+    if (failedStatuses.has(st)) snap[tk] = st;
+  }}
+  const n = Object.keys(snap).length;
+  if (!n) {{
+    alert('В последнем прогоне нет тикеров со статусом «нет истории»/«ошибка API»/«ошибка». Сначала запусти прогон бэктеста — тогда статусы попадут в /api/progress.');
+    return;
+  }}
+  const list = Object.keys(snap).sort().join(', ');
+  if (!confirm(`Убрать из oi_tickers.json ${{n}} тикеров, упавших в последнем прогоне?\\n\\n${{list}}\\n\\nТикеры, сконфигурированные в settings.ini/[FUTURES_TRADING], не тронутся — их надо удалять оттуда вручную.`)) return;
+  fetch('/api/oi_tickers_prune_failed', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{statuses: snap}})}})
+    .then(r => r.json()).then(d => {{
+      if (!d.ok) {{ alert('ошибка'); return; }}
+      let msg = `Убрано: ${{d.count}}` + (d.count ? `\\n${{d.removed.join(', ')}}` : '');
+      if ((d.kept_configured || []).length) {{
+        msg += `\\n\\nОстались (сконфигурированы в settings.ini): ${{d.kept_configured.join(', ')}}`;
+      }}
+      alert(msg);
+      loadOverrides();
+    }}).catch(() => alert('ошибка сети'));
+}}
+
 async function loadBotStatus() {{
   const data = await fetch('/api/bot_status').then(r => r.json()).catch(() => ({{running: false}}));
   const dot = document.getElementById('bot_state_dot');
@@ -8031,6 +8069,63 @@ def prune_stale_oi_tickers() -> dict:
     return {"ok": True, "removed": sorted(removed), "count": len(removed)}
 
 
+# Ошибочные статусы, за которые тикер попадает в кандидаты на очистку.
+# «нет истории» — Tinkoff API не смог отдать свечи (мёртвый фьючерс/делистинг);
+# «ошибка API» — RequestError на этапе запроса свечей (обычно тоже мёртвый);
+# «ошибка» — необработанное исключение в самом бэктесте (баг данных, а не бота).
+_PRUNE_FAILED_STATUSES = {"нет истории", "ошибка API", "ошибка"}
+
+
+def prune_failed_oi_tickers(statuses_snapshot: dict | None = None) -> dict:
+    """Убирает из oi_tickers.json тикеры, которые в последнем прогоне попали
+    в _PRUNE_FAILED_STATUSES (нет истории / ошибка API / ошибка). Работает по
+    той же логике безопасности, что prune_stale: только тикеры из oi_only
+    (в settings.ini/FUTURES_TRADING не трогаются — они появятся заново на
+    следующей перезагрузке в любом случае, оттуда их удалять нужно вручную).
+
+    statuses_snapshot — если задан, используется он ({ticker: status_str});
+    иначе берётся текущий _progress. Явный параметр нужен для тестируемости.
+    Клиент обычно передаёт свой снимок из UI, чтобы результат совпадал с тем,
+    что пользователь видит в таблице."""
+    if statuses_snapshot is None:
+        progress = _get_progress_proxy()
+        # dict(progress) — снимок через Manager-proxy, dict возвращает
+        # {ticker: {"status": ..., "ts": ...}}
+        try:
+            snap = dict(progress)
+        except Exception:
+            snap = {}
+        statuses_snapshot = {tk: v.get("status") for tk, v in snap.items()
+                              if isinstance(v, dict)}
+
+    oi_only = set(_oi_import_tickers_only())
+    current = load_oi_tickers()
+
+    failed_all = [tk for tk, st in statuses_snapshot.items()
+                    if st in _PRUNE_FAILED_STATUSES]
+    # Разделяем: те, что реально можем удалить (в oi_only + есть в файле), и
+    # те, что скипаются (сконфигурированы в settings.ini — трогать не будем).
+    removed = []
+    kept_configured = []
+    for t in failed_all:
+        if t in current and t in oi_only:
+            del current[t]
+            removed.append(t)
+        elif t in current:
+            kept_configured.append(t)
+
+    if removed:
+        with open(OI_TICKERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(current, f, ensure_ascii=False, indent=2)
+
+    return {
+        "ok": True,
+        "removed": sorted(removed), "count": len(removed),
+        "kept_configured": sorted(kept_configured),
+        "total_failed_in_run": len(failed_all),
+    }
+
+
 def get_live_chart(ticker: str, days: int = 7) -> dict:
     """Свечи из candle_archive + реальные сделки из data/trades.jsonl для живого графика."""
     try:
@@ -9323,6 +9418,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(delete_oi_ticker(payload.get("ticker", "")))
         elif self.path == "/api/oi_tickers_prune_stale":
             self._send_json(prune_stale_oi_tickers())
+        elif self.path == "/api/oi_tickers_prune_failed":
+            # Клиент может передать свой снимок статусов — иначе берём _progress.
+            snap = payload.get("statuses") if isinstance(payload.get("statuses"), dict) else None
+            self._send_json(prune_failed_oi_tickers(snap))
         elif self.path == "/api/reload_futures":
             started = _start_futures_reload_bg()
             running = _futures_reload_running.is_set()
