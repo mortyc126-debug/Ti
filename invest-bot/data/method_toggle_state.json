@@ -1,0 +1,22 @@
+{
+  "disabled": [
+    "DONCHIAN",
+    "KLINGER",
+    "LEVEL_QUALITY",
+    "RMI",
+    "TWIGGS",
+    "VOL_MOMENTUM",
+    "WICK_REJECTION"
+  ],
+  "inverted": [
+    "ALLIGATOR",
+    "BB_KELTNER_SQUEEZE",
+    "EHLERS_MODE",
+    "FRACTIONAL_DIFF",
+    "LEVEL_ABSORPTION",
+    "PRICE_TREND",
+    "T3_SIGNAL",
+    "VOL_COMPRESSION",
+    "ZLEMA_SIGNAL"
+  ]
+}

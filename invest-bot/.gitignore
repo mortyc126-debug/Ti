@@ -134,5 +134,12 @@ TODO.txt
 *.pyc
 
 # risk.py / oi_composite_strategy.py persisted state
-/data/
+# ВАЖНО: паттерн /data/* (не /data/) — чтобы можно было исключать конкретные
+# файлы через ! (для игнорируемой директории git не проверяет содержимое).
+/data/*
 oi_weights.json
+
+# Пресеты методов и текущее состояние чекбоксов — исключения:
+# генерируются офлайн-анализом (score_methods.py), должны версионироваться.
+!/data/method_presets.json
+!/data/method_toggle_state.json

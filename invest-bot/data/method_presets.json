@@ -1,0 +1,42 @@
+{
+  "score_methods_pool_2026-07": {
+    "description": "Автосгенерировано из score_methods.py --by-regime на пуле ~418 тикеров. disabled = universal noise (|d| ≤ 0.05 во всех режимах при огромных n_fires — балласт). inverted = universal ANTI (d < −0.05 стабильно во всех 6 режимах — глобальная инверсия работает). Режимные методы (BS_PRESSURE, FALSE_BREAKOUT, ICHIMOKU_SIGNAL, RSI_DIVERGENCE, VSA, VSA_ABSORPTION) в этом пресете НЕ ТРОНУТЫ — для них нужен режимный множитель через REGIME_WEIGHT_MODS, не глобальная инверсия.",
+    "disabled": [
+      "DONCHIAN",
+      "KLINGER",
+      "LEVEL_QUALITY",
+      "RMI",
+      "TWIGGS",
+      "VOL_MOMENTUM",
+      "WICK_REJECTION"
+    ],
+    "inverted": [
+      "ALLIGATOR",
+      "BB_KELTNER_SQUEEZE",
+      "EHLERS_MODE",
+      "FRACTIONAL_DIFF",
+      "LEVEL_ABSORPTION",
+      "PRICE_TREND",
+      "T3_SIGNAL",
+      "VOL_COMPRESSION",
+      "ZLEMA_SIGNAL"
+    ],
+    "saved_at": 1751758800
+  },
+  "score_methods_minimal_risk_2026-07": {
+    "description": "Осторожный вариант того же прогона: только 4 самых массовых universal anti (n_fires × |d| в топе contribution) и 4 самых массовых noise. Меньше риск конфликта с уже подстроенными IC-весами.",
+    "disabled": [
+      "CUMUL_DELTA",
+      "RMI",
+      "VOL_MOMENTUM",
+      "SINEWAVE_SIGNAL"
+    ],
+    "inverted": [
+      "ALLIGATOR",
+      "BB_KELTNER_SQUEEZE",
+      "EHLERS_MODE",
+      "FRACTIONAL_DIFF"
+    ],
+    "saved_at": 1751758800
+  }
+}
