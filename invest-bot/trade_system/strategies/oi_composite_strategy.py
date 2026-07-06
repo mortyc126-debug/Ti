@@ -83,6 +83,16 @@ from narrative import (
 )
 from indicators import score_adaptive_ma, score_trend_quality, zlema, t3, mmi
 from indicators_fractal import score_fractal, score_entropy_regime, chop_energy_mult
+
+# TA-Lib свечные паттерны — опционально: если пакета нет, TALIB_ANTISIGNAL
+# просто вернёт 0.0 и не будет вносить вклад в композит. Установка:
+# pip install TA-Lib (на Windows — precompiled wheel из cgohlke/talib-build).
+try:
+    import numpy as _np
+    import talib as _talib
+    _TALIB_AVAILABLE = True
+except ImportError:
+    _TALIB_AVAILABLE = False
 from indicators_ehlers import (
     score_cyber_cycle, score_decycler, score_fisher_rsi, score_ebsw, even_better_sinewave,
     score_mama_fama, score_ehlers_mode, score_cyber_phase, fisher_rsi, fisher_score_core,
@@ -1442,6 +1452,103 @@ def score_candle_pattern(candles: list[HistoricCandle]) -> float:
             raw -= inside_push
 
     return max(-1.0, min(1.0, round(raw, 4)))
+
+
+# ── TALIB_ANTISIGNAL ──────────────────────────────────────────────────────────
+# Веса паттернов подобраны по прогону candle_patterns.py на пуле из 559
+# тикеров (~5.3 млн валидных баров, 5-мин). Знак в _FADE_PATTERNS означает
+# INVERSION: bull-паттерн предсказывает падение, bear — рост. Знак в
+# _CORRECT_PATTERNS — прямой (bull→рост, bear→падение).
+#
+# Веса = (win_rate − 0.5) * 2 → диапазон [-1, 1]. Fade-паттерны берутся с
+# положительным весом (мы инвертируем сигнал сами), correct — тоже с
+# положительным (не инвертируем). Нормализация под композит: сумма весов
+# на активных паттернах приводится к [-1, 1] делением на суммарный
+# потенциальный вес.
+#
+# n_fires в комментариях — количество наблюдений в пуле, показывает
+# статистическую прочность каждого веса. Пороги менее 40k n_fires не
+# включены, чтобы вес не улетел на редком паттерне.
+_FADE_PATTERNS = (
+    # (talib_name, weight_from_pool_winrate_deviation)
+    ("CDLMARUBOZU",        0.23),   # n=828k,  win 38.5% → fade
+    ("CDLCLOSINGMARUBOZU", 0.21),   # n=1.25M, win 39.5%
+    ("CDLBELTHOLD",        0.18),   # n=1.30M, win 41.0%
+    ("CDLLONGLINE",        0.19),   # n=1.08M, win 40.3%
+    ("CDL3INSIDE",         0.14),   # n=43k,   win 42.8%
+)
+_CORRECT_PATTERNS = (
+    ("CDLDOJISTAR",     0.08),      # n=90k,   win 54.1%
+    ("CDLHARAMICROSS",  0.02),      # n=334k,  win 50.7% — слабый, для полноты
+)
+
+
+def score_talib_antisignal(candles: list[HistoricCandle]) -> float:
+    """
+    Свечные паттерны TA-Lib как ЯВНЫЙ анти-сигнал.
+
+    Открытие через candle_patterns.py на пуле 559 тикеров: паттерны
+    «длинная свеча в направлении X» (Marubozu, ClosingMarubozu, LongLine,
+    BeltHold, 3-Inside) на 5-мин работают КАК АНТИ-СИГНАЛ — цена после
+    них статистически чаще идёт в противоположную сторону (win 38-43%
+    при n в сотни тысяч наблюдений). Это микроструктурный факт
+    российского ликвида, а не подгонка.
+
+    Разворотные паттерны (DojiStar, HaramiCross) работают классически
+    (win 54% и 51%).
+
+    Возвращает score ∈ [-1, 1]:
+    - fade-паттерн сработал бычьим (bar_signal > 0) → score < 0 (ждём падения)
+    - fade-паттерн сработал медвежьим (< 0) → score > 0
+    - correct-паттерн (DojiStar): знак совпадает с bar_signal
+    - вклады взвешиваются по эмпирической силе (win_rate − 0.5) и
+      суммируются; итог нормируется на сумму всех потенциальных весов.
+
+    Если TA-Lib не установлен — return 0.0 (метод молчит).
+    """
+    if not _TALIB_AVAILABLE or len(candles) < 20:
+        return 0.0
+
+    try:
+        o = _np.array([_to_f(c.open)  for c in candles], dtype=float)
+        h = _np.array([_to_f(c.high)  for c in candles], dtype=float)
+        l = _np.array([_to_f(c.low)   for c in candles], dtype=float)
+        c = _np.array([_to_f(c.close) for c in candles], dtype=float)
+    except Exception:
+        return 0.0
+
+    total_weight = 0.0
+    raw_score = 0.0
+
+    # Fade: инвертируем знак сигнала.
+    for name, w in _FADE_PATTERNS:
+        try:
+            sig_arr = getattr(_talib, name)(o, h, l, c)
+        except Exception:
+            continue
+        last = int(sig_arr[-1]) if sig_arr[-1] == sig_arr[-1] else 0  # NaN-safe
+        total_weight += w
+        if last > 0:
+            raw_score -= w        # бык-fade → продавать
+        elif last < 0:
+            raw_score += w        # медв-fade → покупать
+
+    # Correct: знак напрямую.
+    for name, w in _CORRECT_PATTERNS:
+        try:
+            sig_arr = getattr(_talib, name)(o, h, l, c)
+        except Exception:
+            continue
+        last = int(sig_arr[-1]) if sig_arr[-1] == sig_arr[-1] else 0
+        total_weight += w
+        if last > 0:
+            raw_score += w
+        elif last < 0:
+            raw_score -= w
+
+    if total_weight <= 0:
+        return 0.0
+    return max(-1.0, min(1.0, round(raw_score / total_weight, 4)))
 
 
 def score_adaptive_ma_candle(candles: list[HistoricCandle]) -> float:
@@ -5912,6 +6019,11 @@ METHODS = [
     ("VWAP_SIGNAL",    score_vwap_signal),
     ("BS_PRESSURE",    score_bs_pressure),
     ("CANDLE_PATTERN", score_candle_pattern),
+    # Прямые TA-Lib свечные паттерны как fade + reversal (win-rates взяты из
+    # прогона candle_patterns.py по пулу 559 тикеров). Ортогонален
+    # CANDLE_PATTERN (тот считает параметрический анализ, этот — известные
+    # именованные шаблоны с эмпирическими весами).
+    ("TALIB_ANTISIGNAL", score_talib_antisignal),
     ("ADAPTIVE_MA",    score_adaptive_ma_candle),
     ("TREND_QUALITY",  score_trend_quality_candle),
     ("FRACTAL",        score_fractal_candle),
