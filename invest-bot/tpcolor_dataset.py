@@ -602,6 +602,15 @@ def main() -> None:
     ap.add_argument("--p-pctl", type=float, default=None,
                      help="ЛОКАЛЬНЫЙ порог: верхний процентиль P̂ у каждого "
                           "тикера (напр. 90 → верхние 10%%). Переопределяет --p-hi.")
+    ap.add_argument("--exclude-fat-tail", type=float, default=None,
+                     help="Только ALL: отсечь тикеры со std(fwd_ret_k) > M × медиана "
+                          "по пулу (типичный M ≈ 3). Гасит один-два инструмента с "
+                          "экстремальными выбросами, которые перекашивают "
+                          "пуловое d_quad. Не влияет на per-ticker CSV — там все.")
+    ap.add_argument("--per-ticker-signs", action="store_true",
+                     help="Только ALL: разбить per-ticker d_quad по знаку "
+                          "(правильный/обратный/нейтральный) и вывести "
+                          "распределение + топ обратного знака.")
     args = ap.parse_args()
 
     if (args.t_pctl is None) != (args.p_pctl is None):
@@ -697,7 +706,10 @@ def _run_all(args) -> None:
     summaries: list[dict] = []
     pooled_rows: list[dict] = []                # для --quadrant-check/sweep в ALL
     per_ticker_d: list[dict] = []               # для --quadrant-per-ticker
-    need_quadrant = args.quadrant_check or args.quadrant_sweep or args.quadrant_per_ticker
+    ticker_std: dict[str, float] = {}           # std(fwd_ret_k) на тикере — для --exclude-fat-tail
+    need_quadrant = (args.quadrant_check or args.quadrant_sweep
+                      or args.quadrant_per_ticker or args.per_ticker_signs
+                      or args.exclude_fat_tail is not None)
     skipped = 0
     for idx, ticker in enumerate(tickers, 1):
         try:
@@ -729,7 +741,8 @@ def _run_all(args) -> None:
         })
         if need_quadrant:
             # pooled — только нужные поля, чтобы не держать в памяти 30+ колонок
-            # на весь пул (иначе на ALL --all это гигабайты).
+            # на весь пул (иначе на ALL --all это гигабайты). Тикер в каждой
+            # строке — нужен для --exclude-fat-tail фильтрации по имени.
             ticker_rows: list[dict] = []
             for r in rows:
                 if r["T_hat"] is None or r["P_hat"] is None:
@@ -739,10 +752,16 @@ def _run_all(args) -> None:
                 if r["outcome_known"] != 1:
                     continue
                 ticker_rows.append({
+                    "_ticker": ticker,
                     "T_hat": r["T_hat"], "P_hat": r["P_hat"],
                     "color_hat": r["color_hat"], "fwd_ret_k": r["fwd_ret_k"],
                     "outcome_known": 1,
                 })
+
+            # std(fwd_ret_k) на тикере — единственная величина для отсева
+            # fat-tail'ов. Считаем даже если --exclude-fat-tail не задан,
+            # чтобы можно было напечатать в signs summary.
+            _, ticker_std[ticker] = _mean_std([r["fwd_ret_k"] for r in ticker_rows])
 
             # Локальные пороги: у каждого тикера свои (по его собственному
             # распределению T̂,P̂). Это отвечает на «оси адаптируются, а не
@@ -777,6 +796,7 @@ def _run_all(args) -> None:
                     "d_quad": d_q if d_q is not None else "",
                     "d_base": d_b if d_b is not None else "",
                     "ratio": (abs(d_q) / abs(d_b)) if (d_q is not None and d_b and abs(d_b) > 1e-9) else "",
+                    "std_fwd": round(ticker_std.get(ticker, 0.0), 3),
                 })
         if per_dir:
             with open(os.path.join(per_dir, f"{ticker}.csv"),
@@ -812,8 +832,32 @@ def _run_all(args) -> None:
             print(f"  {name:<8}  медиана {_fmt_corr(_median(vals))}  "
                   f"|·|>0.7: {sum(1 for v in vals if abs(v) > 0.7)}/{len(vals)}")
 
+    # Fat-tail фильтр: гасит один-два инструмента с экстремальными выбросами,
+    # которые перекашивают пуловое d_quad. Медиана как пороговый ориентир
+    # робастнее среднего к самим же выбросам, которые мы отсекаем.
+    excluded_by_fat: list[str] = []
+    if args.exclude_fat_tail is not None and ticker_std:
+        stds = sorted(ticker_std.values())
+        median_std = stds[len(stds) // 2] if stds else 0
+        thr = args.exclude_fat_tail * median_std if median_std > 0 else float("inf")
+        excluded_by_fat = sorted(tk for tk, s in ticker_std.items() if s > thr)
+        if excluded_by_fat:
+            excluded_set = set(excluded_by_fat)
+            before_pool = len(pooled_rows)
+            pooled_rows = [r for r in pooled_rows if r.get("_ticker") not in excluded_set]
+            print()
+            print(f"--exclude-fat-tail {args.exclude_fat_tail}: медиана std={median_std:.3f}, "
+                  f"порог={thr:.3f}")
+            print(f"  отсечено {len(excluded_by_fat)} тикеров, {before_pool - len(pooled_rows)} "
+                  f"баров вылетело из пула")
+            print(f"  ({', '.join(excluded_by_fat[:12])}"
+                  f"{'…' if len(excluded_by_fat) > 12 else ''})")
+
     if (args.quadrant_check or args.quadrant_sweep) and pooled_rows:
-        title = f"пул из {len(ok)} тикеров, {len(pooled_rows)} валидных баров"
+        pool_size = len({r.get("_ticker") for r in pooled_rows})
+        title = f"пул из {pool_size} тикеров, {len(pooled_rows)} валидных баров"
+        if excluded_by_fat:
+            title += f" (после --exclude-fat-tail)"
         if args.t_pctl is not None:
             filter_fn = lambda r: r.get("in_quadrant", False)
             desc = (f"per-ticker p{args.t_pctl}×p{args.p_pctl} "
@@ -824,14 +868,16 @@ def _run_all(args) -> None:
             desc = f"T̂ < {t_lo:+.2f}   P̂ > {p_hi:+.2f} (глобальные)"
         _quadrant_report(pooled_rows, filter_fn, desc, title)
     if args.quadrant_sweep and pooled_rows:
-        _sweep_report(pooled_rows, f"пул из {len(ok)} тикеров",
+        pool_size = len({r.get("_ticker") for r in pooled_rows})
+        _sweep_report(pooled_rows, f"пул из {pool_size} тикеров",
                        mode="pctl" if args.t_pctl is not None else "abs")
 
     if args.quadrant_per_ticker and per_ticker_d:
         per_ticker_d.sort(key=lambda r: (abs(r["d_quad"]) if isinstance(r["d_quad"], float) else -1),
                             reverse=True)
         with open(args.quadrant_per_ticker, "w", encoding="utf-8", newline="") as f:
-            fields = ["ticker", "t_lo", "p_hi", "n_quad", "d_quad", "d_base", "ratio"]
+            fields = ["ticker", "t_lo", "p_hi", "n_quad", "d_quad", "d_base",
+                       "ratio", "std_fwd"]
             w = csv.DictWriter(f, fieldnames=fields)
             w.writeheader()
             w.writerows(per_ticker_d)
@@ -849,6 +895,33 @@ def _run_all(args) -> None:
                       f"d_quad={r['d_quad']:+.3f}  d_base={r['d_base']:+.4f}  "
                       f"ratio={r['ratio']:.1f}" if isinstance(r['ratio'], float)
                       else f"    {r['ticker']:<10} n_q={r['n_quad']:>5}  d_quad={r['d_quad']:+.3f}")
+
+    if args.per_ticker_signs and per_ticker_d:
+        # Разбиение по знаку d_quad на «валидных» тикерах (n_quad>=200):
+        # правильный знак = d<0 (color+ → откат, ожидание документа),
+        # обратный = d>0 (color+ → продолжение — крупные ликвиды типа SBER),
+        # нейтральный = |d|<=0.05 (сигнала нет).
+        valid_signs = [r for r in per_ticker_d
+                        if isinstance(r["d_quad"], float) and r["n_quad"] >= 200]
+        NEUTRAL = 0.05
+        correct = [r for r in valid_signs if r["d_quad"] < -NEUTRAL]
+        wrong   = [r for r in valid_signs if r["d_quad"] > +NEUTRAL]
+        neutral = [r for r in valid_signs if abs(r["d_quad"]) <= NEUTRAL]
+        print()
+        print(f"=== per-ticker знаки (n_quad>=200, порог нейтральности ±{NEUTRAL}) ===")
+        print(f"  правильный (d<-{NEUTRAL}, ожидание §8.3): {len(correct)}")
+        print(f"  обратный   (d>+{NEUTRAL}, механика противоположная): {len(wrong)}")
+        print(f"  нейтральный (|d|<={NEUTRAL}): {len(neutral)}")
+        if wrong:
+            print("  топ-5 обратного знака (кандидаты в «SBER-класс»):")
+            for r in sorted(wrong, key=lambda x: -x["d_quad"])[:5]:
+                print(f"    {r['ticker']:<10} d_quad={r['d_quad']:+.3f}  "
+                      f"n_q={r['n_quad']:>5}  std_fwd={r['std_fwd']:>7}")
+        if correct:
+            print("  топ-5 правильного знака (ядро для §11):")
+            for r in sorted(correct, key=lambda x: x["d_quad"])[:5]:
+                print(f"    {r['ticker']:<10} d_quad={r['d_quad']:+.3f}  "
+                      f"n_q={r['n_quad']:>5}  std_fwd={r['std_fwd']:>7}")
 
 
 if __name__ == "__main__":
