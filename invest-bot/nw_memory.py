@@ -419,6 +419,13 @@ def main() -> None:
                      help="верхняя граница T̂ для квадранта (default -0.5)")
     ap.add_argument("--p-hi", type=float, default=+0.5,
                      help="нижняя граница P̂ для квадранта (default +0.5)")
+    ap.add_argument("--t-pctl", type=float, default=None,
+                     help="ЛОКАЛЬНЫЙ порог: нижний процентиль T̂ этого тикера "
+                          "(напр. 5 → нижние 5%%). Переопределяет --t-lo. "
+                          "Пары --t-pctl/--p-pctl задаются совместно.")
+    ap.add_argument("--p-pctl", type=float, default=None,
+                     help="ЛОКАЛЬНЫЙ порог: верхний процентиль P̂ этого тикера "
+                          "(напр. 90 → верхние 10%%). Переопределяет --p-hi.")
     ap.add_argument("--out", default=None, help="CSV с per-bar предсказаниями")
     ap.add_argument("--plot", action="store_true", help="показать calibration diagram")
     args = ap.parse_args()
@@ -427,10 +434,27 @@ def main() -> None:
     ticker = os.path.splitext(os.path.basename(args.csv_in))[0]
     print(f"датасет: {args.csv_in}, {len(data['T_hat'])} баров", file=sys.stderr)
 
+    # Per-ticker процентильный режим: пороги считаем из локального
+    # распределения — отвечает на «оси адаптируются, а не применяются
+    # одним глобальным z для всех». Пары --t-pctl/--p-pctl задаются
+    # совместно; если задан один, sys.exit.
+    if (args.t_pctl is None) != (args.p_pctl is None):
+        sys.exit("--t-pctl и --p-pctl задаются либо оба, либо ни одного.")
+    t_lo, p_hi = args.t_lo, args.p_hi
+    if args.t_pctl is not None:
+        T_valid = data["T_hat"][~np.isnan(data["T_hat"])]
+        P_valid = data["P_hat"][~np.isnan(data["P_hat"])]
+        if len(T_valid) == 0 or len(P_valid) == 0:
+            sys.exit("нет валидных T̂/P̂ для percentile-расчёта")
+        t_lo = float(np.percentile(T_valid, args.t_pctl))
+        p_hi = float(np.percentile(P_valid, args.p_pctl))
+        print(f"per-ticker percentile: T̂ p{args.t_pctl}={t_lo:+.3f}, "
+              f"P̂ p{args.p_pctl}={p_hi:+.3f}", file=sys.stderr)
+
     result = _run_nw(data, h=args.h, neighbors=args.neighbors,
                       density_min=args.density_min, k=args.k,
                       quadrant_only=args.quadrant_only,
-                      t_lo=args.t_lo, p_hi=args.p_hi)
+                      t_lo=t_lo, p_hi=p_hi)
     m = _evaluate(result, confidence=args.confidence)
     _print_summary(m, ticker)
     _print_calibration(m["calibration_bins"])
