@@ -61,6 +61,7 @@ import math
 import multiprocessing as mp
 import os
 import sys
+import threading
 import time
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -669,6 +670,24 @@ def main() -> None:
     t_start = time.time()
     done = 0
 
+    # Heartbeat в фоновом потоке. Между результатами воркеров может быть
+    # 30-60 секунд тишины (classify_regime + 40 методов на 39k баров — не
+    # быстро), из-за чего кажется что процесс висит. Раз в 30 сек печатаем
+    # elapsed + скорость. Поток закрывается по завершении цикла воркеров.
+    hb_stop = threading.Event()
+    hb_state = {"done": 0, "total": len(tickers)}
+
+    def _heartbeat():
+        while not hb_stop.wait(30.0):
+            elapsed = time.time() - t_start
+            d = hb_state["done"]; tot = hb_state["total"]
+            rate = d / elapsed if elapsed > 0 else 0
+            eta = (tot - d) / rate if rate > 0 else 0
+            print(f"[heartbeat] прошло {elapsed:>5.0f}с | {d}/{tot} тикеров | "
+                  f"{rate:.2f} тик/с | ETA ~{eta:>4.0f}с", file=sys.stderr, flush=True)
+    hb_thread = threading.Thread(target=_heartbeat, daemon=True)
+    hb_thread.start()
+
     if args.workers == 1 or len(tickers) == 1:
         _init_worker()
         for job in jobs:
@@ -681,6 +700,7 @@ def main() -> None:
                                     time.time() - t_start)
             _accumulate_pool(pool_agg, ticker, results)
             _write_ticker(ticker, results)
+            hb_state["done"] = done
     else:
         with mp.Pool(processes=args.workers, initializer=_init_worker) as pool:
             for ticker, results in pool.imap_unordered(_run_ticker, jobs):
@@ -692,6 +712,10 @@ def main() -> None:
                                         time.time() - t_start)
                 _accumulate_pool(pool_agg, ticker, results)
                 _write_ticker(ticker, results)
+
+    # Останавливаем heartbeat перед финальным выводом
+    hb_stop.set()
+    hb_thread.join(timeout=1)
 
     if per_ticker_fp:
         per_ticker_fp.close()
