@@ -78,6 +78,14 @@ try:
 except ImportError as ex:
     sys.exit(f"нужны numpy + scipy: pip install numpy scipy. текущая ошибка: {ex}")
 
+# sklearn.isotonic — опционально, только для --calibrate. Отдельный try,
+# чтобы отсутствие пакета не ломало основной путь.
+try:
+    from sklearn.isotonic import IsotonicRegression
+    _SKLEARN_AVAILABLE = True
+except ImportError:
+    _SKLEARN_AVAILABLE = False
+
 
 def _load_dataset(path: str) -> dict:
     """Читает CSV из tpcolor_dataset.py, возвращает numpy-массивы по колонкам.
@@ -273,9 +281,10 @@ def _run_nw(data: dict, h: float, neighbors: int, density_min: float,
     }
 
 
-def _evaluate(result: dict, confidence: float) -> dict:
+def _evaluate(result: dict, confidence: float, calibrate: bool = False) -> dict:
     """Собирает метрики. Возвращает {brier, base_rate, edge_stats, n_signal,
-    n_no_precedent}."""
+    n_no_precedent}. Если calibrate=True — применяет изотоническую регрессию
+    к сырым p_hold (in-sample), потом считает метрики по калиброванным."""
     p_hold = result["p_hold"]
     fwd = result["fwd"]
     tgt = result["tgt"]
@@ -283,6 +292,7 @@ def _evaluate(result: dict, confidence: float) -> dict:
 
     # Пары (pred, actual) для калибровки: где мы что-то предсказали и знаем факт.
     preds = []; actuals = []
+    valid_idxs = []
     for i in range(len(p_hold)):
         if memory_type[i] != "population":
             continue
@@ -290,43 +300,59 @@ def _evaluate(result: dict, confidence: float) -> dict:
             continue
         preds.append(float(p_hold[i]))
         actuals.append(1 if tgt[i] > 0 else 0)
+        valid_idxs.append(i)
 
-    brier = _brier(preds, actuals)
+    # Калибровка: изотоническая регрессия на всех (pred, actual). In-sample —
+    # оптимистичная оценка (в проде нужен walk-forward), но для проверки
+    # «маскирует ли плохая калибровка настоящий edge» этого достаточно.
+    calibrated = None
+    if calibrate and preds and _SKLEARN_AVAILABLE:
+        ir = IsotonicRegression(out_of_bounds="clip")
+        ir.fit(np.array(preds), np.array(actuals))
+        calibrated = ir.predict(np.array(preds)).tolist()
+    elif calibrate and not _SKLEARN_AVAILABLE:
+        print("⚠ --calibrate требует sklearn (pip install scikit-learn), "
+              "калибровка пропущена", file=sys.stderr)
+
+    brier_raw = _brier(preds, actuals)
     base_rate = sum(actuals) / len(actuals) if actuals else None
     naive_brier = (base_rate * (1 - base_rate)) if base_rate is not None else None
 
-    # Реализованный edge: |p_hold − 0.5| > confidence → торгуем
-    # direction = sign(p_hold − 0.5), realized = direction × fwd_ret_k
-    edge_rets = []
-    for i in range(len(p_hold)):
-        if memory_type[i] != "population":
-            continue
-        if np.isnan(fwd[i]):
-            continue
-        gap = float(p_hold[i]) - 0.5
-        if abs(gap) < confidence:
-            continue
-        direction = 1.0 if gap > 0 else -1.0
-        edge_rets.append(direction * float(fwd[i]))
+    # Метрики edge — сначала на raw, потом (если калибровано) на calibrated.
+    def _edge_stats(preds_src):
+        rets = []
+        for j, i in enumerate(valid_idxs):
+            if np.isnan(fwd[i]):
+                continue
+            gap = preds_src[j] - 0.5
+            if abs(gap) < confidence:
+                continue
+            direction = 1.0 if gap > 0 else -1.0
+            rets.append(direction * float(fwd[i]))
+        if not rets:
+            return {"mean": None, "std": None, "win_rate": None, "n": 0}
+        mean = sum(rets) / len(rets)
+        std = (math.sqrt(sum((r - mean) ** 2 for r in rets) / (len(rets) - 1))
+               if len(rets) > 1 else None)
+        wr = sum(1 for r in rets if r > 0) / len(rets)
+        return {"mean": mean, "std": std, "win_rate": wr, "n": len(rets)}
 
-    edge_mean = sum(edge_rets) / len(edge_rets) if edge_rets else None
-    edge_std = (
-        math.sqrt(sum((r - edge_mean) ** 2 for r in edge_rets) / (len(edge_rets) - 1))
-        if edge_rets and len(edge_rets) > 1 else None
-    )
-    win_rate = (sum(1 for r in edge_rets if r > 0) / len(edge_rets)
-                if edge_rets else None)
+    edge_raw = _edge_stats(preds)
+    edge_cal = _edge_stats(calibrated) if calibrated is not None else None
+    brier_cal = _brier(calibrated, actuals) if calibrated is not None else None
 
     n_no_precedent = sum(1 for m in memory_type if m == "no_precedent")
     n_population = sum(1 for m in memory_type if m == "population")
 
     return {
-        "brier": brier, "base_rate": base_rate, "naive_brier": naive_brier,
+        "brier_raw": brier_raw, "brier_cal": brier_cal,
+        "base_rate": base_rate, "naive_brier": naive_brier,
         "n_preds": len(preds),
-        "edge_mean_atr": edge_mean, "edge_std_atr": edge_std,
-        "edge_win_rate": win_rate, "n_signal": len(edge_rets),
+        "edge_raw": edge_raw, "edge_cal": edge_cal,
         "n_population": n_population, "n_no_precedent": n_no_precedent,
-        "calibration_bins": _calibration_bins(preds, actuals, 10),
+        "calibration_bins_raw": _calibration_bins(preds, actuals, 10),
+        "calibration_bins_cal": (_calibration_bins(calibrated, actuals, 10)
+                                   if calibrated is not None else None),
     }
 
 
@@ -335,23 +361,28 @@ def _print_summary(m: dict, ticker: str) -> None:
     print(f"баров с предсказанием (population):  {m['n_preds']}")
     print(f"баров без прецедента (no_precedent): {m['n_no_precedent']}")
     print()
-    if m["brier"] is None:
+    if m["brier_raw"] is None:
         print("не удалось посчитать метрики — недостаточно предсказаний")
         return
-    print(f"Brier score      : {m['brier']:.4f}")
-    print(f"Naive baseline   : {m['naive_brier']:.4f}  (константа = {m['base_rate']:.3f})")
-    print(f"Улучшение к naive: {(1 - m['brier']/m['naive_brier'])*100:+.1f}%")
+    print(f"Brier raw          : {m['brier_raw']:.4f}")
+    if m["brier_cal"] is not None:
+        print(f"Brier calibrated   : {m['brier_cal']:.4f}  (изотоническая, in-sample)")
+    print(f"Naive baseline     : {m['naive_brier']:.4f}  (константа = {m['base_rate']:.3f})")
+    print(f"Улучшение raw→naive: {(1 - m['brier_raw']/m['naive_brier'])*100:+.1f}%")
+    if m["brier_cal"] is not None:
+        print(f"Улучш. cal→naive   : {(1 - m['brier_cal']/m['naive_brier'])*100:+.1f}%")
     print()
-    print(f"=== Реализованный edge (|p_hold − 0.5| > threshold) ===")
-    if m["edge_mean_atr"] is None:
-        print("сигналов не набралось — снизь --confidence")
-        return
-    print(f"сигналов        : {m['n_signal']}")
-    print(f"mean fwd_ret/ATR: {m['edge_mean_atr']:+.4f}  (положит. = система работает)")
-    print(f"std             : {m['edge_std_atr']:.4f}")
-    print(f"Sharpe-подобный : {m['edge_mean_atr']/m['edge_std_atr']:.3f}"
-          if m['edge_std_atr'] else "  Sharpe — /0")
-    print(f"win-rate        : {m['edge_win_rate']*100:.1f}%")
+    def _print_edge(label, e):
+        if e is None or e["mean"] is None:
+            print(f"{label}: сигналов не набралось")
+            return
+        sharpe = (e["mean"] / e["std"]) if e["std"] else 0
+        print(f"{label}: n={e['n']}  mean_ret/ATR={e['mean']:+.4f}  "
+              f"std={e['std']:.3f}  Sharpe={sharpe:+.3f}  win={e['win_rate']*100:.1f}%")
+    print(f"=== Реализованный edge (|p − 0.5| > threshold) ===")
+    _print_edge("raw       ", m["edge_raw"])
+    if m["edge_cal"] is not None:
+        _print_edge("calibrated", m["edge_cal"])
 
 
 def _write_out(result: dict, m: dict, path: str) -> None:
@@ -428,6 +459,11 @@ def main() -> None:
                           "(напр. 90 → верхние 10%%). Переопределяет --p-hi.")
     ap.add_argument("--out", default=None, help="CSV с per-bar предсказаниями")
     ap.add_argument("--plot", action="store_true", help="показать calibration diagram")
+    ap.add_argument("--calibrate", action="store_true",
+                     help="Изотоническая калибровка (in-sample). Показывает "
+                          "верхнюю границу того, что может дать post-hoc "
+                          "калибровочный слой. Ставит sklearn — pip install "
+                          "scikit-learn.")
     args = ap.parse_args()
 
     data = _load_dataset(args.csv_in)
@@ -455,16 +491,19 @@ def main() -> None:
                       density_min=args.density_min, k=args.k,
                       quadrant_only=args.quadrant_only,
                       t_lo=t_lo, p_hi=p_hi)
-    m = _evaluate(result, confidence=args.confidence)
+    m = _evaluate(result, confidence=args.confidence, calibrate=args.calibrate)
     _print_summary(m, ticker)
-    _print_calibration(m["calibration_bins"])
+    _print_calibration(m["calibration_bins_raw"])
+    if m.get("calibration_bins_cal") is not None:
+        print("\n--- после изотонической калибровки ---")
+        _print_calibration(m["calibration_bins_cal"])
 
     if args.out:
         _write_out(result, m, args.out)
         print(f"\nсохранено: {args.out}")
 
     if args.plot:
-        _plot_calibration(m["calibration_bins"], ticker)
+        _plot_calibration(m["calibration_bins_raw"], ticker)
 
 
 if __name__ == "__main__":
