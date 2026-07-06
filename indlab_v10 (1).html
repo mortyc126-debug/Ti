@@ -890,6 +890,12 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
           <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);cursor:pointer;">
             <input type="checkbox" id="an-multi-best" checked style="accent-color:var(--green);"> только ≥55%
           </label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);cursor:pointer;" title="Применить параметры из формы «Один тикер» ко ВСЕМ тикерам (одинаковые значения для всех).">
+            <input type="checkbox" id="an-multi-custom" style="accent-color:var(--violet);"> параметры из формы
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);cursor:pointer;" title="Walk-forward подбирает периоды индикаторов ДЛЯ КАЖДОГО тикера отдельно — по его собственной истории. Альты пересчитываются от подобранных серий. Наведи на ячейку — покажет выбранный период.">
+            <input type="checkbox" id="an-multi-adaptive" style="accent-color:var(--violet);"> 🎯 адаптивно per-ticker
+          </label>
           <div style="font-size:9px;color:var(--text3);font-family:var(--mono);line-height:1.5;max-width:160px;">σ — насколько универсален индикатор по разным тикерам</div>
         </div>
         <span id="an-multi-status" style="font-size:10px;color:var(--text3);font-family:var(--mono);align-self:center;flex:1;min-width:100px;"></span>
@@ -15198,9 +15204,17 @@ async function ilRunMultiComp() {
   _ilMultiCompResults = [];
   const failed = [];
 
+  // Режим параметров: дефолт / из формы / адаптивно per-ticker. Читаем один раз
+  // до цикла — форма-значения не должны меняться между тикерами внутри одного
+  // прогона (иначе сравнение перестаёт быть корректным).
+  const useCustom  = document.getElementById('an-multi-custom')?.checked;
+  const useAdaptive = document.getElementById('an-multi-adaptive')?.checked;
+  const formParams = useCustom ? _anReadTestParams() : null;
+
   for (let i=0; i<tickers.length; i++) {
     const tk = tickers[i];
-    if(statusEl) statusEl.textContent = `[${i+1}/${tickers.length}] ${tk}…`;
+    const stage = useAdaptive ? 'подбор' : 'считаю';
+    if(statusEl) statusEl.textContent = `[${i+1}/${tickers.length}] ${tk} — ${stage}…`;
     try {
       const found = await ilFindFigi(tk, token, chartGetProxy?.());
       if (!found) throw new Error('не найден');
@@ -15209,7 +15223,19 @@ async function ilRunMultiComp() {
       const candles = await _ilFetchCandlesWithCache(tk, found.figi, tfConst, from, now, token, chartGetProxy?.(), null);
       if (!candles || candles.length<30) throw new Error('мало данных ('+candles?.length+')');
       const closes = candles.map(c=>c.close);
-      const ss = _ilCalcAllSeries(candles, closes);
+      // Стартовая база: либо параметры формы (одинаковые для всех), либо
+      // дефолт (как было раньше — совместимость с прошлыми прогонами).
+      let ss = formParams ? _ilCalcCustomSeries(candles, closes, formParams)
+                          : _ilCalcAllSeries(candles, closes);
+      // Адаптив: walk-forward подбор ПО КАЖДОМУ тикеру отдельно — на его
+      // собственной истории. Каждый тикер получает свой набор периодов, что
+      // и просилось в постановке «с учётом параметров каждого инструмента».
+      let adaptiveChosen = null;
+      if (useAdaptive) {
+        const r = _ilAdaptiveSeries(candles, closes, ss);
+        ss = r.ss;
+        adaptiveChosen = r.chosen;
+      }
       const chopArr = ilCalcChop(candles,14);
       const ssAlt = {};
       IL_INDICATORS.forEach(id=>{ ssAlt[id] = _ilAltScoreSeries(id, ss, closes, candles, chopArr); });
@@ -15219,7 +15245,8 @@ async function ilRunMultiComp() {
         const s15a = _ilBtStats(ssAlt[id],closes,15,null);
         stats[id] = { cl: s15, alt: s15a };
       });
-      _ilMultiCompResults.push({ ticker:tk, stats, closes, barMinutes });
+      _ilMultiCompResults.push({ ticker:tk, stats, closes, barMinutes,
+                                  testParams: formParams, adaptiveChosen });
     } catch(e) { failed.push(`${tk}(${e.message})`); }
   }
 
@@ -15265,21 +15292,39 @@ function ilRenderMultiComp(tfLabel) {
   // Сортировка: по mean desc
   visRows.sort((a,b)=>b.mean-a.mean);
 
-  const fmtAcc = (v,bold)=>{
+  const fmtAcc = (v,bold,tt)=>{
     if(v==null) return '<td style="color:#2a2050;text-align:center;font-size:10px;">—</td>';
     let col='#7870a0';
     if(v>=62) col='var(--green)'; else if(v>=55) col='var(--violet)'; else if(v<=45) col='var(--negative)';
-    return `<td style="text-align:center;font-size:10px;color:${col};${bold?'font-weight:700;':''}">${v}%</td>`;
+    // «·» — маркер того, что здесь есть детали (адаптивно подобранный период
+    // или параметры из формы); тултип покажет какие именно.
+    const marker = tt ? '<span style="color:#5a5080;font-size:8px;vertical-align:super;">·</span>' : '';
+    const ttAttr = tt ? ` title="${tt.replace(/"/g,'&quot;')}"` : '';
+    return `<td style="text-align:center;font-size:10px;color:${col};${bold?'font-weight:700;':''}"${ttAttr}>${v}%${marker}</td>`;
   };
-  const fmtDelta = (cl,alt)=>{
+  const fmtDelta = (cl,alt,tt)=>{
     if(cl==null||alt==null) return '<td style="color:#2a2050;text-align:center;font-size:9px;">—</td>';
     const d=alt-cl;
     const col=d>0?'var(--green)':d<0?'var(--negative)':'#5a5070';
-    return `<td style="text-align:center;font-size:9px;color:${col};">${d>0?'+':''}${d}</td>`;
+    const ttAttr = tt ? ` title="${tt.replace(/"/g,'&quot;')}"` : '';
+    return `<td style="text-align:center;font-size:9px;color:${col};"${ttAttr}>${d>0?'+':''}${d}</td>`;
   };
   const fmtStd = (std)=>{
     const col=std<=5?'var(--green)':std<=10?'var(--violet)':'var(--negative)';
     return `<td style="text-align:center;font-size:10px;color:${col};">${std}</td>`;
+  };
+  // Тултип с параметрами для (тикер, индикатор): адаптив (🎯) приоритетнее формы.
+  // Если ни того ни другого — undefined, ячейка без tooltip'а (как раньше).
+  const paramTip = (rIdx, id) => {
+    const r = results[rIdx];
+    if (!r) return undefined;
+    const adaptP = r.adaptiveChosen?.[id];
+    if (adaptP != null) return `${IL_NAMES[id]||id}: 🎯 подобрано (${adaptP})`;
+    if (r.testParams) {
+      const sfx = _anParamSuffix(id, r.testParams);
+      if (sfx) return `${IL_NAMES[id]||id}: параметры формы ${sfx}`;
+    }
+    return undefined;
   };
 
   // Шапка таблицы
@@ -15312,10 +15357,11 @@ function ilRenderMultiComp(tfLabel) {
         <td style="text-align:center;font-size:10px;color:var(--text2);padding:3px 4px;">${row.mean}%</td>
         ${fmtStd(row.std)}`;
       tickers.forEach((_,i)=>{
+        const tt = paramTip(i, row.id);
         if (onlyAlt) {
-          tbody += fmtAcc(row.altVals[i]);
+          tbody += fmtAcc(row.altVals[i], false, tt);
         } else {
-          tbody += fmtAcc(row.clVals[i]) + fmtDelta(row.clVals[i], row.altVals[i]);
+          tbody += fmtAcc(row.clVals[i], false, tt) + fmtDelta(row.clVals[i], row.altVals[i], tt);
         }
       });
       const pct = row.bothCount>0 ? Math.round(row.altWins/row.bothCount*100) : null;
@@ -15334,8 +15380,9 @@ function ilRenderMultiComp(tfLabel) {
         <td style="text-align:center;font-size:10px;color:var(--text2);padding:3px 4px;">${row.mean}%</td>
         ${fmtStd(row.std)}`;
       tickers.forEach((_,i)=>{
-        if (onlyAlt) tbody += fmtAcc(row.altVals[i]);
-        else tbody += fmtAcc(row.clVals[i]) + fmtDelta(row.clVals[i], row.altVals[i]);
+        const tt = paramTip(i, row.id);
+        if (onlyAlt) tbody += fmtAcc(row.altVals[i], false, tt);
+        else tbody += fmtAcc(row.clVals[i], false, tt) + fmtDelta(row.clVals[i], row.altVals[i], tt);
       });
       const pct = row.bothCount>0 ? Math.round(row.altWins/row.bothCount*100) : null;
       const pCol = pct==null?'#3a3060':pct>=60?'var(--green)':pct<=40?'var(--negative)':'#7870a0';
@@ -15361,9 +15408,20 @@ function ilRenderMultiComp(tfLabel) {
   summary+=card('Классика надёжнее','var(--violet)',clBetter,'Альт-формула у большинства тикеров хуже классики');
   summary+=`</div>`;
 
+  // Режим параметров: отражаем ЧЕСТНО в заголовке — читатель должен видеть,
+  // сравниваются ли инструменты на одинаковых периодах (дефолт/форма) или у
+  // каждого свои (адаптив per-ticker). Иначе Δ и σ можно неверно прочитать.
+  const anyAdaptive = results.some(r=>r.adaptiveChosen);
+  const anyCustom = results.some(r=>r.testParams);
+  const paramMode = anyAdaptive
+    ? '<span style="color:var(--violet);">🎯 адаптивно per-ticker</span> (у каждого тикера свои периоды — наведи на ячейку)'
+    : anyCustom
+      ? '<span style="color:var(--violet);">параметры из формы</span> (одинаковые у всех тикеров — наведи на ячейку)'
+      : '<span style="color:#7870a0;">дефолтные периоды</span> (одинаковые у всех)';
+
   // Легенда колонок
   const legend = `<div style="margin-bottom:8px;font-size:9px;color:#4a4060;font-family:var(--mono);line-height:1.8;">
-    ТФ: <span style="color:#a898c8;">${tfLabel||''}</span> · горизонт H15 ·
+    ТФ: <span style="color:#a898c8;">${tfLabel||''}</span> · горизонт H15 · параметры: ${paramMode}<br>
     <span style="color:var(--green)">≥62%</span> устойчивый · <span style="color:var(--violet)">55–61%</span> умеренный · <span style="color:#7870a0">&lt;55%</span> случайный · <span style="color:var(--negative)">≤45%</span> антисигнал<br>
     <b style="color:var(--text3);">Разброс σ</b>: <span style="color:var(--green)">≤5</span> = универсальный · <span style="color:var(--violet)">6–10</span> = умеренно специфичный · <span style="color:var(--negative)">&gt;10</span> = тикер-специфичный<br>
     ${onlyAlt?'':'<b style="color:var(--text3);">Δ</b> = альт − классика · '}
