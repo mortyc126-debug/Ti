@@ -69,16 +69,20 @@ from typing import Optional
 # Глобальные внутри воркера — заполняются в _init_worker и переиспользуются.
 _WORKER_METHODS = None
 _WORKER_NP = None
+_WORKER_CLASSIFY_REGIME = None
+
+# Режимы бота — совпадают с REGIMES в regime.py; порядок фиксирован для
+# стабильности CSV-колонок.
+REGIMES = ("trending_up", "trending_down", "ranging",
+            "high_vol", "low_vol", "stress")
+ALL_LABEL = "ALL"       # синтетический ярлык «без режимной маски»
 
 
 def _init_worker():
-    """Инициализируется один раз на воркер: импорт стратегии + numpy.
-    Активирует локальный tinkoff-stub, если реальный SDK не установлен
-    (например, под Python 3.14 wheel'а ещё нет). Реальный пакет, если
-    он есть, найдётся первым — stub не помешает."""
-    global _WORKER_METHODS, _WORKER_NP
-    # sys.path: и папка invest-bot (для импорта trade_system, indicators…),
-    # и _tinkoff_stub (fallback для tinkoff.invest)
+    """Инициализируется один раз на воркер: импорт стратегии + numpy +
+    classify_regime. Активирует локальный tinkoff-stub, если реальный
+    SDK не установлен (Python 3.14 wheel пока нет)."""
+    global _WORKER_METHODS, _WORKER_NP, _WORKER_CLASSIFY_REGIME
     here = os.path.dirname(os.path.abspath(__file__))
     if here not in sys.path:
         sys.path.insert(0, here)
@@ -90,8 +94,10 @@ def _init_worker():
             sys.path.insert(0, stub)
     import numpy as _np
     from trade_system.strategies import oi_composite_strategy as ocs
+    from regime import classify_regime as _cr
     _WORKER_METHODS = ocs.METHODS
     _WORKER_NP = _np
+    _WORKER_CLASSIFY_REGIME = _cr
 
 
 def _load_from_cache(ticker: str, cache_dir: str, interval_min: int) -> list[dict]:
@@ -154,9 +160,49 @@ def _fwd_ret_bar_native(closes, atr, k: int):
     return out
 
 
+def _compute_regime_at(closes_list: list[float], volumes_list: list[float],
+                        window: int = 60) -> str:
+    """classify_regime на окне последних `window` баров. classify_regime
+    сам обрабатывает короткие входы, возвращает (regime, confidence).
+    Confidence нам не нужен — на границах режимов вклады обеих сторон
+    попадут в разные ведра, что и есть цель."""
+    cr = _WORKER_CLASSIFY_REGIME
+    if cr is None:
+        return "ranging"
+    win_cl = closes_list[-window:] if len(closes_list) > window else closes_list
+    win_vol = volumes_list[-window:] if len(volumes_list) > window else volumes_list
+    try:
+        regime, _ = cr(win_cl, win_vol)
+        return regime
+    except Exception:
+        return "ranging"
+
+
+def _bucket(bull_rets, bear_rets, np):
+    """Общие расчёты по одному ведру (bull_rets, bear_rets) → метрики."""
+    n_bull, n_bear = len(bull_rets), len(bear_rets)
+    n_fires = n_bull + n_bear
+    if n_bull >= 2 and n_bear >= 2:
+        ma = float(np.mean(bull_rets)); mb = float(np.mean(bear_rets))
+        sa = float(np.std(bull_rets, ddof=1))
+        sb = float(np.std(bear_rets, ddof=1))
+        pooled = math.sqrt(((n_bull - 1) * sa * sa + (n_bear - 1) * sb * sb)
+                            / max(n_bull + n_bear - 2, 1))
+        d = (ma - mb) / pooled if pooled > 0 else None
+        wins = sum(1 for r in bull_rets if r > 0) + sum(1 for r in bear_rets if r < 0)
+        win_rate = wins / n_fires
+    else:
+        ma = mb = d = win_rate = None
+    return {
+        "n_fires": n_fires, "n_bull": n_bull, "n_bear": n_bear,
+        "mean_bull": ma, "mean_bear": mb, "d": d, "win_rate": win_rate,
+    }
+
+
 def _run_ticker(job: dict) -> tuple[str, Optional[dict]]:
-    """Один воркер, один тикер, все методы. Возвращает (ticker, results)
-    где results = {method_name: {metrics}}. None если тикер пропущен."""
+    """Один воркер, один тикер, все методы. Возвращает
+    (ticker, {method: {regime: {metrics}, "ALL": {...}}}).
+    None если тикер пропущен."""
     global _WORKER_METHODS, _WORKER_NP
     np = _WORKER_NP
     ticker = job["ticker"]
@@ -170,11 +216,31 @@ def _run_ticker(job: dict) -> tuple[str, Optional[dict]]:
         return ticker, None
 
     candles = [_row_to_ns(r) for r in rows_raw]
-    closes = np.array([r["close"] for r in rows_raw], dtype=float)
-    highs  = np.array([r["high"]  for r in rows_raw], dtype=float)
-    lows   = np.array([r["low"]   for r in rows_raw], dtype=float)
+    closes_arr = np.array([r["close"]  for r in rows_raw], dtype=float)
+    highs      = np.array([r["high"]   for r in rows_raw], dtype=float)
+    lows       = np.array([r["low"]    for r in rows_raw], dtype=float)
+    vols_arr   = np.array([r["volume"] for r in rows_raw], dtype=float)
     atr = _atr_sma(highs, lows, job["n_atr"])
-    fwd = _fwd_ret_bar_native(closes, atr, K)
+    fwd = _fwd_ret_bar_native(closes_arr, atr, K)
+
+    by_regime = job.get("by_regime", False)
+    regime_win = job.get("regime_window", 60)
+
+    # Заранее считаем режим на каждой позиции i, где будем звонить методам.
+    # Это дорого (classify_regime не бесплатна на 60 барах), но делается один
+    # раз на тикер, не на каждый метод. С 40 методами экономия огромная.
+    positions = list(range(W, len(candles) - K, S))
+    if by_regime:
+        closes_list = closes_arr.tolist()
+        vols_list = vols_arr.tolist()
+        regime_at = {}
+        for i in positions:
+            if np.isnan(fwd[i]):
+                continue
+            regime_at[i] = _compute_regime_at(
+                closes_list[:i + 1], vols_list[:i + 1], regime_win)
+    else:
+        regime_at = None
 
     method_filter = job["methods_filter"]
     to_run = [(n, fn) for n, fn in _WORKER_METHODS
@@ -182,9 +248,12 @@ def _run_ticker(job: dict) -> tuple[str, Optional[dict]]:
 
     results = {}
     for name, fn in to_run:
-        bull_rets = []
-        bear_rets = []
-        for i in range(W, len(candles) - K, S):
+        # buckets: {regime_or_"ALL": (bull_rets, bear_rets)}
+        buckets: dict[str, tuple[list, list]] = {ALL_LABEL: ([], [])}
+        if by_regime:
+            for r in REGIMES:
+                buckets[r] = ([], [])
+        for i in positions:
             if np.isnan(fwd[i]):
                 continue
             try:
@@ -193,61 +262,58 @@ def _run_ticker(job: dict) -> tuple[str, Optional[dict]]:
                 continue
             if score is None:
                 continue
+            side = None
             if score >= AGREE:
-                bull_rets.append(fwd[i])
+                side = "bull"
             elif score <= -AGREE:
-                bear_rets.append(fwd[i])
-            # score в нейтральной зоне: молчание, не считаем срабатыванием
+                side = "bear"
+            else:
+                continue
+            fr = float(fwd[i])
+            (bull, bear) = buckets[ALL_LABEL]
+            (bull if side == "bull" else bear).append(fr)
+            if by_regime:
+                r_here = regime_at.get(i, "ranging")
+                if r_here in buckets:
+                    (rb, rB) = buckets[r_here]
+                    (rb if side == "bull" else rB).append(fr)
 
-        n_bull, n_bear = len(bull_rets), len(bear_rets)
-        n_fires = n_bull + n_bear
-        if n_bull >= 2 and n_bear >= 2:
-            ma = float(np.mean(bull_rets)); mb = float(np.mean(bear_rets))
-            sa = float(np.std(bull_rets, ddof=1))
-            sb = float(np.std(bear_rets, ddof=1))
-            pooled = math.sqrt(((n_bull - 1) * sa * sa + (n_bear - 1) * sb * sb)
-                                / max(n_bull + n_bear - 2, 1))
-            d = (ma - mb) / pooled if pooled > 0 else None
-            wins = sum(1 for r in bull_rets if r > 0) + sum(1 for r in bear_rets if r < 0)
-            win_rate = wins / n_fires
-        else:
-            ma = mb = d = win_rate = None
-        results[name] = {
-            "n_fires": n_fires, "n_bull": n_bull, "n_bear": n_bear,
-            "mean_bull": ma, "mean_bear": mb, "d": d, "win_rate": win_rate,
-        }
+        # Финализируем каждое ведро
+        per_regime = {}
+        for label, (bull, bear) in buckets.items():
+            per_regime[label] = _bucket(bull, bear, np)
+        results[name] = per_regime
     return ticker, results
 
 
 def _accumulate_pool(pool_agg: dict, ticker: str, results: dict) -> None:
-    """Копит per-ticker результаты в пуловые агрегаты. mean/d в пуле —
-    из накопленных sum(bull)/n_bull; d — грубая аппроксимация (та же
-    оговорка что в candle_patterns._finalize_pool)."""
-    for name, s in results.items():
-        acc = pool_agg.setdefault(name, {
-            "n_fires": 0, "n_bull": 0, "n_bear": 0,
-            "sum_bull": 0.0, "sum_bear": 0.0, "wins": 0,
-            "n_tickers": 0, "d_values": [],
-        })
-        acc["n_fires"] += s["n_fires"]
-        acc["n_bull"]  += s["n_bull"]
-        acc["n_bear"]  += s["n_bear"]
-        if s["mean_bull"] is not None and s["n_bull"]:
-            acc["sum_bull"] += s["mean_bull"] * s["n_bull"]
-        if s["mean_bear"] is not None and s["n_bear"]:
-            acc["sum_bear"] += s["mean_bear"] * s["n_bear"]
-        if s["win_rate"] is not None:
-            acc["wins"] += int(round(s["win_rate"] * s["n_fires"]))
-        if s["d"] is not None:
-            acc["d_values"].append(s["d"])
-            acc["n_tickers"] += 1
+    """Копит per-ticker × per-regime результаты. pool_agg[(method, regime)] = {agg}."""
+    for name, per_regime in results.items():
+        for regime, s in per_regime.items():
+            key = (name, regime)
+            acc = pool_agg.setdefault(key, {
+                "n_fires": 0, "n_bull": 0, "n_bear": 0,
+                "sum_bull": 0.0, "sum_bear": 0.0, "wins": 0,
+                "n_tickers": 0, "d_values": [],
+            })
+            acc["n_fires"] += s["n_fires"]
+            acc["n_bull"]  += s["n_bull"]
+            acc["n_bear"]  += s["n_bear"]
+            if s["mean_bull"] is not None and s["n_bull"]:
+                acc["sum_bull"] += s["mean_bull"] * s["n_bull"]
+            if s["mean_bear"] is not None and s["n_bear"]:
+                acc["sum_bear"] += s["mean_bear"] * s["n_bear"]
+            if s["win_rate"] is not None:
+                acc["wins"] += int(round(s["win_rate"] * s["n_fires"]))
+            if s["d"] is not None:
+                acc["d_values"].append(s["d"])
+                acc["n_tickers"] += 1
 
 
 def _finalize_pool(pool_agg: dict) -> dict:
-    """Финализирует пул: медиана d по тикерам (робастнее к выбросам),
-    win_rate по накопленным, средние из сумм."""
+    """Финализирует. pool[(method, regime)] = {...}."""
     out = {}
-    for name, acc in pool_agg.items():
+    for key, acc in pool_agg.items():
         n_fires = acc["n_fires"]
         mean_bull = acc["sum_bull"] / acc["n_bull"] if acc["n_bull"] else None
         mean_bear = acc["sum_bear"] / acc["n_bear"] if acc["n_bear"] else None
@@ -257,7 +323,7 @@ def _finalize_pool(pool_agg: dict) -> dict:
             xs = sorted(acc["d_values"])
             nl = len(xs)
             d_med = xs[nl // 2] if nl % 2 else 0.5 * (xs[nl // 2 - 1] + xs[nl // 2])
-        out[name] = {
+        out[key] = {
             "n_fires": n_fires, "n_bull": acc["n_bull"], "n_bear": acc["n_bear"],
             "mean_bull": mean_bull, "mean_bear": mean_bear,
             "win_rate": win_rate, "d_median": d_med, "n_tickers": acc["n_tickers"],
@@ -277,10 +343,10 @@ def _role(d: Optional[float], neutral: float = 0.05) -> str:
 
 def _print_ticker_progress(ticker: str, results: dict, done: int, total: int,
                             elapsed: float) -> None:
-    """Короткая строка после каждого тикера: сколько сигналов/анти/шума +
-    топ-3 signal и топ-3 anti."""
-    with_d = [(n, s) for n, s in results.items()
-              if s["d"] is not None and s["n_fires"] >= 30]
+    """results теперь {method: {regime: {metrics}}}. Печатаем по ALL-ярлыку."""
+    with_d = [(n, per_reg[ALL_LABEL]) for n, per_reg in results.items()
+              if per_reg.get(ALL_LABEL, {}).get("d") is not None
+              and per_reg[ALL_LABEL]["n_fires"] >= 30]
     n_sig = sum(1 for _, s in with_d if s["d"] > 0.05)
     n_ant = sum(1 for _, s in with_d if s["d"] < -0.05)
     n_noi = len(with_d) - n_sig - n_ant
@@ -296,16 +362,20 @@ def _print_ticker_progress(ticker: str, results: dict, done: int, total: int,
           f"| {rate:.1f}/s", file=sys.stderr)
 
 
-def _print_final(pool: dict, min_fires: int) -> None:
-    valid = [(n, s) for n, s in pool.items()
-             if s["d_median"] is not None and s["n_fires"] >= min_fires]
+def _print_final(pool: dict, min_fires: int, by_regime: bool) -> None:
+    """pool: {(method, regime): {...}}. Печатаем ALL-разрез (совместимо с
+    прошлыми выводами) + матрицу метод × режим + генерацию REGIME_WEIGHT_MODS."""
+    all_only = {n: s for (n, r), s in pool.items() if r == ALL_LABEL}
+    valid_all = [(n, s) for n, s in all_only.items()
+                  if s["d_median"] is not None and s["n_fires"] >= min_fires]
 
-    signal = sorted((x for x in valid if x[1]["d_median"] > 0.05),
+    signal = sorted((x for x in valid_all if x[1]["d_median"] > 0.05),
                      key=lambda x: -x[1]["d_median"])[:15]
-    anti = sorted((x for x in valid if x[1]["d_median"] < -0.05),
+    anti = sorted((x for x in valid_all if x[1]["d_median"] < -0.05),
                    key=lambda x: x[1]["d_median"])[:15]
-    contrib = sorted(valid, key=lambda x: -x[1]["n_fires"] * abs(x[1]["d_median"]))[:15]
-    noise = sorted((x for x in valid if abs(x[1]["d_median"]) <= 0.05),
+    contrib = sorted(valid_all,
+                      key=lambda x: -x[1]["n_fires"] * abs(x[1]["d_median"]))[:15]
+    noise = sorted((x for x in valid_all if abs(x[1]["d_median"]) <= 0.05),
                     key=lambda x: -x[1]["n_fires"])[:10]
 
     def hdr(label):
@@ -319,27 +389,122 @@ def _print_final(pool: dict, min_fires: int) -> None:
         return (f"{name:<24} {d:>7} {s['n_fires']:>8} {s['n_tickers']:>5} "
                 f"{wr:>6}  {_role(s['d_median'])}")
 
-    print(hdr("топ SIGNAL (d > +0.05) — работают правильно"))
-    for n, s in signal:
-        print(row(n, s))
-    print(hdr("топ ANTI (d < −0.05) — кандидаты в _inverted_methods"))
-    for n, s in anti:
-        print(row(n, s))
-    print(hdr("топ CONTRIBUTION (n_fires × |d|) — реальный вес в композите"))
-    for n, s in contrib:
-        print(row(n, s))
-    print(hdr("топ NOISE (|d| ≤ 0.05) — кандидаты в _disabled_methods"))
-    for n, s in noise:
-        print(row(n, s))
+    print(hdr("топ SIGNAL по ALL (d > +0.05)"))
+    for n, s in signal: print(row(n, s))
+    print(hdr("топ ANTI по ALL (d < −0.05)"))
+    for n, s in anti:   print(row(n, s))
+    print(hdr("топ CONTRIBUTION по ALL (n_fires × |d|)"))
+    for n, s in contrib: print(row(n, s))
+    print(hdr("топ NOISE по ALL (|d| ≤ 0.05)"))
+    for n, s in noise:  print(row(n, s))
 
-    inv = [n for n, s in valid if s["d_median"] is not None
-                              and s["d_median"] < -0.05
-                              and s["n_fires"] >= min_fires * 2]
-    dis = [n for n, s in valid if s["d_median"] is not None
-                              and abs(s["d_median"]) <= 0.05
-                              and s["n_fires"] >= min_fires * 5]
-    print(f"\n→ рекомендация к _inverted_methods = {sorted(inv)}")
-    print(f"→ рекомендация к _disabled_methods = {sorted(dis)}")
+    if not by_regime:
+        # Совместимый вывод рекомендаций для не-режимного прогона
+        inv = [n for n, s in valid_all if s["d_median"] < -0.05
+                                        and s["n_fires"] >= min_fires * 2]
+        dis = [n for n, s in valid_all if abs(s["d_median"]) <= 0.05
+                                        and s["n_fires"] >= min_fires * 5]
+        print(f"\n→ рекомендация к _inverted_methods = {sorted(inv)}")
+        print(f"→ рекомендация к _disabled_methods = {sorted(dis)}")
+        return
+
+    # ── Режимный анализ ──
+    # Матрица метод × режим (d) на пуле — компактная.
+    all_methods = sorted({n for (n, r) in pool.keys()})
+    print(f"\n=== матрица d_median по режимам (пул) ===")
+    print(f"{'метод':<24}" + "".join(f"{r:>14}" for r in REGIMES))
+    print("-" * (24 + 14 * len(REGIMES)))
+    for name in all_methods:
+        parts = [f"{name:<24}"]
+        for r in REGIMES:
+            s = pool.get((name, r))
+            if not s or s["d_median"] is None or s["n_fires"] < min_fires // 3:
+                parts.append(f"{'—':>14}")
+                continue
+            d = s["d_median"]
+            role = _role(d)
+            tag = "s" if role == "signal" else "a" if role == "anti" else "n"
+            parts.append(f"{d:+.3f}[{tag}] n={s['n_fires']:>5}"[:14].rjust(14))
+        print("".join(parts))
+
+    # Классификация метода целиком:
+    # - «универсал signal»: d>+0.05 во всех режимах с достаточным n
+    # - «универсал anti»: d<-0.05 во всех режимах с достаточным n
+    # - «режимный» — знак разный в разных режимах
+    # - «шум» — везде в нейтрали
+    universals_sig = []
+    universals_anti = []
+    regimenal = []
+    all_noise = []
+    for name in all_methods:
+        signs = []
+        for r in REGIMES:
+            s = pool.get((name, r))
+            if not s or s["d_median"] is None or s["n_fires"] < min_fires // 3:
+                signs.append(None)
+                continue
+            d = s["d_median"]
+            if d > 0.05:   signs.append("+")
+            elif d < -0.05: signs.append("-")
+            else:           signs.append("0")
+        realized = [x for x in signs if x is not None]
+        if not realized:
+            continue
+        if all(x == "+" for x in realized):
+            universals_sig.append(name)
+        elif all(x == "-" for x in realized):
+            universals_anti.append(name)
+        elif "+" in realized and "-" in realized:
+            regimenal.append((name, signs))
+        elif all(x == "0" for x in realized):
+            all_noise.append(name)
+
+    print(f"\nуниверсал SIGNAL (везде работают правильно): {sorted(universals_sig)}")
+    print(f"универсал ANTI (везде наоборот, глобально инвертировать): {sorted(universals_anti)}")
+    print(f"шум во всех режимах (кандидат в disable): {sorted(all_noise)}")
+    if regimenal:
+        print(f"\n=== режимные методы: разный знак в разных режимах ===")
+        print(f"{'метод':<24}" + "".join(f"{r:>14}" for r in REGIMES))
+        for name, signs in regimenal:
+            marks = "".join(f"{('+++' if x=='+' else '---' if x=='-' else '···' if x=='0' else '   '):>14}"
+                             for x in signs)
+            print(f"{name:<24}{marks}")
+
+    # Генерация REGIME_WEIGHT_MODS.
+    # Формат: {regime: {method: multiplier}}. multiplier: -1 (инвертировать),
+    # 0 (выключить), +1 (усилить/оставить как есть). Для нейтрали (|d|≤0.05)
+    # НЕ пишем ничего — оставим текущий вес из бота.
+    generated = {r: {} for r in REGIMES}
+    for (name, r), s in pool.items():
+        if r == ALL_LABEL:
+            continue
+        if s["d_median"] is None or s["n_fires"] < min_fires // 3:
+            continue
+        d = s["d_median"]
+        if d > 0.05:    generated[r][name] = 1.0
+        elif d < -0.05: generated[r][name] = -1.0
+        # noise — не трогаем (оставляем текущий вес)
+
+    print(f"\n=== сгенерированный REGIME_WEIGHT_MODS ===")
+    print("# +1.0 — метод работает правильно в этом режиме, оставить/усилить")
+    print("# -1.0 — метод стабильно наоборот, ИНВЕРТИРОВАТЬ через режимный множитель")
+    print("REGIME_WEIGHT_MODS_AUTO = {")
+    for r in REGIMES:
+        items = generated[r]
+        if not items:
+            print(f'    "{r}": {{}},')
+            continue
+        pos = {n: v for n, v in items.items() if v > 0}
+        neg = {n: v for n, v in items.items() if v < 0}
+        print(f'    "{r}": {{')
+        if pos:
+            print(f'        # signal (оставить, IC подстроит):')
+            for n in sorted(pos): print(f'        "{n}": +1.0,')
+        if neg:
+            print(f'        # anti (инвертировать):')
+            for n in sorted(neg): print(f'        "{n}": -1.0,')
+        print(f'    }},')
+    print("}")
 
 
 def _list_tickers(cache_dir, interval_min) -> list[str]:
@@ -396,9 +561,16 @@ def main() -> None:
     ap.add_argument("--min-fires", type=int, default=None,
                      help="порог в итоговых топах (default: single 50, ALL 500)")
     ap.add_argument("--out", default=None,
-                     help="CSV per-ticker результатов (append)")
+                     help="CSV per-ticker × per-regime результатов (append)")
     ap.add_argument("--pool-out", default=None,
-                     help="CSV пуловой сводки")
+                     help="CSV пуловой сводки (метод × режим)")
+    ap.add_argument("--by-regime", action="store_true",
+                     help="Разбить метрики по режимам (classify_regime бота: "
+                          "trending_up/down, ranging, high_vol/low_vol, stress). "
+                          "В отчёте появится матрица метод×режим и сгенерируется "
+                          "REGIME_WEIGHT_MODS_AUTO для копирования в бот.")
+    ap.add_argument("--regime-window", type=int, default=60,
+                     help="Окно последних баров для classify_regime (default 60)")
     args = ap.parse_args()
 
     # Разбираем --methods
@@ -433,9 +605,6 @@ def main() -> None:
     # Для простоты: если --all — всю историю; иначе передаём days и воркер
     # обрежет сам.
     def build_job(tk):
-        # Для одиночного тикера с --days воркер получит last-bar сам и
-        # обрежет. Реализовано ниже: если date_from/to None и не --all,
-        # обрезаем по last-bar-days в воркере.
         return {
             "ticker": tk,
             "cache_dir": args.cache,
@@ -448,6 +617,8 @@ def main() -> None:
             "n_atr": args.n_atr,
             "methods_filter": methods_filter,
             "agree_min": args.agree_min,
+            "by_regime": args.by_regime,
+            "regime_window": args.regime_window,
         }
     # --days без явных дат: обрежем здесь по каждому тикеру отдельно
     def build_job_with_days(tk):
@@ -467,23 +638,38 @@ def main() -> None:
 
     jobs = [build_job_with_days(tk) for tk in tickers]
 
-    # CSV per-ticker: инкрементальная запись
+    # CSV per-ticker × per-regime: инкрементальная запись
     per_ticker_fp = None
     per_ticker_writer = None
     if args.out:
         per_ticker_fp = open(args.out, "w", encoding="utf-8", newline="")
         per_ticker_writer = csv.DictWriter(per_ticker_fp, fieldnames=[
-            "ticker", "method", "n_fires", "n_bull", "n_bear",
+            "ticker", "method", "regime", "n_fires", "n_bull", "n_bear",
             "mean_bull", "mean_bear", "win_rate", "d", "role"])
         per_ticker_writer.writeheader()
+
+    def _write_ticker(ticker, results):
+        if not per_ticker_writer:
+            return
+        for name, per_regime in results.items():
+            for regime, s in per_regime.items():
+                per_ticker_writer.writerow({
+                    "ticker": ticker, "method": name, "regime": regime,
+                    "n_fires": s["n_fires"], "n_bull": s["n_bull"],
+                    "n_bear": s["n_bear"],
+                    "mean_bull": s["mean_bull"] if s["mean_bull"] is not None else "",
+                    "mean_bear": s["mean_bear"] if s["mean_bear"] is not None else "",
+                    "win_rate": s["win_rate"] if s["win_rate"] is not None else "",
+                    "d": s["d"] if s["d"] is not None else "",
+                    "role": _role(s["d"]),
+                })
+        per_ticker_fp.flush()
 
     pool_agg: dict = {}
     t_start = time.time()
     done = 0
 
     if args.workers == 1 or len(tickers) == 1:
-        # Один воркер — синхронно, без Pool, чтобы single-режим не платил
-        # 30-секундного старта spawn'а.
         _init_worker()
         for job in jobs:
             ticker, results = _run_ticker(job)
@@ -494,23 +680,8 @@ def main() -> None:
             _print_ticker_progress(ticker, results, done, len(tickers),
                                     time.time() - t_start)
             _accumulate_pool(pool_agg, ticker, results)
-            if per_ticker_writer:
-                for name, s in results.items():
-                    per_ticker_writer.writerow({
-                        "ticker": ticker, "method": name,
-                        "n_fires": s["n_fires"], "n_bull": s["n_bull"],
-                        "n_bear": s["n_bear"],
-                        "mean_bull": s["mean_bull"] if s["mean_bull"] is not None else "",
-                        "mean_bear": s["mean_bear"] if s["mean_bear"] is not None else "",
-                        "win_rate": s["win_rate"] if s["win_rate"] is not None else "",
-                        "d": s["d"] if s["d"] is not None else "",
-                        "role": _role(s["d"]),
-                    })
-                per_ticker_fp.flush()
+            _write_ticker(ticker, results)
     else:
-        # Параллельный запуск. На Windows spawn = каждый воркер импортит
-        # oi_composite_strategy заново (30-60 сек). Пул создаётся один раз,
-        # воркеры переиспользуются на N тикеров.
         with mp.Pool(processes=args.workers, initializer=_init_worker) as pool:
             for ticker, results in pool.imap_unordered(_run_ticker, jobs):
                 done += 1
@@ -520,19 +691,7 @@ def main() -> None:
                 _print_ticker_progress(ticker, results, done, len(tickers),
                                         time.time() - t_start)
                 _accumulate_pool(pool_agg, ticker, results)
-                if per_ticker_writer:
-                    for name, s in results.items():
-                        per_ticker_writer.writerow({
-                            "ticker": ticker, "method": name,
-                            "n_fires": s["n_fires"], "n_bull": s["n_bull"],
-                            "n_bear": s["n_bear"],
-                            "mean_bull": s["mean_bull"] if s["mean_bull"] is not None else "",
-                            "mean_bear": s["mean_bear"] if s["mean_bear"] is not None else "",
-                            "win_rate": s["win_rate"] if s["win_rate"] is not None else "",
-                            "d": s["d"] if s["d"] is not None else "",
-                            "role": _role(s["d"]),
-                        })
-                    per_ticker_fp.flush()
+                _write_ticker(ticker, results)
 
     if per_ticker_fp:
         per_ticker_fp.close()
@@ -541,15 +700,15 @@ def main() -> None:
     if args.pool_out:
         with open(args.pool_out, "w", encoding="utf-8", newline="") as f:
             w = csv.DictWriter(f, fieldnames=[
-                "method", "n_fires", "n_bull", "n_bear",
+                "method", "regime", "n_fires", "n_bull", "n_bear",
                 "mean_bull", "mean_bear", "win_rate",
                 "d_median", "n_tickers", "role"])
             w.writeheader()
-            for name, s in sorted(pool.items(),
-                                    key=lambda x: -abs(x[1]["d_median"])
-                                    if x[1]["d_median"] is not None else 0):
+            for (name, regime), s in sorted(pool.items(),
+                                              key=lambda x: (x[0][0], x[0][1])):
                 w.writerow({
-                    "method": name, "n_fires": s["n_fires"],
+                    "method": name, "regime": regime,
+                    "n_fires": s["n_fires"],
                     "n_bull": s["n_bull"], "n_bear": s["n_bear"],
                     "mean_bull": s["mean_bull"] if s["mean_bull"] is not None else "",
                     "mean_bear": s["mean_bear"] if s["mean_bear"] is not None else "",
@@ -566,7 +725,7 @@ def main() -> None:
     min_fires = args.min_fires
     if min_fires is None:
         min_fires = 50 if len(tickers) == 1 else 500
-    _print_final(pool, min_fires)
+    _print_final(pool, min_fires, args.by_regime)
 
 
 if __name__ == "__main__":
