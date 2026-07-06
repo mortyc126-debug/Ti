@@ -159,9 +159,15 @@ def _print_calibration(bins: list[dict]) -> None:
 
 
 def _run_nw(data: dict, h: float, neighbors: int, density_min: float,
-             k: int) -> dict:
+             k: int, quadrant_only: bool = False,
+             t_lo: float = -0.5, p_hi: float = 0.5) -> dict:
     """Ядро прогона: для каждой i считает p_hold, density, memory_type.
-    Возвращает per-bar массивы + метаинформацию."""
+    Возвращает per-bar массивы + метаинформацию.
+
+    Если quadrant_only=True — и целевая точка, и соседи ограничены
+    квадрантом (T̂ < t_lo, P̂ > p_hi). Гипотеза §8.3: эффект концентрируется
+    там, а на всём пространстве размывается до нуля. Локализуем поиск —
+    NW-память перестаёт усреднять сигнал по baseline'у."""
     T = data["T_hat"]; P = data["P_hat"]; C = data["color_hat"]
     fwd = data["fwd_ret_k"]; tgt = data["target"]
     ok = data["outcome_known"] == 1.0
@@ -169,11 +175,16 @@ def _run_nw(data: dict, h: float, neighbors: int, density_min: float,
 
     # Индекс: только точки с outcome_known + все три координаты валидны.
     valid_mask = ok & ~np.isnan(T) & ~np.isnan(P) & ~np.isnan(C) & ~np.isnan(tgt)
+    if quadrant_only:
+        quadrant_mask = (T < t_lo) & (P > p_hi)
+        valid_mask = valid_mask & quadrant_mask
     valid_idx = np.where(valid_mask)[0]
 
+    if quadrant_only:
+        print(f"quadrant-only режим: T̂<{t_lo:+.2f} и P̂>{p_hi:+.2f}", file=sys.stderr)
     print(f"валидных точек для памяти: {len(valid_idx)} из {n}", file=sys.stderr)
     if len(valid_idx) < 100:
-        sys.exit("слишком мало валидных точек — увеличь --all и/или пересчитай tpcolor_dataset с бо́льшим окном")
+        sys.exit("слишком мало валидных точек в квадранте — попробуй ослабить пороги --t-lo/--p-hi или увеличить историю")
 
     coords = np.column_stack([T[valid_idx], P[valid_idx], C[valid_idx]])
     tree = cKDTree(coords)
@@ -191,6 +202,11 @@ def _run_nw(data: dict, h: float, neighbors: int, density_min: float,
         # Целевая точка должна иметь валидные координаты; исход у неё сам может
         # быть неизвестен (мы предсказываем будущее), это ок.
         if np.isnan(T[i]) or np.isnan(P[i]) or np.isnan(C[i]):
+            continue
+        # В quadrant-only режиме предсказываем только для точек в квадранте.
+        # Вне квадранта — memory_type="outside_quadrant", p_hold остаётся NaN.
+        if quadrant_only and not (T[i] < t_lo and P[i] > p_hi):
+            memory_type[i] = "outside_quadrant"
             continue
 
         # Ищем кандидатов внутри радиуса
@@ -395,6 +411,14 @@ def main() -> None:
                      help="порог |p_hold − 0.5| для «открыть позицию»")
     ap.add_argument("--k", type=int, default=12,
                      help="горизонт fwd_ret_k (должен совпадать с tpcolor_dataset)")
+    ap.add_argument("--quadrant-only", action="store_true",
+                     help="§8.3 локализация: искать соседей и предсказывать только "
+                          "внутри квадранта (T̂<t_lo, P̂>p_hi). NW-память перестаёт "
+                          "размывать сигнал по baseline'у.")
+    ap.add_argument("--t-lo", type=float, default=-0.5,
+                     help="верхняя граница T̂ для квадранта (default -0.5)")
+    ap.add_argument("--p-hi", type=float, default=+0.5,
+                     help="нижняя граница P̂ для квадранта (default +0.5)")
     ap.add_argument("--out", default=None, help="CSV с per-bar предсказаниями")
     ap.add_argument("--plot", action="store_true", help="показать calibration diagram")
     args = ap.parse_args()
@@ -404,7 +428,9 @@ def main() -> None:
     print(f"датасет: {args.csv_in}, {len(data['T_hat'])} баров", file=sys.stderr)
 
     result = _run_nw(data, h=args.h, neighbors=args.neighbors,
-                      density_min=args.density_min, k=args.k)
+                      density_min=args.density_min, k=args.k,
+                      quadrant_only=args.quadrant_only,
+                      t_lo=args.t_lo, p_hi=args.p_hi)
     m = _evaluate(result, confidence=args.confidence)
     _print_summary(m, ticker)
     _print_calibration(m["calibration_bins"])
