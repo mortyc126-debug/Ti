@@ -5920,11 +5920,16 @@ async function pruneFailedOiTickers() {{
   fetch('/api/oi_tickers_prune_failed', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{statuses: snap}})}})
     .then(r => r.json()).then(d => {{
       if (!d.ok) {{ alert('ошибка'); return; }}
-      let msg = `Убрано: ${{d.count}}` + (d.count ? `\\n${{d.removed.join(', ')}}` : '');
-      if ((d.kept_configured || []).length) {{
-        msg += `\\n\\nОстались (сконфигурированы в settings.ini): ${{d.kept_configured.join(', ')}}`;
-      }}
-      alert(msg);
+      const parts = [];
+      const rmOi = d.removed_from_oi || [];
+      const disOv = d.disabled_in_overrides || [];
+      const alr = d.already_disabled || [];
+      const unk = d.unknown_source || [];
+      if (rmOi.length) parts.push(`Удалено из oi_tickers.json (${{rmOi.length}}):\\n  ${{rmOi.join(', ')}}`);
+      if (disOv.length) parts.push(`Выключено enabled=false в overrides (settings.ini, ${{disOv.length}}):\\n  ${{disOv.join(', ')}}`);
+      if (alr.length) parts.push(`Уже отключены (пропущено, ${{alr.length}}):\\n  ${{alr.join(', ')}}`);
+      if (unk.length) parts.push(`Неизвестный источник (не в oi_tickers и не в settings.ini, ${{unk.length}}):\\n  ${{unk.join(', ')}}`);
+      alert(parts.length ? parts.join('\\n\\n') : 'Ничего не изменилось.');
       loadOverrides();
     }}).catch(() => alert('ошибка сети'));
 }}
@@ -8099,29 +8104,53 @@ def prune_failed_oi_tickers(statuses_snapshot: dict | None = None) -> dict:
                               if isinstance(v, dict)}
 
     oi_only = set(_oi_import_tickers_only())
-    current = load_oi_tickers()
+    current_oi = load_oi_tickers()
+    settings_by_ticker = _all_settings_by_ticker()
+    overrides = load_overrides()
+    overrides_tickers = overrides.setdefault("tickers", {})
 
     failed_all = [tk for tk, st in statuses_snapshot.items()
                     if st in _PRUNE_FAILED_STATUSES]
-    # Разделяем: те, что реально можем удалить (в oi_only + есть в файле), и
-    # те, что скипаются (сконфигурированы в settings.ini — трогать не будем).
-    removed = []
-    kept_configured = []
+    # Ветвим по источнику тикера:
+    # (а) держится только на oi_tickers.json → удаляем из файла
+    # (б) сконфигурирован в settings.ini → нельзя удалить программно
+    #     (это пользовательский конфиг), но можно отключить через overrides:
+    #     enabled=false → бот в проде игнорирует. Для бэктестного UI
+    #     пользователь снимает чипсу вручную (или чекбокс в этой же панели).
+    # (в) неизвестный источник — редко: свежий одноразовый backtest, тикер
+    #     не сохранён ни там ни там. Пропускаем, сообщаем в отчёте.
+    removed_from_oi = []
+    disabled_in_overrides = []
+    already_disabled = []
+    unknown = []
     for t in failed_all:
-        if t in current and t in oi_only:
-            del current[t]
-            removed.append(t)
-        elif t in current:
-            kept_configured.append(t)
+        if t in current_oi and t in oi_only:
+            del current_oi[t]
+            removed_from_oi.append(t)
+            continue
+        if t in settings_by_ticker:
+            cur = overrides_tickers.get(t, {})
+            if cur.get("enabled") is False:
+                already_disabled.append(t)
+            else:
+                cur["enabled"] = False
+                overrides_tickers[t] = cur
+                disabled_in_overrides.append(t)
+            continue
+        unknown.append(t)
 
-    if removed:
+    if removed_from_oi:
         with open(OI_TICKERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(current, f, ensure_ascii=False, indent=2)
+            json.dump(current_oi, f, ensure_ascii=False, indent=2)
+    if disabled_in_overrides:
+        save_overrides(overrides)
 
     return {
         "ok": True,
-        "removed": sorted(removed), "count": len(removed),
-        "kept_configured": sorted(kept_configured),
+        "removed_from_oi": sorted(removed_from_oi),
+        "disabled_in_overrides": sorted(disabled_in_overrides),
+        "already_disabled": sorted(already_disabled),
+        "unknown_source": sorted(unknown),
         "total_failed_in_run": len(failed_all),
     }
 
