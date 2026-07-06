@@ -72,12 +72,22 @@ _WORKER_NP = None
 
 
 def _init_worker():
-    """Инициализируется один раз на воркер: импорт стратегии + numpy."""
+    """Инициализируется один раз на воркер: импорт стратегии + numpy.
+    Активирует локальный tinkoff-stub, если реальный SDK не установлен
+    (например, под Python 3.14 wheel'а ещё нет). Реальный пакет, если
+    он есть, найдётся первым — stub не помешает."""
     global _WORKER_METHODS, _WORKER_NP
-    # sys.path нужен, потому что multiprocessing spawn стартует без него.
+    # sys.path: и папка invest-bot (для импорта trade_system, indicators…),
+    # и _tinkoff_stub (fallback для tinkoff.invest)
     here = os.path.dirname(os.path.abspath(__file__))
     if here not in sys.path:
         sys.path.insert(0, here)
+    try:
+        import tinkoff.invest  # noqa: F401
+    except ImportError:
+        stub = os.path.join(here, "_tinkoff_stub")
+        if stub not in sys.path:
+            sys.path.insert(0, stub)
     import numpy as _np
     from trade_system.strategies import oi_composite_strategy as ocs
     _WORKER_METHODS = ocs.METHODS
