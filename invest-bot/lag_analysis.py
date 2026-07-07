@@ -78,6 +78,48 @@ def _corrcoef(a: list[float], b: list[float]) -> float:
         return 0.0
 
 
+def _q_to_f(q) -> float:
+    """Quotation(units/nano) или уже число → float. Тот же смысл, что _to_f
+    в стратегии, но без тяжёлого импорта."""
+    try:
+        return float(q.units) + float(q.nano) / 1e9
+    except AttributeError:
+        return float(q)
+
+
+def _liq_vol(candles: list) -> tuple:
+    """Прокси ликвидности и волатильности тикера по свечам: liq — медианный
+    барный оборот close·volume (млн), vol — медианный относит. диапазон
+    (high-low)/close в %. Медиана — устойчивость к всплескам."""
+    turn = []
+    rng = []
+    for c in candles:
+        cl = _q_to_f(c.close)
+        if cl <= 0:
+            continue
+        turn.append(cl * float(c.volume))
+        rng.append((_q_to_f(c.high) - _q_to_f(c.low)) / cl)
+    if not turn:
+        return (None, None)
+    return (statistics.median(turn) / 1e6, statistics.median(rng) * 100.0)
+
+
+def _rank_corr(xs: list[float], ys: list[float]) -> float:
+    """Спирмен: Пирсон по рангам. Устойчив к выбросам/нелинейности.
+    Если один из рядов константа (нет разброса) — связи нет, 0.0 (иначе
+    ранги константы дали бы ложную корреляцию)."""
+    if len(set(xs)) < 2 or len(set(ys)) < 2:
+        return 0.0
+
+    def ranks(v):
+        order = sorted(range(len(v)), key=lambda i: v[i])
+        rk = [0.0] * len(v)
+        for pos, i in enumerate(order):
+            rk[i] = float(pos)
+        return rk
+    return _corrcoef(ranks(xs), ranks(ys))
+
+
 def _lag_profile(scores: list[float], fwd_ret: list[float], max_lag: int,
                   regime_mask: list[bool] | None = None) -> dict[int, float]:
     """{lag: corr(score[t], fwd_ret[t+lag])} для lag в [0, max_lag], только
@@ -115,33 +157,36 @@ def _lag_profile(scores: list[float], fwd_ret: list[float], max_lag: int,
 TickerResult = dict[str, dict[str, tuple[int, float]]]
 
 
-def _analyze_one(ticker: str, days: int, horizon: int, max_lag: int) -> TickerResult | None:
+def _analyze_one(ticker: str, days: int, horizon: int, max_lag: int) -> tuple:
+    """Возвращает (TickerResult|None, (liq, vol))."""
     by_ticker = _strategy_settings_by_ticker()
     strategy_settings = by_ticker.get(ticker)
     if strategy_settings is None:
         print(f"{ticker}: нет в settings.ini/oi_tickers.json — пропуск")
-        return None
+        return None, (None, None)
 
     try:
         candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
     except RequestError as e:
         print(f"{ticker}: ошибка Tinkoff API ({e.code if hasattr(e, 'code') else e}) — пропуск")
-        return None
+        return None, (None, None)
     if not candles:
         print(f"{ticker}: нет истории свечей — пропуск")
-        return None
+        return None, (None, None)
+
+    liqvol = _liq_vol(candles)
 
     strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
     _wire_history(strategy)
     if strategy is None or not hasattr(strategy, "scan_method_scores"):
         print(f"{ticker}: стратегия не поддерживает scan_method_scores — пропуск")
-        return None
+        return None, liqvol
 
     print(f"Сканирую {ticker}...")
     rows = strategy.scan_method_scores(candles)
     if len(rows) < 30:
         print(f"{ticker}: недостаточно баров ({len(rows)}) — пропуск")
-        return None
+        return None, liqvol
 
     closes = [r["close"] for r in rows]
     fwd_ret = _forward_returns(closes, horizon)
@@ -165,7 +210,7 @@ def _analyze_one(ticker: str, days: int, horizon: int, max_lag: int) -> TickerRe
             per_method[method] = (best_lag, profile[best_lag])
         if per_method:
             out[label] = per_method
-    return out or None
+    return (out or None), liqvol
 
 
 def _print_group(title: str, per_method: dict[str, tuple[int, float]]) -> None:
@@ -206,6 +251,50 @@ def _print_aggregate(per_ticker: dict[str, TickerResult]) -> None:
             print(f"{method:<16} {med_lag:>13} {mean_corr:>13.3f} {n:>10}   {tag}")
 
 
+def _print_lag_liquidity(per_ticker: dict, tk_lv: dict, min_tickers: int = 15) -> None:
+    """Зависит ли ЛАГ метода от ликвидности тикера? Гипотеза: на ликвидных
+    именах микроструктурные методы ведут сильнее (лаг меньше), на неликвидных
+    индикаторы запаздывают. По разрезу "_all": Spearman(best_lag, log10 liq) и
+    медиана лага в нижней/верхней трети ликвидности."""
+    import math
+    by_method: dict[str, list[tuple]] = {}
+    for tk, result in per_ticker.items():
+        liq, vol = tk_lv.get(tk, (None, None))
+        if liq is None or liq <= 0:
+            continue
+        for method, (lag, corr) in result.get("_all", {}).items():
+            by_method.setdefault(method, []).append((liq, lag))
+    rows = []
+    for method, pairs in by_method.items():
+        if len(pairs) < min_tickers:
+            continue
+        liqs = [math.log10(p[0]) for p in pairs]
+        lags = [float(p[1]) for p in pairs]
+        sp = _rank_corr(liqs, lags)
+        srt = sorted(pairs, key=lambda x: x[0])
+        t = len(srt) // 3
+        lo = [p[1] for p in srt[:t]]
+        hi = [p[1] for p in srt[2 * t:]]
+        rows.append((method, len(pairs), sp,
+                     statistics.median(lo) if lo else None,
+                     statistics.median(hi) if hi else None))
+    if not rows:
+        return
+    rows.sort(key=lambda r: r[2])  # сначала сильнее «ведёт на ликвидных» (sp<0)
+    print("\n=== зависимость ЛАГА метода от ликвидности тикера (разрез _all) ===")
+    print("# Spearman(лаг, log10 ликв): − = на ликвидных лаг меньше (ведёт),")
+    print("#  + = на ликвидных лаг больше. lag_lo/lag_hi — медиана лага в")
+    print("#  нижней/верхней трети по ликвидности.")
+    print(f"{'метод':<16}{'n_tk':>5}{'sp_liq':>8}{'lag_lo':>8}{'lag_hi':>8}  флаг")
+    print("-" * 60)
+    for method, n, sp, llo, lhi in rows:
+        f_sp = f"{sp:+.2f}"
+        f_lo = f"{llo:g}" if llo is not None else "—"
+        f_hi = f"{lhi:g}" if lhi is not None else "—"
+        flag = "ликв-зависимый лаг" if abs(sp) >= 0.3 else ""
+        print(f"{method:<16}{n:>5}{f_sp:>8}{f_lo:>8}{f_hi:>8}  {flag}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("ticker", nargs="?", help="один тикер, список через запятую, или используй --all")
@@ -226,7 +315,7 @@ def main() -> None:
         return
 
     if len(tickers) == 1:
-        result = _analyze_one(tickers[0], args.days, args.horizon, args.max_lag)
+        result, _ = _analyze_one(tickers[0], args.days, args.horizon, args.max_lag)
         if result:
             for label, per_method in result.items():
                 title = f"{tickers[0]}: общий (все режимы)" if label == "_all" else f"{tickers[0]}: режим {label}"
@@ -234,17 +323,21 @@ def main() -> None:
         return
 
     per_ticker = {}
+    tk_lv = {}
     for i, ticker in enumerate(tickers, 1):
         print(f"[{i}/{len(tickers)}]", end=" ")
         try:
-            result = _analyze_one(ticker, args.days, args.horizon, args.max_lag)
+            result, liqvol = _analyze_one(ticker, args.days, args.horizon, args.max_lag)
         except Exception as e:
             print(f"{ticker}: непредвиденная ошибка ({e}) — пропуск")
             continue
         if result:
             per_ticker[ticker] = result
+            tk_lv[ticker] = liqvol
     if per_ticker:
         _print_aggregate(per_ticker)
+        if len(per_ticker) >= 15:
+            _print_lag_liquidity(per_ticker, tk_lv)
     else:
         print("Ни один тикер не дал результата.")
 
