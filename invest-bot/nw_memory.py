@@ -311,18 +311,26 @@ def _run_nw(data: dict, h: float, neighbors: int, density_min: float,
     }
 
 
-def _evaluate(result: dict, confidence: float, calibrate: bool = False) -> dict:
-    """Собирает метрики. Возвращает {brier, base_rate, edge_stats, n_signal,
-    n_no_precedent}. Если calibrate=True — применяет изотоническую регрессию
-    к сырым p_hold (in-sample), потом считает метрики по калиброванным."""
+def _evaluate(result: dict, confidence: float, calibrate: bool = False,
+               split_idx: Optional[int] = None) -> dict:
+    """Собирает метрики. Если calibrate=True — изотоническая регрессия.
+
+    Walk-forward (split_idx задан): калибровка ОБУЧАЕТСЯ только на барах
+    i < split_idx (train), а ВСЕ метрики (Brier, edge, calibration bins)
+    считаются только на барах i >= split_idx (holdout). Это честная
+    out-of-sample оценка: модель не видела holdout ни при построении
+    памяти (лукахед-фильтр j+k≤i уже это гарантирует), ни при калибровке.
+
+    Без split_idx — прежнее in-sample поведение (калибровка и метрики на
+    всех предсказаниях)."""
     p_hold = result["p_hold"]
     fwd = result["fwd"]
     tgt = result["tgt"]
     memory_type = result["memory_type"]
 
-    # Пары (pred, actual) для калибровки: где мы что-то предсказали и знаем факт.
-    preds = []; actuals = []
-    valid_idxs = []
+    # Пары (pred, actual) с разбивкой train/holdout.
+    preds = []; actuals = []; valid_idxs = []
+    is_holdout = []       # для каждой валидной точки: True если i >= split_idx
     for i in range(len(p_hold)):
         if memory_type[i] != "population":
             continue
@@ -331,30 +339,47 @@ def _evaluate(result: dict, confidence: float, calibrate: bool = False) -> dict:
         preds.append(float(p_hold[i]))
         actuals.append(1 if tgt[i] > 0 else 0)
         valid_idxs.append(i)
+        is_holdout.append(split_idx is not None and i >= split_idx)
 
-    # Калибровка: изотоническая регрессия на всех (pred, actual). In-sample —
-    # оптимистичная оценка (в проде нужен walk-forward), но для проверки
-    # «маскирует ли плохая калибровка настоящий edge» этого достаточно.
+    # Калибровка: fit на train (или на всём, если split_idx=None).
     calibrated = None
     if calibrate and preds and _SKLEARN_AVAILABLE:
-        ir = IsotonicRegression(out_of_bounds="clip")
-        ir.fit(np.array(preds), np.array(actuals))
-        calibrated = ir.predict(np.array(preds)).tolist()
+        if split_idx is not None:
+            train_p = [preds[j] for j in range(len(preds)) if not is_holdout[j]]
+            train_a = [actuals[j] for j in range(len(preds)) if not is_holdout[j]]
+        else:
+            train_p, train_a = preds, actuals
+        if len(train_p) >= 10:
+            ir = IsotonicRegression(out_of_bounds="clip")
+            ir.fit(np.array(train_p), np.array(train_a))
+            calibrated = ir.predict(np.array(preds)).tolist()
     elif calibrate and not _SKLEARN_AVAILABLE:
         print("⚠ --calibrate требует sklearn (pip install scikit-learn), "
               "калибровка пропущена", file=sys.stderr)
 
-    brier_raw = _brier(preds, actuals)
-    base_rate = sum(actuals) / len(actuals) if actuals else None
+    # Маска точек, по которым СЧИТАЕМ метрики: holdout при walk-forward,
+    # иначе все.
+    if split_idx is not None:
+        metric_js = [j for j in range(len(preds)) if is_holdout[j]]
+    else:
+        metric_js = list(range(len(preds)))
+
+    m_preds = [preds[j] for j in metric_js]
+    m_actuals = [actuals[j] for j in metric_js]
+    m_calibrated = ([calibrated[j] for j in metric_js]
+                    if calibrated is not None else None)
+
+    brier_raw = _brier(m_preds, m_actuals)
+    base_rate = sum(m_actuals) / len(m_actuals) if m_actuals else None
     naive_brier = (base_rate * (1 - base_rate)) if base_rate is not None else None
 
-    # Метрики edge — сначала на raw, потом (если калибровано) на calibrated.
-    def _edge_stats(preds_src):
+    def _edge_stats(preds_src, js):
         rets = []
-        for j, i in enumerate(valid_idxs):
+        for local, j in enumerate(js):
+            i = valid_idxs[j]
             if np.isnan(fwd[i]):
                 continue
-            gap = preds_src[j] - 0.5
+            gap = preds_src[local] - 0.5
             if abs(gap) < confidence:
                 continue
             direction = 1.0 if gap > 0 else -1.0
@@ -367,36 +392,45 @@ def _evaluate(result: dict, confidence: float, calibrate: bool = False) -> dict:
         wr = sum(1 for r in rets if r > 0) / len(rets)
         return {"mean": mean, "std": std, "win_rate": wr, "n": len(rets)}
 
-    edge_raw = _edge_stats(preds)
-    edge_cal = _edge_stats(calibrated) if calibrated is not None else None
-    brier_cal = _brier(calibrated, actuals) if calibrated is not None else None
+    edge_raw = _edge_stats(m_preds, metric_js)
+    edge_cal = _edge_stats(m_calibrated, metric_js) if m_calibrated is not None else None
+    brier_cal = _brier(m_calibrated, m_actuals) if m_calibrated is not None else None
 
-    n_no_precedent = sum(1 for m in memory_type if m == "no_precedent")
-    n_population = sum(1 for m in memory_type if m == "population")
+    n_no_precedent = sum(1 for mm in memory_type if mm == "no_precedent")
+    n_population = sum(1 for mm in memory_type if mm == "population")
 
     return {
         "brier_raw": brier_raw, "brier_cal": brier_cal,
         "base_rate": base_rate, "naive_brier": naive_brier,
-        "n_preds": len(preds),
+        "n_preds": len(m_preds),
+        "n_train": len(preds) - len(metric_js) if split_idx is not None else None,
+        "walk_forward": split_idx is not None,
         "edge_raw": edge_raw, "edge_cal": edge_cal,
         "n_population": n_population, "n_no_precedent": n_no_precedent,
-        "calibration_bins_raw": _calibration_bins(preds, actuals, 10),
-        "calibration_bins_cal": (_calibration_bins(calibrated, actuals, 10)
-                                   if calibrated is not None else None),
+        "calibration_bins_raw": _calibration_bins(m_preds, m_actuals, 10),
+        "calibration_bins_cal": (_calibration_bins(m_calibrated, m_actuals, 10)
+                                   if m_calibrated is not None else None),
     }
 
 
 def _print_summary(m: dict, ticker: str) -> None:
-    print(f"\n=== NW-память §11 — {ticker} ===")
-    print(f"баров с предсказанием (population):  {m['n_preds']}")
+    wf = m.get("walk_forward")
+    tag = " [WALK-FORWARD — holdout]" if wf else ""
+    print(f"\n=== NW-память §11 — {ticker}{tag} ===")
+    if wf:
+        print(f"калибровка обучена на train: {m['n_train']} баров")
+        print(f"метрики на holdout:          {m['n_preds']} баров (модель не видела)")
+    else:
+        print(f"баров с предсказанием (population):  {m['n_preds']}")
     print(f"баров без прецедента (no_precedent): {m['n_no_precedent']}")
     print()
     if m["brier_raw"] is None:
         print("не удалось посчитать метрики — недостаточно предсказаний")
         return
+    cal_tag = "(изотоническая, holdout)" if m.get("walk_forward") else "(изотоническая, in-sample)"
     print(f"Brier raw          : {m['brier_raw']:.4f}")
     if m["brier_cal"] is not None:
-        print(f"Brier calibrated   : {m['brier_cal']:.4f}  (изотоническая, in-sample)")
+        print(f"Brier calibrated   : {m['brier_cal']:.4f}  {cal_tag}")
     print(f"Naive baseline     : {m['naive_brier']:.4f}  (константа = {m['base_rate']:.3f})")
     print(f"Улучшение raw→naive: {(1 - m['brier_raw']/m['naive_brier'])*100:+.1f}%")
     if m["brier_cal"] is not None:
@@ -459,13 +493,26 @@ def _plot_calibration(bins: list[dict], ticker: str) -> None:
     plt.show()
 
 
-def _quadrant_thresholds(data: dict, args) -> tuple[float, float]:
+def _split_index(data: dict, train_frac: Optional[float]) -> Optional[int]:
+    """Индекс раздела train/holdout по времени. None если walk-forward выкл."""
+    if not train_frac:
+        return None
+    n = len(data["T_hat"])
+    return int(n * train_frac)
+
+
+def _quadrant_thresholds(data: dict, args, split_idx: Optional[int] = None) -> tuple[float, float]:
     """Возвращает (t_lo, p_hi) с учётом --t-pctl/--p-pctl. Общая для single
-    и batch, чтобы percentile считался одинаково."""
+    и batch. При walk-forward (split_idx задан) percentile считается только
+    по train-части — иначе пороги «подглядывают» в holdout (лукахед в
+    выборе границы квадранта)."""
     t_lo, p_hi = args.t_lo, args.p_hi
     if args.t_pctl is not None:
-        T_valid = data["T_hat"][~np.isnan(data["T_hat"])]
-        P_valid = data["P_hat"][~np.isnan(data["P_hat"])]
+        T = data["T_hat"]; P = data["P_hat"]
+        if split_idx is not None:
+            T = T[:split_idx]; P = P[:split_idx]
+        T_valid = T[~np.isnan(T)]
+        P_valid = P[~np.isnan(P)]
         if len(T_valid) == 0 or len(P_valid) == 0:
             return t_lo, p_hi
         t_lo = float(np.percentile(T_valid, args.t_pctl))
@@ -477,7 +524,8 @@ def _eval_one_dataset(data: dict, args) -> Optional[dict]:
     """Прогоняет NW+eval на одном датасете (уже в numpy-формате). Возвращает
     метрики _evaluate + n_quad, или None если данных мало. Тихий (без print),
     для batch-режима."""
-    t_lo, p_hi = _quadrant_thresholds(data, args)
+    split_idx = _split_index(data, getattr(args, "train_frac", None))
+    t_lo, p_hi = _quadrant_thresholds(data, args, split_idx)
     # Считаем n_quad до _run_nw, чтобы отфильтровать заранее (иначе _run_nw
     # делает sys.exit при <100 точек — в batch это убило бы весь прогон).
     T = data["T_hat"]; P = data["P_hat"]
@@ -495,7 +543,8 @@ def _eval_one_dataset(data: dict, args) -> Optional[dict]:
                           min_points=args.batch_min_points, quiet=True)
     except SystemExit:
         return {"n_quad": n_quad, "skipped": True, "t_lo": t_lo, "p_hi": p_hi}
-    m = _evaluate(result, confidence=args.confidence, calibrate=args.calibrate)
+    m = _evaluate(result, confidence=args.confidence, calibrate=args.calibrate,
+                   split_idx=split_idx)
     m["n_quad"] = n_quad
     m["t_lo"] = t_lo
     m["p_hi"] = p_hi
@@ -658,10 +707,16 @@ def main() -> None:
     ap.add_argument("--out", default=None, help="CSV с per-bar предсказаниями")
     ap.add_argument("--plot", action="store_true", help="показать calibration diagram")
     ap.add_argument("--calibrate", action="store_true",
-                     help="Изотоническая калибровка (in-sample). Показывает "
-                          "верхнюю границу того, что может дать post-hoc "
-                          "калибровочный слой. Ставит sklearn — pip install "
-                          "scikit-learn.")
+                     help="Изотоническая калибровка. Без --train-frac — "
+                          "in-sample (потолок). С --train-frac — обучается "
+                          "на train, применяется к holdout (честно). Ставит "
+                          "sklearn.")
+    ap.add_argument("--train-frac", type=float, default=None,
+                     help="Walk-forward: первые FRAC баров (напр. 0.6) — train "
+                          "(память+калибровка+percentile-пороги), последние "
+                          "(1-FRAC) — holdout, на котором меряются ВСЕ метрики. "
+                          "Честная out-of-sample оценка. Без флага — прежнее "
+                          "in-sample поведение.")
     # ── Batch-режим по всему кэшу ──
     ap.add_argument("--batch", action="store_true",
                      help="Прогнать по всему кэшу (или --tickers). Собирает "
@@ -697,16 +752,22 @@ def main() -> None:
     ticker = os.path.splitext(os.path.basename(args.csv_in))[0]
     print(f"датасет: {args.csv_in}, {len(data['T_hat'])} баров", file=sys.stderr)
 
-    t_lo, p_hi = _quadrant_thresholds(data, args)
+    split_idx = _split_index(data, args.train_frac)
+    if split_idx is not None:
+        print(f"walk-forward: train=[0:{split_idx}]  holdout=[{split_idx}:"
+              f"{len(data['T_hat'])}]", file=sys.stderr)
+    t_lo, p_hi = _quadrant_thresholds(data, args, split_idx)
     if args.t_pctl is not None:
-        print(f"per-ticker percentile: T̂ p{args.t_pctl}={t_lo:+.3f}, "
+        src = " (по train)" if split_idx is not None else ""
+        print(f"per-ticker percentile{src}: T̂ p{args.t_pctl}={t_lo:+.3f}, "
               f"P̂ p{args.p_pctl}={p_hi:+.3f}", file=sys.stderr)
 
     result = _run_nw(data, h=args.h, neighbors=args.neighbors,
                       density_min=args.density_min, k=args.k,
                       quadrant_only=args.quadrant_only,
                       t_lo=t_lo, p_hi=p_hi)
-    m = _evaluate(result, confidence=args.confidence, calibrate=args.calibrate)
+    m = _evaluate(result, confidence=args.confidence, calibrate=args.calibrate,
+                   split_idx=split_idx)
     _print_summary(m, ticker)
     _print_calibration(m["calibration_bins_raw"])
     if m.get("calibration_bins_cal") is not None:
