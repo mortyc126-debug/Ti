@@ -583,6 +583,15 @@ def _eval_one_dataset(data: dict, args) -> Optional[dict]:
     use_zone = args.quadrant_only
     conds = _zone_conditions(data, zone, args.t_pctl, args.p_pctl,
                               split_idx) if use_zone else []
+    # Если зону запросили, но порог удалось задать НЕ для всех осей (train-часть
+    # по оси сплошь NaN — короткая история короче окна нормировки w_norm),
+    # зона фактически не применится (пустое условие → маска всё-True) и «edge»
+    # посчитается по ВСЕМ барам. Такой тикер не сравним с остальными — честнее
+    # пропустить, чем пускать в сводку неотфильтрованный шум (короткие фьючерсы
+    # давали ±4…13 ATR, одинаковые во всех зонах). См. NW_MEMORY_FINDINGS.
+    if use_zone and len(conds) < len(ZONES[zone]):
+        return {"n_quad": 0, "skipped": True, "zone_desc": "",
+                "zone_undefined": True}
     zmask = _zone_mask(data, conds) if use_zone else None
 
     T = data["T_hat"]; P = data["P_hat"]
