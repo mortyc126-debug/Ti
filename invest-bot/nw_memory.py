@@ -123,6 +123,33 @@ def _load_dataset(path: str) -> dict:
     }
 
 
+def _dataset_from_rows(rows: list[dict]) -> dict:
+    """Конвертит выход tpcolor_dataset.build_dataset (список dict-строк) в
+    тот же формат numpy-массивов, что _load_dataset. Нужен для batch-режима,
+    где датасет считается в памяти, а не читается из CSV."""
+    n = len(rows)
+    def col(name):
+        arr = np.full(n, np.nan, dtype=float)
+        for i, r in enumerate(rows):
+            v = r.get(name)
+            if v is None:
+                continue
+            try:
+                arr[i] = float(v)
+            except (ValueError, TypeError):
+                pass
+        return arr
+    return {
+        "time": [r["time"] for r in rows],
+        "T_hat": col("T_hat"),
+        "P_hat": col("P_hat"),
+        "color_hat": col("color_hat"),
+        "fwd_ret_k": col("fwd_ret_k"),
+        "target": col("target"),
+        "outcome_known": col("outcome_known"),
+    }
+
+
 def _brier(preds: list[float], actuals: list[int]) -> Optional[float]:
     """(p − y)², среднее. Чем меньше, тем лучше калибровка."""
     if not preds:
@@ -168,7 +195,8 @@ def _print_calibration(bins: list[dict]) -> None:
 
 def _run_nw(data: dict, h: float, neighbors: int, density_min: float,
              k: int, quadrant_only: bool = False,
-             t_lo: float = -0.5, p_hi: float = 0.5) -> dict:
+             t_lo: float = -0.5, p_hi: float = 0.5,
+             min_points: int = 100, quiet: bool = False) -> dict:
     """Ядро прогона: для каждой i считает p_hold, density, memory_type.
     Возвращает per-bar массивы + метаинформацию.
 
@@ -188,15 +216,17 @@ def _run_nw(data: dict, h: float, neighbors: int, density_min: float,
         valid_mask = valid_mask & quadrant_mask
     valid_idx = np.where(valid_mask)[0]
 
-    if quadrant_only:
-        print(f"quadrant-only режим: T̂<{t_lo:+.2f} и P̂>{p_hi:+.2f}", file=sys.stderr)
-    print(f"валидных точек для памяти: {len(valid_idx)} из {n}", file=sys.stderr)
-    if len(valid_idx) < 100:
+    if not quiet:
+        if quadrant_only:
+            print(f"quadrant-only режим: T̂<{t_lo:+.2f} и P̂>{p_hi:+.2f}", file=sys.stderr)
+        print(f"валидных точек для памяти: {len(valid_idx)} из {n}", file=sys.stderr)
+    if len(valid_idx) < min_points:
         sys.exit("слишком мало валидных точек в квадранте — попробуй ослабить пороги --t-lo/--p-hi или увеличить историю")
 
     coords = np.column_stack([T[valid_idx], P[valid_idx], C[valid_idx]])
     tree = cKDTree(coords)
-    print(f"KDTree построен, dim=3", file=sys.stderr)
+    if not quiet:
+        print(f"KDTree построен, dim=3", file=sys.stderr)
 
     p_hold = np.full(n, np.nan)
     density = np.full(n, np.nan)
@@ -429,9 +459,177 @@ def _plot_calibration(bins: list[dict], ticker: str) -> None:
     plt.show()
 
 
+def _quadrant_thresholds(data: dict, args) -> tuple[float, float]:
+    """Возвращает (t_lo, p_hi) с учётом --t-pctl/--p-pctl. Общая для single
+    и batch, чтобы percentile считался одинаково."""
+    t_lo, p_hi = args.t_lo, args.p_hi
+    if args.t_pctl is not None:
+        T_valid = data["T_hat"][~np.isnan(data["T_hat"])]
+        P_valid = data["P_hat"][~np.isnan(data["P_hat"])]
+        if len(T_valid) == 0 or len(P_valid) == 0:
+            return t_lo, p_hi
+        t_lo = float(np.percentile(T_valid, args.t_pctl))
+        p_hi = float(np.percentile(P_valid, args.p_pctl))
+    return t_lo, p_hi
+
+
+def _eval_one_dataset(data: dict, args) -> Optional[dict]:
+    """Прогоняет NW+eval на одном датасете (уже в numpy-формате). Возвращает
+    метрики _evaluate + n_quad, или None если данных мало. Тихий (без print),
+    для batch-режима."""
+    t_lo, p_hi = _quadrant_thresholds(data, args)
+    # Считаем n_quad до _run_nw, чтобы отфильтровать заранее (иначе _run_nw
+    # делает sys.exit при <100 точек — в batch это убило бы весь прогон).
+    T = data["T_hat"]; P = data["P_hat"]
+    ok = data["outcome_known"] == 1.0
+    valid = ok & ~np.isnan(T) & ~np.isnan(P) & ~np.isnan(data["color_hat"]) & ~np.isnan(data["target"])
+    if args.quadrant_only:
+        valid = valid & (T < t_lo) & (P > p_hi)
+    n_quad = int(valid.sum())
+    if n_quad < args.batch_min_points:
+        return {"n_quad": n_quad, "skipped": True, "t_lo": t_lo, "p_hi": p_hi}
+    try:
+        result = _run_nw(data, h=args.h, neighbors=args.neighbors,
+                          density_min=args.density_min, k=args.k,
+                          quadrant_only=args.quadrant_only, t_lo=t_lo, p_hi=p_hi,
+                          min_points=args.batch_min_points, quiet=True)
+    except SystemExit:
+        return {"n_quad": n_quad, "skipped": True, "t_lo": t_lo, "p_hi": p_hi}
+    m = _evaluate(result, confidence=args.confidence, calibrate=args.calibrate)
+    m["n_quad"] = n_quad
+    m["t_lo"] = t_lo
+    m["p_hi"] = p_hi
+    m["skipped"] = False
+    return m
+
+
+def _run_batch(args) -> None:
+    """Batch по всему кэшу (или списку). Для каждого тикера собирает датасет
+    через tpcolor_dataset.build_dataset в памяти, прогоняет NW+calibrate,
+    печатает одну сводную строку и копит в CSV. Главная проверка: работает
+    ли механизм на тикерах ВНЕ отобранного ансамбля — универсальность vs
+    подгонка под 25 избранных."""
+    # Импортим из tpcolor_dataset — тот же расчёт осей, что в single-режиме.
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import tpcolor_dataset as tpc
+
+    if args.tickers and args.tickers.upper() != "ALL":
+        tickers = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
+    else:
+        tickers = tpc._list_tickers(args.cache, args.interval)
+    print(f"тикеров к прогону: {len(tickers)}", file=sys.stderr)
+
+    fieldnames = ["ticker", "n_hist", "n_quad", "t_lo", "p_hi",
+                  "edge_raw", "win_raw", "sharpe_raw",
+                  "edge_cal", "win_cal", "sharpe_cal",
+                  "brier_raw", "brier_cal", "naive_brier",
+                  "improve_cal_pct", "status"]
+    out_path = args.out or "nw_batch.csv"
+    fp = open(out_path, "w", encoding="utf-8", newline="")
+    writer = csv.DictWriter(fp, fieldnames=fieldnames)
+    writer.writeheader()
+
+    rows_summary = []
+    min_bars = max(args.tpc_n_macro, args.tpc_w_norm) + args.k + 5
+    for idx, tk in enumerate(tickers, 1):
+        try:
+            candles = tpc._load_from_cache(tk, args.cache, args.interval)
+        except SystemExit:
+            continue
+        if len(candles) < min_bars:
+            print(f"[{idx:>4}/{len(tickers)}] {tk:<12} skip (мало баров: {len(candles)})",
+                  file=sys.stderr)
+            continue
+        rows = tpc.build_dataset(candles, n=args.tpc_n, n_macro=args.tpc_n_macro,
+                                  w_norm=args.tpc_w_norm, k=args.k)
+        data = _dataset_from_rows(rows)
+        m = _eval_one_dataset(data, args)
+        n_hist = len(candles)
+        if m is None or m.get("skipped"):
+            nq = m["n_quad"] if m else 0
+            writer.writerow({"ticker": tk, "n_hist": n_hist, "n_quad": nq,
+                             "t_lo": f"{m['t_lo']:.3f}" if m else "",
+                             "p_hi": f"{m['p_hi']:.3f}" if m else "",
+                             "status": "skip_few_points"})
+            fp.flush()
+            print(f"[{idx:>4}/{len(tickers)}] {tk:<12} n_quad={nq:<4} — мало точек",
+                  file=sys.stderr)
+            continue
+
+        er = m["edge_raw"]; ec = m["edge_cal"]
+        def sh(e): return (e["mean"] / e["std"]) if (e and e["mean"] is not None and e["std"]) else None
+        improve = ((1 - m["brier_cal"] / m["naive_brier"]) * 100
+                   if m["brier_cal"] and m["naive_brier"] else None)
+        row = {
+            "ticker": tk, "n_hist": n_hist, "n_quad": m["n_quad"],
+            "t_lo": f"{m['t_lo']:.3f}", "p_hi": f"{m['p_hi']:.3f}",
+            "edge_raw": f"{er['mean']:+.4f}" if er and er["mean"] is not None else "",
+            "win_raw": f"{er['win_rate']*100:.1f}" if er and er["win_rate"] is not None else "",
+            "sharpe_raw": f"{sh(er):+.3f}" if sh(er) is not None else "",
+            "edge_cal": f"{ec['mean']:+.4f}" if ec and ec["mean"] is not None else "",
+            "win_cal": f"{ec['win_rate']*100:.1f}" if ec and ec["win_rate"] is not None else "",
+            "sharpe_cal": f"{sh(ec):+.3f}" if sh(ec) is not None else "",
+            "brier_raw": f"{m['brier_raw']:.4f}" if m["brier_raw"] is not None else "",
+            "brier_cal": f"{m['brier_cal']:.4f}" if m["brier_cal"] is not None else "",
+            "naive_brier": f"{m['naive_brier']:.4f}" if m["naive_brier"] is not None else "",
+            "improve_cal_pct": f"{improve:+.1f}" if improve is not None else "",
+            "status": "ok",
+        }
+        writer.writerow(row); fp.flush()
+        rows_summary.append((tk, m, er, ec, sh))
+        ec_str = (f"edge_cal={ec['mean']:+.3f} win={ec['win_rate']*100:.0f}%"
+                  if ec and ec["mean"] is not None else "edge_cal=—")
+        print(f"[{idx:>4}/{len(tickers)}] {tk:<12} n_quad={m['n_quad']:<4} {ec_str}",
+              file=sys.stderr)
+
+    fp.close()
+    print(f"\nсводка: {out_path}", file=sys.stderr)
+
+    # Финальная статистика: сколько тикеров с положительным edge_cal, медианы.
+    ok_rows = [(tk, m, er, ec, sh) for (tk, m, er, ec, sh) in rows_summary
+               if ec and ec["mean"] is not None]
+    if not ok_rows:
+        print("нет тикеров с валидной оценкой", file=sys.stderr)
+        return
+    def med(xs):
+        xs = sorted(xs)
+        return xs[len(xs)//2] if len(xs) % 2 else 0.5*(xs[len(xs)//2-1]+xs[len(xs)//2])
+
+    # ВАЖНО: edge_cal раздут in-sample калибровкой (на чистом шуме тоже даёт
+    # +0.7 ATR — проверено). Для честного сравнения между тикерами смотрим
+    # edge_RAW: он без post-hoc подгонки. edge_cal показываем как «потолок».
+    raw_edges = [er["mean"] for (_, _, er, _, _) in ok_rows
+                 if er and er["mean"] is not None]
+    raw_wins = [er["win_rate"] for (_, _, er, _, _) in ok_rows
+                if er and er["win_rate"] is not None]
+    cal_edges = [ec["mean"] for (_, _, _, ec, _) in ok_rows]
+    n_raw_pos = sum(1 for e in raw_edges if e > 0)
+    n_raw_strong = sum(1 for (_, _, er, _, _) in ok_rows
+                        if er and er["mean"] is not None and er["mean"] > 0.3
+                        and er["win_rate"] is not None and er["win_rate"] > 0.55)
+
+    print(f"\n=== ИТОГ по {len(ok_rows)} тикерам с достаточной историей ===")
+    print(f"── RAW (честная метрика для сравнения тикеров) ──")
+    print(f"edge_raw > 0:                 {n_raw_pos}/{len(raw_edges)} "
+          f"({n_raw_pos/max(len(raw_edges),1)*100:.0f}%)")
+    print(f"edge_raw > 0.3 И win > 55%:   {n_raw_strong}/{len(ok_rows)} "
+          f"({n_raw_strong/len(ok_rows)*100:.0f}%)")
+    print(f"медиана edge_raw:             {med(raw_edges):+.4f} ATR")
+    print(f"медиана win_raw:              {med(raw_wins)*100:.1f}%")
+    print(f"── CAL (in-sample потолок, раздут — НЕ для сравнения) ──")
+    print(f"медиана edge_cal:             {med(cal_edges):+.4f} ATR")
+    print(f"\nГлавный вопрос: доля edge_RAW > 0 на всём пуле.")
+    print(f"  ~50% → механизм не работает вне отобранного ансамбля (подгонка).")
+    print(f"  сильно >50% → механизм универсальный.")
+    print(f"ВНИМАНИЕ: обе метрики in-sample (нет walk-forward). Настоящая")
+    print(f"проверка edge — обучение памяти на train, оценка на holdout.")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Прототип NW-памяти §11 T/P/color")
-    ap.add_argument("csv_in", help="CSV из tpcolor_dataset.py")
+    ap.add_argument("csv_in", nargs="?", default=None,
+                     help="CSV из tpcolor_dataset.py (single-режим). "
+                          "В batch-режиме (--batch) не нужен.")
     ap.add_argument("--h", type=float, default=0.3, help="bandwidth ядра")
     ap.add_argument("--neighbors", type=int, default=200,
                      help="k ближайших для стартового отбора (не используется, "
@@ -464,26 +662,43 @@ def main() -> None:
                           "верхнюю границу того, что может дать post-hoc "
                           "калибровочный слой. Ставит sklearn — pip install "
                           "scikit-learn.")
+    # ── Batch-режим по всему кэшу ──
+    ap.add_argument("--batch", action="store_true",
+                     help="Прогнать по всему кэшу (или --tickers). Собирает "
+                          "датасет каждого тикера в памяти через "
+                          "tpcolor_dataset.build_dataset, печатает сводную "
+                          "таблицу. Проверка универсальности механизма вне "
+                          "отобранного ансамбля.")
+    ap.add_argument("--tickers", default="ALL",
+                     help="batch: ALL (весь кэш) или список через запятую")
+    ap.add_argument("--cache", default=os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "data", "candle_cache"),
+                     help="batch: путь к data/candle_cache")
+    ap.add_argument("--interval", type=int, default=5, choices=(1, 5),
+                     help="batch: интервал свечей")
+    ap.add_argument("--batch-min-points", type=int, default=100,
+                     help="batch: минимум точек в квадранте для оценки (default 100)")
+    ap.add_argument("--tpc-n", type=int, default=20, help="batch: окно T/P/color")
+    ap.add_argument("--tpc-n-macro", type=int, default=200, help="batch: макро-окно")
+    ap.add_argument("--tpc-w-norm", type=int, default=500, help="batch: окно z-норм")
     args = ap.parse_args()
+
+    if (args.t_pctl is None) != (args.p_pctl is None):
+        sys.exit("--t-pctl и --p-pctl задаются либо оба, либо ни одного.")
+
+    if args.batch:
+        _run_batch(args)
+        return
+
+    if not args.csv_in:
+        sys.exit("нужен csv_in (single-режим) или --batch")
 
     data = _load_dataset(args.csv_in)
     ticker = os.path.splitext(os.path.basename(args.csv_in))[0]
     print(f"датасет: {args.csv_in}, {len(data['T_hat'])} баров", file=sys.stderr)
 
-    # Per-ticker процентильный режим: пороги считаем из локального
-    # распределения — отвечает на «оси адаптируются, а не применяются
-    # одним глобальным z для всех». Пары --t-pctl/--p-pctl задаются
-    # совместно; если задан один, sys.exit.
-    if (args.t_pctl is None) != (args.p_pctl is None):
-        sys.exit("--t-pctl и --p-pctl задаются либо оба, либо ни одного.")
-    t_lo, p_hi = args.t_lo, args.p_hi
+    t_lo, p_hi = _quadrant_thresholds(data, args)
     if args.t_pctl is not None:
-        T_valid = data["T_hat"][~np.isnan(data["T_hat"])]
-        P_valid = data["P_hat"][~np.isnan(data["P_hat"])]
-        if len(T_valid) == 0 or len(P_valid) == 0:
-            sys.exit("нет валидных T̂/P̂ для percentile-расчёта")
-        t_lo = float(np.percentile(T_valid, args.t_pctl))
-        p_hi = float(np.percentile(P_valid, args.p_pctl))
         print(f"per-ticker percentile: T̂ p{args.t_pctl}={t_lo:+.3f}, "
               f"P̂ p{args.p_pctl}={p_hi:+.3f}", file=sys.stderr)
 
