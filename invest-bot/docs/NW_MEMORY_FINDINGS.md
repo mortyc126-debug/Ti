@@ -135,7 +135,11 @@ python nw_memory.py --batch --tickers ALL --quadrant-only --zone lowT_lowP \
 - `nw_memory.py` — NW-память. single / `--batch`. Ключевые флаги:
   `--quadrant-only --zone {lowT_highP|highT_highP|lowT_lowP|highT_lowP|…}`,
   `--t-pctl/--p-pctl`, `--train-frac` (walk-forward), `--calibrate`
-  (изотоническая, для диагностики), `--confidence`.
+  (изотоническая, для диагностики), `--confidence`. Batch пишет по тикеру
+  `liq_mln` (медианный барный оборот close·volume) и `vol_pct` (медианный
+  относит. диапазон), а в конце — корреляции `edge_raw ↔ ликвидность/
+  волатильность` (Pearson+Spearman) и медиану edge по третям ликвидности
+  (ловит немонотонность — «топ-ликвиды инвертированы», SBER-класс).
 - `candle_patterns.py` — 61 свечной паттерн TA-Lib по кэшу.
 
 ---

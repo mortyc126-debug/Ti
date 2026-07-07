@@ -618,6 +618,28 @@ def _eval_one_dataset(data: dict, args) -> Optional[dict]:
     return m
 
 
+def _liq_vol(candles: list) -> tuple:
+    """Грубые прокси ликвидности и волатильности тикера по свечам:
+    - liq  = медианный барный оборот close·volume, в млн (единицы volume
+      как в кэше — для РАНЖИРОВАНИЯ тикеров между собой этого достаточно);
+    - vol  = медианный относительный диапазон бара (high-low)/close, в %.
+    Медиана — чтобы не ловить единичные всплески. Нужны, чтобы проверить,
+    зависит ли работоспособность метода от ликвидности/волатильности."""
+    turn = []
+    rng = []
+    for c in candles:
+        cl = float(c["close"])
+        if cl <= 0:
+            continue
+        turn.append(cl * float(c["volume"]))
+        rng.append((float(c["high"]) - float(c["low"])) / cl)
+    if not turn:
+        return (None, None)
+    liq = float(np.median(turn)) / 1e6
+    vol = float(np.median(rng)) * 100.0
+    return (liq, vol)
+
+
 def _run_batch(args) -> None:
     """Batch по всему кэшу (или списку). Для каждого тикера собирает датасет
     через tpcolor_dataset.build_dataset в памяти, прогоняет NW+calibrate,
@@ -634,7 +656,7 @@ def _run_batch(args) -> None:
         tickers = tpc._list_tickers(args.cache, args.interval)
     print(f"тикеров к прогону: {len(tickers)}", file=sys.stderr)
 
-    fieldnames = ["ticker", "n_hist", "n_quad", "zone",
+    fieldnames = ["ticker", "n_hist", "n_quad", "zone", "liq_mln", "vol_pct",
                   "edge_raw", "win_raw", "sharpe_raw",
                   "edge_cal", "win_cal", "sharpe_cal",
                   "brier_raw", "brier_cal", "naive_brier",
@@ -645,6 +667,7 @@ def _run_batch(args) -> None:
     writer.writeheader()
 
     rows_summary = []
+    tk_lv = {}  # ticker -> (liq_mln, vol_pct), для корреляции edge↔ликв/волат
     min_bars = max(args.tpc_n_macro, args.tpc_w_norm) + args.k + 5
     for idx, tk in enumerate(tickers, 1):
         try:
@@ -655,6 +678,9 @@ def _run_batch(args) -> None:
             print(f"[{idx:>4}/{len(tickers)}] {tk:<12} skip (мало баров: {len(candles)})",
                   file=sys.stderr)
             continue
+        liq, vol = _liq_vol(candles)
+        liq_s = f"{liq:.2f}" if liq is not None else ""
+        vol_s = f"{vol:.3f}" if vol is not None else ""
         rows = tpc.build_dataset(candles, n=args.tpc_n, n_macro=args.tpc_n_macro,
                                   w_norm=args.tpc_w_norm, k=args.k)
         data = _dataset_from_rows(rows)
@@ -664,6 +690,7 @@ def _run_batch(args) -> None:
             nq = m["n_quad"] if m else 0
             writer.writerow({"ticker": tk, "n_hist": n_hist, "n_quad": nq,
                              "zone": m.get("zone_desc", "") if m else "",
+                             "liq_mln": liq_s, "vol_pct": vol_s,
                              "status": "skip_few_points"})
             fp.flush()
             print(f"[{idx:>4}/{len(tickers)}] {tk:<12} n_quad={nq:<4} — мало точек",
@@ -677,6 +704,7 @@ def _run_batch(args) -> None:
         row = {
             "ticker": tk, "n_hist": n_hist, "n_quad": m["n_quad"],
             "zone": m.get("zone_desc", ""),
+            "liq_mln": liq_s, "vol_pct": vol_s,
             "edge_raw": f"{er['mean']:+.4f}" if er and er["mean"] is not None else "",
             "win_raw": f"{er['win_rate']*100:.1f}" if er and er["win_rate"] is not None else "",
             "sharpe_raw": f"{sh(er):+.3f}" if sh(er) is not None else "",
@@ -691,6 +719,7 @@ def _run_batch(args) -> None:
         }
         writer.writerow(row); fp.flush()
         rows_summary.append((tk, m, er, ec, sh))
+        tk_lv[tk] = (liq, vol)
         # Прогресс по RAW (без --calibrate ec=None) — raw и есть честная
         # OOS-метрика при --train-frac; калибровка OOS не помогает.
         wf = " [holdout]" if m.get("walk_forward") else ""
@@ -747,6 +776,66 @@ def _run_batch(args) -> None:
         print(f"Главный вопрос: доля edge_raw > 0 на пуле.")
         print(f"  ВНИМАНИЕ: метрики in-sample (без --train-frac). Для честной")
         print(f"  оценки добавь --train-frac 0.6.")
+
+    _liq_vol_report(ok_rows, tk_lv)
+
+
+def _corr(xs, ys):
+    """Пирсон + Спирмен (ранговый). Спирмен устойчивее к выбросам/нелинейности.
+    None если точек мало или нет разброса."""
+    x = np.asarray(xs, float); y = np.asarray(ys, float)
+    ok = ~np.isnan(x) & ~np.isnan(y)
+    x, y = x[ok], y[ok]
+    if len(x) < 5 or np.std(x) == 0 or np.std(y) == 0:
+        return (None, None, len(x))
+    pear = float(np.corrcoef(x, y)[0, 1])
+    rx = np.argsort(np.argsort(x)); ry = np.argsort(np.argsort(y))
+    spear = float(np.corrcoef(rx, ry)[0, 1])
+    return (pear, spear, len(x))
+
+
+def _liq_vol_report(ok_rows, tk_lv) -> None:
+    """Есть ли связь между ликвидностью/волатильностью тикера и тем, насколько
+    работает метод (edge_raw)? Считаем корреляции и режем пул на трети по
+    ликвидности — так видно и монотонную зависимость, и нелинейную (напр.
+    'работает только на средних, а топ-ликвиды инвертированы' = SBER-класс)."""
+    rows = [(tk, er["mean"], tk_lv.get(tk, (None, None)))
+            for (tk, m, er, ec, sh) in ok_rows
+            if er and er["mean"] is not None and tk_lv.get(tk, (None, None))[0] is not None]
+    if len(rows) < 5:
+        return
+    edges = [e for (_, e, _) in rows]
+    liqs = [lv[0] for (_, _, lv) in rows]
+    vols = [lv[1] for (_, _, lv) in rows]
+    log_liq = [math.log10(x) for x in liqs]
+
+    print("\n── Зависимость edge_raw от ликвидности / волатильности ──")
+    pe, sp, n = _corr(log_liq, edges)
+    if pe is not None:
+        print(f"edge_raw ↔ log10(ликвидность): Pearson {pe:+.2f}  Spearman {sp:+.2f}  (n={n})")
+    pe, sp, n = _corr(vols, edges)
+    if pe is not None:
+        print(f"edge_raw ↔ волатильность:      Pearson {pe:+.2f}  Spearman {sp:+.2f}  (n={n})")
+
+    # Трети по ликвидности: медиана edge в каждой. Ловит немонотонность.
+    order = sorted(range(len(rows)), key=lambda i: liqs[i])
+    t = len(order) // 3
+    bands = [("низкая ликв.", order[:t]), ("средняя", order[t:2*t]),
+             ("высокая ликв.", order[2*t:])]
+
+    def med(xs):
+        xs = sorted(xs); n = len(xs)
+        return xs[n//2] if n % 2 else 0.5*(xs[n//2-1]+xs[n//2])
+    print("  медиана edge_raw по третям ликвидности:")
+    for name, idxs in bands:
+        if not idxs:
+            continue
+        es = [edges[i] for i in idxs]
+        pos = sum(1 for e in es if e > 0)
+        print(f"    {name:<14} медиана {med(es):+.3f} ATR, "
+              f"edge>0 {pos}/{len(es)} ({pos/len(es)*100:.0f}%)")
+    print("  (Spearman ~0 при разной медиане по третям = немонотонная связь,")
+    print("   напр. топ-ликвиды инвертированы — SBER-класс.)")
 
 
 def main() -> None:
