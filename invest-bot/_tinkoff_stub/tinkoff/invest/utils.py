@@ -1,6 +1,12 @@
 """tinkoff.invest.utils stub — только для quotation_to_decimal."""
+from datetime import datetime, timezone
 from decimal import Decimal
 from . import Quotation, MoneyValue
+
+
+def now() -> datetime:
+    """Реальная возвращает timezone-aware UTC now."""
+    return datetime.now(timezone.utc)
 
 
 def quotation_to_decimal(q) -> Decimal:

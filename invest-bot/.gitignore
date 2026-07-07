@@ -143,3 +143,8 @@ oi_weights.json
 # генерируются офлайн-анализом (score_methods.py), должны версионироваться.
 !/data/method_presets.json
 !/data/method_toggle_state.json
+
+# Выхлоп Шага 1 чистки методов (METHOD_CLEANUP_PLAN.md) — версионируется,
+# чтобы чистку вести по этим файлам в чате. Негейт директории разрешает git
+# спуститься внутрь; файлы там (два уровня) под /data/* уже не попадают.
+!/data/analysis/

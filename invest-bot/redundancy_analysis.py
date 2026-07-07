@@ -18,7 +18,21 @@ redundancy_analysis.py — для каждого метода: точность 
     python redundancy_analysis.py AFKS,AFLT,GAZP --days 60
 """
 import argparse
+import os
 import statistics
+import sys
+
+# Активируем локальный tinkoff-stub, если реальный SDK не установлен
+# (Python 3.14 wheel пока нет). Свечи всё равно берутся из кэша.
+_here = os.path.dirname(os.path.abspath(__file__))
+if _here not in sys.path:
+    sys.path.insert(0, _here)
+try:
+    import tinkoff.invest  # noqa: F401
+except ImportError:
+    _stub = os.path.join(_here, "_tinkoff_stub")
+    if _stub not in sys.path:
+        sys.path.insert(0, _stub)
 
 from tinkoff.invest.exceptions import RequestError
 

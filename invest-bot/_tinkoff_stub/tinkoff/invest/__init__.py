@@ -68,3 +68,21 @@ class GetTradingStatusResponse:
 class LastPrice:
     figi: str = ""
     price: Optional[Quotation] = None
+
+
+# Catch-all: любое имя, не определённое явно выше, при
+# `from tinkoff.invest import Foo` получит тривиальный класс-заглушку.
+# Так офлайн-скрипты (redundancy_analysis, lag_analysis), которые тянут
+# десятки типов из SDK ради аннотаций/except, импортируются без падения,
+# не общаясь с реальным API (свечи берутся из локального кэша). PEP 562.
+_MADE: dict = {}
+
+
+def __getattr__(name: str):
+    if name in _MADE:
+        return _MADE[name]
+    # Классы исключений — наследуем Exception, чтобы except ловил.
+    base = Exception if ("Error" in name or "Exception" in name) else object
+    cls = type(name, (base,), {"__doc__": f"tinkoff.invest stub for {name}"})
+    _MADE[name] = cls
+    return cls
