@@ -203,16 +203,16 @@ def _print_calibration(bins: list[dict]) -> None:
 
 
 def _run_nw(data: dict, h: float, neighbors: int, density_min: float,
-             k: int, quadrant_only: bool = False,
-             t_lo: float = -0.5, p_hi: float = 0.5,
+             k: int, zone_mask=None,
              min_points: int = 100, quiet: bool = False) -> dict:
     """Ядро прогона: для каждой i считает p_hold, density, memory_type.
     Возвращает per-bar массивы + метаинформацию.
 
-    Если quadrant_only=True — и целевая точка, и соседи ограничены
-    квадрантом (T̂ < t_lo, P̂ > p_hi). Гипотеза §8.3: эффект концентрируется
-    там, а на всём пространстве размывается до нуля. Локализуем поиск —
-    NW-память перестаёт усреднять сигнал по baseline'у."""
+    zone_mask (per-bar bool, True = точка в зоне) — если задан, и целевая
+    точка, и соседи ограничены зоной. Гипотеза §8.3: эффект концентрируется
+    в углу (T,P)-пространства, а глобально размывается. Локализуем поиск —
+    NW-память перестаёт усреднять сигнал по baseline'у. Зона строится
+    вызывающим (лоу-T/хай-P квадрант или любой другой, см. ZONES)."""
     T = data["T_hat"]; P = data["P_hat"]; C = data["color_hat"]
     fwd = data["fwd_ret_k"]; tgt = data["target"]
     ok = data["outcome_known"] == 1.0
@@ -220,17 +220,14 @@ def _run_nw(data: dict, h: float, neighbors: int, density_min: float,
 
     # Индекс: только точки с outcome_known + все три координаты валидны.
     valid_mask = ok & ~np.isnan(T) & ~np.isnan(P) & ~np.isnan(C) & ~np.isnan(tgt)
-    if quadrant_only:
-        quadrant_mask = (T < t_lo) & (P > p_hi)
-        valid_mask = valid_mask & quadrant_mask
+    if zone_mask is not None:
+        valid_mask = valid_mask & zone_mask
     valid_idx = np.where(valid_mask)[0]
 
     if not quiet:
-        if quadrant_only:
-            print(f"quadrant-only режим: T̂<{t_lo:+.2f} и P̂>{p_hi:+.2f}", file=sys.stderr)
         print(f"валидных точек для памяти: {len(valid_idx)} из {n}", file=sys.stderr)
     if len(valid_idx) < min_points:
-        sys.exit("слишком мало валидных точек в квадранте — попробуй ослабить пороги --t-lo/--p-hi или увеличить историю")
+        sys.exit("слишком мало валидных точек в зоне — ослабь пороги (--t-pctl/--p-pctl) или увеличь историю")
 
     coords = np.column_stack([T[valid_idx], P[valid_idx], C[valid_idx]])
     tree = cKDTree(coords)
@@ -250,10 +247,10 @@ def _run_nw(data: dict, h: float, neighbors: int, density_min: float,
         # быть неизвестен (мы предсказываем будущее), это ок.
         if np.isnan(T[i]) or np.isnan(P[i]) or np.isnan(C[i]):
             continue
-        # В quadrant-only режиме предсказываем только для точек в квадранте.
-        # Вне квадранта — memory_type="outside_quadrant", p_hold остаётся NaN.
-        if quadrant_only and not (T[i] < t_lo and P[i] > p_hi):
-            memory_type[i] = "outside_quadrant"
+        # В зонном режиме предсказываем только для точек в зоне.
+        # Вне зоны — memory_type="outside_zone", p_hold остаётся NaN.
+        if zone_mask is not None and not zone_mask[i]:
+            memory_type[i] = "outside_zone"
             continue
 
         # Ищем кандидатов внутри радиуса
@@ -510,23 +507,71 @@ def _split_index(data: dict, train_frac: Optional[float]) -> Optional[int]:
     return int(n * train_frac)
 
 
-def _quadrant_thresholds(data: dict, args, split_idx: Optional[int] = None) -> tuple[float, float]:
-    """Возвращает (t_lo, p_hi) с учётом --t-pctl/--p-pctl. Общая для single
-    и batch. При walk-forward (split_idx задан) percentile считается только
-    по train-части — иначе пороги «подглядывают» в holdout (лукахед в
-    выборе границы квадранта)."""
-    t_lo, p_hi = args.t_lo, args.p_hi
-    if args.t_pctl is not None:
-        T = data["T_hat"]; P = data["P_hat"]
-        if split_idx is not None:
-            T = T[:split_idx]; P = P[:split_idx]
-        T_valid = T[~np.isnan(T)]
-        P_valid = P[~np.isnan(P)]
-        if len(T_valid) == 0 or len(P_valid) == 0:
-            return t_lo, p_hi
-        t_lo = float(np.percentile(T_valid, args.t_pctl))
-        p_hi = float(np.percentile(P_valid, args.p_pctl))
-    return t_lo, p_hi
+# Зоны (T,P)-пространства для локализации поиска. Каждая — список условий
+# (ось, направление): 'lo' = ниже percentile(pctl), 'hi' = выше
+# percentile(100-pctl). Документ §3/§8.3 обсуждает разные углы поверхности;
+# это позволяет проверить не только «низкая T + высокая P», а все квадранты.
+ZONES = {
+    "lowT_highP":  [("T", "lo"), ("P", "hi")],   # §8.3 базовый (тонкий грайндинг)
+    "lowT_lowP":   [("T", "lo"), ("P", "lo")],   # тихий шум/поглощение
+    "highT_highP": [("T", "hi"), ("P", "hi")],   # наполненный направленный рывок
+    "highT_lowP":  [("T", "hi"), ("P", "lo")],   # высокая активность без прогресса
+    "lowT":        [("T", "lo")],                # только низкая T (P любая)
+    "highT":       [("T", "hi")],
+    "highP":       [("P", "hi")],
+    "lowP":        [("P", "lo")],
+}
+
+
+def _zone_conditions(data: dict, zone: str, t_pctl: Optional[float],
+                      p_pctl: Optional[float],
+                      split_idx: Optional[int] = None) -> list:
+    """Для зоны считает конкретные пороги: [(ось, направление, thr), ...].
+    Percentile берётся по train-части при walk-forward (иначе граница
+    подглядывает в holdout).
+
+    pctl трактуется БУКВАЛЬНО как линия отреза: thr = percentile(pctl), для
+    'lo' берём точки НИЖЕ, для 'hi' — ВЫШЕ. Если pctl не задан (None),
+    дефолт по направлению: lo→5 (нижние 5%), hi→95 (верхние 5%) — так для
+    любой зоны без ручных порогов берётся симметричный 5% хвост нужной
+    стороны. Явный --t-pctl/--p-pctl переопределяет (напр. p_pctl=90 на
+    lowT_highP = старое поведение «верхние 10%»)."""
+    out = []
+    for axis, direction in ZONES[zone]:
+        arr = data["T_hat"] if axis == "T" else data["P_hat"]
+        user_pctl = t_pctl if axis == "T" else p_pctl
+        if user_pctl is None:
+            pctl = 5.0 if direction == "lo" else 95.0
+        else:
+            pctl = user_pctl
+        a = arr[:split_idx] if split_idx is not None else arr
+        a = a[~np.isnan(a)]
+        if len(a) == 0:
+            continue
+        thr = float(np.percentile(a, pctl))
+        out.append((axis, direction, thr))
+    return out
+
+
+def _zone_mask(data: dict, conds: list):
+    """Boolean per-bar маска: True где точка удовлетворяет всем условиям зоны."""
+    T = data["T_hat"]; P = data["P_hat"]
+    mask = np.ones(len(T), dtype=bool)
+    for axis, direction, thr in conds:
+        arr = T if axis == "T" else P
+        with np.errstate(invalid="ignore"):
+            mask &= (arr < thr) if direction == "lo" else (arr > thr)
+    # NaN в arr даёт False в сравнении — точки с невалидной осью выпадут, ок.
+    return mask
+
+
+def _zone_desc(conds: list) -> str:
+    parts = []
+    for axis, direction, thr in conds:
+        sym = "T̂" if axis == "T" else "P̂"
+        op = "<" if direction == "lo" else ">"
+        parts.append(f"{sym}{op}{thr:+.2f}")
+    return " & ".join(parts)
 
 
 def _eval_one_dataset(data: dict, args) -> Optional[dict]:
@@ -534,29 +579,32 @@ def _eval_one_dataset(data: dict, args) -> Optional[dict]:
     метрики _evaluate + n_quad, или None если данных мало. Тихий (без print),
     для batch-режима."""
     split_idx = _split_index(data, getattr(args, "train_frac", None))
-    t_lo, p_hi = _quadrant_thresholds(data, args, split_idx)
-    # Считаем n_quad до _run_nw, чтобы отфильтровать заранее (иначе _run_nw
-    # делает sys.exit при <100 точек — в batch это убило бы весь прогон).
+    zone = getattr(args, "zone", "lowT_highP")
+    use_zone = args.quadrant_only
+    conds = _zone_conditions(data, zone, args.t_pctl, args.p_pctl,
+                              split_idx) if use_zone else []
+    zmask = _zone_mask(data, conds) if use_zone else None
+
     T = data["T_hat"]; P = data["P_hat"]
     ok = data["outcome_known"] == 1.0
     valid = ok & ~np.isnan(T) & ~np.isnan(P) & ~np.isnan(data["color_hat"]) & ~np.isnan(data["target"])
-    if args.quadrant_only:
-        valid = valid & (T < t_lo) & (P > p_hi)
+    if zmask is not None:
+        valid = valid & zmask
     n_quad = int(valid.sum())
+    zdesc = _zone_desc(conds) if conds else ""
     if n_quad < args.batch_min_points:
-        return {"n_quad": n_quad, "skipped": True, "t_lo": t_lo, "p_hi": p_hi}
+        return {"n_quad": n_quad, "skipped": True, "zone_desc": zdesc}
     try:
         result = _run_nw(data, h=args.h, neighbors=args.neighbors,
                           density_min=args.density_min, k=args.k,
-                          quadrant_only=args.quadrant_only, t_lo=t_lo, p_hi=p_hi,
+                          zone_mask=zmask,
                           min_points=args.batch_min_points, quiet=True)
     except SystemExit:
-        return {"n_quad": n_quad, "skipped": True, "t_lo": t_lo, "p_hi": p_hi}
+        return {"n_quad": n_quad, "skipped": True, "zone_desc": zdesc}
     m = _evaluate(result, confidence=args.confidence, calibrate=args.calibrate,
                    split_idx=split_idx)
     m["n_quad"] = n_quad
-    m["t_lo"] = t_lo
-    m["p_hi"] = p_hi
+    m["zone_desc"] = zdesc
     m["skipped"] = False
     return m
 
@@ -577,7 +625,7 @@ def _run_batch(args) -> None:
         tickers = tpc._list_tickers(args.cache, args.interval)
     print(f"тикеров к прогону: {len(tickers)}", file=sys.stderr)
 
-    fieldnames = ["ticker", "n_hist", "n_quad", "t_lo", "p_hi",
+    fieldnames = ["ticker", "n_hist", "n_quad", "zone",
                   "edge_raw", "win_raw", "sharpe_raw",
                   "edge_cal", "win_cal", "sharpe_cal",
                   "brier_raw", "brier_cal", "naive_brier",
@@ -606,8 +654,7 @@ def _run_batch(args) -> None:
         if m is None or m.get("skipped"):
             nq = m["n_quad"] if m else 0
             writer.writerow({"ticker": tk, "n_hist": n_hist, "n_quad": nq,
-                             "t_lo": f"{m['t_lo']:.3f}" if m else "",
-                             "p_hi": f"{m['p_hi']:.3f}" if m else "",
+                             "zone": m.get("zone_desc", "") if m else "",
                              "status": "skip_few_points"})
             fp.flush()
             print(f"[{idx:>4}/{len(tickers)}] {tk:<12} n_quad={nq:<4} — мало точек",
@@ -620,7 +667,7 @@ def _run_batch(args) -> None:
                    if m["brier_cal"] and m["naive_brier"] else None)
         row = {
             "ticker": tk, "n_hist": n_hist, "n_quad": m["n_quad"],
-            "t_lo": f"{m['t_lo']:.3f}", "p_hi": f"{m['p_hi']:.3f}",
+            "zone": m.get("zone_desc", ""),
             "edge_raw": f"{er['mean']:+.4f}" if er and er["mean"] is not None else "",
             "win_raw": f"{er['win_rate']*100:.1f}" if er and er["win_rate"] is not None else "",
             "sharpe_raw": f"{sh(er):+.3f}" if sh(er) is not None else "",
@@ -710,12 +757,14 @@ def main() -> None:
                      help="горизонт fwd_ret_k (должен совпадать с tpcolor_dataset)")
     ap.add_argument("--quadrant-only", action="store_true",
                      help="§8.3 локализация: искать соседей и предсказывать только "
-                          "внутри квадранта (T̂<t_lo, P̂>p_hi). NW-память перестаёт "
-                          "размывать сигнал по baseline'у.")
-    ap.add_argument("--t-lo", type=float, default=-0.5,
-                     help="верхняя граница T̂ для квадранта (default -0.5)")
-    ap.add_argument("--p-hi", type=float, default=+0.5,
-                     help="нижняя граница P̂ для квадранта (default +0.5)")
+                          "внутри зоны (--zone). NW-память перестаёт размывать "
+                          "сигнал по baseline'у.")
+    ap.add_argument("--zone", default="lowT_highP",
+                     choices=list(ZONES.keys()),
+                     help="какой угол (T,P)-пространства проверять (при "
+                          "--quadrant-only). lowT_highP — базовый §8.3; другие "
+                          "квадранты: lowT_lowP, highT_highP, highT_lowP; "
+                          "одноосевые: lowT/highT/highP/lowP. default lowT_highP")
     ap.add_argument("--t-pctl", type=float, default=None,
                      help="ЛОКАЛЬНЫЙ порог: нижний процентиль T̂ этого тикера "
                           "(напр. 5 → нижние 5%%). Переопределяет --t-lo. "
@@ -775,16 +824,17 @@ def main() -> None:
     if split_idx is not None:
         print(f"walk-forward: train=[0:{split_idx}]  holdout=[{split_idx}:"
               f"{len(data['T_hat'])}]", file=sys.stderr)
-    t_lo, p_hi = _quadrant_thresholds(data, args, split_idx)
-    if args.t_pctl is not None:
+
+    zmask = None
+    if args.quadrant_only:
+        conds = _zone_conditions(data, args.zone, args.t_pctl, args.p_pctl, split_idx)
+        zmask = _zone_mask(data, conds)
         src = " (по train)" if split_idx is not None else ""
-        print(f"per-ticker percentile{src}: T̂ p{args.t_pctl}={t_lo:+.3f}, "
-              f"P̂ p{args.p_pctl}={p_hi:+.3f}", file=sys.stderr)
+        print(f"зона '{args.zone}'{src}: {_zone_desc(conds)}  "
+              f"(точек: {int(zmask.sum())})", file=sys.stderr)
 
     result = _run_nw(data, h=args.h, neighbors=args.neighbors,
-                      density_min=args.density_min, k=args.k,
-                      quadrant_only=args.quadrant_only,
-                      t_lo=t_lo, p_hi=p_hi)
+                      density_min=args.density_min, k=args.k, zone_mask=zmask)
     m = _evaluate(result, confidence=args.confidence, calibrate=args.calibrate,
                    split_idx=split_idx)
     _print_summary(m, ticker)
