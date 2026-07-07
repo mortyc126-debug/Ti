@@ -72,6 +72,15 @@ import os
 import sys
 from typing import Optional
 
+# Windows-консоль по умолчанию cp1251 — падает на типографском минусе (U+2212),
+# кириллице в pipe и символах T̂/P̂. Форсируем UTF-8 вывод; на платформах без
+# reconfigure (или уже UTF-8) — no-op.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):
+        pass
+
 try:
     import numpy as np
     from scipy.spatial import cKDTree

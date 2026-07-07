@@ -48,6 +48,14 @@ import json
 import math
 import os
 import sys
+
+# Windows-консоль по умолчанию cp1251 — падает на типографском минусе (U+2212)
+# и кириллице в pipe. Форсируем UTF-8; где reconfigure нет — no-op.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):
+        pass
 from datetime import datetime, timedelta
 from typing import Optional
 
