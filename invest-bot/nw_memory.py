@@ -635,17 +635,20 @@ def _run_batch(args) -> None:
         }
         writer.writerow(row); fp.flush()
         rows_summary.append((tk, m, er, ec, sh))
-        ec_str = (f"edge_cal={ec['mean']:+.3f} win={ec['win_rate']*100:.0f}%"
-                  if ec and ec["mean"] is not None else "edge_cal=—")
-        print(f"[{idx:>4}/{len(tickers)}] {tk:<12} n_quad={m['n_quad']:<4} {ec_str}",
+        # Прогресс по RAW (без --calibrate ec=None) — raw и есть честная
+        # OOS-метрика при --train-frac; калибровка OOS не помогает.
+        wf = " [holdout]" if m.get("walk_forward") else ""
+        raw_str = (f"edge_raw={er['mean']:+.3f} win={er['win_rate']*100:.0f}%"
+                   if er and er["mean"] is not None else "edge_raw=—")
+        print(f"[{idx:>4}/{len(tickers)}] {tk:<12} n_quad={m['n_quad']:<4} {raw_str}{wf}",
               file=sys.stderr)
 
     fp.close()
     print(f"\nсводка: {out_path}", file=sys.stderr)
 
-    # Финальная статистика: сколько тикеров с положительным edge_cal, медианы.
+    # Валидные для итога — по edge_RAW (работает и без --calibrate).
     ok_rows = [(tk, m, er, ec, sh) for (tk, m, er, ec, sh) in rows_summary
-               if ec and ec["mean"] is not None]
+               if er and er["mean"] is not None]
     if not ok_rows:
         print("нет тикеров с валидной оценкой", file=sys.stderr)
         return
@@ -660,7 +663,8 @@ def _run_batch(args) -> None:
                  if er and er["mean"] is not None]
     raw_wins = [er["win_rate"] for (_, _, er, _, _) in ok_rows
                 if er and er["win_rate"] is not None]
-    cal_edges = [ec["mean"] for (_, _, _, ec, _) in ok_rows]
+    cal_edges = [ec["mean"] for (_, _, _, ec, _) in ok_rows
+                 if ec and ec["mean"] is not None]
     n_raw_pos = sum(1 for e in raw_edges if e > 0)
     n_raw_strong = sum(1 for (_, _, er, _, _) in ok_rows
                         if er and er["mean"] is not None and er["mean"] > 0.3
@@ -674,13 +678,19 @@ def _run_batch(args) -> None:
           f"({n_raw_strong/len(ok_rows)*100:.0f}%)")
     print(f"медиана edge_raw:             {med(raw_edges):+.4f} ATR")
     print(f"медиана win_raw:              {med(raw_wins)*100:.1f}%")
-    print(f"── CAL (in-sample потолок, раздут — НЕ для сравнения) ──")
-    print(f"медиана edge_cal:             {med(cal_edges):+.4f} ATR")
-    print(f"\nГлавный вопрос: доля edge_RAW > 0 на всём пуле.")
-    print(f"  ~50% → механизм не работает вне отобранного ансамбля (подгонка).")
-    print(f"  сильно >50% → механизм универсальный.")
-    print(f"ВНИМАНИЕ: обе метрики in-sample (нет walk-forward). Настоящая")
-    print(f"проверка edge — обучение памяти на train, оценка на holdout.")
+    if cal_edges:
+        print(f"── CAL (in-sample потолок, раздут — НЕ для сравнения) ──")
+        print(f"медиана edge_cal:             {med(cal_edges):+.4f} ATR")
+    wf_any = any(m.get("walk_forward") for (_, m, _, _, _) in ok_rows)
+    print()
+    if wf_any:
+        print(f"WALK-FORWARD (holdout): доля edge_raw > 0 = {n_raw_pos}/{len(raw_edges)}")
+        print(f"  Это ЧЕСТНАЯ out-of-sample метрика. Сильно >50% и медиана")
+        print(f"  edge_raw заметно >0 → класс реально работает вне выборки.")
+    else:
+        print(f"Главный вопрос: доля edge_raw > 0 на пуле.")
+        print(f"  ВНИМАНИЕ: метрики in-sample (без --train-frac). Для честной")
+        print(f"  оценки добавь --train-frac 0.6.")
 
 
 def main() -> None:
