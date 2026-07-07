@@ -354,7 +354,8 @@ def backfill(tickers: list[str], months: int, token: str) -> dict:
 
 
 def backfill_by_codes(codes: list[str], date_from: "date", date_till: "date",
-                      token: str, progress: dict | None = None) -> dict:
+                      token: str, progress: dict | None = None,
+                      budget_sec: float | None = None) -> dict:
     """Прямой сбор FutOI с MOEX по КОДАМ контрактов (вариант B) за [date_from,
     date_till]. Нужен, когда вселенная прогона — произвольные фьючерсы, которых
     нет в предсобранном воркере: авто-поток раньше в MOEX за ними не ходил вовсе.
@@ -364,6 +365,13 @@ def backfill_by_codes(codes: list[str], date_from: "date", date_till: "date",
     бэктеста) → _fetch_day. Кладём под ключ = ИСХОДНЫЙ код, чтобы has_data(code)
     сматчил (вариант B). Инкрементально: известные даты не перезапрашиваем.
 
+    budget_sec: мягкий лимит wall-clock. Один код = сотни дневных MOEX-запросов
+    по PAUSE_SEC=0.4с → до ~2 мин НА КОД; при десятках непокрытых фьючерсов
+    без лимита сбор растягивается на ЧАСЫ и вешает бэктест (прогресс замирает
+    на 0/N ещё до старта пула). С budget_sec собираем сколько успеваем в
+    бюджет и выходим — OI получится частичным, но best-effort и так задумано
+    (signal_gate мягко деградирует к flow_extremity без полного покрытия).
+
     Ограничения (те же, что у стокового backfill): MOEX ISS отдаёт текущие
     контракты, поэтому для давно экспирировавших фронтов старые даты могут не
     подтянуться. Цена (close) не тянется — signal_gate.oi_regime_instability
@@ -372,16 +380,34 @@ def backfill_by_codes(codes: list[str], date_from: "date", date_till: "date",
     days = _trading_days(date_from, date_till)
     history = _load_existing()
     summary: dict[str, dict] = {}
+    t_start = time.monotonic()
+    stopped_early = False
+    done_codes = 0
     for code in codes:
+        # Бюджет проверяем на границе кода — незаконченный код не сохраняем
+        # полу-собранным (следующий прогон дособерёт инкрементально).
+        if budget_sec is not None and (time.monotonic() - t_start) > budget_sec:
+            stopped_early = True
+            logger.warning(
+                f"OI прямой сбор: превышен бюджет {budget_sec:.0f}с — собрано "
+                f"{done_codes}/{len(codes)} кодов, остальные (частичное покрытие) "
+                f"дособерутся на следующих прогонах")
+            break
         root = _contract_root(code)
         contracts = _fetch_futures_contracts(root)
         if not contracts:
             summary[code] = {"days": len(history.get(code, [])), "added": 0,
                              "reason": f"нет контрактов по корню {root}"}
+            done_codes += 1
             continue
         existing_dates = {r["tradedate"] for r in history.get(code, [])}
         new_rows: list[dict] = []
         for d in days:
+            # Внутренняя проверка бюджета — чтобы длинный код (сотни дней) не
+            # перескакивал лимит на минуты. Собранное сохраняем (инкремент).
+            if budget_sec is not None and (time.monotonic() - t_start) > budget_sec:
+                stopped_early = True
+                break
             ds = d.isoformat()
             if ds in existing_dates:
                 continue
@@ -397,13 +423,17 @@ def backfill_by_codes(codes: list[str], date_from: "date", date_till: "date",
         history[code] = merged
         summary[code] = {"days": len(merged), "added": len(new_rows), "reason": None}
         _save(history)   # прогресс переживает обрыв
+        done_codes += 1
         if progress is not None:
             try:
                 progress[code] = f"OI собран: +{len(new_rows)} дн. (всего {len(merged)})"
             except Exception:
                 pass
+        if stopped_early:
+            break
     return {"summary": summary, "codes": len(codes),
-            "added_total": sum(v["added"] for v in summary.values())}
+            "added_total": sum(v["added"] for v in summary.values()),
+            "stopped_early": stopped_early, "done_codes": done_codes}
 
 
 def main() -> None:

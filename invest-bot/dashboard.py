@@ -8325,6 +8325,11 @@ def _get_oi_api_url() -> str:
 _oi_autosync_at: dict = {}  # ticker(upper) -> monotonic ts последней авто-подтяжки
 _oi_autosync_lock = __import__("threading").Lock()
 OI_AUTOSYNC_TTL_SEC = 300   # не дёргать воркер по тому же тикеру чаще, чем раз в 5 мин
+# Мягкий лимит на прямой MOEX-сбор OI перед бэктестом. Без него вселенная с
+# десятками непокрытых фьючерсов (каждый — сотни дневных запросов × 0.4с)
+# вешала прогон на часы, прогресс замирал на 0/N. Непокрытое дособирается
+# инкрементально на следующих прогонах. Можно поднять для полного покрытия.
+OI_BACKFILL_BUDGET_SEC = 90.0
 
 
 def _oi_base_resolver():
@@ -8408,9 +8413,16 @@ def ensure_oi_synced(tickers: list[str], days: int | None = None, offset_days: i
                 date_till = datetime.date.today() - datetime.timedelta(days=int(offset_days or 0))
                 # +260 кал.дней запаса на прогрев перцентильных окон signal_gate (60/60).
                 date_from = date_till - datetime.timedelta(days=int(days) + 260)
+                # Бюджет: без него сбор по десяткам непокрытых фьючерсов
+                # (каждый — сотни дневных MOEX-запросов × 0.4с паузы) вешал
+                # бэктест на ЧАСЫ, прогресс замирал на 0/N. Собираем сколько
+                # успеваем в OI_BACKFILL_BUDGET_SEC, остальное дособерётся
+                # инкрементально на следующих прогонах (best-effort и так).
                 logger.info(f"OI: прямой сбор с MOEX по {len(uncovered)} непокрытым кодам "
-                            f"за {date_from}…{date_till} (первый раз может занять минуты)")
-                res = backfill_oi.backfill_by_codes(uncovered, date_from, date_till, token)
+                            f"за {date_from}…{date_till} (бюджет {OI_BACKFILL_BUDGET_SEC:.0f}с; "
+                            f"непокрытое дособерётся на следующих прогонах)")
+                res = backfill_oi.backfill_by_codes(uncovered, date_from, date_till, token,
+                                                     budget_sec=OI_BACKFILL_BUDGET_SEC)
                 spec2 = oi_layers.build_oi_spec(tickers, path=_oi_path, base_resolver=_base_res)
                 logger.info(f"OI прямой сбор: +{res.get('added_total')} дней · "
                             + oi_layers.oi_coverage_summary(spec2))
