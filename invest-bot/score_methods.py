@@ -32,7 +32,8 @@ CSV пишется инкрементально после каждого тик
     python score_methods.py SBER --days 180
     python score_methods.py ALL --workers 8 --stride 5 --out scores.csv
     python score_methods.py ALL --workers 4 --stride 20 --methods PRICE_TREND,ADX_DI_CONVERGENCE
-    python score_methods.py ALL --workers 8 --stride 1 --out scores_full.csv  # часами
+    python score_methods.py ALL --workers 8 --stride 3 --by-regime --out scores.csv
+    python score_methods.py ALL --workers 8 --stride 3 --by-regime --out scores.csv --resume  # догнать прерванный
 
 Аргументы:
     ticker              тикер или ALL
@@ -51,6 +52,9 @@ CSV пишется инкрементально после каждого тик
     --min-fires N       порог фильтрации в итоговых топах (default: single 50, ALL 500)
     --out PATH          CSV со всеми per-ticker результатами (append)
     --pool-out PATH     CSV с пуловой сводкой по каждому методу
+    --resume            догнать прерванный прогон: пропустить тикеры, уже
+                        записанные в --out, дописать остальных; итоговая
+                        сводка считается по всему пулу (готовые + новые)
 """
 from __future__ import annotations
 
@@ -630,6 +634,45 @@ def _print_liquidity_dependency(pool_agg: dict, min_tickers: int = 15) -> None:
     print("\n(Полная матрица метод×режим×тикер с liq/vol — в CSV из --out.)")
 
 
+def _load_done_from_csv(path: str) -> tuple:
+    """Читает уже записанный --out CSV для --resume. Возвращает
+    ({ticker: results}, {ticker: (liq, vol)}), где results[method][regime] —
+    те же метрики, что копит _accumulate_pool. Пустой при отсутствии/ошибке."""
+    done: dict = {}
+    liq_of: dict = {}
+    if not path or not os.path.exists(path) or os.path.getsize(path) == 0:
+        return done, liq_of
+
+    def fnum(v):
+        return float(v) if v not in ("", None) else None
+
+    def inum(v):
+        return int(v) if v not in ("", None) else 0
+
+    try:
+        with open(path, "r", encoding="utf-8", newline="") as f:
+            for row in csv.DictReader(f):
+                tk = row.get("ticker")
+                meth = row.get("method")
+                reg = row.get("regime")
+                if not tk or not meth or not reg:
+                    continue
+                res = done.setdefault(tk, {})
+                res.setdefault(meth, {})[reg] = {
+                    "n_fires": inum(row.get("n_fires")),
+                    "n_bull": inum(row.get("n_bull")),
+                    "n_bear": inum(row.get("n_bear")),
+                    "mean_bull": fnum(row.get("mean_bull")),
+                    "mean_bear": fnum(row.get("mean_bear")),
+                    "win_rate": fnum(row.get("win_rate")),
+                    "d": fnum(row.get("d")),
+                }
+                liq_of[tk] = (fnum(row.get("liq_mln")), fnum(row.get("vol_pct")))
+    except (OSError, csv.Error, ValueError):
+        return {}, {}
+    return done, liq_of
+
+
 def _list_tickers(cache_dir, interval_min) -> list[str]:
     if not os.path.isdir(cache_dir):
         sys.exit(f"нет папки кэша: {cache_dir}")
@@ -694,6 +737,10 @@ def main() -> None:
                           "REGIME_WEIGHT_MODS_AUTO для копирования в бот.")
     ap.add_argument("--regime-window", type=int, default=60,
                      help="Окно последних баров для classify_regime (default 60)")
+    ap.add_argument("--resume", action="store_true",
+                     help="Догнать прерванный прогон: пропустить тикеры, уже "
+                          "записанные в --out CSV, и дописать в него (append). "
+                          "Готовые тикеры подтягиваются обратно в итоговую сводку.")
     args = ap.parse_args()
 
     # Разбираем --methods
@@ -719,6 +766,18 @@ def main() -> None:
         tickers = [args.ticker]
     if not tickers:
         sys.exit("нет тикеров")
+
+    # n_universe — размер полного пула ДО отсева готовых (--resume). По нему
+    # выбираем min_fires и порог печати ликвид-сводки, чтобы догон не занижал.
+    n_universe = len(tickers)
+    resume_done: dict = {}
+    resume_liq: dict = {}
+    if args.resume:
+        resume_done, resume_liq = _load_done_from_csv(args.out) if args.out else ({}, {})
+        if resume_done:
+            tickers = [t for t in tickers if t not in resume_done]
+            print(f"resume: {len(resume_done)} тикеров уже в {args.out}, "
+                  f"осталось {len(tickers)}", file=sys.stderr)
 
     print(f"тикеров к прогону: {len(tickers)}, воркеров: {args.workers}, "
           f"window={args.window}, stride={args.stride}, k={args.k}", file=sys.stderr)
@@ -765,12 +824,17 @@ def main() -> None:
     per_ticker_fp = None
     per_ticker_writer = None
     if args.out:
-        per_ticker_fp = open(args.out, "w", encoding="utf-8", newline="")
+        # При --resume с непустым файлом — дописываем (append), заголовок не
+        # трогаем. Иначе перезаписываем с нуля.
+        append = bool(resume_done)
+        per_ticker_fp = open(args.out, "a" if append else "w",
+                             encoding="utf-8", newline="")
         per_ticker_writer = csv.DictWriter(per_ticker_fp, fieldnames=[
             "ticker", "method", "regime", "liq_mln", "vol_pct",
             "n_fires", "n_bull", "n_bear",
             "mean_bull", "mean_bear", "win_rate", "d", "role"])
-        per_ticker_writer.writeheader()
+        if not append:
+            per_ticker_writer.writeheader()
 
     def _write_ticker(ticker, results, liqvol=(None, None)):
         if not per_ticker_writer:
@@ -794,6 +858,10 @@ def main() -> None:
         per_ticker_fp.flush()
 
     pool_agg: dict = {}
+    # Подтягиваем готовые тикеры (--resume) в агрегат, чтобы финальная сводка
+    # и ликвид-зависимость считались по всему пулу, а не только по новым.
+    for tk, results in resume_done.items():
+        _accumulate_pool(pool_agg, tk, results, resume_liq.get(tk, (None, None)))
     t_start = time.time()
     done = 0
 
@@ -875,11 +943,12 @@ def main() -> None:
 
     min_fires = args.min_fires
     if min_fires is None:
-        min_fires = 50 if len(tickers) == 1 else 500
+        min_fires = 50 if n_universe == 1 else 500
     _print_final(pool, min_fires, args.by_regime)
     # Зависимость edge от ликвидности/волатильности имеет смысл только на пуле
-    # (по одному тикеру корреляции нет).
-    if len(tickers) >= 15:
+    # (по одному тикеру корреляции нет). Считаем по всему пулу (n_universe),
+    # включая подтянутые --resume тикеры.
+    if n_universe >= 15:
         _print_liquidity_dependency(pool_agg)
 
 
