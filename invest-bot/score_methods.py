@@ -69,6 +69,7 @@ for _stream in (sys.stdout, sys.stderr):
         _stream.reconfigure(encoding="utf-8")
     except (AttributeError, ValueError):
         pass
+import statistics
 import threading
 import time
 from datetime import datetime, timedelta
@@ -208,21 +209,22 @@ def _bucket(bull_rets, bear_rets, np):
     }
 
 
-def _run_ticker(job: dict) -> tuple[str, Optional[dict]]:
+def _run_ticker(job: dict) -> tuple:
     """Один воркер, один тикер, все методы. Возвращает
-    (ticker, {method: {regime: {metrics}, "ALL": {...}}}).
-    None если тикер пропущен."""
+    (ticker, {method: {regime: {metrics}, "ALL": {...}}}, (liq, vol)).
+    results=None если тикер пропущен."""
     global _WORKER_METHODS, _WORKER_NP
     np = _WORKER_NP
     ticker = job["ticker"]
 
     rows_raw = _load_from_cache(ticker, job["cache_dir"], job["interval"])
     if not rows_raw:
-        return ticker, None
+        return ticker, None, (None, None)
     rows_raw = _filter_by_dates(rows_raw, job["date_from"], job["date_to"])
     W = job["window"]; S = job["stride"]; K = job["k"]; AGREE = job["agree_min"]
     if len(rows_raw) < W + K + 5:
-        return ticker, None
+        return ticker, None, (None, None)
+    liqvol = _liq_vol(rows_raw)
 
     candles = [_row_to_ns(r) for r in rows_raw]
     closes_arr = np.array([r["close"]  for r in rows_raw], dtype=float)
@@ -292,18 +294,20 @@ def _run_ticker(job: dict) -> tuple[str, Optional[dict]]:
         for label, (bull, bear) in buckets.items():
             per_regime[label] = _bucket(bull, bear, np)
         results[name] = per_regime
-    return ticker, results
+    return ticker, results, liqvol
 
 
-def _accumulate_pool(pool_agg: dict, ticker: str, results: dict) -> None:
+def _accumulate_pool(pool_agg: dict, ticker: str, results: dict,
+                      liqvol: tuple = (None, None)) -> None:
     """Копит per-ticker × per-regime результаты. pool_agg[(method, regime)] = {agg}."""
+    liq, vol = liqvol
     for name, per_regime in results.items():
         for regime, s in per_regime.items():
             key = (name, regime)
             acc = pool_agg.setdefault(key, {
                 "n_fires": 0, "n_bull": 0, "n_bear": 0,
                 "sum_bull": 0.0, "sum_bear": 0.0, "wins": 0,
-                "n_tickers": 0, "d_values": [],
+                "n_tickers": 0, "d_values": [], "dl_pairs": [],
             })
             acc["n_fires"] += s["n_fires"]
             acc["n_bull"]  += s["n_bull"]
@@ -317,6 +321,10 @@ def _accumulate_pool(pool_agg: dict, ticker: str, results: dict) -> None:
             if s["d"] is not None:
                 acc["d_values"].append(s["d"])
                 acc["n_tickers"] += 1
+                # Пара (ликвидность тикера, d этого метода на нём) — для
+                # корреляции «работает ли метод сильнее на ликвидных/волатильных».
+                if liq is not None:
+                    acc["dl_pairs"].append((liq, vol, s["d"]))
 
 
 def _finalize_pool(pool_agg: dict) -> dict:
@@ -348,6 +356,59 @@ def _role(d: Optional[float], neutral: float = 0.05) -> str:
     if d < -neutral:
         return "anti"
     return "noise"
+
+
+def _liq_vol(rows_raw: list) -> tuple:
+    """Грубые прокси ликвидности и волатильности тикера по свечам:
+    liq — медианный барный оборот close·volume (в млн; единицы volume как в
+    кэше — для РАНЖИРОВАНИЯ тикеров между собой этого хватает); vol —
+    медианный относит. диапазон (high-low)/close в %. Медиана — чтобы не
+    ловить единичные всплески. Считается один раз на тикер в воркере."""
+    turn = []
+    rng = []
+    for r in rows_raw:
+        cl = float(r["close"])
+        if cl <= 0:
+            continue
+        turn.append(cl * float(r["volume"]))
+        rng.append((float(r["high"]) - float(r["low"])) / cl)
+    if not turn:
+        return (None, None)
+    return (statistics.median(turn) / 1e6, statistics.median(rng) * 100.0)
+
+
+def _pearson_spearman(pairs: list) -> tuple:
+    """(pearson, spearman, n) для списка (x, y). Спирмен — ранговый, устойчив
+    к выбросам и нелинейности. None если точек мало или нет разброса."""
+    pairs = [(x, y) for (x, y) in pairs if x is not None and y is not None]
+    n = len(pairs)
+    if n < 5:
+        return (None, None, n)
+    xs = [p[0] for p in pairs]
+    ys = [p[1] for p in pairs]
+
+    def pear(a, b):
+        ma = sum(a) / len(a); mb = sum(b) / len(b)
+        va = sum((x - ma) ** 2 for x in a)
+        vb = sum((y - mb) ** 2 for y in b)
+        if va == 0 or vb == 0:
+            return None
+        cov = sum((x - ma) * (y - mb) for x, y in zip(a, b))
+        return cov / math.sqrt(va * vb)
+
+    def ranks(v):
+        order = sorted(range(len(v)), key=lambda i: v[i])
+        rk = [0] * len(v)
+        for pos, i in enumerate(order):
+            rk[i] = pos
+        return rk
+
+    p = pear(xs, ys)
+    # pear=None только при нулевой дисперсии x или y — тогда и Спирмен не
+    # определён (ранги константы дали бы ложную корреляцию), возвращаем None.
+    if p is None:
+        return (None, None, n)
+    return (p, pear(ranks(xs), ranks(ys)), n)
 
 
 def _print_ticker_progress(ticker: str, results: dict, done: int, total: int,
@@ -516,6 +577,59 @@ def _print_final(pool: dict, min_fires: int, by_regime: bool) -> None:
     print("}")
 
 
+def _print_liquidity_dependency(pool_agg: dict, min_tickers: int = 15) -> None:
+    """Для каждого метода: зависит ли его edge (d по тикерам) от ликвидности и
+    волатильности тикера. Считается по ALL-разрезу (без режимной маски).
+    Spearman(d, log10 liq) и Spearman(d, vol) + медиана d по третям
+    ликвидности — трети ловят немонотонность (метод работает на средних, а
+    топ-ликвиды инвертированы — «SBER-класс»), которую корреляция маскирует.
+    Сырьё — data[--out].csv (столбцы liq_mln/vol_pct); тут печатается сводка."""
+    methods = sorted({n for (n, r) in pool_agg.keys() if r == ALL_LABEL})
+    rows = []
+    for name in methods:
+        acc = pool_agg.get((name, ALL_LABEL))
+        pairs = acc.get("dl_pairs", []) if acc else []
+        pairs = [(liq, vol, d) for (liq, vol, d) in pairs
+                 if liq is not None and liq > 0 and d is not None]
+        if len(pairs) < min_tickers:
+            continue
+        liq_d = [(math.log10(liq), d) for (liq, vol, d) in pairs]
+        vol_d = [(vol, d) for (liq, vol, d) in pairs if vol is not None]
+        _, sp_liq, n = _pearson_spearman(liq_d)
+        _, sp_vol, _ = _pearson_spearman(vol_d)
+        # трети по ликвидности
+        srt = sorted(pairs, key=lambda x: x[0])
+        t = len(srt) // 3
+        lo = [d for (_, _, d) in srt[:t]]
+        hi = [d for (_, _, d) in srt[2 * t:]]
+        med_lo = statistics.median(lo) if lo else None
+        med_hi = statistics.median(hi) if hi else None
+        rows.append((name, n, sp_liq, sp_vol, med_lo, med_hi))
+    if not rows:
+        return
+    # Сортируем по силе связи с ликвидностью
+    rows.sort(key=lambda r: -(abs(r[2]) if r[2] is not None else 0))
+    print("\n=== зависимость edge (d) метода от ликвидности/волатильности тикера ===")
+    print("# по ALL-разрезу. Spearman: +сильнее на ликвидных/волатильных,")
+    print("#  −сильнее на неликвидных/спокойных. d_lo/d_hi — медиана d в нижней/")
+    print("#  верхней трети по ликвидности (расходятся при знаке = немонотонность).")
+    print(f"{'метод':<24}{'n_tk':>5}{'sp_liq':>8}{'sp_vol':>8}"
+          f"{'d_lo':>8}{'d_hi':>8}  флаг")
+    print("-" * 76)
+    for name, n, sl, sv, dlo, dhi in rows:
+        f_sl = f"{sl:+.2f}" if sl is not None else "  —"
+        f_sv = f"{sv:+.2f}" if sv is not None else "  —"
+        f_lo = f"{dlo:+.3f}" if dlo is not None else "  —"
+        f_hi = f"{dhi:+.3f}" if dhi is not None else "  —"
+        flag = ""
+        if sl is not None and abs(sl) >= 0.3:
+            flag = "ЛИКВ-зависим"
+        if dlo is not None and dhi is not None and dlo * dhi < 0:
+            flag = (flag + " " if flag else "") + "знак-флип по ликв"
+        print(f"{name:<24}{n:>5}{f_sl:>8}{f_sv:>8}{f_lo:>8}{f_hi:>8}  {flag}")
+    print("\n(Полная матрица метод×режим×тикер с liq/vol — в CSV из --out.)")
+
+
 def _list_tickers(cache_dir, interval_min) -> list[str]:
     if not os.path.isdir(cache_dir):
         sys.exit(f"нет папки кэша: {cache_dir}")
@@ -653,17 +767,22 @@ def main() -> None:
     if args.out:
         per_ticker_fp = open(args.out, "w", encoding="utf-8", newline="")
         per_ticker_writer = csv.DictWriter(per_ticker_fp, fieldnames=[
-            "ticker", "method", "regime", "n_fires", "n_bull", "n_bear",
+            "ticker", "method", "regime", "liq_mln", "vol_pct",
+            "n_fires", "n_bull", "n_bear",
             "mean_bull", "mean_bear", "win_rate", "d", "role"])
         per_ticker_writer.writeheader()
 
-    def _write_ticker(ticker, results):
+    def _write_ticker(ticker, results, liqvol=(None, None)):
         if not per_ticker_writer:
             return
+        liq, vol = liqvol
+        liq_s = f"{liq:.4f}" if liq is not None else ""
+        vol_s = f"{vol:.4f}" if vol is not None else ""
         for name, per_regime in results.items():
             for regime, s in per_regime.items():
                 per_ticker_writer.writerow({
                     "ticker": ticker, "method": name, "regime": regime,
+                    "liq_mln": liq_s, "vol_pct": vol_s,
                     "n_fires": s["n_fires"], "n_bull": s["n_bull"],
                     "n_bear": s["n_bear"],
                     "mean_bull": s["mean_bull"] if s["mean_bull"] is not None else "",
@@ -699,27 +818,27 @@ def main() -> None:
     if args.workers == 1 or len(tickers) == 1:
         _init_worker()
         for job in jobs:
-            ticker, results = _run_ticker(job)
+            ticker, results, liqvol = _run_ticker(job)
             done += 1
             if results is None:
                 print(f"[{done}/{len(tickers)}] {ticker}: SKIP", file=sys.stderr)
                 continue
             _print_ticker_progress(ticker, results, done, len(tickers),
                                     time.time() - t_start)
-            _accumulate_pool(pool_agg, ticker, results)
-            _write_ticker(ticker, results)
+            _accumulate_pool(pool_agg, ticker, results, liqvol)
+            _write_ticker(ticker, results, liqvol)
             hb_state["done"] = done
     else:
         with mp.Pool(processes=args.workers, initializer=_init_worker) as pool:
-            for ticker, results in pool.imap_unordered(_run_ticker, jobs):
+            for ticker, results, liqvol in pool.imap_unordered(_run_ticker, jobs):
                 done += 1
                 if results is None:
                     print(f"[{done}/{len(tickers)}] {ticker}: SKIP", file=sys.stderr)
                     continue
                 _print_ticker_progress(ticker, results, done, len(tickers),
                                         time.time() - t_start)
-                _accumulate_pool(pool_agg, ticker, results)
-                _write_ticker(ticker, results)
+                _accumulate_pool(pool_agg, ticker, results, liqvol)
+                _write_ticker(ticker, results, liqvol)
 
     # Останавливаем heartbeat перед финальным выводом
     hb_stop.set()
@@ -758,6 +877,10 @@ def main() -> None:
     if min_fires is None:
         min_fires = 50 if len(tickers) == 1 else 500
     _print_final(pool, min_fires, args.by_regime)
+    # Зависимость edge от ликвидности/волатильности имеет смысл только на пуле
+    # (по одному тикеру корреляции нет).
+    if len(tickers) >= 15:
+        _print_liquidity_dependency(pool_agg)
 
 
 if __name__ == "__main__":
