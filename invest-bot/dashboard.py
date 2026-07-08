@@ -4113,25 +4113,29 @@ function initMethodCheckboxes() {{
     const wrap = document.createElement('div');
     wrap.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:1px;min-width:155px;';
     const lbl = document.createElement('label');
-    lbl.style.cssText = 'display:flex;align-items:center;gap:3px;font-size:10px;color:var(--txt2);white-space:nowrap;flex:1;cursor:' + (toggl ? 'pointer' : 'default') + ';' + (toggl ? '' : 'opacity:.6;');
+    lbl.style.cssText = 'display:flex;align-items:center;gap:3px;font-size:10px;color:var(--txt2);flex:1;min-width:0;overflow:hidden;cursor:' + (toggl ? 'pointer' : 'default') + ';' + (toggl ? '' : 'opacity:.6;');
     const cap = name + ' — ' + ru;
+    lbl.title = cap;  // полное имя в тултипе — подпись усекается многоточием
+    const capSpan = document.createElement('span');
+    capSpan.textContent = cap;
+    capSpan.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;';
     if (toggl) {{
       const cb = document.createElement('input');
       cb.type = 'checkbox'; cb.value = name; cb.id = 'dm_' + name;
       cb.onchange = () => {{ updateDisabledCount(); renderGlobalMethodStats(); }};
-      lbl.append(cb, cap);
+      lbl.append(cb, capSpan);
       const inv = document.createElement('button');
       inv.textContent = '↔'; inv.title = 'Использовать как контр-индикатор (инвертировать скор)';
       inv.id = 'inv_' + name;
-      inv.style.cssText = 'font-size:9px;padding:0 5px;border-radius:3px;border:1px solid var(--border2);background:transparent;color:var(--txt3);cursor:pointer;line-height:14px;';
+      inv.style.cssText = 'font-size:9px;padding:0 5px;border-radius:3px;border:1px solid var(--border2);background:transparent;color:var(--txt3);cursor:pointer;line-height:14px;flex:none;';
       inv.onclick = () => {{ toggleInvertMethod(name); renderGlobalMethodStats(); }};
       wrap.append(lbl, inv);
     }} else {{
-      lbl.append(cap);
+      lbl.append(capSpan);
       const tag = document.createElement('span');
       tag.textContent = 'инфо';
       tag.title = 'Метод считается, но отключить/инвертировать его отсюда нельзя';
-      tag.style.cssText = 'font-size:8px;padding:0 4px;border-radius:3px;border:1px solid var(--border2);color:var(--txt3);line-height:14px;';
+      tag.style.cssText = 'font-size:8px;padding:0 4px;border-radius:3px;border:1px solid var(--border2);color:var(--txt3);line-height:14px;flex:none;';
       wrap.append(lbl, tag);
     }}
     box.appendChild(wrap);
