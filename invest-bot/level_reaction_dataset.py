@@ -83,6 +83,11 @@ GAP_MIN = 0.003         # гэп открытия ≥ 0.3% → границы г
 ER_TREND = 0.55
 ER_RANGE = 0.35
 
+# Сетка тейк/стоп для экспектанси (в ATR) + издержки на круг по умолчанию.
+TS_TAKES = (0.5, 0.7, 1.0)
+TS_STOPS = (0.3, 0.5)
+DEFAULT_COST_ATR = 0.05
+
 # Вес вида уровня в силе — по «прямоте свидетельства отложенного интереса».
 KIND_WEIGHT = {
     "VOL_NODE": 3.0,
@@ -133,6 +138,14 @@ class Touch:
     resolve_speed_atr: float  # доминирующий ход / бары до разрешения (ATR/бар)
     mfe_away_atr: float
     mae_beyond_atr: float
+    # Первое достижение тейков/стопов (баров от подтверждения, -1 = не достигнут)
+    # и P&L по тайм-стопу на закрытии дня — для сетки экспектанси. Только у pullback.
+    tp05: int
+    tp07: int
+    tp10: int
+    sl03: int
+    sl05: int
+    exit_away: float
     ticker: str = ""          # проставляется в мульти-прогоне (иначе пусто)
 
 
@@ -352,6 +365,7 @@ class _Episode:
     pullback_thr: float
     extreme: float
     meta: dict
+    closes: list           # ссылка на общий ряд closes — для сетки тейк/стоп в _emit
     confirmed: bool = False
     confirm_idx: int = -1
     penetration: float = 0.0
@@ -402,6 +416,22 @@ class _Episode:
         resolve_bars = m - self.start_idx
         dominant = (self.mfe if result == "bounce"
                     else self.mae if result == "break" else max(self.mfe, self.mae))
+        # Сетка тейк/стоп: время первого достижения каждого барьера от подтверждения
+        # до конца дня (метка вправо смотреть можно) + P&L тайм-стопа на закрытии.
+        tp05 = tp07 = tp10 = sl03 = sl05 = -1
+        exit_away = 0.0
+        if self.confirmed:
+            sgn = 1.0 if self.side == "support" else -1.0
+            lvl = self.lv.price
+            for j in range(self.confirm_idx + 1, self.day_end_idx + 1):
+                away = sgn * (self.closes[j] - lvl) / self.atr
+                rel = j - self.confirm_idx
+                if tp05 < 0 and away >= 0.5: tp05 = rel
+                if tp07 < 0 and away >= 0.7: tp07 = rel
+                if tp10 < 0 and away >= 1.0: tp10 = rel
+                if sl03 < 0 and away <= -0.3: sl03 = rel
+                if sl05 < 0 and away <= -0.5: sl05 = rel
+            exit_away = sgn * (self.closes[self.day_end_idx] - lvl) / self.atr
         md = self.meta
         return Touch(
             ts_msk=md["ts"], level_price=round(self.lv.price, 6), kind=self.lv.kind,
@@ -416,6 +446,8 @@ class _Episode:
             follow=follow, result=result, resolve_bars=resolve_bars,
             resolve_speed_atr=round(dominant / max(resolve_bars, 1), 4),
             mfe_away_atr=round(self.mfe, 4), mae_beyond_atr=round(self.mae, 4),
+            tp05=tp05, tp07=tp07, tp10=tp10, sl03=sl03, sl05=sl05,
+            exit_away=round(exit_away, 4),
         )
 
 
@@ -527,7 +559,7 @@ def collect(bars: list[dict], round_valid_from, pullback_atr: float = PULLBACK_A
                 "er": er, "er_d": er_d, "regime": regime,
             }
             extreme = bar["l"] if side == "support" else bar["h"]
-            active_ep[ev_id] = _Episode(lv, m, side, atr, de, pullback_atr, extreme, meta)
+            active_ep[ev_id] = _Episode(lv, m, side, atr, de, pullback_atr, extreme, meta, closes)
     return touches
 
 
@@ -662,7 +694,44 @@ def _combo_analysis(pull: list) -> None:
                 print(f"    {fname+' / '+mname:<30}{len(rows):>7}{w:>8.1f}{f:>8.1f}")
 
 
-def _print_summary(touches: list) -> None:
+_TAKE_FIELD = {0.5: "tp05", 0.7: "tp07", 1.0: "tp10"}
+_STOP_FIELD = {0.3: "sl03", 0.5: "sl05"}
+
+
+def _ts_pnl(row, take: float, stop: float) -> float:
+    """P&L одной сделки (в ATR) при выходе на первом из тейка/стопа, иначе
+    тайм-стоп на закрытии дня. При одновременном касании — пессимистично стоп."""
+    tt = getattr(row, _TAKE_FIELD[take])
+    ss = getattr(row, _STOP_FIELD[stop])
+    tt = None if tt < 0 else tt
+    ss = None if ss < 0 else ss
+    if tt is not None and (ss is None or tt < ss):
+        return take
+    if ss is not None:
+        return -stop
+    return row.exit_away
+
+
+def _take_stop_grid(rows: list, cost: float, title: str) -> None:
+    """Матожидание в ATR за вычетом издержек по сетке тейк×стоп + доля прибыльных."""
+    n = len(rows)
+    print(f"\n== Экспектанси тейк/стоп (ATR, за вычетом cost={cost}) — {title} (N={n}) ==")
+    if not n:
+        print("  нет сделок")
+        return
+    hdr = "take\\stop"
+    print(f"    {hdr:<10}" + "".join(f"{'S='+str(s):>16}" for s in TS_STOPS))
+    for take in TS_TAKES:
+        cells = []
+        for stop in TS_STOPS:
+            pnls = [_ts_pnl(r, take, stop) for r in rows]
+            exp = sum(pnls) / n - cost
+            winr = 100 * sum(1 for p in pnls if p > 0) / n
+            cells.append(f"{exp:+.3f}({winr:.0f}%)")
+        print(f"    T={take:<8}" + "".join(f"{c:>16}" for c in cells))
+
+
+def _print_summary(touches: list, cost: float = DEFAULT_COST_ATR) -> None:
     rh = f"{'':<24}{'N':>7}{'bounce%':>9}{'break%':>9}{'stall%':>9}{'MFE':>8}"
     fh = f"{'':<24}{'N':>7}{'win%':>9}{'fail%':>9}{'none%':>9}{'MFE':>8}"
     pull = [t for t in touches if t.signal == "pullback"]
@@ -699,6 +768,13 @@ def _print_summary(touches: list) -> None:
 
     _influence(pull)
     _combo_analysis(pull)
+
+    # Экспектанси: по всем откатам и по лучшей комбо-ячейке (быстрый+память+чистое).
+    _take_stop_grid(pull, cost, "все откаты")
+    best = [r for r in pull if r.approach_v6 >= 0.6
+            and (r.touches_before >= 1 or r.prev_outcome == "break")
+            and r.penetration_atr < 0]
+    _take_stop_grid(best, cost, "комбо: быстрый+память+чистое")
 
     print("\n== Память уровня: исход по прошлому исходу ==");  print(rh)
     for prev in ("bounce", "break", "stall", ""):
@@ -841,6 +917,8 @@ def main() -> None:
     parser.add_argument("--days", type=int, default=365)
     parser.add_argument("--offset-days", type=int, default=0)
     parser.add_argument("--pullback-atr", type=float, default=PULLBACK_ATR)
+    parser.add_argument("--cost-atr", type=float, default=DEFAULT_COST_ATR,
+                        help="издержки на круг в ATR (спред+комиссия+проскальзывание)")
     parser.add_argument("--out", default="")
     args = parser.parse_args()
 
@@ -899,7 +977,7 @@ def main() -> None:
 
     if multi:
         _universe_summary(all_touches, metrics)
-    _print_summary(all_touches)
+    _print_summary(all_touches, args.cost_atr)
 
 
 if __name__ == "__main__":
