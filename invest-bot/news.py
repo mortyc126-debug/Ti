@@ -29,6 +29,8 @@ import logging
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
+
+import ssl_setup
 from email.utils import parsedate_to_datetime
 
 from news_config import NEWS_FEEDS, TICKER_KEYWORDS, NEWS_POLL_MINUTES, DISCLOSURE_FEEDS
@@ -93,7 +95,7 @@ SIGNAL_VS_NOISE_THR = 1.5
 def _fetch_feed(url: str, timeout: int = 15) -> bytes | None:
     try:
         req = urllib.request.Request(url, headers=UA)
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with urllib.request.urlopen(req, timeout=timeout, context=ssl_setup.ssl_context()) as r:
             return r.read()
     except Exception as e:
         logger.warning(f"_fetch_feed {url}: {e}")

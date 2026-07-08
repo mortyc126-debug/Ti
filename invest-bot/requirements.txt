@@ -3,3 +3,4 @@ aiogram
 cerebras_cloud_sdk
 numpy
 scipy
+certifi

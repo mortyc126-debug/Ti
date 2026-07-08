@@ -18,6 +18,8 @@ import os
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
+import ssl_setup
+
 __all__ = ("MegaAlertsService",)
 
 logger = logging.getLogger(__name__)
@@ -58,7 +60,7 @@ def _fetch_alerts(market: str, trade_date: str) -> list[dict]:
         "User-Agent": "Mozilla/5.0 (compatible; invest-bot/1.0)",
     })
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
+        with urllib.request.urlopen(req, timeout=20, context=ssl_setup.ssl_context()) as resp:
             data = json.load(resp)
     except Exception as e:
         logger.warning(f"mega_alerts: запрос {market}/{trade_date} упал: {e}")

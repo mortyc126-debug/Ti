@@ -1,3 +1,5 @@
+import ssl_setup  # noqa: F401 — ПЕРВЫМ: ставит certifi CA до любых SSL-контекстов (aiogram/urllib)
+
 import asyncio
 import logging
 import os

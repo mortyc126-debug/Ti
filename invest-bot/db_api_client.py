@@ -9,6 +9,8 @@ import logging
 import urllib.error
 import urllib.request
 
+import ssl_setup
+
 __all__ = ("DbApiClient",)
 
 logger = logging.getLogger(__name__)
@@ -37,7 +39,7 @@ class DbApiClient:
             "User-Agent": "Mozilla/5.0 (compatible; invest-bot-collector/1.0)",
         })
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with urllib.request.urlopen(req, timeout=timeout, context=ssl_setup.ssl_context()) as resp:
                 return json.load(resp)
         except urllib.error.HTTPError as ex:
             body = ex.read().decode("utf-8", errors="replace")

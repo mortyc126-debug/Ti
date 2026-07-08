@@ -35,6 +35,8 @@ os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
 
+import ssl_setup  # noqa: F401 — ставит certifi CA до любых SSL-контекстов (urllib/HTTPS)
+
 import datetime
 import multiprocessing
 import dataclasses

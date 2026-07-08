@@ -23,6 +23,7 @@ import urllib.request
 from datetime import date, datetime
 
 from market_time import today_msk
+import ssl_setup
 
 __all__ = ("TradeStatsService",)
 
@@ -84,7 +85,7 @@ def _fetch_stats(metric: str, ticker: str) -> list[dict]:
         "User-Agent": "Mozilla/5.0 (compatible; invest-bot/1.0)",
     })
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15, context=ssl_setup.ssl_context()) as resp:
             data = json.load(resp)
     except Exception as e:
         logger.warning(f"tradestats: {metric} запрос {ticker} упал: {e}")
