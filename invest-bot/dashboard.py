@@ -70,7 +70,7 @@ import ticker_universe
 from trade_system.issuer_filter import issuer_key, select_top_tickers
 from trade_system.strategies.oi_composite_strategy import (
     AUTO_ATR_MIN_TRADES, AUTO_ATR_SCALE_EXPS, AUTO_ATR_STOP_KS, AUTO_ATR_TAKE_KS,
-    ATR_EVAL_LOOKBACK,
+    ATR_EVAL_LOOKBACK, ALL_METHOD_NAMES,
 )
 from trade_system.strategies.strategy_factory import StrategyFactory
 
@@ -4031,6 +4031,27 @@ const _ALL_METHODS = _METHOD_CATALOG.filter(r => r[3]).map(r => r[1]);
 // имя метода → русская подпись (для тултипов в атрибуции сделок)
 const _METHOD_RU = {{}};
 _METHOD_CATALOG.forEach(r => {{ _METHOD_RU[r[1]] = r[2]; }});
+
+// Анти-дрейф: JS-каталог методов — не единый источник, поэтому сверяем его с
+// эталоном из Python (ALL_METHOD_NAMES, /api/method_catalog). Разъехалось —
+// громко в консоль + красный баннер, чтобы рассинхрон не прошёл незаметно.
+window.addEventListener('load', function() {{
+  fetch('/api/method_catalog').then(r => r.json()).then(d => {{
+    const py = new Set(d.names || []);
+    const js = new Set(_METHOD_CATALOG.map(r => r[1]));
+    const missingInJs = [...py].filter(n => !js.has(n));
+    const extraInJs = [...js].filter(n => !py.has(n));
+    if (missingInJs.length || extraInJs.length) {{
+      console.warn('Каталог методов РАЗЪЕХАЛСЯ с Python (ALL_METHOD_NAMES):',
+        {{нет_в_UI: missingInJs, лишние_в_UI: extraInJs}});
+      const bar = document.createElement('div');
+      bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#b91c1c;color:#fff;font:12px/1.4 monospace;padding:6px 12px;';
+      bar.textContent = '⚠ Каталог методов разъехался с Python — нет в UI: [' +
+        missingInJs.join(', ') + '] | лишние в UI: [' + extraInJs.join(', ') + ']';
+      document.body.appendChild(bar);
+    }}
+  }}).catch(() => {{}});
+}});
 
 function initMethodCheckboxes() {{
   const box = document.getElementById('method_checkboxes');
@@ -9085,6 +9106,11 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"rows": get_history_coverage()})
         elif self.path == "/api/mfe_stats":
             self._send_json(get_mfe_mae_stats())
+        elif self.path == "/api/method_catalog":
+            # Эталонный список имён методов из Python (единый источник). JS
+            # сверяет с ним свой _METHOD_CATALOG и ругается при расхождении —
+            # чтобы фронтовый каталог не «разъезжался» с ALL_METHOD_NAMES молча.
+            self._send_json({"names": list(ALL_METHOD_NAMES)})
         elif self.path == "/api/progress":
             self._send_json({"progress": dict(_get_progress_proxy())})
         elif self.path.startswith("/api/last_result"):
