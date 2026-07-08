@@ -1,26 +1,39 @@
-"""level_reaction_dataset.py — датасет «касания уровней» для будущего блока
-индексного контекста: уровни с иерархией силы + кинематика подхода на 5м +
-фактический исход (отбой/пробой/ничего).
+"""level_reaction_dataset.py — датасет «касаний уровней» для будущего блока
+индексного контекста: уровни с иерархией силы + ПОДТВЕРЖДЁННЫЙ ОТКАТ от
+уровня как сигнал входа + фактический исход (follow-through / провал).
 
-Ядро проверяемой гипотезы: P(отбой | замедление в уровень) существенно
-отличается от P(отбой | ускорение в уровень). Если на этом датасете разницы
-нет — детектор реакции мёртв, и строить машину состояний не из чего.
+Проверяемая гипотеза (уточнённая): сигнал — не «замедление при подходе», а
+факт того, что цена коснулась уровня и УЖЕ тикнула обратно (микро-разворот на
+PULLBACK_ATR от крайней точки касания). Вопрос к данным: если вход открыт по
+подтверждённому откату, какова доля доведения до полноценного отскока
+(follow-through, BOUNCE_ATR) против ложного тика и последующего пробоя — и как
+это зависит от силы уровня, номера касания и глубины прокола.
 
-Запуск (из каталога invest-bot, нужен token в settings.ini):
+Модель «эпизода» касания (машина состояний на уровень):
+  вошёл в зону (TRIGGER_ATR) → следим за экстремумом прокола →
+    • откатил от экстремума на PULLBACK_ATR, не пробив → signal=pullback,
+      дальше следим: дошёл до BOUNCE_ATR (follow=win) / вернулся и пробил
+      (fail) / до конца дня никак (none);
+    • пробил уровень на BREAK_ATR раньше отката → signal=straight_break;
+    • день кончился без отката → signal=drift.
+result ∈ {bounce, break, stall} — свёрнутый исход для памяти уровня.
+
+Что относится к уровням (по убыванию «свидетельств отложенного интереса»):
+  VOL_NODE (узлы объёма по цене за трейлинг-окно) и многократно тестированные
+  уровни — сильнее всего; поведенческие якоря (вчерашние H/L/C, круглые числа);
+  голая геометрия (swing D1/H4/H1) — слабее. Сила уровня строится из вида +
+  истории касаний + ранга объёма по его цене + конфлюэнции соседей.
+
+Запуск (из invest-bot, нужен token в settings.ini):
     python level_reaction_dataset.py [--base-ticker IMOEX] [--days 365]
-                                     [--offset-days 0] [--out путь.csv]
+                                     [--offset-days 0] [--pullback-atr 0.15] [--out ...]
 
-Результат: data/analysis/level_touches_<TICKER>.csv (одна строка = одно
-касание) + сводные таблицы в stdout (отбой% по кинематике × силе уровня).
+Без подглядывания: swing рождается после ±STEP баров справа; ATR дня — по
+дневкам ДО него; профиль объёма — по трейлинг-дням СТРОГО до дня; откат и
+кинематика — только прошлые бары того же дня. Будущее — только для метки исхода.
 
-Без подглядывания: swing-уровень «рождается» только после подтверждающих
-STEP баров справа; ATR дня — по дневкам ДО этого дня; кинематика — только
-прошлые бары. Будущее используется единственно для разметки исхода (label).
-
-Ограничение склейки контрактов: back-adjustment сдвигает цены старых
-контрактов, поэтому круглые уровни (психологические числа) считаются только
-на сегменте ТЕКУЩЕГО контракта, где сдвиг нулевой. Swing/prev-day уровням
-сдвиг не мешает — структура относительных цен сохраняется.
+Склейка контрактов (back-adjustment) сдвигает цены старых контрактов, поэтому
+круглые уровни и профиль объёма считаются только на сегменте ТЕКУЩЕГО контракта.
 """
 import argparse
 import csv
@@ -37,24 +50,33 @@ from market_time import MSK
 logger = logging.getLogger(__name__)
 
 # ── Пороги (в дневных ATR) ───────────────────────────────────────────────────
-TRIGGER_ATR = 0.30   # ближе — считаем касанием
-REARM_ATR = 1.50     # дальше — уровень «взводится» для нового касания
-BOUNCE_ATR = 1.00    # уход от уровня на столько = отбой
-BREAK_ATR = 0.30     # закрытие за уровнем на столько = пробой
-CONFLUENCE_ATR = 0.30  # соседние уровни ближе — конфлюэнция (признак силы)
-SCAN_WINDOW_ATR = 2.2  # окно поиска уровней-кандидатов вокруг цены
+TRIGGER_ATR = 0.30      # ближе — вход в зону касания (старт эпизода)
+PULLBACK_ATR = 0.15     # откат от экстремума прокола = подтверждение разворота
+BREAK_ATR = 0.30        # закрытие за уровень на столько = пробой/провал
+BOUNCE_ATR = 1.00       # уход от уровня на столько = состоявшийся отбой (win)
+REARM_ATR = 1.50        # дальше — уровень «взводится» под новое касание
+CONFLUENCE_ATR = 0.30   # соседние уровни ближе — конфлюэнция (признак силы)
+SCAN_WINDOW_ATR = 2.2   # окно поиска уровней-кандидатов вокруг цены
 
 ATR_PERIOD = 14
-SWING_STEP = 3       # подтверждение swing-экстремума: ±STEP баров
-KIN_LOOKBACK = 6     # баров 5м для кинематики подхода (v6 = за 6 баров)
-MAX_HORIZON_BARS = 96  # потолок разметки исхода (8ч), но не дальше конца дня
+SWING_STEP = 3          # подтверждение swing-экстремума: ±STEP баров
+KIN_LOOKBACK = 6        # баров для скорости подхода (v6, как ковариата)
 MIN_DAILY_BARS = 20
 
-# Вес вида уровня: старший ТФ сильнее. Часть будущего strength-скора.
+# Профиль объёма по цене (volume-at-price).
+VP_LOOKBACK_DAYS = 30   # трейлинг-окно для гистограммы объёма
+VP_BIN_ATR = 0.25       # ширина корзины цены в дневных ATR
+VP_TOP_K = 4            # сколько пиков-узлов брать на день
+VP_SEP_ATR = 1.0        # минимальный разнос между узлами
+VP_MIN_DAYS = 5         # минимум дней в окне, иначе профиль не строим
+
+# Вес вида уровня в силе. НЕ по таймфрейму, а по «прямоте свидетельства
+# интереса»: узел объёма и якоря толпы > голого swing'а.
 KIND_WEIGHT = {
-    "D1_SWING": 3.0, "H4_SWING": 2.0, "H1_SWING": 1.0,
-    "PREV_DAY_H": 2.0, "PREV_DAY_L": 2.0, "PREV_DAY_C": 1.5,
+    "VOL_NODE": 3.0,
+    "PREV_DAY_H": 2.0, "PREV_DAY_L": 2.0, "PREV_DAY_C": 1.2,
     "ROUND": 1.5,
+    "D1_SWING": 2.5, "H4_SWING": 1.5, "H1_SWING": 0.8,
 }
 
 
@@ -65,7 +87,6 @@ class Level:
     born_at: datetime            # с какого момента уровень известен без подглядывания
     valid_to: datetime | None = None  # None = живёт до конца данных
     armed: bool = True
-    resolving_until: int = -1    # индекс 5м бара, до которого идёт разметка исхода
     touches: int = 0
     prev_outcome: str = ""
 
@@ -75,22 +96,23 @@ class Touch:
     ts_msk: str
     level_price: float
     kind: str
+    side: str            # support (подход сверху) / resistance (снизу)
     age_days: int
     touches_before: int
     prev_outcome: str
     confluence: int
+    vol_rank: float      # ранг объёма по цене уровня (0..1) в профиле дня
     strength: float
-    side: str            # support (подход сверху) / resistance (снизу)
-    v6_atr: float        # скорость подхода за 6 баров, ATR, по модулю
-    v3_atr: float
-    decel_ratio: float   # |v3|/|v3 предыдущих| : <0.7 замедление, >1.3 ускорение
-    kin_class: str       # decel / steady / accel
-    range_exp: float     # расширение диапазона баров у уровня
-    dist_atr: float      # расстояние до уровня в момент триггера
-    outcome: str         # bounce / break / none
+    approach_v6: float   # скорость подхода за 6 баров, ATR (ковариата)
+    signal: str          # pullback / straight_break / drift
+    penetration_atr: float  # как глубоко экстремум зашёл ЗА уровень (>0 прокол, <0 не дошёл)
+    pullback_atr: float  # фактический откат на подтверждении
+    bars_to_confirm: int
+    follow: str          # win / fail / none (только для signal=pullback)
+    result: str          # bounce / break / stall
     resolve_bars: int
-    mfe_away_atr: float  # максимальный уход ОТ уровня до разрешения
-    mae_beyond_atr: float  # максимальный прокол ЗА уровень до разрешения
+    mfe_away_atr: float
+    mae_beyond_atr: float
 
 
 def _f(q) -> float:
@@ -107,8 +129,8 @@ def _bars_from_candles(candles) -> list[dict]:
 
 
 def _aggregate(bars: list[dict], key_fn) -> list[dict]:
-    """Агрегация 5м баров в старший ТФ. t_end — конец последнего 5м бара
-    группы: момент, с которого агрегат известен (для born_at без подглядывания)."""
+    """Агрегация 5м баров в старший ТФ. t_end — конец последнего 5м бара группы:
+    момент, с которого агрегат известен (для born_at без подглядывания)."""
     groups: dict = {}
     for b in bars:
         g = groups.setdefault(key_fn(b), {"h": b["h"], "l": b["l"], "t_end": b["t"]})
@@ -132,9 +154,9 @@ def _daily_bars(bars: list[dict]) -> list[dict]:
     return [days[d] for d in sorted(days)]
 
 
-def _atr_by_date(daily: list[dict]) -> dict[date, float]:
+def _atr_by_date(daily: list[dict]) -> dict:
     """ATR дня d — по TR дней СТРОГО до d: внутри дня d этот ATR уже известен."""
-    out: dict[date, float] = {}
+    out: dict = {}
     trs: list[float] = []
     for i, bar in enumerate(daily):
         tail = trs[-ATR_PERIOD:]
@@ -159,7 +181,7 @@ def _swing_levels(tf_bars: list[dict], kind: str) -> list[Level]:
     return out
 
 
-def _prev_day_levels(daily: list[dict], day_bounds: dict[date, tuple[datetime, datetime]]) -> list[Level]:
+def _prev_day_levels(daily: list[dict], day_bounds: dict) -> list[Level]:
     """H/L/C вчерашнего дня — уровни только на СЛЕДУЮЩИЙ торговый день."""
     out = []
     for prev, cur in zip(daily, daily[1:]):
@@ -186,9 +208,9 @@ def _nice_step(target: float) -> float:
     return best
 
 
-def _round_levels(bars: list[dict], atr_map: dict[date, float], valid_from: date) -> list[Level]:
+def _round_levels(bars: list[dict], atr_map: dict, valid_from: date) -> list[Level]:
     """Круглые уровни — только на сегменте текущего контракта (цены не сдвинуты
-    склейкой). Шаг сетки ~2 дневных ATR: мельче — сетка везде, уровни теряют смысл."""
+    склейкой). Шаг сетки ~2 дневных ATR."""
     seg = [b for b in bars if b["d"] >= valid_from]
     if not seg:
         return []
@@ -209,58 +231,159 @@ def _round_levels(bars: list[dict], atr_map: dict[date, float], valid_from: date
     return out
 
 
-def _kinematics(closes: list[float], highs: list[float], lows: list[float],
-                m: int, level: float, atr: float) -> dict:
-    """Кинематика подхода на баре m: скорость за 6/3 бара, замедление, диапазон."""
-    c0, c3, c6 = closes[m], closes[m - 3], closes[m - 6]
-    v6 = abs(c0 - c6) / atr
-    v3 = abs(c0 - c3) / atr
-    v_prev3 = abs(c3 - c6) / atr
-    decel = v3 / (v_prev3 + 1e-9)
-    rng_now = sum(highs[m - i] - lows[m - i] for i in range(3)) / 3
-    rng_prev = sum(highs[m - i] - lows[m - i] for i in range(3, 9)) / 6 if m >= 8 else rng_now
-    kin = "decel" if decel < 0.7 else ("accel" if decel > 1.3 else "steady")
-    side = "support" if c6 > level else "resistance"
-    return {"v6": v6, "v3": v3, "decel": decel, "kin": kin, "side": side,
-            "range_exp": rng_now / (rng_prev + 1e-9)}
+class _Profile:
+    """Гистограмма объёма по цене за трейлинг-окно (корзины по bin)."""
+    __slots__ = ("bin", "hist", "sorted_vols")
+
+    def __init__(self, bin_size: float, hist: dict):
+        self.bin = bin_size
+        self.hist = hist
+        self.sorted_vols = sorted(hist.values())
+
+    def vol_rank(self, price: float) -> float:
+        """Перцентиль объёма в корзине цены (0..1). Вне профиля → 0."""
+        if not self.sorted_vols or self.bin <= 0:
+            return 0.0
+        v = self.hist.get(round(price / self.bin), 0)
+        if v <= 0:
+            return 0.0
+        return bisect_right(self.sorted_vols, v) / len(self.sorted_vols)
 
 
-def _resolve(closes: list[float], m: int, day_end_idx: int, level: float,
-             atr: float, side: str) -> tuple[str, int, float, float]:
-    """Исход касания: bounce/break/none + бары до разрешения + MFE/MAE в ATR.
-    Пороги асимметричны сознательно: пробой подтверждается закрытием за уровень
-    на 0.3 ATR (стоп за уровнем), отбой — уходом на 1.0 ATR (рабочий тейк)."""
-    sgn = 1.0 if side == "support" else -1.0  # «от уровня» = вверх для поддержки
-    end = min(m + MAX_HORIZON_BARS, day_end_idx)
-    mfe, mae = 0.0, 0.0
-    for j in range(m + 1, end + 1):
-        away = sgn * (closes[j] - level) / atr
-        mfe = max(mfe, away)
-        mae = max(mae, -away)
-        if away <= -BREAK_ATR:
-            return "break", j - m, mfe, mae
-        if away >= BOUNCE_ATR:
-            return "bounce", j - m, mfe, mae
-    return "none", end - m, mfe, mae
+def _build_profiles(bars, atr_map, trading_days, day_start, day_end, valid_from):
+    """Профиль объёма на каждый день — по VP_LOOKBACK_DAYS дням СТРОГО до него.
+    Только сегмент текущего контракта (valid_from): склейка искажает цены."""
+    profiles: dict = {}
+    days = [d for d in trading_days if d >= valid_from]
+    for p, d in enumerate(days):
+        atr = atr_map.get(d)
+        if not atr or atr <= 0:
+            continue
+        window = days[max(0, p - VP_LOOKBACK_DAYS):p]  # строго ДО дня d
+        if len(window) < VP_MIN_DAYS:
+            continue
+        bin_size = VP_BIN_ATR * atr
+        hist: dict = {}
+        for wd in window:
+            for i in range(day_start[wd], day_end[wd] + 1):
+                b = bars[i]
+                hist[round(b["c"] / bin_size)] = hist.get(round(b["c"] / bin_size), 0) + b["v"]
+        if hist:
+            profiles[d] = _Profile(bin_size, hist)
+    return profiles
 
 
-def collect(bars: list[dict], round_valid_from: date | None) -> list[Touch]:
+def _volume_node_levels(profiles: dict, day_bounds: dict) -> list[Level]:
+    """Топ-K пиков объёма как уровни на день (разнос ≥ VP_SEP_ATR·ATR·)."""
+    out = []
+    for d, prof in profiles.items():
+        if d not in day_bounds:
+            continue
+        start, end = day_bounds[d]
+        sep = VP_SEP_ATR * (prof.bin / VP_BIN_ATR)  # sep в ATR → в ценах
+        chosen: list[float] = []
+        for binidx, _v in sorted(prof.hist.items(), key=lambda kv: kv[1], reverse=True):
+            price = binidx * prof.bin
+            if all(abs(price - c) >= sep for c in chosen):
+                chosen.append(price)
+            if len(chosen) >= VP_TOP_K:
+                break
+        for price in chosen:
+            out.append(Level(round(price, 6), "VOL_NODE", start, valid_to=end))
+    return out
+
+
+@dataclass
+class _Episode:
+    """Живая машина состояний одного касания: от входа в зону до исхода."""
+    lv: Level
+    start_idx: int
+    side: str
+    atr: float
+    day_end_idx: int
+    pullback_thr: float
+    extreme: float               # крайняя точка прокола (low для support / high для res)
+    meta: dict                   # статические признаки касания, зафиксированы на старте
+    confirmed: bool = False
+    confirm_idx: int = -1
+    penetration: float = 0.0
+    pullback: float = 0.0
+    mfe: float = 0.0
+    mae: float = 0.0
+
+    def feed(self, m: int, h: float, l: float, c: float):
+        """Один бар. Возвращает Touch, если эпизод разрешился, иначе None."""
+        lvl = self.lv.price
+        sgn = 1.0 if self.side == "support" else -1.0   # away = уход ОТ уровня
+        self.extreme = min(self.extreme, l) if self.side == "support" else max(self.extreme, h)
+        away = sgn * (c - lvl) / self.atr
+        if not self.confirmed:
+            if away <= -BREAK_ATR:                       # пробил раньше отката
+                return self._emit("straight_break", "", m)
+            retrace = sgn * (c - self.extreme) / self.atr  # откат от экстремума к away
+            if retrace >= self.pullback_thr:
+                self.confirmed = True
+                self.confirm_idx = m
+                self.pullback = retrace
+                self.penetration = sgn * (lvl - self.extreme) / self.atr
+                self.mfe, self.mae = away, -away
+            elif m >= self.day_end_idx:
+                return self._emit("drift", "", m)
+        if self.confirmed:
+            self.mfe = max(self.mfe, away)
+            self.mae = max(self.mae, -away)
+            if away >= BOUNCE_ATR:
+                return self._emit("pullback", "win", m)
+            if away <= -BREAK_ATR:
+                return self._emit("pullback", "fail", m)
+            if m >= self.day_end_idx:
+                return self._emit("pullback", "none", m)
+        return None
+
+    def _emit(self, signal: str, follow: str, m: int) -> Touch:
+        if signal == "straight_break":
+            result = "break"
+        elif signal == "drift":
+            result = "stall"
+        else:
+            result = {"win": "bounce", "fail": "break", "none": "stall"}[follow]
+        self.lv.armed = False
+        self.lv.touches += 1
+        self.lv.prev_outcome = result
+        md = self.meta
+        return Touch(
+            ts_msk=md["ts"], level_price=round(self.lv.price, 6), kind=self.lv.kind,
+            side=self.side, age_days=md["age"], touches_before=md["touches_before"],
+            prev_outcome=md["prev_outcome"], confluence=md["confl"],
+            vol_rank=round(md["vol_rank"], 4), strength=round(md["strength"], 2),
+            approach_v6=round(md["v6"], 4), signal=signal,
+            penetration_atr=round(self.penetration, 4) if self.confirmed else 0.0,
+            pullback_atr=round(self.pullback, 4) if self.confirmed else 0.0,
+            bars_to_confirm=(self.confirm_idx - self.start_idx) if self.confirmed else -1,
+            follow=follow, result=result, resolve_bars=m - self.start_idx,
+            mfe_away_atr=round(self.mfe, 4), mae_beyond_atr=round(self.mae, 4),
+        )
+
+
+def collect(bars: list[dict], round_valid_from, pullback_atr: float = PULLBACK_ATR) -> list[Touch]:
     daily = _daily_bars(bars)
     if len(daily) < MIN_DAILY_BARS:
         raise SystemExit(f"мало дневных баров ({len(daily)} < {MIN_DAILY_BARS}) — увеличьте --days")
     atr_map = _atr_by_date(daily)
 
-    # Границы торговых дней по МСК: старт кинематики и потолок разметки исхода.
-    day_start_idx: dict[date, int] = {}
-    day_end_idx: dict[date, int] = {}
+    day_start: dict = {}
+    day_end: dict = {}
     for i, b in enumerate(bars):
-        day_start_idx.setdefault(b["d"], i)
-        day_end_idx[b["d"]] = i
-    day_bounds = {d: (bars[day_start_idx[d]]["t"], bars[day_end_idx[d]]["t"])
-                  for d in day_start_idx}
+        day_start.setdefault(b["d"], i)
+        day_end[b["d"]] = i
+    day_bounds = {d: (bars[day_start[d]]["t"], bars[day_end[d]]["t"]) for d in day_start}
+    trading_days = sorted(day_start)
 
     h1 = _aggregate(bars, lambda b: (b["d"], b["t"].astimezone(MSK).hour))
     h4 = _aggregate(bars, lambda b: (b["d"], b["t"].astimezone(MSK).hour // 4))
+
+    vfrom = round_valid_from if round_valid_from is not None else trading_days[0]
+    profiles = _build_profiles(bars, atr_map, trading_days, day_start, day_end, vfrom)
 
     levels: list[Level] = []
     levels += _swing_levels([{**b, "t_end": day_bounds[b["d"]][1] + timedelta(minutes=5)}
@@ -268,117 +391,152 @@ def collect(bars: list[dict], round_valid_from: date | None) -> list[Touch]:
     levels += _swing_levels(h4, "H4_SWING")
     levels += _swing_levels(h1, "H1_SWING")
     levels += _prev_day_levels(daily, day_bounds)
+    levels += _volume_node_levels(profiles, day_bounds)
     if round_valid_from is not None:
         levels += _round_levels(bars, atr_map, round_valid_from)
     logger.info("уровней сгенерировано: %d (%s)", len(levels),
-                ", ".join(f"{k}={sum(1 for l in levels if l.kind == k)}"
-                          for k in KIND_WEIGHT))
+                ", ".join(f"{k}={sum(1 for l in levels if l.kind == k)}" for k in KIND_WEIGHT))
 
     events = sorted(levels, key=lambda l: l.born_at)
     ev_i = 0
-    # Активные уровни в сортированном по цене списке: кандидаты у цены — bisect,
-    # иначе 50к баров × тысячи уровней не прожуёшь. seq — тай-брейк кортежа.
-    active: list[tuple[float, int, Level]] = []
+    active: list = []  # (price, ev_id, Level), отсортирован по цене — bisect у цены
+    active_ep: dict = {}  # ev_id -> _Episode (живые касания, отвязаны от окна)
 
     closes = [b["c"] for b in bars]
-    highs = [b["h"] for b in bars]
-    lows = [b["l"] for b in bars]
-
     touches: list[Touch] = []
+
     for m, bar in enumerate(bars):
         while ev_i < len(events) and events[ev_i].born_at <= bar["t"]:
             insort(active, (events[ev_i].price, ev_i, events[ev_i]))
             ev_i += 1
+        c = bar["c"]
+
+        # 1) прогоняем живые эпизоды (они привязаны к своему дню через day_end_idx)
+        done = []
+        for ev_id, ep in active_ep.items():
+            t = ep.feed(m, bar["h"], bar["l"], c)
+            if t is not None:
+                touches.append(t)
+                done.append(ev_id)
+        for ev_id in done:
+            del active_ep[ev_id]
+
         atr = atr_map.get(bar["d"])
         if not atr or atr <= 0:
             continue
-        c = bar["c"]
+        prof = profiles.get(bar["d"])
+        ds, de = day_start[bar["d"]], day_end[bar["d"]]
+
+        # 2) взводим/стартуем касания у уровней в окне цены
         lo_i = bisect_left(active, (c - SCAN_WINDOW_ATR * atr, -1, None))
         hi_i = bisect_right(active, (c + SCAN_WINDOW_ATR * atr, len(events) + 1, None))
-        d_end = day_end_idx[bar["d"]]
-
-        for price, _, lv in active[lo_i:hi_i]:
+        window = active[lo_i:hi_i]
+        for price, ev_id, lv in window:
             if lv.valid_to is not None and bar["t"] > lv.valid_to:
+                continue
+            if ev_id in active_ep:
                 continue
             dist = abs(c - price) / atr
             if not lv.armed:
-                if dist > REARM_ATR and m >= lv.resolving_until:
+                if dist > REARM_ATR:
                     lv.armed = True
                 continue
             if dist >= TRIGGER_ATR:
                 continue
-            # Триггер касания. Кинематике нужен пробег внутри ЭТОГО дня —
-            # через ночной гэп скорость подхода бессмысленна.
-            if m - KIN_LOOKBACK < day_start_idx[bar["d"]]:
+            if m - 1 < ds:            # нужен хотя бы один прошлый бар того же дня
                 continue
-            kin = _kinematics(closes, highs, lows, m, price, atr)
-            outcome, res_bars, mfe, mae = _resolve(closes, m, d_end, price, atr, kin["side"])
-            confl = sum(1 for p2, _, lv2 in active[lo_i:hi_i]
-                        if lv2 is not lv and abs(p2 - price) <= CONFLUENCE_ATR * atr
+            ref = max(m - 3, ds)
+            side = "support" if closes[ref] >= price else "resistance"
+            confl = sum(1 for p2, e2, lv2 in window
+                        if e2 != ev_id and abs(p2 - price) <= CONFLUENCE_ATR * atr
                         and (lv2.valid_to is None or bar["t"] <= lv2.valid_to))
-            strength = KIND_WEIGHT[lv.kind] + 0.5 * min(lv.touches, 4) + 0.5 * confl
-            touches.append(Touch(
-                ts_msk=bar["t"].astimezone(MSK).isoformat(),
-                level_price=round(price, 6), kind=lv.kind,
-                age_days=(bar["d"] - lv.born_at.astimezone(MSK).date()).days,
-                touches_before=lv.touches, prev_outcome=lv.prev_outcome,
-                confluence=confl, strength=round(strength, 2), side=kin["side"],
-                v6_atr=round(kin["v6"], 4), v3_atr=round(kin["v3"], 4),
-                decel_ratio=round(kin["decel"], 4), kin_class=kin["kin"],
-                range_exp=round(kin["range_exp"], 4), dist_atr=round(dist, 4),
-                outcome=outcome, resolve_bars=res_bars,
-                mfe_away_atr=round(mfe, 4), mae_beyond_atr=round(mae, 4),
-            ))
-            lv.armed = False
-            lv.resolving_until = m + res_bars
-            lv.touches += 1
-            lv.prev_outcome = outcome
+            vol_rank = prof.vol_rank(price) if prof is not None else 0.0
+            strength = (KIND_WEIGHT[lv.kind] + 0.5 * min(lv.touches, 4)
+                        + 2.0 * vol_rank + 0.5 * confl)
+            meta = {
+                "ts": bar["t"].astimezone(MSK).isoformat(),
+                "age": (bar["d"] - lv.born_at.astimezone(MSK).date()).days,
+                "touches_before": lv.touches, "prev_outcome": lv.prev_outcome,
+                "confl": confl, "vol_rank": vol_rank, "strength": strength,
+                "v6": abs(closes[m] - closes[max(m - KIN_LOOKBACK, ds)]) / atr,
+            }
+            extreme = bar["l"] if side == "support" else bar["h"]
+            active_ep[ev_id] = _Episode(lv, m, side, atr, de, pullback_atr, extreme, meta)
     return touches
 
 
+# ── Сводка ───────────────────────────────────────────────────────────────────
 def _strength_tier(s: float) -> str:
-    return "strong" if s >= 4.0 else ("mid" if s >= 2.5 else "weak")
+    return "strong" if s >= 4.5 else ("mid" if s >= 3.0 else "weak")
 
 
-def _print_summary(touches: list[Touch]) -> None:
-    def line(label: str, rows: list[Touch]) -> None:
-        n = len(rows)
-        if not n:
-            print(f"{label:<28}{'—':>7}")
-            return
-        b = sum(1 for r in rows if r.outcome == "bounce")
-        k = sum(1 for r in rows if r.outcome == "break")
-        mfe = sum(r.mfe_away_atr for r in rows) / n
-        print(f"{label:<28}{n:>7}{100*b/n:>9.1f}{100*k/n:>9.1f}"
-              f"{100*(n-b-k)/n:>9.1f}{mfe:>9.2f}")
+def _result_line(label: str, rows: list) -> None:
+    n = len(rows)
+    if not n:
+        print(f"{label:<26}{'—':>7}")
+        return
+    b = sum(1 for r in rows if r.result == "bounce")
+    k = sum(1 for r in rows if r.result == "break")
+    mfe = sum(r.mfe_away_atr for r in rows) / n
+    print(f"{label:<26}{n:>7}{100*b/n:>9.1f}{100*k/n:>9.1f}{100*(n-b-k)/n:>9.1f}{mfe:>8.2f}")
 
-    hdr = f"{'':<28}{'N':>7}{'bounce%':>9}{'break%':>9}{'none%':>9}{'MFE':>9}"
-    print("\n== Всего ==");  print(hdr);  line("all", touches)
 
-    print("\n== Ключевая гипотеза: кинематика подхода ==");  print(hdr)
-    for kin in ("decel", "steady", "accel"):
-        line(kin, [t for t in touches if t.kin_class == kin])
+def _follow_line(label: str, rows: list) -> None:
+    n = len(rows)
+    if not n:
+        print(f"{label:<26}{'—':>7}")
+        return
+    w = sum(1 for r in rows if r.follow == "win")
+    fl = sum(1 for r in rows if r.follow == "fail")
+    mfe = sum(r.mfe_away_atr for r in rows) / n
+    print(f"{label:<26}{n:>7}{100*w/n:>9.1f}{100*fl/n:>9.1f}{100*(n-w-fl)/n:>9.1f}{mfe:>8.2f}")
 
-    print("\n== Кинематика × сила уровня ==");  print(hdr)
+
+def _print_summary(touches: list) -> None:
+    rh = f"{'':<26}{'N':>7}{'bounce%':>9}{'break%':>9}{'stall%':>9}{'MFE':>8}"
+    fh = f"{'':<26}{'N':>7}{'win%':>9}{'fail%':>9}{'none%':>9}{'MFE':>8}"
+    pull = [t for t in touches if t.signal == "pullback"]
+
+    print("\n== Все касания: распределение сигналов ==")
+    for sig in ("pullback", "straight_break", "drift"):
+        n = sum(1 for t in touches if t.signal == sig)
+        print(f"  {sig:<16}{n:>7}{100*n/max(len(touches),1):>8.1f}%")
+
+    print("\n== Все касания: исход ==");  print(rh);  _result_line("all", touches)
+
+    print("\n== ГИПОТЕЗА: follow-through подтверждённого отката ==");  print(fh)
+    _follow_line("pullback (все)", pull)
+    print("  — по силе уровня:")
     for tier in ("strong", "mid", "weak"):
-        for kin in ("decel", "steady", "accel"):
-            line(f"{tier}/{kin}",
-                 [t for t in touches if _strength_tier(t.strength) == tier and t.kin_class == kin])
+        _follow_line(f"  {tier}", [t for t in pull if _strength_tier(t.strength) == tier])
+    print("  — по глубине прокола (penetration):")
+    _follow_line("  не дошёл (<0)", [t for t in pull if t.penetration_atr < 0])
+    _follow_line("  фитиль 0..0.3", [t for t in pull if 0 <= t.penetration_atr < 0.3])
+    _follow_line("  глубокий >0.3", [t for t in pull if t.penetration_atr >= 0.3])
+    print("  — по номеру касания:")
+    _follow_line("  первое", [t for t in pull if t.touches_before == 0])
+    _follow_line("  повторное", [t for t in pull if t.touches_before >= 1])
 
-    print("\n== По виду уровня ==");  print(hdr)
+    print("\n== Память уровня: исход по прошлому исходу ==");  print(rh)
+    for prev in ("bounce", "break", "stall", ""):
+        _result_line(prev or "first_touch", [t for t in touches if t.prev_outcome == prev])
+
+    print("\n== Второй тест после отбоя (age 1-3 дня) ==");  print(rh)
+    _result_line("2nd|prev=bounce|1-3d",
+                 [t for t in touches if t.touches_before >= 1 and t.prev_outcome == "bounce"
+                  and 1 <= t.age_days <= 3])
+
+    print("\n== По виду уровня: исход ==");  print(rh)
     for kind in KIND_WEIGHT:
-        line(kind, [t for t in touches if t.kind == kind])
-
-    print("\n== Память уровня: чем кончилось прошлое касание ==");  print(hdr)
-    for prev in ("bounce", "break", "none", ""):
-        line(prev or "first_touch", [t for t in touches if t.prev_outcome == prev])
+        _result_line(kind, [t for t in touches if t.kind == kind])
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Сбор датасета касаний уровней (5м, склейка фьючерсов)")
+    parser = argparse.ArgumentParser(description="Датасет касаний уровней (откат-сигнал, 5м, склейка фьючерсов)")
     parser.add_argument("--base-ticker", default="IMOEX")
     parser.add_argument("--days", type=int, default=365)
     parser.add_argument("--offset-days", type=int, default=0)
+    parser.add_argument("--pullback-atr", type=float, default=PULLBACK_ATR)
     parser.add_argument("--out", default="")
     args = parser.parse_args()
 
@@ -408,14 +566,13 @@ def main() -> None:
         raise SystemExit("свечи не получены")
     bars = _bars_from_candles(candles)
 
-    # Сегмент текущего контракта (без сдвига склейкой) — для круглых уровней.
-    # Повторный вызов бесплатный: chain уже положил эти дни в локальный кэш.
     cur_only = get_candles_cached(fut.ticker, figi, args.days, market_data, db,
                                   candle_interval_min=5, offset_days=args.offset_days)
     round_from = min((c.time.astimezone(MSK).date() for c in cur_only), default=None)
 
-    touches = collect(bars, round_from)
-    logger.info("касаний собрано: %d за %d дней (5м баров: %d)", len(touches), args.days, len(bars))
+    touches = collect(bars, round_from, args.pullback_atr)
+    logger.info("касаний собрано: %d за %d дней (5м баров: %d, откат=%.2f ATR)",
+                len(touches), args.days, len(bars), args.pullback_atr)
 
     out_path = args.out or os.path.join("data", "analysis", f"level_touches_{args.base_ticker}.csv")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
