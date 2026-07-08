@@ -8902,18 +8902,10 @@ class OICompositeStrategy(IStrategy):
             composite *= 0.35
             logger.debug(f"{self.__settings.figi}: MMI вето (рынок вязкий, MMI={_mmi_val:.1f}) → ×0.35")
 
-        # Расширенное вето 2: FRACTAL (Hurst < 0.5) — mean-reverting рынок,
-        # подавляем трендовые методы (PRICE_TREND/ZLEMA/T3 доминируют в сумме).
-        # fractal < -0.25 значит Hurst ≈ <0.45 (по реализации score_fractal).
-        try:
-            frac_idx = BASE_METHOD_NAMES.index("FRACTAL")
-            frac_score = scores[frac_idx]
-        except (ValueError, IndexError):
-            frac_score = 0.0
-        if frac_score < -0.25 and not active_playbooks:
-            # Нет активного плейбука + рынок mean-reverting: трендовая часть ненадёжна.
-            composite *= 0.45
-            logger.debug(f"{self.__settings.figi}: Hurst вето (mean-revert) → ×0.45")
+        # (Убрано вето FRACTAL/Hurst — Риск 5 SYSTEM_RISKS: score_fractal_candle
+        # всегда 0.0, поэтому frac_score < -0.25 никогда не выполнялось. Мёртвый
+        # слой без эффекта, только путал. Сам метод FRACTAL остаётся в METHODS
+        # (score 0.0) для совместимости весов; при полной чистке уйдёт и он.)
 
         # Вето сильного структурного противосигнала: CASCADE / VSA_ABSORPTION /
         # IMPULSE_PULLBACK — специализированные методы с направленным Edge. Если
