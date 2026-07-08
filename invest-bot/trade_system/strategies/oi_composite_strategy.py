@@ -7643,8 +7643,43 @@ class OICompositeStrategy(IStrategy):
         if len(candles) < self.__candle_window + 2:
             return []
 
-        saved_candles = self.__candles
-        saved_score_history = list(self.__score_history)
+        # scan НЕ должен оставлять побочек на объекте: __compute_composite
+        # мутирует ~30 полей, а метод зовётся и на ЖИВОЙ стратегии
+        # (__warm_up_calibrator_from_candles → self.scan_method_scores), где
+        # раньше засорял боевые буферы и дважды кормил калибратор (compute
+        # кормит его каждый бар + цикл warm-up ещё раз). Схема отката:
+        # 1) снимок ВСЕХ ссылок __dict__ — ловит любые переприсваивания полей;
+        # 2) до цикла подменяем IN-PLACE-мутируемые объекты глубокими копиями,
+        #    чтобы compute менял КОПИИ, а оригиналы остались нетронуты (важно:
+        #    оригинальный объект калибратора сохраняет identity — warm-up на
+        #    него и рассчитывает);
+        # 3) в finally полный откат __dict__ → оригиналы возвращаются как были.
+        import copy
+
+        def _dc(obj):
+            try:
+                return copy.deepcopy(obj)
+            except Exception:
+                return obj  # деградация: это поле не откатим, но и не упадём
+
+        _saved_dict = self.__dict__.copy()
+        # Подмена IN-PLACE-мутируемых объектов на копии (переприсваиваемые поля
+        # __last_*/__cached_*/__regime_*/__l1_score восстановит откат __dict__
+        # сам). Набор — объединение мутируемого состояния из backtest-снимка
+        # (см. saved_new_state, ~стр. 7398) и того, что трогает compute напрямую.
+        self.__score_history = _dc(self.__score_history)
+        self.__ic_close_buf = _dc(self.__ic_close_buf)
+        self.__ic_score_buf = _dc(self.__ic_score_buf)
+        self.__composite_history = _dc(self.__composite_history)
+        self.__calibrator = _dc(self.__calibrator)
+        self.__stat_break = _dc(self.__stat_break)
+        self.__threshold_adapters = _dc(self.__threshold_adapters)
+        self.__mfe_distribution = _dc(self.__mfe_distribution)
+        self.__playbook_stats = _dc(self.__playbook_stats)
+        self.__playbook_disabled = _dc(self.__playbook_disabled)
+        self.__narrative_lifecycle = _dc(self.__narrative_lifecycle)
+        self.__narrative_bars_since_confirmed = _dc(self.__narrative_bars_since_confirmed)
+
         rows: list[dict] = []
         try:
             for i in range(self.__candle_window, len(candles)):
@@ -7660,8 +7695,10 @@ class OICompositeStrategy(IStrategy):
                     "regime": max(regime_probs, key=regime_probs.get),
                 })
         finally:
-            self.__candles = saved_candles
-            self.__score_history = saved_score_history
+            # Полный откат: возвращаем ВСЕ оригинальные ссылки. Копии, которые
+            # мутировал compute, отбрасываются — оригиналы остались чистыми.
+            self.__dict__.clear()
+            self.__dict__.update(_saved_dict)
 
         return rows
 
