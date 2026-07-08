@@ -6312,6 +6312,17 @@ def _l2_momentum_mult(buf: list[float], l2_composite: float) -> float:
 # самостоятельного бэктеста/решающего слоя.
 ALL_METHOD_NAMES = BASE_METHOD_NAMES + CLUSTER_MODEL_NAMES
 
+# Инвариант Риска 1 (SYSTEM_RISKS.md): base_scores начинается со скоров METHODS
+# в ЭТОМ же порядке, поэтому первые len(METHODS) имён BASE_METHOD_NAMES обязаны
+# совпадать по порядку с METHODS. Length-guard в __compute_composite ловит
+# add/remove; эта проверка ловит и REORDER блока METHODS — и на ИМПОРТЕ, до
+# первого бара (raise, а не assert — переживает python -O).
+if [n for n, _ in METHODS] != list(BASE_METHOD_NAMES[:len(METHODS)]):
+    raise RuntimeError(
+        "BASE_METHOD_NAMES[:len(METHODS)] разошёлся с порядком METHODS — "
+        "рассинхрон Риска 1 (см. SYSTEM_RISKS.md). Синхронизируй оба списка."
+    )
+
 # (ticker, direction) -> squeeze_score; подключается извне (Trader), т.к.
 # у самой стратегии нет доступа к сети/oi_layers.py. Без подключённого
 # провайдера метод просто молчит (score=0, не участвует в "согласии" и не
