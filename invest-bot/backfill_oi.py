@@ -28,6 +28,8 @@ import urllib.request
 from configparser import ConfigParser
 from datetime import date, timedelta
 
+from market_time import today_msk
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -295,7 +297,7 @@ def _merge(existing: list[dict], new_rows: list[dict]) -> list[dict]:
 
 
 def backfill(tickers: list[str], months: int, token: str) -> dict:
-    date_till = date.today()
+    date_till = today_msk()
     date_from = date_till - timedelta(days=months * 31)
     days = _trading_days(date_from, date_till)
 

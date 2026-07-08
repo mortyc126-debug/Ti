@@ -22,6 +22,8 @@ import urllib.parse
 import urllib.request
 from datetime import date, datetime
 
+from market_time import today_msk
+
 __all__ = ("TradeStatsService",)
 
 logger = logging.getLogger(__name__)
@@ -72,7 +74,7 @@ def _fetch_stats(metric: str, ticker: str) -> list[dict]:
     token = _load_moex_token()
     if not token:
         return []
-    today = date.today().isoformat().replace("-", "")
+    today = today_msk().isoformat().replace("-", "")
     params = {"secid": ticker, "iss.meta": "off", "limit": 1000, "from": today, "till": today}
     url = f"{BASE_URL}/{metric}.json?{urllib.parse.urlencode(params)}"
     req = urllib.request.Request(url, headers={

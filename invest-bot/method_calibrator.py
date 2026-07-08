@@ -29,6 +29,8 @@ import math
 import os
 from typing import Callable, Optional
 
+from market_time import today_msk
+
 logger = logging.getLogger(__name__)
 
 # Горизонт оценки привязан к периоду индикатора, а не фиксирован: ждать
@@ -620,7 +622,7 @@ class MethodCalibrator:
                 return True
             try:
                 last = datetime.date.fromisoformat(updated)
-                delta = (datetime.date.today() - last).days
+                delta = (today_msk() - last).days
                 return delta >= CALIB_RECALC_DAYS
             except Exception:
                 return True
@@ -655,7 +657,7 @@ class MethodCalibrator:
         highs  = [c["high"]  for c in candles_raw]
         lows   = [c["low"]   for c in candles_raw]
         atr_frac = _atr_frac_series(highs, lows, closes)   # причинный ATR/цена
-        today = datetime.date.today().isoformat()
+        today = today_msk().isoformat()
         result = {}
 
         eval_start = self._window

@@ -19,6 +19,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 import metrics
+from market_time import now_msk
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ def ticker_summary(ticker: str, days: int = 30) -> str:
     if not ticker_data:
         return f"Нет данных по {ticker} в архиве наблюдений."
 
-    cutoff = (datetime.now() - timedelta(days=days)).date().isoformat()
+    cutoff = (now_msk() - timedelta(days=days)).date().isoformat()
     recent = {d: s for d, s in ticker_data.items() if d >= cutoff}
 
     if not recent:
@@ -109,7 +110,7 @@ def all_tickers_summary(top: int = 8) -> str:
     Используется для ежедневного Telegram-репорта.
     """
     archive = _load()
-    cutoff = (datetime.now() - timedelta(days=7)).date().isoformat()
+    cutoff = (now_msk() - timedelta(days=7)).date().isoformat()
 
     rows = []
     for ticker, dates in archive.items():
@@ -139,7 +140,7 @@ def all_tickers_summary(top: int = 8) -> str:
 def tickers_with_weak_signal(threshold: float = 0.3) -> list[str]:
     """Тикеры у которых rolling_quality < threshold за последние 7 дней — для предупреждений."""
     archive = _load()
-    cutoff = (datetime.now() - timedelta(days=7)).date().isoformat()
+    cutoff = (now_msk() - timedelta(days=7)).date().isoformat()
     weak = []
     for ticker, dates in archive.items():
         recent = {d: s for d, s in dates.items() if d >= cutoff}

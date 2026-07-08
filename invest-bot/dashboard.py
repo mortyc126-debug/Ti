@@ -60,6 +60,7 @@ from candle_archive import get_candles_cached, get_candles_cached_futures_chain
 from configuration.configuration import ProgramConfiguration
 from configuration.settings import StrategySettings
 from db_api_client import DbApiClient
+from market_time import today_msk
 from history import BacktestHistoryStore, HistoryStore
 from invest_api.services.instruments_service import InstrumentService
 from invest_api.services.market_data_service import MarketDataService
@@ -8468,7 +8469,7 @@ def ensure_oi_synced(tickers: list[str], days: int | None = None, offset_days: i
             token = backfill_oi._get_token()
             uncovered = [s["code"] for s in spec if not s["has_oi"]]
             if token and uncovered:
-                date_till = datetime.date.today() - datetime.timedelta(days=int(offset_days or 0))
+                date_till = today_msk() - datetime.timedelta(days=int(offset_days or 0))
                 # +260 кал.дней запаса на прогрев перцентильных окон signal_gate (60/60).
                 date_from = date_till - datetime.timedelta(days=int(days) + 260)
                 # Бюджет: без него сбор по десяткам непокрытых фьючерсов

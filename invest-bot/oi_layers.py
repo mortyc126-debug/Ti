@@ -30,6 +30,7 @@ from datetime import date, datetime, timedelta
 # Нестабильность режима считаем через организованный порт oi_lab (signal_gate),
 # а не отдельной метрикой. signal_gate тянет только stdlib → цикла импортов нет.
 from signal_gate import oi_regime_instability
+from market_time import today_msk
 
 __all__ = ("OiLayersService",)
 
@@ -131,7 +132,7 @@ def _get_current_fut_ticker(stock_ticker: str) -> str | None:
         _FUTOI_CONTRACTS_CACHE[stock_ticker] = _fetch_iss_contracts(stock_ticker)
 
     contracts = _FUTOI_CONTRACTS_CACHE[stock_ticker]
-    today = date.today().isoformat()
+    today = today_msk().isoformat()
     candidates = [c for c in contracts if c["lasttradedate"] >= today]
     if not candidates:
         return None
@@ -590,9 +591,9 @@ def _contract_expiry_ym(ticker: str) -> int | None:
     if not mon:
         return None
     d = int(m.group(3))
-    base = (date.today().year // 10) * 10
+    base = (today_msk().year // 10) * 10
     year = base + d
-    if year < date.today().year - 3:   # цифра указывает на следующее десятилетие
+    if year < today_msk().year - 3:   # цифра указывает на следующее десятилетие
         year += 10
     return year * 12 + mon
 
