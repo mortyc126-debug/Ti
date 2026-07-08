@@ -6549,6 +6549,9 @@ class OICompositeStrategy(IStrategy):
         # Гистерезис метки: кандидат на смену и сколько свежих оценок подряд он держится.
         self.__regime_cand: str = "ranging"
         self.__regime_cand_bars: int = 0
+        # Зона 6: счётчик залипания — сколько heavy-баров держим committed, хотя
+        # argmax другой (детектор sink-состояния гистерезиса).
+        self.__regime_stuck_bars: int = 0
         self.__last_scores: dict[str, float] = {}
         # Теневые скоры: то же самое, но БЕЗ гейта по _disabled_methods (только
         # инверсия) — нужны, чтобы видеть гипотетический винрейт выключенного
@@ -8419,6 +8422,7 @@ class OICompositeStrategy(IStrategy):
         if argmax_regime == prev:
             self.__regime_cand = prev
             self.__regime_cand_bars = 0
+            self.__regime_stuck_bars = 0
             return prev
         # argmax отличается от текущей метки — копим подтверждение свежими оценками
         if argmax_regime == self.__regime_cand:
@@ -8431,7 +8435,18 @@ class OICompositeStrategy(IStrategy):
         persistent = self.__regime_cand_bars >= REGIME_HYST_DWELL
         if decisive or persistent:
             self.__regime_cand_bars = 0
+            self.__regime_stuck_bars = 0
             return argmax_regime
+        # Зона 6: держим prev, хотя argmax≠prev и переключение не сработало.
+        # Если argmax осциллирует (кандидат сбрасывается, dwell не набирается),
+        # committed может залипнуть надолго. Логируем ОДИН раз при переходе
+        # порога (4×dwell), чтобы поймать sink без флуда каждый бар.
+        self.__regime_stuck_bars += 1
+        if self.__regime_stuck_bars == REGIME_HYST_DWELL * 4:
+            logger.warning(
+                "regime-гистерезис залип: committed=%s держится %d heavy-баров, "
+                "argmax=%s (probs: %s)", prev, self.__regime_stuck_bars,
+                argmax_regime, {k: round(v, 2) for k, v in regime_probs.items()})
         return prev
 
     def __compute_composite(self) -> tuple[float, list[float]]:
