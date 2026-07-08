@@ -38,5 +38,31 @@
       "FRACTIONAL_DIFF"
     ],
     "saved_at": 1751758800
+  },
+  "score_methods_pool_2026-07_refined": {
+    "description": "Уточнённый прогон score_methods.py --by-regime (полный пул ~415 тикеров, июль 2026). Это ТЕКУЩИЙ применённый в method_toggle_state.json набор. Отличия от score_methods_pool_2026-07: inverted +ADAPTIVE_MA, +BS_PRESSURE, +MAMA_FAMA, −PRICE_TREND (стал режимным); disabled +MA_TENSION, −VOL_MOMENTUM. inverted = 11 universal ANTI (стабильно d<−0.05 во всех 6 режимах). disabled = 7 universal noise. Режимные (FALSE_BREAKOUT, ICHIMOKU_SIGNAL, NADARAYA_WATSON, PRICE_TREND, VSA, VSA_ABSORPTION) НЕ трогать глобально — только через REGIME_WEIGHT_MODS. Baseline-вердикты и REGIME_WEIGHT_MODS_AUTO — в docs/BASELINE_method_verdicts_2026-07.md.",
+    "disabled": [
+      "DONCHIAN",
+      "KLINGER",
+      "LEVEL_QUALITY",
+      "MA_TENSION",
+      "RMI",
+      "TWIGGS",
+      "WICK_REJECTION"
+    ],
+    "inverted": [
+      "ADAPTIVE_MA",
+      "ALLIGATOR",
+      "BB_KELTNER_SQUEEZE",
+      "BS_PRESSURE",
+      "EHLERS_MODE",
+      "FRACTIONAL_DIFF",
+      "LEVEL_ABSORPTION",
+      "MAMA_FAMA",
+      "T3_SIGNAL",
+      "VOL_COMPRESSION",
+      "ZLEMA_SIGNAL"
+    ],
+    "saved_at": 1752019200
   }
 }

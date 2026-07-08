@@ -1,4 +1,24 @@
 {
-  "disabled": [],
-  "inverted": []
+  "disabled": [
+    "DONCHIAN",
+    "KLINGER",
+    "LEVEL_QUALITY",
+    "MA_TENSION",
+    "RMI",
+    "TWIGGS",
+    "WICK_REJECTION"
+  ],
+  "inverted": [
+    "ADAPTIVE_MA",
+    "ALLIGATOR",
+    "BB_KELTNER_SQUEEZE",
+    "BS_PRESSURE",
+    "EHLERS_MODE",
+    "FRACTIONAL_DIFF",
+    "LEVEL_ABSORPTION",
+    "MAMA_FAMA",
+    "T3_SIGNAL",
+    "VOL_COMPRESSION",
+    "ZLEMA_SIGNAL"
+  ]
 }
