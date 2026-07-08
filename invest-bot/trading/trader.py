@@ -2018,17 +2018,20 @@ class Trader:
         take_id: str | None = None
         stop_id: str | None = None
 
-        # Лимит тейка: продаём если лонг (закрываем), покупаем если шорт
-        try:
-            p = Decimal(str(take_price))
-            resp = self.__order_service.post_limit_order(
-                account_id=account_id, figi=figi,
-                count_lots=lots, is_buy=(not is_long), price=p
-            )
-            take_id = resp.order_id
-            logger.info(f"EXIT_ORDERS {ticker}: тейк-лимит {take_price:.4f} → {take_id}")
-        except Exception as ex:
-            logger.warning(f"EXIT_ORDERS {ticker}: не удалось поставить тейк-лимит: {repr(ex)}")
+        # Лимит тейка: продаём если лонг (закрываем), покупаем если шорт.
+        # take_price <= 0 — тейк не ставим (напр. стартовый reconcile, где
+        # восстанавливаем только стоп; адаптивный выход тейк и так игнорирует).
+        if take_price > 0:
+            try:
+                p = Decimal(str(take_price))
+                resp = self.__order_service.post_limit_order(
+                    account_id=account_id, figi=figi,
+                    count_lots=lots, is_buy=(not is_long), price=p
+                )
+                take_id = resp.order_id
+                logger.info(f"EXIT_ORDERS {ticker}: тейк-лимит {take_price:.4f} → {take_id}")
+            except Exception as ex:
+                logger.warning(f"EXIT_ORDERS {ticker}: не удалось поставить тейк-лимит: {repr(ex)}")
 
         # Адаптивный буфер стоп-лимита: 3 тика или 10% ATR — что больше.
         # На ликвидных акциях с малым ATR работает как раньше (3 тика).
@@ -2057,6 +2060,11 @@ class Trader:
             "is_long": is_long,
             "ticker": ticker,
             "min_price_step": step,
+            # Уровень биржевого стопа — нужен для ретрая, если постановка упала
+            # (см. __update_stop_order/__check_adaptive_exit). stop_missing=True,
+            # если стоп сейчас НЕ стоит на бирже (постановка не удалась).
+            "stop_price": stop_price,
+            "stop_missing": stop_id is None,
         }
 
     def __cancel_exit_orders(self, account_id: str, figi: str, which: str = "both") -> None:
@@ -2071,24 +2079,54 @@ class Trader:
             return
         ticker = ex_info.get("ticker", figi)
 
+        # id обнуляем ТОЛЬКО при успешной отмене: иначе (отмена упала, а ордер
+        # на бирже жив) забытый id → осиротевший ордер, который позже сработает
+        # и откроет непреднамеренную позицию. Оставляем id, чтобы EOD-очистка
+        # (cancel_all_orders) или повторная попытка его добрала.
         if which in ("both", "take") and ex_info.get("take_id"):
             try:
                 self.__order_service.cancel_order(account_id, ex_info["take_id"])
                 logger.info(f"EXIT_ORDERS {ticker}: отменён тейк {ex_info['take_id']}")
+                ex_info["take_id"] = None
             except Exception as ex:
-                logger.warning(f"EXIT_ORDERS {ticker}: ошибка отмены тейка: {repr(ex)}")
-            ex_info["take_id"] = None
+                logger.warning(f"EXIT_ORDERS {ticker}: ошибка отмены тейка (id сохранён): {repr(ex)}")
 
         if which in ("both", "stop") and ex_info.get("stop_id"):
             try:
                 self.__stop_order_service.cancel_stop_order(account_id, ex_info["stop_id"])
                 logger.info(f"EXIT_ORDERS {ticker}: отменён стоп {ex_info['stop_id']}")
+                ex_info["stop_id"] = None
             except Exception as ex:
-                logger.warning(f"EXIT_ORDERS {ticker}: ошибка отмены стопа: {repr(ex)}")
-            ex_info["stop_id"] = None
+                logger.warning(f"EXIT_ORDERS {ticker}: ошибка отмены стопа (id сохранён): {repr(ex)}")
 
-        if which == "both":
+        # pop только если оба ордера реально сняты — иначе теряем id живого
+        # ордера (осиротеет). Если что-то не отменилось, ex_info остаётся.
+        if which == "both" and not ex_info.get("take_id") and not ex_info.get("stop_id"):
             self.__active_exit_orders.pop(figi, None)
+
+    def __cancel_all_resting_stops(self, account_id: str) -> None:
+        """
+        Снять ВСЕ висящие на бирже стоп-ордера (не только отслеживаемые нами).
+
+        cancel_all_orders (client_service) снимает обычные заявки; стоп-ордера в
+        Tinkoff — отдельный эндпоинт (get_stop_orders/cancel_stop_order), и он ими
+        может не покрываться. При рестарте среди дня Trader создаётся заново с
+        пустым __active_exit_orders, но на бирже остаются стопы прошлой сессии —
+        осиротевшие. Если их не снять, после закрытия позиций в __clear_all_positions
+        такой стоп позже сработает и откроет непреднамеренную позицию. Зовём из
+        __clear_all_positions (старт дня стартует «плоским»).
+        """
+        try:
+            resting = self.__stop_order_service.get_stop_orders(account_id) or []
+        except Exception as ex:
+            logger.warning(f"CLEAR_STOPS: get_stop_orders упал: {repr(ex)}")
+            return
+        for so in resting:
+            try:
+                self.__stop_order_service.cancel_stop_order(account_id, so.stop_order_id)
+                logger.info(f"CLEAR_STOPS: снят висящий стоп {so.stop_order_id} figi={getattr(so, 'figi', '?')}")
+            except Exception as ex:
+                logger.warning(f"CLEAR_STOPS: не снят стоп {so.stop_order_id}: {repr(ex)}")
 
     def __update_stop_order(
             self,
@@ -2109,13 +2147,20 @@ class Trader:
         is_long = ex_info["is_long"]
         step = ex_info["min_price_step"]
 
-        # Отменяем старый стоп и ставим новый
+        # Отменяем старый стоп. stop_id обнуляем ТОЛЬКО при успешной отмене:
+        # если отмена упала, а ордер на бирже жив, забыть его id и поставить
+        # новый = ДВА живых стопа. На гэпе сквозь оба уровня исполнятся оба →
+        # продадим 2× лота → позиция перевернётся (лонг→шорт). Поэтому при
+        # неуспешной отмене НЕ ставим новый: оставляем старый стоп действующим
+        # (он не туже нового — позиция всё равно под защитой), выходим.
         if ex_info.get("stop_id"):
             try:
                 self.__stop_order_service.cancel_stop_order(account_id, ex_info["stop_id"])
+                ex_info["stop_id"] = None
             except Exception as ex:
-                logger.warning(f"UPDATE_STOP {ticker}: отмена старого стопа: {repr(ex)}")
-            ex_info["stop_id"] = None
+                logger.warning(f"UPDATE_STOP {ticker}: отмена старого стопа упала — "
+                               f"НЕ переставляю (старый стоп остаётся жив): {repr(ex)}")
+                return
 
         limit_offset = 3 * step
         stop_limit_price = (new_stop_price - limit_offset) if is_long else (new_stop_price + limit_offset)
@@ -2128,17 +2173,33 @@ class Trader:
                 limit_price=stop_limit_price,
             )
             ex_info["stop_id"] = new_id
+            ex_info["stop_price"] = new_stop_price
+            ex_info["stop_missing"] = False
             logger.info(f"UPDATE_STOP {ticker}: новый стоп {new_stop_price:.4f} → {new_id}")
         except Exception as ex:
-            logger.warning(f"UPDATE_STOP {ticker}: ошибка постановки нового стопа: {repr(ex)}")
+            # Старый стоп уже снят, новый не встал → позиция БЕЗ биржевого стопа.
+            # Помечаем stop_missing — следующий бар адаптивного выхода повторит
+            # постановку (см. __check_adaptive_exit). Внутренний check_exit
+            # тем временем закроет по внутреннему уровню, если цена дойдёт.
+            ex_info["stop_id"] = None
+            ex_info["stop_price"] = new_stop_price
+            ex_info["stop_missing"] = True
+            logger.warning(f"UPDATE_STOP {ticker}: постановка нового стопа упала — "
+                           f"позиция без биржевого стопа, ретрай на след. баре: {repr(ex)}")
 
-        # Если тейк тоже изменился (частичный TP / scale-out)
+        # Если тейк тоже изменился (частичный TP / scale-out).
+        # Тот же принцип, что и со стопом: take_id обнуляем только при успешной
+        # отмене, иначе (отмена упала, тейк жив) забытый id + новый тейк = два
+        # лимита на закрытие → двойное закрытие/переворот. При неуспехе выходим,
+        # старый тейк остаётся.
         if new_take_price is not None and ex_info.get("take_id"):
             try:
                 self.__order_service.cancel_order(account_id, ex_info["take_id"])
-            except Exception:
-                pass
-            ex_info["take_id"] = None
+                ex_info["take_id"] = None
+            except Exception as ex:
+                logger.warning(f"UPDATE_TAKE {ticker}: отмена старого тейка упала — "
+                               f"НЕ переставляю (старый тейк остаётся): {repr(ex)}")
+                return
             try:
                 p = Decimal(str(new_take_price))
                 resp = self.__order_service.post_limit_order(
@@ -2314,6 +2375,10 @@ class Trader:
 
         logger.debug("Cancel all order.")
         self.__client_service.cancel_all_orders(account_id)
+        # cancel_all_orders не покрывает стоп-ордера (отдельный эндпоинт Tinkoff) —
+        # снимаем их явно, иначе осиротевший стоп прошлой сессии (рестарт среди
+        # дня) сработает после закрытия позиций и откроет непреднамеренную позицию.
+        self.__cancel_all_resting_stops(account_id)
 
         logger.debug("Close all positions.")
         # Снимаем с учёта risk.py то, что осталось открытым к концу дня. Точная
@@ -2546,6 +2611,16 @@ class Trader:
                 f"TRAIL_STOP {risk_ticker}: стоп {stop_before:.4f} → {pos.stop_price:.4f}, "
                 f"переставляем биржевой ордер"
             )
+            self.__update_stop_order(
+                account_id=account_id,
+                figi=candle.figi,
+                new_stop_price=pos.stop_price,
+            )
+        elif (self.__active_exit_orders.get(candle.figi) or {}).get("stop_missing"):
+            # Прошлая постановка биржевого стопа упала (позиция без стопа на
+            # бирже) — ретраим на текущем внутреннем уровне, даже если трейлинг
+            # не двигался. Пока не встанет — внутренний check_exit прикрывает.
+            logger.info(f"RETRY_STOP {risk_ticker}: повторная постановка биржевого стопа {pos.stop_price:.4f}")
             self.__update_stop_order(
                 account_id=account_id,
                 figi=candle.figi,
