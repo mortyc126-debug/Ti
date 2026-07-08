@@ -105,60 +105,67 @@ def _parse_phase_from_log(tail_lines: list[str]) -> dict:
     """
     result = {"phase": "unknown", "phase_msg": None, "sleep_until_iso": None}
 
-    # Идём от последних к первым — первое совпадение выигрывает.
-    trading_start_re = re.compile(
-        r"Trading day has been started")
-    trading_done_re = re.compile(
-        r"Trading day has been completed")
     # start_time от Tinkoff API форматируется как datetime.__str__ —
     # «2026-07-06 07:00:00+00:00» (с пробелом внутри). Захватываем до конца
     # строки, потом чистим trailing whitespace.
-    waiting_re = re.compile(
-        r"Today is trading day\. Trading will start after (.+)$")
-    not_trading_re = re.compile(
-        r"Today is not trading day\. Sleep on next morning")
-    sleep_re = re.compile(r"Sleep to next morning")
-    check_sched_re = re.compile(r"Check trading schedule on today")
+    waiting_re = re.compile(r"Today is trading day\. Trading will start after (.+)$")
 
-    for line in reversed(tail_lines):
-        if trading_done_re.search(line):
-            result["phase"] = "waiting_open"
-            result["phase_msg"] = "торговый день завершён, ждём завтра"
-            return result
-        if trading_start_re.search(line):
-            result["phase"] = "trading"
-            result["phase_msg"] = "торговая сессия"
-            return result
-        m = waiting_re.search(line)
-        if m:
-            raw = m.group(1).strip()
-            # Формат "2026-07-06 07:00:00+00:00" → нормализуем к ISO
-            iso = raw.replace(" ", "T", 1) if " " in raw else raw
-            result["phase"] = "waiting_open"
-            result["phase_msg"] = f"торговый день, откроется {raw}"
-            result["sleep_until_iso"] = iso
-            return result
-        if not_trading_re.search(line):
-            result["phase"] = "sleeping_night"
-            result["phase_msg"] = "не торговый день (выходной/праздник), спит до утра"
-            # Следующее пробуждение — 06:00 UTC следующего дня
-            tomorrow = (datetime.datetime.now(datetime.timezone.utc)
-                        + datetime.timedelta(days=1))
-            wake = tomorrow.replace(hour=6, minute=0, second=0, microsecond=0)
-            result["sleep_until_iso"] = wake.isoformat()
-            return result
-        if sleep_re.search(line):
-            result["phase"] = "sleeping_night"
-            result["phase_msg"] = "сессия закончилась, спит до утра"
-            tomorrow = (datetime.datetime.now(datetime.timezone.utc)
-                        + datetime.timedelta(days=1))
-            wake = tomorrow.replace(hour=6, minute=0, second=0, microsecond=0)
-            result["sleep_until_iso"] = wake.isoformat()
-            return result
-        if check_sched_re.search(line):
-            result["phase"] = "starting"
-            result["phase_msg"] = "получаю расписание МОЕХ"
-            return result
+    def _wake_next_morning_iso() -> str:
+        tomorrow = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1)
+        return tomorrow.replace(hour=6, minute=0, second=0, microsecond=0).isoformat()
+
+    # Смотрим ТОЛЬКО последнюю итерацию цикла (после последнего
+    # «Check trading schedule on today») — более старые нерелевантны.
+    # Прежняя версия шла с конца и первой же ловила «Sleep to next morning»,
+    # который логируется в КОНЦЕ ЛЮБОЙ ветки (ошибка/не-торговый-день/день
+    # завершён) → фаза ВСЕГДА показывалась «сессия закончилась», настоящая
+    # причина маскировалась. Теперь классифицируем по тому, ЧТО реально было в
+    # последней итерации, а не по последней строке.
+    last_check = -1
+    for i, line in enumerate(tail_lines):
+        if "Check trading schedule on today" in line:
+            last_check = i
+    window = tail_lines[last_check:] if last_check >= 0 else tail_lines
+
+    started = any("Trading day has been started" in l for l in window)
+    completed = any("Trading day has been completed" in l for l in window)
+    not_trading = any("Today is not trading day" in l for l in window)
+    errored = any("Start trading today error" in l for l in window)
+    slept = any("Sleep to next morning" in l for l in window)
+    waiting_line = next((l for l in reversed(window) if waiting_re.search(l)), None)
+
+    # Приоритет: активная торговля > ошибка > не-торговый-день > день завершён >
+    # ждём открытия > провалились в сон > только стартовали.
+    if started and not slept:
+        result["phase"] = "trading"
+        result["phase_msg"] = "торговая сессия"
+    elif errored:
+        # Раньше это выглядело как «сессия закончилась» — теперь видно, что
+        # старт торговли упал (расписание/API/стратегии), и бот спит до утра.
+        result["phase"] = "error"
+        result["phase_msg"] = "ошибка старта торговли — бот спит до утра (смотри лог)"
+        result["sleep_until_iso"] = _wake_next_morning_iso()
+    elif not_trading:
+        result["phase"] = "sleeping_night"
+        result["phase_msg"] = "не торговый день (выходной/праздник), спит до утра"
+        result["sleep_until_iso"] = _wake_next_morning_iso()
+    elif completed:
+        result["phase"] = "waiting_open"
+        result["phase_msg"] = "торговый день завершён, ждём завтра"
+        result["sleep_until_iso"] = _wake_next_morning_iso()
+    elif waiting_line is not None:
+        raw = waiting_re.search(waiting_line).group(1).strip()
+        iso = raw.replace(" ", "T", 1) if " " in raw else raw
+        result["phase"] = "waiting_open"
+        result["phase_msg"] = f"торговый день, откроется {raw}"
+        result["sleep_until_iso"] = iso
+    elif slept:
+        result["phase"] = "sleeping_night"
+        result["phase_msg"] = "сессия закончилась, спит до утра"
+        result["sleep_until_iso"] = _wake_next_morning_iso()
+    elif last_check >= 0:
+        result["phase"] = "starting"
+        result["phase_msg"] = "получаю расписание МОЕХ"
     return result
 
 

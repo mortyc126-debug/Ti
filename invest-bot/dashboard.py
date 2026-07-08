@@ -6561,7 +6561,7 @@ async function loadSupervisorStatus() {{
     if (data.phase && data.phase_msg) {{
       const icons = {{
         trading: '🟢', waiting_open: '🟡', sleeping_night: '💤',
-        starting: '⏳', unknown: '❔'
+        starting: '⏳', error: '🔴', unknown: '❔'
       }};
       const ic = icons[data.phase] || '❔';
       let sleep = '';
