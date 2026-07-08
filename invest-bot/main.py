@@ -71,26 +71,47 @@ async def start_asyncio_trading(
         token, chat_id = control_listener_creds
         control_task = asyncio.create_task(run_control_listener(token, chat_id))
 
-    # Раньше здесь было последовательное `await blog_task; await trade_task; ...` —
-    # blog_task (обработка очереди сообщений) не завершается сам по себе, поэтому
-    # `await blog_task` блокировал бы НАВСЕГДА, даже если trade_task уже закончил
-    # работу (например, по запросу мягкой остановки с дашборда,
-    # trading/trader.py::BotShutdownRequested) — процесс никогда бы не завершался.
-    # Ждём, пока ЛЮБАЯ из задач закончится, остальные отменяем — тогда
-    # asyncio.run(...) в __main__ реально возвращает управление, и процесс
-    # завершается (bot_supervisor.py со стороны дашборда видит, что PID умер).
-    all_tasks = [t for t in (blog_task, trade_task, news_task, control_task) if t is not None]
-    done, pending = await asyncio.wait(all_tasks, return_when=asyncio.FIRST_COMPLETED)
+    # Пивотируем ТОЛЬКО на trade_task: торговый цикл — единственная задача, чьё
+    # завершение означает «бот отработал» (мягкая остановка с дашборда через
+    # BotShutdownRequested или фатальная ошибка торговли). Вспомогательные —
+    # Telegram-контроль, новости, блог — НЕ должны ронять торговлю: у них своя
+    # сеть (api.telegram.org, MOEX ISS), и её сбой (SSL/таймаут) раньше через
+    # FIRST_COMPLETED по ВСЕМ задачам отменял trade_task и убивал весь процесс.
+    # На практике: TelegramNetworkError у control_task клал бота через секунды
+    # после старта на КАЖДОЙ сессии, если телега/новости не достучались.
+    aux_tasks = [t for t in (blog_task, news_task, control_task) if t is not None]
 
-    for task in pending:
-        task.cancel()
-    if pending:
-        await asyncio.gather(*pending, return_exceptions=True)
-
-    for task in done:
+    # Упавшую вспомогательную задачу логируем (и этим извлекаем её исключение,
+    # чтобы не было "exception never retrieved"), но процесс НЕ завершаем.
+    def _log_aux_failure(task: asyncio.Task) -> None:
+        if task.cancelled():
+            return
         exc = task.exception()
         if exc is not None:
-            logger.error(f"start_asyncio_trading: задача {task.get_name()} завершилась с ошибкой: {repr(exc)}")
+            logger.error(
+                f"Вспомогательная задача {task.get_name()} упала "
+                f"(торговля продолжается): {repr(exc)}"
+            )
+
+    for t in aux_tasks:
+        t.add_done_callback(_log_aux_failure)
+
+    # Ждём ИМЕННО торговый цикл. blog_task сам не завершается (бесконечная
+    # обработка очереди) — поэтому ждать «любую» было нельзя, а ждать trade_task
+    # напрямую — можно: он завершается по мягкой остановке или ошибке.
+    await asyncio.wait([trade_task], return_when=asyncio.FIRST_COMPLETED)
+
+    # Торговый цикл закончился — гасим вспомогательные и отдаём управление
+    # asyncio.run(...), чтобы процесс завершился (bot_supervisor увидит смерть PID).
+    for task in aux_tasks:
+        task.cancel()
+    if aux_tasks:
+        await asyncio.gather(*aux_tasks, return_exceptions=True)
+
+    if not trade_task.cancelled():
+        exc = trade_task.exception()
+        if exc is not None:
+            logger.error(f"Торговый цикл завершился с ошибкой: {repr(exc)}")
 
 
 def prepare_logs() -> None:
