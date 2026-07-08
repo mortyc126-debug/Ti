@@ -9970,8 +9970,8 @@ class OICompositeStrategy(IStrategy):
                 }
                 for regime, methods in self.__regime_weights.items()
             }
-            with open(WEIGHTS_FILE, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+            from atomic_json import atomic_write_json
+            atomic_write_json(WEIGHTS_FILE, data, indent=2)
         except Exception as e:
             logger.warning(f"Could not save weights: {e}")
 
@@ -10129,7 +10129,7 @@ class OICompositeStrategy(IStrategy):
             key = self.__settings.figi
             data.setdefault(key, {})["__rolling_quality__"] = self.__rolling_quality
             data[key]["__rolling_quality_by_regime__"] = self.__rolling_quality_by_regime
-            with open(WEIGHTS_FILE, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+            from atomic_json import atomic_write_json
+            atomic_write_json(WEIGHTS_FILE, data, indent=2)
         except Exception as e:
             logger.warning(f"Could not save rolling_quality: {e}")

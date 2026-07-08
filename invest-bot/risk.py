@@ -179,9 +179,8 @@ class RiskManager:
                 pass
 
     def _save_state(self):
-        os.makedirs("data", exist_ok=True)
-        with open(STATE_FILE, "w", encoding="utf-8") as f:
-            json.dump(self.state, f, ensure_ascii=False)
+        from atomic_json import atomic_write_json
+        atomic_write_json(STATE_FILE, self.state)
 
     def _rollover_if_new_day(self):
         now = datetime.now(timezone.utc)

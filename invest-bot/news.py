@@ -346,9 +346,8 @@ class PriceTracker:
                 self._pending = []
 
     def _save(self):
-        os.makedirs("data", exist_ok=True)
-        with open(self.TRACK_FILE, "w", encoding="utf-8") as f:
-            json.dump(self._pending, f, ensure_ascii=False, indent=2)
+        from atomic_json import atomic_write_json
+        atomic_write_json(self.TRACK_FILE, self._pending, indent=2)
 
     def add(self, ticker: str, news_link: str, saved_at: str, price_at_save: float | None):
         self._pending.append({
@@ -472,9 +471,8 @@ class NewsCollector:
                 self._seen = set()
 
     def _save_seen(self):
-        os.makedirs("data", exist_ok=True)
-        with open(self.SEEN_FILE, "w", encoding="utf-8") as f:
-            json.dump(list(self._seen)[-2000:], f)
+        from atomic_json import atomic_write_json
+        atomic_write_json(self.SEEN_FILE, list(self._seen)[-2000:])
 
     def poll_once(self) -> int:
         self._tracker.poll()

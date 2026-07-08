@@ -602,9 +602,9 @@ class MethodCalibrator:
         return {}
 
     def _save(self) -> None:
+        from atomic_json import atomic_write_json
         try:
-            with open(self._store_path, "w") as f:
-                json.dump(self._data, f, indent=2)
+            atomic_write_json(self._store_path, self._data, indent=2)
         except Exception as exc:
             logger.warning(f"MethodCalibrator: не удалось сохранить {exc}")
 
