@@ -576,11 +576,10 @@ def _print_rules(ticker, regime, n, base, rules, top=6):
 # ── Сохранение / загрузка ─────────────────────────────────────────────────────
 
 def save_rules(ticker: str, data: dict, days: int | None) -> str:
-    os.makedirs(BAR_RULES_DIR, exist_ok=True)
     suffix = f"_{days}d" if days else ""
     path = os.path.join(BAR_RULES_DIR, f"{ticker}{suffix}.json")
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    from atomic_json import atomic_write_json
+    atomic_write_json(path, data, indent=2)
     return path
 
 

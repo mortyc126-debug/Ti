@@ -401,9 +401,8 @@ def _load_existing() -> dict:
 
 
 def _save(data: dict) -> None:
-    os.makedirs(os.path.dirname(LASSO_WEIGHTS_FILE), exist_ok=True)
-    with open(LASSO_WEIGHTS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    from atomic_json import atomic_write_json
+    atomic_write_json(LASSO_WEIGHTS_FILE, data, indent=2)
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────

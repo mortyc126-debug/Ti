@@ -102,9 +102,8 @@ def main() -> None:
 
     result = aggregate(args.history, days=args.days, min_n=args.min_n)
 
-    os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
-    with open(args.out, "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2)
+    from atomic_json import atomic_write_json
+    atomic_write_json(args.out, result, indent=2)
 
     print(f"Wrote {args.out} — {len(result)} methods (window={args.days}d, min_n={args.min_n})")
     print()

@@ -53,6 +53,7 @@ from typing import Optional
 from tinkoff.invest.exceptions import RequestError
 
 import bug_council
+from atomic_json import atomic_write_json
 from archive import ArchiveStore
 from calibration import PercentileCalibrator
 from candle_archive import get_candles_cached, get_candles_cached_futures_chain
@@ -739,8 +740,7 @@ def merge_oi_tickers(oi_tickers: list[dict], signal_log: list[dict] | None = Non
             "demand": demand_counts.get(ticker, current.get(ticker, {}).get("demand", 0)),
         }
         n += 1
-    with open(OI_TICKERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(current, f, ensure_ascii=False, indent=2)
+    atomic_write_json(OI_TICKERS_FILE, current, indent=2)
     return n
 
 
@@ -770,8 +770,7 @@ _futures_reload_running = threading.Event()  # установлен пока и�
 def _futures_cache_to_disk(data: dict[str, dict]) -> None:
     """Сохраняет сырые данные (dict, не StrategySettings) в JSON-файл."""
     try:
-        with open(FUTURES_DISK_CACHE, "w", encoding="utf-8") as f:
-            json.dump({"saved_at": time.time(), "contracts": data}, f, ensure_ascii=False)
+        atomic_write_json(FUTURES_DISK_CACHE, {"saved_at": time.time(), "contracts": data})
     except Exception as e:
         logger.warning(f"futures: не удалось записать кэш на диск: {e}")
 
@@ -8047,8 +8046,7 @@ def delete_oi_ticker(ticker: str) -> dict:
     if ticker not in current:
         return {"ok": False, "error": "тикер не найден в oi_tickers.json"}
     del current[ticker]
-    with open(OI_TICKERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(current, f, ensure_ascii=False, indent=2)
+    atomic_write_json(OI_TICKERS_FILE, current, indent=2)
     return {"ok": True}
 
 
@@ -8069,8 +8067,7 @@ def prune_stale_oi_tickers() -> dict:
             del current[t]
             removed.append(t)
     if removed:
-        with open(OI_TICKERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(current, f, ensure_ascii=False, indent=2)
+        atomic_write_json(OI_TICKERS_FILE, current, indent=2)
     return {"ok": True, "removed": sorted(removed), "count": len(removed)}
 
 
@@ -8140,8 +8137,7 @@ def prune_failed_oi_tickers(statuses_snapshot: dict | None = None) -> dict:
         unknown.append(t)
 
     if removed_from_oi:
-        with open(OI_TICKERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(current_oi, f, ensure_ascii=False, indent=2)
+        atomic_write_json(OI_TICKERS_FILE, current_oi, indent=2)
     if disabled_in_overrides:
         save_overrides(overrides)
 
@@ -8731,9 +8727,7 @@ def save_method_preset(name: str, disabled: list, inverted: list) -> dict | None
         "inverted": sorted(set(inverted or [])),
         "saved_at": time.time(),
     }
-    os.makedirs(os.path.dirname(METHOD_PRESETS_FILE), exist_ok=True)
-    with open(METHOD_PRESETS_FILE, "w", encoding="utf-8") as f:
-        json.dump(presets, f, ensure_ascii=False, indent=2)
+    atomic_write_json(METHOD_PRESETS_FILE, presets, indent=2)
     return None
 
 
@@ -8741,8 +8735,7 @@ def delete_method_preset(name: str) -> None:
     presets = get_method_presets()
     if name in presets:
         del presets[name]
-        with open(METHOD_PRESETS_FILE, "w", encoding="utf-8") as f:
-            json.dump(presets, f, ensure_ascii=False, indent=2)
+        atomic_write_json(METHOD_PRESETS_FILE, presets, indent=2)
 
 
 # ── Текущее состояние вкл/выкл методов (переживает перезагрузку страницы) ──
@@ -8765,12 +8758,11 @@ def get_method_toggle_state() -> dict:
 
 
 def save_method_toggle_state(disabled: list, inverted: list) -> None:
-    os.makedirs(os.path.dirname(METHOD_TOGGLE_STATE_FILE), exist_ok=True)
-    with open(METHOD_TOGGLE_STATE_FILE, "w", encoding="utf-8") as f:
-        json.dump(
-            {"disabled": sorted(set(disabled or [])), "inverted": sorted(set(inverted or []))},
-            f, ensure_ascii=False, indent=2,
-        )
+    atomic_write_json(
+        METHOD_TOGGLE_STATE_FILE,
+        {"disabled": sorted(set(disabled or [])), "inverted": sorted(set(inverted or []))},
+        indent=2,
+    )
 
 
 def get_method_calibration() -> dict:
@@ -8835,8 +8827,7 @@ def save_weights_snapshot(name: str, weights: dict) -> dict:
         return {"error": "нет весов для сохранения (сначала прогон)"}
     os.makedirs(WEIGHTS_SNAPSHOTS_DIR, exist_ok=True)
     path = os.path.join(WEIGHTS_SNAPSHOTS_DIR, _safe_snap_name(name) + ".json")
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump({"saved_at": time.time(), "weights": weights}, f, ensure_ascii=False, indent=2)
+    atomic_write_json(path, {"saved_at": time.time(), "weights": weights}, indent=2)
     return {"ok": True, "tickers": len(weights)}
 
 
@@ -8854,8 +8845,7 @@ def apply_weights_snapshot(name: str) -> dict:
         with open(OI_WEIGHTS_FILE, encoding="utf-8") as f:
             data = json.load(f)
         # бэкап перед перезаписью боевого файла
-        with open(OI_WEIGHTS_FILE + ".bak", "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        atomic_write_json(OI_WEIGHTS_FILE + ".bak", data, indent=2)
     applied = 0
     for mw in weights.values():
         figi = mw.get("figi")

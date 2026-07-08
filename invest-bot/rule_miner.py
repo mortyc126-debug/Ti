@@ -216,9 +216,8 @@ def _load_existing() -> dict:
 
 
 def _save(data: dict) -> None:
-    os.makedirs(os.path.dirname(RULES_FILE), exist_ok=True)
-    with open(RULES_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    from atomic_json import atomic_write_json
+    atomic_write_json(RULES_FILE, data, indent=2)
 
 
 def main() -> None:
