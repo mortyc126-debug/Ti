@@ -733,12 +733,34 @@ def _fetch_bars(base, args, instrument_service, market_data, db):
     return _bars_from_candles(candles), round_from
 
 
-def _resolve_universe(n, instrument_service, market_data):
-    """Топ-N ликвидных фьючерсов на акции по среднему объёму (тот же скор
-    востребованности, что использует бот в режиме top_n)."""
-    from ticker_universe import compute_demand_scores, resolve_top_n, RU_STOCKS
-    scores = compute_demand_scores(sorted(RU_STOCKS), instrument_service, market_data)
-    return resolve_top_n(scores, n, ["stock"], [])
+def _resolve_universe(n, instrument_service, market_data, db, rank_days=20):
+    """Топ-N ликвидных фьючерсов на акции по среднему дневному объёму за
+    последние rank_days. Ранжируем сами (а не через compute_demand_scores) —
+    та функция дёргает get_candles_cached с db=None и падает на любом пропуске
+    в локальном кэше, отсекая частично закэшированные тикеры. Здесь передаём
+    реальный db: пропуски докачиваются из D1/Tinkoff, тикер не теряется."""
+    from ticker_universe import RU_STOCKS
+    from candle_archive import get_candles_cached
+    bulk = instrument_service.futures_by_base_tickers_bulk(sorted(RU_STOCKS), margin_delay=1.2)
+    ranked = []
+    for base, resolved in bulk.items():
+        if not resolved:
+            continue
+        fs, figi = resolved
+        try:
+            candles = get_candles_cached(fs.ticker, figi, rank_days, market_data, db, candle_interval_min=5)
+        except Exception as e:
+            logger.warning("%s: объём для ранжирования не посчитан — %s", base, e)
+            continue
+        if not candles:
+            continue
+        by_day: dict = {}
+        for c in candles:
+            by_day[c.time.date()] = by_day.get(c.time.date(), 0) + c.volume
+        if by_day:
+            ranked.append((sum(by_day.values()) / len(by_day), base))
+    ranked.sort(reverse=True)
+    return [b for _, b in ranked[:n]]
 
 
 def _write_csv(touches, out_path):
@@ -778,7 +800,10 @@ def main() -> None:
     if args.tickers:
         tickers = [t.strip() for t in args.tickers.split(",") if t.strip()]
     elif args.universe:
-        tickers = _resolve_universe(args.universe, instrument_service, market_data)
+        tickers = _resolve_universe(args.universe, instrument_service, market_data, db)
+        if not tickers:
+            raise SystemExit("вселенная пуста: ни один фьючерс на акцию не резолвился/не дал объёма "
+                             "(проверь токен и сеть). Как обходной путь — задай --tickers явно.")
         logger.info("вселенная: %d тикеров — %s", len(tickers), ", ".join(tickers))
     else:
         tickers = [args.base_ticker]
