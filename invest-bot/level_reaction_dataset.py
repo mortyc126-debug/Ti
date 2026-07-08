@@ -133,6 +133,7 @@ class Touch:
     resolve_speed_atr: float  # доминирующий ход / бары до разрешения (ATR/бар)
     mfe_away_atr: float
     mae_beyond_atr: float
+    ticker: str = ""          # проставляется в мульти-прогоне (иначе пусто)
 
 
 def _f(q) -> float:
@@ -662,9 +663,99 @@ def _print_summary(touches: list) -> None:
         _result_line(kind, [t for t in touches if t.kind == kind])
 
 
+def instrument_metrics(bars: list[dict]) -> tuple[float, float]:
+    """Ликвидность и волатильность инструмента: средний дневной объём и
+    медианный дневной ATR% — по ним бакетим тикеры в мульти-прогоне."""
+    daily = _daily_bars(bars)
+    if not daily:
+        return 0.0, 0.0
+    avg_vol = sum(b["v"] for b in daily) / len(daily)
+    atr_map = _atr_by_date(daily)
+    pcts = [atr_map[b["d"]] / b["c"] for b in daily
+            if b["d"] in atr_map and b["c"] > 0]
+    atr_pct = sorted(pcts)[len(pcts) // 2] if pcts else 0.0
+    return avg_vol, atr_pct
+
+
+def _quartile_labels(metrics: dict, idx: int) -> dict:
+    """base -> квартиль 0..3 по metrics[base][idx] (0 = нижний)."""
+    items = sorted(metrics, key=lambda b: metrics[b][idx])
+    n = len(items)
+    return {base: (min(3, i * 4 // n) if n >= 4 else 0) for i, base in enumerate(items)}
+
+
+def _universe_summary(all_touches: list, metrics: dict) -> None:
+    by_ticker: dict = {}
+    for t in all_touches:
+        by_ticker.setdefault(t.ticker, []).append(t)
+
+    print("\n== По инструментам (сорт. по ликвидности) ==")
+    print(f"{'тикер':<10}{'N':>7}{'ср.об/дн':>12}{'ATR%':>8}{'pull.win%':>11}{'bounce%':>9}")
+    for base in sorted(metrics, key=lambda b: metrics[b][0], reverse=True):
+        rows = by_ticker.get(base, [])
+        pull = [r for r in rows if r.signal == "pullback"]
+        win = 100 * sum(1 for r in pull if r.follow == "win") / max(len(pull), 1)
+        bnc = 100 * sum(1 for r in rows if r.result == "bounce") / max(len(rows), 1)
+        vol, atrp = metrics[base]
+        print(f"{base:<10}{len(rows):>7}{vol:>12.0f}{100*atrp:>7.2f}%{win:>11.1f}{bnc:>9.1f}")
+
+    fh = f"{'':<28}{'N':>7}{'win%':>9}{'fail%':>9}{'none%':>9}{'MFE':>8}"
+    for idx, name in ((0, "ликвидности (ср. дневной объём)"), (1, "волатильности (ATR%)")):
+        labels = _quartile_labels(metrics, idx)
+        print(f"\n== ГИПОТЕЗА: follow-through по квартилям {name} ==");  print(fh)
+        for q in range(4):
+            bases = [b for b in labels if labels[b] == q]
+            if not bases:
+                continue
+            lo = min(metrics[b][idx] for b in bases)
+            hi = max(metrics[b][idx] for b in bases)
+            rng = (f"{lo:.0f}..{hi:.0f}" if idx == 0 else f"{100*lo:.2f}..{100*hi:.2f}%")
+            rows = [t for t in all_touches if labels.get(t.ticker) == q and t.signal == "pullback"]
+            _follow_line(f"Q{q+1} [{rng}]", rows)
+
+
+def _fetch_bars(base, args, instrument_service, market_data, db):
+    from candle_archive import get_candles_cached, get_candles_cached_futures_chain
+    resolved = instrument_service.future_by_base_ticker(base)
+    if not resolved:
+        logger.warning("%s: фьючерс не найден — пропуск", base)
+        return None, None
+    fut, figi = resolved
+    candles = get_candles_cached_futures_chain(
+        fut.ticker, figi, args.days, market_data, db, instrument_service,
+        candle_interval_min=5, offset_days=args.offset_days)
+    if not candles:
+        logger.warning("%s (%s): свечей нет — пропуск", base, fut.ticker)
+        return None, None
+    cur_only = get_candles_cached(fut.ticker, figi, args.days, market_data, db,
+                                  candle_interval_min=5, offset_days=args.offset_days)
+    round_from = min((c.time.astimezone(MSK).date() for c in cur_only), default=None)
+    return _bars_from_candles(candles), round_from
+
+
+def _resolve_universe(n, instrument_service, market_data):
+    """Топ-N ликвидных фьючерсов на акции по среднему объёму (тот же скор
+    востребованности, что использует бот в режиме top_n)."""
+    from ticker_universe import compute_demand_scores, resolve_top_n, RU_STOCKS
+    scores = compute_demand_scores(sorted(RU_STOCKS), instrument_service, market_data)
+    return resolve_top_n(scores, n, ["stock"], [])
+
+
+def _write_csv(touches, out_path):
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    fields = list(Touch.__dataclass_fields__)
+    with open(out_path, "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=fields)
+        w.writeheader()
+        for t in touches:
+            w.writerow({k: getattr(t, k) for k in fields})
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Датасет касаний уровней (откат-сигнал + влияние факторов)")
     parser.add_argument("--base-ticker", default="IMOEX")
+    parser.add_argument("--tickers", default="", help="явный список базовых тикеров через запятую")
+    parser.add_argument("--universe", type=int, default=0, help="топ-N ликвидных фьючерсов на акции")
     parser.add_argument("--days", type=int, default=365)
     parser.add_argument("--offset-days", type=int, default=0)
     parser.add_argument("--pullback-atr", type=float, default=PULLBACK_ATR)
@@ -677,45 +768,51 @@ def main() -> None:
     from invest_api.services.instruments_service import InstrumentService
     from invest_api.services.market_data_service import MarketDataService
     from db_api_client import DbApiClient
-    from candle_archive import get_candles_cached, get_candles_cached_futures_chain
 
     config = ProgramConfiguration("settings.ini")
     market_data = MarketDataService(config.tinkoff_token, config.tinkoff_app_name)
     instrument_service = InstrumentService(config.tinkoff_token, config.tinkoff_app_name)
     db = DbApiClient(config.mega_alerts_settings.db_api_url, config.mega_alerts_settings.db_api_key)
 
-    resolved = instrument_service.future_by_base_ticker(args.base_ticker)
-    if not resolved:
-        raise SystemExit(f"фьючерс по базовому тикеру {args.base_ticker} не найден")
-    fut, figi = resolved
-    logger.info("контракт: %s (%s)", fut.ticker, figi)
+    # Список тикеров: явный / топ-N ликвидных / одиночный (совместимость).
+    if args.tickers:
+        tickers = [t.strip() for t in args.tickers.split(",") if t.strip()]
+    elif args.universe:
+        tickers = _resolve_universe(args.universe, instrument_service, market_data)
+        logger.info("вселенная: %d тикеров — %s", len(tickers), ", ".join(tickers))
+    else:
+        tickers = [args.base_ticker]
 
-    candles = get_candles_cached_futures_chain(
-        fut.ticker, figi, args.days, market_data, db, instrument_service,
-        candle_interval_min=5, offset_days=args.offset_days)
-    if not candles:
-        raise SystemExit("свечи не получены")
-    bars = _bars_from_candles(candles)
+    multi = len(tickers) > 1
+    all_touches: list = []
+    metrics: dict = {}
+    for base in tickers:
+        try:
+            bars, round_from = _fetch_bars(base, args, instrument_service, market_data, db)
+            if bars is None:
+                continue
+            touches = collect(bars, round_from, args.pullback_atr)
+            for t in touches:
+                t.ticker = base
+            all_touches += touches
+            metrics[base] = instrument_metrics(bars)
+            logger.info("%s: касаний %d (5м баров %d)", base, len(touches), len(bars))
+        except SystemExit as e:      # мало баров у отдельного тикера — не рушим прогон
+            logger.warning("%s: пропуск — %s", base, e)
+        except Exception as e:
+            logger.warning("%s: ошибка — %s", base, e)
 
-    cur_only = get_candles_cached(fut.ticker, figi, args.days, market_data, db,
-                                  candle_interval_min=5, offset_days=args.offset_days)
-    round_from = min((c.time.astimezone(MSK).date() for c in cur_only), default=None)
+    if not all_touches:
+        raise SystemExit("касаний не собрано ни по одному тикеру")
 
-    touches = collect(bars, round_from, args.pullback_atr)
-    logger.info("касаний собрано: %d за %d дней (5м баров: %d, откат=%.2f ATR)",
-                len(touches), args.days, len(bars), args.pullback_atr)
+    name = "universe" if multi else tickers[0]
+    out_path = args.out or os.path.join("data", "analysis", f"level_touches_{name}.csv")
+    _write_csv(all_touches, out_path)
+    print(f"\nCSV: {out_path} ({len(all_touches)} касаний по {len(metrics)} тикерам)")
 
-    out_path = args.out or os.path.join("data", "analysis", f"level_touches_{args.base_ticker}.csv")
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    fields = list(Touch.__dataclass_fields__)
-    with open(out_path, "w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=fields)
-        w.writeheader()
-        for t in touches:
-            w.writerow({k: getattr(t, k) for k in fields})
-    print(f"\nCSV: {out_path} ({len(touches)} касаний)")
-
-    _print_summary(touches)
+    if multi:
+        _universe_summary(all_touches, metrics)
+    _print_summary(all_touches)
 
 
 if __name__ == "__main__":
