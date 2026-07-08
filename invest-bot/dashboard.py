@@ -3408,6 +3408,44 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 </div><!-- /app-layout -->
 
 <script>
+// Глобальная ловля ошибок UI: непойманные JS-исключения (window 'error') и
+// утонувшие промисы/fetch'и (unhandledrejection) шлём на /api/client_error →
+// тот же серверный лог, плюс баннер снизу. Раньше такие ошибки молча тонули
+// в консоли браузера. Ставим ПЕРВЫМ делом, чтобы ловить с начала загрузки.
+(function() {{
+  let _n = 0, _bar = null;
+  function _banner(text) {{
+    try {{
+      if (!document.body) return;
+      if (!_bar) {{
+        _bar = document.createElement('div');
+        _bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99998;background:#7f1d1d;color:#fff;font:11px/1.4 monospace;padding:5px 12px;max-height:30%;overflow:auto;';
+        document.body.appendChild(_bar);
+      }}
+      _bar.textContent = '⚠ Ошибка в интерфейсе (записана в лог сервера): ' + text;
+    }} catch (e) {{}}
+  }}
+  function _report(kind, msg, extra) {{
+    if (_n >= 10) return;
+    _n++;
+    try {{
+      fetch('/api/client_error', {{
+        method: 'POST',
+        headers: {{'Content-Type': 'application/json'}},
+        body: JSON.stringify({{kind: kind, message: String(msg), extra: String(extra || ''), url: location.pathname}})
+      }}).catch(function() {{}});
+    }} catch (e) {{}}
+    _banner(kind + ': ' + msg);
+  }}
+  window.addEventListener('error', function(ev) {{
+    _report('js-error', ev.message || 'unknown', (ev.filename || '') + ':' + (ev.lineno || ''));
+  }});
+  window.addEventListener('unhandledrejection', function(ev) {{
+    var r = ev.reason;
+    _report('promise', (r && r.message) ? r.message : String(r), (r && r.stack) ? r.stack : '');
+  }});
+}})();
+
 function toggleSidebar() {{
   const sb = document.getElementById('sidebar');
   const collapsed = sb.classList.toggle('collapsed');
@@ -9282,6 +9320,15 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"error": "bad json"}, 400)
             return
 
+        if self.path == "/api/client_error":
+            # Ошибки браузерного JS (window.onerror/unhandledrejection) — чтобы
+            # они не тонули молча в консоли, а падали в тот же серверный лог.
+            logger.warning("client-JS %s @ %s: %s | %s",
+                           payload.get("kind", "?"), payload.get("url", "?"),
+                           str(payload.get("message", ""))[:500],
+                           str(payload.get("extra", ""))[:500])
+            self._send_json({"ok": True})
+            return
         if self.path == "/api/bar_rules_apply":
             from_ticker = payload.get("from_ticker", "").upper()
             to_ticker   = payload.get("to_ticker", "").upper()
