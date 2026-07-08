@@ -612,6 +612,56 @@ def _influence(pull: list) -> None:
         print(f"{label:<24}{n1:>6}{100*p1:>8.1f}{100*p2:>8.1f}{z:>7.1f}  {mark}")
 
 
+def _wr(rows: list) -> tuple[float, float]:
+    """(win%, fail%) по подмножеству откатов."""
+    n = len(rows)
+    if not n:
+        return 0.0, 0.0
+    w = sum(1 for r in rows if r.follow == "win")
+    fl = sum(1 for r in rows if r.follow == "fail")
+    return 100 * w / n, 100 * fl / n
+
+
+def _combo_analysis(pull: list) -> None:
+    """Складываются ли сильные факторы или это одна и та же информация.
+    Воронка (последовательное И) + двумерные сетки верхних факторов."""
+    fast = lambda r: r.approach_v6 >= 0.6
+    notrange = lambda r: r.regime != "range"
+    mem = lambda r: r.touches_before >= 1 or r.prev_outcome == "break"
+    clean = lambda r: r.penetration_atr < 0
+    bw, bf = _wr(pull)
+    print(f"\n== Комбо-факторы: win/fail отката (база win={bw:.1f} fail={bf:.1f}, N={len(pull)}) ==")
+
+    print("  воронка (каждое условие добавляется поверх предыдущих):")
+    print(f"    {'':<30}{'N':>7}{'win%':>8}{'fail%':>8}")
+    acc: list = []
+    print(f"    {'база (все откаты)':<30}{len(pull):>7}{bw:>8.1f}{bf:>8.1f}")
+    for label, cond in (("+ быстрый подход v6≥0.6", fast), ("+ не боковик", notrange),
+                        ("+ память (повтор/pre-break)", mem), ("+ чистое касание (no pierce)", clean)):
+        acc.append(cond)
+        cur = [r for r in pull if all(c(r) for c in acc)]
+        w, f = _wr(cur)
+        print(f"    {label:<30}{len(cur):>7}{w:>8.1f}{f:>8.1f}")
+
+    print("  быстрый подход × режим:")
+    print(f"    {'':<30}{'N':>7}{'win%':>8}{'fail%':>8}")
+    for fl_, fname in ((True, "fast"), (False, "slow")):
+        for reg in ("trend", "mixed", "range"):
+            rows = [r for r in pull if fast(r) == fl_ and r.regime == reg]
+            if rows:
+                w, f = _wr(rows)
+                print(f"    {fname+' / '+reg:<30}{len(rows):>7}{w:>8.1f}{f:>8.1f}")
+
+    print("  быстрый подход × память уровня:")
+    print(f"    {'':<30}{'N':>7}{'win%':>8}{'fail%':>8}")
+    for fl_, fname in ((True, "fast"), (False, "slow")):
+        for ml, mname in ((True, "с памятью"), (False, "первое/без")):
+            rows = [r for r in pull if fast(r) == fl_ and mem(r) == ml]
+            if rows:
+                w, f = _wr(rows)
+                print(f"    {fname+' / '+mname:<30}{len(rows):>7}{w:>8.1f}{f:>8.1f}")
+
+
 def _print_summary(touches: list) -> None:
     rh = f"{'':<24}{'N':>7}{'bounce%':>9}{'break%':>9}{'stall%':>9}{'MFE':>8}"
     fh = f"{'':<24}{'N':>7}{'win%':>9}{'fail%':>9}{'none%':>9}{'MFE':>8}"
@@ -648,6 +698,7 @@ def _print_summary(touches: list) -> None:
                 print(f"{reg+'/'+res:<24}{len(rows):>7}{sp:>9.3f}{bl:>8.1f}")
 
     _influence(pull)
+    _combo_analysis(pull)
 
     print("\n== Память уровня: исход по прошлому исходу ==");  print(rh)
     for prev in ("bounce", "break", "stall", ""):
@@ -733,12 +784,15 @@ def _fetch_bars(base, args, instrument_service, market_data, db):
     return _bars_from_candles(candles), round_from
 
 
-def _resolve_universe(n, instrument_service, market_data, db, rank_days=20):
-    """Топ-N ликвидных фьючерсов на акции по среднему дневному объёму за
-    последние rank_days. Ранжируем сами (а не через compute_demand_scores) —
-    та функция дёргает get_candles_cached с db=None и падает на любом пропуске
-    в локальном кэше, отсекая частично закэшированные тикеры. Здесь передаём
-    реальный db: пропуски докачиваются из D1/Tinkoff, тикер не теряется."""
+def _resolve_universe(n, instrument_service, market_data, db, mode="top", rank_days=20):
+    """N фьючерсов на акции по среднему дневному объёму за последние rank_days.
+    mode="top" — топ-N ликвидных; mode="spread" — N штук РАВНОМЕРНО по спектру
+    ликвидности (ликвид→неликвид), чтобы квартили ликвидности не выродились в
+    один тикер на бакет — только так проверяется гипотеза «уровни на ликвиде».
+
+    Ранжируем сами (не через compute_demand_scores): та зовёт get_candles_cached
+    с db=None и падает на любом пропуске кэша, теряя частично закэшированные
+    тикеры. Здесь реальный db — пропуски докачиваются из D1/Tinkoff."""
     from ticker_universe import RU_STOCKS
     from candle_archive import get_candles_cached
     bulk = instrument_service.futures_by_base_tickers_bulk(sorted(RU_STOCKS), margin_delay=1.2)
@@ -760,6 +814,10 @@ def _resolve_universe(n, instrument_service, market_data, db, rank_days=20):
         if by_day:
             ranked.append((sum(by_day.values()) / len(by_day), base))
     ranked.sort(reverse=True)
+    if mode == "spread" and len(ranked) > n > 1:
+        # равномерные индексы от самого ликвидного до самого неликвидного
+        idxs = sorted({round(i * (len(ranked) - 1) / (n - 1)) for i in range(n)})
+        return [ranked[i][1] for i in idxs]
     return [b for _, b in ranked[:n]]
 
 
@@ -778,6 +836,8 @@ def main() -> None:
     parser.add_argument("--base-ticker", default="IMOEX")
     parser.add_argument("--tickers", default="", help="явный список базовых тикеров через запятую")
     parser.add_argument("--universe", type=int, default=0, help="топ-N ликвидных фьючерсов на акции")
+    parser.add_argument("--spread", type=int, default=0,
+                        help="N тикеров равномерно по спектру ликвидности (для проверки оси ликвид/неликвид)")
     parser.add_argument("--days", type=int, default=365)
     parser.add_argument("--offset-days", type=int, default=0)
     parser.add_argument("--pullback-atr", type=float, default=PULLBACK_ATR)
@@ -799,12 +859,14 @@ def main() -> None:
     # Список тикеров: явный / топ-N ликвидных / одиночный (совместимость).
     if args.tickers:
         tickers = [t.strip() for t in args.tickers.split(",") if t.strip()]
-    elif args.universe:
-        tickers = _resolve_universe(args.universe, instrument_service, market_data, db)
+    elif args.universe or args.spread:
+        n = args.spread or args.universe
+        mode = "spread" if args.spread else "top"
+        tickers = _resolve_universe(n, instrument_service, market_data, db, mode=mode)
         if not tickers:
             raise SystemExit("вселенная пуста: ни один фьючерс на акцию не резолвился/не дал объёма "
                              "(проверь токен и сеть). Как обходной путь — задай --tickers явно.")
-        logger.info("вселенная: %d тикеров — %s", len(tickers), ", ".join(tickers))
+        logger.info("вселенная (%s, %d): %s", mode, len(tickers), ", ".join(tickers))
     else:
         tickers = [args.base_ticker]
 
