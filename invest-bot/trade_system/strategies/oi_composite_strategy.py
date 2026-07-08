@@ -8578,6 +8578,26 @@ class OICompositeStrategy(IStrategy):
             _inv_only("OI_ABSORPTION", oi_raw["OI_ABSORPTION"]),
         ] + _tail_scores[3:]
 
+        # ── ИНВАРИАНТ ВЫРАВНИВАНИЯ (не assert — переживает python -O) ──────────
+        # base_scores строится ПОЗИЦИОННО и обязан совпадать по длине/порядку с
+        # BASE_METHOD_NAMES: ниже везде dict(zip(BASE_METHOD_NAMES, base_scores))
+        # и веты scores[BASE_METHOD_NAMES.index(...)]. При рассинхроне zip молча
+        # спарит имя метода со скором СОСЕДА — тихая катастрофа (веты берут чужой
+        # скор, IC/веса учатся на чужом ряду), в проде не видно. Падаем громко на
+        # первом баре, чтобы удаление/добавление метода в METHODS без синхронной
+        # правки BASE_METHOD_NAMES не ушло в прод молча.
+        if len(base_scores) != len(BASE_METHOD_NAMES):
+            raise RuntimeError(
+                f"РАССИНХРОН base_scores/BASE_METHOD_NAMES: {len(base_scores)} скоров "
+                f"vs {len(BASE_METHOD_NAMES)} имён — метод добавлен/удалён в METHODS "
+                f"(или _tail_scores) без синхронной правки BASE_METHOD_NAMES"
+            )
+        if len(_shadow_scores) != len(BASE_METHOD_NAMES):
+            raise RuntimeError(
+                f"РАССИНХРОН _shadow_scores/BASE_METHOD_NAMES: "
+                f"{len(_shadow_scores)} vs {len(BASE_METHOD_NAMES)}"
+            )
+
         # Layer 0: непрерывное распределение по всем режимам. Дискретную метку
         # (argmax) для гейта/порога/нарратива прогоняем через гистерезис —
         # __commit_regime_label. Смесь весов (regime_mods) ниже берёт ВСЁ
@@ -8598,19 +8618,12 @@ class OICompositeStrategy(IStrategy):
 
         # Кластерные модели M1/M2/M3: обновляем при смене режима,
         # вычисляем на текущих скорах. До накопления истории — 0.
-        base_score_dict = dict(zip(
-            [name for name, _ in METHODS]
-            + STRUCTURAL_METHOD_NAMES
-            + [OI_SQUEEZE_NAME, INST_OI_NAME, RETAIL_CONTRA_NAME, DELTA_QUADRANT_NAME, OI_ABSORPTION_NAME]
-            # INDEX_CONTEXT_NAME — тут, а не после TRADESTATS: в base_scores он
-            # стоит именно на этой позиции (см. _tail_scores/BASE_METHOD_NAMES).
-            # Без него zip молча сдвигал все имена TRADESTATS/CHANGE_POINT/
-            # MULTI_TICKER на 1 позицию относительно их реальных скоров.
-            + [INDEX_CONTEXT_NAME]
-            + TRADESTATS_METHOD_NAMES
-            + [CHANGE_POINT_NAME, MULTI_TICKER_NAME],
-            base_scores
-        ))
+        # Имена берём напрямую из BASE_METHOD_NAMES (единый источник порядка) —
+        # раньше список пересобирался здесь вручную (пятый литерал того же
+        # порядка), и рассинхрон уже стрелял: без INDEX_CONTEXT_NAME на нужной
+        # позиции zip сдвигал все имена TRADESTATS/CHANGE_POINT/MULTI_TICKER на 1.
+        # Инвариант длины проверен выше (RuntimeError при рассинхроне).
+        base_score_dict = dict(zip(BASE_METHOD_NAMES, base_scores))
         # M1/M2/M3 отключены: win rate ~35-37% → они блокировали хорошие входы
         # через P7-вето. Скоры держим 0.0 для совместимости ALL_METHOD_NAMES.
         m1_sc = m2_sc = m3_sc = 0.0
