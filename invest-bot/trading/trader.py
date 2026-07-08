@@ -1375,8 +1375,18 @@ class Trader:
                             strategy, direction, confidence, entry_price, stop_price,
                         ))
                     else:
-                        logger.info(f"New signal has been skipped. No available money or risk budget")
-                        self.__record_skip(risk_ticker, signal_new, "нет денег / риск-бюджет")
+                        # Зона 3: раньше причина скипа была общей — не видно, КТО
+                        # из трёх лимитов упёрся в 0 (cash/risk/liquidity). Логируем
+                        # все три на INFO и пишем конкретную причину в skip-статистику,
+                        # чтобы найти доминирующий 0-провайдер без DEBUG-прогона.
+                        _zero = [n for n, v in (("cash", cash_lots), ("risk", risk_qty),
+                                                ("liquidity", liquidity_lots)) if not v]
+                        _why = f"нет лотов (0 у: {', '.join(_zero) if _zero else 'risk_qty<=0'})"
+                        logger.info(
+                            f"New signal skipped: {_why} "
+                            f"(cash={cash_lots}, risk={risk_qty}, liquidity={liquidity_lots})"
+                        )
+                        self.__record_skip(risk_ticker, signal_new, _why)
         except Exception as ex:
             logger.error(f"Error open new position by new signal: {repr(ex)}")
 
