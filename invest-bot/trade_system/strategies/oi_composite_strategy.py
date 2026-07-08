@@ -7280,7 +7280,14 @@ class OICompositeStrategy(IStrategy):
                     self.rejection_stats["below_threshold"] += 1
                     i += 1
                     continue
-                if self.__last_regime in BACKTEST_BLOCKED_REGIMES or (block_ranging and self.__last_regime == "ranging"):
+                # block_ranging — это дашборд-only настройка backtest_scan_signals
+                # (чекбокс «Не торговать в боковике»); в backtest_quality (валидация
+                # перед реальной торговлей) её нет, а живой путь боковик не блокирует.
+                # Ссылка на неё здесь была осиротевшей копипастой из scan-функции и
+                # роняла NameError, как только в валидации срабатывал сигнал →
+                # «Start trading today error» → бот засыпал. Оставляем только штатный
+                # блок стрессового режима (как в live).
+                if self.__last_regime in BACKTEST_BLOCKED_REGIMES:
                     self.rejection_stats["below_threshold"] += 1
                     i += 1
                     continue
