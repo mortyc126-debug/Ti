@@ -667,7 +667,7 @@ def _run_batch(args) -> None:
     writer.writeheader()
 
     rows_summary = []
-    tk_lv = {}  # ticker -> (liq_mln, vol_pct), для корреляции edge↔ликв/волат
+    tk_lv = {}  # ticker -> (liq_mln, vol_pct, n_hist); edge↔ликв/волат/история
     min_bars = max(args.tpc_n_macro, args.tpc_w_norm) + args.k + 5
     for idx, tk in enumerate(tickers, 1):
         try:
@@ -719,7 +719,7 @@ def _run_batch(args) -> None:
         }
         writer.writerow(row); fp.flush()
         rows_summary.append((tk, m, er, ec, sh))
-        tk_lv[tk] = (liq, vol)
+        tk_lv[tk] = (liq, vol, n_hist)
         # Прогресс по RAW (без --calibrate ec=None) — raw и есть честная
         # OOS-метрика при --train-frac; калибровка OOS не помогает.
         wf = " [holdout]" if m.get("walk_forward") else ""
@@ -798,15 +798,25 @@ def _liq_vol_report(ok_rows, tk_lv) -> None:
     """Есть ли связь между ликвидностью/волатильностью тикера и тем, насколько
     работает метод (edge_raw)? Считаем корреляции и режем пул на трети по
     ликвидности — так видно и монотонную зависимость, и нелинейную (напр.
-    'работает только на средних, а топ-ликвиды инвертированы' = SBER-класс)."""
-    rows = [(tk, er["mean"], tk_lv.get(tk, (None, None)))
+    'работает только на средних, а топ-ликвиды инвертированы' = SBER-класс).
+
+    ВАЖНЫЙ конфаунд: неликвидные тикеры обычно и по истории короче. Если
+    edge растёт на неликвиде, надо проверить, не тянет ли это на самом деле
+    длина истории (короткая история → шумный edge → более экстремальные
+    медианы). Поэтому тут же считаем edge↔история и ликвидность↔история:
+    если ликв↔история сильная — эти два фактора неразделимы на этих данных."""
+    def _lv(tk):
+        v = tk_lv.get(tk, (None, None, None))
+        return v if len(v) == 3 else (v[0], v[1], None)
+    rows = [(tk, er["mean"], _lv(tk))
             for (tk, m, er, ec, sh) in ok_rows
-            if er and er["mean"] is not None and tk_lv.get(tk, (None, None))[0] is not None]
+            if er and er["mean"] is not None and _lv(tk)[0] is not None]
     if len(rows) < 5:
         return
     edges = [e for (_, e, _) in rows]
     liqs = [lv[0] for (_, _, lv) in rows]
     vols = [lv[1] for (_, _, lv) in rows]
+    nhs = [lv[2] for (_, _, lv) in rows]
     log_liq = [math.log10(x) for x in liqs]
 
     print("\n── Зависимость edge_raw от ликвидности / волатильности ──")
@@ -817,23 +827,45 @@ def _liq_vol_report(ok_rows, tk_lv) -> None:
     if pe is not None:
         print(f"edge_raw ↔ волатильность:      Pearson {pe:+.2f}  Spearman {sp:+.2f}  (n={n})")
 
-    # Трети по ликвидности: медиана edge в каждой. Ловит немонотонность.
-    order = sorted(range(len(rows)), key=lambda i: liqs[i])
-    t = len(order) // 3
-    bands = [("низкая ликв.", order[:t]), ("средняя", order[t:2*t]),
-             ("высокая ликв.", order[2*t:])]
+    # Конфаунд «длина истории»: edge↔история и ликвидность↔история.
+    has_nh = all(x is not None for x in nhs)
+    if has_nh:
+        log_nh = [math.log10(x) for x in nhs]
+        pe, sp, n = _corr(log_nh, edges)
+        if pe is not None:
+            print(f"edge_raw ↔ log10(история): Pearson {pe:+.2f}  Spearman {sp:+.2f}  (n={n})")
+        pe, sp, n = _corr(log_nh, log_liq)
+        if pe is not None:
+            print(f"ликвидность ↔ история:     Pearson {pe:+.2f}  Spearman {sp:+.2f}  (n={n})")
+            print("  (если ликв↔история сильная — фактор ликвидности и длины")
+            print("   истории на этих данных неразделимы: нужна докачка коротких.)")
 
     def med(xs):
         xs = sorted(xs); n = len(xs)
         return xs[n//2] if n % 2 else 0.5*(xs[n//2-1]+xs[n//2])
-    print("  медиана edge_raw по третям ликвидности:")
-    for name, idxs in bands:
-        if not idxs:
-            continue
-        es = [edges[i] for i in idxs]
-        pos = sum(1 for e in es if e > 0)
-        print(f"    {name:<14} медиана {med(es):+.3f} ATR, "
-              f"edge>0 {pos}/{len(es)} ({pos/len(es)*100:.0f}%)")
+
+    def _thirds(key_vals, label):
+        order = sorted(range(len(rows)), key=lambda i: key_vals[i])
+        t = len(order) // 3
+        bands = [(f"низкая {label}", order[:t]), ("средняя", order[t:2*t]),
+                 (f"высокая {label}", order[2*t:])]
+        print(f"  медиана edge_raw по третям ({label}):")
+        for name, idxs in bands:
+            if not idxs:
+                continue
+            es = [edges[i] for i in idxs]
+            pos = sum(1 for e in es if e > 0)
+            mnh = med([nhs[i] for i in idxs]) if has_nh else None
+            nh_str = f", медиана истории {mnh:.0f} бар" if mnh is not None else ""
+            print(f"    {name:<16} медиана {med(es):+.3f} ATR, "
+                  f"edge>0 {pos}/{len(es)} ({pos/len(es)*100:.0f}%){nh_str}")
+
+    # Трети по ликвидности (с медианой истории в каждой — сразу видно конфаунд).
+    _thirds(liqs, "ликв.")
+    # Трети по истории — если edge так же растёт от короткой к длинной, значит
+    # дело в истории, а не в ликвидности.
+    if has_nh:
+        _thirds(nhs, "история")
     print("  (Spearman ~0 при разной медиане по третям = немонотонная связь,")
     print("   напр. топ-ликвиды инвертированы — SBER-класс.)")
 
