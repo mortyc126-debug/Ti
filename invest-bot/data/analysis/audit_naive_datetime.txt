@@ -1,0 +1,23 @@
+./bot_supervisor.py:227: log_f.write(f"\n\n===== старт {datetime.datetime.now().isoformat()} sandbox={sandbox} =====\n")
+./history.py:411: под симулируемую дату (set_sim_date), а не под datetime.now().
+./metrics.py:78: record = {"event": event, "ts": datetime.now().isoformat(), **data}
+./candle_archive.py:237: # сама вычисляет datetime.now(), поэтому сдвинутый now здесь неприменим.
+./sandbox_monitor.py:86: now = datetime.now().strftime("%H:%M:%S")
+./trade_analytics.py:49: cutoff = (datetime.now() - timedelta(days=days)).date().isoformat()
+./trade_analytics.py:112: cutoff = (datetime.now() - timedelta(days=7)).date().isoformat()
+./trade_analytics.py:142: cutoff = (datetime.now() - timedelta(days=7)).date().isoformat()
+./oi_layers.py:134: today = date.today().isoformat()
+./oi_layers.py:593: base = (date.today().year // 10) * 10
+./oi_layers.py:595: if year < date.today().year - 3:   # цифра указывает на следующее десятилетие
+./dashboard.py:8409: date_till = datetime.date.today() - datetime.timedelta(days=int(offset_days or 0))
+./backfill_oi.py:298: date_till = date.today()
+./tradestats.py:75: today = date.today().isoformat().replace("-", "")
+./method_calibrator.py:623: delta = (datetime.date.today() - last).days
+./method_calibrator.py:658: today = datetime.date.today().isoformat()
+./council.py:335: "ts": datetime.now().isoformat(),
+./risk.py:216: data = {"saved_ts": datetime.now().isoformat(),
+./risk.py:472: opened_ts=datetime.now().isoformat(),
+./risk.py:784: "closed_ts": datetime.now().isoformat()}
+./risk.py:822: "opened_ts": pos.opened_ts, "closed_ts": datetime.now().isoformat(),
+./invest_api/services/instruments_service.py:47: # UTC-датой, а не datetime.date.today() (локальная дата
+--- 22 ---

@@ -1,0 +1,335 @@
+# КАНДИДАТЫ в мёртвые функции (не найден вызов по имени). Возможны
+# ложные: роуты/динамический вызов/getattr/точки входа. Проверять руками.
+
+absorption_score
+  ./oi_layers.py:526
+  ./oi_layers.py:954
+account_settings
+  ./configuration/configuration.py:125
+add_to_position
+  ./risk.py:791
+all_tfs
+  ./ic_ewa_store.py:57
+all_tickers_summary
+  ./trade_analytics.py:106
+alt_fn
+  ./method_calibrator.py:542
+blended
+  ./method_calibrator.py:560
+blog_settings
+  ./configuration/configuration.py:121
+calibrate_agreement_threshold
+  ./joint_calibration.py:82
+calibrate_iterative
+  ./joint_calibration.py:115
+calibrate_signal_threshold
+  ./joint_calibration.py:58
+can_add
+  ./risk.py:396
+candle_to_historiccandle
+  ./invest_api/utils.py:41
+cmd_adopt
+  ./tg_api/tg_control.py:73
+cmd_close
+  ./tg_api/tg_control.py:61
+cmd_move_stop
+  ./tg_api/tg_control.py:112
+cmd_pause
+  ./tg_api/tg_control.py:47
+cmd_resume
+  ./tg_api/tg_control.py:54
+cmd_status
+  ./tg_api/tg_control.py:39
+configured
+  ./db_api_client.py:23
+current_risk_pct
+  ./risk.py:331
+current_risk_rub
+  ./trading_system.py:105
+daily_method_scores_by_regime
+  ./history.py:248
+daily_pnl_rub
+  ./trading_system.py:89
+dashboard_password
+  ./configuration/configuration.py:145
+decimal_to_moneyvalue
+  ./invest_api/utils.py:28
+delta_quadrant_score
+  ./oi_layers.py:523
+  ./oi_layers.py:946
+direction
+  ./narrative.py:178
+do_GET
+  ./dashboard.py:9052
+do_POST
+  ./dashboard.py:9242
+dominant_cycle
+  ./indicators_ehlers.py:367
+download_historic_candle
+  ./invest_api/services/client_service.py:25
+entry_priority
+  ./risk.py:1015
+equity
+  ./trading_system.py:85
+errors_retry
+  ./invest_api/invest_error_decorators.py:36
+errors_wrapper
+  ./invest_api/invest_error_decorators.py:38
+ewa_bucket
+  ./ic_ewa_store.py:50
+frama
+  ./indicators.py:45
+from_intraday
+  ./index_context.py:138
+futures_trading_settings
+  ./configuration/configuration.py:141
+get_1h
+  ./timeframe.py:71
+get_5min
+  ./timeframe.py:68
+get_price_impact_summary
+  ./news.py:655
+horizon_minutes
+  ./trading_system.py:46
+inst_oi_score
+  ./oi_layers.py:517
+  ./oi_layers.py:938
+invest_error_logging
+  ./invest_api/invest_error_decorators.py:13
+is_actionable
+  ./narrative.py:182
+is_anomaly
+  ./calibration.py:98
+key_fn
+  ./news.py:570
+log_message
+  ./dashboard.py:9637
+log_wrapper
+  ./invest_api/invest_error_decorators.py:14
+loss_limits
+  ./runtime_overrides.py:166
+mega_alerts_settings
+  ./configuration/configuration.py:137
+month_pnl_rub
+  ./trading_system.py:97
+nearest_across_horizons
+  ./trade_system/strategies/level_pattern.py:734
+oi_hook
+  ./dashboard.py:1068
+  ./dashboard.py:218
+  ./dashboard.py:1750
+  ./dashboard.py:2014
+  ./compare_take_stop.py:112
+oi_instability_score
+  ./oi_layers.py:533
+  ./oi_layers.py:933
+on_progress
+  ./dashboard.py:9233
+open_positions
+  ./trading_system.py:101
+pause
+  ./trading/trader.py:315
+percentile_rank
+  ./history.py:380
+poll_once
+  ./news.py:477
+priority
+  ./trading_system.py:50
+recalibrate_from_file
+  ./signal_gate.py:711
+request_close
+  ./trading/trader.py:321
+resume
+  ./trading/trader.py:318
+retail_contra_score
+  ./oi_layers.py:520
+  ./oi_layers.py:942
+score
+  ./tradestats.py:271
+  ./index_context.py:152
+score_adaptive_ma_candle
+  ./trade_system/strategies/oi_composite_strategy.py:1554
+score_adx_di_convergence
+  ./trade_system/strategies/oi_composite_strategy.py:1965
+score_alligator
+  ./trade_system/strategies/oi_composite_strategy.py:5235
+score_amt_poc
+  ./trade_system/strategies/oi_composite_strategy.py:3901
+score_atr_exhaustion
+  ./trade_system/strategies/oi_composite_strategy.py:5182
+score_bb_keltner_squeeze
+  ./trade_system/strategies/oi_composite_strategy.py:4969
+score_bs_pressure
+  ./trade_system/strategies/oi_composite_strategy.py:1241
+score_candle_pattern
+  ./trade_system/strategies/oi_composite_strategy.py:1256
+score_cascade
+  ./trade_system/strategies/oi_composite_strategy.py:4126
+score_chaikin_ad
+  ./indicators_volume.py:107
+score_cumul_delta
+  ./trade_system/strategies/oi_composite_strategy.py:3855
+score_cyber_cycle_candle
+  ./trade_system/strategies/oi_composite_strategy.py:1637
+score_cyber_phase_candle
+  ./trade_system/strategies/oi_composite_strategy.py:1724
+score_decycler_candle
+  ./trade_system/strategies/oi_composite_strategy.py:1642
+score_donchian_candle
+  ./trade_system/strategies/oi_composite_strategy.py:1908
+score_ebsw_candle
+  ./trade_system/strategies/oi_composite_strategy.py:1663
+score_ehlers_mode_candle
+  ./trade_system/strategies/oi_composite_strategy.py:1719
+score_entropy_candle
+  ./trade_system/strategies/oi_composite_strategy.py:1632
+score_false_breakout
+  ./trade_system/strategies/oi_composite_strategy.py:4532
+score_fisher_rsi
+  ./indicators_ehlers.py:242
+score_fisher_rsi_candle
+  ./trade_system/strategies/oi_composite_strategy.py:1647
+score_fractal
+  ./indicators_fractal.py:166
+score_fractal_candle
+  ./trade_system/strategies/oi_composite_strategy.py:1616
+score_fractional_diff
+  ./trade_system/strategies/oi_composite_strategy.py:2572
+score_fvg
+  ./trade_system/strategies/oi_composite_strategy.py:5666
+score_hawkes_signal
+  ./trade_system/strategies/oi_composite_strategy.py:2627
+score_ichimoku_signal
+  ./trade_system/strategies/oi_composite_strategy.py:4796
+score_impulse_pullback
+  ./trade_system/strategies/oi_composite_strategy.py:4201
+score_klinger
+  ./indicators_volume.py:470
+score_klinger_candle
+  ./trade_system/strategies/oi_composite_strategy.py:1737
+score_level_absorption
+  ./trade_system/strategies/oi_composite_strategy.py:4657
+score_level_quality
+  ./trade_system/strategies/oi_composite_strategy.py:5489
+score_liquidity_sweep
+  ./trade_system/strategies/oi_composite_strategy.py:5870
+score_ma_envelope
+  ./trade_system/strategies/oi_composite_strategy.py:4903
+score_ma_tension
+  ./trade_system/strategies/oi_composite_strategy.py:5057
+score_mama_fama_candle
+  ./trade_system/strategies/oi_composite_strategy.py:1668
+score_mfi_div
+  ./indicators_volume.py:184
+score_mmi_signal
+  ./trade_system/strategies/oi_composite_strategy.py:2415
+score_nadaraya_watson
+  ./trade_system/strategies/oi_composite_strategy.py:2521
+score_obv_div
+  ./indicators_volume.py:57
+score_order_block
+  ./trade_system/strategies/oi_composite_strategy.py:5779
+score_price_accel
+  ./trade_system/strategies/oi_composite_strategy.py:3795
+score_price_trend
+  ./trade_system/strategies/oi_composite_strategy.py:1113
+score_rmi_candle
+  ./trade_system/strategies/oi_composite_strategy.py:2220
+score_rsi_divergence
+  ./trade_system/strategies/oi_composite_strategy.py:5112
+score_sinewave_signal
+  ./trade_system/strategies/oi_composite_strategy.py:2351
+score_ssa_signal
+  ./trade_system/strategies/oi_composite_strategy.py:2499
+score_t3_signal
+  ./trade_system/strategies/oi_composite_strategy.py:2341
+score_talib_antisignal
+  ./trade_system/strategies/oi_composite_strategy.py:1486
+score_trend_quality_candle
+  ./trade_system/strategies/oi_composite_strategy.py:1611
+score_triangle
+  ./trade_system/strategies/oi_composite_strategy.py:3319
+score_twiggs
+  ./indicators_volume.py:499
+score_twiggs_candle
+  ./trade_system/strategies/oi_composite_strategy.py:2124
+score_ult_osc_disagreement
+  ./trade_system/strategies/oi_composite_strategy.py:2061
+score_vol_compression
+  ./trade_system/strategies/oi_composite_strategy.py:4467
+score_vol_momentum
+  ./trade_system/strategies/oi_composite_strategy.py:1138
+score_vol_profile
+  ./indicators_volume.py:334
+score_vr_signal
+  ./trade_system/strategies/oi_composite_strategy.py:2487
+score_vsa
+  ./trade_system/strategies/oi_composite_strategy.py:2683
+score_vsa_absorption
+  ./trade_system/strategies/oi_composite_strategy.py:4065
+score_vwap_signal
+  ./trade_system/strategies/oi_composite_strategy.py:1173
+score_vzo
+  ./indicators_volume.py:486
+score_vzo_candle
+  ./trade_system/strategies/oi_composite_strategy.py:1828
+score_waning_impulses
+  ./trade_system/strategies/oi_composite_strategy.py:4354
+score_wavelet_signal
+  ./trade_system/strategies/oi_composite_strategy.py:2677
+score_wick_rejection
+  ./trade_system/strategies/oi_composite_strategy.py:3263
+score_zlema_signal
+  ./trade_system/strategies/oi_composite_strategy.py:2331
+score_zscore
+  ./indicators_volume.py:525
+score_zscore_candle
+  ./trade_system/strategies/oi_composite_strategy.py:2225
+set_narrative_thresholds
+  ./trade_system/strategies/oi_composite_strategy.py:9881
+settings
+  ./trade_system/strategies/base_strategy.py:18
+  ./trade_system/strategies/oi_composite_strategy.py:6657
+  ./trade_system/strategies/hierarchical_strategy.py:352
+shannon_entropy
+  ./indicators_fractal.py:121
+signal_only
+  ./trade_system/strategies/oi_composite_strategy.py:6661
+snapshot
+  ./ic_ewa_store.py:60
+sort_and_filter
+  ./risk.py:1021
+start_candles_stream
+  ./invest_api/services/market_data_stream_service.py:28
+stats
+  ./calibration.py:106
+summary
+  ./method_calibrator.py:854
+tickers_with_weak_signal
+  ./trade_analytics.py:139
+tii
+  ./indicators.py:110
+timeframe_method_performance
+  ./history.py:346
+tinkoff_app_name
+  ./configuration/configuration.py:117
+tinkoff_token
+  ./configuration/configuration.py:113
+tpi
+  ./indicators.py:141
+trade_strategy_settings
+  ./configuration/configuration.py:129
+trading_settings
+  ./configuration/configuration.py:133
+update_loss_limits
+  ./risk.py:134
+vhf
+  ./indicators.py:132
+vidya
+  ./indicators.py:62
+week_pnl_rub
+  ./trading_system.py:93
+win_rate
+  ./history.py:392
+
+--- 159 кандидатов ---
