@@ -8727,6 +8727,12 @@ class OICompositeStrategy(IStrategy):
             redundancy_mult = {}
 
         # Инверсия скора для методов с отрицательным IC (метод работает наоборот)
+        # ⚠ ИНВАРИАНТ ПОРЯДКА (Риск 4 SYSTEM_RISKS): эта инверсия и режимная ниже
+        # обязаны идти ПОСЛЕ _apply_alt_transforms (выше). alt анализирует скор
+        # таким, каким метод его «думал» (дивергенция/истощение на raw-знаке).
+        # Переставишь инверсию ПЕРЕД alt — alt увидит уже перевёрнутый скор и
+        # найдёт «дивергенцию» там, где её нет. Порядок alt → IC.invert → regime
+        # load-bearing, не менять.
         scores_for_composite = [
             -s if self.__ic(n).invert else s
             for n, s in zip(ALL_METHOD_NAMES, scores_for_composite)
@@ -8837,6 +8843,12 @@ class OICompositeStrategy(IStrategy):
         composite *= confidence_mult
 
         # L2-блендинг: даёт 30% итогового composite. Работает на любом ТФ.
+        # ⚠ ИНВАРИАНТ ПОРЯДКА (Риск 4 SYSTEM_RISKS): это АДДИТИВНОЕ смешивание
+        # (сложение, не умножение). Все веты НИЖЕ (LEVEL_VETO ×0.15,
+        # STRONG_SIGNAL_VETO ×0.12, MMI ×0.35, L1-гейт, Hurst-ex, ATR-ex) обязаны
+        # стоять ПОСЛЕ этой строки: их множитель бьёт по УЖЕ смешанному
+        # composite. Перенесёшь вето выше блендинга — эффект ×0.15 разбавится
+        # 30%-й L2-долей и станет ≈×0.4 (тихо ослабнет). Не переставлять.
         l2_comp = self.__cached_mtf5_composite
         l2_scores = self.__cached_mtf5_scores
         if abs(l2_comp) > 0.01:
