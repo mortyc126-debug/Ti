@@ -158,6 +158,26 @@ __all__ = ("OICompositeStrategy",)
 
 logger = logging.getLogger(__name__)
 
+# Зона 1 аудита: score_*-методы глушат баг в except → return 0.0 (метод молча
+# перестаёт давать edge, IC-веса тихо роняют его в 0.5). Раньше — ни строки в
+# логе. Логируем КАЖДЫЙ такой сбой ОДИН раз на место (throttle), чтобы всплыл
+# скрытый баг и при этом не флудить (методы зовутся каждый бар).
+_SCORE_EXC_SEEN: set = set()
+
+
+def _score_except(exc: Exception) -> None:
+    # Ключ = место вызова (файл:строка), берём из кадра вызывающего — не надо
+    # руками давать имя каждому месту, и оно не «поедет» при правках выше.
+    import traceback
+    tb = traceback.extract_stack(limit=2)[0]
+    key = f"{tb.name}:{tb.lineno}"
+    if key in _SCORE_EXC_SEEN:
+        return
+    _SCORE_EXC_SEEN.add(key)
+    logger.warning("score-except в %s упал (глушится в 0.0): %r "
+                   "[дальше по этому месту молчим]", key, exc)
+
+
 # ── Константы ────────────────────────────────────────────────────────────────
 WEIGHTS_FILE = "oi_weights.json"       # файл весов (рядом с main.py)
 GLOBAL_IC_FILE = "data/global_ic_prior.json"  # агрегированный sign-IC по всем тикерам
@@ -1514,7 +1534,8 @@ def score_talib_antisignal(candles: list[HistoricCandle]) -> float:
         h = _np.array([_to_f(c.high)  for c in candles], dtype=float)
         l = _np.array([_to_f(c.low)   for c in candles], dtype=float)
         c = _np.array([_to_f(c.close) for c in candles], dtype=float)
-    except Exception:
+    except Exception as _e:
+        _score_except(_e)
         return 0.0
 
     total_weight = 0.0
@@ -2514,7 +2535,8 @@ def score_ssa_signal(candles: list[HistoricCandle]) -> float:
             return 0.0
         dev = (closes[-1] - ssa_trend) / ssa_trend
         return max(-1.0, min(1.0, math.tanh(dev * 30)))
-    except Exception:
+    except Exception as _e:
+        _score_except(_e)
         return 0.0
 
 
@@ -2650,7 +2672,8 @@ def score_hawkes_signal(candles: list[HistoricCandle]) -> float:
         if n < 0.5:
             return -0.3 * price_dir
         return 0.0
-    except Exception:
+    except Exception as _e:
+        _score_except(_e)
         return 0.0
 
 
@@ -4347,7 +4370,8 @@ def score_impulse_pullback(candles: list[HistoricCandle]) -> float:
                 return round(imp_dir * 0.20, 4)
 
         return 0.0
-    except Exception:
+    except Exception as _e:
+        _score_except(_e)
         return 0.0
 
 
@@ -4650,7 +4674,8 @@ def score_false_breakout(candles: list[HistoricCandle]) -> float:
                 return round(direction * strength, 4)
 
         return 0.0
-    except Exception:
+    except Exception as _e:
+        _score_except(_e)
         return 0.0
 
 
@@ -5659,7 +5684,8 @@ def score_level_quality(candles: list[HistoricCandle]) -> float:
         dir_sign = 1.0 if direction > 0 else -1.0 if direction < 0 else 0.0
         raw = dir_sign * (criteria / 5.0) * strength_mult
         return max(-1.0, min(1.0, round(raw, 4)))
-    except Exception:
+    except Exception as _e:
+        _score_except(_e)
         return 0.0
 
 
@@ -5772,7 +5798,8 @@ def score_fvg(candles: list[HistoricCandle]) -> float:
             score *= 1.25
 
         return max(-1.0, min(1.0, round(score, 4)))
-    except Exception:
+    except Exception as _e:
+        _score_except(_e)
         return 0.0
 
 
@@ -5863,7 +5890,8 @@ def score_order_block(candles: list[HistoricCandle]) -> float:
                     score += s
 
         return max(-1.0, min(1.0, round(score, 4)))
-    except Exception:
+    except Exception as _e:
+        _score_except(_e)
         return 0.0
 
 
@@ -6007,7 +6035,8 @@ def score_liquidity_sweep(candles: list[HistoricCandle]) -> float:
             score *= 1.5
 
         return max(-1.0, min(1.0, round(score, 4)))
-    except Exception:
+    except Exception as _e:
+        _score_except(_e)
         return 0.0
 
 
@@ -6203,7 +6232,8 @@ def _compute_l2_composite(candles_1m: list, factor: int = _MTF_FACTOR) -> tuple[
     """
     try:
         bars_5m = _aggregate_candles(candles_1m, factor)
-    except Exception:
+    except Exception as _e:
+        _score_except(_e)
         return 0.0, {}
     n5 = len(bars_5m)
     if n5 < _MTF5_MIN_5M_BARS:
@@ -9028,7 +9058,8 @@ class OICompositeStrategy(IStrategy):
             return 0.0
         try:
             return float(self.__oi_regime_provider(self.__settings.ticker) or 0.0)
-        except Exception:
+        except Exception as _e:
+            _score_except(_e)
             return 0.0
 
     def __score_provider(self, provider: Optional[ScoreProvider]) -> float:
@@ -9053,7 +9084,8 @@ class OICompositeStrategy(IStrategy):
             return 0.0
         try:
             return max(-1.0, min(1.0, float(self.__multi_ticker_provider(self.__settings.ticker))))
-        except Exception:
+        except Exception as _e:
+            _score_except(_e)
             return 0.0
 
     def __methods_agree(self, scores: list[float], direction: SignalType) -> bool:

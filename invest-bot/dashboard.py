@@ -9049,12 +9049,20 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_error(self, exc: Exception, status: int = 500):
+        """Ошибка запроса: пишем ПОЛНЫЙ трейсбек в серверный лог (раньше
+        уходил только str(e) в браузер — где именно упало, было не видно) и
+        отдаём краткий текст клиенту. Один центр — вместо логов в 47 местах."""
+        logger.exception(f"dashboard {self.command} {self.path}: {exc}")
+        self._send_json({"error": str(exc)}, status)
+
     def do_GET(self):
         if self.path == "/":
             try:
                 body = _render_page()
             except Exception as _e:
                 import traceback
+                logger.exception(f"dashboard render / упал: {_e}")
                 err_html = f"<pre>Ошибка рендеринга: {traceback.format_exc()}</pre>".encode("utf-8")
                 self.send_response(500)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -9103,7 +9111,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 self._send_json(get_trade_chart(ticker, days, atr_take, atr_stop))
             except Exception as e:
-                self._send_json({"error": str(e)})
+                self._send_error(e)
         elif self.path.startswith("/api/export_bar_scores"):
             from urllib.parse import urlparse, parse_qs
             qs = parse_qs(urlparse(self.path).query)
@@ -9123,7 +9131,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.end_headers()
                     self.wfile.write(csv_bytes)
             except Exception as e:
-                self._send_json({"error": str(e)})
+                self._send_error(e)
         elif self.path.startswith("/api/export_trades_csv"):
             try:
                 with _last_full_trades_lock:
@@ -9141,7 +9149,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.end_headers()
                     self.wfile.write(csv_bytes)
             except Exception as e:
-                self._send_json({"error": str(e)})
+                self._send_error(e)
         elif self.path == "/api/bot_status":
             self._send_json(get_bot_status())
         elif self.path == "/api/supervisor/status":
@@ -9193,7 +9201,7 @@ class Handler(BaseHTTPRequestHandler):
                     path = candidates[0] if candidates else os.path.join(BAR_RULES_DIR, f"{ticker}.json")
                     self._send_json({"result": result, "path": path, "computed_at": result.get("computed_at","?")})
             except Exception as e:
-                self._send_json({"error": str(e)})
+                self._send_error(e)
         elif self.path.startswith("/api/bar_scores_list"):
             self._send_json(list_bar_scores_files())
         elif self.path.startswith("/api/bar_scores_download"):
@@ -9266,7 +9274,7 @@ class Handler(BaseHTTPRequestHandler):
                 n_global = len(result.get("global", {}).get("rules", []))
                 self._send_json({"result": result, "path": path, "n_rules_global": n_global})
             except Exception as e:
-                self._send_json({"error": str(e)})
+                self._send_error(e)
         elif self.path == "/api/bar_rules_mine":
             ticker       = payload.get("ticker", "").upper()
             target       = payload.get("target", "fwd_ret_3")
@@ -9282,7 +9290,7 @@ class Handler(BaseHTTPRequestHandler):
                     n_global = len(result.get("global", {}).get("rules", []))
                     self._send_json({"result": result, "path": path, "n_rules_global": n_global})
             except Exception as e:
-                self._send_json({"error": str(e)})
+                self._send_error(e)
         elif self.path == "/api/backtest_one":
             ticker = payload.get("ticker", "")
             days = int(payload.get("days", 30))
