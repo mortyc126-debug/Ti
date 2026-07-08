@@ -4283,6 +4283,7 @@ function refreshMethodPresets() {{
     Object.keys(_methodPresets).sort().forEach(name => {{
       const o = document.createElement('option');
       o.value = name; o.textContent = name;
+      o.title = (_methodPresets[name] && _methodPresets[name].description) || '';
       sel.appendChild(o);
     }});
     if (cur && _methodPresets[cur]) sel.value = cur;

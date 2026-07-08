@@ -1,46 +1,12 @@
 {
-  "score_methods_pool_2026-07": {
-    "description": "Автосгенерировано из score_methods.py --by-regime на пуле ~418 тикеров. disabled = universal noise (|d| ≤ 0.05 во всех режимах при огромных n_fires — балласт). inverted = universal ANTI (d < −0.05 стабильно во всех 6 режимах — глобальная инверсия работает). Режимные методы (BS_PRESSURE, FALSE_BREAKOUT, ICHIMOKU_SIGNAL, RSI_DIVERGENCE, VSA, VSA_ABSORPTION) в этом пресете НЕ ТРОНУТЫ — для них нужен режимный множитель через REGIME_WEIGHT_MODS, не глобальная инверсия.",
-    "disabled": [
-      "DONCHIAN",
-      "KLINGER",
-      "LEVEL_QUALITY",
-      "RMI",
-      "TWIGGS",
-      "VOL_MOMENTUM",
-      "WICK_REJECTION"
-    ],
-    "inverted": [
-      "ALLIGATOR",
-      "BB_KELTNER_SQUEEZE",
-      "EHLERS_MODE",
-      "FRACTIONAL_DIFF",
-      "LEVEL_ABSORPTION",
-      "PRICE_TREND",
-      "T3_SIGNAL",
-      "VOL_COMPRESSION",
-      "ZLEMA_SIGNAL"
-    ],
-    "saved_at": 1751758800
+  "1. Пусто — baseline (откат, ничего не тронуто)": {
+    "description": "Ничего не выключено и не инвертировано. Загрузи для полного отката к чистому состоянию — или как baseline перед A/B-сравнением с чисткой.",
+    "disabled": [],
+    "inverted": [],
+    "saved_at": 1752019200
   },
-  "score_methods_minimal_risk_2026-07": {
-    "description": "Осторожный вариант того же прогона: только 4 самых массовых universal anti (n_fires × |d| в топе contribution) и 4 самых массовых noise. Меньше риск конфликта с уже подстроенными IC-весами.",
-    "disabled": [
-      "CUMUL_DELTA",
-      "RMI",
-      "VOL_MOMENTUM",
-      "SINEWAVE_SIGNAL"
-    ],
-    "inverted": [
-      "ALLIGATOR",
-      "BB_KELTNER_SQUEEZE",
-      "EHLERS_MODE",
-      "FRACTIONAL_DIFF"
-    ],
-    "saved_at": 1751758800
-  },
-  "score_methods_pool_2026-07_refined": {
-    "description": "Уточнённый прогон score_methods.py --by-regime (полный пул ~415 тикеров, июль 2026). Это ТЕКУЩИЙ применённый в method_toggle_state.json набор. Отличия от score_methods_pool_2026-07: inverted +ADAPTIVE_MA, +BS_PRESSURE, +MAMA_FAMA, −PRICE_TREND (стал режимным); disabled +MA_TENSION, −VOL_MOMENTUM. inverted = 11 universal ANTI (стабильно d<−0.05 во всех 6 режимах). disabled = 7 universal noise. Режимные (FALSE_BREAKOUT, ICHIMOKU_SIGNAL, NADARAYA_WATSON, PRICE_TREND, VSA, VSA_ABSORPTION) НЕ трогать глобально — только через REGIME_WEIGHT_MODS. Baseline-вердикты и REGIME_WEIGHT_MODS_AUTO — в docs/BASELINE_method_verdicts_2026-07.md.",
+  "2. Чистка — текущая (11 инверсий + 7 выкл)": {
+    "description": "ТЕКУЩИЙ применённый набор (совпадает с method_toggle_state.json). score_methods --by-regime, полный пул ~415 тикеров, июль 2026. 11 инверсий = universal ANTI (стабильно d<-0.05 во всех 6 режимах, в основном трендовые MA — на 5-мин работают как fade). 7 выключений = universal noise (нет edge нигде). Режимные (FALSE_BREAKOUT/ICHIMOKU/NADARAYA/PRICE_TREND/VSA/VSA_ABSORPTION) НЕ трогаются глобально — только через REGIME_WEIGHT_MODS. Детали и baseline-вердикты — docs/BASELINE_method_verdicts_2026-07.md.",
     "disabled": [
       "DONCHIAN",
       "KLINGER",
@@ -64,5 +30,45 @@
       "ZLEMA_SIGNAL"
     ],
     "saved_at": 1752019200
+  },
+  "3. Чистка — осторожная (4 инверсии + 4 выкл)": {
+    "description": "Минимальный риск: только 4 самых массовых инверсии + 4 шумовых. Меньше конфликта с уже подстроенными IC-весами. Если полная чистка (пресет 2) ухудшит A/B — попробуй этот как промежуточный.",
+    "disabled": [
+      "CUMUL_DELTA",
+      "RMI",
+      "VOL_MOMENTUM",
+      "SINEWAVE_SIGNAL"
+    ],
+    "inverted": [
+      "ALLIGATOR",
+      "BB_KELTNER_SQUEEZE",
+      "EHLERS_MODE",
+      "FRACTIONAL_DIFF"
+    ],
+    "saved_at": 1751758800
+  },
+  "4. Чистка — старый прогон v1 (9 инверсий + 7 выкл)": {
+    "description": "Первый прогон (score_methods_pool_2026-07). 9 инверсий + 7 выключений. Отличия от текущей (пресет 2): без ADAPTIVE_MA/BS_PRESSURE/MAMA_FAMA, зато с PRICE_TREND (позже признан режимным, из инверсий убран) и VOL_MOMENTUM в выключениях. Оставлен для истории/сравнения.",
+    "disabled": [
+      "DONCHIAN",
+      "KLINGER",
+      "LEVEL_QUALITY",
+      "RMI",
+      "TWIGGS",
+      "VOL_MOMENTUM",
+      "WICK_REJECTION"
+    ],
+    "inverted": [
+      "ALLIGATOR",
+      "BB_KELTNER_SQUEEZE",
+      "EHLERS_MODE",
+      "FRACTIONAL_DIFF",
+      "LEVEL_ABSORPTION",
+      "PRICE_TREND",
+      "T3_SIGNAL",
+      "VOL_COMPRESSION",
+      "ZLEMA_SIGNAL"
+    ],
+    "saved_at": 1751758800
   }
 }
