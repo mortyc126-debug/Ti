@@ -826,9 +826,7 @@ def _print_summary(touches: list, cost: float = DEFAULT_COST_ATR) -> None:
 
     # Экспектанси: по всем откатам и по лучшей комбо-ячейке (быстрый+память+чистое).
     _take_stop_grid(pull, cost, "все откаты")
-    best = [r for r in pull if r.approach_v6 >= 0.6
-            and (r.touches_before >= 1 or r.prev_outcome == "break")
-            and r.penetration_atr < 0]
+    best = _combo_filter(pull)
     _take_stop_grid(best, cost, "комбо: быстрый+память+чистое")
     # Реалистичная версия: без перекрытия позиций (частоту в доход не умножить).
     _portfolio_grid(pull, cost, "все откаты")
@@ -970,6 +968,34 @@ def _write_csv(touches, out_path):
             w.writerow({k: getattr(t, k) for k in fields})
 
 
+def _combo_filter(rows: list) -> list:
+    """ФИКСИРОВАННЫЙ фильтр (быстрый подход + память + чистое касание) — те же
+    пороги, что и в комбо-воронке выше. Держим отдельной функцией, чтобы held-out
+    проверка применяла РОВНО тот же критерий к train и test, без переподбора."""
+    return [r for r in rows if r.approach_v6 >= 0.6
+            and (r.touches_before >= 1 or r.prev_outcome == "break")
+            and r.penetration_atr < 0]
+
+
+def _holdout_check(all_touches: list, split_date: str, cost: float) -> None:
+    """Train/test по ВРЕМЕНИ (не случайно) — критерий _combo_filter фиксирован
+    заранее (не переподбирается на train), поэтому это честная OOS-проверка:
+    если сигнал реален, а не подгонка под конкретные даты, экспектанси должна
+    быть положительной на ОБЕИХ половинах, не только там, где его искали."""
+    train = [t for t in all_touches if t.ts_msk[:10] < split_date]
+    test = [t for t in all_touches if t.ts_msk[:10] >= split_date]
+    print(f"\n{'='*70}\nHELD-OUT ПО ВРЕМЕНИ: train < {split_date} ({len(train)} касаний) | "
+          f"test ≥ {split_date} ({len(test)} касаний)\n{'='*70}")
+    if not train or not test:
+        print("одна из половин пуста — сдвинь --split-date")
+        return
+    for label, rows in (("TRAIN", train), ("TEST (held-out)", test)):
+        pull = [r for r in rows if r.signal == "pullback"]
+        best = _combo_filter(pull)
+        print(f"\n-- {label} --")
+        _portfolio_grid(best, cost, f"{label}: комбо (фиксированный фильтр)")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Датасет касаний уровней (откат-сигнал + влияние факторов)")
     parser.add_argument("--base-ticker", default="IMOEX")
@@ -984,6 +1010,9 @@ def main() -> None:
                         help="издержки на круг в ATR (спред+комиссия+проскальзывание)")
     parser.add_argument("--min-liquidity", type=float, default=0.0,
                         help="отсечь тикеры со средним дневным объёмом ниже (неисполнимые)")
+    parser.add_argument("--split-date", default="",
+                        help="held-out проверка: YYYY-MM-DD, train < дата, test ≥ дата "
+                             "(фиксированный комбо-фильтр, без переподбора на train)")
     parser.add_argument("--out", default="")
     args = parser.parse_args()
 
@@ -1054,6 +1083,9 @@ def main() -> None:
     if multi:
         _universe_summary(all_touches, metrics)
     _print_summary(all_touches, args.cost_atr)
+
+    if args.split_date:
+        _holdout_check(all_touches, args.split_date, args.cost_atr)
 
 
 if __name__ == "__main__":
