@@ -833,6 +833,11 @@ def _print_summary(touches: list, cost: float = DEFAULT_COST_ATR) -> None:
     # Реалистичная версия: без перекрытия позиций (частоту в доход не умножить).
     _portfolio_grid(pull, cost, "все откаты")
     _portfolio_grid(best, cost, "комбо: быстрый+память+чистое")
+    # Лонг/шорт разрез: рынок РФ падающий с 2023, растёт только на шорт-сквизах.
+    # support-касание = лонг (отскок вверх), resistance = шорт. Ждём перевес и
+    # надёжность ШОРТА; лонги редки и, вероятно, ловля сквиз-дна (рисковее).
+    for lbl, sd in (("ЛОНГ (support)", "support"), ("ШОРТ (resistance)", "resistance")):
+        _portfolio_grid([r for r in best if r.side == sd], cost, f"комбо {lbl}")
 
     print("\n== Память уровня: исход по прошлому исходу ==");  print(rh)
     for prev in ("bounce", "break", "stall", ""):
@@ -977,6 +982,8 @@ def main() -> None:
     parser.add_argument("--pullback-atr", type=float, default=PULLBACK_ATR)
     parser.add_argument("--cost-atr", type=float, default=DEFAULT_COST_ATR,
                         help="издержки на круг в ATR (спред+комиссия+проскальзывание)")
+    parser.add_argument("--min-liquidity", type=float, default=0.0,
+                        help="отсечь тикеры со средним дневным объёмом ниже (неисполнимые)")
     parser.add_argument("--out", default="")
     args = parser.parse_args()
 
@@ -1027,6 +1034,17 @@ def main() -> None:
 
     if not all_touches:
         raise SystemExit("касаний не собрано ни по одному тикеру")
+
+    # Гейт ликвидности: неисполнимые бумаги (тонкий стакан) дают бумажный edge —
+    # спред съест. Отсекаем по среднему дневному объёму.
+    if args.min_liquidity > 0:
+        keep = {t for t in metrics if metrics[t][0] >= args.min_liquidity}
+        before = len(all_touches)
+        all_touches = [x for x in all_touches if x.ticker in keep]
+        logger.info("гейт ликвидности ≥%g: осталось %d тикеров, %d/%d касаний",
+                    args.min_liquidity, len(keep), len(all_touches), before)
+        if not all_touches:
+            raise SystemExit("после гейта ликвидности касаний не осталось — снизь --min-liquidity")
 
     name = "universe" if multi else tickers[0]
     out_path = args.out or os.path.join("data", "analysis", f"level_touches_{name}.csv")
