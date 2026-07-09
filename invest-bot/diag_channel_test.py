@@ -54,6 +54,8 @@ TF_MINUTES_DEFAULT = 60
 CAP_BARS_DEFAULT = 300          # потолок жизни канала (в барах swing-ТФ)
 MIN_FORMATION_BARS_DEFAULT = 6  # мин. расстояние между точкой 1 и точкой 3
 MIN_HEIGHT_ATR_DEFAULT = 1.0    # мин. ширина канала при подтверждении (в ATR)
+RESOLVE_CAP_DEFAULT = 36        # потолок разрешения эпизода (баров ТФ) — иначе
+                                # на движущейся линии stall не существует вовсе
 ATR_PERIOD = 20
 
 
@@ -165,12 +167,17 @@ def _boundary_vals(ch, bar):
     return a + ch["offset"], a              # lo, hi (offset<0 здесь)
 
 
-def _scan_channel(ch, h, l, c, atr, cap_bars: int, ticker: str):
-    """Та же машина состояний, что _Episode в level_reaction_dataset, но
-    относительно ДВИЖУЩЕЙСЯ границы (пересчитывается каждый бар). Раздельно
-    для lower/upper — после ПРОБОЯ (result=break) сторона больше не
-    сканируется (канал на этой границе «умер», как и у трейдера — пробили,
-    забыли, рисуем новый)."""
+def _scan_channel(ch, h, l, c, atr, cap_bars: int, ticker: str, resolve_cap: int):
+    """Та же машина состояний, что _Episode в level_reaction_dataset. Движущаяся
+    граница используется ТОЛЬКО для детекции касания; исход эпизода меряется
+    относительно ЗАМОРОЖЕННОГО значения линии на баре касания. Иначе наклон
+    линии сам генерирует исходы: pullback-граница (низ up-канала) растёт и
+    догоняет стоящую цену = фиктивный break, extreme-граница уезжает от цены =
+    фиктивный bounce — асимметрия ролей надувается чистой геометрией.
+    resolve_cap — тайм-аут эпизода (аналог конца дня у уровней), без него на
+    бесконечном горизонте stall не существует. Раздельно для lower/upper —
+    после ПРОБОЯ (result=break) сторона больше не сканируется (канал на этой
+    границе «умер», как у трейдера — пробили, забыли, рисуем новый)."""
     n = len(c)
     start = ch["confirmed_bar"]
     end = min(n - 1, start + cap_bars)
@@ -201,18 +208,21 @@ def _scan_channel(ch, h, l, c, atr, cap_bars: int, ticker: str):
 
             sgn = 1.0 if side == "lower" else -1.0
             extreme = l[bar] if side == "lower" else h[bar]
+            # Замораживаем уровень на баре касания: исход = поведение ЦЕНЫ,
+            # а не дрейф линии (см. докстринг).
+            lo_t, hi_t = _boundary_vals(ch, bar)
+            lvl = lo_t if side == "lower" else hi_t
             confirmed, confirm_bar = False, None
             pullback = penetration = mfe = mae = 0.0
             signal = result = follow = ""
             resolve_bars = 0
             m = bar
             while True:
-                lo_m, hi_m = _boundary_vals(ch, m)
-                lvl = lo_m if side == "lower" else hi_m
+                timeout = m >= end or (m - bar) >= resolve_cap
                 extreme = min(extreme, l[m]) if side == "lower" else max(extreme, h[m])
                 am = atr[m]
                 if not np.isfinite(am) or am <= 0:
-                    if m >= end:
+                    if timeout:
                         signal, result = "drift", "stall"
                         resolve_bars = m - bar
                         break
@@ -230,7 +240,7 @@ def _scan_channel(ch, h, l, c, atr, cap_bars: int, ticker: str):
                         pullback = retrace
                         penetration = sgn * (lvl - extreme) / am
                         mfe, mae = away, -away
-                    elif m >= end:
+                    elif timeout:
                         signal, result = "drift", "stall"
                         resolve_bars = m - bar
                         break
@@ -244,7 +254,7 @@ def _scan_channel(ch, h, l, c, atr, cap_bars: int, ticker: str):
                         signal, follow, result = "pullback", "fail", "break"
                         resolve_bars = m - bar
                         break
-                    if m >= end:
+                    if timeout:
                         signal, follow, result = "pullback", "none", "stall"
                         resolve_bars = m - bar
                         break
@@ -271,7 +281,7 @@ def _scan_channel(ch, h, l, c, atr, cap_bars: int, ticker: str):
 
 def _process_ticker(path: str, ticker: str, tf_minutes: int, swing_step: int,
                     cap_bars: int, min_formation_bars: int, min_height_atr: float,
-                    days: int):
+                    days: int, resolve_cap: int):
     data = _load_bars(path)
     if data is None:
         return []
@@ -287,7 +297,7 @@ def _process_ticker(path: str, ticker: str, tf_minutes: int, swing_step: int,
     channels = _build_channels(swings, atr, min_formation_bars, min_height_atr)
     touches = []
     for ch in channels:
-        touches += _scan_channel(ch, ah, al, ac, atr, cap_bars, ticker)
+        touches += _scan_channel(ch, ah, al, ac, atr, cap_bars, ticker, resolve_cap)
     return touches
 
 
@@ -350,8 +360,9 @@ def _summary(touches: list) -> None:
     print(rh)
     ages = sorted(t["age_bars"] for t in touches)
     if len(ages) >= 40:
-        edges = [ages[len(ages) * i // 5] for i in range(5)] + [ages[-1] + 1]
-        for i in range(5):
+        # dedupe: при массе age=0 квинтильные границы дублируются → пустые бакеты
+        edges = sorted(set([ages[len(ages) * i // 5] for i in range(5)] + [ages[-1] + 1]))
+        for i in range(len(edges) - 1):
             seg = [t for t in touches if edges[i] <= t["age_bars"] < edges[i + 1]]
             _line(f"age∈[{edges[i]},{edges[i+1]})", seg)
     else:
@@ -393,6 +404,8 @@ def main() -> None:
     ap.add_argument("--cap-bars", type=int, default=CAP_BARS_DEFAULT)
     ap.add_argument("--min-formation-bars", type=int, default=MIN_FORMATION_BARS_DEFAULT)
     ap.add_argument("--min-height-atr", type=float, default=MIN_HEIGHT_ATR_DEFAULT)
+    ap.add_argument("--resolve-cap-bars", type=int, default=RESOLVE_CAP_DEFAULT,
+                    help="тайм-аут эпизода в барах ТФ (аналог конца дня у уровней)")
     ap.add_argument("--out", default="")
     args = ap.parse_args()
 
@@ -404,7 +417,7 @@ def main() -> None:
             continue
         touches = _process_ticker(path, ticker, args.tf_minutes, args.swing_step,
                                   args.cap_bars, args.min_formation_bars,
-                                  args.min_height_atr, args.days)
+                                  args.min_height_atr, args.days, args.resolve_cap_bars)
         all_touches += touches
         print(f"{ticker}: касаний {len(touches)}")
 
