@@ -31,7 +31,11 @@ def _load(path: str, d_thresh: float) -> dict:
     with open(path, newline="", encoding="utf-8") as f:
         for r in csv.DictReader(f):
             m = r.get("method")
-            d, nf = r.get("d"), r.get("n_fires")
+            # score_methods --pool-out пишет колонку d_median (не d); держим оба.
+            d = r.get("d_median")
+            if d in ("", None):
+                d = r.get("d")
+            nf = r.get("n_fires")
             if not m or d in ("", None):
                 continue
             try:
