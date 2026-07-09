@@ -146,6 +146,8 @@ class Touch:
     sl03: int
     sl05: int
     exit_away: float
+    entry_bar: int            # абс. бар входа (подтверждение) и конца дня — для
+    day_end_bar: int          # портфельной симуляции без перекрытия позиций
     ticker: str = ""          # проставляется в мульти-прогоне (иначе пусто)
 
 
@@ -454,6 +456,8 @@ class _Episode:
             mfe_away_atr=round(self.mfe, 4), mae_beyond_atr=round(self.mae, 4),
             tp05=tp05, tp07=tp07, tp10=tp10, sl03=sl03, sl05=sl05,
             exit_away=round(exit_away, 4),
+            entry_bar=self.confirm_idx if self.confirmed else -1,
+            day_end_bar=self.day_end_idx,
         )
 
 
@@ -721,6 +725,48 @@ def _ts_pnl(row, take: float, stop: float) -> float:
     return row.exit_away
 
 
+def _exit_of(row, take: float, stop: float) -> tuple[int, float]:
+    """Бар выхода (абсолютный) и P&L сделки при правиле (take, stop)."""
+    tt = getattr(row, _TAKE_FIELD[take])
+    ss = getattr(row, _STOP_FIELD[stop])
+    tt = None if tt < 0 else tt
+    ss = None if ss < 0 else ss
+    if tt is not None and (ss is None or tt < ss):
+        return row.entry_bar + tt, take
+    if ss is not None:
+        return row.entry_bar + ss, -stop
+    return row.day_end_bar, row.exit_away  # тайм-стоп на закрытии дня
+
+
+def _portfolio_grid(rows: list, cost: float, title: str) -> None:
+    """Экспектанси БЕЗ перекрытия: одна позиция на инструмент в моменте — новый
+    сигнал игнорируется, пока предыдущая сделка не закрылась. Показывает реальную
+    частоту независимых сделок (N резко падает против наивной сетки)."""
+    by_t: dict = {}
+    for r in rows:
+        if r.entry_bar >= 0:
+            by_t.setdefault(r.ticker, []).append(r)
+    print(f"\n== Экспектанси БЕЗ перекрытия позиций (cost={cost}) — {title} ==")
+    hdr = "take\\stop"
+    print(f"    {hdr:<10}" + "".join(f"{'S='+str(s):>18}" for s in TS_STOPS))
+    for take in TS_TAKES:
+        cells = []
+        for stop in TS_STOPS:
+            tot, n = 0.0, 0
+            for trs in by_t.values():
+                last = -1
+                for r in sorted(trs, key=lambda x: x.entry_bar):
+                    if r.entry_bar <= last:
+                        continue  # позиция ещё открыта — пропускаем сигнал
+                    ebar, pnl = _exit_of(r, take, stop)
+                    tot += pnl - cost
+                    n += 1
+                    last = ebar
+            exp = tot / n if n else 0.0
+            cells.append(f"{exp:+.3f} (N={n})")
+        print(f"    T={take:<8}" + "".join(f"{c:>18}" for c in cells))
+
+
 def _take_stop_grid(rows: list, cost: float, title: str) -> None:
     """Матожидание в ATR за вычетом издержек по сетке тейк×стоп + доля прибыльных."""
     n = len(rows)
@@ -784,6 +830,9 @@ def _print_summary(touches: list, cost: float = DEFAULT_COST_ATR) -> None:
             and (r.touches_before >= 1 or r.prev_outcome == "break")
             and r.penetration_atr < 0]
     _take_stop_grid(best, cost, "комбо: быстрый+память+чистое")
+    # Реалистичная версия: без перекрытия позиций (частоту в доход не умножить).
+    _portfolio_grid(pull, cost, "все откаты")
+    _portfolio_grid(best, cost, "комбо: быстрый+память+чистое")
 
     print("\n== Память уровня: исход по прошлому исходу ==");  print(rh)
     for prev in ("bounce", "break", "stall", ""):
