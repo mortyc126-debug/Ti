@@ -123,6 +123,32 @@ def _summary(rows: list, present: list) -> None:
               + f"{qs[-1]-qs[0]:>+9.4f}{trend:>7}")
 
 
+def _accel_conditional(rows: list, feat: str = "color_hat") -> None:
+    """Гипотеза: умеренное ускорение → тренд продолжается (знак совпадает),
+    аномальное (|z| велик) → разворот (знак наоборот). Линейный IC это гасит,
+    поэтому режем по МОДУЛЮ |feat| (в SD, раз он z-нормирован) и в каждой полосе
+    меряем continuation-hit = доля, где sign(feat)==sign(fwd). >50 = follow,
+    <50 = fade."""
+    data = [(r[feat], r["fwd"]) for r in rows if r.get(feat) is not None]
+    if len(data) < 200:
+        print(f"\n[{feat}] мало данных для условного разбора")
+        return
+    edges = [0.0, 0.5, 1.0, 1.5, 2.0, 3.0, float("inf")]
+    labels = ["0–0.5σ", "0.5–1σ", "1–1.5σ", "1.5–2σ", "2–3σ", ">3σ"]
+    print(f"\n-- УСЛОВНО по |{feat}| (гипотеза: норма→тренд/follow, аномалия→разворот/fade) --")
+    print(f"{'полоса |z|':<12}{'N':>9}{'cont.hit%':>11}{'mean_dir(σ)':>13}  трактовка")
+    for (lo, hi), lab in zip(zip(edges, edges[1:]), labels):
+        seg = [(c, f) for c, f in data if lo <= abs(c) < hi]
+        n = len(seg)
+        if n < 30:
+            print(f"{lab:<12}{n:>9}{'—':>11}{'—':>13}")
+            continue
+        cont = 100 * sum(1 for c, f in seg if c * f > 0) / n
+        mdir = sum((1 if c > 0 else -1) * f for c, f in seg) / n
+        tag = "follow (тренд)" if cont >= 52 else ("fade (разворот)" if cont <= 48 else "нейтрально")
+        print(f"{lab:<12}{n:>9}{cont:>11.1f}{mdir:>+13.4f}  {tag}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="IC/hit-rate признаков T/P/color против будущего движения")
     ap.add_argument("path", help="по-баровый CSV или папка с CSV (из --per-ticker-dir)")
@@ -142,6 +168,11 @@ def main() -> None:
                          "outcome_known=1). Это по-баровый CSV, не corr_all.csv?")
     print(f"файлов: {len(paths)}, признаков: {present}")
     _summary(rows, present)
+    # Условный разбор ускорения (гипотеза «норма→тренд, аномалия→разворот») —
+    # то, что линейный IC не видит. Заодно по T (интенсивность), если есть.
+    for feat in ("color_hat", "T_hat"):
+        if feat in present:
+            _accel_conditional(rows, feat)
 
 
 if __name__ == "__main__":
