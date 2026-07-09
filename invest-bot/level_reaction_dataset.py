@@ -365,7 +365,9 @@ class _Episode:
     pullback_thr: float
     extreme: float
     meta: dict
-    closes: list           # ссылка на общий ряд closes — для сетки тейк/стоп в _emit
+    closes: list           # ссылки на общие ряды — для сетки тейк/стоп в _emit
+    highs: list            # тейк/стоп меряются по интрабар high/low (реальное
+    lows: list             # исполнение ордера внутри бара), не по close
     confirmed: bool = False
     confirm_idx: int = -1
     penetration: float = 0.0
@@ -424,13 +426,17 @@ class _Episode:
             sgn = 1.0 if self.side == "support" else -1.0
             lvl = self.lv.price
             for j in range(self.confirm_idx + 1, self.day_end_idx + 1):
-                away = sgn * (self.closes[j] - lvl) / self.atr
+                # fav — лучший ход В сторону сделки внутри бара, adv — худший
+                # против неё: тейк исполняется по экстремуму в свою сторону,
+                # стоп — по экстремуму против (реальный ордер, а не по close).
+                fav = sgn * ((self.highs[j] if sgn > 0 else self.lows[j]) - lvl) / self.atr
+                adv = sgn * ((self.lows[j] if sgn > 0 else self.highs[j]) - lvl) / self.atr
                 rel = j - self.confirm_idx
-                if tp05 < 0 and away >= 0.5: tp05 = rel
-                if tp07 < 0 and away >= 0.7: tp07 = rel
-                if tp10 < 0 and away >= 1.0: tp10 = rel
-                if sl03 < 0 and away <= -0.3: sl03 = rel
-                if sl05 < 0 and away <= -0.5: sl05 = rel
+                if tp05 < 0 and fav >= 0.5: tp05 = rel
+                if tp07 < 0 and fav >= 0.7: tp07 = rel
+                if tp10 < 0 and fav >= 1.0: tp10 = rel
+                if sl03 < 0 and adv <= -0.3: sl03 = rel
+                if sl05 < 0 and adv <= -0.5: sl05 = rel
             exit_away = sgn * (self.closes[self.day_end_idx] - lvl) / self.atr
         md = self.meta
         return Touch(
@@ -495,6 +501,8 @@ def collect(bars: list[dict], round_valid_from, pullback_atr: float = PULLBACK_A
     active_ep: dict = {}
 
     closes = [b["c"] for b in bars]
+    highs = [b["h"] for b in bars]
+    lows = [b["l"] for b in bars]
     touches: list[Touch] = []
 
     for m, bar in enumerate(bars):
@@ -559,7 +567,8 @@ def collect(bars: list[dict], round_valid_from, pullback_atr: float = PULLBACK_A
                 "er": er, "er_d": er_d, "regime": regime,
             }
             extreme = bar["l"] if side == "support" else bar["h"]
-            active_ep[ev_id] = _Episode(lv, m, side, atr, de, pullback_atr, extreme, meta, closes)
+            active_ep[ev_id] = _Episode(lv, m, side, atr, de, pullback_atr, extreme, meta,
+                                        closes, highs, lows)
     return touches
 
 
