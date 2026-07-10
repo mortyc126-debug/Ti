@@ -33,6 +33,12 @@ import numpy as np
 ANOM_EDGES = [0.0, 1.0, 1.5, 2.0, 3.0, 5.0, np.inf]
 ANOM_LABELS = ["<1x", "1–1.5x", "1.5–2x", "2–3x", "3–5x", ">5x"]
 
+# Fade-скамья: сетка тейк/стоп (ATR), тайм-кап сделки, издержки по умолчанию.
+TS_TAKES = (0.5, 0.7, 1.0)
+TS_STOPS = (0.3, 0.5)
+FADE_CAP_BARS = 12          # тайм-стоп сделки (баров рабочего ТФ)
+DEFAULT_COST = 0.07
+
 
 def _load_closes(path: str):
     with open(path, encoding="utf-8") as f:
@@ -44,7 +50,8 @@ def _load_closes(path: str):
     h = np.array([r["high"] for r in rows], float)
     l = np.array([r["low"] for r in rows], float)
     c = np.array([r["close"] for r in rows], float)
-    return o, h, l, c
+    dates = [str(r.get("time", ""))[:10] for r in rows]
+    return o, h, l, c, dates
 
 
 def _rmean(x, n):
@@ -68,9 +75,12 @@ def _ewm_causal(x, halflife):
     return out
 
 
-def _process(ticker_data, m, halflife, n_atr, trend_w, horizons):
-    """Возвращает список записей (anom, sign_acc, trend_sign, {k: fwd})."""
-    o, h, l, c = ticker_data
+def _process(ticker_data, m, halflife, n_atr, trend_w, horizons,
+             ticker="", anom_min=0.0, cost_unused=0.0):
+    """Возвращает (записи для cont-hit таблиц, fade-сделки для скамьи).
+    fade-сделка = вход ПРОТИВ ускорения (fade) на аномальном спайке ПО тренду —
+    самая сильная ячейка из cont-hit анализа. Барьеры интрабар high/low."""
+    o, h, l, c, dates = ticker_data
     n = len(c)
     if n < max(horizons) + trend_w + n_atr + 4 * m + 10:
         return []
@@ -119,7 +129,42 @@ def _process(ticker_data, m, halflife, n_atr, trend_w, horizons):
                 ok = True
         if ok:
             out.append(rec)
-    return out
+
+    # ── fade-сделки: аномалия ≥ anom_min И ускорение ПО тренду → вход ПРОТИВ ──
+    fades = []
+    if anom_min > 0:
+        for i in range(n - FADE_CAP_BARS - 1):
+            a = anom[i]
+            s = sign_acc[i]
+            if np.isnan(a) or s == 0 or np.isnan(trend_sign[i]):
+                continue
+            if a < anom_min or s != trend_sign[i]:
+                continue
+            ai = atr[i]
+            if not np.isfinite(ai) or ai <= 0:
+                continue
+            fdir = -s                      # fade = против ускорения
+            entry = c[i]
+            tp = {t: -1 for t in TS_TAKES}
+            sl = {st: -1 for st in TS_STOPS}
+            end = min(i + FADE_CAP_BARS, n - 1)
+            for j in range(i + 1, end + 1):
+                fav = fdir * ((h[j] if fdir > 0 else l[j]) - entry) / ai
+                adv = fdir * ((l[j] if fdir > 0 else h[j]) - entry) / ai
+                rel = j - i
+                for t in TS_TAKES:
+                    if tp[t] < 0 and fav >= t:
+                        tp[t] = rel
+                for st in TS_STOPS:
+                    if sl[st] < 0 and adv <= -st:
+                        sl[st] = rel
+            exit_away = fdir * (c[end] - entry) / ai
+            fades.append({
+                "ticker": ticker, "entry_bar": i, "date": dates[i],
+                "tp05": tp[0.5], "tp07": tp[0.7], "tp10": tp[1.0],
+                "sl03": sl[0.3], "sl05": sl[0.5], "exit_away": exit_away,
+            })
+    return out, fades
 
 
 def _bucket(anom):
@@ -160,6 +205,71 @@ def _report(records, horizons):
                 print(f"    {ANOM_LABELS[band]:<10}{n:>10}{hit:>11.1f}{md:>+15.4f}  {tag}")
 
 
+_TAKE_F = {0.5: "tp05", 0.7: "tp07", 1.0: "tp10"}
+_STOP_F = {0.3: "sl03", 0.5: "sl05"}
+
+
+def _fade_pnl(tr, take, stop):
+    tt = tr[_TAKE_F[take]]
+    ss = tr[_STOP_F[stop]]
+    tt = None if tt < 0 else tt
+    ss = None if ss < 0 else ss
+    if tt is not None and (ss is None or tt < ss):
+        return take, (tr["entry_bar"] + tt)
+    if ss is not None:
+        return -stop, (tr["entry_bar"] + ss)
+    return tr["exit_away"], (tr["entry_bar"] + FADE_CAP_BARS)
+
+
+def _fade_grid(trades, cost, title, overlap=True):
+    n = len(trades)
+    tag = "с перекрытием" if overlap else "БЕЗ перекрытия"
+    print(f"\n== Fade-экспектанси ({tag}, cost={cost}) — {title} ==")
+    if not n:
+        print("  нет сделок")
+        return
+    by_t = {}
+    for tr in trades:
+        by_t.setdefault(tr["ticker"], []).append(tr)
+    hdr = "take\\stop"
+    print(f"    {hdr:<10}" + "".join(f"{'S='+str(s):>16}" for s in TS_STOPS))
+    for take in TS_TAKES:
+        cells = []
+        for stop in TS_STOPS:
+            tot, cnt = 0.0, 0
+            if overlap:
+                for tr in trades:
+                    pnl, _ = _fade_pnl(tr, take, stop)
+                    tot += pnl - cost
+                    cnt += 1
+            else:
+                for trs in by_t.values():
+                    last = -1
+                    for tr in sorted(trs, key=lambda x: x["entry_bar"]):
+                        if tr["entry_bar"] <= last:
+                            continue
+                        pnl, ex = _fade_pnl(tr, take, stop)
+                        tot += pnl - cost
+                        cnt += 1
+                        last = ex
+            exp = tot / cnt if cnt else 0.0
+            cells.append(f"{exp:+.3f}(N={cnt})")
+        print(f"    T={take:<8}" + "".join(f"{c:>16}" for c in cells))
+
+
+def _fade_report(trades, cost, split_date):
+    print(f"\n{'='*70}\nFADE-СКАМЬЯ: аномальный спайк ПО тренду → вход ПРОТИВ "
+          f"({len(trades)} сделок)\n{'='*70}")
+    _fade_grid(trades, cost, "все", overlap=True)
+    _fade_grid(trades, cost, "все", overlap=False)
+    if split_date:
+        tr = [t for t in trades if t["date"] < split_date]
+        te = [t for t in trades if t["date"] >= split_date]
+        print(f"\n-- HELD-OUT: train<{split_date} ({len(tr)}) | test≥{split_date} ({len(te)}) --")
+        _fade_grid(tr, cost, "TRAIN", overlap=False)
+        _fade_grid(te, cost, "TEST (held-out)", overlap=False)
+
+
 def main():
     ap = argparse.ArgumentParser(description="Тест гипотезы: аномальное ускорение → разворот, нормальное → тренд")
     ap.add_argument("--cache", default=os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -173,6 +283,9 @@ def main():
     ap.add_argument("--n-atr", type=int, default=20)
     ap.add_argument("--trend-window", type=int, default=50)
     ap.add_argument("--horizons", default="3,6,12")
+    ap.add_argument("--anom-min", type=float, default=2.0, help="порог аномалии для fade-сделки")
+    ap.add_argument("--cost", type=float, default=DEFAULT_COST, help="издержки на круг в ATR")
+    ap.add_argument("--split-date", default="", help="held-out: YYYY-MM-DD (train<дата, test≥)")
     args = ap.parse_args()
 
     horizons = [int(x) for x in args.horizons.split(",")]
@@ -186,7 +299,7 @@ def main():
     else:
         raise SystemExit("укажи --tickers СПИСОК или --all")
 
-    records = []
+    records, fades = [], []
     n_tk = 0
     bars_per_day = 100 if args.interval == 5 else 500
     for p in paths:
@@ -198,16 +311,20 @@ def main():
             continue
         if args.days:
             cut = args.days * bars_per_day
-            data = tuple(arr[-cut:] for arr in data)
-        recs = _process(data, args.accel_m, args.ewm_halflife, args.n_atr,
-                        args.trend_window, horizons)
+            o, h, l, c, dts = data
+            data = (o[-cut:], h[-cut:], l[-cut:], c[-cut:], dts[-cut:])
+        ticker = os.path.basename(p).replace("_1m", "")[:-5]
+        recs, fds = _process(data, args.accel_m, args.ewm_halflife, args.n_atr,
+                             args.trend_window, horizons, ticker=ticker, anom_min=args.anom_min)
         records.extend(recs)
+        fades.extend(fds)
         n_tk += 1
     print(f"тикеров: {n_tk}, записей: {len(records)} "
           f"(accel_m={args.accel_m}, halflife={args.ewm_halflife})")
     if not records:
         raise SystemExit("нет записей — проверь кэш/параметры")
     _report(records, horizons)
+    _fade_report(fades, args.cost, args.split_date)
 
 
 if __name__ == "__main__":
