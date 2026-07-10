@@ -161,6 +161,7 @@ def _process(ticker_data, m, halflife, n_atr, trend_w, horizons,
             exit_away = fdir * (c[end] - entry) / ai
             fades.append({
                 "ticker": ticker, "entry_bar": i, "date": dates[i],
+                "dir": int(fdir),   # +1 лонг / -1 шорт (fade = против ускорения)
                 "tp05": tp[0.5], "tp07": tp[0.7], "tp10": tp[1.0],
                 "sl03": sl[0.3], "sl05": sl[0.5], "exit_away": exit_away,
             })
