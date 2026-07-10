@@ -406,15 +406,19 @@ def _gauntlet(touches, cost, split_date):
     print("\n-- No-overlap портфель (одна позиция/инструмент) --")
     _gt_portfolio(first, cost, "first-touch все")
     _gt_portfolio(first_norm, cost, "first-touch норм")
-    # held-out по времени
-    train = [t for t in first if t["date"] and t["date"] < split_date]
-    test = [t for t in first if t["date"] and t["date"] >= split_date]
-    print(f"\n-- HELD-OUT: train<{split_date} ({len(train)}) | test≥ ({len(test)}) --")
-    if train and test:
-        _gt_portfolio(train, cost, "TRAIN first-touch")
-        _gt_portfolio(test, cost, "TEST  first-touch")
-    else:
-        print("одна из половин пуста — сдвинь --split-date")
+    # held-out по времени — и на всех, и на норм-ширине (где эдж жирнее): вопрос,
+    # держится ли норм-фильтр out-of-sample или это подгонка на train.
+    def _split(rows, label):
+        tr = [t for t in rows if t["date"] and t["date"] < split_date]
+        te = [t for t in rows if t["date"] and t["date"] >= split_date]
+        print(f"\n-- HELD-OUT {label}: train<{split_date} ({len(tr)}) | test≥ ({len(te)}) --")
+        if tr and te:
+            _gt_portfolio(tr, cost, f"TRAIN {label}")
+            _gt_portfolio(te, cost, f"TEST  {label}")
+        else:
+            print("одна из половин пуста — сдвинь --split-date")
+    _split(first, "все ширины")
+    _split(first_norm, "ширина=норм")
     # коллинеарность first-touch ↔ retest<1: пересечение популяций
     ft = {(t["ticker"], t["entry_bar"]) for t in first}
     r1 = {(t["ticker"], t["entry_bar"]) for t in touches
