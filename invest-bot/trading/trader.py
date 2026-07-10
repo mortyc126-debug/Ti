@@ -3085,7 +3085,7 @@ class Trader:
                 lot_size=share_settings.lot,
                 short_enabled_flag=share_settings.short_enabled_flag
             )
-            strategy = StrategyFactory.new_factory("OICompositeStrategy", settings)
+            strategy = StrategyFactory.new_factory(settings.name, settings)
             if not strategy:
                 continue
 
@@ -3223,7 +3223,7 @@ class Trader:
                 # поддерживает — просто сюда значение раньше не доходило.
                 point_value=future_settings.point_value
             )
-            strategy = StrategyFactory.new_factory("OICompositeStrategy", settings)
+            strategy = StrategyFactory.new_factory(settings.name, settings)
             if not strategy:
                 continue
             self.__future_base_ticker[future_settings.ticker] = base_ticker
