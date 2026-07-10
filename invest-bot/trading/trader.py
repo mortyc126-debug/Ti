@@ -481,7 +481,11 @@ class Trader:
         # накапливаются бессрочно и показывают «лучший максимум» из прошлых дней.
         self.__pos_tracking.clear()
         today_trade_strategies = self.__get_today_strategies(strategies)
-        if not today_trade_strategies:
+        # Пустой статический список НЕ повод выходить, если включена фьючерс-
+        # автоторговля: фьючерсы строятся ниже (__build_futures_strategies). Раньше
+        # при отсутствии STRATEGY_* секций бот выходил тут же и фьючерсы не строил.
+        futures_on = self.__futures_trading_settings.enabled and bool(self.__futures_trading_settings.base_tickers)
+        if not today_trade_strategies and not futures_on:
             logger.info("No shares to trade today.")
             return None
 
@@ -540,6 +544,10 @@ class Trader:
                     f"FUTURES: акции исключены из торговли (заменены фьючерсом) — "
                     f"{len(stale_shares)} шт."
                 )
+
+        if not today_trade_strategies:
+            logger.info("Нет инструментов для торговли сегодня (фьючерсы не резолвнулись).")
+            return None
 
         self.__blogger.mega_alerts_message(
             tracked_hits, [t for t in candidate_tickers if t not in [s.settings.ticker for s in added_strategies.values()]]
@@ -3137,8 +3145,25 @@ class Trader:
 
         by_ticker = {s.settings.ticker: s for s in base_strategies.values()}
 
+        import time as _time
         for base_ticker in base_tickers:
-            resolved = self.__instrument_service.future_by_base_ticker(base_ticker)
+            # Резолв с ретраем на лимит API песочницы (15 запросов/60с). На холодном
+            # старте длинный BASE_TICKERS упирается в лимит уже к ~16-му тикеру —
+            # раньше один RESOURCE_EXHAUSTED пробрасывался и валил ВЕСЬ торговый день.
+            # Теперь ждём окно сброса и повторяем; чужие ошибки не глотаем.
+            resolved = None
+            for _attempt in range(4):
+                try:
+                    resolved = self.__instrument_service.future_by_base_ticker(base_ticker)
+                    break
+                except Exception as _e:
+                    if "RESOURCE_EXHAUSTED" not in repr(_e):
+                        raise
+                    if _attempt == 3:
+                        logger.warning(f"FUTURES: {base_ticker} — лимит API не отпустил за 4 попытки, пропуск")
+                        break
+                    logger.info(f"FUTURES: лимит API на {base_ticker}, пауза 40с (попытка {_attempt + 1}/4)")
+                    _time.sleep(40)
             if not resolved:
                 logger.warning(f"FUTURES: контракт на {base_ticker} не найден, пропуск")
                 continue
