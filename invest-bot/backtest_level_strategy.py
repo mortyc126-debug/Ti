@@ -37,9 +37,9 @@ def _combo_rows(bars, ticker):
     return rows
 
 
-def _portfolio(rows, cost, label):
+def _portfolio(rows, cost, label, quiet=False):
     """No-overlap: одна позиция на инструмент за раз (по entry/exit-бару). Возвращает
-    (n, exp, total, win%, trades[])."""
+    (n, exp, total, win%, trades[]). quiet=True — не печатать строку (для ранжира)."""
     by_tk = {}
     for r in rows:
         by_tk.setdefault(r.ticker, []).append(r)
@@ -59,7 +59,8 @@ def _portfolio(rows, cost, label):
             trades.append((r, net))
     exp = pnl_sum / n if n else 0.0
     wr = 100 * wins / n if n else 0.0
-    print(f"{label:<26} N={n:<5} exp={exp:+.3f}  Σ={pnl_sum:+.1f} ATR  win={wr:.0f}%  (тейк{TAKE}/стоп{STOP})")
+    if not quiet:
+        print(f"{label:<26} N={n:<5} exp={exp:+.3f}  Σ={pnl_sum:+.1f} ATR  win={wr:.0f}%  (тейк{TAKE}/стоп{STOP})")
     return n, exp, pnl_sum, wr, trades
 
 
@@ -101,6 +102,24 @@ def main():
 
     print(f"\n{'='*70}\nБЭКТЕСТ LevelReactionStrategy (combo, тейк/стоп {TAKE}/{STOP}, cost={args.cost_atr})\n{'='*70}")
     _, _, _, _, trades = _portfolio(all_rows, args.cost_atr, "ВСЁ (no-overlap)")
+
+    # РАНЖИР ПО ИНСТРУМЕНТАМ — выбираем универс по эджу, не по ликвиду.
+    # Считаем per-ticker no-overlap exp/win + held-out test (где эдж не подгонка).
+    by_tk: dict[str, list] = {}
+    for r in all_rows:
+        by_tk.setdefault(r.ticker, []).append(r)
+    rank = []
+    for tk, rs in by_tk.items():
+        te = [r for r in rs if r.ts_msk[:10] >= args.split_date]
+        n, exp, _, wr, _ = _portfolio(rs, args.cost_atr, tk, quiet=True)
+        tn, texp, _, twr, _ = _portfolio(te, args.cost_atr, tk, quiet=True) if te else (0, 0.0, 0.0, 0.0, [])
+        rank.append((tk, n, exp, wr, tn, texp, twr))
+    # сортировка по held-out test exp (реальный эдж), затем по общему exp
+    rank.sort(key=lambda x: (x[5], x[2]), reverse=True)
+    print(f"\n{'='*70}\nРАНЖИР ПО ИНСТРУМЕНТАМ (по held-out test exp) — брать топ в BASE_TICKERS\n{'='*70}")
+    print(f"{'тикер':<10}{'N':>6}{'exp':>9}{'win%':>7}  | {'testN':>6}{'test_exp':>10}{'test_win%':>10}")
+    for tk, n, exp, wr, tn, texp, twr in rank:
+        print(f"{tk:<10}{n:>6}{exp:>+9.3f}{wr:>6.0f}%  | {tn:>6}{texp:>+10.3f}{twr:>9.0f}%")
 
     train = [r for r in all_rows if r.ts_msk[:10] < args.split_date]
     test = [r for r in all_rows if r.ts_msk[:10] >= args.split_date]
