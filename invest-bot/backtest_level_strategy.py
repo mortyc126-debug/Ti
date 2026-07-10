@@ -24,17 +24,113 @@ from signal_blotter import _bars_from_cache
 TAKE, STOP = 1.0, 0.3   # ровно как в LevelReactionStrategy
 
 
-def _combo_rows(bars, ticker):
-    """Провалидированные combo-касания (=входы стратегии) с тикером."""
+def _all_pull_rows(bars, ticker):
+    """Все pullback-касания с тикером (до combo-фильтра) — нужно для вариантов ниже."""
     try:
         touches = lr.collect(bars, round_valid_from=bars[0]["d"])
     except SystemExit:
         return []
     pull = [t for t in touches if t.signal == "pullback"]
-    rows = lr._combo_filter(pull)
-    for r in rows:
+    for r in pull:
         r.ticker = ticker
-    return rows
+    return pull
+
+
+def _passes_memory(r):
+    """Общая часть combo-фильтра (быстрый подход + память), без условия на пенетрацию."""
+    return r.approach_v6 >= 0.6 and (r.touches_before >= 1 or r.prev_outcome == "break")
+
+
+# Сетки для перебора барьеров (в ATR)
+GRID_TAKES = [0.5, 0.7, 1.0, 1.5, 2.0]
+GRID_STOPS = [0.3, 0.5, 0.7, 1.0]
+
+
+def _precompute_grid(bars, r):
+    """Один проход по барам эпизода: для каждого тейка/стопа сетки запоминаем бар
+    первого достижения — от ЦЕНЫ ВХОДА (закрытие бара подтверждения) и от УРОВНЯ.
+    Кладём на row, чтобы дальше не держать бары в памяти (иначе --all съедает RAM).
+    Тейк меряется по интрабар-экстремуму в свою сторону, стоп — против (реальный
+    ордер, не по close)."""
+    if r.entry_bar < 0 or r.atr <= 0 or r.day_end_bar >= len(bars):
+        r._gE = r._gL = None
+        return
+    sgn = 1.0 if r.side == "support" else -1.0
+    atr = r.atr
+    entry = bars[r.entry_bar]["c"]
+    lvl = r.level_price
+    end = r.day_end_bar
+    etp = {t: -1 for t in GRID_TAKES}; esl = {s: -1 for s in GRID_STOPS}
+    ltp = {t: -1 for t in GRID_TAKES}; lsl = {s: -1 for s in GRID_STOPS}
+    for j in range(r.entry_bar + 1, end + 1):
+        hi, lo = bars[j]["h"], bars[j]["l"]
+        fav = (hi if sgn > 0 else lo)   # экстремум в сторону сделки
+        adv = (lo if sgn > 0 else hi)   # экстремум против
+        favE = sgn * (fav - entry) / atr; advE = sgn * (adv - entry) / atr
+        favL = sgn * (fav - lvl) / atr;   advL = sgn * (adv - lvl) / atr
+        for t in GRID_TAKES:
+            if etp[t] < 0 and favE >= t: etp[t] = j
+            if ltp[t] < 0 and favL >= t: ltp[t] = j
+        for s in GRID_STOPS:
+            if esl[s] < 0 and advE <= -s: esl[s] = j
+            if lsl[s] < 0 and advL <= -s: lsl[s] = j
+    r._gE = (etp, esl, sgn * (bars[end]["c"] - entry) / atr, end)
+    r._gL = (ltp, lsl, sgn * (bars[end]["c"] - lvl) / atr, end)
+
+
+def _exit_grid(r, take, stop, anchor):
+    """Выход (exit_bar, pnl_atr) по предпосчитанным барьерам. Тай в одном баре → стоп."""
+    g = r._gE if anchor == "entry" else r._gL
+    if g is None:
+        return None
+    tp_bar, sl_bar = g[0][take], g[1][stop]
+    if sl_bar >= 0 and (tp_bar < 0 or sl_bar <= tp_bar):
+        return sl_bar, -stop
+    if tp_bar >= 0:
+        return tp_bar, take
+    return g[3], g[2]   # тайм-стоп на закрытии дня
+
+
+def _grid_portfolio(rows, cost, take, stop, anchor):
+    """No-overlap портфель для (take, stop, anchor). Возвращает (n, exp, win%)."""
+    by_tk = {}
+    for r in rows:
+        by_tk.setdefault(r.ticker, []).append(r)
+    n, tot, wins = 0, 0.0, 0
+    for rs in by_tk.values():
+        rs.sort(key=lambda r: r.entry_bar)
+        free_at = -1
+        for r in rs:
+            if r.entry_bar <= free_at:
+                continue
+            res = _exit_grid(r, take, stop, anchor)
+            if res is None:
+                continue
+            ebar, pnl = res
+            net = pnl - cost
+            tot += net
+            wins += 1 if net > 0 else 0
+            free_at = ebar
+            n += 1
+    exp = tot / n if n else 0.0
+    wr = 100 * wins / n if n else 0.0
+    return n, exp, wr
+
+
+def _print_grid(rows, cost, anchor, title):
+    """Матрица exp/win% по сетке тейк×стоп для заданной базы (вход/уровень)."""
+    print(f"\n{'='*70}\n{title}\n{'='*70}")
+    hdr = "тейк\\стоп"
+    print(f"{hdr:<10}" + "".join(f"{'S='+str(s):>14}" for s in GRID_STOPS))
+    n0 = 0
+    for take in GRID_TAKES:
+        cells = []
+        for stop in GRID_STOPS:
+            n, exp, wr = _grid_portfolio(rows, cost, take, stop, anchor)
+            n0 = max(n0, n)
+            cells.append(f"{exp:+.2f}/{wr:.0f}%")
+        print(f"    T={take:<6}" + "".join(f"{c:>14}" for c in cells))
+    print(f"    (N≈{n0}; ячейка = exp ATR / win%, за вычетом cost={cost})")
 
 
 def _portfolio(rows, cost, label, quiet=False, from_level=False):
@@ -76,6 +172,7 @@ def main():
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--cost-atr", type=float, default=0.12)
     ap.add_argument("--split-date", default="2026-04-01")
+    ap.add_argument("--no-grid", action="store_true", help="не считать сетки #1/#2 (быстрее)")
     ap.add_argument("--out", default="")
     args = ap.parse_args()
 
@@ -88,7 +185,8 @@ def main():
     else:
         raise SystemExit("--tickers СПИСОК или --all")
 
-    all_rows = []
+    all_rows = []          # combo (penetration<0) — как торгует бот
+    reached_rows = []      # тот же сигнал, но цена ДОШЛА до уровня (penetration>=0)
     for p in paths:
         if not os.path.exists(p):
             print(f"нет файла: {p}")
@@ -97,9 +195,15 @@ def main():
         bars = _bars_from_cache(p)
         if not bars:
             continue
-        rows = _combo_rows(bars, ticker)
-        all_rows += rows
-        print(f"{ticker}: combo-входов {len(rows)}")
+        pull = _all_pull_rows(bars, ticker)
+        combo = [r for r in pull if _passes_memory(r) and r.penetration_atr < 0]
+        reached = [r for r in pull if _passes_memory(r) and r.penetration_atr >= 0]
+        if not args.no_grid:  # предпосчитать барьеры сетки, пока бары в памяти
+            for r in combo + reached:
+                _precompute_grid(bars, r)
+        all_rows += combo
+        reached_rows += reached
+        print(f"{ticker}: combo-входов {len(combo)} (дошло-до-уровня {len(reached)})")
 
     if not all_rows:
         raise SystemExit("combo-входов не собрано — проверь кэш/период")
@@ -135,6 +239,25 @@ def main():
         _portfolio(test, args.cost_atr, "TEST (held-out)")
     else:
         print("одна из половин пуста — сдвинь --split-date")
+
+    if not args.no_grid:
+        # #1 — TP/SL переякорены на ЦЕНУ ВХОДА (а не уровень). Если хоть одна ячейка
+        # стабильно плюсовая — у combo-сигнала есть эдж при своём соотношении барьеров.
+        _print_grid(all_rows, args.cost_atr, "entry",
+                    "#1 TP/SL ОТ ЦЕНЫ ВХОДА — сетка тейк×стоп (combo, вход по рынку)")
+
+        # #2 — лимит У УРОВНЯ: берём только касания, где цена реально дошла до уровня
+        # (penetration>=0) → лимит бы налился по уровню, P&L считаем от уровня.
+        # Приближение: выход считается от бара подтверждения (фактический филл лимита
+        # может быть чуть раньше) — для оценки, есть ли эдж, достаточно.
+        print(f"\n-- #2: касаний 'дошло до уровня' (penetration>=0): {len(reached_rows)} "
+              f"против combo {len(all_rows)} --")
+        if reached_rows:
+            _portfolio(reached_rows, args.cost_atr, "ЛИМИТ У УРОВНЯ 1.0/0.3 (от уровня)", from_level=True)
+            _print_grid(reached_rows, args.cost_atr, "level",
+                        "#2 ЛИМИТ У УРОВНЯ — сетка тейк×стоп (fill по уровню)")
+        else:
+            print("нет касаний с penetration>=0 — лимит-вариант проверить не на чем")
 
     if args.out:
         with open(args.out, "w", newline="", encoding="utf-8") as fh:

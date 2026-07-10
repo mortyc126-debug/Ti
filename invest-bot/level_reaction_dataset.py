@@ -146,6 +146,8 @@ class Touch:
     sl03: int
     sl05: int
     exit_away: float
+    atr: float                # ATR в ЦЕНОВЫХ единицах на момент касания — для пересчёта
+                              # барьеров от цены входа в бэктесте
     entry_offset_atr: float   # (цена бара подтверждения − уровень)/ATR в сторону сделки:
                               # насколько реальный вход ушёл от уровня. P&L барьеров
                               # книжится от уровня, поэтому для честного расчёта от
@@ -463,6 +465,7 @@ class _Episode:
             mfe_away_atr=round(self.mfe, 4), mae_beyond_atr=round(self.mae, 4),
             tp05=tp05, tp07=tp07, tp10=tp10, sl03=sl03, sl05=sl05,
             exit_away=round(exit_away, 4),
+            atr=round(self.atr, 6),
             entry_offset_atr=round(entry_offset_atr, 4),
             entry_bar=self.confirm_idx if self.confirmed else -1,
             day_end_bar=self.day_end_idx,
