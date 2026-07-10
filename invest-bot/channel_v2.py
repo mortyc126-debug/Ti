@@ -47,6 +47,11 @@ MIN_HEIGHT_ATR = 0.5          # ниже — «нитка», не торговы
 WIDTH_EDGES = [0.0, 0.5, 1.5, 4.0, np.inf]
 WIDTH_LABELS = ["нитка<0.5", "узкий0.5-1.5", "норм1.5-4", "широкий>4"]
 
+# Гонтлет: тейк/стоп-сетка (в ATR), барьеры от ЦЕНЫ ВХОДА, интрабар first-passage.
+GT_TAKES = (0.5, 0.7, 1.0)
+GT_STOPS = (0.3, 0.5)
+GT_PORT = (1.0, 0.5)          # комбо для no-overlap портфеля
+
 
 def _load(path):
     rows = json.load(open(path, encoding="utf-8"))
@@ -56,7 +61,8 @@ def _load(path):
     return (np.array([r["open"] for r in rows], float),
             np.array([r["high"] for r in rows], float),
             np.array([r["low"] for r in rows], float),
-            np.array([r["close"] for r in rows], float))
+            np.array([r["close"] for r in rows], float),
+            [str(r["time"]) for r in rows])
 
 
 def _aggregate(o, h, l, c, f):
@@ -148,7 +154,32 @@ def _width_bucket(w_atr):
     return WIDTH_LABELS[-1]
 
 
-def _scan(ch, h5, l5, c5, atr5, f, ticker):
+def _barriers(entry, sgn, a, h5, l5, c5, i, end5, cap):
+    """Тейк/стоп-сетка для сделки-отскока, барьеры от ЦЕНЫ ВХОДА c5[i] (не от
+    уровня — иначе pnl завышен), интрабар first-passage по high/low. sgn: +1 лонг
+    (нижняя граница), -1 шорт (верхняя). Возвращает {(take,stop):(pnl_atr, exit_bar)}.
+    Тай в одном баре (задело и тейк, и стоп) — консервативно считаем стоп первым."""
+    last = min(end5, i + cap)
+    grid = {}
+    for take in GT_TAKES:
+        for stop in GT_STOPS:
+            pnl, exb = None, last
+            for j in range(i + 1, last + 1):
+                fav = sgn * ((h5[j] if sgn > 0 else l5[j]) - entry) / a
+                adv = sgn * ((l5[j] if sgn > 0 else h5[j]) - entry) / a
+                if adv <= -stop:            # стоп имеет приоритет при тае
+                    pnl, exb = -stop, j
+                    break
+                if fav >= take:
+                    pnl, exb = take, j
+                    break
+            if pnl is None:                 # ни тейк, ни стоп — закрытие по close
+                pnl = sgn * (c5[last] - entry) / a
+            grid[(take, stop)] = (pnl, exb)
+    return grid
+
+
+def _scan(ch, h5, l5, c5, atr5, f, ticker, times):
     """Скан касаний обеих границ на 5м. Линия старшего ТФ в точке 5м-бара i:
     x = i/f (позиция в индексе старшего ТФ). Исход — по замороженному уровню."""
     n5 = len(c5)
@@ -241,6 +272,9 @@ def _scan(ch, h5, l5, c5, atr5, f, ticker):
                 "w_bucket": _width_bucket(w_atr),
                 "retest": round(float(retest), 3) if np.isfinite(retest) else None,
                 "mfe": round(mfe, 3),
+                # для гонтлета: интрабар тейк/стоп от цены входа + время/бар входа
+                "grid": _barriers(c5[i], sgn, a, h5, l5, c5, i, end5, RESOLVE_CAP_5M),
+                "entry_bar": i, "date": times[i][:10] if i < len(times) else "",
             })
             tb += 1
             prev_out = res
@@ -253,10 +287,10 @@ def _process(path, ticker, f, days):
     data = _load(path)
     if data is None:
         return []
-    o, h, l, c = data
+    o, h, l, c, times = data
     if days:
         cut = days * 100
-        o, h, l, c = o[-cut:], h[-cut:], l[-cut:], c[-cut:]
+        o, h, l, c, times = o[-cut:], h[-cut:], l[-cut:], c[-cut:], times[-cut:]
     agg = _aggregate(o, h, l, c, f)
     if agg is None:
         return []
@@ -272,7 +306,7 @@ def _process(path, ticker, f, days):
     for ch in channels:
         # фильтр «нитка»/минимум по высоте на баре рождения
         a = atr5[int(ch["born"] * f)] if int(ch["born"] * f) < len(atr5) else np.nan
-        touches += _scan(ch, h, l, c, atr5, f, ticker)
+        touches += _scan(ch, h, l, c, atr5, f, ticker, times)
     return touches
 
 
@@ -313,6 +347,80 @@ def _report(touches):
     _row("retest<0 (без хода)", [t for t in rr if t["retest"] < 0])
 
 
+def _gt_grid(rows, cost, title):
+    """Экспектанси тейк/стоп-сетки (avg pnl−cost, ATR) + win%. Барьеры интрабар."""
+    print(f"\n-- {title}: сетка тейк/стоп (N={len(rows)}, cost={cost}) --")
+    print(f"{'take/stop':<12}" + "".join(f"{s:>10}" for s in GT_STOPS))
+    if not rows:
+        print("  пусто")
+        return
+    for take in GT_TAKES:
+        cells = []
+        for stop in GT_STOPS:
+            pnls = [r["grid"][(take, stop)][0] - cost for r in rows]
+            exp = sum(pnls) / len(pnls)
+            wr = 100 * sum(1 for p in pnls if p > 0) / len(pnls)
+            cells.append(f"{exp:+.3f}/{wr:.0f}%")
+        print(f"take{take:<8}" + "".join(f"{c:>10}" for c in cells))
+
+
+def _gt_portfolio(rows, cost, title):
+    """No-overlap: одна позиция на инструмент за раз (по entry/exit-бару), комбо
+    GT_PORT. Так эпизоды одного канала не считаются как N независимых сделок."""
+    take, stop = GT_PORT
+    by_tk = {}
+    for r in rows:
+        by_tk.setdefault(r["ticker"], []).append(r)
+    trades, pnl_sum = 0, 0.0
+    for tk, rs in by_tk.items():
+        rs.sort(key=lambda r: r["entry_bar"])
+        free_at = -1
+        for r in rs:
+            if r["entry_bar"] <= free_at:
+                continue
+            pnl, exb = r["grid"][(take, stop)]
+            pnl_sum += pnl - cost
+            free_at = exb
+            trades += 1
+    if not trades:
+        print(f"{title:<30} нет сделок")
+        return
+    print(f"{title:<30} N={trades:<5} exp={pnl_sum/trades:+.3f}  Σ={pnl_sum:+.1f} ATR "
+          f"(тейк{take}/стоп{stop})")
+
+
+def _gauntlet(touches, cost, split_date):
+    """Гонтлет для first-touch сигнала: интрабар тейк/стоп + no-overlap + held-out.
+    Тот же критерий, что провалидировал уровневый сигнал — если first-touch реален,
+    экспектанси >0 на обеих половинах времени и после схлопывания перекрытий."""
+    first = [t for t in touches if t["touches_before"] == 0]
+    first_norm = [t for t in first if t["w_bucket"] == "норм1.5-4"]
+    print(f"\n{'='*70}\nГОНТЛЕТ first-touch: {len(first)} касаний "
+          f"(из них норм-ширина {len(first_norm)})\n{'='*70}")
+    _gt_grid(first, cost, "first-touch, все ширины")
+    _gt_grid(first_norm, cost, "first-touch, ширина=норм")
+    print("\n-- No-overlap портфель (одна позиция/инструмент) --")
+    _gt_portfolio(first, cost, "first-touch все")
+    _gt_portfolio(first_norm, cost, "first-touch норм")
+    # held-out по времени
+    train = [t for t in first if t["date"] and t["date"] < split_date]
+    test = [t for t in first if t["date"] and t["date"] >= split_date]
+    print(f"\n-- HELD-OUT: train<{split_date} ({len(train)}) | test≥ ({len(test)}) --")
+    if train and test:
+        _gt_portfolio(train, cost, "TRAIN first-touch")
+        _gt_portfolio(test, cost, "TEST  first-touch")
+    else:
+        print("одна из половин пуста — сдвинь --split-date")
+    # коллинеарность first-touch ↔ retest<1: пересечение популяций
+    ft = {(t["ticker"], t["entry_bar"]) for t in first}
+    r1 = {(t["ticker"], t["entry_bar"]) for t in touches
+          if t["retest"] is not None and 0 <= t["retest"] < 1}
+    if r1:
+        inter = len(ft & r1)
+        print(f"\n-- Коллинеарность: retest<1 популяция {len(r1)}, из них first-touch "
+              f"{inter} ({100*inter/len(r1):.0f}%) → {'дубль сигнала' if inter/len(r1)>0.6 else 'частично независим'}")
+
+
 def main():
     ap = argparse.ArgumentParser(description="Детектор каналов v2 (спека пользователя + гейты видео)")
     ap.add_argument("--cache", default=os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -322,6 +430,10 @@ def main():
     ap.add_argument("--days", type=int, default=0)
     ap.add_argument("--struct-factor", type=int, default=STRUCT_FACTOR_DEFAULT)
     ap.add_argument("--out", default="")
+    ap.add_argument("--gauntlet", action="store_true",
+                    help="прогнать first-touch через интрабар тейк/стоп + no-overlap + held-out")
+    ap.add_argument("--cost-atr", type=float, default=0.12, help="издержки на сделку в ATR")
+    ap.add_argument("--split-date", default="2026-06-01", help="граница train/test для held-out")
     args = ap.parse_args()
 
     if args.tickers:
@@ -349,13 +461,15 @@ def main():
 
     if args.out:
         import csv
-        cols = list(touches[0].keys())
+        cols = [k for k in touches[0].keys() if k != "grid"]   # grid — вложенный dict, не в CSV
         with open(args.out, "w", newline="", encoding="utf-8") as fh:
-            w = csv.DictWriter(fh, fieldnames=cols)
+            w = csv.DictWriter(fh, fieldnames=cols, extrasaction="ignore")
             w.writeheader()
             w.writerows(touches)
         print(f"CSV: {args.out}")
     _report(touches)
+    if args.gauntlet:
+        _gauntlet(touches, args.cost_atr, args.split_date)
 
 
 if __name__ == "__main__":
