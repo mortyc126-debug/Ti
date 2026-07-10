@@ -148,6 +148,7 @@ class Touch:
     exit_away: float
     atr: float                # ATR в ЦЕНОВЫХ единицах на момент касания — для пересчёта
                               # барьеров от цены входа в бэктесте
+    reach_bar: int            # абс. бар первого касания уровня (момент налива лимитки); -1 = не дошло
     entry_offset_atr: float   # (цена бара подтверждения − уровень)/ATR в сторону сделки:
                               # насколько реальный вход ушёл от уровня. P&L барьеров
                               # книжится от уровня, поэтому для честного расчёта от
@@ -378,6 +379,7 @@ class _Episode:
     lows: list             # исполнение ордера внутри бара), не по close
     confirmed: bool = False
     confirm_idx: int = -1
+    reach_idx: int = -1          # первый бар, где цена реально коснулась уровня (для лимит-входа)
     penetration: float = 0.0
     pullback: float = 0.0
     mfe: float = 0.0
@@ -387,6 +389,8 @@ class _Episode:
         lvl = self.lv.price
         sgn = 1.0 if self.side == "support" else -1.0
         self.extreme = min(self.extreme, l) if self.side == "support" else max(self.extreme, h)
+        if self.reach_idx < 0 and (l <= lvl if self.side == "support" else h >= lvl):
+            self.reach_idx = m       # лимитка по уровню налилась бы здесь
         away = sgn * (c - lvl) / self.atr
         if not self.confirmed:
             if away <= -BREAK_ATR:
@@ -466,6 +470,7 @@ class _Episode:
             tp05=tp05, tp07=tp07, tp10=tp10, sl03=sl03, sl05=sl05,
             exit_away=round(exit_away, 4),
             atr=round(self.atr, 6),
+            reach_bar=self.reach_idx,
             entry_offset_atr=round(entry_offset_atr, 4),
             entry_bar=self.confirm_idx if self.confirmed else -1,
             day_end_bar=self.day_end_idx,
