@@ -146,6 +146,10 @@ class Touch:
     sl03: int
     sl05: int
     exit_away: float
+    entry_offset_atr: float   # (цена бара подтверждения − уровень)/ATR в сторону сделки:
+                              # насколько реальный вход ушёл от уровня. P&L барьеров
+                              # книжится от уровня, поэтому для честного расчёта от
+                              # фактического филла надо вычесть это смещение.
     entry_bar: int            # абс. бар входа (подтверждение) и конца дня — для
     day_end_bar: int          # портфельной симуляции без перекрытия позиций
     ticker: str = ""          # проставляется в мульти-прогоне (иначе пусто)
@@ -424,6 +428,7 @@ class _Episode:
         # до конца дня (метка вправо смотреть можно) + P&L тайм-стопа на закрытии.
         tp05 = tp07 = tp10 = sl03 = sl05 = -1
         exit_away = 0.0
+        entry_offset_atr = 0.0
         if self.confirmed:
             sgn = 1.0 if self.side == "support" else -1.0
             lvl = self.lv.price
@@ -440,6 +445,8 @@ class _Episode:
                 if sl03 < 0 and adv <= -0.3: sl03 = rel
                 if sl05 < 0 and adv <= -0.5: sl05 = rel
             exit_away = sgn * (self.closes[self.day_end_idx] - lvl) / self.atr
+            # реальный вход — по закрытию бара подтверждения, а не по цене уровня
+            entry_offset_atr = sgn * (self.closes[self.confirm_idx] - lvl) / self.atr
         md = self.meta
         return Touch(
             ts_msk=md["ts"], level_price=round(self.lv.price, 6), kind=self.lv.kind,
@@ -456,6 +463,7 @@ class _Episode:
             mfe_away_atr=round(self.mfe, 4), mae_beyond_atr=round(self.mae, 4),
             tp05=tp05, tp07=tp07, tp10=tp10, sl03=sl03, sl05=sl05,
             exit_away=round(exit_away, 4),
+            entry_offset_atr=round(entry_offset_atr, 4),
             entry_bar=self.confirm_idx if self.confirmed else -1,
             day_end_bar=self.day_end_idx,
         )

@@ -37,9 +37,11 @@ def _combo_rows(bars, ticker):
     return rows
 
 
-def _portfolio(rows, cost, label, quiet=False):
+def _portfolio(rows, cost, label, quiet=False, from_level=False):
     """No-overlap: одна позиция на инструмент за раз (по entry/exit-бару). Возвращает
-    (n, exp, total, win%, trades[]). quiet=True — не печатать строку (для ранжира)."""
+    (n, exp, total, win%, trades[]). quiet=True — не печатать строку (для ранжира).
+    from_level=True — старый расчёт (P&L от цены уровня, завышает); по умолчанию
+    книжим от РЕАЛЬНОГО входа: вычитаем entry_offset_atr (сдвиг филла от уровня)."""
     by_tk = {}
     for r in rows:
         by_tk.setdefault(r.ticker, []).append(r)
@@ -51,6 +53,8 @@ def _portfolio(rows, cost, label, quiet=False):
             if r.entry_bar <= free_at:
                 continue
             exit_bar, pnl = lr._exit_of(r, TAKE, STOP)
+            if not from_level:
+                pnl -= r.entry_offset_atr   # барьеры мерятся от уровня → переводим в P&L от филла
             net = pnl - cost
             pnl_sum += net
             wins += 1 if net > 0 else 0
@@ -100,8 +104,10 @@ def main():
     if not all_rows:
         raise SystemExit("combo-входов не собрано — проверь кэш/период")
 
-    print(f"\n{'='*70}\nБЭКТЕСТ LevelReactionStrategy (combo, тейк/стоп {TAKE}/{STOP}, cost={args.cost_atr})\n{'='*70}")
-    _, _, _, _, trades = _portfolio(all_rows, args.cost_atr, "ВСЁ (no-overlap)")
+    print(f"\n{'='*70}\nБЭКТЕСТ LevelReactionStrategy (combo, тейк/стоп {TAKE}/{STOP}, cost={args.cost_atr})")
+    print(f"P&L от РЕАЛЬНОЙ цены входа (закрытие бара подтверждения), не от уровня\n{'='*70}")
+    _portfolio(all_rows, args.cost_atr, "ВСЁ (от уровня, старый)", from_level=True)
+    _, _, _, _, trades = _portfolio(all_rows, args.cost_atr, "ВСЁ (от входа, честный)")
 
     # РАНЖИР ПО ИНСТРУМЕНТАМ — выбираем универс по эджу, не по ликвиду.
     # Считаем per-ticker no-overlap exp/win + held-out test (где эдж не подгонка).
