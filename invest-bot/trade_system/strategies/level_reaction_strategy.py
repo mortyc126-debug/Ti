@@ -61,8 +61,10 @@ class LevelReactionStrategy(IStrategy):
     def __init__(self, settings=None) -> None:
         self._settings = settings
         self._bars: list[dict] = []
-        self._short_enabled: bool = True
+        self._short_enabled: bool = getattr(settings, "short_enabled_flag", True) if settings else True
         self._lot: int = 1
+        self._hist_provider = None   # set_atr_history_provider — прогрев буфера историей
+        self._warmed: bool = False
 
     @property
     def settings(self):
@@ -74,9 +76,41 @@ class LevelReactionStrategy(IStrategy):
     def update_short_status(self, status: bool) -> None:
         self._short_enabled = status
 
+    def set_atr_history_provider(self, provider) -> None:
+        """Трейдер даёт провайдер кэш-истории (90 дней) — используем его, чтобы
+        прогреть буфер на старте и НЕ ждать накопления живьём. Тот же хук, что у
+        OICompositeStrategy; сигналы при прогреве не эмитятся (только заполняем bars)."""
+        self._hist_provider = provider
+
+    def _append(self, c: HistoricCandle) -> None:
+        """Добавить бар, только если он строго новее последнего — так живой поток
+        не дублирует прогретую историю на стыке."""
+        b = _candle_to_bar(c)
+        if self._bars and b["t"] <= self._bars[-1]["t"]:
+            return
+        self._bars.append(b)
+
+    def _warmup(self) -> None:
+        self._warmed = True
+        if not self._hist_provider or not self._settings:
+            return
+        try:
+            hist = self._hist_provider(getattr(self._settings, "ticker", "")) or []
+        except Exception as e:
+            logger.warning("LevelReactionStrategy: прогрев истории не удался (%s)", e)
+            return
+        for c in sorted(hist, key=lambda x: x.time):
+            self._append(c)
+        if len(self._bars) > _MAX_BUFFER_BARS:
+            self._bars = self._bars[-_MAX_BUFFER_BARS:]
+        logger.info("LevelReactionStrategy: буфер прогрет историей — %d баров", len(self._bars))
+
     def analyze_candles(self, candles: list[HistoricCandle]) -> Optional[Signal]:
+        if not self._warmed:
+            self._warmup()
         prev_n = len(self._bars)
-        self._bars.extend(_candle_to_bar(c) for c in candles)
+        for c in candles:
+            self._append(c)
         if len(self._bars) > _MAX_BUFFER_BARS:
             drop = len(self._bars) - _MAX_BUFFER_BARS
             self._bars = self._bars[drop:]
