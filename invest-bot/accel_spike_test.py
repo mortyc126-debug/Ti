@@ -50,7 +50,7 @@ def _load_closes(path: str):
     h = np.array([r["high"] for r in rows], float)
     l = np.array([r["low"] for r in rows], float)
     c = np.array([r["close"] for r in rows], float)
-    dates = [str(r.get("time", ""))[:10] for r in rows]
+    dates = [str(r.get("time", "")) for r in rows]   # полный ISO-таймстемп (для held-out хватает лексики, для блоттера нужно время)
     return o, h, l, c, dates
 
 
@@ -103,6 +103,7 @@ def _process(ticker_data, m, halflife, n_atr, trend_w, horizons,
     prev_c = np.concatenate([[c[0]], c[:-1]])
     tr = np.maximum(h - l, np.maximum(np.abs(h - prev_c), np.abs(l - prev_c)))
     atr = _rmean(tr, n_atr)
+    atr[atr <= 0] = np.nan   # плоские/неликвидные бары: ATR=0 → деление даёт inf
 
     # Тренд-контекст: знак хода за trend_w баров.
     trend_sign = np.full(n, np.nan)

@@ -93,6 +93,28 @@ def _fade_signals(path, ticker, anom_min):
     return out
 
 
+def _collapse(rows, gap_min):
+    """Схлопывание перекрытий: подряд идущие сигналы одного (тикер,тип,направление)
+    в пределах gap_min минут — это ОДНО движение, а не N сделок. Оставляем первый,
+    остальные душим. Так блоттер = список сделок к исполнению, а не поток эпизодов."""
+    if gap_min <= 0:
+        return rows
+    last = {}
+    out = []
+    for r in sorted(rows, key=lambda r: r["datetime"]):
+        try:
+            t = datetime.fromisoformat(r["datetime"])
+        except ValueError:
+            out.append(r)
+            continue
+        key = (r["ticker"], r["type"], r["direction"])
+        prev = last.get(key)
+        if prev is None or (t - prev).total_seconds() / 60.0 >= gap_min:
+            out.append(r)
+            last[key] = t
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description="Blotter двух сигналов (level-комбо + accel-fade) для paper-trade")
     ap.add_argument("--cache", default=os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -101,6 +123,8 @@ def main():
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--recent-days", type=int, default=0, help="показать сигналы за последние N дней")
     ap.add_argument("--anom-min", type=float, default=2.0)
+    ap.add_argument("--collapse-min", type=int, default=60,
+                    help="душить повторы одного (тикер,тип,напр) в пределах N минут (0=не душить)")
     ap.add_argument("--out", default="")
     args = ap.parse_args()
 
@@ -124,6 +148,10 @@ def main():
             rows += _level_signals(bars, ticker)
         rows += _fade_signals(p, ticker, args.anom_min)
 
+    raw_n = len(rows)
+    rows = _collapse(rows, args.collapse_min)
+    if args.collapse_min:
+        print(f"схлопнуто перекрытий: {raw_n} → {len(rows)} (окно {args.collapse_min} мин)")
     rows.sort(key=lambda r: r["datetime"])
     if args.recent_days:
         # последние N дней от максимальной даты в blotter
