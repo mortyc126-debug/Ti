@@ -39,7 +39,9 @@ class ProgramConfiguration:
             daily_trend_gate=ts.get("DAILY_TREND_GATE", "1") == "1",
             corr_max_sector_positions=int(ts.get("CORR_MAX_SECTOR_POSITIONS", "2")),
             atr_lot_scale=ts.get("ATR_LOT_SCALE", "1") == "1",
+            strategy_override=ts.get("STRATEGY_OVERRIDE", "").strip(),
         )
+        _strat_override = self.__trading_settings.strategy_override
 
         if "MEGA_ALERTS" in config:
             ma = config["MEGA_ALERTS"]
@@ -99,7 +101,7 @@ class ProgramConfiguration:
             if strategy_section.startswith("STRATEGY_") and not strategy_section.endswith("_SETTINGS"):
                 self.__trade_strategy_settings.append(
                     StrategySettings(
-                        name=config[strategy_section]["STRATEGY_NAME"],
+                        name=_strat_override or config[strategy_section]["STRATEGY_NAME"],
                         figi=config[strategy_section]["FIGI"],
                         ticker=config[strategy_section]["TICKER"],
                         max_lots_per_order=int(config[strategy_section]["MAX_LOTS_PER_ORDER"]),

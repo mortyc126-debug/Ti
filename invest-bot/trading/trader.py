@@ -3062,7 +3062,7 @@ class Trader:
                 continue
             share_settings, figi = resolved
             settings = StrategySettings(
-                name="OICompositeStrategy",
+                name=self.__trading_settings.strategy_override or "OICompositeStrategy",
                 figi=figi,
                 ticker=ticker,
                 max_lots_per_order=cfg.max_lots_per_order,
@@ -3182,7 +3182,7 @@ class Trader:
                 max_lots_per_order = ft_cfg.max_lots_per_order
 
             settings = StrategySettings(
-                name="OICompositeStrategy",
+                name=self.__trading_settings.strategy_override or "OICompositeStrategy",
                 figi=figi,
                 ticker=future_settings.ticker,
                 max_lots_per_order=max_lots_per_order,
