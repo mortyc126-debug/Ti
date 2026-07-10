@@ -461,7 +461,25 @@ class _Episode:
         )
 
 
-def collect(bars: list[dict], round_valid_from, pullback_atr: float = PULLBACK_ATR) -> list[Touch]:
+def _confirm_signal(ep, m: int) -> dict:
+    """Запись входа в момент ПОДТВЕРЖДЕНИЯ эпизода (для live). Все поля combo-
+    фильтра известны здесь и backward-looking — forward-резолв (_emit) для входа
+    не нужен. atr/level в ЦЕНОВЫХ единицах: барьеры считаются от уровня."""
+    md = ep.meta
+    return {
+        "confirm_bar": m, "ts": md["ts"], "side": ep.side,
+        "kind": ep.lv.kind, "level_price": ep.lv.price, "atr": ep.atr,
+        "approach_v6": md["v6"], "touches_before": md["touches_before"],
+        "prev_outcome": md["prev_outcome"], "penetration_atr": ep.penetration,
+        "confluence": md["confl"], "strength": md["strength"], "regime": md["regime"],
+    }
+
+
+def collect(bars: list[dict], round_valid_from, pullback_atr: float = PULLBACK_ATR,
+            confirm_sink: list | None = None) -> list[Touch]:
+    """confirm_sink: если передан список — collect дописывает в него записи входа
+    в момент подтверждения эпизода (live-режим). Офлайн-поведение (возврат touches)
+    не меняется. Держим общую машину _Episode.feed → торгуем ровно то, что валидировали."""
     daily = _daily_bars(bars)
     if len(daily) < MIN_DAILY_BARS:
         raise SystemExit(f"мало дневных баров ({len(daily)} < {MIN_DAILY_BARS}) — увеличьте --days")
@@ -496,8 +514,10 @@ def collect(bars: list[dict], round_valid_from, pullback_atr: float = PULLBACK_A
     levels += _volume_node_levels(profiles, day_bounds)
     if round_valid_from is not None:
         levels += _round_levels(bars, atr_map, round_valid_from)
-    logger.info("уровней сгенерировано: %d (%s)", len(levels),
-                ", ".join(f"{k}={sum(1 for l in levels if l.kind == k)}" for k in KIND_WEIGHT))
+    # в live (confirm_sink) collect зовётся каждый бар — не спамим INFO
+    _lvl_log = logger.debug if confirm_sink is not None else logger.info
+    _lvl_log("уровней сгенерировано: %d (%s)", len(levels),
+             ", ".join(f"{k}={sum(1 for l in levels if l.kind == k)}" for k in KIND_WEIGHT))
 
     events = sorted(levels, key=lambda l: l.born_at)
     ev_i = 0
@@ -517,7 +537,10 @@ def collect(bars: list[dict], round_valid_from, pullback_atr: float = PULLBACK_A
 
         done = []
         for ev_id, ep in active_ep.items():
+            was_conf = ep.confirmed
             t = ep.feed(m, bar["h"], bar["l"], c)
+            if confirm_sink is not None and ep.confirmed and not was_conf:
+                confirm_sink.append(_confirm_signal(ep, m))   # эпизод подтвердился на этом баре
             if t is not None:
                 touches.append(t)
                 done.append(ev_id)
