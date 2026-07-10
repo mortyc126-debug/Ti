@@ -179,12 +179,16 @@ def _barriers(entry, sgn, a, h5, l5, c5, i, end5, cap):
     return grid
 
 
-def _scan(ch, h5, l5, c5, atr5, f, ticker, times):
+def _scan(ch, h5, l5, c5, atr5, f, ticker, times, confirm_lag):
     """Скан касаний обеих границ на 5м. Линия старшего ТФ в точке 5м-бара i:
-    x = i/f (позиция в индексе старшего ТФ). Исход — по замороженному уровню."""
+    x = i/f (позиция в индексе старшего ТФ). Исход — по замороженному уровню.
+    confirm_lag: канал ПОДТВЕРЖДЁН только через lag баров старшего ТФ после born
+    (пивоты в _swings видны с задержкой ±step) — до этого касания задним числом,
+    в реале канал построить нельзя. Скан стартует с (born+lag)*f. Это закрывает
+    look-ahead: без сдвига первые касания залезают в неподтверждённое окно."""
     n5 = len(c5)
-    start5 = int(ch["born"] * f)
-    end5 = min(n5 - 1, start5 + CAP_STRUCT_BARS * f)
+    start5 = int((ch["born"] + confirm_lag) * f)
+    end5 = min(n5 - 1, int(ch["born"] * f) + CAP_STRUCT_BARS * f)
     if start5 >= end5:
         return []
     touches = []
@@ -283,7 +287,7 @@ def _scan(ch, h5, l5, c5, atr5, f, ticker, times):
     return touches
 
 
-def _process(path, ticker, f, days):
+def _process(path, ticker, f, days, confirm_lag=SWING_STEP_DEFAULT):
     data = _load(path)
     if data is None:
         return []
@@ -306,7 +310,7 @@ def _process(path, ticker, f, days):
     for ch in channels:
         # фильтр «нитка»/минимум по высоте на баре рождения
         a = atr5[int(ch["born"] * f)] if int(ch["born"] * f) < len(atr5) else np.nan
-        touches += _scan(ch, h, l, c, atr5, f, ticker, times)
+        touches += _scan(ch, h, l, c, atr5, f, ticker, times, confirm_lag)
     return touches
 
 
@@ -434,6 +438,8 @@ def main():
                     help="прогнать first-touch через интрабар тейк/стоп + no-overlap + held-out")
     ap.add_argument("--cost-atr", type=float, default=0.12, help="издержки на сделку в ATR")
     ap.add_argument("--split-date", default="2026-06-01", help="граница train/test для held-out")
+    ap.add_argument("--confirm-lag", type=int, default=SWING_STEP_DEFAULT,
+                    help="лаг подтверждения канала в барах старшего ТФ (0=утёкшая версия для A/B)")
     args = ap.parse_args()
 
     if args.tickers:
@@ -450,7 +456,7 @@ def main():
             print(f"нет файла: {p}")
             continue
         ticker = os.path.basename(p)[:-5]
-        recs = _process(p, ticker, args.struct_factor, args.days)
+        recs = _process(p, ticker, args.struct_factor, args.days, args.confirm_lag)
         touches += recs
         n_tk += 1
         if args.tickers:
