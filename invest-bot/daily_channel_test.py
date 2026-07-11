@@ -529,6 +529,109 @@ def _build_reg_channels(h, l, c, atr):
     return _suppress_dupes(out)
 
 
+# ── ZigZag-каналы: как рисует человек — по ЗНАЧИМЫМ свингам ────────────────────
+ZZ_THR_ATR = 1.5       # свинг значим, если ход от прошлого пивота ≥ X ATR
+ZZ_WIDTH_MAX = 5.0     # каналы шире — не коридор (у ZZ ширину держит значимый свинг)
+ZZ_EXTEND_TOL = 0.5    # следующий одноимённый пивот у линии ближе X ATR → канал продлевается
+
+
+def _zigzag(h, l, atr, thr):
+    """Чередующиеся значимые пивоты (H/L). Пивот подтверждается, когда цена
+    развернулась от экстремума на thr*ATR. Это и есть «значимые точки», по которым
+    человек строит канал, — а не каждый локальный тычок."""
+    n = len(h)
+    piv = []
+    trend = 0                      # 0 неизвестно, +1 ищем хай, −1 ищем лой
+    hi_i, hi = 0, h[0]
+    lo_i, lo = 0, l[0]
+    for i in range(1, n):
+        a = atr[i]
+        if not (np.isfinite(a) and a > 0):
+            continue
+        if trend >= 0 and h[i] > hi:
+            hi_i, hi = i, h[i]
+        if trend <= 0 and l[i] < lo:
+            lo_i, lo = i, l[i]
+        if trend == 0:
+            if hi - l[i] >= thr * a:
+                piv.append((hi_i, hi, "H")); trend = -1; lo_i, lo = i, l[i]
+            elif h[i] - lo >= thr * a:
+                piv.append((lo_i, lo, "L")); trend = 1; hi_i, hi = i, h[i]
+        elif trend == 1:            # вверх, ждём разворот вниз → хай-пивот
+            if hi - l[i] >= thr * a:
+                piv.append((hi_i, hi, "H")); trend = -1; lo_i, lo = i, l[i]
+        elif trend == -1:
+            if h[i] - lo >= thr * a:
+                piv.append((lo_i, lo, "L")); trend = 1; hi_i, hi = i, h[i]
+    return piv
+
+
+def _build_zigzag_channels(h, l, c, atr, thr=ZZ_THR_ATR):
+    """Канал по 3 чередующимся значимым пивотам: 2 одноимённых задают линию (наклон),
+    противоположный между ними — ширину. ОБЕ границы прибиты к реальным свингам (нет
+    «линии по одной точке»). Канал продлевается, если следующий одноимённый пивот
+    ложится на линию; рвётся на пробое (_death_bar) — «создаётся и ломается»."""
+    n = len(h)
+    piv = _zigzag(h, l, atr, thr)
+    out = []
+    for idx in range(2, len(piv)):
+        p0, p1, p2 = piv[idx - 2], piv[idx - 1], piv[idx]   # p0,p2 одноимённые; p1 — между
+        if p0[2] == p1[2]:
+            continue                                        # страховка от несочередования
+        i0, y0, kind = p0[0], p0[1], p0[2]
+        i2, y2 = p2[0], p2[1]
+        if i2 == i0:
+            continue
+        if not (np.isfinite(atr[i0]) and atr[i0] > 0):
+            continue                                        # якорь в зоне прогрева ATR — пропуск
+        k = (y2 - y0) / (i2 - i0)
+        b = y0 - k * i0
+        born = i2
+        a = atr[born] if (born < n and np.isfinite(atr[born]) and atr[born] > 0) else None
+        if a is None or abs(k) > SLOPE_MAX_ATR * a:
+            continue
+        off = p1[1] - (k * p1[0] + b)                       # противоположный пивот задаёт ширину
+        w = abs(off) / a
+        if w < WIDTH_MIN_ATR or w > ZZ_WIDTH_MAX:
+            continue
+        # верх/низ: если анкер по лоям (kind L) — база нижняя, off>0 (хай сверху)
+        if off >= 0:
+            ku, bu, kl, bl = k, b + off, k, b
+        else:
+            ku, bu, kl, bl = k, b, k, b + off
+        ch = {"anchor": "low" if kind == "L" else "high", "born": born,
+              "x0": i0, "span": i2 - i0, "ku": ku, "bu": bu, "kl": kl, "bl": bl}
+        # продление: следующие одноимённые пивоты, легшие на линию базы, двигают born вперёд
+        j = idx + 2
+        while j < len(piv) and piv[j][2] == kind:
+            px, py = piv[j][0], piv[j][1]
+            aj = atr[px] if (px < n and np.isfinite(atr[px]) and atr[px] > 0) else a
+            if abs(py - (k * px + b)) <= ZZ_EXTEND_TOL * aj:
+                ch["born"] = px; ch["span"] = px - i0
+                j += 2
+            else:
+                break
+        ch["death"] = _death_bar(ch, h, l, c, atr, n)
+        ch["life"] = ch["death"] - ch["born"]
+        if ch["life"] < step_min():
+            continue
+        # цена должна ДЕРЖАТЬСЯ в коридоре на всём отрезке жизни, иначе линия не ложится
+        ins = tot = 0
+        for x in range(ch["x0"], ch["death"] + 1):
+            ax = atr[x]
+            if not (np.isfinite(ax) and ax > 0):
+                continue
+            up, lo = _bounds(ch, x)
+            tol = 0.5 * ax
+            tot += 1
+            if lo - tol <= c[x] <= up + tol:
+                ins += 1
+        if tot == 0 or ins / tot < 0.75:
+            continue
+        out.append(ch)
+    return _suppress_dupes(out)
+
+
 def step_min():
     return 2   # анкеры хотя бы 2 дня врозь (иначе не канал)
 
@@ -883,7 +986,9 @@ def _plot_svg(ticker, o, h, l, c, ds, channels, touches, out, days):
 
 
 def _channels_for(h, l, c, atr, args):
-    """Выбор билдера по --channel/--reg."""
+    """Выбор билдера по --zz/--channel/--reg."""
+    if getattr(args, "zz", False):
+        return _build_zigzag_channels(h, l, c, atr, getattr(args, "zz_thr", ZZ_THR_ATR))
     if args.channel in ("trend", "pair"):
         highs, lows = _swings(h, l, SWING_STEP)
         return (_build_adaptive_channels if args.channel == "trend"
@@ -910,6 +1015,10 @@ def main():
     ap.add_argument("--plot-days", type=int, default=160)
     ap.add_argument("--reg", action="store_true",
                     help="регрессионные каналы (МНК + перцентильные полосы) вместо свинг-анкеров")
+    ap.add_argument("--zz", action="store_true",
+                    help="ZigZag-каналы по значимым свингам (как рисует человек)")
+    ap.add_argument("--zz-thr", type=float, default=ZZ_THR_ATR,
+                    help="порог значимости свинга ZigZag в ATR (по умолч. 1.5)")
     ap.add_argument("--breakout", action="store_true",
                     help="торговать ПРОБОЙ канала по тренду, а не отскок")
     ap.add_argument("--fade", action="store_true",
@@ -941,6 +1050,8 @@ def main():
     args = ap.parse_args()
     MAX_SPAN = args.max_span
     SLOPE_MAX_ATR = {"flat": 0.06, "gentle": 0.15, "any": 0.30, "trend": 1.0, "pair": 0.60}[args.channel]
+    if args.zz:
+        SLOPE_MAX_ATR = 0.35   # ZZ: пологие торговые каналы, крутые трендовые ноги режем
     if args.max_slope > 0:
         SLOPE_MAX_ATR = args.max_slope
     MIN_TOUCHES = args.min_touches
