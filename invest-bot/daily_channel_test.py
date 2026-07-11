@@ -115,7 +115,7 @@ BREAK_OUT_ATR = 0.50   # цена ушла за границу глубже X AT
 FWD_SPAN_MULT = 0.75   # проекция вперёд не длиннее формирования*MULT — иначе луч в пустоту
 TREND_FWD_MULT = 0.6   # трендовые линии тянем вперёд (в этом смысл канала), но не в пустоту
 TREND_FWD_MAX_D = 14   # абсолютный потолок проекции вперёд (дней) — чтобы не улетало лучом
-SLOPE_PAIR_TOL = 0.25  # верх и низ образуют канал, только если наклоны близки (ATR/день)
+SLOPE_PAIR_TOL = 0.15  # порог близости наклонов: <= — берём противоположную линию по её точкам, > — параллель
 CONTAIN_MIN = 0.62     # доля close между линиями в окне формирования — иначе не коридор
 BREAK_HARD_ATR = 0.5   # прокол границы глубже этого (ATR) — слом, начинаем НОВЫЙ канал;
                        # мельче — подправляем линию по новой точке (канал жив, «но не слишком»)
@@ -325,39 +325,47 @@ def _cap_line(pts, s, e, atr, upper):
     return best
 
 
+def _side_line(pts, s, e, atr, upper):
+    """Своя трендовая границы ЧЕРЕЗ 2 ТОЧКИ: огибающая (cap) если есть, иначе по 2
+    последним пивотам стороны. (k,b) или None."""
+    sel = [p for p in pts if s <= p[0] <= e]
+    if len(sel) < 2:
+        return None
+    return _cap_line(pts, s, e, atr, upper=upper) or _line(sel[-2], sel[-1])
+
+
 def _fit_channel(highs, lows, h, l, c, atr, s, e):
-    """Канал ЧЕРЕЗ ТОЧКИ: опорная линия — через 2 ПОСЛЕДНИХ пивота тренд-стороны
-    (сопротивление по хаям на спуске / поддержка по лоям на росте), огибающую по
-    возможности; вторую границу кладём ПАРАЛЛЕЛЬНО по крайней противоположной точке.
-    Линии идут по реальным точкам и параллельны. Проверяем удержание цены внутри.
-    (ku,bu,kl,bl,w) или None."""
+    """Канал ЧЕРЕЗ ТОЧКИ, гибрид: главная линия — трендовая тренд-стороны по 2 точкам
+    (сопротивление по хаям на спуске / поддержка по лоям на росте). Противоположную
+    пробуем ТОЖЕ по своим 2 точкам; если её наклон близок к главной — берём её (обе
+    границы на реальных точках); если нет — кладём параллелью по «телу» точек (чтобы
+    не было дыр на сходящихся/расходящихся участках). Проверяем ширину и удержание."""
     a = atr[e] if e < len(atr) and np.isfinite(atr[e]) and atr[e] > 0 else None
     if a is None:
         return None
     xs = np.arange(s, e + 1)
-    anchor_high = float(np.polyfit(xs, c[s:e + 1], 1)[0]) <= 0   # спуск→опора по хаям
-    sel = [p for p in (highs if anchor_high else lows) if s <= p[0] <= e]
-    if len(sel) < 2:
+    anchor_high = float(np.polyfit(xs, c[s:e + 1], 1)[0]) <= 0    # спуск→главная по хаям
+    main = _side_line(highs if anchor_high else lows, s, e, atr, upper=anchor_high)
+    if main is None:
         return None
-    ln = _cap_line(highs if anchor_high else lows, s, e, atr, upper=anchor_high)
-    if ln is None:
-        ln = _line(sel[-2], sel[-1])           # нет огибающей — берём 2 последних пивота
-    if ln is None:
+    km, bm = main
+    if abs(km) > SLOPE_MAX_ATR * a:
         return None
-    k, b = ln
-    if abs(k) > SLOPE_MAX_ATR * a:
-        return None
-    if anchor_high:
-        ku, bu, kl = k, b, k
-        # параллель низа — по «телу» лоёв (нижний квантиль), а не по единичному спайку
-        bl = float(np.quantile(l[s:e + 1] - k * xs, 1 - PARALLEL_Q))
+    opp = _side_line(lows if anchor_high else highs, s, e, atr, upper=not anchor_high)
+    if opp is not None and abs(opp[0] - km) <= SLOPE_PAIR_TOL * a:
+        ko, bo = opp                                    # противоположная тоже по своим точкам
     else:
-        kl, bl, ku = k, b, k
-        bu = float(np.quantile(h[s:e + 1] - k * xs, PARALLEL_Q))
-    w = (ku * e + bu - kl * e - bl) / a
-    if w < WIDTH_MIN_ATR or w > WIDTH_MAX_ATR:
+        ko = km                                          # параллель по «телу» точек
+        arr = (l if anchor_high else h)[s:e + 1] - km * xs
+        bo = float(np.quantile(arr, 1 - PARALLEL_Q if anchor_high else PARALLEL_Q))
+    if anchor_high:
+        ku, bu, kl, bl = km, bm, ko, bo
+    else:
+        ku, bu, kl, bl = ko, bo, km, bm
+    up_line, lo_line = ku * xs + bu, kl * xs + bl
+    w = (up_line[-1] - lo_line[-1]) / a
+    if up_line[-1] <= lo_line[-1] or w < WIDTH_MIN_ATR or w > WIDTH_MAX_ATR:
         return None
-    up_line, lo_line = ku * xs + bu, kl * xs + bl   # цена держится внутри?
     inside = float(np.mean((c[s:e + 1] >= lo_line - TOUCH_TOL_ATR * a)
                            & (c[s:e + 1] <= up_line + TOUCH_TOL_ATR * a)))
     if inside < CONTAIN_MIN:
