@@ -113,9 +113,10 @@ WIDTH_MAX_ATR = 4.0    # шире — не коридор, а полнеба (о
 PIERCE_TOL = 0.25      # линия анкера может протыкаться промежуточной ценой не глубже X ATR
 BREAK_OUT_ATR = 0.50   # цена ушла за границу глубже X ATR → канал умер (перестаём рисовать)
 FWD_SPAN_MULT = 0.75   # проекция вперёд не длиннее формирования*MULT — иначе луч в пустоту
-TREND_FWD_MULT = 1.0   # трендовые линии тянем вперёд (в этом смысл канала), но не в пустоту
-SLOPE_PAIR_TOL = 0.12  # верх и низ образуют канал, только если наклоны близки (ATR/день)
-CONTAIN_MIN = 0.70     # доля close между линиями в окне формирования — иначе не коридор
+TREND_FWD_MULT = 0.6   # трендовые линии тянем вперёд (в этом смысл канала), но не в пустоту
+TREND_FWD_MAX_D = 14   # абсолютный потолок проекции вперёд (дней) — чтобы не улетало лучом
+SLOPE_PAIR_TOL = 0.08  # верх и низ образуют канал, только если наклоны БЛИЗКИ (ATR/день)
+CONTAIN_MIN = 0.72     # доля close между линиями в окне формирования — иначе не коридор
 MIN_TOUCHES = 2        # цена должна ПОДХОДИТЬ к КАЖДОЙ границе ≥ этого числа раз (подтверждённый коридор)
 TOUCH_TOL_ATR = 0.40   # «подход к границе» = экстремум ближе X ATR к линии
 
@@ -137,10 +138,13 @@ def _touch_events(arr, k, b, x0, x1, atr, tol=TOUCH_TOL_ATR):
     return ev
 
 
-def _death_bar(ch, h, l, c, atr, n, mult=FWD_SPAN_MULT):
+def _death_bar(ch, h, l, c, atr, n, mult=FWD_SPAN_MULT, cap=None):
     """Бар, где канал перестал существовать: цена вышла за границу глубже BREAK_OUT
-    ИЛИ линии сошлись (верх ниже низа). Горизонт проекции вперёд — span*mult."""
+    ИЛИ линии сошлись (верх ниже низа). Горизонт проекции вперёд — span*mult (не
+    больше cap дней, если задан)."""
     fwd = max(step_min(), int(ch["span"] * mult))
+    if cap is not None:
+        fwd = min(fwd, cap)
     end = min(n - 1, ch["born"] + fwd)
     for x in range(ch["born"] + 1, end + 1):
         a = atr[x]
@@ -258,7 +262,7 @@ def _build_trend_channels(highs, lows, h, l, c, atr):
     for kh, bh, xh, bornh in hl:
         for kl, bl, xl, bornl in ll:
             born = max(bornh, bornl)
-            x0 = min(xh, xl)
+            x0 = max(xh, xl)          # с этого бара ОБЕ линии уже реальны — не экстраполируем назад
             if born - x0 < step_min() or born >= n:
                 continue
             a = atr[born] if np.isfinite(atr[born]) and atr[born] > 0 else None
@@ -279,7 +283,7 @@ def _build_trend_channels(highs, lows, h, l, c, atr):
                 continue
             ch = {"anchor": "trend", "born": born, "x0": x0, "span": max(born - x0, step_min()),
                   "ku": kh, "bu": bh, "kl": kl, "bl": bl}
-            ch["death"] = _death_bar(ch, h, l, c, atr, n, mult=TREND_FWD_MULT)
+            ch["death"] = _death_bar(ch, h, l, c, atr, n, mult=TREND_FWD_MULT, cap=TREND_FWD_MAX_D)
             ch["life"] = ch["death"] - born
             if ch["life"] < step_min():
                 continue
