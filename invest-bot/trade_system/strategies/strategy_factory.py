@@ -3,6 +3,7 @@ from typing import Optional
 from trade_system.strategies.oi_composite_strategy import OICompositeStrategy
 from trade_system.strategies.hierarchical_strategy import HierarchicalStrategy
 from trade_system.strategies.level_reaction_strategy import LevelReactionStrategy
+from trade_system.strategies.accel_fade_strategy import AccelFadeStrategy
 from trade_system.strategies.base_strategy import IStrategy
 
 __all__ = ("StrategyFactory")
@@ -21,5 +22,7 @@ class StrategyFactory:
                 return HierarchicalStrategy(*args, **kwargs)
             case "LevelReactionStrategy":
                 return LevelReactionStrategy(*args, **kwargs)
+            case "AccelFadeStrategy":
+                return AccelFadeStrategy(*args, **kwargs)
             case _:
                 return None
