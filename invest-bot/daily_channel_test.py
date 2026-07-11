@@ -113,7 +113,9 @@ WIDTH_MAX_ATR = 4.0    # шире — не коридор, а полнеба (о
 PIERCE_TOL = 0.25      # линия анкера может протыкаться промежуточной ценой не глубже X ATR
 BREAK_OUT_ATR = 0.50   # цена ушла за границу глубже X ATR → канал умер (перестаём рисовать)
 FWD_SPAN_MULT = 0.75   # проекция вперёд не длиннее формирования*MULT — иначе луч в пустоту
-TREND_FWD_MULT = 2.0   # трендовые линии тянем вперёд длиннее (в этом весь смысл канала)
+TREND_FWD_MULT = 1.0   # трендовые линии тянем вперёд (в этом смысл канала), но не в пустоту
+SLOPE_PAIR_TOL = 0.12  # верх и низ образуют канал, только если наклоны близки (ATR/день)
+CONTAIN_MIN = 0.70     # доля close между линиями в окне формирования — иначе не коридор
 MIN_TOUCHES = 2        # цена должна ПОДХОДИТЬ к КАЖДОЙ границе ≥ этого числа раз (подтверждённый коридор)
 TOUCH_TOL_ATR = 0.40   # «подход к границе» = экстремум ближе X ATR к линии
 
@@ -216,10 +218,11 @@ def _build_channels(highs, lows, h, l, c, atr):
     return _suppress_dupes(out)
 
 
-def _extreme_lines(pts, atr, n):
+def _extreme_lines(pts, arr, atr, n, is_high):
     """Линии по парам последовательных экстремумов (2 хая → линия / 2 лоя → линия).
-    Возвращает [(k, b, x0, born)]. Наклон ограничен SLOPE_MAX (для трендового режима
-    он поднят), пара не дальше MAX_SPAN дней."""
+    Линия должна ОГИБАТЬ экстремумы: промежуточные хаи не выше линии (для верха) /
+    лои не ниже (для низа) глубже PIERCE_TOL — иначе это палка через свечи, не
+    трендовая. Возвращает [(k, b, x0, born)]."""
     out = []
     for i in range(1, len(pts)):
         a1, a2 = pts[i - 1], pts[i]
@@ -234,46 +237,53 @@ def _extreme_lines(pts, atr, n):
         a = atr[born] if born < n and np.isfinite(atr[born]) and atr[born] > 0 else None
         if a is None or abs(k) > SLOPE_MAX_ATR * a:
             continue
+        base = k * np.arange(a1[0], a2[0] + 1) + b
+        seg = arr[a1[0]:a2[0] + 1] - base
+        pierce = float(np.max(seg)) if is_high else -float(np.min(seg))
+        if pierce > PIERCE_TOL * a:            # линия рвётся серединой — не трендовая
+            continue
         out.append((k, b, a1[0], born))
     return out
 
 
 def _build_trend_channels(highs, lows, h, l, c, atr):
-    """Каналы по ДВУМ независимым трендовым линиям: линия по 2 хаям (верх) и линия
-    по 2 лоям (низ), у каждой СВОЙ наклон. Линии продлеваются вперёд, зазор между
-    ними — канал (может сходиться/расходиться). По ходу истории берём последнюю
-    сложившуюся верхнюю и последнюю нижнюю линию; каждое обновление рождает канал."""
+    """Каналы по ДВУМ трендовым линиям: верх по 2 хаям, низ по 2 лоям. Пара образует
+    канал, ТОЛЬКО если линии почти параллельны (наклоны близки), верх выше низа, и
+    цена реально держится МЕЖДУ ними (>= CONTAIN_MIN). Иначе это не коридор, а две
+    случайные палки — что и давало отрыв от реальности."""
     n = len(c)
-    hl = _extreme_lines(highs, atr, n)
-    ll = _extreme_lines(lows, atr, n)
-    events = [("H", *x) for x in hl] + [("L", *x) for x in ll]
-    events.sort(key=lambda e: e[4])          # по born
-    out, cur_h, cur_l = [], None, None
-    for typ, k, b, x0, born in events:
-        if typ == "H":
-            cur_h = (k, b, x0)
-        else:
-            cur_l = (k, b, x0)
-        if not (cur_h and cur_l):
-            continue
-        ku, bu, xh = cur_h
-        kl, bl, xl = cur_l
-        x0_ch = min(xh, xl)
-        a = atr[born] if np.isfinite(atr[born]) and atr[born] > 0 else None
-        if a is None:
-            continue
-        up = ku * born + bu
-        lo = kl * born + bl
-        w = (up - lo) / a
-        if up <= lo or w < WIDTH_MIN_ATR or w > WIDTH_MAX_ATR:   # верх ниже низа/узко/широко
-            continue
-        ch = {"anchor": "trend", "born": born, "x0": x0_ch, "span": max(born - x0_ch, step_min()),
-              "ku": ku, "bu": bu, "kl": kl, "bl": bl}
-        ch["death"] = _death_bar(ch, h, l, c, atr, n, mult=TREND_FWD_MULT)
-        ch["life"] = ch["death"] - born
-        if ch["life"] < step_min():
-            continue
-        out.append(ch)
+    hl = _extreme_lines(highs, h, atr, n, True)
+    ll = _extreme_lines(lows, l, atr, n, False)
+    out = []
+    for kh, bh, xh, bornh in hl:
+        for kl, bl, xl, bornl in ll:
+            born = max(bornh, bornl)
+            x0 = min(xh, xl)
+            if born - x0 < step_min() or born >= n:
+                continue
+            a = atr[born] if np.isfinite(atr[born]) and atr[born] > 0 else None
+            if a is None:
+                continue
+            if abs(kh - kl) > SLOPE_PAIR_TOL * a:        # не параллельны — не канал
+                continue
+            up_b, lo_b = kh * born + bh, kl * born + bl
+            w = (up_b - lo_b) / a
+            if up_b <= lo_b or w < WIDTH_MIN_ATR or w > WIDTH_MAX_ATR:
+                continue
+            xs = np.arange(x0, born + 1)
+            up_line, lo_line = kh * xs + bh, kl * xs + bl
+            cc = c[x0:born + 1]
+            inside = float(np.mean((cc >= lo_line - TOUCH_TOL_ATR * a)
+                                   & (cc <= up_line + TOUCH_TOL_ATR * a)))
+            if inside < CONTAIN_MIN:                     # цена не держится в коридоре
+                continue
+            ch = {"anchor": "trend", "born": born, "x0": x0, "span": max(born - x0, step_min()),
+                  "ku": kh, "bu": bh, "kl": kl, "bl": bl}
+            ch["death"] = _death_bar(ch, h, l, c, atr, n, mult=TREND_FWD_MULT)
+            ch["life"] = ch["death"] - born
+            if ch["life"] < step_min():
+                continue
+            out.append(ch)
     return _suppress_dupes(out)
 
 
