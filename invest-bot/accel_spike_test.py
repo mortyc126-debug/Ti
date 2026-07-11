@@ -83,7 +83,7 @@ def _process(ticker_data, m, halflife, n_atr, trend_w, horizons,
     o, h, l, c, dates = ticker_data
     n = len(c)
     if n < max(horizons) + trend_w + n_atr + 4 * m + 10:
-        return []
+        return [], []
 
     # Резкое ускорение: v = ROC за m баров; accel = изменение v за m баров.
     v = np.full(n, np.nan)
