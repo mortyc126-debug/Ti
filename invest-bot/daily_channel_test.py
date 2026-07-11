@@ -106,7 +106,26 @@ WIDTH_MIN_ATR = 0.8    # уже — «нитка»/шум, не торговый
 WIDTH_MAX_ATR = 4.0    # шире — не коридор, а полнеба (одна граница улетает за экран)
 PIERCE_TOL = 0.25      # линия анкера может протыкаться промежуточной ценой не глубже X ATR
 BREAK_OUT_ATR = 0.50   # цена ушла за границу глубже X ATR → канал умер (перестаём рисовать)
-FWD_SPAN_MULT = 1.0    # проекция вперёд не длиннее формирования*MULT — иначе луч в пустоту
+FWD_SPAN_MULT = 0.75   # проекция вперёд не длиннее формирования*MULT — иначе луч в пустоту
+MIN_TOUCHES = 2        # цена должна ПОДХОДИТЬ к КАЖДОЙ границе ≥ этого числа раз (подтверждённый коридор)
+TOUCH_TOL_ATR = 0.40   # «подход к границе» = экстремум ближе X ATR к линии
+
+
+def _touch_events(arr, k, b, x0, x1, atr, tol=TOUCH_TOL_ATR):
+    """Сколько РАЗ ряд (high для верха / low для низа) подходил к линии k*i+b ближе
+    tol*ATR. Соседние бары-касания схлопываем в одно событие — это и есть «отскок
+    от границы». Мало событий на границе → это не коридор, а случайная параллель."""
+    ev, inside_prev = 0, False
+    for i in range(x0, x1 + 1):
+        a = atr[i]
+        if not (np.isfinite(a) and a > 0):
+            inside_prev = False
+            continue
+        near = abs(arr[i] - (k * i + b)) <= tol * a
+        if near and not inside_prev:
+            ev += 1
+        inside_prev = near
+    return ev
 
 
 def _death_bar(ch, h, l, c, atr, n):
@@ -172,6 +191,15 @@ def _build_channels(highs, lows, h, l, c, atr):
             w = abs(off) / a
             if w < WIDTH_MIN_ATR or w > WIDTH_MAX_ATR:  # слишком узко/широко
                 continue
+            # (3) ПОДТВЕРЖДЁННЫЙ коридор: цена подходила к ОБЕИМ границам ≥ MIN_TOUCHES
+            if anchor == "high":
+                nt_up = _touch_events(h, k, b, a1[0], a2[0], atr)
+                nt_lo = _touch_events(l, k, b + off, a1[0], a2[0], atr)
+            else:
+                nt_lo = _touch_events(l, k, b, a1[0], a2[0], atr)
+                nt_up = _touch_events(h, k, b + off, a1[0], a2[0], atr)
+            if nt_up < MIN_TOUCHES or nt_lo < MIN_TOUCHES:
+                continue
             ch = {"anchor": anchor, "k": k, "b": b, "off": off, "born": born,
                   "x0": a1[0], "span": span}
             ch["death"] = _death_bar(ch, h, l, c, atr, n)
@@ -202,11 +230,11 @@ def _suppress_dupes(chans):
             ov = min(e, k["death"]) - max(s, k["x0"])
             if ov <= 0:
                 continue
-            if ov < 0.7 * min(e - s, k["death"] - k["x0"]):
+            if ov < 0.5 * min(e - s, k["death"] - k["x0"]):
                 continue
             xm = (max(s, k["x0"]) + min(e, k["death"])) // 2
             wid = max(abs(ch["off"]), abs(k["off"]))
-            if abs(_mid_at(ch, xm) - _mid_at(k, xm)) < 0.5 * wid:
+            if abs(_mid_at(ch, xm) - _mid_at(k, xm)) < 0.8 * wid:
                 dup = True; break
         if not dup:
             kept.append(ch)
@@ -254,6 +282,11 @@ def _build_reg_channels(h, l, c, atr):
             cc = c[x0:i + 1]
             inside = float(np.mean((cc >= lo_band) & (cc <= up_band)))
             if inside < REG_INSIDE_MIN:                     # цена не держится в полосах
+                continue
+            # подтверждённый коридор: подходы к обеим полосам ≥ MIN_TOUCHES
+            nt_lo = _touch_events(l, k, b0 + dn_dev, x0, i, atr)
+            nt_up = _touch_events(h, k, b0 + up_dev, x0, i, atr)
+            if nt_up < MIN_TOUCHES or nt_lo < MIN_TOUCHES:
                 continue
             ch = {"anchor": "high" if k >= 0 else "low", "k": float(k),
                   "b": float(b0 + dn_dev), "off": float(off), "born": born,
@@ -514,7 +547,7 @@ def _fade_report(allt, args):
     tgt = "СРЕДНЕЙ ЛИНИИ (полширины)" if args.fade_target == "mid" else "ПРОТИВОПОЛОЖНОЙ границы"
     stp = "без стопа (чистый проход)" if args.no_stop else f"стоп = пробой входной границы на {FADE_STOP_ATR} ATR"
     print(f"\n{'='*74}\nFADE: отскок от границы → {tgt} (mom={args.mom_lookback})")
-    print(f"{stp}; {len(fr)} входов\n{'='*74}")
+    print(f"канал={args.channel}, подтв.касаний≥{args.min_touches}; {stp}; {len(fr)} входов\n{'='*74}")
     if not fr:
         print("нет входов — проверь кэш/период (или ослабь фильтр --mom-lookback 0)")
         return
@@ -624,7 +657,7 @@ def _plot_svg(ticker, o, h, l, c, ds, channels, touches, out, days):
 
 
 def main():
-    global MAX_SPAN
+    global MAX_SPAN, SLOPE_MAX_ATR, MIN_TOUCHES
     ap = argparse.ArgumentParser(description="Дневные параллельные каналы (спека пользователя)")
     ap.add_argument("--cache", default=os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                                     "data", "candle_cache"))
@@ -648,8 +681,14 @@ def main():
                     help="цель отскока: far=противоположная граница, mid=средняя линия")
     ap.add_argument("--no-stop", action="store_true",
                     help="без стопа — чистая проверка, доходит ли цель за жизнь канала")
+    ap.add_argument("--channel", choices=("flat", "gentle", "any"), default="gentle",
+                    help="тип канала: flat=почти горизонталь, gentle=+пологий наклон, any=любой наклон")
+    ap.add_argument("--min-touches", type=int, default=MIN_TOUCHES,
+                    help="цена должна подходить к КАЖДОЙ границе >= N раз (подтверждённый коридор)")
     args = ap.parse_args()
     MAX_SPAN = args.max_span
+    SLOPE_MAX_ATR = {"flat": 0.06, "gentle": 0.15, "any": 0.30}[args.channel]
+    MIN_TOUCHES = args.min_touches
 
     if args.plot:
         p = os.path.join(args.cache, f"{args.plot}.json")
