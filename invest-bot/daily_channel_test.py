@@ -24,6 +24,7 @@ import glob
 import json
 import os
 import re
+import webbrowser
 from datetime import datetime
 
 import numpy as np
@@ -613,8 +614,13 @@ def _plot_svg(ticker, o, h, l, c, ds, channels, touches, out, days):
     parts.append("</svg>")
     with open(out, "w", encoding="utf-8") as fh:
         fh.write("<!doctype html><meta charset=utf-8><body style='margin:0'>" + "".join(parts))
-    print(f"картинка: {out} — открой в браузере ({len(fades)} fade-сделок в окне)"
-          if fades else f"картинка: {out} (открой в браузере)")
+    full = os.path.abspath(out)
+    tail = f" ({len(fades)} fade-сделок в окне)" if fades else ""
+    print(f"\n>>> ОТКРОЙ: {full}{tail}")
+    try:                       # сразу открыть в браузере по умолчанию
+        webbrowser.open("file:///" + full.replace("\\", "/"))
+    except Exception:
+        pass
 
 
 def main():
