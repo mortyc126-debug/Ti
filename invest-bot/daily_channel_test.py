@@ -293,12 +293,12 @@ def _fade_barriers(ch, entry, side, h, l, c, atr, i, end, target="far", use_stop
     проход канала), 'mid' — на СРЕДНЕЙ линии (полширины). use_stop=False — без
     стопа (чистая проверка: доходит ли цель в принципе за жизнь канала). Стоп =
     пробой входной границы на FADE_STOP ATR. Интрабар first-passage, тай → стоп.
-    P&L в ATR от цены входа. Возвращает (pnl, exit_bar, reached_target)."""
+    P&L в ATR от цены входа. Возвращает (pnl, exit_bar, reached_target, exit_price)."""
     k, b, off = ch["k"], ch["b"], ch["off"]
     sgn = 1.0 if side == "support" else -1.0
     a0 = atr[i]
     if not (np.isfinite(a0) and a0 > 0):
-        return 0.0, i, False
+        return 0.0, i, False, entry
     for j in range(i + 1, end + 1):
         aj = atr[j]
         if not (np.isfinite(aj) and aj > 0):
@@ -314,10 +314,10 @@ def _fade_barriers(ch, entry, side, h, l, c, atr, i, end, target="far", use_stop
             sl_price = upper + FADE_STOP_ATR * aj
             hit_sl, hit_tp = (use_stop and h[j] >= sl_price), l[j] <= tp_price
         if hit_sl:
-            return sgn * (sl_price - entry) / a0, j, False
+            return sgn * (sl_price - entry) / a0, j, False, sl_price
         if hit_tp:
-            return sgn * (tp_price - entry) / a0, j, True
-    return sgn * (c[end] - entry) / a0, end, False   # таймаут — по закрытию
+            return sgn * (tp_price - entry) / a0, j, True, tp_price
+    return sgn * (c[end] - entry) / a0, end, False, c[end]   # таймаут — по закрытию
 
 
 def _scan(ch, h, l, c, atr, ds, ticker, breakout=False, fade=False, mom=MOM_LOOKBACK,
@@ -417,10 +417,14 @@ def _scan(ch, h, l, c, atr, ds, ticker, breakout=False, fade=False, mom=MOM_LOOK
                     mom_ok = (mom <= 0) or (c[i] > prev if side == "resistance" else c[i] < prev)
                     if mom_ok:
                         fend = min(n - 1, ch.get("death", i + FADE_HORIZON), entry_bar + FADE_HORIZON)
-                        p, exb, reached = _fade_barriers(ch, c[entry_bar], side, h, l, c, atr,
-                                                         entry_bar, fend, target=target, use_stop=use_stop)
+                        p, exb, reached, xpx = _fade_barriers(ch, c[entry_bar], side, h, l, c, atr,
+                                                              entry_bar, fend, target=target, use_stop=use_stop)
                         rec["fade"] = (p, exb, reached)
                         rec["entry_bar"] = entry_bar
+                        rec["entry_price"] = c[entry_bar]
+                        rec["exit_bar"] = exb
+                        rec["exit_price"] = xpx
+                        rec["pnl"] = p
                 else:
                     rec["grid"] = _barriers(c[entry_bar], sgn, atr[entry_bar], h, l, c, entry_bar, end, CAP_BARS)
                     rec["entry_bar"] = entry_bar
@@ -556,8 +560,14 @@ def _plot_svg(ticker, o, h, l, c, ds, channels, touches, out, days):
     def Y(p): return H - m - (p - pmin) / max(pmax - pmin, 1e-9) * (H - 2 * m)
     parts = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
              f'style="background:#0d1117;font-family:monospace">']
-    parts.append(f'<text x="{m}" y="30" fill="#c9d1d9" font-size="18">{ticker} — дневки, '
-                 f'каналы алго (последние {days}д). Зелёный=отскок, красный=пробой</text>')
+    fades = [t for t in touches if "fade" in t]
+    if fades:
+        legend = ("fade-сделки: ▲=лонг(низ→верх) ▼=шорт(верх→низ); линия вход→выход "
+                  "зелёная=дошёл до цели, красная=не дошёл. Наведи на маркер — детали.")
+    else:
+        legend = "Зелёный=отскок, красный=пробой"
+    parts.append(f'<text x="{m}" y="30" fill="#c9d1d9" font-size="16">{ticker} — дневки, '
+                 f'каналы алго (последние {days}д). {legend}</text>')
     # цена
     pts = " ".join(f"{X(i):.1f},{Y(p):.1f}" for i, p in seg)
     parts.append(f'<polyline points="{pts}" fill="none" stroke="#58a6ff" stroke-width="1.5"/>')
@@ -571,19 +581,40 @@ def _plot_svg(ticker, o, h, l, c, ds, channels, touches, out, days):
         up = " ".join(f"{X(i):.1f},{Y(max(k*i+b, k*i+b+off)):.1f}" for i in range(s, e + 1))
         lo = " ".join(f"{X(i):.1f},{Y(min(k*i+b, k*i+b+off)):.1f}" for i in range(s, e + 1))
         col = "#d29922" if ch["anchor"] == "high" else "#a371f7"
-        parts.append(f'<polyline points="{up}" fill="none" stroke="{col}" stroke-width="0.8" opacity="0.5"/>')
-        parts.append(f'<polyline points="{lo}" fill="none" stroke="{col}" stroke-width="0.8" opacity="0.5"/>')
-    # касания
-    cmap = {"bounce": "#3fb950", "break": "#f85149", "stall": "#8b949e"}
-    for t in touches:
-        if not (i0 <= t["bar"] <= i1):
-            continue
-        parts.append(f'<circle cx="{X(t["bar"]):.1f}" cy="{Y(t["lvl"]):.1f}" r="3" '
-                     f'fill="{cmap.get(t["result"], "#8b949e")}"/>')
+        parts.append(f'<polyline points="{up}" fill="none" stroke="{col}" stroke-width="1.3" opacity="0.7"/>')
+        parts.append(f'<polyline points="{lo}" fill="none" stroke="{col}" stroke-width="1.3" opacity="0.7"/>')
+    if fades:
+        # каждая fade-сделка: маркер входа (направление) + линия вход→выход (цвет=дошёл ли до цели)
+        for t in fades:
+            eb = t["entry_bar"]
+            if not (i0 <= eb <= i1):
+                continue
+            ep, xb, xp = t["entry_price"], min(t["exit_bar"], i1), t["exit_price"]
+            reached = t["fade"][2]
+            seg_col = "#3fb950" if reached else "#f85149"
+            parts.append(f'<line x1="{X(eb):.1f}" y1="{Y(ep):.1f}" x2="{X(xb):.1f}" y2="{Y(xp):.1f}" '
+                         f'stroke="{seg_col}" stroke-width="1.3" opacity="0.85"/>')
+            is_long = t["side"] == "support"
+            ecol = "#58a6ff" if is_long else "#d29922"
+            cx, cy = X(eb), Y(ep)
+            tri = (f"{cx:.1f},{cy-8:.1f} {cx-5:.1f},{cy+4:.1f} {cx+5:.1f},{cy+4:.1f}" if is_long
+                   else f"{cx:.1f},{cy+8:.1f} {cx-5:.1f},{cy-4:.1f} {cx+5:.1f},{cy-4:.1f}")
+            tt = (f'{t["date"]} {"LONG низ→верх" if is_long else "SHORT верх→низ"} '
+                  f'pnl={t["pnl"]:+.2f}ATR {"ДОШЁЛ до цели" if reached else "НЕ дошёл"}')
+            parts.append(f'<polygon points="{tri}" fill="{ecol}"><title>{tt}</title></polygon>')
+            parts.append(f'<circle cx="{X(xb):.1f}" cy="{Y(xp):.1f}" r="3" fill="{seg_col}"/>')
+    else:
+        cmap = {"bounce": "#3fb950", "break": "#f85149", "stall": "#8b949e"}
+        for t in touches:
+            if not (i0 <= t["bar"] <= i1):
+                continue
+            parts.append(f'<circle cx="{X(t["bar"]):.1f}" cy="{Y(t["lvl"]):.1f}" r="3" '
+                         f'fill="{cmap.get(t["result"], "#8b949e")}"/>')
     parts.append("</svg>")
     with open(out, "w", encoding="utf-8") as fh:
         fh.write("<!doctype html><meta charset=utf-8><body style='margin:0'>" + "".join(parts))
-    print(f"картинка: {out} (каналов в окне нарисовано; открой в браузере)")
+    print(f"картинка: {out} — открой в браузере ({len(fades)} fade-сделок в окне)"
+          if fades else f"картинка: {out} (открой в браузере)")
 
 
 def main():
