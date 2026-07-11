@@ -29,7 +29,7 @@ from datetime import datetime
 import numpy as np
 
 SWING_STEP = 2         # свинг подтверждается ±STEP дней
-MAX_SPAN = 30          # анкер-экстремумы не дальше друг от друга (дней)
+MAX_SPAN = 20          # анкер-экстремумы не дальше друг от друга (дней)
 TRIGGER_ATR = 0.30
 PULLBACK_ATR = 0.15
 BREAK_ATR = 0.30
@@ -94,7 +94,7 @@ def _line(p_a, p_b):
     return k, ya - k * xa
 
 
-SLOPE_MAX_ATR = 0.35   # наклон границы круче X ATR/день — это не канал, а спайк-линия
+SLOPE_MAX_ATR = 0.28   # наклон границы круче X ATR/день — это не канал, а спайк-линия
 WIDTH_MIN_ATR = 0.8    # уже — «нитка»/шум, не торговый коридор
 WIDTH_MAX_ATR = 4.0    # шире — не коридор, а полнеба (одна граница улетает за экран)
 PIERCE_TOL = 0.25      # линия анкера может протыкаться промежуточной ценой не глубже X ATR
@@ -172,12 +172,38 @@ def _build_channels(highs, lows, h, l, c, atr):
             if ch["life"] < step_min():                  # умер сразу — не жил
                 continue
             out.append(ch)
-    seen, uniq = set(), []
-    for ch in out:
-        key = (ch["born"], ch["anchor"], round(ch["k"], 6))
-        if key not in seen:
-            seen.add(key); uniq.append(ch)
-    return uniq
+    return _suppress_dupes(out)
+
+
+def _mid_at(ch, x):
+    base = ch["k"] * x + ch["b"]
+    return base + ch["off"] / 2.0    # средняя линия коридора на баре x
+
+
+def _suppress_dupes(chans):
+    """Глушим near-дубли: десятки почти одинаковых каналов внахлёст → спагетти.
+    Оставляем дольше живущий; выкидываем канал, если он того же анкера, перекрыт
+    по времени >70% и его средняя линия ближе 0.5 ширины к уже принятому. Разные
+    по масштабу/наклону вложенные каналы остаются — их пользователь как раз хочет."""
+    kept = []
+    for ch in sorted(chans, key=lambda c: c["life"], reverse=True):
+        s, e = ch["x0"], ch["death"]
+        dup = False
+        for k in kept:
+            if k["anchor"] != ch["anchor"]:
+                continue
+            ov = min(e, k["death"]) - max(s, k["x0"])
+            if ov <= 0:
+                continue
+            if ov < 0.7 * min(e - s, k["death"] - k["x0"]):
+                continue
+            xm = (max(s, k["x0"]) + min(e, k["death"])) // 2
+            wid = max(abs(ch["off"]), abs(k["off"]))
+            if abs(_mid_at(ch, xm) - _mid_at(k, xm)) < 0.5 * wid:
+                dup = True; break
+        if not dup:
+            kept.append(ch)
+    return kept
 
 
 def step_min():
