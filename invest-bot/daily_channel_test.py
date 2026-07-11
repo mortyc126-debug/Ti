@@ -96,16 +96,19 @@ def _line(p_a, p_b):
 
 SLOPE_MAX_ATR = 0.35   # наклон границы круче X ATR/день — это не канал, а спайк-линия
 WIDTH_MIN_ATR = 0.8    # уже — «нитка»/шум, не торговый коридор
-WIDTH_MAX_ATR = 8.0    # шире — не коридор, а полнеба
+WIDTH_MAX_ATR = 4.0    # шире — не коридор, а полнеба (одна граница улетает за экран)
 PIERCE_TOL = 0.25      # линия анкера может протыкаться промежуточной ценой не глубже X ATR
 BREAK_OUT_ATR = 0.50   # цена ушла за границу глубже X ATR → канал умер (перестаём рисовать)
+FWD_SPAN_MULT = 1.0    # проекция вперёд не длиннее формирования*MULT — иначе луч в пустоту
 
 
 def _death_bar(ch, h, l, c, atr, n):
     """Бар, где цена вышла из коридора глубже BREAK_OUT — канал перестал существовать.
-    Рисуем/сканируем только до этого бара, а не вечным лучом на life вперёд."""
+    Горизонт проекции вперёд ограничен длиной формирования (span*FWD_SPAN_MULT):
+    коридор, сложившийся за N дней, не имеет права тянуться лучом на 60 дней."""
     k, b, off = ch["k"], ch["b"], ch["off"]
-    end = min(n - 1, ch["born"] + LIFE_BARS)
+    fwd = max(step_min(), int(ch["span"] * FWD_SPAN_MULT))
+    end = min(n - 1, ch["born"] + fwd)
     for x in range(ch["born"] + 1, end + 1):
         a = atr[x]
         if not (np.isfinite(a) and a > 0):
@@ -162,7 +165,8 @@ def _build_channels(highs, lows, h, l, c, atr):
             w = abs(off) / a
             if w < WIDTH_MIN_ATR or w > WIDTH_MAX_ATR:  # слишком узко/широко
                 continue
-            ch = {"anchor": anchor, "k": k, "b": b, "off": off, "born": born}
+            ch = {"anchor": anchor, "k": k, "b": b, "off": off, "born": born,
+                  "x0": a1[0], "span": span}
             ch["death"] = _death_bar(ch, h, l, c, atr, n)
             ch["life"] = ch["death"] - born
             if ch["life"] < step_min():                  # умер сразу — не жил
@@ -331,7 +335,7 @@ def _plot_svg(ticker, o, h, l, c, ds, channels, touches, out, days):
     parts.append(f'<polyline points="{pts}" fill="none" stroke="#58a6ff" stroke-width="1.5"/>')
     # каналы в окне
     for ch in channels:
-        s = ch["born"]; e = min(n - 1, ch.get("death", ch["born"] + ch["life"]))
+        s = ch.get("x0", ch["born"]); e = min(n - 1, ch.get("death", ch["born"] + ch["life"]))
         if e < i0 or s > i1:
             continue
         s = max(s, i0); e = min(e, i1)
