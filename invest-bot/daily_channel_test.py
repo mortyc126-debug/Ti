@@ -97,17 +97,38 @@ def _line(p_a, p_b):
 SLOPE_MAX_ATR = 0.35   # наклон границы круче X ATR/день — это не канал, а спайк-линия
 WIDTH_MIN_ATR = 0.8    # уже — «нитка»/шум, не торговый коридор
 WIDTH_MAX_ATR = 8.0    # шире — не коридор, а полнеба
-LIFE_SPAN_MULT = 2.0   # канал живёт ~span*MULT дней (не фиксировано), но не дольше LIFE_BARS
+PIERCE_TOL = 0.25      # линия анкера может протыкаться промежуточной ценой не глубже X ATR
+BREAK_OUT_ATR = 0.50   # цена ушла за границу глубже X ATR → канал умер (перестаём рисовать)
 
 
-def _build_channels(highs, lows, h, l, atr):
-    """Параллельные каналы. Анкер по 2 хаям (верх) / 2 лоям (низ), параллель к
-    крайнему противоположному экстремусу окна (оба входят). Отбор по вменяемости:
-    наклон не круче SLOPE_MAX_ATR/день, ширина в коридоре, жизнь ~span (не вечный
-    луч). Иначе линии-ракеты, которые ничего не значат."""
+def _death_bar(ch, h, l, c, atr, n):
+    """Бар, где цена вышла из коридора глубже BREAK_OUT — канал перестал существовать.
+    Рисуем/сканируем только до этого бара, а не вечным лучом на life вперёд."""
+    k, b, off = ch["k"], ch["b"], ch["off"]
+    end = min(n - 1, ch["born"] + LIFE_BARS)
+    for x in range(ch["born"] + 1, end + 1):
+        a = atr[x]
+        if not (np.isfinite(a) and a > 0):
+            continue
+        base = k * x + b
+        upper, lower = max(base, base + off), min(base, base + off)
+        if h[x] > upper + BREAK_OUT_ATR * a or l[x] < lower - BREAK_OUT_ATR * a:
+            return x
+    return end
+
+
+def _build_channels(highs, lows, h, l, c, atr):
+    """Параллельные каналы, ПРИВЯЗАННЫЕ к цене. Анкер по 2 хаям (верх)/2 лоям (низ);
+    ключевое: линия анкера не должна протыкаться промежуточной ценой глубже
+    PIERCE_TOL — иначе это не трендовая линия, а случайная палка через свечи.
+    Параллель кладём на крайний противоположный экстремум окна (оба входят). Канал
+    живёт от born до бара пробоя (_death_bar), а не вечным лучом."""
+    n = len(h)
     out = []
-    for anchor, opp_arr in (("high", l), ("low", h)):
+    for anchor in ("high", "low"):
         pts = highs if anchor == "high" else lows
+        pierce_arr = h if anchor == "high" else l   # что не должно протыкать линию анкера
+        opp_arr = l if anchor == "high" else h       # куда кладём параллель
         for i in range(1, len(pts)):
             a1, a2 = pts[i - 1], pts[i]
             span = a2[0] - a1[0]
@@ -125,6 +146,15 @@ def _build_channels(highs, lows, h, l, atr):
                 continue
             xs = np.arange(a1[0], a2[0] + 1)
             base = k * xs + b
+            # (1) линия анкера чистая: промежуточная цена не протыкает её глубже tol
+            if anchor == "high":
+                pierce = float(np.max(pierce_arr[a1[0]:a2[0] + 1] - base))   # хай над линией
+            else:
+                pierce = float(np.min(pierce_arr[a1[0]:a2[0] + 1] - base))   # лой под линией
+                pierce = -pierce
+            if pierce > PIERCE_TOL * a:                  # линия рвётся серединой — палка, не канал
+                continue
+            # (2) параллель на крайнем противоположном экстремуме окна
             if anchor == "high":
                 off = float(np.min(opp_arr[a1[0]:a2[0] + 1] - base))
             else:
@@ -132,8 +162,12 @@ def _build_channels(highs, lows, h, l, atr):
             w = abs(off) / a
             if w < WIDTH_MIN_ATR or w > WIDTH_MAX_ATR:  # слишком узко/широко
                 continue
-            life = min(LIFE_BARS, int(span * LIFE_SPAN_MULT))
-            out.append({"anchor": anchor, "k": k, "b": b, "off": off, "born": born, "life": life})
+            ch = {"anchor": anchor, "k": k, "b": b, "off": off, "born": born}
+            ch["death"] = _death_bar(ch, h, l, c, atr, n)
+            ch["life"] = ch["death"] - born
+            if ch["life"] < step_min():                  # умер сразу — не жил
+                continue
+            out.append(ch)
     seen, uniq = set(), []
     for ch in out:
         key = (ch["born"], ch["anchor"], round(ch["k"], 6))
@@ -169,7 +203,7 @@ def _scan(ch, h, l, c, atr, ds, ticker):
     """Скан касаний обеих параллельных границ. Причинно: старт с born+STEP."""
     n = len(c)
     start = ch["born"] + SWING_STEP
-    end0 = min(n - 1, ch["born"] + ch["life"])
+    end0 = min(n - 1, ch.get("death", ch["born"] + ch["life"]))
     if start >= end0:
         return []
     k, b, off = ch["k"], ch["b"], ch["off"]
@@ -297,7 +331,7 @@ def _plot_svg(ticker, o, h, l, c, ds, channels, touches, out, days):
     parts.append(f'<polyline points="{pts}" fill="none" stroke="#58a6ff" stroke-width="1.5"/>')
     # каналы в окне
     for ch in channels:
-        s = ch["born"] + SWING_STEP; e = min(n - 1, ch["born"] + ch["life"])
+        s = ch["born"]; e = min(n - 1, ch.get("death", ch["born"] + ch["life"]))
         if e < i0 or s > i1:
             continue
         s = max(s, i0); e = min(e, i1)
@@ -344,7 +378,7 @@ def main():
         o, h, l, c, ds = data
         atr = _atr(h, l, c, ATR_PERIOD)
         highs, lows = _swings(h, l, SWING_STEP)
-        chs = _build_channels(highs, lows, h, l, atr)
+        chs = _build_channels(highs, lows, h, l, c, atr)
         tch = []
         for ch in chs:
             tch += _scan(ch, h, l, c, atr, ds, args.plot)
@@ -372,7 +406,7 @@ def main():
         atr = _atr(h, l, c, ATR_PERIOD)
         highs, lows = _swings(h, l, SWING_STEP)
         tk = os.path.basename(p)[:-5]
-        for ch in _build_channels(highs, lows, h, l, atr):
+        for ch in _build_channels(highs, lows, h, l, c, atr):
             allt += _scan(ch, h, l, c, atr, ds, tk)
         if args.tickers:
             print(f"{tk}: дней {len(c)}, касаний {sum(1 for t in allt if t['ticker']==tk)}")
