@@ -210,7 +210,8 @@ def _scan(ch, h, l, c, atr, ds, ticker):
                         res = "stall"; break
                 j += 1
             rec = {"ticker": ticker, "anchor": ch["anchor"], "which": which, "side": side,
-                   "result": res or "stall", "date": ds[i], "confirmed": confirmed}
+                   "result": res or "stall", "date": ds[i], "confirmed": confirmed,
+                   "bar": i, "lvl": lvl}
             if confirmed and entry_bar > 0:
                 rec["grid"] = _barriers(c[entry_bar], sgn, atr[entry_bar], h, l, c, entry_bar, end, CAP_BARS)
                 rec["entry_bar"] = entry_bar
@@ -264,6 +265,48 @@ def _gt_portfolio(rows, cost, title):
     print(f"{title:<28} N={trades:<5} exp={pnl/trades:+.3f}  Σ={pnl:+.1f} ATR (тейк{take}/стоп{stop})")
 
 
+def _plot_svg(ticker, o, h, l, c, ds, channels, touches, out, days):
+    """SVG-картинка: цена (close) + границы каналов + точки касаний (зелёный отскок
+    / красный пробой). Чтобы глазами оценить, вменяемые ли каналы рисует алго."""
+    n = len(c)
+    i0 = max(0, n - days); i1 = n - 1
+    seg = [(i, c[i]) for i in range(i0, i1 + 1)]
+    pmin = min(l[i0:i1 + 1]); pmax = max(h[i0:i1 + 1])
+    W, H, m = 1600, 800, 60
+    def X(i): return m + (i - i0) / max(i1 - i0, 1) * (W - 2 * m)
+    def Y(p): return H - m - (p - pmin) / max(pmax - pmin, 1e-9) * (H - 2 * m)
+    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
+             f'style="background:#0d1117;font-family:monospace">']
+    parts.append(f'<text x="{m}" y="30" fill="#c9d1d9" font-size="18">{ticker} — дневки, '
+                 f'каналы алго (последние {days}д). Зелёный=отскок, красный=пробой</text>')
+    # цена
+    pts = " ".join(f"{X(i):.1f},{Y(p):.1f}" for i, p in seg)
+    parts.append(f'<polyline points="{pts}" fill="none" stroke="#58a6ff" stroke-width="1.5"/>')
+    # каналы в окне
+    for ch in channels:
+        s = ch["born"] + SWING_STEP; e = min(n - 1, ch["born"] + LIFE_BARS)
+        if e < i0 or s > i1:
+            continue
+        s = max(s, i0); e = min(e, i1)
+        k, b, off = ch["k"], ch["b"], ch["off"]
+        up = " ".join(f"{X(i):.1f},{Y(max(k*i+b, k*i+b+off)):.1f}" for i in range(s, e + 1))
+        lo = " ".join(f"{X(i):.1f},{Y(min(k*i+b, k*i+b+off)):.1f}" for i in range(s, e + 1))
+        col = "#d29922" if ch["anchor"] == "high" else "#a371f7"
+        parts.append(f'<polyline points="{up}" fill="none" stroke="{col}" stroke-width="0.8" opacity="0.5"/>')
+        parts.append(f'<polyline points="{lo}" fill="none" stroke="{col}" stroke-width="0.8" opacity="0.5"/>')
+    # касания
+    cmap = {"bounce": "#3fb950", "break": "#f85149", "stall": "#8b949e"}
+    for t in touches:
+        if not (i0 <= t["bar"] <= i1):
+            continue
+        parts.append(f'<circle cx="{X(t["bar"]):.1f}" cy="{Y(t["lvl"]):.1f}" r="3" '
+                     f'fill="{cmap.get(t["result"], "#8b949e")}"/>')
+    parts.append("</svg>")
+    with open(out, "w", encoding="utf-8") as fh:
+        fh.write("<!doctype html><meta charset=utf-8><body style='margin:0'>" + "".join(parts))
+    print(f"картинка: {out} (каналов в окне нарисовано; открой в браузере)")
+
+
 def main():
     global MAX_SPAN
     ap = argparse.ArgumentParser(description="Дневные параллельные каналы (спека пользователя)")
@@ -274,8 +317,26 @@ def main():
     ap.add_argument("--max-span", type=int, default=MAX_SPAN)
     ap.add_argument("--cost-atr", type=float, default=0.12)
     ap.add_argument("--split-date", default="2026-04-01")
+    ap.add_argument("--plot", default="", help="тикер — нарисовать каналы в HTML/SVG")
+    ap.add_argument("--plot-out", default="channels.html")
+    ap.add_argument("--plot-days", type=int, default=160)
     args = ap.parse_args()
     MAX_SPAN = args.max_span
+
+    if args.plot:
+        p = os.path.join(args.cache, f"{args.plot}.json")
+        data = _daily(p)
+        if data is None:
+            raise SystemExit(f"нет данных: {p}")
+        o, h, l, c, ds = data
+        atr = _atr(h, l, c, ATR_PERIOD)
+        highs, lows = _swings(h, l, SWING_STEP)
+        chs = _build_channels(highs, lows, h, l)
+        tch = []
+        for ch in chs:
+            tch += _scan(ch, h, l, c, atr, ds, args.plot)
+        _plot_svg(args.plot, o, h, l, c, ds, chs, tch, args.plot_out, args.plot_days)
+        return
 
     if args.tickers:
         paths = [os.path.join(args.cache, f"{t.strip()}.json") for t in args.tickers.split(",") if t.strip()]
