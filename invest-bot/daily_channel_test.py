@@ -117,6 +117,8 @@ TREND_FWD_MULT = 0.6   # трендовые линии тянем вперёд (
 TREND_FWD_MAX_D = 14   # абсолютный потолок проекции вперёд (дней) — чтобы не улетало лучом
 SLOPE_PAIR_TOL = 0.08  # верх и низ образуют канал, только если наклоны БЛИЗКИ (ATR/день)
 CONTAIN_MIN = 0.72     # доля close между линиями в окне формирования — иначе не коридор
+BREAK_HARD_ATR = 0.5   # прокол границы глубже этого (ATR) — слом, начинаем НОВЫЙ канал;
+                       # мельче — подправляем линию по новой точке (канал жив, «но не слишком»)
 MIN_TOUCHES = 2        # цена должна ПОДХОДИТЬ к КАЖДОЙ границе ≥ этого числа раз (подтверждённый коридор)
 TOUCH_TOL_ATR = 0.40   # «подход к границе» = экстремум ближе X ATR к линии
 
@@ -288,6 +290,69 @@ def _build_trend_channels(highs, lows, h, l, c, atr):
             if ch["life"] < step_min():
                 continue
             out.append(ch)
+    return _suppress_dupes(out)
+
+
+def _build_adaptive_channels(highs, lows, h, l, c, atr):
+    """Как строит человек: прямой канал по точкам, ведём вперёд по пивотам; новый
+    экстремум с небольшим проколом (<= ADJUST_TOL) ПОДПРАВЛЯЕТ линию (перецепляем к
+    двум последним точкам этой стороны) — канал жив и «чётко по точкам»; сильный
+    прокол (> BREAK_HARD) — слом, начинаем НОВЫЙ канал с этого места. Сегменты идут
+    подряд вдоль тренда, а не десятками наложений."""
+    n = len(c)
+    piv = sorted([(i, p, "H") for i, p in highs] + [(i, p, "L") for i, p in lows])
+    out = []
+    s = 0
+    while s < len(piv):
+        hs, ls, k = [], [], s
+        while k < len(piv) and (len(hs) < 2 or len(ls) < 2):
+            i, p, t = piv[k]
+            (hs if t == "H" else ls).append((i, p))
+            k += 1
+        if len(hs) < 2 or len(ls) < 2:
+            break
+        ku, bu = _line(hs[-2], hs[-1])
+        kl, bl = _line(ls[-2], ls[-1])
+        start = min(hs[0][0], ls[0][0])
+        end = max(hs[-1][0], ls[-1][0])
+        j, broke = k, None
+        while j < len(piv):
+            i, p, t = piv[j]
+            a = atr[i] if i < n and np.isfinite(atr[i]) and atr[i] > 0 else None
+            if a is None:
+                j += 1
+                continue
+            if t == "H":
+                over = (p - (ku * i + bu)) / a
+                if over > BREAK_HARD_ATR:            # сильный прокол вверх — слом
+                    broke = j
+                    break
+                if over > 0:                          # поклевал выше линии в пределах — подправляем
+                    hs.append((i, p))
+                    ku, bu = _line(hs[-2], hs[-1])
+            else:
+                under = ((kl * i + bl) - p) / a
+                if under > BREAK_HARD_ATR:            # сильный прокол вниз — слом
+                    broke = j
+                    break
+                if under > 0:
+                    ls.append((i, p))
+                    kl, bl = _line(ls[-2], ls[-1])
+            end = i
+            j += 1
+        a0 = atr[end] if end < n and np.isfinite(atr[end]) and atr[end] > 0 else None
+        if a0 is not None:
+            up_e, lo_e = ku * end + bu, kl * end + bl
+            w = (up_e - lo_e) / a0
+            if up_e > lo_e and WIDTH_MIN_ATR <= w <= WIDTH_MAX_ATR and abs(ku - kl) <= SLOPE_PAIR_TOL * a0:
+                ch = {"anchor": "trend", "born": end, "x0": start,
+                      "span": max(end - start, step_min()), "ku": ku, "bu": bu, "kl": kl, "bl": bl}
+                ch["death"] = _death_bar(ch, h, l, c, atr, n, mult=TREND_FWD_MULT, cap=TREND_FWD_MAX_D)
+                ch["life"] = ch["death"] - end
+                out.append(ch)
+        s = broke if broke is not None else k    # новый сегмент с точки слома (или дальше)
+        if s <= start:                            # страховка от застоя
+            s = k
     return _suppress_dupes(out)
 
 
@@ -735,9 +800,10 @@ def _plot_svg(ticker, o, h, l, c, ds, channels, touches, out, days):
 
 def _channels_for(h, l, c, atr, args):
     """Выбор билдера по --channel/--reg."""
-    if args.channel == "trend":
+    if args.channel in ("trend", "pair"):
         highs, lows = _swings(h, l, SWING_STEP)
-        return _build_trend_channels(highs, lows, h, l, c, atr)
+        return (_build_adaptive_channels if args.channel == "trend"
+                else _build_trend_channels)(highs, lows, h, l, c, atr)
     if args.reg:
         return _build_reg_channels(h, l, c, atr)
     highs, lows = _swings(h, l, SWING_STEP)
@@ -745,7 +811,7 @@ def _channels_for(h, l, c, atr, args):
 
 
 def main():
-    global MAX_SPAN, SLOPE_MAX_ATR, MIN_TOUCHES
+    global MAX_SPAN, SLOPE_MAX_ATR, MIN_TOUCHES, BREAK_HARD_ATR
     ap = argparse.ArgumentParser(description="Дневные параллельные каналы (спека пользователя)")
     ap.add_argument("--cache", default=os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                                     "data", "candle_cache"))
@@ -769,15 +835,19 @@ def main():
                     help="цель отскока: far=противоположная граница, mid=средняя линия")
     ap.add_argument("--no-stop", action="store_true",
                     help="без стопа — чистая проверка, доходит ли цель за жизнь канала")
-    ap.add_argument("--channel", choices=("flat", "gentle", "any", "trend"), default="trend",
-                    help="flat/gentle/any=параллельные (порог наклона); "
-                         "trend=две независимые трендовые линии (2 хая + 2 лоя), зазор=канал")
+    ap.add_argument("--channel", choices=("flat", "gentle", "any", "trend", "pair"), default="trend",
+                    help="trend=адаптивные каналы по точкам (подстройка при малом проколе, новый при сломе); "
+                         "pair=статические пары линий; flat/gentle/any=параллельные по порогу наклона")
     ap.add_argument("--min-touches", type=int, default=MIN_TOUCHES,
                     help="цена должна подходить к КАЖДОЙ границе >= N раз (подтверждённый коридор)")
+    ap.add_argument("--break-hard", type=float, default=BREAK_HARD_ATR,
+                    help="глубина прокола (ATR), после которой канал ломается и начинается новый; "
+                         "меньше = чаще новые каналы (плотнее), больше = один канал тянется дольше")
     args = ap.parse_args()
     MAX_SPAN = args.max_span
-    SLOPE_MAX_ATR = {"flat": 0.06, "gentle": 0.15, "any": 0.30, "trend": 0.60}[args.channel]
+    SLOPE_MAX_ATR = {"flat": 0.06, "gentle": 0.15, "any": 0.30, "trend": 0.60, "pair": 0.60}[args.channel]
     MIN_TOUCHES = args.min_touches
+    BREAK_HARD_ATR = args.break_hard
 
     if args.plot:
         p = os.path.join(args.cache, f"{args.plot}.json")
