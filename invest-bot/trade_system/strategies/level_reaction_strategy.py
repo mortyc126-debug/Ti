@@ -70,6 +70,15 @@ class LevelReactionStrategy(IStrategy):
     def settings(self):
         return self._settings
 
+    @property
+    def signal_only(self) -> bool:
+        # ЭТАП 1: резтинг-лимит по signal.entry_price в трейдере ещё не реализован.
+        # Держим signal_only=True — бот ЛОГИРУЕТ намеренную лимитку у уровня, но НЕ
+        # шлёт ордер (иначе трейдер вошёл бы РЫНКОМ у текущей цены = −0.27 ATR,
+        # проверено). Снять в Этапе 2, когда трейдер научится ставить пассивную
+        # резтинг-лимитку по entry_price (тогда +0.01..0.05 честного #3).
+        return True
+
     def update_lot_count(self, lot: int) -> None:
         self._lot = lot
 
@@ -118,18 +127,20 @@ class LevelReactionStrategy(IStrategy):
         if len(self._bars) < _MIN_BUFFER_BARS:
             return None
 
+        # ЛИМИТ-У-УРОВНЯ: рыночный вход на подтверждении теряет (−0.27, платит спред);
+        # честный эдж (+0.01..0.05) — пассивная лимитка ПО УРОВНЮ, налив если цена
+        # дошла (penetration≥0), барьеры от уровня. limit_sink даёт кандидатов в
+        # момент квалификации (память + быстрый подход), до подтверждения.
         sink: list[dict] = []
         try:
-            lr.collect(self._bars, round_valid_from=self._bars[0]["d"], confirm_sink=sink)
+            lr.collect(self._bars, round_valid_from=self._bars[0]["d"], limit_sink=sink)
         except SystemExit:
             return None   # мало дневных баров — collect ругается, ждём накопления
 
-        # интересуют только подтверждения на СВЕЖИХ барах этого вызова, прошедшие combo
-        fresh = [s for s in sink if s["confirm_bar"] >= prev_n and _combo(s)]
+        fresh = [s for s in sink if s["start_bar"] >= prev_n]
         if not fresh:
             return None
-        # если несколько — берём самый свежий, среди равных — сильнейший уровень
-        sig = max(fresh, key=lambda s: (s["confirm_bar"], s["strength"]))
+        sig = max(fresh, key=lambda s: s["start_bar"])   # самый свежий кандидат
 
         side_long = sig["side"] == "support"
         if not side_long and not self._short_enabled:
@@ -147,9 +158,10 @@ class LevelReactionStrategy(IStrategy):
             tp, sl = level - take * atr, level + stop * atr
 
         figi = getattr(self._settings, "figi", "") if self._settings else ""
-        signal = Signal(figi=figi, signal_type=stype, take_profit_level=tp, stop_loss_level=sl)
-        logger.info("LevelReactionStrategy signal: %s level=%s kind=%s v6=%.2f "
-                    "tb=%d prev=%s pen=%.2f", signal, sig["level_price"], sig["kind"],
-                    sig["approach_v6"], sig["touches_before"], sig["prev_outcome"],
-                    sig["penetration_atr"])
+        # entry_price = УРОВЕНЬ: трейдер поставит резтинг-лимит по этой цене (Этап 2).
+        signal = Signal(figi=figi, signal_type=stype, take_profit_level=tp,
+                        stop_loss_level=sl, entry_price=level)
+        logger.info("LevelReactionStrategy ЛИМИТ signal: %s entry(уровень)=%s kind=%s "
+                    "v6=%.2f tb=%d prev=%s", signal, sig["level_price"], sig["kind"],
+                    sig["approach_v6"], sig["touches_before"], sig["prev_outcome"])
         return signal

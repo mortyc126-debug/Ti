@@ -492,7 +492,7 @@ def _confirm_signal(ep, m: int) -> dict:
 
 
 def collect(bars: list[dict], round_valid_from, pullback_atr: float = PULLBACK_ATR,
-            confirm_sink: list | None = None) -> list[Touch]:
+            confirm_sink: list | None = None, limit_sink: list | None = None) -> list[Touch]:
     """confirm_sink: если передан список — collect дописывает в него записи входа
     в момент подтверждения эпизода (live-режим). Офлайн-поведение (возврат touches)
     не меняется. Держим общую машину _Episode.feed → торгуем ровно то, что валидировали."""
@@ -530,8 +530,8 @@ def collect(bars: list[dict], round_valid_from, pullback_atr: float = PULLBACK_A
     levels += _volume_node_levels(profiles, day_bounds)
     if round_valid_from is not None:
         levels += _round_levels(bars, atr_map, round_valid_from)
-    # в live (confirm_sink) collect зовётся каждый бар — не спамим INFO
-    _lvl_log = logger.debug if confirm_sink is not None else logger.info
+    # в live (confirm_sink/limit_sink) collect зовётся каждый бар — не спамим INFO
+    _lvl_log = logger.debug if (confirm_sink is not None or limit_sink is not None) else logger.info
     _lvl_log("уровней сгенерировано: %d (%s)", len(levels),
              ", ".join(f"{k}={sum(1 for l in levels if l.kind == k)}" for k in KIND_WEIGHT))
 
@@ -612,6 +612,18 @@ def collect(bars: list[dict], round_valid_from, pullback_atr: float = PULLBACK_A
             extreme = bar["l"] if side == "support" else bar["h"]
             active_ep[ev_id] = _Episode(lv, m, side, atr, de, pullback_atr, extreme, meta,
                                         closes, highs, lows)
+            # limit_sink: кандидат на РЕЗТИНГ-ЛИМИТ у уровня. Квалификация в момент
+            # входа в зону касания (память + быстрый подход) — та же, что даёт
+            # честный #3. Лимит ставится ПО УРОВНЮ, нальётся если цена дойдёт
+            # (penetration≥0). Барьеры от уровня. Эмитим здесь, до подтверждения.
+            if limit_sink is not None and meta["v6"] >= 0.6 and \
+                    (meta["touches_before"] >= 1 or meta["prev_outcome"] == "break"):
+                limit_sink.append({
+                    "start_bar": m, "ts": meta["ts"], "side": side,
+                    "level_price": round(lv.price, 6), "kind": lv.kind, "atr": atr,
+                    "approach_v6": meta["v6"], "touches_before": meta["touches_before"],
+                    "prev_outcome": meta["prev_outcome"],
+                })
     return touches
 
 

@@ -21,3 +21,7 @@ class Signal:
     signal_type: SignalType = 0
     take_profit_level: Decimal = field(default_factory=Decimal)
     stop_loss_level: Decimal = field(default_factory=Decimal)
+    # Цена резтинг-лимитки входа. 0/None → трейдер входит у рынка (прежнее
+    # поведение). >0 → трейдер ставит ПАССИВНУЮ лимитку по этой цене и ждёт
+    # налива (для лимит-у-уровня: цена = уровень). Спред на входе не платим.
+    entry_price: Decimal = field(default_factory=Decimal)
