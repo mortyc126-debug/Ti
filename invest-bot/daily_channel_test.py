@@ -288,11 +288,12 @@ def _barriers(entry, sgn, a, h, l, c, i, end, cap):
     return grid
 
 
-def _fade_barriers(ch, entry, side, h, l, c, atr, i, end):
-    """Твоя гипотеза: отскок от границы идёт до ПРОТИВОПОЛОЖНОЙ границы.
-    TP = противоположная граница (динамическая, канал наклонён), SL = пробой
-    ВХОДНОЙ границы на FADE_STOP ATR. Интрабар first-passage, тай в баре → стоп.
-    P&L в ATR от цены входа (atr[i]). Возвращает (pnl, exit_bar, reached_opposite)."""
+def _fade_barriers(ch, entry, side, h, l, c, atr, i, end, target="far", use_stop=True):
+    """Отскок от границы. target='far' — цель на ПРОТИВОПОЛОЖНОЙ границе (полный
+    проход канала), 'mid' — на СРЕДНЕЙ линии (полширины). use_stop=False — без
+    стопа (чистая проверка: доходит ли цель в принципе за жизнь канала). Стоп =
+    пробой входной границы на FADE_STOP ATR. Интрабар first-passage, тай → стоп.
+    P&L в ATR от цены входа. Возвращает (pnl, exit_bar, reached_target)."""
     k, b, off = ch["k"], ch["b"], ch["off"]
     sgn = 1.0 if side == "support" else -1.0
     a0 = atr[i]
@@ -303,13 +304,15 @@ def _fade_barriers(ch, entry, side, h, l, c, atr, i, end):
         if not (np.isfinite(aj) and aj > 0):
             continue
         anc = k * j + b
-        upper, lower = max(anc, anc + off), min(anc, anc + off)
-        if side == "support":               # лонг от низа: цель — верх, стоп — под низом
-            tp_price, sl_price = upper, lower - FADE_STOP_ATR * aj
-            hit_sl, hit_tp = l[j] <= sl_price, h[j] >= tp_price
-        else:                                # шорт от верха: цель — низ, стоп — над верхом
-            tp_price, sl_price = lower, upper + FADE_STOP_ATR * aj
-            hit_sl, hit_tp = h[j] >= sl_price, l[j] <= tp_price
+        upper, lower, mid = max(anc, anc + off), min(anc, anc + off), anc + off / 2.0
+        if side == "support":               # лонг от низа: цель выше, стоп под низом
+            tp_price = mid if target == "mid" else upper
+            sl_price = lower - FADE_STOP_ATR * aj
+            hit_sl, hit_tp = (use_stop and l[j] <= sl_price), h[j] >= tp_price
+        else:                                # шорт от верха: цель ниже, стоп над верхом
+            tp_price = mid if target == "mid" else lower
+            sl_price = upper + FADE_STOP_ATR * aj
+            hit_sl, hit_tp = (use_stop and h[j] >= sl_price), l[j] <= tp_price
         if hit_sl:
             return sgn * (sl_price - entry) / a0, j, False
         if hit_tp:
@@ -317,7 +320,8 @@ def _fade_barriers(ch, entry, side, h, l, c, atr, i, end):
     return sgn * (c[end] - entry) / a0, end, False   # таймаут — по закрытию
 
 
-def _scan(ch, h, l, c, atr, ds, ticker, breakout=False, fade=False, mom=MOM_LOOKBACK):
+def _scan(ch, h, l, c, atr, ds, ticker, breakout=False, fade=False, mom=MOM_LOOKBACK,
+          target="far", use_stop=True):
     """Скан касаний обеих параллельных границ. Причинно: старт с born+STEP.
     breakout=True — торгуем ПРОБОЙ по тренду (вход на закрытии за границей на
     BREAK_ATR, тейк в сторону пробоя), а не отскок. Раз рынок ломает каналы чаще
@@ -413,7 +417,8 @@ def _scan(ch, h, l, c, atr, ds, ticker, breakout=False, fade=False, mom=MOM_LOOK
                     mom_ok = (mom <= 0) or (c[i] > prev if side == "resistance" else c[i] < prev)
                     if mom_ok:
                         fend = min(n - 1, ch.get("death", i + FADE_HORIZON), entry_bar + FADE_HORIZON)
-                        p, exb, reached = _fade_barriers(ch, c[entry_bar], side, h, l, c, atr, entry_bar, fend)
+                        p, exb, reached = _fade_barriers(ch, c[entry_bar], side, h, l, c, atr,
+                                                         entry_bar, fend, target=target, use_stop=use_stop)
                         rec["fade"] = (p, exb, reached)
                         rec["entry_bar"] = entry_bar
                 else:
@@ -469,9 +474,9 @@ def _gt_portfolio(rows, cost, title):
     print(f"{title:<28} N={trades:<5} exp={pnl/trades:+.3f}  Σ={pnl:+.1f} ATR (тейк{take}/стоп{stop})")
 
 
-def _fade_portfolio(rows, cost, label, quiet=False):
-    """No-overlap по entry_bar. Единая цель — противоположная граница. Возвращает
-    (n, exp, win%, reach%) — reach% = доля, где отскок реально дошёл до неё."""
+def _fade_portfolio(rows, cost, label, quiet=False, rlab="против"):
+    """No-overlap по entry_bar. Возвращает (n, exp, win%, reach%) — reach% = доля,
+    где отскок реально дошёл до цели (противоположной границы или середины)."""
     by_tk = {}
     for r in rows:
         if "fade" in r:
@@ -494,30 +499,33 @@ def _fade_portfolio(rows, cost, label, quiet=False):
     wr = 100 * wins / n if n else 0.0
     rr = 100 * reach / n if n else 0.0
     if not quiet:
-        print(f"{label:<28} N={n:<5} exp={exp:+.3f}  Σ={pnl:+.1f} ATR  win={wr:.0f}%  дошло-до-против={rr:.0f}%")
+        print(f"{label:<28} N={n:<5} exp={exp:+.3f}  Σ={pnl:+.1f} ATR  win={wr:.0f}%  дошло-до-{rlab}={rr:.0f}%")
     return n, exp, wr, rr
 
 
 def _fade_report(allt, args):
     fr = [r for r in allt if "fade" in r]
-    print(f"\n{'='*74}\nFADE: отскок от границы → противоположная граница (mom={args.mom_lookback})")
-    print(f"стоп = пробой входной границы на {FADE_STOP_ATR} ATR; {len(fr)} входов\n{'='*74}")
+    rlab = "середины" if args.fade_target == "mid" else "против"
+    tgt = "СРЕДНЕЙ ЛИНИИ (полширины)" if args.fade_target == "mid" else "ПРОТИВОПОЛОЖНОЙ границы"
+    stp = "без стопа (чистый проход)" if args.no_stop else f"стоп = пробой входной границы на {FADE_STOP_ATR} ATR"
+    print(f"\n{'='*74}\nFADE: отскок от границы → {tgt} (mom={args.mom_lookback})")
+    print(f"{stp}; {len(fr)} входов\n{'='*74}")
     if not fr:
         print("нет входов — проверь кэш/период (или ослабь фильтр --mom-lookback 0)")
         return
-    _fade_portfolio(fr, args.cost_atr, "ВСЁ")
+    _fade_portfolio(fr, args.cost_atr, "ВСЁ", rlab=rlab)
     for sd in ("support", "resistance"):
         _fade_portfolio([r for r in fr if r["side"] == sd], args.cost_atr,
-                        f"  {'низ→верх (лонг)' if sd == 'support' else 'верх→низ (шорт)'}")
+                        f"  {'низ→верх (лонг)' if sd == 'support' else 'верх→низ (шорт)'}", rlab=rlab)
     print("-- запас прочности по издержкам --")
     for cst in (0.08, 0.12, 0.16, 0.20):
-        _fade_portfolio(fr, cst, f"cost={cst}")
+        _fade_portfolio(fr, cst, f"cost={cst}", rlab=rlab)
     tr = [r for r in fr if r["date"] < args.split_date]
     te = [r for r in fr if r["date"] >= args.split_date]
     print(f"-- held-out: train ({len(tr)}) | test≥{args.split_date} ({len(te)}) --")
     if tr and te:
-        _fade_portfolio(tr, args.cost_atr, "TRAIN")
-        _fade_portfolio(te, args.cost_atr, "TEST (held-out)")
+        _fade_portfolio(tr, args.cost_atr, "TRAIN", rlab=rlab)
+        _fade_portfolio(te, args.cost_atr, "TEST (held-out)", rlab=rlab)
     # ранжир по тикерам (по held-out test exp)
     by = {}
     for r in fr:
@@ -599,6 +607,10 @@ def main():
                     help="отскок от границы с целью на ПРОТИВОПОЛОЖНОЙ границе (гипотеза юзера)")
     ap.add_argument("--mom-lookback", type=int, default=MOM_LOOKBACK,
                     help="фильтр 'двигалась к границе' за N дней (0 = выключить)")
+    ap.add_argument("--fade-target", choices=("far", "mid"), default="far",
+                    help="цель отскока: far=противоположная граница, mid=средняя линия")
+    ap.add_argument("--no-stop", action="store_true",
+                    help="без стопа — чистая проверка, доходит ли цель за жизнь канала")
     args = ap.parse_args()
     MAX_SPAN = args.max_span
 
@@ -617,7 +629,8 @@ def main():
         tch = []
         for ch in chs:
             tch += _scan(ch, h, l, c, atr, ds, args.plot, breakout=args.breakout,
-                         fade=args.fade, mom=args.mom_lookback)
+                         fade=args.fade, mom=args.mom_lookback,
+                         target=args.fade_target, use_stop=not args.no_stop)
         _plot_svg(args.plot, o, h, l, c, ds, chs, tch, args.plot_out, args.plot_days)
         return
 
@@ -648,7 +661,8 @@ def main():
             built = _build_channels(highs, lows, h, l, c, atr)
         for ch in built:
             allt += _scan(ch, h, l, c, atr, ds, tk, breakout=args.breakout,
-                          fade=args.fade, mom=args.mom_lookback)
+                          fade=args.fade, mom=args.mom_lookback,
+                          target=args.fade_target, use_stop=not args.no_stop)
         if args.tickers:
             print(f"{tk}: дней {len(c)}, касаний {sum(1 for t in allt if t['ticker']==tk)}")
 
