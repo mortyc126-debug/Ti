@@ -294,6 +294,7 @@ def _build_trend_channels(highs, lows, h, l, c, atr):
 
 
 MIN_SEG_LEN = 8        # минимальная длина канала (дней) — короче не рисуем
+PARALLEL_Q = 0.9       # параллель кладём по квантилю крайних точек (не по единичному спайку) — прижимается к цене
 
 
 def _cap_line(pts, s, e, atr, upper):
@@ -348,10 +349,11 @@ def _fit_channel(highs, lows, h, l, c, atr, s, e):
         return None
     if anchor_high:
         ku, bu, kl = k, b, k
-        bl = float(np.min(l[s:e + 1] - k * xs))     # параллель по самому низкому лою
+        # параллель низа — по «телу» лоёв (нижний квантиль), а не по единичному спайку
+        bl = float(np.quantile(l[s:e + 1] - k * xs, 1 - PARALLEL_Q))
     else:
         kl, bl, ku = k, b, k
-        bu = float(np.max(h[s:e + 1] - k * xs))     # параллель по самому высокому хаю
+        bu = float(np.quantile(h[s:e + 1] - k * xs, PARALLEL_Q))
     w = (ku * e + bu - kl * e - bl) / a
     if w < WIDTH_MIN_ATR or w > WIDTH_MAX_ATR:
         return None
