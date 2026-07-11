@@ -40,6 +40,11 @@ _ANOM_MIN = 2.0        # порог аномалии для входа
 # Лучшая ячейка гонтлета: тейк 1.0 ATR / стоп 0.3 ATR (от цены входа).
 _TAKE_ATR = 1.0
 _STOP_ATR = 0.3
+# Фильтр новостей (прокси по объёму): спайк с объёмом ≥ X× недавней нормы — это
+# сюрприз/новость (репрайс, не откатывает), fade таких втрое хуже. Проверено на
+# истории: отсев поднял held-out test 0.148 → 0.168, новостные на тесных тейках в
+# минус. Не интерпретируем новость — ловим её ОТПЕЧАТОК в объёме.
+_NEWS_VOL_THR = 3.0
 # Буфер: хватить на trend_w + n_atr + прогрев EWM-нормы; кап, чтобы recompute был быстрым.
 _MIN_BUFFER_BARS = _TREND_W + _N_ATR + 4 * _ACCEL_M + 200   # ~прогрев EWM
 _MAX_BUFFER_BARS = 6000
@@ -51,6 +56,7 @@ def _candle_to_bar(c: HistoricCandle) -> dict:
         "h": float(quotation_to_decimal(c.high)),
         "l": float(quotation_to_decimal(c.low)),
         "c": float(quotation_to_decimal(c.close)),
+        "v": float(c.volume),
     }
 
 
@@ -167,6 +173,16 @@ class AccelFadeStrategy(IStrategy):
                 and anom >= _ANOM_MIN and s == trend
                 and np.isfinite(ai) and ai > 0):
             return None
+
+        # ФИЛЬТР НОВОСТЕЙ (прокси по объёму): если объём спайк-бара ≥ порога от
+        # недавней нормы — это сюрприз/репрайс, fade проигрывает. Отсекаем.
+        vol = np.array([b["v"] for b in self._bars], float)
+        vbase = _ewm_causal(vol, _EWM_HALFLIFE)
+        if i >= 1 and np.isfinite(vbase[i - 1]) and vbase[i - 1] > 0:
+            if vol[i] / vbase[i - 1] >= _NEWS_VOL_THR:
+                logger.info("AccelFadeStrategy: спайк с новостным объёмом "
+                            "(%.1f× нормы) — пропуск", vol[i] / vbase[i - 1])
+                return None
 
         # один спайк-бар — один сигнал (analyze_candles может звать повторно на том же баре)
         t_now = self._bars[i]["t"]
