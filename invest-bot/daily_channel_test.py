@@ -531,7 +531,7 @@ def _build_reg_channels(h, l, c, atr):
 
 # ── ZigZag-каналы: как рисует человек — по ЗНАЧИМЫМ свингам ────────────────────
 ZZ_THR_ATR = 1.5       # свинг значим, если ход от прошлого пивота ≥ X ATR
-ZZ_WIDTH_MAX = 5.0     # каналы шире — не коридор (у ZZ ширину держит значимый свинг)
+ZZ_WIDTH_MAX = 4.0     # каналы шире — не коридор (у ZZ ширину держит значимый свинг)
 ZZ_EXTEND_TOL = 0.5    # следующий одноимённый пивот у линии ближе X ATR → канал продлевается
 
 
@@ -629,7 +629,38 @@ def _build_zigzag_channels(h, l, c, atr, thr=ZZ_THR_ATR):
         if tot == 0 or ins / tot < 0.75:
             continue
         out.append(ch)
-    return _suppress_dupes(out)
+    return _suppress_zz(out, atr)
+
+
+def _suppress_zz(chans, atr):
+    """Чистим картинку: near-дубли + ПЕРЕСЕКАЮЩИЕСЯ разнонаправленные каналы.
+    Наложенные каналы противоположного наклона на одном участке — это не
+    вложенность (её оставляем), а противоречие → оставляем доминирующий (дольше
+    живущий, лучше ложится). Вложенность одного направления разного масштаба цела."""
+    def q(c):
+        return c["life"]
+    kept = []
+    for ch in sorted(chans, key=q, reverse=True):
+        s, e = ch["x0"], ch["death"]
+        drop = False
+        for k in kept:
+            ov = min(e, k["death"]) - max(s, k["x0"])
+            if ov <= 0:
+                continue
+            frac = ov / min(e - s, k["death"] - k["x0"])
+            same_dir = (ch["ku"] >= 0) == (k["ku"] >= 0)
+            if frac >= 0.55 and not same_dir:      # пересечение разнонаправленных → противоречие
+                drop = True; break
+            if frac >= 0.7 and same_dir:           # near-дубль того же направления
+                xm = (max(s, k["x0"]) + min(e, k["death"])) // 2
+                midch = (ch["ku"] * xm + ch["bu"] + ch["kl"] * xm + ch["bl"]) / 2
+                midk = (k["ku"] * xm + k["bu"] + k["kl"] * xm + k["bl"]) / 2
+                wid = max(abs(ch["bu"] - ch["bl"]), abs(k["bu"] - k["bl"]))
+                if abs(midch - midk) < 0.5 * wid:
+                    drop = True; break
+        if not drop:
+            kept.append(ch)
+    return kept
 
 
 def step_min():
@@ -1051,7 +1082,7 @@ def main():
     MAX_SPAN = args.max_span
     SLOPE_MAX_ATR = {"flat": 0.06, "gentle": 0.15, "any": 0.30, "trend": 1.0, "pair": 0.60}[args.channel]
     if args.zz:
-        SLOPE_MAX_ATR = 0.35   # ZZ: пологие торговые каналы, крутые трендовые ноги режем
+        SLOPE_MAX_ATR = 0.28   # ZZ: пологие торговые каналы, крутые трендовые ноги режем
     if args.max_slope > 0:
         SLOPE_MAX_ATR = args.max_slope
     MIN_TOUCHES = args.min_touches
