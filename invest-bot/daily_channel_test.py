@@ -206,6 +206,59 @@ def _suppress_dupes(chans):
     return kept
 
 
+REG_WINDOWS = (10, 15, 21)   # окна регрессии (вложенность: несколько масштабов)
+REG_PCTL = 90                # полосы по 90/10 перцентилю отклонения — одиночный
+                             # выброс не раздувает канал («выброс не больше ещё ширины»)
+REG_INSIDE_MIN = 0.80        # доля close внутри полос (перцентиль допускает края)
+REG_STEP = 2                 # анкер регрессии через каждые STEP баров (меньше дублей)
+
+
+def _build_reg_channels(h, l, c, atr):
+    """Регрессионные каналы: линия наименьших квадратов по close в окне + две
+    ПАРАЛЛЕЛЬНЫЕ полосы по перцентилю отклонения хай/лой. По построению обнимает
+    цену, наклон = реальный тренд окна. Несколько окон дают вложенность. Форма
+    записи та же (k,b,off,x0,born,span,death) — работают _scan/_death/_plot."""
+    n = len(c)
+    out = []
+    for W in REG_WINDOWS:
+        for i in range(W - 1 + ATR_PERIOD, n, REG_STEP):
+            x0 = i - W + 1
+            born = i
+            a = atr[born]
+            if not (np.isfinite(a) and a > 0):
+                continue
+            xs = np.arange(x0, i + 1)
+            k, b0 = np.polyfit(xs, c[x0:i + 1], 1)
+            if abs(k) > SLOPE_MAX_ATR * a:                 # трендовая нога, не коридор
+                continue
+            base = k * xs + b0
+            up = h[x0:i + 1] - base
+            dn = l[x0:i + 1] - base
+            up_dev = float(np.percentile(up, REG_PCTL))
+            dn_dev = float(np.percentile(dn, 100 - REG_PCTL))
+            if up_dev <= 0 or dn_dev >= 0:                  # вырожденный
+                continue
+            off = up_dev - dn_dev
+            w = off / a
+            if w < WIDTH_MIN_ATR or w > WIDTH_MAX_ATR:
+                continue
+            lo_band = base + dn_dev
+            up_band = base + up_dev
+            cc = c[x0:i + 1]
+            inside = float(np.mean((cc >= lo_band) & (cc <= up_band)))
+            if inside < REG_INSIDE_MIN:                     # цена не держится в полосах
+                continue
+            ch = {"anchor": "high" if k >= 0 else "low", "k": float(k),
+                  "b": float(b0 + dn_dev), "off": float(off), "born": born,
+                  "x0": x0, "span": W}
+            ch["death"] = _death_bar(ch, h, l, c, atr, n)
+            ch["life"] = ch["death"] - born
+            if ch["life"] < step_min():
+                continue
+            out.append(ch)
+    return _suppress_dupes(out)
+
+
 def step_min():
     return 2   # анкеры хотя бы 2 дня врозь (иначе не канал)
 
@@ -397,6 +450,8 @@ def main():
     ap.add_argument("--plot", default="", help="тикер — нарисовать каналы в HTML/SVG")
     ap.add_argument("--plot-out", default="channels.html")
     ap.add_argument("--plot-days", type=int, default=160)
+    ap.add_argument("--reg", action="store_true",
+                    help="регрессионные каналы (МНК + перцентильные полосы) вместо свинг-анкеров")
     args = ap.parse_args()
     MAX_SPAN = args.max_span
 
@@ -407,8 +462,11 @@ def main():
             raise SystemExit(f"нет данных: {p}")
         o, h, l, c, ds = data
         atr = _atr(h, l, c, ATR_PERIOD)
-        highs, lows = _swings(h, l, SWING_STEP)
-        chs = _build_channels(highs, lows, h, l, c, atr)
+        if args.reg:
+            chs = _build_reg_channels(h, l, c, atr)
+        else:
+            highs, lows = _swings(h, l, SWING_STEP)
+            chs = _build_channels(highs, lows, h, l, c, atr)
         tch = []
         for ch in chs:
             tch += _scan(ch, h, l, c, atr, ds, args.plot)
@@ -434,9 +492,13 @@ def main():
         if len(c) < ATR_PERIOD + 4 * SWING_STEP + 10:
             continue
         atr = _atr(h, l, c, ATR_PERIOD)
-        highs, lows = _swings(h, l, SWING_STEP)
         tk = os.path.basename(p)[:-5]
-        for ch in _build_channels(highs, lows, h, l, c, atr):
+        if args.reg:
+            built = _build_reg_channels(h, l, c, atr)
+        else:
+            highs, lows = _swings(h, l, SWING_STEP)
+            built = _build_channels(highs, lows, h, l, c, atr)
+        for ch in built:
             allt += _scan(ch, h, l, c, atr, ds, tk)
         if args.tickers:
             print(f"{tk}: дней {len(c)}, касаний {sum(1 for t in allt if t['ticker']==tk)}")
