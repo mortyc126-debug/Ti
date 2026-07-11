@@ -50,8 +50,9 @@ def _load_closes(path: str):
     h = np.array([r["high"] for r in rows], float)
     l = np.array([r["low"] for r in rows], float)
     c = np.array([r["close"] for r in rows], float)
+    vol = np.array([r.get("volume", 0) for r in rows], float)
     dates = [str(r.get("time", "")) for r in rows]   # полный ISO-таймстемп (для held-out хватает лексики, для блоттера нужно время)
-    return o, h, l, c, dates
+    return o, h, l, c, vol, dates
 
 
 def _rmean(x, n):
@@ -80,7 +81,7 @@ def _process(ticker_data, m, halflife, n_atr, trend_w, horizons,
     """Возвращает (записи для cont-hit таблиц, fade-сделки для скамьи).
     fade-сделка = вход ПРОТИВ ускорения (fade) на аномальном спайке ПО тренду —
     самая сильная ячейка из cont-hit анализа. Барьеры интрабар high/low."""
-    o, h, l, c, dates = ticker_data
+    o, h, l, c, vol, dates = ticker_data
     n = len(c)
     if n < max(horizons) + trend_w + n_atr + 4 * m + 10:
         return [], []
@@ -104,6 +105,12 @@ def _process(ticker_data, m, halflife, n_atr, trend_w, horizons,
     tr = np.maximum(h - l, np.maximum(np.abs(h - prev_c), np.abs(l - prev_c)))
     atr = _rmean(tr, n_atr)
     atr[atr <= 0] = np.nan   # плоские/неликвидные бары: ATR=0 → деление даёт inf
+
+    # Прокси новости: аномалия ОБЪЁМА (объём / недавняя типичная норма, причинно).
+    # Новостной спайк = экстремальный объём; такие бары теханализ игнорирует.
+    vbase = _ewm_causal(vol, halflife)
+    vbase_prev = np.concatenate([[np.nan], vbase[:-1]])
+    vol_anom = np.where((vbase_prev > 0), vol / vbase_prev, np.nan)
 
     # Тренд-контекст: знак хода за trend_w баров.
     trend_sign = np.full(n, np.nan)
@@ -160,11 +167,13 @@ def _process(ticker_data, m, halflife, n_atr, trend_w, horizons,
                     if sl[st] < 0 and adv <= -st:
                         sl[st] = rel
             exit_away = fdir * (c[end] - entry) / ai
+            va = vol_anom[i]
             fades.append({
                 "ticker": ticker, "entry_bar": i, "date": dates[i],
                 "dir": int(fdir),   # +1 лонг / -1 шорт (fade = против ускорения)
                 "tp05": tp[0.5], "tp07": tp[0.7], "tp10": tp[1.0],
                 "sl03": sl[0.3], "sl05": sl[0.5], "exit_away": exit_away,
+                "vanom": float(va) if np.isfinite(va) else 0.0,  # прокси новости
             })
     return out, fades
 
@@ -259,7 +268,7 @@ def _fade_grid(trades, cost, title, overlap=True):
         print(f"    T={take:<8}" + "".join(f"{c:>16}" for c in cells))
 
 
-def _fade_report(trades, cost, split_date):
+def _fade_report(trades, cost, split_date, vol_thr=0.0):
     print(f"\n{'='*70}\nFADE-СКАМЬЯ: аномальный спайк ПО тренду → вход ПРОТИВ "
           f"({len(trades)} сделок)\n{'='*70}")
     _fade_grid(trades, cost, "все", overlap=True)
@@ -270,6 +279,22 @@ def _fade_report(trades, cost, split_date):
         print(f"\n-- HELD-OUT: train<{split_date} ({len(tr)}) | test≥{split_date} ({len(te)}) --")
         _fade_grid(tr, cost, "TRAIN", overlap=False)
         _fade_grid(te, cost, "TEST (held-out)", overlap=False)
+
+    # ── ПРОКСИ НОВОСТЕЙ: сплит по аномалии объёма ──
+    if vol_thr > 0:
+        news = [t for t in trades if t.get("vanom", 0.0) >= vol_thr]
+        clean = [t for t in trades if t.get("vanom", 0.0) < vol_thr]
+        print(f"\n{'='*70}\nПРОКСИ НОВОСТЕЙ: объём ≥ {vol_thr}× нормы = «новостной» спайк\n"
+              f"новостных: {len(news)} | чистых: {len(clean)} (из {len(trades)})\n{'='*70}")
+        print("Гипотеза жива, если ЧИСТЫЕ лучше ВСЕХ, а НОВОСТНЫЕ — хуже (теханализу «плевать»).")
+        _fade_grid(clean, cost, "ЧИСТЫЕ (без новостей)", overlap=False)
+        _fade_grid(news, cost, "НОВОСТНЫЕ (объём-спайк)", overlap=False)
+        if split_date:
+            trc = [t for t in clean if t["date"] < split_date]
+            tec = [t for t in clean if t["date"] >= split_date]
+            print(f"\n-- ЧИСТЫЕ held-out: train ({len(trc)}) | test ({len(tec)}) --")
+            _fade_grid(trc, cost, "ЧИСТЫЕ TRAIN", overlap=False)
+            _fade_grid(tec, cost, "ЧИСТЫЕ TEST (held-out)", overlap=False)
 
 
 def main():
@@ -288,6 +313,8 @@ def main():
     ap.add_argument("--anom-min", type=float, default=2.0, help="порог аномалии для fade-сделки")
     ap.add_argument("--cost", type=float, default=DEFAULT_COST, help="издержки на круг в ATR")
     ap.add_argument("--split-date", default="", help="held-out: YYYY-MM-DD (train<дата, test≥)")
+    ap.add_argument("--vol-thr", type=float, default=0.0,
+                    help="прокси новостей: объём ≥ X× нормы = «новостной» спайк (сплит отчёта). 0=выкл")
     args = ap.parse_args()
 
     horizons = [int(x) for x in args.horizons.split(",")]
@@ -313,8 +340,8 @@ def main():
             continue
         if args.days:
             cut = args.days * bars_per_day
-            o, h, l, c, dts = data
-            data = (o[-cut:], h[-cut:], l[-cut:], c[-cut:], dts[-cut:])
+            o, h, l, c, vol, dts = data
+            data = (o[-cut:], h[-cut:], l[-cut:], c[-cut:], vol[-cut:], dts[-cut:])
         ticker = os.path.basename(p).replace("_1m", "")[:-5]
         recs, fds = _process(data, args.accel_m, args.ewm_halflife, args.n_atr,
                              args.trend_window, horizons, ticker=ticker, anom_min=args.anom_min)
@@ -326,7 +353,7 @@ def main():
     if not records:
         raise SystemExit("нет записей — проверь кэш/параметры")
     _report(records, horizons)
-    _fade_report(fades, args.cost, args.split_date)
+    _fade_report(fades, args.cost, args.split_date, vol_thr=args.vol_thr)
 
 
 if __name__ == "__main__":
