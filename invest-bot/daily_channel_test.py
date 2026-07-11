@@ -293,67 +293,141 @@ def _build_trend_channels(highs, lows, h, l, c, atr):
     return _suppress_dupes(out)
 
 
-def _build_adaptive_channels(highs, lows, h, l, c, atr):
-    """Как строит человек: прямой канал по точкам, ведём вперёд по пивотам; новый
-    экстремум с небольшим проколом (<= ADJUST_TOL) ПОДПРАВЛЯЕТ линию (перецепляем к
-    двум последним точкам этой стороны) — канал жив и «чётко по точкам»; сильный
-    прокол (> BREAK_HARD) — слом, начинаем НОВЫЙ канал с этого места. Сегменты идут
-    подряд вдоль тренда, а не десятками наложений."""
-    n = len(c)
-    piv = sorted([(i, p, "H") for i, p in highs] + [(i, p, "L") for i, p in lows])
-    out = []
-    s = 0
-    while s < len(piv):
-        hs, ls, k = [], [], s
-        while k < len(piv) and (len(hs) < 2 or len(ls) < 2):
-            i, p, t = piv[k]
-            (hs if t == "H" else ls).append((i, p))
-            k += 1
-        if len(hs) < 2 or len(ls) < 2:
-            break
-        ku, bu = _line(hs[-2], hs[-1])
-        kl, bl = _line(ls[-2], ls[-1])
-        start = min(hs[0][0], ls[0][0])
-        end = max(hs[-1][0], ls[-1][0])
-        j, broke = k, None
-        while j < len(piv):
-            i, p, t = piv[j]
-            a = atr[i] if i < n and np.isfinite(atr[i]) and atr[i] > 0 else None
-            if a is None:
-                j += 1
+MIN_SEG_LEN = 8        # минимальная длина канала (дней) — короче не рисуем
+
+
+def _cap_line(pts, s, e, atr, upper):
+    """Опорная трендовая ЧЕРЕЗ 2 реальных пивота: линия, которая касается двух точек и
+    ОГИБАЕТ все остальные (хаи под ней для upper / лои над ней для lower, глубже
+    PIERCE_TOL не протыкают). Берём самую «прижатую» к экстремумам. (k,b) или None."""
+    sel = [p for p in pts if s <= p[0] <= e]
+    if len(sel) < 2:
+        return None
+    a = atr[e] if e < len(atr) and np.isfinite(atr[e]) and atr[e] > 0 else None
+    if a is None:
+        return None
+    best, best_slack = None, None
+    for ia in range(len(sel)):
+        for ib in range(ia + 1, len(sel)):
+            ln = _line(sel[ia], sel[ib])
+            if ln is None:
                 continue
-            if t == "H":
-                over = (p - (ku * i + bu)) / a
-                if over > BREAK_HARD_ATR:            # сильный прокол вверх — слом
-                    broke = j
-                    break
-                if over > 0:                          # поклевал выше линии в пределах — подправляем
-                    hs.append((i, p))
-                    ku, bu = _line(hs[-2], hs[-1])
+            k, b = ln
+            pierce = max(((pp - (k * xp + b)) if upper else ((k * xp + b) - pp))
+                         for xp, pp in sel)
+            if pierce > PIERCE_TOL * a:        # линия рвётся точками — не огибает
+                continue
+            # среди огибающих берём самую тесную (минимальный суммарный зазор до точек)
+            slack = sum(abs(pp - (k * xp + b)) for xp, pp in sel)
+            if best is None or slack < best_slack:
+                best, best_slack = (k, b), slack
+    return best
+
+
+def _fit_channel(highs, lows, h, l, c, atr, s, e):
+    """Канал ЧЕРЕЗ ТОЧКИ: опорная линия — через 2 ПОСЛЕДНИХ пивота тренд-стороны
+    (сопротивление по хаям на спуске / поддержка по лоям на росте), огибающую по
+    возможности; вторую границу кладём ПАРАЛЛЕЛЬНО по крайней противоположной точке.
+    Линии идут по реальным точкам и параллельны. Проверяем удержание цены внутри.
+    (ku,bu,kl,bl,w) или None."""
+    a = atr[e] if e < len(atr) and np.isfinite(atr[e]) and atr[e] > 0 else None
+    if a is None:
+        return None
+    xs = np.arange(s, e + 1)
+    anchor_high = float(np.polyfit(xs, c[s:e + 1], 1)[0]) <= 0   # спуск→опора по хаям
+    sel = [p for p in (highs if anchor_high else lows) if s <= p[0] <= e]
+    if len(sel) < 2:
+        return None
+    ln = _cap_line(highs if anchor_high else lows, s, e, atr, upper=anchor_high)
+    if ln is None:
+        ln = _line(sel[-2], sel[-1])           # нет огибающей — берём 2 последних пивота
+    if ln is None:
+        return None
+    k, b = ln
+    if abs(k) > SLOPE_MAX_ATR * a:
+        return None
+    if anchor_high:
+        ku, bu, kl = k, b, k
+        bl = float(np.min(l[s:e + 1] - k * xs))     # параллель по самому низкому лою
+    else:
+        kl, bl, ku = k, b, k
+        bu = float(np.max(h[s:e + 1] - k * xs))     # параллель по самому высокому хаю
+    w = (ku * e + bu - kl * e - bl) / a
+    if w < WIDTH_MIN_ATR or w > WIDTH_MAX_ATR:
+        return None
+    up_line, lo_line = ku * xs + bu, kl * xs + bl   # цена держится внутри?
+    inside = float(np.mean((c[s:e + 1] >= lo_line - TOUCH_TOL_ATR * a)
+                           & (c[s:e + 1] <= up_line + TOUCH_TOL_ATR * a)))
+    if inside < CONTAIN_MIN:
+        return None
+    return ku, bu, kl, bl, w
+
+
+MAX_CH_LEN = 45        # потолок длины одного канала (дней) — дальше форсим новый
+
+
+def _build_adaptive_channels(highs, lows, h, l, c, atr):
+    """Каналы как рисуют руками: опорная линия по 2 точкам + параллель по крайней
+    точке. Ведём вперёд, канал подстраивается (пере-фит по мере роста отрезка); когда
+    close выходит за границу глубже BREAK_HARD ATR, или канал перерос (стал шире
+    лимита / длиннее MAX_CH_LEN) — закрываем на последнем валидном баре и начинаем
+    новый с этого места."""
+    n = len(c)
+    start = ATR_PERIOD
+    while start < n and not (np.isfinite(atr[start]) and atr[start] > 0):
+        start += 1
+    out, seg, last_ok = [], start, -1
+    i = seg + MIN_SEG_LEN
+
+    def reset(to):
+        nonlocal seg, last_ok, i
+        seg, last_ok = to, -1
+        i = seg + MIN_SEG_LEN
+
+    while i < n:
+        a = atr[i] if np.isfinite(atr[i]) and atr[i] > 0 else None
+        if a is None:
+            i += 1
+            continue
+        f = _fit_channel(highs, lows, h, l, c, atr, seg, i)
+        if f is None:                                  # канал потерял валидность (обычно шире лимита)
+            if last_ok - seg >= MIN_SEG_LEN:
+                _emit_seg(out, highs, lows, h, l, c, atr, seg, last_ok, n)
+                reset(last_ok)
             else:
-                under = ((kl * i + bl) - p) / a
-                if under > BREAK_HARD_ATR:            # сильный прокол вниз — слом
-                    broke = j
-                    break
-                if under > 0:
-                    ls.append((i, p))
-                    kl, bl = _line(ls[-2], ls[-1])
-            end = i
-            j += 1
-        a0 = atr[end] if end < n and np.isfinite(atr[end]) and atr[end] > 0 else None
-        if a0 is not None:
-            up_e, lo_e = ku * end + bu, kl * end + bl
-            w = (up_e - lo_e) / a0
-            if up_e > lo_e and WIDTH_MIN_ATR <= w <= WIDTH_MAX_ATR and abs(ku - kl) <= SLOPE_PAIR_TOL * a0:
-                ch = {"anchor": "trend", "born": end, "x0": start,
-                      "span": max(end - start, step_min()), "ku": ku, "bu": bu, "kl": kl, "bl": bl}
-                ch["death"] = _death_bar(ch, h, l, c, atr, n, mult=TREND_FWD_MULT, cap=TREND_FWD_MAX_D)
-                ch["life"] = ch["death"] - end
-                out.append(ch)
-        s = broke if broke is not None else k    # новый сегмент с точки слома (или дальше)
-        if s <= start:                            # страховка от застоя
-            s = k
+                reset(i)
+            continue
+        ku, bu, kl, bl, _ = f
+        up, lo = ku * i + bu, kl * i + bl
+        broke = c[i] > up + BREAK_HARD_ATR * a or c[i] < lo - BREAK_HARD_ATR * a
+        if broke or i - seg >= MAX_CH_LEN:
+            _emit_seg(out, highs, lows, h, l, c, atr, seg, i - 1 if broke else i, n)
+            reset(i)
+            continue
+        last_ok = i
+        i += 1
+    if last_ok - seg >= MIN_SEG_LEN:
+        _emit_seg(out, highs, lows, h, l, c, atr, seg, last_ok, n)
     return _suppress_dupes(out)
+
+
+def _emit_seg(out, highs, lows, h, l, c, atr, s, e, n):
+    if e - s < MIN_SEG_LEN:
+        return
+    f = _fit_channel(highs, lows, h, l, c, atr, s, e)
+    if f is None:
+        return
+    ku, bu, kl, bl, _ = f
+    ch = {"anchor": "trend", "born": e, "x0": s, "span": max(e - s, step_min()),
+          "ku": ku, "bu": bu, "kl": kl, "bl": bl}
+    ch["death"] = _death_bar(ch, h, l, c, atr, n, mult=TREND_FWD_MULT, cap=TREND_FWD_MAX_D)
+    ch["life"] = ch["death"] - e
+    out.append(ch)
+
+
+def _mid_at(ch, x):
+    up, lo = _bounds(ch, x)
+    return (up + lo) / 2.0
 
 
 def _mid_at(ch, x):
