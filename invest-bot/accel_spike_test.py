@@ -268,17 +268,53 @@ def _fade_grid(trades, cost, title, overlap=True):
         print(f"    T={take:<8}" + "".join(f"{c:>16}" for c in cells))
 
 
-def _fade_report(trades, cost, split_date, vol_thr=0.0):
+def _fade_per_ticker(trades, cost, take, stop, title):
+    """P&L по тикерам (no-overlap, ячейка take/stop): N, экспектанси, Σ в ATR.
+    Отвечает на «сколько сейчас в плюсе/минусе» отдельно по каждой бумаге."""
+    print(f"\n== P&L по тикерам ({title}, тейк{take}/стоп{stop}, cost={cost}) ==")
+    by_t = {}
+    for tr in trades:
+        by_t.setdefault(tr["ticker"], []).append(tr)
+    rows = []
+    tot_sum, tot_n = 0.0, 0
+    for tk, trs in by_t.items():
+        last, s, n = -1, 0.0, 0
+        for tr in sorted(trs, key=lambda x: x["entry_bar"]):
+            if tr["entry_bar"] <= last:
+                continue
+            pnl, ex = _fade_pnl(tr, take, stop)
+            s += pnl - cost; n += 1; last = ex
+        if n:
+            rows.append((tk, n, s / n, s)); tot_sum += s; tot_n += n
+    print(f"    {'тикер':<10}{'N':>7}{'exp(ATR)':>11}{'Σ(ATR)':>11}")
+    for tk, n, exp, s in sorted(rows, key=lambda r: r[3], reverse=True):
+        mark = "" if s >= 0 else "  ◄ минус"
+        print(f"    {tk:<10}{n:>7}{exp:>+11.3f}{s:>+11.1f}{mark}")
+    if tot_n:
+        print(f"    {'ИТОГО':<10}{tot_n:>7}{tot_sum/tot_n:>+11.3f}{tot_sum:>+11.1f}")
+
+
+def _fade_report(trades, cost, split_date, vol_thr=0.0, drop_news=False):
+    # drop_news: убрать новостные спайки из ТОРГУЕМОГО набора — ровно как в живой
+    # стратегии (accel-fade + фильтр объёма). Тогда P&L = то, что реально торгует бот.
+    if drop_news and vol_thr > 0:
+        before = len(trades)
+        trades = [t for t in trades if t.get("vanom", 0.0) < vol_thr]
+        print(f"\n[--drop-news] новостные (объём ≥{vol_thr}×) убраны из торговли: "
+              f"{before} → {len(trades)}")
     print(f"\n{'='*70}\nFADE-СКАМЬЯ: аномальный спайк ПО тренду → вход ПРОТИВ "
           f"({len(trades)} сделок)\n{'='*70}")
     _fade_grid(trades, cost, "все", overlap=True)
     _fade_grid(trades, cost, "все", overlap=False)
+    # P&L по тикерам на лучшей ячейке — «сколько сейчас в плюсе/минусе» по бумагам
+    _fade_per_ticker(trades, cost, 1.0, 0.3, "все")
     if split_date:
         tr = [t for t in trades if t["date"] < split_date]
         te = [t for t in trades if t["date"] >= split_date]
         print(f"\n-- HELD-OUT: train<{split_date} ({len(tr)}) | test≥{split_date} ({len(te)}) --")
         _fade_grid(tr, cost, "TRAIN", overlap=False)
         _fade_grid(te, cost, "TEST (held-out)", overlap=False)
+        _fade_per_ticker(te, cost, 1.0, 0.3, "TEST held-out — свежий период")
 
     # ── ПРОКСИ НОВОСТЕЙ: сплит по аномалии объёма ──
     if vol_thr > 0:
@@ -315,6 +351,8 @@ def main():
     ap.add_argument("--split-date", default="", help="held-out: YYYY-MM-DD (train<дата, test≥)")
     ap.add_argument("--vol-thr", type=float, default=0.0,
                     help="прокси новостей: объём ≥ X× нормы = «новостной» спайк (сплит отчёта). 0=выкл")
+    ap.add_argument("--drop-news", action="store_true",
+                    help="убрать новостные спайки из ТОРГОВЛИ (как в живой стратегии); нужен --vol-thr")
     args = ap.parse_args()
 
     horizons = [int(x) for x in args.horizons.split(",")]
@@ -353,7 +391,8 @@ def main():
     if not records:
         raise SystemExit("нет записей — проверь кэш/параметры")
     _report(records, horizons)
-    _fade_report(fades, args.cost, args.split_date, vol_thr=args.vol_thr)
+    _fade_report(fades, args.cost, args.split_date, vol_thr=args.vol_thr,
+                 drop_news=args.drop_news)
 
 
 if __name__ == "__main__":
