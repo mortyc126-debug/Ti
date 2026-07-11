@@ -101,12 +101,19 @@ def _line(p_a, p_b):
     return k, ya - k * xa
 
 
+def _bounds(ch, x):
+    """Верх и низ канала на баре x. Канал = две линии (могут быть с РАЗНЫМ наклоном
+    у трендового билдера): ku/bu — верхняя, kl/bl — нижняя."""
+    return ch["ku"] * x + ch["bu"], ch["kl"] * x + ch["bl"]
+
+
 SLOPE_MAX_ATR = 0.28   # наклон границы круче X ATR/день — это не канал, а спайк-линия
 WIDTH_MIN_ATR = 0.8    # уже — «нитка»/шум, не торговый коридор
 WIDTH_MAX_ATR = 4.0    # шире — не коридор, а полнеба (одна граница улетает за экран)
 PIERCE_TOL = 0.25      # линия анкера может протыкаться промежуточной ценой не глубже X ATR
 BREAK_OUT_ATR = 0.50   # цена ушла за границу глубже X ATR → канал умер (перестаём рисовать)
 FWD_SPAN_MULT = 0.75   # проекция вперёд не длиннее формирования*MULT — иначе луч в пустоту
+TREND_FWD_MULT = 2.0   # трендовые линии тянем вперёд длиннее (в этом весь смысл канала)
 MIN_TOUCHES = 2        # цена должна ПОДХОДИТЬ к КАЖДОЙ границе ≥ этого числа раз (подтверждённый коридор)
 TOUCH_TOL_ATR = 0.40   # «подход к границе» = экстремум ближе X ATR к линии
 
@@ -128,19 +135,18 @@ def _touch_events(arr, k, b, x0, x1, atr, tol=TOUCH_TOL_ATR):
     return ev
 
 
-def _death_bar(ch, h, l, c, atr, n):
-    """Бар, где цена вышла из коридора глубже BREAK_OUT — канал перестал существовать.
-    Горизонт проекции вперёд ограничен длиной формирования (span*FWD_SPAN_MULT):
-    коридор, сложившийся за N дней, не имеет права тянуться лучом на 60 дней."""
-    k, b, off = ch["k"], ch["b"], ch["off"]
-    fwd = max(step_min(), int(ch["span"] * FWD_SPAN_MULT))
+def _death_bar(ch, h, l, c, atr, n, mult=FWD_SPAN_MULT):
+    """Бар, где канал перестал существовать: цена вышла за границу глубже BREAK_OUT
+    ИЛИ линии сошлись (верх ниже низа). Горизонт проекции вперёд — span*mult."""
+    fwd = max(step_min(), int(ch["span"] * mult))
     end = min(n - 1, ch["born"] + fwd)
     for x in range(ch["born"] + 1, end + 1):
         a = atr[x]
         if not (np.isfinite(a) and a > 0):
             continue
-        base = k * x + b
-        upper, lower = max(base, base + off), min(base, base + off)
+        upper, lower = _bounds(ch, x)
+        if upper <= lower:                       # линии пересеклись — канал схлопнулся
+            return x - 1
         if h[x] > upper + BREAK_OUT_ATR * a or l[x] < lower - BREAK_OUT_ATR * a:
             return x
     return end
@@ -200,8 +206,8 @@ def _build_channels(highs, lows, h, l, c, atr):
                 nt_up = _touch_events(h, k, b + off, a1[0], a2[0], atr)
             if nt_up < MIN_TOUCHES or nt_lo < MIN_TOUCHES:
                 continue
-            ch = {"anchor": anchor, "k": k, "b": b, "off": off, "born": born,
-                  "x0": a1[0], "span": span}
+            ch = {"anchor": anchor, "born": born, "x0": a1[0], "span": span,
+                  "ku": k, "bu": b + max(off, 0.0), "kl": k, "bl": b + min(off, 0.0)}
             ch["death"] = _death_bar(ch, h, l, c, atr, n)
             ch["life"] = ch["death"] - born
             if ch["life"] < step_min():                  # умер сразу — не жил
@@ -210,9 +216,70 @@ def _build_channels(highs, lows, h, l, c, atr):
     return _suppress_dupes(out)
 
 
+def _extreme_lines(pts, atr, n):
+    """Линии по парам последовательных экстремумов (2 хая → линия / 2 лоя → линия).
+    Возвращает [(k, b, x0, born)]. Наклон ограничен SLOPE_MAX (для трендового режима
+    он поднят), пара не дальше MAX_SPAN дней."""
+    out = []
+    for i in range(1, len(pts)):
+        a1, a2 = pts[i - 1], pts[i]
+        span = a2[0] - a1[0]
+        if span > MAX_SPAN or span < step_min():
+            continue
+        ln = _line(a1, a2)
+        if ln is None:
+            continue
+        k, b = ln
+        born = a2[0]
+        a = atr[born] if born < n and np.isfinite(atr[born]) and atr[born] > 0 else None
+        if a is None or abs(k) > SLOPE_MAX_ATR * a:
+            continue
+        out.append((k, b, a1[0], born))
+    return out
+
+
+def _build_trend_channels(highs, lows, h, l, c, atr):
+    """Каналы по ДВУМ независимым трендовым линиям: линия по 2 хаям (верх) и линия
+    по 2 лоям (низ), у каждой СВОЙ наклон. Линии продлеваются вперёд, зазор между
+    ними — канал (может сходиться/расходиться). По ходу истории берём последнюю
+    сложившуюся верхнюю и последнюю нижнюю линию; каждое обновление рождает канал."""
+    n = len(c)
+    hl = _extreme_lines(highs, atr, n)
+    ll = _extreme_lines(lows, atr, n)
+    events = [("H", *x) for x in hl] + [("L", *x) for x in ll]
+    events.sort(key=lambda e: e[4])          # по born
+    out, cur_h, cur_l = [], None, None
+    for typ, k, b, x0, born in events:
+        if typ == "H":
+            cur_h = (k, b, x0)
+        else:
+            cur_l = (k, b, x0)
+        if not (cur_h and cur_l):
+            continue
+        ku, bu, xh = cur_h
+        kl, bl, xl = cur_l
+        x0_ch = min(xh, xl)
+        a = atr[born] if np.isfinite(atr[born]) and atr[born] > 0 else None
+        if a is None:
+            continue
+        up = ku * born + bu
+        lo = kl * born + bl
+        w = (up - lo) / a
+        if up <= lo or w < WIDTH_MIN_ATR or w > WIDTH_MAX_ATR:   # верх ниже низа/узко/широко
+            continue
+        ch = {"anchor": "trend", "born": born, "x0": x0_ch, "span": max(born - x0_ch, step_min()),
+              "ku": ku, "bu": bu, "kl": kl, "bl": bl}
+        ch["death"] = _death_bar(ch, h, l, c, atr, n, mult=TREND_FWD_MULT)
+        ch["life"] = ch["death"] - born
+        if ch["life"] < step_min():
+            continue
+        out.append(ch)
+    return _suppress_dupes(out)
+
+
 def _mid_at(ch, x):
-    base = ch["k"] * x + ch["b"]
-    return base + ch["off"] / 2.0    # средняя линия коридора на баре x
+    up, lo = _bounds(ch, x)
+    return (up + lo) / 2.0
 
 
 def _suppress_dupes(chans):
@@ -233,7 +300,8 @@ def _suppress_dupes(chans):
             if ov < 0.5 * min(e - s, k["death"] - k["x0"]):
                 continue
             xm = (max(s, k["x0"]) + min(e, k["death"])) // 2
-            wid = max(abs(ch["off"]), abs(k["off"]))
+            u1, l1 = _bounds(ch, xm); u2, l2 = _bounds(k, xm)
+            wid = max(u1 - l1, u2 - l2)
             if abs(_mid_at(ch, xm) - _mid_at(k, xm)) < 0.8 * wid:
                 dup = True; break
         if not dup:
@@ -288,9 +356,8 @@ def _build_reg_channels(h, l, c, atr):
             nt_up = _touch_events(h, k, b0 + up_dev, x0, i, atr)
             if nt_up < MIN_TOUCHES or nt_lo < MIN_TOUCHES:
                 continue
-            ch = {"anchor": "high" if k >= 0 else "low", "k": float(k),
-                  "b": float(b0 + dn_dev), "off": float(off), "born": born,
-                  "x0": x0, "span": W}
+            ch = {"anchor": "high" if k >= 0 else "low", "born": born, "x0": x0, "span": W,
+                  "ku": float(k), "bu": float(b0 + up_dev), "kl": float(k), "bl": float(b0 + dn_dev)}
             ch["death"] = _death_bar(ch, h, l, c, atr, n)
             ch["life"] = ch["death"] - born
             if ch["life"] < step_min():
@@ -328,7 +395,6 @@ def _fade_barriers(ch, entry, side, h, l, c, atr, i, end, target="far", use_stop
     стопа (чистая проверка: доходит ли цель в принципе за жизнь канала). Стоп =
     пробой входной границы на FADE_STOP ATR. Интрабар first-passage, тай → стоп.
     P&L в ATR от цены входа. Возвращает (pnl, exit_bar, reached_target, exit_price)."""
-    k, b, off = ch["k"], ch["b"], ch["off"]
     sgn = 1.0 if side == "support" else -1.0
     a0 = atr[i]
     if not (np.isfinite(a0) and a0 > 0):
@@ -337,8 +403,8 @@ def _fade_barriers(ch, entry, side, h, l, c, atr, i, end, target="far", use_stop
         aj = atr[j]
         if not (np.isfinite(aj) and aj > 0):
             continue
-        anc = k * j + b
-        upper, lower, mid = max(anc, anc + off), min(anc, anc + off), anc + off / 2.0
+        upper, lower = _bounds(ch, j)
+        mid = (upper + lower) / 2.0
         if side == "support":               # лонг от низа: цель выше, стоп под низом
             tp_price = mid if target == "mid" else upper
             sl_price = lower - FADE_STOP_ATR * aj
@@ -365,19 +431,17 @@ def _scan(ch, h, l, c, atr, ds, ticker, breakout=False, fade=False, mom=MOM_LOOK
     end0 = min(n - 1, ch.get("death", ch["born"] + ch["life"]))
     if start >= end0:
         return []
-    k, b, off = ch["k"], ch["b"], ch["off"]
     touches = []
-    # две параллельные границы на баре x: anchor = k*x+b, parallel = k*x+b+off.
-    # верх = max, низ = min. Касание верха → resistance (шорт), низа → support (лонг).
+    # две границы на баре x берём из _bounds (у трендового билдера наклоны разные).
+    # Касание верха → resistance (шорт), низа → support (лонг).
     for which in ("upper", "lower"):
         armed, i = True, start
         while i <= end0:
             a = atr[i]
             if not (np.isfinite(a) and a > 0):
                 i += 1; continue
-            v_anchor = k * i + b
-            v_parallel = v_anchor + off
-            lvl_now = max(v_anchor, v_parallel) if which == "upper" else min(v_anchor, v_parallel)
+            up_i, lo_i = _bounds(ch, i)
+            lvl_now = up_i if which == "upper" else lo_i
             is_upper = which == "upper"
             dist = abs(c[i] - lvl_now) / a
             if not armed:
@@ -592,8 +656,8 @@ def _plot_svg(ticker, o, h, l, c, ds, channels, touches, out, days):
     W, H, m = 1600, 800, 60
     def X(i): return m + (i - i0) / max(i1 - i0, 1) * (W - 2 * m)
     def Y(p): return H - m - (p - pmin) / max(pmax - pmin, 1e-9) * (H - 2 * m)
-    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
-             f'style="background:#0d1117;font-family:monospace">']
+    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" '
+             f'width="100%" style="max-width:100%;height:auto;background:#0d1117;font-family:monospace">']
     fades = [t for t in touches if "fade" in t]
     if fades:
         legend = ("fade-сделки: ▲=лонг(низ→верх) ▼=шорт(верх→низ); линия вход→выход "
@@ -611,12 +675,11 @@ def _plot_svg(ticker, o, h, l, c, ds, channels, touches, out, days):
         if e < i0 or s > i1:
             continue
         s = max(s, i0); e = min(e, i1)
-        k, b, off = ch["k"], ch["b"], ch["off"]
-        up = " ".join(f"{X(i):.1f},{Y(max(k*i+b, k*i+b+off)):.1f}" for i in range(s, e + 1))
-        lo = " ".join(f"{X(i):.1f},{Y(min(k*i+b, k*i+b+off)):.1f}" for i in range(s, e + 1))
-        col = "#d29922" if ch["anchor"] == "high" else "#a371f7"
-        parts.append(f'<polyline points="{up}" fill="none" stroke="{col}" stroke-width="1.3" opacity="0.7"/>')
-        parts.append(f'<polyline points="{lo}" fill="none" stroke="{col}" stroke-width="1.3" opacity="0.7"/>')
+        bnd = [_bounds(ch, i) for i in range(s, e + 1)]
+        up = " ".join(f"{X(s+j):.1f},{Y(u):.1f}" for j, (u, _) in enumerate(bnd))
+        lo = " ".join(f"{X(s+j):.1f},{Y(d):.1f}" for j, (_, d) in enumerate(bnd))
+        parts.append(f'<polyline points="{up}" fill="none" stroke="#d29922" stroke-width="1.4" opacity="0.8"/>')
+        parts.append(f'<polyline points="{lo}" fill="none" stroke="#a371f7" stroke-width="1.4" opacity="0.8"/>')
     if fades:
         # каждая fade-сделка: маркер входа (направление) + линия вход→выход (цвет=дошёл ли до цели)
         for t in fades:
@@ -656,6 +719,17 @@ def _plot_svg(ticker, o, h, l, c, ds, channels, touches, out, days):
         pass
 
 
+def _channels_for(h, l, c, atr, args):
+    """Выбор билдера по --channel/--reg."""
+    if args.channel == "trend":
+        highs, lows = _swings(h, l, SWING_STEP)
+        return _build_trend_channels(highs, lows, h, l, c, atr)
+    if args.reg:
+        return _build_reg_channels(h, l, c, atr)
+    highs, lows = _swings(h, l, SWING_STEP)
+    return _build_channels(highs, lows, h, l, c, atr)
+
+
 def main():
     global MAX_SPAN, SLOPE_MAX_ATR, MIN_TOUCHES
     ap = argparse.ArgumentParser(description="Дневные параллельные каналы (спека пользователя)")
@@ -681,13 +755,14 @@ def main():
                     help="цель отскока: far=противоположная граница, mid=средняя линия")
     ap.add_argument("--no-stop", action="store_true",
                     help="без стопа — чистая проверка, доходит ли цель за жизнь канала")
-    ap.add_argument("--channel", choices=("flat", "gentle", "any"), default="gentle",
-                    help="тип канала: flat=почти горизонталь, gentle=+пологий наклон, any=любой наклон")
+    ap.add_argument("--channel", choices=("flat", "gentle", "any", "trend"), default="trend",
+                    help="flat/gentle/any=параллельные (порог наклона); "
+                         "trend=две независимые трендовые линии (2 хая + 2 лоя), зазор=канал")
     ap.add_argument("--min-touches", type=int, default=MIN_TOUCHES,
                     help="цена должна подходить к КАЖДОЙ границе >= N раз (подтверждённый коридор)")
     args = ap.parse_args()
     MAX_SPAN = args.max_span
-    SLOPE_MAX_ATR = {"flat": 0.06, "gentle": 0.15, "any": 0.30}[args.channel]
+    SLOPE_MAX_ATR = {"flat": 0.06, "gentle": 0.15, "any": 0.30, "trend": 0.60}[args.channel]
     MIN_TOUCHES = args.min_touches
 
     if args.plot:
@@ -697,11 +772,7 @@ def main():
             raise SystemExit(f"нет данных: {p}")
         o, h, l, c, ds = data
         atr = _atr(h, l, c, ATR_PERIOD)
-        if args.reg:
-            chs = _build_reg_channels(h, l, c, atr)
-        else:
-            highs, lows = _swings(h, l, SWING_STEP)
-            chs = _build_channels(highs, lows, h, l, c, atr)
+        chs = _channels_for(h, l, c, atr, args)
         tch = []
         for ch in chs:
             tch += _scan(ch, h, l, c, atr, ds, args.plot, breakout=args.breakout,
@@ -730,11 +801,7 @@ def main():
             continue
         atr = _atr(h, l, c, ATR_PERIOD)
         tk = os.path.basename(p)[:-5]
-        if args.reg:
-            built = _build_reg_channels(h, l, c, atr)
-        else:
-            highs, lows = _swings(h, l, SWING_STEP)
-            built = _build_channels(highs, lows, h, l, c, atr)
+        built = _channels_for(h, l, c, atr, args)
         for ch in built:
             allt += _scan(ch, h, l, c, atr, ds, tk, breakout=args.breakout,
                           fade=args.fade, mom=args.mom_lookback,
