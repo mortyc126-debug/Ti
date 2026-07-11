@@ -94,33 +94,46 @@ def _line(p_a, p_b):
     return k, ya - k * xa
 
 
-def _build_channels(highs, lows, h, l):
-    """Параллельные каналы. Два типа: анкер по 2 хаям (верх), параллель вниз к
-    min-low окна; и анкер по 2 лоям (низ), параллель вверх к max-high окна.
-    Оба экстремума-анкера входят, противоположная граница — на крайнем
-    противоположном экстремуме. born = max индекс из точек построения."""
+SLOPE_MAX_ATR = 0.35   # наклон границы круче X ATR/день — это не канал, а спайк-линия
+WIDTH_MIN_ATR = 0.8    # уже — «нитка»/шум, не торговый коридор
+WIDTH_MAX_ATR = 8.0    # шире — не коридор, а полнеба
+LIFE_SPAN_MULT = 2.0   # канал живёт ~span*MULT дней (не фиксировано), но не дольше LIFE_BARS
+
+
+def _build_channels(highs, lows, h, l, atr):
+    """Параллельные каналы. Анкер по 2 хаям (верх) / 2 лоям (низ), параллель к
+    крайнему противоположному экстремусу окна (оба входят). Отбор по вменяемости:
+    наклон не круче SLOPE_MAX_ATR/день, ширина в коридоре, жизнь ~span (не вечный
+    луч). Иначе линии-ракеты, которые ничего не значат."""
     out = []
-    for anchor, opp_arr, sign in (("high", l, -1), ("low", h, +1)):
+    for anchor, opp_arr in (("high", l), ("low", h)):
         pts = highs if anchor == "high" else lows
         for i in range(1, len(pts)):
             a1, a2 = pts[i - 1], pts[i]
-            if a2[0] - a1[0] > MAX_SPAN or a2[0] - a1[0] < step_min():
+            span = a2[0] - a1[0]
+            if span > MAX_SPAN or span < step_min():
                 continue
             line = _line(a1, a2)
             if line is None:
                 continue
             k, b = line
-            # противоположная граница: та же slope, offset до крайнего opp в окне
-            lo_i, hi_i = a1[0], a2[0]
-            xs = np.arange(lo_i, hi_i + 1)
+            born = a2[0]
+            a = atr[born] if born < len(atr) and np.isfinite(atr[born]) and atr[born] > 0 else None
+            if a is None:
+                continue
+            if abs(k) > SLOPE_MAX_ATR * a:              # наклон-ракета — не канал
+                continue
+            xs = np.arange(a1[0], a2[0] + 1)
             base = k * xs + b
             if anchor == "high":
-                off = float(np.min(opp_arr[lo_i:hi_i + 1] - base))   # low ниже линии → off<0
+                off = float(np.min(opp_arr[a1[0]:a2[0] + 1] - base))
             else:
-                off = float(np.max(opp_arr[lo_i:hi_i + 1] - base))   # high выше линии → off>0
-            born = a2[0]
-            out.append({"anchor": anchor, "k": k, "b": b, "off": off, "born": born})
-    # дедуп по (born, anchor)
+                off = float(np.max(opp_arr[a1[0]:a2[0] + 1] - base))
+            w = abs(off) / a
+            if w < WIDTH_MIN_ATR or w > WIDTH_MAX_ATR:  # слишком узко/широко
+                continue
+            life = min(LIFE_BARS, int(span * LIFE_SPAN_MULT))
+            out.append({"anchor": anchor, "k": k, "b": b, "off": off, "born": born, "life": life})
     seen, uniq = set(), []
     for ch in out:
         key = (ch["born"], ch["anchor"], round(ch["k"], 6))
@@ -156,7 +169,7 @@ def _scan(ch, h, l, c, atr, ds, ticker):
     """Скан касаний обеих параллельных границ. Причинно: старт с born+STEP."""
     n = len(c)
     start = ch["born"] + SWING_STEP
-    end0 = min(n - 1, ch["born"] + LIFE_BARS)
+    end0 = min(n - 1, ch["born"] + ch["life"])
     if start >= end0:
         return []
     k, b, off = ch["k"], ch["b"], ch["off"]
@@ -284,7 +297,7 @@ def _plot_svg(ticker, o, h, l, c, ds, channels, touches, out, days):
     parts.append(f'<polyline points="{pts}" fill="none" stroke="#58a6ff" stroke-width="1.5"/>')
     # каналы в окне
     for ch in channels:
-        s = ch["born"] + SWING_STEP; e = min(n - 1, ch["born"] + LIFE_BARS)
+        s = ch["born"] + SWING_STEP; e = min(n - 1, ch["born"] + ch["life"])
         if e < i0 or s > i1:
             continue
         s = max(s, i0); e = min(e, i1)
@@ -331,7 +344,7 @@ def main():
         o, h, l, c, ds = data
         atr = _atr(h, l, c, ATR_PERIOD)
         highs, lows = _swings(h, l, SWING_STEP)
-        chs = _build_channels(highs, lows, h, l)
+        chs = _build_channels(highs, lows, h, l, atr)
         tch = []
         for ch in chs:
             tch += _scan(ch, h, l, c, atr, ds, args.plot)
@@ -359,7 +372,7 @@ def main():
         atr = _atr(h, l, c, ATR_PERIOD)
         highs, lows = _swings(h, l, SWING_STEP)
         tk = os.path.basename(p)[:-5]
-        for ch in _build_channels(highs, lows, h, l):
+        for ch in _build_channels(highs, lows, h, l, atr):
             allt += _scan(ch, h, l, c, atr, ds, tk)
         if args.tickers:
             print(f"{tk}: дней {len(c)}, касаний {sum(1 for t in allt if t['ticker']==tk)}")
