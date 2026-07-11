@@ -42,6 +42,12 @@ GT_TAKES = (0.5, 0.7, 1.0)
 GT_STOPS = (0.3, 0.5)
 GT_PORT = (1.0, 0.5)
 
+# Режим --fade: цель = ПРОТИВОПОЛОЖНАЯ граница канала, стоп = пробой входной
+# границы на FADE_STOP ATR. MOM_LOOKBACK — фильтр «двигалась к границе до касания».
+FADE_STOP_ATR = 0.5
+MOM_LOOKBACK = 5
+FADE_HORIZON = 40      # сколько дней ждать доход до противоположной границы
+
 
 def _daily(path):
     """5м-кэш → дневные OHLC (по дате MSK-независимо, берём дату из time[:10])."""
@@ -282,7 +288,36 @@ def _barriers(entry, sgn, a, h, l, c, i, end, cap):
     return grid
 
 
-def _scan(ch, h, l, c, atr, ds, ticker, breakout=False):
+def _fade_barriers(ch, entry, side, h, l, c, atr, i, end):
+    """Твоя гипотеза: отскок от границы идёт до ПРОТИВОПОЛОЖНОЙ границы.
+    TP = противоположная граница (динамическая, канал наклонён), SL = пробой
+    ВХОДНОЙ границы на FADE_STOP ATR. Интрабар first-passage, тай в баре → стоп.
+    P&L в ATR от цены входа (atr[i]). Возвращает (pnl, exit_bar, reached_opposite)."""
+    k, b, off = ch["k"], ch["b"], ch["off"]
+    sgn = 1.0 if side == "support" else -1.0
+    a0 = atr[i]
+    if not (np.isfinite(a0) and a0 > 0):
+        return 0.0, i, False
+    for j in range(i + 1, end + 1):
+        aj = atr[j]
+        if not (np.isfinite(aj) and aj > 0):
+            continue
+        anc = k * j + b
+        upper, lower = max(anc, anc + off), min(anc, anc + off)
+        if side == "support":               # лонг от низа: цель — верх, стоп — под низом
+            tp_price, sl_price = upper, lower - FADE_STOP_ATR * aj
+            hit_sl, hit_tp = l[j] <= sl_price, h[j] >= tp_price
+        else:                                # шорт от верха: цель — низ, стоп — над верхом
+            tp_price, sl_price = lower, upper + FADE_STOP_ATR * aj
+            hit_sl, hit_tp = h[j] >= sl_price, l[j] <= tp_price
+        if hit_sl:
+            return sgn * (sl_price - entry) / a0, j, False
+        if hit_tp:
+            return sgn * (tp_price - entry) / a0, j, True
+    return sgn * (c[end] - entry) / a0, end, False   # таймаут — по закрытию
+
+
+def _scan(ch, h, l, c, atr, ds, ticker, breakout=False, fade=False, mom=MOM_LOOKBACK):
     """Скан касаний обеих параллельных границ. Причинно: старт с born+STEP.
     breakout=True — торгуем ПРОБОЙ по тренду (вход на закрытии за границей на
     BREAK_ATR, тейк в сторону пробоя), а не отскок. Раз рынок ломает каналы чаще
@@ -371,8 +406,19 @@ def _scan(ch, h, l, c, atr, ds, ticker, breakout=False):
                    "result": res or "stall", "date": ds[i], "confirmed": confirmed,
                    "bar": i, "lvl": lvl}
             if confirmed and entry_bar > 0:
-                rec["grid"] = _barriers(c[entry_bar], sgn, atr[entry_bar], h, l, c, entry_bar, end, CAP_BARS)
-                rec["entry_bar"] = entry_bar
+                if fade:
+                    # фильтр «двигалась к границе до касания»: вверх — если это верх
+                    # (resistance), вниз — если низ (support). mom<=0 отключает фильтр.
+                    prev = c[max(0, i - mom)]
+                    mom_ok = (mom <= 0) or (c[i] > prev if side == "resistance" else c[i] < prev)
+                    if mom_ok:
+                        fend = min(n - 1, ch.get("death", i + FADE_HORIZON), entry_bar + FADE_HORIZON)
+                        p, exb, reached = _fade_barriers(ch, c[entry_bar], side, h, l, c, atr, entry_bar, fend)
+                        rec["fade"] = (p, exb, reached)
+                        rec["entry_bar"] = entry_bar
+                else:
+                    rec["grid"] = _barriers(c[entry_bar], sgn, atr[entry_bar], h, l, c, entry_bar, end, CAP_BARS)
+                    rec["entry_bar"] = entry_bar
             touches.append(rec)
             armed, i = False, j + 1
     return touches
@@ -421,6 +467,73 @@ def _gt_portfolio(rows, cost, title):
     if not trades:
         print(f"{title:<28} нет сделок"); return
     print(f"{title:<28} N={trades:<5} exp={pnl/trades:+.3f}  Σ={pnl:+.1f} ATR (тейк{take}/стоп{stop})")
+
+
+def _fade_portfolio(rows, cost, label, quiet=False):
+    """No-overlap по entry_bar. Единая цель — противоположная граница. Возвращает
+    (n, exp, win%, reach%) — reach% = доля, где отскок реально дошёл до неё."""
+    by_tk = {}
+    for r in rows:
+        if "fade" in r:
+            by_tk.setdefault(r["ticker"], []).append(r)
+    n, pnl, wins, reach = 0, 0.0, 0, 0
+    for rs in by_tk.values():
+        rs.sort(key=lambda r: r["entry_bar"])
+        free = -1
+        for r in rs:
+            if r["entry_bar"] <= free:
+                continue
+            p, exb, reached = r["fade"]
+            net = p - cost
+            pnl += net
+            wins += 1 if net > 0 else 0
+            reach += 1 if reached else 0
+            free = exb
+            n += 1
+    exp = pnl / n if n else 0.0
+    wr = 100 * wins / n if n else 0.0
+    rr = 100 * reach / n if n else 0.0
+    if not quiet:
+        print(f"{label:<28} N={n:<5} exp={exp:+.3f}  Σ={pnl:+.1f} ATR  win={wr:.0f}%  дошло-до-против={rr:.0f}%")
+    return n, exp, wr, rr
+
+
+def _fade_report(allt, args):
+    fr = [r for r in allt if "fade" in r]
+    print(f"\n{'='*74}\nFADE: отскок от границы → противоположная граница (mom={args.mom_lookback})")
+    print(f"стоп = пробой входной границы на {FADE_STOP_ATR} ATR; {len(fr)} входов\n{'='*74}")
+    if not fr:
+        print("нет входов — проверь кэш/период (или ослабь фильтр --mom-lookback 0)")
+        return
+    _fade_portfolio(fr, args.cost_atr, "ВСЁ")
+    for sd in ("support", "resistance"):
+        _fade_portfolio([r for r in fr if r["side"] == sd], args.cost_atr,
+                        f"  {'низ→верх (лонг)' if sd == 'support' else 'верх→низ (шорт)'}")
+    print("-- запас прочности по издержкам --")
+    for cst in (0.08, 0.12, 0.16, 0.20):
+        _fade_portfolio(fr, cst, f"cost={cst}")
+    tr = [r for r in fr if r["date"] < args.split_date]
+    te = [r for r in fr if r["date"] >= args.split_date]
+    print(f"-- held-out: train ({len(tr)}) | test≥{args.split_date} ({len(te)}) --")
+    if tr and te:
+        _fade_portfolio(tr, args.cost_atr, "TRAIN")
+        _fade_portfolio(te, args.cost_atr, "TEST (held-out)")
+    # ранжир по тикерам (по held-out test exp)
+    by = {}
+    for r in fr:
+        by.setdefault(r["ticker"], []).append(r)
+    rk = []
+    for tk, rs in by.items():
+        te2 = [r for r in rs if r["date"] >= args.split_date]
+        n, exp, wr, rr = _fade_portfolio(rs, args.cost_atr, tk, quiet=True)
+        tn, texp, twr, trr = _fade_portfolio(te2, args.cost_atr, tk, quiet=True) if te2 else (0, 0.0, 0.0, 0.0)
+        if n:
+            rk.append((tk, n, exp, wr, rr, tn, texp))
+    rk.sort(key=lambda x: (x[6], x[2]), reverse=True)
+    print(f"\n-- ранжир по тикерам (топ-30 из {len(rk)}, по held-out test exp) --")
+    print(f"{'тикер':<10}{'N':>5}{'exp':>8}{'win%':>6}{'reach%':>8}  |{'testN':>6}{'test_exp':>10}")
+    for tk, n, exp, wr, rr, tn, texp in rk[:30]:
+        print(f"{tk:<10}{n:>5}{exp:>+8.3f}{wr:>5.0f}%{rr:>7.0f}%  |{tn:>6}{texp:>+10.3f}")
 
 
 def _plot_svg(ticker, o, h, l, c, ds, channels, touches, out, days):
@@ -482,6 +595,10 @@ def main():
                     help="регрессионные каналы (МНК + перцентильные полосы) вместо свинг-анкеров")
     ap.add_argument("--breakout", action="store_true",
                     help="торговать ПРОБОЙ канала по тренду, а не отскок")
+    ap.add_argument("--fade", action="store_true",
+                    help="отскок от границы с целью на ПРОТИВОПОЛОЖНОЙ границе (гипотеза юзера)")
+    ap.add_argument("--mom-lookback", type=int, default=MOM_LOOKBACK,
+                    help="фильтр 'двигалась к границе' за N дней (0 = выключить)")
     args = ap.parse_args()
     MAX_SPAN = args.max_span
 
@@ -499,7 +616,8 @@ def main():
             chs = _build_channels(highs, lows, h, l, c, atr)
         tch = []
         for ch in chs:
-            tch += _scan(ch, h, l, c, atr, ds, args.plot, breakout=args.breakout)
+            tch += _scan(ch, h, l, c, atr, ds, args.plot, breakout=args.breakout,
+                         fade=args.fade, mom=args.mom_lookback)
         _plot_svg(args.plot, o, h, l, c, ds, chs, tch, args.plot_out, args.plot_days)
         return
 
@@ -529,12 +647,17 @@ def main():
             highs, lows = _swings(h, l, SWING_STEP)
             built = _build_channels(highs, lows, h, l, c, atr)
         for ch in built:
-            allt += _scan(ch, h, l, c, atr, ds, tk, breakout=args.breakout)
+            allt += _scan(ch, h, l, c, atr, ds, tk, breakout=args.breakout,
+                          fade=args.fade, mom=args.mom_lookback)
         if args.tickers:
             print(f"{tk}: дней {len(c)}, касаний {sum(1 for t in allt if t['ticker']==tk)}")
 
     if not allt:
         raise SystemExit("касаний нет — мало дневных баров? нужен кэш с историей")
+
+    if args.fade:
+        _fade_report(allt, args)
+        return
 
     hdr = f"{'':<22}{'N':>7}{'bounce%':>9}{'break%':>9}{'stall%':>9}"
     print(f"\n{'='*70}\nДНЕВНЫЕ ПАРАЛЛЕЛЬНЫЕ КАНАЛЫ (max-span={MAX_SPAN}д) — {len(allt)} касаний\n{'='*70}")
