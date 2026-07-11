@@ -282,8 +282,11 @@ def _barriers(entry, sgn, a, h, l, c, i, end, cap):
     return grid
 
 
-def _scan(ch, h, l, c, atr, ds, ticker):
-    """Скан касаний обеих параллельных границ. Причинно: старт с born+STEP."""
+def _scan(ch, h, l, c, atr, ds, ticker, breakout=False):
+    """Скан касаний обеих параллельных границ. Причинно: старт с born+STEP.
+    breakout=True — торгуем ПРОБОЙ по тренду (вход на закрытии за границей на
+    BREAK_ATR, тейк в сторону пробоя), а не отскок. Раз рынок ломает каналы чаще
+    (break 52.6% > bounce 44.3%) — проверяем обратную ставку."""
     n = len(c)
     start = ch["born"] + SWING_STEP
     end0 = min(n - 1, ch.get("death", ch["born"] + ch["life"]))
@@ -317,6 +320,31 @@ def _scan(ch, h, l, c, atr, ds, ticker):
             confirmed, entry_bar, res = False, -1, ""
             end = min(n - 1, i + CAP_BARS)
             j = i
+            if breakout:
+                # ждём ПРОБОЙ границы (away ≤ −BREAK): вход по тренду пробоя, sgn_b=−sgn.
+                # если раньше отскочило (away ≥ BOUNCE) — пробоя нет, сделки нет.
+                while j <= end:
+                    aj = atr[j]
+                    if not (np.isfinite(aj) and aj > 0):
+                        j += 1; continue
+                    away = sgn * (c[j] - lvl) / aj
+                    if away <= -BREAK_ATR:
+                        entry_bar = j; res = "break"; break
+                    if away >= BOUNCE_ATR:
+                        res = "bounce"; break
+                    if j >= end:
+                        res = "stall"; break
+                    j += 1
+                rec = {"ticker": ticker, "anchor": ch["anchor"], "which": which, "side": side,
+                       "result": res or "stall", "date": ds[i], "confirmed": res == "break",
+                       "bar": i, "lvl": lvl}
+                if res == "break" and entry_bar > 0:
+                    sgn_b = -sgn   # продолжение пробоя: support-пробой → шорт, resist-пробой → лонг
+                    rec["grid"] = _barriers(c[entry_bar], sgn_b, atr[entry_bar], h, l, c, entry_bar, end, CAP_BARS)
+                    rec["entry_bar"] = entry_bar
+                touches.append(rec)
+                armed, i = False, (entry_bar if entry_bar > 0 else j) + 1
+                continue
             while j <= end:
                 aj = atr[j]
                 if not (np.isfinite(aj) and aj > 0):
@@ -452,6 +480,8 @@ def main():
     ap.add_argument("--plot-days", type=int, default=160)
     ap.add_argument("--reg", action="store_true",
                     help="регрессионные каналы (МНК + перцентильные полосы) вместо свинг-анкеров")
+    ap.add_argument("--breakout", action="store_true",
+                    help="торговать ПРОБОЙ канала по тренду, а не отскок")
     args = ap.parse_args()
     MAX_SPAN = args.max_span
 
@@ -469,7 +499,7 @@ def main():
             chs = _build_channels(highs, lows, h, l, c, atr)
         tch = []
         for ch in chs:
-            tch += _scan(ch, h, l, c, atr, ds, args.plot)
+            tch += _scan(ch, h, l, c, atr, ds, args.plot, breakout=args.breakout)
         _plot_svg(args.plot, o, h, l, c, ds, chs, tch, args.plot_out, args.plot_days)
         return
 
@@ -499,7 +529,7 @@ def main():
             highs, lows = _swings(h, l, SWING_STEP)
             built = _build_channels(highs, lows, h, l, c, atr)
         for ch in built:
-            allt += _scan(ch, h, l, c, atr, ds, tk)
+            allt += _scan(ch, h, l, c, atr, ds, tk, breakout=args.breakout)
         if args.tickers:
             print(f"{tk}: дней {len(c)}, касаний {sum(1 for t in allt if t['ticker']==tk)}")
 
