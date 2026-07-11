@@ -115,8 +115,8 @@ BREAK_OUT_ATR = 0.50   # цена ушла за границу глубже X AT
 FWD_SPAN_MULT = 0.75   # проекция вперёд не длиннее формирования*MULT — иначе луч в пустоту
 TREND_FWD_MULT = 0.6   # трендовые линии тянем вперёд (в этом смысл канала), но не в пустоту
 TREND_FWD_MAX_D = 14   # абсолютный потолок проекции вперёд (дней) — чтобы не улетало лучом
-SLOPE_PAIR_TOL = 0.08  # верх и низ образуют канал, только если наклоны БЛИЗКИ (ATR/день)
-CONTAIN_MIN = 0.72     # доля close между линиями в окне формирования — иначе не коридор
+SLOPE_PAIR_TOL = 0.25  # верх и низ образуют канал, только если наклоны близки (ATR/день)
+CONTAIN_MIN = 0.62     # доля close между линиями в окне формирования — иначе не коридор
 BREAK_HARD_ATR = 0.5   # прокол границы глубже этого (ATR) — слом, начинаем НОВЫЙ канал;
                        # мельче — подправляем линию по новой точке (канал жив, «но не слишком»)
 MIN_TOUCHES = 2        # цена должна ПОДХОДИТЬ к КАЖДОЙ границе ≥ этого числа раз (подтверждённый коридор)
@@ -812,6 +812,7 @@ def _channels_for(h, l, c, atr, args):
 
 def main():
     global MAX_SPAN, SLOPE_MAX_ATR, MIN_TOUCHES, BREAK_HARD_ATR
+    global SLOPE_PAIR_TOL, CONTAIN_MIN, TREND_FWD_MAX_D, WIDTH_MAX_ATR
     ap = argparse.ArgumentParser(description="Дневные параллельные каналы (спека пользователя)")
     ap.add_argument("--cache", default=os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                                     "data", "candle_cache"))
@@ -843,11 +844,27 @@ def main():
     ap.add_argument("--break-hard", type=float, default=BREAK_HARD_ATR,
                     help="глубина прокола (ATR), после которой канал ломается и начинается новый; "
                          "меньше = чаще новые каналы (плотнее), больше = один канал тянется дольше")
+    ap.add_argument("--slope-pair", type=float, default=SLOPE_PAIR_TOL,
+                    help="макс. разница наклонов верх/низ (ATR/день): больше = ловит больше каналов, но линии могут расходиться")
+    ap.add_argument("--contain", type=float, default=CONTAIN_MIN,
+                    help="мин. доля close между линиями (0..1): меньше = терпимее к проколам")
+    ap.add_argument("--max-slope", type=float, default=0.0,
+                    help="потолок наклона трендовой линии (ATR/день); 0 = по типу канала (trend=1.0)")
+    ap.add_argument("--fwd-max", type=int, default=TREND_FWD_MAX_D,
+                    help="на сколько дней максимум продлять канал вперёд (меньше = короче лучи)")
+    ap.add_argument("--max-width", type=float, default=WIDTH_MAX_ATR,
+                    help="макс. ширина канала в ATR")
     args = ap.parse_args()
     MAX_SPAN = args.max_span
-    SLOPE_MAX_ATR = {"flat": 0.06, "gentle": 0.15, "any": 0.30, "trend": 0.60, "pair": 0.60}[args.channel]
+    SLOPE_MAX_ATR = {"flat": 0.06, "gentle": 0.15, "any": 0.30, "trend": 1.0, "pair": 0.60}[args.channel]
+    if args.max_slope > 0:
+        SLOPE_MAX_ATR = args.max_slope
     MIN_TOUCHES = args.min_touches
     BREAK_HARD_ATR = args.break_hard
+    SLOPE_PAIR_TOL = args.slope_pair
+    CONTAIN_MIN = args.contain
+    TREND_FWD_MAX_D = args.fwd_max
+    WIDTH_MAX_ATR = args.max_width
 
     if args.plot:
         p = os.path.join(args.cache, f"{args.plot}.json")
