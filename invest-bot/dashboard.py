@@ -1057,6 +1057,37 @@ def _wire_backtest_providers(strategy, ticker: str, days: int, offset_days: int 
         pass
 
 
+def _system_candles(ticker, settings, days: int):
+    """Свечи для системного прогона БЕЗ цепочки контрактов. Цепочный вариант
+    (_get_backtest_candles → get_candles_cached_futures_chain) на cache-miss
+    дёргает futures_chain_by_figi → live API, который в этом окружении падает
+    ('Client' has no attribute 'market_data') И ВЫБРАСЫВАЕТ уже готовый кэш —
+    отсюда ложное «нет свечей». Здесь прямой get_candles_cached (локальный
+    кэш + D1, тот же путь, что у get_trade_chart и обычного бэктеста), с
+    финальным падением на ЧИСТЫЙ локальный кэш без сети."""
+    figi = settings.figi
+    interval = 5 if getattr(settings, "is_future", False) else getattr(settings, "candle_interval_min", 5)
+    try:
+        c = get_candles_cached(ticker, figi, days, _market_data, _db, candle_interval_min=interval)
+        if c:
+            return c
+    except Exception as e:
+        logger.info("system_backtest: get_candles_cached(%s) упал (%s) — пробую локальный кэш", ticker, e)
+    try:
+        from candle_archive import _load_local, _row_to_candle
+        rows = _load_local(ticker, interval)
+        if rows:
+            cutoff = (datetime.datetime.now(datetime.timezone.utc)
+                      - datetime.timedelta(days=days)).isoformat()
+            rows = [r for r in rows if r.get("time", "") >= cutoff]
+            cs = [_row_to_candle(r) for r in rows]
+            cs.sort(key=lambda x: x.time)
+            return cs
+    except Exception as e:
+        logger.info("system_backtest: локальный кэш %s недоступен (%s)", ticker, e)
+    return []
+
+
 def run_system_backtest(days: int = 90, split_frac: float = 0.6,
                         cost_atr: float = 0.12, tickers: list | None = None) -> dict:
     """СИСТЕМНЫЙ ПРОГОН: каждый тикер через ЖИВУЮ стратегию (composite/accel/NW),
@@ -1095,7 +1126,7 @@ def run_system_backtest(days: int = 90, split_frac: float = 0.6,
             # на части инструментов падает (напр. тонкие фьючерсы без кэша). Это
             # НЕ ошибка прогона — тикер просто пропускаем (нет данных для оценки).
             try:
-                candles = _get_backtest_candles(ticker, settings, days)
+                candles = _system_candles(ticker, settings, days)
             except Exception as cx:
                 rows.append({"ticker": ticker, "strategy": live_name,
                              "skipped": "нет свечей в кэше"})
