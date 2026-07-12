@@ -236,6 +236,24 @@
     renderRows();
   }
 
+  // Рисование НАТИВНЫМИ инструментами TradingView — фигуры привязаны к цене/времени
+  // и масштабируются/двигаются вместе с графиком. selectLineTool переводит график
+  // в режим рисования, дальше пользователь рисует мышью, TV сам считает координаты.
+  function drawTool(t) {
+    if (!S.chart) { status('график не готов'); return; }
+    if (t === '__clear') {
+      if (confirm('Стереть ВСЮ разметку на графике (включая стрелки-сигналы расширения)?')) {
+        try { S.chart.removeAllShapes(); } catch (e) {}
+        S.drawn = {};
+      }
+      return;
+    }
+    try {
+      if (typeof S.chart.selectLineTool === 'function') S.chart.selectLineTool(t);
+      else status('в этой сборке рисование через API недоступно');
+    } catch (e) { status('рисование: ' + (e && e.message || e)); }
+  }
+
   // ── панель ───────────────────────────────────────────────────────────────────
   let panel, rowsEl, statusEl;
   function build() {
@@ -244,6 +262,17 @@
       '<div id="tvsig-head"><span id="tvsig-title">◆ Сигнальные модели</span>' +
       '<button id="tvsig-refresh" title="Пересчитать">⟳</button>' +
       '<button id="tvsig-min" title="Свернуть">–</button></div>' +
+      '<div id="tvsig-draw">' +
+      '<button class="tvsig-dt" data-t="cursor" title="Курсор — выйти из режима рисования">➤</button>' +
+      '<button class="tvsig-dt" data-t="horizontal_line" title="Горизонтальный уровень">━</button>' +
+      '<button class="tvsig-dt" data-t="horizontal_ray" title="Луч-уровень (от точки вправо)">┅</button>' +
+      '<button class="tvsig-dt" data-t="trend_line" title="Трендлиния">╱</button>' +
+      '<button class="tvsig-dt" data-t="ray" title="Луч">→</button>' +
+      '<button class="tvsig-dt" data-t="parallel_channel" title="Канал (параллели)">▱</button>' +
+      '<button class="tvsig-dt" data-t="rectangle" title="Прямоугольник (зона)">▭</button>' +
+      '<button class="tvsig-dt" data-t="brush" title="Свободное рисование">✎</button>' +
+      '<button class="tvsig-dt danger" data-t="__clear" title="Стереть ВСЮ разметку на графике">🗑</button>' +
+      '</div>' +
       '<div id="tvsig-status">инициализация…</div>' +
       '<div id="tvsig-rows"></div>' +
       '<div id="tvsig-oi"><div id="tvsig-oi-head">📊 Открытый интерес' +
@@ -255,6 +284,7 @@
     document.documentElement.appendChild(panel);
     rowsEl = panel.querySelector('#tvsig-rows'); statusEl = panel.querySelector('#tvsig-status');
     panel.querySelector('#tvsig-refresh').onclick = () => refresh(true);
+    panel.querySelectorAll('.tvsig-dt').forEach(btn => btn.onclick = () => drawTool(btn.dataset.t));
     panel.querySelector('#tvsig-oi-load').onclick = () => oiLoad();
     panel.querySelector('#tvsig-oi-tk').addEventListener('keydown', e => { if (e.key === 'Enter') { S._oiSeeded = null; oiLoad(); } });
     const keyBtn = panel.querySelector('#tvsig-oi-key');

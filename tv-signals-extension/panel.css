@@ -8,6 +8,11 @@
 #tvsig-title{ flex:1; font-size:11px; font-weight:600; color:#c9c3e6; }
 #tvsig-head button{ width:22px; height:22px; border-radius:6px; cursor:pointer; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); color:#d6d2e8; font-size:13px; }
 #tvsig-head button:hover{ background:rgba(255,255,255,0.12); }
+#tvsig-draw{ display:flex; gap:3px; flex-wrap:wrap; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06); }
+#tvsig-draw .tvsig-dt{ width:26px; height:24px; border-radius:6px; cursor:pointer; font-size:13px; line-height:1;
+  border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); color:#d6d2e8; display:flex; align-items:center; justify-content:center; }
+#tvsig-draw .tvsig-dt:hover{ background:rgba(122,92,255,0.22); border-color:rgba(122,92,255,0.5); color:#fff; }
+#tvsig-draw .tvsig-dt.danger:hover{ background:rgba(255,77,122,0.2); border-color:rgba(255,77,122,0.5); }
 #tvsig-status{ padding:5px 10px; font-size:10px; color:#8b84ac; border-bottom:1px solid rgba(255,255,255,0.05); }
 #tvsig-rows{ padding:4px; max-height:340px; overflow:auto; }
 .tvsig-row{ display:flex; align-items:center; gap:7px; padding:5px 6px; border-radius:7px; }
