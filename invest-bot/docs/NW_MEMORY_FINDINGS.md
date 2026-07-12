@@ -6,10 +6,12 @@
 чистка убирает балласт из существующих 40+ методов, а тут строится
 **новый** метод. Не конфликтуют.
 
-Статус: **прототип валидирован walk-forward; заведён в бот как
-`NWMemoryStrategy` (в фабрике), но в живом конфиге не активирован** —
-`STRATEGY_OVERRIDE` пока на `AccelFadeStrategy`. Активация — вручную (см.
-раздел «Что дальше», п.2).
+Статус: **валидирован walk-forward; заведён в бот как `NWMemoryStrategy` и
+АКТИВИРОВАН** на неликвидных фьючерсах жёстким разделением по ликвидности.
+`STRATEGY_OVERRIDE` остаётся `AccelFadeStrategy` (дефолт всего фронта), а
+секция `[FUTURES_STRATEGY_MAP]` перебивает его для IRAO/PLZL → NWMemoryStrategy
+(реальные ордера, `[FUTURES_DEFAULTS]` SIGNAL_ONLY=0). Стратегии НЕ смешиваются:
+у каждой свой валидированный вход/выход; accel на ликвиде, NW на неликвиде.
 
 ---
 
@@ -194,10 +196,16 @@ python nw_memory.py --batch --tickers ALL --quadrant-only --zone lowT_lowP \
    мерился офлайн-эдж; тейк/стоп широкие (3 ATR) — только страховка, НЕ
    торговый выход (чтобы не повторить entry-accounting-ошибку уровней).
    Smoke: `smoke_nw_memory.py` (фабрика→прогрев→build→score→analyze + прямой
-   тест ветки голоса). **Активация:** снять `STRATEGY_OVERRIDE` и завести
-   per-ticker `STRATEGY_NAME=NWMemoryStrategy` c `SIGNAL_ONLY=1` на выбранных
-   НЕликвидных именах (там эдж сильнее; на ликвиде p_hold≈0.5 → голос≈0 сам).
-   Прод-ордера (`SIGNAL_ONLY=0`) — только после наблюдения sandbox-сигналов.
+   тест ветки голоса). **АКТИВИРОВАНО** жёстким разделением по ликвидности:
+   секция `[FUTURES_STRATEGY_MAP]` в settings.ini (TICKER=ИмяСтратегии)
+   перебивает глобальный `STRATEGY_OVERRIDE` только для перечисленных базовых
+   тикеров. Сейчас `IRAO`/`PLZL` → NWMemoryStrategy (единственные из
+   BASE_TICKERS с положительным walk-forward holdout; SBER-класс исключён),
+   остальной фронт остаётся на AccelFadeStrategy. Ордера реальные
+   (`[FUTURES_DEFAULTS]` SIGNAL_ONLY=0). Механизм роутинга — `strategy_map` в
+   `FuturesTradingSettings`, лукап в `trader.__build_futures_strategies` (карта
+   > override > дефолт). Расширять набор NW — только после per-ticker holdout
+   по своему кэшу (`nw_memory.py --batch`), не на глаз: реальные деньги.
 3. **Режимный слой §11.4** (D_regime) — вес соседа × близость макро-
    контекста (T_macro/P_macro уже в датасете, не используются).
 4. **Свечной case-track §5.4** — паттерны как отдельный трек памяти для

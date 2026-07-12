@@ -75,6 +75,14 @@ class ProgramConfiguration:
             # полная обратная совместимость для конфигов без новой секции.
             ma = self.__mega_alerts_settings
             fd = config["FUTURES_DEFAULTS"] if "FUTURES_DEFAULTS" in config else {}
+            # Пер-тикерная карта стратегий: [FUTURES_STRATEGY_MAP] TICKER=Name.
+            # Ключи в UPPERCASE (лукап по base_ticker.upper()); перебивает
+            # STRATEGY_OVERRIDE только для этих тикеров.
+            strat_map = {}
+            if "FUTURES_STRATEGY_MAP" in config:
+                for _tk, _name in config["FUTURES_STRATEGY_MAP"].items():
+                    if _name.strip():
+                        strat_map[_tk.strip().upper()] = _name.strip()
             self.__futures_trading_settings = FuturesTradingSettings(
                 enabled=ft.get("ENABLED", "0") == "1",
                 base_tickers=base_tickers,
@@ -86,6 +94,7 @@ class ProgramConfiguration:
                 short_stop=fd.get("SHORT_STOP", ma.short_stop),
                 signal_only=fd.get("SIGNAL_ONLY", ma.signal_only),
                 max_lots_per_order=int(fd.get("MAX_LOTS_PER_ORDER", ma.max_lots_per_order)),
+                strategy_map=strat_map,
             )
         else:
             self.__futures_trading_settings = FuturesTradingSettings()

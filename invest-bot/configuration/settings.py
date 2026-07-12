@@ -85,6 +85,13 @@ class FuturesTradingSettings:
     short_stop: str = "1.015"
     signal_only: str = "1"
     max_lots_per_order: int = 1
+    # Пер-тикерная карта «базовый тикер → имя стратегии» (секция
+    # [FUTURES_STRATEGY_MAP]). Перебивает глобальный STRATEGY_OVERRIDE ТОЛЬКО
+    # для перечисленных тикеров — остальные фьючерсы идут по override/дефолту.
+    # Так accel-fade остаётся дефолтом на всём фронте, а отдельные неликвидные
+    # имена уходят на NWMemoryStrategy (жёсткое разделение по ликвидности).
+    # Ключи хранятся в UPPERCASE, лукап — по base_ticker.upper().
+    strategy_map: dict = field(default_factory=dict)
 
 
 @dataclass(eq=False, repr=True)

@@ -3206,8 +3206,14 @@ class Trader:
                 }
                 max_lots_per_order = ft_cfg.max_lots_per_order
 
+            # Пер-тикерная карта стратегий перебивает глобальный override ТОЛЬКО
+            # для перечисленных базовых тикеров (жёсткое разделение по ликвидности:
+            # неликвид → NWMemoryStrategy, остальные — по override/дефолту).
+            strat_name = (ft_cfg.strategy_map.get(base_ticker.upper())
+                          or self.__trading_settings.strategy_override
+                          or "OICompositeStrategy")
             settings = StrategySettings(
-                name=self.__trading_settings.strategy_override or "OICompositeStrategy",
+                name=strat_name,
                 figi=figi,
                 ticker=future_settings.ticker,
                 max_lots_per_order=max_lots_per_order,
