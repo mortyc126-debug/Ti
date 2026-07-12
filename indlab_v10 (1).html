@@ -2867,10 +2867,10 @@ const IND_GROUPS = [
     ]
   },
   {
-    id: 'strategy', label: 'Из стратегии бота',
+    id: 'strategy', label: 'Сигнальные модели',
     items: [
       { id:'strat_nw', name:'NW-память (T/P/color)', full:'Nadaraya-Watson память микросостояния',
-        desc:'Память ближайших соседей ПО ТИКЕРУ в пространстве 3 осей бара: T (температура = объём×размах/ATR), P (давление = efficiency ratio Кауфмана), color (сглаженное ускорение). В тихо-направленном квадранте (низкая T + высокая P) ищет исторические бары в том же (T,P,color), взвешивает гауссовым ядром и считает p_hold — вероятность продолжения хода на 12 баров. Голос = 2·p_hold−1. По walk-forward: 20/29 тикеров edge>0 на holdout, медиана +0.26 ATR; сильнее на неликвиде, SBER-класс инвертирован. Живёт в боте на IRAO/PLZL.',
+        desc:'Память ближайших соседей ПО ТИКЕРУ в пространстве 3 осей бара: T (температура = объём×размах/ATR), P (давление = efficiency ratio Кауфмана), color (сглаженное ускорение). В тихо-направленном квадранте (низкая T + высокая P) ищет исторические бары в том же (T,P,color), взвешивает гауссовым ядром и считает p_hold — вероятность продолжения хода на 12 баров. Голос = 2·p_hold−1. По walk-forward: 20/29 тикеров edge>0 на holdout, медиана +0.26 ATR; сильнее на неликвиде, SBER-класс инвертирован. Проверен на IRAO/PLZL.',
         params:[{id:'phold',label:'p_hold (вероятность продолжения)',min:0,max:1,def:0.5,step:0.01}],
         interpret: v => {
           const g = 2*v.phold-1;
@@ -2880,7 +2880,7 @@ const IND_GROUPS = [
         }
       },
       { id:'strat_accel', name:'Accel-fade (фейд климакса)', full:'Фейд аномального ускорения по тренду',
-        desc:'Аномальное ускорение цены ПО тренду — это климакс, за которым разворот. Вход ПРОТИВ ускорения (fade). Аномалия = |accel| / недавняя типичная |accel| (робастная EWM-норма). Умеренное ускорение не трогаем. Тейк/стоп 1.0/0.3 ATR от цены входа, фильтр новостей по объёму (спайк с объёмом ≥3× нормы — репрайс, пропуск). По гонтлету: нетто +0.15 ATR/сделку (cost 0.12), test≥train (не подгонка), эдж живёт в тейке 1.0. Живёт в боте на ликвидном фронте фьючерсов.',
+        desc:'Аномальное ускорение цены ПО тренду — это климакс, за которым разворот. Вход ПРОТИВ ускорения (fade). Аномалия = |accel| / недавняя типичная |accel| (робастная EWM-норма). Умеренное ускорение не трогаем. Тейк/стоп 1.0/0.3 ATR от цены входа, фильтр новостей по объёму (спайк с объёмом ≥3× нормы — репрайс, пропуск). По гонтлету: нетто +0.15 ATR/сделку (cost 0.12), test≥train (не подгонка), эдж живёт в тейке 1.0. Работает на ликвидном фронте фьючерсов.',
         params:[{id:'anom',label:'Аномалия ускорения (× нормы)',min:0,max:6,def:1,step:0.1}],
         interpret: v => {
           if (v.anom>=2) return {s:'sell-strong',t:`Аномалия ${v.anom.toFixed(1)}× по тренду — климакс. Фейд: вход ПРОТИВ ускорения (если тренд вверх → шорт).`};
@@ -15117,7 +15117,7 @@ const _IL_GROUPS = [
   { label: 'Структура / цикл',              color: '#6366F1', ids: ['ichimoku','alligator','zigzag','fractals','dpo','chop','vortex','cyber_cycle','mama','ebs','ssa'] },
   { label: 'Продвинутая статистика / DSP',  color: '#7A8CFF', ids: ['nw','kalman','gpr','cusum','tmf','cum_delta','bb_pct'] },
   { label: 'Режим рынка (без винрейта)',    color: '#9090BB', ids: ['hmm','hurst','mprof','te','rough','frac_dim','efficiency_ratio','entropy'] },
-  { label: 'Из стратегии бота',             color: '#FF6EC7', ids: ['strat_zscore','strat_accel','strat_order_block','strat_fvg','strat_liq_sweep','strat_false_breakout','strat_vsa_abs','strat_waning','strat_talib_anti','strat_hawkes','strat_cascade','strat_nw'] },
+  { label: 'Сигнальные модели',             color: '#FF6EC7', ids: ['strat_zscore','strat_accel','strat_order_block','strat_fvg','strat_liq_sweep','strat_false_breakout','strat_vsa_abs','strat_waning','strat_talib_anti','strat_hawkes','strat_cascade','strat_nw'] },
 ];
 
 // Показывает/скрывает и стилизует alt-ромбики — вызывается после того как
