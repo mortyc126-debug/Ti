@@ -8,7 +8,9 @@
     let d; try { d = JSON.parse(e.detail); } catch (_) { return; }
     const res = { id: d.id };
     try {
-      const r = await fetch(d.url, { credentials: 'omit' });
+      const opt = { credentials: 'omit' };
+      if (d.headers) opt.headers = d.headers;   // напр. Authorization: Bearer <MOEX-токен>
+      const r = await fetch(d.url, opt);
       if (!r.ok) { res.ok = false; res.error = 'HTTP ' + r.status; }
       else { res.ok = true; res.json = await r.text(); }
     } catch (err) { res.ok = false; res.error = String(err && err.message || err); }

@@ -28,36 +28,112 @@
   const OI_BASE_DEF = 'https://oi.marginacall.workers.dev';
   function oiBase() { try { return localStorage.getItem('tvsig:oibase') || OI_BASE_DEF; } catch (e) { return OI_BASE_DEF; } }
   // мост в isolated-world (oi-bridge.js) — обход CSP терминала на фетч воркера
-  function oiFetch(url) {
+  function oiFetch(url, headers) {
     return new Promise(resolve => {
       const id = 'oi' + Math.random().toString(36).slice(2);
       function onRes(e) { let r; try { r = JSON.parse(e.detail); } catch (_) { return; } if (r.id !== id) return; window.removeEventListener('tvsig:oi:res', onRes); resolve(r); }
       window.addEventListener('tvsig:oi:res', onRes);
-      window.dispatchEvent(new CustomEvent('tvsig:oi:req', { detail: JSON.stringify({ id, url }) }));
-      setTimeout(() => { window.removeEventListener('tvsig:oi:res', onRes); resolve({ ok: false, error: 'timeout' }); }, 9000);
+      window.dispatchEvent(new CustomEvent('tvsig:oi:req', { detail: JSON.stringify({ id, url, headers: headers || null }) }));
+      setTimeout(() => { window.removeEventListener('tvsig:oi:res', onRes); resolve({ ok: false, error: 'timeout' }); }, 12000);
     });
   }
+  // токен AlgoPack (MOEX) — хранится локально, шлётся ТОЛЬКО в apim.moex.com
+  function oiTokenGet() { try { return localStorage.getItem('tvsig:moextoken') || ''; } catch (e) { return ''; } }
+  function oiTokenSet(v) { try { v ? localStorage.setItem('tvsig:moextoken', v) : localStorage.removeItem('tvsig:moextoken'); } catch (e) {} }
+  // ISS columnar {columns,data} → массив объектов
+  function issToObjects(block) {
+    if (!block || !block.columns || !block.data) return [];
+    return block.data.map(row => { const o = {}; block.columns.forEach((c, i) => o[c] = row[i]); return o; });
+  }
+  // Живой снэпшот физ/юр по контракту напрямую из AlgoPack (нужен токен).
+  // Возвращает {ok, snap:{ts,fl,fs,yl,ys}, syms} или {ok:false, error, syms}.
+  async function oiLiveSnap(candidates) {
+    const tok = oiTokenGet(); if (!tok) return { ok: false, error: 'no-token' };
+    const url = 'https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?iss.meta=off&limit=5000';
+    const r = await oiFetch(url, { Authorization: 'Bearer ' + tok });
+    if (!r.ok) return { ok: false, error: r.error || 'fetch' };
+    let j; try { j = JSON.parse(r.json); } catch (_) { return { ok: false, error: 'parse' }; }
+    const key = Object.keys(j).find(k => k !== 'metadata' && k !== 'history') || 'futoi';
+    const rows = issToObjects(j[key]);
+    const syms = [...new Set(rows.map(o => String(o.ticker || '').toUpperCase()))];
+    // ищем sym среди кандидатов (полный код, 2-буквенный, и то что вернул сервер)
+    let pick = null;
+    for (const c of candidates) { const cu = c.toUpperCase(); if (syms.indexOf(cu) >= 0) { pick = cu; break; }
+      const hit = syms.find(s => cu.indexOf(s) === 0 || s.indexOf(cu) === 0); if (hit) { pick = hit; break; } }
+    if (!pick) return { ok: false, error: 'sym-not-found', syms };
+    const grp = {};
+    for (const o of rows) { if (String(o.ticker).toUpperCase() !== pick) continue; const g = String(o.clgroup || '').toUpperCase(); if (g === 'YUR' || g === 'FIZ') grp[g] = o; }
+    const Y = grp.YUR || {}, F = grp.FIZ || {};
+    const snap = { ts: Math.floor(Date.now() / 1000),
+      yl: +(Y.pos_long || 0), ys: Math.abs(+(Y.pos_short || 0)), fl: +(F.pos_long || 0), fs: Math.abs(+(F.pos_short || 0)) };
+    return { ok: true, snap: { ts: snap.ts, fl: snap.fl, fs: snap.fs, yl: snap.yl, ys: snap.ys }, sym: pick };
+  }
+  // накопленная live-серия по контракту (localStorage) — из неё Δ по региону
+  function oiAccKey(sym) { return 'tvsig:oiacc:' + sym; }
+  function oiAccLoad(sym) { try { return JSON.parse(localStorage.getItem(oiAccKey(sym)) || '[]'); } catch (e) { return []; } }
+  function oiAccPush(sym, snap) {
+    let arr = oiAccLoad(sym);
+    if (arr.length && Math.abs(arr[arr.length - 1].ts - snap.ts) < 60) arr[arr.length - 1] = snap; // тот же снэпшот
+    else arr.push(snap);
+    if (arr.length > 600) arr = arr.slice(-600);
+    try { localStorage.setItem(oiAccKey(sym), JSON.stringify(arr)); } catch (e) {}
+    return arr;
+  }
   function oiNormalize(r) {
-    return { date: r.tradedate || r.date || r.timestamp || '',
-      ts: (Date.parse(String(r.tradedate || r.date || '').replace(' ', 'T')) / 1000) || 0,
-      fl: +(r.fiz_long || 0), fs: +(r.fiz_short || 0), yl: +(r.yur_long || 0), ys: +(r.yur_short || 0) };
+    let ts, label;
+    if (r.ts != null) { ts = Number(r.ts) / 1000; const d = new Date(ts * 1000); // oi_hourly: 5-мин, unix ms
+      label = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+    else { ts = (Date.parse(String(r.tradedate || r.date || '').replace(' ', 'T')) / 1000) || 0; label = r.tradedate || r.date || ''; }
+    return { date: label, ts, fl: +(r.fiz_long || 0), fs: +(r.fiz_short || 0), yl: +(r.yur_long || 0), ys: +(r.yur_short || 0) };
+  }
+  function oiCands() {
+    let sym = ''; try { sym = S.chart.symbol(); } catch (e) {}
+    const ov = ((document.getElementById('tvsig-oi-tk') || {}).value || '').trim().toUpperCase();
+    const cands = []; if (ov) cands.push(ov);
+    if (sym) { const u = sym.toUpperCase(); if (cands.indexOf(u) < 0) cands.push(u); const m = u.match(/^([A-Z]{2})/); if (m && cands.indexOf(m[1]) < 0) cands.push(m[1]); }
+    return cands;
+  }
+  async function oiWorkerSeries(cands) { // архив из воркера (5-мин oihourly → дневной)
+    for (const c of cands) for (const ep of [['oihourly', '&days=30', '5-мин'], ['oidaily', '', 'день']]) {
+      const r = await oiFetch(oiBase() + '/db/' + ep[0] + '?ticker=' + encodeURIComponent(c) + ep[1]);
+      if (!r.ok) continue;
+      let arr; try { const j = JSON.parse(r.json); arr = Array.isArray(j) ? j : (j.rows || j.data || []); } catch (_) { arr = []; }
+      const norm = arr.map(oiNormalize).filter(x => x.ts);
+      if (norm.length) return { rows: norm.sort((a, b) => a.ts - b.ts), used: c, tf: ep[2] };
+    }
+    return null;
+  }
+  function oiMerge(a, b) { // объединяем по ts (сек), дедуп
+    const map = {}; [...(a || []), ...(b || [])].forEach(r => { map[Math.round(r.ts)] = r; });
+    return Object.values(map).sort((x, y) => x.ts - y.ts);
   }
   async function oiLoad() {
     if (!S.chart) return;
-    const body = document.getElementById('tvsig-oi-body'); if (body) body.textContent = 'загрузка…';
-    let sym = ''; try { sym = S.chart.symbol(); } catch (e) {}
-    const ov = ((document.getElementById('tvsig-oi-tk') || {}).value || '').trim().toUpperCase();
-    const cands = [];
-    if (ov) cands.push(ov);
-    if (sym) { const u = sym.toUpperCase(); cands.push(u); const m = u.match(/^([A-Z]{2})/); if (m && cands.indexOf(m[1]) < 0) cands.push(m[1]); }
-    let rows = null, used = '';
-    for (const c of cands) {
-      const r = await oiFetch(oiBase() + '/db/oidaily?ticker=' + encodeURIComponent(c));
-      if (r.ok) { let arr; try { const j = JSON.parse(r.json); arr = Array.isArray(j) ? j : (j.rows || j.data || []); } catch (_) { arr = []; }
-        const norm = arr.map(oiNormalize).filter(x => x.ts); if (norm.length) { rows = norm.sort((a, b) => a.ts - b.ts); used = c; break; } }
+    const body = document.getElementById('tvsig-oi-body'); if (body && !S.oi) body.textContent = 'загрузка…';
+    const cands = oiCands();
+    if (!cands.length) { if (body) body.textContent = 'нет тикера'; return; }
+    const tok = oiTokenGet();
+    if (tok) {
+      // ЖИВОЙ путь: снэпшот AlgoPack по токену + подсев архива из воркера + накопление
+      const live = await oiLiveSnap(cands);
+      if (live.ok) {
+        let series = oiAccPush(live.sym, live.snap);
+        if (!S._oiSeeded || S._oiSeeded !== live.sym) { // разово подмешиваем историю из воркера
+          const w = await oiWorkerSeries([live.sym, ...cands]);
+          if (w) series = oiMerge(w.rows.map(r => ({ ts: r.ts, fl: r.fl, fs: r.fs, yl: r.yl, ys: r.ys })), series);
+          S._oiSeeded = live.sym;
+        }
+        const rows = series.map(r => { const d = new Date(r.ts * 1000); return { ...r, date: ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) }; });
+        S.oi = { rows, used: live.sym, tf: '5-мин live' }; oiRender(); return;
+      }
+      if (live.error === 'sym-not-found') { if (body) body.innerHTML = '<span style="color:#b0873b">Контракт не найден в AlgoPack. Доступные коды: ' + (live.syms || []).slice(0, 40).join(', ') + '. Впиши нужный в поле кода.</span>'; return; }
+      if (body) body.innerHTML = '<span style="color:#FF6B6B">AlgoPack: ' + (live.error || 'ошибка') + ' (проверь токен)</span>';
+      return;
     }
-    if (!rows) { if (body) body.innerHTML = '<span style="color:#b0873b">OI не найден (' + (cands.join(' / ') || '?') + '). Введи код контракта вручную и ⟳.</span>'; S.oi = null; return; }
-    S.oi = { rows, used }; oiRender();
+    // без токена — только архив воркера (то, что коллектор уже собрал)
+    const w = await oiWorkerSeries(cands);
+    if (!w) { if (body) body.innerHTML = '<span style="color:#b0873b">OI не найден (' + cands.join(' / ') + '). Впиши код или задай токен AlgoPack (🔑) для живых данных.</span>'; S.oi = null; return; }
+    S.oi = w; oiRender();
   }
   function oiRender() {
     const body = document.getElementById('tvsig-oi-body'); if (!body || !S.oi) return;
@@ -69,7 +145,7 @@
     const dlt = v => (v > 0 ? '+' : v < 0 ? '−' : '') + num(Math.abs(v));
     const cell = (cur, d) => { const col = d > 0 ? '#52D8A0' : d < 0 ? '#FF6B6B' : '#9a94b8'; return '<b>' + num(cur) + '</b> <span style="color:' + col + '">' + dlt(d) + '</span>'; };
     body.innerHTML =
-      '<div class="tvsig-oi-meta">' + S.oi.used + ' · регион ' + reg.length + ' дн (' + a.date + '…' + b.date + ')</div>' +
+      '<div class="tvsig-oi-meta">' + S.oi.used + ' · ' + (S.oi.tf || '') + ' · ' + reg.length + ' точек (' + a.date + '…' + b.date + ')</div>' +
       '<table class="tvsig-oi-t"><tr><th></th><th>лонг</th><th>шорт</th></tr>' +
       '<tr><td>физ</td><td>' + cell(b.fl, b.fl - a.fl) + '</td><td>' + cell(b.fs, b.fs - a.fs) + '</td></tr>' +
       '<tr><td>юр</td><td>' + cell(b.yl, b.yl - a.yl) + '</td><td>' + cell(b.ys, b.ys - a.ys) + '</td></tr></table>';
@@ -113,7 +189,7 @@
       renderRows();
       // перерисовать активные слои
       Object.keys(S.on).forEach(id => { if (S.on[id]) drawMethod(id); });
-      if (changed) { S.oi = null; oiLoad(); } else if (S.oi) oiRender(); // OI: перезагрузка при смене тикера, иначе обновляем регион
+      if (changed) { S.oi = null; S._oiSeeded = null; oiLoad(); } else if (S.oi) oiRender(); // OI: перезагрузка при смене тикера, иначе обновляем регион
       status('тикер ' + (S.symbol || '?') + ' · ' + bars.length + ' баров');
     } catch (e) { status('ошибка: ' + (e && e.message || e)); }
     S.busy = false;
@@ -172,6 +248,7 @@
       '<div id="tvsig-rows"></div>' +
       '<div id="tvsig-oi"><div id="tvsig-oi-head">📊 Открытый интерес' +
       '<input id="tvsig-oi-tk" placeholder="код (авто)" title="Код OI-контракта; пусто = авто по тикеру">' +
+      '<button id="tvsig-oi-key" title="Токен AlgoPack для живых 5-мин данных">🔑</button>' +
       '<button id="tvsig-oi-load" title="Загрузить/обновить OI">⟳</button></div>' +
       '<div id="tvsig-oi-body"><span class="tvsig-oi-meta">физ/юр лонг-шорт и Δ по видимому окну · ⟳ загрузить</span></div></div>' +
       '<div id="tvsig-foot">точн. — доля совпадения знака с ходом за 12 баров по этому тикеру · клик по строке рисует сигналы на графике</div>';
@@ -179,7 +256,17 @@
     rowsEl = panel.querySelector('#tvsig-rows'); statusEl = panel.querySelector('#tvsig-status');
     panel.querySelector('#tvsig-refresh').onclick = () => refresh(true);
     panel.querySelector('#tvsig-oi-load').onclick = () => oiLoad();
-    panel.querySelector('#tvsig-oi-tk').addEventListener('keydown', e => { if (e.key === 'Enter') oiLoad(); });
+    panel.querySelector('#tvsig-oi-tk').addEventListener('keydown', e => { if (e.key === 'Enter') { S._oiSeeded = null; oiLoad(); } });
+    const keyBtn = panel.querySelector('#tvsig-oi-key');
+    function updateKeyBtn() { keyBtn.style.opacity = oiTokenGet() ? '1' : '0.5'; keyBtn.title = oiTokenGet() ? 'Токен AlgoPack задан (клик — сменить/очистить)' : 'Задать токен AlgoPack для живых 5-мин данных'; }
+    keyBtn.onclick = () => {
+      const has = !!oiTokenGet();
+      const v = prompt('Токен AlgoPack (MOEX) для живых 5-мин физ/юр.\nХранится ЛОКАЛЬНО, шлётся только в apim.moex.com.\n' + (has ? 'Есть заданный. Введи новый, или "-" чтобы очистить.' : 'Вставь токен:'), '');
+      if (v === null) return;
+      if (v.trim() === '-') oiTokenSet(''); else if (v.trim()) oiTokenSet(v.trim());
+      updateKeyBtn(); S._oiSeeded = null; oiLoad();
+    };
+    updateKeyBtn();
     let minimized = false;
     panel.querySelector('#tvsig-min').onclick = () => { minimized = !minimized; rowsEl.style.display = minimized ? 'none' : ''; panel.querySelector('#tvsig-foot').style.display = minimized ? 'none' : ''; };
     drag(panel, panel.querySelector('#tvsig-head'));
@@ -235,7 +322,8 @@
     const iv = setInterval(() => {
       tries++;
       if (ready()) { clearInterval(iv); status('график найден'); refresh(true);
-        setInterval(() => { if (!S.busy) refresh(false); }, 2500); } // отслеживаем смену тикера/данных
+        setInterval(() => { if (!S.busy) refresh(false); }, 2500); // отслеживаем смену тикера/данных
+        setInterval(() => { if (oiTokenGet() && S.oi) oiLoad(); }, 300000); } // живой OI раз в 5 мин
       else if (tries > 120) { clearInterval(iv); status('график не найден (открой вкладку с графиком)'); }
     }, 500);
   }
