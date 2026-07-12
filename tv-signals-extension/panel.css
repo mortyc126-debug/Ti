@@ -1,0 +1,24 @@
+#tvsig-panel{
+  position:fixed; top:90px; right:16px; z-index:2147483000; width:230px;
+  background:rgba(16,16,24,0.97); border:1px solid rgba(255,255,255,0.12);
+  border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,0.55);
+  font:12px/1.3 -apple-system,Segoe UI,Roboto,sans-serif; color:#e8e6f0; user-select:none;
+}
+#tvsig-head{ display:flex; align-items:center; gap:6px; padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.08); }
+#tvsig-title{ flex:1; font-size:11px; font-weight:600; color:#c9c3e6; }
+#tvsig-head button{ width:22px; height:22px; border-radius:6px; cursor:pointer; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); color:#d6d2e8; font-size:13px; }
+#tvsig-head button:hover{ background:rgba(255,255,255,0.12); }
+#tvsig-status{ padding:5px 10px; font-size:10px; color:#8b84ac; border-bottom:1px solid rgba(255,255,255,0.05); }
+#tvsig-rows{ padding:4px; max-height:340px; overflow:auto; }
+.tvsig-row{ display:flex; align-items:center; gap:6px; padding:5px 6px; border-radius:7px; cursor:pointer; }
+.tvsig-row:hover{ background:rgba(255,255,255,0.05); }
+.tvsig-row.on{ background:rgba(155,93,229,0.14); }
+.tvsig-dot{ width:8px; height:8px; border-radius:2px; flex-shrink:0; }
+.tvsig-name{ flex:1; font-size:11px; }
+.tvsig-b{ font-size:10px; padding:1px 5px; border-radius:5px; }
+.tvsig-b.buy{ color:#52D8A0; background:rgba(82,216,160,0.14); }
+.tvsig-b.sell{ color:#FF6B6B; background:rgba(255,107,107,0.14); }
+.tvsig-b.neu{ color:#6b6690; }
+.tvsig-acc{ font-size:11px; font-weight:600; min-width:30px; text-align:right; }
+.tvsig-n{ font-size:9px; color:#5f5a80; min-width:26px; text-align:right; }
+#tvsig-foot{ padding:6px 10px; font-size:9px; color:#6b6690; line-height:1.5; border-top:1px solid rgba(255,255,255,0.05); }
