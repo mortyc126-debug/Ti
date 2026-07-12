@@ -58,7 +58,7 @@
       const s = parts.reduce((a, b) => a + b, 0); o[i] = Math.abs(s) >= 2 ? Math.sign(s) : 0; } return o; };
   M.nw = (cd) => { const cl = cd.map(c => c.close), n = cl.length, at = atr(cd, 14), N = 10, w = 60, k = 5, h = 0.4;
     const T = new Array(n).fill(null), P = new Array(n).fill(null), C = new Array(n).fill(null);
-    for (let i = 0; i < n; i++) { const c = cd[i]; if (at[i] && at[i] > 0) T[i] = (c.volume || 0) * (c.high - c.low) / at[i]; }
+    for (let i = 0; i < n; i++) { const c = cd[i]; if (at[i] && at[i] > 0) { const vv = (c.volume && c.volume > 0) ? c.volume : 1; T[i] = vv * (c.high - c.low) / at[i]; } } // без объёма — прокси по размаху
     for (let i = N; i < n; i++) { const ch = Math.abs(cl[i] - cl[i - N]); let v = 0; for (let j = i - N + 1; j <= i; j++) v += Math.abs(cl[j] - cl[j - 1]); P[i] = v > 0 ? ch / v : 0; }
     const roc = new Array(n).fill(null); for (let i = N; i < n; i++) roc[i] = (cl[i] - cl[i - N]) / cl[i - N];
     for (let i = 2 * N; i < n; i++) C[i] = roc[i] - roc[i - N];

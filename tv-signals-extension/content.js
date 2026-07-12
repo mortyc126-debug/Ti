@@ -55,6 +55,7 @@
       let bars = window.SignalsCore.parseExport(res);
       if (bars.length > 3000) bars = bars.slice(-3000); // держим NW (O(n^2)) в узде
       S.bars = bars;
+      S.hasVolume = bars.some(b => b.volume && b.volume > 0);
       if (bars.length < 60) { status('мало свечей (' + bars.length + ')'); S.busy = false; return; }
       S.computed = window.SignalsCore.computeAll(bars, 12);
       renderRows();
@@ -71,24 +72,33 @@
     S.drawn[id] = [];
   }
   function clearAll() { Object.keys(S.drawn).forEach(clearMethod); }
+  const MAX_MARKS = 14; // не засорять график — только начала серий, последние N
   function drawMethod(id) {
     if (!S.chart || !S.computed || !S.computed[id]) return;
     clearMethod(id);
     let vr = null; try { vr = S.chart.getVisibleRange(); } catch (e) {}
-    const series = S.computed[id].series, bars = S.bars, out = [];
-    let placed = 0;
-    for (let i = bars.length - 1; i >= 0 && placed < 60; i--) {
+    const series = S.computed[id].series, bars = S.bars;
+    // Берём только ПЕРЕХОДЫ (начало нового сигнала / смена направления), а не
+    // каждый бар — иначе частые методы (FVG, Z-score) заливают весь график.
+    const marks = [];
+    for (let i = 1; i < bars.length; i++) {
       const sc = series[i]; if (sc == null || sc === 0) continue;
+      const pr = series[i - 1];
+      const isNew = pr == null || pr === 0 || Math.sign(pr) !== Math.sign(sc);
+      if (!isNew) continue;
       const b = bars[i]; if (vr && (b.time < vr.from || b.time > vr.to)) continue;
-      const buy = sc > 0;
+      marks.push({ b, buy: sc > 0 });
+    }
+    const out = [];
+    marks.slice(-MAX_MARKS).forEach(m => {
       try {
         const sid = S.chart.createShape(
-          { time: b.time, price: buy ? b.low : b.high },
-          { shape: buy ? 'arrow_up' : 'arrow_down', lock: true, disableSelection: true, disableSave: true,
+          { time: m.b.time, price: m.buy ? m.b.low : m.b.high },
+          { shape: m.buy ? 'arrow_up' : 'arrow_down', lock: true, disableSelection: true, disableSave: true,
             zOrder: 'top', overrides: { arrowColor: COLOR[id], color: COLOR[id] } });
-        if (sid) { out.push(sid); placed++; }
+        if (sid) out.push(sid);
       } catch (e) {}
-    }
+    });
     S.drawn[id] = out;
   }
   function toggle(id) {
@@ -123,8 +133,15 @@
   }
   function renderRows() {
     if (!rowsEl) return;
+    const noVol = S.hasVolume === false;
     rowsEl.innerHTML = META.map(([id]) => {
       const c = S.computed && S.computed[id];
+      if (id === 'vsa_abs' && noVol) {
+        return '<div class="tvsig-row" data-id="' + id + '" title="Включи индикатор Объём на графике — метод про объём">' +
+          '<span class="tvsig-dot" style="background:' + COLOR[id] + '"></span>' +
+          '<span class="tvsig-name">' + NAME[id] + '</span>' +
+          '<span class="tvsig-b neu" style="color:#b0873b">нужен объём</span></div>';
+      }
       const acc = c && c.stats.acc != null ? (c.stats.acc * 100).toFixed(0) + '%' : '—';
       const nn = c ? c.stats.n : 0;
       const accCol = c && c.stats.acc != null ? (c.stats.acc >= 0.55 ? '#52D8A0' : c.stats.acc <= 0.45 ? '#FF6B6B' : '#9a94b8') : '#6b6690';
