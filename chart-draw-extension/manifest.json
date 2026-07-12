@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Разметка графика (Тинькофф)",
+  "version": "0.1.0",
+  "description": "Рисование уровней, линий, каналов и параллелей поверх веб-терминала — то, чего не хватает в терминале, чтобы не переключаться на TradingView.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": ["*://*.tbank.ru/*", "*://*.tinkoff.ru/*"],
+  "content_scripts": [
+    {
+      "matches": ["*://*.tbank.ru/*", "*://*.tinkoff.ru/*"],
+      "js": ["overlay.js"],
+      "css": ["overlay.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Разметка графика: вкл/выкл (или Alt+D)"
+  }
+}
