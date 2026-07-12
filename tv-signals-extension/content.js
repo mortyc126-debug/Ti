@@ -23,8 +23,57 @@
   const S = {
     api: null, chart: null, bars: [], symbol: '', res: null,
     on: loadPref(), colors: loadColors(), drawn: {}, // id -> [shapeId]
-    computed: null, busy: false, hasVolume: null,
+    computed: null, busy: false, hasVolume: null, oi: null,
   };
+  const OI_BASE_DEF = 'https://oi.marginacall.workers.dev';
+  function oiBase() { try { return localStorage.getItem('tvsig:oibase') || OI_BASE_DEF; } catch (e) { return OI_BASE_DEF; } }
+  // мост в isolated-world (oi-bridge.js) — обход CSP терминала на фетч воркера
+  function oiFetch(url) {
+    return new Promise(resolve => {
+      const id = 'oi' + Math.random().toString(36).slice(2);
+      function onRes(e) { let r; try { r = JSON.parse(e.detail); } catch (_) { return; } if (r.id !== id) return; window.removeEventListener('tvsig:oi:res', onRes); resolve(r); }
+      window.addEventListener('tvsig:oi:res', onRes);
+      window.dispatchEvent(new CustomEvent('tvsig:oi:req', { detail: JSON.stringify({ id, url }) }));
+      setTimeout(() => { window.removeEventListener('tvsig:oi:res', onRes); resolve({ ok: false, error: 'timeout' }); }, 9000);
+    });
+  }
+  function oiNormalize(r) {
+    return { date: r.tradedate || r.date || r.timestamp || '',
+      ts: (Date.parse(String(r.tradedate || r.date || '').replace(' ', 'T')) / 1000) || 0,
+      fl: +(r.fiz_long || 0), fs: +(r.fiz_short || 0), yl: +(r.yur_long || 0), ys: +(r.yur_short || 0) };
+  }
+  async function oiLoad() {
+    if (!S.chart) return;
+    const body = document.getElementById('tvsig-oi-body'); if (body) body.textContent = 'загрузка…';
+    let sym = ''; try { sym = S.chart.symbol(); } catch (e) {}
+    const ov = ((document.getElementById('tvsig-oi-tk') || {}).value || '').trim().toUpperCase();
+    const cands = [];
+    if (ov) cands.push(ov);
+    if (sym) { const u = sym.toUpperCase(); cands.push(u); const m = u.match(/^([A-Z]{2})/); if (m && cands.indexOf(m[1]) < 0) cands.push(m[1]); }
+    let rows = null, used = '';
+    for (const c of cands) {
+      const r = await oiFetch(oiBase() + '/db/oidaily?ticker=' + encodeURIComponent(c));
+      if (r.ok) { let arr; try { const j = JSON.parse(r.json); arr = Array.isArray(j) ? j : (j.rows || j.data || []); } catch (_) { arr = []; }
+        const norm = arr.map(oiNormalize).filter(x => x.ts); if (norm.length) { rows = norm.sort((a, b) => a.ts - b.ts); used = c; break; } }
+    }
+    if (!rows) { if (body) body.innerHTML = '<span style="color:#b0873b">OI не найден (' + (cands.join(' / ') || '?') + '). Введи код контракта вручную и ⟳.</span>'; S.oi = null; return; }
+    S.oi = { rows, used }; oiRender();
+  }
+  function oiRender() {
+    const body = document.getElementById('tvsig-oi-body'); if (!body || !S.oi) return;
+    const rows = S.oi.rows; let vr = null; try { vr = S.chart.getVisibleRange(); } catch (e) {}
+    let reg = vr ? rows.filter(r => r.ts >= vr.from && r.ts <= vr.to) : rows;
+    if (reg.length < 2) reg = rows; // в окне мало точек — берём весь диапазон
+    const a = reg[0], b = reg[reg.length - 1];
+    const num = v => Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'к' : v.toFixed(0);
+    const dlt = v => (v > 0 ? '+' : v < 0 ? '−' : '') + num(Math.abs(v));
+    const cell = (cur, d) => { const col = d > 0 ? '#52D8A0' : d < 0 ? '#FF6B6B' : '#9a94b8'; return '<b>' + num(cur) + '</b> <span style="color:' + col + '">' + dlt(d) + '</span>'; };
+    body.innerHTML =
+      '<div class="tvsig-oi-meta">' + S.oi.used + ' · регион ' + reg.length + ' дн (' + a.date + '…' + b.date + ')</div>' +
+      '<table class="tvsig-oi-t"><tr><th></th><th>лонг</th><th>шорт</th></tr>' +
+      '<tr><td>физ</td><td>' + cell(b.fl, b.fl - a.fl) + '</td><td>' + cell(b.fs, b.fs - a.fs) + '</td></tr>' +
+      '<tr><td>юр</td><td>' + cell(b.yl, b.yl - a.yl) + '</td><td>' + cell(b.ys, b.ys - a.ys) + '</td></tr></table>';
+  }
   function loadPref() { try { return JSON.parse(localStorage.getItem(PREF) || '{}'); } catch (e) { return {}; } }
   function savePref() { try { localStorage.setItem(PREF, JSON.stringify(S.on)); } catch (e) {} }
   function loadColors() { try { return Object.assign({}, DEF_COLOR, JSON.parse(localStorage.getItem(CKEY) || '{}')); } catch (e) { return Object.assign({}, DEF_COLOR); } }
@@ -64,6 +113,7 @@
       renderRows();
       // перерисовать активные слои
       Object.keys(S.on).forEach(id => { if (S.on[id]) drawMethod(id); });
+      if (changed) { S.oi = null; oiLoad(); } else if (S.oi) oiRender(); // OI: перезагрузка при смене тикера, иначе обновляем регион
       status('тикер ' + (S.symbol || '?') + ' · ' + bars.length + ' баров');
     } catch (e) { status('ошибка: ' + (e && e.message || e)); }
     S.busy = false;
@@ -120,10 +170,16 @@
       '<button id="tvsig-min" title="Свернуть">–</button></div>' +
       '<div id="tvsig-status">инициализация…</div>' +
       '<div id="tvsig-rows"></div>' +
+      '<div id="tvsig-oi"><div id="tvsig-oi-head">📊 Открытый интерес' +
+      '<input id="tvsig-oi-tk" placeholder="код (авто)" title="Код OI-контракта; пусто = авто по тикеру">' +
+      '<button id="tvsig-oi-load" title="Загрузить/обновить OI">⟳</button></div>' +
+      '<div id="tvsig-oi-body"><span class="tvsig-oi-meta">физ/юр лонг-шорт и Δ по видимому окну · ⟳ загрузить</span></div></div>' +
       '<div id="tvsig-foot">точн. — доля совпадения знака с ходом за 12 баров по этому тикеру · клик по строке рисует сигналы на графике</div>';
     document.documentElement.appendChild(panel);
     rowsEl = panel.querySelector('#tvsig-rows'); statusEl = panel.querySelector('#tvsig-status');
     panel.querySelector('#tvsig-refresh').onclick = () => refresh(true);
+    panel.querySelector('#tvsig-oi-load').onclick = () => oiLoad();
+    panel.querySelector('#tvsig-oi-tk').addEventListener('keydown', e => { if (e.key === 'Enter') oiLoad(); });
     let minimized = false;
     panel.querySelector('#tvsig-min').onclick = () => { minimized = !minimized; rowsEl.style.display = minimized ? 'none' : ''; panel.querySelector('#tvsig-foot').style.display = minimized ? 'none' : ''; };
     drag(panel, panel.querySelector('#tvsig-head'));
