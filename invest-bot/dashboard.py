@@ -1091,10 +1091,19 @@ def run_system_backtest(days: int = 90, split_frac: float = 0.6,
                 rows.append({"ticker": ticker, "strategy": live_name,
                              "error": "стратегия не создана"})
                 continue
-            candles = _get_backtest_candles(ticker, settings, days)
+            # Загрузка свечей — отдельно: cache-miss уходит в live-fetch, который
+            # на части инструментов падает (напр. тонкие фьючерсы без кэша). Это
+            # НЕ ошибка прогона — тикер просто пропускаем (нет данных для оценки).
+            try:
+                candles = _get_backtest_candles(ticker, settings, days)
+            except Exception as cx:
+                rows.append({"ticker": ticker, "strategy": live_name,
+                             "skipped": "нет свечей в кэше"})
+                logger.info("system_backtest: %s без свечей (%s)", ticker, cx)
+                continue
             if not candles or len(candles) < 200:
                 rows.append({"ticker": ticker, "strategy": live_name,
-                             "error": "мало свечей"})
+                             "skipped": "мало свечей"})
                 continue
             _wire_backtest_providers(strategy, ticker, days)
             split_idx = int(len(candles) * split_frac)
@@ -1125,8 +1134,12 @@ def run_system_backtest(days: int = 90, split_frac: float = 0.6,
         agg["win"] = round(agg["winsum"] / n, 3)
         del agg["wsum"], agg["winsum"]
 
+    evaluated = sum(1 for r in rows if r.get("n") is not None and not r.get("error"))
+    skipped = sum(1 for r in rows if r.get("skipped"))
+    errored = sum(1 for r in rows if r.get("error"))
     return {"rows": rows, "by_strategy": by_strategy, "days": days,
-            "cost_atr": cost_atr, "split_frac": split_frac}
+            "cost_atr": cost_atr, "split_frac": split_frac,
+            "evaluated": evaluated, "skipped": skipped, "errored": errored}
 
 
 def get_trade_chart(ticker: str, days: int, atr_take: float, atr_stop: float) -> dict:
@@ -5498,15 +5511,25 @@ function toggleDashView() {{
 
 async function runSystemBacktest() {{
   const box = document.getElementById('systemResult');
-  box.innerHTML = '<span style="color:var(--txt3);font-size:12px;">🧭 Системный прогон (каждый тикер через свою живую стратегию), это может занять минуты…</span>';
+  const allChips = Array.from(document.querySelectorAll('.chip.active'));
+  const tickers = allChips.map(c => c.dataset.ticker).filter(Boolean);
+  if (tickers.length === 0) {{ alert('Нет активных чипов тикеров. Выбери хотя бы один (системный прогон идёт по выбранным, как обычный бэктест).'); return; }}
+  const days = parseInt(document.getElementById('days').value, 10) || 90;
+  box.innerHTML = '<span style="color:var(--txt3);font-size:12px;">🧭 Системный прогон '+tickers.length+' тикеров через живые стратегии…</span>';
   try {{
-    const resp = await fetch('/api/system_backtest?days=90');
+    const resp = await fetch('/api/system_backtest?days='+days+'&tickers='+encodeURIComponent(tickers.join(',')));
     const d = await resp.json();
     if (d.error) {{ box.innerHTML = '<span style="color:var(--neg)">Ошибка: '+d.error+'</span>'; return; }}
-    const rows = (d.rows||[]).slice().sort((a,b)=> (b.exp_atr||-9) - (a.exp_atr||-9));
+    const allRows = (d.rows||[]);
+    const skippedRows = allRows.filter(r => r.skipped);
+    const rows = allRows.filter(r => !r.skipped).sort((a,b)=> (b.exp_atr!==undefined?b.exp_atr:-9) - (a.exp_atr!==undefined?a.exp_atr:-9));
     const col = v => v>0 ? 'var(--pos)' : v<0 ? 'var(--neg)' : 'var(--txt2)';
     let html = '<div style="font-size:11px;color:var(--txt3);margin-bottom:4px;">'+
-      'held-out прогон: прогрев='+Math.round(d.split_frac*100)+'% (train), сигналы=OOS · cost='+d.cost_atr+' ATR · '+d.days+'д свечей · exp в ATR/сделку</div>';
+      'оценено <b style="color:var(--txt)">'+(d.evaluated||0)+'</b> · пропущено '+(d.skipped||0)+' (нет свечей в кэше) · ошибок '+(d.errored||0)+
+      ' &nbsp;|&nbsp; held-out: прогрев='+Math.round(d.split_frac*100)+'% (train), сигналы=OOS · cost='+d.cost_atr+' ATR · '+d.days+'д · exp в ATR/сделку</div>';
+    if ((d.evaluated||0) === 0) {{
+      html += '<div style="font-size:11px;color:var(--neg);margin-bottom:6px;">Ни один тикер не оценён — нет свечей в кэше. Прогрей кэш обычным бэктестом/«сохранить историю» по этим тикерам, потом повтори системный прогон.</div>';
+    }}
     // Свод по стратегиям
     const bs = d.by_strategy||{{}};
     html += '<table style="font-size:11px;border-collapse:collapse;margin-bottom:8px;"><tr style="color:var(--txt3)">'+
@@ -5530,6 +5553,11 @@ async function runSystemBacktest() {{
         '<td style="text-align:center;padding:2px 8px;color:'+col(r.exp_atr)+';font-weight:700">'+(r.exp_atr>=0?'+':'')+r.exp_atr.toFixed(3)+'</td><td></td></tr>';
     }}
     html += '</table>';
+    if (skippedRows.length) {{
+      const names = skippedRows.map(r => r.ticker).join(', ');
+      html += '<details style="margin-top:8px;font-size:11px;color:var(--txt3)"><summary style="cursor:pointer">пропущено '+skippedRows.length+' (нет свечей в кэше)</summary>'+
+        '<div style="padding:4px 8px;line-height:1.6">'+names+'</div></details>';
+    }}
     box.innerHTML = html;
   }} catch (e) {{
     box.innerHTML = '<span style="color:var(--neg)">Сбой запроса: '+e+'</span>';
