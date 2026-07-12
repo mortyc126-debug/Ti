@@ -1088,14 +1088,35 @@ def _system_candles(ticker, settings, days: int):
     return []
 
 
+def _resolve_preset(preset: str | None):
+    """(disabled, inverted, label) для композит-референса. preset:
+    имя из method_presets.json | 'current' (текущий toggle) | пусто/None (нет)."""
+    if not preset:
+        return None
+    if preset == "current":
+        st = get_method_toggle_state()
+        return (st.get("disabled", []), st.get("inverted", []), "composite·текущий")
+    presets = get_method_presets()
+    p = presets.get(preset)
+    if not p:
+        return None
+    short = preset.split(".")[0].strip() or preset
+    return (p.get("disabled", []), p.get("inverted", []), "composite·пресет " + short)
+
+
 def run_system_backtest(days: int = 90, split_frac: float = 0.6,
-                        cost_atr: float = 0.12, tickers: list | None = None) -> dict:
+                        cost_atr: float = 0.12, tickers: list | None = None,
+                        preset: str | None = None) -> dict:
     """СИСТЕМНЫЙ ПРОГОН: каждый тикер через ЖИВУЮ стратегию (composite/accel/NW),
     единый бар-за-баром симулятор (system_backtest.simulate_analyze_strategy) →
     сопоставимая метрика exp_atr/win/N на held-out окне (прогрев=train, сигналы
     =OOS). Отражает то, как система реально торгует, а не всегда composite.
 
-    Возвращает {rows:[...], by_strategy:{...}, days, cost_atr, split_frac}.
+    preset (опц.) — добавляет по каждому тикеру ВТОРУЮ строку: OICompositeStrategy
+    с этим пресетом методов (disabled/inverted), чтобы сравнивать/комбинировать
+    accel+NW+методы в одной таблице и одной шкале.
+
+    Возвращает {rows:[...], by_strategy:{...}, days, cost_atr, split_frac, preset}.
     """
     import dataclasses
     import system_backtest as sysbt
@@ -1104,6 +1125,24 @@ def run_system_backtest(days: int = 90, split_frac: float = 0.6,
     strat_map = _config.futures_trading_settings.strategy_map
     override = _config.trading_settings.strategy_override
     names = list(tickers) if tickers else list(by_ticker.keys())
+    preset_spec = _resolve_preset(preset)  # (disabled, inverted, label) | None
+
+    def _sim_one(strat_name, settings, candles, split_idx, label,
+                 disabled=None, inverted=None):
+        """Прогон одной стратегии по уже загруженным свечам → строка результата."""
+        st_settings = dataclasses.replace(_backtest_strategy_settings(settings),
+                                          name=strat_name)
+        strat = StrategyFactory.new_factory(strat_name, st_settings)
+        if strat is None:
+            return {"strategy": label, "error": "стратегия не создана"}
+        if disabled and hasattr(strat, "set_disabled_methods"):
+            strat.set_disabled_methods(disabled)
+        if inverted and hasattr(strat, "set_inverted_methods"):
+            strat.set_inverted_methods(inverted)
+        _wire_backtest_providers(strat, settings.ticker, days)
+        res = sysbt.simulate_analyze_strategy(strat, candles, split_idx, cost_atr=cost_atr)
+        return {"strategy": label, "n": res["n"], "win": round(res["win"], 3),
+                "exp_atr": round(res["exp_atr"], 3)}
 
     rows = []
     for ticker in names:
@@ -1114,40 +1153,44 @@ def run_system_backtest(days: int = 90, split_frac: float = 0.6,
         base = _futures_base_by_ticker.get(ticker, ticker)
         live_name = sysbt.live_strategy_name(ticker, base, strat_map, override,
                                              default=settings.name)
+        # Загрузка свечей — один раз на тикер (обход цепочки контрактов в
+        # _system_candles). cache-miss / нет данных → пропуск, не ошибка.
         try:
-            live_settings = dataclasses.replace(_backtest_strategy_settings(settings),
-                                                name=live_name)
-            strategy = StrategyFactory.new_factory(live_name, live_settings)
-            if strategy is None:
-                rows.append({"ticker": ticker, "strategy": live_name,
-                             "error": "стратегия не создана"})
-                continue
-            # Загрузка свечей — отдельно: cache-miss уходит в live-fetch, который
-            # на части инструментов падает (напр. тонкие фьючерсы без кэша). Это
-            # НЕ ошибка прогона — тикер просто пропускаем (нет данных для оценки).
-            try:
-                candles = _system_candles(ticker, settings, days)
-            except Exception as cx:
-                rows.append({"ticker": ticker, "strategy": live_name,
-                             "skipped": "нет свечей в кэше"})
-                logger.info("system_backtest: %s без свечей (%s)", ticker, cx)
-                continue
-            if not candles or len(candles) < 200:
-                rows.append({"ticker": ticker, "strategy": live_name,
-                             "skipped": "мало свечей"})
-                continue
-            _wire_backtest_providers(strategy, ticker, days)
-            split_idx = int(len(candles) * split_frac)
-            res = sysbt.simulate_analyze_strategy(strategy, candles, split_idx,
-                                                  cost_atr=cost_atr)
-            rows.append({
-                "ticker": ticker, "base": base, "strategy": live_name,
-                "n": res["n"], "win": round(res["win"], 3),
-                "exp_atr": round(res["exp_atr"], 3),
-                "bars": len(candles), "test_from": split_idx,
-            })
+            candles = _system_candles(ticker, settings, days)
+        except Exception as cx:
+            rows.append({"ticker": ticker, "strategy": live_name,
+                         "skipped": "нет свечей в кэше"})
+            logger.info("system_backtest: %s без свечей (%s)", ticker, cx)
+            continue
+        if not candles or len(candles) < 200:
+            rows.append({"ticker": ticker, "strategy": live_name,
+                         "skipped": "мало свечей"})
+            continue
+        split_idx = int(len(candles) * split_frac)
+
+        # Живая стратегия. Если она сама composite и выбран пресет — применяем его.
+        live_dis = live_inv = None
+        if live_name == "OICompositeStrategy" and preset_spec:
+            live_dis, live_inv, _ = preset_spec
+        try:
+            r = _sim_one(live_name, settings, candles, split_idx, live_name,
+                         disabled=live_dis, inverted=live_inv)
+            r.update({"ticker": ticker, "base": base, "kind": "live"})
+            rows.append(r)
         except Exception as ex:
-            rows.append({"ticker": ticker, "strategy": live_name, "error": str(ex)})
+            rows.append({"ticker": ticker, "strategy": live_name, "error": str(ex), "kind": "live"})
+
+        # Референс композита с пресетом (если выбран и живая — не composite).
+        if preset_spec and live_name != "OICompositeStrategy":
+            dis, inv, label = preset_spec
+            try:
+                r2 = _sim_one("OICompositeStrategy", settings, candles, split_idx,
+                              label, disabled=dis, inverted=inv)
+                r2.update({"ticker": ticker, "base": base, "kind": "composite"})
+                rows.append(r2)
+            except Exception as ex:
+                rows.append({"ticker": ticker, "strategy": label, "error": str(ex),
+                             "kind": "composite"})
 
     # Свод по стратегиям: суммарный N, взвешенная по N экспектанси, средний win.
     by_strategy: dict[str, dict] = {}
@@ -1170,6 +1213,7 @@ def run_system_backtest(days: int = 90, split_frac: float = 0.6,
     errored = sum(1 for r in rows if r.get("error"))
     return {"rows": rows, "by_strategy": by_strategy, "days": days,
             "cost_atr": cost_atr, "split_frac": split_frac,
+            "preset": preset or "", "preset_label": (preset_spec[2] if preset_spec else ""),
             "evaluated": evaluated, "skipped": skipped, "errored": errored}
 
 
@@ -2817,6 +2861,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="btn-pill" onclick="runBacktest()">▶ ЗАПУСТИТЬ БЭКТЕСТ</button>
   <button class="btn-pill danger" onclick="cancelRun()">⏹ СТОП</button>
   <button class="btn-pill info" onclick="runSystemBacktest()" title="Системный прогон: каждый тикер через СВОЮ живую стратегию (composite/accel/NW по settings.ini), единый held-out бэктест — exp/win/N в одной таблице. Не «всегда composite», а как система реально торгует.">🧭 СИСТЕМНЫЙ ПРОГОН</button>
+  <select id="system_preset_select" title="Добавить к прогону строку композита с этим пресетом методов — сравнить/скомбинировать accel+NW+методы в одной шкале" style="font-size:11px;padding:3px 6px;background:var(--bg2);color:var(--txt2);border:1px solid var(--border2);border-radius:4px;"><option value="">+ методы: без композита</option><option value="current">+ методы: текущий toggle</option></select>
   <button class="btn-pill btn-sm ghost" onclick="saveBacktestHistory()" title="Сохранить сделки бэктеста в history.json для калибровки lasso">💾 сохранить историю</button>
   <button class="btn-pill btn-sm ghost" onclick="runCalibration()" title="Калибровка порогов narrative.py + lasso_calibration + rule_miner по уже сохранённой history.json">🎯 калибровать (narrative+lasso+rules)</button>
   <button class="btn-pill btn-sm ghost" onclick="calibrateAllHistory()" title="Калибровать по ВСЕМ тикерам/датам, что уже лежат в data/history.json, независимо от того, какие чипы сейчас активны на странице">🎯 калибровать по всей history.json</button>
@@ -4434,6 +4479,19 @@ function refreshMethodPresets() {{
       sel.appendChild(o);
     }});
     if (cur && _methodPresets[cur]) sel.value = cur;
+    // Заодно наполняем селектор системного прогона (пресет для композит-строки)
+    const ssel = document.getElementById('system_preset_select');
+    if (ssel) {{
+      const scur = ssel.value;
+      ssel.innerHTML = '<option value="">+ методы: без композита</option><option value="current">+ методы: текущий toggle</option>';
+      Object.keys(_methodPresets).sort().forEach(name => {{
+        const o = document.createElement('option');
+        o.value = name; o.textContent = '+ методы: ' + name;
+        o.title = (_methodPresets[name] && _methodPresets[name].description) || '';
+        ssel.appendChild(o);
+      }});
+      ssel.value = scur;
+    }}
   }}).catch(() => {{}});
 }}
 
@@ -5546,17 +5604,22 @@ async function runSystemBacktest() {{
   const tickers = allChips.map(c => c.dataset.ticker).filter(Boolean);
   if (tickers.length === 0) {{ alert('Нет активных чипов тикеров. Выбери хотя бы один (системный прогон идёт по выбранным, как обычный бэктест).'); return; }}
   const days = parseInt(document.getElementById('days').value, 10) || 90;
-  box.innerHTML = '<span style="color:var(--txt3);font-size:12px;">🧭 Системный прогон '+tickers.length+' тикеров через живые стратегии…</span>';
+  const psel = document.getElementById('system_preset_select');
+  const preset = psel ? psel.value : '';
+  box.innerHTML = '<span style="color:var(--txt3);font-size:12px;">🧭 Системный прогон '+tickers.length+' тикеров через живые стратегии'+(preset?' + композит':'')+'…</span>';
   try {{
-    const resp = await fetch('/api/system_backtest?days='+days+'&tickers='+encodeURIComponent(tickers.join(',')));
+    const resp = await fetch('/api/system_backtest?days='+days+'&preset='+encodeURIComponent(preset)+'&tickers='+encodeURIComponent(tickers.join(',')));
     const d = await resp.json();
     if (d.error) {{ box.innerHTML = '<span style="color:var(--neg)">Ошибка: '+d.error+'</span>'; return; }}
     const allRows = (d.rows||[]);
     const skippedRows = allRows.filter(r => r.skipped);
-    const rows = allRows.filter(r => !r.skipped).sort((a,b)=> (b.exp_atr!==undefined?b.exp_atr:-9) - (a.exp_atr!==undefined?a.exp_atr:-9));
+    // Группируем по тикеру (живая строка + композит-референс рядом).
+    const rows = allRows.filter(r => !r.skipped).sort((a,b)=>
+      (a.ticker||'').localeCompare(b.ticker||'') || ((a.kind==='composite')-(b.kind==='composite')));
     const col = v => v>0 ? 'var(--pos)' : v<0 ? 'var(--neg)' : 'var(--txt2)';
     let html = '<div style="font-size:11px;color:var(--txt3);margin-bottom:4px;">'+
       'оценено <b style="color:var(--txt)">'+(d.evaluated||0)+'</b> · пропущено '+(d.skipped||0)+' (нет свечей в кэше) · ошибок '+(d.errored||0)+
+      (d.preset_label?' · +'+d.preset_label:'')+
       ' &nbsp;|&nbsp; held-out: прогрев='+Math.round(d.split_frac*100)+'% (train), сигналы=OOS · cost='+d.cost_atr+' ATR · '+d.days+'д · exp в ATR/сделку</div>';
     if ((d.evaluated||0) === 0) {{
       html += '<div style="font-size:11px;color:var(--neg);margin-bottom:6px;">Ни один тикер не оценён — нет свечей в кэше. Прогрей кэш обычным бэктестом/«сохранить историю» по этим тикерам, потом повтори системный прогон.</div>';
@@ -5575,11 +5638,15 @@ async function runSystemBacktest() {{
     html += '<table style="font-size:11px;border-collapse:collapse;"><tr style="color:var(--txt3)">'+
       '<th style="text-align:left;padding:2px 8px">тикер</th><th style="padding:2px 8px">стратегия</th><th style="padding:2px 8px">N</th><th style="padding:2px 8px">win</th><th style="padding:2px 8px">exp ATR</th><th style="text-align:left;padding:2px 8px"></th></tr>';
     for (const r of rows) {{
+      const isComp = r.kind === 'composite';
+      const tickCell = isComp ? '' : r.ticker;              // тикер только у живой строки
+      const tickStyle = isComp ? 'padding:2px 8px;color:var(--txt3)' : 'padding:2px 8px;font-weight:600';
+      const stratStyle = isComp ? 'padding:2px 8px 2px 18px;color:var(--txt3)' : 'padding:2px 8px;color:var(--txt2)';
       if (r.error) {{
-        html += '<tr><td style="padding:2px 8px">'+r.ticker+'</td><td style="padding:2px 8px;color:var(--txt3)">'+(r.strategy||'')+'</td><td colspan=3></td><td style="padding:2px 8px;color:var(--txt3)">'+r.error+'</td></tr>';
+        html += '<tr><td style="'+tickStyle+'">'+tickCell+'</td><td style="'+stratStyle+'">'+(r.strategy||'')+'</td><td colspan=3></td><td style="padding:2px 8px;color:var(--txt3)">'+r.error+'</td></tr>';
         continue;
       }}
-      html += '<tr><td style="padding:2px 8px;font-weight:600">'+r.ticker+'</td><td style="padding:2px 8px;color:var(--txt2)">'+r.strategy+'</td>'+
+      html += '<tr><td style="'+tickStyle+'">'+tickCell+'</td><td style="'+stratStyle+'">'+r.strategy+'</td>'+
         '<td style="text-align:center;padding:2px 8px">'+r.n+'</td><td style="text-align:center;padding:2px 8px">'+(r.win*100).toFixed(0)+'%</td>'+
         '<td style="text-align:center;padding:2px 8px;color:'+col(r.exp_atr)+';font-weight:700">'+(r.exp_atr>=0?'+':'')+r.exp_atr.toFixed(3)+'</td><td></td></tr>';
     }}
@@ -9460,8 +9527,9 @@ class Handler(BaseHTTPRequestHandler):
             days = int(qs.get("days", ["90"])[0])
             tk = qs.get("tickers", [""])[0]
             tickers = [t.strip() for t in tk.split(",") if t.strip()] or None
+            preset = qs.get("preset", [""])[0] or None
             try:
-                self._send_json(run_system_backtest(days=days, tickers=tickers))
+                self._send_json(run_system_backtest(days=days, tickers=tickers, preset=preset))
             except Exception as ex:
                 import traceback
                 logger.exception("system_backtest упал")
