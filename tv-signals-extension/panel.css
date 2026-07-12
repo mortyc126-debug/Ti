@@ -10,11 +10,19 @@
 #tvsig-head button:hover{ background:rgba(255,255,255,0.12); }
 #tvsig-status{ padding:5px 10px; font-size:10px; color:#8b84ac; border-bottom:1px solid rgba(255,255,255,0.05); }
 #tvsig-rows{ padding:4px; max-height:340px; overflow:auto; }
-.tvsig-row{ display:flex; align-items:center; gap:6px; padding:5px 6px; border-radius:7px; cursor:pointer; }
+.tvsig-row{ display:flex; align-items:center; gap:7px; padding:5px 6px; border-radius:7px; }
 .tvsig-row:hover{ background:rgba(255,255,255,0.05); }
-.tvsig-row.on{ background:rgba(155,93,229,0.14); }
+.tvsig-row.on{ background:rgba(255,255,255,0.06); }
+/* ромб-переключатель в стиле indlab */
+.tvsig-diam{ width:10px; height:10px; transform:rotate(45deg); flex-shrink:0; cursor:pointer;
+  border:1.5px solid #7a5cff; background:transparent; transition:all .12s; }
+.tvsig-diam:hover{ transform:rotate(45deg) scale(1.18); }
 .tvsig-dot{ width:8px; height:8px; border-radius:2px; flex-shrink:0; }
-.tvsig-name{ flex:1; font-size:11px; }
+.tvsig-name{ flex:1; font-size:11px; cursor:pointer; user-select:none; }
+.tvsig-row.on .tvsig-name{ color:#fff; font-weight:600; }
+.tvsig-col{ width:16px; height:16px; padding:0; border:none; background:none; cursor:pointer; flex-shrink:0; border-radius:4px; overflow:hidden; }
+.tvsig-col::-webkit-color-swatch-wrapper{ padding:0; }
+.tvsig-col::-webkit-color-swatch{ border:1px solid rgba(255,255,255,0.25); border-radius:4px; }
 .tvsig-b{ font-size:10px; padding:1px 5px; border-radius:5px; }
 .tvsig-b.buy{ color:#52D8A0; background:rgba(82,216,160,0.14); }
 .tvsig-b.sell{ color:#FF6B6B; background:rgba(255,107,107,0.14); }

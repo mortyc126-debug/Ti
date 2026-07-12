@@ -17,16 +17,19 @@
     ['talib_anti', 'Фейд свечей', '#E36414'], ['hawkes', 'Hawkes', '#00BBF9'],
     ['cascade', 'Cascade', '#F15BB5'], ['nw', 'NW-память', '#9B5DE5'],
   ];
-  const NAME = {}, COLOR = {}; META.forEach(([id, n, c]) => { NAME[id] = n; COLOR[id] = c; });
-  const PREF = 'tvsig:on';
+  const NAME = {}, DEF_COLOR = {}; META.forEach(([id, n, c]) => { NAME[id] = n; DEF_COLOR[id] = c; });
+  const PREF = 'tvsig:on', CKEY = 'tvsig:colors';
 
   const S = {
     api: null, chart: null, bars: [], symbol: '', res: null,
-    on: loadPref(), drawn: {}, // id -> [shapeId]
-    computed: null, busy: false,
+    on: loadPref(), colors: loadColors(), drawn: {}, // id -> [shapeId]
+    computed: null, busy: false, hasVolume: null,
   };
   function loadPref() { try { return JSON.parse(localStorage.getItem(PREF) || '{}'); } catch (e) { return {}; } }
   function savePref() { try { localStorage.setItem(PREF, JSON.stringify(S.on)); } catch (e) {} }
+  function loadColors() { try { return Object.assign({}, DEF_COLOR, JSON.parse(localStorage.getItem(CKEY) || '{}')); } catch (e) { return Object.assign({}, DEF_COLOR); } }
+  function saveColors() { try { localStorage.setItem(CKEY, JSON.stringify(S.colors)); } catch (e) {} }
+  function setColor(id, val) { S.colors[id] = val; saveColors(); if (S.on[id]) drawMethod(id); renderRows(); }
 
   // ── доступ к TradingView ─────────────────────────────────────────────────────
   function getApi() {
@@ -95,7 +98,7 @@
         const sid = S.chart.createShape(
           { time: m.b.time, price: m.buy ? m.b.low : m.b.high },
           { shape: m.buy ? 'arrow_up' : 'arrow_down', lock: true, disableSelection: true, disableSave: true,
-            zOrder: 'top', overrides: { arrowColor: COLOR[id], color: COLOR[id] } });
+            zOrder: 'top', overrides: { arrowColor: S.colors[id], color: S.colors[id] } });
         if (sid) out.push(sid);
       } catch (e) {}
     });
@@ -136,23 +139,31 @@
     const noVol = S.hasVolume === false;
     rowsEl.innerHTML = META.map(([id]) => {
       const c = S.computed && S.computed[id];
-      if (id === 'vsa_abs' && noVol) {
-        return '<div class="tvsig-row" data-id="' + id + '" title="Включи индикатор Объём на графике — метод про объём">' +
-          '<span class="tvsig-dot" style="background:' + COLOR[id] + '"></span>' +
-          '<span class="tvsig-name">' + NAME[id] + '</span>' +
-          '<span class="tvsig-b neu" style="color:#b0873b">нужен объём</span></div>';
-      }
-      const acc = c && c.stats.acc != null ? (c.stats.acc * 100).toFixed(0) + '%' : '—';
-      const nn = c ? c.stats.n : 0;
-      const accCol = c && c.stats.acc != null ? (c.stats.acc >= 0.55 ? '#52D8A0' : c.stats.acc <= 0.45 ? '#FF6B6B' : '#9a94b8') : '#6b6690';
-      return '<div class="tvsig-row' + (S.on[id] ? ' on' : '') + '" data-id="' + id + '">' +
-        '<span class="tvsig-dot" style="background:' + COLOR[id] + '"></span>' +
-        '<span class="tvsig-name">' + NAME[id] + '</span>' +
-        pill(c ? c.last : 0) +
-        '<span class="tvsig-acc" style="color:' + accCol + '">' + acc + '</span>' +
-        '<span class="tvsig-n">n' + nn + '</span></div>';
+      const on = !!S.on[id];
+      const col = S.colors[id];
+      // ромб-переключатель в стиле indlab: горит цветом метода когда включён
+      const diam = '<span class="tvsig-diam' + (on ? ' on' : '') + '" data-id="' + id + '" title="Показать/скрыть на графике" ' +
+        'style="border-color:' + col + ';background:' + (on ? col : 'transparent') + ';box-shadow:' + (on ? '0 0 6px ' + col : 'none') + ';"></span>';
+      const swatch = '<input type="color" class="tvsig-col" data-id="' + id + '" value="' + col + '" title="Цвет метода">';
+      const noVolRow = (id === 'vsa_abs' && noVol);
+      const mid = noVolRow
+        ? '<span class="tvsig-b neu" style="color:#b0873b" title="Включи индикатор Объём на графике">нужен объём</span>'
+        : (function () {
+            const acc = c && c.stats.acc != null ? (c.stats.acc * 100).toFixed(0) + '%' : '—';
+            const nn = c ? c.stats.n : 0;
+            const accCol = c && c.stats.acc != null ? (c.stats.acc >= 0.55 ? '#52D8A0' : c.stats.acc <= 0.45 ? '#FF6B6B' : '#9a94b8') : '#6b6690';
+            return pill(c ? c.last : 0) + '<span class="tvsig-acc" style="color:' + accCol + '">' + acc + '</span><span class="tvsig-n">n' + nn + '</span>';
+          })();
+      return '<div class="tvsig-row' + (on ? ' on' : '') + '" data-id="' + id + '">' +
+        diam + '<span class="tvsig-name">' + NAME[id] + '</span>' + mid + swatch + '</div>';
     }).join('');
-    rowsEl.querySelectorAll('.tvsig-row').forEach(r => r.onclick = () => toggle(r.dataset.id));
+    // ромб/имя → вкл/выкл; пикер цвета → своё событие (не триггерит toggle)
+    rowsEl.querySelectorAll('.tvsig-diam, .tvsig-name').forEach(el =>
+      el.addEventListener('click', e => { toggle(el.dataset.id || el.parentElement.dataset.id); e.stopPropagation(); }));
+    rowsEl.querySelectorAll('.tvsig-col').forEach(inp => {
+      inp.addEventListener('input', e => { setColor(inp.dataset.id, e.target.value); e.stopPropagation(); });
+      inp.addEventListener('click', e => e.stopPropagation());
+    });
   }
   function drag(el, h) {
     let sx, sy, ox, oy, on = false; h.style.cursor = 'move';
