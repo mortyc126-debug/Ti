@@ -1028,6 +1028,107 @@ def _all_settings_by_ticker() -> dict[str, StrategySettings]:
     return merged
 
 
+def _wire_backtest_providers(strategy, ticker: str, days: int, offset_days: int = 0):
+    """Best-effort инъекция OI/index-провайдеров и истории (как в
+    _save_backtest_history_one). Не критично для accel/NW — тихо пропускаем."""
+    try:
+        _wire_history(strategy)
+    except Exception:
+        pass
+    try:
+        from oi_layers import OiBacktestProvider
+        oi_prov = OiBacktestProvider.load()
+        if oi_prov.has_data(ticker):
+            for setter, fn in (("set_inst_oi_provider", "inst_oi_score"),
+                               ("set_retail_contra_provider", "retail_contra_score"),
+                               ("set_delta_quadrant_provider", "delta_quadrant_score"),
+                               ("set_oi_absorption_provider", "absorption_score"),
+                               ("set_squeeze_provider", "squeeze_score"),
+                               ("set_oi_regime_provider", "oi_instability_score")):
+                if hasattr(strategy, setter):
+                    getattr(strategy, setter)(getattr(oi_prov, fn))
+    except Exception:
+        pass
+    try:
+        idx_prov = _index_context_provider_for_backtest(days, offset_days)
+        if idx_prov is not None and hasattr(strategy, "set_index_context_provider"):
+            strategy.set_index_context_provider(idx_prov.score)
+    except Exception:
+        pass
+
+
+def run_system_backtest(days: int = 90, split_frac: float = 0.6,
+                        cost_atr: float = 0.12, tickers: list | None = None) -> dict:
+    """СИСТЕМНЫЙ ПРОГОН: каждый тикер через ЖИВУЮ стратегию (composite/accel/NW),
+    единый бар-за-баром симулятор (system_backtest.simulate_analyze_strategy) →
+    сопоставимая метрика exp_atr/win/N на held-out окне (прогрев=train, сигналы
+    =OOS). Отражает то, как система реально торгует, а не всегда composite.
+
+    Возвращает {rows:[...], by_strategy:{...}, days, cost_atr, split_frac}.
+    """
+    import dataclasses
+    import system_backtest as sysbt
+
+    by_ticker = _all_settings_by_ticker()
+    strat_map = _config.futures_trading_settings.strategy_map
+    override = _config.trading_settings.strategy_override
+    names = list(tickers) if tickers else list(by_ticker.keys())
+
+    rows = []
+    for ticker in names:
+        settings = by_ticker.get(ticker)
+        if settings is None:
+            rows.append({"ticker": ticker, "error": "нет в settings"})
+            continue
+        base = _futures_base_by_ticker.get(ticker, ticker)
+        live_name = sysbt.live_strategy_name(ticker, base, strat_map, override,
+                                             default=settings.name)
+        try:
+            live_settings = dataclasses.replace(_backtest_strategy_settings(settings),
+                                                name=live_name)
+            strategy = StrategyFactory.new_factory(live_name, live_settings)
+            if strategy is None:
+                rows.append({"ticker": ticker, "strategy": live_name,
+                             "error": "стратегия не создана"})
+                continue
+            candles = _get_backtest_candles(ticker, settings, days)
+            if not candles or len(candles) < 200:
+                rows.append({"ticker": ticker, "strategy": live_name,
+                             "error": "мало свечей"})
+                continue
+            _wire_backtest_providers(strategy, ticker, days)
+            split_idx = int(len(candles) * split_frac)
+            res = sysbt.simulate_analyze_strategy(strategy, candles, split_idx,
+                                                  cost_atr=cost_atr)
+            rows.append({
+                "ticker": ticker, "base": base, "strategy": live_name,
+                "n": res["n"], "win": round(res["win"], 3),
+                "exp_atr": round(res["exp_atr"], 3),
+                "bars": len(candles), "test_from": split_idx,
+            })
+        except Exception as ex:
+            rows.append({"ticker": ticker, "strategy": live_name, "error": str(ex)})
+
+    # Свод по стратегиям: суммарный N, взвешенная по N экспектанси, средний win.
+    by_strategy: dict[str, dict] = {}
+    for r in rows:
+        if r.get("error") or not r.get("n"):
+            continue
+        agg = by_strategy.setdefault(r["strategy"], {"n": 0, "wsum": 0.0, "winsum": 0.0, "tickers": 0})
+        agg["n"] += r["n"]
+        agg["wsum"] += r["exp_atr"] * r["n"]
+        agg["winsum"] += r["win"] * r["n"]
+        agg["tickers"] += 1
+    for name, agg in by_strategy.items():
+        n = agg["n"] or 1
+        agg["exp_atr"] = round(agg["wsum"] / n, 3)
+        agg["win"] = round(agg["winsum"] / n, 3)
+        del agg["wsum"], agg["winsum"]
+
+    return {"rows": rows, "by_strategy": by_strategy, "days": days,
+            "cost_atr": cost_atr, "split_frac": split_frac}
+
+
 def get_trade_chart(ticker: str, days: int, atr_take: float, atr_stop: float) -> dict:
     """Свечи + бэктестовые сделки для графика: {candles, trades, ticker}."""
     from candle_archive import _candle_to_row  # уже импортирован через get_candles_cached
@@ -2671,6 +2772,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <div class="sec-lg">Бэктест по тикерам</div>
   <button class="btn-pill" onclick="runBacktest()">▶ ЗАПУСТИТЬ БЭКТЕСТ</button>
   <button class="btn-pill danger" onclick="cancelRun()">⏹ СТОП</button>
+  <button class="btn-pill info" onclick="runSystemBacktest()" title="Системный прогон: каждый тикер через СВОЮ живую стратегию (composite/accel/NW по settings.ini), единый held-out бэктест — exp/win/N в одной таблице. Не «всегда composite», а как система реально торгует.">🧭 СИСТЕМНЫЙ ПРОГОН</button>
   <button class="btn-pill btn-sm ghost" onclick="saveBacktestHistory()" title="Сохранить сделки бэктеста в history.json для калибровки lasso">💾 сохранить историю</button>
   <button class="btn-pill btn-sm ghost" onclick="runCalibration()" title="Калибровка порогов narrative.py + lasso_calibration + rule_miner по уже сохранённой history.json">🎯 калибровать (narrative+lasso+rules)</button>
   <button class="btn-pill btn-sm ghost" onclick="calibrateAllHistory()" title="Калибровать по ВСЕМ тикерам/датам, что уже лежат в data/history.json, независимо от того, какие чипы сейчас активны на странице">🎯 калибровать по всей history.json</button>
@@ -2685,6 +2787,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <select id="weights_snapshot_select" onclick="refreshWeightsSnapshots()" style="font-size:11px;padding:3px 6px;background:var(--bg2);color:var(--txt2);border:1px solid var(--border2);border-radius:4px;"><option value="">— снимок весов —</option></select>
   <button class="btn-pill btn-sm warn" onclick="applyWeightsSnapshotConfirm()" title="Применить выбранный снимок к боевому oi_weights.json — с окном подтверждения. Бэкап в oi_weights.json.bak.">⚠️ применить к боту</button>
   <span id="status"></span>
+  <div id="systemResult" style="margin-top:8px;"></div>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:11px;color:var(--txt3);">
     <label><input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть нулевые</label>
     <label>мин сделок: <input type="number" id="min_trades" value="0" min="0" style="width:44px;background:var(--panel);border:1px solid var(--border2);color:var(--txt);border-radius:4px;padding:1px 4px;" onchange="renderResultsTable()"></label>
@@ -5390,6 +5493,46 @@ function toggleDashView() {{
     canvas.style.height = '480px';
     canvas.style.borderRadius = '10px';
     setTimeout(() => {{ if (typeof _resize === 'function') _resize(); }}, 50);
+  }}
+}}
+
+async function runSystemBacktest() {{
+  const box = document.getElementById('systemResult');
+  box.innerHTML = '<span style="color:var(--txt3);font-size:12px;">🧭 Системный прогон (каждый тикер через свою живую стратегию), это может занять минуты…</span>';
+  try {{
+    const resp = await fetch('/api/system_backtest?days=90');
+    const d = await resp.json();
+    if (d.error) {{ box.innerHTML = '<span style="color:var(--neg)">Ошибка: '+d.error+'</span>'; return; }}
+    const rows = (d.rows||[]).slice().sort((a,b)=> (b.exp_atr||-9) - (a.exp_atr||-9));
+    const col = v => v>0 ? 'var(--pos)' : v<0 ? 'var(--neg)' : 'var(--txt2)';
+    let html = '<div style="font-size:11px;color:var(--txt3);margin-bottom:4px;">'+
+      'held-out прогон: прогрев='+Math.round(d.split_frac*100)+'% (train), сигналы=OOS · cost='+d.cost_atr+' ATR · '+d.days+'д свечей · exp в ATR/сделку</div>';
+    // Свод по стратегиям
+    const bs = d.by_strategy||{{}};
+    html += '<table style="font-size:11px;border-collapse:collapse;margin-bottom:8px;"><tr style="color:var(--txt3)">'+
+      '<th style="text-align:left;padding:2px 8px">стратегия</th><th style="padding:2px 8px">тикеров</th><th style="padding:2px 8px">N</th><th style="padding:2px 8px">win</th><th style="padding:2px 8px">exp ATR</th></tr>';
+    for (const [name, a] of Object.entries(bs)) {{
+      html += '<tr><td style="padding:2px 8px;font-weight:600">'+name+'</td><td style="text-align:center;padding:2px 8px">'+a.tickers+'</td>'+
+        '<td style="text-align:center;padding:2px 8px">'+a.n+'</td><td style="text-align:center;padding:2px 8px">'+(a.win*100).toFixed(0)+'%</td>'+
+        '<td style="text-align:center;padding:2px 8px;color:'+col(a.exp_atr)+';font-weight:700">'+(a.exp_atr>=0?'+':'')+a.exp_atr.toFixed(3)+'</td></tr>';
+    }}
+    html += '</table>';
+    // По тикерам
+    html += '<table style="font-size:11px;border-collapse:collapse;"><tr style="color:var(--txt3)">'+
+      '<th style="text-align:left;padding:2px 8px">тикер</th><th style="padding:2px 8px">стратегия</th><th style="padding:2px 8px">N</th><th style="padding:2px 8px">win</th><th style="padding:2px 8px">exp ATR</th><th style="text-align:left;padding:2px 8px"></th></tr>';
+    for (const r of rows) {{
+      if (r.error) {{
+        html += '<tr><td style="padding:2px 8px">'+r.ticker+'</td><td style="padding:2px 8px;color:var(--txt3)">'+(r.strategy||'')+'</td><td colspan=3></td><td style="padding:2px 8px;color:var(--txt3)">'+r.error+'</td></tr>';
+        continue;
+      }}
+      html += '<tr><td style="padding:2px 8px;font-weight:600">'+r.ticker+'</td><td style="padding:2px 8px;color:var(--txt2)">'+r.strategy+'</td>'+
+        '<td style="text-align:center;padding:2px 8px">'+r.n+'</td><td style="text-align:center;padding:2px 8px">'+(r.win*100).toFixed(0)+'%</td>'+
+        '<td style="text-align:center;padding:2px 8px;color:'+col(r.exp_atr)+';font-weight:700">'+(r.exp_atr>=0?'+':'')+r.exp_atr.toFixed(3)+'</td><td></td></tr>';
+    }}
+    html += '</table>';
+    box.innerHTML = html;
+  }} catch (e) {{
+    box.innerHTML = '<span style="color:var(--neg)">Сбой запроса: '+e+'</span>';
   }}
 }}
 
@@ -9252,6 +9395,18 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(get_method_presets())
         elif self.path == "/api/method_toggle_state":
             self._send_json(get_method_toggle_state())
+        elif self.path.startswith("/api/system_backtest"):
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            days = int(qs.get("days", ["90"])[0])
+            tk = qs.get("tickers", [""])[0]
+            tickers = [t.strip() for t in tk.split(",") if t.strip()] or None
+            try:
+                self._send_json(run_system_backtest(days=days, tickers=tickers))
+            except Exception as ex:
+                import traceback
+                logger.exception("system_backtest упал")
+                self._send_json({"error": str(ex), "trace": traceback.format_exc()})
         elif self.path == "/api/method_calibration":
             self._send_json(get_method_calibration())
         elif self.path == "/api/moex_token_status":
