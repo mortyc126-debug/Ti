@@ -18,6 +18,21 @@
     ['cascade', 'Cascade', '#F15BB5'], ['nw', 'NW-память', '#9B5DE5'],
   ];
   const NAME = {}, DEF_COLOR = {}; META.forEach(([id, n, c]) => { NAME[id] = n; DEF_COLOR[id] = c; });
+  // описания для ℹ-окон: что делает · как читать знак · оговорка из прогонов бота
+  const DESC = {
+    zscore: { what: 'Rolling z-score: отклонение цены от среднего за 20 баров.', read: 'Контрарный возврат к среднему — цена высоко над средней → sell, глубоко под → buy.', note: 'Универсальный сигнал во всех режимах (OOS-подтверждён). Сильнее на менее ликвидных тикерах.' },
+    accel: { what: 'Ускорение цены (2-я производная). Аномальный всплеск ПО тренду = климакс/истощение.', read: 'Фейд: сильное ускорение в сторону тренда → сигнал ПРОТИВ.', note: 'Гонтлет пройден (held-out +0.185 ATR). Эдж живёт при тейке 1.0/стопе 0.5; чувствителен к спреду — торгуй ликвид.' },
+    order_block: { what: 'ICT Order Block: последняя противоположная свеча перед импульсом ≥1.2 ATR.', read: 'Возврат цены в зону блока → сигнал ПО направлению импульса (континуация).', note: 'Реальный сигнал, держится в OOS.' },
+    fvg: { what: 'Fair Value Gap: 3-свечной гэп-имбаланс (свеча i−2 против i).', read: 'Возврат в гэп → сигнал ПО направлению гэпа (заполнение).', note: 'Универсальный сигнал, огромная выборка, работает во всех режимах.' },
+    liq_sweep: { what: 'Снятие ликвидности: прокол 20-барного хая/лоя с закрытием обратно.', read: 'Контр: прокол вверх с возвратом → sell, вниз → buy.', note: 'В прогонах слабый/режимный; знак уже контрарный.' },
+    false_breakout: { what: 'Ложный пробой: пробой 15-барного уровня с закрытием обратно за него.', read: 'Контр: провал пробоя вверх → sell, вниз → buy.', note: 'Режимный: + в up/ranging, − в down/stress. В OOS ослаб (anti→noise).' },
+    vsa_abs: { what: 'VSA-поглощение: большой объём (≥1.8×) при крошечном размахе (≤0.7 ATR).', read: 'Усилие без результата → сигнал ПРОТИВ тела свечи (разворот).', note: 'Нужен объём. In-sample топ, но OOS не подтвердил — доверять осторожно.' },
+    waning: { what: 'Затухание импульса: 3 свечи в одну сторону с убывающими телами.', read: 'Против гаснущего движения (разворот).', note: 'Держится сигналом в OOS — слабый, но стабильный.' },
+    talib_anti: { what: 'Фейд свечных паттернов: крупное тело ≥1.2 ATR и ≥60% размаха.', read: 'Сигнал ПРОТИВ тела — именованные свечные шаблоны работают наоборот.', note: 'Топ-сигнал по вкладу в боте (win 54.5%, огромная выборка). Фейдить свечи = edge.' },
+    hawkes: { what: 'Хоукс-интенсивность: EWMA абсолютных доходностей (кластеризация волатильности).', read: 'Рост интенсивности + ход за 5 баров → континуация в ту сторону.', note: 'Универсальный сигнал во всех режимах (OOS-подтверждён).' },
+    cascade: { what: 'Ансамбль: Z-score + Order Block + FVG.', read: 'Сигнал только если ≥2 согласны в одну сторону (конфлюэнс).', note: 'Сильнейший effect-size в боте, но редкий — мало срабатываний.' },
+    nw: { what: 'Nadaraya-Watson память: ядерный поиск похожих прошлых баров (объём×размах/ATR, направленность, ROC-сдвиг).', read: 'Предсказание направления по тому, что было ПОСЛЕ аналогов.', note: 'Режимный, но + в большинстве режимов. Без объёма — прокси по размаху (слабее).' },
+  };
   const PREF = 'tvsig:on', CKEY = 'tvsig:colors', SKEY = 'tvsig:stats';
 
   const S = {
@@ -346,6 +361,44 @@
     if (sc < 0) return '<span class="tvsig-b sell">▼ sell</span>';
     return '<span class="tvsig-b neu">—</span>';
   }
+  // ── ℹ-окно метода: описание + аналог блока анализа indlab (бэктест по горизонтам) ─
+  function closeInfo() { const o = document.getElementById('tvsig-info'); if (o) o.remove(); }
+  function openInfo(id) {
+    closeInfo();
+    const d = DESC[id] || { what: '—', read: '—', note: '' };
+    const col = S.colors[id] || DEF_COLOR[id];
+    const bars = S.bars;
+    let series = S.computed && S.computed[id] && S.computed[id].series;
+    if (!series && bars && bars.length) { try { series = window.SignalsCore.methods[id](bars); } catch (e) { series = null; } }
+    // чипы точности на горизонтах 5/10/20 баров — как «Анализ» в indlab
+    const chips = (series && bars && bars.length) ? [5, 10, 20].map(h => {
+      const s = window.SignalsCore.btStats(series, bars, h);
+      if (!s || !s.n) return '<span class="tvsig-chip na">' + h + 'б: —</span>';
+      const e = (s.exp >= 0 ? '+' : '') + s.exp.toFixed(2);
+      const ec = s.exp > 0.03 ? '#52D8A0' : s.exp < -0.03 ? '#FF6B6B' : '#9a94b8';
+      const w = s.acc != null ? Math.round(s.acc * 100) + '%' : '—';
+      return '<span class="tvsig-chip"><b>' + h + 'б</b> exp <b style="color:' + ec + '">' + e + '</b> · ' + w + ' · n' + s.n + '</span>';
+    }).join('') : '<span class="tvsig-chip na">нет данных (мало свечей)</span>';
+    const last = S.computed && S.computed[id] ? S.computed[id].last : 0;
+    const sig = last > 0 ? '<span style="color:#52D8A0">▲ buy</span>' : last < 0 ? '<span style="color:#FF6B6B">▼ sell</span>' : '<span style="color:#8b84ac">— нет</span>';
+    const o = document.createElement('div'); o.id = 'tvsig-info';
+    o.innerHTML =
+      '<div class="tvsig-info-card">' +
+        '<div class="tvsig-info-head"><span class="tvsig-info-dot" style="background:' + col + '"></span>' +
+          '<span class="tvsig-info-title">' + NAME[id] + '</span>' +
+          '<span class="tvsig-info-sig">' + sig + '</span>' +
+          '<button class="tvsig-info-x" title="Закрыть">×</button></div>' +
+        '<div class="tvsig-info-sec"><div class="tvsig-info-lbl">Что делает</div>' + d.what + '</div>' +
+        '<div class="tvsig-info-sec"><div class="tvsig-info-lbl">Как читать</div>' + d.read + '</div>' +
+        '<div class="tvsig-info-sec"><div class="tvsig-info-lbl">Бэктест по тикеру ' + (S.symbol || '?') + '</div>' +
+          '<div class="tvsig-chips">' + chips + '</div>' +
+          '<div class="tvsig-info-fine">exp — средний P&amp;L сделки в ATR (тейк 1.0 / стоп 0.5, издержки 0.12) при выходе через N баров · % — winrate · n — сделок</div></div>' +
+        (d.note ? '<div class="tvsig-info-note">⚠ ' + d.note + '</div>' : '') +
+      '</div>';
+    o.addEventListener('click', e => { if (e.target === o || e.target.classList.contains('tvsig-info-x')) closeInfo(); });
+    document.documentElement.appendChild(o);
+  }
+
   function renderRows() {
     if (!rowsEl) return;
     const noVol = S.hasVolume === false;
@@ -357,6 +410,7 @@
       const diam = '<span class="tvsig-diam' + (on ? ' on' : '') + '" data-id="' + id + '" title="Показать/скрыть на графике" ' +
         'style="border-color:' + col + ';background:' + (on ? col : 'transparent') + ';box-shadow:' + (on ? '0 0 6px ' + col : 'none') + ';"></span>';
       const swatch = '<input type="color" class="tvsig-col" data-id="' + id + '" value="' + col + '" title="Цвет метода">';
+      const info = '<span class="tvsig-info-btn" data-id="' + id + '" title="Описание метода + бэктест по горизонтам">ⓘ</span>';
       const noVolRow = (id === 'vsa_abs' && noVol);
       const mid = noVolRow
         ? '<span class="tvsig-b neu" style="color:#b0873b" title="Включи индикатор Объём на графике">нужен объём</span>'
@@ -373,11 +427,13 @@
               '<span class="tvsig-n" title="Число сделок в exp-симуляции">n' + nn + '</span>';
           })();
       return '<div class="tvsig-row' + (on ? ' on' : '') + '" data-id="' + id + '">' +
-        diam + '<span class="tvsig-name">' + NAME[id] + '</span>' + mid + swatch + '</div>';
+        diam + '<span class="tvsig-name">' + NAME[id] + '</span>' + mid + info + swatch + '</div>';
     }).join('');
     // ромб/имя → вкл/выкл; пикер цвета → своё событие (не триггерит toggle)
     rowsEl.querySelectorAll('.tvsig-diam, .tvsig-name').forEach(el =>
       el.addEventListener('click', e => { toggle(el.dataset.id || el.parentElement.dataset.id); e.stopPropagation(); }));
+    rowsEl.querySelectorAll('.tvsig-info-btn').forEach(el =>
+      el.addEventListener('click', e => { openInfo(el.dataset.id); e.stopPropagation(); }));
     rowsEl.querySelectorAll('.tvsig-col').forEach(inp => {
       inp.addEventListener('input', e => { setColor(inp.dataset.id, e.target.value); e.stopPropagation(); });
       inp.addEventListener('click', e => e.stopPropagation());

@@ -35,6 +35,32 @@
 .tvsig-exp{ font-size:11px; font-weight:600; min-width:38px; text-align:right; font-variant-numeric:tabular-nums; }
 .tvsig-acc{ font-size:10px; font-weight:500; color:#8983a8; min-width:30px; text-align:right; font-variant-numeric:tabular-nums; }
 .tvsig-n{ font-size:9px; color:#5f5a80; min-width:26px; text-align:right; }
+.tvsig-info-btn{ font-size:12px; color:#8b84ac; cursor:pointer; padding:0 2px; line-height:1; }
+.tvsig-info-btn:hover{ color:#c9b8ff; }
+
+/* ℹ-окно метода (описание + бэктест по горизонтам) */
+#tvsig-info{ position:fixed; inset:0; z-index:2147483001; background:rgba(0,0,0,0.5);
+  display:flex; align-items:center; justify-content:center; }
+.tvsig-info-card{ width:340px; max-width:92vw; max-height:80vh; overflow:auto;
+  background:rgba(16,16,24,0.99); border:1px solid rgba(122,92,255,0.4); border-radius:12px;
+  box-shadow:0 12px 40px rgba(0,0,0,0.6); color:#e8e6f0;
+  font:12px/1.45 -apple-system,Segoe UI,Roboto,sans-serif; padding:12px 14px; }
+.tvsig-info-head{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.tvsig-info-dot{ width:10px; height:10px; border-radius:50%; flex:none; }
+.tvsig-info-title{ font-size:13px; font-weight:700; flex:1; }
+.tvsig-info-sig{ font-size:11px; font-family:monospace; }
+.tvsig-info-x{ width:22px; height:22px; border-radius:6px; cursor:pointer; flex:none;
+  border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#d6d2e8; font-size:15px; line-height:1; }
+.tvsig-info-x:hover{ background:rgba(255,77,122,0.2); }
+.tvsig-info-sec{ margin-bottom:9px; }
+.tvsig-info-lbl{ font-size:9px; text-transform:uppercase; letter-spacing:0.06em; color:#8b84ac; margin-bottom:3px; }
+.tvsig-chips{ display:flex; flex-wrap:wrap; gap:5px; }
+.tvsig-chip{ font-size:10px; font-family:monospace; padding:3px 6px; border-radius:6px;
+  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08); }
+.tvsig-chip.na{ color:#6b6690; }
+.tvsig-info-fine{ font-size:9px; color:#6b6690; margin-top:5px; line-height:1.4; }
+.tvsig-info-note{ font-size:10px; color:#d8b36a; background:rgba(216,179,106,0.08);
+  border:1px solid rgba(216,179,106,0.2); border-radius:7px; padding:6px 8px; margin-top:4px; }
 #tvsig-oi{ border-top:1px solid rgba(255,255,255,0.07); padding:7px 9px; }
 #tvsig-oi-head{ display:flex; align-items:center; gap:6px; font-size:11px; color:#c9c3e6; margin-bottom:5px; }
 #tvsig-oi-head input{ flex:1; min-width:0; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#e8e6f0; border-radius:5px; padding:2px 6px; font-size:10px; }
