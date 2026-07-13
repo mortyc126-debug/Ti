@@ -219,6 +219,111 @@
       '</b> · юр Л <b style="color:' + dcol(s.oi.yl) + '">' + dsg(s.oi.yl) + '</b> Ш <b style="color:' + dcol(s.oi.ys) + '">' + dsg(s.oi.ys) + '</b></div>';
     el.innerHTML = '<div>' + label + ': <b>' + s.n + '</b> св' + pc + '</div>' + oi;
   }
+  // ── вкладка «Сравнение»: наложение второго инструмента (MOEX ISS) на активный ──
+  // Активный тикер берём из графика (S.bars). Второй — свечи с iss.moex.com через
+  // тот же SW-мост (oiFetch). Считаем корреляцию/бету по доходностям, наложение и
+  // расхождение — в базе 100 по видимому окну.
+  function cmpDate(ts) { const d = new Date(ts * 1000); return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2); }
+  function cmpTfLabel(iv) { return iv === 1 ? '1-мин' : iv === 10 ? '10-мин' : iv === 60 ? 'час' : iv === 24 ? 'день' : 'неделя'; }
+  function _pearson(x, y) {
+    const n = x.length; if (n < 3) return null;
+    let sx = 0, sy = 0; for (let i = 0; i < n; i++) { sx += x[i]; sy += y[i]; }
+    const mx = sx / n, my = sy / n; let cxy = 0, vx = 0, vy = 0;
+    for (let i = 0; i < n; i++) { const a = x[i] - mx, b = y[i] - my; cxy += a * b; vx += a * a; vy += b * b; }
+    if (vx <= 0 || vy <= 0) return null; return cxy / Math.sqrt(vx * vy);
+  }
+  function _cmpPath(vals, W, H, P, lo, hi) {
+    const n = vals.length; if (n < 2) return ''; const span = (hi - lo) || 1;
+    return vals.map((v, i) => { const x = P + (W - 2 * P) * (i / (n - 1)); const y = P + (H - 2 * P) * (1 - (v - lo) / span); return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1); }).join(' ');
+  }
+  // перебираем рынки MOEX, пока не найдём свечи по коду
+  async function cmpFetch(code, iv, t0, t1) {
+    const d0 = cmpDate(t0 - 86400), d1 = cmpDate(t1 + 86400);
+    const mkts = [['stock', 'shares'], ['stock', 'index'], ['futures', 'forts'], ['currency', 'selt'], ['stock', 'bonds']];
+    let lastErr = 'не найдено на MOEX (проверь код)';
+    for (const [eng, mkt] of mkts) {
+      const url = 'https://iss.moex.com/iss/engines/' + eng + '/markets/' + mkt + '/securities/' + encodeURIComponent(code) +
+        '/candles.json?iss.meta=off&interval=' + iv + '&from=' + d0 + '&till=' + d1;
+      const r = await oiFetch(url); if (!r.ok) { lastErr = r.error || 'сеть'; continue; }
+      let j; try { j = JSON.parse(r.json); } catch (e) { continue; }
+      const cc = j.candles; if (!cc || !cc.data || !cc.data.length) { lastErr = 'нет свечей (код/рынок/период)'; continue; }
+      const ci = cc.columns.indexOf('close'), bi = cc.columns.indexOf('begin');
+      const rows = cc.data.map(row => ({ t: Math.floor(Date.parse(String(row[bi]).replace(' ', 'T') + '+03:00') / 1000), close: +row[ci] }))
+        .filter(x => x.t && x.close > 0).sort((a, b) => a.t - b.t);
+      if (rows.length) return { ok: true, rows, market: mkt };
+    }
+    return { ok: false, error: lastErr };
+  }
+  async function cmpLoad() {
+    const body = document.getElementById('tvsig-cmp-body'); if (!body) return;
+    const inp = document.getElementById('tvsig-cmp-tk');
+    let code = ((inp && inp.value) || '').trim().toUpperCase().split(':').pop();
+    if (!code) { body.innerHTML = '<div class="tvsig-cmp-hint">Впиши код бумаги/индекса/фьючерса MOEX (SBER, IMOEX, LKOH, MOEXOG…) и жми ⟳.</div>'; return; }
+    if (!S.bars || S.bars.length < 10) { body.textContent = 'нет свечей активного тикера — открой вкладку «Сигналы» и нажми ⟳'; return; }
+    try { localStorage.setItem('tvsig:cmpcode', code); } catch (e) {}
+    body.textContent = 'загрузка ' + code + '…';
+    // окно = видимый диапазон графика (то, на что смотрит юзер), иначе все бары
+    let vr = null; try { vr = S.chart.getVisibleRange(); } catch (e) {}
+    let abars = S.bars;
+    if (vr) { const w = S.bars.filter(b => b.time >= vr.from && b.time <= vr.to); if (w.length >= 10) abars = w; }
+    const dts = []; for (let i = 1; i < abars.length; i++) dts.push(abars[i].time - abars[i - 1].time);
+    dts.sort((a, b) => a - b); const dt = dts[Math.floor(dts.length / 2)] || 86400;
+    const iv = dt <= 90 ? 1 : dt <= 1200 ? 10 : dt <= 10800 ? 60 : dt <= 259200 ? 24 : 7;
+    const ivSec = iv === 1 ? 60 : iv === 10 ? 600 : iv === 60 ? 3600 : iv === 24 ? 86400 : 604800;
+    const fetched = await cmpFetch(code, iv, abars[0].time, abars[abars.length - 1].time);
+    if (!fetched.ok) { body.innerHTML = '<div class="tvsig-cmp-hint" style="color:var(--negative)">' + code + ': ' + fetched.error + '</div>'; return; }
+    // выравниваем второй инструмент на времена активных баров (ближайшая свеча в пределах допуска)
+    const comp = fetched.rows, tol = ivSec * 1.5; let j = 0; const A = [], C = [];
+    for (const b of abars) {
+      while (j + 1 < comp.length && Math.abs(comp[j + 1].t - b.time) <= Math.abs(comp[j].t - b.time)) j++;
+      if (comp[j] && Math.abs(comp[j].t - b.time) <= tol && b.close > 0) { A.push(b.close); C.push(comp[j].close); }
+    }
+    if (A.length < 8) { body.innerHTML = '<div class="tvsig-cmp-hint" style="color:var(--amber)">Мало совпавших точек (' + A.length + '). Похоже, у ' + code + ' другой таймфрейм/период — попробуй дневной ТФ на графике или другой код.</div>'; return; }
+    const normA = A.map(v => v / A[0] * 100), normC = C.map(v => v / C[0] * 100);
+    const spread = normA.map((v, i) => v - normC[i]);
+    const rA = [], rC = []; for (let i = 1; i < A.length; i++) { rA.push(A[i] / A[i - 1] - 1); rC.push(C[i] / C[i - 1] - 1); }
+    const corr = _pearson(rA, rC);
+    let beta = null; { const n = rA.length; let mx = 0, my = 0; for (let i = 0; i < n; i++) { mx += rA[i]; my += rC[i]; } mx /= n; my /= n; let cxy = 0, vy = 0; for (let i = 0; i < n; i++) { cxy += (rA[i] - mx) * (rC[i] - my); vy += (rC[i] - my) ** 2; } if (vy > 0) beta = cxy / vy; }
+    cmpRender({ aLabel: (S.symbol || 'актив').split(':').pop(), code, normA, normC, spread, corr, beta,
+      moveA: A[A.length - 1] / A[0] - 1, moveC: C[C.length - 1] / C[0] - 1, n: A.length, tf: cmpTfLabel(iv) });
+  }
+  function cmpRender(o) {
+    const body = document.getElementById('tvsig-cmp-body'); if (!body) return;
+    const W = 248, H = 96, P = 6, SH = 46;
+    const all = o.normA.concat(o.normC); let lo = Math.min.apply(null, all), hi = Math.max.apply(null, all); if (lo === hi) { lo -= 1; hi += 1; }
+    const pA = _cmpPath(o.normA, W, H, P, lo, hi), pC = _cmpPath(o.normC, W, H, P, lo, hi);
+    const y100 = (P + (H - 2 * P) * (1 - (100 - lo) / ((hi - lo) || 1))).toFixed(1);
+    let slo = Math.min(0, Math.min.apply(null, o.spread)), shi = Math.max(0, Math.max.apply(null, o.spread)); if (slo === shi) { slo -= 1; shi += 1; }
+    const pS = _cmpPath(o.spread, W, SH, P, slo, shi);
+    const y0 = (P + (SH - 2 * P) * (1 - (0 - slo) / ((shi - slo) || 1))).toFixed(1);
+    const col = v => v > 0 ? '#52F2C9' : v < 0 ? '#FF6A8B' : '#A79BC9';
+    const pc = v => (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';
+    const corrTxt = o.corr == null ? '—' : o.corr.toFixed(2);
+    const corrCol = o.corr == null ? '#A79BC9' : o.corr > 0.5 ? '#52F2C9' : o.corr < -0.5 ? '#FF6A8B' : (o.corr > 0.2 || o.corr < -0.2) ? '#F4C36A' : '#A79BC9';
+    body.dataset.loaded = '1';
+    body.innerHTML =
+      '<div class="tvsig-cmp-legend"><span style="color:#7CC7FF">■ ' + o.aLabel + '</span> <span style="color:#F4C36A">■ ' + o.code + '</span> · ' + o.n + ' точек · ' + o.tf + '</div>' +
+      '<svg class="tvsig-cmp-svg" viewBox="0 0 ' + W + ' ' + H + '" width="100%">' +
+        '<line x1="' + P + '" y1="' + y100 + '" x2="' + (W - P) + '" y2="' + y100 + '" stroke="#3a2a50" stroke-dasharray="3 3"/>' +
+        '<path d="' + pA + '" fill="none" stroke="#7CC7FF" stroke-width="1.4"/>' +
+        '<path d="' + pC + '" fill="none" stroke="#F4C36A" stroke-width="1.4"/></svg>' +
+      '<div class="tvsig-cmp-splabel">разница (' + o.aLabel + ' − ' + o.code + ', база 100)</div>' +
+      '<svg class="tvsig-cmp-svg" viewBox="0 0 ' + W + ' ' + SH + '" width="100%">' +
+        '<line x1="' + P + '" y1="' + y0 + '" x2="' + (W - P) + '" y2="' + y0 + '" stroke="#3a2a50"/>' +
+        '<path d="' + pS + '" fill="none" stroke="#B487F8" stroke-width="1.4"/></svg>' +
+      '<table class="tvsig-cmp-t">' +
+        '<tr><td>корреляция</td><td style="color:' + corrCol + '"><b>' + corrTxt + '</b></td><td>бета</td><td>' + (o.beta == null ? '—' : o.beta.toFixed(2)) + '</td></tr>' +
+        '<tr><td>' + o.aLabel + ' Δ</td><td style="color:' + col(o.moveA) + '">' + pc(o.moveA) + '</td><td>' + o.code + ' Δ</td><td style="color:' + col(o.moveC) + '">' + pc(o.moveC) + '</td></tr>' +
+        '<tr><td>расхождение</td><td colspan="3" style="color:' + col(o.moveA - o.moveC) + '"><b>' + pc(o.moveA - o.moveC) + '</b> за окно</td></tr></table>';
+  }
+  function cmpSetTab(which) {
+    if (!panel) return;
+    const ps = panel.querySelector('#tvsig-pane-signals'), pc = panel.querySelector('#tvsig-pane-compare');
+    if (ps) ps.hidden = which !== 'signals'; if (pc) pc.hidden = which !== 'compare';
+    panel.querySelectorAll('.tvsig-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === which));
+    if (which === 'compare') { const b = document.getElementById('tvsig-cmp-body'); const inp = document.getElementById('tvsig-cmp-tk');
+      if (b && !b.dataset.loaded) { if (inp && inp.value.trim()) cmpLoad(); else b.innerHTML = '<div class="tvsig-cmp-hint">Впиши код бумаги/индекса/фьючерса MOEX и жми ⟳. Наложу на активный тикер, посчитаю корреляцию и расхождение по видимому окну.</div>'; } }
+  }
   function loadPref() { try { return JSON.parse(localStorage.getItem(PREF) || '{}'); } catch (e) { return {}; } }
   function savePref() { try { localStorage.setItem(PREF, JSON.stringify(S.on)); } catch (e) {} }
   function loadColors() { try { return Object.assign({}, DEF_COLOR, JSON.parse(localStorage.getItem(CKEY) || '{}')); } catch (e) { return Object.assign({}, DEF_COLOR); } }
@@ -381,6 +486,10 @@
       '<div id="tvsig-head"><span id="tvsig-title">◆</span>' +
       '<button id="tvsig-refresh" title="Пересчитать">⟳</button>' +
       '<button id="tvsig-min" title="Свернуть">–</button></div>' +
+      '<div id="tvsig-tabs">' +
+      '<button class="tvsig-tab on" data-tab="signals">◆ Сигналы</button>' +
+      '<button class="tvsig-tab" data-tab="compare">⇄ Сравнение</button></div>' +
+      '<div id="tvsig-pane-signals" class="tvsig-pane">' +
       '<div id="tvsig-draw">' +
       '<button class="tvsig-dt" data-t="cursor" title="Курсор — выйти из режима рисования">➤</button>' +
       '<button class="tvsig-dt" data-t="horizontal_line" title="Горизонтальный уровень">━</button>' +
@@ -400,7 +509,15 @@
       '<button id="tvsig-oi-key" title="Токен AlgoPack для живых 5-мин данных">🔑</button>' +
       '<button id="tvsig-oi-load" title="Загрузить/обновить OI">⟳</button></div>' +
       '<div id="tvsig-oi-body"><span class="tvsig-oi-meta">физ/юр лонг-шорт и Δ по видимому окну · ⟳ загрузить</span></div></div>' +
-      '<div id="tvsig-foot">Цифры считаются на свечах <b>текущего тикера</b>, хранятся по каждому и обновляются при закрытии нового бара. <b>exp</b> — экспектанси, средний P&amp;L сделки в ATR (тейк +1.0 / стоп −0.5 ATR, издержки 0.12); плюс = метод в прибыли. <b>%</b> — winrate, частота угадывания знака за 12 баров (у фейдов низкая при плюсовом exp — норма). <b>n</b> — число сделок. Клик по строке рисует сигналы.</div>';
+      '<div id="tvsig-foot">Цифры считаются на свечах <b>текущего тикера</b>, хранятся по каждому и обновляются при закрытии нового бара. <b>exp</b> — экспектанси, средний P&amp;L сделки в ATR (тейк +1.0 / стоп −0.5 ATR, издержки 0.12); плюс = метод в прибыли. <b>%</b> — winrate, частота угадывания знака за 12 баров (у фейдов низкая при плюсовом exp — норма). <b>n</b> — число сделок. Клик по строке рисует сигналы.</div>' +
+      '</div>' + // /pane-signals
+      '<div id="tvsig-pane-compare" class="tvsig-pane" hidden>' +
+      '<div id="tvsig-cmp-ctrl">' +
+      '<input id="tvsig-cmp-tk" placeholder="код MOEX: SBER, IMOEX, LKOH…" title="Код бумаги/индекса/фьючерса на MOEX">' +
+      '<button id="tvsig-cmp-go" title="Наложить и посчитать">⟳</button></div>' +
+      '<div id="tvsig-cmp-body"></div>' +
+      '<div id="tvsig-cmp-foot">Второй инструмент грузится с MOEX ISS и накладывается на <b>видимое окно</b> активного графика (масштабом окна и задаётся период). Корреляция и бета — по доходностям баров; наложение и «разница» — в базе 100. Индекс — IMOEX, нефтегаз — MOEXOG, нефть — код фьючерса Brent (напр. BRN6).</div>' +
+      '</div>'; // /pane-compare
     document.documentElement.appendChild(panel);
     rowsEl = panel.querySelector('#tvsig-rows'); statusEl = panel.querySelector('#tvsig-status');
     panel.querySelector('#tvsig-refresh').onclick = () => refresh(true);
@@ -417,6 +534,12 @@
       updateKeyBtn(); S._oiSeeded = null; oiLoad();
     };
     updateKeyBtn();
+    // вкладки + сравнение
+    panel.querySelectorAll('.tvsig-tab').forEach(b => b.onclick = () => cmpSetTab(b.dataset.tab));
+    const cmpTk = panel.querySelector('#tvsig-cmp-tk');
+    try { cmpTk.value = localStorage.getItem('tvsig:cmpcode') || ''; } catch (e) {}
+    panel.querySelector('#tvsig-cmp-go').onclick = () => cmpLoad();
+    cmpTk.addEventListener('keydown', e => { if (e.key === 'Enter') cmpLoad(); });
     let minimized = false;
     panel.querySelector('#tvsig-min').onclick = () => { minimized = !minimized; rowsEl.style.display = minimized ? 'none' : ''; panel.querySelector('#tvsig-foot').style.display = minimized ? 'none' : ''; };
     drag(panel, panel.querySelector('#tvsig-head'));
