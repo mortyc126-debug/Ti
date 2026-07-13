@@ -18,12 +18,13 @@
     ['cascade', 'Cascade', '#F15BB5'], ['nw', 'NW-память', '#9B5DE5'],
   ];
   const NAME = {}, DEF_COLOR = {}; META.forEach(([id, n, c]) => { NAME[id] = n; DEF_COLOR[id] = c; });
-  const PREF = 'tvsig:on', CKEY = 'tvsig:colors';
+  const PREF = 'tvsig:on', CKEY = 'tvsig:colors', SKEY = 'tvsig:stats';
 
   const S = {
     api: null, chart: null, bars: [], symbol: '', res: null,
     on: loadPref(), colors: loadColors(), drawn: {}, // id -> [shapeId]
     computed: null, busy: false, hasVolume: null, oi: null,
+    statsCache: loadStats(), lastBarTime: 0, statsTs: 0, // exp/winrate по тикеру
   };
   const OI_BASE_DEF = 'https://oi.marginacall.workers.dev';
   function oiBase() { try { return localStorage.getItem('tvsig:oibase') || OI_BASE_DEF; } catch (e) { return OI_BASE_DEF; } }
@@ -154,6 +155,32 @@
   function savePref() { try { localStorage.setItem(PREF, JSON.stringify(S.on)); } catch (e) {} }
   function loadColors() { try { return Object.assign({}, DEF_COLOR, JSON.parse(localStorage.getItem(CKEY) || '{}')); } catch (e) { return Object.assign({}, DEF_COLOR); } }
   function saveColors() { try { localStorage.setItem(CKEY, JSON.stringify(S.colors)); } catch (e) {} }
+
+  // ── статистика exp/winrate по тикеру: считается на его свечах, хранится
+  //    per-symbol в localStorage, обновляется при закрытии нового бара ──────────
+  function loadStats() { try { return JSON.parse(localStorage.getItem(SKEY) || '{}'); } catch (e) { return {}; } }
+  function saveStats(sym, computed, bars) {
+    if (!sym || !computed) return;
+    const m = {}; // компактно: e=exp, a=acc(winrate), w=win-до-тейка, n=сделок
+    META.forEach(([id]) => { const s = computed[id] && computed[id].stats; if (s) m[id] = { e: s.exp, a: s.acc, w: s.win, n: s.n }; });
+    S.statsCache[sym] = { m, ts: Date.now(), bars: bars.length, t: bars.length ? bars[bars.length - 1].time : 0 };
+    S.statsTs = S.statsCache[sym].ts;
+    const keys = Object.keys(S.statsCache); // не разрастаться — держим последние ~300 тикеров
+    if (keys.length > 300) keys.sort((a, b) => S.statsCache[a].ts - S.statsCache[b].ts).slice(0, keys.length - 300).forEach(k => delete S.statsCache[k]);
+    try { localStorage.setItem(SKEY, JSON.stringify(S.statsCache)); } catch (e) {}
+  }
+  // мгновенно показать сохранённые цифры тикера, пока идёт свежий пересчёт
+  function seedFromCache(sym) {
+    const e = S.statsCache[sym];
+    if (!e || !e.m) { S.computed = null; S.statsTs = 0; return; }
+    const c = {};
+    META.forEach(([id]) => { const x = e.m[id];
+      c[id] = { last: 0, series: null, stats: x ? { exp: x.e, acc: x.a, win: x.w, n: x.n } : { exp: null, acc: null, win: null, n: 0 } }; });
+    S.computed = c; S.statsTs = e.ts; renderRows();
+  }
+  function fmtAgo(ts) { if (!ts) return '—'; const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+    if (s < 60) return s + 'с назад'; const m = Math.round(s / 60); if (m < 60) return m + 'м назад';
+    return Math.round(m / 60) + 'ч назад'; }
   function setColor(id, val) { S.colors[id] = val; saveColors(); if (S.on[id]) drawMethod(id); renderRows(); }
 
   // ── доступ к TradingView ─────────────────────────────────────────────────────
@@ -175,22 +202,33 @@
   // ── данные + расчёт ──────────────────────────────────────────────────────────
   async function refresh(force) {
     if (S.busy || !S.chart) return;
-    S.busy = true; status('считаю…');
+    S.busy = true;
     try {
       let sym = ''; try { sym = S.chart.symbol(); } catch (e) {}
-      const changed = sym !== S.symbol; if (changed) { clearAll(); S.symbol = sym; }
+      const changed = sym !== S.symbol;
+      if (changed) { clearAll(); S.symbol = sym; S.lastBarTime = 0; seedFromCache(sym); status('тикер ' + (sym || '?') + ' · пересчёт…'); }
       const res = await Promise.resolve(S.chart.exportData());
       let bars = window.SignalsCore.parseExport(res);
       if (bars.length > 3000) bars = bars.slice(-3000); // держим NW (O(n^2)) в узде
+      const lastT = bars.length ? bars[bars.length - 1].time : 0;
+      const newBar = lastT !== S.lastBarTime;
+      // тот же тикер, новый бар не закрылся, есть живой расчёт → только освежаем «обновлено»
+      if (!changed && !newBar && !force && S.computed && S.computed.__live) {
+        status('тикер ' + (S.symbol || '?') + ' · ' + S.bars.length + ' баров · обновлено ' + fmtAgo(S.statsTs));
+        S.busy = false; return;
+      }
+      if (!changed) status('считаю…');
       S.bars = bars;
       S.hasVolume = bars.some(b => b.volume && b.volume > 0);
       if (bars.length < 60) { status('мало свечей (' + bars.length + ')'); S.busy = false; return; }
       S.computed = window.SignalsCore.computeAll(bars, 12);
+      S.computed.__live = true; S.lastBarTime = lastT;
+      saveStats(S.symbol, S.computed, bars); // сохранить exp/winrate по этому тикеру
       renderRows();
       // перерисовать активные слои
       Object.keys(S.on).forEach(id => { if (S.on[id]) drawMethod(id); });
       if (changed) { S.oi = null; S._oiSeeded = null; oiLoad(); } else if (S.oi) oiRender(); // OI: перезагрузка при смене тикера, иначе обновляем регион
-      status('тикер ' + (S.symbol || '?') + ' · ' + bars.length + ' баров');
+      status('тикер ' + (S.symbol || '?') + ' · ' + bars.length + ' баров · обновлено ' + fmtAgo(S.statsTs));
     } catch (e) { status('ошибка: ' + (e && e.message || e)); }
     S.busy = false;
   }
@@ -207,6 +245,7 @@
     clearMethod(id);
     let vr = null; try { vr = S.chart.getVisibleRange(); } catch (e) {}
     const series = S.computed[id].series, bars = S.bars;
+    if (!series || !bars.length) return; // сид из кэша (series=null) — рисовать нечего до пересчёта
     // Берём только ПЕРЕХОДЫ (начало нового сигнала / смена направления), а не
     // каждый бар — иначе частые методы (FVG, Z-score) заливают весь график.
     const marks = [];
@@ -280,7 +319,7 @@
       '<button id="tvsig-oi-key" title="Токен AlgoPack для живых 5-мин данных">🔑</button>' +
       '<button id="tvsig-oi-load" title="Загрузить/обновить OI">⟳</button></div>' +
       '<div id="tvsig-oi-body"><span class="tvsig-oi-meta">физ/юр лонг-шорт и Δ по видимому окну · ⟳ загрузить</span></div></div>' +
-      '<div id="tvsig-foot"><b>exp</b> — экспектанси, средний P&amp;L сделки в ATR (тейк +1.0 / стоп −0.5 ATR, издержки 0.12); плюс = метод в прибыли. <b>%</b> — winrate, частота угадывания знака за 12 баров (у фейдов низкая при плюсовом exp — норма). <b>n</b> — число сделок. Клик по строке рисует сигналы на графике.</div>';
+      '<div id="tvsig-foot">Цифры считаются на свечах <b>текущего тикера</b>, хранятся по каждому и обновляются при закрытии нового бара. <b>exp</b> — экспектанси, средний P&amp;L сделки в ATR (тейк +1.0 / стоп −0.5 ATR, издержки 0.12); плюс = метод в прибыли. <b>%</b> — winrate, частота угадывания знака за 12 баров (у фейдов низкая при плюсовом exp — норма). <b>n</b> — число сделок. Клик по строке рисует сигналы.</div>';
     document.documentElement.appendChild(panel);
     rowsEl = panel.querySelector('#tvsig-rows'); statusEl = panel.querySelector('#tvsig-status');
     panel.querySelector('#tvsig-refresh').onclick = () => refresh(true);
