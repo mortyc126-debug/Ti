@@ -17,7 +17,7 @@
     ['talib_anti', 'Фейд свечей', '#A78BFA'], ['hawkes', 'Hawkes', '#7B61FF'],
     ['cascade', 'Cascade', '#B487F8'], ['nw', 'NW-память', '#9090BB'],
   ];
-  const NAME = {}, DEF_COLOR = {}; META.forEach(([id, n, c]) => { NAME[id] = n; DEF_COLOR[id] = c; });
+  const NAME = {}, DEF_COLOR = {}, IDX = {}; META.forEach(([id, n, c], i) => { NAME[id] = n; DEF_COLOR[id] = c; IDX[id] = i; });
   // описания для ℹ-окон: что делает · как читать знак · оговорка из прогонов бота
   const DESC = {
     zscore: { what: 'Rolling z-score: отклонение цены от среднего за 20 баров.', read: 'Контрарный возврат к среднему — цена высоко над средней → sell, глубоко под → buy.', note: 'Универсальный сигнал во всех режимах (OOS-подтверждён). Сильнее на менее ликвидных тикерах.' },
@@ -321,22 +321,26 @@
     let vr = null; try { vr = S.chart.getVisibleRange(); } catch (e) {}
     const series = S.computed[id].series, bars = S.bars;
     if (!series || !bars.length) return; // сид из кэша (series=null) — рисовать нечего до пересчёта
-    // Точка на КАЖДОМ баре, где сигнал активен. Цвет = НАПРАВЛЕНИЕ: зелёная = buy,
-    // красная = sell (сразу понятно). Позиция дублирует: buy под баром, sell над.
+    // Точка на КАЖДОМ баре, где сигнал активен. ЦВЕТ = МЕТОД (совпадает с ромбом/
+    // пикером в панели — так видно, чей это сигнал, когда активны несколько). ФОРМА =
+    // направление: ▲ buy (под баром), ▼ sell (над баром). Слои чуть разнесены по
+    // вертикали (off по индексу метода), чтобы точки разных методов не сливались.
+    const col = S.colors[id] || DEF_COLOR[id];
+    const off = 0.0006 * (IDX[id] || 0);
     const marks = [];
     for (let i = 0; i < bars.length; i++) {
       const sc = series[i]; if (sc == null || sc === 0) continue;
       const b = bars[i]; if (vr && (b.time < vr.from || b.time > vr.to)) continue;
       const buy = sc > 0;
-      marks.push({ time: b.time, price: buy ? b.low * 0.9985 : b.high * 1.0015, buy });
+      marks.push({ time: b.time, price: buy ? b.low * (0.9985 - off) : b.high * (1.0015 + off), buy });
     }
     const out = [];
     marks.slice(-MAX_DOTS).forEach(m => {
       try {
         const sid = S.chart.createShape(
           { time: m.time, price: m.price },
-          { shape: 'text', text: '●', lock: true, disableSelection: true, disableSave: true,
-            zOrder: 'top', overrides: { color: m.buy ? '#52F2C9' : '#FF6A8B', fontsize: 8, bold: true } });
+          { shape: 'text', text: m.buy ? '▲' : '▼', lock: true, disableSelection: true, disableSave: true,
+            zOrder: 'top', overrides: { color: col, fontsize: 9, bold: true } });
         if (sid) out.push(sid);
       } catch (e) {}
     });
@@ -360,10 +364,13 @@
       }
       return;
     }
-    try {
-      if (typeof S.chart.selectLineTool === 'function') S.chart.selectLineTool(t);
-      else status('рисуй линию нативным инструментом терминала (панель слева) — плашка сама покажет Δ по ней');
-    } catch (e) { status('рисование: ' + (e && e.message || e)); }
+    // selectLineTool в разных сборках Charting Library лежит либо на чарте
+    // (activeChart), либо на самом виджете (tradingViewApi) — пробуем оба.
+    const target = (S.chart && typeof S.chart.selectLineTool === 'function') ? S.chart
+      : (S.api && typeof S.api.selectLineTool === 'function') ? S.api : null;
+    if (!target) { status('терминал не даёт включить рисование из панели — рисуй инструментом слева, плашка покажет Δ по линии'); return; }
+    try { target.selectLineTool(t); status(t === 'cursor' ? 'курсор' : 'рисуй: ' + t); }
+    catch (e) { status('рисование: ' + (e && e.message || e)); }
   }
 
   // ── панель ───────────────────────────────────────────────────────────────────
