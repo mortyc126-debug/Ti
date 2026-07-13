@@ -144,8 +144,11 @@
       }
       if (live.error === 'sym-not-found') { if (body) body.innerHTML = '<span style="color:#F4C36A">Контракт не найден в AlgoPack. Доступные коды: ' + (live.syms || []).slice(0, 40).join(', ') + '. Впиши нужный в поле кода.</span>'; return; }
       const er = live.error || 'ошибка', isAuth = /401|403/.test(er);
+      // живой путь не удался (напр. 401) — не тупик: подхватываем архив воркера
+      const w = await oiWorkerSeries(cands);
+      if (w) { w.note = isAuth ? 'live-токен отклонён (нужен MOEX AlgoPack) → архив' : 'live не дошёл → архив'; S.oi = w; oiRender(); return; }
       if (body) body.innerHTML = '<span style="color:#FF6A8B">AlgoPack: ' + er +
-        (isAuth ? ' — токен отклонён (истёк/неверный/нет подписки)' : ' — запрос не дошёл (после апдейта перезагрузи расширение: нужен доступ к apim.moex.com)') + '</span>';
+        (isAuth ? ' — токен отклонён (нужен MOEX AlgoPack; pscalp-токен не подойдёт)' : ' — запрос не дошёл (перезагрузи расширение)') + '. Архива по тикеру тоже нет.</span>';
       return;
     }
     // без токена — только архив воркера (то, что коллектор уже собрал)
@@ -163,7 +166,7 @@
     const dlt = v => (v > 0 ? '+' : v < 0 ? '−' : '') + num(Math.abs(v));
     const cell = (cur, d) => { const col = d > 0 ? '#52F2C9' : d < 0 ? '#FF6A8B' : '#A79BC9'; return '<b>' + num(cur) + '</b> <span style="color:' + col + '">' + dlt(d) + '</span>'; };
     body.innerHTML =
-      '<div class="tvsig-oi-meta">' + S.oi.used + ' · ' + (S.oi.tf || '') + ' · ' + reg.length + ' точек (' + a.date + '…' + b.date + ')</div>' +
+      '<div class="tvsig-oi-meta">' + S.oi.used + ' · ' + (S.oi.tf || '') + ' · ' + reg.length + ' точек (' + a.date + '…' + b.date + ')' + (S.oi.note ? ' · ' + S.oi.note : '') + '</div>' +
       '<table class="tvsig-oi-t"><tr><th></th><th>лонг</th><th>шорт</th></tr>' +
       '<tr><td>физ</td><td>' + cell(b.fl, b.fl - a.fl) + '</td><td>' + cell(b.fs, b.fs - a.fs) + '</td></tr>' +
       '<tr><td>юр</td><td>' + cell(b.yl, b.yl - a.yl) + '</td><td>' + cell(b.ys, b.ys - a.ys) + '</td></tr></table>';
