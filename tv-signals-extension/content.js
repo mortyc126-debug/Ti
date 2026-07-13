@@ -229,11 +229,16 @@
   function setColor(id, val) { S.colors[id] = val; saveColors(); if (S.on[id]) drawMethod(id); renderRows(); }
 
   // ── доступ к TradingView ─────────────────────────────────────────────────────
+  function _apiIn(w) { try { if (w && w.tradingViewApi && typeof w.tradingViewApi.activeChart === 'function') return w.tradingViewApi; } catch (e) {} return null; }
   function getApi() {
+    let a = _apiIn(window); if (a) return a; // сам верхний фрейм
     const frames = document.getElementsByTagName('iframe');
     for (let i = 0; i < frames.length; i++) {
       let w; try { w = frames[i].contentWindow; } catch (e) { continue; }
-      if (w && w.tradingViewApi && typeof w.tradingViewApi.activeChart === 'function') return w.tradingViewApi;
+      a = _apiIn(w); if (a) return a;
+      // один уровень вложенности (терминал мог обернуть график ещё в iframe)
+      let inner; try { inner = w && w.document && w.document.getElementsByTagName('iframe'); } catch (e) { inner = null; }
+      if (inner) for (let j = 0; j < inner.length; j++) { let w2; try { w2 = inner[j].contentWindow; } catch (e) { continue; } a = _apiIn(w2); if (a) return a; }
     }
     return null;
   }
@@ -387,6 +392,7 @@
     let minimized = false;
     panel.querySelector('#tvsig-min').onclick = () => { minimized = !minimized; rowsEl.style.display = minimized ? 'none' : ''; panel.querySelector('#tvsig-foot').style.display = minimized ? 'none' : ''; };
     drag(panel, panel.querySelector('#tvsig-head'));
+    try { renderRows(); } catch (e) {} // список методов виден сразу, даже пока график не найден (stats будут «—»)
   }
   function status(t) { if (statusEl) statusEl.textContent = t; }
   function pill(sc) {
