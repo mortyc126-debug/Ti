@@ -311,31 +311,30 @@
     S.drawn[id] = [];
   }
   function clearAll() { Object.keys(S.drawn).forEach(clearMethod); }
-  const MAX_MARKS = 14; // не засорять график — только начала серий, последние N
+  const MAX_DOTS = 260; // потолок точек на метод в окне (перф + чистота)
   function drawMethod(id) {
     if (!S.chart || !S.computed || !S.computed[id]) return;
     clearMethod(id);
     let vr = null; try { vr = S.chart.getVisibleRange(); } catch (e) {}
     const series = S.computed[id].series, bars = S.bars;
     if (!series || !bars.length) return; // сид из кэша (series=null) — рисовать нечего до пересчёта
-    // Берём только ПЕРЕХОДЫ (начало нового сигнала / смена направления), а не
-    // каждый бар — иначе частые методы (FVG, Z-score) заливают весь график.
+    const col = S.colors[id];
+    // Точка на КАЖДОМ баре, где сигнал активен: buy — под баром, sell — над баром.
+    // Цвет = цвет метода (различать методы на графике), направление — позицией.
     const marks = [];
-    for (let i = 1; i < bars.length; i++) {
+    for (let i = 0; i < bars.length; i++) {
       const sc = series[i]; if (sc == null || sc === 0) continue;
-      const pr = series[i - 1];
-      const isNew = pr == null || pr === 0 || Math.sign(pr) !== Math.sign(sc);
-      if (!isNew) continue;
       const b = bars[i]; if (vr && (b.time < vr.from || b.time > vr.to)) continue;
-      marks.push({ b, buy: sc > 0 });
+      const buy = sc > 0;
+      marks.push({ time: b.time, price: buy ? b.low * 0.9985 : b.high * 1.0015 });
     }
     const out = [];
-    marks.slice(-MAX_MARKS).forEach(m => {
+    marks.slice(-MAX_DOTS).forEach(m => {
       try {
         const sid = S.chart.createShape(
-          { time: m.b.time, price: m.buy ? m.b.low : m.b.high },
-          { shape: m.buy ? 'arrow_up' : 'arrow_down', lock: true, disableSelection: true, disableSave: true,
-            zOrder: 'top', overrides: { arrowColor: S.colors[id], color: S.colors[id] } });
+          { time: m.time, price: m.price },
+          { shape: 'text', text: '●', lock: true, disableSelection: true, disableSave: true,
+            zOrder: 'top', overrides: { color: col, fontsize: 8, bold: true } });
         if (sid) out.push(sid);
       } catch (e) {}
     });
