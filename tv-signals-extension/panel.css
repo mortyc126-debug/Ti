@@ -1,77 +1,98 @@
-#tvsig-panel{
-  position:fixed; top:90px; right:16px; z-index:2147483000; width:230px;
-  background:rgba(16,16,24,0.97); border:1px solid rgba(255,255,255,0.12);
-  border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,0.55);
-  font:12px/1.3 -apple-system,Segoe UI,Roboto,sans-serif; color:#e8e6f0; user-select:none;
+/* Панель «Сигнальные модели» — тема indlab (Neon Magenta Terminal) */
+#tvsig-panel, #tvsig-info{
+  --bg:#0B0613; --surface:#140A24; --surface2:#1A1030; --border:#2a1f3d; --border2:#3a2a50;
+  --text:#F2F0FF; --text2:#A79BC9; --text3:#6F648F;
+  --accent:#C71B52; --green:#52F2C9; --violet:#B487F8; --blue:#7CC7FF; --negative:#FF6A8B; --amber:#F4C36A;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
 }
-#tvsig-head{ display:flex; align-items:center; gap:6px; padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.08); }
-#tvsig-title{ flex:1; font-size:11px; font-weight:600; color:#c9c3e6; }
-#tvsig-head button{ width:22px; height:22px; border-radius:6px; cursor:pointer; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); color:#d6d2e8; font-size:13px; }
-#tvsig-head button:hover{ background:rgba(255,255,255,0.12); }
-#tvsig-draw{ display:flex; gap:3px; flex-wrap:wrap; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06); }
+#tvsig-panel{
+  position:fixed; top:90px; right:16px; z-index:2147483000; width:266px;
+  background:var(--surface); border:1px solid var(--border); border-radius:10px;
+  box-shadow:0 8px 30px rgba(0,0,0,0.65);
+  font:12px/1.35 'Inter',-apple-system,'Segoe UI',Roboto,sans-serif; color:var(--text); user-select:none;
+}
+#tvsig-head{ display:flex; align-items:center; gap:6px; padding:8px 10px; border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg,var(--surface2),var(--surface)); }
+#tvsig-title{ flex:1; font-size:11px; font-weight:600; letter-spacing:0.03em; color:var(--text); font-family:var(--mono); }
+#tvsig-head button{ width:22px; height:22px; border-radius:6px; cursor:pointer; border:1px solid var(--border2);
+  background:var(--surface2); color:var(--text2); font-size:13px; transition:all .12s; }
+#tvsig-head button:hover{ background:var(--accent); border-color:var(--accent); color:#fff; }
+
+#tvsig-draw{ display:flex; gap:3px; flex-wrap:wrap; padding:6px 8px; border-bottom:1px solid var(--border); }
 #tvsig-draw .tvsig-dt{ width:26px; height:24px; border-radius:6px; cursor:pointer; font-size:13px; line-height:1;
-  border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); color:#d6d2e8; display:flex; align-items:center; justify-content:center; }
-#tvsig-draw .tvsig-dt:hover{ background:rgba(122,92,255,0.22); border-color:rgba(122,92,255,0.5); color:#fff; }
-#tvsig-draw .tvsig-dt.danger:hover{ background:rgba(255,77,122,0.2); border-color:rgba(255,77,122,0.5); }
-#tvsig-status{ padding:5px 10px; font-size:10px; color:#8b84ac; border-bottom:1px solid rgba(255,255,255,0.05); }
-#tvsig-period{ padding:5px 10px; font-size:10px; color:#a49ec4; border-bottom:1px solid rgba(255,255,255,0.05); line-height:1.5; }
+  border:1px solid var(--border2); background:var(--surface2); color:var(--text2); display:flex; align-items:center; justify-content:center; transition:all .12s; }
+#tvsig-draw .tvsig-dt:hover{ background:rgba(180,135,248,0.18); border-color:var(--violet); color:var(--text); }
+#tvsig-draw .tvsig-dt.danger:hover{ background:rgba(199,27,82,0.22); border-color:var(--accent); color:#fff; }
+
+#tvsig-status{ padding:5px 10px; font-size:10px; color:var(--text3); font-family:var(--mono); border-bottom:1px solid var(--border); }
+#tvsig-period{ padding:5px 10px; font-size:10px; color:var(--text2); font-family:var(--mono); border-bottom:1px solid var(--border); line-height:1.5; }
 #tvsig-period:empty{ display:none; }
-.tvsig-period-oi{ color:#8b84ac; margin-top:1px; }
+.tvsig-period-oi{ color:var(--text3); margin-top:1px; }
+
 #tvsig-rows{ padding:4px; max-height:340px; overflow:auto; }
-.tvsig-row{ display:flex; align-items:center; gap:7px; padding:5px 6px; border-radius:7px; }
-.tvsig-row:hover{ background:rgba(255,255,255,0.05); }
-.tvsig-row.on{ background:rgba(255,255,255,0.06); }
-/* ромб-переключатель в стиле indlab */
-.tvsig-diam{ width:10px; height:10px; transform:rotate(45deg); flex-shrink:0; cursor:pointer;
-  border:1.5px solid #7a5cff; background:transparent; transition:all .12s; }
+.tvsig-row{ display:flex; align-items:center; gap:6px; padding:5px 6px; border-radius:8px; transition:background .12s; }
+.tvsig-row:hover{ background:rgba(255,255,255,0.04); }
+.tvsig-row.on{ background:rgba(199,27,82,0.10); }
+/* ромб-переключатель в стиле indlab (цвет метода задаётся инлайном из content.js) */
+.tvsig-diam{ width:12px; height:12px; transform:rotate(45deg); flex-shrink:0; cursor:pointer;
+  border:1.5px solid var(--accent); background:transparent; transition:all .15s; }
 .tvsig-diam:hover{ transform:rotate(45deg) scale(1.18); }
-.tvsig-dot{ width:8px; height:8px; border-radius:2px; flex-shrink:0; }
-.tvsig-name{ flex:1; font-size:11px; cursor:pointer; user-select:none; }
-.tvsig-row.on .tvsig-name{ color:#fff; font-weight:600; }
+.tvsig-name{ flex:1; min-width:0; font-size:11px; font-family:var(--mono); color:var(--text2); cursor:pointer; user-select:none;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tvsig-row.on .tvsig-name{ color:var(--text); font-weight:600; }
 .tvsig-col{ width:16px; height:16px; padding:0; border:none; background:none; cursor:pointer; flex-shrink:0; border-radius:4px; overflow:hidden; }
 .tvsig-col::-webkit-color-swatch-wrapper{ padding:0; }
-.tvsig-col::-webkit-color-swatch{ border:1px solid rgba(255,255,255,0.25); border-radius:4px; }
-.tvsig-b{ font-size:10px; padding:1px 5px; border-radius:5px; }
-.tvsig-b.buy{ color:#52D8A0; background:rgba(82,216,160,0.14); }
-.tvsig-b.sell{ color:#FF6B6B; background:rgba(255,107,107,0.14); }
-.tvsig-b.neu{ color:#6b6690; }
-.tvsig-exp{ font-size:11px; font-weight:600; min-width:38px; text-align:right; font-variant-numeric:tabular-nums; }
-.tvsig-acc{ font-size:10px; font-weight:500; color:#8983a8; min-width:30px; text-align:right; font-variant-numeric:tabular-nums; }
-.tvsig-n{ font-size:9px; color:#5f5a80; min-width:26px; text-align:right; }
-.tvsig-info-btn{ font-size:12px; color:#8b84ac; cursor:pointer; padding:0 2px; line-height:1; }
-.tvsig-info-btn:hover{ color:#c9b8ff; }
+.tvsig-col::-webkit-color-swatch{ border:1px solid var(--border2); border-radius:4px; }
+
+.tvsig-b{ font-size:11px; width:13px; text-align:center; flex-shrink:0; font-family:var(--mono); }
+.tvsig-b.buy{ color:var(--green); }
+.tvsig-b.sell{ color:var(--negative); }
+.tvsig-b.neu{ color:var(--text3); }
+.tvsig-exp{ font-size:11px; font-weight:600; min-width:36px; text-align:right; flex-shrink:0; font-family:var(--mono); font-variant-numeric:tabular-nums; }
+.tvsig-acc{ font-size:10px; font-weight:500; color:var(--text2); min-width:28px; text-align:right; flex-shrink:0; font-family:var(--mono); font-variant-numeric:tabular-nums; }
+.tvsig-n{ font-size:9px; color:var(--text3); min-width:22px; text-align:right; flex-shrink:0; font-family:var(--mono); }
+.tvsig-info-btn{ font-size:12px; color:var(--text3); cursor:pointer; padding:0 2px; line-height:1; }
+.tvsig-info-btn:hover{ color:var(--violet); }
+
+/* ползунки в стиле indlab: тонкий трек, повёрнутый на 45° фиолетовый thumb */
+#tvsig-panel input[type=range]{ -webkit-appearance:none; appearance:none; height:2px; background:rgba(122,95,191,0.35); border-radius:0; }
+#tvsig-panel input[type=range]::-webkit-slider-runnable-track{ height:2px; background:rgba(122,95,191,0.35); border-radius:0; }
+#tvsig-panel input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:9px; height:9px; background:#7A5FBF; border-radius:0; transform:rotate(45deg); margin-top:-3.5px; transition:background .12s; }
+#tvsig-panel input[type=range]::-webkit-slider-thumb:hover{ background:var(--violet); }
+#tvsig-panel input[type=range]::-webkit-slider-progress{ height:2px; background:rgba(180,135,248,0.55); }
 
 /* ℹ-окно метода (описание + бэктест по горизонтам) */
-#tvsig-info{ position:fixed; inset:0; z-index:2147483001; background:rgba(0,0,0,0.5);
-  display:flex; align-items:center; justify-content:center; }
-.tvsig-info-card{ width:340px; max-width:92vw; max-height:80vh; overflow:auto;
-  background:rgba(16,16,24,0.99); border:1px solid rgba(122,92,255,0.4); border-radius:12px;
-  box-shadow:0 12px 40px rgba(0,0,0,0.6); color:#e8e6f0;
-  font:12px/1.45 -apple-system,Segoe UI,Roboto,sans-serif; padding:12px 14px; }
+#tvsig-info{ position:fixed; inset:0; z-index:2147483001; background:rgba(11,6,19,0.62);
+  display:flex; align-items:center; justify-content:center; font:12px/1.45 'Inter',-apple-system,'Segoe UI',Roboto,sans-serif; }
+.tvsig-info-card{ width:344px; max-width:92vw; max-height:80vh; overflow:auto;
+  background:var(--surface); border:1px solid var(--accent); border-radius:12px;
+  box-shadow:0 12px 44px rgba(0,0,0,0.7), 0 0 22px rgba(199,27,82,0.18); color:var(--text); padding:12px 14px; }
 .tvsig-info-head{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
-.tvsig-info-dot{ width:10px; height:10px; border-radius:50%; flex:none; }
-.tvsig-info-title{ font-size:13px; font-weight:700; flex:1; }
-.tvsig-info-sig{ font-size:11px; font-family:monospace; }
+.tvsig-info-dot{ width:11px; height:11px; transform:rotate(45deg); flex:none; }
+.tvsig-info-title{ font-size:13px; font-weight:700; flex:1; font-family:var(--mono); }
+.tvsig-info-sig{ font-size:11px; font-family:var(--mono); }
 .tvsig-info-x{ width:22px; height:22px; border-radius:6px; cursor:pointer; flex:none;
-  border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:#d6d2e8; font-size:15px; line-height:1; }
-.tvsig-info-x:hover{ background:rgba(255,77,122,0.2); }
-.tvsig-info-sec{ margin-bottom:9px; }
-.tvsig-info-lbl{ font-size:9px; text-transform:uppercase; letter-spacing:0.06em; color:#8b84ac; margin-bottom:3px; }
+  border:1px solid var(--border2); background:var(--surface2); color:var(--text2); font-size:15px; line-height:1; }
+.tvsig-info-x:hover{ background:var(--accent); color:#fff; }
+.tvsig-info-sec{ margin-bottom:9px; color:var(--text2); }
+.tvsig-info-lbl{ font-size:9px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text3); font-family:var(--mono); margin-bottom:3px; }
 .tvsig-chips{ display:flex; flex-wrap:wrap; gap:5px; }
-.tvsig-chip{ font-size:10px; font-family:monospace; padding:3px 6px; border-radius:6px;
-  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08); }
-.tvsig-chip.na{ color:#6b6690; }
-.tvsig-info-fine{ font-size:9px; color:#6b6690; margin-top:5px; line-height:1.4; }
-.tvsig-info-note{ font-size:10px; color:#d8b36a; background:rgba(216,179,106,0.08);
-  border:1px solid rgba(216,179,106,0.2); border-radius:7px; padding:6px 8px; margin-top:4px; }
-#tvsig-oi{ border-top:1px solid rgba(255,255,255,0.07); padding:7px 9px; }
-#tvsig-oi-head{ display:flex; align-items:center; gap:6px; font-size:11px; color:#c9c3e6; margin-bottom:5px; }
-#tvsig-oi-head input{ flex:1; min-width:0; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#e8e6f0; border-radius:5px; padding:2px 6px; font-size:10px; }
-#tvsig-oi-head button{ width:24px; height:20px; border-radius:5px; cursor:pointer; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.05); color:#d6d2e8; }
-#tvsig-oi-head button:hover{ background:rgba(255,255,255,0.12); }
-.tvsig-oi-meta{ font-size:9px; color:#8b84ac; margin-bottom:4px; }
-.tvsig-oi-t{ width:100%; border-collapse:collapse; font-size:11px; }
-.tvsig-oi-t th{ font-size:9px; color:#6b6690; font-weight:500; text-align:right; padding:1px 4px; }
+.tvsig-chip{ font-size:10px; font-family:var(--mono); padding:3px 6px; border-radius:6px;
+  background:var(--surface2); border:1px solid var(--border2); color:var(--text2); }
+.tvsig-chip.na{ color:var(--text3); }
+.tvsig-info-fine{ font-size:9px; color:var(--text3); font-family:var(--mono); margin-top:5px; line-height:1.4; }
+.tvsig-info-note{ font-size:10px; color:var(--violet); background:rgba(180,135,248,0.08);
+  border:1px solid rgba(180,135,248,0.25); border-radius:7px; padding:6px 8px; margin-top:4px; }
+
+/* OI-блок */
+#tvsig-oi{ border-top:1px solid var(--border); padding:7px 9px; }
+#tvsig-oi-head{ display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text2); font-family:var(--mono); margin-bottom:5px; }
+#tvsig-oi-head input{ flex:1; min-width:0; background:var(--surface2); border:1px solid var(--border2); color:var(--text); border-radius:5px; padding:2px 6px; font-size:10px; font-family:var(--mono); }
+#tvsig-oi-head button{ width:24px; height:20px; border-radius:5px; cursor:pointer; border:1px solid var(--border2); background:var(--surface2); color:var(--text2); transition:all .12s; }
+#tvsig-oi-head button:hover{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.tvsig-oi-meta{ font-size:9px; color:var(--text3); font-family:var(--mono); margin-bottom:4px; }
+.tvsig-oi-t{ width:100%; border-collapse:collapse; font-size:11px; font-family:var(--mono); }
+.tvsig-oi-t th{ font-size:9px; color:var(--text3); font-weight:500; text-align:right; padding:1px 4px; }
 .tvsig-oi-t td{ padding:2px 4px; text-align:right; }
-.tvsig-oi-t td:first-child{ text-align:left; color:#9a94b8; }
-#tvsig-foot{ padding:6px 10px; font-size:9px; color:#6b6690; line-height:1.5; border-top:1px solid rgba(255,255,255,0.05); }
+.tvsig-oi-t td:first-child{ text-align:left; color:var(--text2); }
+#tvsig-foot{ padding:6px 10px; font-size:9px; color:var(--text3); font-family:var(--mono); line-height:1.5; border-top:1px solid var(--border); }

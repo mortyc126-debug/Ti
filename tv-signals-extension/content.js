@@ -10,12 +10,12 @@
   if (window.__tvSignals) return;
 
   const META = [
-    ['zscore', 'Z-score', '#4CC9F0'], ['accel', 'Accel-fade', '#F72585'],
-    ['order_block', 'Order Block', '#FFB703'], ['fvg', 'FVG', '#8AC926'],
-    ['liq_sweep', 'Liquidity Sweep', '#FF6B6B'], ['false_breakout', 'False Breakout', '#B197FC'],
-    ['vsa_abs', 'VSA Absorption', '#52D8A0'], ['waning', 'Waning', '#FF9F40'],
-    ['talib_anti', 'Фейд свечей', '#E36414'], ['hawkes', 'Hawkes', '#00BBF9'],
-    ['cascade', 'Cascade', '#F15BB5'], ['nw', 'NW-память', '#9B5DE5'],
+    ['zscore', 'Z-score', '#7CC7FF'], ['accel', 'Accel-fade', '#FF006E'],
+    ['order_block', 'Order Block', '#FF9F40'], ['fvg', 'FVG', '#52F2C9'],
+    ['liq_sweep', 'Liquidity Sweep', '#FF6A8B'], ['false_breakout', 'False Breakout', '#B45CFF'],
+    ['vsa_abs', 'VSA Absorption', '#3DD9FF'], ['waning', 'Waning', '#FF8800'],
+    ['talib_anti', 'Фейд свечей', '#A78BFA'], ['hawkes', 'Hawkes', '#7B61FF'],
+    ['cascade', 'Cascade', '#B487F8'], ['nw', 'NW-память', '#9090BB'],
   ];
   const NAME = {}, DEF_COLOR = {}; META.forEach(([id, n, c]) => { NAME[id] = n; DEF_COLOR[id] = c; });
   // описания для ℹ-окон: что делает · как читать знак · оговорка из прогонов бота
@@ -142,13 +142,13 @@
         const rows = series.map(r => { const d = new Date(r.ts * 1000); return { ...r, date: ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) }; });
         S.oi = { rows, used: live.sym, tf: '5-мин live' }; oiRender(); return;
       }
-      if (live.error === 'sym-not-found') { if (body) body.innerHTML = '<span style="color:#b0873b">Контракт не найден в AlgoPack. Доступные коды: ' + (live.syms || []).slice(0, 40).join(', ') + '. Впиши нужный в поле кода.</span>'; return; }
-      if (body) body.innerHTML = '<span style="color:#FF6B6B">AlgoPack: ' + (live.error || 'ошибка') + ' (проверь токен)</span>';
+      if (live.error === 'sym-not-found') { if (body) body.innerHTML = '<span style="color:#F4C36A">Контракт не найден в AlgoPack. Доступные коды: ' + (live.syms || []).slice(0, 40).join(', ') + '. Впиши нужный в поле кода.</span>'; return; }
+      if (body) body.innerHTML = '<span style="color:#FF6A8B">AlgoPack: ' + (live.error || 'ошибка') + ' (проверь токен)</span>';
       return;
     }
     // без токена — только архив воркера (то, что коллектор уже собрал)
     const w = await oiWorkerSeries(cands);
-    if (!w) { if (body) body.innerHTML = '<span style="color:#b0873b">OI не найден (' + cands.join(' / ') + '). Впиши код или задай токен AlgoPack (🔑) для живых данных.</span>'; S.oi = null; return; }
+    if (!w) { if (body) body.innerHTML = '<span style="color:#F4C36A">OI не найден (' + cands.join(' / ') + '). Впиши код или задай токен AlgoPack (🔑) для живых данных.</span>'; S.oi = null; return; }
     S.oi = w; oiRender();
   }
   function oiRender() {
@@ -159,7 +159,7 @@
     const a = reg[0], b = reg[reg.length - 1];
     const num = v => Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'к' : v.toFixed(0);
     const dlt = v => (v > 0 ? '+' : v < 0 ? '−' : '') + num(Math.abs(v));
-    const cell = (cur, d) => { const col = d > 0 ? '#52D8A0' : d < 0 ? '#FF6B6B' : '#9a94b8'; return '<b>' + num(cur) + '</b> <span style="color:' + col + '">' + dlt(d) + '</span>'; };
+    const cell = (cur, d) => { const col = d > 0 ? '#52F2C9' : d < 0 ? '#FF6A8B' : '#A79BC9'; return '<b>' + num(cur) + '</b> <span style="color:' + col + '">' + dlt(d) + '</span>'; };
     body.innerHTML =
       '<div class="tvsig-oi-meta">' + S.oi.used + ' · ' + (S.oi.tf || '') + ' · ' + reg.length + ' точек (' + a.date + '…' + b.date + ')</div>' +
       '<table class="tvsig-oi-t"><tr><th></th><th>лонг</th><th>шорт</th></tr>' +
@@ -189,8 +189,8 @@
     if (!s.n) { el.innerHTML = ''; return; }
     const dnum = v => Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'к' : v.toFixed(0);
     const dsg = v => (v > 0 ? '+' : v < 0 ? '−' : '') + dnum(Math.abs(v));
-    const dcol = v => v > 0 ? '#52D8A0' : v < 0 ? '#FF6B6B' : '#9a94b8';
-    const pc = s.pricePct == null ? '' : ' · цена <b style="color:' + (s.pricePct >= 0 ? '#52D8A0' : '#FF6B6B') + '">' + (s.pricePct >= 0 ? '+' : '') + s.pricePct.toFixed(2) + '%</b>';
+    const dcol = v => v > 0 ? '#52F2C9' : v < 0 ? '#FF6A8B' : '#A79BC9';
+    const pc = s.pricePct == null ? '' : ' · цена <b style="color:' + (s.pricePct >= 0 ? '#52F2C9' : '#FF6A8B') + '">' + (s.pricePct >= 0 ? '+' : '') + s.pricePct.toFixed(2) + '%</b>';
     let oi = '';
     if (s.oi) oi = '<div class="tvsig-period-oi">OI Δ: физ Л <b style="color:' + dcol(s.oi.fl) + '">' + dsg(s.oi.fl) + '</b> Ш <b style="color:' + dcol(s.oi.fs) + '">' + dsg(s.oi.fs) +
       '</b> · юр Л <b style="color:' + dcol(s.oi.yl) + '">' + dsg(s.oi.yl) + '</b> Ш <b style="color:' + dcol(s.oi.ys) + '">' + dsg(s.oi.ys) + '</b></div>';
@@ -396,9 +396,9 @@
   }
   function status(t) { if (statusEl) statusEl.textContent = t; }
   function pill(sc) {
-    if (sc > 0) return '<span class="tvsig-b buy">▲ buy</span>';
-    if (sc < 0) return '<span class="tvsig-b sell">▼ sell</span>';
-    return '<span class="tvsig-b neu">—</span>';
+    if (sc > 0) return '<span class="tvsig-b buy" title="текущий сигнал: buy">▲</span>';
+    if (sc < 0) return '<span class="tvsig-b sell" title="текущий сигнал: sell">▼</span>';
+    return '<span class="tvsig-b neu" title="нет сигнала">—</span>';
   }
   // ── ℹ-окно метода: описание + аналог блока анализа indlab (бэктест по горизонтам) ─
   function closeInfo() { const o = document.getElementById('tvsig-info'); if (o) o.remove(); }
@@ -414,12 +414,12 @@
       const s = window.SignalsCore.btStats(series, bars, h);
       if (!s || !s.n) return '<span class="tvsig-chip na">' + h + 'б: —</span>';
       const e = (s.exp >= 0 ? '+' : '') + s.exp.toFixed(2);
-      const ec = s.exp > 0.03 ? '#52D8A0' : s.exp < -0.03 ? '#FF6B6B' : '#9a94b8';
+      const ec = s.exp > 0.03 ? '#52F2C9' : s.exp < -0.03 ? '#FF6A8B' : '#A79BC9';
       const w = s.acc != null ? Math.round(s.acc * 100) + '%' : '—';
       return '<span class="tvsig-chip"><b>' + h + 'б</b> exp <b style="color:' + ec + '">' + e + '</b> · ' + w + ' · n' + s.n + '</span>';
     }).join('') : '<span class="tvsig-chip na">нет данных (мало свечей)</span>';
     const last = S.computed && S.computed[id] ? S.computed[id].last : 0;
-    const sig = last > 0 ? '<span style="color:#52D8A0">▲ buy</span>' : last < 0 ? '<span style="color:#FF6B6B">▼ sell</span>' : '<span style="color:#8b84ac">— нет</span>';
+    const sig = last > 0 ? '<span style="color:#52F2C9">▲ buy</span>' : last < 0 ? '<span style="color:#FF6A8B">▼ sell</span>' : '<span style="color:#A79BC9">— нет</span>';
     const o = document.createElement('div'); o.id = 'tvsig-info';
     o.innerHTML =
       '<div class="tvsig-info-card">' +
@@ -452,12 +452,12 @@
       const info = '<span class="tvsig-info-btn" data-id="' + id + '" title="Описание метода + бэктест по горизонтам">ⓘ</span>';
       const noVolRow = (id === 'vsa_abs' && noVol);
       const mid = noVolRow
-        ? '<span class="tvsig-b neu" style="color:#b0873b" title="Включи индикатор Объём на графике">нужен объём</span>'
+        ? '<span class="tvsig-b neu" style="color:#F4C36A" title="Включи индикатор Объём на графике">нужен объём</span>'
         : (function () {
             const st = c && c.stats;
             // exp — главная цифра (деньги), красим по знаку; winrate — справочная, приглушённая
             const exp = st && st.exp != null ? (st.exp >= 0 ? '+' : '') + st.exp.toFixed(2) : '—';
-            const expCol = st && st.exp != null ? (st.exp > 0.03 ? '#52D8A0' : st.exp < -0.03 ? '#FF6B6B' : '#9a94b8') : '#6b6690';
+            const expCol = st && st.exp != null ? (st.exp > 0.03 ? '#52F2C9' : st.exp < -0.03 ? '#FF6A8B' : '#A79BC9') : '#6F648F';
             const win = st && st.acc != null ? (st.acc * 100).toFixed(0) + '%' : '—';
             const nn = st ? st.n : 0;
             return pill(c ? c.last : 0) +
@@ -466,7 +466,7 @@
               '<span class="tvsig-n" title="Число сделок в exp-симуляции">n' + nn + '</span>';
           })();
       return '<div class="tvsig-row' + (on ? ' on' : '') + '" data-id="' + id + '">' +
-        diam + '<span class="tvsig-name">' + NAME[id] + '</span>' + mid + info + swatch + '</div>';
+        diam + '<span class="tvsig-name" title="' + NAME[id] + '">' + NAME[id] + '</span>' + mid + info + swatch + '</div>';
     }).join('');
     // ромб/имя → вкл/выкл; пикер цвета → своё событие (не триггерит toggle)
     rowsEl.querySelectorAll('.tvsig-diam, .tvsig-name').forEach(el =>
