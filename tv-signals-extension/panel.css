@@ -14,6 +14,9 @@
 #tvsig-draw .tvsig-dt:hover{ background:rgba(122,92,255,0.22); border-color:rgba(122,92,255,0.5); color:#fff; }
 #tvsig-draw .tvsig-dt.danger:hover{ background:rgba(255,77,122,0.2); border-color:rgba(255,77,122,0.5); }
 #tvsig-status{ padding:5px 10px; font-size:10px; color:#8b84ac; border-bottom:1px solid rgba(255,255,255,0.05); }
+#tvsig-period{ padding:5px 10px; font-size:10px; color:#a49ec4; border-bottom:1px solid rgba(255,255,255,0.05); line-height:1.5; }
+#tvsig-period:empty{ display:none; }
+.tvsig-period-oi{ color:#8b84ac; margin-top:1px; }
 #tvsig-rows{ padding:4px; max-height:340px; overflow:auto; }
 .tvsig-row{ display:flex; align-items:center; gap:7px; padding:5px 6px; border-radius:7px; }
 .tvsig-row:hover{ background:rgba(255,255,255,0.05); }

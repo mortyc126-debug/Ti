@@ -165,6 +165,36 @@
       '<table class="tvsig-oi-t"><tr><th></th><th>лонг</th><th>шорт</th></tr>' +
       '<tr><td>физ</td><td>' + cell(b.fl, b.fl - a.fl) + '</td><td>' + cell(b.fs, b.fs - a.fs) + '</td></tr>' +
       '<tr><td>юр</td><td>' + cell(b.yl, b.yl - a.yl) + '</td><td>' + cell(b.ys, b.ys - a.ys) + '</td></tr></table>';
+    renderPeriod();
+  }
+  // ── сводка за период [t0,t1]: свечи, %Δ цены, Δ OI по всем сторонам ──────────
+  function periodSummary(t0, t1) {
+    const bars = S.bars || [], seg = bars.filter(b => b.time >= t0 && b.time <= t1), out = { n: seg.length };
+    if (seg.length >= 2) { const p0 = seg[0].close, p1 = seg[seg.length - 1].close;
+      out.pricePct = p0 ? (p1 - p0) / p0 * 100 : null; out.t0 = seg[0].time; out.t1 = seg[seg.length - 1].time; }
+    if (S.oi && S.oi.rows) { const reg = S.oi.rows.filter(r => r.ts >= t0 && r.ts <= t1);
+      if (reg.length >= 2) { const a = reg[0], b = reg[reg.length - 1];
+        out.oi = { fl: b.fl - a.fl, fs: b.fs - a.fs, yl: b.yl - a.yl, ys: b.ys - a.ys, pts: reg.length }; } }
+    return out;
+  }
+  // Плашка «изложение за период». span=null → видимое окно графика.
+  function renderPeriod(span) {
+    const el = document.getElementById('tvsig-period'); if (!el) return;
+    const bars = S.bars || []; if (!bars.length) { el.innerHTML = ''; return; }
+    let t0, t1, label;
+    if (span) { t0 = span.from; t1 = span.to; label = 'отрезок'; }
+    else { let vr = null; try { vr = S.chart.getVisibleRange(); } catch (e) {}
+      t0 = vr ? vr.from : bars[0].time; t1 = vr ? vr.to : bars[bars.length - 1].time; label = 'видимое окно'; }
+    const s = periodSummary(t0, t1);
+    if (!s.n) { el.innerHTML = ''; return; }
+    const dnum = v => Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'к' : v.toFixed(0);
+    const dsg = v => (v > 0 ? '+' : v < 0 ? '−' : '') + dnum(Math.abs(v));
+    const dcol = v => v > 0 ? '#52D8A0' : v < 0 ? '#FF6B6B' : '#9a94b8';
+    const pc = s.pricePct == null ? '' : ' · цена <b style="color:' + (s.pricePct >= 0 ? '#52D8A0' : '#FF6B6B') + '">' + (s.pricePct >= 0 ? '+' : '') + s.pricePct.toFixed(2) + '%</b>';
+    let oi = '';
+    if (s.oi) oi = '<div class="tvsig-period-oi">OI Δ: физ Л <b style="color:' + dcol(s.oi.fl) + '">' + dsg(s.oi.fl) + '</b> Ш <b style="color:' + dcol(s.oi.fs) + '">' + dsg(s.oi.fs) +
+      '</b> · юр Л <b style="color:' + dcol(s.oi.yl) + '">' + dsg(s.oi.yl) + '</b> Ш <b style="color:' + dcol(s.oi.ys) + '">' + dsg(s.oi.ys) + '</b></div>';
+    el.innerHTML = '<div>' + label + ': <b>' + s.n + '</b> св' + pc + '</div>' + oi;
   }
   function loadPref() { try { return JSON.parse(localStorage.getItem(PREF) || '{}'); } catch (e) { return {}; } }
   function savePref() { try { localStorage.setItem(PREF, JSON.stringify(S.on)); } catch (e) {} }
@@ -230,6 +260,7 @@
       // тот же тикер, новый бар не закрылся, есть живой расчёт → только освежаем «обновлено»
       if (!changed && !newBar && !force && S.computed && S.computed.__live) {
         status('тикер ' + (S.symbol || '?') + ' · ' + S.bars.length + ' баров · обновлено ' + fmtAgo(S.statsTs));
+        renderPeriod(); // освежаем плашку периода при зуме/скролле (бары те же)
         S.busy = false; return;
       }
       if (!changed) status('считаю…');
@@ -243,6 +274,7 @@
       // перерисовать активные слои
       Object.keys(S.on).forEach(id => { if (S.on[id]) drawMethod(id); });
       if (changed) { S.oi = null; S._oiSeeded = null; oiLoad(); } else if (S.oi) oiRender(); // OI: перезагрузка при смене тикера, иначе обновляем регион
+      renderPeriod();
       status('тикер ' + (S.symbol || '?') + ' · ' + bars.length + ' баров · обновлено ' + fmtAgo(S.statsTs));
     } catch (e) { status('ошибка: ' + (e && e.message || e)); }
     S.busy = false;
@@ -328,6 +360,7 @@
       '<button class="tvsig-dt danger" data-t="__clear" title="Стереть ВСЮ разметку на графике">🗑</button>' +
       '</div>' +
       '<div id="tvsig-status">инициализация…</div>' +
+      '<div id="tvsig-period" title="Сводка за видимое окно графика"></div>' +
       '<div id="tvsig-rows"></div>' +
       '<div id="tvsig-oi"><div id="tvsig-oi-head">📊 Открытый интерес' +
       '<input id="tvsig-oi-tk" placeholder="код (авто)" title="Код OI-контракта; пусто = авто по тикеру">' +
