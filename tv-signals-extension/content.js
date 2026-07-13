@@ -318,15 +318,14 @@
     let vr = null; try { vr = S.chart.getVisibleRange(); } catch (e) {}
     const series = S.computed[id].series, bars = S.bars;
     if (!series || !bars.length) return; // сид из кэша (series=null) — рисовать нечего до пересчёта
-    const col = S.colors[id];
-    // Точка на КАЖДОМ баре, где сигнал активен: buy — под баром, sell — над баром.
-    // Цвет = цвет метода (различать методы на графике), направление — позицией.
+    // Точка на КАЖДОМ баре, где сигнал активен. Цвет = НАПРАВЛЕНИЕ: зелёная = buy,
+    // красная = sell (сразу понятно). Позиция дублирует: buy под баром, sell над.
     const marks = [];
     for (let i = 0; i < bars.length; i++) {
       const sc = series[i]; if (sc == null || sc === 0) continue;
       const b = bars[i]; if (vr && (b.time < vr.from || b.time > vr.to)) continue;
       const buy = sc > 0;
-      marks.push({ time: b.time, price: buy ? b.low * 0.9985 : b.high * 1.0015 });
+      marks.push({ time: b.time, price: buy ? b.low * 0.9985 : b.high * 1.0015, buy });
     }
     const out = [];
     marks.slice(-MAX_DOTS).forEach(m => {
@@ -334,7 +333,7 @@
         const sid = S.chart.createShape(
           { time: m.time, price: m.price },
           { shape: 'text', text: '●', lock: true, disableSelection: true, disableSave: true,
-            zOrder: 'top', overrides: { color: col, fontsize: 8, bold: true } });
+            zOrder: 'top', overrides: { color: m.buy ? '#52F2C9' : '#FF6A8B', fontsize: 8, bold: true } });
         if (sid) out.push(sid);
       } catch (e) {}
     });
@@ -369,7 +368,7 @@
   function build() {
     panel = document.createElement('div'); panel.id = 'tvsig-panel';
     panel.innerHTML =
-      '<div id="tvsig-head"><span id="tvsig-title">◆ Сигнальные модели</span>' +
+      '<div id="tvsig-head"><span id="tvsig-title">◆</span>' +
       '<button id="tvsig-refresh" title="Пересчитать">⟳</button>' +
       '<button id="tvsig-min" title="Свернуть">–</button></div>' +
       '<div id="tvsig-draw">' +
