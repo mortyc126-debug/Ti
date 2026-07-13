@@ -143,7 +143,9 @@
         S.oi = { rows, used: live.sym, tf: '5-мин live' }; oiRender(); return;
       }
       if (live.error === 'sym-not-found') { if (body) body.innerHTML = '<span style="color:#F4C36A">Контракт не найден в AlgoPack. Доступные коды: ' + (live.syms || []).slice(0, 40).join(', ') + '. Впиши нужный в поле кода.</span>'; return; }
-      if (body) body.innerHTML = '<span style="color:#FF6A8B">AlgoPack: ' + (live.error || 'ошибка') + ' (проверь токен)</span>';
+      const er = live.error || 'ошибка', isAuth = /401|403/.test(er);
+      if (body) body.innerHTML = '<span style="color:#FF6A8B">AlgoPack: ' + er +
+        (isAuth ? ' — токен отклонён (истёк/неверный/нет подписки)' : ' — запрос не дошёл (после апдейта перезагрузи расширение: нужен доступ к apim.moex.com)') + '</span>';
       return;
     }
     // без токена — только архив воркера (то, что коллектор уже собрал)
@@ -177,12 +179,30 @@
         out.oi = { fl: b.fl - a.fl, fs: b.fs - a.fs, yl: b.yl - a.yl, ys: b.ys - a.ys, pts: reg.length }; } }
     return out;
   }
-  // Плашка «изложение за период». span=null → видимое окно графика.
+  // Ищем нарисованную линию (ровно 2 точки) и берём её отрезок по времени.
+  // selectLineTool в терминале нет — линию юзер рисует нативным инструментом,
+  // а мы читаем её концы через getAllShapes/getShapeById/getPoints.
+  function lineSpan() {
+    try {
+      const c = S.chart; if (!c || typeof c.getAllShapes !== 'function' || typeof c.getShapeById !== 'function') return null;
+      const sh = c.getAllShapes() || [];
+      for (let i = sh.length - 1; i >= 0; i--) { // с конца — самая свежая линия
+        let pts; try { pts = c.getShapeById(sh[i].id).getPoints(); } catch (e) { continue; }
+        if (pts && pts.length === 2 && pts[0] && pts[1] && pts[0].time != null && pts[1].time != null) {
+          const t0 = Math.min(pts[0].time, pts[1].time), t1 = Math.max(pts[0].time, pts[1].time);
+          if (t1 > t0) return { from: t0, to: t1 };
+        }
+      }
+    } catch (e) {}
+    return null;
+  }
+  // Плашка «изложение за период»: отрезок нарисованной линии, иначе видимое окно.
   function renderPeriod(span) {
     const el = document.getElementById('tvsig-period'); if (!el) return;
     const bars = S.bars || []; if (!bars.length) { el.innerHTML = ''; return; }
     let t0, t1, label;
-    if (span) { t0 = span.from; t1 = span.to; label = 'отрезок'; }
+    const ls = span || lineSpan();
+    if (ls) { t0 = ls.from; t1 = ls.to; label = '📏 по линии'; }
     else { let vr = null; try { vr = S.chart.getVisibleRange(); } catch (e) {}
       t0 = vr ? vr.from : bars[0].time; t1 = vr ? vr.to : bars[bars.length - 1].time; label = 'видимое окно'; }
     const s = periodSummary(t0, t1);
@@ -341,7 +361,7 @@
     }
     try {
       if (typeof S.chart.selectLineTool === 'function') S.chart.selectLineTool(t);
-      else status('в этой сборке рисование через API недоступно');
+      else status('рисуй линию нативным инструментом терминала (панель слева) — плашка сама покажет Δ по ней');
     } catch (e) { status('рисование: ' + (e && e.message || e)); }
   }
 

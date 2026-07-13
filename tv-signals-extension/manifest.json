@@ -3,7 +3,7 @@
   "name": "Сигнальные модели на графике (Тинькофф/TradingView)",
   "version": "0.1.0",
   "description": "Считает сигнальные методы на свечах графика и рисует их нативными фигурами TradingView + показывает точность по тикеру. Данные берутся из самого графика (без токена).",
-  "host_permissions": ["*://*.tbank.ru/*", "*://*.tinkoff.ru/*", "*://*.workers.dev/*"],
+  "host_permissions": ["*://*.tbank.ru/*", "*://*.tinkoff.ru/*", "*://*.workers.dev/*", "*://*.moex.com/*"],
   "content_scripts": [
     {
       "matches": ["*://*.tbank.ru/*", "*://*.tinkoff.ru/*"],
