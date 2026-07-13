@@ -64,9 +64,13 @@
   // Живой снэпшот физ/юр по контракту напрямую из AlgoPack (нужен токен).
   // Возвращает {ok, snap:{ts,fl,fs,yl,ys}, syms} или {ok:false, error, syms}.
   async function oiLiveSnap(candidates) {
-    const tok = oiTokenGet(); if (!tok) return { ok: false, error: 'no-token' };
-    const url = 'https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?iss.meta=off&limit=5000';
-    const r = await oiFetch(url, { Authorization: 'Bearer ' + tok });
+    // futoi авторизуется КУКОЙ MOEX Passport (тот же вход, что даёт ручной доступ
+    // на сайте), а не токеном. Хост — iss.moex.com (там живёт analyticalproducts),
+    // куку туда шлёт background (credentials:'include'). Bearer-токен добавляем лишь
+    // если задан — для тех, у кого отдельный AlgoPack APIKEY.
+    const tok = oiTokenGet();
+    const url = 'https://iss.moex.com/iss/analyticalproducts/futoi/securities.json?iss.meta=off&limit=5000';
+    const r = await oiFetch(url, tok ? { Authorization: 'Bearer ' + tok } : null);
     if (!r.ok) return { ok: false, error: r.error || 'fetch' };
     let j; try { j = JSON.parse(r.json); } catch (_) { return { ok: false, error: 'parse' }; }
     const key = Object.keys(j).find(k => k !== 'metadata' && k !== 'history') || 'futoi';
@@ -128,9 +132,9 @@
     const body = document.getElementById('tvsig-oi-body'); if (body && !S.oi) body.textContent = 'загрузка…';
     const cands = oiCands();
     if (!cands.length) { if (body) body.textContent = 'нет тикера'; return; }
-    const tok = oiTokenGet();
-    if (tok) {
-      // ЖИВОЙ путь: снэпшот AlgoPack по токену + подсев архива из воркера + накопление
+    {
+      // ЖИВОЙ путь: снэпшот futoi по сессии MOEX (ручной вход) или токену AlgoPack
+      // + подсев архива из воркера + накопление. Не удался — падаем на архив.
       const live = await oiLiveSnap(cands);
       if (live.ok) {
         let series = oiAccPush(live.sym, live.snap);
@@ -146,15 +150,11 @@
       const er = live.error || 'ошибка', isAuth = /401|403/.test(er);
       // живой путь не удался (напр. 401) — не тупик: подхватываем архив воркера
       const w = await oiWorkerSeries(cands);
-      if (w) { w.note = isAuth ? 'live-токен отклонён (нужен MOEX AlgoPack) → архив' : 'live не дошёл → архив'; S.oi = w; oiRender(); return; }
-      if (body) body.innerHTML = '<span style="color:#FF6A8B">AlgoPack: ' + er +
-        (isAuth ? ' — токен отклонён (нужен MOEX AlgoPack; pscalp-токен не подойдёт)' : ' — запрос не дошёл (перезагрузи расширение)') + '. Архива по тикеру тоже нет.</span>';
+      if (w) { w.note = isAuth ? 'нет доступа к живым (войди на moex.com) → архив' : 'live не дошёл → архив'; S.oi = w; oiRender(); return; }
+      if (body) body.innerHTML = '<span style="color:#FF6A8B">futoi: ' + er +
+        (isAuth ? ' — нет доступа. Войди на moex.com в этом браузере (подписка на «Открытый интерес») — куку входа расширение подхватит само' : ' — запрос не дошёл (перезагрузи расширение)') + '. Архива по тикеру тоже нет.</span>';
       return;
     }
-    // без токена — только архив воркера (то, что коллектор уже собрал)
-    const w = await oiWorkerSeries(cands);
-    if (!w) { if (body) body.innerHTML = '<span style="color:#F4C36A">OI не найден (' + cands.join(' / ') + '). Впиши код или задай токен AlgoPack (🔑) для живых данных.</span>'; S.oi = null; return; }
-    S.oi = w; oiRender();
   }
   function oiRender() {
     const body = document.getElementById('tvsig-oi-body'); if (!body || !S.oi) return;
@@ -401,10 +401,10 @@
     panel.querySelector('#tvsig-oi-load').onclick = () => oiLoad();
     panel.querySelector('#tvsig-oi-tk').addEventListener('keydown', e => { if (e.key === 'Enter') { S._oiSeeded = null; oiLoad(); } });
     const keyBtn = panel.querySelector('#tvsig-oi-key');
-    function updateKeyBtn() { keyBtn.style.opacity = oiTokenGet() ? '1' : '0.5'; keyBtn.title = oiTokenGet() ? 'Токен AlgoPack задан (клик — сменить/очистить)' : 'Задать токен AlgoPack для живых 5-мин данных'; }
+    function updateKeyBtn() { keyBtn.style.opacity = oiTokenGet() ? '1' : '0.5'; keyBtn.title = oiTokenGet() ? 'Токен AlgoPack задан (клик — сменить/очистить)' : 'Живые данные идут по твоему входу на moex.com. Токен нужен только при отдельном AlgoPack APIKEY'; }
     keyBtn.onclick = () => {
       const has = !!oiTokenGet();
-      const v = prompt('Токен AlgoPack (MOEX) для живых 5-мин физ/юр.\nХранится ЛОКАЛЬНО, шлётся только в apim.moex.com.\n' + (has ? 'Есть заданный. Введи новый, или "-" чтобы очистить.' : 'Вставь токен:'), '');
+      const v = prompt('Живой OI (5-мин физ/юр) обычно НЕ требует токена — расширение берёт данные по твоему входу на moex.com.\nТокен нужен, только если у тебя отдельный AlgoPack APIKEY.\nХранится ЛОКАЛЬНО, шлётся только в iss.moex.com.\n' + (has ? 'Есть заданный. Введи новый, или "-" чтобы очистить.' : 'Вставь токен (или Отмена):'), '');
       if (v === null) return;
       if (v.trim() === '-') oiTokenSet(''); else if (v.trim()) oiTokenSet(v.trim());
       updateKeyBtn(); S._oiSeeded = null; oiLoad();
