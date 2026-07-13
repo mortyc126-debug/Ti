@@ -542,7 +542,7 @@
     cmpTk.addEventListener('keydown', e => { if (e.key === 'Enter') cmpLoad(); });
     let minimized = false;
     panel.querySelector('#tvsig-min').onclick = () => { minimized = !minimized; rowsEl.style.display = minimized ? 'none' : ''; panel.querySelector('#tvsig-foot').style.display = minimized ? 'none' : ''; };
-    drag(panel, panel.querySelector('#tvsig-head'));
+    drag(panel);
     try { renderRows(); } catch (e) {} // список методов виден сразу, даже пока график не найден (stats будут «—»)
   }
   function status(t) { if (statusEl) statusEl.textContent = t; }
@@ -629,10 +629,24 @@
       inp.addEventListener('click', e => e.stopPropagation());
     });
   }
-  function drag(el, h) {
-    let sx, sy, ox, oy, on = false; h.style.cursor = 'move';
-    h.addEventListener('mousedown', e => { on = true; sx = e.clientX; sy = e.clientY; const r = el.getBoundingClientRect(); ox = r.left; oy = r.top; e.preventDefault(); });
-    document.addEventListener('mousemove', e => { if (!on) return; el.style.left = (ox + e.clientX - sx) + 'px'; el.style.top = (oy + e.clientY - sy) + 'px'; el.style.right = 'auto'; });
+  // Тащим за ЛЮБУЮ пустую область панели. Не начинаем drag на кнопках/полях/
+  // переключателях и на текстовых зонах (чтобы можно было кликать и выделять текст).
+  const NO_DRAG = 'button, input, select, textarea, a, svg, .tvsig-diam, .tvsig-name, ' +
+    '.tvsig-col, .tvsig-info-btn, .tvsig-tab, #tvsig-status, #tvsig-period, #tvsig-foot, ' +
+    '#tvsig-cmp-foot, #tvsig-cmp-body, #tvsig-oi-body, .tvsig-oi-meta, .tvsig-oi-t';
+  function drag(el) {
+    let sx, sy, ox, oy, on = false;
+    el.addEventListener('mousedown', e => {
+      if (e.button !== 0 || (e.target.closest && e.target.closest(NO_DRAG))) return;
+      on = true; sx = e.clientX; sy = e.clientY; const r = el.getBoundingClientRect(); ox = r.left; oy = r.top; e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!on) return; const w = el.offsetWidth, h = el.offsetHeight;
+      // держим панель в пределах экрана, чтобы не «застряла» за краем
+      const left = Math.max(0, Math.min(window.innerWidth - Math.min(w, 60), ox + e.clientX - sx));
+      const top = Math.max(0, Math.min(window.innerHeight - 30, oy + e.clientY - sy));
+      el.style.left = left + 'px'; el.style.top = top + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto';
+    });
     document.addEventListener('mouseup', () => on = false);
   }
 
