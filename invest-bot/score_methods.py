@@ -109,7 +109,9 @@ def _init_worker():
     import numpy as _np
     from trade_system.strategies import oi_composite_strategy as ocs
     from regime import classify_regime as _cr
-    _WORKER_METHODS = ocs.METHODS
+    # + классические версии индикаторов (METHODS_CLASSIC) для сверки alt↔учебник;
+    # они вне живого композита бота, участвуют только в офлайн-скоринге.
+    _WORKER_METHODS = list(ocs.METHODS) + list(getattr(ocs, "METHODS_CLASSIC", []))
     _WORKER_NP = _np
     _WORKER_CLASSIFY_REGIME = _cr
 

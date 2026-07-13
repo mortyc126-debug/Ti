@@ -6115,6 +6115,176 @@ METHODS = [
     ("LEVEL_QUALITY",       score_level_quality),
 ]
 
+# ── КЛАССИЧЕСКИЕ версии индикаторов (для сверки alt vs учебник) ───────────────
+# ВНЕ METHODS/BASE_METHOD_NAMES — в живом голосовании бота НЕ участвуют. Их
+# подмешивает только score_methods.py (getattr(ocs,'METHODS_CLASSIC',...)),
+# чтобы прогнать точность каноничных реализаций рядом с переработанными.
+# Каждая функция возвращает score∈[-1,1] по КАНОНИЧЕСКОМУ правилу индикатора.
+
+def _lastv_num(arr, k: int = 1):
+    """k-е с конца валидное (не None/NaN) значение списка, иначе None."""
+    vals = [v for v in arr if v is not None and not (isinstance(v, float) and math.isnan(v))]
+    return vals[-k] if len(vals) >= k else None
+
+def score_alligator_classic(candles: list[HistoricCandle]) -> float:
+    """ALLIGATOR_CLASSIC: канонический Аллигатор Уильямса.
+    SMMA(13/8/5) по медиане (H+L)/2 со сдвигом ВПЕРЁД +8/+5/+3 (jaw/teeth/lips).
+    Сигнал по порядку линий (пасть раскрыта) и позиции цены — трендследящий."""
+    n = len(candles)
+    if n < 26:
+        return 0.0
+    highs = [_to_f(c.high) for c in candles]
+    lows  = [_to_f(c.low)  for c in candles]
+    median = [(highs[i] + lows[i]) / 2.0 for i in range(n)]
+    jaw   = _smma(median, 13)
+    teeth = _smma(median, 8)
+    lips  = _smma(median, 5)
+    # линия на текущем баре = SMMA, посчитанная shift баров назад (сдвиг вперёд)
+    j = jaw[n - 1 - 8] if n - 1 - 8 >= 0 else float('nan')
+    t = teeth[n - 1 - 5] if n - 1 - 5 >= 0 else float('nan')
+    l = lips[n - 1 - 3] if n - 1 - 3 >= 0 else float('nan')
+    if any(math.isnan(x) for x in (j, t, l)):
+        return 0.0
+    cur = _to_f(candles[-1].close)
+    atr_abs = _compute_atr(candles) * (cur or 1) or 1e-9
+    openness = min(1.0, (max(j, t, l) - min(j, t, l)) / atr_abs / 1.5)  # разброс ≥1.5 ATR = пасть открыта
+    if l > t > j and cur > l:      # бычий каскад, цена выше губ
+        return min(1.0, 0.3 + 0.7 * openness)
+    if l < t < j and cur < l:      # медвежий каскад
+        return -min(1.0, 0.3 + 0.7 * openness)
+    return 0.0                     # переплетены/цена внутри = аллигатор спит
+
+def score_ichimoku_classic(candles: list[HistoricCandle]) -> float:
+    """ICHIMOKU_CLASSIC: полный каноничный Ишимоку (все 5 линий + облако).
+    Голос = среднее знаков: цена vs текущее облако (Senkou 26 назад), Tenkan/Kijun,
+    Chikou vs цена 26 назад, цвет будущего облака (Senkou A vs B)."""
+    n = len(candles)
+    if n < 78:
+        return 0.0
+    highs  = [_to_f(c.high)  for c in candles]
+    lows   = [_to_f(c.low)   for c in candles]
+    closes = [_to_f(c.close) for c in candles]
+
+    def mid(e, p):
+        s = e - p + 1
+        if s < 0 or e >= n:
+            return None
+        return (max(highs[s:e + 1]) + min(lows[s:e + 1])) / 2.0
+
+    e = n - 1
+    cur = closes[-1]
+    tenkan = mid(e, 9)
+    kijun  = mid(e, 26)
+    if tenkan is None or kijun is None:
+        return 0.0
+    # текущее облако = Senkou A/B, рассчитанные 26 баров назад (сдвиг вперёд)
+    ep = e - 26
+    ta, ka, sb_now = mid(ep, 9), mid(ep, 26), mid(ep, 52)
+    sa_now = (ta + ka) / 2.0 if (ta is not None and ka is not None) else None
+    # будущее облако (цвет тренда): считается сейчас, рисуется на +26
+    sa_fut = (tenkan + kijun) / 2.0
+    sb_fut = mid(e, 52)
+
+    parts = []
+    if sa_now is not None and sb_now is not None:   # 1. цена vs облако
+        top, bot = max(sa_now, sb_now), min(sa_now, sb_now)
+        parts.append(1.0 if cur > top else -1.0 if cur < bot else 0.0)
+    parts.append(1.0 if tenkan > kijun else -1.0 if tenkan < kijun else 0.0)  # 2. TK-крест
+    parts.append(1.0 if cur > closes[-27] else -1.0 if cur < closes[-27] else 0.0)  # 3. Chikou
+    if sb_fut is not None:                          # 4. цвет будущего облака
+        parts.append(1.0 if sa_fut > sb_fut else -1.0 if sa_fut < sb_fut else 0.0)
+    return max(-1.0, min(1.0, sum(parts) / len(parts))) if parts else 0.0
+
+def score_ma_tension_classic(candles: list[HistoricCandle]) -> float:
+    """MA_TENSION_CLASSIC: классический кроссовер быстрой/медленной SMA (10/30)
+    с подтверждением позицией цены. Знак = направление, величина = сила расхождения."""
+    closes = [_to_f(c.close) for c in candles]
+    n = len(closes)
+    if n < 30:
+        return 0.0
+    fast = _sma(closes, 10)[-1]
+    slow = _sma(closes, 30)[-1]
+    if math.isnan(fast) or math.isnan(slow):
+        return 0.0
+    cur = closes[-1]
+    atr_abs = _compute_atr(candles) * (cur or 1) or 1e-9
+    cross = math.tanh((fast - slow) / atr_abs * 1.5)
+    conf = 1.0 if ((cur > fast) == (fast > slow)) else 0.55  # цена по ту же сторону = подтверждение
+    return max(-1.0, min(1.0, cross * conf))
+
+def score_mama_fama_classic(candles: list[HistoricCandle]) -> float:
+    """MAMA_FAMA_CLASSIC: каноничное правило Элерса — MAMA vs FAMA.
+    MAMA > FAMA → лонг, MAMA < FAMA → шорт; сила по нормированному разрыву."""
+    closes = [_to_f(c.close) for c in candles]
+    if len(closes) < 20:
+        return 0.0
+    from indicators_ehlers import mama_fama as _mf
+    mama_s, fama_s, _ = _mf(closes)
+    m, f = _lastv_num(mama_s), _lastv_num(fama_s)
+    if m is None or f is None:
+        return 0.0
+    return max(-1.0, min(1.0, math.tanh((m - f) / (abs(m) or 1.0) * 80.0)))
+
+def score_adaptive_ma_classic(candles: list[HistoricCandle]) -> float:
+    """ADAPTIVE_MA_CLASSIC: классика KAMA — цена относительно KAMA + наклон KAMA.
+    Лонг, когда цена выше растущей линии; шорт — ниже падающей."""
+    closes = [_to_f(c.close) for c in candles]
+    if len(closes) < 20:
+        return 0.0
+    from indicators import kama as _kama
+    k = _kama(closes)
+    kv, kprev = _lastv_num(k), _lastv_num(k, 4)
+    if kv is None:
+        return 0.0
+    cur = closes[-1]
+    atr_abs = _compute_atr(candles) * (cur or 1) or 1e-9
+    dev = math.tanh((cur - kv) / atr_abs)
+    slope = math.tanh((kv - kprev) / atr_abs * 3.0) if kprev is not None else 0.0
+    return max(-1.0, min(1.0, 0.6 * dev + 0.4 * slope))
+
+def score_zlema_classic(candles: list[HistoricCandle]) -> float:
+    """ZLEMA_CLASSIC: классический кроссовер быстрой/медленной ZLEMA (14/28)
+    + позиция цены относительно быстрой линии."""
+    closes = [_to_f(c.close) for c in candles]
+    if len(closes) < 30:
+        return 0.0
+    from indicators import zlema as _z
+    ff, ss = _lastv_num(_z(closes, 14)), _lastv_num(_z(closes, 28))
+    if ff is None or ss is None:
+        return 0.0
+    cur = closes[-1]
+    atr_abs = _compute_atr(candles) * (cur or 1) or 1e-9
+    cross = math.tanh((ff - ss) / atr_abs * 1.5)
+    price = math.tanh((cur - ff) / atr_abs)
+    return max(-1.0, min(1.0, 0.6 * cross + 0.4 * price))
+
+def score_t3_classic(candles: list[HistoricCandle]) -> float:
+    """T3_CLASSIC: классика T3 (Tillson) — цена относительно линии T3 + её наклон."""
+    closes = [_to_f(c.close) for c in candles]
+    if len(closes) < 20:
+        return 0.0
+    from indicators import t3 as _t3
+    t = _t3(closes, 5, 0.7)
+    tv, tprev = _lastv_num(t), _lastv_num(t, 4)
+    if tv is None:
+        return 0.0
+    cur = closes[-1]
+    atr_abs = _compute_atr(candles) * (cur or 1) or 1e-9
+    dev = math.tanh((cur - tv) / atr_abs)
+    slope = math.tanh((tv - tprev) / atr_abs * 3.0) if tprev is not None else 0.0
+    return max(-1.0, min(1.0, 0.6 * dev + 0.4 * slope))
+
+# Реестр классических методов — только для score_methods.py (сверка alt↔классика)
+METHODS_CLASSIC = [
+    ("ALLIGATOR_CLASSIC",    score_alligator_classic),
+    ("ICHIMOKU_CLASSIC",     score_ichimoku_classic),
+    ("MA_TENSION_CLASSIC",   score_ma_tension_classic),
+    ("MAMA_FAMA_CLASSIC",    score_mama_fama_classic),
+    ("ADAPTIVE_MA_CLASSIC",  score_adaptive_ma_classic),
+    ("ZLEMA_CLASSIC",        score_zlema_classic),
+    ("T3_CLASSIC",           score_t3_classic),
+]
+
 # Структурные методы — используют MultiTFLevelCache инстанса стратегии,
 # поэтому вынесены из METHODS и вызываются отдельно в __compute_scores.
 LEVEL_CONTEXT_NAME  = "LEVEL_CONTEXT"
