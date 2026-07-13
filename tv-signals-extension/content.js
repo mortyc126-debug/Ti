@@ -178,9 +178,17 @@
     const bars = S.bars || [], seg = bars.filter(b => b.time >= t0 && b.time <= t1), out = { n: seg.length };
     if (seg.length >= 2) { const p0 = seg[0].close, p1 = seg[seg.length - 1].close;
       out.pricePct = p0 ? (p1 - p0) / p0 * 100 : null; out.t0 = seg[0].time; out.t1 = seg[seg.length - 1].time; }
-    if (S.oi && S.oi.rows) { const reg = S.oi.rows.filter(r => r.ts >= t0 && r.ts <= t1);
-      if (reg.length >= 2) { const a = reg[0], b = reg[reg.length - 1];
-        out.oi = { fl: b.fl - a.fl, fs: b.fs - a.fs, yl: b.yl - a.yl, ys: b.ys - a.ys, pts: reg.length }; } }
+    // Δ OI берём по ГРАНИЦАМ отрезка: значение на/до t0 и на/до t1 (forward-fill).
+    // Так дельта считается даже когда точек СТРОГО внутри отрезка нет — лишь бы
+    // серия покрывала участок. rows отсортированы по ts возр.
+    if (S.oi && S.oi.rows && S.oi.rows.length) {
+      const rows = S.oi.rows; let a = null, b = null;
+      for (const r of rows) { if (r.ts <= t0) a = r; if (r.ts <= t1) b = r; }
+      if (!a) a = rows.find(r => r.ts >= t0 && r.ts <= t1) || null; // до t0 точек нет — первая внутри
+      if (a && b && b.ts > a.ts) {
+        out.oi = { fl: b.fl - a.fl, fs: b.fs - a.fs, yl: b.yl - a.yl, ys: b.ys - a.ys,
+          pts: rows.filter(r => r.ts >= a.ts && r.ts <= b.ts).length }; }
+    }
     return out;
   }
   // Ищем нарисованную линию (ровно 2 точки) и берём её отрезок по времени.
