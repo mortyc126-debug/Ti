@@ -1,19 +1,21 @@
-/* oi-bridge.js — isolated-world мост для загрузки OI из воркера.
- * MAIN-мир не может фетчить сторонний домен (CSP терминала), а isolated-world
- * content-script ходит по host_permissions в обход CSP страницы. Общаемся
- * через DOM-события (detail — строка JSON, чисто переносится между мирами). */
+/* oi-bridge.js — isolated-world мост MAIN ↔ background service worker.
+ * MAIN-мир не видит chrome.runtime, а в MV3 фетч из content-script режется
+ * CORS (host_permissions не освобождает — только фетч из SW). Поэтому:
+ * content.js (MAIN) → DOM-событие → этот мост (ISOLATED) → chrome.runtime →
+ * background.js (SW, CORS-exempt) → ответ обратно тем же путём. */
 (function () {
   'use strict';
-  window.addEventListener('tvsig:oi:req', async (e) => {
+  window.addEventListener('tvsig:oi:req', (e) => {
     let d; try { d = JSON.parse(e.detail); } catch (_) { return; }
-    const res = { id: d.id };
+    const reply = (res) => {
+      res.id = d.id;
+      try { window.dispatchEvent(new CustomEvent('tvsig:oi:res', { detail: JSON.stringify(res) })); } catch (_) {}
+    };
     try {
-      const opt = { credentials: 'omit' };
-      if (d.headers) opt.headers = d.headers;   // напр. Authorization: Bearer <MOEX-токен>
-      const r = await fetch(d.url, opt);
-      if (!r.ok) { res.ok = false; res.error = 'HTTP ' + r.status; }
-      else { res.ok = true; res.json = await r.text(); }
-    } catch (err) { res.ok = false; res.error = String(err && err.message || err); }
-    try { window.dispatchEvent(new CustomEvent('tvsig:oi:res', { detail: JSON.stringify(res) })); } catch (_) {}
+      chrome.runtime.sendMessage({ type: 'tvsig:fetch', url: d.url, headers: d.headers || null }, (res) => {
+        if (chrome.runtime.lastError) return reply({ ok: false, error: chrome.runtime.lastError.message || 'sw-unreachable' });
+        reply(res || { ok: false, error: 'no-response' });
+      });
+    } catch (err) { reply({ ok: false, error: String(err && err.message || err) }); }
   });
 })();
