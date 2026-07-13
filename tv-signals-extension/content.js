@@ -171,6 +171,7 @@
       '<tr><td>физ</td><td>' + cell(b.fl, b.fl - a.fl) + '</td><td>' + cell(b.fs, b.fs - a.fs) + '</td></tr>' +
       '<tr><td>юр</td><td>' + cell(b.yl, b.yl - a.yl) + '</td><td>' + cell(b.ys, b.ys - a.ys) + '</td></tr></table>';
     renderPeriod();
+    segRender(); // OI подгрузился — пересчитать Δ по отрезкам
   }
   // ── сводка за период [t0,t1]: свечи, %Δ цены, Δ OI по всем сторонам ──────────
   function periodSummary(t0, t1) {
@@ -205,7 +206,7 @@
     const bars = S.bars || []; if (!bars.length) { el.innerHTML = ''; return; }
     let t0, t1, label;
     const ls = span || lineSpan();
-    if (ls) { t0 = ls.from; t1 = ls.to; label = '📏 по линии'; }
+    if (ls) { t0 = ls.from; t1 = ls.to; label = 'по линии'; }
     else { let vr = null; try { vr = S.chart.getVisibleRange(); } catch (e) {}
       t0 = vr ? vr.from : bars[0].time; t1 = vr ? vr.to : bars[bars.length - 1].time; label = 'видимое окно'; }
     const s = periodSummary(t0, t1);
@@ -316,13 +317,59 @@
         '<tr><td>' + o.aLabel + ' Δ</td><td style="color:' + col(o.moveA) + '">' + pc(o.moveA) + '</td><td>' + o.code + ' Δ</td><td style="color:' + col(o.moveC) + '">' + pc(o.moveC) + '</td></tr>' +
         '<tr><td>расхождение</td><td colspan="3" style="color:' + col(o.moveA - o.moveC) + '"><b>' + pc(o.moveA - o.moveC) + '</b> за окно</td></tr></table>';
   }
-  function cmpSetTab(which) {
+  function setTab(which) {
     if (!panel) return;
-    const ps = panel.querySelector('#tvsig-pane-signals'), pc = panel.querySelector('#tvsig-pane-compare');
-    if (ps) ps.hidden = which !== 'signals'; if (pc) pc.hidden = which !== 'compare';
+    panel.querySelectorAll('.tvsig-pane').forEach(p => { p.hidden = (p.id !== 'tvsig-pane-' + which); });
     panel.querySelectorAll('.tvsig-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === which));
     if (which === 'compare') { const b = document.getElementById('tvsig-cmp-body'); const inp = document.getElementById('tvsig-cmp-tk');
       if (b && !b.dataset.loaded) { if (inp && inp.value.trim()) cmpLoad(); else b.innerHTML = '<div class="tvsig-cmp-hint">Впиши код бумаги/индекса/фьючерса MOEX и жми ⟳. Наложу на активный тикер, посчитаю корреляцию и расхождение по видимому окну.</div>'; } }
+    if (which === 'periods') segRender();
+  }
+  // все нарисованные трендлинии/лучи (2 точки, разные времена) = отрезки
+  function lineSpans() {
+    const out = [];
+    try {
+      const c = S.chart; if (!c || typeof c.getAllShapes !== 'function' || typeof c.getShapeById !== 'function') return out;
+      const sh = c.getAllShapes() || [];
+      for (const s of sh) {
+        let pts; try { pts = c.getShapeById(s.id).getPoints(); } catch (e) { continue; }
+        if (pts && pts.length === 2 && pts[0] && pts[1] && pts[0].time != null && pts[1].time != null) {
+          const t0 = Math.min(pts[0].time, pts[1].time), t1 = Math.max(pts[0].time, pts[1].time);
+          if (t1 > t0) out.push({ from: t0, to: t1 });
+        }
+      }
+    } catch (e) {}
+    return out.sort((a, b) => a.from - b.from);
+  }
+  // таблица отрезков: видимое окно + каждая линия; по каждому цена %Δ и Δ OI
+  function segRender() {
+    const body = document.getElementById('tvsig-seg-body'); if (!body) return;
+    if (!S.bars || !S.bars.length) { body.innerHTML = '<div class="tvsig-seg-hint">Нет свечей — открой вкладку «Модели» и нажми ⟳.</div>'; return; }
+    const segs = [];
+    let vr = null; try { vr = S.chart.getVisibleRange(); } catch (e) {}
+    if (vr) segs.push({ label: 'видимое окно', from: vr.from, to: vr.to, live: true });
+    lineSpans().forEach((s, i) => segs.push({ label: 'отрезок ' + (i + 1), from: s.from, to: s.to }));
+    const p2 = n => ('0' + n).slice(-2);
+    const fmt = t => { const d = new Date(t * 1000); return p2(d.getDate()) + '.' + p2(d.getMonth() + 1) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()); };
+    const num = v => Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'к' : ('' + Math.round(v));
+    const dlt = v => (v > 0 ? '+' : v < 0 ? '−' : '') + num(Math.abs(v));
+    const dcol = v => v > 0 ? '#52F2C9' : v < 0 ? '#FF6A8B' : '#A79BC9';
+    const hasOi = !!(S.oi && S.oi.rows && S.oi.rows.length);
+    let html = '';
+    for (const g of segs) {
+      const s = periodSummary(g.from, g.to); if (!s.n) continue;
+      const pc = s.pricePct == null ? '—' : '<b style="color:' + (s.pricePct >= 0 ? '#52F2C9' : '#FF6A8B') + '">' + (s.pricePct >= 0 ? '+' : '') + s.pricePct.toFixed(2) + '%</b>';
+      let oi;
+      if (!hasOi) oi = '<div class="tvsig-seg-oi na">OI не загружен (блок выше → ⟳)</div>';
+      else if (!s.oi) oi = '<div class="tvsig-seg-oi na">нет точек OI в этом отрезке</div>';
+      else oi = '<div class="tvsig-seg-oi">OI Δ · физ Л <b style="color:' + dcol(s.oi.fl) + '">' + dlt(s.oi.fl) + '</b> Ш <b style="color:' + dcol(s.oi.fs) + '">' + dlt(s.oi.fs) +
+        '</b> · юр Л <b style="color:' + dcol(s.oi.yl) + '">' + dlt(s.oi.yl) + '</b> Ш <b style="color:' + dcol(s.oi.ys) + '">' + dlt(s.oi.ys) + '</b></div>';
+      html += '<div class="tvsig-seg' + (g.live ? ' live' : '') + '"><div class="tvsig-seg-hd"><span class="tvsig-seg-nm">' + g.label +
+        '</span><span class="tvsig-seg-pc">' + s.n + ' св · цена ' + pc + '</span></div>' +
+        '<div class="tvsig-seg-rng">' + fmt(g.from) + ' – ' + fmt(g.to) + '</div>' + oi + '</div>';
+    }
+    if (!html) html = '<div class="tvsig-seg-hint">Нарисуй на графике трендлинию или луч (вкладка «Модели» → инструменты) — каждая линия станет отрезком. Всегда доступно «видимое окно».</div>';
+    body.innerHTML = html;
   }
   function loadPref() { try { return JSON.parse(localStorage.getItem(PREF) || '{}'); } catch (e) { return {}; } }
   function savePref() { try { localStorage.setItem(PREF, JSON.stringify(S.on)); } catch (e) {} }
@@ -487,8 +534,9 @@
       '<button id="tvsig-refresh" title="Пересчитать">⟳</button>' +
       '<button id="tvsig-min" title="Свернуть">–</button></div>' +
       '<div id="tvsig-tabs">' +
-      '<button class="tvsig-tab on" data-tab="signals">◆ Сигналы</button>' +
-      '<button class="tvsig-tab" data-tab="compare">⇄ Сравнение</button></div>' +
+      '<button class="tvsig-tab on" data-tab="signals">Модели</button>' +
+      '<button class="tvsig-tab" data-tab="compare">Сравнение</button>' +
+      '<button class="tvsig-tab" data-tab="periods">Периоды</button></div>' +
       '<div id="tvsig-pane-signals" class="tvsig-pane">' +
       '<div id="tvsig-draw">' +
       '<button class="tvsig-dt" data-t="cursor" title="Курсор — выйти из режима рисования">➤</button>' +
@@ -499,16 +547,10 @@
       '<button class="tvsig-dt" data-t="parallel_channel" title="Канал (параллели)">▱</button>' +
       '<button class="tvsig-dt" data-t="rectangle" title="Прямоугольник (зона)">▭</button>' +
       '<button class="tvsig-dt" data-t="brush" title="Свободное рисование">✎</button>' +
-      '<button class="tvsig-dt danger" data-t="__clear" title="Стереть ВСЮ разметку на графике">🗑</button>' +
+      '<button class="tvsig-dt danger" data-t="__clear" title="Стереть ВСЮ разметку на графике">✕</button>' +
       '</div>' +
       '<div id="tvsig-status">инициализация…</div>' +
-      '<div id="tvsig-period" title="Сводка за видимое окно графика"></div>' +
       '<div id="tvsig-rows"></div>' +
-      '<div id="tvsig-oi"><div id="tvsig-oi-head">📊 Открытый интерес' +
-      '<input id="tvsig-oi-tk" placeholder="код (авто)" title="Код OI-контракта; пусто = авто по тикеру">' +
-      '<button id="tvsig-oi-key" title="Токен AlgoPack для живых 5-мин данных">🔑</button>' +
-      '<button id="tvsig-oi-load" title="Загрузить/обновить OI">⟳</button></div>' +
-      '<div id="tvsig-oi-body"><span class="tvsig-oi-meta">физ/юр лонг-шорт и Δ по видимому окну · ⟳ загрузить</span></div></div>' +
       '<div id="tvsig-foot">Цифры считаются на свечах <b>текущего тикера</b>, хранятся по каждому и обновляются при закрытии нового бара. <b>exp</b> — экспектанси, средний P&amp;L сделки в ATR (тейк +1.0 / стоп −0.5 ATR, издержки 0.12); плюс = метод в прибыли. <b>%</b> — winrate, частота угадывания знака за 12 баров (у фейдов низкая при плюсовом exp — норма). <b>n</b> — число сделок. Клик по строке рисует сигналы.</div>' +
       '</div>' + // /pane-signals
       '<div id="tvsig-pane-compare" class="tvsig-pane" hidden>' +
@@ -517,7 +559,18 @@
       '<button id="tvsig-cmp-go" title="Наложить и посчитать">⟳</button></div>' +
       '<div id="tvsig-cmp-body"></div>' +
       '<div id="tvsig-cmp-foot">Второй инструмент грузится с MOEX ISS и накладывается на <b>видимое окно</b> активного графика (масштабом окна и задаётся период). Корреляция и бета — по доходностям баров; наложение и «разница» — в базе 100. Индекс — IMOEX, нефтегаз — MOEXOG, нефть — код фьючерса Brent (напр. BRN6).</div>' +
-      '</div>'; // /pane-compare
+      '</div>' + // /pane-compare
+      '<div id="tvsig-pane-periods" class="tvsig-pane" hidden>' +
+      '<div id="tvsig-period" title="Сводка за видимое окно графика"></div>' +
+      '<div id="tvsig-oi"><div id="tvsig-oi-head">Открытый интерес' +
+      '<input id="tvsig-oi-tk" placeholder="код (авто)" title="Код OI-контракта; пусто = авто по тикеру">' +
+      '<button id="tvsig-oi-key" title="Токен AlgoPack для живых 5-мин данных">AP</button>' +
+      '<button id="tvsig-oi-load" title="Загрузить/обновить OI">⟳</button></div>' +
+      '<div id="tvsig-oi-body"><span class="tvsig-oi-meta">физ/юр лонг-шорт и Δ по видимому окну · ⟳ загрузить</span></div></div>' +
+      '<div class="tvsig-seg-ctrl">Отрезки<button id="tvsig-seg-go" title="Обновить отрезки по нарисованным линиям">⟳</button></div>' +
+      '<div id="tvsig-seg-body"></div>' +
+      '<div id="tvsig-seg-foot">Отрезок = трендлиния/луч, нарисованный на графике (вкладка «Модели» → инструменты рисования). Для каждого — цена %Δ и Δ открытого интереса за период. Несколько линий = несколько отрезков. Загрузи OI в блоке выше, чтобы видеть позиции.</div>' +
+      '</div>'; // /pane-periods
     document.documentElement.appendChild(panel);
     rowsEl = panel.querySelector('#tvsig-rows'); statusEl = panel.querySelector('#tvsig-status');
     panel.querySelector('#tvsig-refresh').onclick = () => refresh(true);
@@ -534,12 +587,13 @@
       updateKeyBtn(); S._oiSeeded = null; oiLoad();
     };
     updateKeyBtn();
-    // вкладки + сравнение
-    panel.querySelectorAll('.tvsig-tab').forEach(b => b.onclick = () => cmpSetTab(b.dataset.tab));
+    // вкладки + сравнение + отрезки
+    panel.querySelectorAll('.tvsig-tab').forEach(b => b.onclick = () => setTab(b.dataset.tab));
     const cmpTk = panel.querySelector('#tvsig-cmp-tk');
     try { cmpTk.value = localStorage.getItem('tvsig:cmpcode') || ''; } catch (e) {}
     panel.querySelector('#tvsig-cmp-go').onclick = () => cmpLoad();
     cmpTk.addEventListener('keydown', e => { if (e.key === 'Enter') cmpLoad(); });
+    panel.querySelector('#tvsig-seg-go').onclick = () => segRender();
     let minimized = false;
     panel.querySelector('#tvsig-min').onclick = () => { minimized = !minimized; rowsEl.style.display = minimized ? 'none' : ''; panel.querySelector('#tvsig-foot').style.display = minimized ? 'none' : ''; };
     drag(panel);
@@ -583,7 +637,7 @@
         '<div class="tvsig-info-sec"><div class="tvsig-info-lbl">Бэктест по тикеру ' + (S.symbol || '?') + '</div>' +
           '<div class="tvsig-chips">' + chips + '</div>' +
           '<div class="tvsig-info-fine">exp — средний P&amp;L сделки в ATR (тейк 1.0 / стоп 0.5, издержки 0.12) при выходе через N баров · % — winrate · n — сделок</div></div>' +
-        (d.note ? '<div class="tvsig-info-note">⚠ ' + d.note + '</div>' : '') +
+        (d.note ? '<div class="tvsig-info-note">' + d.note + '</div>' : '') +
       '</div>';
     o.addEventListener('click', e => { if (e.target === o || e.target.classList.contains('tvsig-info-x')) closeInfo(); });
     document.documentElement.appendChild(o);
