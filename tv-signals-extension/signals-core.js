@@ -72,16 +72,49 @@
         const d2 = (zT[j] - zT[i]) ** 2 + (zP[j] - zP[i]) ** 2 + (zC[j] - zC[i]) ** 2, ww = Math.exp(-d2 / (2 * h * h)); ws += ww; wp += ww * (cl[j + k] > cl[j] ? 1 : 0); cnt++; }
       if (ws < 0.5 || cnt < 2) { o[i] = 0; continue; } const ph = wp / ws, g = 2 * ph - 1; o[i] = Math.abs(g) < 0.2 ? 0 : Math.max(-1, Math.min(1, g)); } return o; };
 
-  // ── бэктест точности (доля совпадения знака с ходом через horizon баров) ──────
-  function btStats(scoreArr, closes, horizon) {
-    if (!scoreArr) return { acc: null, n: 0 };
-    let win = 0, n = 0;
-    for (let i = 0; i < closes.length - horizon; i++) {
+  // ── бэктест: winrate (частота угадывания направления) + exp ATR (экспектанси
+  //    сделки с тейком/стопом — как системный прогон дашборда). Для фейдов winrate
+  //    врёт (низкая при плюсовом exp), поэтому считаем обе цифры. ──────────────
+  // acc — доля баров, где знак сигнала совпал с ходом через horizon (как было).
+  // exp — средний P&L сделки в ATR: вход по close, тейк +T·ATR / стоп −S·ATR
+  //   (интрабар, стоп проверяем первым — консервативно), минус издержки cost·ATR,
+  //   без перекрытия, тайм-выход через horizon баров. Порт
+  //   system_backtest.simulate_analyze_strategy из invest-bot.
+  function btStats(scoreArr, bars, horizon, opts) {
+    if (!scoreArr || !bars || !bars.length) return { acc: null, exp: null, win: null, n: 0 };
+    horizon = horizon || 12; opts = opts || {};
+    const T = opts.take != null ? opts.take : 1.0, S = opts.stop != null ? opts.stop : 0.5;
+    const cost = opts.cost != null ? opts.cost : 0.12;
+    const closes = bars.map(b => b.close), n = bars.length, at = atr(bars, opts.atrPer || 20);
+    // winrate: доля совпадений знака с ходом через horizon баров
+    let hit = 0, hn = 0;
+    for (let i = 0; i < n - horizon; i++) {
       const sc = scoreArr[i]; if (sc == null || sc === 0) continue;
-      const fut = closes[i + horizon] - closes[i]; if (fut === 0) continue; n++;
-      if ((sc > 0 && fut > 0) || (sc < 0 && fut < 0)) win++;
+      const fut = closes[i + horizon] - closes[i]; if (fut === 0) continue; hn++;
+      if ((sc > 0 && fut > 0) || (sc < 0 && fut < 0)) hit++;
     }
-    return { acc: n > 0 ? win / n : null, n };
+    // exp ATR: бар-за-баром сделки с тейк/стопом, одна позиция за раз
+    let pnlSum = 0, wins = 0, tn = 0, pos = null;
+    for (let i = 0; i < n; i++) {
+      const hi = bars[i].high, lo = bars[i].low, cl = bars[i].close;
+      if (pos) { // ведём открытую: стоп первым, затем тейк, затем тайм-выход
+        let ex = null;
+        if (pos.dir > 0) { if (lo <= pos.sl) ex = pos.sl; else if (hi >= pos.tp) ex = pos.tp; }
+        else { if (hi >= pos.sl) ex = pos.sl; else if (lo <= pos.tp) ex = pos.tp; }
+        if (ex == null && i - pos.i >= horizon) ex = cl;
+        if (ex != null) { const p = pos.dir * (ex - pos.entry) / pos.eatr - cost;
+          pnlSum += p; if (p > 0) wins++; tn++; pos = null; }
+      }
+      if (!pos) { // вход, если флэт и есть сигнал (и посчитан ATR)
+        const sc = scoreArr[i], e = at[i];
+        if (sc != null && sc !== 0 && e != null && e > 0) {
+          const dir = sc > 0 ? 1 : -1;
+          pos = { dir, entry: cl, tp: cl + dir * T * e, sl: cl - dir * S * e, eatr: e, i };
+        }
+      }
+    }
+    return { acc: hn > 0 ? hit / hn : null, exp: tn > 0 ? pnlSum / tn : null,
+             win: tn > 0 ? wins / tn : null, n: tn };
   }
 
   // ── парсинг exportData() → свечи (по schema, колонки динамические) ────────────
@@ -110,11 +143,11 @@
   const IDS = ['zscore', 'accel', 'order_block', 'fvg', 'liq_sweep', 'false_breakout', 'vsa_abs', 'waning', 'talib_anti', 'hawkes', 'cascade', 'nw'];
   function computeAll(bars, horizon) {
     horizon = horizon || 12;
-    const closes = bars.map(b => b.close), out = {};
+    const out = {};
     IDS.forEach(id => {
       let series; try { series = M[id](bars); } catch (e) { series = bars.map(() => null); }
       let last = 0; for (let i = series.length - 1; i >= 0; i--) if (series[i] != null) { last = series[i]; break; }
-      out[id] = { series, last, stats: btStats(series, closes, horizon) };
+      out[id] = { series, last, stats: btStats(series, bars, horizon) };
     });
     return out;
   }

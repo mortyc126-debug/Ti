@@ -32,7 +32,8 @@
 .tvsig-b.buy{ color:#52D8A0; background:rgba(82,216,160,0.14); }
 .tvsig-b.sell{ color:#FF6B6B; background:rgba(255,107,107,0.14); }
 .tvsig-b.neu{ color:#6b6690; }
-.tvsig-acc{ font-size:11px; font-weight:600; min-width:30px; text-align:right; }
+.tvsig-exp{ font-size:11px; font-weight:600; min-width:38px; text-align:right; font-variant-numeric:tabular-nums; }
+.tvsig-acc{ font-size:10px; font-weight:500; color:#8983a8; min-width:30px; text-align:right; font-variant-numeric:tabular-nums; }
 .tvsig-n{ font-size:9px; color:#5f5a80; min-width:26px; text-align:right; }
 #tvsig-oi{ border-top:1px solid rgba(255,255,255,0.07); padding:7px 9px; }
 #tvsig-oi-head{ display:flex; align-items:center; gap:6px; font-size:11px; color:#c9c3e6; margin-bottom:5px; }

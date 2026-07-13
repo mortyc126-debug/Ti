@@ -280,7 +280,7 @@
       '<button id="tvsig-oi-key" title="Токен AlgoPack для живых 5-мин данных">🔑</button>' +
       '<button id="tvsig-oi-load" title="Загрузить/обновить OI">⟳</button></div>' +
       '<div id="tvsig-oi-body"><span class="tvsig-oi-meta">физ/юр лонг-шорт и Δ по видимому окну · ⟳ загрузить</span></div></div>' +
-      '<div id="tvsig-foot">точн. — доля совпадения знака с ходом за 12 баров по этому тикеру · клик по строке рисует сигналы на графике</div>';
+      '<div id="tvsig-foot"><b>exp</b> — экспектанси, средний P&amp;L сделки в ATR (тейк +1.0 / стоп −0.5 ATR, издержки 0.12); плюс = метод в прибыли. <b>%</b> — winrate, частота угадывания знака за 12 баров (у фейдов низкая при плюсовом exp — норма). <b>n</b> — число сделок. Клик по строке рисует сигналы на графике.</div>';
     document.documentElement.appendChild(panel);
     rowsEl = panel.querySelector('#tvsig-rows'); statusEl = panel.querySelector('#tvsig-status');
     panel.querySelector('#tvsig-refresh').onclick = () => refresh(true);
@@ -322,10 +322,16 @@
       const mid = noVolRow
         ? '<span class="tvsig-b neu" style="color:#b0873b" title="Включи индикатор Объём на графике">нужен объём</span>'
         : (function () {
-            const acc = c && c.stats.acc != null ? (c.stats.acc * 100).toFixed(0) + '%' : '—';
-            const nn = c ? c.stats.n : 0;
-            const accCol = c && c.stats.acc != null ? (c.stats.acc >= 0.55 ? '#52D8A0' : c.stats.acc <= 0.45 ? '#FF6B6B' : '#9a94b8') : '#6b6690';
-            return pill(c ? c.last : 0) + '<span class="tvsig-acc" style="color:' + accCol + '">' + acc + '</span><span class="tvsig-n">n' + nn + '</span>';
+            const st = c && c.stats;
+            // exp — главная цифра (деньги), красим по знаку; winrate — справочная, приглушённая
+            const exp = st && st.exp != null ? (st.exp >= 0 ? '+' : '') + st.exp.toFixed(2) : '—';
+            const expCol = st && st.exp != null ? (st.exp > 0.03 ? '#52D8A0' : st.exp < -0.03 ? '#FF6B6B' : '#9a94b8') : '#6b6690';
+            const win = st && st.acc != null ? (st.acc * 100).toFixed(0) + '%' : '—';
+            const nn = st ? st.n : 0;
+            return pill(c ? c.last : 0) +
+              '<span class="tvsig-exp" style="color:' + expCol + '" title="exp — экспектанси: средний P&L сделки в ATR (тейк +1.0 / стоп −0.5 ATR, издержки 0.12). Плюс = метод в прибыли, даже если winrate низкий.">' + exp + '</span>' +
+              '<span class="tvsig-acc" title="winrate — частота совпадения знака с ходом за 12 баров. У фейдов бывает низкой при плюсовом exp — это норма.">' + win + '</span>' +
+              '<span class="tvsig-n" title="Число сделок в exp-симуляции">n' + nn + '</span>';
           })();
       return '<div class="tvsig-row' + (on ? ' on' : '') + '" data-id="' + id + '">' +
         diam + '<span class="tvsig-name">' + NAME[id] + '</span>' + mid + swatch + '</div>';
