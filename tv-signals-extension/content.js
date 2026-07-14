@@ -40,6 +40,7 @@
     on: loadPref(), colors: loadColors(), drawn: {}, // id -> [shapeId]
     computed: null, busy: false, hasVolume: null, oi: null,
     statsCache: loadStats(), lastBarTime: 0, statsTs: 0, // exp/winrate по тикеру
+    barDt: 0, // медианный шаг баров — для распознавания смены ТФ
   };
   const OI_BASE_DEF = 'https://oi.marginacall.workers.dev';
   function oiBase() { try { return localStorage.getItem('tvsig:oibase') || OI_BASE_DEF; } catch (e) { return OI_BASE_DEF; } }
@@ -438,14 +439,22 @@
     S.busy = true;
     try {
       let sym = ''; try { sym = S.chart.symbol(); } catch (e) {}
-      const changed = sym !== S.symbol;
-      if (changed) { clearAll(); S.symbol = sym; S.lastBarTime = 0; seedFromCache(sym); status('тикер ' + (sym || '?') + ' · пересчёт…'); }
+      const symChanged = sym !== S.symbol;
+      if (symChanged) { clearAll(); S.symbol = sym; S.lastBarTime = 0; S.barDt = 0; seedFromCache(sym); status('тикер ' + (sym || '?') + ' · пересчёт…'); }
       const res = await Promise.resolve(S.chart.exportData());
       let bars = window.SignalsCore.parseExport(res);
       if (bars.length > 3000) bars = bars.slice(-3000); // держим NW (O(n^2)) в узде
+      // таймфрейм ловим по медианному шагу баров (resolution() есть не во всех
+      // сборках). Сменился ТФ на том же тикере → чистим старые точки и пересчёт,
+      // иначе рисунки остаются от прежнего ТФ и не адаптируются.
+      let dt = 0; if (bars.length > 5) { const d = []; for (let i = 1; i < bars.length; i++) d.push(bars[i].time - bars[i - 1].time); d.sort((a, b) => a - b); dt = d[d.length >> 1] || 0; }
+      const tfChanged = !symChanged && dt > 0 && S.barDt > 0 && dt !== S.barDt;
+      if (tfChanged) { clearAll(); S.lastBarTime = 0; status('ТФ сменился · пересчёт…'); }
+      if (dt > 0) S.barDt = dt;
+      const changed = symChanged || tfChanged;
       const lastT = bars.length ? bars[bars.length - 1].time : 0;
       const newBar = lastT !== S.lastBarTime;
-      // тот же тикер, новый бар не закрылся, есть живой расчёт → только освежаем «обновлено»
+      // тот же тикер и ТФ, новый бар не закрылся, есть живой расчёт → только «обновлено»
       if (!changed && !newBar && !force && S.computed && S.computed.__live) {
         status('тикер ' + (S.symbol || '?') + ' · ' + S.bars.length + ' баров · обновлено ' + fmtAgo(S.statsTs));
         renderPeriod(); // освежаем плашку периода при зуме/скролле (бары те же)
@@ -461,7 +470,7 @@
       renderRows();
       // перерисовать активные слои
       Object.keys(S.on).forEach(id => { if (S.on[id]) drawMethod(id); });
-      if (changed) { S.oi = null; S._oiSeeded = null; oiLoad(); } else if (S.oi) oiRender(); // OI: перезагрузка при смене тикера, иначе обновляем регион
+      if (symChanged) { S.oi = null; S._oiSeeded = null; oiLoad(); } else if (S.oi) oiRender(); // OI: перезагрузка при смене тикера, иначе обновляем регион
       renderPeriod();
       status('тикер ' + (S.symbol || '?') + ' · ' + bars.length + ' баров · обновлено ' + fmtAgo(S.statsTs));
     } catch (e) { status('ошибка: ' + (e && e.message || e)); }
