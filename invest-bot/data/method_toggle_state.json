@@ -1,5 +1,6 @@
 {
   "disabled": [
+    "ALLIGATOR",
     "DONCHIAN",
     "KLINGER",
     "LEVEL_QUALITY",
@@ -10,7 +11,6 @@
   ],
   "inverted": [
     "ADAPTIVE_MA",
-    "ALLIGATOR",
     "BB_KELTNER_SQUEEZE",
     "BS_PRESSURE",
     "EHLERS_MODE",

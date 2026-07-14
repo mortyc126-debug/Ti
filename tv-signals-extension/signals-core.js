@@ -71,6 +71,22 @@
       for (let j = w; j <= i - k; j++) { if (!inQ(j)) continue; if (Math.sign(zC[j]) !== Math.sign(zC[i])) continue;
         const d2 = (zT[j] - zT[i]) ** 2 + (zP[j] - zP[i]) ** 2 + (zC[j] - zC[i]) ** 2, ww = Math.exp(-d2 / (2 * h * h)); ws += ww; wp += ww * (cl[j + k] > cl[j] ? 1 : 0); cnt++; }
       if (ws < 0.5 || cnt < 2) { o[i] = 0; continue; } const ph = wp / ws, g = 2 * ph - 1; o[i] = Math.abs(g) < 0.2 ? 0 : Math.max(-1, Math.min(1, g)); } return o; };
+  // Wilder SMMA (для Аллигатора)
+  function smma(arr, per) { const n = arr.length, o = new Array(n).fill(null); if (n < per) return o;
+    let s = 0; for (let k = 0; k < per; k++) s += arr[k]; o[per - 1] = s / per;
+    for (let i = per; i < n; i++) o[i] = (o[i - 1] * (per - 1) + arr[i]) / per; return o; }
+  // Классический Аллигатор Уильямса (SMMA 13/8/5 по медиане, сдвиг вперёд +8/+5/+3),
+  // взятый ИНВЕРТИРОВАННО: раскрытая пасть (тренд по Аллигатору) → сигнал ПРОТИВ.
+  // На 5-мин РФ трендследящий Аллигатор системно ошибается (проверено: anti d≈−0.12,
+  // держится в OOS), поэтому фейдим.
+  M.alligator_inv = (cd) => { const n = cd.length, o = new Array(n).fill(0); if (n < 26) return o;
+    const med = cd.map(c => (c.high + c.low) / 2), jaw = smma(med, 13), teeth = smma(med, 8), lips = smma(med, 5);
+    for (let i = 0; i < n; i++) {
+      const j = i - 8 >= 0 ? jaw[i - 8] : null, t = i - 5 >= 0 ? teeth[i - 5] : null, l = i - 3 >= 0 ? lips[i - 3] : null;
+      if (j == null || t == null || l == null) { o[i] = 0; continue; }
+      const c = cd[i].close;
+      o[i] = (l > t && t > j && c > l) ? -1 : (l < t && t < j && c < l) ? 1 : 0; // инверсия классического сигнала
+    } return o; };
 
   // ── бэктест: winrate (частота угадывания направления) + exp ATR (экспектанси
   //    сделки с тейком/стопом — как системный прогон дашборда). Для фейдов winrate
@@ -140,7 +156,7 @@
   }
 
   // ── всё вместе: серии + последний сигнал + точность ──────────────────────────
-  const IDS = ['zscore', 'accel', 'order_block', 'fvg', 'liq_sweep', 'false_breakout', 'vsa_abs', 'waning', 'talib_anti', 'hawkes', 'cascade', 'nw'];
+  const IDS = ['zscore', 'accel', 'order_block', 'fvg', 'liq_sweep', 'false_breakout', 'vsa_abs', 'waning', 'talib_anti', 'hawkes', 'cascade', 'nw', 'alligator_inv'];
   function computeAll(bars, horizon) {
     horizon = horizon || 12;
     const out = {};
