@@ -555,7 +555,8 @@
       '<div id="tvsig-tabs">' +
       '<button class="tvsig-tab on" data-tab="signals">Модели</button>' +
       '<button class="tvsig-tab" data-tab="compare">Сравнение</button>' +
-      '<button class="tvsig-tab" data-tab="periods">Периоды</button></div>' +
+      '<button class="tvsig-tab" data-tab="periods">Периоды</button>' +
+      '<button class="tvsig-tab" data-tab="theme">Тема</button></div>' +
       '<div id="tvsig-pane-signals" class="tvsig-pane">' +
       '<div id="tvsig-draw">' +
       '<button class="tvsig-dt" data-t="cursor" title="Курсор — выйти из режима рисования">➤</button>' +
@@ -589,7 +590,24 @@
       '<div class="tvsig-seg-ctrl">Отрезки<button id="tvsig-seg-go" title="Обновить отрезки по нарисованным линиям">⟳</button></div>' +
       '<div id="tvsig-seg-body"></div>' +
       '<div id="tvsig-seg-foot">Отрезок = трендлиния/луч, нарисованный на графике (вкладка «Модели» → инструменты рисования). Для каждого — цена %Δ и Δ открытого интереса за период. Несколько линий = несколько отрезков. Загрузи OI в блоке выше, чтобы видеть позиции.</div>' +
-      '</div>'; // /pane-periods
+      '</div>' + // /pane-periods
+      '<div id="tvsig-pane-theme" class="tvsig-pane" hidden>' +
+      '<div class="tvsig-th-row"><label class="tvsig-th-sw"><input type="checkbox" id="tvsig-th-on"> Перекрасить терминал</label>' +
+      '<button id="tvsig-th-reset" title="Сбросить">сброс</button></div>' +
+      '<div class="tvsig-th-presets">' +
+      '<button class="tvsig-th-pr" data-pr="warm">Тёплый</button>' +
+      '<button class="tvsig-th-pr" data-pr="dim">Приглушить</button>' +
+      '<button class="tvsig-th-pr" data-pr="contrast">Контраст</button>' +
+      '<button class="tvsig-th-pr" data-pr="night">Ночь</button>' +
+      '<button class="tvsig-th-pr" data-pr="invert">Инверсия</button></div>' +
+      '<div class="tvsig-th-sl"><span>Яркость</span><input type="range" id="tvsig-th-b" min="50" max="130" step="1"><b id="tvsig-th-bv"></b></div>' +
+      '<div class="tvsig-th-sl"><span>Контраст</span><input type="range" id="tvsig-th-c" min="70" max="150" step="1"><b id="tvsig-th-cv"></b></div>' +
+      '<div class="tvsig-th-sl"><span>Насыщ.</span><input type="range" id="tvsig-th-s" min="0" max="180" step="1"><b id="tvsig-th-sv"></b></div>' +
+      '<div class="tvsig-th-sl"><span>Тепло</span><input type="range" id="tvsig-th-w" min="0" max="100" step="1"><b id="tvsig-th-wv"></b></div>' +
+      '<div class="tvsig-th-sl"><span>Оттенок</span><input type="range" id="tvsig-th-h" min="0" max="360" step="1"><b id="tvsig-th-hv"></b></div>' +
+      '<label class="tvsig-th-sw"><input type="checkbox" id="tvsig-th-inv"> Инверсия цветов (тёмная↔светлая)</label>' +
+      '<div id="tvsig-th-foot">Фильтр накладывается на весь терминал (включая график); панель расширения не затрагивается. Пресеты задают ползунки, дальше подстраивай вручную. Настройки сохраняются.</div>' +
+      '</div>'; // /pane-theme
     document.documentElement.appendChild(panel);
     rowsEl = panel.querySelector('#tvsig-rows'); statusEl = panel.querySelector('#tvsig-status');
     panel.querySelector('#tvsig-refresh').onclick = () => refresh(true);
@@ -613,6 +631,7 @@
     panel.querySelector('#tvsig-cmp-go').onclick = () => cmpLoad();
     cmpTk.addEventListener('keydown', e => { if (e.key === 'Enter') cmpLoad(); });
     panel.querySelector('#tvsig-seg-go').onclick = () => segRender();
+    themeBind();
     let minimized = false;
     panel.querySelector('#tvsig-min').onclick = () => { minimized = !minimized; rowsEl.style.display = minimized ? 'none' : ''; panel.querySelector('#tvsig-foot').style.display = minimized ? 'none' : ''; };
     drag(panel);
@@ -721,6 +740,54 @@
       el.style.left = left + 'px'; el.style.top = top + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto';
     });
     document.addEventListener('mouseup', () => on = false);
+  }
+
+  // ── Оформление: CSS-фильтр на терминал (наша панель — вне body, не затронута) ──
+  const TH_DEF = { on: false, b: 100, c: 100, s: 100, w: 0, h: 0, inv: false };
+  let _theme = null;
+  function themeLoad() { try { return Object.assign({}, TH_DEF, JSON.parse(localStorage.getItem('tvsig:theme') || '{}')); } catch (e) { return Object.assign({}, TH_DEF); } }
+  function themeFilter(t) {
+    if (!t.on) return 'none';
+    let f = 'brightness(' + t.b + '%) contrast(' + t.c + '%) saturate(' + t.s + '%)';
+    if (t.w) f += ' sepia(' + t.w + '%)';
+    if (t.h) f += ' hue-rotate(' + t.h + 'deg)';
+    if (t.inv) f = 'invert(1) hue-rotate(180deg) ' + f; // «умная» инверсия: яркость флипается, оттенок сохраняется
+    return f;
+  }
+  function themeApply(t) {
+    let st = document.getElementById('tvsig-theme-style');
+    if (!st) { st = document.createElement('style'); st.id = 'tvsig-theme-style'; document.documentElement.appendChild(st); }
+    const f = themeFilter(t);
+    st.textContent = f === 'none' ? '' : 'body{filter:' + f + ' !important;}';
+  }
+  function themePreset(p) {
+    const t = _theme; t.on = true; t.inv = false; t.h = 0;
+    if (p === 'warm') { t.b = 98; t.c = 100; t.s = 105; t.w = 30; }
+    else if (p === 'dim') { t.b = 80; t.c = 94; t.s = 88; t.w = 8; }
+    else if (p === 'contrast') { t.b = 102; t.c = 125; t.s = 112; t.w = 0; }
+    else if (p === 'night') { t.b = 80; t.c = 106; t.s = 90; t.w = 18; }
+    else if (p === 'invert') { t.b = 100; t.c = 100; t.s = 100; t.w = 0; t.inv = true; }
+  }
+  const _TH_UNIT = { b: '%', c: '%', s: '%', w: '%', h: '°' };
+  function themeReflect() { // состояние → контролы
+    if (!panel) return; const t = _theme;
+    const on = panel.querySelector('#tvsig-th-on'), inv = panel.querySelector('#tvsig-th-inv');
+    if (on) on.checked = t.on; if (inv) inv.checked = t.inv;
+    for (const k of ['b', 'c', 's', 'w', 'h']) { const el = panel.querySelector('#tvsig-th-' + k), lb = panel.querySelector('#tvsig-th-' + k + 'v');
+      if (el) el.value = t[k]; if (lb) lb.textContent = t[k] + _TH_UNIT[k]; }
+  }
+  function themeBind() {
+    _theme = themeLoad();
+    const push = () => { try { localStorage.setItem('tvsig:theme', JSON.stringify(_theme)); } catch (e) {} themeApply(_theme); };
+    const on = panel.querySelector('#tvsig-th-on'), inv = panel.querySelector('#tvsig-th-inv');
+    on.addEventListener('change', () => { _theme.on = on.checked; push(); });
+    inv.addEventListener('change', () => { _theme.inv = inv.checked; _theme.on = true; on.checked = true; push(); });
+    for (const k of ['b', 'c', 's', 'w', 'h']) {
+      panel.querySelector('#tvsig-th-' + k).addEventListener('input', e => { _theme[k] = +e.target.value; const lb = panel.querySelector('#tvsig-th-' + k + 'v'); if (lb) lb.textContent = _theme[k] + _TH_UNIT[k]; _theme.on = true; on.checked = true; push(); });
+    }
+    panel.querySelectorAll('.tvsig-th-pr').forEach(b => b.onclick = () => { themePreset(b.dataset.pr); themeReflect(); push(); });
+    panel.querySelector('#tvsig-th-reset').onclick = () => { Object.assign(_theme, TH_DEF); themeReflect(); push(); };
+    themeReflect(); themeApply(_theme); // применить сохранённое сразу
   }
 
   // ── старт: ждём готовность графика ───────────────────────────────────────────

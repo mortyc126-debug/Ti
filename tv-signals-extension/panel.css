@@ -25,7 +25,8 @@
 
 /* вкладки Сигналы / Сравнение */
 #tvsig-tabs{ display:flex; gap:4px; padding:6px 8px 0; }
-.tvsig-tab{ flex:1; padding:5px 6px; border-radius:7px 7px 0 0; cursor:pointer; font-size:11px; font-family:var(--mono);
+.tvsig-tab{ flex:1; min-width:0; padding:5px 4px; border-radius:7px 7px 0 0; cursor:pointer; font-size:10.5px; font-family:var(--mono);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   border:1px solid var(--border2); border-bottom:none; background:var(--surface2); color:var(--text3); transition:all .12s; }
 .tvsig-tab:hover{ color:var(--text2); }
 .tvsig-tab.on{ background:var(--surface); color:var(--text); border-color:var(--accent); }
@@ -66,6 +67,25 @@
 .tvsig-seg-oi.na{ color:var(--text3); }
 .tvsig-seg-hint{ font-size:10px; color:var(--text3); font-family:var(--mono); line-height:1.5; padding:8px 2px; }
 #tvsig-seg-foot{ padding:4px 10px 8px; font-size:9px; color:var(--text3); font-family:var(--mono); line-height:1.5; }
+
+/* вкладка «Оформление» */
+#tvsig-pane-theme{ padding:8px 10px; }
+.tvsig-th-row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.tvsig-th-sw{ display:flex; align-items:center; gap:6px; font-size:11px; font-family:var(--mono); color:var(--text); cursor:pointer; }
+.tvsig-th-sw input{ cursor:pointer; }
+.tvsig-th-row #tvsig-th-reset{ margin-left:auto; padding:3px 8px; border-radius:6px; cursor:pointer; font-size:10px;
+  font-family:var(--mono); border:1px solid var(--border2); background:var(--surface2); color:var(--text2); }
+.tvsig-th-row #tvsig-th-reset:hover{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.tvsig-th-presets{ display:flex; flex-wrap:wrap; gap:5px; margin-bottom:9px; }
+.tvsig-th-pr{ padding:4px 8px; border-radius:6px; cursor:pointer; font-size:10px; font-family:var(--mono);
+  border:1px solid var(--border2); background:var(--surface2); color:var(--text2); transition:all .12s; }
+.tvsig-th-pr:hover{ background:rgba(180,135,248,0.18); border-color:var(--violet); color:var(--text); }
+.tvsig-th-sl{ display:grid; grid-template-columns:56px 1fr 40px; align-items:center; gap:8px; margin-bottom:6px;
+  font-size:10px; font-family:var(--mono); color:var(--text2); }
+.tvsig-th-sl input[type=range]{ width:100%; }
+.tvsig-th-sl b{ text-align:right; color:var(--text); font-variant-numeric:tabular-nums; }
+#tvsig-pane-theme > .tvsig-th-sw{ margin-top:6px; }
+#tvsig-th-foot{ margin-top:8px; font-size:9px; color:var(--text3); font-family:var(--mono); line-height:1.5; }
 #tvsig-oi-head button#tvsig-oi-key{ font-size:9px; font-family:var(--mono); font-weight:600; }
 
 #tvsig-draw{ display:flex; gap:3px; flex-wrap:wrap; padding:6px 8px; border-bottom:1px solid var(--border); }
