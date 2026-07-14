@@ -11,6 +11,7 @@
   ],
   "inverted": [
     "ADAPTIVE_MA",
+    "ALLIGATOR_CLASSIC",
     "BB_KELTNER_SQUEEZE",
     "BS_PRESSURE",
     "EHLERS_MODE",

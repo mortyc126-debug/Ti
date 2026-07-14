@@ -368,6 +368,8 @@ _ALT_DSP: frozenset = frozenset({
 _ALT_NONE: frozenset = frozenset({
     "BB_KELTNER_SQUEEZE", "DONCHIAN", "MA_ENVELOPE", "SSA_SIGNAL",
     "OI_SQUEEZE", "INST_OI",
+    # классический Аллигатор идёт RAW-скором (как проверено в OOS), инверсия — через toggle
+    "ALLIGATOR_CLASSIC",
 })
 
 _ALT_LOOKBACK = 10   # окно дивергенции для осцилляторов и объёма
@@ -6276,7 +6278,6 @@ def score_t3_classic(candles: list[HistoricCandle]) -> float:
 
 # Реестр классических методов — только для score_methods.py (сверка alt↔классика)
 METHODS_CLASSIC = [
-    ("ALLIGATOR_CLASSIC",    score_alligator_classic),
     ("ICHIMOKU_CLASSIC",     score_ichimoku_classic),
     ("MA_TENSION_CLASSIC",   score_ma_tension_classic),
     ("MAMA_FAMA_CLASSIC",    score_mama_fama_classic),
@@ -6284,6 +6285,12 @@ METHODS_CLASSIC = [
     ("ZLEMA_CLASSIC",        score_zlema_classic),
     ("T3_CLASSIC",           score_t3_classic),
 ]
+
+# ALLIGATOR_CLASSIC валидирован в OOS как инвертируемый anti (train −0.15 → test
+# −0.12, n≈166k, держится) — вынесен в ЖИВОЙ композит вместо выключенного alt.
+# Идёт raw-скором (_ALT_NONE) + инверсией через method_toggle_state. Определён
+# после METHODS-литерала, поэтому добавляем append'ом (до BASE_METHOD_NAMES ниже).
+METHODS.append(("ALLIGATOR_CLASSIC", score_alligator_classic))
 
 # Структурные методы — используют MultiTFLevelCache инстанса стратегии,
 # поэтому вынесены из METHODS и вызываются отдельно в __compute_scores.
