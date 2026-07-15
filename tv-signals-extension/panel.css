@@ -137,6 +137,15 @@
 .tvsig-info-btn:hover{ color:var(--violet); }
 
 /* ползунки в стиле indlab: тонкий трек, повёрнутый на 45° фиолетовый thumb */
+/* скроллбары (полосы прокрутки) — в тему indlab */
+#tvsig-panel, #tvsig-info{ scrollbar-width:thin; scrollbar-color:var(--border2) var(--surface); }
+#tvsig-panel *, #tvsig-info *{ scrollbar-width:thin; scrollbar-color:var(--border2) var(--surface); }
+#tvsig-panel ::-webkit-scrollbar, #tvsig-info ::-webkit-scrollbar{ width:9px; height:9px; }
+#tvsig-panel ::-webkit-scrollbar-track, #tvsig-info ::-webkit-scrollbar-track{ background:var(--surface); border-radius:5px; }
+#tvsig-panel ::-webkit-scrollbar-thumb, #tvsig-info ::-webkit-scrollbar-thumb{ background:var(--border2); border-radius:5px; border:2px solid var(--surface); }
+#tvsig-panel ::-webkit-scrollbar-thumb:hover, #tvsig-info ::-webkit-scrollbar-thumb:hover{ background:var(--violet); }
+#tvsig-panel ::-webkit-scrollbar-corner, #tvsig-info ::-webkit-scrollbar-corner{ background:var(--surface); }
+
 #tvsig-panel input[type=range]{ -webkit-appearance:none; appearance:none; width:100%; height:16px;
   margin:0; padding:0; background:transparent; cursor:pointer; }
 #tvsig-panel input[type=range]:focus{ outline:none; }
