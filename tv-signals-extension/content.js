@@ -608,7 +608,8 @@
       '<div class="tvsig-th-sl"><span>Тепло</span><input type="range" id="tvsig-th-w" min="0" max="100" step="1"><b id="tvsig-th-wv"></b></div>' +
       '<div class="tvsig-th-sl"><span>Оттенок</span><input type="range" id="tvsig-th-h" min="0" max="360" step="1"><b id="tvsig-th-hv"></b></div>' +
       '<label class="tvsig-th-sw"><input type="checkbox" id="tvsig-th-inv"> Инверсия цветов (тёмная↔светлая)</label>' +
-      '<div id="tvsig-th-foot">Фильтр накладывается на весь терминал (включая график); панель расширения не затрагивается. Пресеты задают ползунки, дальше подстраивай вручную. Настройки сохраняются.</div>' +
+      '<label class="tvsig-th-sw"><input type="checkbox" id="tvsig-th-logo"> Не менять цвет логотипов бумаг</label>' +
+      '<div id="tvsig-th-foot">Фильтр накладывается на весь терминал (включая график); панель расширения не затрагивается. «Не менять логотипы» возвращает картинкам-логотипам родной цвет обратным фильтром (тёплый оттенок может слегка остаться; фоновые/SVG-значки не всегда ловятся). Пресеты задают ползунки. Настройки сохраняются.</div>' +
       '</div>'; // /pane-theme
     document.documentElement.appendChild(panel);
     rowsEl = panel.querySelector('#tvsig-rows'); statusEl = panel.querySelector('#tvsig-status');
@@ -774,7 +775,7 @@
   }
 
   // ── Оформление: CSS-фильтр на терминал (наша панель — вне body, не затронута) ──
-  const TH_DEF = { on: false, b: 100, c: 100, s: 100, w: 0, h: 0, inv: false };
+  const TH_DEF = { on: false, b: 100, c: 100, s: 100, w: 0, h: 0, inv: false, logo: true };
   let _theme = null;
   function themeLoad() { try { return Object.assign({}, TH_DEF, JSON.parse(localStorage.getItem('tvsig:theme') || '{}')); } catch (e) { return Object.assign({}, TH_DEF); } }
   function themeFilter(t) {
@@ -785,11 +786,23 @@
     if (t.inv) f = 'invert(1) hue-rotate(180deg) ' + f; // «умная» инверсия: яркость флипается, оттенок сохраняется
     return f;
   }
+  // обратный фильтр — компенсирует фильтр body на логотипах (sepia не обратим → лёгкий остаток)
+  function themeInverseFilter(t) {
+    const p = [];
+    if (t.h) p.push('hue-rotate(' + (-t.h) + 'deg)');
+    if (t.s > 0 && t.s !== 100) p.push('saturate(' + Math.round(10000 / t.s) + '%)');
+    if (t.c !== 100) p.push('contrast(' + Math.round(10000 / t.c) + '%)');
+    if (t.b !== 100) p.push('brightness(' + Math.round(10000 / t.b) + '%)');
+    if (t.inv) { p.push('hue-rotate(-180deg)'); p.push('invert(1)'); }
+    return p.join(' ');
+  }
   function themeApply(t) {
     let st = document.getElementById('tvsig-theme-style');
     if (!st) { st = document.createElement('style'); st.id = 'tvsig-theme-style'; document.documentElement.appendChild(st); }
     const f = themeFilter(t);
-    st.textContent = f === 'none' ? '' : 'body{filter:' + f + ' !important;}';
+    let css = f === 'none' ? '' : 'body{filter:' + f + ' !important;}';
+    if (t.on && t.logo) { const inv = themeInverseFilter(t); if (inv) css += ' body img{filter:' + inv + ' !important;}'; }
+    st.textContent = css;
   }
   function themePreset(p) {
     const t = _theme; t.on = true; t.inv = false; t.h = 0;
@@ -802,17 +815,18 @@
   const _TH_UNIT = { b: '%', c: '%', s: '%', w: '%', h: '°' };
   function themeReflect() { // состояние → контролы
     if (!panel) return; const t = _theme;
-    const on = panel.querySelector('#tvsig-th-on'), inv = panel.querySelector('#tvsig-th-inv');
-    if (on) on.checked = t.on; if (inv) inv.checked = t.inv;
+    const on = panel.querySelector('#tvsig-th-on'), inv = panel.querySelector('#tvsig-th-inv'), lg = panel.querySelector('#tvsig-th-logo');
+    if (on) on.checked = t.on; if (inv) inv.checked = t.inv; if (lg) lg.checked = t.logo;
     for (const k of ['b', 'c', 's', 'w', 'h']) { const el = panel.querySelector('#tvsig-th-' + k), lb = panel.querySelector('#tvsig-th-' + k + 'v');
       if (el) el.value = t[k]; if (lb) lb.textContent = t[k] + _TH_UNIT[k]; }
   }
   function themeBind() {
     _theme = themeLoad();
     const push = () => { try { localStorage.setItem('tvsig:theme', JSON.stringify(_theme)); } catch (e) {} themeApply(_theme); };
-    const on = panel.querySelector('#tvsig-th-on'), inv = panel.querySelector('#tvsig-th-inv');
+    const on = panel.querySelector('#tvsig-th-on'), inv = panel.querySelector('#tvsig-th-inv'), lg = panel.querySelector('#tvsig-th-logo');
     on.addEventListener('change', () => { _theme.on = on.checked; push(); });
     inv.addEventListener('change', () => { _theme.inv = inv.checked; _theme.on = true; on.checked = true; push(); });
+    lg.addEventListener('change', () => { _theme.logo = lg.checked; push(); });
     for (const k of ['b', 'c', 's', 'w', 'h']) {
       panel.querySelector('#tvsig-th-' + k).addEventListener('input', e => { _theme[k] = +e.target.value; const lb = panel.querySelector('#tvsig-th-' + k + 'v'); if (lb) lb.textContent = _theme[k] + _TH_UNIT[k]; _theme.on = true; on.checked = true; push(); });
     }
