@@ -470,6 +470,7 @@
       S.computed.__live = true; S.lastBarTime = lastT;
       saveStats(S.symbol, S.computed, bars); // сохранить exp/winrate по этому тикеру
       renderRows();
+      renderConsensus();
       // перерисовать активные слои
       Object.keys(S.on).forEach(id => { if (S.on[id]) drawMethod(id); });
       if (symChanged) { S.oi = null; S._oiSeeded = null; oiLoad(); } else if (S.oi) oiRender(); // OI: перезагрузка при смене тикера, иначе обновляем регион
@@ -570,6 +571,7 @@
       '<button class="tvsig-dt danger" data-t="__clear" title="Стереть ВСЮ разметку на графике">✕</button>' +
       '</div>' +
       '<div id="tvsig-status">инициализация…</div>' +
+      '<div id="tvsig-consensus" title="Общий текущий сигнал: сумма голосов методов, взвешенных по их exp на этом тикере"></div>' +
       '<div id="tvsig-rows"></div>' +
       '<div id="tvsig-foot">Цифры считаются на свечах <b>текущего тикера</b>, хранятся по каждому и обновляются при закрытии нового бара. <b>exp</b> — экспектанси, средний P&amp;L сделки в ATR (тейк +1.0 / стоп −0.5 ATR, издержки 0.12); плюс = метод в прибыли. <b>%</b> — winrate, частота угадывания знака за 12 баров (у фейдов низкая при плюсовом exp — норма). <b>n</b> — число сделок. Клик по строке рисует сигналы.</div>' +
       '</div>' + // /pane-signals
@@ -679,6 +681,35 @@
       '</div>';
     o.addEventListener('click', e => { if (e.target === o || e.target.classList.contains('tvsig-info-x')) closeInfo(); });
     document.documentElement.appendChild(o);
+  }
+
+  // ── консенсус: один живой вердикт из всех методов, взвешенный по их exp ────────
+  function renderConsensus() {
+    const el = document.getElementById('tvsig-consensus'); if (!el) return;
+    const c = S.computed;
+    if (!c || !c.__live) { el.innerHTML = ''; return; } // только по свежему расчёту, не по кэшу
+    let net = 0, wsum = 0, buy = 0, sell = 0, working = 0;
+    META.forEach(([id]) => {
+      const m = c[id]; if (!m || !m.stats) return;
+      const exp = m.stats.exp;
+      if (exp == null || exp <= 0.03) return; // только методы с реальным edge на этом тикере
+      working++;
+      const sig = m.last > 0 ? 1 : m.last < 0 ? -1 : 0;
+      if (sig === 0) return;
+      const w = Math.min(1, exp); net += sig * w; wsum += w; if (sig > 0) buy++; else sell++;
+    });
+    if (working === 0) { el.innerHTML = '<div class="tvsig-cons-empty">Консенсус: у методов пока нет подтверждённого edge на этом тикере (мало истории — дай пересчитаться).</div>'; return; }
+    const strength = wsum > 0 ? net / wsum : 0; // [-1..1]
+    const dir = strength > 0.08 ? 1 : strength < -0.08 ? -1 : 0;
+    const col = dir > 0 ? '#52F2C9' : dir < 0 ? '#FF6A8B' : '#A79BC9';
+    const label = dir > 0 ? '▲ ПОКУПКА' : dir < 0 ? '▼ ПРОДАЖА' : '— нейтрально';
+    const wd = Math.round(Math.abs(strength) * 50);
+    const fill = (dir >= 0 ? 'left:50%;width:' + wd + '%' : 'left:' + (50 - wd) + '%;width:' + wd + '%') + ';background:' + col;
+    el.innerHTML =
+      '<div class="tvsig-cons-top"><b style="color:' + col + '">' + label + '</b>' +
+      '<span class="tvsig-cons-pct">сила ' + Math.round(Math.abs(strength) * 100) + '%</span></div>' +
+      '<div class="tvsig-cons-scale"><span class="tvsig-cons-mid"></span><span class="tvsig-cons-fill" style="' + fill + '"></span></div>' +
+      '<div class="tvsig-cons-votes">' + buy + ' за покупку · ' + sell + ' за продажу · из ' + working + ' рабочих методов (exp&gt;0)</div>';
   }
 
   function renderRows() {
