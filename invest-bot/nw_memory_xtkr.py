@@ -37,6 +37,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 BAR_SECONDS = 300  # 5-мин бары; для другого ТФ поменяй --bar-min
+_EPOCH = datetime(1970, 1, 1)
 
 
 def _parse_time(s):
@@ -100,17 +101,25 @@ def main():
     T, P, C = _col(rows, "T_hat"), _col(rows, "P_hat"), _col(rows, "color_hat")
     fwd, tgt, ok = _col(rows, "fwd_ret_k"), _col(rows, "target"), _col(rows, "outcome_known")
     tk_arr = np.array([tk for tk, _ in rows])
-    ts = np.array([(_parse_time(r.get("time", "")) or datetime(1970, 1, 1)).timestamp() for _, r in rows])
+    # секунды от эпохи через total_seconds() — без .timestamp() (тот падает на
+    # Windows на пред-эпоховых/локальных датах). Непарсящееся время → NaN.
+    def _epoch_s(s):
+        d = _parse_time(s)
+        return (d - _EPOCH).total_seconds() if d else float("nan")
+    ts = np.array([_epoch_s(r.get("time", "")) for _, r in rows])
+    n_badtime = int(np.isnan(ts).sum())
+    if n_badtime:
+        print(f"строк с непарсящимся time (исключены): {n_badtime}", file=sys.stderr)
 
     split_ts = None
     if args.split_date:
         d = _parse_time(args.split_date)
         if not d:
             sys.exit("не разобрал --split-date (жду ГГГГ-ММ-ДД)")
-        split_ts = d.timestamp()
+        split_ts = (d - _EPOCH).total_seconds()
 
     # Банк аналогов: исход известен + валидные координаты (+ до split для OOS)
-    bank = (ok == 1.0) & ~np.isnan(T) & ~np.isnan(P) & ~np.isnan(C) & ~np.isnan(tgt)
+    bank = (ok == 1.0) & ~np.isnan(T) & ~np.isnan(P) & ~np.isnan(C) & ~np.isnan(tgt) & ~np.isnan(ts)
     if split_ts is not None:
         bank = bank & (ts < split_ts)
     bank_idx = np.where(bank)[0]
@@ -123,7 +132,7 @@ def main():
     print(f"банк: {len(bank_idx)} точек, KDTree dim=3", file=sys.stderr)
 
     # Запросы: валидные координаты (+ ≥ split для OOS)
-    q = ~np.isnan(T) & ~np.isnan(P) & ~np.isnan(C) & ~np.isnan(fwd)
+    q = ~np.isnan(T) & ~np.isnan(P) & ~np.isnan(C) & ~np.isnan(fwd) & ~np.isnan(ts)
     if split_ts is not None:
         q = q & (ts >= split_ts)
     query_idx = np.where(q)[0]
