@@ -41,7 +41,17 @@ _EPOCH = datetime(1970, 1, 1)
 
 
 def _parse_time(s):
-    s = (s or "").strip().replace("T", " ")
+    s = (s or "").strip()
+    if not s:
+        return None
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    # fromisoformat берёт все ISO-варианты (с таймзоной, микросекундами, T/пробел)
+    try:
+        return datetime.fromisoformat(s).replace(tzinfo=None)  # наивное: сравнения относительные
+    except ValueError:
+        pass
+    s = s.replace("T", " ").split("+")[0].split(".")[0].strip()
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
         try:
             return datetime.strptime(s, fmt)
