@@ -97,6 +97,9 @@ def main():
     ap.add_argument("--bar-min", type=int, default=5, help="минут в баре (для анти-лукахед сдвига)")
     ap.add_argument("--cross-only", action="store_true", help="исключать аналоги того же тикера")
     ap.add_argument("--local", action="store_true", help="только аналоги того же тикера (базлайн)")
+    ap.add_argument("--zone", action="store_true", help="запросы только из продуктивного угла T<t_max и P>p_min (где у NW есть эдж)")
+    ap.add_argument("--t-max", type=float, default=-0.4, help="верх T для зоны")
+    ap.add_argument("--p-min", type=float, default=0.6, help="низ P для зоны")
     ap.add_argument("--split-date", default=None, help="OOS: банк — только до даты, запросы — только с даты")
     ap.add_argument("--sample", type=int, default=50000, help="считать по случайной подвыборке запросов (0=все, медленно)")
     args = ap.parse_args()
@@ -145,6 +148,8 @@ def main():
     q = ~np.isnan(T) & ~np.isnan(P) & ~np.isnan(C) & ~np.isnan(fwd) & ~np.isnan(ts)
     if split_ts is not None:
         q = q & (ts >= split_ts)
+    if args.zone:
+        q = q & (T < args.t_max) & (P > args.p_min)
     query_idx = np.where(q)[0]
     if args.sample and len(query_idx) > args.sample:
         query_idx = np.random.default_rng(0).choice(query_idx, args.sample, replace=False)
@@ -186,6 +191,8 @@ def main():
 
     mode = "cross-only" if args.cross_only else "local" if args.local else "global"
     tag = f", OOS≥{args.split_date}" if args.split_date else ""
+    if args.zone:
+        tag += f", zone(T<{args.t_max},P>{args.p_min})"
     print(f"\n=== NW-память [{mode}]  (radius={args.radius}, k={args.k}, min_nb={args.min_neighbors}{tag}) ===")
     print(f"запросов:           {len(query_idx)}")
     print(f"с прецедентом:      {n_prec}  ({100 * n_prec / max(1, len(query_idx)):.1f}%)")
