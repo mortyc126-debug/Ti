@@ -48,6 +48,8 @@ TP_EDGES = [20, 45, 90]
 TP_LBL = ["<=20", "20-45", "45-90", ">90"]
 EG_EDGES = [0.45, 0.75]
 EG_LBL = ["ER<.45", "ER.45-.75", "ER>.75"]
+MFE_EDGES = [1.5, 2.5, 4.0, 6.0]           # сила хода (размах до пика, ATR)
+MFE_LBL = ["MFE<1.5", "1.5-2.5", "2.5-4", "4-6", "MFE>6"]
 
 
 def _cache_dir(arg):
@@ -111,7 +113,9 @@ def main():
     ap.add_argument("--by-clean", action="store_true", help="бить вёдра по ЧИСТОТЕ (глубине отката, завершившего ход)")
     ap.add_argument("--by-er", action="store_true", help="бить вёдра по EFFICIENCY RATIO восхождения (чистота ПУТИ к пику, независимо от финала)")
     ap.add_argument("--peak-win", type=int, default=120, help="окно поиска пика для --by-er/--grid, мин (откаты разрешены)")
-    ap.add_argument("--grid", action="store_true", help="2D-сетка t_peak × ER → P(перелом): развести чистоту и длительность")
+    ap.add_argument("--grid", action="store_true", help="2D-сетка axis×axis → P(перелом)")
+    ap.add_argument("--grid-rows", default="tpeak", choices=("tpeak", "er", "mfe"), help="ось строк сетки")
+    ap.add_argument("--grid-cols", default="er", choices=("tpeak", "er", "mfe"), help="ось столбцов сетки")
     ap.add_argument("--tickers", default=None)
     ap.add_argument("--sample", type=int, default=200000, help="сигналов в выборку (0=все, медленно)")
     ap.add_argument("--min-count", type=int, default=200)
@@ -131,13 +135,16 @@ def main():
         LBL = CLEAN_LBL; col0 = "чистота"; statcol = "dip"
     else:
         LBL = BUCKET_LBL; col0 = "ускор."; statcol = "dip"
+    AX = {"tpeak": (TP_EDGES, TP_LBL), "er": (EG_EDGES, EG_LBL), "mfe": (MFE_EDGES, MFE_LBL)}
+    ROW_EDGES, ROW_LBL = AX[args.grid_rows]
+    COL_EDGES, COL_LBL = AX[args.grid_cols]
     hl_a = 1.0 - 0.5 ** (1.0 / args.ewma_hl)
     m = args.m
     rng = np.random.default_rng(0)
     # на тикер берём долю сигналов, чтобы суммарно ~= sample
     acc = [dict(tpeak=[], mfe=[], dip=[], cont=[], rev=[], rng=[]) for _ in range(nb)]
-    gN = [[0] * len(EG_LBL) for _ in range(len(TP_LBL))]  # для --grid: счётчики
-    gR = [[0] * len(EG_LBL) for _ in range(len(TP_LBL))]  # и переломы
+    gN = [[0] * len(COL_LBL) for _ in range(len(ROW_LBL))]  # для --grid: счётчики
+    gR = [[0] * len(COL_LBL) for _ in range(len(ROW_LBL))]  # и переломы
     n_tk = 0
 
     for tk in tickers:
@@ -224,8 +231,9 @@ def main():
                 if f <= -args.rev_atr:
                     outcome = "rev"; break
             if args.grid:
-                tb = int(np.digitize((peak_j + 1) * args.interval, TP_EDGES))
-                eb = int(np.digitize(stat, EG_EDGES))
+                axval = {"tpeak": (peak_j + 1) * args.interval, "mfe": peak, "er": stat}
+                tb = int(np.digitize(axval[args.grid_rows], ROW_EDGES))
+                eb = int(np.digitize(axval[args.grid_cols], COL_EDGES))
                 gN[tb][eb] += 1
                 if outcome == "rev":
                     gR[tb][eb] += 1
@@ -251,19 +259,19 @@ def main():
           f"ускорение {direction}, min-run {args.min_run} ATR, перелом >{args.rev_atr} ATR")
 
     if args.grid:
-        print(f"(2D: P(перелом) по t_peak × ER; пик в окне {args.peak_win}м, гонка {args.post}м)")
-        hdr0 = "t_peak\\ER"
-        print("\n" + f"{hdr0:>10} " + " ".join(f"{c:>13}" for c in EG_LBL))
-        for tb in range(len(TP_LBL)):
+        print(f"(2D: P(перелом), строки={args.grid_rows} × столбцы={args.grid_cols}; "
+              f"пик в окне {args.peak_win}м, гонка {args.post}м)")
+        hdr0 = f"{args.grid_rows}\\{args.grid_cols}"
+        print("\n" + f"{hdr0:>10} " + " ".join(f"{c:>13}" for c in COL_LBL))
+        for tb in range(len(ROW_LBL)):
             cells = []
-            for eb in range(len(EG_LBL)):
+            for eb in range(len(COL_LBL)):
                 nnc = gN[tb][eb]
                 cells.append(f"{100 * gR[tb][eb] / nnc:5.1f}% n{nnc:<6}" if nnc >= args.min_count else f"{'—':>13}")
-            print(f"{TP_LBL[tb]:>10} " + " ".join(cells))
-        print("\nЧитать: строка — длительность (t_peak), столбец — чистота пути (ER). Если")
-        print("P(перелом) РАСТЁТ слева→направо ВНУТРИ строки — чистота независима от длительности")
-        print("(твой тезис жив). Если плоско по строкам, а меняется по столбцам вниз — решала")
-        print("длительность (короткий спайк), а ER был её прокси.")
+            print(f"{ROW_LBL[tb]:>10} " + " ".join(cells))
+        print("\nЧитать: ячейка — P(перелом) при данном сочетании. Смотри, меняется ли он ВНУТРИ")
+        print("строки (эффект столбца при фикс. строке) и внутри столбца — так каждый фактор")
+        print("виден отдельно от другого.")
         return
 
     print(f"(конец хода = откат {args.giveback} ATR от пика; ATR({args.atr_period}) для нормировки; "
