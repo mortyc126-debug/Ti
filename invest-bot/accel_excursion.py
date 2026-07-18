@@ -40,6 +40,9 @@ BUCKET_LBL = ["<0.5", "0.5-1", "1-2", "2-3", "3-5", ">5"]
 # для --by-clean: вёдра по «чистоте» (макс. откат до пика, ATR); меньше = глаже
 CLEAN_EDGES = [0.5, 1.0, 1.5, 2.0, 3.0]
 CLEAN_LBL = ["<0.5", "0.5-1", "1-1.5", "1.5-2", "2-3", ">3"]
+# для --by-er: вёдра по efficiency ratio восхождения (net/путь); выше = глаже
+ER_EDGES = [0.30, 0.45, 0.60, 0.75, 0.90]
+ER_LBL = ["<.30", ".30-.45", ".45-.60", ".60-.75", ".75-.90", ">.90"]
 
 
 def _cache_dir(arg):
@@ -100,7 +103,9 @@ def main():
     ap.add_argument("--post", type=int, default=120, help="окно ПОСЛЕ пика для замера разворота, мин")
     ap.add_argument("--min-run", type=float, default=0.0, help="считать только эпизоды с MFE≥R ATR (описательно)")
     ap.add_argument("--counter", action="store_true", help="ускорение против движения")
-    ap.add_argument("--by-clean", action="store_true", help="бить вёдра по ЧИСТОТЕ (глубине откатов до пика), а не по ускорению")
+    ap.add_argument("--by-clean", action="store_true", help="бить вёдра по ЧИСТОТЕ (глубине отката, завершившего ход)")
+    ap.add_argument("--by-er", action="store_true", help="бить вёдра по EFFICIENCY RATIO восхождения (чистота ПУТИ к пику, независимо от финала)")
+    ap.add_argument("--peak-win", type=int, default=120, help="окно поиска пика для --by-er, мин (откаты разрешены)")
     ap.add_argument("--tickers", default=None)
     ap.add_argument("--sample", type=int, default=200000, help="сигналов в выборку (0=все, медленно)")
     ap.add_argument("--min-count", type=int, default=200)
@@ -114,8 +119,12 @@ def main():
         sys.exit(f"нет тикеров в {cache} (interval={args.interval})")
     nb = len(BUCKETS)
     edges = [b for _, b in BUCKETS[:-1]]
-    LBL = CLEAN_LBL if args.by_clean else BUCKET_LBL
-    col0 = "чистота" if args.by_clean else "ускор."
+    if args.by_er:
+        LBL = ER_LBL; col0 = "ER"; statcol = "ER"
+    elif args.by_clean:
+        LBL = CLEAN_LBL; col0 = "чистота"; statcol = "dip"
+    else:
+        LBL = BUCKET_LBL; col0 = "ускор."; statcol = "dip"
     hl_a = 1.0 - 0.5 ** (1.0 / args.ewma_hl)
     m = args.m
     rng = np.random.default_rng(0)
@@ -161,25 +170,38 @@ def main():
         bi = np.digitize(an, edges)
         G = args.giveback
         post_bars = max(1, round(args.post / args.interval))
+        peakwin_bars = max(1, round(args.peak_win / args.interval))
         for i in sig:
             a0 = atr[i]
             fav = (cl[i + 1:i + 1 + W] - cl[i]) * d[i] / a0   # ход ПО направлению, ATR
             L = fav.shape[0]
-            # ЛОКАЛЬНЫЙ пик: ход длится, пока не откатит G ATR от максимума (трейлинг-стоп).
-            # peak_j — когда движение выдохлось; dip — макс. откат ДО пика (чистота хода).
-            peak = 0.0; peak_j = -1; dip = 0.0
-            for j in range(L):
-                f = fav[j]
-                if f > peak:
-                    peak = f; peak_j = j
-                else:
-                    pull = peak - f
-                    if pull > dip:
-                        dip = pull
-                    if pull >= G:
-                        break
-            if peak < args.min_run:
-                continue
+            if args.by_er:
+                # пик по ФИКСИРОВАННОМУ окну (откаты по пути разрешены);
+                # stat = efficiency ratio = net к пику / суммарный путь ∈(0,1], выше=глаже
+                seg = fav[:min(L, peakwin_bars)]
+                peak_j = int(np.argmax(seg)); peak = float(seg[peak_j])
+                if peak < args.min_run:
+                    continue
+                path = abs(float(fav[0]))
+                if peak_j > 0:
+                    path += float(np.abs(np.diff(fav[:peak_j + 1])).sum())
+                stat = peak / path if path > 1e-9 else 1.0
+            else:
+                # трейлинг-стоп: ход до отката G ATR от максимума; stat = dip (макс. откат до пика)
+                peak = 0.0; peak_j = -1; dip = 0.0
+                for j in range(L):
+                    f = fav[j]
+                    if f > peak:
+                        peak = f; peak_j = j
+                    else:
+                        pull = peak - f
+                        if pull > dip:
+                            dip = pull
+                        if pull >= G:
+                            break
+                if peak < args.min_run:
+                    continue
+                stat = dip
             # ГОНКА после пика: что раньше в окне post — новый максимум (>пика →
             # тренд возобновился = откат/продолжение) или уход за вход на rev_atr
             # (= перелом). Ни то ни другое → боковик. Так откат В ТРЕНДЕ не путается
@@ -193,10 +215,15 @@ def main():
                     outcome = "cont"; break
                 if f <= -args.rev_atr:
                     outcome = "rev"; break
-            b_ = int(np.digitize(dip, CLEAN_EDGES)) if args.by_clean else int(bi[i])
+            if args.by_er:
+                b_ = int(np.digitize(stat, ER_EDGES))
+            elif args.by_clean:
+                b_ = int(np.digitize(stat, CLEAN_EDGES))
+            else:
+                b_ = int(bi[i])
             acc[b_]["tpeak"].append((peak_j + 1) * args.interval if peak_j >= 0 else args.interval)
             acc[b_]["mfe"].append(peak)
-            acc[b_]["dip"].append(dip)
+            acc[b_]["dip"].append(stat)
             acc[b_]["cont"].append(1.0 if outcome == "cont" else 0.0)
             acc[b_]["rev"].append(1.0 if outcome == "rev" else 0.0)
             acc[b_]["rng"].append(1.0 if outcome == "rng" else 0.0)
@@ -209,7 +236,7 @@ def main():
           f"ускорение {direction}, min-run {args.min_run} ATR, перелом >{args.rev_atr} ATR")
     print(f"(конец хода = откат {args.giveback} ATR от пика; ATR({args.atr_period}) для нормировки; "
           f"гонка в окне {args.post}м после пика; перелом = уход за вход на {args.rev_atr} ATR)")
-    print(f"\n{col0:>8} {'n':>8} {'t_peak,мин':>11} {'MFE,ATR':>9} {'чистота':>9} "
+    print(f"\n{col0:>8} {'n':>8} {'t_peak,мин':>11} {'MFE,ATR':>9} {statcol:>9} "
           f"{'P(прод)':>9} {'P(перелом)':>11} {'P(боковик)':>11}")
 
     def med(x):
