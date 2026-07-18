@@ -29,6 +29,7 @@ nw_memory_xtkr.py — кросс-тикерная NW-память с жёстк�
 import sys
 import os
 import csv
+import json
 import glob
 import argparse
 from datetime import datetime
@@ -88,6 +89,42 @@ def _col(rows, key):
     return out
 
 
+def _ticker_liq(cache_dir):
+    """тикер(upper) → медианный оборот (volume*close) из 5м candle_cache."""
+    liq = {}
+    for fp in glob.glob(os.path.join(cache_dir, "*.json")):
+        base = os.path.splitext(os.path.basename(fp))[0]
+        if base.endswith("_1m"):
+            continue
+        try:
+            with open(fp, encoding="utf-8") as f:
+                rows = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            continue
+        if not isinstance(rows, list) or len(rows) < 50:
+            continue
+        tos = []
+        for r in rows:
+            try:
+                tos.append(float(r["volume"]) * float(r["close"]))
+            except (KeyError, TypeError, ValueError):
+                pass
+        if tos:
+            liq[base.upper()] = float(np.median(tos))
+    return liq
+
+
+def _report(label, dirs, acts):
+    if len(dirs) < 3:
+        print(f"{label:>16}: мало ({len(dirs)})")
+        return
+    dirs = np.asarray(dirs); acts = np.asarray(acts); signed = dirs * acts
+    hit = float((signed > 0).mean()); mean = float(signed.mean())
+    sd = float(signed.std(ddof=1)); d = mean / sd if sd > 0 else float("nan")
+    ic = float(np.corrcoef(dirs, acts)[0, 1]) if len(dirs) > 1 else float("nan")
+    print(f"{label:>16}: n={len(dirs):>6}  mean{mean:+.4f}  d{d:+.3f}  hit{100 * hit:5.1f}%  IC{ic:+.3f}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("path", help="каталог с *_tpc.csv или один файл")
@@ -102,6 +139,8 @@ def main():
     ap.add_argument("--p-min", type=float, default=0.6, help="низ P для зоны")
     ap.add_argument("--split-date", default=None, help="OOS: банк — только до даты, запросы — только с даты")
     ap.add_argument("--sample", type=int, default=50000, help="считать по случайной подвыборке запросов (0=все, медленно)")
+    ap.add_argument("--by-liq", action="store_true", help="разрез по ликвидности тикера (терцили медианного оборота)")
+    ap.add_argument("--cache", default=None, help="candle_cache для оборота (--by-liq); default data/candle_cache")
     args = ap.parse_args()
     if args.cross_only and args.local:
         sys.exit("--cross-only и --local взаимоисключающие")
@@ -155,7 +194,22 @@ def main():
         query_idx = np.random.default_rng(0).choice(query_idx, args.sample, replace=False)
     print(f"запросов к оценке: {len(query_idx)}", file=sys.stderr)
 
+    # карта ликвидности → терциль тикера (0 неликвид … 2 ликвид)
+    liq_tercile = {}
+    if args.by_liq:
+        cache = args.cache or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "candle_cache")
+        liq = _ticker_liq(cache)
+        present = {tk_arr[i] for i in query_idx if tk_arr[i] in liq}
+        if len(present) < 6:
+            print(f"ликвидности хватило лишь на {len(present)} тикеров — проверь --cache", file=sys.stderr)
+        vals = sorted(liq[t] for t in present)
+        q1 = vals[len(vals) // 3] if vals else 0
+        q2 = vals[2 * len(vals) // 3] if vals else 0
+        for t in present:
+            liq_tercile[t] = 0 if liq[t] <= q1 else 1 if liq[t] <= q2 else 2
+
     dirs, acts = [], []
+    lb = [([], []), ([], []), ([], [])]  # per-терциль dirs/acts
     n_prec = n_noprec = 0
     for i in query_idx:
         cand = tree.query_ball_point([T[i], P[i], C[i]], r=args.radius)
@@ -176,34 +230,31 @@ def main():
         if p_hold == 0.5:
             continue
         n_prec += 1
-        dirs.append(1.0 if p_hold > 0.5 else -1.0)
-        acts.append(fwd[i])
+        dv = 1.0 if p_hold > 0.5 else -1.0
+        av = fwd[i]
+        dirs.append(dv); acts.append(av)
+        if args.by_liq:
+            t = liq_tercile.get(tk_arr[i], -1)
+            if t >= 0:
+                lb[t][0].append(dv); lb[t][1].append(av)
 
     if not dirs:
         sys.exit("ни одного прецедента — ослабь --radius / --min-neighbors")
-    dirs, acts = np.array(dirs), np.array(acts)
-    signed = dirs * acts
-    hit = float((signed > 0).mean())
-    mean = float(signed.mean())
-    sd = float(signed.std(ddof=1)) if len(signed) > 1 else 0.0
-    d_cohen = mean / sd if sd > 0 else float("nan")
-    ic = float(np.corrcoef(dirs, acts)[0, 1]) if len(dirs) > 1 else float("nan")
 
     mode = "cross-only" if args.cross_only else "local" if args.local else "global"
     tag = f", OOS≥{args.split_date}" if args.split_date else ""
     if args.zone:
         tag += f", zone(T<{args.t_max},P>{args.p_min})"
     print(f"\n=== NW-память [{mode}]  (radius={args.radius}, k={args.k}, min_nb={args.min_neighbors}{tag}) ===")
-    print(f"запросов:           {len(query_idx)}")
-    print(f"с прецедентом:      {n_prec}  ({100 * n_prec / max(1, len(query_idx)):.1f}%)")
-    print(f"без прецедента:     {n_noprec}")
-    print(f"mean signed (ATR):  {mean:+.4f}")
-    print(f"d (mean/std):       {d_cohen:+.3f}")
-    print(f"hit (знак угадан):  {100 * hit:.1f}%")
-    print(f"IC (dir vs fwd):    {ic:+.3f}")
-    print("\nСравни режимы global/cross-only/local по этим же цифрам:")
-    print("  ждём у global больше «с прецедентом» и d/hit не хуже local;")
-    print("  cross-only держит edge → паттерны универсальны между тикерами.")
+    print(f"с прецедентом: {n_prec} из {len(query_idx)} ({100 * n_prec / max(1, len(query_idx)):.1f}%)")
+    _report("ВСЕ", dirs, acts)
+    if args.by_liq:
+        print("— по ликвидности (терцили оборота): —")
+        _report("неликвид (низ)", lb[0][0], lb[0][1])
+        _report("середина", lb[1][0], lb[1][1])
+        _report("ликвид (верх)", lb[2][0], lb[2][1])
+        print("\nГейт: если IC/hit держатся (или растут) в ВЕРХНЕМ терциле — эдж на исполнимом")
+        print("ликвиде, кандидат в модуль. Если эдж только в НИЗЕ — мираж (не влезешь без слипа).")
 
 
 if __name__ == "__main__":
