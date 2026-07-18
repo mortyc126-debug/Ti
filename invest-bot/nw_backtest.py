@@ -120,13 +120,20 @@ def _ticker_liq(cache_dir):
     return liq
 
 
-def _stats(label, pnls):
+def _stats(label, pnls, dirs=None):
     if len(pnls) < 5:
         print(f"{label:>16}: сделок {len(pnls)} (мало)")
         return
     a = np.asarray(pnls)
     print(f"{label:>16}: N={len(a):>6}  exp={a.mean():+.4f} ATR  win={100 * (a > 0).mean():5.1f}%  "
           f"сумма={a.sum():+.1f} ATR")
+    # разбивка long/short — проверка, что плюс не только от шортов (бета рынка)
+    if dirs is not None:
+        d = np.asarray(dirs)
+        for sub, lbl in ((d > 0, "  ↑long"), (d < 0, "  ↓short")):
+            if sub.sum() >= 5:
+                s = a[sub]
+                print(f"{lbl:>16}: N={len(s):>6}  exp={s.mean():+.4f} ATR  win={100 * (s > 0).mean():5.1f}%")
 
 
 def main():
@@ -202,6 +209,7 @@ def main():
 
     maxhold = args.k
     pnls, pnls_tr, pnls_te = [], [], []
+    dirs, dirs_tr, dirs_te = [], [], []
     n_tk = 0
     for tk in sorted(feat_by_tk):
         if liq_top is not None and tk not in liq_top:
@@ -257,9 +265,12 @@ def main():
                     if cL[j] <= tp:
                         exit_j = j; px = tp; break
             pnl = dirn * (px - entry) / a0 - args.cost
-            pnls.append(pnl)
+            pnls.append(pnl); dirs.append(dirn)
             if split_ts is not None:
-                (pnls_te if cep[i] >= split_ts else pnls_tr).append(pnl)
+                if cep[i] >= split_ts:
+                    pnls_te.append(pnl); dirs_te.append(dirn)
+                else:
+                    pnls_tr.append(pnl); dirs_tr.append(dirn)
             i = exit_j + 1  # БЕЗ перекрытия
 
     if not pnls:
@@ -273,10 +284,10 @@ def main():
     print(f"\n=== NW-бэктест  radius={args.radius} take={args.take}/stop={args.stop} "
           f"cost={args.cost} k={args.k}  {', '.join(tag)} ===")
     print(f"тикеров торговали: {n_tk}")
-    _stats("ВСЕ (no-overlap)", pnls)
+    _stats("ВСЕ (no-overlap)", pnls, dirs)
     if split_ts is not None:
-        _stats(f"TRAIN <{args.split_date}", pnls_tr)
-        _stats(f"TEST ≥{args.split_date}", pnls_te)
+        _stats(f"TRAIN <{args.split_date}", pnls_tr, dirs_tr)
+        _stats(f"TEST ≥{args.split_date}", pnls_te, dirs_te)
     print("\nexp — средний P&L сделки в ATR после издержек. Плюс на TEST при разумном")
     print("cost = сигнал переживает честный учёт входа и no-overlap. Проверь cost 0.05/0.08/0.12.")
 
