@@ -43,6 +43,11 @@ CLEAN_LBL = ["<0.5", "0.5-1", "1-1.5", "1.5-2", "2-3", ">3"]
 # для --by-er: вёдра по efficiency ratio восхождения (net/путь); выше = глаже
 ER_EDGES = [0.30, 0.45, 0.60, 0.75, 0.90]
 ER_LBL = ["<.30", ".30-.45", ".45-.60", ".60-.75", ".75-.90", ">.90"]
+# для --grid: 2D t_peak(мин) × ER — развести чистоту и длительность
+TP_EDGES = [20, 45, 90]
+TP_LBL = ["<=20", "20-45", "45-90", ">90"]
+EG_EDGES = [0.45, 0.75]
+EG_LBL = ["ER<.45", "ER.45-.75", "ER>.75"]
 
 
 def _cache_dir(arg):
@@ -105,7 +110,8 @@ def main():
     ap.add_argument("--counter", action="store_true", help="ускорение против движения")
     ap.add_argument("--by-clean", action="store_true", help="бить вёдра по ЧИСТОТЕ (глубине отката, завершившего ход)")
     ap.add_argument("--by-er", action="store_true", help="бить вёдра по EFFICIENCY RATIO восхождения (чистота ПУТИ к пику, независимо от финала)")
-    ap.add_argument("--peak-win", type=int, default=120, help="окно поиска пика для --by-er, мин (откаты разрешены)")
+    ap.add_argument("--peak-win", type=int, default=120, help="окно поиска пика для --by-er/--grid, мин (откаты разрешены)")
+    ap.add_argument("--grid", action="store_true", help="2D-сетка t_peak × ER → P(перелом): развести чистоту и длительность")
     ap.add_argument("--tickers", default=None)
     ap.add_argument("--sample", type=int, default=200000, help="сигналов в выборку (0=все, медленно)")
     ap.add_argument("--min-count", type=int, default=200)
@@ -130,6 +136,8 @@ def main():
     rng = np.random.default_rng(0)
     # на тикер берём долю сигналов, чтобы суммарно ~= sample
     acc = [dict(tpeak=[], mfe=[], dip=[], cont=[], rev=[], rng=[]) for _ in range(nb)]
+    gN = [[0] * len(EG_LBL) for _ in range(len(TP_LBL))]  # для --grid: счётчики
+    gR = [[0] * len(EG_LBL) for _ in range(len(TP_LBL))]  # и переломы
     n_tk = 0
 
     for tk in tickers:
@@ -175,7 +183,7 @@ def main():
             a0 = atr[i]
             fav = (cl[i + 1:i + 1 + W] - cl[i]) * d[i] / a0   # ход ПО направлению, ATR
             L = fav.shape[0]
-            if args.by_er:
+            if args.by_er or args.grid:
                 # пик по ФИКСИРОВАННОМУ окну (откаты по пути разрешены);
                 # stat = efficiency ratio = net к пику / суммарный путь ∈(0,1], выше=глаже
                 seg = fav[:min(L, peakwin_bars)]
@@ -215,6 +223,13 @@ def main():
                     outcome = "cont"; break
                 if f <= -args.rev_atr:
                     outcome = "rev"; break
+            if args.grid:
+                tb = int(np.digitize((peak_j + 1) * args.interval, TP_EDGES))
+                eb = int(np.digitize(stat, EG_EDGES))
+                gN[tb][eb] += 1
+                if outcome == "rev":
+                    gR[tb][eb] += 1
+                continue
             if args.by_er:
                 b_ = int(np.digitize(stat, ER_EDGES))
             elif args.by_clean:
@@ -234,6 +249,23 @@ def main():
     direction = "ПРОТИВ движения" if args.counter else "ПО движению"
     print(f"\nтикеров: {n_tk}, интервал {args.interval}м, окно {args.maxh}м ({W} баров), "
           f"ускорение {direction}, min-run {args.min_run} ATR, перелом >{args.rev_atr} ATR")
+
+    if args.grid:
+        print(f"(2D: P(перелом) по t_peak × ER; пик в окне {args.peak_win}м, гонка {args.post}м)")
+        hdr0 = "t_peak\\ER"
+        print("\n" + f"{hdr0:>10} " + " ".join(f"{c:>13}" for c in EG_LBL))
+        for tb in range(len(TP_LBL)):
+            cells = []
+            for eb in range(len(EG_LBL)):
+                nnc = gN[tb][eb]
+                cells.append(f"{100 * gR[tb][eb] / nnc:5.1f}% n{nnc:<6}" if nnc >= args.min_count else f"{'—':>13}")
+            print(f"{TP_LBL[tb]:>10} " + " ".join(cells))
+        print("\nЧитать: строка — длительность (t_peak), столбец — чистота пути (ER). Если")
+        print("P(перелом) РАСТЁТ слева→направо ВНУТРИ строки — чистота независима от длительности")
+        print("(твой тезис жив). Если плоско по строкам, а меняется по столбцам вниз — решала")
+        print("длительность (короткий спайк), а ER был её прокси.")
+        return
+
     print(f"(конец хода = откат {args.giveback} ATR от пика; ATR({args.atr_period}) для нормировки; "
           f"гонка в окне {args.post}м после пика; перелом = уход за вход на {args.rev_atr} ATR)")
     print(f"\n{col0:>8} {'n':>8} {'t_peak,мин':>11} {'MFE,ATR':>9} {statcol:>9} "
