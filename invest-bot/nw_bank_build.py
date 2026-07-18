@@ -156,9 +156,14 @@ def main():
     coords = np.concatenate(coords_parts)
     y = np.concatenate(y_parts)
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    np.savez_compressed(out, coords=coords, y=y,
+    # Атомарно: пишем во временный, затем os.replace — чтобы бот с горячей
+    # перезагрузкой (NWMemoryGlobal по mtime) не прочитал недописанный файл.
+    # tmp оканчивается на .npz → savez не дописывает расширение.
+    tmp = out + ".tmp.npz"
+    np.savez_compressed(tmp, coords=coords, y=y,
                         meta=np.array([_N, _N_MACRO, _W_NORM, _K], dtype=np.int32),
                         liquid=np.array([1 if args.liquid_only else 0], dtype=np.int8))
+    os.replace(tmp, out)
     print(f"\nбанк сохранён: {out}")
     print(f"тикеров: {n_tk}, точек: {len(y)}, доля up: {100 * y.mean():.1f}%")
     print(f"размер файла: {os.path.getsize(out) / 1e6:.1f} МБ")

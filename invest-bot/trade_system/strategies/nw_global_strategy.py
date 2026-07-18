@@ -133,6 +133,13 @@ class NWGlobalStrategy(IStrategy):
         cur_t = self._bars[-1].time if self._bars else None
         is_fresh = new_bar and cur_t is not None and cur_t != self._last_bar_t
         if is_fresh:
+            # Горячая перезагрузка банка при смене торгового дня: ночной
+            # nw_bank_refresh пересобрал .npz → подхватываем без перезапуска бота.
+            if self._memory is not None and self._last_bar_t is not None \
+                    and getattr(cur_t, "date", lambda: None)() != getattr(self._last_bar_t, "date", lambda: None)():
+                if self._memory.maybe_reload():
+                    logger.info("NWGlobalStrategy: банк обновлён, перезагружен (точек=%d)",
+                                len(self._memory.y))
             self._last_bar_t = cur_t
 
         # Держим шорт → считаем бары до горизонта, вход не ищем. Тейк/стоп закроют

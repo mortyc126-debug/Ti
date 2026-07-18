@@ -50,10 +50,12 @@ def _axes_from_candles(candles: list, np):
 class NWMemoryGlobal:
     """Глобальный банк. Строй через NWMemoryGlobal.load(...), запрашивай score(...)."""
 
-    def __init__(self, coords, y, tree):
+    def __init__(self, coords, y, tree, path=None, mtime=0.0):
         self.coords = coords   # (N,3) float32
         self.y = y             # (N,) int8: 1 если target>0
         self._tree = tree
+        self._path = path      # для горячей перезагрузки
+        self._mtime = mtime
 
     @classmethod
     def load(cls, path: Optional[str] = None) -> Optional["NWMemoryGlobal"]:
@@ -67,6 +69,7 @@ class NWMemoryGlobal:
         if not os.path.exists(path):
             return None
         try:
+            mtime = os.path.getmtime(path)
             d = np.load(path)
             coords = d["coords"].astype(np.float64)
             y = d["y"].astype(np.float64)
@@ -74,7 +77,25 @@ class NWMemoryGlobal:
             return None
         if len(coords) < _MIN_NEIGHBORS:
             return None
-        return cls(coords, y, cKDTree(coords))
+        return cls(coords, y, cKDTree(coords), path=path, mtime=mtime)
+
+    def maybe_reload(self) -> bool:
+        """Горячая перезагрузка: если файл банка обновился (ночной nw_bank_refresh),
+        перечитывает его и пересобирает дерево на месте. True если перезагрузился.
+        Дёшево (один os.stat) — зови раз в день/на смене дня, не на каждом баре."""
+        if not self._path:
+            return False
+        try:
+            mt = os.path.getmtime(self._path)
+        except OSError:
+            return False
+        if mt <= self._mtime:
+            return False
+        fresh = NWMemoryGlobal.load(self._path)
+        if fresh is None:
+            return False
+        self.coords, self.y, self._tree, self._mtime = fresh.coords, fresh.y, fresh._tree, fresh._mtime
+        return True
 
     def score(self, candles: list) -> float:
         """Голос 2·p_hold−1 для последнего бара окна. 0.0 вне зоны / мало соседей /
