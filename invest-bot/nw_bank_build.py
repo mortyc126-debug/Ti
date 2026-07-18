@@ -22,10 +22,25 @@ import sys
 import json
 import glob
 import argparse
+from datetime import datetime
 
 import numpy as np
 
 import tpcolor_dataset as tpc
+
+_EPOCH = datetime(1970, 1, 1)
+
+
+def _epoch_s(s):
+    s = (s or "").strip()
+    if not s:
+        return float("nan")
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    try:
+        return (datetime.fromisoformat(s).replace(tzinfo=None) - _EPOCH).total_seconds()
+    except ValueError:
+        return float("nan")
 
 # Параметры осей — ровно как в nw_memory_live (единый источник, без рассинхрона).
 _N = 20
@@ -80,7 +95,15 @@ def main():
     ap.add_argument("--out", default=None, help="куда сохранить банк (.npz)")
     ap.add_argument("--liquid-only", action="store_true",
                     help="в банк только верхний терциль ликвидности (как валидировалось)")
+    ap.add_argument("--split-date", default=None,
+                    help="в банк только точки СТРОГО РАНЬШЕ даты (train-only банк для "
+                         "честной OOS-проверки: заморозил на train, торгуешь на test)")
     args = ap.parse_args()
+    split_ts = None
+    if args.split_date:
+        split_ts = _epoch_s(args.split_date)
+        if not np.isfinite(split_ts):
+            sys.exit("плохой --split-date")
     cache = _cache_dir(args.cache)
     out = args.out or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "nw_bank.npz")
 
@@ -115,6 +138,11 @@ def main():
         tg = np.array([r["target"] if r["target"] is not None else np.nan for r in rows])
         ok = np.array([r["outcome_known"] for r in rows]) == 1
         good = ok & ~np.isnan(T) & ~np.isnan(P) & ~np.isnan(C) & ~np.isnan(tg)
+        if split_ts is not None:
+            # исход должен реализоваться (t + k баров) до split — иначе утечка в test.
+            # консервативно режем по времени бара: точки строго раньше split.
+            bts = np.array([_epoch_s(r.get("time", "")) for r in rows])
+            good &= np.isfinite(bts) & (bts < split_ts)
         if not good.any():
             continue
         coords_parts.append(np.column_stack([T[good], P[good], C[good]]).astype(np.float32))

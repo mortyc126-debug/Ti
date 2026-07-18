@@ -156,6 +156,10 @@ def main():
                     help="бенчмарк беты: игнорировать сигнал, входить на КАЖДОМ баре "
                          "в заданном направлении (short/long/rand). Сравни exp с сигналом.")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--bank", default=None,
+                    help="взять сигнал из готового банка .npz через NWMemoryGlobal "
+                         "(live-путь). С train-only банком (--split-date в сборщике) и "
+                         "--split-date тут = честная OOS-проверка замороженной памяти.")
     args = ap.parse_args()
     bar_s = args.bar_min * 60
     cache = args.cache or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "candle_cache")
@@ -176,17 +180,26 @@ def main():
     T, P, C = col("T_hat"), col("P_hat"), col("color_hat")
     tgt = col("target")
     ok = col("outcome_known")
-    tk_arr = np.array([tk for tk, _ in rows])
     ts = np.array([_epoch_s(r.get("time", "")) for _, r in rows])
 
-    # банк аналогов (весь пул, исход известен, валидные координаты, валидное время)
-    bank = (ok == 1.0) & ~np.isnan(T) & ~np.isnan(P) & ~np.isnan(C) & ~np.isnan(tgt) & ~np.isnan(ts)
-    bi = np.where(bank)[0]
-    if len(bi) < args.min_neighbors:
-        sys.exit("маленький банк")
-    tree = cKDTree(np.column_stack([T[bi], P[bi], C[bi]]))
-    b_ts = ts[bi]; b_y = (tgt[bi] > 0).astype(float)
-    print(f"банк: {len(bi)} точек", file=sys.stderr)
+    # live-путь: сигнал из готового банка .npz (NWMemoryGlobal). Банк заморожен,
+    # каузальность обеспечивается тем, что он построен на train (--split-date в сборщике).
+    memg = None
+    if args.bank:
+        from nw_memory_global import NWMemoryGlobal
+        memg = NWMemoryGlobal.load(args.bank)
+        if memg is None:
+            sys.exit(f"не загрузился банк {args.bank} (нет файла/scipy/numpy)")
+        print(f"банк (live .npz): {len(memg.y)} точек", file=sys.stderr)
+    else:
+        # банк аналогов (весь пул, исход известен, валидные координаты, валидное время)
+        bank = (ok == 1.0) & ~np.isnan(T) & ~np.isnan(P) & ~np.isnan(C) & ~np.isnan(tgt) & ~np.isnan(ts)
+        bi = np.where(bank)[0]
+        if len(bi) < args.min_neighbors:
+            sys.exit("маленький банк")
+        tree = cKDTree(np.column_stack([T[bi], P[bi], C[bi]]))
+        b_ts = ts[bi]; b_y = (tgt[bi] > 0).astype(float)
+        print(f"банк: {len(bi)} точек", file=sys.stderr)
 
     split_ts = None
     if args.split_date:
@@ -254,6 +267,12 @@ def main():
                     dirn = 1.0
                 else:
                     dirn = 1.0 if rng.random() > 0.5 else -1.0
+            elif memg is not None:
+                # live-путь: голос из замороженного банка (зона/радиус/соседи внутри)
+                sc = memg.score_axes(Tq, Pq, Cq)
+                if sc == 0.0:
+                    i += 1; continue
+                dirn = 1.0 if sc > 0 else -1.0
             else:
                 if args.zone and not (Tq < args.t_max and Pq > args.p_min):
                     i += 1; continue
@@ -304,6 +323,8 @@ def main():
         tag.append("liquid-only")
     if args.null != "none":
         tag.append(f"NULL={args.null}(бета-бенчмарк)")
+    if args.bank:
+        tag.append("bank=live(.npz)")
     print(f"\n=== NW-бэктест  radius={args.radius} take={args.take}/stop={args.stop} "
           f"cost={args.cost} k={args.k}  {', '.join(tag)} ===")
     print(f"тикеров торговали: {n_tk}")
