@@ -114,7 +114,7 @@ def main():
     m = args.m
     rng = np.random.default_rng(0)
     # на тикер берём долю сигналов, чтобы суммарно ~= sample
-    acc = [dict(tpeak=[], mfe=[], rfrac=[], mae=[], rev=[], dip=[]) for _ in range(nb)]
+    acc = [dict(tpeak=[], mfe=[], dip=[], cont=[], rev=[], rng=[]) for _ in range(nb)]
     n_tk = 0
 
     for tk in tickers:
@@ -174,16 +174,26 @@ def main():
                         break
             if peak < args.min_run:
                 continue
-            # разворот — в ОГРАНИЧЕННОМ окне post_bars ПОСЛЕ локального пика (не за все сутки)
-            post = fav[peak_j + 1: peak_j + 1 + post_bars] if peak_j + 1 < L else fav[peak_j:peak_j + 1]
-            trough = float(post.min()) if post.size else peak
+            # ГОНКА после пика: что раньше в окне post — новый максимум (>пика →
+            # тренд возобновился = откат/продолжение) или уход за вход на rev_atr
+            # (= перелом). Ни то ни другое → боковик. Так откат В ТРЕНДЕ не путается
+            # с разворотом: если сделал новый хай раньше слома — это продолжение.
+            start = peak_j + 1 if peak_j >= 0 else 0
+            jmax = min(L, start + post_bars)
+            outcome = "rng"
+            for j in range(start, jmax):
+                f = fav[j]
+                if f > peak:
+                    outcome = "cont"; break
+                if f <= -args.rev_atr:
+                    outcome = "rev"; break
             b_ = int(bi[i])
             acc[b_]["tpeak"].append((peak_j + 1) * args.interval if peak_j >= 0 else args.interval)
             acc[b_]["mfe"].append(peak)
-            acc[b_]["rfrac"].append((peak - trough) / peak if peak > 1e-9 else np.nan)
-            acc[b_]["mae"].append(-trough if trough < 0 else 0.0)
-            acc[b_]["rev"].append(1.0 if trough <= -args.rev_atr else 0.0)
             acc[b_]["dip"].append(dip)
+            acc[b_]["cont"].append(1.0 if outcome == "cont" else 0.0)
+            acc[b_]["rev"].append(1.0 if outcome == "rev" else 0.0)
+            acc[b_]["rng"].append(1.0 if outcome == "rng" else 0.0)
 
     if n_tk == 0:
         sys.exit("не загрузилось ни одного тикера")
@@ -192,9 +202,9 @@ def main():
     print(f"\nтикеров: {n_tk}, интервал {args.interval}м, окно {args.maxh}м ({W} баров), "
           f"ускорение {direction}, min-run {args.min_run} ATR, перелом >{args.rev_atr} ATR")
     print(f"(конец хода = откат {args.giveback} ATR от пика; ATR({args.atr_period}) для нормировки; "
-          f"разворот в окне {args.post}м после пика)")
-    print(f"\n{'аномалия':>8} {'n':>8} {'t_peak,мин':>11} {'MFE,ATR':>9} {'откат%MFE':>10} "
-          f"{'чистота':>9} {'MAE_post':>9} {'P(перелом)':>11}")
+          f"гонка в окне {args.post}м после пика; перелом = уход за вход на {args.rev_atr} ATR)")
+    print(f"\n{'аномалия':>8} {'n':>8} {'t_peak,мин':>11} {'MFE,ATR':>9} {'чистота':>9} "
+          f"{'P(прод)':>9} {'P(перелом)':>11} {'P(боковик)':>11}")
 
     def med(x):
         x = [v for v in x if v == v]
@@ -206,13 +216,13 @@ def main():
             print(f"{BUCKET_LBL[j]:>8} {nn:>8}   (мало данных)")
             continue
         print(f"{BUCKET_LBL[j]:>8} {nn:>8} {med(a['tpeak']):>11.0f} {med(a['mfe']):>9.2f} "
-              f"{100 * med(a['rfrac']):>9.0f}% {med(a['dip']):>9.2f} {med(a['mae']):>9.2f} "
-              f"{100 * np.mean(a['rev']):>10.1f}%")
+              f"{med(a['dip']):>9.2f} {100 * np.mean(a['cont']):>8.1f}% {100 * np.mean(a['rev']):>10.1f}% "
+              f"{100 * np.mean(a['rng']):>10.1f}%")
 
-    print("\nЧитать: t_peak — когда ход ЛОКАЛЬНО выдохся (медиана, мин); MFE — размах хода до пика;")
-    print("откат%MFE — сколько % хода отдал после пика; чистота — макс. откат ДО пика (меньше=глаже);")
-    print("MAE_post — уход за вход после пика; P(перелом) — доля с уходом за вход > --rev-atr.")
-    print("Гипотеза: сильнее ускорение (+ ниже чистота) → короче t_peak и выше P(перелом).")
+    print("\nЧитать: гонка после пика — что раньше: новый хай (>пика) = ПРОДОЛЖЕНИЕ (откат в тренде),")
+    print("уход за вход на rev_atr = ПЕРЕЛОМ, ничего за окно = БОКОВИК. t_peak — когда выдохся;")
+    print("MFE — размах до пика; чистота — макс. откат ДО пика (меньше=глаже).")
+    print("Гипотеза: сильнее ускорение (+ ниже чистота) → выше P(перелом) при низком P(прод).")
 
 
 if __name__ == "__main__":
