@@ -238,11 +238,16 @@ def main():
             if np.isnan(atr[i]) or atr[i] <= 0:
                 i += 1; continue
             f = feat.get(t)
-            if args.null == "none" and f is None:
+            # null без --zone входит на любом баре; с --zone или в сигнале нужен признак
+            if f is None and (args.null == "none" or args.zone):
                 i += 1; continue
             Tq, Pq, Cq = f if f is not None else (np.nan, np.nan, np.nan)
             if args.null != "none":
-                # бенчмарк беты: без зоны/сигнала, направление фиксировано
+                # бенчмарк беты: направление фиксировано. С --zone входит только на
+                # зонных барах (matched null — изолирует вклад направления p_hold
+                # при том же тайминге зоны), без --zone — на каждом баре (чистая бета).
+                if args.zone and not (Tq < args.t_max and Pq > args.p_min):
+                    i += 1; continue
                 if args.null == "short":
                     dirn = -1.0
                 elif args.null == "long":
