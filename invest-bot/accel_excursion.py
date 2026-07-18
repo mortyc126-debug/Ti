@@ -37,6 +37,9 @@ import numpy as np
 
 BUCKETS = [(0.0, 0.5), (0.5, 1.0), (1.0, 2.0), (2.0, 3.0), (3.0, 5.0), (5.0, 1e9)]
 BUCKET_LBL = ["<0.5", "0.5-1", "1-2", "2-3", "3-5", ">5"]
+# для --by-clean: вёдра по «чистоте» (макс. откат до пика, ATR); меньше = глаже
+CLEAN_EDGES = [0.5, 1.0, 1.5, 2.0, 3.0]
+CLEAN_LBL = ["<0.5", "0.5-1", "1-1.5", "1.5-2", "2-3", ">3"]
 
 
 def _cache_dir(arg):
@@ -97,6 +100,7 @@ def main():
     ap.add_argument("--post", type=int, default=120, help="окно ПОСЛЕ пика для замера разворота, мин")
     ap.add_argument("--min-run", type=float, default=0.0, help="считать только эпизоды с MFE≥R ATR (описательно)")
     ap.add_argument("--counter", action="store_true", help="ускорение против движения")
+    ap.add_argument("--by-clean", action="store_true", help="бить вёдра по ЧИСТОТЕ (глубине откатов до пика), а не по ускорению")
     ap.add_argument("--tickers", default=None)
     ap.add_argument("--sample", type=int, default=200000, help="сигналов в выборку (0=все, медленно)")
     ap.add_argument("--min-count", type=int, default=200)
@@ -110,6 +114,8 @@ def main():
         sys.exit(f"нет тикеров в {cache} (interval={args.interval})")
     nb = len(BUCKETS)
     edges = [b for _, b in BUCKETS[:-1]]
+    LBL = CLEAN_LBL if args.by_clean else BUCKET_LBL
+    col0 = "чистота" if args.by_clean else "ускор."
     hl_a = 1.0 - 0.5 ** (1.0 / args.ewma_hl)
     m = args.m
     rng = np.random.default_rng(0)
@@ -187,7 +193,7 @@ def main():
                     outcome = "cont"; break
                 if f <= -args.rev_atr:
                     outcome = "rev"; break
-            b_ = int(bi[i])
+            b_ = int(np.digitize(dip, CLEAN_EDGES)) if args.by_clean else int(bi[i])
             acc[b_]["tpeak"].append((peak_j + 1) * args.interval if peak_j >= 0 else args.interval)
             acc[b_]["mfe"].append(peak)
             acc[b_]["dip"].append(dip)
@@ -203,7 +209,7 @@ def main():
           f"ускорение {direction}, min-run {args.min_run} ATR, перелом >{args.rev_atr} ATR")
     print(f"(конец хода = откат {args.giveback} ATR от пика; ATR({args.atr_period}) для нормировки; "
           f"гонка в окне {args.post}м после пика; перелом = уход за вход на {args.rev_atr} ATR)")
-    print(f"\n{'аномалия':>8} {'n':>8} {'t_peak,мин':>11} {'MFE,ATR':>9} {'чистота':>9} "
+    print(f"\n{col0:>8} {'n':>8} {'t_peak,мин':>11} {'MFE,ATR':>9} {'чистота':>9} "
           f"{'P(прод)':>9} {'P(перелом)':>11} {'P(боковик)':>11}")
 
     def med(x):
@@ -213,9 +219,9 @@ def main():
     for j in range(nb):
         a = acc[j]; nn = len(a["mfe"])
         if nn < args.min_count:
-            print(f"{BUCKET_LBL[j]:>8} {nn:>8}   (мало данных)")
+            print(f"{LBL[j]:>8} {nn:>8}   (мало данных)")
             continue
-        print(f"{BUCKET_LBL[j]:>8} {nn:>8} {med(a['tpeak']):>11.0f} {med(a['mfe']):>9.2f} "
+        print(f"{LBL[j]:>8} {nn:>8} {med(a['tpeak']):>11.0f} {med(a['mfe']):>9.2f} "
               f"{med(a['dip']):>9.2f} {100 * np.mean(a['cont']):>8.1f}% {100 * np.mean(a['rev']):>10.1f}% "
               f"{100 * np.mean(a['rng']):>10.1f}%")
 
