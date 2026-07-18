@@ -92,6 +92,7 @@ def main():
     ap.add_argument("--m", type=int, default=3, help="окно скорости/ускорения (баров)")
     ap.add_argument("--ewma-hl", type=int, default=50)
     ap.add_argument("--rev-atr", type=float, default=1.0, help="порог 'перелома': уход за вход, ATR")
+    ap.add_argument("--giveback", type=float, default=1.0, help="откат от пика (ATR), считающийся концом хода (трейлинг-стоп)")
     ap.add_argument("--min-run", type=float, default=0.0, help="считать только эпизоды с MFE≥R ATR (описательно)")
     ap.add_argument("--counter", action="store_true", help="ускорение против движения")
     ap.add_argument("--tickers", default=None)
@@ -111,7 +112,7 @@ def main():
     m = args.m
     rng = np.random.default_rng(0)
     # на тикер берём долю сигналов, чтобы суммарно ~= sample
-    acc = [dict(tpeak=[], mfe=[], retr=[], rfrac=[], mae=[], rev=[]) for _ in range(nb)]
+    acc = [dict(tpeak=[], mfe=[], rfrac=[], mae=[], rev=[], dip=[]) for _ in range(nb)]
     n_tk = 0
 
     for tk in tickers:
@@ -150,22 +151,36 @@ def main():
             if len(sig) > per:
                 sig = rng.choice(sig, per, replace=False)
         bi = np.digitize(an, edges)
+        G = args.giveback
         for i in sig:
             a0 = atr[i]
             fav = (cl[i + 1:i + 1 + W] - cl[i]) * d[i] / a0   # ход ПО направлению, ATR
-            pj = int(np.argmax(fav)); mfe = float(fav[pj])
-            if mfe < args.min_run:
+            L = fav.shape[0]
+            # ЛОКАЛЬНЫЙ пик: ход длится, пока не откатит G ATR от максимума (трейлинг-стоп).
+            # peak_j — когда движение выдохлось; dip — макс. откат ДО пика (чистота хода).
+            peak = 0.0; peak_j = -1; dip = 0.0
+            for j in range(L):
+                f = fav[j]
+                if f > peak:
+                    peak = f; peak_j = j
+                else:
+                    pull = peak - f
+                    if pull > dip:
+                        dip = pull
+                    if pull >= G:
+                        break
+            if peak < args.min_run:
                 continue
-            post = fav[pj + 1:]
-            trough = float(post.min()) if post.size else mfe
-            retr = mfe - trough
+            # разворот — по ВСЕМУ окну ПОСЛЕ локального пика (глубина/перелом копятся дальше)
+            post = fav[peak_j + 1:] if peak_j + 1 < L else fav[peak_j:peak_j + 1]
+            trough = float(post.min()) if post.size else peak
             b_ = int(bi[i])
-            acc[b_]["tpeak"].append((pj + 1) * args.interval)
-            acc[b_]["mfe"].append(mfe)
-            acc[b_]["retr"].append(retr)
-            acc[b_]["rfrac"].append(retr / mfe if mfe > 1e-9 else np.nan)
+            acc[b_]["tpeak"].append((peak_j + 1) * args.interval if peak_j >= 0 else args.interval)
+            acc[b_]["mfe"].append(peak)
+            acc[b_]["rfrac"].append((peak - trough) / peak if peak > 1e-9 else np.nan)
             acc[b_]["mae"].append(-trough if trough < 0 else 0.0)
             acc[b_]["rev"].append(1.0 if trough <= -args.rev_atr else 0.0)
+            acc[b_]["dip"].append(dip)
 
     if n_tk == 0:
         sys.exit("не загрузилось ни одного тикера")
@@ -173,8 +188,9 @@ def main():
     direction = "ПРОТИВ движения" if args.counter else "ПО движению"
     print(f"\nтикеров: {n_tk}, интервал {args.interval}м, окно {args.maxh}м ({W} баров), "
           f"ускорение {direction}, min-run {args.min_run} ATR, перелом >{args.rev_atr} ATR")
-    print(f"\n{'аномалия':>8} {'n':>8} {'t_peak,мин':>11} {'MFE,ATR':>9} {'retrace':>9} "
-          f"{'откат%MFE':>10} {'MAE_post':>9} {'P(перелом)':>11}")
+    print(f"(конец хода = откат {args.giveback} ATR от пика; пик = локальный, не за всё окно)")
+    print(f"\n{'аномалия':>8} {'n':>8} {'t_peak,мин':>11} {'MFE,ATR':>9} {'откат%MFE':>10} "
+          f"{'чистота':>9} {'MAE_post':>9} {'P(перелом)':>11}")
 
     def med(x):
         x = [v for v in x if v == v]
@@ -186,13 +202,13 @@ def main():
             print(f"{BUCKET_LBL[j]:>8} {nn:>8}   (мало данных)")
             continue
         print(f"{BUCKET_LBL[j]:>8} {nn:>8} {med(a['tpeak']):>11.0f} {med(a['mfe']):>9.2f} "
-              f"{med(a['retr']):>9.2f} {100 * med(a['rfrac']):>9.0f}% {med(a['mae']):>9.2f} "
+              f"{100 * med(a['rfrac']):>9.0f}% {med(a['dip']):>9.2f} {med(a['mae']):>9.2f} "
               f"{100 * np.mean(a['rev']):>10.1f}%")
 
-    print("\nЧитать: t_peak — когда ход выдохся (медиана); MFE — докуда добежал;")
-    print("retrace/откат%MFE — глубина отдачи от пика; MAE_post — уход за вход после пика;")
-    print("P(перелом) — доля, где после пика цена ушла за вход больше --rev-atr.")
-    print("Гипотеза: сильнее ускорение → короче t_peak и выше P(перелом).")
+    print("\nЧитать: t_peak — когда ход ЛОКАЛЬНО выдохся (медиана, мин); MFE — размах хода до пика;")
+    print("откат%MFE — сколько % хода отдал после пика; чистота — макс. откат ДО пика (меньше=глаже);")
+    print("MAE_post — уход за вход после пика; P(перелом) — доля с уходом за вход > --rev-atr.")
+    print("Гипотеза: сильнее ускорение (+ ниже чистота) → короче t_peak и выше P(перелом).")
 
 
 if __name__ == "__main__":
