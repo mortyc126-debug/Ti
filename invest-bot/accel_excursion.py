@@ -93,6 +93,8 @@ def main():
     ap.add_argument("--ewma-hl", type=int, default=50)
     ap.add_argument("--rev-atr", type=float, default=1.0, help="порог 'перелома': уход за вход, ATR")
     ap.add_argument("--giveback", type=float, default=1.0, help="откат от пика (ATR), считающийся концом хода (трейлинг-стоп)")
+    ap.add_argument("--atr-period", type=int, default=50, help="период ATR для нормировки (медленный = не раздут спайком)")
+    ap.add_argument("--post", type=int, default=120, help="окно ПОСЛЕ пика для замера разворота, мин")
     ap.add_argument("--min-run", type=float, default=0.0, help="считать только эпизоды с MFE≥R ATR (описательно)")
     ap.add_argument("--counter", action="store_true", help="ускорение против движения")
     ap.add_argument("--tickers", default=None)
@@ -137,7 +139,7 @@ def main():
         an = np.full(n, np.nan)
         good = ~np.isnan(a) & ~np.isnan(prev) & (prev > 0)
         an[good] = np.abs(a[good]) / prev[good]
-        atr = _atr(hi, lo, cl)
+        atr = _atr(hi, lo, cl, args.atr_period)  # медленный ATR — не раздут спайком
         d = np.sign(v)
         pro = np.sign(a) == d
         want = pro if not args.counter else ~pro
@@ -152,6 +154,7 @@ def main():
                 sig = rng.choice(sig, per, replace=False)
         bi = np.digitize(an, edges)
         G = args.giveback
+        post_bars = max(1, round(args.post / args.interval))
         for i in sig:
             a0 = atr[i]
             fav = (cl[i + 1:i + 1 + W] - cl[i]) * d[i] / a0   # ход ПО направлению, ATR
@@ -171,8 +174,8 @@ def main():
                         break
             if peak < args.min_run:
                 continue
-            # разворот — по ВСЕМУ окну ПОСЛЕ локального пика (глубина/перелом копятся дальше)
-            post = fav[peak_j + 1:] if peak_j + 1 < L else fav[peak_j:peak_j + 1]
+            # разворот — в ОГРАНИЧЕННОМ окне post_bars ПОСЛЕ локального пика (не за все сутки)
+            post = fav[peak_j + 1: peak_j + 1 + post_bars] if peak_j + 1 < L else fav[peak_j:peak_j + 1]
             trough = float(post.min()) if post.size else peak
             b_ = int(bi[i])
             acc[b_]["tpeak"].append((peak_j + 1) * args.interval if peak_j >= 0 else args.interval)
@@ -188,7 +191,8 @@ def main():
     direction = "ПРОТИВ движения" if args.counter else "ПО движению"
     print(f"\nтикеров: {n_tk}, интервал {args.interval}м, окно {args.maxh}м ({W} баров), "
           f"ускорение {direction}, min-run {args.min_run} ATR, перелом >{args.rev_atr} ATR")
-    print(f"(конец хода = откат {args.giveback} ATR от пика; пик = локальный, не за всё окно)")
+    print(f"(конец хода = откат {args.giveback} ATR от пика; ATR({args.atr_period}) для нормировки; "
+          f"разворот в окне {args.post}м после пика)")
     print(f"\n{'аномалия':>8} {'n':>8} {'t_peak,мин':>11} {'MFE,ATR':>9} {'откат%MFE':>10} "
           f"{'чистота':>9} {'MAE_post':>9} {'P(перелом)':>11}")
 
