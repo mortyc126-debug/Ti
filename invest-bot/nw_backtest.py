@@ -152,6 +152,10 @@ def main():
     ap.add_argument("--cost", type=float, default=0.08, help="издержки за сделку, ATR")
     ap.add_argument("--split-date", default=None)
     ap.add_argument("--liquid-only", action="store_true", help="торговать только верхний терциль ликвидности")
+    ap.add_argument("--null", choices=("none", "short", "long", "rand"), default="none",
+                    help="бенчмарк беты: игнорировать сигнал, входить на КАЖДОМ баре "
+                         "в заданном направлении (short/long/rand). Сравни exp с сигналом.")
+    ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
     bar_s = args.bar_min * 60
     cache = args.cache or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "candle_cache")
@@ -208,6 +212,7 @@ def main():
         feat_by_tk.setdefault(tk, {})[r.get("time", "")] = (T[idx], P[idx], C[idx])
 
     maxhold = args.k
+    rng = np.random.default_rng(args.seed)
     pnls, pnls_tr, pnls_te = [], [], []
     dirs, dirs_tr, dirs_te = [], [], []
     n_tk = 0
@@ -230,24 +235,35 @@ def main():
         i = maxhold  # чтобы был ATR и история
         while i < m - 1:
             t = ctime[i]
+            if np.isnan(atr[i]) or atr[i] <= 0:
+                i += 1; continue
             f = feat.get(t)
-            if f is None or np.isnan(atr[i]) or atr[i] <= 0:
+            if args.null == "none" and f is None:
                 i += 1; continue
-            Tq, Pq, Cq = f
-            if args.zone and not (Tq < args.t_max and Pq > args.p_min):
-                i += 1; continue
-            # запрос к банку (каузально)
-            cand = tree.query_ball_point([Tq, Pq, Cq], r=args.radius)
-            if not cand:
-                i += 1; continue
-            cand = np.asarray(cand)
-            cand = cand[b_ts[cand] + args.k * bar_s <= cep[i]]
-            if len(cand) < args.min_neighbors:
-                i += 1; continue
-            p_hold = b_y[cand].mean()
-            if p_hold == 0.5:
-                i += 1; continue
-            dirn = 1.0 if p_hold > 0.5 else -1.0
+            Tq, Pq, Cq = f if f is not None else (np.nan, np.nan, np.nan)
+            if args.null != "none":
+                # бенчмарк беты: без зоны/сигнала, направление фиксировано
+                if args.null == "short":
+                    dirn = -1.0
+                elif args.null == "long":
+                    dirn = 1.0
+                else:
+                    dirn = 1.0 if rng.random() > 0.5 else -1.0
+            else:
+                if args.zone and not (Tq < args.t_max and Pq > args.p_min):
+                    i += 1; continue
+                # запрос к банку (каузально)
+                cand = tree.query_ball_point([Tq, Pq, Cq], r=args.radius)
+                if not cand:
+                    i += 1; continue
+                cand = np.asarray(cand)
+                cand = cand[b_ts[cand] + args.k * bar_s <= cep[i]]
+                if len(cand) < args.min_neighbors:
+                    i += 1; continue
+                p_hold = b_y[cand].mean()
+                if p_hold == 0.5:
+                    i += 1; continue
+                dirn = 1.0 if p_hold > 0.5 else -1.0
             entry = cC[i]; a0 = atr[i]
             tp = entry + dirn * args.take * a0
             sl = entry - dirn * args.stop * a0
@@ -281,6 +297,8 @@ def main():
         tag.append(f"zone(T<{args.t_max},P>{args.p_min})")
     if args.liquid_only:
         tag.append("liquid-only")
+    if args.null != "none":
+        tag.append(f"NULL={args.null}(бета-бенчмарк)")
     print(f"\n=== NW-бэктест  radius={args.radius} take={args.take}/stop={args.stop} "
           f"cost={args.cost} k={args.k}  {', '.join(tag)} ===")
     print(f"тикеров торговали: {n_tk}")
