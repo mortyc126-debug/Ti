@@ -5,6 +5,7 @@ from trade_system.strategies.hierarchical_strategy import HierarchicalStrategy
 from trade_system.strategies.level_reaction_strategy import LevelReactionStrategy
 from trade_system.strategies.accel_fade_strategy import AccelFadeStrategy
 from trade_system.strategies.nw_memory_strategy import NWMemoryStrategy
+from trade_system.strategies.nw_global_strategy import NWGlobalStrategy
 from trade_system.strategies.base_strategy import IStrategy
 
 __all__ = ("StrategyFactory")
@@ -27,5 +28,7 @@ class StrategyFactory:
                 return AccelFadeStrategy(*args, **kwargs)
             case "NWMemoryStrategy":
                 return NWMemoryStrategy(*args, **kwargs)
+            case "NWGlobalStrategy":
+                return NWGlobalStrategy(*args, **kwargs)
             case _:
                 return None
