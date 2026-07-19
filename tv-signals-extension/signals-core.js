@@ -4,6 +4,12 @@
 (function () {
   'use strict';
 
+  // Рыночный breadth для полной версии фейда: карта время→медианная 3-барная
+  // доходность рынка + медиана |M|. Заполняется извне (content.js тянет корзину
+  // ликвидных тикеров). Пусто → фейд работает в level-режиме (см. M.fade).
+  let _breadthMap = null, _breadthMedAbs = 0;
+  function setBreadth(map, medAbs) { _breadthMap = map || null; _breadthMedAbs = medAbs || 0; }
+
   // ── ATR ─────────────────────────────────────────────────────────────────────
   function atr(cn, per) {
     const n = cn.length, r = new Array(n).fill(null);
@@ -99,7 +105,12 @@
       for (let j = i - m - W; j < i - m; j++) { if (cd[j].high > hmax) hmax = cd[j].high; if (cd[j].low < lmin) lmin = cd[j].low; }
       const c = cd[i].close;
       const inLvl = md > 0 ? (c <= hmax && hmax - c < band * a) : (c >= lmin && c - lmin < band * a);
-      o[i] = inLvl ? -md : 0; // фейд: против хода, упёршегося в уровень
+      if (!inLvl) continue;
+      // breadth-фильтр (полная версия): фейдим только идио/против-рынка ход;
+      // ход СОНАПРАВЛЕН с рынком (|M|≥медианы и знак совпал) = моментум → не фейдим.
+      if (_breadthMap) { const Mk = _breadthMap.get(cd[i].time);
+        if (Mk != null && Math.abs(Mk) >= _breadthMedAbs && Math.sign(Mk) === md) continue; }
+      o[i] = -md; // фейд: против хода, упёршегося в уровень
     } return o; };
 
   // ── бэктест: winrate (частота угадывания направления) + exp ATR (экспектанси
@@ -182,5 +193,13 @@
     return out;
   }
 
-  window.SignalsCore = { methods: M, btStats, parseExport, computeAll, atr, IDS };
+  // пересчёт одного метода (для фейда после подгрузки breadth — без полного O(n²) NW)
+  function computeOne(id, bars, horizon) {
+    horizon = horizon || 12;
+    let series; try { series = M[id](bars); } catch (e) { series = bars.map(() => null); }
+    let last = 0; for (let i = series.length - 1; i >= 0; i--) if (series[i] != null) { last = series[i]; break; }
+    return { series, last, stats: btStats(series, bars, horizon) };
+  }
+
+  window.SignalsCore = { methods: M, btStats, parseExport, computeAll, computeOne, atr, IDS, setBreadth };
 })();

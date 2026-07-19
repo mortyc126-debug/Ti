@@ -35,7 +35,7 @@
     cascade: { what: 'Ансамбль: Z-score + Order Block + FVG.', read: 'Сигнал только если ≥2 согласны в одну сторону (конфлюэнс).', note: 'Сильнейший effect-size в боте, но редкий — мало срабатываний.' },
     nw: { what: 'Nadaraya-Watson память: ядерный поиск похожих прошлых баров (объём×размах/ATR, направленность, ROC-сдвиг).', read: 'Предсказание направления по тому, что было ПОСЛЕ аналогов.', note: 'Режимный, но + в большинстве режимов. Без объёма — прокси по размаху (слабее).' },
     alligator_inv: { what: 'Классический Аллигатор Уильямса: SMMA 13/8/5 по медиане (H+L)/2 со сдвигами вперёд +8/+5/+3. Взят ИНВЕРТИРОВАННО.', read: 'Раскрытая пасть (Аллигатор говорит «тренд») → сигнал ПРОТИВ. Трендследящий Аллигатор на 5-мин РФ системно ошибается — фейдим его.', note: 'Как anti d≈−0.12 (инверт. → сигнал уровня ZSCORE), устойчив в OOS: train −0.15 → test −0.12, n≈166k. Сильнее alt-версии; в боте alt-Аллигатор выключен в его пользу.' },
-    fade: { what: 'Фейд у уровня: резкий ход (≥0.5 ATR за 3 бара), упёршийся в прошлый хай/лоу за 100 баров (реджект от сопротивления/поддержки).', read: 'Ход вверх в прошлый хай → сигнал ВНИЗ (фейд), ход вниз в прошлый лоу → ВВЕРХ. Ставка на разворот от уровня.', note: 'Из исследования анатомии хода (invest-bot): ход в прошлый экстремум разворачивается сильнее всего (реджект −0.26 ATR). ВАЖНО: полная стратегия использовала ещё breadth-фильтр (идио/против рынка) — в одном графике он недоступен, тут только level-часть (слабее полной both-версии). Брекет из бэктеста R:R 2:1 (тейк ~1.5 / стоп ~0.75 ATR).' },
+    fade: { what: 'Фейд у уровня + breadth: резкий ход (≥0.5 ATR за 3 бара), упёршийся в прошлый хай/лоу за 100 баров (реджект), И идиосинкразический либо против рынка (не сонаправлен с рынком).', read: 'Ход вверх в прошлый хай → сигнал ВНИЗ (фейд), ход вниз в прошлый лоу → ВВЕРХ. Фейдим только шум: если ход идёт ВМЕСТЕ с рынком — сигнала нет (это моментум).', note: 'ПОЛНАЯ версия both из бэктеста (invest-bot): level (реджект у уровня, −0.26 ATR) + breadth (медиана 3-барных доходностей корзины ~30 ликвидных бумаг MOEX). Пока breadth грузится (статус «фейд полный») — работает level-режим. TEST +0.31 ATR/сделку при R:R 2:1 (тейк ~1.5 / стоп ~0.75 ATR), но эдж режимный — сайзить умеренно.' },
   };
   const PREF = 'tvsig:on', CKEY = 'tvsig:colors', SKEY = 'tvsig:stats';
 
@@ -268,6 +268,56 @@
     }
     return { ok: false, error: lastErr };
   }
+
+  // ── рыночный breadth для полной версии фейда ──────────────────────────────────
+  // Корзина ликвидных бумаг MOEX: медиана их 3-барных доходностей = «рынок».
+  // ~30 имён достаточно (median робастна). Тянем через тот же cmpFetch, выравниваем
+  // на бары графика. Полный аналог breadth-фильтра из бэктеста (both).
+  const BREADTH_BASKET = ['SBER', 'GAZP', 'LKOH', 'GMKN', 'ROSN', 'NVTK', 'TATN', 'PLZL',
+    'MGNT', 'MTSS', 'MOEX', 'VTBR', 'ALRS', 'CHMF', 'NLMK', 'SNGS', 'RUAL', 'AFLT', 'PIKK',
+    'MAGN', 'IRAO', 'PHOR', 'SIBN', 'TRNFP', 'AFKS', 'HYDR', 'RTKM', 'SELG', 'FLOT', 'POSI'];
+
+  async function breadthEnsure(bars, dt) {
+    if (!window.SignalsCore || !bars || bars.length < 20 || !dt) return;
+    const key = (S.symbol || '') + '|' + dt;
+    if (S._breadthKey === key && S._breadthMap) { // уже построен на этот тикер+ТФ
+      window.SignalsCore.setBreadth(S._breadthMap, S._breadthMedAbs); return; }
+    if (S._breadthBuilding === key) return;       // уже строится — не дублируем
+    S._breadthBuilding = key;
+    const iv = dt <= 90 ? 1 : dt <= 1200 ? 10 : dt <= 10800 ? 60 : dt <= 259200 ? 24 : 7;
+    const ivSec = iv === 1 ? 60 : iv === 10 ? 600 : iv === 60 ? 3600 : iv === 24 ? 86400 : 604800;
+    const tol = ivSec * 1.5, t0 = bars[0].time, t1 = bars[bars.length - 1].time, m = 3;
+    try {
+      const results = await Promise.all(BREADTH_BASKET.map(code =>
+        cmpFetch(code, iv, t0, t1).then(r => (r && r.ok) ? r.rows : null).catch(() => null)));
+      const aligned = []; // на каждый удавшийся тикер — close[], выровненный на бары
+      for (const rows of results) {
+        if (!rows || rows.length < 10) continue;
+        const cl = new Array(bars.length).fill(null); let j = 0;
+        for (let bi = 0; bi < bars.length; bi++) { const bt = bars[bi].time;
+          while (j + 1 < rows.length && Math.abs(rows[j + 1].t - bt) <= Math.abs(rows[j].t - bt)) j++;
+          if (rows[j] && Math.abs(rows[j].t - bt) <= tol) cl[bi] = rows[j].close; }
+        aligned.push(cl);
+      }
+      if (aligned.length < 8) { // мало корзины → остаёмся в level-режиме
+        S._breadthBuilding = null;
+        status('breadth: мало данных корзины (' + aligned.length + ') · фейд level-режим'); return; }
+      const map = new Map(); const absv = [];
+      for (let bi = m; bi < bars.length; bi++) { const rs = [];
+        for (const cl of aligned) { const a = cl[bi], b = cl[bi - m]; if (a != null && b != null && b > 0) rs.push(a / b - 1); }
+        if (rs.length < 5) continue;
+        rs.sort((x, y) => x - y); const md = rs[rs.length >> 1];
+        map.set(bars[bi].time, md); absv.push(Math.abs(md)); }
+      absv.sort((x, y) => x - y); const medAbs = absv.length ? absv[absv.length >> 1] : 0;
+      S._breadthMap = map; S._breadthMedAbs = medAbs; S._breadthKey = key; S._breadthBuilding = null;
+      window.SignalsCore.setBreadth(map, medAbs);
+      if (S.computed && S.bars) { // пересчитать только фейд + перерисовать
+        S.computed.fade = window.SignalsCore.computeOne('fade', S.bars, 12);
+        renderRows(); renderConsensus(); if (S.on && S.on.fade) drawMethod('fade'); }
+      status('breadth готов (' + aligned.length + ' тикеров) · фейд полный');
+    } catch (e) { S._breadthBuilding = null; }
+  }
+
   async function cmpLoad() {
     const body = document.getElementById('tvsig-cmp-body'); if (!body) return;
     const inp = document.getElementById('tvsig-cmp-tk');
@@ -478,6 +528,7 @@
       if (symChanged) { S.oi = null; S._oiSeeded = null; oiLoad(); } else if (S.oi) oiRender(); // OI: перезагрузка при смене тикера, иначе обновляем регион
       renderPeriod();
       status('тикер ' + (S.symbol || '?') + ' · ' + bars.length + ' баров · обновлено ' + fmtAgo(S.statsTs));
+      breadthEnsure(bars, dt); // полная версия фейда: рыночный breadth (async, не блокирует)
     } catch (e) { status('ошибка: ' + (e && e.message || e)); }
     S.busy = false;
   }
