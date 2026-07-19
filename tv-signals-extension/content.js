@@ -1079,14 +1079,7 @@
       '<label class="tvsig-fc-mtf"><input type="checkbox" id="tvsig-fc-mtf-on"> старший ТФ</label>' +
       '<label class="tvsig-fc-mtf" title="NW: проецировать от любого бара, не только из квадранта (надёжность ниже)"><input type="checkbox" id="tvsig-fc-uncond"> NW везде</label></div>' +
       '<div id="tvsig-fc-regime" class="tvsig-fc-badge"></div>' +
-      '<div class="tvsig-fc-sec">Где точнее / слабее (exp ATR · win% · n по осям)</div>' +
-      '<div id="tvsig-fc-cond"></div>' +
-      '<div class="tvsig-fc-sec">Прогноз от точки — клик по сигналу</div>' +
-      '<div id="tvsig-fc-signals"></div>' +
-      '<div id="tvsig-fc-detail"></div>' +
-      '<div class="tvsig-fc-sec">Гипотеза: если цена дойдёт до</div>' +
-      '<div id="tvsig-fc-hypo-ctrl"><input id="tvsig-fc-price" type="number" step="any" placeholder="цена"><button id="tvsig-fc-hypo-go" title="Пересчитать сигнал на этой цене">→</button></div>' +
-      '<div id="tvsig-fc-hypo"></div>' +
+      // калькулятор риска и гипотеза — вверху, это самые нужные инструменты
       '<div class="tvsig-fc-sec">Калькулятор позиции (риск на сделку)</div>' +
       '<div id="tvsig-rc-ctrl">' +
       '<label>Счёт ₽<input id="tvsig-rc-acct" type="number" placeholder="сумма на счету"></label>' +
@@ -1094,7 +1087,15 @@
       '<label>Лимит риска портфеля %<input id="tvsig-rc-port" type="number" step="1" value="10"></label>' +
       '</div>' +
       '<div id="tvsig-rc-out"></div>' +
-      '<div id="tvsig-fc-foot">Режим: <b>ER</b> тренд/боковик (окно 60, порог 0.3), <b>vol</b> сжатие/расшир (ATR/медиана-200), <b>рынок</b> — breadth корзины. Условная точность — фейд по каждому режиму (тейк 1.5/стоп 0.75 ATR, R:R 2:1). Прогноз от точки: вход по close сигнала, тейк/стоп в ATR, тайм-выход 12 баров; показывает исход или «в позиции». Гипотеза: подставляет цену как закрытие следующего бара и пересчитывает.</div>' +
+      '<div class="tvsig-fc-sec">Гипотеза: если цена дойдёт до</div>' +
+      '<div id="tvsig-fc-hypo-ctrl"><input id="tvsig-fc-price" type="number" step="any" placeholder="цена"><button id="tvsig-fc-hypo-go" title="Пересчитать сигнал на этой цене">→</button></div>' +
+      '<div id="tvsig-fc-hypo"></div>' +
+      '<div class="tvsig-fc-sec">Где точнее / слабее (exp ATR · win% · n по осям)</div>' +
+      '<div id="tvsig-fc-cond"></div>' +
+      '<div class="tvsig-fc-sec">Прогноз от точки — клик по сигналу</div>' +
+      '<div id="tvsig-fc-signals"></div>' +
+      '<div id="tvsig-fc-detail"></div>' +
+      '<div id="tvsig-fc-foot">Калькулятор: тейк/стоп от волатильности (ATR×VR-шум), R:R 2:1. Режим: <b>ER</b> тренд/боковик (окно 60, порог 0.3), <b>vol</b> сжатие/расшир (ATR/медиана-200), <b>рынок</b> — breadth корзины. Условная точность — фейд по каждому режиму (тейк 1.5/стоп 0.75 ATR). Прогноз от точки: вход по close сигнала, тейк/стоп в ATR, тайм-выход 12 баров. Гипотеза: подставляет цену как закрытие следующего бара и пересчитывает.</div>' +
       '</div>' + // /pane-forecast
       '<div id="tvsig-pane-scan" class="tvsig-pane" hidden>' +
       '<div class="tvsig-fc-sec">Сканер связок по списку тикеров</div>' +
@@ -1311,9 +1312,9 @@
     let sx, sy, ox, oy, on = false;
     el.addEventListener('mousedown', e => {
       if (e.button !== 0 || (e.target.closest && e.target.closest(NO_DRAG))) return;
-      // нижне-правый угол (~18px) — зона нативного ресайза ширины, не тащим панель
+      // правая кромка (~16px) — зона скроллбара/ресайза ширины; там не тащим панель
       const r = el.getBoundingClientRect();
-      if (e.clientX > r.right - 18 && e.clientY > r.bottom - 18) return;
+      if (e.clientX > r.right - 16) return;
       on = true; sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top; e.preventDefault();
     });
     document.addEventListener('mousemove', e => {
