@@ -323,6 +323,46 @@
     return { n: an.length, med: med, lo: lo, hi: hi, dir: Math.sign(med[med.length - 1]), inQuad: inQ(iq) };
   }
 
+  // Variance Ratio VR(q): дисперсия q-барных лог-доходностей / (q × дисперсия
+  // 1-барных). VR>1 — персистентность (тренд/момент), VR<1 — возврат к среднему
+  // (шум). Порт из бота (_variance_ratio) — то же сырое число, что крутит стоп.
+  function _varianceRatio(bars, q) {
+    q = q || 4; const cl = bars.map(b => b.close), r = [];
+    for (let i = 1; i < cl.length; i++) if (cl[i] > 0 && cl[i - 1] > 0) r.push(Math.log(cl[i] / cl[i - 1]));
+    if (r.length < q * 3) return null;
+    const pv = a => { const m = a.reduce((s, x) => s + x, 0) / a.length; return a.reduce((s, x) => s + (x - m) * (x - m), 0) / a.length; };
+    const v1 = pv(r); if (v1 <= 0) return null;
+    const qs = []; for (let i = 0; i + q <= r.length; i++) { let s = 0; for (let k = 0; k < q; k++) s += r[i + k]; qs.push(s); }
+    if (qs.length < 2) return null;
+    return pv(qs) / (q * v1);
+  }
+  // Адаптивная ширина стопа по VR (порт __noise_stop_scale). VR<0.7 — шум/возврат:
+  // узкий стоп (×0.7). VR>1.3 — устойчивый тренд: стопу нужен запас (×1.15). Между —
+  // гладкая интерполяция. Тейк масштабируется тем же, R:R держится.
+  function _noiseStopScale(vr) {
+    if (vr == null) return 1.0;
+    if (vr <= 0.7) return 0.7;
+    if (vr >= 1.3) return 1.15;
+    if (vr <= 1.0) return 0.7 + (vr - 0.7) / 0.3 * 0.3;
+    return 1.0 + (vr - 1.0) / 0.3 * 0.15;
+  }
+  // Волатильностный профиль тикера → адаптивные тейк/стоп (порт логики бота
+  // __take_stop_mults: барьеры от ATR, ширина крутится VR-шумом). База R:R 2:1
+  // (валидированная Зона-фейд), опц. override через opts.take/opts.stop.
+  function volProfile(bars, opts) {
+    opts = opts || {}; if (!bars || bars.length < 20) return null;
+    const at = atr(bars, 14); let a = null; for (let i = at.length - 1; i >= 0; i--) if (at[i] != null) { a = at[i]; break; }
+    const price = bars[bars.length - 1].close; if (!a || !price) return null;
+    const baseStop = opts.stop != null ? opts.stop : 1.0, baseTake = opts.take != null ? opts.take : 2.0;
+    const vr = _varianceRatio(bars, 4), noise = _noiseStopScale(vr);
+    const stopK = baseStop * noise, takeK = baseTake * noise;      // R:R сохраняется
+    const i = bars.length - 1; let vol = null; const med = _rollMedian(at, i, 200);
+    if (med != null && med > 0) { const rr = a / med; vol = rr < 0.8 ? 'сжатие' : (rr > 1.3 ? 'расшир' : 'норма'); }
+    const kind = vr == null ? 'н/д' : (vr < 0.7 ? 'возврат к среднему' : vr > 1.3 ? 'тренд/момент' : 'смешанный');
+    return { atr: a, price: price, atrPct: 100 * a / price, vr: vr, noise: noise,
+      stopK: stopK, takeK: takeK, stopDist: stopK * a, takeDist: takeK * a, vol: vol, kind: kind };
+  }
+
   // текущее ведро бара по каждой оси — для подсветки «сейчас» в таблице
   function regimeBuckets(bars, i) {
     const rg = regimeInfo(bars, i); if (!rg) return {};
@@ -341,5 +381,5 @@
   }
 
   window.SignalsCore = { methods: M, btStats, parseExport, computeAll, computeOne, atr, IDS,
-    setBreadth, regimeInfo, regimeBuckets, condStats, tradeOutcome, nwForecast };
+    setBreadth, regimeInfo, regimeBuckets, condStats, tradeOutcome, nwForecast, volProfile };
 })();

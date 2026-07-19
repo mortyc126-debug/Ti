@@ -350,6 +350,22 @@
     'MGNT', 'MTSS', 'MOEX', 'VTBR', 'ALRS', 'CHMF', 'NLMK', 'SNGS', 'RUAL', 'AFLT', 'PIKK',
     'MAGN', 'IRAO', 'PHOR', 'SIBN', 'TRNFP', 'AFKS', 'HYDR', 'RTKM', 'SELG', 'FLOT', 'POSI'];
 
+  // ── сканер: стандартные наборы тикеров MOEX (пресеты по секторам) ──────────────
+  const SCAN_PRESETS = {
+    'Голубые фишки': 'SBER GAZP LKOH GMKN ROSN NVTK TATN PLZL MGNT MTSS MOEX VTBR',
+    'Нефтегаз': 'LKOH GAZP ROSN NVTK TATN SNGS SNGSP SIBN TRNFP BANE',
+    'Металлурги / горнодоб': 'GMKN NLMK MAGN CHMF PLZL RUAL ALRS SELG MTLR RASP',
+    'Финансы': 'SBER SBERP VTBR MOEX BSPB SVCB CBOM TCSG',
+    'Потреб / ритейл': 'MGNT MVID FIXP LENT BELU AGRO GCHE ABRD',
+    'Энергетика': 'IRAO HYDR FEES UPRO OGKB MSNG MRKC TGKA',
+    'Технологии / телеком': 'MTSS RTKM POSI VKCO HHRU ASTR',
+    'Широкий ликвид': 'SBER GAZP LKOH GMKN ROSN NVTK TATN PLZL MGNT MTSS MOEX VTBR ALRS CHMF NLMK MAGN SNGS RUAL AFLT PIKK IRAO PHOR SIBN AFKS HYDR RTKM SELG FLOT POSI MTLR',
+  };
+  // база для «списка дня»: широкий ликвидный универс, из которого ранжируем
+  const SCAN_UNIVERSE = ('SBER SBERP GAZP LKOH GMKN ROSN NVTK TATN TATNP PLZL MGNT MTSS MOEX VTBR ' +
+    'ALRS CHMF NLMK MAGN SNGS SNGSP RUAL AFLT PIKK IRAO PHOR SIBN AFKS HYDR RTKM SELG FLOT POSI ' +
+    'MTLR MVID FIXP BSPB SVCB CBOM UPRO FEES OGKB MSNG BANE TRNFP RASP AGRO BELU HHRU VKCO ASTR').split(' ');
+
   async function breadthEnsure(bars, dt) {
     if (!window.SignalsCore || !bars || bars.length < 20 || !dt) return;
     const key = (S.symbol || '') + '|' + dt;
@@ -472,7 +488,84 @@
       sa.dataset.init = '1';
       const lst = document.getElementById('tvsig-scan-list');
       try { const s = localStorage.getItem('tvsig:scanlist'); if (s && lst) lst.value = s; } catch (e) {}
+      scanFillPresets();
     }
+  }
+  // свои списки: {имя: "SBER GAZP ..."} в localStorage
+  function scanLoadLists() { try { return JSON.parse(localStorage.getItem('tvsig:scanlists') || '{}') || {}; } catch (e) { return {}; } }
+  function scanSaveLists(o) { try { localStorage.setItem('tvsig:scanlists', JSON.stringify(o)); } catch (e) {} }
+  // наполняем выпадашку: пресеты (стандартные) + свои списки (★). Пустой первый пункт.
+  function scanFillPresets() {
+    const sel = document.getElementById('tvsig-scan-preset'); if (!sel) return;
+    const cur = sel.value, mine = scanLoadLists();
+    let html = '<option value="">— набор тикеров —</option>';
+    html += '<optgroup label="Стандартные">' + Object.keys(SCAN_PRESETS).map(k =>
+      '<option value="p:' + k + '">' + k + '</option>').join('') + '</optgroup>';
+    const mk = Object.keys(mine);
+    if (mk.length) html += '<optgroup label="Мои списки">' + mk.map(k =>
+      '<option value="m:' + k + '">★ ' + k + '</option>').join('') + '</optgroup>';
+    sel.innerHTML = html; if (cur) sel.value = cur;
+  }
+  function scanApplyPreset(v) {
+    const lst = document.getElementById('tvsig-scan-list'); if (!lst || !v) return;
+    let txt = null;
+    if (v.indexOf('p:') === 0) txt = SCAN_PRESETS[v.slice(2)];
+    else if (v.indexOf('m:') === 0) txt = scanLoadLists()[v.slice(2)];
+    if (txt != null) { lst.value = txt; try { localStorage.setItem('tvsig:scanlist', txt); } catch (e) {} }
+  }
+  function scanSaveList() {
+    const lst = document.getElementById('tvsig-scan-list'); if (!lst) return;
+    const txt = (lst.value || '').trim(); if (!txt) { status('список пуст — нечего сохранять'); return; }
+    const name = (prompt('Имя списка (напр. «Мои ВДО» или «Список дня 19.07»):', '') || '').trim();
+    if (!name) return;
+    const o = scanLoadLists(); o[name] = txt; scanSaveLists(o); scanFillPresets();
+    const sel = document.getElementById('tvsig-scan-preset'); if (sel) sel.value = 'm:' + name;
+    status('список «' + name + '» сохранён');
+  }
+  function scanDeleteList() {
+    const sel = document.getElementById('tvsig-scan-preset'); if (!sel) return;
+    const v = sel.value;
+    if (v.indexOf('m:') !== 0) { status('удалять можно только свои списки (★)'); return; }
+    const name = v.slice(2); const o = scanLoadLists();
+    if (!(name in o)) return;
+    if (!confirm('Удалить список «' + name + '»?')) return;
+    delete o[name]; scanSaveLists(o); scanFillPresets(); sel.value = ''; status('список «' + name + '» удалён');
+  }
+  // «список дня»: ранжируем широкий универс по волатильности (ATR%) и ликвидности
+  // (медианный оборот) на ДНЕВНЫХ свечах, берём топ-15 по сумме перцентилей.
+  async function scanListDay() {
+    const body = document.getElementById('tvsig-scan-body'), lst = document.getElementById('tvsig-scan-list');
+    if (!body || !lst) return;
+    const btn = document.getElementById('tvsig-scan-day'); if (btn) btn.disabled = true;
+    body.innerHTML = '<div class="tvsig-fc-hint">Считаю список дня по ' + SCAN_UNIVERSE.length + ' тикерам (дневные свечи)…</div>';
+    const SC = window.SignalsCore, now = Math.floor(Date.now() / 1000), t0 = now - 120 * 86400;
+    const rows = [];
+    for (const code of SCAN_UNIVERSE) {
+      let f; try { f = await scanFetch(code, 24, t0, now); } catch (e) { f = null; }
+      if (!f || !f.ok || f.bars.length < 20) continue;
+      const bars = f.bars, at = SC.atr(bars, 14);
+      let a = null; for (let i = at.length - 1; i >= 0; i--) if (at[i] != null) { a = at[i]; break; }
+      const price = bars[bars.length - 1].close; if (!a || !price) continue;
+      const tos = bars.map(b => b.volume * b.close).filter(x => isFinite(x) && x > 0).sort((x, y) => x - y);
+      if (!tos.length) continue;
+      rows.push({ code, atrPct: 100 * a / price, turn: tos[tos.length >> 1] });
+    }
+    if (btn) btn.disabled = false;
+    if (rows.length < 5) { body.innerHTML = '<div class="tvsig-fc-hint">Мало данных с MOEX — попробуй ещё раз позже.</div>'; return; }
+    // перцентиль-ранг по каждой оси (0..1), скор = волатильность + ликвидность
+    const rank = (key) => { const s = rows.slice().sort((x, y) => x[key] - y[key]); const m = new Map();
+      s.forEach((r, i) => m.set(r.code, s.length > 1 ? i / (s.length - 1) : 0.5)); return m; };
+    const rv = rank('atrPct'), rl = rank('turn');
+    rows.forEach(r => r.score = rv.get(r.code) + rl.get(r.code));
+    rows.sort((x, y) => y.score - x.score);
+    const top = rows.slice(0, 15);
+    const txt = top.map(r => r.code).join(' ');
+    lst.value = txt; try { localStorage.setItem('tvsig:scanlist', txt); } catch (e) {}
+    const bn = x => x >= 1e9 ? (x / 1e9).toFixed(1) + ' млрд' : (x / 1e6).toFixed(0) + ' млн';
+    body.innerHTML = '<div class="tvsig-scan-hd">Список дня — топ-15 по волатильности × ликвидности:</div>' +
+      top.map(r => '<div class="tvsig-scan-hit" data-code="' + r.code + '"><b>' + r.code + '</b> ' +
+        '<span class="dim">ATR ' + r.atrPct.toFixed(1) + '% · оборот/день ' + bn(r.turn) + ' ₽</span></div>').join('') +
+      '<div class="tvsig-fc-hint">Список подставлен выше. Жми «Скан» для проверки связки или «Сохранить…».</div>';
   }
   // все нарисованные трендлинии/лучи (2 точки, разные времена) = отрезки
   function lineSpans() {
@@ -673,7 +766,8 @@
     el.innerHTML = '<div class="tvsig-fc-card">если цена дойдёт до <b>' + price + '</b>:<br>' + (NAME[S.fcId] || S.fcId) + ': <b>' + txt + '</b><br>режим: ' + (_regLbl(rg) || '—') + (rg && rg.mkt ? ' / ' + rg.mkt : '') + '</div>';
   }
   // Калькулятор позиции: счёт + риск% → размер и макс. число позиций по стопу/тейку.
-  // Стоп/тейк = стратегия Зона-фейд R:R 2:1 (стоп 1.0 / тейк 2.0 ATR текущего графика).
+  // Стоп/тейк адаптивны к волатильности (SC.volProfile: ширина от ATR, крутится
+  // VR-шумом — порт бота), база R:R 2:1 (Зона-фейд).
   function _rcVal(id) { const el = document.getElementById(id); const v = el ? parseFloat(el.value) : NaN; return isFinite(v) ? v : NaN; }
   function rcInit() {
     try { const s = JSON.parse(localStorage.getItem('tvsig:rc') || '{}');
@@ -687,13 +781,17 @@
     try { localStorage.setItem('tvsig:rc', JSON.stringify({ a: _rcVal('tvsig-rc-acct'), r: _rcVal('tvsig-rc-risk'), p: _rcVal('tvsig-rc-port') })); } catch (e) {}
     const bars = S.bars, SC = window.SignalsCore;
     if (!bars || bars.length < 20) { out.innerHTML = '<span class="tvsig-fc-hint">Нет свечей — открой «Модели» и ⟳.</span>'; return; }
-    const at = SC.atr(bars, 14); let atrv = null; for (let i = at.length - 1; i >= 0; i--) if (at[i] != null) { atrv = at[i]; break; }
-    const price = bars[bars.length - 1].close;
-    if (!atrv || !price) { out.innerHTML = '<span class="tvsig-fc-hint">Нет ATR/цены.</span>'; return; }
-    const stopATR = 1.0, takeATR = 2.0, dg = price > 100 ? 2 : (price > 1 ? 3 : 5);
-    const stopDist = stopATR * atrv, takeDist = takeATR * atrv, stopPct = 100 * stopDist / price;
+    const vp = SC.volProfile ? SC.volProfile(bars) : null;
+    const atrv = vp ? vp.atr : null, price = bars[bars.length - 1].close;
+    if (!vp || !atrv || !price) { out.innerHTML = '<span class="tvsig-fc-hint">Нет ATR/цены.</span>'; return; }
+    // адаптивные тейк/стоп: ширина крутится VR-шумом (порт бота), R:R 2:1 держится
+    const stopATR = vp.stopK, takeATR = vp.takeK, dg = price > 100 ? 2 : (price > 1 ? 3 : 5);
+    const stopDist = vp.stopDist, takeDist = vp.takeDist, stopPct = 100 * stopDist / price;
     const rub = x => Math.round(x).toLocaleString('ru-RU');
-    let html = '<div class="tvsig-fc-card">ATR ' + atrv.toFixed(dg) + ' · стоп <b>' + stopDist.toFixed(dg) + ' ₽</b> (' + stopPct.toFixed(2) + '%) · тейк ' + takeDist.toFixed(dg) + ' ₽ · R:R 2:1';
+    const volTxt = vp.vol ? ' · ' + vp.vol : '';
+    const noiseTxt = vp.vr != null ? ' · шум VR ' + vp.vr.toFixed(2) + ' (' + vp.kind + ', стоп ×' + vp.noise.toFixed(2) + ')' : '';
+    let html = '<div class="tvsig-fc-card">ATR ' + atrv.toFixed(dg) + ' (' + vp.atrPct.toFixed(2) + '%)' + volTxt + noiseTxt +
+      '<br>стоп <b>' + stopDist.toFixed(dg) + ' ₽</b> (' + stopPct.toFixed(2) + '%, ' + stopATR.toFixed(2) + ' ATR) · тейк ' + takeDist.toFixed(dg) + ' ₽ (' + takeATR.toFixed(2) + ' ATR) · R:R 2:1';
     const acct = _rcVal('tvsig-rc-acct'), risk = _rcVal('tvsig-rc-risk'), port = _rcVal('tvsig-rc-port');
     if (acct > 0 && risk > 0) {
       const riskMoney = acct * risk / 100, units = riskMoney / stopDist, posValue = units * price, profit = riskMoney * (takeATR / stopATR);
@@ -967,11 +1065,15 @@
       '</div>' + // /pane-forecast
       '<div id="tvsig-pane-scan" class="tvsig-pane" hidden>' +
       '<div class="tvsig-fc-sec">Сканер связок по списку тикеров</div>' +
+      '<div id="tvsig-scan-listrow"><select id="tvsig-scan-preset" title="Стандартный набор или свой список"></select>' +
+      '<button id="tvsig-scan-day" title="Составить список дня: ранжирует широкий универс по волатильности и ликвидности (дневные свечи)">📊 Список дня</button>' +
+      '<button id="tvsig-scan-save" title="Сохранить текущий список тикеров под своим именем">Сохранить…</button>' +
+      '<button id="tvsig-scan-del" title="Удалить выбранный свой список">Удалить</button></div>' +
       '<textarea id="tvsig-scan-list" placeholder="SBER GAZP LKOH SNGS ROSN … (через пробел/запятую)"></textarea>' +
       '<div id="tvsig-scan-sel">Сигнал <select id="tvsig-scan-a"></select> + <select id="tvsig-scan-b"></select>' +
       '<button id="tvsig-scan-go" title="Просканировать список">Скан</button></div>' +
       '<div id="tvsig-scan-body"></div>' +
-      '<div id="tvsig-scan-foot">Тянет свечи каждого тикера с MOEX на ТФ активного графика, считает выбранный сигнал (или согласие двух) на последнем ЗАКРЫТОМ баре и показывает, у кого сработало. Кросс-тикерный breadth в скане не применяется (фейд/зона-фейд без него) — открой хит на графике для полной версии. Второй сигнал «—» = один метод.</div>' +
+      '<div id="tvsig-scan-foot">Пресеты — стандартные секторные наборы MOEX; свои списки можно сохранять/удалять («список дня» тоже сохраняется). Скан тянет свечи каждого тикера на ТФ активного графика, считает сигнал (или согласие двух) на последнем ЗАКРЫТОМ баре. Кросс-тикерный breadth в скане не применяется — открой хит на графике для полной версии. Второй сигнал «—» = один метод.</div>' +
       '</div>'; // /pane-scan
     document.documentElement.appendChild(panel);
     rowsEl = panel.querySelector('#tvsig-rows'); statusEl = panel.querySelector('#tvsig-status');
@@ -997,6 +1099,10 @@
     cmpTk.addEventListener('keydown', e => { if (e.key === 'Enter') cmpLoad(); });
     panel.querySelector('#tvsig-seg-go').onclick = () => segRender();
     panel.querySelector('#tvsig-scan-go').onclick = () => scanRun();
+    panel.querySelector('#tvsig-scan-preset').addEventListener('change', e => scanApplyPreset(e.target.value));
+    panel.querySelector('#tvsig-scan-day').onclick = () => scanListDay();
+    panel.querySelector('#tvsig-scan-save').onclick = () => scanSaveList();
+    panel.querySelector('#tvsig-scan-del').onclick = () => scanDeleteList();
     panel.querySelector('#tvsig-scan-body').addEventListener('click', e => {
       const h = e.target.closest('.tvsig-scan-hit'); if (h && h.dataset.code) { try { S.chart.setSymbol(h.dataset.code); } catch (er) {} } });
     // «Прогноз»: клик по сигналу → карточка прогноза от точки; гипотеза по цене
@@ -1164,7 +1270,7 @@
     '.tvsig-col, .tvsig-info-btn, .tvsig-tab, #tvsig-status, #tvsig-period, #tvsig-foot, ' +
     '#tvsig-cmp-foot, #tvsig-cmp-body, #tvsig-oi-body, .tvsig-oi-meta, .tvsig-oi-t, ' +
     '.tvsig-fc-sig, #tvsig-fc-cond, #tvsig-fc-detail, #tvsig-fc-hypo, #tvsig-fc-foot, #tvsig-fc-pickrow, ' +
-    '#tvsig-rc-ctrl, #tvsig-rc-out, #tvsig-scan-list, #tvsig-scan-sel, #tvsig-scan-body, #tvsig-scan-foot';
+    '#tvsig-rc-ctrl, #tvsig-rc-out, #tvsig-scan-list, #tvsig-scan-sel, #tvsig-scan-body, #tvsig-scan-foot, #tvsig-scan-listrow';
   function drag(el) {
     let sx, sy, ox, oy, on = false;
     el.addEventListener('mousedown', e => {
