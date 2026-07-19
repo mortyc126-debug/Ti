@@ -160,6 +160,13 @@ def main():
                     help="взять сигнал из готового банка .npz через NWMemoryGlobal "
                          "(live-путь). С train-only банком (--split-date в сборщике) и "
                          "--split-date тут = честная OOS-проверка замороженной памяти.")
+    ap.add_argument("--kernel", choices=("uniform", "gaussian", "triangular", "knn"), default="uniform",
+                    help="ядро агрегации соседей: uniform (box, как валидировано), gaussian "
+                         "(хвост), triangular (линейный спад), knn (k ближайших). Сравни "
+                         "частоту/точность/exp — нужен ли хвост памяти.")
+    ap.add_argument("--bw", type=float, default=None,
+                    help="полоса ядра: gaussian σ (по умолч. radius/2), triangular обрезка "
+                         "(по умолч. radius). Для knn — число соседей (по умолч. min-neighbors).")
     args = ap.parse_args()
     bar_s = args.bar_min * 60
     cache = args.cache or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "candle_cache")
@@ -197,7 +204,8 @@ def main():
         bi = np.where(bank)[0]
         if len(bi) < args.min_neighbors:
             sys.exit("маленький банк")
-        tree = cKDTree(np.column_stack([T[bi], P[bi], C[bi]]))
+        b_co = np.column_stack([T[bi], P[bi], C[bi]])
+        tree = cKDTree(b_co)
         b_ts = ts[bi]; b_y = (tgt[bi] > 0).astype(float)
         print(f"банк: {len(bi)} точек", file=sys.stderr)
 
@@ -276,15 +284,38 @@ def main():
             else:
                 if args.zone and not (Tq < args.t_max and Pq > args.p_min):
                     i += 1; continue
-                # запрос к банку (каузально)
-                cand = tree.query_ball_point([Tq, Pq, Cq], r=args.radius)
-                if not cand:
-                    i += 1; continue
-                cand = np.asarray(cand)
-                cand = cand[b_ts[cand] + args.k * bar_s <= cep[i]]
+                # запрос к банку (каузально). knn берёт k ближайших, остальные — в радиусе.
+                if args.kernel == "knn":
+                    kk = int(args.bw) if args.bw else args.min_neighbors
+                    dq, iq = tree.query([Tq, Pq, Cq], k=min(kk * 4, len(b_y)))
+                    iq = np.atleast_1d(iq); dq = np.atleast_1d(dq)
+                    ok_c = b_ts[iq] + args.k * bar_s <= cep[i]      # каузальный фильтр
+                    iq = iq[ok_c]; dq = dq[ok_c]
+                    if len(iq) < args.min_neighbors:
+                        i += 1; continue
+                    cand = iq[:kk]                                   # k ближайших каузальных
+                else:
+                    cand = tree.query_ball_point([Tq, Pq, Cq], r=args.radius)
+                    if not cand:
+                        i += 1; continue
+                    cand = np.asarray(cand)
+                    cand = cand[b_ts[cand] + args.k * bar_s <= cep[i]]
                 if len(cand) < args.min_neighbors:
                     i += 1; continue
-                p_hold = b_y[cand].mean()
+                if args.kernel in ("uniform", "knn"):
+                    p_hold = b_y[cand].mean()
+                else:
+                    dd = np.sqrt(((b_co[cand] - np.array([Tq, Pq, Cq])) ** 2).sum(axis=1))
+                    if args.kernel == "gaussian":
+                        bw = args.bw if args.bw else args.radius / 2.0
+                        wt = np.exp(-dd * dd / (2.0 * bw * bw))
+                    else:  # triangular
+                        bw = args.bw if args.bw else args.radius
+                        wt = np.clip(1.0 - dd / bw, 0.0, None)
+                    sw = wt.sum()
+                    if sw <= 0:
+                        i += 1; continue
+                    p_hold = float((wt * b_y[cand]).sum() / sw)
                 if p_hold == 0.5:
                     i += 1; continue
                 dirn = 1.0 if p_hold > 0.5 else -1.0
@@ -325,6 +356,8 @@ def main():
         tag.append(f"NULL={args.null}(бета-бенчмарк)")
     if args.bank:
         tag.append("bank=live(.npz)")
+    if args.kernel != "uniform":
+        tag.append(f"kernel={args.kernel}" + (f"(bw={args.bw})" if args.bw else ""))
     print(f"\n=== NW-бэктест  radius={args.radius} take={args.take}/stop={args.stop} "
           f"cost={args.cost} k={args.k}  {', '.join(tag)} ===")
     print(f"тикеров торговали: {n_tk}")
