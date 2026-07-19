@@ -87,6 +87,20 @@
       const c = cd[i].close;
       o[i] = (l > t && t > j && c > l) ? -1 : (l < t && t < j && c < l) ? 1 : 0; // инверсия классического сигнала
     } return o; };
+  // Фейд у уровня: резкий ход (≥0.5 ATR за 3 бара), упёршийся в прошлый хай/лоу
+  // (реджект) → сигнал ПРОТИВ хода. Валидировано в invest-bot (docs/MOVE_ANATOMY_
+  // FINDINGS: ход в прошлый экстремум разворачивается сильнее всего). breadth-
+  // фильтр из бэктеста тут недоступен (нужны все тикеры) — это level-версия.
+  M.fade = (cd) => { const n = cd.length, at = atr(cd, 14), o = new Array(n).fill(0);
+    const m = 3, W = 100, moveA = 0.5, band = 0.5;
+    for (let i = m + W; i < n; i++) { const a = at[i]; if (a == null || a <= 0) continue;
+      const move = cd[i].close - cd[i - m].close; if (Math.abs(move) / a < moveA) continue;
+      const md = Math.sign(move); let hmax = -Infinity, lmin = Infinity;
+      for (let j = i - m - W; j < i - m; j++) { if (cd[j].high > hmax) hmax = cd[j].high; if (cd[j].low < lmin) lmin = cd[j].low; }
+      const c = cd[i].close;
+      const inLvl = md > 0 ? (c <= hmax && hmax - c < band * a) : (c >= lmin && c - lmin < band * a);
+      o[i] = inLvl ? -md : 0; // фейд: против хода, упёршегося в уровень
+    } return o; };
 
   // ── бэктест: winrate (частота угадывания направления) + exp ATR (экспектанси
   //    сделки с тейком/стопом — как системный прогон дашборда). Для фейдов winrate
@@ -156,7 +170,7 @@
   }
 
   // ── всё вместе: серии + последний сигнал + точность ──────────────────────────
-  const IDS = ['zscore', 'accel', 'order_block', 'fvg', 'liq_sweep', 'false_breakout', 'vsa_abs', 'waning', 'talib_anti', 'hawkes', 'cascade', 'nw', 'alligator_inv'];
+  const IDS = ['zscore', 'accel', 'order_block', 'fvg', 'liq_sweep', 'false_breakout', 'vsa_abs', 'waning', 'talib_anti', 'hawkes', 'cascade', 'nw', 'alligator_inv', 'fade'];
   function computeAll(bars, horizon) {
     horizon = horizon || 12;
     const out = {};
