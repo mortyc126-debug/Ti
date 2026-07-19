@@ -21,6 +21,8 @@ if (!dir || !fs.existsSync(dir)) { console.error('укажи путь к candle_
 const TAKE = +arg('take', 2.0), STOP = +arg('stop', 1.0), COST = +arg('cost', 0.05);
 const HOR = +arg('horizon', 12), MINN = +arg('min-n', 300), TOP = +arg('top', 25);
 const liquid = has('liquid');
+const NOOV = has('no-overlap');          // строго: одна позиция на метод/пару, без перекрытия
+const SPLIT = arg('split-date', null);   // OOS: строки времени лексикографически ("YYYY-MM-DD ...")
 
 const files = fs.readdirSync(dir).filter(f => f.endsWith('.json') && !f.endsWith('_1m.json'));
 // ликвид-терциль по медианному обороту
@@ -57,21 +59,22 @@ const medAbs = absv.length ? median(absv) : 0;
 if (SC.setBreadth) SC.setBreadth(market, medAbs);
 
 const IDS = SC.IDS;
-// аккумуляторы: single[id] и pair["a+b"] → {sum, win, n}
+// аккумуляторы: single[id] / pair["a+b"] → train/test {sum, win, n}
 const single = {}, pair = {};
-IDS.forEach(id => single[id] = { s: 0, w: 0, n: 0 });
-const bump = (o, k, pnl) => { const c = o[k] || (o[k] = { s: 0, w: 0, n: 0 }); c.s += pnl; c.w += pnl > 0 ? 1 : 0; c.n++; };
+const mk = () => ({ tr: { s: 0, w: 0, n: 0 }, te: { s: 0, w: 0, n: 0 } });
+IDS.forEach(id => single[id] = mk());
+const bump = (o, k, pnl, te) => { const c = o[k] || (o[k] = mk()); const g = te ? c.te : c.tr; g.s += pnl; g.w += pnl > 0 ? 1 : 0; g.n++; };
 
-// исход одной сделки от i в направлении dir (тейк/стоп в ATR, стоп первым, тайм-выход)
+// исход одной сделки от i в направлении dir → {pnl, exit}. Тейк/стоп в ATR (стоп первым), тайм-выход.
 function outcome(bars, atr, i, dir) {
   const a0 = atr[i]; if (a0 == null || a0 <= 0) return null;
   const entry = bars[i].close, tp = entry + dir * TAKE * a0, sl = entry - dir * STOP * a0;
-  const lim = Math.min(i + HOR, bars.length - 1); let px = bars[lim].close;
+  const lim = Math.min(i + HOR, bars.length - 1); let px = bars[lim].close, ex = lim;
   for (let j = i + 1; j <= lim; j++) {
-    if (dir > 0) { if (bars[j].low <= sl) { px = sl; break; } if (bars[j].high >= tp) { px = tp; break; } }
-    else { if (bars[j].high >= sl) { px = sl; break; } if (bars[j].low <= tp) { px = tp; break; } }
+    if (dir > 0) { if (bars[j].low <= sl) { px = sl; ex = j; break; } if (bars[j].high >= tp) { px = tp; ex = j; break; } }
+    else { if (bars[j].high >= sl) { px = sl; ex = j; break; } if (bars[j].low <= tp) { px = tp; ex = j; break; } }
   }
-  return dir * (px - entry) / a0 - COST;
+  return { pnl: dir * (px - entry) / a0 - COST, exit: ex };
 }
 
 let nTk = 0;
@@ -83,32 +86,44 @@ for (const f in cache) {
   nTk++;
   const n = bars.length;
   const outL = new Array(n), outS = new Array(n);
+  const busy = {};                        // no-overlap: key → бар, до которого занято
   for (let i = HOR; i < n - HOR; i++) {
-    // какие методы сработали и с каким знаком
     const fired = [];
     for (const id of IDS) { const v = ser[id] ? ser[id][i] : 0; if (v) fired.push([id, v > 0 ? 1 : -1]); }
     if (!fired.length) continue;
     if (outL[i] === undefined) { outL[i] = outcome(bars, atr, i, 1); outS[i] = outcome(bars, atr, i, -1); }
     const get = sg => sg > 0 ? outL[i] : outS[i];
-    for (const [id, sg] of fired) { const o = get(sg); if (o != null) bump(single, id, o); }
+    const te = SPLIT != null && String(bars[i].time) >= SPLIT;
+    const take = (o, key, r) => {                        // учесть сделку с no-overlap по ключу
+      if (r == null) return;
+      if (NOOV && busy[key] != null && i <= busy[key]) return;
+      bump(o, key, r.pnl, te);
+      if (NOOV) busy[key] = r.exit;
+    };
+    for (const [id, sg] of fired) take(single, id, get(sg));
     for (let x = 0; x < fired.length; x++) for (let y = x + 1; y < fired.length; y++) {
-      if (fired[x][1] !== fired[y][1]) continue;                 // согласие по знаку
-      const o = get(fired[x][1]); if (o == null) continue;
+      if (fired[x][1] !== fired[y][1]) continue;         // согласие по знаку
       const k = fired[x][0] < fired[y][0] ? fired[x][0] + '+' + fired[y][0] : fired[y][0] + '+' + fired[x][0];
-      bump(pair, k, o);
+      take(pair, k, get(fired[x][1]));
     }
   }
 }
 
-function rows(o) { return Object.keys(o).map(k => ({ k, exp: o[k].s / o[k].n, win: o[k].w / o[k].n, n: o[k].n }))
-  .filter(r => r.n >= MINN).sort((a, b) => b.exp - a.exp); }
-const NAME = k => k; // id как есть
-
-console.log(`\nтикеров обработано: ${nTk}\n`);
-console.log('=== ОДИНОЧНЫЕ методы (exp ATR, win, n) — по убыванию exp ===');
-for (const r of rows(single)) console.log(`  ${r.k.padEnd(16)} exp=${r.exp >= 0 ? '+' : ''}${r.exp.toFixed(4)}  win=${(100 * r.win).toFixed(1)}%  n=${r.n}`);
-console.log(`\n=== ТОП-${TOP} СОГЛАСИЙ пар (оба метода в одну сторону) ===`);
+const seg = c => (SPLIT != null ? c.te : c.tr);            // сегмент для ранжирования (TEST при сплите)
+function rows(o) {
+  return Object.keys(o).map(k => { const g = seg(o[k]), tr = o[k].tr;
+    return { k, exp: g.n ? g.s / g.n : 0, win: g.n ? g.w / g.n : 0, n: g.n,
+             tr_exp: tr.n ? tr.s / tr.n : 0, tr_n: tr.n }; })
+    .filter(r => r.n >= MINN).sort((a, b) => b.exp - a.exp);
+}
+const fmt = r => `exp=${r.exp >= 0 ? '+' : ''}${r.exp.toFixed(4)}  win=${(100 * r.win).toFixed(1)}%  n=${r.n}` +
+  (SPLIT != null ? `   (TRAIN ${r.tr_exp >= 0 ? '+' : ''}${r.tr_exp.toFixed(4)} n=${r.tr_n})` : '');
+const segName = SPLIT != null ? `TEST≥${SPLIT}` : 'ВСЕ';
+console.log(`\nтикеров обработано: ${nTk}  ·  ${NOOV ? 'no-overlap' : 'overlap'}  ·  сегмент ${segName}\n`);
+console.log(`=== ОДИНОЧНЫЕ методы (${segName}, по убыванию exp) ===`);
+for (const r of rows(single)) console.log(`  ${r.k.padEnd(16)} ${fmt(r)}`);
 const pr = rows(pair);
-for (const r of pr.slice(0, TOP)) console.log(`  ${r.k.padEnd(34)} exp=${r.exp >= 0 ? '+' : ''}${r.exp.toFixed(4)}  win=${(100 * r.win).toFixed(1)}%  n=${r.n}`);
-console.log(`\nвсего пар с n>=${MINN}: ${pr.length}. Сравни exp согласий с лучшими одиночными —`);
-console.log('согласие ценно, только если exp пары заметно выше exp каждого из методов по отдельности.');
+console.log(`\n=== ТОП-${TOP} СОГЛАСИЙ пар (${segName}) ===`);
+for (const r of pr.slice(0, TOP)) console.log(`  ${r.k.padEnd(34)} ${fmt(r)}`);
+console.log(`\nвсего пар с n>=${MINN}: ${pr.length}. Строго: --no-overlap --split-date.`);
+console.log('Согласие ценно, только если exp пары выше exp каждого метода по отдельности И держится на TRAIN и TEST.');
