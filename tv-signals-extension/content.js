@@ -387,6 +387,7 @@
     if (which === 'compare') { const b = document.getElementById('tvsig-cmp-body'); const inp = document.getElementById('tvsig-cmp-tk');
       if (b && !b.dataset.loaded) { if (inp && inp.value.trim()) cmpLoad(); else b.innerHTML = '<div class="tvsig-cmp-hint">Впиши код бумаги/индекса/фьючерса MOEX и жми ⟳. Наложу на активный тикер, посчитаю корреляцию и расхождение по видимому окну.</div>'; } }
     if (which === 'periods') segRender();
+    if (which === 'forecast') forecastRender();
   }
   // все нарисованные трендлинии/лучи (2 точки, разные времена) = отрезки
   function lineSpans() {
@@ -487,6 +488,71 @@
     S.api = api; S.chart = c; return true;
   }
 
+  // ── вкладка «Прогноз»: режим + условная точность + прогноз от точки + гипотеза ─
+  function _fcNum(x, d) { return x == null ? '—' : (x >= 0 ? '+' : '') + x.toFixed(d == null ? 3 : d); }
+  function _hhmm(ts) { const t = new Date(ts * 1000); return ('0' + t.getUTCHours()).slice(-2) + ':' + ('0' + t.getUTCMinutes()).slice(-2); }
+  function _regLbl(rg) { return rg ? (rg.isTrend ? 'тренд ' + (rg.trendDir > 0 ? '↑' : '↓') : 'боковик') + (rg.vol ? '/' + rg.vol : '') : ''; }
+  function _regimeBadge(rg) {
+    if (!rg) return '';
+    const tr = rg.isTrend ? ('тренд ' + (rg.trendDir > 0 ? '↑' : '↓')) : 'боковик';
+    const erS = rg.er != null ? ' · ER ' + rg.er.toFixed(2) : '';
+    return '<span class="tvsig-fc-chip c-reg">' + tr + erS + '</span>' +
+      '<span class="tvsig-fc-chip c-vol">vol: ' + (rg.vol || '—') + '</span>' +
+      '<span class="tvsig-fc-chip c-mkt">' + (rg.mkt || 'breadth —') + '</span>';
+  }
+  function _condTable(cs, rg) {
+    const curT = rg ? (rg.isTrend ? 'тренд' : 'боковик') : null, curV = rg ? rg.vol : null;
+    const row = k => { const s = cs[k], cur = (k === curT || k === curV);
+      const exp = s.n ? _fcNum(s.exp) : '—', win = s.n ? Math.round(s.win * 100) + '%' : '—';
+      const cls = s.n ? (s.exp > 0 ? 'pos' : 'neg') : 'dim';
+      return '<tr class="' + (cur ? 'cur' : '') + '"><td>' + k + (cur ? ' ◂сейчас' : '') + '</td><td class="' + cls + '">' + exp + '</td><td>' + win + '</td><td class="dim">' + (s.n || 0) + '</td></tr>'; };
+    return '<table class="tvsig-fc-tbl"><tr><th>режим</th><th>exp</th><th>win</th><th>n</th></tr>' +
+      ['тренд', 'боковик', 'сжатие', 'норма', 'расшир'].map(row).join('') + '</table>';
+  }
+  function _recentSignals(fade, bars) {
+    const idx = []; for (let i = bars.length - 1; i >= 0 && idx.length < 8; i--) if (fade[i]) idx.push(i);
+    if (!idx.length) return '<span class="tvsig-fc-hint">Нет сигналов фейда на этой истории.</span>';
+    return idx.map(i => '<div class="tvsig-fc-sig" data-idx="' + i + '">' + _hhmm(bars[i].time) + ' UTC · ' +
+      (fade[i] < 0 ? 'шорт ↓' : 'лонг ↑') + ' · <span class="dim">' + _regLbl(window.SignalsCore.regimeInfo(bars, i)) + '</span></div>').join('');
+  }
+  function forecastRender() {
+    const pane = document.getElementById('tvsig-pane-forecast'); if (!pane || pane.hidden) return;
+    const bars = S.bars, SC = window.SignalsCore;
+    const rgEl = document.getElementById('tvsig-fc-regime'), condEl = document.getElementById('tvsig-fc-cond'), sigEl = document.getElementById('tvsig-fc-signals');
+    if (!bars || bars.length < 60) { if (rgEl) rgEl.innerHTML = '<span class="tvsig-fc-hint">Мало свечей — открой «Модели» и ⟳.</span>'; if (condEl) condEl.innerHTML = ''; if (sigEl) sigEl.innerHTML = ''; return; }
+    const rg = SC.regimeInfo(bars, bars.length - 1);
+    if (rgEl) rgEl.innerHTML = _regimeBadge(rg);
+    const fade = (S.computed && S.computed.fade) ? S.computed.fade.series : SC.methods.fade(bars);
+    if (condEl) condEl.innerHTML = _condTable(SC.condStats(fade, bars, 12), rg);
+    if (sigEl) sigEl.innerHTML = _recentSignals(fade, bars);
+  }
+  function fcDetail(i) {
+    const el = document.getElementById('tvsig-fc-detail'), bars = S.bars, SC = window.SignalsCore;
+    if (!el || !bars || i < 0 || i >= bars.length) return;
+    const fade = (S.computed && S.computed.fade) ? S.computed.fade.series : SC.methods.fade(bars);
+    const dir = Math.sign(fade[i] || 0); if (!dir) { el.innerHTML = ''; return; }
+    const rg = SC.regimeInfo(bars, i), out = SC.tradeOutcome(bars, i, dir, 1.5, 0.75, 0.12, 12);
+    if (!out) { el.innerHTML = ''; return; }
+    const cs = SC.condStats(fade, bars, 12), bk = rg && rg.isTrend ? 'тренд' : 'боковик';
+    const expC = cs[bk] && cs[bk].n ? _fcNum(cs[bk].exp) : '—';
+    let real; if (out.exit === 'открыта') { const left = (i + 12) - (bars.length - 1); real = 'в позиции · осталось ' + Math.max(0, left) + ' баров'; }
+    else real = out.exit + ' · P&L ' + _fcNum(out.pnl) + ' ATR';
+    el.innerHTML = '<div class="tvsig-fc-card"><b>' + (dir < 0 ? 'ФЕЙД в ШОРТ ↓' : 'ФЕЙД в ЛОНГ ↑') + '</b> · ' + _regLbl(rg) + ' · ' + _hhmm(bars[i].time) + ' UTC<br>' +
+      'вход <b>' + out.entry.toFixed(4) + '</b> · тейк ' + out.tp.toFixed(4) + ' · стоп ' + out.sl.toFixed(4) + '<br>' +
+      'ожидание в этом режиме: exp <b>' + expC + '</b> ATR<br>факт: <b>' + real + '</b></div>';
+  }
+  function fcHypo() {
+    const el = document.getElementById('tvsig-fc-hypo'), inp = document.getElementById('tvsig-fc-price'), bars = S.bars, SC = window.SignalsCore;
+    if (!el || !bars || bars.length < 5) return;
+    const price = parseFloat(inp && inp.value); if (!(price > 0)) { el.innerHTML = '<span class="tvsig-fc-hint">Впиши цену.</span>'; return; }
+    const dt = S.barDt || 300, last = bars[bars.length - 1];
+    const synth = { time: last.time + (dt || 300), open: price, high: Math.max(price, last.close), low: Math.min(price, last.close), close: price, volume: 0 };
+    const bars2 = bars.concat([synth]), li = bars2.length - 1;
+    const sig = SC.methods.fade(bars2)[li], rg = SC.regimeInfo(bars2, li);
+    const txt = sig < 0 ? 'ФЕЙД в ШОРТ ↓' : sig > 0 ? 'ФЕЙД в ЛОНГ ↑' : 'нет сигнала';
+    el.innerHTML = '<div class="tvsig-fc-card">если цена дойдёт до <b>' + price + '</b>:<br>сигнал: <b>' + txt + '</b><br>режим: ' + (_regLbl(rg) || '—') + (rg && rg.mkt ? ' / ' + rg.mkt : '') + '</div>';
+  }
+
   // ── данные + расчёт ──────────────────────────────────────────────────────────
   async function refresh(force) {
     if (S.busy || !S.chart) return;
@@ -527,6 +593,7 @@
       Object.keys(S.on).forEach(id => { if (S.on[id]) drawMethod(id); });
       if (symChanged) { S.oi = null; S._oiSeeded = null; oiLoad(); } else if (S.oi) oiRender(); // OI: перезагрузка при смене тикера, иначе обновляем регион
       renderPeriod();
+      forecastRender(); // режим + условная точность пересчитываются на баре
       status('тикер ' + (S.symbol || '?') + ' · ' + bars.length + ' баров · обновлено ' + fmtAgo(S.statsTs));
       breadthEnsure(bars, dt); // полная версия фейда: рыночный breadth (async, не блокирует)
     } catch (e) { status('ошибка: ' + (e && e.message || e)); }
@@ -610,6 +677,7 @@
       '<button class="tvsig-tab on" data-tab="signals">Модели</button>' +
       '<button class="tvsig-tab" data-tab="compare">Сравнение</button>' +
       '<button class="tvsig-tab" data-tab="periods">Периоды</button>' +
+      '<button class="tvsig-tab" data-tab="forecast">Прогноз</button>' +
       '<button class="tvsig-tab" data-tab="theme">Тема</button></div>' +
       '<div id="tvsig-pane-signals" class="tvsig-pane">' +
       '<div id="tvsig-draw">' +
@@ -663,7 +731,19 @@
       '<label class="tvsig-th-sw"><input type="checkbox" id="tvsig-th-inv"> Инверсия цветов (тёмная↔светлая)</label>' +
       '<label class="tvsig-th-sw"><input type="checkbox" id="tvsig-th-logo"> Не менять цвет логотипов бумаг</label>' +
       '<div id="tvsig-th-foot">Фильтр накладывается на весь терминал (включая график); панель расширения не затрагивается. «Не менять логотипы» возвращает картинкам-логотипам родной цвет обратным фильтром (тёплый оттенок может слегка остаться; фоновые/SVG-значки не всегда ловятся). Пресеты задают ползунки. Настройки сохраняются.</div>' +
-      '</div>'; // /pane-theme
+      '</div>' + // /pane-theme
+      '<div id="tvsig-pane-forecast" class="tvsig-pane" hidden>' +
+      '<div id="tvsig-fc-regime" class="tvsig-fc-badge"></div>' +
+      '<div class="tvsig-fc-sec">Где фейд точнее / слабее (exp ATR · win% · n по режимам)</div>' +
+      '<div id="tvsig-fc-cond"></div>' +
+      '<div class="tvsig-fc-sec">Прогноз от точки — клик по сигналу</div>' +
+      '<div id="tvsig-fc-signals"></div>' +
+      '<div id="tvsig-fc-detail"></div>' +
+      '<div class="tvsig-fc-sec">Гипотеза: если цена дойдёт до</div>' +
+      '<div id="tvsig-fc-hypo-ctrl"><input id="tvsig-fc-price" type="number" step="any" placeholder="цена"><button id="tvsig-fc-hypo-go" title="Пересчитать сигнал на этой цене">→</button></div>' +
+      '<div id="tvsig-fc-hypo"></div>' +
+      '<div id="tvsig-fc-foot">Режим: <b>ER</b> тренд/боковик (окно 60, порог 0.3), <b>vol</b> сжатие/расшир (ATR/медиана-200), <b>рынок</b> — breadth корзины. Условная точность — фейд по каждому режиму (тейк 1.5/стоп 0.75 ATR, R:R 2:1). Прогноз от точки: вход по close сигнала, тейк/стоп в ATR, тайм-выход 12 баров; показывает исход или «в позиции». Гипотеза: подставляет цену как закрытие следующего бара и пересчитывает.</div>' +
+      '</div>'; // /pane-forecast
     document.documentElement.appendChild(panel);
     rowsEl = panel.querySelector('#tvsig-rows'); statusEl = panel.querySelector('#tvsig-status');
     panel.querySelector('#tvsig-refresh').onclick = () => refresh(true);
@@ -687,6 +767,11 @@
     panel.querySelector('#tvsig-cmp-go').onclick = () => cmpLoad();
     cmpTk.addEventListener('keydown', e => { if (e.key === 'Enter') cmpLoad(); });
     panel.querySelector('#tvsig-seg-go').onclick = () => segRender();
+    // «Прогноз»: клик по сигналу → карточка прогноза от точки; гипотеза по цене
+    panel.querySelector('#tvsig-fc-signals').addEventListener('click', e => {
+      const s = e.target.closest('.tvsig-fc-sig'); if (s) fcDetail(+s.dataset.idx); });
+    panel.querySelector('#tvsig-fc-hypo-go').onclick = () => fcHypo();
+    panel.querySelector('#tvsig-fc-price').addEventListener('keydown', e => { if (e.key === 'Enter') fcHypo(); });
     themeBind();
     let minimized = false;
     panel.querySelector('#tvsig-min').onclick = () => { minimized = !minimized; rowsEl.style.display = minimized ? 'none' : ''; panel.querySelector('#tvsig-foot').style.display = minimized ? 'none' : ''; };
@@ -810,7 +895,8 @@
   // переключателях и на текстовых зонах (чтобы можно было кликать и выделять текст).
   const NO_DRAG = 'button, input, select, textarea, a, svg, .tvsig-diam, .tvsig-name, ' +
     '.tvsig-col, .tvsig-info-btn, .tvsig-tab, #tvsig-status, #tvsig-period, #tvsig-foot, ' +
-    '#tvsig-cmp-foot, #tvsig-cmp-body, #tvsig-oi-body, .tvsig-oi-meta, .tvsig-oi-t';
+    '#tvsig-cmp-foot, #tvsig-cmp-body, #tvsig-oi-body, .tvsig-oi-meta, .tvsig-oi-t, ' +
+    '.tvsig-fc-sig, #tvsig-fc-cond, #tvsig-fc-detail, #tvsig-fc-hypo, #tvsig-fc-foot';
   function drag(el) {
     let sx, sy, ox, oy, on = false;
     el.addEventListener('mousedown', e => {

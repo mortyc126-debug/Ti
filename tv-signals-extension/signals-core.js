@@ -193,6 +193,62 @@
     return out;
   }
 
+  // ── режим бара + условная точность по режимам + прогноз от точки ─────────────
+  function _rollMedian(arr, i, W) { const s = []; for (let j = Math.max(0, i - W); j < i; j++) { const v = arr[j]; if (v != null && isFinite(v)) s.push(v); }
+    if (s.length < W * 0.4) return null; s.sort((a, b) => a - b); return s[s.length >> 1]; }
+
+  // Режим на баре i: ER тренд/боковик (окно 60, порог 0.3 — как #3), vol-состояние
+  // (ATR/медиана-200: сжатие/норма/расшир — #5), рынок (breadth: ↑/↓/тих — #2).
+  function regimeInfo(bars, i) {
+    const n = bars.length; if (i < 0 || i >= n) return null;
+    const cl = bars.map(b => b.close), at = atr(bars, 14), W = 60;
+    let er = null, trendDir = 0;
+    if (i >= W) { let d = 0; for (let j = i - W + 1; j <= i; j++) d += Math.abs(cl[j] - cl[j - 1]);
+      if (d > 0) { er = Math.abs(cl[i] - cl[i - W]) / d; trendDir = Math.sign(cl[i] - cl[i - W]); } }
+    const isTrend = er != null && er >= 0.3;
+    let vol = null; if (at[i] != null) { const med = _rollMedian(at, i, 200);
+      if (med != null && med > 0) { const r = at[i] / med; vol = r < 0.8 ? 'сжатие' : (r > 1.3 ? 'расшир' : 'норма'); } }
+    let mkt = null; if (_breadthMap) { const Mk = _breadthMap.get(bars[i].time);
+      if (Mk != null) mkt = Math.abs(Mk) < _breadthMedAbs ? 'тих' : (Mk > 0 ? 'рынок↑' : 'рынок↓'); }
+    return { er, isTrend, trendDir, vol, mkt };
+  }
+
+  // Исход одной сделки от бара i (тейк/стоп в ATR интрабар, стоп первым, тайм-выход
+  // через horizon). Возвращает {pnl, exit:'тейк'|'стоп'|'тайм'|'открыта', bar}.
+  function tradeOutcome(bars, i, dir, take, stop, cost, horizon, at) {
+    at = at || atr(bars, 14); const a = at[i]; if (a == null || a <= 0) return null;
+    const entry = bars[i].close, tp = entry + dir * take * a, sl = entry - dir * stop * a;
+    const last = bars.length - 1, lim = Math.min(i + horizon, last);
+    for (let j = i + 1; j <= lim; j++) {
+      if (dir > 0) { if (bars[j].low <= sl) return { pnl: dir * (sl - entry) / a - cost, exit: 'стоп', bar: j, entry, tp, sl, a };
+        if (bars[j].high >= tp) return { pnl: dir * (tp - entry) / a - cost, exit: 'тейк', bar: j, entry, tp, sl, a }; }
+      else { if (bars[j].high >= sl) return { pnl: dir * (sl - entry) / a - cost, exit: 'стоп', bar: j, entry, tp, sl, a };
+        if (bars[j].low <= tp) return { pnl: dir * (tp - entry) / a - cost, exit: 'тейк', bar: j, entry, tp, sl, a }; }
+    }
+    if (i + horizon > last) return { pnl: null, exit: 'открыта', bar: last, entry, tp, sl, a }; // ещё в будущем
+    return { pnl: dir * (bars[lim].close - entry) / a - cost, exit: 'тайм', bar: lim, entry, tp, sl, a };
+  }
+
+  // Условная точность сигнала ПО РЕЖИМАМ: exp/win/n в каждом ведре (тренд/боковик,
+  // сжатие/норма/расшир). Сделки независимые (описательная статистика, не портфель).
+  function condStats(scoreArr, bars, horizon, opts) {
+    horizon = horizon || 12; opts = opts || {};
+    const T = opts.take != null ? opts.take : 1.5, S = opts.stop != null ? opts.stop : 0.75, cost = opts.cost != null ? opts.cost : 0.12;
+    const n = bars.length, at = atr(bars, 14);
+    const keys = ['тренд', 'боковик', 'сжатие', 'норма', 'расшир'];
+    const acc = {}; keys.forEach(k => acc[k] = { sum: 0, win: 0, n: 0 });
+    for (let i = 0; i < n; i++) {
+      const sc = scoreArr[i]; if (sc == null || sc === 0) continue;
+      const rg = regimeInfo(bars, i); if (!rg) continue;
+      const out = tradeOutcome(bars, i, Math.sign(sc), T, S, cost, horizon, at);
+      if (!out || out.pnl == null) continue;
+      const put = k => { acc[k].sum += out.pnl; acc[k].win += out.pnl > 0 ? 1 : 0; acc[k].n++; };
+      put(rg.isTrend ? 'тренд' : 'боковик'); if (rg.vol) put(rg.vol);
+    }
+    const res = {}; keys.forEach(k => res[k] = acc[k].n ? { exp: acc[k].sum / acc[k].n, win: acc[k].win / acc[k].n, n: acc[k].n } : { exp: null, win: null, n: 0 });
+    return res;
+  }
+
   // пересчёт одного метода (для фейда после подгрузки breadth — без полного O(n²) NW)
   function computeOne(id, bars, horizon) {
     horizon = horizon || 12;
@@ -201,5 +257,6 @@
     return { series, last, stats: btStats(series, bars, horizon) };
   }
 
-  window.SignalsCore = { methods: M, btStats, parseExport, computeAll, computeOne, atr, IDS, setBreadth };
+  window.SignalsCore = { methods: M, btStats, parseExport, computeAll, computeOne, atr, IDS,
+    setBreadth, regimeInfo, condStats, tradeOutcome };
 })();

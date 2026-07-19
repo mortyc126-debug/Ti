@@ -198,3 +198,36 @@
 .tvsig-oi-t td{ padding:2px 4px; text-align:right; }
 .tvsig-oi-t td:first-child{ text-align:left; color:var(--text2); }
 #tvsig-foot{ padding:6px 10px; font-size:9px; color:var(--text3); font-family:var(--mono); line-height:1.5; border-top:1px solid var(--border); }
+
+/* ── вкладка «Прогноз» ─────────────────────────────────────────────────────── */
+.tvsig-fc-badge{ display:flex; flex-wrap:wrap; gap:5px; padding:8px 10px 4px; }
+.tvsig-fc-chip{ font-family:var(--mono); font-size:10px; padding:3px 7px; border-radius:6px;
+  border:1px solid var(--border2); background:var(--surface2); color:var(--text2); white-space:nowrap; }
+.tvsig-fc-chip.c-reg{ border-color:var(--violet); color:var(--violet); }
+.tvsig-fc-chip.c-vol{ border-color:var(--blue); color:var(--blue); }
+.tvsig-fc-chip.c-mkt{ border-color:var(--green); color:var(--green); }
+.tvsig-fc-sec{ padding:8px 10px 3px; font-size:10px; font-family:var(--mono); color:var(--text3);
+  text-transform:uppercase; letter-spacing:.4px; }
+.tvsig-fc-tbl{ width:calc(100% - 20px); margin:0 10px; border-collapse:collapse; font-family:var(--mono); font-size:11px; }
+.tvsig-fc-tbl th{ text-align:right; color:var(--text3); font-weight:600; padding:2px 5px; font-size:9.5px; }
+.tvsig-fc-tbl th:first-child{ text-align:left; }
+.tvsig-fc-tbl td{ text-align:right; padding:2px 5px; color:var(--text2); border-top:1px solid var(--border); }
+.tvsig-fc-tbl td:first-child{ text-align:left; }
+.tvsig-fc-tbl tr.cur td{ background:rgba(180,135,248,.12); color:var(--text); font-weight:600; }
+.tvsig-fc-tbl .pos{ color:var(--green); }
+.tvsig-fc-tbl .neg{ color:var(--negative); }
+.tvsig-fc-tbl .dim, .tvsig-fc-sig .dim{ color:var(--text3); }
+.tvsig-fc-sig{ margin:2px 10px; padding:4px 8px; border-radius:6px; cursor:pointer; font-family:var(--mono);
+  font-size:10.5px; color:var(--text2); background:var(--surface2); border:1px solid var(--border); transition:all .1s; }
+.tvsig-fc-sig:hover{ border-color:var(--accent); color:var(--text); }
+.tvsig-fc-card{ margin:4px 10px; padding:7px 9px; border-radius:7px; font-family:var(--mono); font-size:10.5px;
+  line-height:1.55; color:var(--text2); background:var(--surface2); border:1px solid var(--violet); }
+.tvsig-fc-card b{ color:var(--text); }
+#tvsig-fc-hypo-ctrl{ display:flex; gap:6px; padding:2px 10px 4px; }
+#tvsig-fc-price{ flex:1; min-width:0; background:var(--surface2); border:1px solid var(--border2); border-radius:6px;
+  color:var(--text); padding:4px 8px; font-family:var(--mono); font-size:11px; }
+#tvsig-fc-hypo-go{ background:var(--surface2); border:1px solid var(--border2); border-radius:6px; color:var(--text2);
+  cursor:pointer; padding:4px 10px; font-size:13px; }
+#tvsig-fc-hypo-go:hover{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.tvsig-fc-hint{ display:block; padding:4px 10px; font-size:10px; color:var(--text3); font-family:var(--mono); }
+#tvsig-fc-foot{ padding:6px 10px; font-size:9px; color:var(--text3); font-family:var(--mono); line-height:1.5; border-top:1px solid var(--border); margin-top:6px; }
