@@ -327,7 +327,13 @@
       let hit = false, dir = 0;
       if (B && B !== '-') { if (va && vb && Math.sign(va) === Math.sign(vb)) { hit = true; dir = Math.sign(va); } }
       else if (va) { hit = true; dir = Math.sign(va); }
-      if (hit) hits.push({ code, dir, price: bars[li].close });
+      if (hit) {
+        // точность связки НА ЭТОМ тикере: exp/win/n по истории (для сортировки).
+        // Для согласия — серия только там, где оба метода в одну сторону.
+        const ser2 = sb ? sa.map((v, k) => { const w = sb[k]; return (v && w && Math.sign(v) === Math.sign(w)) ? Math.sign(v) : 0; }) : sa;
+        let st = null; try { st = SC.btStats(ser2, bars, 12); } catch (e) {}
+        hits.push({ code, dir, price: bars[li].close, exp: st ? st.exp : null, win: st ? st.win : null, n: st ? st.n : 0 });
+      }
     }
     scanRender(hits, A, B);
   }
@@ -336,10 +342,19 @@
     const found = hits.filter(h => h.dir);
     const combo = (B && B !== '-') ? (NAME[A] + ' + ' + NAME[B]) : NAME[A];
     if (!found.length) { body.innerHTML = '<div class="tvsig-fc-hint">Нет срабатываний «' + combo + '» на последнем баре из ' + hits.length + ' тикеров.</div>'; return; }
-    body.innerHTML = '<div class="tvsig-scan-hd">' + combo + ' — сработало у ' + found.length + ':</div>' +
-      found.map(h => '<div class="tvsig-scan-hit" data-code="' + h.code + '">' +
-        '<b>' + h.code + '</b> <span class="' + (h.dir < 0 ? 'neg' : 'pos') + '">' + (h.dir < 0 ? '↓ шорт' : '↑ лонг') + '</span>' +
-        ' <span class="dim">@ ' + h.price + '</span></div>').join('');
+    // сортируем по историческому exp связки на тикере (сильные/точные — вверх);
+    // тикеры с малой выборкой (n<10) уводим вниз, оценке доверять нельзя.
+    const rk = h => (h.n >= 10 && h.exp != null) ? h.exp : -Infinity;
+    found.sort((a, b) => rk(b) - rk(a));
+    body.innerHTML = '<div class="tvsig-scan-hd">' + combo + ' — сработало у ' + found.length + ' (сортировка по точности связки на тикере):</div>' +
+      found.map(h => {
+        const stat = (h.n >= 10 && h.exp != null)
+          ? '<span class="' + (h.exp > 0.03 ? 'pos' : h.exp < -0.03 ? 'neg' : 'dim') + '" title="exp — средний P&L сделки этой связки в ATR на истории тикера (R:R 2:1). win — винрейт, n — число сделок.">exp ' + (h.exp >= 0 ? '+' : '') + h.exp.toFixed(2) + ' · win ' + Math.round(h.win * 100) + '% · n' + h.n + '</span>'
+          : '<span class="dim" title="Мало сделок на истории тикера — точность оценить нельзя.">мало истории</span>';
+        return '<div class="tvsig-scan-hit" data-code="' + h.code + '">' +
+          '<b>' + h.code + '</b> <span class="' + (h.dir < 0 ? 'neg' : 'pos') + '">' + (h.dir < 0 ? '↓ шорт' : '↑ лонг') + '</span>' +
+          ' <span class="dim">@ ' + h.price + '</span> ' + stat + '</div>';
+      }).join('');
   }
 
   // ── рыночный breadth для полной версии фейда ──────────────────────────────────
@@ -1073,7 +1088,7 @@
       '<div id="tvsig-scan-sel">Сигнал <select id="tvsig-scan-a"></select> + <select id="tvsig-scan-b"></select>' +
       '<button id="tvsig-scan-go" title="Просканировать список">Скан</button></div>' +
       '<div id="tvsig-scan-body"></div>' +
-      '<div id="tvsig-scan-foot">Пресеты — стандартные секторные наборы MOEX; свои списки можно сохранять/удалять («список дня» тоже сохраняется). Скан тянет свечи каждого тикера на ТФ активного графика, считает сигнал (или согласие двух) на последнем ЗАКРЫТОМ баре. Кросс-тикерный breadth в скане не применяется — открой хит на графике для полной версии. Второй сигнал «—» = один метод.</div>' +
+      '<div id="tvsig-scan-foot">Пресеты — стандартные секторные наборы MOEX; свои списки можно сохранять/удалять («список дня» тоже сохраняется). Скан тянет свечи каждого тикера на ТФ активного графика, считает сигнал (или согласие двух) на последнем ЗАКРЫТОМ баре. Хиты сортируются по ТОЧНОСТИ связки на истории самого тикера (exp/win/n, R:R 2:1) — вверху те, где метод исторически прибыльнее; n&lt;10 = мало данных, вниз. Кросс-тикерный breadth в скане не применяется — открой хит на графике для полной версии. Второй сигнал «—» = один метод.</div>' +
       '</div>'; // /pane-scan
     document.documentElement.appendChild(panel);
     rowsEl = panel.querySelector('#tvsig-rows'); statusEl = panel.querySelector('#tvsig-status');
