@@ -66,6 +66,12 @@ def main():
     ap.add_argument("--liquid-only", action="store_true")
     ap.add_argument("--boot", type=int, default=0, help="итераций block-bootstrap CI (по дням)")
     ap.add_argument("--perm", type=int, default=0, help="итераций permutation (случайное направление)")
+    ap.add_argument("--ticker-holdout", action="store_true",
+                    help="holdout по тикерам: случайно 50/50, сравнить exp на in-sample и невиданных")
+    ap.add_argument("--concentration", action="store_true",
+                    help="портфельная концентрация: макс. одновременных позиций + доля суммы от топ-дней")
+    ap.add_argument("--by-sync", action="store_true",
+                    help="разрез по силе синхронности рынка (|M|/медиана: тихо/норма/экстрим)")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
     cache = args.cache or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "candle_cache")
@@ -94,9 +100,9 @@ def main():
 
     split_ts = _epoch_s(args.split_date) if args.split_date else None
 
-    # рыночный индекс для breadth-гейта
+    # рыночный индекс для breadth-гейта и/или разреза по синхронности
     market = {}; med_absM = 0.0; cand_cache = {}
-    if args.gate_breadth:
+    if args.gate_breadth or args.by_sync:
         by_ts = {}
         for tk in traded:
             cr = _load_candles(cache, tk)
@@ -110,8 +116,10 @@ def main():
         market = {ts: float(np.median(v)) for ts, v in by_ts.items() if v}
         med_absM = float(np.median([abs(x) for x in market.values()])) if market else 0.0
 
-    # сделки: pnl при фактическом направлении + при лонге/шорте (для permutation) + день + сегмент
+    # сделки: pnl при фактическом направлении + при лонге/шорте (для permutation) + день +
+    # сегмент + тикер + времена входа/выхода (концентрация) + сила синхронности рынка
     P_act, P_long, P_short, days, is_te, dirs = [], [], [], [], [], []
+    tks, ent_ts, exit_ts, syncs = [], [], [], []
     n_tk = 0
     for tk in traded:
         cr = cand_cache.get(tk) or _load_candles(cache, tk)
@@ -152,14 +160,19 @@ def main():
             P_act.append(pact); P_long.append(pl); P_short.append(ps); dirs.append(dirn)
             days.append(datetime.utcfromtimestamp(cep[i]).strftime("%Y-%m-%d") if np.isfinite(cep[i]) else "?")
             is_te.append(split_ts is not None and cep[i] >= split_ts)
+            tks.append(tk); ent_ts.append(cep[i])
+            Ms = market.get(ctime[i])
+            syncs.append(abs(Ms) / med_absM if (Ms is not None and med_absM > 0) else np.nan)
             # шаг: до выхода фактической сделки (no-overlap)
             _, ej_act = _sim(cH, cL, cC, i, entry, a0, dirn, args.take, args.stop, args.maxhold, m, args.cost)
+            exit_ts.append(cep[ej_act])
             i = ej_act + 1
 
     if not P_act:
         sys.exit("ноль сделок — проверь зону/гейты/кэш")
     P_act = np.array(P_act); P_long = np.array(P_long); P_short = np.array(P_short)
     days = np.array(days); is_te = np.array(is_te); dirs = np.array(dirs)
+    tks = np.array(tks); ent_ts = np.array(ent_ts); exit_ts = np.array(exit_ts); syncs = np.array(syncs)
 
     tag = ("zone " if not args.no_zone else "NO-zone ") + \
           ("gate:против+идио " if args.gate_breadth else "") + ("gate:боковик " if args.gate_trend else "")
@@ -199,6 +212,54 @@ def main():
         print(f"  наблюдаемый exp={obs:+.4f}  null среднее={null.mean():+.4f}  "
               f"p-value={pval:.3f}  {'ЗНАЧИМ (p<0.05)' if pval < 0.05 else 'НЕ значим'}")
         print(f"  → фейд-направление {'БЬЁТ' if pval < 0.05 else 'НЕ бьёт'} случайное на тех же сетапах")
+
+    # holdout по тикерам: случайно 50/50, edge на невиданных бумагах
+    if args.ticker_holdout:
+        uniq_tk = np.unique(tks[seg])
+        inset = set(rng.choice(uniq_tk, size=max(1, len(uniq_tk) // 2), replace=False).tolist())
+        m_in = np.array([t in inset for t in tks[seg]])
+        print(f"\nholdout по тикерам ({segname}, {len(uniq_tk)} тикеров 50/50):")
+        _stats("  in-sample", a[m_in])
+        _stats("  held-out", a[~m_in])
+        print("  близкие exp → edge обобщается на невиданные бумаги, не сидит в горстке.")
+
+    # разрез по силе синхронности рынка (независимо от паттерна бумаги)
+    if args.by_sync:
+        sv = syncs[seg]
+        ok = np.isfinite(sv)
+        if ok.sum() > 30:
+            aa = a[ok]; ss = sv[ok]
+            q1, q2 = np.percentile(ss, [33, 66])
+            buckets = [("тихо |M|<p33", ss < q1), ("норма", (ss >= q1) & (ss < q2)), ("экстрим |M|>p66", ss >= q2)]
+            print(f"\nсила синхронности рынка ({segname}, |M|/медиана на баре входа):")
+            for name, mk in buckets:
+                if mk.sum() >= 20:
+                    print(f"  {name:>16}: N={int(mk.sum()):>6}  exp={aa[mk].mean():+.4f}  win={100*(aa[mk]>0).mean():4.1f}%")
+            print("  сравни экстрим vs тихо — работает ли фейд в дни массового синхронного хода.")
+
+    # портфельная концентрация: макс. одновременных позиций + доля суммы от топ-дней
+    if args.concentration:
+        et = ent_ts[seg]; xt = exit_ts[seg]
+        order = np.argsort(et)
+        # sweep-line: событий +1 на входе, −1 на выходе
+        evt = sorted([(et[k], 1) for k in range(len(et))] + [(xt[k], -1) for k in range(len(xt))])
+        cur = mx = 0
+        for _, d in evt:
+            cur += d; mx = max(mx, cur)
+        # концентрация P&L по дням
+        dd2 = days[seg]; uniq = np.unique(dd2)
+        daypnl = np.array([a[dd2 == d].sum() for d in uniq])
+        top5 = np.sort(daypnl)[::-1][:5].sum()
+        tot = a.sum()
+        print(f"\nпортфельная концентрация ({segname}):")
+        print(f"  макс. одновременных позиций: {mx}   (за {len(uniq)} дней)")
+        pos_days = int((daypnl > 0).sum())
+        print(f"  прибыльных дней: {pos_days}/{len(uniq)} ({100*pos_days/len(uniq):.0f}%)")
+        if tot > 0:
+            print(f"  топ-5 дней дают {100*top5/tot:.0f}% всей суммы "
+                  f"({'КОНЦЕНТРИРОВАНО (риск)' if top5 > 0.5*tot else 'размазано (здорово)'})")
+        else:
+            print(f"  общая сумма ≤0 — доля топ-дней неинформативна")
 
 
 if __name__ == "__main__":
