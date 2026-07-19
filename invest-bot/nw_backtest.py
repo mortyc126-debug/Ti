@@ -170,6 +170,11 @@ def main():
     ap.add_argument("--by-regime", action="store_true",
                     help="разбить итог по режимам: сессия/vol/тренд/breadth — где NW точнее. "
                          "Считается на сегменте TEST (или ВСЕ без --split-date).")
+    ap.add_argument("--gate-breadth", action="store_true",
+                    help="не торговать сигнал, сонаправленный с рынком (лузер −0.04); "
+                         "оставить идио+против. Требует рыночный индекс (строится авто).")
+    ap.add_argument("--gate-trend", action="store_true",
+                    help="не торговать в трендовом режиме (ER-60≥0.3; там NW теряет −0.22).")
     args = ap.parse_args()
     bar_s = args.bar_min * 60
     cache = args.cache or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "candle_cache")
@@ -246,7 +251,8 @@ def main():
     traded = [tk for tk in sorted(feat_by_tk) if liq_top is None or tk in liq_top]
     cand_cache = {}
     market = {}; med_absM = 0.0; reg = None
-    if args.by_regime:
+    need_market = args.by_regime or args.gate_breadth
+    if need_market:
         by_ts = {}
         for tk in traded:
             cr = _load_candles(cache, tk)
@@ -259,10 +265,11 @@ def main():
                     by_ts.setdefault(tms[j], []).append(cc[j] / cc[j - 3] - 1.0)
         market = {ts: float(np.median(v)) for ts, v in by_ts.items() if v}
         med_absM = float(np.median([abs(x) for x in market.values()])) if market else 0.0
+        print(f"рыночный индекс: {len(market)} ts, медиана|M|={med_absM:.5f}", file=sys.stderr)
+    if args.by_regime:
         groups = {"сессия": ["ядро", "край", "тонко"], "vol": ["сжатие", "норма", "расшир"],
                   "тренд": ["тренд", "боковик"], "рынок": ["идио", "с рынком", "против"]}
         reg = {g: {k: [0.0, 0, 0] for k in ks} for g, ks in groups.items()}  # [sum, win, n]
-        print(f"by-regime: рыночный индекс {len(market)} ts, медиана|M|={med_absM:.5f}", file=sys.stderr)
 
     def _roll_med(a, i, W):
         s = a[max(0, i - W):i]; s = s[np.isfinite(s)]
@@ -348,6 +355,15 @@ def main():
                 if p_hold == 0.5:
                     i += 1; continue
                 dirn = 1.0 if p_hold > 0.5 else -1.0
+            # гейты режима (скип на входе): тренд и «сигнал с рынком» — валидированные лузеры
+            if args.gate_trend and i >= 60:
+                den = np.abs(np.diff(cC[i - 60:i + 1])).sum()
+                if den > 0 and abs(cC[i] - cC[i - 60]) / den >= 0.3:
+                    i += 1; continue
+            if args.gate_breadth:
+                Mg = market.get(t)
+                if Mg is not None and abs(Mg) >= med_absM and np.sign(Mg) == dirn:
+                    i += 1; continue
             entry = cC[i]; a0 = atr[i]
             tp = entry + dirn * args.take * a0
             sl = entry - dirn * args.stop * a0
@@ -403,6 +419,10 @@ def main():
         tag.append("bank=live(.npz)")
     if args.kernel != "uniform":
         tag.append(f"kernel={args.kernel}" + (f"(bw={args.bw})" if args.bw else ""))
+    if args.gate_breadth:
+        tag.append("gate:против+идио")
+    if args.gate_trend:
+        tag.append("gate:боковик")
     print(f"\n=== NW-бэктест  radius={args.radius} take={args.take}/stop={args.stop} "
           f"cost={args.cost} k={args.k}  {', '.join(tag)} ===")
     print(f"тикеров торговали: {n_tk}")
