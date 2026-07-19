@@ -6,7 +6,8 @@
   --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
 }
 #tvsig-panel{
-  position:fixed; top:90px; right:16px; z-index:2147483000; width:266px;
+  position:fixed; top:90px; right:16px; z-index:2147483000; width:340px;
+  min-width:300px; max-width:640px; resize:horizontal; overflow:hidden; /* тянем правый-нижний угол — шире/уже */
   background:var(--surface); border:1px solid var(--border); border-radius:10px;
   box-shadow:0 8px 30px rgba(0,0,0,0.65);
   font:12px/1.35 'Inter',-apple-system,'Segoe UI',Roboto,sans-serif; color:var(--text); user-select:none;
@@ -24,8 +25,8 @@
 #tvsig-head button:hover{ background:var(--accent); border-color:var(--accent); color:#fff; }
 
 /* вкладки Сигналы / Сравнение */
-#tvsig-tabs{ display:flex; gap:4px; padding:6px 8px 0; }
-.tvsig-tab{ flex:1; min-width:0; padding:5px 4px; border-radius:7px 7px 0 0; cursor:pointer; font-size:10.5px; font-family:var(--mono);
+#tvsig-tabs{ display:flex; flex-wrap:wrap; gap:4px; padding:6px 8px 0; }
+.tvsig-tab{ flex:1 1 auto; min-width:52px; padding:5px 6px; border-radius:7px 7px 0 0; cursor:pointer; font-size:10.5px; font-family:var(--mono);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   border:1px solid var(--border2); border-bottom:none; background:var(--surface2); color:var(--text3); transition:all .12s; }
 .tvsig-tab:hover{ color:var(--text2); }
