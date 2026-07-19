@@ -167,6 +167,9 @@ def main():
     ap.add_argument("--bw", type=float, default=None,
                     help="полоса ядра: gaussian σ (по умолч. radius/2), triangular обрезка "
                          "(по умолч. radius). Для knn — число соседей (по умолч. min-neighbors).")
+    ap.add_argument("--by-regime", action="store_true",
+                    help="разбить итог по режимам: сессия/vol/тренд/breadth — где NW точнее. "
+                         "Считается на сегменте TEST (или ВСЕ без --split-date).")
     args = ap.parse_args()
     bar_s = args.bar_min * 60
     cache = args.cache or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "candle_cache")
@@ -237,10 +240,36 @@ def main():
     pnls, pnls_tr, pnls_te = [], [], []
     dirs, dirs_tr, dirs_te = [], [], []
     n_tk = 0
-    for tk in sorted(feat_by_tk):
-        if liq_top is not None and tk not in liq_top:
-            continue
-        cr = _load_candles(cache, tk)
+
+    # --by-regime: пред-проход. Кэшируем свечи, строим рыночный индекс (медиана
+    # 3-барных доходностей по тикерам) для breadth, готовим аккумуляторы по осям.
+    traded = [tk for tk in sorted(feat_by_tk) if liq_top is None or tk in liq_top]
+    cand_cache = {}
+    market = {}; med_absM = 0.0; reg = None
+    if args.by_regime:
+        by_ts = {}
+        for tk in traded:
+            cr = _load_candles(cache, tk)
+            if not cr:
+                continue
+            cand_cache[tk] = cr
+            cc = np.array([float(r["close"]) for r in cr]); tms = [r["time"] for r in cr]
+            for j in range(3, len(cc)):
+                if cc[j - 3] > 0:
+                    by_ts.setdefault(tms[j], []).append(cc[j] / cc[j - 3] - 1.0)
+        market = {ts: float(np.median(v)) for ts, v in by_ts.items() if v}
+        med_absM = float(np.median([abs(x) for x in market.values()])) if market else 0.0
+        groups = {"сессия": ["ядро", "край", "тонко"], "vol": ["сжатие", "норма", "расшир"],
+                  "тренд": ["тренд", "боковик"], "рынок": ["идио", "с рынком", "против"]}
+        reg = {g: {k: [0.0, 0, 0] for k in ks} for g, ks in groups.items()}  # [sum, win, n]
+        print(f"by-regime: рыночный индекс {len(market)} ts, медиана|M|={med_absM:.5f}", file=sys.stderr)
+
+    def _roll_med(a, i, W):
+        s = a[max(0, i - W):i]; s = s[np.isfinite(s)]
+        return float(np.median(s)) if len(s) > W * 0.4 else np.nan
+
+    for tk in traded:
+        cr = cand_cache.get(tk) or _load_candles(cache, tk)
         if not cr:
             continue
         ctime = [r["time"] for r in cr]
@@ -342,6 +371,22 @@ def main():
                     pnls_te.append(pnl); dirs_te.append(dirn)
                 else:
                     pnls_tr.append(pnl); dirs_tr.append(dirn)
+            # разрез по режимам на целевом сегменте (TEST при split, иначе ВСЕ)
+            if reg is not None and ((split_ts is None) or (cep[i] >= split_ts)):
+                def _put(g, k):
+                    c = reg[g][k]; c[0] += pnl; c[1] += 1 if pnl > 0 else 0; c[2] += 1
+                hh = datetime.utcfromtimestamp(cep[i]).hour if np.isfinite(cep[i]) else -1
+                _put("сессия", "ядро" if 7 <= hh < 14 else ("край" if (5 <= hh < 7 or 14 <= hh < 18) else "тонко"))
+                vm = _roll_med(atr, i, 200)
+                if np.isfinite(vm) and vm > 0:
+                    rr = a0 / vm; _put("vol", "сжатие" if rr < 0.8 else ("расшир" if rr > 1.3 else "норма"))
+                if i >= 60:
+                    den = np.abs(np.diff(cC[i - 60:i + 1])).sum()
+                    if den > 0:
+                        er = abs(cC[i] - cC[i - 60]) / den; _put("тренд", "тренд" if er >= 0.3 else "боковик")
+                M = market.get(t)
+                if M is not None:
+                    _put("рынок", "идио" if abs(M) < med_absM else ("с рынком" if np.sign(M) == dirn else "против"))
             i = exit_j + 1  # БЕЗ перекрытия
 
     if not pnls:
@@ -365,6 +410,19 @@ def main():
     if split_ts is not None:
         _stats(f"TRAIN <{args.split_date}", pnls_tr, dirs_tr)
         _stats(f"TEST ≥{args.split_date}", pnls_te, dirs_te)
+
+    if reg is not None:
+        seg = "TEST" if split_ts is not None else "ВСЕ"
+        print(f"\n=== РАЗРЕЗ ПО РЕЖИМАМ ({seg}): где NW точнее ===")
+        for g in ("сессия", "vol", "тренд", "рынок"):
+            print(f"-- {g} --")
+            for k, c in reg[g].items():
+                if c[2] >= 30:
+                    print(f"   {k:>10}: N={c[2]:>6}  exp={c[0] / c[2]:+.4f} ATR  win={100 * c[1] / c[2]:5.1f}%")
+                else:
+                    print(f"   {k:>10}: N={c[2]:>6} (мало)")
+        print("Ищем ведро с exp заметно выше общего — там NW силён; можно гейтить.")
+
     print("\nexp — средний P&L сделки в ATR после издержек. Плюс на TEST при разумном")
     print("cost = сигнал переживает честный учёт входа и no-overlap. Проверь cost 0.05/0.08/0.12.")
 
