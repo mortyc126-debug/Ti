@@ -18,6 +18,7 @@
     ['cascade', 'Cascade', '#B487F8'], ['nw', 'NW-память', '#9090BB'],
     ['alligator_inv', 'Аллигатор класс. (инв.)', '#E67E22'],
     ['fade', 'Фейд у уровня', '#5EE6A8'],
+    ['zonefade', 'Зона-фейд', '#52F2C9'],
   ];
   const NAME = {}, DEF_COLOR = {}, IDX = {}; META.forEach(([id, n, c], i) => { NAME[id] = n; DEF_COLOR[id] = c; IDX[id] = i; });
   // описания для ℹ-окон: что делает · как читать знак · оговорка из прогонов бота
@@ -35,6 +36,7 @@
     cascade: { what: 'Ансамбль: Z-score + Order Block + FVG.', read: 'Сигнал только если ≥2 согласны в одну сторону (конфлюэнс).', note: 'Сильнейший effect-size в боте, но редкий — мало срабатываний.' },
     nw: { what: 'Nadaraya-Watson память: ядерный поиск похожих прошлых баров (объём×размах/ATR, направленность, ROC-сдвиг).', read: 'Предсказание направления по тому, что было ПОСЛЕ аналогов.', note: 'Режимный, но + в большинстве режимов. Без объёма — прокси по размаху (слабее).' },
     alligator_inv: { what: 'Классический Аллигатор Уильямса: SMMA 13/8/5 по медиане (H+L)/2 со сдвигами вперёд +8/+5/+3. Взят ИНВЕРТИРОВАННО.', read: 'Раскрытая пасть (Аллигатор говорит «тренд») → сигнал ПРОТИВ. Трендследящий Аллигатор на 5-мин РФ системно ошибается — фейдим его.', note: 'Как anti d≈−0.12 (инверт. → сигнал уровня ZSCORE), устойчив в OOS: train −0.15 → test −0.12, n≈166k. Сильнее alt-версии; в боте alt-Аллигатор выключен в его пользу.' },
+    zonefade: { what: 'Зона-фейд — валидированная стратегия (invest-bot аудит взамен NW). Зона z(T)<−0.4 & z(P)>0.6 (низкая интенсивность + высокая направленность) → ФЕЙД хода 3 баров, только когда рынок НЕ сонаправлен (breadth) и БОКОВИК (ER-60<0.3).', read: 'В зоне после роста → сигнал ВНИЗ, после падения → ВВЕРХ. Ставка на разворот в mean-reversion режиме.', note: 'Прошла весь чек-лист: TEST short +0.25 ATR, block-bootstrap CI [+0.11,+0.20], permutation p≈0, holdout по тикерам обобщается, синхронность рынка не ломает, P&L размазан. Наивный mean-reversion бьёт NW — вся аналог-память избыточна, это ядро edge. Брекет R:R 2:1 (тейк 2.0/стоп 1.0 ATR). До 20 одновременных позиций — сайзить с учётом коррелированного риска (см. калькулятор).' },
     fade: { what: 'Фейд у уровня + breadth: резкий ход (≥0.5 ATR за 3 бара), упёршийся в прошлый хай/лоу за 100 баров (реджект), И идиосинкразический либо против рынка (не сонаправлен с рынком).', read: 'Ход вверх в прошлый хай → сигнал ВНИЗ (фейд), ход вниз в прошлый лоу → ВВЕРХ. Фейдим только шум: если ход идёт ВМЕСТЕ с рынком — сигнала нет (это моментум).', note: 'ПОЛНАЯ версия both из бэктеста (invest-bot): level (реджект у уровня, −0.26 ATR) + breadth (медиана 3-барных доходностей корзины ~30 ликвидных бумаг MOEX). Пока breadth грузится (статус «фейд полный») — работает level-режим. TEST +0.31 ATR/сделку при R:R 2:1 (тейк ~1.5 / стоп ~0.75 ATR), но эдж режимный — сайзить умеренно.' },
   };
   const PREF = 'tvsig:on', CKEY = 'tvsig:colors', SKEY = 'tvsig:stats';
@@ -548,6 +550,7 @@
     if (condEl) condEl.innerHTML = _condTable(SC.condStats(ser, bars, 12), SC.regimeBuckets(bars, bars.length - 1));
     if (sigEl) sigEl.innerHTML = _recentSignals(ser, bars);
     if (S.mtfOn) mtfEnsure(bars, S.barDt || 300);
+    rcCompute(); // калькулятор позиции (цена/ATR обновляются на баре)
   }
   function fcDetail(i) {
     const el = document.getElementById('tvsig-fc-detail'), bars = S.bars, SC = window.SignalsCore;
@@ -586,6 +589,41 @@
     const txt = sig < 0 ? '↓ шорт' : sig > 0 ? '↑ лонг' : 'нет сигнала';
     el.innerHTML = '<div class="tvsig-fc-card">если цена дойдёт до <b>' + price + '</b>:<br>' + (NAME[S.fcId] || S.fcId) + ': <b>' + txt + '</b><br>режим: ' + (_regLbl(rg) || '—') + (rg && rg.mkt ? ' / ' + rg.mkt : '') + '</div>';
   }
+  // Калькулятор позиции: счёт + риск% → размер и макс. число позиций по стопу/тейку.
+  // Стоп/тейк = стратегия Зона-фейд R:R 2:1 (стоп 1.0 / тейк 2.0 ATR текущего графика).
+  function _rcVal(id) { const el = document.getElementById(id); const v = el ? parseFloat(el.value) : NaN; return isFinite(v) ? v : NaN; }
+  function rcInit() {
+    try { const s = JSON.parse(localStorage.getItem('tvsig:rc') || '{}');
+      if (s.a != null && document.getElementById('tvsig-rc-acct')) document.getElementById('tvsig-rc-acct').value = s.a;
+      if (s.r != null && document.getElementById('tvsig-rc-risk')) document.getElementById('tvsig-rc-risk').value = s.r;
+      if (s.p != null && document.getElementById('tvsig-rc-port')) document.getElementById('tvsig-rc-port').value = s.p;
+    } catch (e) {}
+  }
+  function rcCompute() {
+    const out = document.getElementById('tvsig-rc-out'); if (!out) return;
+    try { localStorage.setItem('tvsig:rc', JSON.stringify({ a: _rcVal('tvsig-rc-acct'), r: _rcVal('tvsig-rc-risk'), p: _rcVal('tvsig-rc-port') })); } catch (e) {}
+    const bars = S.bars, SC = window.SignalsCore;
+    if (!bars || bars.length < 20) { out.innerHTML = '<span class="tvsig-fc-hint">Нет свечей — открой «Модели» и ⟳.</span>'; return; }
+    const at = SC.atr(bars, 14); let atrv = null; for (let i = at.length - 1; i >= 0; i--) if (at[i] != null) { atrv = at[i]; break; }
+    const price = bars[bars.length - 1].close;
+    if (!atrv || !price) { out.innerHTML = '<span class="tvsig-fc-hint">Нет ATR/цены.</span>'; return; }
+    const stopATR = 1.0, takeATR = 2.0, dg = price > 100 ? 2 : (price > 1 ? 3 : 5);
+    const stopDist = stopATR * atrv, takeDist = takeATR * atrv, stopPct = 100 * stopDist / price;
+    const rub = x => Math.round(x).toLocaleString('ru-RU');
+    let html = '<div class="tvsig-fc-card">ATR ' + atrv.toFixed(dg) + ' · стоп <b>' + stopDist.toFixed(dg) + ' ₽</b> (' + stopPct.toFixed(2) + '%) · тейк ' + takeDist.toFixed(dg) + ' ₽ · R:R 2:1';
+    const acct = _rcVal('tvsig-rc-acct'), risk = _rcVal('tvsig-rc-risk'), port = _rcVal('tvsig-rc-port');
+    if (acct > 0 && risk > 0) {
+      const riskMoney = acct * risk / 100, units = riskMoney / stopDist, posValue = units * price, profit = riskMoney * (takeATR / stopATR);
+      html += '<br>риск/сделку <b>' + rub(riskMoney) + ' ₽</b> → профит при тейке <b>+' + rub(profit) + ' ₽</b>';
+      html += '<br>размер позиции: <b>' + rub(posValue) + ' ₽</b> ≈ ' + (units >= 10 ? rub(units) : units.toFixed(2)) + ' ед.';
+      const maxByCap = Math.floor(acct / posValue), maxByRisk = port > 0 ? Math.floor(port / risk) : Infinity;
+      let mp = maxByCap, lim = 'капиталу'; if (maxByRisk < mp) { mp = maxByRisk; lim = 'лимиту риска'; }
+      html += '<br>макс. позиций: <b>' + mp + '</b> (по ' + lim + ')';
+      if (mp > 20) html += ' <span class="tvsig-fc-lown">в бэктесте до 20 одновременных — коррелир. риск, держи ≤20</span>';
+    } else html += '<br><span class="tvsig-fc-hint">Введи счёт ₽ и риск% — посчитаю размер и лимит позиций.</span>';
+    out.innerHTML = html + '</div>';
+  }
+
   // (A/#8) старший ТФ: тренд по нему, выровненный на бары графика (кэш по тикер+ТФ)
   async function mtfEnsure(bars, dt) {
     if (!bars || bars.length < 20 || !dt) return;
@@ -834,6 +872,13 @@
       '<div class="tvsig-fc-sec">Гипотеза: если цена дойдёт до</div>' +
       '<div id="tvsig-fc-hypo-ctrl"><input id="tvsig-fc-price" type="number" step="any" placeholder="цена"><button id="tvsig-fc-hypo-go" title="Пересчитать сигнал на этой цене">→</button></div>' +
       '<div id="tvsig-fc-hypo"></div>' +
+      '<div class="tvsig-fc-sec">Калькулятор позиции (риск на сделку)</div>' +
+      '<div id="tvsig-rc-ctrl">' +
+      '<label>Счёт ₽<input id="tvsig-rc-acct" type="number" placeholder="сумма на счету"></label>' +
+      '<label>Риск/сделку %<input id="tvsig-rc-risk" type="number" step="0.1" value="1"></label>' +
+      '<label>Лимит риска портфеля %<input id="tvsig-rc-port" type="number" step="1" value="10"></label>' +
+      '</div>' +
+      '<div id="tvsig-rc-out"></div>' +
       '<div id="tvsig-fc-foot">Режим: <b>ER</b> тренд/боковик (окно 60, порог 0.3), <b>vol</b> сжатие/расшир (ATR/медиана-200), <b>рынок</b> — breadth корзины. Условная точность — фейд по каждому режиму (тейк 1.5/стоп 0.75 ATR, R:R 2:1). Прогноз от точки: вход по close сигнала, тейк/стоп в ATR, тайм-выход 12 баров; показывает исход или «в позиции». Гипотеза: подставляет цену как закрытие следующего бара и пересчитывает.</div>' +
       '</div>'; // /pane-forecast
     document.documentElement.appendChild(panel);
@@ -869,6 +914,9 @@
       try { _clearNwPath(); (S._fcBand || []).forEach(id => S.chart.removeEntity(id)); S._fcBand = []; } catch (er) {}
       forecastRender(); };
     panel.querySelector('#tvsig-fc-mtf-on').onchange = e => { S.mtfOn = e.target.checked; forecastRender(); };
+    rcInit();
+    ['tvsig-rc-acct', 'tvsig-rc-risk', 'tvsig-rc-port'].forEach(id => {
+      const el = panel.querySelector('#' + id); if (el) el.addEventListener('input', rcCompute); });
     panel.querySelector('#tvsig-fc-uncond').onchange = e => { S.nwUncond = e.target.checked;
       const d = document.getElementById('tvsig-fc-detail'); if (d) d.innerHTML = ''; _clearNwPath(); forecastRender(); };
     themeBind();
@@ -995,7 +1043,8 @@
   const NO_DRAG = 'button, input, select, textarea, a, svg, .tvsig-diam, .tvsig-name, ' +
     '.tvsig-col, .tvsig-info-btn, .tvsig-tab, #tvsig-status, #tvsig-period, #tvsig-foot, ' +
     '#tvsig-cmp-foot, #tvsig-cmp-body, #tvsig-oi-body, .tvsig-oi-meta, .tvsig-oi-t, ' +
-    '.tvsig-fc-sig, #tvsig-fc-cond, #tvsig-fc-detail, #tvsig-fc-hypo, #tvsig-fc-foot, #tvsig-fc-pickrow';
+    '.tvsig-fc-sig, #tvsig-fc-cond, #tvsig-fc-detail, #tvsig-fc-hypo, #tvsig-fc-foot, #tvsig-fc-pickrow, ' +
+    '#tvsig-rc-ctrl, #tvsig-rc-out';
   function drag(el) {
     let sx, sy, ox, oy, on = false;
     el.addEventListener('mousedown', e => {

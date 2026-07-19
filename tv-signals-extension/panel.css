@@ -239,3 +239,8 @@
 .tvsig-fc-chip.c-mtf{ border-color:var(--amber); color:var(--amber); }
 .tvsig-fc-tbl tr.tvsig-fc-grp td{ color:var(--text3); text-transform:uppercase; letter-spacing:.4px; font-size:9px; padding-top:5px; border-top:1px solid var(--border2); background:none; }
 .tvsig-fc-lown{ color:var(--amber); font-weight:700; }
+
+/* Калькулятор позиции */
+#tvsig-rc-ctrl{ display:flex; flex-direction:column; gap:5px; padding:2px 10px 4px; }
+#tvsig-rc-ctrl label{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-family:var(--mono); font-size:10.5px; color:var(--text3); }
+#tvsig-rc-ctrl input{ width:120px; background:var(--surface2); border:1px solid var(--border2); border-radius:6px; color:var(--text); padding:3px 7px; font-family:var(--mono); font-size:11px; }

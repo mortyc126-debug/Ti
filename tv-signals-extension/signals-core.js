@@ -113,6 +113,32 @@
       o[i] = -md; // фейд: против хода, упёршегося в уровень
     } return o; };
 
+  // Зона-фейд — валидированная стратегия взамен NW (invest-bot аудит: весь edge NW =
+  // mean-reversion в зоне + гейты, аналог-память избыточна). TEST short +0.25 ATR,
+  // CI [+0.11,+0.20], permutation p≈0, holdout/синхронность/концентрация — чисто.
+  //   зона : z(T)<-0.4 & z(P)>0.6 (низкая интенсивность, высокая направленность);
+  //   вход : ФЕЙД хода 3 баров; гейты: не с рынком (breadth) + боковик (ER-60<0.3).
+  M.zonefade = (cd) => {
+    const n = cd.length, o = new Array(n).fill(0); if (n < 80) return o;
+    const cl = cd.map(c => c.close), at = atr(cd, 14), N = 10, w = 60;
+    const Ta = new Array(n).fill(null), Pa = new Array(n).fill(null);
+    for (let i = 0; i < n; i++) { const c = cd[i]; if (at[i] && at[i] > 0) { const vv = (c.volume && c.volume > 0) ? c.volume : 1; Ta[i] = vv * (c.high - c.low) / at[i]; } }
+    for (let i = N; i < n; i++) { const ch = Math.abs(cl[i] - cl[i - N]); let v = 0; for (let j = i - N + 1; j <= i; j++) v += Math.abs(cl[j] - cl[j - 1]); Pa[i] = v > 0 ? ch / v : 0; }
+    const zf = (arr, i) => { if (i < w) return null; let s = 0, s2 = 0, c = 0; for (let j = i - w + 1; j <= i; j++) { if (arr[j] == null) continue; s += arr[j]; s2 += arr[j] * arr[j]; c++; }
+      if (c < w * 0.6 || arr[i] == null) return null; const m = s / c, sd = Math.sqrt(Math.max(1e-12, s2 / c - m * m)); return (arr[i] - m) / sd; };
+    for (let i = w; i < n; i++) {
+      const zT = zf(Ta, i), zP = zf(Pa, i);
+      if (zT == null || zP == null || !(zT < -0.4 && zP > 0.6)) continue;   // зона lowT-highP
+      const mv = cl[i] - cl[i - 3]; if (mv === 0) continue;
+      const dirn = mv > 0 ? -1 : 1;                                          // ФЕЙД хода
+      if (i >= 60) { let den = 0; for (let j = i - 59; j <= i; j++) den += Math.abs(cl[j] - cl[j - 1]);
+        if (den > 0 && Math.abs(cl[i] - cl[i - 60]) / den >= 0.3) continue; } // гейт: только боковик
+      if (_breadthMap) { const Mk = _breadthMap.get(cd[i].time);
+        if (Mk != null && Math.abs(Mk) >= _breadthMedAbs && Math.sign(Mk) === dirn) continue; } // не с рынком
+      o[i] = dirn;
+    } return o;
+  };
+
   // ── бэктест: winrate (частота угадывания направления) + exp ATR (экспектанси
   //    сделки с тейком/стопом — как системный прогон дашборда). Для фейдов winrate
   //    врёт (низкая при плюсовом exp), поэтому считаем обе цифры. ──────────────
@@ -183,7 +209,7 @@
   }
 
   // ── всё вместе: серии + последний сигнал + точность ──────────────────────────
-  const IDS = ['zscore', 'accel', 'order_block', 'fvg', 'liq_sweep', 'false_breakout', 'vsa_abs', 'waning', 'talib_anti', 'hawkes', 'cascade', 'nw', 'alligator_inv', 'fade'];
+  const IDS = ['zscore', 'accel', 'order_block', 'fvg', 'liq_sweep', 'false_breakout', 'vsa_abs', 'waning', 'talib_anti', 'hawkes', 'cascade', 'nw', 'alligator_inv', 'fade', 'zonefade'];
   function computeAll(bars, horizon) {
     horizon = horizon || 12;
     const out = {};
