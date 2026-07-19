@@ -231,3 +231,11 @@
 #tvsig-fc-hypo-go:hover{ background:var(--accent); border-color:var(--accent); color:#fff; }
 .tvsig-fc-hint{ display:block; padding:4px 10px; font-size:10px; color:var(--text3); font-family:var(--mono); }
 #tvsig-fc-foot{ padding:6px 10px; font-size:9px; color:var(--text3); font-family:var(--mono); line-height:1.5; border-top:1px solid var(--border); margin-top:6px; }
+
+/* Прогноз: выбор сигнала, группы таблицы, МТФ */
+#tvsig-fc-pickrow{ display:flex; align-items:center; gap:8px; padding:6px 10px 2px; font-family:var(--mono); font-size:10.5px; color:var(--text3); }
+#tvsig-fc-pick{ flex:1; min-width:0; background:var(--surface2); border:1px solid var(--border2); border-radius:6px; color:var(--text); padding:3px 6px; font-family:var(--mono); font-size:11px; }
+.tvsig-fc-mtf{ display:flex; align-items:center; gap:4px; cursor:pointer; white-space:nowrap; }
+.tvsig-fc-chip.c-mtf{ border-color:var(--amber); color:var(--amber); }
+.tvsig-fc-tbl tr.tvsig-fc-grp td{ color:var(--text3); text-transform:uppercase; letter-spacing:.4px; font-size:9px; padding-top:5px; border-top:1px solid var(--border2); background:none; }
+.tvsig-fc-lown{ color:var(--amber); font-weight:700; }

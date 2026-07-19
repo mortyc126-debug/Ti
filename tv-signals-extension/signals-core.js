@@ -229,24 +229,46 @@
     return { pnl: dir * (bars[lim].close - entry) / a - cost, exit: 'тайм', bar: lim, entry, tp, sl, a };
   }
 
-  // Условная точность сигнала ПО РЕЖИМАМ: exp/win/n в каждом ведре (тренд/боковик,
-  // сжатие/норма/расшир). Сделки независимые (описательная статистика, не портфель).
+  // Условная точность сигнала ПО ОСЯМ (описательная статистика, независимые сделки):
+  //   режим (тренд/боковик, ER), vol (сжатие/норма/расшир), рынок (breadth относительно
+  //   направления сигнала: идио/с рынком/против), сессия (UTC час → ядро/край/тонко).
+  // Возвращает {режим:{...}, vol:{...}, рынок:{...}, сессия:{...}}, каждое ведро {exp,win,n}.
   function condStats(scoreArr, bars, horizon, opts) {
     horizon = horizon || 12; opts = opts || {};
     const T = opts.take != null ? opts.take : 1.5, S = opts.stop != null ? opts.stop : 0.75, cost = opts.cost != null ? opts.cost : 0.12;
-    const n = bars.length, at = atr(bars, 14);
-    const keys = ['тренд', 'боковик', 'сжатие', 'норма', 'расшир'];
-    const acc = {}; keys.forEach(k => acc[k] = { sum: 0, win: 0, n: 0 });
+    const n = bars.length, at = atr(bars, 14), cl = bars.map(b => b.close), W = 60;
+    const isTrend = new Array(n).fill(null), vol = new Array(n).fill(null); // precompute (без O(n²))
+    for (let i = 0; i < n; i++) {
+      if (i >= W) { let d = 0; for (let j = i - W + 1; j <= i; j++) d += Math.abs(cl[j] - cl[j - 1]); if (d > 0) isTrend[i] = (Math.abs(cl[i] - cl[i - W]) / d) >= 0.3; }
+      if (at[i] != null) { const med = _rollMedian(at, i, 200); if (med != null && med > 0) { const r = at[i] / med; vol[i] = r < 0.8 ? 'сжатие' : (r > 1.3 ? 'расшир' : 'норма'); } }
+    }
+    const groups = { 'режим': ['тренд', 'боковик'], 'vol': ['сжатие', 'норма', 'расшир'],
+      'рынок': ['идио', 'с рынком', 'против'], 'сессия': ['ядро', 'край', 'тонко'] };
+    const G = {}; for (const g in groups) { G[g] = {}; groups[g].forEach(k => G[g][k] = { sum: 0, win: 0, n: 0 }); }
+    const put = (g, k, pnl) => { const a = G[g][k]; if (!a) return; a.sum += pnl; a.win += pnl > 0 ? 1 : 0; a.n++; };
     for (let i = 0; i < n; i++) {
       const sc = scoreArr[i]; if (sc == null || sc === 0) continue;
-      const rg = regimeInfo(bars, i); if (!rg) continue;
-      const out = tradeOutcome(bars, i, Math.sign(sc), T, S, cost, horizon, at);
+      const dir = Math.sign(sc), out = tradeOutcome(bars, i, dir, T, S, cost, horizon, at);
       if (!out || out.pnl == null) continue;
-      const put = k => { acc[k].sum += out.pnl; acc[k].win += out.pnl > 0 ? 1 : 0; acc[k].n++; };
-      put(rg.isTrend ? 'тренд' : 'боковик'); if (rg.vol) put(rg.vol);
+      if (isTrend[i] != null) put('режим', isTrend[i] ? 'тренд' : 'боковик', out.pnl);
+      if (vol[i]) put('vol', vol[i], out.pnl);
+      if (_breadthMap) { const Mk = _breadthMap.get(bars[i].time);
+        if (Mk != null) put('рынок', Math.abs(Mk) < _breadthMedAbs ? 'идио' : (Math.sign(Mk) === dir ? 'с рынком' : 'против'), out.pnl); }
+      const h = new Date(bars[i].time * 1000).getUTCHours();
+      put('сессия', (h >= 7 && h < 14) ? 'ядро' : ((h >= 5 && h < 7) || (h >= 14 && h < 18)) ? 'край' : 'тонко', out.pnl);
     }
-    const res = {}; keys.forEach(k => res[k] = acc[k].n ? { exp: acc[k].sum / acc[k].n, win: acc[k].win / acc[k].n, n: acc[k].n } : { exp: null, win: null, n: 0 });
+    const fin = a => a.n ? { exp: a.sum / a.n, win: a.win / a.n, n: a.n } : { exp: null, win: null, n: 0 };
+    const res = {}; for (const g in groups) { res[g] = {}; groups[g].forEach(k => res[g][k] = fin(G[g][k])); }
     return res;
+  }
+
+  // текущее ведро бара по каждой оси — для подсветки «сейчас» в таблице
+  function regimeBuckets(bars, i) {
+    const rg = regimeInfo(bars, i); if (!rg) return {};
+    const h = new Date(bars[i].time * 1000).getUTCHours();
+    const ses = (h >= 7 && h < 14) ? 'ядро' : ((h >= 5 && h < 7) || (h >= 14 && h < 18)) ? 'край' : 'тонко';
+    let mk = null; if (rg.mkt) mk = rg.mkt === 'тих' ? 'идио' : null; // с рынком/против зависят от сигнала — в бейдже не метим
+    return { 'режим': rg.isTrend ? 'тренд' : 'боковик', 'vol': rg.vol, 'рынок': mk, 'сессия': ses };
   }
 
   // пересчёт одного метода (для фейда после подгрузки breadth — без полного O(n²) NW)
@@ -258,5 +280,5 @@
   }
 
   window.SignalsCore = { methods: M, btStats, parseExport, computeAll, computeOne, atr, IDS,
-    setBreadth, regimeInfo, condStats, tradeOutcome };
+    setBreadth, regimeInfo, regimeBuckets, condStats, tradeOutcome };
 })();

@@ -489,57 +489,82 @@
   }
 
   // ── вкладка «Прогноз»: режим + условная точность + прогноз от точки + гипотеза ─
+  // Сигнал-агностична: анализируем ВЫБРАННЫЙ сигнал (S.fcId), не только фейд —
+  // мета-слой «когда он надёжен» одинаково полезен NW, фейду и любому из 14.
   function _fcNum(x, d) { return x == null ? '—' : (x >= 0 ? '+' : '') + x.toFixed(d == null ? 3 : d); }
   function _hhmm(ts) { const t = new Date(ts * 1000); return ('0' + t.getUTCHours()).slice(-2) + ':' + ('0' + t.getUTCMinutes()).slice(-2); }
   function _regLbl(rg) { return rg ? (rg.isTrend ? 'тренд ' + (rg.trendDir > 0 ? '↑' : '↓') : 'боковик') + (rg.vol ? '/' + rg.vol : '') : ''; }
+  function _fcSeries(id) { const SC = window.SignalsCore;
+    if (S.computed && S.computed[id] && S.computed[id].series) return S.computed[id].series;
+    return SC.computeOne(id, S.bars, 12).series; }
+  function _mtfDirAt(i) { return (S._mtfByTime && S.bars[i]) ? (S._mtfByTime.get(S.bars[i].time) || 0) : null; }
+  function _mtfChip() {
+    if (!S.mtfOn) return '';
+    if (!S._mtfByTime) return '<span class="tvsig-fc-chip c-mtf">старший ТФ: гружу…</span>';
+    const d = _mtfDirAt(S.bars.length - 1);
+    return '<span class="tvsig-fc-chip c-mtf">' + (S._mtfTf || 'ТФ') + ': ' + (d > 0 ? 'тренд ↑' : d < 0 ? 'тренд ↓' : 'плоско') + '</span>';
+  }
   function _regimeBadge(rg) {
     if (!rg) return '';
     const tr = rg.isTrend ? ('тренд ' + (rg.trendDir > 0 ? '↑' : '↓')) : 'боковик';
     const erS = rg.er != null ? ' · ER ' + rg.er.toFixed(2) : '';
     return '<span class="tvsig-fc-chip c-reg">' + tr + erS + '</span>' +
       '<span class="tvsig-fc-chip c-vol">vol: ' + (rg.vol || '—') + '</span>' +
-      '<span class="tvsig-fc-chip c-mkt">' + (rg.mkt || 'breadth —') + '</span>';
+      '<span class="tvsig-fc-chip c-mkt">' + (rg.mkt || 'breadth —') + '</span>' + _mtfChip();
   }
-  function _condTable(cs, rg) {
-    const curT = rg ? (rg.isTrend ? 'тренд' : 'боковик') : null, curV = rg ? rg.vol : null;
-    const row = k => { const s = cs[k], cur = (k === curT || k === curV);
-      const exp = s.n ? _fcNum(s.exp) : '—', win = s.n ? Math.round(s.win * 100) + '%' : '—';
-      const cls = s.n ? (s.exp > 0 ? 'pos' : 'neg') : 'dim';
-      return '<tr class="' + (cur ? 'cur' : '') + '"><td>' + k + (cur ? ' ◂сейчас' : '') + '</td><td class="' + cls + '">' + exp + '</td><td>' + win + '</td><td class="dim">' + (s.n || 0) + '</td></tr>'; };
-    return '<table class="tvsig-fc-tbl"><tr><th>режим</th><th>exp</th><th>win</th><th>n</th></tr>' +
-      ['тренд', 'боковик', 'сжатие', 'норма', 'расшир'].map(row).join('') + '</table>';
+  // группированная таблица условной точности по осям режим/vol/рынок/сессия
+  function _condTable(cs, cur) {
+    const grp = (g) => { const keys = Object.keys(cs[g]);
+      const rows = keys.map(k => { const s = cs[g][k], isCur = cur && cur[g] === k;
+        const exp = s.n ? _fcNum(s.exp) : '—', win = s.n ? Math.round(s.win * 100) + '%' : '—';
+        const cls = !s.n ? 'dim' : (s.exp > 0 ? 'pos' : 'neg');
+        const nMark = s.n && s.n < 20 ? ' <span class="tvsig-fc-lown" title="мало сделок — цифра шумная">!</span>' : '';
+        return '<tr class="' + (isCur ? 'cur' : '') + '"><td>' + k + (isCur ? ' ◂' : '') + '</td><td class="' + cls + '">' + exp + '</td><td>' + win + '</td><td class="dim">' + (s.n || 0) + nMark + '</td></tr>'; }).join('');
+      return '<tr class="tvsig-fc-grp"><td colspan="4">' + g + '</td></tr>' + rows; };
+    return '<table class="tvsig-fc-tbl"><tr><th>ось</th><th>exp</th><th>win</th><th>n</th></tr>' +
+      ['режим', 'vol', 'рынок', 'сессия'].map(grp).join('') + '</table>';
   }
-  function _recentSignals(fade, bars) {
-    const idx = []; for (let i = bars.length - 1; i >= 0 && idx.length < 8; i--) if (fade[i]) idx.push(i);
-    if (!idx.length) return '<span class="tvsig-fc-hint">Нет сигналов фейда на этой истории.</span>';
+  function _recentSignals(ser, bars) {
+    const idx = []; for (let i = bars.length - 1; i >= 0 && idx.length < 8; i--) if (ser[i]) idx.push(i);
+    if (!idx.length) return '<span class="tvsig-fc-hint">Нет сигналов на этой истории.</span>';
     return idx.map(i => '<div class="tvsig-fc-sig" data-idx="' + i + '">' + _hhmm(bars[i].time) + ' UTC · ' +
-      (fade[i] < 0 ? 'шорт ↓' : 'лонг ↑') + ' · <span class="dim">' + _regLbl(window.SignalsCore.regimeInfo(bars, i)) + '</span></div>').join('');
+      (ser[i] < 0 ? '↓ шорт' : '↑ лонг') + ' · <span class="dim">' + _regLbl(window.SignalsCore.regimeInfo(bars, i)) + '</span></div>').join('');
+  }
+  function _fcPickInit() {
+    const sel = document.getElementById('tvsig-fc-pick'); if (!sel || sel.dataset.init) return;
+    sel.innerHTML = (window.SignalsCore.IDS).map(id => '<option value="' + id + '">' + (NAME[id] || id) + '</option>').join('');
+    if (!S.fcId) S.fcId = 'fade';
+    sel.value = S.fcId; sel.dataset.init = '1';
   }
   function forecastRender() {
     const pane = document.getElementById('tvsig-pane-forecast'); if (!pane || pane.hidden) return;
     const bars = S.bars, SC = window.SignalsCore;
+    _fcPickInit();
     const rgEl = document.getElementById('tvsig-fc-regime'), condEl = document.getElementById('tvsig-fc-cond'), sigEl = document.getElementById('tvsig-fc-signals');
     if (!bars || bars.length < 60) { if (rgEl) rgEl.innerHTML = '<span class="tvsig-fc-hint">Мало свечей — открой «Модели» и ⟳.</span>'; if (condEl) condEl.innerHTML = ''; if (sigEl) sigEl.innerHTML = ''; return; }
     const rg = SC.regimeInfo(bars, bars.length - 1);
     if (rgEl) rgEl.innerHTML = _regimeBadge(rg);
-    const fade = (S.computed && S.computed.fade) ? S.computed.fade.series : SC.methods.fade(bars);
-    if (condEl) condEl.innerHTML = _condTable(SC.condStats(fade, bars, 12), rg);
-    if (sigEl) sigEl.innerHTML = _recentSignals(fade, bars);
+    const ser = _fcSeries(S.fcId);
+    if (condEl) condEl.innerHTML = _condTable(SC.condStats(ser, bars, 12), SC.regimeBuckets(bars, bars.length - 1));
+    if (sigEl) sigEl.innerHTML = _recentSignals(ser, bars);
+    if (S.mtfOn) mtfEnsure(bars, S.barDt || 300);
   }
   function fcDetail(i) {
     const el = document.getElementById('tvsig-fc-detail'), bars = S.bars, SC = window.SignalsCore;
     if (!el || !bars || i < 0 || i >= bars.length) return;
-    const fade = (S.computed && S.computed.fade) ? S.computed.fade.series : SC.methods.fade(bars);
-    const dir = Math.sign(fade[i] || 0); if (!dir) { el.innerHTML = ''; return; }
+    const ser = _fcSeries(S.fcId), dir = Math.sign(ser[i] || 0); if (!dir) { el.innerHTML = ''; return; }
     const rg = SC.regimeInfo(bars, i), out = SC.tradeOutcome(bars, i, dir, 1.5, 0.75, 0.12, 12);
     if (!out) { el.innerHTML = ''; return; }
-    const cs = SC.condStats(fade, bars, 12), bk = rg && rg.isTrend ? 'тренд' : 'боковик';
-    const expC = cs[bk] && cs[bk].n ? _fcNum(cs[bk].exp) : '—';
+    const cs = SC.condStats(ser, bars, 12), bk = rg && rg.isTrend ? 'тренд' : 'боковик';
+    const expC = cs['режим'][bk] && cs['режим'][bk].n ? _fcNum(cs['режим'][bk].exp) : '—';
     let real; if (out.exit === 'открыта') { const left = (i + 12) - (bars.length - 1); real = 'в позиции · осталось ' + Math.max(0, left) + ' баров'; }
     else real = out.exit + ' · P&L ' + _fcNum(out.pnl) + ' ATR';
-    el.innerHTML = '<div class="tvsig-fc-card"><b>' + (dir < 0 ? 'ФЕЙД в ШОРТ ↓' : 'ФЕЙД в ЛОНГ ↑') + '</b> · ' + _regLbl(rg) + ' · ' + _hhmm(bars[i].time) + ' UTC<br>' +
+    let mtf = ''; if (S.mtfOn) { const md = _mtfDirAt(i);
+      if (md != null && md !== 0) mtf = '<br>старший ТФ (' + (S._mtfTf || '') + '): тренд ' + (md > 0 ? '↑' : '↓') + ' · сигнал <b>' + (md === dir ? 'согласован' : 'против') + '</b>'; }
+    el.innerHTML = '<div class="tvsig-fc-card"><b>' + (NAME[S.fcId] || S.fcId) + ': ' + (dir < 0 ? '↓ шорт' : '↑ лонг') + '</b> · ' + _regLbl(rg) + ' · ' + _hhmm(bars[i].time) + ' UTC<br>' +
       'вход <b>' + out.entry.toFixed(4) + '</b> · тейк ' + out.tp.toFixed(4) + ' · стоп ' + out.sl.toFixed(4) + '<br>' +
-      'ожидание в этом режиме: exp <b>' + expC + '</b> ATR<br>факт: <b>' + real + '</b></div>';
+      'ожидание в этом режиме: exp <b>' + expC + '</b> ATR<br>факт: <b>' + real + '</b>' + mtf + '</div>';
+    if (S.chart && out) drawForecastBand(i, out); // (C) полоса ожидания на графике
   }
   function fcHypo() {
     const el = document.getElementById('tvsig-fc-hypo'), inp = document.getElementById('tvsig-fc-price'), bars = S.bars, SC = window.SignalsCore;
@@ -548,9 +573,43 @@
     const dt = S.barDt || 300, last = bars[bars.length - 1];
     const synth = { time: last.time + (dt || 300), open: price, high: Math.max(price, last.close), low: Math.min(price, last.close), close: price, volume: 0 };
     const bars2 = bars.concat([synth]), li = bars2.length - 1;
-    const sig = SC.methods.fade(bars2)[li], rg = SC.regimeInfo(bars2, li);
-    const txt = sig < 0 ? 'ФЕЙД в ШОРТ ↓' : sig > 0 ? 'ФЕЙД в ЛОНГ ↑' : 'нет сигнала';
-    el.innerHTML = '<div class="tvsig-fc-card">если цена дойдёт до <b>' + price + '</b>:<br>сигнал: <b>' + txt + '</b><br>режим: ' + (_regLbl(rg) || '—') + (rg && rg.mkt ? ' / ' + rg.mkt : '') + '</div>';
+    const sig = SC.computeOne(S.fcId, bars2, 12).series[li], rg = SC.regimeInfo(bars2, li);
+    const txt = sig < 0 ? '↓ шорт' : sig > 0 ? '↑ лонг' : 'нет сигнала';
+    el.innerHTML = '<div class="tvsig-fc-card">если цена дойдёт до <b>' + price + '</b>:<br>' + (NAME[S.fcId] || S.fcId) + ': <b>' + txt + '</b><br>режим: ' + (_regLbl(rg) || '—') + (rg && rg.mkt ? ' / ' + rg.mkt : '') + '</div>';
+  }
+  // (A/#8) старший ТФ: тренд по нему, выровненный на бары графика (кэш по тикер+ТФ)
+  async function mtfEnsure(bars, dt) {
+    if (!bars || bars.length < 20 || !dt) return;
+    const code = (S.symbol || '').split(':').pop().toUpperCase(); if (!code) return;
+    const key = code + '|' + dt;
+    if (S._mtfKey === key && S._mtfByTime) return;
+    if (S._mtfBuilding === key) return; S._mtfBuilding = key;
+    const iv = dt < 3600 ? 60 : dt < 86400 ? 24 : 7;
+    try {
+      const r = await cmpFetch(code, iv, bars[0].time, bars[bars.length - 1].time);
+      if (r && r.ok && r.rows.length >= 5) {
+        const rows = r.rows, L = rows.length, w = 10;
+        const dirRow = rows.map((x, k) => k >= w ? Math.sign(x.close - rows[k - w].close) : 0);
+        const map = new Map(); let j = 0;
+        for (const b of bars) { while (j + 1 < L && rows[j + 1].t <= b.time) j++; map.set(b.time, dirRow[j] || 0); }
+        S._mtfByTime = map; S._mtfTf = iv === 60 ? 'час' : iv === 24 ? 'день' : 'неделя'; S._mtfKey = key;
+        forecastRender();
+      }
+    } catch (e) {}
+    S._mtfBuilding = null;
+  }
+  // (C) полоса ожидания на графике: тейк/стоп горизонтальными лучами от точки на 12 баров
+  function drawForecastBand(i, out) {
+    try {
+      (S._fcBand || []).forEach(id => { try { S.chart.removeEntity(id); } catch (e) {} }); S._fcBand = [];
+      const bars = S.bars, dt = S.barDt || 300;
+      const t0 = bars[i].time, t1 = t0 + 12 * dt;
+      const mk = (price, color) => { try {
+        const id = S.chart.createMultipointShape([{ time: t0, price: price }, { time: t1, price: price }],
+          { shape: 'trend_line', lock: true, disableSelection: true, overrides: { linecolor: color, linewidth: 1, linestyle: 2 } });
+        if (id) S._fcBand.push(id); } catch (e) {} };
+      mk(out.tp, '#52F2C9'); mk(out.sl, '#FF6A8B'); mk(out.entry, '#B487F8');
+    } catch (e) {}
   }
 
   // ── данные + расчёт ──────────────────────────────────────────────────────────
@@ -733,8 +792,10 @@
       '<div id="tvsig-th-foot">Фильтр накладывается на весь терминал (включая график); панель расширения не затрагивается. «Не менять логотипы» возвращает картинкам-логотипам родной цвет обратным фильтром (тёплый оттенок может слегка остаться; фоновые/SVG-значки не всегда ловятся). Пресеты задают ползунки. Настройки сохраняются.</div>' +
       '</div>' + // /pane-theme
       '<div id="tvsig-pane-forecast" class="tvsig-pane" hidden>' +
+      '<div id="tvsig-fc-pickrow">Сигнал <select id="tvsig-fc-pick"></select>' +
+      '<label class="tvsig-fc-mtf"><input type="checkbox" id="tvsig-fc-mtf-on"> старший ТФ</label></div>' +
       '<div id="tvsig-fc-regime" class="tvsig-fc-badge"></div>' +
-      '<div class="tvsig-fc-sec">Где фейд точнее / слабее (exp ATR · win% · n по режимам)</div>' +
+      '<div class="tvsig-fc-sec">Где точнее / слабее (exp ATR · win% · n по осям)</div>' +
       '<div id="tvsig-fc-cond"></div>' +
       '<div class="tvsig-fc-sec">Прогноз от точки — клик по сигналу</div>' +
       '<div id="tvsig-fc-signals"></div>' +
@@ -772,6 +833,9 @@
       const s = e.target.closest('.tvsig-fc-sig'); if (s) fcDetail(+s.dataset.idx); });
     panel.querySelector('#tvsig-fc-hypo-go').onclick = () => fcHypo();
     panel.querySelector('#tvsig-fc-price').addEventListener('keydown', e => { if (e.key === 'Enter') fcHypo(); });
+    panel.querySelector('#tvsig-fc-pick').onchange = e => { S.fcId = e.target.value;
+      const d = document.getElementById('tvsig-fc-detail'); if (d) d.innerHTML = ''; forecastRender(); };
+    panel.querySelector('#tvsig-fc-mtf-on').onchange = e => { S.mtfOn = e.target.checked; forecastRender(); };
     themeBind();
     let minimized = false;
     panel.querySelector('#tvsig-min').onclick = () => { minimized = !minimized; rowsEl.style.display = minimized ? 'none' : ''; panel.querySelector('#tvsig-foot').style.display = minimized ? 'none' : ''; };
@@ -896,7 +960,7 @@
   const NO_DRAG = 'button, input, select, textarea, a, svg, .tvsig-diam, .tvsig-name, ' +
     '.tvsig-col, .tvsig-info-btn, .tvsig-tab, #tvsig-status, #tvsig-period, #tvsig-foot, ' +
     '#tvsig-cmp-foot, #tvsig-cmp-body, #tvsig-oi-body, .tvsig-oi-meta, .tvsig-oi-t, ' +
-    '.tvsig-fc-sig, #tvsig-fc-cond, #tvsig-fc-detail, #tvsig-fc-hypo, #tvsig-fc-foot';
+    '.tvsig-fc-sig, #tvsig-fc-cond, #tvsig-fc-detail, #tvsig-fc-hypo, #tvsig-fc-foot, #tvsig-fc-pickrow';
   function drag(el) {
     let sx, sy, ox, oy, on = false;
     el.addEventListener('mousedown', e => {
