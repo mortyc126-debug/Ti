@@ -271,6 +271,67 @@
     return { ok: false, error: lastErr };
   }
 
+  // ── сканер тикеров: полный OHLCV с MOEX для расчёта сигналов ───────────────────
+  async function scanFetch(code, iv, t0, t1) {
+    const d0 = cmpDate(t0 - 86400), d1 = cmpDate(t1 + 86400);
+    const mkts = [['stock', 'shares'], ['stock', 'index'], ['futures', 'forts'], ['currency', 'selt']];
+    for (const [eng, mkt] of mkts) {
+      const url = 'https://iss.moex.com/iss/engines/' + eng + '/markets/' + mkt + '/securities/' + encodeURIComponent(code) +
+        '/candles.json?iss.meta=off&interval=' + iv + '&from=' + d0 + '&till=' + d1;
+      const r = await oiFetch(url); if (!r.ok) continue;
+      let j; try { j = JSON.parse(r.json); } catch (e) { continue; }
+      const cc = j.candles; if (!cc || !cc.data || !cc.data.length) continue;
+      const C = cc.columns, io = C.indexOf('open'), ih = C.indexOf('high'), il = C.indexOf('low'),
+        ic = C.indexOf('close'), iv2 = C.indexOf('volume'), ib = C.indexOf('begin');
+      const bars = cc.data.map(row => ({
+        time: Math.floor(Date.parse(String(row[ib]).replace(' ', 'T') + '+03:00') / 1000),
+        open: +row[io], high: +row[ih], low: +row[il], close: +row[ic], volume: +row[iv2]
+      })).filter(b => b.time && b.close > 0).sort((a, b) => a.time - b.time);
+      if (bars.length) return { ok: true, bars };
+    }
+    return { ok: false };
+  }
+  async function scanRun() {
+    const body = document.getElementById('tvsig-scan-body'); if (!body) return;
+    const raw = (document.getElementById('tvsig-scan-list') || {}).value || '';
+    const codes = raw.split(/[\s,;]+/).map(s => s.trim().toUpperCase().split(':').pop()).filter(Boolean);
+    if (!codes.length) { body.innerHTML = '<div class="tvsig-fc-hint">Впиши тикеры MOEX через запятую/пробел/строку.</div>'; return; }
+    try { localStorage.setItem('tvsig:scanlist', raw); } catch (e) {}
+    const A = (document.getElementById('tvsig-scan-a') || {}).value, B = (document.getElementById('tvsig-scan-b') || {}).value;
+    const dt = S.barDt || 300;
+    const iv = dt <= 90 ? 1 : dt <= 1200 ? 10 : dt <= 10800 ? 60 : dt <= 259200 ? 24 : 7;
+    const ivSec = iv === 1 ? 60 : iv === 10 ? 600 : iv === 60 ? 3600 : iv === 24 ? 86400 : 604800;
+    const now = Math.floor(Date.now() / 1000), t0 = now - 1000 * ivSec;
+    body.innerHTML = '<div class="tvsig-fc-hint">Сканирую ' + codes.length + ' тикеров…</div>';
+    const SC = window.SignalsCore; if (SC.setBreadth) SC.setBreadth(null, 0); // без кросс-тикер breadth в скане
+    const hits = [];
+    for (const code of codes) {
+      let f; try { f = await scanFetch(code, iv, t0, now); } catch (e) { f = null; }
+      if (!f || !f.ok || f.bars.length < 80) { hits.push({ code, err: true }); continue; }
+      const bars = f.bars;
+      let sa, sb;
+      try { sa = SC.methods[A](bars); sb = B && B !== '-' ? SC.methods[B](bars) : null; } catch (e) { continue; }
+      // последний ЗАКРЫТЫЙ бар
+      const li = bars.length - 2;
+      const va = sa[li] || 0, vb = sb ? (sb[li] || 0) : null;
+      let hit = false, dir = 0;
+      if (B && B !== '-') { if (va && vb && Math.sign(va) === Math.sign(vb)) { hit = true; dir = Math.sign(va); } }
+      else if (va) { hit = true; dir = Math.sign(va); }
+      if (hit) hits.push({ code, dir, price: bars[li].close });
+    }
+    scanRender(hits, A, B);
+  }
+  function scanRender(hits, A, B) {
+    const body = document.getElementById('tvsig-scan-body'); if (!body) return;
+    const found = hits.filter(h => h.dir);
+    const combo = (B && B !== '-') ? (NAME[A] + ' + ' + NAME[B]) : NAME[A];
+    if (!found.length) { body.innerHTML = '<div class="tvsig-fc-hint">Нет срабатываний «' + combo + '» на последнем баре из ' + hits.length + ' тикеров.</div>'; return; }
+    body.innerHTML = '<div class="tvsig-scan-hd">' + combo + ' — сработало у ' + found.length + ':</div>' +
+      found.map(h => '<div class="tvsig-scan-hit" data-code="' + h.code + '">' +
+        '<b>' + h.code + '</b> <span class="' + (h.dir < 0 ? 'neg' : 'pos') + '">' + (h.dir < 0 ? '↓ шорт' : '↑ лонг') + '</span>' +
+        ' <span class="dim">@ ' + h.price + '</span></div>').join('');
+  }
+
   // ── рыночный breadth для полной версии фейда ──────────────────────────────────
   // Корзина ликвидных бумаг MOEX: медиана их 3-барных доходностей = «рынок».
   // ~30 имён достаточно (median робастна). Тянем через тот же cmpFetch, выравниваем
@@ -390,6 +451,18 @@
       if (b && !b.dataset.loaded) { if (inp && inp.value.trim()) cmpLoad(); else b.innerHTML = '<div class="tvsig-cmp-hint">Впиши код бумаги/индекса/фьючерса MOEX и жми ⟳. Наложу на активный тикер, посчитаю корреляцию и расхождение по видимому окну.</div>'; } }
     if (which === 'periods') segRender();
     if (which === 'forecast') forecastRender();
+    if (which === 'scan') scanInit();
+  }
+  function scanInit() {
+    const sa = document.getElementById('tvsig-scan-a'), sb = document.getElementById('tvsig-scan-b');
+    if (sa && !sa.dataset.init) {
+      const opts = window.SignalsCore.IDS.map(id => '<option value="' + id + '">' + (NAME[id] || id) + '</option>').join('');
+      sa.innerHTML = opts; sb.innerHTML = '<option value="-">— (один метод)</option>' + opts;
+      sa.value = 'talib_anti'; sb.value = 'zonefade';        // сильная связка по умолчанию
+      sa.dataset.init = '1';
+      const lst = document.getElementById('tvsig-scan-list');
+      try { const s = localStorage.getItem('tvsig:scanlist'); if (s && lst) lst.value = s; } catch (e) {}
+    }
   }
   // все нарисованные трендлинии/лучи (2 точки, разные времена) = отрезки
   function lineSpans() {
@@ -805,6 +878,7 @@
       '<button class="tvsig-tab" data-tab="compare">Сравнение</button>' +
       '<button class="tvsig-tab" data-tab="periods">Периоды</button>' +
       '<button class="tvsig-tab" data-tab="forecast">Прогноз</button>' +
+      '<button class="tvsig-tab" data-tab="scan">Сканер</button>' +
       '<button class="tvsig-tab" data-tab="theme">Тема</button></div>' +
       '<div id="tvsig-pane-signals" class="tvsig-pane">' +
       '<div id="tvsig-draw">' +
@@ -880,7 +954,15 @@
       '</div>' +
       '<div id="tvsig-rc-out"></div>' +
       '<div id="tvsig-fc-foot">Режим: <b>ER</b> тренд/боковик (окно 60, порог 0.3), <b>vol</b> сжатие/расшир (ATR/медиана-200), <b>рынок</b> — breadth корзины. Условная точность — фейд по каждому режиму (тейк 1.5/стоп 0.75 ATR, R:R 2:1). Прогноз от точки: вход по close сигнала, тейк/стоп в ATR, тайм-выход 12 баров; показывает исход или «в позиции». Гипотеза: подставляет цену как закрытие следующего бара и пересчитывает.</div>' +
-      '</div>'; // /pane-forecast
+      '</div>' + // /pane-forecast
+      '<div id="tvsig-pane-scan" class="tvsig-pane" hidden>' +
+      '<div class="tvsig-fc-sec">Сканер связок по списку тикеров</div>' +
+      '<textarea id="tvsig-scan-list" placeholder="SBER GAZP LKOH SNGS ROSN … (через пробел/запятую)"></textarea>' +
+      '<div id="tvsig-scan-sel">Сигнал <select id="tvsig-scan-a"></select> + <select id="tvsig-scan-b"></select>' +
+      '<button id="tvsig-scan-go" title="Просканировать список">Скан</button></div>' +
+      '<div id="tvsig-scan-body"></div>' +
+      '<div id="tvsig-scan-foot">Тянет свечи каждого тикера с MOEX на ТФ активного графика, считает выбранный сигнал (или согласие двух) на последнем ЗАКРЫТОМ баре и показывает, у кого сработало. Кросс-тикерный breadth в скане не применяется (фейд/зона-фейд без него) — открой хит на графике для полной версии. Второй сигнал «—» = один метод.</div>' +
+      '</div>'; // /pane-scan
     document.documentElement.appendChild(panel);
     rowsEl = panel.querySelector('#tvsig-rows'); statusEl = panel.querySelector('#tvsig-status');
     panel.querySelector('#tvsig-refresh').onclick = () => refresh(true);
@@ -904,6 +986,9 @@
     panel.querySelector('#tvsig-cmp-go').onclick = () => cmpLoad();
     cmpTk.addEventListener('keydown', e => { if (e.key === 'Enter') cmpLoad(); });
     panel.querySelector('#tvsig-seg-go').onclick = () => segRender();
+    panel.querySelector('#tvsig-scan-go').onclick = () => scanRun();
+    panel.querySelector('#tvsig-scan-body').addEventListener('click', e => {
+      const h = e.target.closest('.tvsig-scan-hit'); if (h && h.dataset.code) { try { S.chart.setSymbol(h.dataset.code); } catch (er) {} } });
     // «Прогноз»: клик по сигналу → карточка прогноза от точки; гипотеза по цене
     panel.querySelector('#tvsig-fc-signals').addEventListener('click', e => {
       const s = e.target.closest('.tvsig-fc-sig'); if (s) fcDetail(+s.dataset.idx); });
@@ -1044,7 +1129,7 @@
     '.tvsig-col, .tvsig-info-btn, .tvsig-tab, #tvsig-status, #tvsig-period, #tvsig-foot, ' +
     '#tvsig-cmp-foot, #tvsig-cmp-body, #tvsig-oi-body, .tvsig-oi-meta, .tvsig-oi-t, ' +
     '.tvsig-fc-sig, #tvsig-fc-cond, #tvsig-fc-detail, #tvsig-fc-hypo, #tvsig-fc-foot, #tvsig-fc-pickrow, ' +
-    '#tvsig-rc-ctrl, #tvsig-rc-out';
+    '#tvsig-rc-ctrl, #tvsig-rc-out, #tvsig-scan-list, #tvsig-scan-sel, #tvsig-scan-body, #tvsig-scan-foot';
   function drag(el) {
     let sx, sy, ox, oy, on = false;
     el.addEventListener('mousedown', e => {

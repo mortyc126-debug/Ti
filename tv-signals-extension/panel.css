@@ -244,3 +244,15 @@
 #tvsig-rc-ctrl{ display:flex; flex-direction:column; gap:5px; padding:2px 10px 4px; }
 #tvsig-rc-ctrl label{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-family:var(--mono); font-size:10.5px; color:var(--text3); }
 #tvsig-rc-ctrl input{ width:120px; background:var(--surface2); border:1px solid var(--border2); border-radius:6px; color:var(--text); padding:3px 7px; font-family:var(--mono); font-size:11px; }
+
+/* Сканер тикеров */
+#tvsig-scan-list{ width:calc(100% - 20px); margin:2px 10px; min-height:52px; resize:vertical; background:var(--surface2); border:1px solid var(--border2); border-radius:6px; color:var(--text); padding:5px 8px; font-family:var(--mono); font-size:11px; box-sizing:border-box; }
+#tvsig-scan-sel{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:4px 10px; font-family:var(--mono); font-size:10.5px; color:var(--text3); }
+#tvsig-scan-sel select{ flex:1; min-width:60px; background:var(--surface2); border:1px solid var(--border2); border-radius:6px; color:var(--text); padding:3px 5px; font-family:var(--mono); font-size:10.5px; }
+#tvsig-scan-go{ background:var(--accent); border:1px solid var(--accent); border-radius:6px; color:#fff; cursor:pointer; padding:4px 12px; font-size:11px; }
+#tvsig-scan-go:hover{ filter:brightness(1.15); }
+.tvsig-scan-hd{ padding:5px 10px 2px; font-family:var(--mono); font-size:10.5px; color:var(--text2); }
+.tvsig-scan-hit{ margin:2px 10px; padding:4px 8px; border-radius:6px; cursor:pointer; font-family:var(--mono); font-size:11px; color:var(--text2); background:var(--surface2); border:1px solid var(--border); }
+.tvsig-scan-hit:hover{ border-color:var(--accent); }
+.tvsig-scan-hit .pos{ color:var(--green); } .tvsig-scan-hit .neg{ color:var(--negative); } .tvsig-scan-hit .dim{ color:var(--text3); }
+#tvsig-scan-foot{ padding:6px 10px; font-size:9px; color:var(--text3); font-family:var(--mono); line-height:1.5; border-top:1px solid var(--border); margin-top:6px; }
