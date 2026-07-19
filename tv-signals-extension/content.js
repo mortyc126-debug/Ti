@@ -561,10 +561,17 @@
     else real = out.exit + ' · P&L ' + _fcNum(out.pnl) + ' ATR';
     let mtf = ''; if (S.mtfOn) { const md = _mtfDirAt(i);
       if (md != null && md !== 0) mtf = '<br>старший ТФ (' + (S._mtfTf || '') + '): тренд ' + (md > 0 ? '↑' : '↓') + ' · сигнал <b>' + (md === dir ? 'согласован' : 'против') + '</b>'; }
+    // NW: спроецировать ожидаемый путь по аналогам (что было ПОСЛЕ похожих баров)
+    let nwLine = '';
+    if (S.fcId === 'nw') { const fc = SC.nwForecast(bars, i, 12);
+      if (fc) { const lastM = fc.med[fc.med.length - 1], band = fc.hi[fc.hi.length - 1] - lastM;
+        nwLine = '<br>NW-путь: аналогов <b>' + fc.n + '</b> · ожидаемый ход за 12 баров <b>' + (lastM >= 0 ? '+' : '') + (lastM * 100).toFixed(2) + '%</b> (±' + (band * 100).toFixed(2) + '%)';
+        if (S.chart) drawNwPath(i, fc); }
+      else { nwLine = '<br>NW-путь: бар вне квадранта / мало аналогов'; _clearNwPath(); }
+    } else if (S.chart && out) drawForecastBand(i, out); // (C) полоса тейк/стоп для остальных
     el.innerHTML = '<div class="tvsig-fc-card"><b>' + (NAME[S.fcId] || S.fcId) + ': ' + (dir < 0 ? '↓ шорт' : '↑ лонг') + '</b> · ' + _regLbl(rg) + ' · ' + _hhmm(bars[i].time) + ' UTC<br>' +
       'вход <b>' + out.entry.toFixed(4) + '</b> · тейк ' + out.tp.toFixed(4) + ' · стоп ' + out.sl.toFixed(4) + '<br>' +
-      'ожидание в этом режиме: exp <b>' + expC + '</b> ATR<br>факт: <b>' + real + '</b>' + mtf + '</div>';
-    if (S.chart && out) drawForecastBand(i, out); // (C) полоса ожидания на графике
+      'ожидание в этом режиме: exp <b>' + expC + '</b> ATR<br>факт: <b>' + real + '</b>' + mtf + nwLine + '</div>';
   }
   function fcHypo() {
     const el = document.getElementById('tvsig-fc-hypo'), inp = document.getElementById('tvsig-fc-price'), bars = S.bars, SC = window.SignalsCore;
@@ -597,6 +604,27 @@
       }
     } catch (e) {}
     S._mtfBuilding = null;
+  }
+  // NW-путь на графике: медиана траектории аналогов (сегментами) + конус ±σ.
+  // Проецируется от бара i вперёд kFwd баров (будущие времена = i.time + s·dt).
+  function _clearNwPath() { (S._nwBand || []).forEach(id => { try { S.chart.removeEntity(id); } catch (e) {} }); S._nwBand = []; }
+  function drawNwPath(i, fc) {
+    try {
+      _clearNwPath();
+      const bars = S.bars, dt = S.barDt || 300, base = bars[i].close, t0 = bars[i].time;
+      const P = r => base * (1 + r);
+      const seg = (ta, pa, tb, pb, color, style, wdt) => { try {
+        const id = S.chart.createMultipointShape([{ time: ta, price: pa }, { time: tb, price: pb }],
+          { shape: 'trend_line', lock: true, disableSelection: true, overrides: { linecolor: color, linewidth: wdt || 1, linestyle: style } });
+        if (id) S._nwBand.push(id); } catch (e) {} };
+      // медиана: сегмент на каждый шаг (форма ожидаемого пути), фиолетовым
+      let pt = t0, pp = P(0);
+      for (let s = 1; s <= fc.med.length; s++) { const nt = t0 + s * dt, np = P(fc.med[s - 1]); seg(pt, pp, nt, np, '#B487F8', 0, 2); pt = nt; pp = np; }
+      // конус неопределённости ±σ: от входа к финальным lo/hi, пунктиром
+      const endT = t0 + fc.med.length * dt;
+      seg(t0, P(0), endT, P(fc.lo[fc.lo.length - 1]), '#7CC7FF', 2, 1);
+      seg(t0, P(0), endT, P(fc.hi[fc.hi.length - 1]), '#7CC7FF', 2, 1);
+    } catch (e) {}
   }
   // (C) полоса ожидания на графике: тейк/стоп горизонтальными лучами от точки на 12 баров
   function drawForecastBand(i, out) {
@@ -834,7 +862,9 @@
     panel.querySelector('#tvsig-fc-hypo-go').onclick = () => fcHypo();
     panel.querySelector('#tvsig-fc-price').addEventListener('keydown', e => { if (e.key === 'Enter') fcHypo(); });
     panel.querySelector('#tvsig-fc-pick').onchange = e => { S.fcId = e.target.value;
-      const d = document.getElementById('tvsig-fc-detail'); if (d) d.innerHTML = ''; forecastRender(); };
+      const d = document.getElementById('tvsig-fc-detail'); if (d) d.innerHTML = '';
+      try { _clearNwPath(); (S._fcBand || []).forEach(id => S.chart.removeEntity(id)); S._fcBand = []; } catch (er) {}
+      forecastRender(); };
     panel.querySelector('#tvsig-fc-mtf-on').onchange = e => { S.mtfOn = e.target.checked; forecastRender(); };
     themeBind();
     let minimized = false;

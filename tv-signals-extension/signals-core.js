@@ -262,6 +262,35 @@
     return res;
   }
 
+  // Прогноз NW: по аналогам текущего бара (та же логика, что M.nw) собираем
+  // ФОРВАРД-ПУТЬ — что было ПОСЛЕ похожих баров. Возвращает на каждый шаг 1..kFwd
+  // взвешенное среднее доходности от входа + полосу ±σ (в долях цены), число
+  // аналогов и направление. null, если бар вне квадранта / мало аналогов.
+  function nwForecast(cd, iq, kFwd) {
+    kFwd = kFwd || 12;
+    const cl = cd.map(c => c.close), n = cl.length, at = atr(cd, 14), N = 10, w = 60, h = 0.4;
+    const T = new Array(n).fill(null), P = new Array(n).fill(null), C = new Array(n).fill(null);
+    for (let i = 0; i < n; i++) { const c = cd[i]; if (at[i] && at[i] > 0) { const vv = (c.volume && c.volume > 0) ? c.volume : 1; T[i] = vv * (c.high - c.low) / at[i]; } }
+    for (let i = N; i < n; i++) { const ch = Math.abs(cl[i] - cl[i - N]); let v = 0; for (let j = i - N + 1; j <= i; j++) v += Math.abs(cl[j] - cl[j - 1]); P[i] = v > 0 ? ch / v : 0; }
+    const roc = new Array(n).fill(null); for (let i = N; i < n; i++) roc[i] = (cl[i] - cl[i - N]) / cl[i - N];
+    for (let i = 2 * N; i < n; i++) C[i] = roc[i] - roc[i - N];
+    const zf = (arr, i) => { if (i < w) return null; let s = 0, s2 = 0, c = 0; for (let j = i - w + 1; j <= i; j++) { if (arr[j] == null) continue; s += arr[j]; s2 += arr[j] * arr[j]; c++; }
+      if (c < w * 0.6 || arr[i] == null) return null; const m = s / c, sd = Math.sqrt(Math.max(1e-12, s2 / c - m * m)); return (arr[i] - m) / sd; };
+    const zT = [], zP = [], zC = []; for (let i = 0; i < n; i++) { zT[i] = zf(T, i); zP[i] = zf(P, i); zC[i] = zf(C, i); }
+    const inQ = i => zT[i] != null && zP[i] != null && zC[i] != null && zT[i] < -0.4 && zP[i] > 0.6;
+    if (iq < w || iq >= n || !inQ(iq)) return null;
+    const an = [];
+    for (let j = w; j <= iq - kFwd && j + kFwd < n; j++) { if (!inQ(j)) continue; if (Math.sign(zC[j]) !== Math.sign(zC[iq])) continue;
+      const d2 = (zT[j] - zT[iq]) ** 2 + (zP[j] - zP[iq]) ** 2 + (zC[j] - zC[iq]) ** 2; an.push({ j: j, ww: Math.exp(-d2 / (2 * h * h)) }); }
+    if (an.length < 3) return null;
+    const med = [], lo = [], hi = [];
+    for (let s = 1; s <= kFwd; s++) { let sw = 0, swx = 0; const vals = [];
+      for (const a of an) { const r = (cl[a.j + s] - cl[a.j]) / cl[a.j]; sw += a.ww; swx += a.ww * r; vals.push([r, a.ww]); }
+      const mean = sw > 0 ? swx / sw : 0; let sv = 0; for (const v of vals) sv += v[1] * (v[0] - mean) ** 2;
+      const sd = Math.sqrt(Math.max(0, sw > 0 ? sv / sw : 0)); med.push(mean); lo.push(mean - sd); hi.push(mean + sd); }
+    return { n: an.length, med: med, lo: lo, hi: hi, dir: Math.sign(med[med.length - 1]) };
+  }
+
   // текущее ведро бара по каждой оси — для подсветки «сейчас» в таблице
   function regimeBuckets(bars, i) {
     const rg = regimeInfo(bars, i); if (!rg) return {};
@@ -280,5 +309,5 @@
   }
 
   window.SignalsCore = { methods: M, btStats, parseExport, computeAll, computeOne, atr, IDS,
-    setBreadth, regimeInfo, regimeBuckets, condStats, tradeOutcome };
+    setBreadth, regimeInfo, regimeBuckets, condStats, tradeOutcome, nwForecast };
 })();
