@@ -181,6 +181,11 @@ def main():
     ap.add_argument("--embargo-xs", type=int, default=0,
                     help="кросс-секц. эмбарго: отбросить аналоги в ±M баров от времени запроса "
                          "у ЛЮБОГО тикера (контроль синхронности рынка → раздутого эфф. N).")
+    ap.add_argument("--dedupe-ts", action="store_true",
+                    help="кросс-секц. контроль: среди аналогов оставить по ОДНОМУ на уникальный "
+                         "таймстемп (много тикеров в один момент = раздутое эфф. N). Правильный "
+                         "тест синхронности (в отличие от --embargo-xs, который каузальность и так "
+                         "делает no-op).")
     ap.add_argument("--naive", choices=("off", "meanrev", "momentum"), default="off",
                     help="бенчмарк: игнорировать NW, направление по наивному правилу на зонных "
                          "барах — meanrev (против хода m баров) или momentum (по ходу). Сравни с NW.")
@@ -254,6 +259,7 @@ def main():
 
     maxhold = args.k
     rng = np.random.default_rng(args.seed)
+    _emb_stat = [0, 0]  # [аналогов до эмбарго, после] — диагностика «кусает ли»
     pnls, pnls_tr, pnls_te = [], [], []
     dirs, dirs_tr, dirs_te = [], [], []
     n_tk = 0
@@ -365,7 +371,13 @@ def main():
                         keep &= ~((b_tk[cand] == _tkmap.get(tk, -1)) & (dtc <= args.embargo * bar_s))
                     if args.embargo_xs:
                         keep &= dtc > args.embargo_xs * bar_s
+                    _emb_stat[0] += len(cand); _emb_stat[1] += int(keep.sum())
                     cand = cand[keep]
+                # dedupe-ts: один аналог на уникальный таймстемп (контроль синхронности)
+                if args.dedupe_ts and len(cand):
+                    _, uix = np.unique(b_ts[cand], return_index=True)
+                    _emb_stat[0] += len(cand); _emb_stat[1] += len(uix)
+                    cand = cand[np.sort(uix)]
                 if len(cand) < args.min_neighbors:
                     i += 1; continue
                 if args.kernel in ("uniform", "knn"):
@@ -462,6 +474,10 @@ def main():
     print(f"\n=== NW-бэктест  radius={args.radius} take={args.take}/stop={args.stop} "
           f"cost={args.cost} k={args.k}  {', '.join(tag)} ===")
     print(f"тикеров торговали: {n_tk}")
+    if _emb_stat[0]:
+        removed = 100 * (1 - _emb_stat[1] / _emb_stat[0])
+        print(f"эмбарго/dedupe убрало {removed:.1f}% аналогов-кандидатов "
+              f"({_emb_stat[0] - _emb_stat[1]} из {_emb_stat[0]})")
     _stats("ВСЕ (no-overlap)", pnls, dirs)
     if split_ts is not None:
         _stats(f"TRAIN <{args.split_date}", pnls_tr, dirs_tr)
