@@ -124,7 +124,9 @@
   function btStats(scoreArr, bars, horizon, opts) {
     if (!scoreArr || !bars || !bars.length) return { acc: null, exp: null, win: null, n: 0 };
     horizon = horizon || 12; opts = opts || {};
-    const T = opts.take != null ? opts.take : 1.0, S = opts.stop != null ? opts.stop : 0.5;
+    // Брекет по умолчанию R:R 2:1 (тейк 1.5 / стоп 0.75) — валидировано в invest-bot:
+    // узкий 1.0/0.5 занижал exp вдвое и давал обманчиво низкий win (артефакт брекета).
+    const T = opts.take != null ? opts.take : 1.5, S = opts.stop != null ? opts.stop : 0.75;
     const cost = opts.cost != null ? opts.cost : 0.12;
     const closes = bars.map(b => b.close), n = bars.length, at = atr(bars, opts.atrPer || 20);
     // winrate: доля совпадений знака с ходом через horizon баров
