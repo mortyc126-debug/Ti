@@ -21,6 +21,16 @@
     ['zonefade', 'Зона-фейд', '#52F2C9'],
   ];
   const NAME = {}, DEF_COLOR = {}, IDX = {}; META.forEach(([id, n, c], i) => { NAME[id] = n; DEF_COLOR[id] = c; IDX[id] = i; });
+  // группировка списка по синергии (строгий рейтинг agree_scan: no-overlap + OOS).
+  // Методы одной группы хорошо сочетаются в согласиях; заголовок — агрегат exp/win.
+  const GROUPS = [
+    { title: 'Разворотные — ядро связок', ids: ['fade', 'talib_anti', 'zonefade', 'accel', 'nw', 'vsa_abs'],
+      desc: 'Mean-reversion/фейд-методы с сильнейшими согласиями (строго: связки удваивают одиночный edge и держатся OOS). «Фейд свечей» — клей, входит в большинство топ-пар. Лучшая частая связка: Фейд у уровня + Фейд свечей (+0.60 ATR).' },
+    { title: 'Разворотные — поддержка', ids: ['zscore', 'alligator_inv', 'waning'],
+      desc: 'Плюсовые сами по себе и усиливают ядро в согласиях, но слабее. Z-score и Аллигатор класс.(инв.) — частые, стабильные OOS.' },
+    { title: 'Моментум / структура — слабы на R:R 2:1', ids: ['order_block', 'fvg', 'liq_sweep', 'false_breakout', 'hawkes', 'cascade'],
+      desc: 'На брекете R:R 2:1 (заточен под разворот) в среднем в минус: Hawkes/Order Block/FVG/пробои — это моментум/структурные сигналы, им нужен другой выход, не фейд-сетка. Cascade нестабилен OOS. Держать выключенными или для контекста.' },
+  ];
   // описания для ℹ-окон: что делает · как читать знак · оговорка из прогонов бота
   const DESC = {
     zscore: { what: 'Rolling z-score: отклонение цены от среднего за 20 баров.', read: 'Контрарный возврат к среднему — цена высоко над средней → sell, глубоко под → buy.', note: 'Универсальный сигнал во всех режимах (OOS-подтверждён). Сильнее на менее ликвидных тикерах.' },
@@ -1083,35 +1093,60 @@
       '<div class="tvsig-cons-votes">' + buy + ' за покупку · ' + sell + ' за продажу · из ' + working + ' рабочих методов (exp&gt;0)</div>';
   }
 
+  // HTML одной строки метода (вынесено из renderRows, чтобы группировать)
+  function rowHTML(id, noVol) {
+    const c = S.computed && S.computed[id];
+    const on = !!S.on[id];
+    const col = S.colors[id];
+    // ромб-переключатель в стиле indlab: горит цветом метода когда включён
+    const diam = '<span class="tvsig-diam' + (on ? ' on' : '') + '" data-id="' + id + '" title="Показать/скрыть на графике" ' +
+      'style="border-color:' + col + ';background:' + (on ? col : 'transparent') + ';box-shadow:' + (on ? '0 0 6px ' + col : 'none') + ';"></span>';
+    const swatch = '<input type="color" class="tvsig-col" data-id="' + id + '" value="' + col + '" title="Цвет метода">';
+    const info = '<span class="tvsig-info-btn" data-id="' + id + '" title="Описание метода + бэктест по горизонтам">ⓘ</span>';
+    const noVolRow = (id === 'vsa_abs' && noVol);
+    const mid = noVolRow
+      ? '<span class="tvsig-b neu" style="color:#F4C36A" title="Включи индикатор Объём на графике">нужен объём</span>'
+      : (function () {
+          const st = c && c.stats;
+          // exp — главная цифра (деньги), красим по знаку; winrate — справочная, приглушённая
+          const exp = st && st.exp != null ? (st.exp >= 0 ? '+' : '') + st.exp.toFixed(2) : '—';
+          const expCol = st && st.exp != null ? (st.exp > 0.03 ? '#52F2C9' : st.exp < -0.03 ? '#FF6A8B' : '#A79BC9') : '#6F648F';
+          const win = st && st.acc != null ? (st.acc * 100).toFixed(0) + '%' : '—';
+          const nn = st ? st.n : 0;
+          return pill(c ? c.last : 0) +
+            '<span class="tvsig-exp" style="color:' + expCol + '" title="exp — экспектанси: средний P&L сделки в ATR (тейк +1.0 / стоп −0.5 ATR, издержки 0.12). Плюс = метод в прибыли, даже если winrate низкий.">' + exp + '</span>' +
+            '<span class="tvsig-acc" title="winrate — частота совпадения знака с ходом за 12 баров. У фейдов бывает низкой при плюсовом exp — это норма.">' + win + '</span>' +
+            '<span class="tvsig-n" title="Число сделок в exp-симуляции">n' + nn + '</span>';
+        })();
+    return '<div class="tvsig-row' + (on ? ' on' : '') + '" data-id="' + id + '">' +
+      diam + '<span class="tvsig-name" title="' + NAME[id] + '">' + NAME[id] + '</span>' + mid + info + swatch + '</div>';
+  }
+
+  // агрегат exp/win по группе — среднее с весом по числу сделок n (только валидные stats)
+  function groupAgg(ids) {
+    let se = 0, sw = 0, sn = 0;
+    ids.forEach(id => {
+      const st = S.computed && S.computed[id] && S.computed[id].stats;
+      if (!st || st.exp == null || !st.n) return;
+      se += st.exp * st.n; if (st.acc != null) sw += st.acc * st.n; sn += st.n;
+    });
+    return sn ? { exp: se / sn, win: sw / sn, n: sn } : null;
+  }
+
   function renderRows() {
     if (!rowsEl) return;
     const noVol = S.hasVolume === false;
-    rowsEl.innerHTML = META.map(([id]) => {
-      const c = S.computed && S.computed[id];
-      const on = !!S.on[id];
-      const col = S.colors[id];
-      // ромб-переключатель в стиле indlab: горит цветом метода когда включён
-      const diam = '<span class="tvsig-diam' + (on ? ' on' : '') + '" data-id="' + id + '" title="Показать/скрыть на графике" ' +
-        'style="border-color:' + col + ';background:' + (on ? col : 'transparent') + ';box-shadow:' + (on ? '0 0 6px ' + col : 'none') + ';"></span>';
-      const swatch = '<input type="color" class="tvsig-col" data-id="' + id + '" value="' + col + '" title="Цвет метода">';
-      const info = '<span class="tvsig-info-btn" data-id="' + id + '" title="Описание метода + бэктест по горизонтам">ⓘ</span>';
-      const noVolRow = (id === 'vsa_abs' && noVol);
-      const mid = noVolRow
-        ? '<span class="tvsig-b neu" style="color:#F4C36A" title="Включи индикатор Объём на графике">нужен объём</span>'
-        : (function () {
-            const st = c && c.stats;
-            // exp — главная цифра (деньги), красим по знаку; winrate — справочная, приглушённая
-            const exp = st && st.exp != null ? (st.exp >= 0 ? '+' : '') + st.exp.toFixed(2) : '—';
-            const expCol = st && st.exp != null ? (st.exp > 0.03 ? '#52F2C9' : st.exp < -0.03 ? '#FF6A8B' : '#A79BC9') : '#6F648F';
-            const win = st && st.acc != null ? (st.acc * 100).toFixed(0) + '%' : '—';
-            const nn = st ? st.n : 0;
-            return pill(c ? c.last : 0) +
-              '<span class="tvsig-exp" style="color:' + expCol + '" title="exp — экспектанси: средний P&L сделки в ATR (тейк +1.0 / стоп −0.5 ATR, издержки 0.12). Плюс = метод в прибыли, даже если winrate низкий.">' + exp + '</span>' +
-              '<span class="tvsig-acc" title="winrate — частота совпадения знака с ходом за 12 баров. У фейдов бывает низкой при плюсовом exp — это норма.">' + win + '</span>' +
-              '<span class="tvsig-n" title="Число сделок в exp-симуляции">n' + nn + '</span>';
-          })();
-      return '<div class="tvsig-row' + (on ? ' on' : '') + '" data-id="' + id + '">' +
-        diam + '<span class="tvsig-name" title="' + NAME[id] + '">' + NAME[id] + '</span>' + mid + info + swatch + '</div>';
+    rowsEl.innerHTML = GROUPS.map(g => {
+      const a = groupAgg(g.ids);
+      const exp = a ? (a.exp >= 0 ? '+' : '') + a.exp.toFixed(2) : '—';
+      const expCol = a ? (a.exp > 0.03 ? '#52F2C9' : a.exp < -0.03 ? '#FF6A8B' : '#A79BC9') : '#6F648F';
+      const win = a && a.win ? (a.win * 100).toFixed(0) + '%' : '';
+      const hd = '<div class="tvsig-grouphd" title="' + g.desc.replace(/"/g, '&quot;') + '">' +
+        '<span class="tvsig-gh-title">' + g.title + '</span>' +
+        '<span class="tvsig-gh-stat" style="color:' + expCol + '">' + exp +
+        (win ? ' <span class="tvsig-gh-win">' + win + '</span>' : '') + '</span>' +
+        '<div class="tvsig-gh-desc">' + g.desc + '</div></div>';
+      return hd + g.ids.map(id => rowHTML(id, noVol)).join('');
     }).join('');
     // ромб/имя → вкл/выкл; пикер цвета → своё событие (не триггерит toggle)
     rowsEl.querySelectorAll('.tvsig-diam, .tvsig-name').forEach(el =>

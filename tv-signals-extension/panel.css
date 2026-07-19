@@ -112,6 +112,16 @@
 .tvsig-cons-empty{ font-size:10px; color:var(--text3); font-family:var(--mono); line-height:1.4; }
 
 #tvsig-rows{ padding:4px; max-height:340px; overflow:auto; }
+/* мини-заголовок группы синергии: название · агрегат exp/win · описание */
+.tvsig-grouphd{ margin:8px 4px 3px; padding:5px 7px 6px; border-radius:8px;
+  background:linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+  border-left:2px solid rgba(255,255,255,0.14); }
+.tvsig-grouphd:first-child{ margin-top:2px; }
+.tvsig-gh-title{ font-size:10px; font-weight:700; letter-spacing:.02em; text-transform:uppercase;
+  color:var(--text); font-family:var(--mono); }
+.tvsig-gh-stat{ float:right; font-size:11px; font-weight:700; font-family:var(--mono); font-variant-numeric:tabular-nums; }
+.tvsig-gh-win{ font-size:9px; font-weight:600; color:var(--text2); opacity:.75; }
+.tvsig-gh-desc{ clear:both; margin-top:3px; font-size:9.5px; line-height:1.35; color:var(--text2); opacity:.72; }
 .tvsig-row{ display:flex; align-items:center; gap:6px; padding:5px 6px; border-radius:8px; transition:background .12s; }
 .tvsig-row:hover{ background:rgba(255,255,255,0.04); }
 .tvsig-row.on{ background:rgba(199,27,82,0.10); }
