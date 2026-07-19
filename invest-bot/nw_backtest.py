@@ -175,6 +175,15 @@ def main():
                          "оставить идио+против. Требует рыночный индекс (строится авто).")
     ap.add_argument("--gate-trend", action="store_true",
                     help="не торговать в трендовом режиме (ER-60≥0.3; там NW теряет −0.22).")
+    ap.add_argument("--embargo", type=int, default=0,
+                    help="эмбарго: аналог того же тикера годится, только если он дальше ±N "
+                         "баров от запроса (убирает автокорреляцию соседних баров).")
+    ap.add_argument("--embargo-xs", type=int, default=0,
+                    help="кросс-секц. эмбарго: отбросить аналоги в ±M баров от времени запроса "
+                         "у ЛЮБОГО тикера (контроль синхронности рынка → раздутого эфф. N).")
+    ap.add_argument("--naive", choices=("off", "meanrev", "momentum"), default="off",
+                    help="бенчмарк: игнорировать NW, направление по наивному правилу на зонных "
+                         "барах — meanrev (против хода m баров) или momentum (по ходу). Сравни с NW.")
     args = ap.parse_args()
     bar_s = args.bar_min * 60
     cache = args.cache or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "candle_cache")
@@ -215,6 +224,9 @@ def main():
         b_co = np.column_stack([T[bi], P[bi], C[bi]])
         tree = cKDTree(b_co)
         b_ts = ts[bi]; b_y = (tgt[bi] > 0).astype(float)
+        # коды тикеров банка — для эмбарго того же тикера
+        _tkmap = {t: k for k, t in enumerate(sorted(set(tk for tk, _ in rows)))}
+        b_tk = np.array([_tkmap[tk] for tk, _ in rows])[bi]
         print(f"банк: {len(bi)} точек", file=sys.stderr)
 
     split_ts = None
@@ -299,7 +311,15 @@ def main():
             if f is None and (args.null == "none" or args.zone):
                 i += 1; continue
             Tq, Pq, Cq = f if f is not None else (np.nan, np.nan, np.nan)
-            if args.null != "none":
+            if args.naive != "off":
+                # наивный бенчмарк на зонных барах: направление по ходу 3 баров
+                if args.zone and not (Tq < args.t_max and Pq > args.p_min):
+                    i += 1; continue
+                mv = cC[i] - cC[i - 3]
+                if mv == 0:
+                    i += 1; continue
+                dirn = (-1.0 if mv > 0 else 1.0) if args.naive == "meanrev" else (1.0 if mv > 0 else -1.0)
+            elif args.null != "none":
                 # бенчмарк беты: направление фиксировано. С --zone входит только на
                 # зонных барах (matched null — изолирует вклад направления p_hold
                 # при том же тайминге зоны), без --zone — на каждом баре (чистая бета).
@@ -336,6 +356,16 @@ def main():
                         i += 1; continue
                     cand = np.asarray(cand)
                     cand = cand[b_ts[cand] + args.k * bar_s <= cep[i]]
+                # эмбарго: убрать автокоррелированные соседние аналоги того же тикера
+                # и/или синхронные кросс-секц. аналоги в ±M баров от времени запроса
+                if (args.embargo or args.embargo_xs) and len(cand):
+                    dtc = np.abs(b_ts[cand] - cep[i])
+                    keep = np.ones(len(cand), dtype=bool)
+                    if args.embargo:
+                        keep &= ~((b_tk[cand] == _tkmap.get(tk, -1)) & (dtc <= args.embargo * bar_s))
+                    if args.embargo_xs:
+                        keep &= dtc > args.embargo_xs * bar_s
+                    cand = cand[keep]
                 if len(cand) < args.min_neighbors:
                     i += 1; continue
                 if args.kernel in ("uniform", "knn"):
@@ -423,6 +453,12 @@ def main():
         tag.append("gate:против+идио")
     if args.gate_trend:
         tag.append("gate:боковик")
+    if args.embargo:
+        tag.append(f"embargo±{args.embargo}бар")
+    if args.embargo_xs:
+        tag.append(f"embargo-xs±{args.embargo_xs}")
+    if args.naive != "off":
+        tag.append(f"NAIVE={args.naive}")
     print(f"\n=== NW-бэктест  radius={args.radius} take={args.take}/stop={args.stop} "
           f"cost={args.cost} k={args.k}  {', '.join(tag)} ===")
     print(f"тикеров торговали: {n_tk}")
