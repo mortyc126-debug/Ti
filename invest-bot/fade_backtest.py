@@ -62,6 +62,9 @@ def main():
     ap.add_argument("--band", type=float, default=0.5, help="полоса 'в уровень', ATR (#6)")
     ap.add_argument("--split-date", default=None)
     ap.add_argument("--liquid-only", action="store_true")
+    ap.add_argument("--sweep", action="store_true",
+                    help="прогнать сетку брекетов (вкл. reward:risk 2:1) и компактную "
+                         "таблицу exp по сегменту (TEST при --split-date, иначе ВСЕ)")
     ap.add_argument("--tickers", default=None)
     args = ap.parse_args()
     cache = _cache_dir(args.cache)
@@ -117,78 +120,110 @@ def main():
         print(f"рыночный индекс: {len(market)} таймстемпов, медиана |M|={med_absM:.5f}",
               file=sys.stderr)
 
-    pnls, pnls_tr, pnls_te = [], [], []
-    dirs, dirs_tr, dirs_te = [], [], []
-    n_tk = 0
+    # ATR/cep один раз на тикер (от брекета не зависят) — чтобы свип не пересчитывал.
+    prepared = {}
     for tk, (cl, hi, lo, tm, v) in series.items():
-        atr = _atr(hi, lo, cl)
-        cep = np.array([_epoch_s(t) for t in tm])
-        n = len(cl)
-        n_tk += 1
-        i = max(m, args.lvl_window, 15)  # ATR(14)+история уровня
-        while i < n - 1:
-            a = atr[i]
-            if not np.isfinite(a) or a <= 0 or not np.isfinite(v[i]):
-                i += 1; continue
-            move = cl[i] - cl[i - m]
-            if abs(move) / a < args.move_atr:
-                i += 1; continue
-            mdir = 1.0 if move > 0 else -1.0
+        prepared[tk] = (cl, hi, lo, tm, v, _atr(hi, lo, cl),
+                        np.array([_epoch_s(t) for t in tm]))
 
-            passed = True
-            if args.filter in ("breadth", "both"):
-                M = market.get(tm[i], 0.0)
-                if abs(M) < med_absM:
-                    pass                       # идио — фейдим
-                elif np.sign(M) != mdir:
-                    pass                       # против рынка — фейдим
-                else:
-                    passed = False             # с рынком — не фейдим (моментум)
-            if passed and args.filter in ("level", "both"):
-                hmax = hi[i - m - args.lvl_window:i - m].max() if i - m - args.lvl_window >= 0 else np.inf
-                lmin = lo[i - m - args.lvl_window:i - m].min() if i - m - args.lvl_window >= 0 else -np.inf
-                if mdir > 0:
-                    in_level = (cl[i] <= hmax) and (hmax - cl[i] < args.band * a)
-                else:
-                    in_level = (cl[i] >= lmin) and (cl[i] - lmin < args.band * a)
-                if not in_level:
-                    passed = False
-            if not passed:
-                i += 1; continue
+    def _simulate(take, stop):
+        """Один прогон при заданном брекете. Возвращает 6 списков (pnl/dir × all/tr/te)."""
+        pnls, pnls_tr, pnls_te = [], [], []
+        dirs, dirs_tr, dirs_te = [], [], []
+        for tk, (cl, hi, lo, tm, v, atr, cep) in prepared.items():
+            n = len(cl)
+            i = max(m, args.lvl_window, 15)
+            while i < n - 1:
+                a = atr[i]
+                if not np.isfinite(a) or a <= 0 or not np.isfinite(v[i]):
+                    i += 1; continue
+                move = cl[i] - cl[i - m]
+                if abs(move) / a < args.move_atr:
+                    i += 1; continue
+                mdir = 1.0 if move > 0 else -1.0
+                passed = True
+                if args.filter in ("breadth", "both"):
+                    M = market.get(tm[i], 0.0)
+                    if abs(M) < med_absM:
+                        pass                       # идио
+                    elif np.sign(M) != mdir:
+                        pass                       # против рынка
+                    else:
+                        passed = False             # с рынком — не фейдим
+                if passed and args.filter in ("level", "both"):
+                    if i - m - args.lvl_window >= 0:
+                        hmax = hi[i - m - args.lvl_window:i - m].max()
+                        lmin = lo[i - m - args.lvl_window:i - m].min()
+                    else:
+                        hmax, lmin = np.inf, -np.inf
+                    if mdir > 0:
+                        in_level = (cl[i] <= hmax) and (hmax - cl[i] < args.band * a)
+                    else:
+                        in_level = (cl[i] >= lmin) and (cl[i] - lmin < args.band * a)
+                    if not in_level:
+                        passed = False
+                if not passed:
+                    i += 1; continue
+                dirn = -mdir                       # ФЕЙД: против хода
+                entry = cl[i]
+                tp = entry + dirn * take * a
+                sl = entry - dirn * stop * a
+                exit_j = min(i + maxhold, n - 1)
+                px = cl[exit_j]
+                for j in range(i + 1, min(i + 1 + maxhold, n)):
+                    if dirn > 0:
+                        if lo[j] <= sl:
+                            exit_j = j; px = sl; break
+                        if hi[j] >= tp:
+                            exit_j = j; px = tp; break
+                    else:
+                        if hi[j] >= sl:
+                            exit_j = j; px = sl; break
+                        if lo[j] <= tp:
+                            exit_j = j; px = tp; break
+                pnl = dirn * (px - entry) / a - args.cost
+                pnls.append(pnl); dirs.append(dirn)
+                if split_ts is not None:
+                    if cep[i] >= split_ts:
+                        pnls_te.append(pnl); dirs_te.append(dirn)
+                    else:
+                        pnls_tr.append(pnl); dirs_tr.append(dirn)
+                i = exit_j + 1                      # БЕЗ перекрытия
+        return pnls, dirs, pnls_tr, dirs_tr, pnls_te, dirs_te
 
-            dirn = -mdir                        # ФЕЙД: против хода
-            entry = cl[i]
-            tp = entry + dirn * args.take * a
-            sl = entry - dirn * args.stop * a
-            exit_j = min(i + maxhold, n - 1)
-            px = cl[exit_j]
-            for j in range(i + 1, min(i + 1 + maxhold, n)):
-                if dirn > 0:
-                    if lo[j] <= sl:
-                        exit_j = j; px = sl; break
-                    if hi[j] >= tp:
-                        exit_j = j; px = tp; break
-                else:
-                    if hi[j] >= sl:
-                        exit_j = j; px = sl; break
-                    if lo[j] <= tp:
-                        exit_j = j; px = tp; break
-            pnl = dirn * (px - entry) / a - args.cost
-            pnls.append(pnl); dirs.append(dirn)
+    if args.sweep:
+        # сетка брекетов, вкл. асимметрию reward:risk (2:1 и др.)
+        grid = [(0.5, 0.5), (0.75, 0.5), (1.0, 0.5), (1.5, 0.75), (2.0, 1.0),
+                (0.75, 1.0), (1.0, 1.0), (1.5, 1.0), (2.0, 1.5), (1.0, 0.75)]
+        seg = "TEST" if split_ts is not None else "ВСЕ"
+        print(f"\n=== СВИП брекета  filter={args.filter} move≥{args.move_atr} cost={args.cost} "
+              f"maxhold={args.maxhold}{' liquid-only' if args.liquid_only else ''} ({seg}) ===")
+        print(f"{'take/stop':>10} {'R:R':>5}  {'N':>7}  {'exp':>8} {'win%':>6}  "
+              f"{'short':>8} {'long':>8}")
+        for take, stop in grid:
+            p_all, d_all, _, _, pte, dte = _simulate(take, stop)
             if split_ts is not None:
-                if cep[i] >= split_ts:
-                    pnls_te.append(pnl); dirs_te.append(dirn)
-                else:
-                    pnls_tr.append(pnl); dirs_tr.append(dirn)
-            i = exit_j + 1                       # БЕЗ перекрытия
+                use, dd = pte, np.asarray(dte)
+            else:
+                use, dd = p_all, np.asarray(d_all)
+            if len(use) < 20:
+                print(f"{take:>4}/{stop:<4} {take/stop:>5.1f}  {len(use):>7}  мало"); continue
+            a = np.asarray(use)
+            sh = a[dd < 0]; lo_ = a[dd > 0]
+            print(f"{take:>4}/{stop:<4} {take/stop:>5.1f}  {len(a):>7}  {a.mean():+.4f} "
+                  f"{100*(a>0).mean():5.1f}  {sh.mean() if len(sh) else 0:+8.4f} "
+                  f"{lo_.mean() if len(lo_) else 0:+8.4f}")
+        print("\nR:R = take/stop (reward:risk). Ищем плато высокого exp, устойчивое к")
+        print("выбору. Осторожно: выбор бректа по максимуму TEST = OOS-подглядывание.")
+        return
 
+    pnls, dirs, pnls_tr, dirs_tr, pnls_te, dirs_te = _simulate(args.take, args.stop)
     if not pnls:
         sys.exit("ноль сделок — проверь фильтр/порог/кэш")
-
     print(f"\n=== ФЕЙД-бэктест  filter={args.filter}  move≥{args.move_atr} take={args.take}/"
           f"stop={args.stop} cost={args.cost} maxhold={args.maxhold}"
           f"{' liquid-only' if args.liquid_only else ''} ===")
-    print(f"тикеров: {n_tk}   (фейд роста = шорт ↓, фейд падения = лонг ↑)")
+    print(f"тикеров: {len(prepared)}   (фейд роста = шорт ↓, фейд падения = лонг ↑)")
     _stats("ВСЕ (no-overlap)", pnls, dirs)
     if split_ts is not None:
         _stats(f"TRAIN <{args.split_date}", pnls_tr, dirs_tr)
