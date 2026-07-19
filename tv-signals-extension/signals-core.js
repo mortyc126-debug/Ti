@@ -266,8 +266,8 @@
   // ФОРВАРД-ПУТЬ — что было ПОСЛЕ похожих баров. Возвращает на каждый шаг 1..kFwd
   // взвешенное среднее доходности от входа + полосу ±σ (в долях цены), число
   // аналогов и направление. null, если бар вне квадранта / мало аналогов.
-  function nwForecast(cd, iq, kFwd) {
-    kFwd = kFwd || 12;
+  function nwForecast(cd, iq, kFwd, opts) {
+    kFwd = kFwd || 12; opts = opts || {};
     const cl = cd.map(c => c.close), n = cl.length, at = atr(cd, 14), N = 10, w = 60, h = 0.4;
     const T = new Array(n).fill(null), P = new Array(n).fill(null), C = new Array(n).fill(null);
     for (let i = 0; i < n; i++) { const c = cd[i]; if (at[i] && at[i] > 0) { const vv = (c.volume && c.volume > 0) ? c.volume : 1; T[i] = vv * (c.high - c.low) / at[i]; } }
@@ -277,10 +277,14 @@
     const zf = (arr, i) => { if (i < w) return null; let s = 0, s2 = 0, c = 0; for (let j = i - w + 1; j <= i; j++) { if (arr[j] == null) continue; s += arr[j]; s2 += arr[j] * arr[j]; c++; }
       if (c < w * 0.6 || arr[i] == null) return null; const m = s / c, sd = Math.sqrt(Math.max(1e-12, s2 / c - m * m)); return (arr[i] - m) / sd; };
     const zT = [], zP = [], zC = []; for (let i = 0; i < n; i++) { zT[i] = zf(T, i); zP[i] = zf(P, i); zC[i] = zf(C, i); }
-    const inQ = i => zT[i] != null && zP[i] != null && zC[i] != null && zT[i] < -0.4 && zP[i] > 0.6;
-    if (iq < w || iq >= n || !inQ(iq)) return null;
+    const valid = i => zT[i] != null && zP[i] != null && zC[i] != null;
+    const inQ = i => valid(i) && zT[i] < -0.4 && zP[i] > 0.6;
+    // uncond: проецируем от ЛЮБОГО бара по ближайшим аналогам (вне валидированного
+    // квадранта; надёжность ниже). Иначе — только квадрант lowT-highP, как валидировано.
+    const okq = opts.uncond ? valid : inQ;
+    if (iq < w || iq >= n || !okq(iq)) return null;
     const an = [];
-    for (let j = w; j <= iq - kFwd && j + kFwd < n; j++) { if (!inQ(j)) continue; if (Math.sign(zC[j]) !== Math.sign(zC[iq])) continue;
+    for (let j = w; j <= iq - kFwd && j + kFwd < n; j++) { if (!okq(j)) continue; if (Math.sign(zC[j]) !== Math.sign(zC[iq])) continue;
       const d2 = (zT[j] - zT[iq]) ** 2 + (zP[j] - zP[iq]) ** 2 + (zC[j] - zC[iq]) ** 2; an.push({ j: j, ww: Math.exp(-d2 / (2 * h * h)) }); }
     if (an.length < 3) return null;
     const med = [], lo = [], hi = [];
@@ -288,7 +292,7 @@
       for (const a of an) { const r = (cl[a.j + s] - cl[a.j]) / cl[a.j]; sw += a.ww; swx += a.ww * r; vals.push([r, a.ww]); }
       const mean = sw > 0 ? swx / sw : 0; let sv = 0; for (const v of vals) sv += v[1] * (v[0] - mean) ** 2;
       const sd = Math.sqrt(Math.max(0, sw > 0 ? sv / sw : 0)); med.push(mean); lo.push(mean - sd); hi.push(mean + sd); }
-    return { n: an.length, med: med, lo: lo, hi: hi, dir: Math.sign(med[med.length - 1]) };
+    return { n: an.length, med: med, lo: lo, hi: hi, dir: Math.sign(med[med.length - 1]), inQuad: inQ(iq) };
   }
 
   // текущее ведро бара по каждой оси — для подсветки «сейчас» в таблице

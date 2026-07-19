@@ -563,11 +563,13 @@
       if (md != null && md !== 0) mtf = '<br>старший ТФ (' + (S._mtfTf || '') + '): тренд ' + (md > 0 ? '↑' : '↓') + ' · сигнал <b>' + (md === dir ? 'согласован' : 'против') + '</b>'; }
     // NW: спроецировать ожидаемый путь по аналогам (что было ПОСЛЕ похожих баров)
     let nwLine = '';
-    if (S.fcId === 'nw') { const fc = SC.nwForecast(bars, i, 12);
+    if (S.fcId === 'nw') { const fc = SC.nwForecast(bars, i, 12, { uncond: !!S.nwUncond });
       if (fc) { const lastM = fc.med[fc.med.length - 1], band = fc.hi[fc.hi.length - 1] - lastM;
-        nwLine = '<br>NW-путь: аналогов <b>' + fc.n + '</b> · ожидаемый ход за 12 баров <b>' + (lastM >= 0 ? '+' : '') + (lastM * 100).toFixed(2) + '%</b> (±' + (band * 100).toFixed(2) + '%)';
+        const zone = fc.inQuad ? '' : ' <span class="tvsig-fc-lown" title="вне валидированного квадранта — надёжность ниже">вне зоны</span>';
+        const novol = S.hasVolume ? '' : '<br><span class="tvsig-fc-lown">без объёма — T по размаху (слабее)</span>';
+        nwLine = '<br>NW-путь: аналогов <b>' + fc.n + '</b>' + zone + ' · ожидаемый ход за 12 баров <b>' + (lastM >= 0 ? '+' : '') + (lastM * 100).toFixed(2) + '%</b> (±' + (band * 100).toFixed(2) + '%)' + novol;
         if (S.chart) drawNwPath(i, fc); }
-      else { nwLine = '<br>NW-путь: бар вне квадранта / мало аналогов'; _clearNwPath(); }
+      else { nwLine = '<br>NW-путь: мало аналогов' + (S.nwUncond ? '' : ' (бар вне квадранта — включи «NW везде»)'); _clearNwPath(); }
     } else if (S.chart && out) drawForecastBand(i, out); // (C) полоса тейк/стоп для остальных
     el.innerHTML = '<div class="tvsig-fc-card"><b>' + (NAME[S.fcId] || S.fcId) + ': ' + (dir < 0 ? '↓ шорт' : '↑ лонг') + '</b> · ' + _regLbl(rg) + ' · ' + _hhmm(bars[i].time) + ' UTC<br>' +
       'вход <b>' + out.entry.toFixed(4) + '</b> · тейк ' + out.tp.toFixed(4) + ' · стоп ' + out.sl.toFixed(4) + '<br>' +
@@ -821,7 +823,8 @@
       '</div>' + // /pane-theme
       '<div id="tvsig-pane-forecast" class="tvsig-pane" hidden>' +
       '<div id="tvsig-fc-pickrow">Сигнал <select id="tvsig-fc-pick"></select>' +
-      '<label class="tvsig-fc-mtf"><input type="checkbox" id="tvsig-fc-mtf-on"> старший ТФ</label></div>' +
+      '<label class="tvsig-fc-mtf"><input type="checkbox" id="tvsig-fc-mtf-on"> старший ТФ</label>' +
+      '<label class="tvsig-fc-mtf" title="NW: проецировать от любого бара, не только из квадранта (надёжность ниже)"><input type="checkbox" id="tvsig-fc-uncond"> NW везде</label></div>' +
       '<div id="tvsig-fc-regime" class="tvsig-fc-badge"></div>' +
       '<div class="tvsig-fc-sec">Где точнее / слабее (exp ATR · win% · n по осям)</div>' +
       '<div id="tvsig-fc-cond"></div>' +
@@ -866,6 +869,8 @@
       try { _clearNwPath(); (S._fcBand || []).forEach(id => S.chart.removeEntity(id)); S._fcBand = []; } catch (er) {}
       forecastRender(); };
     panel.querySelector('#tvsig-fc-mtf-on').onchange = e => { S.mtfOn = e.target.checked; forecastRender(); };
+    panel.querySelector('#tvsig-fc-uncond').onchange = e => { S.nwUncond = e.target.checked;
+      const d = document.getElementById('tvsig-fc-detail'); if (d) d.innerHTML = ''; _clearNwPath(); forecastRender(); };
     themeBind();
     let minimized = false;
     panel.querySelector('#tvsig-min').onclick = () => { minimized = !minimized; rowsEl.style.display = minimized ? 'none' : ''; panel.querySelector('#tvsig-foot').style.display = minimized ? 'none' : ''; };
