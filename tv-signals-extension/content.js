@@ -61,18 +61,21 @@
   const OI_BASE_DEF = 'https://oi.marginacall.workers.dev';
   function oiBase() { try { return localStorage.getItem('tvsig:oibase') || OI_BASE_DEF; } catch (e) { return OI_BASE_DEF; } }
   // мост в isolated-world (oi-bridge.js) — обход CSP терминала на фетч воркера
-  function oiFetch(url, headers) {
+  function oiFetch(url, headers, method, body) {
     return new Promise(resolve => {
       const id = 'oi' + Math.random().toString(36).slice(2);
       function onRes(e) { let r; try { r = JSON.parse(e.detail); } catch (_) { return; } if (r.id !== id) return; window.removeEventListener('tvsig:oi:res', onRes); resolve(r); }
       window.addEventListener('tvsig:oi:res', onRes);
-      window.dispatchEvent(new CustomEvent('tvsig:oi:req', { detail: JSON.stringify({ id, url, headers: headers || null }) }));
+      window.dispatchEvent(new CustomEvent('tvsig:oi:req', { detail: JSON.stringify({ id, url, headers: headers || null, method: method || null, body: body || null }) }));
       setTimeout(() => { window.removeEventListener('tvsig:oi:res', onRes); resolve({ ok: false, error: 'timeout' }); }, 12000);
     });
   }
   // токен AlgoPack (MOEX) — хранится локально, шлётся ТОЛЬКО в apim.moex.com
   function oiTokenGet() { try { return localStorage.getItem('tvsig:moextoken') || ''; } catch (e) { return ''; } }
   function oiTokenSet(v) { try { v ? localStorage.setItem('tvsig:moextoken', v) : localStorage.removeItem('tvsig:moextoken'); } catch (e) {} }
+  // токен Tinkoff Invest API — хранится локально, шлётся ТОЛЬКО в invest-public-api.tinkoff.ru
+  function tapiTokenGet() { try { return localStorage.getItem('tvsig:tapitoken') || ''; } catch (e) { return ''; } }
+  function tapiTokenSet(v) { try { v ? localStorage.setItem('tvsig:tapitoken', v) : localStorage.removeItem('tvsig:tapitoken'); } catch (e) {} }
   // ISS columnar {columns,data} → массив объектов
   function issToObjects(block) {
     if (!block || !block.columns || !block.data) return [];
@@ -301,6 +304,50 @@
     }
     return { ok: false };
   }
+  // ── источник Tinkoff Invest API: точные данные параллельным REST, график не
+  // трогает. Нужен токен (права только на чтение котировок) из личного кабинета
+  // Т-Инвестиций (Настройки → API-токены). FIGI кэшируется в localStorage —
+  // тикер резолвится в него один раз. НЕ проверено вживую (нет доступа к
+  // реальному токену из песочницы) — если эндпоинт/поля ответа успели
+  // измениться, ошибка от API покажется как есть в подсказке хита скана.
+  const TAPI_BASE = 'https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.';
+  function tapiFigiCache() { try { return JSON.parse(localStorage.getItem('tvsig:tapifigi') || '{}') || {}; } catch (e) { return {}; } }
+  function tapiFigiCacheSet(code, figi) { try { const c = tapiFigiCache(); c[code] = figi; localStorage.setItem('tvsig:tapifigi', JSON.stringify(c)); } catch (e) {} }
+  async function tapiCall(method, body) {
+    const tok = tapiTokenGet(); if (!tok) return { ok: false, error: 'нет токена Tinkoff Invest API' };
+    const r = await oiFetch(TAPI_BASE + method, { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, 'POST', JSON.stringify(body || {}));
+    if (!r.ok) return { ok: false, error: r.error || 'сеть' };
+    try { return { ok: true, data: JSON.parse(r.json) }; } catch (e) { return { ok: false, error: 'плохой ответ API' }; }
+  }
+  async function tapiResolveFigi(code) {
+    const cache = tapiFigiCache(); if (cache[code]) return { ok: true, figi: cache[code] };
+    const r = await tapiCall('InstrumentsService/FindInstrument', { query: code });
+    if (!r.ok) return r;
+    const list = (r.data && r.data.instruments) || [];
+    const exact = list.filter(x => (x.ticker || '').toUpperCase() === code);
+    const pick = exact.find(x => x.classCode === 'TQBR') || exact.find(x => x.instrumentType === 'share' || x.instrumentType === 'futures') || exact[0];
+    if (!pick || !pick.figi) return { ok: false, error: 'тикер не найден в Tinkoff Invest API' };
+    tapiFigiCacheSet(code, pick.figi);
+    return { ok: true, figi: pick.figi };
+  }
+  // шаг ТФ (сек) → ближайший интервал Tinkoff Invest API (мельче, чем 5 у MOEX ISS)
+  function tapiInterval(dt) {
+    return dt <= 90 ? ['CANDLE_INTERVAL_1_MIN', 60] : dt <= 420 ? ['CANDLE_INTERVAL_5_MIN', 300] :
+      dt <= 1200 ? ['CANDLE_INTERVAL_15_MIN', 900] : dt <= 10800 ? ['CANDLE_INTERVAL_HOUR', 3600] : ['CANDLE_INTERVAL_DAY', 86400];
+  }
+  function _tapiQ(q) { return q ? (+q.units || 0) + (+q.nano || 0) / 1e9 : 0; } // Quotation {units,nano} → float
+  async function scanFetchViaTapi(code, dt, t0, t1) {
+    const fg = await tapiResolveFigi(code); if (!fg.ok) return fg;
+    const [interval, ivSec] = tapiInterval(dt);
+    const r = await tapiCall('MarketDataService/GetCandles', {
+      figi: fg.figi, interval, from: new Date(t0 * 1000).toISOString(), to: new Date(t1 * 1000).toISOString() });
+    if (!r.ok) return r;
+    const cc = (r.data && r.data.candles) || [];
+    const bars = cc.map(c => ({ time: Math.floor(Date.parse(c.time) / 1000),
+      open: _tapiQ(c.open), high: _tapiQ(c.high), low: _tapiQ(c.low), close: _tapiQ(c.close), volume: +c.volume || 0 }))
+      .filter(b => b.time && b.close > 0).sort((a, b) => a.time - b.time);
+    return bars.length ? { ok: true, bars, dtSec: ivSec } : { ok: false, error: 'нет свечей за период' };
+  }
   // источник «график терминала»: листаем твой график по тикерам списка, читаем
   // exportData() на ЕГО текущем ТФ (точный, не привязан к 5 интервалам MOEX ISS),
   // потом возвращаем исходный тикер. Медленно (последовательно, один график) и
@@ -350,9 +397,9 @@
     const ivSec = iv === 1 ? 60 : iv === 10 ? 600 : iv === 60 ? 3600 : iv === 24 ? 86400 : 604800;
     const now = Math.floor(Date.now() / 1000), t0 = now - 1000 * ivSec;
     body.innerHTML = '<div class="tvsig-fc-hint">Сканирую ' + codes.length + ' тикеров' + (auto ? ' (авто-подбор метода)' : '') +
-      (source === 'chart' ? ' через график терминала…' : '…') + '</div>';
+      (source === 'chart' ? ' через график терминала…' : source === 'tapi' ? ' через Tinkoff Invest API…' : '…') + '</div>';
     const SC = window.SignalsCore; if (SC.setBreadth) SC.setBreadth(null, 0); // без кросс-тикер breadth в скане
-    const hits = []; const diag = { ok: 0, err: 0, aFire: 0 }; // диагностика: сколько загрузилось, у скольких что-то мелькало
+    const hits = []; const diag = { ok: 0, err: 0, aFire: 0, errMsgs: [] }; // диагностика: сколько загрузилось, у скольких что-то мелькало
     const findFire = (ser, li, lo) => { for (let k = li; k >= lo; k--) if (ser[k]) return k; return -1; }; // самое свежее срабатывание в окне
     const pushHit = (code, bars, dir, hitBar, li, st, mid, ser, dtSec) => {
       let oc = null; try { oc = SC.tradeOutcome(bars, hitBar, dir, 1.5, 0.75, 0.12, 12); } catch (e) {}
@@ -416,6 +463,15 @@
       } finally {
         if (origSymbol) { try { await _chartSetSymbol(origSymbol); } catch (e) {} }
       }
+    } else if (source === 'tapi') {
+      if (!tapiTokenGet()) { body.innerHTML = '<div class="tvsig-fc-hint">Нет токена Tinkoff Invest API — задай его кнопкой 🔑 рядом с источником, или выбери другой источник.</div>'; return; }
+      for (const code of codes) {
+        let f; try { f = await scanFetchViaTapi(code, dt, t0, now); } catch (e) { f = null; }
+        if (!f || !f.ok) { diag.err++; if (f && f.error && diag.errMsgs.length < 3 && !diag.errMsgs.includes(f.error)) diag.errMsgs.push(code + ': ' + f.error); continue; }
+        if (f.bars.length < 80) { diag.err++; continue; }
+        diag.ok++;
+        processTicker(code, f.bars, f.dtSec);
+      }
     } else {
       for (const code of codes) {
         let f; try { f = await scanFetch(code, iv, t0, now); } catch (e) { f = null; }
@@ -424,7 +480,7 @@
         processTicker(code, f.bars, ivSec);
       }
     }
-    const meta = { source, iv, dt: source === 'chart' ? dt : ivSec };
+    const meta = { source, iv, dt: source === 'chart' || source === 'tapi' ? dt : ivSec };
     S._scanCache = { hits, A, B, look, diag, auto, meta }; // для перефильтровки чекбоксом без пересканирования
     S._scanLastTs = Date.now();
     scanRender(hits, A, B, look, diag, auto, meta);
@@ -467,13 +523,16 @@
     // «график терминала» точен всегда, но листает график по тикерам (медленнее).
     const srcNote = meta.source === 'chart'
       ? '<div class="tvsig-fc-hint">источник: график терминала, точный ТФ ≈ ' + _fmtDuration(meta.dt) + '/бар</div>'
-      : '<div class="tvsig-fc-hint">источник: MOEX ISS, интервал <b>' + cmpTfLabel(meta.iv) + '</b> (ближайший из 1/10/60 мин, дня, недели к ТФ графика — соседние ТФ могут дать одинаковый результат, для точного ТФ переключи источник на «график терминала»)</div>';
+      : meta.source === 'tapi'
+      ? '<div class="tvsig-fc-hint">источник: Tinkoff Invest API, точный ТФ ≈ ' + _fmtDuration(meta.dt) + '/бар</div>'
+      : '<div class="tvsig-fc-hint">источник: MOEX ISS, интервал <b>' + cmpTfLabel(meta.iv) + '</b> (ближайший из 1/10/60 мин, дня, недели к ТФ графика — соседние ТФ могут дать одинаковый результат, для точного ТФ переключи источник на «график терминала» или «Tinkoff API»)</div>';
     if (!found.length) {
       if (onlyActive && totalFound > 0) {
         body.innerHTML = srcNote + '<div class="tvsig-fc-hint">Все ' + totalFound + ' срабатывания «' + combo + '»' + win + ' уже отыграли (цель/стоп/тайм-выход) — активных нет. Сними «только неисполненные», чтобы увидеть их с исходом.</div>'; return;
       }
       let msg = 'Нет срабатываний «' + combo + '»' + win + '. Загружено ' + diag.ok + ' тикеров';
       if (diag.err) msg += ' (' + diag.err + ' не отдали свечи)';
+      if (diag.errMsgs && diag.errMsgs.length) msg += '<br><span class="tvsig-fc-lown">' + diag.errMsgs.join(' · ') + '</span>';
       if (auto) msg += '. Сигналы мелькали у ' + diag.aFire + ', но ни один прибыльный на истории (exp>0, n≥10) — увеличь окно или смени ТФ.';
       else { msg += '. ' + NAME[A] + ' мелькал у ' + diag.aFire + '.';
         if (B && B !== '-' && diag.aFire > 0) msg += ' Связка не сошлась — попробуй один метод (второй «—») или увеличь окно.';
@@ -678,10 +737,25 @@
       scanFillPresets();
       const src = document.getElementById('tvsig-scan-src'), warn = document.getElementById('tvsig-scan-src-warn');
       if (src) {
-        try { const sv = localStorage.getItem('tvsig:scansrc'); if (sv) src.value = sv; } catch (e) {}
+        let sv = null; try { sv = localStorage.getItem('tvsig:scansrc'); } catch (e) {}
+        if (sv) src.value = sv;
+        else if (tapiTokenGet()) src.value = 'tapi'; // ни разу не выбирал источник, но токен уже есть — сразу лучший вариант
         const syncWarn = () => { if (warn) warn.hidden = src.value !== 'chart'; };
         src.addEventListener('change', () => { try { localStorage.setItem('tvsig:scansrc', src.value); } catch (er) {} syncWarn(); scanAutoSync(); });
         syncWarn();
+      }
+      const tapiKeyBtn = document.getElementById('tvsig-tapi-key');
+      if (tapiKeyBtn) {
+        const updTapiKeyBtn = () => { tapiKeyBtn.style.opacity = tapiTokenGet() ? '1' : '0.5'; tapiKeyBtn.title = tapiTokenGet() ? 'Токен Tinkoff Invest API задан (клик — сменить/очистить)' : 'Токен Tinkoff Invest API (права только на чтение котировок) — нужен для источника «Tinkoff Invest API»'; };
+        tapiKeyBtn.onclick = () => {
+          const has = !!tapiTokenGet();
+          const v = prompt('Токен Tinkoff Invest API из личного кабинета Т-Инвестиций (Настройки → API-токены). Хватит прав только на чтение котировок — доступ к деньгам/заявкам не нужен.\nХранится ЛОКАЛЬНО, шлётся только в invest-public-api.tinkoff.ru.\n' + (has ? 'Есть заданный. Введи новый, или "-" чтобы очистить.' : 'Вставь токен (или Отмена):'), '');
+          if (v === null) return;
+          if (v.trim() === '-') tapiTokenSet(''); else if (v.trim()) tapiTokenSet(v.trim());
+          updTapiKeyBtn();
+          if (tapiTokenGet() && src && !sv) src.value = 'tapi';
+        };
+        updTapiKeyBtn();
       }
       const autoCb = document.getElementById('tvsig-scan-auto'), autoIv = document.getElementById('tvsig-scan-auto-iv');
       if (autoCb) {
@@ -1435,9 +1509,11 @@
       '<button id="tvsig-scan-save" title="Сохранить текущий список тикеров под своим именем">Сохранить…</button>' +
       '<button id="tvsig-scan-del" title="Удалить выбранный свой список">Удалить</button></div>' +
       '<div id="tvsig-scan-srcrow">Источник <select id="tvsig-scan-src">' +
+      '<option value="tapi">Tinkoff Invest API (точные данные, параллельно, график не трогает — нужен токен)</option>' +
       '<option value="chart" selected>график терминала (точные данные, медленно — переключает твой график)</option>' +
       '<option value="moex">MOEX ISS (быстро, но урезанный/неполный фид — интервал 1/10/60/1440 мин)</option>' +
-      '</select><span id="tvsig-scan-src-warn" class="tvsig-fc-lown"> ⚠ на время скана график будет листать все тикеры списка по очереди и вернётся на исходный</span></div>' +
+      '</select><button id="tvsig-tapi-key" title="Токен Tinkoff Invest API (права только на чтение котировок)">🔑</button>' +
+      '<span id="tvsig-scan-src-warn" class="tvsig-fc-lown"> ⚠ на время скана график будет листать все тикеры списка по очереди и вернётся на исходный</span></div>' +
       '<div id="tvsig-scan-autorow"><label class="tvsig-scan-onlyactive" id="tvsig-scan-auto-lbl" title="Пересканировать список автоматически, пока открыта вкладка «Сканер». Доступно только для источника MOEX — авто-пересканирование через «график терминала» слишком часто дёргало бы твой график."><input type="checkbox" id="tvsig-scan-auto"> автообновление каждые</label>' +
       '<select id="tvsig-scan-auto-iv"><option value="15">15 с</option><option value="30" selected>30 с</option><option value="60">1 мин</option><option value="120">2 мин</option><option value="300">5 мин</option></select>' +
       '<span id="tvsig-scan-auto-ts" class="dim"></span></div>' +
@@ -1448,7 +1524,7 @@
       '<label class="tvsig-scan-onlyactive" title="Спрятать сигналы, которые уже отыграли — цена дошла до цели, выбила стоп, или прошёл горизонт (12 бар.) без исхода. Оставляет только те, что ещё в пути."><input type="checkbox" id="tvsig-scan-onlyactive"> только неисполненные</label>' +
       '<button id="tvsig-scan-go" title="Просканировать список">Скан</button></div>' +
       '<div id="tvsig-scan-body"></div>' +
-      '<div id="tvsig-scan-foot"><b>🔝 авто</b> (по умолчанию): для каждого тикера сам считает все методы и берёт самый прибыльный НА ЕГО истории (exp&gt;0, n≥10), сработавший в окне — список тикеров с их лучшим методом и направлением, без ручного выбора. Или задай метод/связку вручную. Пресеты — стандартные секторные наборы MOEX; свои списки можно сохранять/удалять («список дня» тоже сохраняется). <b>Источник «график терминала»</b> (по умолчанию) — те же данные, что видит терминал: точный ТФ, без округления, покрывает всю сессию 7:00–23:50. Листает твой график по тикерам списка по очереди (медленно, видно визуально) и возвращает исходный тикер в конце. <b>Источник MOEX ISS</b> — быстрее (параллельные REST-запросы, график не трогает), но урезанный бесплатный фид: интервал округляется до одного из 5 (1/10/60 мин, день, неделя), а после вечерней сессии данные обновляются плохо/с задержкой — используй, только если скорость важнее полноты данных. Ищет сигнал в последних N закрытых барах. «X баров / Y назад» — свежесть с пересчётом в реальное время по ТФ. «→ тейк/стоп/тайм ±ATR» — чем ЗАКОНЧИЛАСЬ именно эта сделка (успела ли отыграть): понятно, имел ли сигнал смысл. Хиты сортируются по ТОЧНОСТИ связки на истории тикера (exp/win/n, R:R 2:1); n&lt;10 = мало данных, вниз. Кросс-тикерный breadth в скане не применяется. Второй сигнал «—» = один метод. <b>Автообновление</b> — пересканирует список на заданном интервале, пока открыта эта вкладка (закрыл вкладку — таймер встал, вернулся — снова пошёл); доступно только для источника MOEX.</div>' +
+      '<div id="tvsig-scan-foot"><b>🔝 авто</b> (по умолчанию): для каждого тикера сам считает все методы и берёт самый прибыльный НА ЕГО истории (exp&gt;0, n≥10), сработавший в окне — список тикеров с их лучшим методом и направлением, без ручного выбора. Или задай метод/связку вручную. Пресеты — стандартные секторные наборы MOEX; свои списки можно сохранять/удалять («список дня» тоже сохраняется). <b>Источник Tinkoff Invest API</b> — лучший вариант: точные данные (1/5/15 мин/час/день), параллельные запросы (быстро), график не трогает. Нужен токен (🔑 рядом — права только на чтение котировок, из личного кабинета Т-Инвестиций); тикер резолвится в FIGI один раз и кэшируется. <b>«График терминала»</b> — те же точные данные, но листает твой график по тикерам списка по очереди (медленно, видно визуально) и возвращает исходный тикер в конце — без токена. <b>MOEX ISS</b> — быстрее «графика», но урезанный бесплатный фид: интервал округляется до одного из 5 (1/10/60 мин, день, неделя), после вечерней сессии данные обновляются плохо/с задержкой. Ищет сигнал в последних N закрытых барах. «X баров / Y назад» — свежесть с пересчётом в реальное время по ТФ. «→ тейк/стоп/тайм ±ATR» — чем ЗАКОНЧИЛАСЬ именно эта сделка (успела ли отыграть): понятно, имел ли сигнал смысл. Хиты сортируются по ТОЧНОСТИ связки на истории тикера (exp/win/n, R:R 2:1); n&lt;10 = мало данных, вниз. Кросс-тикерный breadth в скане не применяется. Второй сигнал «—» = один метод. <b>Автообновление</b> — пересканирует список на заданном интервале, пока открыта эта вкладка (закрыл вкладку — таймер встал, вернулся — снова пошёл); недоступно только для источника «график терминала».</div>' +
       '</div>'; // /pane-scan
     document.documentElement.appendChild(panel);
     try { const wv = parseInt(localStorage.getItem('tvsig:width') || '', 10); if (wv >= 300 && wv <= 640) panel.style.width = wv + 'px'; } catch (e) {}

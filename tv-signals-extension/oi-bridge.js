@@ -12,7 +12,7 @@
       try { window.dispatchEvent(new CustomEvent('tvsig:oi:res', { detail: JSON.stringify(res) })); } catch (_) {}
     };
     try {
-      chrome.runtime.sendMessage({ type: 'tvsig:fetch', url: d.url, headers: d.headers || null }, (res) => {
+      chrome.runtime.sendMessage({ type: 'tvsig:fetch', url: d.url, headers: d.headers || null, method: d.method || null, body: d.body || null }, (res) => {
         if (chrome.runtime.lastError) return reply({ ok: false, error: chrome.runtime.lastError.message || 'sw-unreachable' });
         reply(res || { ok: false, error: 'no-response' });
       });

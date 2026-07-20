@@ -11,10 +11,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       // credentials, иначе запрос уходит без входа и MOEX отдаёт 401.
       // Воркер (не moex.com) — по-прежнему без кук.
       let host = ''; try { host = new URL(msg.url).hostname; } catch (_) {}
-      const opt = { credentials: /(^|\.)moex\.com$/.test(host) ? 'include' : 'omit' };
-      if (msg.headers) opt.headers = msg.headers; // напр. Authorization: Bearer <AlgoPack APIKEY>
+      const opt = { credentials: /(^|\.)moex\.com$/.test(host) ? 'include' : 'omit', method: msg.method || 'GET' };
+      if (msg.headers) opt.headers = msg.headers; // напр. Authorization: Bearer <AlgoPack APIKEY / Tinkoff Invest API токен>
+      if (msg.body != null) opt.body = msg.body;   // POST-тело (Tinkoff Invest API — все методы через POST)
       const r = await fetch(msg.url, opt);
-      if (!r.ok) sendResponse({ ok: false, error: 'HTTP ' + r.status });
+      if (!r.ok) { let body = ''; try { body = await r.text(); } catch (e) {} sendResponse({ ok: false, error: 'HTTP ' + r.status + (body ? ': ' + body.slice(0, 300) : '') }); }
       else sendResponse({ ok: true, json: await r.text() });
     } catch (err) { sendResponse({ ok: false, error: String(err && err.message || err) }); }
   })();
