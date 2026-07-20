@@ -318,11 +318,12 @@
     const SC = window.SignalsCore; if (SC.setBreadth) SC.setBreadth(null, 0); // без кросс-тикер breadth в скане
     const hits = []; const diag = { ok: 0, err: 0, aFire: 0 }; // диагностика: сколько загрузилось, у скольких что-то мелькало
     const findFire = (ser, li, lo) => { for (let k = li; k >= lo; k--) if (ser[k]) return k; return -1; }; // самое свежее срабатывание в окне
-    const pushHit = (code, bars, dir, hitBar, li, st, mid) => {
+    const pushHit = (code, bars, dir, hitBar, li, st, mid, ser) => {
       let oc = null; try { oc = SC.tradeOutcome(bars, hitBar, dir, 1.5, 0.75, 0.12, 12); } catch (e) {}
+      let plan = null; try { plan = ser ? _planFor(bars, ser, hitBar, dir, ivSec, li) : null; } catch (e) {}
       hits.push({ code, dir, price: bars[hitBar].close, ago: li - hitBar, ts: bars[hitBar].time, mid,
         exp: st ? st.exp : null, win: st ? st.win : null, n: st ? st.n : 0,
-        ocExit: oc ? oc.exit : null, ocPnl: oc ? oc.pnl : null });
+        ocExit: oc ? oc.exit : null, ocPnl: oc ? oc.pnl : null, plan });
     };
     for (const code of codes) {
       let f; try { f = await scanFetch(code, iv, t0, now); } catch (e) { f = null; }
@@ -341,7 +342,7 @@
           if (!best || st.exp > best.st.exp) best = { id, hb, dir: Math.sign(c.series[hb]), st };
         }
         if (anyFire) diag.aFire++;
-        if (best) pushHit(code, bars, best.dir, best.hb, li, best.st, best.id);
+        if (best) pushHit(code, bars, best.dir, best.hb, li, best.st, best.id, comp[best.id].series);
         continue;
       }
       let sa, sb;
@@ -361,7 +362,7 @@
         // Для согласия — серия только там, где оба метода в одну сторону.
         const ser2 = sb ? sa.map((v, k) => { const w = sb[k]; return (v && w && Math.sign(v) === Math.sign(w)) ? Math.sign(v) : 0; }) : sa;
         let st = null; try { st = SC.btStats(ser2, bars, 12); } catch (e) {}
-        pushHit(code, bars, dir, hitBar, li, st, null);
+        pushHit(code, bars, dir, hitBar, li, st, null, ser2);
       }
     }
     scanRender(hits, A, B, look, diag, ivSec, auto);
@@ -405,9 +406,10 @@
         if (h.ocExit === 'открыта') oc = ' <span class="dim" title="Сделка ещё не закрылась (свежий сигнал)">ещё открыта</span>';
         else if (h.ocExit && h.ocPnl != null) { const good = h.ocPnl > 0;
           oc = ' <span class="' + (good ? 'pos' : 'neg') + '" title="Чем закончилась ИМЕННО эта сделка от сигнала (тейк 1.5 / стоп 0.75 ATR, тайм-выход 12 баров)">→ ' + h.ocExit + ' ' + (h.ocPnl >= 0 ? '+' : '') + h.ocPnl.toFixed(2) + ' ATR</span>'; }
+        const badges = _planBadges(h.plan);
         return '<div class="tvsig-scan-hit" data-code="' + h.code + '">' +
           '<b>' + h.code + '</b> <span class="' + (h.dir < 0 ? 'neg' : 'pos') + '">' + (h.dir < 0 ? '↓ шорт' : '↑ лонг') + '</span>' + mname +
-          ' <span class="dim">@ ' + h.price + '</span> ' + ago + oc + '<br>' + stat + '</div>';
+          ' <span class="dim">@ ' + h.price + '</span> ' + ago + oc + (badges ? '<br>' + badges : '') + '<br>' + stat + '</div>';
       }).join('');
   }
 
@@ -776,11 +778,93 @@
     return '<table class="tvsig-fc-tbl"><tr><th>ось</th><th>exp</th><th>win</th><th>n</th></tr>' +
       ['режим', 'vol', 'рынок', 'сессия'].map(grp).join('') + '</table>';
   }
+  // ── план активного сигнала: цель/срок, промежуточные чекпоинты, тренд метода,
+  //    опровергнут ли рынком с начала забега (общий код для панели и сканера) ────
+  function _fmtDuration(sec) {
+    if (sec == null || !isFinite(sec)) return '—';
+    const s = Math.max(0, Math.round(sec));
+    if (s < 60) return s + ' с'; if (s < 3600) return Math.round(s / 60) + ' мин';
+    if (s < 86400) return (s / 3600).toFixed(s < 36000 ? 1 : 0) + ' ч'; return Math.round(s / 86400) + ' дн';
+  }
+  // bars/ser — свои для тикера (панель: S.bars/series; сканер: бары сканируемого тикера),
+  // i — бар, на котором ищем начало забега сигнала (в сканере — бар срабатывания,
+  // а не обязательно последний), dir — направление, dt — шаг бара (сек), nowIdx —
+  // «сейчас» для отсчёта возраста/чекпоинтов (по умолчанию = i, в сканере — li).
+  function _planFor(bars, ser, i, dir, dt, nowIdx) {
+    const SC = window.SignalsCore;
+    const run = SC.signalRun(ser, i); if (!run) return null;
+    nowIdx = nowIdx != null ? nowIdx : i;
+    const live = SC.liveOutcome(bars, run.startIdx, dir, 1.5, 0.75, 0.12, 12);
+    const trend = SC.methodTrend(ser, bars, 12);
+    const ageBars = nowIdx - run.startIdx;
+    const plan = { dir, startIdx: run.startIdx, startTime: bars[run.startIdx].time,
+      ageBars, ageTime: ageBars * dt, trend, live, nowPrice: bars[nowIdx].close };
+    if (live) { plan.entry = live.entry; plan.tp = live.tp; plan.sl = live.sl; }
+    if (live && live.state === 'active') {
+      plan.etaBars = live.barsRemaining; plan.etaTime = live.barsRemaining * dt;
+      plan.checkpoints = [0.25, 0.5, 0.75, 1].map(f => {
+        const barsFromNow = Math.max(1, Math.round(live.barsRemaining * f));
+        return { f, barsFromNow, time: bars[nowIdx].time + barsFromNow * dt, price: plan.nowPrice + (live.tp - plan.nowPrice) * f };
+      });
+    }
+    return plan;
+  }
+  function _signalPlan(id) {
+    const c = S.computed && S.computed[id], bars = S.bars;
+    if (!c || !c.last || !c.series || !bars || !bars.length) return null;
+    return _planFor(bars, c.series, bars.length - 1, Math.sign(c.last), S.barDt || 300);
+  }
+  // компактный кластер бейджей: тренд метода (усил/слаб) + статус живой сделки
+  // с начала сигнала (в пути / опровергнут стопом / цель достигнута / устарел)
+  function _planBadges(p) {
+    if (!p) return '';
+    let html = '';
+    if (p.trend && p.trend.state) {
+      const t = p.trend.state, cls = t === 'up' ? 'up' : t === 'down' ? 'down' : 'flat';
+      const arrow = t === 'up' ? '↗' : t === 'down' ? '↘' : '→';
+      const word = t === 'up' ? 'усиливается' : t === 'down' ? 'слабеет' : 'стабильно';
+      html += '<span class="tvsig-trend ' + cls + '" title="Метод ' + word + ': последние ' + p.trend.recentN + ' сделок exp ' +
+        _fcNum(p.trend.recentExp) + ' ATR против предыдущих ' + p.trend.priorN + ' сделок exp ' + _fcNum(p.trend.priorExp) + ' ATR">' + arrow + '</span>';
+    }
+    if (p.live) {
+      const st = p.live.state, since = 'с ' + _hhmm(p.startTime) + ' UTC (' + p.ageBars + ' бар. / ' + _fmtDuration(p.ageTime) + ' назад)';
+      if (st === 'stopped') html += '<span class="tvsig-inval" title="Опровергнут: цена уже выбила расчётный стоп ' + p.sl.toFixed(4) + ' ' + since + '">⚠ стоп</span>';
+      else if (st === 'reached') html += '<span class="tvsig-reached" title="Цель ' + p.tp.toFixed(4) + ' уже достигнута ' + since + '">✓ цель</span>';
+      else if (st === 'expired') html += '<span class="tvsig-expired" title="Прошло больше горизонта (12 баров) без тейка/стопа — сигнал устарел, ' + since + '">⏱ истёк</span>';
+      else if (st === 'active') html += '<span class="tvsig-eta" title="Сигнал ' + since + '. Цель ' + p.tp.toFixed(4) + ' · стоп ' + p.sl.toFixed(4) + ' · ~' + _fmtDuration(p.etaTime) + ' (' + p.etaBars + ' бар.) до конца горизонта (12 бар.), если темп сохранится">→' + p.tp.toFixed(2) + ' ~' + _fmtDuration(p.etaTime) + '</span>';
+    }
+    return html;
+  }
   function _recentSignals(ser, bars) {
     const idx = []; for (let i = bars.length - 1; i >= 0 && idx.length < 8; i--) if (ser[i]) idx.push(i);
     if (!idx.length) return '<span class="tvsig-fc-hint">Нет сигналов на этой истории.</span>';
     return idx.map(i => '<div class="tvsig-fc-sig" data-idx="' + i + '">' + _hhmm(bars[i].time) + ' UTC · ' +
       (ser[i] < 0 ? '↓ шорт' : '↑ лонг') + ' · <span class="dim">' + _regLbl(window.SignalsCore.regimeInfo(bars, i)) + '</span></div>').join('');
+  }
+  // карточка ТЕКУЩЕГО активного сигнала выбранного метода: цель/срок, чекпоинты
+  // по пути, тренд метода, статус (в пути / опровергнут / цель / устарел)
+  function _activeSignalCard(id) {
+    const p = _signalPlan(id);
+    if (!p) return '<span class="tvsig-fc-hint">Сейчас нет активного сигнала «' + (NAME[id] || id) + '» на этом тикере.</span>';
+    const dirTxt = p.dir < 0 ? '↓ шорт' : '↑ лонг';
+    const since = _hhmm(p.startTime) + ' UTC · ' + p.ageBars + ' бар. / ' + _fmtDuration(p.ageTime) + ' назад';
+    const st = p.live ? p.live.state : null;
+    let stLine;
+    if (st === 'stopped') stLine = '<span class="tvsig-inval">⚠ ОПРОВЕРГНУТ</span> — цена уже выбила стоп ' + p.sl.toFixed(4) + ' с начала сигнала';
+    else if (st === 'reached') stLine = '<span class="tvsig-reached">✓ цель достигнута</span> — ' + p.tp.toFixed(4) + ' уже пройдена с начала сигнала';
+    else if (st === 'expired') stLine = '<span class="tvsig-expired">⏱ устарел</span> — прошло больше горизонта (12 бар.) без тейка/стопа, актуальность под вопросом';
+    else if (st === 'active') stLine = 'в пути · ещё ~' + _fmtDuration(p.etaTime) + ' (' + p.etaBars + ' бар.) до конца горизонта, если темп сохранится';
+    else stLine = '—';
+    const trend = p.trend && p.trend.state
+      ? ((p.trend.state === 'up' ? '<span class="tvsig-trend up">↗ усиливается</span>' : p.trend.state === 'down' ? '<span class="tvsig-trend down">↘ слабеет</span>' : '<span class="tvsig-trend flat">→ стабильно</span>') +
+        ' (посл. ' + p.trend.recentN + ' сделки exp ' + _fcNum(p.trend.recentExp) + ' ATR против пред. ' + p.trend.priorN + ' сделок exp ' + _fcNum(p.trend.priorExp) + ' ATR)')
+      : '<span class="tvsig-fc-hint">мало сделок в истории для оценки тренда</span>';
+    const cps = p.checkpoints ? '<table class="tvsig-fc-tbl"><tr><th>чекпоинт</th><th>к какому времени</th><th>ожид. цена</th></tr>' +
+      p.checkpoints.map(c => '<tr><td>' + Math.round(c.f * 100) + '%</td><td>' + _hhmm(c.time) + ' UTC (+' + c.barsFromNow + ' бар.)</td><td>' + c.price.toFixed(4) + '</td></tr>').join('') + '</table>' : '';
+    return '<div class="tvsig-fc-card"><b>' + (NAME[id] || id) + ': ' + dirTxt + '</b> · начало ' + since + '<br>' +
+      'статус: ' + stLine + '<br>' +
+      'вход <b>' + p.entry.toFixed(4) + '</b> · цель <b>' + p.tp.toFixed(4) + '</b> · стоп ' + p.sl.toFixed(4) + '<br>' +
+      'тренд метода: ' + trend + cps + '</div>';
   }
   function _fcPickInit() {
     const sel = document.getElementById('tvsig-fc-pick'); if (!sel || sel.dataset.init) return;
@@ -793,9 +877,11 @@
     const bars = S.bars, SC = window.SignalsCore;
     _fcPickInit();
     const rgEl = document.getElementById('tvsig-fc-regime'), condEl = document.getElementById('tvsig-fc-cond'), sigEl = document.getElementById('tvsig-fc-signals');
-    if (!bars || bars.length < 60) { if (rgEl) rgEl.innerHTML = '<span class="tvsig-fc-hint">Мало свечей — открой «Модели» и ⟳.</span>'; if (condEl) condEl.innerHTML = ''; if (sigEl) sigEl.innerHTML = ''; return; }
+    const actEl = document.getElementById('tvsig-fc-active');
+    if (!bars || bars.length < 60) { if (rgEl) rgEl.innerHTML = '<span class="tvsig-fc-hint">Мало свечей — открой «Модели» и ⟳.</span>'; if (condEl) condEl.innerHTML = ''; if (sigEl) sigEl.innerHTML = ''; if (actEl) actEl.innerHTML = ''; return; }
     const rg = SC.regimeInfo(bars, bars.length - 1);
     if (rgEl) rgEl.innerHTML = _regimeBadge(rg);
+    if (actEl) actEl.innerHTML = _activeSignalCard(S.fcId);
     const ser = _fcSeries(S.fcId);
     if (condEl) condEl.innerHTML = _condTable(SC.condStats(ser, bars, 12), SC.regimeBuckets(bars, bars.length - 1));
     if (sigEl) sigEl.innerHTML = _recentSignals(ser, bars);
@@ -841,9 +927,13 @@
   }
   // Калькулятор позиции: счёт + риск% → размер и макс. число позиций.
   // Стоп/тейк — в % от цены (адаптивны к волатильности: SC.volProfile, ширина от
-  // ATR × VR-шум, R:R 2:1). Размер БЕЗ ПЛЕЧА: позиция не больше счёта. Если стоп
-  // слишком узкий, чтобы рискнуть заданный %, берём весь счёт и показываем
-  // фактический (меньший) риск, а не раздуваем позицию в margin до небес.
+  // ATR × VR-шум, R:R 2:1). Размер по формуле риск/стоп: чем УЖЕ стоп, тем БОЛЬШЕ
+  // позиция для того же риска в деньгах — так и должна работать риск-сайзинг
+  // формула. Но на тикерах с типично узким ATR-стопом (особенно на коротких ТФ)
+  // это почти ВСЕГДА выталкивает размер в покупательную способность целиком —
+  // калькулятор предлагал класть весь депозит в одну бумагу. Поэтому есть
+  // отдельный жёсткий потолок «% депозита на сделку» (tvsig-rc-cap), не зависящий
+  // от риск/стоп-расчёта — он и раньше отсутствовал, теперь режет размер первым.
   function _rcVal(id) { const el = document.getElementById(id); const v = el ? parseFloat(el.value) : NaN; return isFinite(v) ? v : NaN; }
   function rcInit() {
     try { const s = JSON.parse(localStorage.getItem('tvsig:rc') || '{}');
@@ -851,11 +941,12 @@
       if (s.r != null && document.getElementById('tvsig-rc-risk')) document.getElementById('tvsig-rc-risk').value = s.r;
       if (s.l != null && document.getElementById('tvsig-rc-lev')) document.getElementById('tvsig-rc-lev').value = s.l;
       if (s.p != null && document.getElementById('tvsig-rc-port')) document.getElementById('tvsig-rc-port').value = s.p;
+      if (s.c != null && document.getElementById('tvsig-rc-cap')) document.getElementById('tvsig-rc-cap').value = s.c;
     } catch (e) {}
   }
   function rcCompute() {
     const out = document.getElementById('tvsig-rc-out'); if (!out) return;
-    try { localStorage.setItem('tvsig:rc', JSON.stringify({ a: _rcVal('tvsig-rc-acct'), r: _rcVal('tvsig-rc-risk'), l: _rcVal('tvsig-rc-lev'), p: _rcVal('tvsig-rc-port') })); } catch (e) {}
+    try { localStorage.setItem('tvsig:rc', JSON.stringify({ a: _rcVal('tvsig-rc-acct'), r: _rcVal('tvsig-rc-risk'), l: _rcVal('tvsig-rc-lev'), p: _rcVal('tvsig-rc-port'), c: _rcVal('tvsig-rc-cap') })); } catch (e) {}
     const bars = S.bars, SC = window.SignalsCore;
     if (!bars || bars.length < 20) { out.innerHTML = '<span class="tvsig-fc-hint">Нет свечей — открой «Модели» и ⟳.</span>'; return; }
     const vp = SC.volProfile ? SC.volProfile(bars) : null;
@@ -870,18 +961,26 @@
       '<span class="tvsig-fc-lown" title="ширина в ATR: стоп ' + vp.stopK.toFixed(2) + ' / тейк ' + vp.takeK.toFixed(2) + ' ATR (крутится VR-шумом ' + (vp.vr != null ? vp.vr.toFixed(2) : '—') + ')"> ⓘ</span>';
     const acct = _rcVal('tvsig-rc-acct'), risk = _rcVal('tvsig-rc-risk'), port = _rcVal('tvsig-rc-port');
     const lev = Math.max(1, _rcVal('tvsig-rc-lev') || 1);
+    const capPct = _rcVal('tvsig-rc-cap');
     if (acct > 0 && risk > 0 && stopPct > 0) {
       const stopFrac = stopPct / 100, takeFrac = takePct / 100;
-      const buyPower = acct * lev;                         // покупательная способность с плечом
-      const posByRisk = (acct * risk / 100) / stopFrac;    // сколько НАДО, чтобы рискнуть risk%
-      const capped = posByRisk > buyPower;                 // ограничение — покупательная способность
-      const posValue = Math.min(posByRisk, buyPower), units = posValue / price;
+      const buyPower = acct * lev;                          // покупательная способность с плечом
+      const capValue = capPct > 0 ? acct * capPct / 100 : Infinity; // жёсткий потолок на одну сделку
+      const hardCap = Math.min(buyPower, capValue);
+      const posByRisk = (acct * risk / 100) / stopFrac;     // сколько НАДО, чтобы рискнуть risk%
+      const capped = posByRisk > hardCap;                   // упёрлись в потолок (капитал или лимит/сделку)
+      const posValue = Math.min(posByRisk, hardCap), units = posValue / price;
       const riskMoney = posValue * stopFrac, riskPctReal = 100 * riskMoney / acct, profit = posValue * takeFrac;
       const wpct = 100 * posValue / acct;
       const levTxt = lev > 1 ? ' · плечо ×' + lev : '';
       html += '<br>размер позиции: <b>' + rub(posValue) + ' ₽</b> (' + wpct.toFixed(0) + '% счёта' + levTxt + ') ≈ ' + (units >= 10 ? rub(units) : units.toFixed(2)) + ' ед.';
       html += '<br>риск по стопу: <b>' + rub(riskMoney) + ' ₽</b> (' + riskPctReal.toFixed(2) + '% счёта) · профит по тейку: <b>+' + rub(profit) + ' ₽</b>';
-      if (capped) html += '<br><span class="tvsig-fc-lown">стоп ' + pct(stopPct) + ': чтобы рискнуть ' + risk + '%, нужна позиция ' + rub(posByRisk) + ' ₽ — больше покупательной способности (' + rub(buyPower) + ' ₽ при плече ×' + lev + '). Взят максимум, фактический риск ' + riskPctReal.toFixed(2) + '%.</span>';
+      if (capped) {
+        if (hardCap === capValue && capValue < buyPower)
+          html += '<br><span class="tvsig-fc-lown">стоп ' + pct(stopPct) + ' узкий: риск-формула просит ' + rub(posByRisk) + ' ₽ на сделку — больше лимита «' + capPct + '% депозита на сделку» (' + rub(capValue) + ' ₽). Взят лимит, фактический риск ' + riskPctReal.toFixed(2) + '% (ниже заданных ' + risk + '%).</span>';
+        else
+          html += '<br><span class="tvsig-fc-lown">стоп ' + pct(stopPct) + ': чтобы рискнуть ' + risk + '%, нужна позиция ' + rub(posByRisk) + ' ₽ — больше покупательной способности (' + rub(buyPower) + ' ₽ при плече ×' + lev + '). Взят максимум, фактический риск ' + riskPctReal.toFixed(2) + '%.</span>';
+      }
       const maxByCap = Math.max(1, Math.floor(buyPower / posValue));
       const maxByRisk = (port > 0 && riskPctReal > 0) ? Math.floor(port / riskPctReal) : Infinity;
       let mp = Math.min(maxByCap, maxByRisk), lim = maxByRisk < maxByCap ? 'лимиту риска портфеля' : (lev > 1 ? 'покупательной способности' : 'капиталу');
@@ -1132,6 +1231,7 @@
       '<label class="tvsig-fc-mtf"><input type="checkbox" id="tvsig-fc-mtf-on"> старший ТФ</label>' +
       '<label class="tvsig-fc-mtf" title="NW: проецировать от любого бара, не только из квадранта (надёжность ниже)"><input type="checkbox" id="tvsig-fc-uncond"> NW везде</label></div>' +
       '<div id="tvsig-fc-regime" class="tvsig-fc-badge"></div>' +
+      '<div id="tvsig-fc-active"></div>' +
       // калькулятор риска и гипотеза — вверху, это самые нужные инструменты
       '<div class="tvsig-fc-sec">Калькулятор позиции (риск на сделку)</div>' +
       '<div id="tvsig-rc-ctrl">' +
@@ -1139,6 +1239,7 @@
       '<label>Риск/сделку %<input id="tvsig-rc-risk" type="number" step="0.1" value="1"></label>' +
       '<label>Плечо ×<input id="tvsig-rc-lev" type="number" step="0.1" min="1" value="1" title="Встроенное плечо инструмента. 1 = без плеча (кэш). Для фьючерсов/маржи впиши доступное плечо — позиция сможет превышать счёт во столько раз."></label>' +
       '<label>Лимит риска портфеля %<input id="tvsig-rc-port" type="number" step="1" value="10"></label>' +
+      '<label>Лимит на сделку, % депозита<input id="tvsig-rc-cap" type="number" step="1" value="25" title="Жёсткий потолок размера ОДНОЙ позиции, не зависит от риск/стоп-расчёта. При узком стопе риск-формула может требовать почти весь депозит на одну бумагу (риск% ÷ стоп% → доля счёта) — этот лимит её обрезает первым. 0 или пусто = без лимита (только покупательная способность)."></label>' +
       '</div>' +
       '<div id="tvsig-rc-out"></div>' +
       '<div class="tvsig-fc-sec">Гипотеза: если цена дойдёт до</div>' +
@@ -1207,7 +1308,7 @@
       forecastRender(); };
     panel.querySelector('#tvsig-fc-mtf-on').onchange = e => { S.mtfOn = e.target.checked; forecastRender(); };
     rcInit();
-    ['tvsig-rc-acct', 'tvsig-rc-risk', 'tvsig-rc-port'].forEach(id => {
+    ['tvsig-rc-acct', 'tvsig-rc-risk', 'tvsig-rc-port', 'tvsig-rc-cap', 'tvsig-rc-lev'].forEach(id => {
       const el = panel.querySelector('#' + id); if (el) el.addEventListener('input', rcCompute); });
     panel.querySelector('#tvsig-fc-uncond').onchange = e => { S.nwUncond = e.target.checked;
       const d = document.getElementById('tvsig-fc-detail'); if (d) d.innerHTML = ''; _clearNwPath(); forecastRender(); };
@@ -1310,10 +1411,11 @@
           const expCol = st && st.exp != null ? (st.exp > 0.03 ? '#52F2C9' : st.exp < -0.03 ? '#FF6A8B' : '#A79BC9') : '#6F648F';
           const win = st && st.acc != null ? (st.acc * 100).toFixed(0) + '%' : '—';
           const nn = st ? st.n : 0;
+          const badges = (c && c.last) ? _planBadges(_signalPlan(id)) : '';
           return pill(c ? c.last : 0) +
             '<span class="tvsig-exp" style="color:' + expCol + '" title="exp — экспектанси: средний P&L сделки в ATR (тейк +1.0 / стоп −0.5 ATR, издержки 0.12). Плюс = метод в прибыли, даже если winrate низкий.">' + exp + '</span>' +
             '<span class="tvsig-acc" title="winrate — частота совпадения знака с ходом за 12 баров. У фейдов бывает низкой при плюсовом exp — это норма.">' + win + '</span>' +
-            '<span class="tvsig-n" title="Число сделок в exp-симуляции">n' + nn + '</span>';
+            '<span class="tvsig-n" title="Число сделок в exp-симуляции">n' + nn + '</span>' + badges;
         })();
     return '<div class="tvsig-row' + (on ? ' on' : '') + '" data-id="' + id + '">' +
       diam + '<span class="tvsig-name" title="' + NAME[id] + '">' + NAME[id] + '</span>' + mid + info + swatch + '</div>';

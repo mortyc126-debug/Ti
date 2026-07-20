@@ -372,6 +372,67 @@
     return { 'режим': rg.isTrend ? 'тренд' : 'боковик', 'vol': rg.vol, 'рынок': mk, 'сессия': ses };
   }
 
+  // ── план активного сигнала: с какого бара идёт, ещё жив/уже опровергнут стопом,
+  //    усиливается/слабеет метод в последних сделках ─────────────────────────────
+  // Контигентный забег сигнала одного знака, заканчивающийся на баре i. Возвращает
+  // {startIdx, dir, ageBars} или null, если на i нет сигнала.
+  function signalRun(scoreArr, i) {
+    if (!scoreArr || i < 0 || i >= scoreArr.length) return null;
+    const dir = Math.sign(scoreArr[i] || 0); if (!dir) return null;
+    let k = i; while (k > 0 && Math.sign(scoreArr[k - 1] || 0) === dir) k--;
+    return { startIdx: k, dir, ageBars: i - k };
+  }
+
+  // Живой исход сделки от бара i в направлении dir: проверяет ВСЕ бары, что уже
+  // случились (не только horizon), поэтому ловит стоп/тейк, даже если индикатор
+  // всё ещё держит тот же знак (лаг). state: 'active' — ещё в пути (≤horizon баров
+  // прошло); 'stopped' — цена уже выбила стоп (сигнал ОПРОВЕРГНУТ рынком); 'reached'
+  // — цель уже достигнута; 'expired' — прошло больше horizon баров без тейка/стопа.
+  function liveOutcome(bars, i, dir, take, stop, cost, horizon, at) {
+    at = at || atr(bars, 14); const a = at[i]; if (a == null || a <= 0) return null;
+    const entry = bars[i].close, tp = entry + dir * take * a, sl = entry - dir * stop * a;
+    const last = bars.length - 1;
+    for (let j = i + 1; j <= last; j++) {
+      if (dir > 0) { if (bars[j].low <= sl) return { state: 'stopped', bar: j, pnl: dir * (sl - entry) / a - cost, entry, tp, sl, a, barsElapsed: j - i };
+        if (bars[j].high >= tp) return { state: 'reached', bar: j, pnl: dir * (tp - entry) / a - cost, entry, tp, sl, a, barsElapsed: j - i }; }
+      else { if (bars[j].high >= sl) return { state: 'stopped', bar: j, pnl: dir * (sl - entry) / a - cost, entry, tp, sl, a, barsElapsed: j - i };
+        if (bars[j].low <= tp) return { state: 'reached', bar: j, pnl: dir * (tp - entry) / a - cost, entry, tp, sl, a, barsElapsed: j - i }; }
+    }
+    const elapsed = last - i;
+    if (elapsed >= horizon) return { state: 'expired', pnl: dir * (bars[last].close - entry) / a - cost, entry, tp, sl, a, barsElapsed: elapsed };
+    return { state: 'active', entry, tp, sl, a, barsElapsed: elapsed, barsRemaining: horizon - elapsed };
+  }
+
+  // Тренд метода: экспектанси последних K закрытых сделок против K сделок ДО них
+  // (тот же бар-за-баром проход, что в btStats, но со списком сделок, не только
+  // суммой). state: 'up' — усиливается, 'down' — слабеет, 'flat' — стабильно,
+  // null — сделок мало для сравнения.
+  function methodTrend(scoreArr, bars, horizon, opts) {
+    if (!scoreArr || !bars || !bars.length) return null;
+    horizon = horizon || 12; opts = opts || {};
+    const T = opts.take != null ? opts.take : 1.5, S = opts.stop != null ? opts.stop : 0.75, cost = opts.cost != null ? opts.cost : 0.12;
+    const at = atr(bars, opts.atrPer || 20), n = bars.length;
+    const trades = []; let pos = null;
+    for (let i = 0; i < n; i++) {
+      const hi = bars[i].high, lo = bars[i].low, cl = bars[i].close;
+      if (pos) { let ex = null;
+        if (pos.dir > 0) { if (lo <= pos.sl) ex = pos.sl; else if (hi >= pos.tp) ex = pos.tp; }
+        else { if (hi >= pos.sl) ex = pos.sl; else if (lo <= pos.tp) ex = pos.tp; }
+        if (ex == null && i - pos.i >= horizon) ex = cl;
+        if (ex != null) { trades.push(pos.dir * (ex - pos.entry) / pos.eatr - cost); pos = null; } }
+      if (!pos) { const sc = scoreArr[i], e = at[i];
+        if (sc != null && sc !== 0 && e != null && e > 0) { const dir = sc > 0 ? 1 : -1;
+          pos = { dir, entry: cl, tp: cl + dir * T * e, sl: cl - dir * S * e, eatr: e, i }; } }
+    }
+    const K = opts.window || 10;
+    if (trades.length < K * 2) return { state: null, recentN: trades.length };
+    const recent = trades.slice(-K), prior = trades.slice(-2 * K, -K);
+    const avg = a => a.reduce((s, x) => s + x, 0) / a.length;
+    const recentExp = avg(recent), priorExp = avg(prior), d = recentExp - priorExp;
+    const state = d > 0.08 ? 'up' : d < -0.08 ? 'down' : 'flat';
+    return { state, recentExp, priorExp, recentN: recent.length, priorN: prior.length };
+  }
+
   // пересчёт одного метода (для фейда после подгрузки breadth — без полного O(n²) NW)
   function computeOne(id, bars, horizon) {
     horizon = horizon || 12;
@@ -381,5 +442,6 @@
   }
 
   window.SignalsCore = { methods: M, btStats, parseExport, computeAll, computeOne, atr, IDS,
-    setBreadth, regimeInfo, regimeBuckets, condStats, tradeOutcome, nwForecast, volProfile };
+    setBreadth, regimeInfo, regimeBuckets, condStats, tradeOutcome, nwForecast, volProfile,
+    signalRun, liveOutcome, methodTrend };
 })();
