@@ -798,9 +798,11 @@
     const txt = sig < 0 ? '↓ шорт' : sig > 0 ? '↑ лонг' : 'нет сигнала';
     el.innerHTML = '<div class="tvsig-fc-card">если цена дойдёт до <b>' + price + '</b>:<br>' + (NAME[S.fcId] || S.fcId) + ': <b>' + txt + '</b><br>режим: ' + (_regLbl(rg) || '—') + (rg && rg.mkt ? ' / ' + rg.mkt : '') + '</div>';
   }
-  // Калькулятор позиции: счёт + риск% → размер и макс. число позиций по стопу/тейку.
-  // Стоп/тейк адаптивны к волатильности (SC.volProfile: ширина от ATR, крутится
-  // VR-шумом — порт бота), база R:R 2:1 (Зона-фейд).
+  // Калькулятор позиции: счёт + риск% → размер и макс. число позиций.
+  // Стоп/тейк — в % от цены (адаптивны к волатильности: SC.volProfile, ширина от
+  // ATR × VR-шум, R:R 2:1). Размер БЕЗ ПЛЕЧА: позиция не больше счёта. Если стоп
+  // слишком узкий, чтобы рискнуть заданный %, берём весь счёт и показываем
+  // фактический (меньший) риск, а не раздуваем позицию в margin до небес.
   function _rcVal(id) { const el = document.getElementById(id); const v = el ? parseFloat(el.value) : NaN; return isFinite(v) ? v : NaN; }
   function rcInit() {
     try { const s = JSON.parse(localStorage.getItem('tvsig:rc') || '{}');
@@ -817,24 +819,30 @@
     const vp = SC.volProfile ? SC.volProfile(bars) : null;
     const atrv = vp ? vp.atr : null, price = bars[bars.length - 1].close;
     if (!vp || !atrv || !price) { out.innerHTML = '<span class="tvsig-fc-hint">Нет ATR/цены.</span>'; return; }
-    // адаптивные тейк/стоп: ширина крутится VR-шумом (порт бота), R:R 2:1 держится
-    const stopATR = vp.stopK, takeATR = vp.takeK, dg = price > 100 ? 2 : (price > 1 ? 3 : 5);
-    const stopDist = vp.stopDist, takeDist = vp.takeDist, stopPct = 100 * stopDist / price;
-    const rub = x => Math.round(x).toLocaleString('ru-RU');
-    const volTxt = vp.vol ? ' · ' + vp.vol : '';
-    const noiseTxt = vp.vr != null ? ' · шум VR ' + vp.vr.toFixed(2) + ' (' + vp.kind + ', стоп ×' + vp.noise.toFixed(2) + ')' : '';
-    let html = '<div class="tvsig-fc-card">ATR ' + atrv.toFixed(dg) + ' (' + vp.atrPct.toFixed(2) + '%)' + volTxt + noiseTxt +
-      '<br>стоп <b>' + stopDist.toFixed(dg) + ' ₽</b> (' + stopPct.toFixed(2) + '%, ' + stopATR.toFixed(2) + ' ATR) · тейк ' + takeDist.toFixed(dg) + ' ₽ (' + takeATR.toFixed(2) + ' ATR) · R:R 2:1';
+    // всё в % от цены; ATR-кратность — только в подсказке
+    const stopPct = 100 * vp.stopDist / price, takePct = 100 * vp.takeDist / price;
+    const pct = x => x.toFixed(2) + '%', rub = x => Math.round(x).toLocaleString('ru-RU');
+    const volTxt = vp.vol ? ' · ' + vp.vol : '', kindTxt = vp.vr != null ? ' · ' + vp.kind : '';
+    let html = '<div class="tvsig-fc-card">волатильность (ATR) ' + pct(vp.atrPct) + volTxt + kindTxt +
+      '<br>стоп <b>' + pct(stopPct) + '</b> · тейк <b>' + pct(takePct) + '</b> · R:R 2:1' +
+      '<span class="tvsig-fc-lown" title="ширина в ATR: стоп ' + vp.stopK.toFixed(2) + ' / тейк ' + vp.takeK.toFixed(2) + ' ATR (крутится VR-шумом ' + (vp.vr != null ? vp.vr.toFixed(2) : '—') + ')"> ⓘ</span>';
     const acct = _rcVal('tvsig-rc-acct'), risk = _rcVal('tvsig-rc-risk'), port = _rcVal('tvsig-rc-port');
-    if (acct > 0 && risk > 0) {
-      const riskMoney = acct * risk / 100, units = riskMoney / stopDist, posValue = units * price, profit = riskMoney * (takeATR / stopATR);
-      html += '<br>риск/сделку <b>' + rub(riskMoney) + ' ₽</b> → профит при тейке <b>+' + rub(profit) + ' ₽</b>';
-      html += '<br>размер позиции: <b>' + rub(posValue) + ' ₽</b> ≈ ' + (units >= 10 ? rub(units) : units.toFixed(2)) + ' ед.';
-      const maxByCap = Math.floor(acct / posValue), maxByRisk = port > 0 ? Math.floor(port / risk) : Infinity;
-      let mp = maxByCap, lim = 'капиталу'; if (maxByRisk < mp) { mp = maxByRisk; lim = 'лимиту риска'; }
-      html += '<br>макс. позиций: <b>' + mp + '</b> (по ' + lim + ')';
-      if (mp > 20) html += ' <span class="tvsig-fc-lown">в бэктесте до 20 одновременных — коррелир. риск, держи ≤20</span>';
-    } else html += '<br><span class="tvsig-fc-hint">Введи счёт ₽ и риск% — посчитаю размер и лимит позиций.</span>';
+    if (acct > 0 && risk > 0 && stopPct > 0) {
+      const stopFrac = stopPct / 100, takeFrac = takePct / 100;
+      const posByRisk = (acct * risk / 100) / stopFrac;   // сколько НАДО, чтобы рискнуть risk%
+      const capped = posByRisk > acct;                    // без плеча: не больше счёта
+      const posValue = Math.min(posByRisk, acct), units = posValue / price;
+      const riskMoney = posValue * stopFrac, riskPctReal = 100 * riskMoney / acct, profit = posValue * takeFrac;
+      const wpct = 100 * posValue / acct;
+      html += '<br>размер позиции: <b>' + rub(posValue) + ' ₽</b> (' + wpct.toFixed(0) + '% счёта) ≈ ' + (units >= 10 ? rub(units) : units.toFixed(2)) + ' ед.';
+      html += '<br>риск по стопу: <b>' + rub(riskMoney) + ' ₽</b> (' + riskPctReal.toFixed(2) + '% счёта) · профит по тейку: <b>+' + rub(profit) + ' ₽</b>';
+      if (capped) html += '<br><span class="tvsig-fc-lown">стоп всего ' + pct(stopPct) + ': чтобы рискнуть ' + risk + '%, позиция должна быть ' + rub(posByRisk) + ' ₽ — больше счёта. Без плеча взят весь счёт, фактический риск ' + riskPctReal.toFixed(2) + '%.</span>';
+      const maxByCap = Math.max(1, Math.floor(acct / posValue));
+      const maxByRisk = (port > 0 && riskPctReal > 0) ? Math.floor(port / riskPctReal) : Infinity;
+      let mp = Math.min(maxByCap, maxByRisk), lim = maxByRisk < maxByCap ? 'лимиту риска портфеля' : 'капиталу';
+      html += '<br>макс. одновременных позиций: <b>' + mp + '</b> (по ' + lim + ')';
+      if (mp > 20) html += ' <span class="tvsig-fc-lown">в бэктесте до 20 — коррелир. риск, держи ≤20</span>';
+    } else html += '<br><span class="tvsig-fc-hint">Введи счёт ₽ и риск% — посчитаю размер (без плеча) и лимит позиций.</span>';
     out.innerHTML = html + '</div>';
   }
 
