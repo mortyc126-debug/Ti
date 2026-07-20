@@ -337,6 +337,9 @@
     const raw = (document.getElementById('tvsig-scan-list') || {}).value || '';
     const codes = raw.split(/[\s,;]+/).map(s => s.trim().toUpperCase().split(':').pop()).filter(Boolean);
     if (!codes.length) { body.innerHTML = '<div class="tvsig-fc-hint">Впиши тикеры MOEX через запятую/пробел/строку.</div>'; return; }
+    if (S._scanBusy) return; // уже сканируем (ручной клик во время авто-тика или наоборот) — не дублируем
+    S._scanBusy = true;
+    try {
     try { localStorage.setItem('tvsig:scanlist', raw); } catch (e) {}
     const A = (document.getElementById('tvsig-scan-a') || {}).value, B = (document.getElementById('tvsig-scan-b') || {}).value;
     const auto = A === '__auto';                              // авто: лучший метод на каждый тикер
@@ -420,7 +423,11 @@
     }
     const meta = { source, iv, dt: source === 'chart' ? dt : ivSec };
     S._scanCache = { hits, A, B, look, diag, auto, meta }; // для перефильтровки чекбоксом без пересканирования
+    S._scanLastTs = Date.now();
     scanRender(hits, A, B, look, diag, auto, meta);
+    const autoCbNow = document.getElementById('tvsig-scan-auto');
+    if (source !== 'chart') scanAutoTsSet('обновлено ' + _hhmm(Math.floor(S._scanLastTs / 1000)) + ' МСК' + (autoCbNow && autoCbNow.checked ? ' · автообновление вкл' : ''));
+    } finally { S._scanBusy = false; }
   }
   // «только неисполненные»: перерисовать последний результат без нового скана
   function scanRerender() {
@@ -628,6 +635,26 @@
     if (which === 'periods') segRender();
     if (which === 'forecast') forecastRender();
     if (which === 'scan') scanInit();
+    scanAutoSync(); // старт/стоп авто-пересканирования — работает только пока вкладка «Сканер» открыта
+  }
+  // авто-пересканирование скана: таймер живёт, только пока вкладка «Сканер»
+  // открыта (scanAutoSync дёргается из setTab на каждое переключение вкладки) и
+  // источник — MOEX (через «график терминала» дёргать твой график каждые N
+  // секунд без спроса — плохая идея, там нет авто).
+  function scanAutoStop() { if (S._scanAutoTimer) { clearInterval(S._scanAutoTimer); S._scanAutoTimer = null; } }
+  function scanAutoTsSet(text) { const el = document.getElementById('tvsig-scan-auto-ts'); if (el) el.textContent = text; }
+  function scanAutoSync() {
+    scanAutoStop();
+    const cb = document.getElementById('tvsig-scan-auto'); if (!cb) return;
+    const ivSel = document.getElementById('tvsig-scan-auto-iv'), lbl = document.getElementById('tvsig-scan-auto-lbl');
+    const chartSrc = ((document.getElementById('tvsig-scan-src') || {}).value) === 'chart';
+    cb.disabled = chartSrc; if (ivSel) ivSel.disabled = chartSrc;
+    if (lbl) lbl.classList.toggle('dim', chartSrc);
+    if (chartSrc) { scanAutoTsSet(cb.checked ? 'на паузе — недоступно для источника «график терминала»' : ''); return; }
+    if (!cb.checked) { scanAutoTsSet(''); return; }
+    const pane = document.getElementById('tvsig-pane-scan'); if (!pane || pane.hidden) return; // вкладка не открыта — не тикаем впустую
+    const secs = Math.max(15, parseInt(ivSel && ivSel.value, 10) || 30);
+    S._scanAutoTimer = setInterval(() => { if (!S._scanBusy) scanRun(); }, secs * 1000);
   }
   function scanInit() {
     const sa = document.getElementById('tvsig-scan-a'), sb = document.getElementById('tvsig-scan-b');
@@ -648,10 +675,18 @@
       if (src) {
         try { const sv = localStorage.getItem('tvsig:scansrc'); if (sv) src.value = sv; } catch (e) {}
         const syncWarn = () => { if (warn) warn.hidden = src.value !== 'chart'; };
-        src.addEventListener('change', () => { try { localStorage.setItem('tvsig:scansrc', src.value); } catch (er) {} syncWarn(); });
+        src.addEventListener('change', () => { try { localStorage.setItem('tvsig:scansrc', src.value); } catch (er) {} syncWarn(); scanAutoSync(); });
         syncWarn();
       }
+      const autoCb = document.getElementById('tvsig-scan-auto'), autoIv = document.getElementById('tvsig-scan-auto-iv');
+      if (autoCb) {
+        try { autoCb.checked = localStorage.getItem('tvsig:scanauto') === '1'; } catch (e) {}
+        try { const v = localStorage.getItem('tvsig:scanautoiv'); if (v && autoIv) autoIv.value = v; } catch (e) {}
+        autoCb.addEventListener('change', () => { try { localStorage.setItem('tvsig:scanauto', autoCb.checked ? '1' : '0'); } catch (er) {} scanAutoSync(); if (autoCb.checked && !S._scanBusy) scanRun(); });
+        if (autoIv) autoIv.addEventListener('change', () => { try { localStorage.setItem('tvsig:scanautoiv', autoIv.value); } catch (er) {} scanAutoSync(); });
+      }
     }
+    scanAutoSync(); // и на повторных заходах (не только первичная инициализация) — вкладка снова видима
   }
   // свои списки: {имя: "SBER GAZP ..."} в localStorage
   function scanLoadLists() { try { return JSON.parse(localStorage.getItem('tvsig:scanlists') || '{}') || {}; } catch (e) { return {}; } }
@@ -1389,6 +1424,9 @@
       '<option value="moex">MOEX (быстро, интервал 1/10/60/1440 мин)</option>' +
       '<option value="chart">график терминала (точный ТФ, медленно — переключает твой график)</option>' +
       '</select><span id="tvsig-scan-src-warn" class="tvsig-fc-lown" hidden> ⚠ на время скана график будет листать все тикеры списка по очереди и вернётся на исходный</span></div>' +
+      '<div id="tvsig-scan-autorow"><label class="tvsig-scan-onlyactive" id="tvsig-scan-auto-lbl" title="Пересканировать список автоматически, пока открыта вкладка «Сканер». Доступно только для источника MOEX — авто-пересканирование через «график терминала» слишком часто дёргало бы твой график."><input type="checkbox" id="tvsig-scan-auto"> автообновление каждые</label>' +
+      '<select id="tvsig-scan-auto-iv"><option value="15">15 с</option><option value="30" selected>30 с</option><option value="60">1 мин</option><option value="120">2 мин</option><option value="300">5 мин</option></select>' +
+      '<span id="tvsig-scan-auto-ts" class="dim"></span></div>' +
       '<textarea id="tvsig-scan-list" placeholder="SBER GAZP LKOH SNGS ROSN … (через пробел/запятую)"></textarea>' +
       '<div id="tvsig-scan-sel">Сигнал <select id="tvsig-scan-a"></select> + <select id="tvsig-scan-b"></select>' +
       ' за <select id="tvsig-scan-look" title="Сколько последних ЗАКРЫТЫХ баров считать «свежим» срабатыванием">' +
@@ -1396,7 +1434,7 @@
       '<label class="tvsig-scan-onlyactive" title="Спрятать сигналы, которые уже отыграли — цена дошла до цели, выбила стоп, или прошёл горизонт (12 бар.) без исхода. Оставляет только те, что ещё в пути."><input type="checkbox" id="tvsig-scan-onlyactive"> только неисполненные</label>' +
       '<button id="tvsig-scan-go" title="Просканировать список">Скан</button></div>' +
       '<div id="tvsig-scan-body"></div>' +
-      '<div id="tvsig-scan-foot"><b>🔝 авто</b> (по умолчанию): для каждого тикера сам считает все методы и берёт самый прибыльный НА ЕГО истории (exp&gt;0, n≥10), сработавший в окне — список тикеров с их лучшим методом и направлением, без ручного выбора. Или задай метод/связку вручную. Пресеты — стандартные секторные наборы MOEX; свои списки можно сохранять/удалять («список дня» тоже сохраняется). <b>Источник MOEX</b> — быстро, но интервал округляется до одного из 5 (1/10/60 мин, день, неделя): соседние ТФ графика (напр. 5 и 15 мин) могут попасть в один интервал и дать одинаковый скан. <b>Источник «график терминала»</b> — точный ТФ графика без округления, но листает твой график по тикерам списка по очереди (медленно, видно визуально) и возвращает исходный тикер в конце. Ищет сигнал в последних N закрытых барах. «X баров / Y назад» — свежесть с пересчётом в реальное время по ТФ. «→ тейк/стоп/тайм ±ATR» — чем ЗАКОНЧИЛАСЬ именно эта сделка (успела ли отыграть): понятно, имел ли сигнал смысл. Хиты сортируются по ТОЧНОСТИ связки на истории тикера (exp/win/n, R:R 2:1); n&lt;10 = мало данных, вниз. Кросс-тикерный breadth в скане не применяется. Второй сигнал «—» = один метод.</div>' +
+      '<div id="tvsig-scan-foot"><b>🔝 авто</b> (по умолчанию): для каждого тикера сам считает все методы и берёт самый прибыльный НА ЕГО истории (exp&gt;0, n≥10), сработавший в окне — список тикеров с их лучшим методом и направлением, без ручного выбора. Или задай метод/связку вручную. Пресеты — стандартные секторные наборы MOEX; свои списки можно сохранять/удалять («список дня» тоже сохраняется). <b>Источник MOEX</b> — быстро, но интервал округляется до одного из 5 (1/10/60 мин, день, неделя): соседние ТФ графика (напр. 5 и 15 мин) могут попасть в один интервал и дать одинаковый скан. <b>Источник «график терминала»</b> — точный ТФ графика без округления, но листает твой график по тикерам списка по очереди (медленно, видно визуально) и возвращает исходный тикер в конце. Ищет сигнал в последних N закрытых барах. «X баров / Y назад» — свежесть с пересчётом в реальное время по ТФ. «→ тейк/стоп/тайм ±ATR» — чем ЗАКОНЧИЛАСЬ именно эта сделка (успела ли отыграть): понятно, имел ли сигнал смысл. Хиты сортируются по ТОЧНОСТИ связки на истории тикера (exp/win/n, R:R 2:1); n&lt;10 = мало данных, вниз. Кросс-тикерный breadth в скане не применяется. Второй сигнал «—» = один метод. <b>Автообновление</b> — пересканирует список на заданном интервале, пока открыта эта вкладка (закрыл вкладку — таймер встал, вернулся — снова пошёл); доступно только для источника MOEX.</div>' +
       '</div>'; // /pane-scan
     document.documentElement.appendChild(panel);
     try { const wv = parseInt(localStorage.getItem('tvsig:width') || '', 10); if (wv >= 300 && wv <= 640) panel.style.width = wv + 'px'; } catch (e) {}
@@ -1602,7 +1640,7 @@
     '.tvsig-col, .tvsig-info-btn, .tvsig-tab, #tvsig-status, #tvsig-period, #tvsig-foot, ' +
     '#tvsig-cmp-foot, #tvsig-cmp-body, #tvsig-oi-body, .tvsig-oi-meta, .tvsig-oi-t, ' +
     '.tvsig-fc-sig, #tvsig-fc-cond, #tvsig-fc-detail, #tvsig-fc-hypo, #tvsig-fc-foot, #tvsig-fc-pickrow, ' +
-    '#tvsig-rc-ctrl, #tvsig-rc-out, #tvsig-scan-list, #tvsig-scan-sel, #tvsig-scan-body, #tvsig-scan-foot, #tvsig-scan-listrow, #tvsig-scan-srcrow';
+    '#tvsig-rc-ctrl, #tvsig-rc-out, #tvsig-scan-list, #tvsig-scan-sel, #tvsig-scan-body, #tvsig-scan-foot, #tvsig-scan-listrow, #tvsig-scan-srcrow, #tvsig-scan-autorow';
   function drag(el) {
     let sx, sy, ox, oy, on = false;
     el.addEventListener('mousedown', e => {
