@@ -1341,10 +1341,13 @@
       try { _clearNwPath(); (S._fcBand || []).forEach(id => S.chart.removeEntity(id)); S._fcBand = []; } catch (er) {}
       forecastRender(); };
     panel.querySelector('#tvsig-fc-mtf-on').onchange = e => { S.mtfOn = e.target.checked; forecastRender(); };
-    rcInit();
+    rcInit(); rcCompute(); // сразу показать расчёт по сохранённым значениям, не дожидаясь первого refresh()
+    // input ловит каждую напечатанную цифру; change — подстраховка для колёсика/стрелочек
+    // числового поля (в части браузеров они не всегда бьют input стабильно)
     ['tvsig-rc-acct', 'tvsig-rc-risk', 'tvsig-rc-port', 'tvsig-rc-cap', 'tvsig-rc-lev', 'tvsig-rc-lot', 'tvsig-rc-stoppct'].forEach(id => {
-      const el = panel.querySelector('#' + id); if (el) el.addEventListener('input', rcCompute); });
-    panel.querySelector('#tvsig-rc-manual').addEventListener('change', () => { rcManualToggle(); rcCompute(); });
+      const el = panel.querySelector('#' + id); if (el) { el.addEventListener('input', rcCompute); el.addEventListener('change', rcCompute); } });
+    const rcManualEl = panel.querySelector('#tvsig-rc-manual');
+    if (rcManualEl) rcManualEl.addEventListener('change', () => { rcManualToggle(); rcCompute(); });
     panel.querySelector('#tvsig-fc-uncond').onchange = e => { S.nwUncond = e.target.checked;
       const d = document.getElementById('tvsig-fc-detail'); if (d) d.innerHTML = ''; _clearNwPath(); forecastRender(); };
     themeBind();
