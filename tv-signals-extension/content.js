@@ -942,27 +942,51 @@
       if (s.l != null && document.getElementById('tvsig-rc-lev')) document.getElementById('tvsig-rc-lev').value = s.l;
       if (s.p != null && document.getElementById('tvsig-rc-port')) document.getElementById('tvsig-rc-port').value = s.p;
       if (s.c != null && document.getElementById('tvsig-rc-cap')) document.getElementById('tvsig-rc-cap').value = s.c;
+      if (s.lot != null && document.getElementById('tvsig-rc-lot')) document.getElementById('tvsig-rc-lot').value = s.lot;
+      if (s.sp != null && document.getElementById('tvsig-rc-stoppct')) document.getElementById('tvsig-rc-stoppct').value = s.sp;
+      if (s.m != null && document.getElementById('tvsig-rc-manual')) document.getElementById('tvsig-rc-manual').checked = s.m;
     } catch (e) {}
+    rcManualToggle();
+  }
+  // показать/спрятать поле «стоп %» под ручной режим (ATR-режим его не использует)
+  function rcManualToggle() {
+    const manual = !!(document.getElementById('tvsig-rc-manual') || {}).checked;
+    const row = document.getElementById('tvsig-rc-stoppct-row'); if (row) row.hidden = !manual;
   }
   function rcCompute() {
     const out = document.getElementById('tvsig-rc-out'); if (!out) return;
-    try { localStorage.setItem('tvsig:rc', JSON.stringify({ a: _rcVal('tvsig-rc-acct'), r: _rcVal('tvsig-rc-risk'), l: _rcVal('tvsig-rc-lev'), p: _rcVal('tvsig-rc-port'), c: _rcVal('tvsig-rc-cap') })); } catch (e) {}
+    try { localStorage.setItem('tvsig:rc', JSON.stringify({ a: _rcVal('tvsig-rc-acct'), r: _rcVal('tvsig-rc-risk'), l: _rcVal('tvsig-rc-lev'), p: _rcVal('tvsig-rc-port'), c: _rcVal('tvsig-rc-cap'),
+      lot: _rcVal('tvsig-rc-lot'), sp: _rcVal('tvsig-rc-stoppct'), m: !!(document.getElementById('tvsig-rc-manual') || {}).checked })); } catch (e) {}
     const bars = S.bars, SC = window.SignalsCore;
-    if (!bars || bars.length < 20) { out.innerHTML = '<span class="tvsig-fc-hint">Нет свечей — открой «Модели» и ⟳.</span>'; return; }
-    const vp = SC.volProfile ? SC.volProfile(bars) : null;
-    const atrv = vp ? vp.atr : null, price = bars[bars.length - 1].close;
-    if (!vp || !atrv || !price) { out.innerHTML = '<span class="tvsig-fc-hint">Нет ATR/цены.</span>'; return; }
-    // всё в % от цены; ATR-кратность — только в подсказке
-    const stopPct = 100 * vp.stopDist / price, takePct = 100 * vp.takeDist / price;
+    if (!bars || !bars.length) { out.innerHTML = '<span class="tvsig-fc-hint">Нет свечей — открой «Модели» и ⟳.</span>'; return; }
+    const price = bars[bars.length - 1].close;
     const pct = x => x.toFixed(2) + '%', rub = x => Math.round(x).toLocaleString('ru-RU');
-    const volTxt = vp.vol ? ' · ' + vp.vol : '', kindTxt = vp.vr != null ? ' · ' + vp.kind : '';
-    let html = '<div class="tvsig-fc-card">волатильность (ATR) ' + pct(vp.atrPct) + volTxt + kindTxt +
-      '<br>стоп <b>' + pct(stopPct) + '</b> · тейк <b>' + pct(takePct) + '</b> · R:R 2:1' +
-      '<span class="tvsig-fc-lown" title="ширина в ATR: стоп ' + vp.stopK.toFixed(2) + ' / тейк ' + vp.takeK.toFixed(2) + ' ATR (крутится VR-шумом ' + (vp.vr != null ? vp.vr.toFixed(2) : '—') + ')"> ⓘ</span>';
-    if (vp.floorApplied) html += '<br><span class="tvsig-fc-lown">⚠ сырой ATR-стоп вышел ' + pct(vp.rawStopPct) + ' — на этом тикере/ТФ волатильность аномально мала (ATR ' + pct(vp.atrPct) + ' от цены), такой стоп уже в пределах спреда/шума, не реальный риск. Поднят до пола ' + vp.minStopPct + '% (тейк пропорционально, R:R сохранён). Пол эвристический, не биржевые данные о спреде — для облигаций/тихих тикеров прикинь стоп сам.</span>';
+    const manual = !!(document.getElementById('tvsig-rc-manual') || {}).checked;
+    let vp = null, stopPct, takePct, html = '<div class="tvsig-fc-card">';
+    if (manual) {
+      // без ATR: свой стоп в % от цены — нужно, когда торги выходного дня/гэпы
+      // на праздниках искажают ATR инструмента и авто-расчёт не заслуживает доверия.
+      const mStop = _rcVal('tvsig-rc-stoppct');
+      if (!(mStop > 0)) { out.innerHTML = '<span class="tvsig-fc-hint">Ручной режим: впиши стоп, % от цены (поле справа от галочки «ручной стоп»).</span>'; return; }
+      stopPct = mStop; takePct = mStop * 2;
+      html += 'ручной стоп (ATR не используется)' +
+        '<br>стоп <b>' + pct(stopPct) + '</b> · тейк <b>' + pct(takePct) + '</b> <span class="tvsig-fc-lown" title="Тейк = 2×стоп (R:R 2:1) просто как ориентир — стоп твой, а не расчётный.">(R:R 2:1)</span>';
+    } else {
+      if (bars.length < 20) { out.innerHTML = '<span class="tvsig-fc-hint">Нет свечей — открой «Модели» и ⟳ (или включи «ручной стоп»).</span>'; return; }
+      vp = SC.volProfile ? SC.volProfile(bars) : null;
+      if (!vp || !vp.atr || !price) { out.innerHTML = '<span class="tvsig-fc-hint">Нет ATR/цены.</span>'; return; }
+      // всё в % от цены; ATR-кратность — только в подсказке
+      stopPct = 100 * vp.stopDist / price; takePct = 100 * vp.takeDist / price;
+      const volTxt = vp.vol ? ' · ' + vp.vol : '', kindTxt = vp.vr != null ? ' · ' + vp.kind : '';
+      html += 'волатильность (ATR) ' + pct(vp.atrPct) + volTxt + kindTxt +
+        '<br>стоп <b>' + pct(stopPct) + '</b> · тейк <b>' + pct(takePct) + '</b> · R:R 2:1' +
+        '<span class="tvsig-fc-lown" title="ширина в ATR: стоп ' + vp.stopK.toFixed(2) + ' / тейк ' + vp.takeK.toFixed(2) + ' ATR (крутится VR-шумом ' + (vp.vr != null ? vp.vr.toFixed(2) : '—') + ')"> ⓘ</span>';
+      if (vp.floorApplied) html += '<br><span class="tvsig-fc-lown">⚠ сырой ATR-стоп вышел ' + pct(vp.rawStopPct) + ' — на этом тикере/ТФ волатильность аномально мала (ATR ' + pct(vp.atrPct) + ' от цены), такой стоп уже в пределах спреда/шума, не реальный риск. Поднят до пола ' + vp.minStopPct + '% (тейк пропорционально, R:R сохранён). Если это выходные/гэп — доверия ATR тут вообще не должно быть, включи «ручной стоп».</span>';
+    }
     const acct = _rcVal('tvsig-rc-acct'), risk = _rcVal('tvsig-rc-risk'), port = _rcVal('tvsig-rc-port');
     const lev = Math.max(1, _rcVal('tvsig-rc-lev') || 1);
     const capPct = _rcVal('tvsig-rc-cap');
+    const lotSize = Math.max(1, Math.round(_rcVal('tvsig-rc-lot') || 1));
     if (acct > 0 && risk > 0 && stopPct > 0) {
       const stopFrac = stopPct / 100, takeFrac = takePct / 100;
       const buyPower = acct * lev;                          // покупательная способность с плечом
@@ -976,6 +1000,12 @@
       const levTxt = lev > 1 ? ' · плечо ×' + lev : '';
       html += '<br>размер позиции: <b>' + rub(posValue) + ' ₽</b> (' + wpct.toFixed(0) + '% счёта' + levTxt + ') ≈ ' + (units >= 10 ? rub(units) : units.toFixed(2)) + ' ед.';
       html += '<br>риск по стопу: <b>' + rub(riskMoney) + ' ₽</b> (' + riskPctReal.toFixed(2) + '% счёта) · профит по тейку: <b>+' + rub(profit) + ' ₽</b>';
+      // лоты: реально купить можно только целое число лотов — округляем вниз и
+      // показываем фактический (после округления) риск, а не идеальный непрерывный
+      const lots = Math.floor(units / lotSize);
+      if (lots > 0) { const lotUnits = lots * lotSize, lotValue = lotUnits * price, lotRisk = lotValue * stopFrac;
+        html += '<br>в лотах (лот ' + lotSize + ' шт): <b>' + lots + '</b> лот. ≈ ' + lotUnits + ' шт · ' + rub(lotValue) + ' ₽ · факт. риск ' + rub(lotRisk) + ' ₽ (' + (100 * lotRisk / acct).toFixed(2) + '% счёта)'; }
+      else html += '<br><span class="tvsig-fc-lown">⚠ на 1 лот (' + lotSize + ' шт) не хватает: нужно ≥' + rub(lotSize * price) + ' ₽, по расчёту доступно ' + rub(posValue) + ' ₽</span>';
       if (capped) {
         if (hardCap === capValue && capValue < buyPower)
           html += '<br><span class="tvsig-fc-lown">стоп ' + pct(stopPct) + ' узкий: риск-формула просит ' + rub(posByRisk) + ' ₽ на сделку — больше лимита «' + capPct + '% депозита на сделку» (' + rub(capValue) + ' ₽). Взят лимит, фактический риск ' + riskPctReal.toFixed(2) + '% (ниже заданных ' + risk + '%).</span>';
@@ -1241,6 +1271,9 @@
       '<label>Плечо ×<input id="tvsig-rc-lev" type="number" step="0.1" min="1" value="1" title="Встроенное плечо инструмента. 1 = без плеча (кэш). Для фьючерсов/маржи впиши доступное плечо — позиция сможет превышать счёт во столько раз."></label>' +
       '<label>Лимит риска портфеля %<input id="tvsig-rc-port" type="number" step="1" value="10"></label>' +
       '<label>Лимит на сделку, % депозита<input id="tvsig-rc-cap" type="number" step="1" value="25" title="Жёсткий потолок размера ОДНОЙ позиции, не зависит от риск/стоп-расчёта. При узком стопе риск-формула может требовать почти весь депозит на одну бумагу (риск% ÷ стоп% → доля счёта) — этот лимит её обрезает первым. 0 или пусто = без лимита (только покупательная способность)."></label>' +
+      '<label>Лот, шт<input id="tvsig-rc-lot" type="number" step="1" min="1" value="1" title="Размер лота инструмента (сколько бумаг в одном лоте на MOEX) — расширение не видит его из графика, впиши сам."></label>' +
+      '<label class="tvsig-rc-manual-sw" title="Считать стоп не от ATR инструмента, а от твоего значения — например, когда торги выходного дня/праздничные гэпы искажают ATR"><input type="checkbox" id="tvsig-rc-manual"> ручной стоп (без ATR)</label>' +
+      '<label id="tvsig-rc-stoppct-row" hidden>Стоп, % от цены<input id="tvsig-rc-stoppct" type="number" step="0.01" placeholder="напр. 1.5"></label>' +
       '</div>' +
       '<div id="tvsig-rc-out"></div>' +
       '<div class="tvsig-fc-sec">Гипотеза: если цена дойдёт до</div>' +
@@ -1309,8 +1342,9 @@
       forecastRender(); };
     panel.querySelector('#tvsig-fc-mtf-on').onchange = e => { S.mtfOn = e.target.checked; forecastRender(); };
     rcInit();
-    ['tvsig-rc-acct', 'tvsig-rc-risk', 'tvsig-rc-port', 'tvsig-rc-cap', 'tvsig-rc-lev'].forEach(id => {
+    ['tvsig-rc-acct', 'tvsig-rc-risk', 'tvsig-rc-port', 'tvsig-rc-cap', 'tvsig-rc-lev', 'tvsig-rc-lot', 'tvsig-rc-stoppct'].forEach(id => {
       const el = panel.querySelector('#' + id); if (el) el.addEventListener('input', rcCompute); });
+    panel.querySelector('#tvsig-rc-manual').addEventListener('change', () => { rcManualToggle(); rcCompute(); });
     panel.querySelector('#tvsig-fc-uncond').onchange = e => { S.nwUncond = e.target.checked;
       const d = document.getElementById('tvsig-fc-detail'); if (d) d.innerHTML = ''; _clearNwPath(); forecastRender(); };
     themeBind();
