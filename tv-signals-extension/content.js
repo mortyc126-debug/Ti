@@ -308,23 +308,44 @@
     if (!codes.length) { body.innerHTML = '<div class="tvsig-fc-hint">Впиши тикеры MOEX через запятую/пробел/строку.</div>'; return; }
     try { localStorage.setItem('tvsig:scanlist', raw); } catch (e) {}
     const A = (document.getElementById('tvsig-scan-a') || {}).value, B = (document.getElementById('tvsig-scan-b') || {}).value;
+    const auto = A === '__auto';                              // авто: лучший метод на каждый тикер
     const look = Math.max(1, parseInt((document.getElementById('tvsig-scan-look') || {}).value, 10) || 3);
     const dt = S.barDt || 300;
     const iv = dt <= 90 ? 1 : dt <= 1200 ? 10 : dt <= 10800 ? 60 : dt <= 259200 ? 24 : 7;
     const ivSec = iv === 1 ? 60 : iv === 10 ? 600 : iv === 60 ? 3600 : iv === 24 ? 86400 : 604800;
     const now = Math.floor(Date.now() / 1000), t0 = now - 1000 * ivSec;
-    body.innerHTML = '<div class="tvsig-fc-hint">Сканирую ' + codes.length + ' тикеров…</div>';
+    body.innerHTML = '<div class="tvsig-fc-hint">Сканирую ' + codes.length + ' тикеров' + (auto ? ' (авто-подбор метода)' : '') + '…</div>';
     const SC = window.SignalsCore; if (SC.setBreadth) SC.setBreadth(null, 0); // без кросс-тикер breadth в скане
-    const hits = []; const diag = { ok: 0, err: 0, aFire: 0 }; // диагностика: сколько загрузилось, у скольких метод A мелькал
+    const hits = []; const diag = { ok: 0, err: 0, aFire: 0 }; // диагностика: сколько загрузилось, у скольких что-то мелькало
+    const findFire = (ser, li, lo) => { for (let k = li; k >= lo; k--) if (ser[k]) return k; return -1; }; // самое свежее срабатывание в окне
+    const pushHit = (code, bars, dir, hitBar, li, st, mid) => {
+      let oc = null; try { oc = SC.tradeOutcome(bars, hitBar, dir, 1.5, 0.75, 0.12, 12); } catch (e) {}
+      hits.push({ code, dir, price: bars[hitBar].close, ago: li - hitBar, ts: bars[hitBar].time, mid,
+        exp: st ? st.exp : null, win: st ? st.win : null, n: st ? st.n : 0,
+        ocExit: oc ? oc.exit : null, ocPnl: oc ? oc.pnl : null });
+    };
     for (const code of codes) {
       let f; try { f = await scanFetch(code, iv, t0, now); } catch (e) { f = null; }
       if (!f || !f.ok || f.bars.length < 80) { diag.err++; continue; }
       diag.ok++;
       const bars = f.bars;
+      const li = bars.length - 2, lo = Math.max(0, li - look + 1); // последний закрытый бар + окно свежести
+      if (auto) {
+        // для тикера считаем ВСЕ методы, берём тот, что (а) сработал в окне,
+        // (б) с лучшим exp на истории тикера и exp>0, n>=10 — «самый точный ЗДЕСЬ».
+        let comp; try { comp = SC.computeAll(bars, 12); } catch (e) { continue; }
+        let best = null, anyFire = false;
+        for (const id of SC.IDS) { const c = comp[id]; if (!c || !c.series) continue;
+          const hb = findFire(c.series, li, lo); if (hb < 0) continue; anyFire = true;
+          const st = c.stats; if (!st || st.exp == null || st.n < 10 || st.exp <= 0) continue;
+          if (!best || st.exp > best.st.exp) best = { id, hb, dir: Math.sign(c.series[hb]), st };
+        }
+        if (anyFire) diag.aFire++;
+        if (best) pushHit(code, bars, best.dir, best.hb, li, best.st, best.id);
+        continue;
+      }
       let sa, sb;
       try { sa = SC.methods[A](bars); sb = B && B !== '-' ? SC.methods[B](bars) : null; } catch (e) { continue; }
-      const li = bars.length - 2;                            // последний ЗАКРЫТЫЙ бар
-      const lo = Math.max(0, li - look + 1);                 // окно свежести
       let aFired = false, hitBar = -1, dir = 0;
       // ищем САМОЕ СВЕЖЕЕ срабатывание в окне (от li вниз)
       for (let k = li; k >= lo; k--) {
@@ -340,14 +361,10 @@
         // Для согласия — серия только там, где оба метода в одну сторону.
         const ser2 = sb ? sa.map((v, k) => { const w = sb[k]; return (v && w && Math.sign(v) === Math.sign(w)) ? Math.sign(v) : 0; }) : sa;
         let st = null; try { st = SC.btStats(ser2, bars, 12); } catch (e) {}
-        // «имело ли смысл»: чем закончилась ИМЕННО эта сделка (если уже отыграла)
-        let oc = null; try { oc = SC.tradeOutcome(bars, hitBar, dir, 1.5, 0.75, 0.12, 12); } catch (e) {}
-        hits.push({ code, dir, price: bars[hitBar].close, ago: li - hitBar, ts: bars[hitBar].time,
-          exp: st ? st.exp : null, win: st ? st.win : null, n: st ? st.n : 0,
-          ocExit: oc ? oc.exit : null, ocPnl: oc ? oc.pnl : null });
+        pushHit(code, bars, dir, hitBar, li, st, null);
       }
     }
-    scanRender(hits, A, B, look, diag, ivSec);
+    scanRender(hits, A, B, look, diag, ivSec, auto);
   }
   // «N баров назад» → реальное время с учётом ТФ
   function _scanAgo(ago, ivSec) {
@@ -358,28 +375,30 @@
     else t = Math.round(s / 86400) + ' дн';
     return ago + ' баров / ' + t + ' назад';
   }
-  function scanRender(hits, A, B, look, diag, ivSec) {
+  function scanRender(hits, A, B, look, diag, ivSec, auto) {
     const body = document.getElementById('tvsig-scan-body'); if (!body) return;
     const found = hits.filter(h => h.dir);
-    const combo = (B && B !== '-') ? (NAME[A] + ' + ' + NAME[B]) : NAME[A];
+    const combo = auto ? '🔝 лучший метод на тикере' : ((B && B !== '-') ? (NAME[A] + ' + ' + NAME[B]) : NAME[A]);
     const win = look > 1 ? ' за ' + look + ' баров' : ' на последнем баре';
     if (!found.length) {
       let msg = 'Нет срабатываний «' + combo + '»' + win + '. Загружено ' + diag.ok + ' тикеров';
       if (diag.err) msg += ' (' + diag.err + ' не отдали свечи)';
-      msg += '. ' + NAME[A] + ' мелькал у ' + diag.aFire + '.';
-      if (B && B !== '-' && diag.aFire > 0) msg += ' Связка не сошлась — попробуй один метод (второй «—») или увеличь окно.';
-      else if (diag.aFire === 0) msg += ' Метод редкий на этом ТФ — увеличь окно (за 5–10 баров) или смени ТФ графика.';
+      if (auto) msg += '. Сигналы мелькали у ' + diag.aFire + ', но ни один прибыльный на истории (exp>0, n≥10) — увеличь окно или смени ТФ.';
+      else { msg += '. ' + NAME[A] + ' мелькал у ' + diag.aFire + '.';
+        if (B && B !== '-' && diag.aFire > 0) msg += ' Связка не сошлась — попробуй один метод (второй «—») или увеличь окно.';
+        else if (diag.aFire === 0) msg += ' Метод редкий на этом ТФ — увеличь окно (за 5–10 баров) или смени ТФ графика.'; }
       body.innerHTML = '<div class="tvsig-fc-hint">' + msg + '</div>'; return;
     }
-    // сортируем по историческому exp связки на тикере (сильные/точные — вверх);
+    // сортируем по историческому exp метода/связки на тикере (сильные/точные — вверх);
     // тикеры с малой выборкой (n<10) уводим вниз, оценке доверять нельзя.
     const rk = h => (h.n >= 10 && h.exp != null) ? h.exp : -Infinity;
     found.sort((a, b) => rk(b) - rk(a));
-    body.innerHTML = '<div class="tvsig-scan-hd">' + combo + win + ' — сработало у ' + found.length + ' (по точности на тикере):</div>' +
+    body.innerHTML = '<div class="tvsig-scan-hd">' + combo + win + ' — ' + found.length + (auto ? ' тикеров с прибыльным сигналом' : ' сработало') + ' (по точности на тикере):</div>' +
       found.map(h => {
         const stat = (h.n >= 10 && h.exp != null)
-          ? '<span class="' + (h.exp > 0.03 ? 'pos' : h.exp < -0.03 ? 'neg' : 'dim') + '" title="exp — средний P&L сделки этой связки в ATR на истории тикера (R:R 2:1). win — винрейт, n — число сделок.">exp ' + (h.exp >= 0 ? '+' : '') + h.exp.toFixed(2) + ' · win ' + Math.round(h.win * 100) + '% · n' + h.n + '</span>'
+          ? '<span class="' + (h.exp > 0.03 ? 'pos' : h.exp < -0.03 ? 'neg' : 'dim') + '" title="exp — средний P&L сделки метода/связки в ATR на истории тикера (R:R 2:1). win — винрейт, n — число сделок.">exp ' + (h.exp >= 0 ? '+' : '') + h.exp.toFixed(2) + ' · win ' + Math.round(h.win * 100) + '% · n' + h.n + '</span>'
           : '<span class="dim" title="Мало сделок на истории тикера — точность оценить нельзя.">мало истории</span>';
+        const mname = (auto && h.mid) ? ' <span class="dim" title="Самый прибыльный на истории этого тикера метод, сработавший в окне">· ' + (NAME[h.mid] || h.mid) + '</span>' : '';
         const ago = '<span class="dim" title="Сколько назад сработало (баров и реального времени с учётом ТФ)">' + _scanAgo(h.ago, ivSec) + '</span>';
         // «имело ли смысл»: исход именно этой сделки, если уже отыграла
         let oc = '';
@@ -387,7 +406,7 @@
         else if (h.ocExit && h.ocPnl != null) { const good = h.ocPnl > 0;
           oc = ' <span class="' + (good ? 'pos' : 'neg') + '" title="Чем закончилась ИМЕННО эта сделка от сигнала (тейк 1.5 / стоп 0.75 ATR, тайм-выход 12 баров)">→ ' + h.ocExit + ' ' + (h.ocPnl >= 0 ? '+' : '') + h.ocPnl.toFixed(2) + ' ATR</span>'; }
         return '<div class="tvsig-scan-hit" data-code="' + h.code + '">' +
-          '<b>' + h.code + '</b> <span class="' + (h.dir < 0 ? 'neg' : 'pos') + '">' + (h.dir < 0 ? '↓ шорт' : '↑ лонг') + '</span>' +
+          '<b>' + h.code + '</b> <span class="' + (h.dir < 0 ? 'neg' : 'pos') + '">' + (h.dir < 0 ? '↓ шорт' : '↑ лонг') + '</span>' + mname +
           ' <span class="dim">@ ' + h.price + '</span> ' + ago + oc + '<br>' + stat + '</div>';
       }).join('');
   }
@@ -533,9 +552,14 @@
     const sa = document.getElementById('tvsig-scan-a'), sb = document.getElementById('tvsig-scan-b');
     if (sa && !sa.dataset.init) {
       const opts = window.SignalsCore.IDS.map(id => '<option value="' + id + '">' + (NAME[id] || id) + '</option>').join('');
-      sa.innerHTML = opts; sb.innerHTML = '<option value="-">— (один метод)</option>' + opts;
-      sa.value = 'zonefade'; sb.value = '-';                 // один валидированный метод — чтобы скан не был пустым; связку юзер выберет сам
+      // 🔝 авто: для каждого тикера сам берёт самый точный на его истории метод
+      sa.innerHTML = '<option value="__auto">🔝 авто: лучший метод тикера</option>' + opts;
+      sb.innerHTML = '<option value="-">— (один метод)</option>' + opts;
+      sa.value = '__auto'; sb.value = '-';                   // авто-подбор по умолчанию — не надо жёстко задавать метод
       sa.dataset.init = '1';
+      // в авто второй селект не нужен — гасим его
+      const syncB = () => { sb.disabled = (sa.value === '__auto'); sb.style.opacity = sb.disabled ? '0.4' : ''; };
+      sa.addEventListener('change', syncB); syncB();
       const lst = document.getElementById('tvsig-scan-list');
       try { const s = localStorage.getItem('tvsig:scanlist'); if (s && lst) lst.value = s; } catch (e) {}
       scanFillPresets();
@@ -1139,7 +1163,7 @@
       '<option value="1">1</option><option value="3" selected>3</option><option value="5">5</option><option value="10">10</option></select> бар' +
       '<button id="tvsig-scan-go" title="Просканировать список">Скан</button></div>' +
       '<div id="tvsig-scan-body"></div>' +
-      '<div id="tvsig-scan-foot">Пресеты — стандартные секторные наборы MOEX; свои списки можно сохранять/удалять («список дня» тоже сохраняется). Скан тянет свечи каждого тикера на ТФ активного графика, ищет сигнал (или согласие двух) в последних N закрытых барах. «X баров / Y назад» — свежесть с пересчётом в реальное время по ТФ. «→ тейк/стоп/тайм ±ATR» — чем ЗАКОНЧИЛАСЬ именно эта сделка (успела ли отыграть): понятно, имел ли сигнал смысл. Хиты сортируются по ТОЧНОСТИ связки на истории тикера (exp/win/n, R:R 2:1); n&lt;10 = мало данных, вниз. Кросс-тикерный breadth в скане не применяется. Второй сигнал «—» = один метод.</div>' +
+      '<div id="tvsig-scan-foot"><b>🔝 авто</b> (по умолчанию): для каждого тикера сам считает все методы и берёт самый прибыльный НА ЕГО истории (exp&gt;0, n≥10), сработавший в окне — список тикеров с их лучшим методом и направлением, без ручного выбора. Или задай метод/связку вручную. Пресеты — стандартные секторные наборы MOEX; свои списки можно сохранять/удалять («список дня» тоже сохраняется). Скан тянет свечи каждого тикера на ТФ активного графика, ищет сигнал в последних N закрытых барах. «X баров / Y назад» — свежесть с пересчётом в реальное время по ТФ. «→ тейк/стоп/тайм ±ATR» — чем ЗАКОНЧИЛАСЬ именно эта сделка (успела ли отыграть): понятно, имел ли сигнал смысл. Хиты сортируются по ТОЧНОСТИ связки на истории тикера (exp/win/n, R:R 2:1); n&lt;10 = мало данных, вниз. Кросс-тикерный breadth в скане не применяется. Второй сигнал «—» = один метод.</div>' +
       '</div>'; // /pane-scan
     document.documentElement.appendChild(panel);
     try { const wv = parseInt(localStorage.getItem('tvsig:width') || '', 10); if (wv >= 300 && wv <= 640) panel.style.width = wv + 'px'; } catch (e) {}
