@@ -359,8 +359,19 @@
     const i = bars.length - 1; let vol = null; const med = _rollMedian(at, i, 200);
     if (med != null && med > 0) { const rr = a / med; vol = rr < 0.8 ? 'сжатие' : (rr > 1.3 ? 'расшир' : 'норма'); }
     const kind = vr == null ? 'н/д' : (vr < 0.7 ? 'возврат к среднему' : vr > 1.3 ? 'тренд/момент' : 'смешанный');
+    // Пол на стоп: на тихих тикерах/коротких ТФ (или на облигациях, где цена — % от
+    // номинала и дневная волатильность сотые процента) сырой ATR-стоп может выйти
+    // 0.02–0.05% — уже сопоставимо со спредом/шагом цены, а не с реальным риском.
+    // Такой стоп выбьет шумом раньше, чем скажет что-то о сделке — считать размер
+    // позиции по нему бессмысленно. Держим R:R, просто масштабируем стоп/тейк вверх
+    // до пола (эвристика, не биржевые данные о спреде — сверяй по своему тикеру).
+    const minStopPct = opts.minStopPct != null ? opts.minStopPct : 0.15;
+    let stopDist = stopK * a, takeDist = takeK * a, floorApplied = false;
+    const rawStopPct = 100 * stopDist / price, minDist = price * minStopPct / 100;
+    if (stopDist > 0 && stopDist < minDist) { const scale = minDist / stopDist; stopDist *= scale; takeDist *= scale; floorApplied = true; }
     return { atr: a, price: price, atrPct: 100 * a / price, vr: vr, noise: noise,
-      stopK: stopK, takeK: takeK, stopDist: stopK * a, takeDist: takeK * a, vol: vol, kind: kind };
+      stopK: stopK, takeK: takeK, stopDist: stopDist, takeDist: takeDist, vol: vol, kind: kind,
+      floorApplied: floorApplied, minStopPct: minStopPct, rawStopPct: rawStopPct };
   }
 
   // текущее ведро бара по каждой оси — для подсветки «сейчас» в таблице

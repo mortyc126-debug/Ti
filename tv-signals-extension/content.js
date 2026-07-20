@@ -959,6 +959,7 @@
     let html = '<div class="tvsig-fc-card">волатильность (ATR) ' + pct(vp.atrPct) + volTxt + kindTxt +
       '<br>стоп <b>' + pct(stopPct) + '</b> · тейк <b>' + pct(takePct) + '</b> · R:R 2:1' +
       '<span class="tvsig-fc-lown" title="ширина в ATR: стоп ' + vp.stopK.toFixed(2) + ' / тейк ' + vp.takeK.toFixed(2) + ' ATR (крутится VR-шумом ' + (vp.vr != null ? vp.vr.toFixed(2) : '—') + ')"> ⓘ</span>';
+    if (vp.floorApplied) html += '<br><span class="tvsig-fc-lown">⚠ сырой ATR-стоп вышел ' + pct(vp.rawStopPct) + ' — на этом тикере/ТФ волатильность аномально мала (ATR ' + pct(vp.atrPct) + ' от цены), такой стоп уже в пределах спреда/шума, не реальный риск. Поднят до пола ' + vp.minStopPct + '% (тейк пропорционально, R:R сохранён). Пол эвристический, не биржевые данные о спреде — для облигаций/тихих тикеров прикинь стоп сам.</span>';
     const acct = _rcVal('tvsig-rc-acct'), risk = _rcVal('tvsig-rc-risk'), port = _rcVal('tvsig-rc-port');
     const lev = Math.max(1, _rcVal('tvsig-rc-lev') || 1);
     const capPct = _rcVal('tvsig-rc-cap');
