@@ -999,7 +999,12 @@
       const wpct = 100 * posValue / acct;
       const levTxt = lev > 1 ? ' · плечо ×' + lev : '';
       html += '<br>размер позиции: <b>' + rub(posValue) + ' ₽</b> (' + wpct.toFixed(0) + '% счёта' + levTxt + ') ≈ ' + (units >= 10 ? rub(units) : units.toFixed(2)) + ' ед.';
-      html += '<br>риск по стопу: <b>' + rub(riskMoney) + ' ₽</b> (' + riskPctReal.toFixed(2) + '% счёта) · профит по тейку: <b>+' + rub(profit) + ' ₽</b>';
+      // факт vs цель прямо в главной строке — цель часто НЕДОСТИЖИМА при узком стопе
+      // и лимитах ниже (см. capped), молчать об этом и оставлять только «X ₽» вводит в заблуждение
+      const riskLine = Math.abs(riskPctReal - risk) > risk * 0.05
+        ? '<b class="tvsig-fc-lown">' + riskPctReal.toFixed(2) + '%</b> из цели ' + risk + '%'
+        : riskPctReal.toFixed(2) + '% счёта (цель ' + risk + '% достигнута)';
+      html += '<br>риск по стопу: <b>' + rub(riskMoney) + ' ₽</b> (' + riskLine + ') · профит по тейку: <b>+' + rub(profit) + ' ₽</b>';
       // лоты: реально купить можно только целое число лотов — округляем вниз и
       // показываем фактический (после округления) риск, а не идеальный непрерывный
       const lots = Math.floor(units / lotSize);
@@ -1267,7 +1272,7 @@
       '<div class="tvsig-fc-sec">Калькулятор позиции (риск на сделку)</div>' +
       '<div id="tvsig-rc-ctrl">' +
       '<label>Счёт ₽<input id="tvsig-rc-acct" type="number" placeholder="сумма на счету"></label>' +
-      '<label>Риск/сделку %<input id="tvsig-rc-risk" type="number" step="0.1" value="1"></label>' +
+      '<label>Целевой риск/сделку %<input id="tvsig-rc-risk" type="number" step="0.1" value="1" title="Сколько ХОЧЕШЬ потерять от депозита, если сработает стоп — доля от «Счёт ₽». Формула считает под это позицию, но её может урезать плечо или «лимит на сделку» ниже — тогда факт. риск окажется меньше цели, это видно в строке «риск по стопу»."></label>' +
       '<label>Плечо ×<input id="tvsig-rc-lev" type="number" step="0.1" min="1" value="1" title="Встроенное плечо инструмента. 1 = без плеча (кэш). Для фьючерсов/маржи впиши доступное плечо — позиция сможет превышать счёт во столько раз."></label>' +
       '<label>Лимит риска портфеля %<input id="tvsig-rc-port" type="number" step="1" value="10"></label>' +
       '<label>Лимит на сделку, % депозита<input id="tvsig-rc-cap" type="number" step="1" value="25" title="Жёсткий потолок размера ОДНОЙ позиции, не зависит от риск/стоп-расчёта. При узком стопе риск-формула может требовать почти весь депозит на одну бумагу (риск% ÷ стоп% → доля счёта) — этот лимит её обрезает первым. 0 или пусто = без лимита (только покупательная способность)."></label>' +
