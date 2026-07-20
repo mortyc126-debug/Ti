@@ -400,9 +400,13 @@
   // прошло); 'stopped' — цена уже выбила стоп (сигнал ОПРОВЕРГНУТ рынком); 'reached'
   // — цель уже достигнута; 'expired' — прошло больше horizon баров БЕЗ тейка/стопа,
   // ИЛИ (если dt задан) реального времени уже сильно больше, чем 12 обычных баров
-  // заняли бы — на разреженных данных (разрывы сессии/выходные/неликвид) 12 баров
-  // могут растянуться на много реальных часов, и «активный» сигнал висел бы висел.
-  function liveOutcome(bars, i, dir, take, stop, cost, horizon, at, dt) {
+  // заняли бы. Время — от nowTs (реальные часы «сейчас»), НЕ от bars[last].time:
+  // пока биржа закрыта (после вечерней сессии до утренней/выходные), новых баров
+  // не появляется, bars[last].time замирает на моменте закрытия — и без nowTs
+  // сигнал висел бы «активным» всю ночь, а не переходил в 'expired'. При
+  // открытии, когда придёт первый гэпующий бар, цикл выше и так поймает стоп/тейк
+  // по факту гэпа — но пока данных ещё нет, статус должен опираться на часы.
+  function liveOutcome(bars, i, dir, take, stop, cost, horizon, at, dt, nowTs) {
     at = at || atr(bars, 14); const a = at[i]; if (a == null || a <= 0) return null;
     const entry = bars[i].close, tp = entry + dir * take * a, sl = entry - dir * stop * a;
     const last = bars.length - 1;
@@ -412,7 +416,9 @@
       else { if (bars[j].high >= sl) return { state: 'stopped', bar: j, pnl: dir * (sl - entry) / a - cost, entry, tp, sl, a, barsElapsed: j - i };
         if (bars[j].low <= tp) return { state: 'reached', bar: j, pnl: dir * (tp - entry) / a - cost, entry, tp, sl, a, barsElapsed: j - i }; }
     }
-    const elapsed = last - i, realElapsed = bars[last].time - bars[i].time;
+    const elapsed = last - i;
+    const refNow = nowTs != null ? Math.max(nowTs, bars[last].time) : bars[last].time;
+    const realElapsed = refNow - bars[i].time;
     const timeCap = dt ? horizon * dt * 1.5 : Infinity; // ×1.5 запас на обеденный перерыв/пару тонких баров
     if (elapsed >= horizon || realElapsed >= timeCap) return { state: 'expired', pnl: dir * (bars[last].close - entry) / a - cost, entry, tp, sl, a, barsElapsed: elapsed, realElapsed };
     return { state: 'active', entry, tp, sl, a, barsElapsed: elapsed, barsRemaining: horizon - elapsed, realElapsed };

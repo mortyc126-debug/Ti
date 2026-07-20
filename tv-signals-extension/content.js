@@ -356,7 +356,7 @@
     const findFire = (ser, li, lo) => { for (let k = li; k >= lo; k--) if (ser[k]) return k; return -1; }; // самое свежее срабатывание в окне
     const pushHit = (code, bars, dir, hitBar, li, st, mid, ser, dtSec) => {
       let oc = null; try { oc = SC.tradeOutcome(bars, hitBar, dir, 1.5, 0.75, 0.12, 12); } catch (e) {}
-      let plan = null; try { plan = ser ? _planFor(bars, ser, hitBar, dir, dtSec, li) : null; } catch (e) {}
+      let plan = null; try { plan = ser ? _planFor(bars, ser, hitBar, dir, dtSec, li, Math.floor(Date.now() / 1000)) : null; } catch (e) {}
       // agoSec — РЕАЛЬНОЕ время между баром сигнала и «сейчас» (li), не ago×dtSec:
       // между барами бывают разрывы сессии, номинальный шаг там врёт.
       hits.push({ code, dir, price: bars[hitBar].close, ago: li - hitBar, agoSec: bars[li].time - bars[hitBar].time,
@@ -918,17 +918,21 @@
   // i — бар, на котором ищем начало забега сигнала (в сканере — бар срабатывания,
   // а не обязательно последний), dir — направление, dt — шаг бара (сек), nowIdx —
   // «сейчас» для отсчёта возраста/чекпоинтов (по умолчанию = i, в сканере — li).
-  function _planFor(bars, ser, i, dir, dt, nowIdx) {
+  // nowTs — реальные часы (Date.now()/1000): пока биржа закрыта, новых баров нет,
+  // bars[nowIdx].time замирает на моменте закрытия — без nowTs возраст/статус
+  // сигнала «зависали» бы до утра вместо перехода в 'expired' по факту времени.
+  function _planFor(bars, ser, i, dir, dt, nowIdx, nowTs) {
     const SC = window.SignalsCore;
     const run = SC.signalRun(ser, i); if (!run) return null;
     nowIdx = nowIdx != null ? nowIdx : i;
-    const live = SC.liveOutcome(bars, run.startIdx, dir, 1.5, 0.75, 0.12, 12, null, dt);
+    nowTs = nowTs != null ? Math.max(nowTs, bars[nowIdx].time) : bars[nowIdx].time;
+    const live = SC.liveOutcome(bars, run.startIdx, dir, 1.5, 0.75, 0.12, 12, null, dt, nowTs);
     const trend = SC.methodTrend(ser, bars, 12);
     const ageBars = nowIdx - run.startIdx;
-    // возраст — РЕАЛЬНОЕ время между таймстампами баров, не ageBars×dt: между
-    // барами бывают разрывы сессии (обед/ночь/выходные), 1 бар может быть и
-    // 5 минут, и много часов — dt тут наврёт, а таймстампы всегда точны.
-    const ageTime = bars[nowIdx].time - bars[run.startIdx].time;
+    // возраст — от реальных часов (nowTs), не ageBars×dt и не bars[nowIdx].time:
+    // между барами бывают разрывы сессии, а пока биржа закрыта, последний бар не
+    // двигается вовсе — nowTs продолжает идти, значит и возраст должен расти.
+    const ageTime = nowTs - bars[run.startIdx].time;
     const plan = { dir, startIdx: run.startIdx, startTime: bars[run.startIdx].time,
       ageBars, ageTime, trend, live, nowPrice: bars[nowIdx].close };
     if (live) { plan.entry = live.entry; plan.tp = live.tp; plan.sl = live.sl; }
@@ -944,7 +948,7 @@
   function _signalPlan(id) {
     const c = S.computed && S.computed[id], bars = S.bars;
     if (!c || !c.last || !c.series || !bars || !bars.length) return null;
-    return _planFor(bars, c.series, bars.length - 1, Math.sign(c.last), S.barDt || 300);
+    return _planFor(bars, c.series, bars.length - 1, Math.sign(c.last), S.barDt || 300, undefined, Math.floor(Date.now() / 1000));
   }
   // компактный кластер бейджей: тренд метода (усил/слаб) + статус живой сделки
   // с начала сигнала (в пути / опровергнут стопом / цель достигнута / устарел)
