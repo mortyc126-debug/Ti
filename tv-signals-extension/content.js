@@ -340,13 +340,25 @@
         // Для согласия — серия только там, где оба метода в одну сторону.
         const ser2 = sb ? sa.map((v, k) => { const w = sb[k]; return (v && w && Math.sign(v) === Math.sign(w)) ? Math.sign(v) : 0; }) : sa;
         let st = null; try { st = SC.btStats(ser2, bars, 12); } catch (e) {}
-        hits.push({ code, dir, price: bars[hitBar].close, ago: li - hitBar,
-          exp: st ? st.exp : null, win: st ? st.win : null, n: st ? st.n : 0 });
+        // «имело ли смысл»: чем закончилась ИМЕННО эта сделка (если уже отыграла)
+        let oc = null; try { oc = SC.tradeOutcome(bars, hitBar, dir, 1.5, 0.75, 0.12, 12); } catch (e) {}
+        hits.push({ code, dir, price: bars[hitBar].close, ago: li - hitBar, ts: bars[hitBar].time,
+          exp: st ? st.exp : null, win: st ? st.win : null, n: st ? st.n : 0,
+          ocExit: oc ? oc.exit : null, ocPnl: oc ? oc.pnl : null });
       }
     }
-    scanRender(hits, A, B, look, diag);
+    scanRender(hits, A, B, look, diag, ivSec);
   }
-  function scanRender(hits, A, B, look, diag) {
+  // «N баров назад» → реальное время с учётом ТФ
+  function _scanAgo(ago, ivSec) {
+    if (ago <= 0) return 'сейчас (последний бар)';
+    const s = ago * ivSec;
+    let t; if (s < 3600) t = Math.round(s / 60) + ' мин';
+    else if (s < 86400) t = (s / 3600).toFixed(s < 36000 ? 1 : 0) + ' ч';
+    else t = Math.round(s / 86400) + ' дн';
+    return ago + ' баров / ' + t + ' назад';
+  }
+  function scanRender(hits, A, B, look, diag, ivSec) {
     const body = document.getElementById('tvsig-scan-body'); if (!body) return;
     const found = hits.filter(h => h.dir);
     const combo = (B && B !== '-') ? (NAME[A] + ' + ' + NAME[B]) : NAME[A];
@@ -368,10 +380,15 @@
         const stat = (h.n >= 10 && h.exp != null)
           ? '<span class="' + (h.exp > 0.03 ? 'pos' : h.exp < -0.03 ? 'neg' : 'dim') + '" title="exp — средний P&L сделки этой связки в ATR на истории тикера (R:R 2:1). win — винрейт, n — число сделок.">exp ' + (h.exp >= 0 ? '+' : '') + h.exp.toFixed(2) + ' · win ' + Math.round(h.win * 100) + '% · n' + h.n + '</span>'
           : '<span class="dim" title="Мало сделок на истории тикера — точность оценить нельзя.">мало истории</span>';
-        const ago = h.ago > 0 ? '<span class="dim" title="Сколько закрытых баров назад сработало">' + h.ago + ' баров назад</span> ' : '';
+        const ago = '<span class="dim" title="Сколько назад сработало (баров и реального времени с учётом ТФ)">' + _scanAgo(h.ago, ivSec) + '</span>';
+        // «имело ли смысл»: исход именно этой сделки, если уже отыграла
+        let oc = '';
+        if (h.ocExit === 'открыта') oc = ' <span class="dim" title="Сделка ещё не закрылась (свежий сигнал)">ещё открыта</span>';
+        else if (h.ocExit && h.ocPnl != null) { const good = h.ocPnl > 0;
+          oc = ' <span class="' + (good ? 'pos' : 'neg') + '" title="Чем закончилась ИМЕННО эта сделка от сигнала (тейк 1.5 / стоп 0.75 ATR, тайм-выход 12 баров)">→ ' + h.ocExit + ' ' + (h.ocPnl >= 0 ? '+' : '') + h.ocPnl.toFixed(2) + ' ATR</span>'; }
         return '<div class="tvsig-scan-hit" data-code="' + h.code + '">' +
           '<b>' + h.code + '</b> <span class="' + (h.dir < 0 ? 'neg' : 'pos') + '">' + (h.dir < 0 ? '↓ шорт' : '↑ лонг') + '</span>' +
-          ' <span class="dim">@ ' + h.price + '</span> ' + ago + stat + '</div>';
+          ' <span class="dim">@ ' + h.price + '</span> ' + ago + oc + '<br>' + stat + '</div>';
       }).join('');
   }
 
@@ -808,12 +825,13 @@
     try { const s = JSON.parse(localStorage.getItem('tvsig:rc') || '{}');
       if (s.a != null && document.getElementById('tvsig-rc-acct')) document.getElementById('tvsig-rc-acct').value = s.a;
       if (s.r != null && document.getElementById('tvsig-rc-risk')) document.getElementById('tvsig-rc-risk').value = s.r;
+      if (s.l != null && document.getElementById('tvsig-rc-lev')) document.getElementById('tvsig-rc-lev').value = s.l;
       if (s.p != null && document.getElementById('tvsig-rc-port')) document.getElementById('tvsig-rc-port').value = s.p;
     } catch (e) {}
   }
   function rcCompute() {
     const out = document.getElementById('tvsig-rc-out'); if (!out) return;
-    try { localStorage.setItem('tvsig:rc', JSON.stringify({ a: _rcVal('tvsig-rc-acct'), r: _rcVal('tvsig-rc-risk'), p: _rcVal('tvsig-rc-port') })); } catch (e) {}
+    try { localStorage.setItem('tvsig:rc', JSON.stringify({ a: _rcVal('tvsig-rc-acct'), r: _rcVal('tvsig-rc-risk'), l: _rcVal('tvsig-rc-lev'), p: _rcVal('tvsig-rc-port') })); } catch (e) {}
     const bars = S.bars, SC = window.SignalsCore;
     if (!bars || bars.length < 20) { out.innerHTML = '<span class="tvsig-fc-hint">Нет свечей — открой «Модели» и ⟳.</span>'; return; }
     const vp = SC.volProfile ? SC.volProfile(bars) : null;
@@ -827,22 +845,25 @@
       '<br>стоп <b>' + pct(stopPct) + '</b> · тейк <b>' + pct(takePct) + '</b> · R:R 2:1' +
       '<span class="tvsig-fc-lown" title="ширина в ATR: стоп ' + vp.stopK.toFixed(2) + ' / тейк ' + vp.takeK.toFixed(2) + ' ATR (крутится VR-шумом ' + (vp.vr != null ? vp.vr.toFixed(2) : '—') + ')"> ⓘ</span>';
     const acct = _rcVal('tvsig-rc-acct'), risk = _rcVal('tvsig-rc-risk'), port = _rcVal('tvsig-rc-port');
+    const lev = Math.max(1, _rcVal('tvsig-rc-lev') || 1);
     if (acct > 0 && risk > 0 && stopPct > 0) {
       const stopFrac = stopPct / 100, takeFrac = takePct / 100;
-      const posByRisk = (acct * risk / 100) / stopFrac;   // сколько НАДО, чтобы рискнуть risk%
-      const capped = posByRisk > acct;                    // без плеча: не больше счёта
-      const posValue = Math.min(posByRisk, acct), units = posValue / price;
+      const buyPower = acct * lev;                         // покупательная способность с плечом
+      const posByRisk = (acct * risk / 100) / stopFrac;    // сколько НАДО, чтобы рискнуть risk%
+      const capped = posByRisk > buyPower;                 // ограничение — покупательная способность
+      const posValue = Math.min(posByRisk, buyPower), units = posValue / price;
       const riskMoney = posValue * stopFrac, riskPctReal = 100 * riskMoney / acct, profit = posValue * takeFrac;
       const wpct = 100 * posValue / acct;
-      html += '<br>размер позиции: <b>' + rub(posValue) + ' ₽</b> (' + wpct.toFixed(0) + '% счёта) ≈ ' + (units >= 10 ? rub(units) : units.toFixed(2)) + ' ед.';
+      const levTxt = lev > 1 ? ' · плечо ×' + lev : '';
+      html += '<br>размер позиции: <b>' + rub(posValue) + ' ₽</b> (' + wpct.toFixed(0) + '% счёта' + levTxt + ') ≈ ' + (units >= 10 ? rub(units) : units.toFixed(2)) + ' ед.';
       html += '<br>риск по стопу: <b>' + rub(riskMoney) + ' ₽</b> (' + riskPctReal.toFixed(2) + '% счёта) · профит по тейку: <b>+' + rub(profit) + ' ₽</b>';
-      if (capped) html += '<br><span class="tvsig-fc-lown">стоп всего ' + pct(stopPct) + ': чтобы рискнуть ' + risk + '%, позиция должна быть ' + rub(posByRisk) + ' ₽ — больше счёта. Без плеча взят весь счёт, фактический риск ' + riskPctReal.toFixed(2) + '%.</span>';
-      const maxByCap = Math.max(1, Math.floor(acct / posValue));
+      if (capped) html += '<br><span class="tvsig-fc-lown">стоп ' + pct(stopPct) + ': чтобы рискнуть ' + risk + '%, нужна позиция ' + rub(posByRisk) + ' ₽ — больше покупательной способности (' + rub(buyPower) + ' ₽ при плече ×' + lev + '). Взят максимум, фактический риск ' + riskPctReal.toFixed(2) + '%.</span>';
+      const maxByCap = Math.max(1, Math.floor(buyPower / posValue));
       const maxByRisk = (port > 0 && riskPctReal > 0) ? Math.floor(port / riskPctReal) : Infinity;
-      let mp = Math.min(maxByCap, maxByRisk), lim = maxByRisk < maxByCap ? 'лимиту риска портфеля' : 'капиталу';
+      let mp = Math.min(maxByCap, maxByRisk), lim = maxByRisk < maxByCap ? 'лимиту риска портфеля' : (lev > 1 ? 'покупательной способности' : 'капиталу');
       html += '<br>макс. одновременных позиций: <b>' + mp + '</b> (по ' + lim + ')';
       if (mp > 20) html += ' <span class="tvsig-fc-lown">в бэктесте до 20 — коррелир. риск, держи ≤20</span>';
-    } else html += '<br><span class="tvsig-fc-hint">Введи счёт ₽ и риск% — посчитаю размер (без плеча) и лимит позиций.</span>';
+    } else html += '<br><span class="tvsig-fc-hint">Введи счёт ₽ и риск% — посчитаю размер и лимит позиций (плечо ×1 = без плеча).</span>';
     out.innerHTML = html + '</div>';
   }
 
@@ -1092,6 +1113,7 @@
       '<div id="tvsig-rc-ctrl">' +
       '<label>Счёт ₽<input id="tvsig-rc-acct" type="number" placeholder="сумма на счету"></label>' +
       '<label>Риск/сделку %<input id="tvsig-rc-risk" type="number" step="0.1" value="1"></label>' +
+      '<label>Плечо ×<input id="tvsig-rc-lev" type="number" step="0.1" min="1" value="1" title="Встроенное плечо инструмента. 1 = без плеча (кэш). Для фьючерсов/маржи впиши доступное плечо — позиция сможет превышать счёт во столько раз."></label>' +
       '<label>Лимит риска портфеля %<input id="tvsig-rc-port" type="number" step="1" value="10"></label>' +
       '</div>' +
       '<div id="tvsig-rc-out"></div>' +
@@ -1117,7 +1139,7 @@
       '<option value="1">1</option><option value="3" selected>3</option><option value="5">5</option><option value="10">10</option></select> бар' +
       '<button id="tvsig-scan-go" title="Просканировать список">Скан</button></div>' +
       '<div id="tvsig-scan-body"></div>' +
-      '<div id="tvsig-scan-foot">Пресеты — стандартные секторные наборы MOEX; свои списки можно сохранять/удалять («список дня» тоже сохраняется). Скан тянет свечи каждого тикера на ТФ активного графика, считает сигнал (или согласие двух) на последнем ЗАКРЫТОМ баре. Хиты сортируются по ТОЧНОСТИ связки на истории самого тикера (exp/win/n, R:R 2:1) — вверху те, где метод исторически прибыльнее; n&lt;10 = мало данных, вниз. Кросс-тикерный breadth в скане не применяется — открой хит на графике для полной версии. Второй сигнал «—» = один метод.</div>' +
+      '<div id="tvsig-scan-foot">Пресеты — стандартные секторные наборы MOEX; свои списки можно сохранять/удалять («список дня» тоже сохраняется). Скан тянет свечи каждого тикера на ТФ активного графика, ищет сигнал (или согласие двух) в последних N закрытых барах. «X баров / Y назад» — свежесть с пересчётом в реальное время по ТФ. «→ тейк/стоп/тайм ±ATR» — чем ЗАКОНЧИЛАСЬ именно эта сделка (успела ли отыграть): понятно, имел ли сигнал смысл. Хиты сортируются по ТОЧНОСТИ связки на истории тикера (exp/win/n, R:R 2:1); n&lt;10 = мало данных, вниз. Кросс-тикерный breadth в скане не применяется. Второй сигнал «—» = один метод.</div>' +
       '</div>'; // /pane-scan
     document.documentElement.appendChild(panel);
     try { const wv = parseInt(localStorage.getItem('tvsig:width') || '', 10); if (wv >= 300 && wv <= 640) panel.style.width = wv + 'px'; } catch (e) {}
