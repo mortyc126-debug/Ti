@@ -283,6 +283,7 @@
 #tvsig-scan-srcrow select{ background:var(--surface2); border:1px solid var(--border2); border-radius:6px; color:var(--text); padding:3px 5px; font-family:var(--mono); font-size:10.5px; max-width:100%; }
 #tvsig-scan-sel{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:4px 10px; font-family:var(--mono); font-size:10.5px; color:var(--text3); }
 #tvsig-scan-sel select{ flex:1; min-width:60px; background:var(--surface2); border:1px solid var(--border2); border-radius:6px; color:var(--text); padding:3px 5px; font-family:var(--mono); font-size:10.5px; }
+.tvsig-scan-onlyactive{ display:flex; align-items:center; gap:4px; cursor:pointer; white-space:nowrap; }
 #tvsig-scan-go{ background:var(--accent); border:1px solid var(--accent); border-radius:6px; color:#fff; cursor:pointer; padding:4px 12px; font-size:11px; }
 #tvsig-scan-go:hover{ filter:brightness(1.15); }
 .tvsig-scan-hd{ padding:5px 10px 2px; font-family:var(--mono); font-size:10.5px; color:var(--text2); }

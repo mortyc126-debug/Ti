@@ -418,7 +418,14 @@
         processTicker(code, f.bars, ivSec);
       }
     }
-    scanRender(hits, A, B, look, diag, auto, { source, iv, dt: source === 'chart' ? dt : ivSec });
+    const meta = { source, iv, dt: source === 'chart' ? dt : ivSec };
+    S._scanCache = { hits, A, B, look, diag, auto, meta }; // для перефильтровки чекбоксом без пересканирования
+    scanRender(hits, A, B, look, diag, auto, meta);
+  }
+  // «только неисполненные»: перерисовать последний результат без нового скана
+  function scanRerender() {
+    const c = S._scanCache; if (!c) return;
+    scanRender(c.hits, c.A, c.B, c.look, c.diag, c.auto, c.meta);
   }
   // «N баров назад» → реальное время с учётом ТФ
   function _scanAgo(ago, ivSec) {
@@ -432,7 +439,14 @@
   function scanRender(hits, A, B, look, diag, auto, meta) {
     const body = document.getElementById('tvsig-scan-body'); if (!body) return;
     meta = meta || {};
-    const found = hits.filter(h => h.dir);
+    let found = hits.filter(h => h.dir);
+    const totalFound = found.length;
+    // «только неисполненные»: прячем то, что уже отыграло (цель/стоп/тайм-выход) —
+    // остаётся только состояние 'active' из liveOutcome. Неизвестное (plan=null,
+    // напр. не удалось посчитать) не прячем — лучше показать лишнее, чем потерять сигнал.
+    const onlyActive = !!(document.getElementById('tvsig-scan-onlyactive') || {}).checked;
+    if (onlyActive) found = found.filter(h => !h.plan || !h.plan.live || h.plan.live.state === 'active');
+    const hiddenCount = totalFound - found.length;
     const combo = auto ? '🔝 лучший метод на тикере' : ((B && B !== '-') ? (NAME[A] + ' + ' + NAME[B]) : NAME[A]);
     const win = look > 1 ? ' за ' + look + ' баров' : ' на последнем баре';
     // источник данных скана — реальный интервал, который сравнивали между тикерами.
@@ -443,6 +457,9 @@
       ? '<div class="tvsig-fc-hint">источник: график терминала, точный ТФ ≈ ' + _fmtDuration(meta.dt) + '/бар</div>'
       : '<div class="tvsig-fc-hint">источник: MOEX ISS, интервал <b>' + cmpTfLabel(meta.iv) + '</b> (ближайший из 1/10/60 мин, дня, недели к ТФ графика — соседние ТФ могут дать одинаковый результат, для точного ТФ переключи источник на «график терминала»)</div>';
     if (!found.length) {
+      if (onlyActive && totalFound > 0) {
+        body.innerHTML = srcNote + '<div class="tvsig-fc-hint">Все ' + totalFound + ' срабатывания «' + combo + '»' + win + ' уже отыграли (цель/стоп/тайм-выход) — активных нет. Сними «только неисполненные», чтобы увидеть их с исходом.</div>'; return;
+      }
       let msg = 'Нет срабатываний «' + combo + '»' + win + '. Загружено ' + diag.ok + ' тикеров';
       if (diag.err) msg += ' (' + diag.err + ' не отдали свечи)';
       if (auto) msg += '. Сигналы мелькали у ' + diag.aFire + ', но ни один прибыльный на истории (exp>0, n≥10) — увеличь окно или смени ТФ.';
@@ -455,7 +472,8 @@
     // тикеры с малой выборкой (n<10) уводим вниз, оценке доверять нельзя.
     const rk = h => (h.n >= 10 && h.exp != null) ? h.exp : -Infinity;
     found.sort((a, b) => rk(b) - rk(a));
-    body.innerHTML = srcNote + '<div class="tvsig-scan-hd">' + combo + win + ' — ' + found.length + (auto ? ' тикеров с прибыльным сигналом' : ' сработало') + ' (по точности на тикере):</div>' +
+    const hiddenNote = hiddenCount > 0 ? ' <span class="dim">(' + hiddenCount + ' исполненных скрыто)</span>' : '';
+    body.innerHTML = srcNote + '<div class="tvsig-scan-hd">' + combo + win + ' — ' + found.length + (auto ? ' тикеров с прибыльным сигналом' : ' сработало') + ' (по точности на тикере):' + hiddenNote + '</div>' +
       found.map(h => {
         const stat = (h.n >= 10 && h.exp != null)
           ? '<span class="' + (h.exp > 0.03 ? 'pos' : h.exp < -0.03 ? 'neg' : 'dim') + '" title="exp — средний P&L сделки метода/связки в ATR на истории тикера (R:R 2:1). win — винрейт, n — число сделок.">exp ' + (h.exp >= 0 ? '+' : '') + h.exp.toFixed(2) + ' · win ' + Math.round(h.win * 100) + '% · n' + h.n + '</span>'
@@ -814,7 +832,9 @@
   // Сигнал-агностична: анализируем ВЫБРАННЫЙ сигнал (S.fcId), не только фейд —
   // мета-слой «когда он надёжен» одинаково полезен NW, фейду и любому из 14.
   function _fcNum(x, d) { return x == null ? '—' : (x >= 0 ? '+' : '') + x.toFixed(d == null ? 3 : d); }
-  function _hhmm(ts) { const t = new Date(ts * 1000); return ('0' + t.getUTCHours()).slice(-2) + ':' + ('0' + t.getUTCMinutes()).slice(-2); }
+  // МСК = UTC+3 без перехода на летнее/зимнее — фиксированный сдвиг, безопасно
+  // независимо от таймзоны машины/браузера (считаем через getUTC* сдвинутой даты)
+  function _hhmm(ts) { const t = new Date((ts + 10800) * 1000); return ('0' + t.getUTCHours()).slice(-2) + ':' + ('0' + t.getUTCMinutes()).slice(-2); }
   function _regLbl(rg) { return rg ? (rg.isTrend ? 'тренд ' + (rg.trendDir > 0 ? '↑' : '↓') : 'боковик') + (rg.vol ? '/' + rg.vol : '') : ''; }
   function _fcSeries(id) { const SC = window.SignalsCore;
     if (S.computed && S.computed[id] && S.computed[id].series) return S.computed[id].series;
@@ -895,7 +915,7 @@
         _fcNum(p.trend.recentExp) + ' ATR против предыдущих ' + p.trend.priorN + ' сделок exp ' + _fcNum(p.trend.priorExp) + ' ATR">' + arrow + '</span>';
     }
     if (p.live) {
-      const st = p.live.state, since = 'с ' + _hhmm(p.startTime) + ' UTC (' + p.ageBars + ' бар. / ' + _fmtDuration(p.ageTime) + ' назад)';
+      const st = p.live.state, since = 'с ' + _hhmm(p.startTime) + ' МСК (' + p.ageBars + ' бар. / ' + _fmtDuration(p.ageTime) + ' назад)';
       if (st === 'stopped') html += '<span class="tvsig-inval" title="Опровергнут: цена уже выбила расчётный стоп ' + p.sl.toFixed(4) + ' ' + since + '">⚠ стоп</span>';
       else if (st === 'reached') html += '<span class="tvsig-reached" title="Цель ' + p.tp.toFixed(4) + ' уже достигнута ' + since + '">✓ цель</span>';
       else if (st === 'expired') html += '<span class="tvsig-expired" title="Прошло больше горизонта (12 баров) без тейка/стопа — сигнал устарел, ' + since + '">⏱ истёк</span>';
@@ -906,7 +926,7 @@
   function _recentSignals(ser, bars) {
     const idx = []; for (let i = bars.length - 1; i >= 0 && idx.length < 8; i--) if (ser[i]) idx.push(i);
     if (!idx.length) return '<span class="tvsig-fc-hint">Нет сигналов на этой истории.</span>';
-    return idx.map(i => '<div class="tvsig-fc-sig" data-idx="' + i + '">' + _hhmm(bars[i].time) + ' UTC · ' +
+    return idx.map(i => '<div class="tvsig-fc-sig" data-idx="' + i + '">' + _hhmm(bars[i].time) + ' МСК · ' +
       (ser[i] < 0 ? '↓ шорт' : '↑ лонг') + ' · <span class="dim">' + _regLbl(window.SignalsCore.regimeInfo(bars, i)) + '</span></div>').join('');
   }
   // карточка ТЕКУЩЕГО активного сигнала выбранного метода: цель/срок, чекпоинты
@@ -915,7 +935,7 @@
     const p = _signalPlan(id);
     if (!p) return '<span class="tvsig-fc-hint">Сейчас нет активного сигнала «' + (NAME[id] || id) + '» на этом тикере.</span>';
     const dirTxt = p.dir < 0 ? '↓ шорт' : '↑ лонг';
-    const since = _hhmm(p.startTime) + ' UTC · ' + p.ageBars + ' бар. / ' + _fmtDuration(p.ageTime) + ' назад';
+    const since = _hhmm(p.startTime) + ' МСК · ' + p.ageBars + ' бар. / ' + _fmtDuration(p.ageTime) + ' назад';
     const st = p.live ? p.live.state : null;
     let stLine;
     if (st === 'stopped') stLine = '<span class="tvsig-inval">⚠ ОПРОВЕРГНУТ</span> — цена уже выбила стоп ' + p.sl.toFixed(4) + ' с начала сигнала';
@@ -928,7 +948,7 @@
         ' (посл. ' + p.trend.recentN + ' сделки exp ' + _fcNum(p.trend.recentExp) + ' ATR против пред. ' + p.trend.priorN + ' сделок exp ' + _fcNum(p.trend.priorExp) + ' ATR)')
       : '<span class="tvsig-fc-hint">мало сделок в истории для оценки тренда</span>';
     const cps = p.checkpoints ? '<table class="tvsig-fc-tbl"><tr><th>чекпоинт</th><th>к какому времени</th><th>ожид. цена</th></tr>' +
-      p.checkpoints.map(c => '<tr><td>' + Math.round(c.f * 100) + '%</td><td>' + _hhmm(c.time) + ' UTC (+' + c.barsFromNow + ' бар.)</td><td>' + c.price.toFixed(4) + '</td></tr>').join('') + '</table>' : '';
+      p.checkpoints.map(c => '<tr><td>' + Math.round(c.f * 100) + '%</td><td>' + _hhmm(c.time) + ' МСК (+' + c.barsFromNow + ' бар.)</td><td>' + c.price.toFixed(4) + '</td></tr>').join('') + '</table>' : '';
     return '<div class="tvsig-fc-card"><b>' + (NAME[id] || id) + ': ' + dirTxt + '</b> · начало ' + since + '<br>' +
       'статус: ' + stLine + '<br>' +
       'вход <b>' + p.entry.toFixed(4) + '</b> · цель <b>' + p.tp.toFixed(4) + '</b> · стоп ' + p.sl.toFixed(4) + '<br>' +
@@ -978,7 +998,7 @@
         if (S.chart) drawNwPath(i, fc); }
       else { nwLine = '<br>NW-путь: мало аналогов' + (S.nwUncond ? '' : ' (бар вне квадранта — включи «NW везде»)'); _clearNwPath(); }
     } else if (S.chart && out) drawForecastBand(i, out); // (C) полоса тейк/стоп для остальных
-    el.innerHTML = '<div class="tvsig-fc-card"><b>' + (NAME[S.fcId] || S.fcId) + ': ' + (dir < 0 ? '↓ шорт' : '↑ лонг') + '</b> · ' + _regLbl(rg) + ' · ' + _hhmm(bars[i].time) + ' UTC<br>' +
+    el.innerHTML = '<div class="tvsig-fc-card"><b>' + (NAME[S.fcId] || S.fcId) + ': ' + (dir < 0 ? '↓ шорт' : '↑ лонг') + '</b> · ' + _regLbl(rg) + ' · ' + _hhmm(bars[i].time) + ' МСК<br>' +
       'вход <b>' + out.entry.toFixed(4) + '</b> · тейк ' + out.tp.toFixed(4) + ' · стоп ' + out.sl.toFixed(4) + '<br>' +
       'ожидание в этом режиме: exp <b>' + expC + '</b> ATR<br>факт: <b>' + real + '</b>' + mtf + nwLine + '</div>';
   }
@@ -1373,6 +1393,7 @@
       '<div id="tvsig-scan-sel">Сигнал <select id="tvsig-scan-a"></select> + <select id="tvsig-scan-b"></select>' +
       ' за <select id="tvsig-scan-look" title="Сколько последних ЗАКРЫТЫХ баров считать «свежим» срабатыванием">' +
       '<option value="1">1</option><option value="3" selected>3</option><option value="5">5</option><option value="10">10</option></select> бар' +
+      '<label class="tvsig-scan-onlyactive" title="Спрятать сигналы, которые уже отыграли — цена дошла до цели, выбила стоп, или прошёл горизонт (12 бар.) без исхода. Оставляет только те, что ещё в пути."><input type="checkbox" id="tvsig-scan-onlyactive"> только неисполненные</label>' +
       '<button id="tvsig-scan-go" title="Просканировать список">Скан</button></div>' +
       '<div id="tvsig-scan-body"></div>' +
       '<div id="tvsig-scan-foot"><b>🔝 авто</b> (по умолчанию): для каждого тикера сам считает все методы и берёт самый прибыльный НА ЕГО истории (exp&gt;0, n≥10), сработавший в окне — список тикеров с их лучшим методом и направлением, без ручного выбора. Или задай метод/связку вручную. Пресеты — стандартные секторные наборы MOEX; свои списки можно сохранять/удалять («список дня» тоже сохраняется). <b>Источник MOEX</b> — быстро, но интервал округляется до одного из 5 (1/10/60 мин, день, неделя): соседние ТФ графика (напр. 5 и 15 мин) могут попасть в один интервал и дать одинаковый скан. <b>Источник «график терминала»</b> — точный ТФ графика без округления, но листает твой график по тикерам списка по очереди (медленно, видно визуально) и возвращает исходный тикер в конце. Ищет сигнал в последних N закрытых барах. «X баров / Y назад» — свежесть с пересчётом в реальное время по ТФ. «→ тейк/стоп/тайм ±ATR» — чем ЗАКОНЧИЛАСЬ именно эта сделка (успела ли отыграть): понятно, имел ли сигнал смысл. Хиты сортируются по ТОЧНОСТИ связки на истории тикера (exp/win/n, R:R 2:1); n&lt;10 = мало данных, вниз. Кросс-тикерный breadth в скане не применяется. Второй сигнал «—» = один метод.</div>' +
@@ -1402,6 +1423,9 @@
     cmpTk.addEventListener('keydown', e => { if (e.key === 'Enter') cmpLoad(); });
     panel.querySelector('#tvsig-seg-go').onclick = () => segRender();
     panel.querySelector('#tvsig-scan-go').onclick = () => scanRun();
+    (function () { const el = panel.querySelector('#tvsig-scan-onlyactive'); if (!el) return;
+      try { el.checked = localStorage.getItem('tvsig:scanonlyactive') === '1'; } catch (e) {}
+      el.addEventListener('change', () => { try { localStorage.setItem('tvsig:scanonlyactive', el.checked ? '1' : '0'); } catch (er) {} scanRerender(); }); })();
     panel.querySelector('#tvsig-scan-preset').addEventListener('change', e => scanApplyPreset(e.target.value));
     panel.querySelector('#tvsig-scan-day').onclick = () => scanListDay();
     panel.querySelector('#tvsig-scan-save').onclick = () => scanSaveList();
