@@ -357,7 +357,10 @@
     const pushHit = (code, bars, dir, hitBar, li, st, mid, ser, dtSec) => {
       let oc = null; try { oc = SC.tradeOutcome(bars, hitBar, dir, 1.5, 0.75, 0.12, 12); } catch (e) {}
       let plan = null; try { plan = ser ? _planFor(bars, ser, hitBar, dir, dtSec, li) : null; } catch (e) {}
-      hits.push({ code, dir, price: bars[hitBar].close, ago: li - hitBar, ts: bars[hitBar].time, mid, dtSec,
+      // agoSec — РЕАЛЬНОЕ время между баром сигнала и «сейчас» (li), не ago×dtSec:
+      // между барами бывают разрывы сессии, номинальный шаг там врёт.
+      hits.push({ code, dir, price: bars[hitBar].close, ago: li - hitBar, agoSec: bars[li].time - bars[hitBar].time,
+        ts: bars[hitBar].time, mid, dtSec,
         exp: st ? st.exp : null, win: st ? st.win : null, n: st ? st.n : 0,
         ocExit: oc ? oc.exit : null, ocPnl: oc ? oc.pnl : null, plan });
     };
@@ -434,10 +437,12 @@
     const c = S._scanCache; if (!c) return;
     scanRender(c.hits, c.A, c.B, c.look, c.diag, c.auto, c.meta);
   }
-  // «N баров назад» → реальное время с учётом ТФ
-  function _scanAgo(ago, ivSec) {
+  // «N баров назад» → РЕАЛЬНОЕ время по таймстампам (agoSec), не N×номинальный
+  // шаг ТФ — между барами бывают разрывы сессии (перерыв/ночь/выходные), где
+  // «1 бар назад» может значить и 5 минут, и много часов.
+  function _scanAgo(ago, agoSec) {
     if (ago <= 0) return 'сейчас (последний бар)';
-    const s = ago * ivSec;
+    const s = Math.max(0, agoSec || 0);
     let t; if (s < 3600) t = Math.round(s / 60) + ' мин';
     else if (s < 86400) t = (s / 3600).toFixed(s < 36000 ? 1 : 0) + ' ч';
     else t = Math.round(s / 86400) + ' дн';
@@ -486,7 +491,7 @@
           ? '<span class="' + (h.exp > 0.03 ? 'pos' : h.exp < -0.03 ? 'neg' : 'dim') + '" title="exp — средний P&L сделки метода/связки в ATR на истории тикера (R:R 2:1). win — винрейт, n — число сделок.">exp ' + (h.exp >= 0 ? '+' : '') + h.exp.toFixed(2) + ' · win ' + Math.round(h.win * 100) + '% · n' + h.n + '</span>'
           : '<span class="dim" title="Мало сделок на истории тикера — точность оценить нельзя.">мало истории</span>';
         const mname = (auto && h.mid) ? ' <span class="dim" title="Самый прибыльный на истории этого тикера метод, сработавший в окне">· ' + (NAME[h.mid] || h.mid) + '</span>' : '';
-        const ago = '<span class="dim" title="Сколько назад сработало (баров и реального времени с учётом ТФ)">' + _scanAgo(h.ago, h.dtSec || meta.dt || 300) + '</span>';
+        const ago = '<span class="dim" title="Сколько назад сработало: баров и РЕАЛЬНОГО времени по таймстампам (не N×ТФ — между барами бывают разрывы сессии)">' + _scanAgo(h.ago, h.agoSec) + '</span>';
         // «имело ли смысл»: исход именно этой сделки, если уже отыграла
         let oc = '';
         if (h.ocExit === 'открыта') oc = ' <span class="dim" title="Сделка ещё не закрылась (свежий сигнал)">ещё открыта</span>';
@@ -920,8 +925,12 @@
     const live = SC.liveOutcome(bars, run.startIdx, dir, 1.5, 0.75, 0.12, 12);
     const trend = SC.methodTrend(ser, bars, 12);
     const ageBars = nowIdx - run.startIdx;
+    // возраст — РЕАЛЬНОЕ время между таймстампами баров, не ageBars×dt: между
+    // барами бывают разрывы сессии (обед/ночь/выходные), 1 бар может быть и
+    // 5 минут, и много часов — dt тут наврёт, а таймстампы всегда точны.
+    const ageTime = bars[nowIdx].time - bars[run.startIdx].time;
     const plan = { dir, startIdx: run.startIdx, startTime: bars[run.startIdx].time,
-      ageBars, ageTime: ageBars * dt, trend, live, nowPrice: bars[nowIdx].close };
+      ageBars, ageTime, trend, live, nowPrice: bars[nowIdx].close };
     if (live) { plan.entry = live.entry; plan.tp = live.tp; plan.sl = live.sl; }
     if (live && live.state === 'active') {
       plan.etaBars = live.barsRemaining; plan.etaTime = live.barsRemaining * dt;
@@ -954,7 +963,7 @@
       if (st === 'stopped') html += '<span class="tvsig-inval" title="Опровергнут: цена уже выбила расчётный стоп ' + p.sl.toFixed(4) + ' ' + since + '">⚠ стоп</span>';
       else if (st === 'reached') html += '<span class="tvsig-reached" title="Цель ' + p.tp.toFixed(4) + ' уже достигнута ' + since + '">✓ цель</span>';
       else if (st === 'expired') html += '<span class="tvsig-expired" title="Прошло больше горизонта (12 баров) без тейка/стопа — сигнал устарел, ' + since + '">⏱ истёк</span>';
-      else if (st === 'active') html += '<span class="tvsig-eta" title="Сигнал ' + since + '. Цель ' + p.tp.toFixed(4) + ' · стоп ' + p.sl.toFixed(4) + ' · ~' + _fmtDuration(p.etaTime) + ' (' + p.etaBars + ' бар.) до конца горизонта (12 бар.), если темп сохранится">→' + p.tp.toFixed(2) + ' ~' + _fmtDuration(p.etaTime) + '</span>';
+      else if (st === 'active') html += '<span class="tvsig-eta" title="Сигнал ' + since + '. Цель ' + p.tp.toFixed(4) + ' · стоп ' + p.sl.toFixed(4) + ' · ~' + _fmtDuration(p.etaTime) + ' (' + p.etaBars + ' бар.) до конца горизонта (12 бар.), если темп сохранится. Срок номинальный (N бар.×шаг ТФ) — не учитывает разрывы сессии, по факту может выйти дольше">→' + p.tp.toFixed(2) + ' ~' + _fmtDuration(p.etaTime) + '</span>';
     }
     return html;
   }
@@ -976,14 +985,15 @@
     if (st === 'stopped') stLine = '<span class="tvsig-inval">⚠ ОПРОВЕРГНУТ</span> — цена уже выбила стоп ' + p.sl.toFixed(4) + ' с начала сигнала';
     else if (st === 'reached') stLine = '<span class="tvsig-reached">✓ цель достигнута</span> — ' + p.tp.toFixed(4) + ' уже пройдена с начала сигнала';
     else if (st === 'expired') stLine = '<span class="tvsig-expired">⏱ устарел</span> — прошло больше горизонта (12 бар.) без тейка/стопа, актуальность под вопросом';
-    else if (st === 'active') stLine = 'в пути · ещё ~' + _fmtDuration(p.etaTime) + ' (' + p.etaBars + ' бар.) до конца горизонта, если темп сохранится';
+    else if (st === 'active') stLine = 'в пути · ещё ~' + _fmtDuration(p.etaTime) + ' (' + p.etaBars + ' бар.) до конца горизонта, если темп сохранится <span class="tvsig-fc-lown" title="Срок номинальный: N баров × шаг ТФ, не учитывает разрывы сессии (обед/ночь/выходные) — реальное время до цели может быть больше, особенно на неликвиде">ⓘ</span>';
     else stLine = '—';
     const trend = p.trend && p.trend.state
       ? ((p.trend.state === 'up' ? '<span class="tvsig-trend up">↗ усиливается</span>' : p.trend.state === 'down' ? '<span class="tvsig-trend down">↘ слабеет</span>' : '<span class="tvsig-trend flat">→ стабильно</span>') +
         ' (посл. ' + p.trend.recentN + ' сделки exp ' + _fcNum(p.trend.recentExp) + ' ATR против пред. ' + p.trend.priorN + ' сделок exp ' + _fcNum(p.trend.priorExp) + ' ATR)')
       : '<span class="tvsig-fc-hint">мало сделок в истории для оценки тренда</span>';
     const cps = p.checkpoints ? '<table class="tvsig-fc-tbl"><tr><th>чекпоинт</th><th>к какому времени</th><th>ожид. цена</th></tr>' +
-      p.checkpoints.map(c => '<tr><td>' + Math.round(c.f * 100) + '%</td><td>' + _hhmm(c.time) + ' МСК (+' + c.barsFromNow + ' бар.)</td><td>' + c.price.toFixed(4) + '</td></tr>').join('') + '</table>' : '';
+      p.checkpoints.map(c => '<tr><td>' + Math.round(c.f * 100) + '%</td><td>' + _hhmm(c.time) + ' МСК (+' + c.barsFromNow + ' бар.)</td><td>' + c.price.toFixed(4) + '</td></tr>').join('') + '</table>' +
+      '<span class="tvsig-fc-hint">время чекпоинтов — номинальное (бары × шаг ТФ), без разрывов сессии; ориентируйся на «+N бар.», часы/дни могут набежать больше на перерывах/выходных</span>' : '';
     return '<div class="tvsig-fc-card"><b>' + (NAME[id] || id) + ': ' + dirTxt + '</b> · начало ' + since + '<br>' +
       'статус: ' + stLine + '<br>' +
       'вход <b>' + p.entry.toFixed(4) + '</b> · цель <b>' + p.tp.toFixed(4) + '</b> · стоп ' + p.sl.toFixed(4) + '<br>' +
