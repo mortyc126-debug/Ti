@@ -398,8 +398,11 @@
   // случились (не только horizon), поэтому ловит стоп/тейк, даже если индикатор
   // всё ещё держит тот же знак (лаг). state: 'active' — ещё в пути (≤horizon баров
   // прошло); 'stopped' — цена уже выбила стоп (сигнал ОПРОВЕРГНУТ рынком); 'reached'
-  // — цель уже достигнута; 'expired' — прошло больше horizon баров без тейка/стопа.
-  function liveOutcome(bars, i, dir, take, stop, cost, horizon, at) {
+  // — цель уже достигнута; 'expired' — прошло больше horizon баров БЕЗ тейка/стопа,
+  // ИЛИ (если dt задан) реального времени уже сильно больше, чем 12 обычных баров
+  // заняли бы — на разреженных данных (разрывы сессии/выходные/неликвид) 12 баров
+  // могут растянуться на много реальных часов, и «активный» сигнал висел бы висел.
+  function liveOutcome(bars, i, dir, take, stop, cost, horizon, at, dt) {
     at = at || atr(bars, 14); const a = at[i]; if (a == null || a <= 0) return null;
     const entry = bars[i].close, tp = entry + dir * take * a, sl = entry - dir * stop * a;
     const last = bars.length - 1;
@@ -409,9 +412,10 @@
       else { if (bars[j].high >= sl) return { state: 'stopped', bar: j, pnl: dir * (sl - entry) / a - cost, entry, tp, sl, a, barsElapsed: j - i };
         if (bars[j].low <= tp) return { state: 'reached', bar: j, pnl: dir * (tp - entry) / a - cost, entry, tp, sl, a, barsElapsed: j - i }; }
     }
-    const elapsed = last - i;
-    if (elapsed >= horizon) return { state: 'expired', pnl: dir * (bars[last].close - entry) / a - cost, entry, tp, sl, a, barsElapsed: elapsed };
-    return { state: 'active', entry, tp, sl, a, barsElapsed: elapsed, barsRemaining: horizon - elapsed };
+    const elapsed = last - i, realElapsed = bars[last].time - bars[i].time;
+    const timeCap = dt ? horizon * dt * 1.5 : Infinity; // ×1.5 запас на обеденный перерыв/пару тонких баров
+    if (elapsed >= horizon || realElapsed >= timeCap) return { state: 'expired', pnl: dir * (bars[last].close - entry) / a - cost, entry, tp, sl, a, barsElapsed: elapsed, realElapsed };
+    return { state: 'active', entry, tp, sl, a, barsElapsed: elapsed, barsRemaining: horizon - elapsed, realElapsed };
   }
 
   // Тренд метода: экспектанси последних K закрытых сделок против K сделок ДО них

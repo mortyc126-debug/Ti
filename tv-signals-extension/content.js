@@ -922,7 +922,7 @@
     const SC = window.SignalsCore;
     const run = SC.signalRun(ser, i); if (!run) return null;
     nowIdx = nowIdx != null ? nowIdx : i;
-    const live = SC.liveOutcome(bars, run.startIdx, dir, 1.5, 0.75, 0.12, 12);
+    const live = SC.liveOutcome(bars, run.startIdx, dir, 1.5, 0.75, 0.12, 12, null, dt);
     const trend = SC.methodTrend(ser, bars, 12);
     const ageBars = nowIdx - run.startIdx;
     // возраст — РЕАЛЬНОЕ время между таймстампами баров, не ageBars×dt: между
@@ -962,7 +962,7 @@
       const st = p.live.state, since = 'с ' + _hhmm(p.startTime) + ' МСК (' + p.ageBars + ' бар. / ' + _fmtDuration(p.ageTime) + ' назад)';
       if (st === 'stopped') html += '<span class="tvsig-inval" title="Опровергнут: цена уже выбила расчётный стоп ' + p.sl.toFixed(4) + ' ' + since + '">⚠ стоп</span>';
       else if (st === 'reached') html += '<span class="tvsig-reached" title="Цель ' + p.tp.toFixed(4) + ' уже достигнута ' + since + '">✓ цель</span>';
-      else if (st === 'expired') html += '<span class="tvsig-expired" title="Прошло больше горизонта (12 баров) без тейка/стопа — сигнал устарел, ' + since + '">⏱ истёк</span>';
+      else if (st === 'expired') html += '<span class="tvsig-expired" title="Прошло больше горизонта (12 баров, или ×1.5 от их номинального времени по реальным часам — на разрывах сессии баров может не хватить, а часы уже вышли) без тейка/стопа — сигнал устарел, ' + since + '">⏱ истёк</span>';
       else if (st === 'active') html += '<span class="tvsig-eta" title="Сигнал ' + since + '. Цель ' + p.tp.toFixed(4) + ' · стоп ' + p.sl.toFixed(4) + ' · ~' + _fmtDuration(p.etaTime) + ' (' + p.etaBars + ' бар.) до конца горизонта (12 бар.), если темп сохранится. Срок номинальный (N бар.×шаг ТФ) — не учитывает разрывы сессии, по факту может выйти дольше">→' + p.tp.toFixed(2) + ' ~' + _fmtDuration(p.etaTime) + '</span>';
     }
     return html;
@@ -984,7 +984,7 @@
     let stLine;
     if (st === 'stopped') stLine = '<span class="tvsig-inval">⚠ ОПРОВЕРГНУТ</span> — цена уже выбила стоп ' + p.sl.toFixed(4) + ' с начала сигнала';
     else if (st === 'reached') stLine = '<span class="tvsig-reached">✓ цель достигнута</span> — ' + p.tp.toFixed(4) + ' уже пройдена с начала сигнала';
-    else if (st === 'expired') stLine = '<span class="tvsig-expired">⏱ устарел</span> — прошло больше горизонта (12 бар.) без тейка/стопа, актуальность под вопросом';
+    else if (st === 'expired') stLine = '<span class="tvsig-expired">⏱ устарел</span> — прошло больше горизонта (12 бар., или ×1.5 их номинального времени по факту — держит и разреженные данные в узде) без тейка/стопа, актуальность под вопросом';
     else if (st === 'active') stLine = 'в пути · ещё ~' + _fmtDuration(p.etaTime) + ' (' + p.etaBars + ' бар.) до конца горизонта, если темп сохранится <span class="tvsig-fc-lown" title="Срок номинальный: N баров × шаг ТФ, не учитывает разрывы сессии (обед/ночь/выходные) — реальное время до цели может быть больше, особенно на неликвиде">ⓘ</span>';
     else stLine = '—';
     const trend = p.trend && p.trend.state
