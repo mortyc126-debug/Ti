@@ -139,6 +139,38 @@
     if (sym) { const u = sym.toUpperCase(); if (cands.indexOf(u) < 0) cands.push(u); const m = u.match(/^([A-Z]{2})/); if (m && cands.indexOf(m[1]) < 0) cands.push(m[1]); }
     return cands;
   }
+  // Настоящий код базового актива (ASSETCODE) для FORTS-фьючерса — из справочника
+  // MOEX ISS по конкретному SECID. Первые 2 буквы тикера НЕ надёжный код OI-отчёта:
+  // напр. у Сбербанка код SR, а не SB — угадывание по буквам подбирало СОВСЕМ
+  // ДРУГОЙ инструмент и показывало его OI как будто это твой тикер (см. случай
+  // SSU6 → угадан «SS» вместо настоящего кода актива). Кэш в localStorage —
+  // не бьём API на каждый ⟳, тикер к коду не меняется.
+  function oiAssetCodeCache() { try { return JSON.parse(localStorage.getItem('tvsig:oiassetcode') || '{}') || {}; } catch (e) { return {}; } }
+  function oiAssetCodeCacheSet(secid, code) { try { const c = oiAssetCodeCache(); c[secid] = code; localStorage.setItem('tvsig:oiassetcode', JSON.stringify(c)); } catch (e) {} }
+  async function oiAssetCode(secid) {
+    if (!secid) return null;
+    const cache = oiAssetCodeCache(); if (cache[secid] !== undefined) return cache[secid];
+    let code = null;
+    try {
+      const r = await oiFetch('https://iss.moex.com/iss/securities/' + encodeURIComponent(secid) + '.json?iss.meta=off');
+      if (r.ok) { const j = JSON.parse(r.json); const rows = issToObjects(j.description || {});
+        const row = rows.find(x => String(x.name).toUpperCase() === 'ASSETCODE');
+        if (row && row.value) code = String(row.value).toUpperCase(); }
+    } catch (e) {}
+    oiAssetCodeCacheSet(secid, code);
+    return code;
+  }
+  // те же кандидаты, что oiCands(), + код из справочника ПЕРВЫМ приоритетом
+  // (сразу после ручного override) — угадывание по буквам остаётся фолбэком.
+  async function oiCandsResolved() {
+    let sym = ''; try { sym = S.chart.symbol(); } catch (e) {}
+    const ov = ((document.getElementById('tvsig-oi-tk') || {}).value || '').trim().toUpperCase();
+    const cands = []; if (ov) cands.push(ov);
+    const secid = (sym || '').split(':').pop().toUpperCase();
+    if (secid) { const ac = await oiAssetCode(secid); if (ac && cands.indexOf(ac) < 0) cands.push(ac); }
+    if (sym) { const u = sym.toUpperCase(); if (cands.indexOf(u) < 0) cands.push(u); const m = u.match(/^([A-Z]{2})/); if (m && cands.indexOf(m[1]) < 0) cands.push(m[1]); }
+    return cands;
+  }
   async function oiWorkerSeries(cands) { // архив из воркера (5-мин oihourly → дневной)
     for (const c of cands) for (const ep of [['oihourly', '&days=30', '5-мин'], ['oidaily', '', 'день']]) {
       const r = await oiFetch(oiBase() + '/db/' + ep[0] + '?ticker=' + encodeURIComponent(c) + ep[1]);
@@ -156,7 +188,7 @@
   async function oiLoad() {
     if (!S.chart) return;
     const body = document.getElementById('tvsig-oi-body'); if (body && !S.oi) body.textContent = 'загрузка…';
-    const cands = oiCands();
+    const cands = await oiCandsResolved();
     if (!cands.length) { if (body) body.textContent = 'нет тикера'; return; }
     {
       // ЖИВОЙ путь: снэпшот futoi по сессии MOEX (ручной вход) или токену AlgoPack
