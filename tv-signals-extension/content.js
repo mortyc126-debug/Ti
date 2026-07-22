@@ -101,12 +101,18 @@
     for (const c of candidates) { const cu = c.toUpperCase(); if (syms.indexOf(cu) >= 0) { pick = cu; break; }
       const hit = syms.find(s => cu.indexOf(s) === 0 || s.indexOf(cu) === 0); if (hit) { pick = hit; break; } }
     if (!pick) return { ok: false, error: 'sym-not-found', syms };
+    // ВСЕ строки, совпавшие с pick, — до группировки. Держим для отладки: если
+    // числа не бьются с сайтом MOEX, дело может быть в том, что под одним
+    // «тикером» futoi отдаёт несколько строк (сессии/под-группы), которые надо
+    // СКЛАДЫВАТЬ, а не просто брать последнюю встреченную — код ниже пока
+    // именно перезаписывает grp[g], без суммирования.
+    const matched = rows.filter(o => String(o.ticker).toUpperCase() === pick);
     const grp = {};
-    for (const o of rows) { if (String(o.ticker).toUpperCase() !== pick) continue; const g = String(o.clgroup || '').toUpperCase(); if (g === 'YUR' || g === 'FIZ') grp[g] = o; }
+    for (const o of matched) { const g = String(o.clgroup || '').toUpperCase(); if (g === 'YUR' || g === 'FIZ') grp[g] = o; }
     const Y = grp.YUR || {}, F = grp.FIZ || {};
     const snap = { ts: Math.floor(Date.now() / 1000),
       yl: +(Y.pos_long || 0), ys: Math.abs(+(Y.pos_short || 0)), fl: +(F.pos_long || 0), fs: Math.abs(+(F.pos_short || 0)) };
-    return { ok: true, snap: { ts: snap.ts, fl: snap.fl, fs: snap.fs, yl: snap.yl, ys: snap.ys }, sym: pick };
+    return { ok: true, snap: { ts: snap.ts, fl: snap.fl, fs: snap.fs, yl: snap.yl, ys: snap.ys }, sym: pick, raw: matched, allSyms: syms };
   }
   // накопленная live-серия по контракту (localStorage) — из неё Δ по региону
   function oiAccKey(sym) { return 'tvsig:oiacc:' + sym; }
@@ -164,7 +170,7 @@
           S._oiSeeded = live.sym;
         }
         const rows = series.map(r => { const d = new Date(r.ts * 1000); return { ...r, date: ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) }; });
-        S.oi = { rows, used: live.sym, tf: '5-мин live' }; oiRender(); return;
+        S.oi = { rows, used: live.sym, tf: '5-мин live', _raw: live.raw, _allSyms: live.allSyms, _cands: cands }; oiRender(); return;
       }
       if (live.error === 'sym-not-found') { if (body) body.innerHTML = '<span style="color:#F4C36A">Контракт не найден в AlgoPack. Доступные коды: ' + (live.syms || []).slice(0, 40).join(', ') + '. Впиши нужный в поле кода.</span>'; return; }
       const er = live.error || 'ошибка', isAuth = /401|403/.test(er);
@@ -1469,7 +1475,8 @@
       '<div id="tvsig-oi"><div id="tvsig-oi-head">Открытый интерес' +
       '<input id="tvsig-oi-tk" placeholder="код (авто)" title="Код OI-контракта; пусто = авто по тикеру">' +
       '<button id="tvsig-oi-key" title="Токен AlgoPack для живых 5-мин данных">AP</button>' +
-      '<button id="tvsig-oi-load" title="Загрузить/обновить OI">⟳</button></div>' +
+      '<button id="tvsig-oi-load" title="Загрузить/обновить OI">⟳</button>' +
+      '<button id="tvsig-oi-debug" title="Показать сырые данные MOEX по этому тикеру — если цифры не бьются с сайтом MOEX, скопируй и пришли">🐞</button></div>' +
       '<div id="tvsig-oi-body"><span class="tvsig-oi-meta">физ/юр лонг-шорт и Δ по видимому окну · ⟳ загрузить</span></div></div>' +
       '<div class="tvsig-seg-ctrl">Отрезки<button id="tvsig-seg-go" title="Обновить отрезки по нарисованным линиям">⟳</button></div>' +
       '<div id="tvsig-seg-body"></div>' +
@@ -1552,6 +1559,7 @@
     panel.querySelector('#tvsig-refresh').onclick = () => refresh(true);
     panel.querySelectorAll('.tvsig-dt').forEach(btn => btn.onclick = () => drawTool(btn.dataset.t));
     panel.querySelector('#tvsig-oi-load').onclick = () => oiLoad();
+    panel.querySelector('#tvsig-oi-debug').onclick = () => oiDebugShow();
     panel.querySelector('#tvsig-oi-tk').addEventListener('keydown', e => { if (e.key === 'Enter') { S._oiSeeded = null; oiLoad(); } });
     const keyBtn = panel.querySelector('#tvsig-oi-key');
     function updateKeyBtn() { keyBtn.style.opacity = oiTokenGet() ? '1' : '0.5'; keyBtn.title = oiTokenGet() ? 'Токен AlgoPack задан (клик — сменить/очистить)' : 'Живые данные идут по твоему входу на moex.com. Токен нужен только при отдельном AlgoPack APIKEY'; }
@@ -1612,6 +1620,30 @@
     return '<span class="tvsig-b neu" title="нет сигнала">—</span>';
   }
   // ── ℹ-окно метода: описание + аналог блока анализа indlab (бэктест по горизонтам) ─
+  // сырые строки futoi по текущему тикеру — когда физ/юр лонг-шорт не сходится
+  // с сайтом MOEX, тут видно ВСЁ: какой тикер выбрался (pick), сколько строк
+  // на него нашлось (если >1 на группу — вероятно, их надо СКЛАДЫВАТЬ, а не
+  // брать последнюю), и точные поля ответа (вдруг pos_long/pos_short — не те).
+  function oiDebugShow() {
+    closeInfo();
+    const cands = (S.oi && S.oi._cands) || oiCands();
+    const raw = (S.oi && S.oi._raw) || null;
+    const syms = (S.oi && S.oi._allSyms) || null;
+    let txt;
+    if (!S.oi) txt = 'OI ещё не загружен — сначала жми ⟳ у «Открытый интерес».';
+    else if (!raw) txt = 'Данные не с live-пути (futoi), а из архива воркера — сырых строк MOEX для сверки нет. Тикер: ' + S.oi.used + ' (' + S.oi.tf + ').';
+    else txt = 'кандидаты (в этом порядке искали): ' + cands.join(', ') + '\nвыбранный тикер (pick): ' + S.oi.used +
+      '\nвсего тикеров в ответе futoi: ' + (syms ? syms.length : '?') + (syms ? '\nпохожие: ' + syms.filter(s => cands.some(c => s.indexOf(c.slice(0, 2)) === 0 || c.indexOf(s) === 0)).slice(0, 20).join(', ') : '') +
+      '\nстрок под выбранный тикер: ' + raw.length + (raw.length > 2 ? ' (если тут больше 2 — возможно, их несколько на клгруппу и надо складывать, а код берёт последнюю)' : '') +
+      '\n\n' + JSON.stringify(raw, null, 1);
+    const o = document.createElement('div'); o.id = 'tvsig-info';
+    o.innerHTML = '<div class="tvsig-info-card"><div class="tvsig-info-head"><span class="tvsig-info-title">Сырые данные MOEX futoi</span><button class="tvsig-info-x" title="Закрыть">×</button></div>' +
+      '<div class="tvsig-info-sec">Скопируй всё и пришли — сверю с реальным ответом MOEX.<br>' +
+      '<textarea readonly style="width:100%;height:240px;margin-top:6px;font-family:var(--mono);font-size:10px;box-sizing:border-box;background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:6px;padding:6px;" onclick="this.select()">' +
+      txt.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</textarea></div></div>';
+    o.addEventListener('click', e => { if (e.target === o || e.target.classList.contains('tvsig-info-x')) closeInfo(); });
+    document.documentElement.appendChild(o);
+  }
   function closeInfo() { const o = document.getElementById('tvsig-info'); if (o) o.remove(); }
   function openInfo(id) {
     closeInfo();
