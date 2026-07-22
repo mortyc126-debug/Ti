@@ -211,31 +211,46 @@
     }
     return out;
   }
-  // Ищем нарисованную линию (ровно 2 точки) и берём её отрезок по времени.
-  // selectLineTool в терминале нет — линию юзер рисует нативным инструментом,
-  // а мы читаем её концы через getAllShapes/getShapeById/getPoints.
+  // Ищем нарисованную линию и берём её отрезок по времени. selectLineTool в
+  // терминале нет — линию юзер рисует нативным инструментом, а мы читаем её
+  // концы через getAllShapes/getShapeById/getPoints. Возвращает либо {from,to},
+  // либо {error: код} — чтобы renderPeriod мог сказать ЧЕСТНО, почему линия не
+  // нашлась (API нет / фигур нет / есть, но ни одна не распозналась), а не
+  // молча падать на видимое окно, оставляя непонятно, откуда цифры.
+  // getAllShapes() отдаёт {id, name} — name это название инструмента («Trend
+  // Line» и т.п., может быть локализовано); сначала ищем среди похожих по
+  // имени на трендлинию, если не нашли — среди ЛЮБЫХ фигур с 2+ точками
+  // (свежие сначала), чтобы не зависеть от точного текста названия.
   function lineSpan() {
-    try {
-      const c = S.chart; if (!c || typeof c.getAllShapes !== 'function' || typeof c.getShapeById !== 'function') return null;
-      const sh = c.getAllShapes() || [];
-      for (let i = sh.length - 1; i >= 0; i--) { // с конца — самая свежая линия
-        let pts; try { pts = c.getShapeById(sh[i].id).getPoints(); } catch (e) { continue; }
-        if (pts && pts.length === 2 && pts[0] && pts[1] && pts[0].time != null && pts[1].time != null) {
-          const t0 = Math.min(pts[0].time, pts[1].time), t1 = Math.max(pts[0].time, pts[1].time);
-          if (t1 > t0) return { from: t0, to: t1 };
+    const c = S.chart;
+    if (!c || typeof c.getAllShapes !== 'function' || typeof c.getShapeById !== 'function') return { error: 'api' };
+    let sh; try { sh = c.getAllShapes() || []; } catch (e) { return { error: 'api' }; }
+    if (!sh.length) return { error: 'none' };
+    const tryPick = list => {
+      for (let i = list.length - 1; i >= 0; i--) { // с конца — самая свежая
+        let pts; try { pts = c.getShapeById(list[i].id).getPoints(); } catch (e) { continue; }
+        if (pts && pts.length >= 2) {
+          const p0 = pts[0], p1 = pts[pts.length - 1];
+          if (p0 && p1 && p0.time != null && p1.time != null) {
+            const t0 = Math.min(p0.time, p1.time), t1 = Math.max(p0.time, p1.time);
+            if (t1 > t0) return { from: t0, to: t1 };
+          }
         }
       }
-    } catch (e) {}
-    return null;
+      return null;
+    };
+    const byName = sh.filter(s => /trend|тренд|линия/i.test(s.name || ''));
+    return tryPick(byName) || tryPick(sh) || { error: 'notfound' };
   }
   // Плашка «изложение за период»: отрезок нарисованной линии, иначе видимое окно.
   function renderPeriod(span) {
     const el = document.getElementById('tvsig-period'); if (!el) return;
     const bars = S.bars || []; if (!bars.length) { el.innerHTML = ''; return; }
-    let t0, t1, label;
+    let t0, t1, label, lsErr = null;
     const ls = span || lineSpan();
-    if (ls) { t0 = ls.from; t1 = ls.to; label = 'по линии'; }
-    else { let vr = null; try { vr = S.chart.getVisibleRange(); } catch (e) {}
+    if (ls && ls.from != null) { t0 = ls.from; t1 = ls.to; label = 'по линии'; }
+    else { if (ls) lsErr = ls.error;
+      let vr = null; try { vr = S.chart.getVisibleRange(); } catch (e) {}
       t0 = vr ? vr.from : bars[0].time; t1 = vr ? vr.to : bars[bars.length - 1].time; label = 'видимое окно'; }
     const s = periodSummary(t0, t1);
     if (!s.n) { el.innerHTML = ''; return; }
@@ -246,7 +261,12 @@
     let oi = '';
     if (s.oi) oi = '<div class="tvsig-period-oi">OI Δ: физ Л <b style="color:' + dcol(s.oi.fl) + '">' + dsg(s.oi.fl) + '</b> Ш <b style="color:' + dcol(s.oi.fs) + '">' + dsg(s.oi.fs) +
       '</b> · юр Л <b style="color:' + dcol(s.oi.yl) + '">' + dsg(s.oi.yl) + '</b> Ш <b style="color:' + dcol(s.oi.ys) + '">' + dsg(s.oi.ys) + '</b></div>';
-    el.innerHTML = '<div>' + label + ': <b>' + s.n + '</b> св' + pc + '</div>' + oi;
+    else if (S.oi) oi = '<div class="tvsig-period-oi tvsig-fc-hint">нет точек OI на этом отрезке (' + (S.oi.rows ? S.oi.rows.length : 0) + ' всего, диапазон ' + (S.oi.rows && S.oi.rows.length ? S.oi.rows[0].date + '…' + S.oi.rows[S.oi.rows.length - 1].date : '—') + ')</div>';
+    // почему не «по линии», хотя линия, казалось бы, нарисована
+    const errTxt = { api: 'в этой сборке терминала нет API для чтения нарисованных фигур (getAllShapes) — используется видимое окно графика',
+      none: 'на графике нет ни одной фигуры — нарисуй трендлинию, потом ⟳', notfound: 'фигуры на графике есть, но с привязкой ко времени (2+ точки) не нашлось — перерисуй линию заново, не как маркер/иконку' }[lsErr];
+    const errHint = (label === 'видимое окно' && errTxt) ? ' <span class="tvsig-fc-lown" title="' + errTxt + '">ⓘ</span>' : '';
+    el.innerHTML = '<div>' + label + errHint + ': <b>' + s.n + '</b> св' + pc + '</div>' + oi;
   }
   // ── вкладка «Сравнение»: наложение второго инструмента (MOEX ISS) на активный ──
   // Активный тикер берём из графика (S.bars). Второй — свечи с iss.moex.com через
