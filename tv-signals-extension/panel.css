@@ -201,6 +201,9 @@
 .tvsig-info-x{ width:22px; height:22px; border-radius:6px; cursor:pointer; flex:none;
   border:1px solid var(--border2); background:var(--surface2); color:var(--text2); font-size:15px; line-height:1; }
 .tvsig-info-x:hover{ background:var(--accent); color:#fff; }
+#tvsig-oi-debug-copy{ flex:none; border-radius:6px; cursor:pointer; border:1px solid var(--border2); background:var(--surface2);
+  color:var(--text2); font-size:10px; font-family:var(--mono); padding:4px 8px; }
+#tvsig-oi-debug-copy:hover{ border-color:var(--accent); color:var(--text); }
 .tvsig-info-sec{ margin-bottom:9px; color:var(--text2); }
 .tvsig-info-lbl{ font-size:9px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text3); font-family:var(--mono); margin-bottom:3px; }
 .tvsig-chips{ display:flex; flex-wrap:wrap; gap:5px; }

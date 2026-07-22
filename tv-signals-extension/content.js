@@ -1637,12 +1637,16 @@
       '\nстрок под выбранный тикер: ' + raw.length + (raw.length > 2 ? ' (если тут больше 2 — возможно, их несколько на клгруппу и надо складывать, а код берёт последнюю)' : '') +
       '\n\n' + JSON.stringify(raw, null, 1);
     const o = document.createElement('div'); o.id = 'tvsig-info';
-    o.innerHTML = '<div class="tvsig-info-card"><div class="tvsig-info-head"><span class="tvsig-info-title">Сырые данные MOEX futoi</span><button class="tvsig-info-x" title="Закрыть">×</button></div>' +
-      '<div class="tvsig-info-sec">Скопируй всё и пришли — сверю с реальным ответом MOEX.<br>' +
-      '<textarea readonly style="width:100%;height:240px;margin-top:6px;font-family:var(--mono);font-size:10px;box-sizing:border-box;background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:6px;padding:6px;" onclick="this.select()">' +
-      txt.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</textarea></div></div>';
-    o.addEventListener('click', e => { if (e.target === o || e.target.classList.contains('tvsig-info-x')) closeInfo(); });
+    o.innerHTML = '<div class="tvsig-info-card"><div class="tvsig-info-head"><span class="tvsig-info-title">Сырые данные MOEX futoi</span>' +
+      '<button id="tvsig-oi-debug-copy" title="Скопировать в буфер">📋 копировать</button><button class="tvsig-info-x" title="Закрыть">×</button></div>' +
+      '<div class="tvsig-info-sec">Жми «копировать» (или кликни в поле — выделит всё) и пришли — сверю с реальным ответом MOEX.<br>' +
+      '<textarea id="tvsig-oi-debug-ta" readonly style="width:100%;height:240px;margin-top:6px;font-family:var(--mono);font-size:10px;box-sizing:border-box;background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:6px;padding:6px;user-select:text;cursor:text;"></textarea></div></div>';
     document.documentElement.appendChild(o);
+    // textarea.value, а не innerHTML — не нужно экранировать и не ловим разметку как HTML
+    const ta = o.querySelector('#tvsig-oi-debug-ta'); ta.value = txt; ta.addEventListener('click', () => ta.select());
+    o.querySelector('#tvsig-oi-debug-copy').onclick = () => { ta.select();
+      try { navigator.clipboard.writeText(txt); } catch (e) { try { document.execCommand('copy'); } catch (e2) {} } };
+    o.addEventListener('click', e => { if (e.target === o || e.target.classList.contains('tvsig-info-x')) closeInfo(); });
   }
   function closeInfo() { const o = document.getElementById('tvsig-info'); if (o) o.remove(); }
   function openInfo(id) {
