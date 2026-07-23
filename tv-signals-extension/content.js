@@ -96,10 +96,14 @@
     const key = Object.keys(j).find(k => k !== 'metadata' && k !== 'history') || 'futoi';
     const rows = issToObjects(j[key]);
     const syms = [...new Set(rows.map(o => String(o.ticker || '').toUpperCase()))];
-    // ищем sym среди кандидатов (полный код, 2-буквенный, и то что вернул сервер)
+    // ищем sym среди кандидатов — ТОЛЬКО точное совпадение. Раньше был ещё
+    // нечёткий фолбэк по префиксу (cu.indexOf(s)===0) — на SSU6/SMLT он не
+    // виноват (там «SS» и так проходил точным совпадением, это подтверждённый
+    // правильный код), но как общий принцип нечёткое совпадение по 1-2 буквам
+    // рискует подсунуть чужой код на других тикерах — честное «не найден»
+    // безопаснее, чем правдоподобные, но не те цифры.
     let pick = null;
-    for (const c of candidates) { const cu = c.toUpperCase(); if (syms.indexOf(cu) >= 0) { pick = cu; break; }
-      const hit = syms.find(s => cu.indexOf(s) === 0 || s.indexOf(cu) === 0); if (hit) { pick = hit; break; } }
+    for (const c of candidates) { const cu = c.toUpperCase(); if (syms.indexOf(cu) >= 0) { pick = cu; break; } }
     if (!pick) return { ok: false, error: 'sym-not-found', syms };
     // ВСЕ строки, совпавшие с pick, — до группировки. Держим для отладки.
     // Проверено на реальном ответе: под одним тикером приходит НЕСКОЛЬКО
@@ -227,7 +231,7 @@
         const rows = series.map(r => { const d = new Date(r.ts * 1000); return { ...r, date: ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) }; });
         S.oi = { rows, used: live.sym, tf: '5-мин live', _raw: live.raw, _allSyms: live.allSyms, _cands: cands }; oiRender(); return;
       }
-      if (live.error === 'sym-not-found') { if (body) body.innerHTML = '<span style="color:#F4C36A">Контракт не найден в AlgoPack. Доступные коды: ' + (live.syms || []).slice(0, 40).join(', ') + '. Впиши нужный в поле кода.</span>'; return; }
+      if (live.error === 'sym-not-found') { if (body) body.innerHTML = '<span style="color:#F4C36A">Точный код этого тикера в отчёте MOEX по открытому интересу не нашёлся среди ' + (live.syms || []).length + ' доступных: ' + (live.syms || []).slice(0, 40).join(', ') + '. Впиши нужный в поле выше.</span>'; return; }
       const er = live.error || 'ошибка', isAuth = /401|403/.test(er);
       // живой путь не удался (напр. 401) — не тупик: подхватываем архив воркера
       const w = await oiWorkerSeries(cands);
