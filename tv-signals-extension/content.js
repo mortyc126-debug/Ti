@@ -89,11 +89,23 @@
     // куку туда шлёт background (credentials:'include'). Bearer-токен добавляем лишь
     // если задан — для тех, у кого отдельный AlgoPack APIKEY.
     const tok = oiTokenGet();
+    const headers = tok ? { Authorization: 'Bearer ' + tok } : null;
     const url = 'https://iss.moex.com/iss/analyticalproducts/futoi/securities.json?iss.meta=off&limit=5000';
-    const r = await oiFetch(url, tok ? { Authorization: 'Bearer ' + tok } : null);
+    let r = await oiFetch(url, headers);
     if (!r.ok) return { ok: false, error: r.error || 'fetch' };
     let j; try { j = JSON.parse(r.json); } catch (_) { return { ok: false, error: 'parse' }; }
-    const key = Object.keys(j).find(k => k !== 'metadata' && k !== 'history') || 'futoi';
+    // Без явной даты MOEX почему-то отдаёт НЕ последний доступный день (проверено:
+    // дефолтный ответ был на 2+ недели старее, чем futoi.dates.till). Перезапрашиваем
+    // явно на till — тот же трюк, что from/till у candles в других местах файла.
+    const dRow = j['futoi.dates'] && j['futoi.dates'].data && j['futoi.dates'].data[0];
+    const till = dRow && dRow[1];
+    if (till) {
+      try {
+        const r2 = await oiFetch(url + '&till=' + till + '&from=' + till, headers);
+        if (r2.ok) { const j2 = JSON.parse(r2.json); if (j2.futoi && j2.futoi.data && j2.futoi.data.length) j = j2; }
+      } catch (e) {}
+    }
+    const key = (j.futoi && j.futoi.data) ? 'futoi' : (Object.keys(j).find(k => k !== 'metadata' && k !== 'history' && k !== 'futoi.dates') || 'futoi');
     const rows = issToObjects(j[key]);
     const syms = [...new Set(rows.map(o => String(o.ticker || '').toUpperCase()))];
     // ищем sym среди кандидатов — ТОЛЬКО точное совпадение. Раньше был ещё
@@ -118,7 +130,7 @@
     const Y = grp.YUR || {}, F = grp.FIZ || {};
     const snap = { ts: Math.floor(Date.now() / 1000),
       yl: +(Y.pos_long || 0), ys: Math.abs(+(Y.pos_short || 0)), fl: +(F.pos_long || 0), fs: Math.abs(+(F.pos_short || 0)) };
-    return { ok: true, snap: { ts: snap.ts, fl: snap.fl, fs: snap.fs, yl: snap.yl, ys: snap.ys }, sym: pick, raw: matched, allSyms: syms };
+    return { ok: true, snap: { ts: snap.ts, fl: snap.fl, fs: snap.fs, yl: snap.yl, ys: snap.ys }, sym: pick, raw: matched, allSyms: syms, till: till || null };
   }
   // накопленная live-серия по контракту (localStorage) — из неё Δ по региону
   function oiAccKey(sym) { return 'tvsig:oiacc:' + sym; }
@@ -229,7 +241,7 @@
           S._oiSeeded = live.sym;
         }
         const rows = series.map(r => { const d = new Date(r.ts * 1000); return { ...r, date: ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) }; });
-        S.oi = { rows, used: live.sym, tf: '5-мин live', _raw: live.raw, _allSyms: live.allSyms, _cands: cands }; oiRender(); return;
+        S.oi = { rows, used: live.sym, tf: '5-мин live', _raw: live.raw, _allSyms: live.allSyms, _cands: cands, _till: live.till }; oiRender(); return;
       }
       if (live.error === 'sym-not-found') { if (body) body.innerHTML = '<span style="color:#F4C36A">Точный код этого тикера в отчёте MOEX по открытому интересу не нашёлся среди ' + (live.syms || []).length + ' доступных: ' + (live.syms || []).slice(0, 40).join(', ') + '. Впиши нужный в поле выше.</span>'; return; }
       const er = live.error || 'ошибка', isAuth = /401|403/.test(er);
@@ -1692,6 +1704,7 @@
     if (!S.oi) txt = 'OI ещё не загружен — сначала жми ⟳ у «Открытый интерес».';
     else if (!raw) txt = 'Данные не с live-пути (futoi), а из архива воркера — сырых строк MOEX для сверки нет. Тикер: ' + S.oi.used + ' (' + S.oi.tf + ').';
     else txt = 'кандидаты (в этом порядке искали): ' + cands.join(', ') + '\nвыбранный тикер (pick): ' + S.oi.used +
+      '\nдата, на которую запрошено (futoi.dates.till): ' + (S.oi._till || 'не нашлась — дефолтный запрос без даты') +
       '\nвсего тикеров в ответе futoi: ' + (syms ? syms.length : '?') + (syms ? '\nпохожие: ' + syms.filter(s => cands.some(c => s.indexOf(c.slice(0, 2)) === 0 || c.indexOf(s) === 0)).slice(0, 20).join(', ') : '') +
       '\nстрок под выбранный тикер: ' + raw.length + (raw.length > 2 ? ' (это история снэпшотов, не дубли — берём максимальный seqnum на группу)' : '') +
       '\n\n' + JSON.stringify(raw, null, 1);
