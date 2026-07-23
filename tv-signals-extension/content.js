@@ -101,14 +101,16 @@
     for (const c of candidates) { const cu = c.toUpperCase(); if (syms.indexOf(cu) >= 0) { pick = cu; break; }
       const hit = syms.find(s => cu.indexOf(s) === 0 || s.indexOf(cu) === 0); if (hit) { pick = hit; break; } }
     if (!pick) return { ok: false, error: 'sym-not-found', syms };
-    // ВСЕ строки, совпавшие с pick, — до группировки. Держим для отладки: если
-    // числа не бьются с сайтом MOEX, дело может быть в том, что под одним
-    // «тикером» futoi отдаёт несколько строк (сессии/под-группы), которые надо
-    // СКЛАДЫВАТЬ, а не просто брать последнюю встреченную — код ниже пока
-    // именно перезаписывает grp[g], без суммирования.
+    // ВСЕ строки, совпавшие с pick, — до группировки. Держим для отладки.
+    // Проверено на реальном ответе: под одним тикером приходит НЕСКОЛЬКО
+    // снэпшотов (по 5 мин каждый, история — не дубли одной минуты для сложения),
+    // так что нужен САМЫЙ СВЕЖИЙ по seqnum на группу, а не «последний встреченный
+    // в массиве» — порядок строк в ответе не гарантирован (у MOEX шёл от нового
+    // к старому, значит раньше бралась САМАЯ СТАРАЯ строка из восьми).
     const matched = rows.filter(o => String(o.ticker).toUpperCase() === pick);
     const grp = {};
-    for (const o of matched) { const g = String(o.clgroup || '').toUpperCase(); if (g === 'YUR' || g === 'FIZ') grp[g] = o; }
+    for (const o of matched) { const g = String(o.clgroup || '').toUpperCase(); if (g !== 'YUR' && g !== 'FIZ') continue;
+      if (!grp[g] || Number(o.seqnum || 0) > Number(grp[g].seqnum || 0)) grp[g] = o; }
     const Y = grp.YUR || {}, F = grp.FIZ || {};
     const snap = { ts: Math.floor(Date.now() / 1000),
       yl: +(Y.pos_long || 0), ys: Math.abs(+(Y.pos_short || 0)), fl: +(F.pos_long || 0), fs: Math.abs(+(F.pos_short || 0)) };
@@ -151,12 +153,33 @@
     if (!secid) return null;
     const cache = oiAssetCodeCache(); if (cache[secid] !== undefined) return cache[secid];
     let code = null;
-    try {
-      const r = await oiFetch('https://iss.moex.com/iss/securities/' + encodeURIComponent(secid) + '.json?iss.meta=off');
-      if (r.ok) { const j = JSON.parse(r.json); const rows = issToObjects(j.description || {});
-        const row = rows.find(x => String(x.name).toUpperCase() === 'ASSETCODE');
-        if (row && row.value) code = String(row.value).toUpperCase(); }
-    } catch (e) {}
+    // общий /iss/securities/<SECID>.json — справочник акций/облигаций, ФЬЮЧЕРСЫ
+    // FORTS он не знает (пусто). Нужен путь конкретного рынка — тот же engine/
+    // market, что уже используют свечи (scanFetch/cmpFetch): futures/forts.
+    // Пробуем сначала его (наш случай — деривативы), затем общий — на случай,
+    // если тикер вообще не срочный (акция/облигация).
+    const urls = [
+      'https://iss.moex.com/iss/engines/futures/markets/forts/securities/' + encodeURIComponent(secid) + '.json?iss.meta=off',
+      'https://iss.moex.com/iss/securities/' + encodeURIComponent(secid) + '.json?iss.meta=off'
+    ];
+    for (const url of urls) {
+      try {
+        const r = await oiFetch(url); if (!r.ok) continue;
+        const j = JSON.parse(r.json);
+        // табличный блок securities (колонки, есть ASSETCODE) — ответ рынка forts
+        if (j.securities && j.securities.data && j.securities.data.length) {
+          const objs = issToObjects(j.securities);
+          const row = objs.find(x => String(x.SECID || '').toUpperCase() === secid) || objs[0];
+          if (row && row.ASSETCODE) { code = String(row.ASSETCODE).toUpperCase(); break; }
+        }
+        // блок description (пары name/value) — ответ общего справочника /iss/securities
+        if (j.description && j.description.data && j.description.data.length) {
+          const rows = issToObjects(j.description);
+          const drow = rows.find(x => String(x.name).toUpperCase() === 'ASSETCODE');
+          if (drow && drow.value) { code = String(drow.value).toUpperCase(); break; }
+        }
+      } catch (e) {}
+    }
     oiAssetCodeCacheSet(secid, code);
     return code;
   }
@@ -1666,7 +1689,7 @@
     else if (!raw) txt = 'Данные не с live-пути (futoi), а из архива воркера — сырых строк MOEX для сверки нет. Тикер: ' + S.oi.used + ' (' + S.oi.tf + ').';
     else txt = 'кандидаты (в этом порядке искали): ' + cands.join(', ') + '\nвыбранный тикер (pick): ' + S.oi.used +
       '\nвсего тикеров в ответе futoi: ' + (syms ? syms.length : '?') + (syms ? '\nпохожие: ' + syms.filter(s => cands.some(c => s.indexOf(c.slice(0, 2)) === 0 || c.indexOf(s) === 0)).slice(0, 20).join(', ') : '') +
-      '\nстрок под выбранный тикер: ' + raw.length + (raw.length > 2 ? ' (если тут больше 2 — возможно, их несколько на клгруппу и надо складывать, а код берёт последнюю)' : '') +
+      '\nстрок под выбранный тикер: ' + raw.length + (raw.length > 2 ? ' (это история снэпшотов, не дубли — берём максимальный seqnum на группу)' : '') +
       '\n\n' + JSON.stringify(raw, null, 1);
     const o = document.createElement('div'); o.id = 'tvsig-info';
     o.innerHTML = '<div class="tvsig-info-card"><div class="tvsig-info-head"><span class="tvsig-info-title">Сырые данные MOEX futoi</span>' +
