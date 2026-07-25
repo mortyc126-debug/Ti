@@ -2,6 +2,18 @@
  * по host_permissions (content-script, даже isolated, CORS подчиняется).
  * Мост oi-bridge.js шлёт сюда запрос, SW фетчит apim.moex.com / воркер и
  * возвращает тело. */
+// desktop-уведомление о новом сигнале — content.js (MAIN-мир) сам chrome.notifications
+// не видит, шлёт сюда через oi-bridge.js тем же паттерном, что и фетч.
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== 'tvsig:notify') return;
+  try {
+    chrome.notifications.create('tvsig-' + Date.now() + '-' + Math.random().toString(36).slice(2), {
+      type: 'basic', iconUrl: chrome.runtime.getURL('icon.png'),
+      title: msg.title || 'Сигнальные модели', message: msg.body || '', priority: 1,
+    }, () => { try { sendResponse({ ok: !chrome.runtime.lastError }); } catch (e) {} });
+  } catch (e) { try { sendResponse({ ok: false, error: String(e && e.message || e) }); } catch (e2) {} }
+  return true;
+});
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || msg.type !== 'tvsig:fetch' || !msg.url) return;
   (async () => {

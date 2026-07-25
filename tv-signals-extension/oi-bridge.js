@@ -18,4 +18,10 @@
       });
     } catch (err) { reply({ ok: false, error: String(err && err.message || err) }); }
   });
+  // desktop-уведомление: fire-and-forget, но всё равно шлём через sendMessage
+  // (единственный способ достучаться до chrome.notifications из MAIN-мира)
+  window.addEventListener('tvsig:notify:req', (e) => {
+    let d; try { d = JSON.parse(e.detail); } catch (_) { return; }
+    try { chrome.runtime.sendMessage({ type: 'tvsig:notify', title: d.title, body: d.body }, () => { void chrome.runtime.lastError; }); } catch (err) {}
+  });
 })();
