@@ -655,19 +655,24 @@ async function backfillOiHistory(db, env, tickers, days, stepMin = 30, startOffs
     // ВАЖНО: внутри одной цепочки start-offset имеет смысл только при
     // НЕИЗМЕННОМ till (записи первого вызова сдвинули бы min-дату) — поэтому
     // клиент передаёт till= из ответа первого вызова на все последующие.
-    if (tillOverride) {
-      till = tillOverride;
-    } else if (startOffset === 0) {
+    // ВАЖНО: сужение — ЛОКАЛЬНОЕ для этого тикера (tillForTicker), а не мутация
+    // общей till. Раньше till мутировалась прямо в общей переменной — и после
+    // первого же тикера с глубокой историей (min(ts) в oi_hourly в далёком
+    // прошлом) till «залипала» на этой дате для ВСЕХ следующих тикеров в списке,
+    // и они все скопом улетали в continue ниже (till<from) — 0 строк по всем
+    // остальным тикерам, хотя своей истории у них никто не проверял.
+    let tillForTicker = till;
+    if (!tillOverride && startOffset === 0) {
       try {
         const { results } = await db.prepare('SELECT MIN(ts) AS m FROM oi_hourly WHERE ticker=?').bind(ticker).all();
         const m = results?.[0]?.m;
         if (m) {
           const d = new Date(m + MSK_OFFSET_MS_W).toISOString().slice(0, 10);
-          if (d < till) till = d;
+          if (d < tillForTicker) tillForTicker = d;
         }
       } catch (_) { /* таблицы может не быть — не критично */ }
     }
-    if (till < from) { continue; } // история уже глубже from — нечего тянуть
+    if (tillForTicker < from) { continue; } // история уже глубже from — нечего тянуть
     // 1. Страницы серии (ISS отдаёт по limit строк, листаем start=)
     const rowsAll = [];
     for (let page = 0; page < maxPages; page++) {
@@ -676,7 +681,7 @@ async function backfillOiHistory(db, env, tickers, days, stepMin = 30, startOffs
         if (pagesTotal > 0) await new Promise(r => setTimeout(r, 150)); // не дразнить rate-limit
         // iss.only + columns: тянем только нужный блок и колонки — JSON в разы
         // легче, а CPU-время на парсинг (лимит бесплатного плана) — меньше
-        const url = `https://apim.moex.com/iss/analyticalproducts/futoi/securities/${encodeURIComponent(sym)}.json?from=${from}&till=${till}&iss.meta=off&iss.only=futoi&futoi.columns=ticker,tradedate,tradetime,clgroup,pos_long,pos_short,pos_long_num,pos_short_num&limit=1000&start=${start}`;
+        const url = `https://apim.moex.com/iss/analyticalproducts/futoi/securities/${encodeURIComponent(sym)}.json?from=${from}&till=${tillForTicker}&iss.meta=off&iss.only=futoi&futoi.columns=ticker,tradedate,tradetime,clgroup,pos_long,pos_short,pos_long_num,pos_short_num&limit=1000&start=${start}`;
         fetchCount++;
         const resp = await fetch(url, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
         if (!resp.ok) { failed++; noteErr(`${sym} стр.${page}`, `HTTP ${resp.status} ${(await resp.text().catch(()=>'')).slice(0,120)}`); break; }
