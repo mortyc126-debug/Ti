@@ -2,6 +2,7 @@
   "disabled": [
     "ALLIGATOR",
     "DONCHIAN",
+    "ELLIOTT_WAVE",
     "KLINGER",
     "LEVEL_QUALITY",
     "MA_TENSION",
