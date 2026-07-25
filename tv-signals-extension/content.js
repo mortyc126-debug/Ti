@@ -75,8 +75,12 @@
   function notifySend(title, body) {
     try { window.dispatchEvent(new CustomEvent('tvsig:notify:req', { detail: JSON.stringify({ title, body }) })); } catch (e) {}
   }
-  function notifyOnGet() { try { return localStorage.getItem('tvsig:notifyon') === '1'; } catch (e) { return false; } }
-  function notifyOnSet(v) { try { localStorage.setItem('tvsig:notifyon', v ? '1' : '0'); } catch (e) {} }
+  // два независимых переключателя — тикер (🔔 в шапке) и скан (в «Сканере»),
+  // чтобы можно было слушать только одно, а не всё оптом
+  function notifyTickerGet() { try { return localStorage.getItem('tvsig:notifyticker') === '1'; } catch (e) { return false; } }
+  function notifyTickerSet(v) { try { localStorage.setItem('tvsig:notifyticker', v ? '1' : '0'); } catch (e) {} }
+  function notifyScanGet() { try { return localStorage.getItem('tvsig:notifyscan') === '1'; } catch (e) { return false; } }
+  function notifyScanSet(v) { try { localStorage.setItem('tvsig:notifyscan', v ? '1' : '0'); } catch (e) {} }
   // токен AlgoPack (MOEX) — хранится локально, шлётся ТОЛЬКО в apim.moex.com
   function oiTokenGet() { try { return localStorage.getItem('tvsig:moextoken') || ''; } catch (e) { return ''; } }
   function oiTokenSet(v) { try { v ? localStorage.setItem('tvsig:moextoken', v) : localStorage.removeItem('tvsig:moextoken'); } catch (e) {} }
@@ -599,7 +603,7 @@
   // null) — иначе шквал уведомлений про уже существующие хиты при первом же
   // запуске автообновления.
   function notifyCheckScan(hits) {
-    if (!notifyOnGet()) return;
+    if (!notifyScanGet()) return;
     const found = hits.filter(h => h.dir);
     const cur = {}; found.forEach(h => { cur[h.code + '|' + (h.mid || '')] = h.dir; });
     const prev = S._scanNotifyPrev;
@@ -888,6 +892,12 @@
         try { const v = localStorage.getItem('tvsig:scanautoiv'); if (v && autoIv) autoIv.value = v; } catch (e) {}
         autoCb.addEventListener('change', () => { try { localStorage.setItem('tvsig:scanauto', autoCb.checked ? '1' : '0'); } catch (er) {} scanAutoSync(); if (autoCb.checked && !S._scanBusy) scanRun(); });
         if (autoIv) autoIv.addEventListener('change', () => { try { localStorage.setItem('tvsig:scanautoiv', autoIv.value); } catch (er) {} scanAutoSync(); });
+      }
+      const scanNotifyCb = document.getElementById('tvsig-scan-notify');
+      if (scanNotifyCb) {
+        scanNotifyCb.checked = notifyScanGet();
+        scanNotifyCb.addEventListener('change', () => { notifyScanSet(scanNotifyCb.checked);
+          if (scanNotifyCb.checked) notifySend('Уведомления скана включены', 'Пришлю сюда новые хиты при автообновлении.'); });
       }
     }
     scanAutoSync(); // и на повторных заходах (не только первичная инициализация) — вкладка снова видима
@@ -1537,7 +1547,7 @@
     panel = document.createElement('div'); panel.id = 'tvsig-panel';
     panel.innerHTML =
       '<div id="tvsig-head"><span id="tvsig-title">◆</span>' +
-      '<button id="tvsig-notify" title="Уведомления браузера о новых сигналах: текущий тикер (вкладка «Модели») + автообновление в «Сканере». Выключено по умолчанию.">🔔</button>' +
+      '<button id="tvsig-notify" title="Уведомления браузера о новых сигналах ТЕКУЩЕГО тикера (эта вкладка). Для сканера — отдельный 🔔 в «Сканере», рядом с автообновлением. Выключено по умолчанию.">🔔</button>' +
       '<button id="tvsig-refresh" title="Пересчитать">⟳</button>' +
       '<button id="tvsig-min" title="Свернуть">–</button></div>' +
       '<div id="tvsig-tabs">' +
@@ -1562,7 +1572,7 @@
       '<div id="tvsig-status">инициализация…</div>' +
       '<div id="tvsig-consensus" title="Общий текущий сигнал: сумма голосов методов, взвешенных по их exp на этом тикере"></div>' +
       '<div id="tvsig-rows"></div>' +
-      '<div id="tvsig-foot">Цифры считаются на свечах <b>текущего тикера</b>, хранятся по каждому и обновляются при закрытии нового бара. <b>exp</b> — экспектанси, средний P&amp;L сделки в ATR (тейк +1.5 / стоп −0.75 ATR, R:R 2:1 — валидировано; узкий брекет занижал вдвое, издержки 0.12); плюс = метод в прибыли. <b>%</b> — winrate, частота угадывания знака за 12 баров (не путать с win сделки — та выше при широком стопе). <b>n</b> — число сделок. Клик по строке рисует сигналы. <b>🔔</b> вверху — уведомления браузера о новых сигналах (только рабочие методы, exp&gt;0.03): текущий тикер здесь + автообновление в «Сканере». Не шлёт про то, что было активно ДО включения — только новые срабатывания.</div>' +
+      '<div id="tvsig-foot">Цифры считаются на свечах <b>текущего тикера</b>, хранятся по каждому и обновляются при закрытии нового бара. <b>exp</b> — экспектанси, средний P&amp;L сделки в ATR (тейк +1.5 / стоп −0.75 ATR, R:R 2:1 — валидировано; узкий брекет занижал вдвое, издержки 0.12); плюс = метод в прибыли. <b>%</b> — winrate, частота угадывания знака за 12 баров (не путать с win сделки — та выше при широком стопе). <b>n</b> — число сделок. Клик по строке рисует сигналы. <b>🔔</b> вверху — уведомления браузера о новых сигналах ЭТОГО тикера (только рабочие методы, exp&gt;0.03). Для сканера — отдельный 🔔 в «Сканере». Не шлёт про то, что было активно ДО включения — только новые срабатывания.</div>' +
       '</div>' + // /pane-signals
       '<div id="tvsig-pane-compare" class="tvsig-pane" hidden>' +
       '<div id="tvsig-cmp-ctrl">' +
@@ -1642,8 +1652,9 @@
       '<option value="moex">MOEX ISS (быстро, но урезанный/неполный фид — интервал 1/10/60/1440 мин)</option>' +
       '</select><button id="tvsig-tapi-key" title="Токен Tinkoff Invest API (права только на чтение котировок)">🔑</button>' +
       '<span id="tvsig-scan-src-warn" class="tvsig-fc-lown"> ⚠ на время скана график будет листать все тикеры списка по очереди и вернётся на исходный</span></div>' +
-      '<div id="tvsig-scan-autorow"><label class="tvsig-scan-onlyactive" id="tvsig-scan-auto-lbl" title="Пересканировать список автоматически, пока открыта вкладка «Сканер». Доступно только для источника MOEX — авто-пересканирование через «график терминала» слишком часто дёргало бы твой график."><input type="checkbox" id="tvsig-scan-auto"> автообновление каждые</label>' +
+      '<div id="tvsig-scan-autorow"><label class="tvsig-scan-onlyactive" id="tvsig-scan-auto-lbl" title="Пересканировать список автоматически, пока открыта вкладка «Сканер». Недоступно для источника «график терминала» — авто-пересканирование им слишком часто дёргало бы твой график."><input type="checkbox" id="tvsig-scan-auto"> автообновление каждые</label>' +
       '<select id="tvsig-scan-auto-iv"><option value="15">15 с</option><option value="30" selected>30 с</option><option value="60">1 мин</option><option value="120">2 мин</option><option value="300">5 мин</option></select>' +
+      '<label class="tvsig-scan-onlyactive" title="Уведомление браузера на каждый НОВЫЙ хит при автообновлении (не было в предыдущем скане). Ручной клик по «Скан» не уведомляет — ты и так смотришь на результат."><input type="checkbox" id="tvsig-scan-notify"> 🔔</label>' +
       '<span id="tvsig-scan-auto-ts" class="dim"></span></div>' +
       '<textarea id="tvsig-scan-list" placeholder="SBER GAZP LKOH SNGS ROSN … (через пробел/запятую)"></textarea>' +
       '<div id="tvsig-scan-sel">Сигнал <select id="tvsig-scan-a"></select> + <select id="tvsig-scan-b"></select>' +
@@ -1652,15 +1663,15 @@
       '<label class="tvsig-scan-onlyactive" title="Спрятать сигналы, которые уже отыграли — цена дошла до цели, выбила стоп, или прошёл горизонт (12 бар.) без исхода. Оставляет только те, что ещё в пути."><input type="checkbox" id="tvsig-scan-onlyactive"> только неисполненные</label>' +
       '<button id="tvsig-scan-go" title="Просканировать список">Скан</button></div>' +
       '<div id="tvsig-scan-body"></div>' +
-      '<div id="tvsig-scan-foot"><b>🔝 авто</b> (по умолчанию): для каждого тикера сам считает все методы и берёт самый прибыльный НА ЕГО истории (exp&gt;0, n≥10), сработавший в окне — список тикеров с их лучшим методом и направлением, без ручного выбора. Или задай метод/связку вручную. Пресеты — стандартные секторные наборы MOEX; свои списки можно сохранять/удалять («список дня» тоже сохраняется). <b>Источник Tinkoff Invest API</b> — лучший вариант: точные данные (1/5/15 мин/час/день), параллельные запросы (быстро), график не трогает. Нужен токен (🔑 рядом — права только на чтение котировок, из личного кабинета Т-Инвестиций); тикер резолвится в FIGI один раз и кэшируется. <b>«График терминала»</b> — те же точные данные, но листает твой график по тикерам списка по очереди (медленно, видно визуально) и возвращает исходный тикер в конце — без токена. <b>MOEX ISS</b> — быстрее «графика», но урезанный бесплатный фид: интервал округляется до одного из 5 (1/10/60 мин, день, неделя), после вечерней сессии данные обновляются плохо/с задержкой. Ищет сигнал в последних N закрытых барах. «X баров / Y назад» — свежесть с пересчётом в реальное время по ТФ. «→ тейк/стоп/тайм ±ATR» — чем ЗАКОНЧИЛАСЬ именно эта сделка (успела ли отыграть): понятно, имел ли сигнал смысл. Хиты сортируются по ТОЧНОСТИ связки на истории тикера (exp/win/n, R:R 2:1); n&lt;10 = мало данных, вниз. Кросс-тикерный breadth в скане не применяется. Второй сигнал «—» = один метод. <b>Автообновление</b> — пересканирует список на заданном интервале, пока открыта эта вкладка (закрыл вкладку — таймер встал, вернулся — снова пошёл); недоступно только для источника «график терминала». Пока автообновление включено, новые хиты (не бывшие в предыдущем скане) шлют уведомление браузера, если 🔔 вверху панели включён.</div>' +
+      '<div id="tvsig-scan-foot"><b>🔝 авто</b> (по умолчанию): для каждого тикера сам считает все методы и берёт самый прибыльный НА ЕГО истории (exp&gt;0, n≥10), сработавший в окне — список тикеров с их лучшим методом и направлением, без ручного выбора. Или задай метод/связку вручную. Пресеты — стандартные секторные наборы MOEX; свои списки можно сохранять/удалять («список дня» тоже сохраняется). <b>Источник Tinkoff Invest API</b> — лучший вариант: точные данные (1/5/15 мин/час/день), параллельные запросы (быстро), график не трогает. Нужен токен (🔑 рядом — права только на чтение котировок, из личного кабинета Т-Инвестиций); тикер резолвится в FIGI один раз и кэшируется. <b>«График терминала»</b> — те же точные данные, но листает твой график по тикерам списка по очереди (медленно, видно визуально) и возвращает исходный тикер в конце — без токена. <b>MOEX ISS</b> — быстрее «графика», но урезанный бесплатный фид: интервал округляется до одного из 5 (1/10/60 мин, день, неделя), после вечерней сессии данные обновляются плохо/с задержкой. Ищет сигнал в последних N закрытых барах. «X баров / Y назад» — свежесть с пересчётом в реальное время по ТФ. «→ тейк/стоп/тайм ±ATR» — чем ЗАКОНЧИЛАСЬ именно эта сделка (успела ли отыграть): понятно, имел ли сигнал смысл. Хиты сортируются по ТОЧНОСТИ связки на истории тикера (exp/win/n, R:R 2:1); n&lt;10 = мало данных, вниз. Кросс-тикерный breadth в скане не применяется. Второй сигнал «—» = один метод. <b>Автообновление</b> — пересканирует список на заданном интервале, пока открыта эта вкладка (закрыл вкладку — таймер встал, вернулся — снова пошёл); недоступно только для источника «график терминала». <b>🔔</b> рядом с интервалом — отдельное от тикерного уведомление: пока автообновление включено, новые хиты (не бывшие в предыдущем скане) шлют уведомление браузера. Ручной клик по «Скан» не уведомляет.</div>' +
       '</div>'; // /pane-scan
     document.documentElement.appendChild(panel);
     try { const wv = parseInt(localStorage.getItem('tvsig:width') || '', 10); if (wv >= 300 && wv <= 640) panel.style.width = wv + 'px'; } catch (e) {}
     rowsEl = panel.querySelector('#tvsig-rows'); statusEl = panel.querySelector('#tvsig-status');
     const notifyBtn = panel.querySelector('#tvsig-notify');
-    const notifyReflect = () => notifyBtn.classList.toggle('on', notifyOnGet());
-    notifyBtn.onclick = () => { notifyOnSet(!notifyOnGet()); notifyReflect();
-      if (notifyOnGet()) notifySend('Уведомления включены', 'Пришлю сюда, когда появится новый сигнал по рабочим методам (exp>0) — тикер или скан.'); };
+    const notifyReflect = () => notifyBtn.classList.toggle('on', notifyTickerGet());
+    notifyBtn.onclick = () => { notifyTickerSet(!notifyTickerGet()); notifyReflect();
+      if (notifyTickerGet()) notifySend('Уведомления по тикеру включены', 'Пришлю сюда, когда на этом тикере появится новый сигнал по рабочему методу (exp>0).'); };
     notifyReflect();
     panel.querySelector('#tvsig-refresh').onclick = () => refresh(true);
     panel.querySelectorAll('.tvsig-dt').forEach(btn => btn.onclick = () => drawTool(btn.dataset.t));
@@ -1800,7 +1811,7 @@
   // давно активные сигналы при каждом переключении тикера. Только методы с
   // реальным edge на этом тикере (exp>0.03, n≥10) — как в consensus/скане.
   function notifyCheckMethods() {
-    if (!notifyOnGet()) return;
+    if (!notifyTickerGet()) return;
     const c = S.computed; if (!c) return;
     const cur = {}; META.forEach(([id]) => { cur[id] = c[id] ? Math.sign(c[id].last || 0) : 0; });
     const prev = S._notifyPrev;
