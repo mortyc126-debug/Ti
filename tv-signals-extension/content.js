@@ -247,6 +247,52 @@
       return Array.isArray(rows) && rows.length ? rows.slice().sort((a, b) => a.ts - b.ts) : null;
     } catch (e) { return null; }
   }
+  // разовая подтяжка истории по ОДНОМУ тикеру через воркер (/db/oibackfill) —
+  // тот же серийный MOEX-эндпоинт, что и у ручного бэкфилла в oi_lab, только
+  // на маленький days= (окно ранжирования) он укладывается в один вызов
+  // (лимит воркера на вызов — 25 страниц; несколько дней на тикер — 1-2 страницы)
+  async function oiRankBackfill(ticker, days) {
+    try {
+      const r = await oiFetch(oiBase() + '/db/oibackfill?tickers=' + encodeURIComponent(ticker) + '&days=' + days);
+      if (!r.ok) return { ok: false, error: r.error || 'сеть' };
+      const j = JSON.parse(r.json);
+      if (j.error) return { ok: false, error: j.error };
+      return { ok: true, saved: (j.saved || 0) + (j.savedIntraday || 0) };
+    } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+  }
+  async function oiRankBackfillMissing(missing, days) {
+    const btn = document.getElementById('tvsig-oirank-bf-go'); if (btn) btn.disabled = true;
+    const st = document.getElementById('tvsig-oirank-bf-status');
+    for (let i = 0; i < missing.length; i++) {
+      const code = missing[i];
+      if (st) st.textContent = 'догружаю ' + code + ' (' + (i + 1) + '/' + missing.length + ')…';
+      const r = await oiRankBackfill(code, days);
+      if (!r.ok && /MOEX_KEY/.test(r.error || '')) { // секрет не настроен на воркере — дальше пытаться бессмысленно
+        if (st) st.textContent = 'на воркере не задан секрет MOEX_KEY — бэкфилл недоступен (это настраивается один раз в Cloudflare, не в расширении).';
+        return;
+      }
+    }
+    oiRankRun(); // пересчитать — уже с подтянутой историей
+  }
+  function oiRankRenderResults(results, missing, sortKey, days) {
+    const body = document.getElementById('tvsig-oirank-body'); if (!body) return;
+    const num = v => (v >= 0 ? '+' : '−') + Math.round(Math.abs(v)).toLocaleString('ru-RU');
+    const cls = v => v > 0 ? 'pos' : v < 0 ? 'neg' : 'dim';
+    let html = !results.length ? '<div class="tvsig-fc-hint">Нет истории ни по одному тикеру из списка.</div>' :
+      '<table class="tvsig-fc-tbl"><tr><th>тикер</th><th>физ Л</th><th>физ Ш</th><th>юр Л</th><th>юр Ш</th><th>окно</th></tr>' +
+      results.slice().sort((a, b) => b[sortKey] - a[sortKey]).map(d => '<tr><td><b>' + d.code + '</b></td>' +
+        '<td class="' + cls(d.fl) + '">' + num(d.fl) + '</td><td class="' + cls(d.fs) + '">' + num(d.fs) + '</td>' +
+        '<td class="' + cls(d.yl) + '">' + num(d.yl) + '</td><td class="' + cls(d.ys) + '">' + num(d.ys) + '</td>' +
+        '<td class="dim">' + d.spanH.toFixed(1) + 'ч</td></tr>').join('') + '</table>';
+    if (missing.length) {
+      html += '<div class="tvsig-fc-hint">Нет истории по ' + missing.length + ' тикер' + (missing.length === 1 ? 'у' : 'ам') + ': ' +
+        missing.slice(0, 15).join(', ') + (missing.length > 15 ? '…' : '') + ' — воркер их раньше не отслеживал (не входили в топ ликвидных FORTS). ' +
+        '<button id="tvsig-oirank-bf-go">⬇ Догрузить историю</button> <span id="tvsig-oirank-bf-status" class="dim"></span></div>';
+    }
+    body.innerHTML = html;
+    const bf = document.getElementById('tvsig-oirank-bf-go');
+    if (bf) bf.onclick = () => oiRankBackfillMissing(missing, days);
+  }
   async function oiRankRun() {
     const body = document.getElementById('tvsig-oirank-body'); if (!body) return;
     const raw = (document.getElementById('tvsig-scan-list') || {}).value || '';
@@ -256,10 +302,10 @@
     const sortKey = (document.getElementById('tvsig-oirank-sort') || {}).value || 'fl';
     body.innerHTML = '<div class="tvsig-fc-hint">Считаю ' + codes.length + ' тикеров за ' + winH + ' ч…</div>';
     const days = Math.max(2, Math.ceil(winH / 24) + 1); // с запасом, чтобы окно точно попало в выборку
-    const results = [];
+    const results = [], missing = [];
     await Promise.all(codes.map(async code => {
       const rows = await oiRankFetch(code, days);
-      if (!rows || rows.length < 2) return;
+      if (!rows || rows.length < 2) { missing.push(code); return; }
       const latest = rows[rows.length - 1], cutoff = latest.ts - winH * 3600 * 1000;
       let baseline = rows[0]; // окно шире доступной истории — берём самую раннюю точку, что есть
       for (const r of rows) { if (r.ts <= cutoff) baseline = r; else break; }
@@ -270,15 +316,7 @@
       d.absmax = Math.max(Math.abs(d.fl), Math.abs(d.fs), Math.abs(d.yl), Math.abs(d.ys));
       results.push(d);
     }));
-    if (!results.length) { body.innerHTML = '<div class="tvsig-fc-hint">Нет истории ни по одному тикеру из списка — воркер их не отслеживает (не входят в топ ликвидных FORTS), или данные ещё не накопились.</div>'; return; }
-    results.sort((a, b) => b[sortKey] - a[sortKey]);
-    const num = v => (v >= 0 ? '+' : '−') + Math.round(Math.abs(v)).toLocaleString('ru-RU');
-    const cls = v => v > 0 ? 'pos' : v < 0 ? 'neg' : 'dim';
-    body.innerHTML = '<table class="tvsig-fc-tbl"><tr><th>тикер</th><th>физ Л</th><th>физ Ш</th><th>юр Л</th><th>юр Ш</th><th>окно</th></tr>' +
-      results.map(d => '<tr><td><b>' + d.code + '</b></td>' +
-        '<td class="' + cls(d.fl) + '">' + num(d.fl) + '</td><td class="' + cls(d.fs) + '">' + num(d.fs) + '</td>' +
-        '<td class="' + cls(d.yl) + '">' + num(d.yl) + '</td><td class="' + cls(d.ys) + '">' + num(d.ys) + '</td>' +
-        '<td class="dim">' + d.spanH.toFixed(1) + 'ч</td></tr>').join('') + '</table>';
+    oiRankRenderResults(results, missing, sortKey, days);
   }
   async function oiLoad() {
     if (!S.chart) return;
@@ -1718,7 +1756,7 @@
       '<option value="absmax">|любое макс. движение|</option></select>' +
       '<button id="tvsig-oirank-go" title="Ранжировать тикеры из текстового поля списка выше по изменению открытого интереса">⟳</button></div>' +
       '<div id="tvsig-oirank-body"></div>' +
-      '<div id="tvsig-oirank-foot">Использует тот же список тикеров, что и скан выше — впиши <b>фьючерсные коды</b> (SiU6, GZU6…, не тикер акции). Данные — из истории воркера (cron собирает раз в 5 мин топ ликвидных FORTS-фьючерсов); если тикера там нет — истории не будет, столбец пустой. Δ считается между самым свежим снэпшотом и ближайшим к началу выбранного окна (если история короче окна — берётся самая ранняя доступная точка, реальный охват показан в столбце «окно»).</div>' +
+      '<div id="tvsig-oirank-foot">Использует тот же список тикеров, что и скан выше — впиши <b>фьючерсные коды</b> (SiU6, GZU6…, не тикер акции). Данные — из истории воркера (cron собирает раз в 5 мин топ ликвидных FORTS-фьючерсов); если тикера там нет — истории не будет. Δ считается между самым свежим снэпшотом и ближайшим к началу выбранного окна (если история короче окна — берётся самая ранняя доступная точка, реальный охват показан в столбце «окно»). Если по тикеру совсем нет истории — появится кнопка «Догрузить историю»: она разово подтянет прошлые дни напрямую с MOEX через воркер (не через расширение) и пересчитает; долго ходить туда-сюда каждый раз при обычном ранжировании расширение не будет — только по кнопке.</div>' +
       '</div>'; // /pane-scan
     document.documentElement.appendChild(panel);
     try { const wv = parseInt(localStorage.getItem('tvsig:width') || '', 10); if (wv >= 300 && wv <= 640) panel.style.width = wv + 'px'; } catch (e) {}
