@@ -342,11 +342,19 @@
         const rows = series.map(r => { const d = new Date(r.ts * 1000); return { ...r, date: ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) }; });
         S.oi = { rows, used: live.sym, tf: '5-мин live', _raw: live.raw, _allSyms: live.allSyms, _cands: cands, _till: live.till }; oiRender(); return;
       }
-      if (live.error === 'sym-not-found') { if (body) body.innerHTML = '<span style="color:#F4C36A">Точный код этого тикера в отчёте MOEX по открытому интересу не нашёлся среди ' + (live.syms || []).length + ' доступных: ' + (live.syms || []).slice(0, 40).join(', ') + '. Впиши нужный в поле выше.</span>'; return; }
+      if (live.error === 'sym-not-found') {
+        // сохраняем для 🐞: без этого при ошибке S.oi так и остаётся null,
+        // а oiDebugShow() требует S.oi — дебаг был недоступен именно тогда,
+        // когда нужнее всего (в момент сбоя, а не после успеха)
+        S._oiDebug = { cands, till: live.till, syms: live.syms, raw: null, err: 'sym-not-found' };
+        if (body) body.innerHTML = '<span style="color:#F4C36A">Точный код этого тикера в отчёте MOEX по открытому интересу не нашёлся среди ' + (live.syms || []).length + ' доступных: ' + (live.syms || []).slice(0, 40).join(', ') + '. Впиши нужный в поле выше.</span>';
+        return;
+      }
       const er = live.error || 'ошибка', isAuth = /401|403/.test(er);
       // живой путь не удался (напр. 401) — не тупик: подхватываем архив воркера
       const w = await oiWorkerSeries(cands);
       if (w) { w.note = isAuth ? 'нет доступа к живым (войди на moex.com) → архив' : 'live не дошёл → архив'; S.oi = w; oiRender(); return; }
+      S._oiDebug = { cands, till: live.till, syms: live.syms, raw: null, err: er };
       if (body) body.innerHTML = '<span style="color:#FF6A8B">futoi: ' + er +
         (isAuth ? ' — нет доступа. Войди на moex.com в этом браузере (подписка на «Открытый интерес») — куку входа расширение подхватит само' : ' — запрос не дошёл (перезагрузи расширение)') + '. Архива по тикеру тоже нет.</span>';
       return;
@@ -1847,11 +1855,16 @@
   // брать последнюю), и точные поля ответа (вдруг pos_long/pos_short — не те).
   function oiDebugShow() {
     closeInfo();
-    const cands = (S.oi && S.oi._cands) || oiCands();
+    const cands = (S.oi && S.oi._cands) || (S._oiDebug && S._oiDebug.cands) || oiCands();
     const raw = (S.oi && S.oi._raw) || null;
-    const syms = (S.oi && S.oi._allSyms) || null;
+    const syms = (S.oi && S.oi._allSyms) || (S._oiDebug && S._oiDebug.syms) || null;
     let txt;
-    if (!S.oi) txt = 'OI ещё не загружен — сначала жми ⟳ у «Открытый интерес».';
+    if (!S.oi && !S._oiDebug) txt = 'OI ещё не загружен — сначала жми ⟳ у «Открытый интерес».';
+    else if (!S.oi) txt = 'Последняя попытка ⟳ провалилась (тикер не выбрался, до записи в S.oi дело не дошло).\n' +
+      'кандидаты (в этом порядке искали): ' + cands.join(', ') +
+      '\nошибка: ' + (S._oiDebug.err || '?') +
+      '\nдата, на которую запрошено (futoi.dates.till): ' + (S._oiDebug.till || 'не нашлась — дефолтный запрос без даты') +
+      '\nвсего тикеров в ответе futoi: ' + (syms ? syms.length : '?') + (syms && syms.length ? '\nдоступные: ' + syms.slice(0, 60).join(', ') : '');
     else if (!raw) txt = 'Данные не с live-пути (futoi), а из архива воркера — сырых строк MOEX для сверки нет. Тикер: ' + S.oi.used + ' (' + S.oi.tf + ').';
     else txt = 'кандидаты (в этом порядке искали): ' + cands.join(', ') + '\nвыбранный тикер (pick): ' + S.oi.used +
       '\nдата, на которую запрошено (futoi.dates.till): ' + (S.oi._till || 'не нашлась — дефолтный запрос без даты') +
