@@ -406,7 +406,12 @@ async function scheduledCollectOi(env) {
   const isTradingHour = nowHourUtc >= 4 && nowHourUtc < 21;
 
   try {
-    const futUrl = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?iss.meta=off&limit=5000`;
+    // date=${today} ОБЯЗАТЕЛЕН: без него MOEX отдаёт не текущий день, а залипший
+    // на какой-то прошлой дате снэпшот (воспроизведено и напрямую в браузере —
+    // не авторизация/кука, особенность самого эндпоинта без явной даты). Без
+    // этого параметра cron каждые 5 мин переписывал oi_daily/oi_hourly ОДНОЙ и
+    // той же старой tradedate — выглядело как «дата не обновляется».
+    const futUrl = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?iss.meta=off&limit=5000&date=${today}`;
     const futResp = await fetch(futUrl, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
     if (!futResp.ok) {
       console.warn('oi cron: FutOI HTTP', futResp.status);
