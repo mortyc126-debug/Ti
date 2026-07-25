@@ -37,6 +37,10 @@
 //                                            товар/индекс) через T-Invest FindInstrument+FutureBy
 //   /db/oistates                      POST — снэпшоты OI-сигналов из oi_lab (мост «лаба → бот»)
 //   /db/oistates?date=|ticker=&days=  GET  — состояния для бота: активные OI-сигналы по тикерам
+//   /db/oistatus                      GET  — когда крон (scheduledCollectOi) последний раз
+//                                            успешно/неуспешно отработал + текст ошибки (напр.
+//                                            401 от MOEX — протухший MOEX_KEY); без похода в
+//                                            Cloudflare Dashboard за логами
 //
 // Cron (scheduled): ежедневный автосбор oi_daily по всем ликвидным фьючерсам
 // FORTS — без участия браузера. Настройка:
@@ -315,18 +319,45 @@ function issBlockToObjects(block) {
 }
 
 // ── Cron: ежедневный автосбор oi_daily по ликвидным фьючерсам FORTS ──
+// Крон и раньше падал на ошибках (истёкший MOEX_KEY, HTTP-сбой MOEX) молча —
+// console.warn/error улетают в логи Cloudflare, которые никто без Dashboard
+// не смотрит; итог — база тихо не обновлялась две с лишним недели, и это
+// заметили только по расхождению цифр в интерфейсе, а не по самой ошибке.
+// Пишем последний исход (успех/ошибка) в отдельную таблицу — читается через
+// /db/oistatus в любой момент, без похода в Dashboard.
+async function _oiCronStatus(db, ok, detail) {
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS oi_cron_status (
+      key TEXT PRIMARY KEY, last_run_ts INTEGER,
+      last_ok_ts INTEGER, last_ok_detail TEXT,
+      last_err_ts INTEGER, last_err_detail TEXT
+    )`).run();
+    const now = Date.now();
+    if (ok) {
+      await db.prepare(`INSERT INTO oi_cron_status(key,last_run_ts,last_ok_ts,last_ok_detail,last_err_ts,last_err_detail)
+          VALUES('oi',?,?,?,NULL,NULL)
+        ON CONFLICT(key) DO UPDATE SET last_run_ts=excluded.last_run_ts, last_ok_ts=excluded.last_ok_ts, last_ok_detail=excluded.last_ok_detail`)
+        .bind(now, now, detail).run();
+    } else {
+      await db.prepare(`INSERT INTO oi_cron_status(key,last_run_ts,last_ok_ts,last_ok_detail,last_err_ts,last_err_detail)
+          VALUES('oi',?,NULL,NULL,?,?)
+        ON CONFLICT(key) DO UPDATE SET last_run_ts=excluded.last_run_ts, last_err_ts=excluded.last_err_ts, last_err_detail=excluded.last_err_detail`)
+        .bind(now, now, detail).run();
+    }
+  } catch (e) { console.error('oi cron: не удалось записать oi_cron_status:', e.message); }
+}
 async function scheduledCollectOi(env) {
   const db = DB(env);
   if (!db) { console.warn('oi cron: D1 binding не настроен'); return; }
   const moexKey = env.MOEX_KEY;
-  if (!moexKey) { console.warn('oi cron: secret MOEX_KEY не задан — пропуск'); return; }
+  if (!moexKey) { console.warn('oi cron: secret MOEX_KEY не задан — пропуск'); await _oiCronStatus(db, false, 'secret MOEX_KEY не задан'); return; }
 
   // 1. Список всех фьючерсов FORTS с объёмом/ОИ/ценой/датой экспирации —
   // публичный ISS, без авторизации.
   const secResp = await fetch(
     'https://iss.moex.com/iss/engines/futures/markets/forts/securities.json?iss.meta=off'
   );
-  if (!secResp.ok) { console.warn('oi cron: securities.json HTTP', secResp.status); return; }
+  if (!secResp.ok) { console.warn('oi cron: securities.json HTTP', secResp.status); await _oiCronStatus(db, false, 'securities.json HTTP ' + secResp.status); return; }
   const secJson = await secResp.json();
   const merged = {}; // SECID -> объединённая строка из всех блоков ответа
   for (const key of Object.keys(secJson)) {
@@ -346,7 +377,7 @@ async function scheduledCollectOi(env) {
       expiry: r.LASTTRADEDATE || r.LASTDELDATE || null,
     }))
     .filter(r => r.ticker && r.price > 0);
-  if (!all.length) { console.warn('oi cron: пустой список фьючерсов'); return; }
+  if (!all.length) { console.warn('oi cron: пустой список фьючерсов'); await _oiCronStatus(db, false, 'пустой список фьючерсов (securities.json)'); return; }
 
   // 2. Гарантированный фронт-месяц по каждому базовому активу — независимо
   // от объёма, чтобы не терять только что начавший роллироваться контракт.
@@ -414,7 +445,13 @@ async function scheduledCollectOi(env) {
     const futUrl = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?iss.meta=off&limit=5000&date=${today}`;
     const futResp = await fetch(futUrl, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
     if (!futResp.ok) {
-      console.warn('oi cron: FutOI HTTP', futResp.status);
+      const bodyTxt = await futResp.text().catch(() => '');
+      console.warn('oi cron: FutOI HTTP', futResp.status, bodyTxt.slice(0, 200));
+      // 401/403 — протухший/отозванный MOEX_KEY: главная причина, из-за которой
+      // база тихо не обновлялась неделями (см. историю этого файла) — статус
+      // теперь виден через /db/oistatus, а не только в логах Cloudflare
+      await _oiCronStatus(db, false, 'FutOI HTTP ' + futResp.status + (bodyTxt ? ': ' + bodyTxt.slice(0, 200) : '') +
+        (futResp.status === 401 || futResp.status === 403 ? ' — похоже, MOEX_KEY протух/отозван, нужен новый (wrangler secret put MOEX_KEY)' : ''));
       return;
     }
     const futJson = await futResp.json();
@@ -515,8 +552,10 @@ async function scheduledCollectOi(env) {
     } else {
       console.log(`oi cron: ${toSave.length} тикеров → oi_daily only`);
     }
+    await _oiCronStatus(db, true, `${toSave.length} тикеров, ${today}${toSave[0]?.tradetime ? ' ' + toSave[0].tradetime : ''}`);
   } catch (e) {
     console.error('oi cron: FutOI fetch failed:', e.message);
+    await _oiCronStatus(db, false, 'exception: ' + e.message);
   }
 }
 
@@ -1319,6 +1358,21 @@ async function handleDb(path, req, env) {
     const out = {};
     for (const [root, v] of Object.entries(best)) out[root] = { asset: v.asset, name: v.name };
     return json(out);
+  }
+
+  // ── Статус крона: /db/oistatus — когда последний раз успешно/неуспешно
+  // прошёл scheduledCollectOi, без похода в Cloudflare Dashboard за логами ──
+  if (p === '/oistatus' && req.method === 'GET') {
+    const { results } = await db.prepare('SELECT * FROM oi_cron_status WHERE key=?').bind('oi').all().catch(() => ({ results: [] }));
+    const row = results && results[0];
+    if (!row) return json({ note: 'крон ещё ни разу не отработал (или таблица oi_cron_status не создана — появится после первого тика)' });
+    const fmt = ts => ts ? new Date(ts).toISOString() : null;
+    return json({
+      last_run: fmt(row.last_run_ts),
+      last_ok: fmt(row.last_ok_ts), last_ok_detail: row.last_ok_detail,
+      last_err: fmt(row.last_err_ts), last_err_detail: row.last_err_detail,
+      stale_min: row.last_ok_ts ? Math.round((Date.now() - row.last_ok_ts) / 60000) : null,
+    });
   }
 
   // ── Диагностика: /db/oitest?ticker=SSU6&date=2026-06-25 — ответ FutOI API ──
