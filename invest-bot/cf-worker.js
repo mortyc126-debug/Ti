@@ -1459,7 +1459,18 @@ async function handleDb(path, req, env) {
     const saveAll = u.searchParams.get('all') === '1';
     let tickers = (u.searchParams.get('tickers') || '').split(',').map(s => s.trim()).filter(Boolean);
     if (!saveAll && !tickers.length) {
-      const { results } = await db.prepare('SELECT ticker FROM oi_tracked_state WHERE tracked=1').all();
+      // oi_tracked_state НЕ чистится сам: строка тикера, выпавшего из текущего
+      // листинга FORTS (экспирировал/сроллировал), просто перестаёт трогаться
+      // кроном (он проходит только по ТЕКУЩЕМУ securities.json) — tracked=1
+      // так и остаётся навсегда, updated_at замирает на дате выпадения. За
+      // годы это раздувает список до сотен мёртвых тикеров (реально видели
+      // 430 — при обычных 50-80 живых), и backfill без tickers= тратил весь
+      // бюджет фетчей на историю давно не торгуемых контрактов. Отсекаем по
+      // свежести updated_at: securities.json дёргается КАЖДЫЙ тик крона (не
+      // зависит от MOEX_KEY/futoi), так что у реально живых тикеров updated_at
+      // не старше пары дней в любом случае.
+      const cutoff = Date.now() - 2 * 86400000;
+      const { results } = await db.prepare('SELECT ticker FROM oi_tracked_state WHERE tracked=1 AND updated_at > ?').bind(cutoff).all();
       tickers = results.map(r => r.ticker);
     }
     if (!saveAll && !tickers.length) return json({ error: 'нет тикеров: пусто и в параметре, и в oi_tracked_state' }, 400);
