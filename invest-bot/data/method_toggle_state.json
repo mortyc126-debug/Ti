@@ -2,7 +2,6 @@
   "disabled": [
     "ALLIGATOR",
     "DONCHIAN",
-    "ELLIOTT_WAVE",
     "KLINGER",
     "LEVEL_QUALITY",
     "MA_TENSION",
@@ -16,6 +15,7 @@
     "BB_KELTNER_SQUEEZE",
     "BS_PRESSURE",
     "EHLERS_MODE",
+    "ELLIOTT_WAVE",
     "FRACTIONAL_DIFF",
     "LEVEL_ABSORPTION",
     "MAMA_FAMA",
