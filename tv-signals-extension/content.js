@@ -94,7 +94,7 @@
   }
   // Живой снэпшот физ/юр по контракту напрямую из AlgoPack (нужен токен).
   // Возвращает {ok, snap:{ts,fl,fs,yl,ys}, syms} или {ok:false, error, syms}.
-  async function oiLiveSnap(candidates) {
+  async function oiLiveSnap(candidates, forcedDate) {
     // futoi авторизуется КУКОЙ MOEX Passport (тот же вход, что даёт ручной доступ
     // на сайте), а не токеном. Хост — iss.moex.com (там живёт analyticalproducts),
     // куку туда шлёт background (credentials:'include'). Bearer-токен добавляем лишь
@@ -102,25 +102,32 @@
     const tok = oiTokenGet();
     const headers = tok ? { Authorization: 'Bearer ' + tok } : null;
     const url = 'https://iss.moex.com/iss/analyticalproducts/futoi/securities.json?iss.meta=off&limit=5000';
-    let r = await oiFetch(url, headers);
-    if (!r.ok) return { ok: false, error: r.error || 'fetch' };
-    let j; try { j = JSON.parse(r.json); } catch (_) { return { ok: false, error: 'parse' }; }
-    // Без явной даты MOEX почему-то отдаёт НЕ последний доступный день (проверено:
-    // дефолтный ответ был на 2+ недели старее, чем futoi.dates.till). Перезапрашиваем
-    // явно с датой. ВАЖНО: у КОЛЛЕКЦИОННОГО securities.json (без тикера в пути)
-    // параметр называется именно date=, а НЕ from=/till= (те относятся только к
+    let till = forcedDate || null, j = null;
+    if (!till) {
+      let r = await oiFetch(url, headers);
+      if (!r.ok) return { ok: false, error: r.error || 'fetch' };
+      try { j = JSON.parse(r.json); } catch (_) { return { ok: false, error: 'parse' }; }
+      const dRow = j['futoi.dates'] && j['futoi.dates'].data && j['futoi.dates'].data[0];
+      till = dRow && dRow[1];
+    }
+    // Без явной даты MOEX либо отдаёт залипший старый день, либо (в окне между
+    // концом предыдущей сессии и стартом новой — данные на «сегодня» ещё нулевые)
+    // futoi.dates вообще пуст. Во втором случае till не находится — берём вчера:
+    // это гарантированно закрытый торговый день с данными, а не «сегодня ещё
+    // ноль» — так тикер смотрибелен в любое время суток, не только во время торгов.
+    // Явную дату можно и переопределить вручную (поле «дата» в панели периодов).
+    if (!till) till = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    // ВАЖНО: у КОЛЛЕКЦИОННОГО securities.json (без тикера в пути) параметр
+    // называется именно date=, а НЕ from=/till= (те относятся только к
     // серийному securities/{sym}.json — см. cf-worker.js scheduledCollectOi).
     // from=/till= коллекционным эндпоинтом молча игнорируются: он возвращает тот
     // же залипший ответ, r2.ok остаётся true, futoi.data непустой — подмена j=j2
     // проходила «успешно», но j2 был идентичен j, и залипшая дата не лечилась.
-    const dRow = j['futoi.dates'] && j['futoi.dates'].data && j['futoi.dates'].data[0];
-    const till = dRow && dRow[1];
-    if (till) {
-      try {
-        const r2 = await oiFetch(url + '&date=' + till, headers);
-        if (r2.ok) { const j2 = JSON.parse(r2.json); if (j2.futoi && j2.futoi.data && j2.futoi.data.length) j = j2; }
-      } catch (e) {}
-    }
+    try {
+      const r2 = await oiFetch(url + '&date=' + till, headers);
+      if (r2.ok) { const j2 = JSON.parse(r2.json); if (j2.futoi && j2.futoi.data && j2.futoi.data.length) j = j2; }
+    } catch (e) {}
+    if (!j) return { ok: false, error: 'нет данных на ' + till };
     const key = (j.futoi && j.futoi.data) ? 'futoi' : (Object.keys(j).find(k => k !== 'metadata' && k !== 'history' && k !== 'futoi.dates') || 'futoi');
     const rows = issToObjects(j[key]);
     const syms = [...new Set(rows.map(o => String(o.ticker || '').toUpperCase()))];
@@ -328,10 +335,25 @@
     const body = document.getElementById('tvsig-oi-body'); if (body && !S.oi) body.textContent = 'загрузка…';
     const cands = await oiCandsResolved();
     if (!cands.length) { if (body) body.textContent = 'нет тикера'; return; }
+    // Явная дата (поле «дата» в панели) — в основном для окна между сессиями,
+    // когда на «сегодня» данных у MOEX ещё нет (нулевые до старта нового
+    // торгового дня): тогда автоопределение внутри oiLiveSnap само откатится
+    // на вчера, но пользователь может и явно посмотреть любой прошлый день.
+    const dateEl = document.getElementById('tvsig-oi-date');
+    const forcedDate = (dateEl && /^\d{4}-\d{2}-\d{2}$/.test(dateEl.value)) ? dateEl.value : null;
     {
       // ЖИВОЙ путь: снэпшот futoi по сессии MOEX (ручной вход) или токену AlgoPack
       // + подсев архива из воркера + накопление. Не удался — падаем на архив.
-      const live = await oiLiveSnap(cands);
+      const live = await oiLiveSnap(cands, forcedDate);
+      if (live.ok && forcedDate) {
+        // разовый снимок КОНКРЕТНОЙ прошлой даты — НЕ мешаем с накопленной
+        // live-серией (иначе испортим её отметкой «сейчас» для данных,
+        // которые на самом деле со выбранного прошлого дня)
+        const ts = Math.floor(Date.parse(forcedDate + 'T18:45:00+03:00') / 1000) || Math.floor(Date.now() / 1000);
+        S.oi = { rows: [{ ...live.snap, ts, date: forcedDate }], used: live.sym, tf: 'снимок на ' + forcedDate,
+          _raw: live.raw, _allSyms: live.allSyms, _cands: cands, _till: live.till };
+        oiRender(); return;
+      }
       if (live.ok) {
         let series = oiAccPush(live.sym, live.snap);
         if (!S._oiSeeded || S._oiSeeded !== live.sym) { // разово подмешиваем историю из воркера
@@ -1681,6 +1703,7 @@
       '<div id="tvsig-period" title="Сводка за видимое окно графика"></div>' +
       '<div id="tvsig-oi"><div id="tvsig-oi-head">Открытый интерес' +
       '<input id="tvsig-oi-tk" placeholder="код (авто)" title="Код OI-контракта; пусто = авто по тикеру">' +
+      '<input type="date" id="tvsig-oi-date" title="Явная дата снимка OI. Пусто = автоматически (сегодня, если MOEX уже опубликовал; между сессиями, пока на сегодня нули, — сама откатится на вчера). Выбери дату, чтобы посмотреть архив в любое время.">' +
       '<button id="tvsig-oi-key" title="Токен AlgoPack для живых 5-мин данных">AP</button>' +
       '<button id="tvsig-oi-load" title="Загрузить/обновить OI">⟳</button>' +
       '<button id="tvsig-oi-debug" title="Показать сырые данные MOEX по этому тикеру — если цифры не бьются с сайтом MOEX, скопируй и пришли">🐞</button></div>' +
@@ -1784,6 +1807,7 @@
     panel.querySelector('#tvsig-oi-load').onclick = () => oiLoad();
     panel.querySelector('#tvsig-oi-debug').onclick = () => oiDebugShow();
     panel.querySelector('#tvsig-oi-tk').addEventListener('keydown', e => { if (e.key === 'Enter') { S._oiSeeded = null; oiLoad(); } });
+    panel.querySelector('#tvsig-oi-date').addEventListener('change', () => { S._oiSeeded = null; oiLoad(); });
     const keyBtn = panel.querySelector('#tvsig-oi-key');
     function updateKeyBtn() { keyBtn.style.opacity = oiTokenGet() ? '1' : '0.5'; keyBtn.title = oiTokenGet() ? 'Токен AlgoPack задан (клик — сменить/очистить)' : 'Живые данные идут по твоему входу на moex.com. Токен нужен только при отдельном AlgoPack APIKEY'; }
     keyBtn.onclick = () => {
