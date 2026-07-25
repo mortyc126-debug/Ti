@@ -71,7 +71,11 @@ const DB = env => env.OI_DB;
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
+    // no-store: без этого браузер (oi_lab.html, расширение) может закэшировать
+    // /db/* ответ и продолжать показывать старые данные ПОСЛЕ того, как база
+    // уже обновилась — то же семейство бага, что и залипшие даты futoi у MOEX,
+    // только теперь на нашей собственной стороне ответа.
+    headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   });
 }
 
