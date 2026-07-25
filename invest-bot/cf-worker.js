@@ -460,7 +460,24 @@ async function scheduledCollectOi(env) {
     }
     const futJson = await futResp.json();
     const block = futJson.futoi || futJson[Object.keys(futJson).find(k => k !== 'metadata' && k !== 'history')];
-    const allRows = issBlockToObjects(block);
+    let allRows = issBlockToObjects(block);
+    // До открытия новой сессии у MOEX на date=today буквально нули (день ещё не
+    // начался) — откатываемся на вчера: утренний снэпшок и так по сути «вчерашний
+    // вечер, сегодняшний день ещё не внёс своих изменений», лучше показать его,
+    // чем ничего не писать и ждать открытия торгов. tradedate у каждой строки —
+    // свой (из ответа MOEX), так что дальше по коду ничего пересчитывать не надо.
+    if (!allRows.length) {
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      try {
+        const futUrl2 = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?iss.meta=off&limit=5000&date=${yesterday}`;
+        const futResp2 = await fetch(futUrl2, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
+        if (futResp2.ok) {
+          const futJson2 = await futResp2.json();
+          const block2 = futJson2.futoi || futJson2[Object.keys(futJson2).find(k => k !== 'metadata' && k !== 'history')];
+          allRows = issBlockToObjects(block2);
+        }
+      } catch (e) { /* не критично — просто останемся с пустым allRows */ }
+    }
 
     // Группируем по тикеру: { sym → { YUR: row, FIZ: row } }
     // tradetime вида "HH:MM:SS" — берём последний снэпшот дня для oi_daily
@@ -552,11 +569,13 @@ async function scheduledCollectOi(env) {
                  rec.yur_long_num, rec.yur_short_num, rec.fiz_long_num, rec.fiz_short_num);
         }));
       }
-      console.log(`oi cron: ${toSave.length} тикеров → oi_daily + oi_hourly (${today} ${(toSave[0]?.tradetime || '')})`);
+      console.log(`oi cron: ${toSave.length} тикеров → oi_daily + oi_hourly (${toSave[0]?.tradedate || today} ${(toSave[0]?.tradetime || '')})`);
     } else {
       console.log(`oi cron: ${toSave.length} тикеров → oi_daily only`);
     }
-    await _oiCronStatus(db, true, `${toSave.length} тикеров, ${today}${toSave[0]?.tradetime ? ' ' + toSave[0].tradetime : ''}`);
+    const savedDate = toSave[0]?.tradedate || today;
+    await _oiCronStatus(db, true, `${toSave.length} тикеров, ${savedDate}${toSave[0]?.tradetime ? ' ' + toSave[0].tradetime : ''}` +
+      (savedDate !== today ? ' (откат на вчера — на сегодня у MOEX ещё пусто)' : ''));
   } catch (e) {
     console.error('oi cron: FutOI fetch failed:', e.message);
     await _oiCronStatus(db, false, 'exception: ' + e.message);
