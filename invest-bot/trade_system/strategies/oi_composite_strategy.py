@@ -4377,6 +4377,115 @@ def score_impulse_pullback(candles: list[HistoricCandle]) -> float:
         return 0.0
 
 
+def _bvc_vpin(candles: list[HistoricCandle], bucket_vol_ratio: float = 0.02, window_buckets: int = 15) -> tuple[float, float, float]:
+    """
+    VPIN (Volume-synchronized Probability of Informed trading, Easley-López de
+    Prado) через Bulk Volume Classification (Easley-López de Prado-O'Hara 2012):
+    когда прямого buy/sell разделения нет (baры, не тики), доля buy-объёма
+    внутри бара оценивается через CDF нормали от нормированной доходности бара:
+        buy_frac = Φ(r_bar / σ_r),  sell_frac = 1 − buy_frac
+    Свечи агрегируются в объёмные бакеты одинакового V (bucket_vol_ratio от
+    среднего volume), VPIN = среднее |buy_vol − sell_vol|/V по window_buckets
+    последним бакетам. Высокий VPIN = токсичный поток = повышенная вероятность
+    резкого движения / разворота (institutional standard для детекции informed
+    flow перед flash crashes).
+
+    Возвращает (vpin ∈ [0,1], vpin_percentile ∈ [0,1] относительно длинного
+    окна, recent_return_norm) — recent_return_norm нужен, чтобы решить, в какую
+    сторону играть от контр-сигнала.
+    """
+    n = len(candles)
+    if n < 60:
+        return 0.0, 0.5, 0.0
+    closes = [_to_f(c.close) for c in candles]
+    vols = [float(c.volume) for c in candles]
+    avg_vol = sum(vols) / n
+    if avg_vol <= 0:
+        return 0.0, 0.5, 0.0
+    # σ доходностей — берём стандартное отклонение, ниже используется как масштаб
+    # для нормировки return бакета перед CDF
+    rets = [closes[i] - closes[i - 1] for i in range(1, n)]
+    if not rets:
+        return 0.0, 0.5, 0.0
+    mean_r = sum(rets) / len(rets)
+    var_r = sum((r - mean_r) ** 2 for r in rets) / max(1, len(rets) - 1)
+    sigma = math.sqrt(var_r) or 1e-9
+
+    V = max(1.0, avg_vol * bucket_vol_ratio * n)  # общий бюджет / кол-во бакетов ~ 1/ratio
+    # Классический VPIN: агрегируем свечи в бакеты фиксированного V. Одна свеча
+    # может внести часть в текущий бакет и часть в следующий (splitting).
+    buckets: list[float] = []  # |buy - sell| в каждом бакете
+    cur_buy = 0.0
+    cur_sell = 0.0
+    cur_v = 0.0
+    for i in range(1, n):
+        r = closes[i] - closes[i - 1]
+        v = vols[i]
+        if v <= 0:
+            continue
+        # доля buy по BVC (стандартная нормаль)
+        z = r / (sigma * math.sqrt(2.0))
+        buy_frac = 0.5 * (1.0 + math.erf(z))
+        remaining = v
+        while remaining > 0:
+            room = V - cur_v
+            take = min(remaining, room)
+            cur_buy += take * buy_frac
+            cur_sell += take * (1.0 - buy_frac)
+            cur_v += take
+            remaining -= take
+            if cur_v >= V - 1e-9:
+                buckets.append(abs(cur_buy - cur_sell) / V)
+                cur_buy = cur_sell = cur_v = 0.0
+    if len(buckets) < 5:
+        return 0.0, 0.5, 0.0
+    # текущий VPIN — среднее по последним window_buckets
+    tail = buckets[-window_buckets:]
+    vpin = sum(tail) / len(tail)
+    # перцентиль текущего VPIN среди всех накопленных
+    below = sum(1 for b in buckets if b <= vpin)
+    percentile = below / len(buckets)
+    # знак недавнего движения — нужен для контр-сигнала
+    last_price = closes[-1]
+    ref_i = max(0, n - min(30, n // 4))
+    recent_ret = (last_price - closes[ref_i]) / (sigma * math.sqrt(n - ref_i) + 1e-9)
+    return vpin, percentile, recent_ret
+
+
+def score_vpin_toxicity(candles: list[HistoricCandle]) -> float:
+    """
+    VPIN_TOXICITY: экстремально высокий VPIN на растущем/падающем участке —
+    предвестник разворота (informed flow «съел» движение, продолжения не будет).
+    Классический контр-сигнал López de Prado: percentile VPIN в верхних 20% +
+    заметное недавнее движение → играем против направления.
+
+    Нейтральная зона (низкий/средний VPIN) — 0.0, метод молчит.
+    Порог агрессивно высокий, чтобы срабатывать редко и по существу.
+    """
+    if len(candles) < 80:
+        return 0.0
+    try:
+        vpin, pctile, rec_ret = _bvc_vpin(candles)
+        if vpin <= 0:
+            return 0.0
+        # интересуют только верхние 25% distribution — иначе шум
+        if pctile < 0.75:
+            return 0.0
+        # знак направления берём из недавнего движения; если оно вялое —
+        # разворачивать нечего
+        if abs(rec_ret) < 0.5:
+            return 0.0
+        # усиление сигнала — линейно от того, насколько глубоко в хвосте
+        strength = (pctile - 0.75) / 0.25   # 0..1 внутри top-25%
+        # сила контр-сигнала масштабируется знаком движения и глубиной хвоста;
+        # при pctile=1.0 и заметном движении — до ±0.6
+        direction = -1 if rec_ret > 0 else 1
+        return round(direction * min(0.6, 0.20 + strength * 0.40), 4)
+    except Exception as _e:
+        _score_except(_e)
+        return 0.0
+
+
 def _zigzag_pivots(candles: list[HistoricCandle], atr_abs: float, mult: float = 1.2) -> list[tuple[int, float, int]]:
     """Цепочка чередующихся хай/лоу пивотов зигзага: разворот засчитывается,
     когда цена уходит от текущего экстремума на >= mult*atr_abs. Не ищет
@@ -6244,6 +6353,7 @@ METHODS = [
     ("CASCADE",          score_cascade),
     ("IMPULSE_PULLBACK", score_impulse_pullback),
     ("ELLIOTT_WAVE",      score_elliott_wave),
+    ("VPIN_TOXICITY",     score_vpin_toxicity),
     # Затухание / компрессия / ложный пробой / поглощение на уровне
     ("WANING_IMPULSES",  score_waning_impulses),
     ("VOL_COMPRESSION",  score_vol_compression),
@@ -6526,6 +6636,7 @@ METHOD_TF_CONFIG: dict[str, dict] = {
     "CASCADE":          {"min_bars": 15, "weight_5m": 1.25},  # каскады видны на 5м лучше
     "IMPULSE_PULLBACK": {"min_bars": 20, "weight_5m": 1.15},  # откат от импульса — среднесрок
     "ELLIOTT_WAVE":     {"min_bars": 40, "weight_5m": 1.15},  # 5-волновка — нужна глубокая история, на 5м стабильнее
+    "VPIN_TOXICITY":    {"min_bars": 80, "weight_5m": 1.15},  # informed flow — глубина нужна для перцентиля
     # Паттерновые — на 5м значимее чем на 1м
     "CANDLE_PATTERN": {"min_bars": 8,  "weight_5m": 1.15},
     "WICK_REJECTION": {"min_bars": 8,  "weight_5m": 1.15},
