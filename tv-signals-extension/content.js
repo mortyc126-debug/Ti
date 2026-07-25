@@ -235,6 +235,51 @@
     const map = {}; [...(a || []), ...(b || [])].forEach(r => { map[Math.round(r.ts)] = r; });
     return Object.values(map).sort((x, y) => x.ts - y.ts);
   }
+  // ── ранжирование тикеров по изменению ОИ за окно (1ч/3ч/6ч/день) ───────────
+  // Часовые снэпшоты берём из oi_hourly воркера (не MOEX напрямую) — там уже
+  // копится история по отслеживаемым ликвидным FORTS-фьючерсам, дёргать N
+  // тикеров у MOEX по одному было бы и медленно, и по рейт-лимитам рискованно.
+  async function oiRankFetch(ticker, days) {
+    try {
+      const r = await oiFetch(oiBase() + '/db/oihourly?ticker=' + encodeURIComponent(ticker) + '&days=' + days);
+      if (!r.ok) return null;
+      const rows = JSON.parse(r.json);
+      return Array.isArray(rows) && rows.length ? rows.slice().sort((a, b) => a.ts - b.ts) : null;
+    } catch (e) { return null; }
+  }
+  async function oiRankRun() {
+    const body = document.getElementById('tvsig-oirank-body'); if (!body) return;
+    const raw = (document.getElementById('tvsig-scan-list') || {}).value || '';
+    const codes = raw.split(/[\s,;]+/).map(s => s.trim().toUpperCase().split(':').pop()).filter(Boolean);
+    if (!codes.length) { body.innerHTML = '<div class="tvsig-fc-hint">Впиши фьючерсные тикеры в поле списка выше (то же поле, что у скана).</div>'; return; }
+    const winH = Math.max(1, parseInt((document.getElementById('tvsig-oirank-win') || {}).value, 10) || 3);
+    const sortKey = (document.getElementById('tvsig-oirank-sort') || {}).value || 'fl';
+    body.innerHTML = '<div class="tvsig-fc-hint">Считаю ' + codes.length + ' тикеров за ' + winH + ' ч…</div>';
+    const days = Math.max(2, Math.ceil(winH / 24) + 1); // с запасом, чтобы окно точно попало в выборку
+    const results = [];
+    await Promise.all(codes.map(async code => {
+      const rows = await oiRankFetch(code, days);
+      if (!rows || rows.length < 2) return;
+      const latest = rows[rows.length - 1], cutoff = latest.ts - winH * 3600 * 1000;
+      let baseline = rows[0]; // окно шире доступной истории — берём самую раннюю точку, что есть
+      for (const r of rows) { if (r.ts <= cutoff) baseline = r; else break; }
+      if (baseline === latest) return; // одна и та же точка — дельту считать не из чего
+      const d = { code, spanH: (latest.ts - baseline.ts) / 3600000,
+        fl: latest.fiz_long - baseline.fiz_long, fs: latest.fiz_short - baseline.fiz_short,
+        yl: latest.yur_long - baseline.yur_long, ys: latest.yur_short - baseline.yur_short };
+      d.absmax = Math.max(Math.abs(d.fl), Math.abs(d.fs), Math.abs(d.yl), Math.abs(d.ys));
+      results.push(d);
+    }));
+    if (!results.length) { body.innerHTML = '<div class="tvsig-fc-hint">Нет истории ни по одному тикеру из списка — воркер их не отслеживает (не входят в топ ликвидных FORTS), или данные ещё не накопились.</div>'; return; }
+    results.sort((a, b) => b[sortKey] - a[sortKey]);
+    const num = v => (v >= 0 ? '+' : '−') + Math.round(Math.abs(v)).toLocaleString('ru-RU');
+    const cls = v => v > 0 ? 'pos' : v < 0 ? 'neg' : 'dim';
+    body.innerHTML = '<table class="tvsig-fc-tbl"><tr><th>тикер</th><th>физ Л</th><th>физ Ш</th><th>юр Л</th><th>юр Ш</th><th>окно</th></tr>' +
+      results.map(d => '<tr><td><b>' + d.code + '</b></td>' +
+        '<td class="' + cls(d.fl) + '">' + num(d.fl) + '</td><td class="' + cls(d.fs) + '">' + num(d.fs) + '</td>' +
+        '<td class="' + cls(d.yl) + '">' + num(d.yl) + '</td><td class="' + cls(d.ys) + '">' + num(d.ys) + '</td>' +
+        '<td class="dim">' + d.spanH.toFixed(1) + 'ч</td></tr>').join('') + '</table>';
+  }
   async function oiLoad() {
     if (!S.chart) return;
     const body = document.getElementById('tvsig-oi-body'); if (body && !S.oi) body.textContent = 'загрузка…';
@@ -1664,6 +1709,16 @@
       '<button id="tvsig-scan-go" title="Просканировать список">Скан</button></div>' +
       '<div id="tvsig-scan-body"></div>' +
       '<div id="tvsig-scan-foot"><b>🔝 авто</b> (по умолчанию): для каждого тикера сам считает все методы и берёт самый прибыльный НА ЕГО истории (exp&gt;0, n≥10), сработавший в окне — список тикеров с их лучшим методом и направлением, без ручного выбора. Или задай метод/связку вручную. Пресеты — стандартные секторные наборы MOEX; свои списки можно сохранять/удалять («список дня» тоже сохраняется). <b>Источник Tinkoff Invest API</b> — лучший вариант: точные данные (1/5/15 мин/час/день), параллельные запросы (быстро), график не трогает. Нужен токен (🔑 рядом — права только на чтение котировок, из личного кабинета Т-Инвестиций); тикер резолвится в FIGI один раз и кэшируется. <b>«График терминала»</b> — те же точные данные, но листает твой график по тикерам списка по очереди (медленно, видно визуально) и возвращает исходный тикер в конце — без токена. <b>MOEX ISS</b> — быстрее «графика», но урезанный бесплатный фид: интервал округляется до одного из 5 (1/10/60 мин, день, неделя), после вечерней сессии данные обновляются плохо/с задержкой. Ищет сигнал в последних N закрытых барах. «X баров / Y назад» — свежесть с пересчётом в реальное время по ТФ. «→ тейк/стоп/тайм ±ATR» — чем ЗАКОНЧИЛАСЬ именно эта сделка (успела ли отыграть): понятно, имел ли сигнал смысл. Хиты сортируются по ТОЧНОСТИ связки на истории тикера (exp/win/n, R:R 2:1); n&lt;10 = мало данных, вниз. Кросс-тикерный breadth в скане не применяется. Второй сигнал «—» = один метод. <b>Автообновление</b> — пересканирует список на заданном интервале, пока открыта эта вкладка (закрыл вкладку — таймер встал, вернулся — снова пошёл); недоступно только для источника «график терминала». <b>🔔</b> рядом с интервалом — отдельное от тикерного уведомление: пока автообновление включено, новые хиты (не бывшие в предыдущем скане) шлют уведомление браузера. Ручной клик по «Скан» не уведомляет.</div>' +
+      '<div class="tvsig-fc-sec">Ранжирование по открытому интересу</div>' +
+      '<div id="tvsig-oirank-ctrl">за <select id="tvsig-oirank-win">' +
+      '<option value="1">1 ч</option><option value="3" selected>3 ч</option><option value="6">6 ч</option><option value="24">24 ч (день)</option></select>' +
+      ' топ <select id="tvsig-oirank-sort">' +
+      '<option value="fl">физ лонг набирают</option><option value="fs">физ шорт набирают</option>' +
+      '<option value="yl">юр лонг набирают</option><option value="ys">юр шорт набирают</option>' +
+      '<option value="absmax">|любое макс. движение|</option></select>' +
+      '<button id="tvsig-oirank-go" title="Ранжировать тикеры из текстового поля списка выше по изменению открытого интереса">⟳</button></div>' +
+      '<div id="tvsig-oirank-body"></div>' +
+      '<div id="tvsig-oirank-foot">Использует тот же список тикеров, что и скан выше — впиши <b>фьючерсные коды</b> (SiU6, GZU6…, не тикер акции). Данные — из истории воркера (cron собирает раз в 5 мин топ ликвидных FORTS-фьючерсов); если тикера там нет — истории не будет, столбец пустой. Δ считается между самым свежим снэпшотом и ближайшим к началу выбранного окна (если история короче окна — берётся самая ранняя доступная точка, реальный охват показан в столбце «окно»).</div>' +
       '</div>'; // /pane-scan
     document.documentElement.appendChild(panel);
     try { const wv = parseInt(localStorage.getItem('tvsig:width') || '', 10); if (wv >= 300 && wv <= 640) panel.style.width = wv + 'px'; } catch (e) {}
@@ -1696,6 +1751,12 @@
     cmpTk.addEventListener('keydown', e => { if (e.key === 'Enter') cmpLoad(); });
     panel.querySelector('#tvsig-seg-go').onclick = () => segRender();
     panel.querySelector('#tvsig-scan-go').onclick = () => scanRun();
+    panel.querySelector('#tvsig-oirank-go').onclick = () => oiRankRun();
+    (function () { const win = panel.querySelector('#tvsig-oirank-win'), sortSel = panel.querySelector('#tvsig-oirank-sort'); if (!win) return;
+      try { const v = localStorage.getItem('tvsig:oirankwin'); if (v) win.value = v; } catch (e) {}
+      try { const v = localStorage.getItem('tvsig:oiranksort'); if (v) sortSel.value = v; } catch (e) {}
+      win.addEventListener('change', () => { try { localStorage.setItem('tvsig:oirankwin', win.value); } catch (er) {} });
+      sortSel.addEventListener('change', () => { try { localStorage.setItem('tvsig:oiranksort', sortSel.value); } catch (er) {} }); })();
     (function () { const el = panel.querySelector('#tvsig-scan-onlyactive'); if (!el) return;
       try { el.checked = localStorage.getItem('tvsig:scanonlyactive') === '1'; } catch (e) {}
       el.addEventListener('change', () => { try { localStorage.setItem('tvsig:scanonlyactive', el.checked ? '1' : '0'); } catch (er) {} scanRerender(); }); })();
@@ -1928,7 +1989,8 @@
     '.tvsig-col, .tvsig-info-btn, .tvsig-tab, #tvsig-status, #tvsig-period, #tvsig-foot, ' +
     '#tvsig-cmp-foot, #tvsig-cmp-body, #tvsig-oi-body, .tvsig-oi-meta, .tvsig-oi-t, ' +
     '.tvsig-fc-sig, #tvsig-fc-cond, #tvsig-fc-detail, #tvsig-fc-hypo, #tvsig-fc-foot, #tvsig-fc-pickrow, ' +
-    '#tvsig-rc-ctrl, #tvsig-rc-out, #tvsig-scan-list, #tvsig-scan-sel, #tvsig-scan-body, #tvsig-scan-foot, #tvsig-scan-listrow, #tvsig-scan-srcrow, #tvsig-scan-autorow';
+    '#tvsig-rc-ctrl, #tvsig-rc-out, #tvsig-scan-list, #tvsig-scan-sel, #tvsig-scan-body, #tvsig-scan-foot, #tvsig-scan-listrow, #tvsig-scan-srcrow, #tvsig-scan-autorow, ' +
+    '#tvsig-oirank-ctrl, #tvsig-oirank-body, #tvsig-oirank-foot';
   function drag(el) {
     let sx, sy, ox, oy, on = false;
     el.addEventListener('mousedown', e => {
