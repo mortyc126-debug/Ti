@@ -139,6 +139,294 @@
     } return o;
   };
 
+  // ── новые «институциональные» методы (портированы из oi_composite_strategy.py) ─
+  // Портированы после реального бэктеста в боте (score_methods.py ALL --days 180):
+  //   DFA_REGIME     d=+0.178 win 55.5% — сильнейший
+  //   BIPOWER_JUMP   d=+0.164 win 54.5%
+  //   AMIHUD_SHOCK   d=+0.144 win 54.7%
+  //   VPIN_TOXICITY  d=+0.127 win 49.7%
+  //   ANCHORED_VWAP  d=-0.074 win 43.9% (реализована уже ИНВЕРТИРОВАННОЙ — сигнал
+  //                                       fade от anchored VWAP как MEAN-REVERSION)
+  //   ELLIOTT_WAVE   d=-0.055 win 44.8% (тоже ИНВЕРТИРОВАННАЯ — 5-волновка как фейд)
+  //
+  // Для скорости все методы разделяют один рабочий проход и переиспользуют
+  // σ доходностей / медианы там где можно; сложные окна пересчитываются per-бар.
+
+  // AMIHUD_SHOCK: |r|/v выше 2×медианы длинного окна + недавнее движение → контр
+  M.amihud_shock = (cd) => {
+    const n = cd.length, o = new Array(n).fill(0);
+    if (n < 50) return o;
+    const cl = cd.map(c => c.close);
+    // amihud[i] = |ret_i|/vol_i (0 если vol<=0)
+    const am = new Array(n).fill(0);
+    for (let i = 1; i < n; i++) {
+      const v = cd[i].volume; if (!(v > 0) || cl[i - 1] === 0) continue;
+      am[i] = Math.abs(cl[i] - cl[i - 1]) / cl[i - 1] / v;
+    }
+    // рекуррентная σ доходностей (по всему префиксу)
+    for (let i = 50; i < n; i++) {
+      // медиана Amihud по последним ≤200
+      const base = am.slice(Math.max(1, i - 199), i + 1).filter(x => x > 0).sort((a, b) => a - b);
+      if (!base.length) continue;
+      const median = base[base.length >> 1];
+      if (median <= 0) continue;
+      const tailN = Math.min(10, (i - 1) >> 2);
+      let tail = 0; for (let j = i - tailN + 1; j <= i; j++) tail += am[j];
+      const tailAvg = tail / tailN;
+      const ratio = tailAvg / median;
+      // σ доходностей за префикс
+      const rets = [], from = 1;
+      let sm = 0; for (let j = from; j <= i; j++) { rets.push(cl[j] - cl[j - 1]); sm += cl[j] - cl[j - 1]; }
+      const mr = sm / rets.length;
+      let vr = 0; for (const r of rets) vr += (r - mr) * (r - mr);
+      const sigma = Math.sqrt(vr / Math.max(1, rets.length - 1)) || 1e-9;
+      const recRet = (cl[i] - cl[i - tailN - 1]) / (sigma * Math.sqrt(tailN));
+      if (ratio < 2.0 || Math.abs(recRet) < 0.5) continue;
+      const strength = Math.min(1.0, (ratio - 2.0) / 3.0);
+      const dir = recRet > 0 ? -1 : 1;
+      o[i] = dir * (0.20 + strength * 0.40);
+    }
+    return o;
+  };
+
+  // BIPOWER_JUMP: скачки в realized variance (BNS) + недавнее движение → контр
+  M.bipower_jump = (cd) => {
+    const n = cd.length, o = new Array(n).fill(0);
+    if (n < 50) return o;
+    const cl = cd.map(c => c.close);
+    for (let i = 50; i < n; i++) {
+      const w = Math.min(40, i);
+      const rets = new Array(w);
+      for (let k = 0; k < w; k++) rets[k] = cl[i - w + k + 1] - cl[i - w + k];
+      let rv = 0; for (const r of rets) rv += r * r;
+      if (rv <= 0) continue;
+      let bv = 0; for (let k = 1; k < rets.length; k++) bv += Math.abs(rets[k]) * Math.abs(rets[k - 1]);
+      bv *= Math.PI / 2;
+      const jumpRatio = Math.max(0, (rv - bv)) / rv;
+      if (jumpRatio < 0.4) continue;
+      let sm = 0; for (const r of rets) sm += r;
+      const mr = sm / rets.length;
+      let vr = 0; for (const r of rets) vr += (r - mr) * (r - mr);
+      const sigma = Math.sqrt(vr / Math.max(1, rets.length - 1)) || 1e-9;
+      const recN = Math.min(6, rets.length);
+      let recSum = 0; for (let k = rets.length - recN; k < rets.length; k++) recSum += rets[k];
+      const recRet = recSum / (sigma * Math.sqrt(recN));
+      if (Math.abs(recRet) < 0.7) continue;
+      const strength = Math.min(1.0, (jumpRatio - 0.4) / 0.4);
+      const dir = recRet > 0 ? -1 : 1;
+      o[i] = dir * (0.20 + strength * 0.35);
+    }
+    return o;
+  };
+
+  // VPIN_TOXICITY: BVC (Bulk Volume Classification) на объёмных бакетах,
+  // перцентиль VPIN относительно своей истории → контр-сигнал против движения
+  M.vpin_toxicity = (cd) => {
+    const n = cd.length, o = new Array(n).fill(0);
+    if (n < 80) return o;
+    const cl = cd.map(c => c.close);
+    for (let i = 80; i < n; i++) {
+      // σ доходностей на префиксе
+      let sm = 0, sq = 0; for (let j = 1; j <= i; j++) { const r = cl[j] - cl[j - 1]; sm += r; sq += r * r; }
+      const mr = sm / i; const sigma = Math.sqrt(Math.max(1e-18, sq / i - mr * mr)) || 1e-9;
+      // avg vol
+      let avgV = 0, cnt = 0; for (let j = 1; j <= i; j++) { if (cd[j].volume > 0) { avgV += cd[j].volume; cnt++; } }
+      if (cnt === 0) continue; avgV /= cnt;
+      // бакет-объём: 2% от суммарного объёма → ~50 бакетов на окно
+      const V = Math.max(1.0, avgV * 0.02 * i);
+      const buckets = [];
+      let cB = 0, cS = 0, cV = 0;
+      for (let j = 1; j <= i; j++) {
+        const r = cl[j] - cl[j - 1], v = cd[j].volume;
+        if (!(v > 0)) continue;
+        // buy_frac по CDF нормали
+        const z = r / (sigma * Math.SQRT2);
+        // приближение erf ≈ tanh для скорости (в реальных задачах точность достаточна)
+        const erf = Math.tanh(1.1283791670955126 * z); // 2/√π
+        const buy = 0.5 * (1 + erf);
+        let rem = v;
+        while (rem > 0) {
+          const room = V - cV, take = Math.min(rem, room);
+          cB += take * buy; cS += take * (1 - buy); cV += take; rem -= take;
+          if (cV >= V - 1e-9) { buckets.push(Math.abs(cB - cS) / V); cB = cS = cV = 0; }
+        }
+      }
+      if (buckets.length < 5) continue;
+      const winB = buckets.slice(-15);
+      const vpin = winB.reduce((a, b) => a + b, 0) / winB.length;
+      let below = 0; for (const b of buckets) if (b <= vpin) below++;
+      const pct = below / buckets.length;
+      if (pct < 0.75) continue;
+      const refI = Math.max(0, i - Math.min(30, i >> 2));
+      const recRet = (cl[i] - cl[refI]) / (sigma * Math.sqrt(i - refI) + 1e-9);
+      if (Math.abs(recRet) < 0.5) continue;
+      const strength = (pct - 0.75) / 0.25;
+      const dir = recRet > 0 ? -1 : 1;
+      o[i] = dir * Math.min(0.6, 0.20 + strength * 0.40);
+    }
+    return o;
+  };
+
+  // ANCHORED_VWAP: VWAP от последнего ATR-зигзаг пивота → сигнал fade
+  // (в боте ANCHORED_VWAP anti — отклонение → mean-reversion, не тренд).
+  M.anchored_vwap = (cd) => {
+    const n = cd.length, o = new Array(n).fill(0), at = atr(cd, 14);
+    // per-бар: находим последний пивот на префиксе, считаем VWAP от него до i
+    for (let i = 30; i < n; i++) {
+      const a = at[i]; if (a == null || a <= 0) continue;
+      const thresh = 1.5 * a;
+      // zigzag на префиксе [0..i]
+      let lastPivot = -1;
+      let up = true, extI = 0, extP = cd[0].high;
+      for (let j = 1; j <= i; j++) {
+        if (up) {
+          if (cd[j].high > extP) { extI = j; extP = cd[j].high; }
+          else if (extP - cd[j].low >= thresh) { lastPivot = extI; up = false; extI = j; extP = cd[j].low; }
+        } else {
+          if (cd[j].low < extP) { extI = j; extP = cd[j].low; }
+          else if (cd[j].high - extP >= thresh) { lastPivot = extI; up = true; extI = j; extP = cd[j].high; }
+        }
+      }
+      if (lastPivot < 0 || i - lastPivot < 8) continue;
+      let num = 0, den = 0;
+      for (let j = lastPivot; j <= i; j++) {
+        const typ = (cd[j].high + cd[j].low + cd[j].close) / 3, v = cd[j].volume || 0;
+        num += typ * v; den += v;
+      }
+      if (den <= 0) continue;
+      const vwap = num / den;
+      const dev = (cd[i].close - vwap) / a;
+      // сырой сигнал tanh(dev*0.8), но ИНВЕРТИРУЕМ (fade от anchored VWAP)
+      o[i] = -Math.tanh(dev * 0.8);
+    }
+    return o;
+  };
+
+  // ELLIOTT_WAVE (v2): жёсткие правила + инверсия (в боте anti)
+  M.elliott_wave = (cd) => {
+    const n = cd.length, o = new Array(n).fill(0), at = atr(cd, 14);
+    for (let i = 40; i < n; i++) {
+      const a = at[i]; if (a == null || a <= 0) continue;
+      const thresh = 1.8 * a;
+      // zigzag пивоты на префиксе
+      const piv = []; // [i, price, kind]
+      let up = true, extI = 0, extP = cd[0].high;
+      for (let j = 1; j <= i; j++) {
+        if (up) {
+          if (cd[j].high > extP) { extI = j; extP = cd[j].high; }
+          else if (extP - cd[j].low >= thresh) { piv.push([extI, extP, 1]); up = false; extI = j; extP = cd[j].low; }
+        } else {
+          if (cd[j].low < extP) { extI = j; extP = cd[j].low; }
+          else if (cd[j].high - extP >= thresh) { piv.push([extI, extP, -1]); up = true; extI = j; extP = cd[j].high; }
+        }
+      }
+      if (piv.length < 5) continue;
+      const [p0i, p0p, k0] = piv[piv.length - 5];
+      const [p1i, p1p, k1] = piv[piv.length - 4];
+      const [, p2p, k2] = piv[piv.length - 3];
+      const [, p3p, k3] = piv[piv.length - 2];
+      const [p4i, p4p, k4] = piv[piv.length - 1];
+      if (!(k0 === -k1 && k1 === k2 * -1 && k2 === -k3 && k3 === k4 * -1)) continue;
+      const direction = k1 === 1 ? 1 : -1;
+      const w1 = Math.abs(p1p - p0p), w2 = Math.abs(p2p - p1p), w3 = Math.abs(p3p - p2p), w4 = Math.abs(p4p - p3p);
+      const lastClose = cd[i].close;
+      const w5 = Math.max(0, direction * (lastClose - p4p));
+      if (w1 <= 0 || w2 <= 0 || w3 <= 0 || w4 <= 0) continue;
+      if (direction > 0 && p2p <= p0p) continue;
+      if (direction < 0 && p2p >= p0p) continue;
+      if (w3 < w1) continue;
+      if (direction > 0 && p4p < p1p) continue;
+      if (direction < 0 && p4p > p1p) continue;
+      const r2 = w2 / w1;
+      if (!(r2 >= 0.236 && r2 <= 0.886)) continue;
+      if (w5 <= 0 && Math.abs(lastClose - p4p) >= a * 1.8) continue;
+      let conf = 0.55; if (w3 >= w1 * 1.5) conf = Math.min(0.85, conf + 0.15);
+      const w5r = w5 / w1;
+      let rawScore = 0;
+      if (w5r < 0.25) continue;
+      if (w5r < 1.0) {
+        const prog = (w5r - 0.25) / 0.75;
+        rawScore = direction * conf * (0.35 + 0.65 * prog);
+      } else if (w5r <= 1.68) {
+        const fade = 1 - (w5r - 1) / 0.68;
+        rawScore = direction * conf * fade * 0.5;
+      } else {
+        const excess = Math.min(1.0, (w5r - 1.68) / 1.0);
+        rawScore = -direction * conf * (0.30 + 0.35 * excess);
+      }
+      // ИНВЕРТИРУЕМ (в боте anti)
+      o[i] = -rawScore;
+    }
+    return o;
+  };
+
+  // DFA_REGIME: α по Detrended Fluctuation Analysis на доходностях
+  // α > 0.65 → persistent → продолжение; α < 0.35 → anti → контр
+  function _dfaAlpha(series) {
+    const nS = series.length, minS = 8, maxS = 6;
+    if (nS < minS * 4) return 0.5;
+    let mean = 0; for (const x of series) mean += x; mean /= nS;
+    const y = new Array(nS); let acc = 0;
+    for (let i = 0; i < nS; i++) { acc += series[i] - mean; y[i] = acc; }
+    const maxScale = Math.max(minS * 2, Math.floor(nS / 4));
+    if (maxScale <= minS) return 0.5;
+    const scales = [];
+    const step = (Math.log(maxScale) - Math.log(minS)) / Math.max(1, maxS - 1);
+    for (let k = 0; k < maxS; k++) {
+      const s = Math.max(minS, Math.round(Math.exp(Math.log(minS) + k * step)));
+      if (!scales.length || s > scales[scales.length - 1]) scales.push(s);
+    }
+    const logS = [], logF = [];
+    for (const s of scales) {
+      const nW = Math.floor(nS / s); if (nW < 4) continue;
+      let fSum = 0;
+      for (let w = 0; w < nW; w++) {
+        // линрегрессия внутри окна
+        const mx = (s - 1) / 2; let my = 0;
+        for (let j = 0; j < s; j++) my += y[w * s + j]; my /= s;
+        let num = 0, den = 0;
+        for (let j = 0; j < s; j++) { const dx = j - mx; num += dx * (y[w * s + j] - my); den += dx * dx; }
+        const slope = num / (den || 1e-9), intercept = my - slope * mx;
+        for (let j = 0; j < s; j++) { const r = y[w * s + j] - (slope * j + intercept); fSum += r * r; }
+      }
+      const F = Math.sqrt(fSum / (nW * s));
+      if (F > 0) { logS.push(Math.log(s)); logF.push(Math.log(F)); }
+    }
+    if (logS.length < 3) return 0.5;
+    let mx = 0, my = 0;
+    for (let i = 0; i < logS.length; i++) { mx += logS[i]; my += logF[i]; }
+    mx /= logS.length; my /= logS.length;
+    let num = 0, den = 0;
+    for (let i = 0; i < logS.length; i++) { num += (logS[i] - mx) * (logF[i] - my); den += (logS[i] - mx) ** 2; }
+    return num / (den || 1e-9);
+  }
+  M.dfa_regime = (cd) => {
+    const n = cd.length, o = new Array(n).fill(0);
+    if (n < 60) return o;
+    const cl = cd.map(c => c.close);
+    for (let i = 60; i < n; i++) {
+      const rets = new Array(i);
+      for (let j = 1; j <= i; j++) rets[j - 1] = cl[j] - cl[j - 1];
+      const alpha = _dfaAlpha(rets);
+      let sm = 0; for (const r of rets) sm += r; const mr = sm / rets.length;
+      let vr = 0; for (const r of rets) vr += (r - mr) * (r - mr);
+      const sigma = Math.sqrt(vr / Math.max(1, rets.length - 1)) || 1e-9;
+      const recN = Math.min(10, rets.length / 5 | 0);
+      if (recN < 2) continue;
+      let recSum = 0; for (let k = rets.length - recN; k < rets.length; k++) recSum += rets[k];
+      const recRet = recSum / (sigma * Math.sqrt(recN));
+      if (Math.abs(recRet) < 0.4) continue;
+      if (alpha > 0.65) {
+        const strength = Math.min(1.0, (alpha - 0.65) / 0.35);
+        o[i] = (recRet > 0 ? 1 : -1) * (0.25 + strength * 0.35);
+      } else if (alpha < 0.35) {
+        const strength = Math.min(1.0, (0.35 - alpha) / 0.35);
+        o[i] = (recRet > 0 ? -1 : 1) * (0.20 + strength * 0.30);
+      }
+    }
+    return o;
+  };
+
   // ── бэктест: winrate (частота угадывания направления) + exp ATR (экспектанси
   //    сделки с тейком/стопом — как системный прогон дашборда). Для фейдов winrate
   //    врёт (низкая при плюсовом exp), поэтому считаем обе цифры. ──────────────
@@ -209,7 +497,8 @@
   }
 
   // ── всё вместе: серии + последний сигнал + точность ──────────────────────────
-  const IDS = ['zscore', 'accel', 'order_block', 'fvg', 'liq_sweep', 'false_breakout', 'vsa_abs', 'waning', 'talib_anti', 'hawkes', 'cascade', 'nw', 'alligator_inv', 'fade', 'zonefade'];
+  const IDS = ['zscore', 'accel', 'order_block', 'fvg', 'liq_sweep', 'false_breakout', 'vsa_abs', 'waning', 'talib_anti', 'hawkes', 'cascade', 'nw', 'alligator_inv', 'fade', 'zonefade',
+    'dfa_regime', 'bipower_jump', 'amihud_shock', 'vpin_toxicity', 'anchored_vwap', 'elliott_wave'];
   function computeAll(bars, horizon) {
     horizon = horizon || 12;
     const out = {};
