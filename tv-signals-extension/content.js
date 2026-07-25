@@ -107,12 +107,17 @@
     let j; try { j = JSON.parse(r.json); } catch (_) { return { ok: false, error: 'parse' }; }
     // Без явной даты MOEX почему-то отдаёт НЕ последний доступный день (проверено:
     // дефолтный ответ был на 2+ недели старее, чем futoi.dates.till). Перезапрашиваем
-    // явно на till — тот же трюк, что from/till у candles в других местах файла.
+    // явно с датой. ВАЖНО: у КОЛЛЕКЦИОННОГО securities.json (без тикера в пути)
+    // параметр называется именно date=, а НЕ from=/till= (те относятся только к
+    // серийному securities/{sym}.json — см. cf-worker.js scheduledCollectOi).
+    // from=/till= коллекционным эндпоинтом молча игнорируются: он возвращает тот
+    // же залипший ответ, r2.ok остаётся true, futoi.data непустой — подмена j=j2
+    // проходила «успешно», но j2 был идентичен j, и залипшая дата не лечилась.
     const dRow = j['futoi.dates'] && j['futoi.dates'].data && j['futoi.dates'].data[0];
     const till = dRow && dRow[1];
     if (till) {
       try {
-        const r2 = await oiFetch(url + '&till=' + till + '&from=' + till, headers);
+        const r2 = await oiFetch(url + '&date=' + till, headers);
         if (r2.ok) { const j2 = JSON.parse(r2.json); if (j2.futoi && j2.futoi.data && j2.futoi.data.length) j = j2; }
       } catch (e) {}
     }
