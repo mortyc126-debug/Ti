@@ -4377,6 +4377,157 @@ def score_impulse_pullback(candles: list[HistoricCandle]) -> float:
         return 0.0
 
 
+def _zigzag_pivots(candles: list[HistoricCandle], atr_abs: float, mult: float = 1.2) -> list[tuple[int, float, int]]:
+    """Цепочка чередующихся хай/лоу пивотов зигзага: разворот засчитывается,
+    когда цена уходит от текущего экстремума на >= mult*atr_abs. Не ищет
+    ретроспективно точную точку разворота внутри окна подтверждения — берёт
+    экстремум, накопленный ДО бара подтверждения (классический zigzag).
+    Возвращает [(индекс, цена, kind)], kind: 1=хай, -1=лоу."""
+    if atr_abs <= 0 or len(candles) < 3:
+        return []
+    highs = [_to_f(c.high) for c in candles]
+    lows = [_to_f(c.low) for c in candles]
+    thresh = atr_abs * mult
+    pivots: list[tuple[int, float, int]] = []
+    up = True  # ищем хай
+    ext_i, ext_p = 0, highs[0]
+    for i in range(1, len(candles)):
+        if up:
+            if highs[i] > ext_p:
+                ext_i, ext_p = i, highs[i]
+            elif ext_p - lows[i] >= thresh:
+                pivots.append((ext_i, ext_p, 1))
+                up = False
+                ext_i, ext_p = i, lows[i]
+        else:
+            if lows[i] < ext_p:
+                ext_i, ext_p = i, lows[i]
+            elif highs[i] - ext_p >= thresh:
+                pivots.append((ext_i, ext_p, -1))
+                up = True
+                ext_i, ext_p = i, highs[i]
+    return pivots
+
+
+def score_elliott_wave(candles: list[HistoricCandle]) -> float:
+    """
+    ELLIOTT_WAVE: эвристический подсчёт импульсной 5-волновки по зигзагу
+    свинг-точек (ATR-порог разворота — единый масштаб с остальными методами,
+    не %).
+
+    Из последних 5 пивотов (P0..P4, чередующиеся хай/лоу — это волны 1-2-3-4)
+    проверяется ЖЁСТКОЕ правило Эллиотта: волна 2 не уходит глубже старта
+    волны 1 (P2 не пробивает P0). Нарушено → это не импульс, счёт волн
+    отклоняется целиком (return 0.0). Остальные классические правила
+    (волна 3 не самая короткая из 1/3/5, волна 4 не заходит на территорию
+    волны 1) для диагоналей нарушаются легитимно — не отказ, а штраф
+    к уверенности сигнала, посчитанный ниже.
+
+    Направление берётся из P0→P1 (если P1 хай — импульс вверх). Волна 5
+    ещё не завершена пивотом — считается ОТ P4 ДО ПОСЛЕДНЕГО бара, это и
+    есть "сейчас".
+
+    Сигнал:
+      Правило волны 2 нарушено, или волна 3 намного короче волны 1
+      (typical: волна 3 — самая длинная или хотя бы не короче волны 1) →
+      низкая уверенность/0.
+      Волна 5 короче волны 1 (типичный размер ещё не набран) → продолжение
+      по направлению импульса, сила растёт по мере приближения к volна1.
+      Волна 5 в вилке 1.0..1.68×волна1 (обычная зона завершения) → сигнал
+      слабеет — паттерн, вероятно, скоро развернётся в ABC-коррекцию.
+      Волна 5 растянута дальше 1.68×волна1 (нетипично далеко) → контр-сигнал
+      против импульса (ждём коррекцию), волна 5 признаётся псевдо-растяжением.
+    """
+    _MIN_PIVOT_MULT = 1.2
+    win = candles[-_adaptive_window(candles, target_hours=10.0, min_bars=40, max_bars=200):]
+    if len(win) < 40:
+        return 0.0
+    try:
+        atr_pct = _compute_atr(win)
+        if atr_pct <= 0:
+            return 0.0
+        last_price = _to_f(win[-1].close) or 0.0
+        if last_price <= 0:
+            return 0.0
+        atr_abs = atr_pct * last_price
+
+        piv = _zigzag_pivots(win, atr_abs, _MIN_PIVOT_MULT)
+        if len(piv) < 4:
+            return 0.0
+        p0_i, p0_p, _ = piv[-5] if len(piv) >= 5 else (0, _to_f(win[0].close), 0)
+        p1_i, p1_p, k1 = piv[-4]
+        p2_i, p2_p, k2 = piv[-3]
+        p3_i, p3_p, k3 = piv[-2]
+        p4_i, p4_p, k4 = piv[-1]
+        # должны чередоваться: хай,лоу,хай,лоу (или наоборот)
+        if not (k1 == -k2 == k3 == -k4):
+            return 0.0
+
+        direction = 1 if k1 == 1 else -1  # P1 хай → импульс вверх (P0 ниже P1)
+
+        wave1 = abs(p1_p - p0_p)
+        wave2 = abs(p2_p - p1_p)
+        wave3 = abs(p3_p - p2_p)
+        wave4 = abs(p4_p - p3_p)
+        last_close = _to_f(win[-1].close)
+        wave5 = max(0.0, direction * (last_close - p4_p))  # только в сторону тренда
+
+        if wave1 <= 0:
+            return 0.0
+
+        # ── Жёсткое правило: волна 2 не пробивает старт волны 1 (P0) ──
+        if direction > 0 and p2_p <= p0_p:
+            return 0.0
+        if direction < 0 and p2_p >= p0_p:
+            return 0.0
+
+        # Волна 5 ещё не сформировала пивот — если цена уже развернула ПРОТИВ
+        # направления импульса от P4 больше, чем на порог зигзага, это уже не
+        # "волна 5 в процессе", а паттерн сломан (коррекция глубже ожидаемого)
+        if wave5 <= 0 and abs(last_close - p4_p) >= atr_abs * _MIN_PIVOT_MULT:
+            return 0.0
+
+        confidence = 0.45
+        # волна 3 короче волны 1 — нетипично (мягкий штраф, не отказ)
+        if wave3 < wave1:
+            confidence -= 0.15
+        elif wave3 >= wave1 * 1.5:
+            confidence += 0.10  # характерное растяжение волны 3
+        # волна 4 заходит на территорию волны 1 — нарушение non-overlap
+        # (легитимно для диагоналей, но снижает уверенность в чистом импульсе)
+        if direction > 0 and p4_p < p1_p:
+            confidence -= 0.15
+        elif direction < 0 and p4_p > p1_p:
+            confidence -= 0.15
+        # волна 2 в типичной Фибо-зоне (50-78.6% волны 1) — более канонично
+        ratio2 = wave2 / wave1
+        if 0.5 <= ratio2 <= 0.786:
+            confidence += 0.10
+        elif ratio2 < 0.2 or ratio2 > 0.95:
+            confidence -= 0.10
+        confidence = max(0.0, min(0.85, confidence))
+        if confidence <= 0:
+            return 0.0
+
+        w5_ratio = wave5 / wave1
+        if w5_ratio < 1.0:
+            # волна 5 ещё не набрала типичный размер — едем по тренду,
+            # сила растёт по мере приближения к волне1 (0.3..1.0 её длины)
+            progress = min(1.0, w5_ratio / 1.0)
+            return round(direction * confidence * (0.35 + 0.65 * progress), 4)
+        if w5_ratio <= 1.68:
+            # обычная зона завершения волны 5 — сигнал по тренду, но слабее
+            fade = 1.0 - (w5_ratio - 1.0) / 0.68  # 1.0 → 0.0
+            return round(direction * confidence * max(0.15, fade * 0.5), 4)
+        # растянулась заметно дальше типичного — вероятная псевдо-5я,
+        # разворотный контр-сигнал против импульса
+        excess = min(1.0, (w5_ratio - 1.68) / 1.0)
+        return round(-direction * confidence * (0.30 + 0.35 * excess), 4)
+    except Exception as _e:
+        _score_except(_e)
+        return 0.0
+
+
 def score_waning_impulses(candles: list[HistoricCandle]) -> float:
     """
     WANING_IMPULSES: затухающие импульсы — три признака одновременно:
@@ -6093,6 +6244,7 @@ METHODS = [
     ("VSA_ABSORPTION",   score_vsa_absorption),
     ("CASCADE",          score_cascade),
     ("IMPULSE_PULLBACK", score_impulse_pullback),
+    ("ELLIOTT_WAVE",      score_elliott_wave),
     # Затухание / компрессия / ложный пробой / поглощение на уровне
     ("WANING_IMPULSES",  score_waning_impulses),
     ("VOL_COMPRESSION",  score_vol_compression),
@@ -6374,6 +6526,7 @@ METHOD_TF_CONFIG: dict[str, dict] = {
     "VSA_ABSORPTION": {"min_bars": 12, "weight_5m": 1.15},  # поглощение на 5м крупнее
     "CASCADE":          {"min_bars": 15, "weight_5m": 1.25},  # каскады видны на 5м лучше
     "IMPULSE_PULLBACK": {"min_bars": 20, "weight_5m": 1.15},  # откат от импульса — среднесрок
+    "ELLIOTT_WAVE":     {"min_bars": 40, "weight_5m": 1.15},  # 5-волновка — нужна глубокая история, на 5м стабильнее
     # Паттерновые — на 5м значимее чем на 1м
     "CANDLE_PATTERN": {"min_bars": 8,  "weight_5m": 1.15},
     "WICK_REJECTION": {"min_bars": 8,  "weight_5m": 1.15},
