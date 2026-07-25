@@ -25,9 +25,16 @@
 //   /db/oidaily?ticker=               GET  — вся история снэпшотов тикера (для слоёв позиций)
 //   /db/oibackfill?tickers=&days=     GET  — разовый backfill истории FutOI юр/физ за прошлые
 //                                            даты (date= в futoi API); без tickers — берёт
-//                                            текущий отслеживаемый список из oi_tracked_state.
-//                                            Пишет и дневной итог в oi_daily, и ВСЕ внутри-
-//                                            дневные снэпшоты даты (10-мин срезы) в oi_hourly
+//                                            текущий отслеживаемый список из oi_tracked_state
+//                                            (весь список, тикеры вбивать не нужно). Пишет и
+//                                            дневной итог в oi_daily, и ВСЕ внутридневные
+//                                            снэпшоты даты (10-мин срезы) в oi_hourly.
+//                                            &tickerOffset= — возобновление МЕЖДУ тикерами,
+//                                            когда список большой и не влезает в бюджет
+//                                            фетчей одного вызова: ответ отдаёт
+//                                            nextTickerOffset — дёргать URL с этим значением
+//                                            в цикле, как и &start= (тот — для страниц ВНУТРИ
+//                                            одного тикера) до nextTickerOffset:null
 //   /db/oidaily/backfillprice?ticker= GET  — ретроактивно проставить price в oi_daily root-
 //                                            тикера (там всегда 0): ищет все дескрипты серии
 //                                            через T-Invest FindInstrument (не только уже
@@ -596,9 +603,19 @@ async function scheduledCollectOi(env) {
 // В oi_hourly пишутся снэпшоты с шагом step минут (по умолчанию 30: полный
 // 5-минутный поток за 100 дней — ~36 тыс. строк на тикер, лимит сабзапросов
 // Workers не резиновый), в oi_daily — последний снэпшот каждой даты.
-async function backfillOiHistory(db, env, tickers, days, stepMin = 30, startOffset = 0, maxPages = 25, tillOverride = null) {
+async function backfillOiHistory(db, env, tickers, days, stepMin = 30, startOffset = 0, maxPages = 25, tillOverride = null, tickerOffset = 0, maxFetches = 40) {
   const moexKey = env.MOEX_KEY;
   if (!moexKey) return { error: 'secret MOEX_KEY не задан' };
+  // Много тикеров за раз (напр. весь oi_tracked_state без явного tickers=)
+  // легко пробивает лимит сабзапросов бесплатного плана Workers (50/вызов) —
+  // maxPages сам по себе рассчитан на ОДИН тикер вглубь истории, а не на
+  // список из полусотни. Считаем фетчи по ВСЕМ тикерам вместе и останавли-
+  // ваемся заранее, возвращая nextTickerOffset — клиент так же дёргает URL
+  // в цикле (&tickerOffset=nextTickerOffset), как уже делает с &start=.
+  let fetchCount = 0;
+  let stoppedAtTicker = null;
+  const allTickers = tickers;
+  tickers = tickers.slice(tickerOffset);
   // Базы, созданные до появления oi_hourly, не имеют этой таблицы, если
   // /db/init с тех пор не перезапускался — бэкфилл тогда падает на каждой
   // записи с «no such table». Создаём сами, IF NOT EXISTS безопасен.
@@ -628,6 +645,7 @@ async function backfillOiHistory(db, env, tickers, days, stepMin = 30, startOffs
   let minDate = null, maxDate = null;
 
   for (const ticker of tickers) {
+    if (fetchCount >= maxFetches) { stoppedAtTicker = allTickers.indexOf(ticker); done = false; break; }
     const sym = futoi2sym(ticker);
     // Возобновление МЕЖДУ запусками: серия листается от свежих к старым, и
     // повторный запуск с start=0 заново гонял бы уже сохранённые страницы.
@@ -653,11 +671,13 @@ async function backfillOiHistory(db, env, tickers, days, stepMin = 30, startOffs
     // 1. Страницы серии (ISS отдаёт по limit строк, листаем start=)
     const rowsAll = [];
     for (let page = 0; page < maxPages; page++) {
+      if (fetchCount >= maxFetches) { stoppedAtTicker = allTickers.indexOf(ticker); done = false; break; }
       try {
         if (pagesTotal > 0) await new Promise(r => setTimeout(r, 150)); // не дразнить rate-limit
         // iss.only + columns: тянем только нужный блок и колонки — JSON в разы
         // легче, а CPU-время на парсинг (лимит бесплатного плана) — меньше
         const url = `https://apim.moex.com/iss/analyticalproducts/futoi/securities/${encodeURIComponent(sym)}.json?from=${from}&till=${till}&iss.meta=off&iss.only=futoi&futoi.columns=ticker,tradedate,tradetime,clgroup,pos_long,pos_short,pos_long_num,pos_short_num&limit=1000&start=${start}`;
+        fetchCount++;
         const resp = await fetch(url, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
         if (!resp.ok) { failed++; noteErr(`${sym} стр.${page}`, `HTTP ${resp.status} ${(await resp.text().catch(()=>'')).slice(0,120)}`); break; }
         const j = await resp.json();
@@ -757,11 +777,13 @@ async function backfillOiHistory(db, env, tickers, days, stepMin = 30, startOffs
       await db.batch(dailyStmts.slice(i, i + 80));
     }
     saved += dailyStmts.length;
+    if (stoppedAtTicker != null) break; // бюджет фетчей исчерпан — то, что успели по этому тикеру, уже сохранили выше
   }
-  return { tickers: tickers.length, days, from, till, step: stepMin, pages: pagesTotal,
+  return { tickersTotal: allTickers.length, tickersDone: tickers.length, days, from, till, step: stepMin, pages: pagesTotal,
     rowsFetched, rowsMatched, matchedDates: minDate ? [minDate, maxDate] : null,
     saved, savedIntraday, failed, errors,
-    done, nextStart: done ? null : start };
+    done, nextStart: done ? null : start,
+    nextTickerOffset: stoppedAtTicker != null ? stoppedAtTicker : null };
 }
 
 async function handleDb(path, req, env) {
@@ -1791,7 +1813,13 @@ async function handleDb(path, req, env) {
     // till= — фиксация правой границы цепочки (из ответа первого вызова):
     // start-offset валиден только при неизменном till
     const tillOverride = /^\d{4}-\d{2}-\d{2}$/.test(u.searchParams.get('till') || '') ? u.searchParams.get('till') : null;
-    const result = await backfillOiHistory(db, env, tickers, days, step, startOffset, maxPages, tillOverride);
+    // tickerOffset= — возобновление МЕЖДУ тикерами (не путать со start= — тот
+    // возобновляет СТРАНИЦЫ внутри одного тикера): нужно, когда tickers= не
+    // задан явно и сервер сам берёт весь oi_tracked_state — список может быть
+    // на полсотни тикеров, что не влезает в бюджет фетчей одного вызова.
+    const tickerOffset = Math.max(0, Number(u.searchParams.get('tickerOffset')) || 0);
+    const maxFetches = Math.max(5, Math.min(Number(u.searchParams.get('maxFetches')) || 40, 45));
+    const result = await backfillOiHistory(db, env, tickers, days, step, startOffset, maxPages, tillOverride, tickerOffset, maxFetches);
     return json(result);
   }
 
