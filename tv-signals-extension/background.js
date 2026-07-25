@@ -23,7 +23,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       // credentials, иначе запрос уходит без входа и MOEX отдаёт 401.
       // Воркер (не moex.com) — по-прежнему без кук.
       let host = ''; try { host = new URL(msg.url).hostname; } catch (_) {}
-      const opt = { credentials: /(^|\.)moex\.com$/.test(host) ? 'include' : 'omit', method: msg.method || 'GET' };
+      // cache:'no-store' обязателен: без него один и тот же URL (напр. недатированный
+      // запрос futoi, из ответа которого потом берётся дата till) браузер мог отдавать
+      // из HTTP-кэша, а не с сети — ⟳ визуально «ничего не делал», потому что дата,
+      // которую якобы «перезапрашивали свежую», сама была вычислена из кэшированного
+      // старого ответа.
+      const opt = { credentials: /(^|\.)moex\.com$/.test(host) ? 'include' : 'omit', method: msg.method || 'GET', cache: 'no-store' };
       if (msg.headers) opt.headers = msg.headers; // напр. Authorization: Bearer <AlgoPack APIKEY / Tinkoff Invest API токен>
       if (msg.body != null) opt.body = msg.body;   // POST-тело (Tinkoff Invest API — все методы через POST)
       const r = await fetch(msg.url, opt);
