@@ -4377,6 +4377,125 @@ def score_impulse_pullback(candles: list[HistoricCandle]) -> float:
         return 0.0
 
 
+def _dfa_alpha(series: list[float], min_scale: int = 8, max_scales: int = 6) -> float:
+    """
+    Detrended Fluctuation Analysis (Peng et al. 1994) — коэффициент α:
+      α ≈ 0.5 — белый шум
+      α > 0.5 — persistent (тренд / long memory)
+      α < 0.5 — anti-persistent (mean-reversion)
+      α > 1.0 — нестационарный тренд
+    Ортогонально Hurst (у нас через FRACTAL): DFA устойчив к нестационарным
+    рядам, где классический Hurst искажается.
+
+    Алгоритм:
+      1. Интегрируем ряд (профиль): Y_k = Σ(x_i - mean)
+      2. Для каждого масштаба s: разбиваем Y на непересекающиеся окна размера s,
+         в каждом фитим линейный тренд, считаем RMS отклонений → F(s)
+      3. log F(s) vs log s — наклон = α (линрегрессия)
+    """
+    n = len(series)
+    if n < min_scale * 4:
+        return 0.5
+    mean_x = sum(series) / n
+    # интегрированный профиль
+    y = [0.0] * n
+    acc = 0.0
+    for i, x in enumerate(series):
+        acc += x - mean_x
+        y[i] = acc
+    # выбираем логарифмически распределённые масштабы (min_scale .. n//4)
+    max_scale = max(min_scale * 2, n // 4)
+    if max_scale <= min_scale:
+        return 0.5
+    scales: list[int] = []
+    step = (math.log(max_scale) - math.log(min_scale)) / max(1, max_scales - 1)
+    for k in range(max_scales):
+        s = int(round(math.exp(math.log(min_scale) + k * step)))
+        if not scales or s > scales[-1]:
+            scales.append(s)
+    log_s: list[float] = []
+    log_f: list[float] = []
+    for s in scales:
+        n_win = n // s
+        if n_win < 4:
+            continue
+        f_sq_sum = 0.0
+        for w in range(n_win):
+            seg = y[w * s:(w + 1) * s]
+            # линрегрессия внутри окна
+            mx = (s - 1) / 2
+            my = sum(seg) / s
+            num = 0.0
+            den = 0.0
+            for i in range(s):
+                num += (i - mx) * (seg[i] - my)
+                den += (i - mx) ** 2
+            slope = num / (den or 1e-9)
+            intercept = my - slope * mx
+            for i in range(s):
+                r = seg[i] - (slope * i + intercept)
+                f_sq_sum += r * r
+        F = math.sqrt(f_sq_sum / (n_win * s))
+        if F > 0:
+            log_s.append(math.log(s))
+            log_f.append(math.log(F))
+    if len(log_s) < 3:
+        return 0.5
+    # линрегрессия log F vs log s → α
+    mx = sum(log_s) / len(log_s)
+    my = sum(log_f) / len(log_f)
+    num = sum((log_s[i] - mx) * (log_f[i] - my) for i in range(len(log_s)))
+    den = sum((log_s[i] - mx) ** 2 for i in range(len(log_s))) or 1e-9
+    return num / den
+
+
+def score_dfa_regime(candles: list[HistoricCandle]) -> float:
+    """
+    DFA_REGIME: коэффициент α по DFA (Detrended Fluctuation Analysis) как
+    режимный сигнал. Ортогонально Hurst (в FRACTAL): DFA устойчив к трендам
+    и нестационарности, где Hurst искажается. Институционалы используют для
+    выбора между trend-following и mean-reversion стратегиями.
+
+    Механика:
+      α > 0.65 (persistent) + недавнее направление → продолжение по тренду
+      α < 0.35 (anti-persistent) + недавнее движение → контр-сигнал
+      В промежутке (близко к белому шуму) — молчим
+
+    Не путать со SINEWAVE/CYBER — те про цикличность (спектральная фаза),
+    DFA — про масштабную инвариантность и долгую память (степенной закон).
+    """
+    if len(candles) < 60:
+        return 0.0
+    try:
+        closes = [_to_f(c.close) for c in candles]
+        # анализируем ряд ДОХОДНОСТЕЙ, не самих цен (цена почти нестационарна
+        # даже интегрированием — DFA цены обычно даёт α~1.5, малоинформативно)
+        rets = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
+        alpha = _dfa_alpha(rets)
+        # знак недавнего движения
+        mean_r = sum(rets) / len(rets)
+        var_r = sum((r - mean_r) ** 2 for r in rets) / max(1, len(rets) - 1)
+        sigma = math.sqrt(var_r) or 1e-9
+        rec_n = min(10, len(rets) // 5)
+        recent_ret = sum(rets[-rec_n:]) / (sigma * math.sqrt(rec_n))
+        if abs(recent_ret) < 0.4:
+            return 0.0
+        if alpha > 0.65:
+            # persistent: продолжение
+            strength = min(1.0, (alpha - 0.65) / 0.35)   # α=0.65..1.0
+            direction = 1 if recent_ret > 0 else -1
+            return round(direction * (0.25 + strength * 0.35), 4)
+        if alpha < 0.35:
+            # anti-persistent: контр-сигнал
+            strength = min(1.0, (0.35 - alpha) / 0.35)   # α=0.35..0.0
+            direction = -1 if recent_ret > 0 else 1
+            return round(direction * (0.20 + strength * 0.30), 4)
+        return 0.0
+    except Exception as _e:
+        _score_except(_e)
+        return 0.0
+
+
 def score_amihud_shock(candles: list[HistoricCandle]) -> float:
     """
     AMIHUD_SHOCK: резкое падение ликвидности после сильного движения =
@@ -6524,6 +6643,7 @@ METHODS = [
     ("AMIHUD_SHOCK",      score_amihud_shock),
     ("BIPOWER_JUMP",      score_bipower_jump),
     ("ANCHORED_VWAP",     score_anchored_vwap),
+    ("DFA_REGIME",        score_dfa_regime),
     # Затухание / компрессия / ложный пробой / поглощение на уровне
     ("WANING_IMPULSES",  score_waning_impulses),
     ("VOL_COMPRESSION",  score_vol_compression),
@@ -6810,6 +6930,7 @@ METHOD_TF_CONFIG: dict[str, dict] = {
     "AMIHUD_SHOCK":     {"min_bars": 50, "weight_5m": 1.10},  # price impact на объём — микроструктура
     "BIPOWER_JUMP":     {"min_bars": 50, "weight_5m": 1.10},  # скачки в realized variance — стат-фильтр
     "ANCHORED_VWAP":    {"min_bars": 30, "weight_5m": 1.15},  # VWAP от структурного пивота, институционально
+    "DFA_REGIME":       {"min_bars": 60, "weight_5m": 1.10},  # степенной закон / long memory, ортогонально Hurst
     # Паттерновые — на 5м значимее чем на 1м
     "CANDLE_PATTERN": {"min_bars": 8,  "weight_5m": 1.15},
     "WICK_REJECTION": {"min_bars": 8,  "weight_5m": 1.15},
