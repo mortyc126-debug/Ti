@@ -4377,6 +4377,173 @@ def score_impulse_pullback(candles: list[HistoricCandle]) -> float:
         return 0.0
 
 
+def score_amihud_shock(candles: list[HistoricCandle]) -> float:
+    """
+    AMIHUD_SHOCK: резкое падение ликвидности после сильного движения =
+    предвестник разворота. Amihud illiquidity = |return|/volume — оценка
+    сдвига цены на единицу объёма (прокси Kyle's lambda). Институционалы
+    используют это как meter влияния сделок и триггер контр-входа.
+
+    Механика:
+      1. Amihud на баре i = |r_i| / v_i (0 если v_i=0).
+      2. Медиана Amihud по длинному окну — базовый уровень.
+      3. Средний Amihud по последним N барам — текущий уровень.
+      4. Направление движения — знак совокупного return за последние N.
+      5. Текущий Amihud > 2× медианы + движение > 0.5σ → контр-сигнал.
+
+    Отличие от других методов: смотрит на price impact на единицу объёма,
+    а не на объём напрямую (как VOL_MOMENTUM) или CDF направления (как VPIN).
+    Информативно, когда цена движется мало НА объём или сильно НА малый объём.
+    """
+    if len(candles) < 50:
+        return 0.0
+    try:
+        closes = [_to_f(c.close) for c in candles]
+        vols = [float(c.volume) for c in candles]
+        n = len(candles)
+        amihud = []
+        for i in range(1, n):
+            v = vols[i]
+            if v <= 0:
+                amihud.append(0.0)
+                continue
+            r = abs(closes[i] - closes[i - 1]) / (closes[i - 1] or 1e-9)
+            amihud.append(r / v)
+        if len(amihud) < 40:
+            return 0.0
+        # медиана по длинному окну (базовый уровень)
+        base_window = amihud[-min(len(amihud), 200):]
+        sorted_base = sorted(base_window)
+        median = sorted_base[len(sorted_base) // 2]
+        if median <= 0:
+            return 0.0
+        # средний по последним ~10 барам
+        tail_n = min(10, len(amihud) // 4)
+        tail_avg = sum(amihud[-tail_n:]) / tail_n
+        ratio = tail_avg / median
+        # направление недавнего движения, нормированное на σ
+        rets = [closes[i] - closes[i - 1] for i in range(1, n)]
+        mean_r = sum(rets) / len(rets)
+        var_r = sum((r - mean_r) ** 2 for r in rets) / max(1, len(rets) - 1)
+        sigma = math.sqrt(var_r) or 1e-9
+        recent_ret = (closes[-1] - closes[-tail_n - 1]) / (sigma * math.sqrt(tail_n))
+        if ratio < 2.0 or abs(recent_ret) < 0.5:
+            return 0.0
+        strength = min(1.0, (ratio - 2.0) / 3.0)   # ratio=2..5 → 0..1
+        direction = -1 if recent_ret > 0 else 1
+        return round(direction * (0.20 + strength * 0.40), 4)
+    except Exception as _e:
+        _score_except(_e)
+        return 0.0
+
+
+def score_bipower_jump(candles: list[HistoricCandle]) -> float:
+    """
+    BIPOWER_JUMP: разложение Barndorff-Nielsen-Shephard realized variance на
+    непрерывный (bipower variation) и скачковой компоненты. RV = сумма r²;
+    BV = (π/2) × сумма |r_i|·|r_{i-1}| устойчив к отдельным большим r
+    (произведение соседних абсолютных значений). Их разница — оценка
+    скачкового вклада, стандартная стат-метода для jump detection.
+
+    Механика:
+      1. Скользящее окно последних ~40 баров.
+      2. Считаем RV и BV, jump_ratio = max(0, (RV - BV)) / RV.
+      3. Если jump_ratio > 0.4 (в последнем окне ≥40% дисперсии дал 1-2 скачка)
+         + недавнее направление явное → контр-сигнал: скачки часто
+         overshoot, за ними mean-reversion.
+
+    В отличие от WICK_REJECTION (единичный бар с длинной тенью), это
+    статистика скачковости всего окна.
+    """
+    if len(candles) < 50:
+        return 0.0
+    try:
+        closes = [_to_f(c.close) for c in candles]
+        n = len(candles)
+        win = min(40, n - 1)
+        rets = [closes[i] - closes[i - 1] for i in range(n - win, n)]
+        if len(rets) < 10:
+            return 0.0
+        abs_r = [abs(r) for r in rets]
+        rv = sum(r * r for r in rets)
+        if rv <= 0:
+            return 0.0
+        bv = (math.pi / 2.0) * sum(abs_r[i] * abs_r[i - 1] for i in range(1, len(abs_r)))
+        jump_ratio = max(0.0, (rv - bv)) / rv
+        if jump_ratio < 0.4:
+            return 0.0
+        # направление недавнего движения
+        mean_r = sum(rets) / len(rets)
+        var_r = sum((r - mean_r) ** 2 for r in rets) / max(1, len(rets) - 1)
+        sigma = math.sqrt(var_r) or 1e-9
+        rec_n = min(6, len(rets))
+        recent_ret = sum(rets[-rec_n:]) / (sigma * math.sqrt(rec_n))
+        if abs(recent_ret) < 0.7:
+            return 0.0
+        strength = min(1.0, (jump_ratio - 0.4) / 0.4)   # 0.4..0.8 → 0..1
+        direction = -1 if recent_ret > 0 else 1
+        return round(direction * (0.20 + strength * 0.35), 4)
+    except Exception as _e:
+        _score_except(_e)
+        return 0.0
+
+
+def score_anchored_vwap(candles: list[HistoricCandle]) -> float:
+    """
+    ANCHORED_VWAP: VWAP от последнего значимого свинг-пивота, а не rolling.
+    Institutional standard: якорь ставят в точку значимого события
+    (открытие, breakout, разворот) и смотрят, куда «пошёл» средневзвешенный
+    капитал ПОСЛЕ этого события. Отклонение цены от такого VWAP-а — сила
+    тренда, инициированного этим событием.
+
+    Механика:
+      1. Находим последний ATR-зигзаг пивот (используем существующий
+         _zigzag_pivots с порогом 1.5×ATR).
+      2. Считаем VWAP от индекса этого пивота до конца окна.
+      3. Отклонение цены от VWAP, нормированное на ATR → сигнал.
+         Цена выше VWAP → бычий (капитал в среднем ниже, тренд удерживается);
+         ниже → медвежий.
+
+    Отличие от VWAP_SIGNAL (rolling MA-like) — точка привязки не «-N баров
+    назад», а конкретное structural event.
+    """
+    if len(candles) < 30:
+        return 0.0
+    try:
+        atr_pct = _compute_atr(candles)
+        if atr_pct <= 0:
+            return 0.0
+        last_price = _to_f(candles[-1].close)
+        if last_price <= 0:
+            return 0.0
+        atr_abs = atr_pct * last_price
+        piv = _zigzag_pivots(candles, atr_abs, 1.5)
+        if not piv:
+            return 0.0
+        anchor_i = piv[-1][0]
+        # от якоря до конца — минимум 8 баров, иначе VWAP нестабильный
+        if len(candles) - anchor_i < 8:
+            return 0.0
+        num = 0.0
+        den = 0.0
+        for i in range(anchor_i, len(candles)):
+            c = candles[i]
+            typ = (_to_f(c.high) + _to_f(c.low) + _to_f(c.close)) / 3.0
+            v = float(c.volume)
+            num += typ * v
+            den += v
+        if den <= 0:
+            return 0.0
+        vwap = num / den
+        # отклонение цены от anchored VWAP, нормировано на ATR
+        dev = (last_price - vwap) / atr_abs
+        # клип и передача через tanh для мягкого насыщения
+        return round(math.tanh(dev * 0.8), 4)
+    except Exception as _e:
+        _score_except(_e)
+        return 0.0
+
+
 def _bvc_vpin(candles: list[HistoricCandle], bucket_vol_ratio: float = 0.02, window_buckets: int = 15) -> tuple[float, float, float]:
     """
     VPIN (Volume-synchronized Probability of Informed trading, Easley-López de
@@ -6354,6 +6521,9 @@ METHODS = [
     ("IMPULSE_PULLBACK", score_impulse_pullback),
     ("ELLIOTT_WAVE",      score_elliott_wave),
     ("VPIN_TOXICITY",     score_vpin_toxicity),
+    ("AMIHUD_SHOCK",      score_amihud_shock),
+    ("BIPOWER_JUMP",      score_bipower_jump),
+    ("ANCHORED_VWAP",     score_anchored_vwap),
     # Затухание / компрессия / ложный пробой / поглощение на уровне
     ("WANING_IMPULSES",  score_waning_impulses),
     ("VOL_COMPRESSION",  score_vol_compression),
@@ -6637,6 +6807,9 @@ METHOD_TF_CONFIG: dict[str, dict] = {
     "IMPULSE_PULLBACK": {"min_bars": 20, "weight_5m": 1.15},  # откат от импульса — среднесрок
     "ELLIOTT_WAVE":     {"min_bars": 40, "weight_5m": 1.15},  # 5-волновка — нужна глубокая история, на 5м стабильнее
     "VPIN_TOXICITY":    {"min_bars": 80, "weight_5m": 1.15},  # informed flow — глубина нужна для перцентиля
+    "AMIHUD_SHOCK":     {"min_bars": 50, "weight_5m": 1.10},  # price impact на объём — микроструктура
+    "BIPOWER_JUMP":     {"min_bars": 50, "weight_5m": 1.10},  # скачки в realized variance — стат-фильтр
+    "ANCHORED_VWAP":    {"min_bars": 30, "weight_5m": 1.15},  # VWAP от структурного пивота, институционально
     # Паттерновые — на 5м значимее чем на 1м
     "CANDLE_PATTERN": {"min_bars": 8,  "weight_5m": 1.15},
     "WICK_REJECTION": {"min_bars": 8,  "weight_5m": 1.15},
