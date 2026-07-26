@@ -2554,9 +2554,8 @@
             try { const s12 = window.SignalsCore.btStats(series, bars, 12); return s12 && s12.n >= 10 ? s12.exp : null; } catch (e) { return null; }
           })()) +
           '<div class="tvsig-info-fine">Cohen\'s d — стабильная мера edge (не варьируется от одного тикера); role — вердикт из score_methods.py (signal/anti/noise). ' +
-          '<b>Внимание:</b> глобальный d — это среднее по ВСЕМ режимам (тренд+боковик+high vol+low vol). ' +
-          'Метод может быть d≈0 в среднем, но +0.3 в тренде и -0.3 в боковике. ' +
-          'Глобального режимного прогона на боте не было — попроси прогнать <code>score_methods.py ALL --by-regime --methods ' + id.toUpperCase() + '</code>, и цифры появятся тут же по режимам.</div></div>' +
+          '<b>Помни:</b> глобальный d — среднее по ВСЕМ режимам. Метод может быть d≈0 в среднем, но +0.3 в тренде и -0.3 в боковике. ' +
+          'Разбор по режимам — в блоке выше (на этом тикере). Когда пришлёшь глобальный режимный прогон бота — цифры добавятся сюда рядом с per-тикерным.</div></div>' +
         (d.note ? '<div class="tvsig-info-note">' + d.note + '</div>' : '') +
       '</div>';
     o.addEventListener('click', e => { if (e.target === o || e.target.classList.contains('tvsig-info-x')) closeInfo(); });
