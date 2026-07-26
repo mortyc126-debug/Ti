@@ -19,7 +19,7 @@
     ['alligator_inv', 'Аллигатор класс. (инв.)', '#E67E22'],
     ['fade', 'Фейд у уровня', '#5EE6A8'],
     ['zonefade', 'Зона-фейд', '#52F2C9'],
-    ['dfa_regime', 'DFA-режим', '#FFD166'],
+    ['dfa_regime', 'DFA-режим', '#F97316'],
     ['bipower_jump', 'Bipower jumps', '#EF476F'],
     ['amihud_shock', 'Amihud shock', '#06D6A0'],
     ['vpin_toxicity', 'VPIN токсичность', '#118AB2'],
