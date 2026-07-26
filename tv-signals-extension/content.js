@@ -70,6 +70,37 @@
     anchored_vwap: { what: 'VWAP от последнего ATR-зигзаг пивота (1.5×ATR), не rolling. Institutional standard — якорь ставят в структурное событие, смотрят куда пошёл средневзвешенный капитал.', read: 'ИНВЕРТИРОВАН (в боте anti d=-0.074): цена ВЫШЕ anchored VWAP → сигнал ВНИЗ (fade), ниже → ВВЕРХ. Отклонение от VWAP как mean-reversion, не как тренд.', note: 'В combo-тесте часто ПРОИГРЫВАЕТ конфликты трендовым (ORDER_BLOCK t=-10.0, CASCADE t=-7.6, FVG t=-5.5). Работает в связках с AMIHUD (+0.40 t=+3.2 верь AMIHUD), но самостоятельно слабый. Инверсия обязательна.' },
     elliott_wave: { what: 'Эвристический счёт импульсной 5-волновки через ATR-зигзаг пивотов. Жёсткие правила: волна 2 не пробивает P0, волна 3 не короче волны 1, волна 4 не заходит на территорию волны 1, ретрейс волны 2 в 23.6-88.6% Фибо-зоне.', read: 'ИНВЕРТИРОВАН (в боте anti d=-0.055): классический textbook-паттерн волны 5 → сигнал ПРОТИВ импульса (слишком очевидный сетап). Волна 5 в процессе (0.25-1.0×волны 1) → фейд по тренду; > 1.68× → фейд к продолжению.', note: 'Редкий (13.6k срабатываний/227 тикеров, жёсткие правила Эллиотта). Топ-синергия: с BIPOWER_JUMP (+1.62 lift, самая сильная), ZSCORE (+0.92), AMIHUD (+0.77). После v2-ужесточения (fire-rate 95k→13k) стал контр-сигналом с чистым edge.' },
   };
+  // Топ пар по lift из combo_methods.py (invest-bot, 19 методов, 180 дней).
+  // Берём пары с lift ≥ 0.5 И (либо n_agr ≥ 1500, либо среди самых сильных).
+  // Если оба метода пары стреляют в ОДНУ сторону на текущем баре — активная
+  // синергия, подсвечиваем строки методов + сводка сверху панели.
+  // Порядок = приоритет для сводки (сортировка по lift).
+  const SYNERGY_PAIRS = [
+    { a: 'bipower_jump', b: 'elliott_wave',  lift: +1.616, agr: 0.21 }, // редкая, но сильнейшая
+    { a: 'bipower_jump', b: 'dfa_regime',    lift: +1.568, agr: 0.90 },
+    { a: 'amihud_shock', b: 'vpin_toxicity', lift: +1.266, agr: 0.85 },
+    { a: 'vpin_toxicity', b: 'zscore',       lift: +1.223, agr: 0.78 },
+    { a: 'elliott_wave', b: 'zscore',        lift: +0.920, agr: 0.17 },
+    { a: 'amihud_shock', b: 'elliott_wave',  lift: +0.765, agr: 0.13 },
+    { a: 'amihud_shock', b: 'cascade',       lift: +0.715, agr: 0.79 },
+    { a: 'cascade',      b: 'dfa_regime',    lift: +0.595, agr: 0.75 },
+    { a: 'dfa_regime',   b: 'talib_anti',    lift: +0.539, agr: 0.75 },
+    { a: 'fvg',          b: 'vpin_toxicity', lift: +0.512, agr: 0.68 },
+  ];
+  // Возвращает активные пары на текущем баре: обе стороны ненулевые и совпадают
+  // по знаку. dir = +1 (LONG-согласие) или -1 (SHORT-согласие).
+  function activeSynergies() {
+    const c = S.computed; if (!c) return [];
+    const out = [];
+    for (const p of SYNERGY_PAIRS) {
+      const la = c[p.a] && c[p.a].last, lb = c[p.b] && c[p.b].last;
+      if (!la || !lb) continue;
+      const sa = Math.sign(la), sb = Math.sign(lb);
+      if (sa === 0 || sb === 0 || sa !== sb) continue;
+      out.push({ a: p.a, b: p.b, lift: p.lift, dir: sa });
+    }
+    return out;
+  }
   const PREF = 'tvsig:on', CKEY = 'tvsig:colors', SKEY = 'tvsig:stats';
 
   const S = {
@@ -2011,15 +2042,31 @@
     const label = dir > 0 ? '▲ ПОКУПКА' : dir < 0 ? '▼ ПРОДАЖА' : '— нейтрально';
     const wd = Math.round(Math.abs(strength) * 50);
     const fill = (dir >= 0 ? 'left:50%;width:' + wd + '%' : 'left:' + (50 - wd) + '%;width:' + wd + '%') + ';background:' + col;
+    // сводка активных синергий (одна строка на пару)
+    const syn = activeSynergies();
+    let synHtml = '';
+    if (syn.length) {
+      const rows = syn.map(s => {
+        const arrow = s.dir > 0 ? '▲' : '▼';
+        const sCol = s.dir > 0 ? '#52F2C9' : '#FF6A8B';
+        return '<div class="tvsig-syn-row" title="Синергия из combo-теста бота: обе половины пары сработали в одну сторону. lift +' + s.lift.toFixed(2) + ' ATR — на сколько связка бьёт лучший из методов поодиночке.">' +
+          '<span class="tvsig-syn-arrow" style="color:' + sCol + '">' + arrow + '</span>' +
+          '<span class="tvsig-syn-names">' + NAME[s.a] + ' + ' + NAME[s.b] + '</span>' +
+          '<span class="tvsig-syn-lift">+' + s.lift.toFixed(2) + '</span></div>';
+      }).join('');
+      synHtml = '<div class="tvsig-syn-box" title="Активные пары из топ-синергий combo-теста бота — оба метода стреляют в одну сторону.">' +
+        '<div class="tvsig-syn-head">⚡ Активные синергии: <b>' + syn.length + '</b></div>' + rows + '</div>';
+    }
     el.innerHTML =
       '<div class="tvsig-cons-top"><b style="color:' + col + '">' + label + '</b>' +
       '<span class="tvsig-cons-pct">сила ' + Math.round(Math.abs(strength) * 100) + '%</span></div>' +
       '<div class="tvsig-cons-scale"><span class="tvsig-cons-mid"></span><span class="tvsig-cons-fill" style="' + fill + '"></span></div>' +
-      '<div class="tvsig-cons-votes">' + buy + ' за покупку · ' + sell + ' за продажу · из ' + working + ' рабочих методов (exp&gt;0)</div>';
+      '<div class="tvsig-cons-votes">' + buy + ' за покупку · ' + sell + ' за продажу · из ' + working + ' рабочих методов (exp&gt;0)</div>' +
+      synHtml;
   }
 
   // HTML одной строки метода (вынесено из renderRows, чтобы группировать)
-  function rowHTML(id, noVol) {
+  function rowHTML(id, noVol, synInfo) {
     const c = S.computed && S.computed[id];
     const on = !!S.on[id];
     const col = S.colors[id];
@@ -2044,8 +2091,12 @@
             '<span class="tvsig-acc" title="winrate — частота совпадения знака с ходом за 12 баров. У фейдов бывает низкой при плюсовом exp — это норма.">' + win + '</span>' +
             '<span class="tvsig-n" title="Число сделок в exp-симуляции">n' + nn + '</span>' + badges;
         })();
-    return '<div class="tvsig-row' + (on ? ' on' : '') + '" data-id="' + id + '">' +
-      diam + '<span class="tvsig-name" title="' + NAME[id] + '">' + NAME[id] + '</span>' + mid + info + swatch + '</div>';
+    // подсветка если метод входит в активную топ-синергию (SYNERGY_PAIRS)
+    const synCls = synInfo ? ' tvsig-syn-active' : '';
+    const synTip = synInfo ? ' title="⚡ Активная синергия: ' + synInfo.partners.map(p => NAME[p]).join(', ') + ' (lift +' + synInfo.maxLift.toFixed(2) + ' ATR по combo-тесту)"' : '';
+    const synIcon = synInfo ? '<span class="tvsig-syn-icon"' + synTip + '>⚡</span>' : '';
+    return '<div class="tvsig-row' + (on ? ' on' : '') + synCls + '" data-id="' + id + '"' + synTip + '>' +
+      diam + '<span class="tvsig-name" title="' + NAME[id] + '">' + NAME[id] + '</span>' + synIcon + mid + info + swatch + '</div>';
   }
 
   // агрегат exp/win по группе — среднее с весом по числу сделок n (только валидные stats)
@@ -2062,6 +2113,17 @@
   function renderRows() {
     if (!rowsEl) return;
     const noVol = S.hasVolume === false;
+    // собираем per-метод partner-info: для каждого метода список партнёров из
+    // активных синергий + max lift среди этих пар (для tooltip)
+    const syn = activeSynergies();
+    const synMap = {};
+    syn.forEach(s => {
+      [[s.a, s.b], [s.b, s.a]].forEach(([m, partner]) => {
+        if (!synMap[m]) synMap[m] = { partners: [], maxLift: 0 };
+        if (synMap[m].partners.indexOf(partner) < 0) synMap[m].partners.push(partner);
+        if (s.lift > synMap[m].maxLift) synMap[m].maxLift = s.lift;
+      });
+    });
     rowsEl.innerHTML = GROUPS.map(g => {
       const a = groupAgg(g.ids);
       const exp = a ? (a.exp >= 0 ? '+' : '') + a.exp.toFixed(2) : '—';
@@ -2072,7 +2134,7 @@
         '<span class="tvsig-gh-stat" style="color:' + expCol + '">' + exp +
         (win ? ' <span class="tvsig-gh-win">' + win + '</span>' : '') + '</span>' +
         '<div class="tvsig-gh-desc">' + g.desc + '</div></div>';
-      return hd + g.ids.map(id => rowHTML(id, noVol)).join('');
+      return hd + g.ids.map(id => rowHTML(id, noVol, synMap[id])).join('');
     }).join('');
     // ромб/имя → вкл/выкл; пикер цвета → своё событие (не триггерит toggle)
     rowsEl.querySelectorAll('.tvsig-diam, .tvsig-name').forEach(el =>
