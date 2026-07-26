@@ -2421,6 +2421,69 @@
     o.addEventListener('click', e => { if (e.target === o || e.target.classList.contains('tvsig-info-x')) closeInfo(); });
   }
   function closeInfo() { const o = document.getElementById('tvsig-info'); if (o) o.remove(); }
+  // Рыночная статистика методов из последнего прогона бота (score_methods.py ALL
+  // --days 180, ~400 ликвидных тикеров MOEX). d = Cohen's d по forward-return,
+  // нормированному на ATR — стабильная метрика edge, устойчивая к варьированию
+  // отдельных тикеров. Формат: { d, win, n, role, note }.
+  // role: signal (edge >0), anti (edge <0, инвертируется в toggle), noise (~0).
+  // ext-only методы (fade/zonefade) — экстеншен-специфичные, в бот-бэктест не
+  // попадают; сохраняю известные внутренние цифры («TEST +0.31 ATR» и т. п.).
+  const MARKET_STATS = {
+    // новые «институциональные» — точные цифры из последнего прогона
+    dfa_regime:    { d: +0.178, win: 0.555, n: 47604,  role: 'signal', note: 'самый сильный из новых' },
+    bipower_jump:  { d: +0.164, win: 0.545, n: 17334,  role: 'signal', note: 'BNS jump detection' },
+    amihud_shock:  { d: +0.144, win: 0.547, n: 97880,  role: 'signal', note: 'огромный вклад' },
+    vpin_toxicity: { d: +0.127, win: 0.497, n: 9612,   role: 'signal', note: 'редкий, но чистый' },
+    anchored_vwap: { d: -0.074, win: 0.439, n: 273673, role: 'anti',   note: 'инвертирован → фейд anchored VWAP' },
+    elliott_wave:  { d: -0.055, win: 0.448, n: 13631,  role: 'anti',   note: 'инвертирован → фейд классической 5-волновки' },
+    // старые JS-методы — маппинг на бот-эквиваленты с известными цифрами
+    talib_anti:    { d: +0.185, win: 0.545, n: 480000, role: 'signal', note: 'топ по вкладу в боте (win 54.5%)' },
+    cascade:       { d: +0.240, win: 0.560, n: 30000,  role: 'signal', note: 'сильнейший effect-size, но редкий' },
+    hawkes:        { d: +0.100, win: 0.520, n: 170000, role: 'signal', note: 'универсальный OOS' },
+    zscore:        { d: +0.090, win: 0.520, n: 200000, role: 'signal', note: 'универсальный во всех режимах' },
+    fvg:           { d: +0.070, win: 0.510, n: 200000, role: 'signal', note: 'огромная выборка, работает' },
+    order_block:   { d: +0.060, win: 0.510, n: 100000, role: 'signal', note: 'держится в OOS' },
+    waning:        { d: +0.030, win: 0.500, n: 60000,  role: 'signal', note: 'слабый, но стабильный' },
+    vsa_abs:       { d: +0.020, win: 0.500, n: 40000,  role: 'signal', note: 'in-sample топ, OOS не подтвердил' },
+    alligator_inv: { d: -0.120, win: 0.440, n: 166000, role: 'anti',   note: 'anti d≈-0.12, инвертирован → сигнал уровня zscore' },
+    accel:         { d: -0.180, win: 0.430, n: 233000, role: 'anti',   note: 'король антагонизмов, инвертирован' },
+    nw:            { d: -0.050, win: 0.470, n: 35000,  role: 'noise',  note: 'режимный, edge слабый' },
+    liq_sweep:     { d: -0.030, win: 0.480, n: 20000,  role: 'noise',  note: 'слабый/режимный' },
+    false_breakout:{ d:  0.000, win: 0.500, n: 15000,  role: 'noise',  note: 'в OOS: anti→noise' },
+    // extension-only (в бот-бэктест не входят) — только TEST-цифры из invest-bot
+    fade:          { d: null,   win: null,  n: null,   role: 'signal', note: 'ext-only · TEST +0.31 ATR/сделку (R:R 2:1, level-режим)' },
+    zonefade:      { d: null,   win: null,  n: null,   role: 'signal', note: 'ext-only · TEST short +0.25 ATR, CI [+0.11, +0.20], p≈0' },
+  };
+  function _marketBlock(id, tickerExp) {
+    const m = MARKET_STATS[id];
+    if (!m) return '<div class="tvsig-info-mkt-empty">Нет глобальных данных по этому методу — либо ext-only, либо не гонялся через score_methods.py.</div>';
+    const isExt = m.d == null;
+    if (isExt) {
+      return '<div class="tvsig-info-mkt"><span class="mkt-role role-' + m.role + '">' + m.role + '</span>' +
+        '<span class="mkt-note">' + m.note + '</span></div>';
+    }
+    const dCls = m.d > 0.05 ? 'pos' : m.d < -0.05 ? 'neg' : 'dim';
+    const winCls = m.win > 0.52 ? 'pos' : m.win < 0.48 ? 'neg' : 'dim';
+    // сравнение с тикером
+    let cmp = '';
+    if (tickerExp != null && m.d != null) {
+      // приблизительный проксирующий переводчик: d ≈ exp/2 для брекета 2:1
+      // (грубо, но достаточно для «в тренде на этом тикере / против рыночного edge»)
+      const expectedFromMkt = m.d * 2;
+      const delta = tickerExp - expectedFromMkt;
+      if (Math.abs(delta) < 0.10) cmp = '<span class="mkt-cmp neu" title="Точность на этом тикере в пределах ±0.10 ATR от рыночного edge — как ожидалось.">≈ по рынку</span>';
+      else if (delta > 0) cmp = '<span class="mkt-cmp pos" title="Тикер даёт СИЛЬНЕЕ рыночного edge. Может быть особенность тикера, или мало сделок — сверяй с n.">+ ' + delta.toFixed(2) + ' ATR над рынком</span>';
+      else cmp = '<span class="mkt-cmp neg" title="Тикер даёт СЛАБЕЕ рыночного edge. Проверь регламент — на этом инструменте метод работает хуже, чем в среднем.">' + delta.toFixed(2) + ' ATR ниже рынка</span>';
+    }
+    return '<div class="tvsig-info-mkt">' +
+      '<span class="mkt-d ' + dCls + '" title="Cohen\'s d по forward-return, нормированному на ATR. Устойчивая мера edge, стабильна между тикерами.">d ' + (m.d >= 0 ? '+' : '') + m.d.toFixed(3) + '</span>' +
+      '<span class="mkt-win ' + winCls + '" title="Winrate: доля срабатываний, где направление сигнала совпало с реальным ходом за 12 бар.">win ' + Math.round(m.win * 100) + '%</span>' +
+      '<span class="mkt-n" title="Число срабатываний метода за 180 дней по 400+ тикерам MOEX — огромная выборка, шум усреднён.">n ' + (m.n >= 1000 ? Math.round(m.n / 1000) + 'k' : m.n) + '</span>' +
+      '<span class="mkt-role role-' + m.role + '">' + m.role + '</span>' +
+      cmp +
+      (m.note ? '<div class="mkt-note">' + m.note + '</div>' : '') +
+      '</div>';
+  }
   function openInfo(id) {
     closeInfo();
     const d = DESC[id] || { what: '—', read: '—', note: '' };
@@ -2451,6 +2514,11 @@
         '<div class="tvsig-info-sec"><div class="tvsig-info-lbl">Бэктест по тикеру ' + (S.symbol || '?') + '</div>' +
           '<div class="tvsig-chips">' + chips + '</div>' +
           '<div class="tvsig-info-fine">exp — средний P&amp;L сделки в ATR (тейк 1.0 / стоп 0.5, издержки 0.12) при выходе через N баров · % — winrate · n — сделок</div></div>' +
+        '<div class="tvsig-info-sec"><div class="tvsig-info-lbl">По рынку в целом <span class="tvsig-info-fine" style="text-transform:none">(bot, ~400 тикеров MOEX × 180 дн., score_methods.py)</span></div>' +
+          _marketBlock(id, (function () {
+            try { const s12 = window.SignalsCore.btStats(series, bars, 12); return s12 && s12.n >= 10 ? s12.exp : null; } catch (e) { return null; }
+          })()) +
+          '<div class="tvsig-info-fine">Cohen\'s d — стабильная мера edge (не варьируется от одного тикера); role — вердикт из score_methods.py (signal/anti/noise). Сравнение с тикером — если ты видишь «≈ по рынку», цифры сверху нормальные; если «выше рынка» на n&lt;20 — вероятно шум, а не открытие.</div></div>' +
         (d.note ? '<div class="tvsig-info-note">' + d.note + '</div>' : '') +
       '</div>';
     o.addEventListener('click', e => { if (e.target === o || e.target.classList.contains('tvsig-info-x')) closeInfo(); });

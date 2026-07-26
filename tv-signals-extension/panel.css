@@ -248,6 +248,22 @@
   background:var(--surface2); border:1px solid var(--border2); color:var(--text2); }
 .tvsig-chip.na{ color:var(--text3); }
 .tvsig-info-fine{ font-size:9px; color:var(--text3); font-family:var(--mono); margin-top:5px; line-height:1.4; }
+/* блок «по рынку в целом» в ℹ-окне метода — компактный row чипов */
+.tvsig-info-mkt{ display:flex; flex-wrap:wrap; gap:6px; margin-top:5px; font-family:var(--mono); font-size:10.5px; align-items:baseline; }
+.tvsig-info-mkt .mkt-d{ padding:2px 6px; border-radius:5px; background:var(--surface2); }
+.tvsig-info-mkt .mkt-win{ padding:2px 6px; border-radius:5px; background:var(--surface2); }
+.tvsig-info-mkt .mkt-n{ padding:2px 6px; border-radius:5px; background:var(--surface2); color:var(--text3); }
+.tvsig-info-mkt .pos{ color:var(--green); }
+.tvsig-info-mkt .neg{ color:var(--negative); }
+.tvsig-info-mkt .dim{ color:var(--text3); }
+.tvsig-info-mkt .neu{ color:var(--text2); }
+.tvsig-info-mkt .mkt-role{ padding:2px 6px; border-radius:5px; font-weight:600; font-size:9.5px; letter-spacing:.03em; text-transform:uppercase; }
+.tvsig-info-mkt .role-signal{ background:rgba(82,242,201,.15); color:var(--green); }
+.tvsig-info-mkt .role-anti{ background:rgba(255,106,139,.15); color:var(--negative); }
+.tvsig-info-mkt .role-noise{ background:rgba(159,148,201,.15); color:var(--text3); }
+.tvsig-info-mkt .mkt-cmp{ padding:2px 6px; border-radius:5px; background:var(--surface2); }
+.tvsig-info-mkt .mkt-note{ flex-basis:100%; margin-top:3px; font-size:10px; color:var(--text3); }
+.tvsig-info-mkt-empty{ font-size:10px; color:var(--text3); font-style:italic; margin-top:5px; }
 .tvsig-info-note{ font-size:10px; color:var(--violet); background:rgba(180,135,248,0.08);
   border:1px solid rgba(180,135,248,0.25); border-radius:7px; padding:6px 8px; margin-top:4px; }
 
