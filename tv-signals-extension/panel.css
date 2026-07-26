@@ -309,6 +309,8 @@
 .tvsig-fc-chip.c-idx{ border-color:var(--blue); color:var(--blue); }
 .tvsig-fc-chip.c-idx .strong{ color:var(--text); font-weight:700; }
 .tvsig-fc-chip.c-idx .dim{ color:var(--text3); }
+/* вариант «независим от индексов MOEX» — приглушённый */
+.tvsig-fc-chip.c-idx-indep{ border-color:var(--text3); color:var(--text3); }
 /* бейджи согласия/противоречия с индексом рядом с методом */
 .tvsig-idx-b{ display:inline-block; margin-left:4px; padding:1px 4px; border-radius:3px; font-size:9px; font-family:var(--mono); cursor:help; }
 .tvsig-idx-b.agree{ background:rgba(82,242,201,.14); color:var(--green); }

@@ -1009,10 +1009,14 @@
     'ALRS CHMF NLMK MAGN SNGS SNGSP RUAL AFLT PIKK IRAO PHOR SIBN AFKS HYDR RTKM SELG FLOT POSI ' +
     'MTLR MVID FIXP BSPB SVCB CBOM UPRO FEES OGKB MSNG BANE TRNFP RASP AGRO BELU HHRU VKCO ASTR').split(' ');
 
-  // ── Индексный контекст (IMOEX): корреляция/бета/лид-лаг/idiosync ─────────────
-  // Раз в тикер+ТФ грузим свечи IMOEX через тот же cmpFetch, выравниваем на бары
-  // актива, кэшируем в S._indexAligned = [close по бару-i или null]. Используется
-  // в indexContextRender + в бейджах согласия/противоречия с индексом на методах.
+  // ── Индексный контекст (авто-выбор): corr/бета/лид-лаг/idiosync ──────────────
+  // Не все активы связаны с широким IMOEX (валюты, нефть, металлы, IT — своя
+  // семья). Грузим сразу пул кандидатов (широкий индекс + секторные), выбираем
+  // тот, у которого |corrLong| с активом максимален. Если у всех |corr|<0.15 —
+  // считаем актив НЕЗАВИСИМЫМ, бейджи «≠idx»/«≡idx» скрываем.
+  // MOEXOG — нефтегаз, MOEXFN — финансы, MOEXMM — металлы/добыча,
+  // MOEXCN — потребсектор, MOEXIT — IT/техи, MOEXEU — электроэнергетика.
+  const INDEX_CANDIDATES = ['IMOEX', 'MOEXOG', 'MOEXFN', 'MOEXMM', 'MOEXCN', 'MOEXIT', 'MOEXEU'];
   async function indexEnsure(bars, dt) {
     if (!bars || bars.length < 30 || !dt) return null;
     const key = (S.symbol || '') + '|' + dt;
@@ -1022,22 +1026,46 @@
     const iv = dt <= 90 ? 1 : dt <= 1200 ? 10 : dt <= 10800 ? 60 : dt <= 259200 ? 24 : 7;
     const ivSec = iv === 1 ? 60 : iv === 10 ? 600 : iv === 60 ? 3600 : iv === 24 ? 86400 : 604800;
     const tol = ivSec * 1.5, t0 = bars[0].time, t1 = bars[bars.length - 1].time;
-    try {
-      const r = await cmpFetch('IMOEX', iv, t0, t1);
-      if (!r || !r.ok || !r.rows || r.rows.length < 20) { S._indexBuilding = null; return null; }
-      const rows = r.rows;
+    const alignRows = (rows) => {
       const cl = new Array(bars.length).fill(null); let j = 0;
       for (let bi = 0; bi < bars.length; bi++) { const bt = bars[bi].time;
         while (j + 1 < rows.length && Math.abs(rows[j + 1].t - bt) <= Math.abs(rows[j].t - bt)) j++;
         if (rows[j] && Math.abs(rows[j].t - bt) <= tol) cl[bi] = rows[j].close;
       }
-      // валидных точек мало → индекс не показываем
-      if (cl.filter(x => x != null).length < 20) { S._indexBuilding = null; return null; }
-      S._indexAligned = cl; S._indexKey = key; S._indexBuilding = null;
-      // асинхронно перерисуем блок «Индекс» на «Прогнозе» и бейджи в методах
+      return cl;
+    };
+    const evalFit = (cl) => {
+      // корреляция return-ов на длинном окне (100 бар) как критерий подгонки
+      const long = _pairReturns(bars, cl, Math.max(1, bars.length - 100));
+      if (long.rA.length < 20) return null;
+      return _pearson(long.rA, long.rI);
+    };
+    try {
+      const results = await Promise.all(INDEX_CANDIDATES.map(async code => {
+        try {
+          const r = await cmpFetch(code, iv, t0, t1);
+          if (!r || !r.ok || !r.rows || r.rows.length < 20) return null;
+          const cl = alignRows(r.rows);
+          if (cl.filter(x => x != null).length < 20) return null;
+          const fit = evalFit(cl);
+          return { code, cl, fit: fit == null ? 0 : fit };
+        } catch (e) { return null; }
+      }));
+      const valid = results.filter(x => x != null);
+      if (!valid.length) { S._indexBuilding = null; return null; }
+      // выбираем индекс с максимальным |corrLong|
+      let best = valid[0];
+      for (const v of valid) if (Math.abs(v.fit) > Math.abs(best.fit)) best = v;
+      S._indexAligned = best.cl;
+      S._indexName = best.code;
+      S._indexFit = best.fit;
+      // порог «независимости»: если у ВСЕХ кандидатов |corr| < 0.15, актив
+      // не привязан к российскому рыночному семейству — валюта/сырьё/exotic
+      S._indexIndependent = Math.abs(best.fit) < 0.15;
+      S._indexKey = key; S._indexBuilding = null;
       if (typeof forecastRender === 'function') try { forecastRender(); } catch (e) {}
       try { renderRows(); } catch (e) {}
-      return cl;
+      return best.cl;
     } catch (e) { S._indexBuilding = null; return null; }
   }
   // Пары return-серий: считаем на всех барах, где обе цены доступны
@@ -1504,12 +1532,19 @@
       '<span class="tvsig-fc-chip c-vol">vol: ' + (rg.vol || '—') + '</span>' +
       '<span class="tvsig-fc-chip c-mkt">' + (rg.mkt || 'breadth —') + '</span>' + _mtfChip();
   }
-  // компактный чип индексного контекста: направление IMOEX, corr, лид/лаг,
-  // idiosync — краткий ориентир перед оценкой сигналов метода. По наведению —
-  // подробная подсказка. Скрыт, пока индекс ещё не загрузился.
+  // компактный чип индексного контекста: подобранный индекс, его направление,
+  // corr, лид/лаг, idiosync. Если у всех кандидатов |corrLong|<0.15 — актив
+  // независимый (валюта/сырьё/exotic), пишем это явно.
   function _indexBadge() {
     const bars = S.bars, idx = S._indexAligned;
     if (!bars || !idx) return '';
+    const indexName = S._indexName || 'IMOEX';
+    // независимость от MOEX-семьи — короткий чип-заглушка, без сигналов
+    if (S._indexIndependent) {
+      const fit = S._indexFit != null ? S._indexFit.toFixed(2) : '—';
+      return '<span class="tvsig-fc-chip c-idx c-idx-indep" title="Актив слабо связан с рыночными индексами MOEX (лучший подбор — ' + indexName + ' с corr ' + fit + ' на 100 барах). Индексный контекст не применяется — сигналы оцениваются как есть.">' +
+        'независим от индексов MOEX <span class="dim">(лучший ' + indexName + ' ' + fit + ')</span></span>';
+    }
     const ctx = computeIndexContext(bars, idx);
     if (!ctx) return '';
     const idxArrow = ctx.idxMove == null ? '=' : (ctx.idxMove > 0 ? '↑' : ctx.idxMove < 0 ? '↓' : '=');
@@ -1523,12 +1558,12 @@
     const lagTxt = ctx.bestLag > 0 ? ' · опережает +' + ctx.bestLag + 'б'
       : ctx.bestLag < 0 ? ' · отстаёт ' + ctx.bestLag + 'б' : '';
     const idiTxt = ctx.idiosync != null ? ((ctx.idiosync >= 0 ? '+' : '') + (ctx.idiosync * 100).toFixed(2) + '%') : '—';
-    const tip = 'IMOEX за 12 бар: ' + idxPct + ' (актив ' + (ctx.actMove != null ? (ctx.actMove >= 0 ? '+' : '') + (ctx.actMove * 100).toFixed(2) + '%' : '—') + ')' +
-      ' · corr20 ' + (corr != null ? corr.toFixed(2) : '—') + ' · corr100 ' + (ctx.corrLong != null ? ctx.corrLong.toFixed(2) : '—') +
-      ' · beta ' + (ctx.beta != null ? ctx.beta.toFixed(2) : '—') + lagTxt +
+    const tip = indexName + ' выбран автоматически как самый близкий (corr100 ' + (ctx.corrLong != null ? ctx.corrLong.toFixed(2) : '—') + ') из ' + INDEX_CANDIDATES.length + ' кандидатов MOEX.' +
+      ' За 12 бар: ' + idxPct + ' (актив ' + (ctx.actMove != null ? (ctx.actMove >= 0 ? '+' : '') + (ctx.actMove * 100).toFixed(2) + '%' : '—') + ')' +
+      ' · corr20 ' + (corr != null ? corr.toFixed(2) : '—') + ' · beta ' + (ctx.beta != null ? ctx.beta.toFixed(2) : '—') + lagTxt +
       ' · idiosync ' + idiTxt + ' (что актив прошёл САМ, минус beta·индекс)';
     return '<span class="tvsig-fc-chip c-idx" title="' + tip.replace(/"/g, '&quot;') + '">' +
-      'IMOEX ' + idxArrow + ' ' + idxPct + ' · <span class="' + corrCls + '">corr ' + corrTxt + '</span>' + lagTxt + '</span>';
+      indexName + ' ' + idxArrow + ' ' + idxPct + ' · <span class="' + corrCls + '">corr ' + corrTxt + '</span>' + lagTxt + '</span>';
   }
   // группированная таблица условной точности по осям режим/vol/рынок/сессия
   function _condTable(cs, cur) {
@@ -2553,14 +2588,16 @@
           const win = st && st.acc != null ? (st.acc * 100).toFixed(0) + '%' : '—';
           const nn = st ? st.n : 0;
           let badges = (c && c.last) ? _planBadges(_signalPlan(id)) : '';
-          // бейдж согласия/противоречия с индексом — только если индекс загружен
-          if (c && c.last && S._indexAligned) {
+          // бейдж согласия/противоречия с индексом — только когда индекс загружен
+          // И актив к нему привязан (не «независим от MOEX-семьи»)
+          if (c && c.last && S._indexAligned && !S._indexIndependent) {
             try {
               const ctx = computeIndexContext(S.bars, S._indexAligned);
               const v = _signalVsIndex(Math.sign(c.last), ctx);
-              if (v === 'agree')   badges += '<span class="tvsig-idx-b agree" title="Сигнал СОГЛАСОВАН с индексом (IMOEX идёт в ту же сторону, corr20≥0.2). Больше уверенности.">≡idx</span>';
-              else if (v === 'against') badges += '<span class="tvsig-idx-b against" title="Сигнал ПРОТИВ индекса (IMOEX идёт в противоположную сторону, corr20≥0.2). Осторожнее — на связанных тикерах индекс часто перевесит.">≠idx</span>';
-              else if (v === 'weak')  badges += '<span class="tvsig-idx-b weak" title="Актив слабо связан с индексом (|corr20|<0.2) — индекс не даёт ориентира.">≈idx</span>';
+              const idxName = S._indexName || 'IMOEX';
+              if (v === 'agree')   badges += '<span class="tvsig-idx-b agree" title="Сигнал согласован с ' + idxName + ' (индекс идёт в ту же сторону, corr20≥0.2). Больше уверенности.">≡' + idxName + '</span>';
+              else if (v === 'against') badges += '<span class="tvsig-idx-b against" title="Сигнал против ' + idxName + ' (индекс идёт в противоположную сторону, corr20≥0.2). Осторожнее — на связанных тикерах индекс часто перевесит.">≠' + idxName + '</span>';
+              // 'weak' и 'neutral' не показываем — просто нет ориентира
             } catch (e) {}
           }
           return pill(c ? c.last : 0) +
