@@ -87,19 +87,27 @@
     { a: 'dfa_regime',   b: 'talib_anti',    lift: +0.539, agr: 0.75 },
     { a: 'fvg',          b: 'vpin_toxicity', lift: +0.512, agr: 0.68 },
   ];
-  // Возвращает активные пары на текущем баре: обе стороны ненулевые и совпадают
-  // по знаку. dir = +1 (LONG-согласие) или -1 (SHORT-согласие).
-  function activeSynergies() {
-    const c = S.computed; if (!c) return [];
+  // Возвращает активные пары на баре с индексом idx для указанного computed-объекта.
+  // getVal(id, i) — извлечение значения (для сканера смотрим series[idx], для
+  // текущего тикера — last). dir = +1 (LONG-согласие) или -1 (SHORT-согласие).
+  function _synergiesAt(computed, getVal) {
+    if (!computed) return [];
     const out = [];
     for (const p of SYNERGY_PAIRS) {
-      const la = c[p.a] && c[p.a].last, lb = c[p.b] && c[p.b].last;
-      if (!la || !lb) continue;
-      const sa = Math.sign(la), sb = Math.sign(lb);
+      const va = getVal(computed, p.a), vb = getVal(computed, p.b);
+      if (!va || !vb) continue;
+      const sa = Math.sign(va), sb = Math.sign(vb);
       if (sa === 0 || sb === 0 || sa !== sb) continue;
       out.push({ a: p.a, b: p.b, lift: p.lift, dir: sa });
     }
     return out;
+  }
+  function activeSynergies() {
+    return _synergiesAt(S.computed, (c, id) => c[id] && c[id].last);
+  }
+  // синергии на конкретном баре i в наборе методов (сканер: comp = SC.computeAll)
+  function synergiesAtBar(comp, i) {
+    return _synergiesAt(comp, (c, id) => c[id] && c[id].series && c[id].series[i]);
   }
   // Информативные конфликты из того же combo_methods.py: пары, где методы часто
   // спорят, и в споре ЯВНО побеждает конкретная сторона (|t| ≥ 5 И n_conf ≥ 3000).
@@ -116,19 +124,24 @@
     { loser: 'alligator_inv', winner: 'cascade',      t: 5.6,  n: 19881 },
     { loser: 'anchored_vwap', winner: 'fvg',          t: 5.5,  n: 247401 },
   ];
-  // Возвращает активные конфликты: обе стороны ненулевые и в РАЗНЫХ направлениях.
-  // trust = знак сигнала winner (кому доверять на этом баре).
-  function activeConflicts() {
-    const c = S.computed; if (!c) return [];
+  // Возвращает активные конфликты. trust = знак winner (кому доверять на баре).
+  function _conflictsAt(computed, getVal) {
+    if (!computed) return [];
     const out = [];
     for (const p of CONFLICT_PAIRS) {
-      const la = c[p.loser] && c[p.loser].last, lw = c[p.winner] && c[p.winner].last;
-      if (!la || !lw) continue;
-      const sa = Math.sign(la), sw = Math.sign(lw);
-      if (sa === 0 || sw === 0 || sa === sw) continue; // не спорят
+      const va = getVal(computed, p.loser), vw = getVal(computed, p.winner);
+      if (!va || !vw) continue;
+      const sa = Math.sign(va), sw = Math.sign(vw);
+      if (sa === 0 || sw === 0 || sa === sw) continue;
       out.push({ loser: p.loser, winner: p.winner, t: p.t, trust: sw });
     }
     return out;
+  }
+  function activeConflicts() {
+    return _conflictsAt(S.computed, (c, id) => c[id] && c[id].last);
+  }
+  function conflictsAtBar(comp, i) {
+    return _conflictsAt(comp, (c, id) => c[id] && c[id].series && c[id].series[i]);
   }
   const PREF = 'tvsig:on', CKEY = 'tvsig:colors', SKEY = 'tvsig:stats';
 
@@ -708,15 +721,17 @@
     const SC = window.SignalsCore; if (SC.setBreadth) SC.setBreadth(null, 0); // без кросс-тикер breadth в скане
     const hits = []; const diag = { ok: 0, err: 0, aFire: 0, errMsgs: [] }; // диагностика: сколько загрузилось, у скольких что-то мелькало
     const findFire = (ser, li, lo) => { for (let k = li; k >= lo; k--) if (ser[k]) return k; return -1; }; // самое свежее срабатывание в окне
-    const pushHit = (code, bars, dir, hitBar, li, st, mid, ser, dtSec) => {
+    const pushHit = (code, bars, dir, hitBar, li, st, mid, ser, dtSec, extras) => {
       let oc = null; try { oc = SC.tradeOutcome(bars, hitBar, dir, 1.5, 0.75, 0.12, 12); } catch (e) {}
       let plan = null; try { plan = ser ? _planFor(bars, ser, hitBar, dir, dtSec, li, Math.floor(Date.now() / 1000)) : null; } catch (e) {}
       // agoSec — РЕАЛЬНОЕ время между баром сигнала и «сейчас» (li), не ago×dtSec:
       // между барами бывают разрывы сессии, номинальный шаг там врёт.
-      hits.push({ code, dir, price: bars[hitBar].close, ago: li - hitBar, agoSec: bars[li].time - bars[hitBar].time,
+      const hit = { code, dir, price: bars[hitBar].close, ago: li - hitBar, agoSec: bars[li].time - bars[hitBar].time,
         ts: bars[hitBar].time, mid, dtSec,
         exp: st ? st.exp : null, win: st ? st.win : null, n: st ? st.n : 0,
-        ocExit: oc ? oc.exit : null, ocPnl: oc ? oc.pnl : null, plan });
+        ocExit: oc ? oc.exit : null, ocPnl: oc ? oc.pnl : null, plan };
+      if (extras) Object.assign(hit, extras);
+      hits.push(hit);
     };
     // общая обработка баров ОДНОГО тикера (общая для обоих источников данных)
     const processTicker = (code, bars, dtSec) => {
@@ -732,7 +747,12 @@
           if (!best || st.exp > best.st.exp) best = { id, hb, dir: Math.sign(c.series[hb]), st };
         }
         if (anyFire) diag.aFire++;
-        if (best) pushHit(code, bars, best.dir, best.hb, li, best.st, best.id, comp[best.id].series, dtSec);
+        if (best) {
+          // синергии/конфликты для этого тикера на баре срабатывания
+          let syn = [], conf = [];
+          try { syn = synergiesAtBar(comp, best.hb); conf = conflictsAtBar(comp, best.hb); } catch (e) {}
+          pushHit(code, bars, best.dir, best.hb, li, best.st, best.id, comp[best.id].series, dtSec, { syn, conf });
+        }
         return;
       }
       let sa, sb;
@@ -752,7 +772,14 @@
         // Для согласия — серия только там, где оба метода в одну сторону.
         const ser2 = sb ? sa.map((v, k) => { const w = sb[k]; return (v && w && Math.sign(v) === Math.sign(w)) ? Math.sign(v) : 0; }) : sa;
         let st = null; try { st = SC.btStats(ser2, bars, 12); } catch (e) {}
-        pushHit(code, bars, dir, hitBar, li, st, null, ser2, dtSec);
+        // если сама выбранная связка A+B входит в топ синергий — помечаем hit
+        let syn = [];
+        if (sb) {
+          const pair = SYNERGY_PAIRS.find(p =>
+            (p.a === A && p.b === B) || (p.a === B && p.b === A));
+          if (pair) syn = [{ a: pair.a, b: pair.b, lift: pair.lift, dir }];
+        }
+        pushHit(code, bars, dir, hitBar, li, st, null, ser2, dtSec, { syn, conf: [] });
       }
     };
     if (source === 'chart') {
@@ -811,7 +838,21 @@
         if (prev[key] === cur[key]) continue; // уже было в ту же сторону — не новый хит
         const h = found.find(x => (x.code + '|' + (x.mid || '')) === key); if (!h) continue;
         const dirTxt = h.dir > 0 ? '▲ лонг' : '▼ шорт';
-        notifySend('Скан: ' + h.code + ' ' + dirTxt, (h.mid ? (NAME[h.mid] || h.mid) + ' · ' : '') + '@ ' + h.price);
+        // если у хита есть активная синергия — усиливаем заголовок (⚡ + перечень пар),
+        // тело сообщения содержит max lift; конфликт-предупреждение — суффиксом
+        let title = 'Скан: ' + h.code + ' ' + dirTxt;
+        let body = (h.mid ? (NAME[h.mid] || h.mid) + ' · ' : '') + '@ ' + h.price;
+        if (h.syn && h.syn.length) {
+          const maxLift = h.syn.reduce((m, s) => Math.max(m, s.lift), 0);
+          const names = h.syn.map(s => (NAME[s.a] || s.a) + '+' + (NAME[s.b] || s.b)).join(', ');
+          title = '⚡ Синергия · ' + h.code + ' ' + dirTxt;
+          body = names + ' · lift +' + maxLift.toFixed(2) + ' ATR · @ ' + h.price;
+        }
+        if (h.conf && h.conf.length) {
+          const loses = h.conf.filter(cc => cc.loser === h.mid);
+          if (loses.length) body += ' ⚠ (проигрывает в споре с ' + loses.map(cc => NAME[cc.winner] || cc.winner).join(', ') + ')';
+        }
+        notifySend(title, body);
       }
     }
     S._scanNotifyPrev = cur;
@@ -885,8 +926,27 @@
         else if (h.ocExit && h.ocPnl != null) { const good = h.ocPnl > 0;
           oc = ' <span class="' + (good ? 'pos' : 'neg') + '" title="Чем закончилась ИМЕННО эта сделка от сигнала (тейк 1.5 / стоп 0.75 ATR, тайм-выход 12 баров)">→ ' + h.ocExit + ' ' + (h.ocPnl >= 0 ? '+' : '') + h.ocPnl.toFixed(2) + ' ATR</span>'; }
         const badges = _planBadges(h.plan);
-        return '<div class="tvsig-scan-hit" data-code="' + h.code + '">' +
-          '<b>' + h.code + '</b> <span class="' + (h.dir < 0 ? 'neg' : 'pos') + '">' + (h.dir < 0 ? '↓ шорт' : '↑ лонг') + '</span>' + mname +
+        // значки синергий/конфликтов рядом с тикером — то же, что в панели одного тикера
+        let synMark = '';
+        if (h.syn && h.syn.length) {
+          const maxLift = h.syn.reduce((m, s) => Math.max(m, s.lift), 0);
+          const names = h.syn.map(s => (NAME[s.a] || s.a) + '+' + (NAME[s.b] || s.b)).join(' · ');
+          synMark = ' <span class="tvsig-scan-syn" title="⚡ Активная синергия из combo-теста: ' + names + ' (max lift +' + maxLift.toFixed(2) + ' ATR)">⚡</span>';
+        }
+        let confMark = '';
+        if (h.conf && h.conf.length) {
+          const wins = new Set(h.conf.map(cc => cc.winner));
+          if (wins.has(h.mid)) {
+            // выбранный метод сам является winner в активном конфликте — плюс
+            const losers = h.conf.filter(cc => cc.winner === h.mid).map(cc => NAME[cc.loser] || cc.loser).join(', ');
+            confMark = ' <span class="tvsig-scan-conf-win" title="✓ Метод победил в споре с ' + losers + ' (combo-тест)">✓</span>';
+          } else {
+            const loses = h.conf.filter(cc => cc.loser === h.mid).map(cc => NAME[cc.winner] || cc.winner);
+            if (loses.length) confMark = ' <span class="tvsig-scan-conf-lose" title="⚠ Метод проигрывает в споре с ' + loses.join(', ') + ' — этот сигнал под сомнением">⚠</span>';
+          }
+        }
+        return '<div class="tvsig-scan-hit' + (h.syn && h.syn.length ? ' tvsig-scan-hit-syn' : '') + '" data-code="' + h.code + '">' +
+          '<b>' + h.code + '</b> <span class="' + (h.dir < 0 ? 'neg' : 'pos') + '">' + (h.dir < 0 ? '↓ шорт' : '↑ лонг') + '</span>' + synMark + confMark + mname +
           ' <span class="dim">@ ' + h.price + '</span> ' + ago + oc + (badges ? '<br>' + badges : '') + '<br>' + stat + '</div>';
       }).join('');
   }
@@ -2037,14 +2097,40 @@
     const c = S.computed; if (!c) return;
     const cur = {}; META.forEach(([id]) => { cur[id] = c[id] ? Math.sign(c[id].last || 0) : 0; });
     const prev = S._notifyPrev;
+    // общие данные для всех уведомлений тикера — синергии/конфликты на этом баре
+    const syn = activeSynergies(), conf = activeConflicts();
+    // отдельное уведомление про НОВУЮ синергию: пара стреляет впервые в этом
+    // тике. Ключ = "a|b|dir", чтобы не спамить пока согласие держится.
+    const synCur = {}; syn.forEach(s => { synCur[s.a + '|' + s.b + '|' + s.dir] = 1; });
+    const synPrev = S._notifySynPrev || {};
+    if (S._notifySynPrev) {
+      for (const key in synCur) {
+        if (synPrev[key]) continue; // держится с прошлого тика — не новая
+        const parts = key.split('|'), s = syn.find(x => x.a === parts[0] && x.b === parts[1]);
+        if (!s) continue;
+        const dirTxt = s.dir > 0 ? '▲ лонг' : '▼ шорт';
+        notifySend('⚡ Синергия · ' + (S.symbol || '?') + ' · ' + dirTxt,
+          (NAME[s.a] || s.a) + ' + ' + (NAME[s.b] || s.b) + ' · lift +' + s.lift.toFixed(2) + ' ATR');
+      }
+    }
+    S._notifySynPrev = synCur;
     if (prev) {
       const price = S.bars && S.bars.length ? S.bars[S.bars.length - 1].close : null;
+      const winSet = new Set(conf.map(cc => cc.winner));
+      const loseSet = new Set(conf.map(cc => cc.loser));
       META.forEach(([id]) => {
         const before = prev[id] || 0, now = cur[id]; if (now === 0 || now === before) return;
         const st = c[id] && c[id].stats; if (!st || st.exp == null || st.exp <= 0.03 || st.n < 10) return;
         const dirTxt = now > 0 ? '▲ лонг' : '▼ шорт';
-        notifySend((NAME[id] || id) + ' · ' + (S.symbol || '?') + ': ' + dirTxt,
-          'exp ' + (st.exp >= 0 ? '+' : '') + st.exp.toFixed(2) + ' ATR' + (price != null ? ' · цена ' + price : ''));
+        // если этот метод входит в АКТИВНУЮ синергию — усиливаем заголовок ⚡;
+        // если проигрывает в конфликте — суффикс-предупреждение
+        const inSyn = syn.some(s => s.a === id || s.b === id);
+        const isLoser = loseSet.has(id), isWinner = winSet.has(id);
+        let title = (inSyn ? '⚡ ' : '') + (NAME[id] || id) + ' · ' + (S.symbol || '?') + ': ' + dirTxt;
+        let body = 'exp ' + (st.exp >= 0 ? '+' : '') + st.exp.toFixed(2) + ' ATR' + (price != null ? ' · цена ' + price : '');
+        if (isWinner) body += ' ✓';
+        else if (isLoser) body += ' ⚠';
+        notifySend(title, body);
       });
     }
     S._notifyPrev = cur;
