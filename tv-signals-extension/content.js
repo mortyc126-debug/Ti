@@ -1816,6 +1816,36 @@
     drawOne(plan.tp,    tpCol, 0, 'TP');
     drawOne(plan.sl,    slCol, 0, 'SL');
     drawOne(plan.entry, enCol, 2, 'entry');
+    // ── ТРАЕКТОРИЯ ОЖИДАНИЯ ─────────────────────────────────────────────────────
+    // Прямая от entry (в момент сигнала) к TP в момент ETA — линейная
+    // интерполяция «идеального» хода. Реальные свечи выше линии → сигнал
+    // опережает план; ниже → отстаёт. Плюс точки-чекпоинты на 25/50/75%
+    // прогресса — числа теперь ВИДНЫ как крестики на графике, а не только
+    // в подсказке.
+    if (plan.checkpoints && plan.checkpoints.length && plan.etaBars && plan.etaBars > 0) {
+      const etaT = t0 + plan.live.barsElapsed * dt + plan.etaBars * dt;
+      // сплошной луч ожидания от entry (сигнал) до tp (ETA)
+      try {
+        const trajId = S.chart.createMultipointShape(
+          [{ time: t0, price: plan.entry }, { time: etaT, price: plan.tp }],
+          { shape: 'trend_line', lock: true, disableSelection: true, disableSave: true,
+            zOrder: 'top',
+            overrides: { linecolor: tpCol, linewidth: 1, linestyle: 1 } }); // linestyle:1 = штриховая
+        if (trajId) out.push(trajId);
+      } catch (e) {}
+      // точки-чекпоинты (25/50/75% пути) — маленькие × метки, чтобы сравнить с фактом
+      for (const cp of plan.checkpoints) {
+        if (cp.f >= 1) continue; // финальная точка = TP, уже нарисовано
+        try {
+          const cpId = S.chart.createShape(
+            { time: cp.time, price: cp.price },
+            { shape: 'text', text: '× ' + Math.round(cp.f * 100) + '%',
+              lock: true, disableSelection: true, disableSave: true, zOrder: 'top',
+              overrides: { color: tpCol, fontsize: 9, bold: false } });
+          if (cpId) out.push(cpId);
+        } catch (e) {}
+      }
+    }
     return out;
   }
   // глобальный переключатель отрисовки TP/SL на графике
