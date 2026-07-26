@@ -1776,38 +1776,46 @@
   }
   function clearAll() { Object.keys(S.drawn).forEach(clearMethod); }
   const MAX_DOTS = 260; // потолок точек на метод в окне (перф + чистота)
-  // horizontal_ray/trend_line лучи для TP/SL/entry активного сигнала: рисуем
-  // от бара сигнала вправо до конца видимой области (плюс запас 12 баров —
-  // столько же, сколько горизонт live-исходов). Убираем при clearMethod.
+  // TP/SL/entry активного сигнала: 3 горизонтальные линии от бара сигнала
+  // вправо + текстовая подпись с ценой возле правого края. Порт того, что уже
+  // работает в drawForecastBand — showLabel/text overrides в сборке терминала
+  // тинькоффа обычно молча игнорируются, поэтому подпись — отдельным createShape.
   function drawTpSl(id, plan) {
     if (!S.chart || !plan || !plan.live || plan.live.state !== 'active') return [];
     if (plan.tp == null || plan.sl == null || plan.entry == null || plan.startTime == null) return [];
-    // цвета в стиле палитры расширения (--green/--negative/--amber)
+    // цвета из палитры (--green/--negative/--amber)
     const tpCol = '#52F2C9', slCol = '#FF6A8B', enCol = '#F4C36A';
     const dt = S.barDt || 300;
     const t0 = plan.startTime;
-    // правый край — «сейчас» + запас 12 баров (горизонт live). Если графическая
-    // область длиннее, TV сама растянет; если короче, луч всё равно виден.
+    // правый край: минимум 30 баров вправо от «сейчас», чтобы линию точно
+    // было видно в видимом окне. Метка ставится ЧУТЬ РАНЬШЕ правого края.
     const nowT = Math.floor(Date.now() / 1000);
-    const t1 = Math.max(nowT, t0) + 12 * dt;
+    const t1 = Math.max(nowT, t0) + 30 * dt;
+    const tLabel = t1 - 2 * dt;
     const out = [];
-    const tryLine = (price, color, label) => {
-      // горизонтальный луч через createMultipointShape (trend_line между двумя
-      // точками на одном price — визуально линия; поддерживается всеми
-      // сборками TV Charting Library, в отличие от 'horizontal_ray')
+    const drawOne = (price, color, style, tag) => {
       try {
-        const sid = S.chart.createMultipointShape(
-          [{ time: t0, price }, { time: t1, price }],
+        const lineId = S.chart.createMultipointShape(
+          [{ time: t0, price: price }, { time: t1, price: price }],
           { shape: 'trend_line', lock: true, disableSelection: true, disableSave: true,
             zOrder: 'top',
-            overrides: { linecolor: color, linewidth: 1, linestyle: label === 'entry' ? 2 : 0,
-              showLabel: true, text: label, textcolor: color, fontsize: 9, bold: true, horzLabelsAlign: 'right' } });
-        if (sid) out.push(sid);
+            overrides: { linecolor: color, linewidth: 2, linestyle: style } });
+        if (lineId) out.push(lineId);
+      } catch (e) {}
+      // подпись с ценой отдельной 'text' фигурой — рабочий паттерн из drawMethod ▲/▼
+      try {
+        const textId = S.chart.createShape(
+          { time: tLabel, price: price },
+          { shape: 'text', text: tag + ' ' + price.toFixed(4),
+            lock: true, disableSelection: true, disableSave: true, zOrder: 'top',
+            overrides: { color: color, fontsize: 10, bold: true } });
+        if (textId) out.push(textId);
       } catch (e) {}
     };
-    tryLine(plan.tp,    tpCol, 'TP ' + plan.tp.toFixed(4));
-    tryLine(plan.sl,    slCol, 'SL ' + plan.sl.toFixed(4));
-    tryLine(plan.entry, enCol, 'entry ' + plan.entry.toFixed(4));
+    // TP/SL сплошные, entry пунктиром (чтобы отличать от «настоящих» уровней сделки)
+    drawOne(plan.tp,    tpCol, 0, 'TP');
+    drawOne(plan.sl,    slCol, 0, 'SL');
+    drawOne(plan.entry, enCol, 2, 'entry');
     return out;
   }
   // глобальный переключатель отрисовки TP/SL на графике
