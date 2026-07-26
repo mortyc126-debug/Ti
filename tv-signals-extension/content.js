@@ -831,31 +831,48 @@
   function notifyCheckScan(hits) {
     if (!notifyScanGet()) return;
     const found = hits.filter(h => h.dir);
-    const cur = {}; found.forEach(h => { cur[h.code + '|' + (h.mid || '')] = h.dir; });
-    const prev = S._scanNotifyPrev;
-    if (prev) {
-      for (const key in cur) {
-        if (prev[key] === cur[key]) continue; // уже было в ту же сторону — не новый хит
-        const h = found.find(x => (x.code + '|' + (x.mid || '')) === key); if (!h) continue;
-        const dirTxt = h.dir > 0 ? '▲ лонг' : '▼ шорт';
-        // если у хита есть активная синергия — усиливаем заголовок (⚡ + перечень пар),
-        // тело сообщения содержит max lift; конфликт-предупреждение — суффиксом
-        let title = 'Скан: ' + h.code + ' ' + dirTxt;
-        let body = (h.mid ? (NAME[h.mid] || h.mid) + ' · ' : '') + '@ ' + h.price;
-        if (h.syn && h.syn.length) {
-          const maxLift = h.syn.reduce((m, s) => Math.max(m, s.lift), 0);
-          const names = h.syn.map(s => (NAME[s.a] || s.a) + '+' + (NAME[s.b] || s.b)).join(', ');
-          title = '⚡ Синергия · ' + h.code + ' ' + dirTxt;
-          body = names + ' · lift +' + maxLift.toFixed(2) + ' ATR · @ ' + h.price;
-        }
-        if (h.conf && h.conf.length) {
-          const loses = h.conf.filter(cc => cc.loser === h.mid);
-          if (loses.length) body += ' ⚠ (проигрывает в споре с ' + loses.map(cc => NAME[cc.winner] || cc.winner).join(', ') + ')';
-        }
-        notifySend(title, body);
-      }
+    // Cooldown per тикер: если по тикеру только что было уведомление, не шлём
+    // новое ещё N минут, независимо от направления и метода. Раньше ключ был
+    // (тикер, метод) — новый метод по тому же тикеру шёл сразу и мог быть в
+    // противоположную сторону («лонг и шорт по одному инструменту за минуту»).
+    const COOLDOWN_MS = 15 * 60 * 1000;
+    // Дедупликация противоречий: сортируем хиты по силе (exp * n или lift),
+    // чтобы если по одному тикеру пришли ↑ и ↓ разными методами, выбрать
+    // САМЫЙ уверенный и подавить противоположный. Синергия — приоритет.
+    const bySymbol = {};
+    for (const h of found) {
+      const rank = (h.syn && h.syn.length ? 10 : 0) + (h.exp != null && h.n >= 10 ? h.exp : 0);
+      const cur = bySymbol[h.code];
+      if (!cur || rank > cur._rank) { h._rank = rank; bySymbol[h.code] = h; }
     }
-    S._scanNotifyPrev = cur;
+    const now = Date.now();
+    const last = S._scanNotifyLast || {}; // code -> {dir, ts}
+    for (const code in bySymbol) {
+      const h = bySymbol[code];
+      const prev = last[code];
+      if (prev && (now - prev.ts) < COOLDOWN_MS && prev.dir === h.dir) continue; // ещё в кулдауне на ту же сторону
+      if (prev && (now - prev.ts) < COOLDOWN_MS && prev.dir !== h.dir) {
+        // противоречие в кулдауне: подавляем, отмечая факт (в UI виден
+        // по обычной scanRender — там оба хита сохраняются в hits[])
+        continue;
+      }
+      const dirTxt = h.dir > 0 ? '▲ лонг' : '▼ шорт';
+      let title = 'Скан: ' + h.code + ' ' + dirTxt;
+      let body = (h.mid ? (NAME[h.mid] || h.mid) + ' · ' : '') + '@ ' + h.price;
+      if (h.syn && h.syn.length) {
+        const maxLift = h.syn.reduce((m, s) => Math.max(m, s.lift), 0);
+        const names = h.syn.map(s => (NAME[s.a] || s.a) + '+' + (NAME[s.b] || s.b)).join(', ');
+        title = '⚡ Синергия · ' + h.code + ' ' + dirTxt;
+        body = names + ' · lift +' + maxLift.toFixed(2) + ' ATR · @ ' + h.price;
+      }
+      if (h.conf && h.conf.length) {
+        const loses = h.conf.filter(cc => cc.loser === h.mid);
+        if (loses.length) body += ' ⚠ (проигрывает в споре с ' + loses.map(cc => NAME[cc.winner] || cc.winner).join(', ') + ')';
+      }
+      notifySend(title, body);
+      last[code] = { dir: h.dir, ts: now };
+    }
+    S._scanNotifyLast = last;
   }
   // «только неисполненные»: перерисовать последний результат без нового скана
   function scanRerender() {
@@ -908,6 +925,18 @@
         else if (diag.aFire === 0) msg += ' Метод редкий на этом ТФ — увеличь окно (за 5–10 баров) или смени ТФ графика.'; }
       body.innerHTML = srcNote + '<div class="tvsig-fc-hint">' + msg + '</div>'; return;
     }
+    // выявляем «спорные» тикеры: если по одному тикеру в hits[] пришли ↑ и ↓
+    // разными методами, помечаем оба хита — это сигнал НИЗКОЙ уверенности
+    // (методы противоречат), а не «двойной точности».
+    const perSymbol = {};
+    for (const h of found) {
+      if (!perSymbol[h.code]) perSymbol[h.code] = { long: 0, short: 0 };
+      if (h.dir > 0) perSymbol[h.code].long++; else perSymbol[h.code].short++;
+    }
+    for (const h of found) {
+      const p = perSymbol[h.code];
+      h._contested = p && p.long > 0 && p.short > 0;
+    }
     // сортируем по историческому exp метода/связки на тикере (сильные/точные — вверх);
     // тикеры с малой выборкой (n<10) уводим вниз, оценке доверять нельзя.
     const rk = h => (h.n >= 10 && h.exp != null) ? h.exp : -Infinity;
@@ -945,8 +974,13 @@
             if (loses.length) confMark = ' <span class="tvsig-scan-conf-lose" title="⚠ Метод проигрывает в споре с ' + loses.join(', ') + ' — этот сигнал под сомнением">⚠</span>';
           }
         }
-        return '<div class="tvsig-scan-hit' + (h.syn && h.syn.length ? ' tvsig-scan-hit-syn' : '') + '" data-code="' + h.code + '">' +
-          '<b>' + h.code + '</b> <span class="' + (h.dir < 0 ? 'neg' : 'pos') + '">' + (h.dir < 0 ? '↓ шорт' : '↑ лонг') + '</span>' + synMark + confMark + mname +
+        // помечаем «противоречивый» тикер: другой метод даёт противоположный
+        // сигнал по тому же тикеру — не верить одиночному, ждать согласия
+        const contested = h._contested
+          ? ' <span class="tvsig-scan-contested" title="Другой метод по этому же тикеру даёт ПРОТИВОПОЛОЖНЫЙ сигнал. Не верь одиночному, дождись согласия (см. соседний хит).">⚡спор</span>'
+          : '';
+        return '<div class="tvsig-scan-hit' + (h.syn && h.syn.length ? ' tvsig-scan-hit-syn' : '') + (h._contested ? ' tvsig-scan-hit-contested' : '') + '" data-code="' + h.code + '">' +
+          '<b>' + h.code + '</b> <span class="' + (h.dir < 0 ? 'neg' : 'pos') + '">' + (h.dir < 0 ? '↓ шорт' : '↑ лонг') + '</span>' + synMark + confMark + contested + mname +
           ' <span class="dim">@ ' + h.price + '</span> ' + ago + oc + (badges ? '<br>' + badges : '') + '<br>' + stat + '</div>';
       }).join('');
   }
@@ -1742,6 +1776,43 @@
   }
   function clearAll() { Object.keys(S.drawn).forEach(clearMethod); }
   const MAX_DOTS = 260; // потолок точек на метод в окне (перф + чистота)
+  // horizontal_ray/trend_line лучи для TP/SL/entry активного сигнала: рисуем
+  // от бара сигнала вправо до конца видимой области (плюс запас 12 баров —
+  // столько же, сколько горизонт live-исходов). Убираем при clearMethod.
+  function drawTpSl(id, plan) {
+    if (!S.chart || !plan || !plan.live || plan.live.state !== 'active') return [];
+    if (plan.tp == null || plan.sl == null || plan.entry == null || plan.startTime == null) return [];
+    // цвета в стиле палитры расширения (--green/--negative/--amber)
+    const tpCol = '#52F2C9', slCol = '#FF6A8B', enCol = '#F4C36A';
+    const dt = S.barDt || 300;
+    const t0 = plan.startTime;
+    // правый край — «сейчас» + запас 12 баров (горизонт live). Если графическая
+    // область длиннее, TV сама растянет; если короче, луч всё равно виден.
+    const nowT = Math.floor(Date.now() / 1000);
+    const t1 = Math.max(nowT, t0) + 12 * dt;
+    const out = [];
+    const tryLine = (price, color, label) => {
+      // горизонтальный луч через createMultipointShape (trend_line между двумя
+      // точками на одном price — визуально линия; поддерживается всеми
+      // сборками TV Charting Library, в отличие от 'horizontal_ray')
+      try {
+        const sid = S.chart.createMultipointShape(
+          [{ time: t0, price }, { time: t1, price }],
+          { shape: 'trend_line', lock: true, disableSelection: true, disableSave: true,
+            zOrder: 'top',
+            overrides: { linecolor: color, linewidth: 1, linestyle: label === 'entry' ? 2 : 0,
+              showLabel: true, text: label, textcolor: color, fontsize: 9, bold: true, horzLabelsAlign: 'right' } });
+        if (sid) out.push(sid);
+      } catch (e) {}
+    };
+    tryLine(plan.tp,    tpCol, 'TP ' + plan.tp.toFixed(4));
+    tryLine(plan.sl,    slCol, 'SL ' + plan.sl.toFixed(4));
+    tryLine(plan.entry, enCol, 'entry ' + plan.entry.toFixed(4));
+    return out;
+  }
+  // глобальный переключатель отрисовки TP/SL на графике
+  function tpSlShowGet() { try { return localStorage.getItem('tvsig:showtpsl') !== '0'; } catch (e) { return true; } } // по умолчанию вкл
+  function tpSlShowSet(v) { try { localStorage.setItem('tvsig:showtpsl', v ? '1' : '0'); } catch (e) {} }
   function drawMethod(id) {
     if (!S.chart || !S.computed || !S.computed[id]) return;
     clearMethod(id);
@@ -1771,6 +1842,15 @@
         if (sid) out.push(sid);
       } catch (e) {}
     });
+    // TP/SL/entry активного сигнала: только если включено И у метода есть текущий
+    // сигнал в фазе 'active' (не устаревший/сбитый/достигнутый) — иначе линии
+    // остаются висеть после того, как сделка уже отыграла, и путают
+    if (tpSlShowGet()) {
+      try {
+        const plan = _signalPlan(id);
+        if (plan) out.push(...drawTpSl(id, plan));
+      } catch (e) {}
+    }
     S.drawn[id] = out;
   }
   function toggle(id) {
@@ -1806,6 +1886,7 @@
     panel = document.createElement('div'); panel.id = 'tvsig-panel';
     panel.innerHTML =
       '<div id="tvsig-head"><span id="tvsig-title">◆</span>' +
+      '<button id="tvsig-tpsl" title="Рисовать уровни TP/SL/entry активных сигналов включённых методов прямо на графике. Показываются только пока сделка \'в пути\' (state=active), после исполнения линии убираются.">📏</button>' +
       '<button id="tvsig-notify" title="Уведомления браузера о новых сигналах ТЕКУЩЕГО тикера (эта вкладка). Для сканера — отдельный 🔔 в «Сканере», рядом с автообновлением. Выключено по умолчанию.">🔔</button>' +
       '<button id="tvsig-refresh" title="Пересчитать">⟳</button>' +
       '<button id="tvsig-min" title="Свернуть">–</button></div>' +
@@ -1943,6 +2024,14 @@
     notifyBtn.onclick = () => { notifyTickerSet(!notifyTickerGet()); notifyReflect();
       if (notifyTickerGet()) notifySend('Уведомления по тикеру включены', 'Пришлю сюда, когда на этом тикере появится новый сигнал по рабочему методу (exp>0).'); };
     notifyReflect();
+    const tpslBtn = panel.querySelector('#tvsig-tpsl');
+    const tpslReflect = () => tpslBtn.classList.toggle('on', tpSlShowGet());
+    tpslBtn.onclick = () => {
+      tpSlShowSet(!tpSlShowGet()); tpslReflect();
+      // перерисовать включённые методы — TP/SL появятся/уберутся
+      try { Object.keys(S.on).forEach(id => { if (S.on[id]) drawMethod(id); }); } catch (e) {}
+    };
+    tpslReflect();
     panel.querySelector('#tvsig-refresh').onclick = () => refresh(true);
     panel.querySelectorAll('.tvsig-dt').forEach(btn => btn.onclick = () => drawTool(btn.dataset.t));
     panel.querySelector('#tvsig-oi-load').onclick = () => oiLoad();

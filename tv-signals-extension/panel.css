@@ -26,6 +26,7 @@
   background:var(--surface2); color:var(--text2); font-size:13px; transition:all .12s; }
 #tvsig-head button:hover{ background:var(--accent); border-color:var(--accent); color:#fff; }
 #tvsig-notify.on{ background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 0 6px var(--accent); }
+#tvsig-tpsl.on{ background:var(--amber); border-color:var(--amber); color:#1A1030; box-shadow:0 0 6px rgba(244,195,106,.5); }
 
 /* вкладки Сигналы / Сравнение */
 #tvsig-tabs{ display:flex; flex-wrap:wrap; gap:4px; padding:6px 8px 0; position:sticky; top:39px; z-index:4; background:var(--surface); }
@@ -349,4 +350,7 @@
 .tvsig-scan-syn{ color:var(--amber); text-shadow:0 0 4px rgba(244,195,106,.7); cursor:help; }
 .tvsig-scan-conf-win{ color:var(--green); cursor:help; }
 .tvsig-scan-conf-lose{ color:var(--negative); cursor:help; }
+/* хит, для которого по тому же тикеру есть противоположный сигнал (contested) */
+.tvsig-scan-hit.tvsig-scan-hit-contested{ border-color:rgba(180,135,248,.4); opacity:.75; }
+.tvsig-scan-contested{ color:var(--violet); font-size:9px; padding:1px 4px; border-radius:3px; background:rgba(180,135,248,.15); cursor:help; }
 #tvsig-scan-foot{ padding:6px 10px; font-size:9px; color:var(--text3); font-family:var(--mono); line-height:1.5; border-top:1px solid var(--border); margin-top:6px; }
