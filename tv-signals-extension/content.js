@@ -1776,17 +1776,34 @@
   }
   function clearAll() { Object.keys(S.drawn).forEach(clearMethod); }
   const MAX_DOTS = 260; // потолок точек на метод в окне (перф + чистота)
-  // TP/SL/entry активного сигнала: 3 горизонтальные линии от бара сигнала
-  // вправо + текстовая подпись с ценой возле правого края. Порт того, что уже
-  // работает в drawForecastBand — showLabel/text overrides в сборке терминала
-  // тинькоффа обычно молча игнорируются, поэтому подпись — отдельным createShape.
+  // TP/SL/entry сигнала на графике. Раньше требовали plan.live.state === 'active',
+  // но у большинства методов signalRun возвращает startIdx в прошлом (сигнал
+  // «висит» десятки баров), и liveOutcome за это время уже поймал stopped/
+  // reached/expired — active бывало редко, линии почти никогда не появлялись.
+  // Новая логика: если сделка ЕЩЁ в пути (active) — рисуем ЕЁ уровни;
+  // если уже отыграла или устарела, но метод даёт сигнал СЕЙЧАС (c.last!==0) —
+  // рисуем уровни «если бы вошли по текущему бару» (entry=close, tp/sl от ATR).
   function drawTpSl(id, plan) {
-    if (!S.chart || !plan || !plan.live || plan.live.state !== 'active') return [];
-    if (plan.tp == null || plan.sl == null || plan.entry == null || plan.startTime == null) return [];
+    if (!S.chart || !plan || !plan.dir) return [];
     // цвета из палитры (--green/--negative/--amber)
     const tpCol = '#52F2C9', slCol = '#FF6A8B', enCol = '#F4C36A';
     const dt = S.barDt || 300;
-    const t0 = plan.startTime;
+    const bars = S.bars;
+    let entry, tp, sl, t0, activeState = false;
+    const st = plan.live && plan.live.state;
+    if (st === 'active' && plan.entry != null && plan.tp != null && plan.sl != null && plan.startTime != null) {
+      entry = plan.entry; tp = plan.tp; sl = plan.sl; t0 = plan.startTime; activeState = true;
+    } else if (bars && bars.length) {
+      // «если бы вошли по текущему бару» — пересчёт от последнего close
+      const SC = window.SignalsCore, at = SC.atr(bars, 14), i = bars.length - 1, a = at[i];
+      if (!a || a <= 0) return [];
+      entry = bars[i].close;
+      tp = entry + plan.dir * 1.5 * a;
+      sl = entry - plan.dir * 0.75 * a;
+      t0 = bars[i].time;
+    } else {
+      return [];
+    }
     // правый край: минимум 30 баров вправо от «сейчас», чтобы линию точно
     // было видно в видимом окне. Метка ставится ЧУТЬ РАНЬШЕ правого края.
     const nowT = Math.floor(Date.now() / 1000);
@@ -1812,39 +1829,37 @@
         if (textId) out.push(textId);
       } catch (e) {}
     };
-    // TP/SL сплошные, entry пунктиром (чтобы отличать от «настоящих» уровней сделки)
-    drawOne(plan.tp,    tpCol, 0, 'TP');
-    drawOne(plan.sl,    slCol, 0, 'SL');
-    drawOne(plan.entry, enCol, 2, 'entry');
+    // TP/SL сплошные, entry пунктиром
+    drawOne(tp,    tpCol, 0, activeState ? 'TP' : 'TP*');
+    drawOne(sl,    slCol, 0, activeState ? 'SL' : 'SL*');
+    drawOne(entry, enCol, 2, activeState ? 'entry' : 'вход*');
     // ── ТРАЕКТОРИЯ ОЖИДАНИЯ ─────────────────────────────────────────────────────
-    // Прямая от entry (в момент сигнала) к TP в момент ETA — линейная
-    // интерполяция «идеального» хода. Реальные свечи выше линии → сигнал
-    // опережает план; ниже → отстаёт. Плюс точки-чекпоинты на 25/50/75%
-    // прогресса — числа теперь ВИДНЫ как крестики на графике, а не только
-    // в подсказке.
-    if (plan.checkpoints && plan.checkpoints.length && plan.etaBars && plan.etaBars > 0) {
-      const etaT = t0 + plan.live.barsElapsed * dt + plan.etaBars * dt;
-      // сплошной луч ожидания от entry (сигнал) до tp (ETA)
+    // Штриховая прямая от entry к TP в момент ETA (12 баров при пересчёте, или
+    // остаток barsRemaining для активной сделки). Плюс крестики 25/50/75%.
+    const horizonBars = activeState && plan.live && plan.live.barsRemaining
+      ? plan.live.barsRemaining + (plan.live.barsElapsed || 0)
+      : 12;
+    const etaT = t0 + horizonBars * dt;
+    try {
+      const trajId = S.chart.createMultipointShape(
+        [{ time: t0, price: entry }, { time: etaT, price: tp }],
+        { shape: 'trend_line', lock: true, disableSelection: true, disableSave: true,
+          zOrder: 'top',
+          overrides: { linecolor: tpCol, linewidth: 1, linestyle: 1 } });
+      if (trajId) out.push(trajId);
+    } catch (e) {}
+    // чекпоинты 25/50/75% пути к TP по времени и цене
+    for (const f of [0.25, 0.5, 0.75]) {
+      const cpTime = t0 + Math.round(horizonBars * f) * dt;
+      const cpPrice = entry + (tp - entry) * f;
       try {
-        const trajId = S.chart.createMultipointShape(
-          [{ time: t0, price: plan.entry }, { time: etaT, price: plan.tp }],
-          { shape: 'trend_line', lock: true, disableSelection: true, disableSave: true,
-            zOrder: 'top',
-            overrides: { linecolor: tpCol, linewidth: 1, linestyle: 1 } }); // linestyle:1 = штриховая
-        if (trajId) out.push(trajId);
+        const cpId = S.chart.createShape(
+          { time: cpTime, price: cpPrice },
+          { shape: 'text', text: '× ' + Math.round(f * 100) + '%',
+            lock: true, disableSelection: true, disableSave: true, zOrder: 'top',
+            overrides: { color: tpCol, fontsize: 9, bold: false } });
+        if (cpId) out.push(cpId);
       } catch (e) {}
-      // точки-чекпоинты (25/50/75% пути) — маленькие × метки, чтобы сравнить с фактом
-      for (const cp of plan.checkpoints) {
-        if (cp.f >= 1) continue; // финальная точка = TP, уже нарисовано
-        try {
-          const cpId = S.chart.createShape(
-            { time: cp.time, price: cp.price },
-            { shape: 'text', text: '× ' + Math.round(cp.f * 100) + '%',
-              lock: true, disableSelection: true, disableSave: true, zOrder: 'top',
-              overrides: { color: tpCol, fontsize: 9, bold: false } });
-          if (cpId) out.push(cpId);
-        } catch (e) {}
-      }
     }
     return out;
   }
