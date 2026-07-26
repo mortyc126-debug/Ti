@@ -264,6 +264,15 @@
 .tvsig-info-mkt .mkt-cmp{ padding:2px 6px; border-radius:5px; background:var(--surface2); }
 .tvsig-info-mkt .mkt-note{ flex-basis:100%; margin-top:3px; font-size:10px; color:var(--text3); }
 .tvsig-info-mkt-empty{ font-size:10px; color:var(--text3); font-style:italic; margin-top:5px; }
+/* компактная per-тикер таблица режимных exp/win/n */
+.tvsig-regime-mini{ display:grid; grid-template-columns:1fr; gap:2px; margin-top:5px; font-family:var(--mono); font-size:10.5px; }
+.tvsig-regime-mini .rg-group-title{ margin-top:5px; color:var(--text3); font-size:9px; letter-spacing:.05em; text-transform:uppercase; }
+.tvsig-regime-row{ display:grid; grid-template-columns:110px 60px 1fr; gap:8px; padding:2px 4px; border-radius:3px; align-items:baseline; }
+.tvsig-regime-row:hover{ background:var(--surface2); }
+.tvsig-regime-row .rg-label{ color:var(--text2); }
+.tvsig-regime-row .pos{ color:var(--green); font-variant-numeric:tabular-nums; }
+.tvsig-regime-row .neg{ color:var(--negative); font-variant-numeric:tabular-nums; }
+.tvsig-regime-row .dim{ color:var(--text3); font-variant-numeric:tabular-nums; }
 .tvsig-info-note{ font-size:10px; color:var(--violet); background:rgba(180,135,248,0.08);
   border:1px solid rgba(180,135,248,0.25); border-radius:7px; padding:6px 8px; margin-top:4px; }
 

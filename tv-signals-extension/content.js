@@ -2484,6 +2484,38 @@
       (m.note ? '<div class="mkt-note">' + m.note + '</div>' : '') +
       '</div>';
   }
+  // Компактная per-тикер таблица «exp/win/n по режимам» — то же, что в condStats
+  // на «Прогнозе», но плоско и без всех 4 групп сразу (только режим и vol —
+  // самые информативные для одного тикера, «рынок» требует breadth, «сессия»
+  // ловит только 5-мин ТФ). Двухколоночная сетка чипов.
+  function _regimeMiniTable(series, bars) {
+    if (!series || !bars || bars.length < 30) return '<div class="tvsig-info-mkt-empty">Мало свечей для режимного разбора.</div>';
+    let cs;
+    try { cs = window.SignalsCore.condStats(series, bars, 12); } catch (e) { return '<div class="tvsig-info-mkt-empty">Нет данных.</div>'; }
+    if (!cs) return '<div class="tvsig-info-mkt-empty">Нет данных.</div>';
+    const mkRow = (label, key) => {
+      const s = cs[label] && cs[label][key];
+      const n = s && s.n ? s.n : 0;
+      const exp = s && s.exp != null ? (s.exp >= 0 ? '+' : '') + s.exp.toFixed(2) : '—';
+      const win = s && s.win != null ? Math.round(s.win * 100) + '%' : '—';
+      const expCls = !n || n < 10 ? 'dim' : s.exp > 0.03 ? 'pos' : s.exp < -0.03 ? 'neg' : 'dim';
+      const nMark = n && n < 10 ? ' <span class="mkt-note" style="display:inline">(мало)</span>' : '';
+      return '<div class="tvsig-regime-row"><span class="rg-label">' + key + '</span>' +
+        '<span class="' + expCls + '">' + exp + '</span>' +
+        '<span class="dim">' + win + ' · n' + n + nMark + '</span></div>';
+    };
+    let html = '<div class="tvsig-regime-mini">';
+    html += '<div class="rg-group-title">режим</div>';
+    for (const k of ['тренд', 'боковик']) html += mkRow('режим', k);
+    html += '<div class="rg-group-title">волатильность</div>';
+    for (const k of ['сжатие', 'норма', 'расшир']) html += mkRow('vol', k);
+    if (cs['рынок'] && (cs['рынок']['идио'].n + cs['рынок']['с рынком'].n + cs['рынок']['против'].n) > 0) {
+      html += '<div class="rg-group-title">относительно рынка (breadth)</div>';
+      for (const k of ['идио', 'с рынком', 'против']) html += mkRow('рынок', k);
+    }
+    html += '</div>';
+    return html;
+  }
   function openInfo(id) {
     closeInfo();
     const d = DESC[id] || { what: '—', read: '—', note: '' };
@@ -2514,11 +2546,17 @@
         '<div class="tvsig-info-sec"><div class="tvsig-info-lbl">Бэктест по тикеру ' + (S.symbol || '?') + '</div>' +
           '<div class="tvsig-chips">' + chips + '</div>' +
           '<div class="tvsig-info-fine">exp — средний P&amp;L сделки в ATR (тейк 1.0 / стоп 0.5, издержки 0.12) при выходе через N баров · % — winrate · n — сделок</div></div>' +
+        '<div class="tvsig-info-sec"><div class="tvsig-info-lbl">По режимам на этом тикере</div>' +
+          _regimeMiniTable(series, bars) +
+          '<div class="tvsig-info-fine">exp/win в разных условиях: тренд/боковик, сжатие/расшир волатильности, идио/с рынком/против. Часто метод «размазан» глобально, но сильный в одном режиме и слабый в другом — это показывает, где ЭТОТ метод реально работает на ЭТОМ тикере (n&lt;10 — цифра шумная, серый).</div></div>' +
         '<div class="tvsig-info-sec"><div class="tvsig-info-lbl">По рынку в целом <span class="tvsig-info-fine" style="text-transform:none">(bot, ~400 тикеров MOEX × 180 дн., score_methods.py)</span></div>' +
           _marketBlock(id, (function () {
             try { const s12 = window.SignalsCore.btStats(series, bars, 12); return s12 && s12.n >= 10 ? s12.exp : null; } catch (e) { return null; }
           })()) +
-          '<div class="tvsig-info-fine">Cohen\'s d — стабильная мера edge (не варьируется от одного тикера); role — вердикт из score_methods.py (signal/anti/noise). Сравнение с тикером — если ты видишь «≈ по рынку», цифры сверху нормальные; если «выше рынка» на n&lt;20 — вероятно шум, а не открытие.</div></div>' +
+          '<div class="tvsig-info-fine">Cohen\'s d — стабильная мера edge (не варьируется от одного тикера); role — вердикт из score_methods.py (signal/anti/noise). ' +
+          '<b>Внимание:</b> глобальный d — это среднее по ВСЕМ режимам (тренд+боковик+high vol+low vol). ' +
+          'Метод может быть d≈0 в среднем, но +0.3 в тренде и -0.3 в боковике. ' +
+          'Глобального режимного прогона на боте не было — попроси прогнать <code>score_methods.py ALL --by-regime --methods ' + id.toUpperCase() + '</code>, и цифры появятся тут же по режимам.</div></div>' +
         (d.note ? '<div class="tvsig-info-note">' + d.note + '</div>' : '') +
       '</div>';
     o.addEventListener('click', e => { if (e.target === o || e.target.classList.contains('tvsig-info-x')) closeInfo(); });
