@@ -675,7 +675,59 @@ def _load_done_from_csv(path: str) -> tuple:
     return done, liq_of
 
 
-def _list_tickers(cache_dir, interval_min) -> list[str]:
+def _liq_vol_of(job):
+    """Worker: считает медианный дневной оборот и стд дневных доходностей.
+    Возвращает (ticker, med_daily_turn, daily_ret_std_pct) или None."""
+    ticker, cache_dir, interval_min, days = job
+    rows = _load_from_cache(ticker, cache_dir, interval_min)
+    if not rows or len(rows) < 100:
+        return None
+    latest = rows[-1]["time"][:10]
+    try:
+        cutoff = (datetime.strptime(latest, "%Y-%m-%d").date()
+                  - timedelta(days=days)).isoformat()
+    except Exception:
+        return None
+    rows = [r for r in rows if r["time"][:10] >= cutoff]
+    if len(rows) < 50:
+        return None
+    daily_turn: dict = {}
+    daily_last: dict = {}
+    for r in rows:
+        d = r["time"][:10]
+        try:
+            turn = float(r["close"]) * float(r["volume"])
+        except Exception:
+            continue
+        daily_turn[d] = daily_turn.get(d, 0.0) + turn
+        daily_last[d] = float(r["close"])
+    if len(daily_turn) < 5:
+        return None
+    turns_sorted = sorted(daily_turn.values())
+    med_turn = turns_sorted[len(turns_sorted) // 2]
+    dates_sorted = sorted(daily_last.keys())
+    closes = [daily_last[d] for d in dates_sorted]
+    rets = [(closes[i] - closes[i-1]) / closes[i-1]
+            for i in range(1, len(closes)) if closes[i-1] > 0]
+    if not rets:
+        return None
+    m = sum(rets) / len(rets)
+    var = sum((x - m) ** 2 for x in rets) / max(1, len(rets) - 1)
+    vol_pct = (var ** 0.5) * 100.0
+    return (ticker, med_turn, vol_pct)
+
+
+def _pctl(sorted_arr, p):
+    if not sorted_arr:
+        return None
+    idx = int(round((p / 100.0) * (len(sorted_arr) - 1)))
+    idx = max(0, min(idx, len(sorted_arr) - 1))
+    return sorted_arr[idx]
+
+
+def _list_tickers(cache_dir, interval_min, *, top_liq=None, liq_days=60,
+                  min_vol_pctl=0.0, max_vol_pctl=100.0,
+                  workers=None) -> list[str]:
     if not os.path.isdir(cache_dir):
         sys.exit(f"нет папки кэша: {cache_dir}")
     out = []
@@ -692,7 +744,43 @@ def _list_tickers(cache_dir, interval_min) -> list[str]:
             continue
         out.append(ticker)
     out.sort()
-    return out
+
+    # Без фильтров — старая логика.
+    if top_liq is None and min_vol_pctl <= 0.0 and max_vol_pctl >= 100.0:
+        return out
+
+    print(f"[universe] отбор из {len(out)} тикеров по ликв/вол "
+          f"(окно {liq_days} дн)...", file=sys.stderr)
+    tasks = [(t, cache_dir, interval_min, liq_days) for t in out]
+    n_wk = workers or max(1, (mp.cpu_count() or 2) - 1)
+    if n_wk > 1 and len(tasks) > 8:
+        with mp.Pool(processes=n_wk) as pool:
+            stats = list(pool.imap_unordered(_liq_vol_of, tasks, chunksize=8))
+    else:
+        stats = [_liq_vol_of(j) for j in tasks]
+    stats = [s for s in stats if s is not None]
+    if not stats:
+        print("[universe] нет тикеров с достаточной историей", file=sys.stderr)
+        return []
+
+    # Фильтр по волатильности (по перцентилям vol_pct на текущей выборке).
+    vols_sorted = sorted(s[2] for s in stats)
+    lo = _pctl(vols_sorted, min_vol_pctl) if min_vol_pctl > 0 else None
+    hi = _pctl(vols_sorted, max_vol_pctl) if max_vol_pctl < 100 else None
+    kept = [s for s in stats
+            if (lo is None or s[2] >= lo) and (hi is None or s[2] <= hi)]
+
+    # Сортировка по обороту DESC, срез top_liq.
+    kept.sort(key=lambda x: -x[1])
+    if top_liq is not None:
+        kept = kept[:top_liq]
+
+    print(f"[universe] после vol-фильтра [{min_vol_pctl:.0f}..{max_vol_pctl:.0f}%] "
+          f"и top-liq={top_liq}: {len(kept)} тикеров", file=sys.stderr)
+    preview = ", ".join(f"{t}({v:.1f}%)" for t, _, v in kept[:10])
+    if preview:
+        print(f"[universe] топ-10: {preview}", file=sys.stderr)
+    return [t for t, _, _ in kept]
 
 
 def _slice_by_args(args, all_rows_len_placeholder=None):
@@ -743,6 +831,22 @@ def main() -> None:
                      help="Догнать прерванный прогон: пропустить тикеры, уже "
                           "записанные в --out CSV, и дописать в него (append). "
                           "Готовые тикеры подтягиваются обратно в итоговую сводку.")
+    # Фильтры универсума (действуют только с ticker=ALL).
+    ap.add_argument("--top-liq", type=int, default=None,
+                     help="Взять топ-N тикеров по медианному дневному обороту "
+                          "(только с ticker=ALL). Ликвидность считается по "
+                          "последним --liq-days дням.")
+    ap.add_argument("--liq-days", type=int, default=60,
+                     help="Окно для расчёта ликвид/вол при отборе универсума "
+                          "(default 60 календарных дней)")
+    ap.add_argument("--min-vol-pctl", type=float, default=0.0,
+                     help="Нижний перцентильный отсев по дневной волатильности "
+                          "(0..100, default 0 = без нижнего фильтра). Отсекает "
+                          "мертвяков перед сортировкой по обороту.")
+    ap.add_argument("--max-vol-pctl", type=float, default=100.0,
+                     help="Верхний перцентильный отсев по дневной волатильности "
+                          "(0..100, default 100 = без верхнего фильтра). "
+                          "Отсекает penny-подобных.")
     args = ap.parse_args()
 
     # Разбираем --methods
@@ -763,7 +867,14 @@ def main() -> None:
             pass
 
     if args.ticker.upper() == "ALL":
-        tickers = _list_tickers(args.cache, args.interval)
+        tickers = _list_tickers(
+            args.cache, args.interval,
+            top_liq=args.top_liq,
+            liq_days=args.liq_days,
+            min_vol_pctl=args.min_vol_pctl,
+            max_vol_pctl=args.max_vol_pctl,
+            workers=args.workers,
+        )
     else:
         tickers = [args.ticker]
     if not tickers:
