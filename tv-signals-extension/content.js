@@ -1481,6 +1481,22 @@
   }
   // карточка ТЕКУЩЕГО активного сигнала выбранного метода: цель/срок, чекпоинты
   // по пути, тренд метода, статус (в пути / опровергнут / цель / устарел)
+  // Прогноз по нескольким горизонтам: exp/win/n на 3/6/9/12 баров для одного
+  // метода, плюс ожидаемая цель по цене (entry + dir·exp·ATR). Раньше показывали
+  // только 12-барный конец — теперь виден профиль ожидания в динамике.
+  function _multiHorizonForecast(id) {
+    const SC = window.SignalsCore;
+    const c = S.computed && S.computed[id]; const bars = S.bars;
+    if (!c || !c.series || !bars || bars.length < 30) return null;
+    const at = SC.atr(bars, 20), i = bars.length - 1, a = at[i]; if (!a || a <= 0) return null;
+    const entry = bars[i].close, dir = Math.sign(c.last || 0); if (!dir) return null;
+    const horizons = [3, 6, 9, 12];
+    return horizons.map(h => {
+      const st = SC.btStats(c.series, bars, h);
+      const targetPrice = st.exp != null ? entry + dir * st.exp * a : null;
+      return { h, exp: st.exp, win: st.win, n: st.n, targetPrice };
+    });
+  }
   function _activeSignalCard(id) {
     const p = _signalPlan(id);
     if (!p) return '<span class="tvsig-fc-hint">Сейчас нет активного сигнала «' + (NAME[id] || id) + '» на этом тикере.</span>';
@@ -1500,10 +1516,29 @@
     const cps = p.checkpoints ? '<table class="tvsig-fc-tbl"><tr><th>чекпоинт</th><th>к какому времени</th><th>ожид. цена</th></tr>' +
       p.checkpoints.map(c => '<tr><td>' + Math.round(c.f * 100) + '%</td><td>' + _hhmm(c.time) + ' МСК (+' + c.barsFromNow + ' бар.)</td><td>' + c.price.toFixed(4) + '</td></tr>').join('') + '</table>' +
       '<span class="tvsig-fc-hint">время чекпоинтов — номинальное (бары × шаг ТФ), без разрывов сессии; ориентируйся на «+N бар.», часы/дни могут набежать больше на перерывах/выходных</span>' : '';
+    // Прогноз по горизонтам: exp/win на 3/6/9/12 бар. — показывает профиль
+    // ожидания метода на СЕГОДНЯШНЕМ тикере, а не только финальную точку TP.
+    let mhBlock = '';
+    const mh = _multiHorizonForecast(id);
+    if (mh) {
+      const dt = S.barDt || 300, nowTs = S.bars[S.bars.length - 1].time;
+      mhBlock = '<div class="tvsig-fc-sub">Прогноз по горизонтам (на этом тикере):</div>' +
+        '<table class="tvsig-fc-tbl"><tr><th>гориз.</th><th>к какому времени</th><th>exp ATR</th><th>win%</th><th>ожид. цена</th></tr>' +
+        mh.map(m => {
+          const expTxt = m.exp != null ? _fcNum(m.exp) : '—';
+          const expCls = m.exp != null ? (m.exp > 0.03 ? 'pos' : m.exp < -0.03 ? 'neg' : 'dim') : 'dim';
+          const winTxt = m.n >= 5 && m.win != null ? Math.round(m.win * 100) + '%' : '—';
+          const priceTxt = m.targetPrice != null ? m.targetPrice.toFixed(4) : '—';
+          const nSub = m.n ? ' <span class="dim">n' + m.n + '</span>' : '';
+          return '<tr><td>' + m.h + ' бар.</td><td>' + _hhmm(nowTs + m.h * dt) + ' МСК</td>' +
+            '<td class="' + expCls + '">' + expTxt + nSub + '</td>' +
+            '<td>' + winTxt + '</td><td>' + priceTxt + '</td></tr>';
+        }).join('') + '</table>';
+    }
     return '<div class="tvsig-fc-card"><b>' + (NAME[id] || id) + ': ' + dirTxt + '</b> · начало ' + since + '<br>' +
       'статус: ' + stLine + '<br>' +
       'вход <b>' + p.entry.toFixed(4) + '</b> · цель <b>' + p.tp.toFixed(4) + '</b> · стоп ' + p.sl.toFixed(4) + '<br>' +
-      'тренд метода: ' + trend + cps + '</div>';
+      'тренд метода: ' + trend + cps + mhBlock + '</div>';
   }
   function _fcPickInit() {
     const sel = document.getElementById('tvsig-fc-pick'); if (!sel || sel.dataset.init) return;
@@ -1860,6 +1895,31 @@
             overrides: { color: tpCol, fontsize: 9, bold: false } });
         if (cpId) out.push(cpId);
       } catch (e) {}
+    }
+    // ── МНОГОГОРИЗОНТНЫЙ ПРОГНОЗ на графике: ожидаемые цены (exp × ATR × dir)
+    // на 3/6/9/12 баров вперёд от ТЕКУЩЕГО бара по историческому exp метода на
+    // этом тикере. Точки-«◇» с ценой — сразу видно, куда «в среднем» ходит
+    // цена после сигнала на разных горизонтах, а не только к финальному TP.
+    const mh = _multiHorizonForecast(id);
+    if (mh && bars && bars.length) {
+      const SC = window.SignalsCore;
+      const at2 = SC.atr(bars, 20), iCur = bars.length - 1, aCur = at2[iCur];
+      const priceNow = bars[iCur].close, timeNow = bars[iCur].time;
+      if (aCur > 0) {
+        for (const m of mh) {
+          if (m.exp == null) continue;
+          const px = priceNow + plan.dir * m.exp * aCur;
+          const tPt = timeNow + m.h * dt;
+          try {
+            const dotId = S.chart.createShape(
+              { time: tPt, price: px },
+              { shape: 'text', text: '◇ +' + m.h + 'б ' + px.toFixed(4),
+                lock: true, disableSelection: true, disableSave: true, zOrder: 'top',
+                overrides: { color: enCol, fontsize: 9, bold: false } });
+            if (dotId) out.push(dotId);
+          } catch (e) {}
+        }
+      }
     }
     return out;
   }
