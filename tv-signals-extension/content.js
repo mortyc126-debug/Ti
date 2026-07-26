@@ -101,6 +101,35 @@
     }
     return out;
   }
+  // Информативные конфликты из того же combo_methods.py: пары, где методы часто
+  // спорят, и в споре ЯВНО побеждает конкретная сторона (|t| ≥ 5 И n_conf ≥ 3000).
+  // loser = метод, за которым не стоит идти в этом споре; winner — которому верить.
+  // Формат: { loser, winner, t, n_conf } — t отрицательный по формату combo (loser
+  // проигрывает winner); больший |t| = более чётко предсказуемый победитель.
+  const CONFLICT_PAIRS = [
+    { loser: 'accel',         winner: 'talib_anti',  t: 20.1, n: 233023 }, // король антагонизмов
+    { loser: 'anchored_vwap', winner: 'order_block', t: 10.0, n: 124682 },
+    { loser: 'accel',         winner: 'bipower_jump', t: 8.4,  n: 14001 },
+    { loser: 'anchored_vwap', winner: 'cascade',      t: 7.6,  n: 23255 },
+    { loser: 'nw',            winner: 'order_block',  t: 7.1,  n: 34762 },
+    { loser: 'nw',            winner: 'talib_anti',   t: 5.9,  n: 31644 },
+    { loser: 'alligator_inv', winner: 'cascade',      t: 5.6,  n: 19881 },
+    { loser: 'anchored_vwap', winner: 'fvg',          t: 5.5,  n: 247401 },
+  ];
+  // Возвращает активные конфликты: обе стороны ненулевые и в РАЗНЫХ направлениях.
+  // trust = знак сигнала winner (кому доверять на этом баре).
+  function activeConflicts() {
+    const c = S.computed; if (!c) return [];
+    const out = [];
+    for (const p of CONFLICT_PAIRS) {
+      const la = c[p.loser] && c[p.loser].last, lw = c[p.winner] && c[p.winner].last;
+      if (!la || !lw) continue;
+      const sa = Math.sign(la), sw = Math.sign(lw);
+      if (sa === 0 || sw === 0 || sa === sw) continue; // не спорят
+      out.push({ loser: p.loser, winner: p.winner, t: p.t, trust: sw });
+    }
+    return out;
+  }
   const PREF = 'tvsig:on', CKEY = 'tvsig:colors', SKEY = 'tvsig:stats';
 
   const S = {
@@ -2057,16 +2086,31 @@
       synHtml = '<div class="tvsig-syn-box" title="Активные пары из топ-синергий combo-теста бота — оба метода стреляют в одну сторону.">' +
         '<div class="tvsig-syn-head">⚡ Активные синергии: <b>' + syn.length + '</b></div>' + rows + '</div>';
     }
+    // сводка активных конфликтов: методы спорят, кому верить — известно
+    const conf = activeConflicts();
+    let confHtml = '';
+    if (conf.length) {
+      const rows = conf.map(cc => {
+        const arrow = cc.trust > 0 ? '▲' : '▼';
+        const cCol = cc.trust > 0 ? '#52F2C9' : '#FF6A8B';
+        return '<div class="tvsig-conf-row" title="Конфликт из combo-теста: методы говорят разное. |t|=' + cc.t.toFixed(1) + ' — насколько устойчиво один бьёт другого в споре.">' +
+          '<span class="tvsig-syn-arrow" style="color:' + cCol + '">' + arrow + '</span>' +
+          '<span class="tvsig-syn-names"><s>' + NAME[cc.loser] + '</s> vs <b>' + NAME[cc.winner] + '</b></span>' +
+          '<span class="tvsig-conf-t">|t|=' + cc.t.toFixed(1) + '</span></div>';
+      }).join('');
+      confHtml = '<div class="tvsig-conf-box" title="Активные конфликты: методы противоречат друг другу, а победитель по combo-тесту известен.">' +
+        '<div class="tvsig-conf-head">⚠ Активные конфликты: <b>' + conf.length + '</b> — верь тому, что жирным</div>' + rows + '</div>';
+    }
     el.innerHTML =
       '<div class="tvsig-cons-top"><b style="color:' + col + '">' + label + '</b>' +
       '<span class="tvsig-cons-pct">сила ' + Math.round(Math.abs(strength) * 100) + '%</span></div>' +
       '<div class="tvsig-cons-scale"><span class="tvsig-cons-mid"></span><span class="tvsig-cons-fill" style="' + fill + '"></span></div>' +
       '<div class="tvsig-cons-votes">' + buy + ' за покупку · ' + sell + ' за продажу · из ' + working + ' рабочих методов (exp&gt;0)</div>' +
-      synHtml;
+      synHtml + confHtml;
   }
 
   // HTML одной строки метода (вынесено из renderRows, чтобы группировать)
-  function rowHTML(id, noVol, synInfo) {
+  function rowHTML(id, noVol, synInfo, confInfo) {
     const c = S.computed && S.computed[id];
     const on = !!S.on[id];
     const col = S.colors[id];
@@ -2095,8 +2139,19 @@
     const synCls = synInfo ? ' tvsig-syn-active' : '';
     const synTip = synInfo ? ' title="⚡ Активная синергия: ' + synInfo.partners.map(p => NAME[p]).join(', ') + ' (lift +' + synInfo.maxLift.toFixed(2) + ' ATR по combo-тесту)"' : '';
     const synIcon = synInfo ? '<span class="tvsig-syn-icon"' + synTip + '>⚡</span>' : '';
-    return '<div class="tvsig-row' + (on ? ' on' : '') + synCls + '" data-id="' + id + '"' + synTip + '>' +
-      diam + '<span class="tvsig-name" title="' + NAME[id] + '">' + NAME[id] + '</span>' + synIcon + mid + info + swatch + '</div>';
+    // маркер конфликта: у loser — предупреждение, у winner — «подтверждён»
+    let confCls = '', confIcon = '';
+    if (confInfo) {
+      if (confInfo.role === 'loser') {
+        confCls = ' tvsig-conf-loser';
+        confIcon = '<span class="tvsig-conf-icon" title="⚠ В споре с ' + confInfo.opponents.map(p => NAME[p]).join(', ') + ' этот метод статистически проигрывает (|t|=' + confInfo.maxT.toFixed(1) + ' в combo-тесте). Не следуй за ним против них.">⚠</span>';
+      } else {
+        confCls = ' tvsig-conf-winner';
+        confIcon = '<span class="tvsig-conf-icon-win" title="✓ В споре с ' + confInfo.opponents.map(p => NAME[p]).join(', ') + ' этот метод статистически побеждает (|t|=' + confInfo.maxT.toFixed(1) + ' в combo-тесте).">✓</span>';
+      }
+    }
+    return '<div class="tvsig-row' + (on ? ' on' : '') + synCls + confCls + '" data-id="' + id + '"' + synTip + '>' +
+      diam + '<span class="tvsig-name" title="' + NAME[id] + '">' + NAME[id] + '</span>' + synIcon + confIcon + mid + info + swatch + '</div>';
   }
 
   // агрегат exp/win по группе — среднее с весом по числу сделок n (только валидные stats)
@@ -2124,6 +2179,17 @@
         if (s.lift > synMap[m].maxLift) synMap[m].maxLift = s.lift;
       });
     });
+    // per-метод conflict-info: role='loser' у проигрывающего, 'winner' у победителя
+    const conf = activeConflicts();
+    const confMap = {};
+    conf.forEach(cc => {
+      if (!confMap[cc.loser]) confMap[cc.loser] = { role: 'loser', opponents: [], maxT: 0 };
+      if (confMap[cc.loser].opponents.indexOf(cc.winner) < 0) confMap[cc.loser].opponents.push(cc.winner);
+      if (cc.t > confMap[cc.loser].maxT) confMap[cc.loser].maxT = cc.t;
+      if (!confMap[cc.winner]) confMap[cc.winner] = { role: 'winner', opponents: [], maxT: 0 };
+      if (confMap[cc.winner].opponents.indexOf(cc.loser) < 0) confMap[cc.winner].opponents.push(cc.loser);
+      if (cc.t > confMap[cc.winner].maxT) confMap[cc.winner].maxT = cc.t;
+    });
     rowsEl.innerHTML = GROUPS.map(g => {
       const a = groupAgg(g.ids);
       const exp = a ? (a.exp >= 0 ? '+' : '') + a.exp.toFixed(2) : '—';
@@ -2134,7 +2200,7 @@
         '<span class="tvsig-gh-stat" style="color:' + expCol + '">' + exp +
         (win ? ' <span class="tvsig-gh-win">' + win + '</span>' : '') + '</span>' +
         '<div class="tvsig-gh-desc">' + g.desc + '</div></div>';
-      return hd + g.ids.map(id => rowHTML(id, noVol, synMap[id])).join('');
+      return hd + g.ids.map(id => rowHTML(id, noVol, synMap[id], confMap[id])).join('');
     }).join('');
     // ромб/имя → вкл/выкл; пикер цвета → своё событие (не триггерит toggle)
     rowsEl.querySelectorAll('.tvsig-diam, .tvsig-name').forEach(el =>
