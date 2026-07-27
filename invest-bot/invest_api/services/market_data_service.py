@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -18,7 +19,13 @@ logger = logging.getLogger(__name__)
 # тикеров с холодным D1-кэшем). Пауза между дневными запросами внутри одного
 # тикера держит суммарную нагрузку нескольких параллельных воркеров safely
 # под лимитом (4 воркера * ~2 запроса/с ≈ 480/60с).
-CANDLE_REQUEST_DELAY = 0.5
+# Можно переопределить через env: CANDLE_REQUEST_DELAY=0.25 python ...
+# Формула-ориентир: delay ≈ (число_воркеров × 60) / 600 = workers × 0.1.
+# То есть при 6 воркерах безопасно снизить до 0.6; при 3 — до 0.3.
+try:
+    CANDLE_REQUEST_DELAY = float(os.environ.get("CANDLE_REQUEST_DELAY", "0.5"))
+except (TypeError, ValueError):
+    CANDLE_REQUEST_DELAY = 0.5
 
 
 class MarketDataService:
