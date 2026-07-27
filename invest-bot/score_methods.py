@@ -488,19 +488,22 @@ def _print_final(pool: dict, min_fires: int, by_regime: bool) -> None:
     # Матрица метод × режим (d) на пуле — компактная.
     all_methods = sorted({n for (n, r) in pool.keys()})
     print(f"\n=== матрица d_median по режимам (пул) ===")
-    print(f"{'метод':<24}" + "".join(f"{r:>14}" for r in REGIMES))
-    print("-" * (24 + 14 * len(REGIMES)))
+    print(f"{'метод':<24}" + "".join(f"{r:>22}" for r in REGIMES))
+    print("-" * (24 + 22 * len(REGIMES)))
     for name in all_methods:
         parts = [f"{name:<24}"]
         for r in REGIMES:
             s = pool.get((name, r))
             if not s or s["d_median"] is None or s["n_fires"] < min_fires // 3:
-                parts.append(f"{'—':>14}")
+                parts.append(f"{'—':>22}")
                 continue
             d = s["d_median"]
             role = _role(d)
             tag = "s" if role == "signal" else "a" if role == "anti" else "n"
-            parts.append(f"{d:+.3f}[{tag}] n={s['n_fires']:>5}"[:14].rjust(14))
+            # Колонка расширена с 14 до 22: раньше {n_fires:>5} обрезалась
+            # срезом [:14] и на клетках с ≥3 знаков n_fires в консоли было
+            # видно только "n= ". Теперь помещается до 6-значного n_fires.
+            parts.append(f"{d:+.3f}[{tag}] n={s['n_fires']:>6} tk{s['n_tickers']:>3}".rjust(22))
         print("".join(parts))
 
     # Классификация метода целиком:
@@ -550,11 +553,20 @@ def _print_final(pool: dict, min_fires: int, by_regime: bool) -> None:
     # Формат: {regime: {method: multiplier}}. multiplier: -1 (инвертировать),
     # 0 (выключить), +1 (усилить/оставить как есть). Для нейтрали (|d|≤0.05)
     # НЕ пишем ничего — оставим текущий вес из бота.
+    # Порог MIN_MODS_TK: клетки, где вердикт держится на <5 тикерах, в MODS не
+    # попадают — d_median по 1-4 тикерам легко даёт случайный знак (в дифе с
+    # BASELINE именно там были все 8 ★FLIP★). Матрица выше при этом их
+    # печатает как есть, чтобы аналитик видел сырьё.
+    MIN_MODS_TK = 5
     generated = {r: {} for r in REGIMES}
+    skipped_thin = 0
     for (name, r), s in pool.items():
         if r == ALL_LABEL:
             continue
         if s["d_median"] is None or s["n_fires"] < min_fires // 3:
+            continue
+        if s.get("n_tickers", 0) < MIN_MODS_TK:
+            skipped_thin += 1
             continue
         d = s["d_median"]
         if d > 0.05:    generated[r][name] = 1.0
@@ -562,8 +574,11 @@ def _print_final(pool: dict, min_fires: int, by_regime: bool) -> None:
         # noise — не трогаем (оставляем текущий вес)
 
     print(f"\n=== сгенерированный REGIME_WEIGHT_MODS ===")
-    print("# +1.0 — метод работает правильно в этом режиме, оставить/усилить")
-    print("# -1.0 — метод стабильно наоборот, ИНВЕРТИРОВАТЬ через режимный множитель")
+    print(f"# +1.0 — метод работает правильно в этом режиме, оставить/усилить")
+    print(f"# -1.0 — метод стабильно наоборот, ИНВЕРТИРОВАТЬ через режимный множитель")
+    print(f"# порог: клетка попадает в MODS только если n_tickers ≥ {MIN_MODS_TK} "
+          f"(на 1-4 тикерах d_median нестабилен — знак случайно флипается между прогонами)."
+          f" Пропущено клеток: {skipped_thin}")
     print("REGIME_WEIGHT_MODS_AUTO = {")
     for r in REGIMES:
         items = generated[r]
