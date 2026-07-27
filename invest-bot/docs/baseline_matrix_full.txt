@@ -1,0 +1,112 @@
+=== ALL-разрез (порог отбора n_fires ≥ 30 на тикере) ===
+метод                    d_med   n_fires  n_tk  win%  роль
+ADAPTIVE_MA             -0.095    186633   332  45.1  anti
+ADX_DI_CONVERGENCE      +0.003    114036   270  48.6  noise
+ALLIGATOR               -0.066    433693   379  45.9  anti
+AMT_POC                 -0.057    407933   376  47.8  anti
+ATR_EXHAUSTION          +0.017    583177   381  49.7  noise
+BB_KELTNER_SQUEEZE      -0.070    620996   386  46.1  anti
+BS_PRESSURE             -0.162     44870    54  46.2  anti
+CANDLE_PATTERN          -0.046    601914   386  47.8  noise
+CASCADE                 +0.108     48116   219  52.5  signal
+CUMUL_DELTA             -0.045    669476   384  47.2  noise
+CYBER_PHASE             -0.049    620193   382  46.6  noise
+DONCHIAN                -0.001    547859   372  48.7  noise
+EHLERS_MODE             -0.078    153200   327  45.5  anti
+ENTROPY                 -0.050    108172   302  47.6  noise
+FALSE_BREAKOUT          -0.122      3658    25  48.5  anti
+FISHER_RSI              -0.014    154447   320  48.8  noise
+FRACTAL                      —         0     0   —    —
+FRACTIONAL_DIFF         -0.063    583035   380  45.4  anti
+FVG                     +0.059    509517   380  51.6  signal
+HAWKES_SIGNAL           +0.059    504711   386  51.5  signal
+ICHIMOKU_SIGNAL         -0.064     24855   228  45.7  anti
+IMPULSE_PULLBACK        -0.040    357209   370  47.2  noise
+KLINGER                 -0.020    612756   380  47.7  noise
+LEVEL_ABSORPTION        -0.145     11885    76  43.9  anti
+LEVEL_QUALITY           +0.016    440098   343  49.3  noise
+LIQUIDITY_SWEEP         -0.105     10283    76  46.2  anti
+MAMA_FAMA               -0.048    504592   384  46.9  noise
+MA_ENVELOPE             +0.029    165651   371  50.7  noise
+MA_TENSION              -0.130       495     1  47.4  anti
+NADARAYA_WATSON         +0.092    227505   375  51.1  signal
+ORDER_BLOCK             +0.074    293776   277  51.1  signal
+PRICE_ACCEL             -0.054    529021   380  47.2  anti
+PRICE_TREND             -0.088      1419    10  41.1  anti
+RMI                     +0.018    648203   382  50.2  noise
+RSI_DIVERGENCE          +0.035    107819   306  49.6  noise
+SINEWAVE_SIGNAL         -0.022    628781   383  48.2  noise
+SSA_SIGNAL                   —    363493   374   —    —
+T3_SIGNAL               -0.123     97614   356  44.1  anti
+TALIB_ANTISIGNAL        +0.155    230790   328  54.3  signal
+TREND_QUALITY                —        29     0   —    —
+TRIANGLE                +0.017     29706   193  48.4  noise
+TWIGGS                  -0.007    572047   379  48.2  noise
+ULT_OSC_DISAGREEMENT    +0.036    111741   319  52.8  noise
+VOL_COMPRESSION         -0.159      5775    55  40.0  anti
+VOL_MOMENTUM            -0.013    580539   380  48.4  noise
+VSA                     -0.011    207113   326  49.0  noise
+VSA_ABSORPTION          -0.155      4350    26  51.4  anti
+VWAP_SIGNAL             -0.042    647152   381  47.2  noise
+VZO                     -0.034    615161   380  47.8  noise
+WANING_IMPULSES         +0.051    338384   368  49.5  signal
+WICK_REJECTION          -0.005    494733   366  48.8  noise
+ZLEMA_SIGNAL            -0.126     69346   337  44.3  anti
+ZSCORE                  +0.095    132458   333  53.2  signal
+
+=== матрица d_median по режимам (тикеры с n_fires ≥ 30 на своей ячейке) ===
+метод                    trending_up trending_down       ranging      high_vol       low_vol        stress
+----------------------------------------------------------------------------------------------------------
+ADAPTIVE_MA           -0.087[a] tk161-0.059[a] tk190-0.102[a] tk233-0.604[a] tk 46-0.112[a] tk202-0.151[a] tk160
+ADX_DI_CONVERGENCE    -0.024[n] tk111+0.028[n] tk149+0.010[n] tk161-0.024[n] tk 32+0.007[n] tk106+0.054[s] tk 94
+ALLIGATOR             -0.090[a] tk247-0.087[a] tk270-0.074[a] tk301-0.164[a] tk131-0.079[a] tk293-0.098[a] tk237
+AMT_POC               -0.068[a] tk198-0.016[n] tk189-0.012[n] tk303-0.135[a] tk104-0.063[a] tk257-0.057[a] tk215
+ATR_EXHAUSTION        -0.017[n] tk264-0.007[n] tk284+0.006[n] tk327+0.057[s] tk161-0.012[n] tk308+0.030[n] tk257
+BB_KELTNER_SQUEEZE    -0.073[a] tk272-0.104[a] tk291-0.078[a] tk337-0.139[a] tk171-0.074[a] tk319-0.080[a] tk273
+BS_PRESSURE           -0.017[n] tk 13-0.265[a] tk 14-0.086[a] tk 21-0.182[a] tk  8-0.355[a] tk 16-0.050[a] tk 13
+CANDLE_PATTERN        -0.039[n] tk273-0.062[a] tk288-0.053[a] tk338-0.047[n] tk169-0.052[a] tk320-0.113[a] tk272
+CASCADE               +0.063[s] tk 45+0.038[n] tk 52+0.089[s] tk104             —+0.066[s] tk103+0.177[s] tk103
+CUMUL_DELTA           +0.007[n] tk272-0.026[n] tk289-0.045[n] tk339-0.061[a] tk169-0.035[n] tk320-0.087[a] tk265
+CYBER_PHASE           -0.037[n] tk272-0.050[n] tk282-0.049[n] tk332-0.091[a] tk161-0.040[n] tk308-0.032[n] tk257
+DONCHIAN              +0.012[n] tk240+0.000[n] tk268-0.009[n] tk318-0.056[a] tk147+0.010[n] tk295-0.031[n] tk236
+EHLERS_MODE           -0.041[n] tk172-0.095[a] tk199-0.128[a] tk145-0.378[a] tk 38-0.139[a] tk143-0.121[a] tk130
+ENTROPY               -0.003[n] tk138-0.001[n] tk104-0.044[n] tk179-0.043[n] tk 44-0.033[n] tk150-0.032[n] tk119
+FALSE_BREAKOUT                     —             —+0.122[s] tk  2             —+0.307[s] tk  2-0.571[a] tk  2
+FISHER_RSI            -0.012[n] tk113-0.028[n] tk145+0.002[n] tk207+0.054[s] tk 47-0.043[n] tk184-0.088[a] tk122
+FRACTAL                            —             —             —             —             —             —
+FRACTIONAL_DIFF       -0.028[n] tk236-0.058[a] tk272-0.073[a] tk320-0.129[a] tk127-0.095[a] tk300-0.072[a] tk249
+FVG                   +0.055[s] tk261+0.042[n] tk281+0.060[s] tk319+0.095[s] tk151+0.056[s] tk303+0.081[s] tk253
+HAWKES_SIGNAL         +0.068[s] tk277+0.073[s] tk293+0.056[s] tk342+0.091[s] tk172+0.073[s] tk322+0.087[s] tk277
+ICHIMOKU_SIGNAL                    —             —-0.041[n] tk106-0.318[a] tk  4-0.047[n] tk 98-0.275[a] tk 14
+IMPULSE_PULLBACK      +0.019[n] tk222-0.018[n] tk242-0.059[a] tk297-0.145[a] tk104-0.032[n] tk259-0.067[a] tk189
+KLINGER               -0.015[n] tk250-0.022[n] tk272-0.004[n] tk320-0.018[n] tk148-0.009[n] tk299-0.013[n] tk257
+LEVEL_ABSORPTION      +0.060[s] tk  1-0.117[a] tk 11-0.148[a] tk 36-0.448[a] tk  1-0.250[a] tk 32-0.365[a] tk 31
+LEVEL_QUALITY         +0.017[n] tk188+0.018[n] tk207+0.016[n] tk265+0.015[n] tk102+0.017[n] tk231+0.009[n] tk169
+LIQUIDITY_SWEEP       -0.153[a] tk  2+0.005[n] tk  2-0.145[a] tk 21             —-0.073[a] tk 29-0.007[n] tk 18
+MAMA_FAMA             -0.044[n] tk275-0.048[n] tk292-0.056[a] tk334-0.113[a] tk159-0.052[a] tk319-0.055[a] tk261
+MA_ENVELOPE           +0.006[n] tk207+0.007[n] tk232+0.037[n] tk282+0.340[s] tk 53+0.036[n] tk265+0.035[n] tk212
+MA_TENSION                         —             —             —             —             —             —
+NADARAYA_WATSON       +0.063[s] tk 78-0.109[a] tk 60+0.051[s] tk303+0.116[s] tk 54+0.034[n] tk238+0.112[s] tk226
+ORDER_BLOCK           +0.061[s] tk133+0.094[s] tk156+0.051[s] tk192+0.153[s] tk 62+0.065[s] tk160+0.068[s] tk114
+PRICE_ACCEL           -0.047[n] tk242-0.030[n] tk261-0.055[a] tk311-0.045[n] tk131-0.052[a] tk296-0.089[a] tk248
+PRICE_TREND                        —             —             —             —             —+0.342[s] tk  3
+RMI                   +0.011[n] tk265+0.015[n] tk286+0.026[n] tk334+0.041[n] tk170+0.018[n] tk315+0.011[n] tk261
+RSI_DIVERGENCE        +0.233[s] tk 19+0.326[s] tk  8-0.011[n] tk182+0.266[s] tk 34+0.105[s] tk118+0.073[s] tk 87
+SINEWAVE_SIGNAL       -0.044[n] tk269-0.025[n] tk285-0.020[n] tk332-0.084[a] tk162-0.035[n] tk310-0.029[n] tk261
+SSA_SIGNAL                         —             —             —             —             —             —
+T3_SIGNAL             -0.120[a] tk125-0.112[a] tk176-0.118[a] tk244-0.727[a] tk 25-0.145[a] tk214-0.143[a] tk178
+TALIB_ANTISIGNAL      +0.114[s] tk150+0.119[s] tk176+0.148[s] tk230+0.366[s] tk 46+0.138[s] tk208+0.156[s] tk175
+TREND_QUALITY                      —             —             —             —             —             —
+TRIANGLE              -0.130[a] tk 11+0.071[s] tk  8+0.035[n] tk 89+0.036[n] tk 31+0.034[n] tk 78-0.012[n] tk 32
+TWIGGS                +0.004[n] tk255+0.008[n] tk278-0.014[n] tk323+0.013[n] tk153-0.001[n] tk303-0.021[n] tk252
+ULT_OSC_DISAGREEMENT  +0.116[s] tk120+0.196[s] tk 55+0.042[n] tk207+0.181[s] tk 41+0.038[n] tk165+0.113[s] tk104
+VOL_COMPRESSION                    —             —             —             —             —-0.237[a] tk 14
+VOL_MOMENTUM          +0.008[n] tk258+0.002[n] tk278-0.017[n] tk328-0.030[n] tk154-0.005[n] tk306-0.049[n] tk256
+VSA                   +0.040[n] tk146+0.018[n] tk171+0.011[n] tk230+0.268[s] tk 47+0.011[n] tk202-0.099[a] tk178
+VSA_ABSORPTION                     —             —             —             —             —             —
+VWAP_SIGNAL           -0.042[n] tk263-0.073[a] tk281-0.018[n] tk328-0.073[a] tk161-0.059[a] tk311-0.077[a] tk254
+VZO                   -0.005[n] tk266-0.026[n] tk284-0.029[n] tk334-0.039[n] tk162-0.037[n] tk309-0.091[a] tk264
+WANING_IMPULSES       +0.032[n] tk 71+0.016[n] tk 73-0.006[n] tk295+0.123[s] tk103+0.057[s] tk260+0.089[s] tk172
+WICK_REJECTION        +0.003[n] tk227-0.024[n] tk249-0.008[n] tk289-0.004[n] tk124+0.003[n] tk271+0.004[n] tk224
+ZLEMA_SIGNAL          -0.142[a] tk 76-0.092[a] tk139-0.138[a] tk201-0.643[a] tk 16-0.158[a] tk178-0.151[a] tk139
+ZSCORE                +0.111[s] tk130+0.079[s] tk166+0.114[s] tk228+0.470[s] tk 41+0.098[s] tk206+0.124[s] tk149
