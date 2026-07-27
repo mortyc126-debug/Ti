@@ -150,6 +150,14 @@
 .tvsig-row.tvsig-syn-active.tvsig-conf-winner{ box-shadow:inset 0 0 0 1px rgba(244,195,106,.55), 0 0 6px rgba(244,195,106,.15); }
 .tvsig-conf-icon{ display:inline-block; margin:0 3px 0 2px; font-size:10px; color:var(--negative); cursor:help; }
 .tvsig-conf-icon-win{ display:inline-block; margin:0 3px 0 2px; font-size:10px; color:var(--green); cursor:help; }
+/* бейдж инверсии метода — маленький чип рядом с именем. 'global' — постоянная
+   инверсия (метод anti в BASELINE); 'regime' — контекстная (nw в trending_down) */
+.tvsig-inv-icon{ display:inline-block; margin:0 4px 0 4px; padding:1px 4px;
+  border-radius:3px; font-size:9px; letter-spacing:.03em;
+  background:rgba(180, 130, 240, .18); color:#B482F0;
+  border:1px solid rgba(180, 130, 240, .35); cursor:help; }
+.tvsig-inv-icon.regime{ background:rgba(94, 230, 168, .12); color:#5EE6A8;
+  border-color:rgba(94, 230, 168, .3); }
 
 #tvsig-rows{ padding:4px; max-height:340px; overflow:auto; }
 /* мини-заголовок группы синергии: название · агрегат exp/win · описание */

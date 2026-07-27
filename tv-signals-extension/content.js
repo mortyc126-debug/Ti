@@ -2725,8 +2725,17 @@
         confIcon = '<span class="tvsig-conf-icon-win" title="✓ В споре с ' + confInfo.opponents.map(p => NAME[p]).join(', ') + ' этот метод статистически побеждает (|t|=' + confInfo.maxT.toFixed(1) + ' в combo-тесте).">✓</span>';
       }
     }
+    // Бейдж инверсии (по signals-core computeAll): 'global' — метод глобальный
+    // anti из BASELINE (score_methods.py, ALL 420 тк + top-50), инвертирован
+    // полностью; 'regime:trending_down' — nw, инверсия только в trending_down.
+    let invIcon = '';
+    if (c && c.inverted === 'global') {
+      invIcon = '<span class="tvsig-inv-icon" title="Метод глобально anti по данным score_methods.py (BASELINE 420 тикеров + top-50 ликвидных): d<0 во всех режимах в обоих прогонах. Голос инвертирован — теперь работает как signal.">↺anti</span>';
+    } else if (c && c.inverted === 'regime:trending_down') {
+      invIcon = '<span class="tvsig-inv-icon regime" title="Режимная инверсия: NW в trending_down d=-0.109 (BASELINE) / -0.353 (top-50) — anti; в остальных режимах +0.05..+0.12 — signal. Инвертируется только на барах в trending_down.">↺td</span>';
+    }
     return '<div class="tvsig-row' + (on ? ' on' : '') + synCls + confCls + '" data-id="' + id + '"' + synTip + '>' +
-      diam + '<span class="tvsig-name" title="' + NAME[id] + '">' + NAME[id] + '</span>' + synIcon + confIcon + mid + info + swatch + '</div>';
+      diam + '<span class="tvsig-name" title="' + NAME[id] + '">' + NAME[id] + '</span>' + invIcon + synIcon + confIcon + mid + info + swatch + '</div>';
   }
 
   // агрегат exp/win по группе — среднее с весом по числу сделок n (только валидные stats)

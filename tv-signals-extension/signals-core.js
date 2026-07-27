@@ -499,13 +499,52 @@
   // ── всё вместе: серии + последний сигнал + точность ──────────────────────────
   const IDS = ['zscore', 'accel', 'order_block', 'fvg', 'liq_sweep', 'false_breakout', 'vsa_abs', 'waning', 'talib_anti', 'hawkes', 'cascade', 'nw', 'alligator_inv', 'fade', 'zonefade',
     'dfa_regime', 'bipower_jump', 'amihud_shock', 'vpin_toxicity', 'anchored_vwap', 'elliott_wave'];
+
+  // Универсал ANTI по данным score_methods.py (invest-bot/docs/BASELINE_method_
+  // verdicts_2026-07.md + свежий top-50 top-liq): методы, у которых d<0 во всех
+  // режимах в обоих прогонах. Инвертируем ряд перед агрегатом — так же, как
+  // alligator_inv, но декларативно списком. Пороги/цифры:
+  //   accel     (PRICE_ACCEL)    BASE -0.054 / top50 -0.050
+  //   liq_sweep (LIQUIDITY_SWEEP) BASE -0.105 / глоб -0.094
+  // anchored_vwap и elliott_wave УЖЕ инвертированы внутри самих методов (см.
+  // "ИНВЕРТИРУЕМ (fade от anchored VWAP)" в M.anchored_vwap и "инверсия (в боте
+  // anti)" в M.elliott_wave) — второй раз крутить нельзя, вернём в anti.
+  const _INVERTED_GLOBAL = new Set(['accel', 'liq_sweep']);
+
+  // Контекстная (режимная) инверсия для NW: в trending_down d от -0.109
+  // (BASELINE) до -0.353 (top-50), во всех остальных режимах — signal.
+  // Инвертируем только те бары, где ER≥0.3 и цена ниже, чем W баров назад.
+  function _isTrendDown(bars) {
+    const n = bars.length, out = new Uint8Array(n), W = 60;
+    if (n < W + 1) return out;
+    const cl = bars.map(b => b.close);
+    for (let i = W; i < n; i++) {
+      let d = 0; for (let j = i - W + 1; j <= i; j++) d += Math.abs(cl[j] - cl[j - 1]);
+      if (d <= 0) continue;
+      const diff = cl[i] - cl[i - W];
+      if (Math.abs(diff) / d < 0.3) continue;
+      if (diff < 0) out[i] = 1;
+    }
+    return out;
+  }
+
   function computeAll(bars, horizon) {
     horizon = horizon || 12;
     const out = {};
+    const trendDown = _isTrendDown(bars);
     IDS.forEach(id => {
       let series; try { series = M[id](bars); } catch (e) { series = bars.map(() => null); }
+      let inverted = false;
+      if (_INVERTED_GLOBAL.has(id)) {
+        series = series.map(v => v == null ? null : -v);
+        inverted = 'global';
+      } else if (id === 'nw') {
+        // Только бары в trending_down переворачиваем.
+        series = series.map((v, i) => (v == null || !trendDown[i]) ? v : -v);
+        inverted = 'regime:trending_down';
+      }
       let last = 0; for (let i = series.length - 1; i >= 0; i--) if (series[i] != null) { last = series[i]; break; }
-      out[id] = { series, last, stats: btStats(series, bars, horizon) };
+      out[id] = { series, last, stats: btStats(series, bars, horizon), inverted };
     });
     return out;
   }
