@@ -1,0 +1,93 @@
+=== ДИФФ BASELINE vs top-50 (по клеткам с n_tk ≥ 5 в обоих) ===
+флаги: FLIP = знак изменился; DIVERGE = |Δd| > 0.10; STRONGER = усилился в ту же сторону; WEAKER = ослаб
+
+метод                  режим            BASE d BASE tk      50 d 50 tk       Δd  флаг
+----------------------------------------------------------------------------------------------------
+ADAPTIVE_MA            trending_up      -0.087  161    -0.130   48   -0.043  stronger
+ADAPTIVE_MA            trending_down    -0.059  190    -0.101   49   -0.043  stronger
+ADAPTIVE_MA            high_vol         -0.604   46    -0.746   22   -0.142  DIVERGE
+ADAPTIVE_MA            stress           -0.151  160    -0.108   46   +0.043  weaker
+ADX_DI_CONVERGENCE     stress           +0.054   94    -0.002   44   -0.057  weaker
+ALLIGATOR              stress           -0.098  237    -0.039   48   +0.059  weaker
+ATR_EXHAUSTION         high_vol         +0.057  161    +0.094   45   +0.037  stronger
+BB_KELTNER_SQUEEZE     trending_down    -0.104  291    -0.074   50   +0.030  weaker
+BB_KELTNER_SQUEEZE     high_vol         -0.139  171    -0.033   45   +0.106  DIVERGE
+BB_KELTNER_SQUEEZE     low_vol          -0.074  319    -0.120   50   -0.047  stronger
+BS_PRESSURE            trending_down    -0.265   14    -0.170    6   +0.094  weaker
+BS_PRESSURE            ranging          -0.086   21    -0.143    8   -0.057  stronger
+BS_PRESSURE            low_vol          -0.355   16    -0.284    7   +0.071  weaker
+CANDLE_PATTERN         high_vol         -0.047  169    -0.124   45   -0.077  stronger
+CASCADE                trending_down    +0.038   52    -0.036   35   -0.074  ★FLIP★
+CASCADE                ranging          +0.089  104    +0.044   45   -0.045  weaker
+CYBER_PHASE            ranging          -0.049  332    -0.009   50   +0.040  weaker
+CYBER_PHASE            low_vol          -0.040  308    -0.074   50   -0.034  stronger
+EHLERS_MODE            trending_up      -0.041  172    -0.092   49   -0.051  stronger
+EHLERS_MODE            trending_down    -0.095  199    -0.059   49   +0.036  weaker
+EHLERS_MODE            high_vol         -0.378   38    -0.322   19   +0.056  weaker
+EHLERS_MODE            stress           -0.121  130    -0.060   45   +0.061  weaker
+ENTROPY                trending_up      -0.003  138    -0.053   45   -0.050  stronger
+ENTROPY                ranging          -0.044  179    +0.001   46   +0.045  weaker
+FISHER_RSI             high_vol         +0.054   47    -0.049   27   -0.103  ★FLIP★
+FRACTIONAL_DIFF        trending_up      -0.028  236    -0.100   49   -0.072  stronger
+FRACTIONAL_DIFF        trending_down    -0.058  272    -0.019   50   +0.038  weaker
+FRACTIONAL_DIFF        ranging          -0.073  320    -0.026   50   +0.047  weaker
+ICHIMOKU_SIGNAL        stress           -0.275   14    +0.112    6   +0.387  ★FLIP★
+IMPULSE_PULLBACK       ranging          -0.059  297    -0.029   50   +0.030  weaker
+KLINGER                high_vol         -0.018  148    +0.070   44   +0.088  stronger
+LEVEL_ABSORPTION       trending_down    -0.117   11    +0.060    8   +0.177  ★FLIP★
+LEVEL_ABSORPTION       ranging          -0.148   36    -0.097   22   +0.050  weaker
+LEVEL_ABSORPTION       low_vol          -0.250   32    -0.154   19   +0.096  weaker
+LIQUIDITY_SWEEP        ranging          -0.145   21    -0.115   10   +0.030  weaker
+LIQUIDITY_SWEEP        stress           -0.007   18    -0.089   12   -0.082  stronger
+MA_ENVELOPE            trending_up      +0.006  207    +0.055   49   +0.048  stronger
+MA_ENVELOPE            high_vol         +0.340   53    +0.501   22   +0.161  DIVERGE
+MA_ENVELOPE            low_vol          +0.036  265    +0.084   50   +0.048  stronger
+NADARAYA_WATSON        trending_up      +0.063   78    +0.003   15   -0.059  weaker
+NADARAYA_WATSON        trending_down    -0.109   60    -0.353   23   -0.244  DIVERGE
+NADARAYA_WATSON        ranging          +0.051  303    -0.013   50   -0.064  weaker
+NADARAYA_WATSON        high_vol         +0.116   54    +0.075   19   -0.041  weaker
+PRICE_ACCEL            high_vol         -0.045  131    -0.100   44   -0.055  stronger
+PRICE_ACCEL            stress           -0.089  248    -0.122   49   -0.032  stronger
+RSI_DIVERGENCE         trending_down    +0.326    8    -0.360    8   -0.686  ★FLIP★
+RSI_DIVERGENCE         high_vol         +0.266   34    +0.219   18   -0.047  weaker
+RSI_DIVERGENCE         low_vol          +0.105  118    +0.040   46   -0.065  weaker
+RSI_DIVERGENCE         stress           +0.073   87    +0.010   41   -0.063  weaker
+T3_SIGNAL              trending_up      -0.120  125    -0.206   40   -0.086  stronger
+T3_SIGNAL              trending_down    -0.112  176    -0.065   47   +0.047  weaker
+T3_SIGNAL              ranging          -0.118  244    -0.054   47   +0.064  weaker
+T3_SIGNAL              low_vol          -0.145  214    -0.104   47   +0.042  weaker
+T3_SIGNAL              stress           -0.143  178    -0.046   45   +0.096  weaker
+TALIB_ANTISIGNAL       trending_down    +0.119  176    +0.082   50   -0.037  weaker
+TALIB_ANTISIGNAL       ranging          +0.148  230    +0.108   50   -0.040  weaker
+TRIANGLE               trending_up      -0.130   11    -0.257    5   -0.127  DIVERGE
+TRIANGLE               ranging          +0.035   89    -0.003   38   -0.038  weaker
+TRIANGLE               high_vol         +0.036   31    +0.162   16   +0.125  DIVERGE
+TRIANGLE               low_vol          +0.034   78    -0.057   37   -0.091  ★FLIP★
+ULT_OSC_DISAGREEMENT   trending_down    +0.196   55    +0.090   23   -0.106  DIVERGE
+ULT_OSC_DISAGREEMENT   high_vol         +0.181   41    +0.117   22   -0.064  weaker
+ULT_OSC_DISAGREEMENT   low_vol          +0.038  165    +0.076   48   +0.038  stronger
+VOL_MOMENTUM           low_vol          -0.005  306    -0.041   50   -0.036  stronger
+VSA                    trending_down    +0.018  171    +0.069   49   +0.051  stronger
+VWAP_SIGNAL            trending_down    -0.073  281    +0.030   50   +0.103  ★FLIP★
+VWAP_SIGNAL            high_vol         -0.073  161    -0.172   44   -0.098  stronger
+VZO                    high_vol         -0.039  162    -0.084   45   -0.045  stronger
+WANING_IMPULSES        trending_up      +0.032   71    +0.094   34   +0.062  stronger
+WANING_IMPULSES        trending_down    +0.016   73    +0.114   34   +0.098  stronger
+WANING_IMPULSES        stress           +0.089  172    +0.002   46   -0.088  weaker
+WICK_REJECTION         high_vol         -0.004  124    +0.041   44   +0.045  stronger
+ZLEMA_SIGNAL           trending_up      -0.142   76    -0.205   28   -0.063  stronger
+ZLEMA_SIGNAL           trending_down    -0.092  139    +0.045   39   +0.137  ★FLIP★
+ZLEMA_SIGNAL           ranging          -0.138  201    +0.004   44   +0.142  DIVERGE
+ZLEMA_SIGNAL           low_vol          -0.158  178    -0.044   43   +0.114  DIVERGE
+ZLEMA_SIGNAL           stress           -0.151  139    -0.078   43   +0.073  weaker
+ZSCORE                 trending_up      +0.111  130    +0.146   46   +0.034  stronger
+ZSCORE                 trending_down    +0.079  166    +0.010   47   -0.068  weaker
+ZSCORE                 high_vol         +0.470   41    +0.583   19   +0.112  DIVERGE
+ZSCORE                 low_vol          +0.098  206    +0.138   49   +0.040  stronger
+
+ИТОГ:
+  ★FLIP★     (знак другой): 8
+  DIVERGE   (|Δd|>0.10):    10
+  stronger  (усилился):     28
+  weaker    (ослаб):        35
+  aligned   (совпал):       175
