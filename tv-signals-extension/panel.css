@@ -158,6 +158,21 @@
   border:1px solid rgba(180, 130, 240, .35); cursor:help; }
 .tvsig-inv-icon.regime{ background:rgba(94, 230, 168, .12); color:#5EE6A8;
   border-color:rgba(94, 230, 168, .3); }
+/* блок с настройкой порогов уведомлений (min exp / min winrate) */
+#tvsig-notify-cfg{ margin:4px 6px 0; padding:5px 8px; border-radius:6px;
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06);
+  font-size:10px; color:var(--text2); display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+#tvsig-notify-cfg input{ background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
+  color:var(--text); border-radius:4px; padding:2px 4px; font-family:var(--mono); font-size:10px; }
+#tvsig-notify-cfg input:focus{ outline:none; border-color:var(--amber); }
+/* Голосующие методы в консенсусе — компактные чипы двумя строками */
+.tvsig-cons-side{ margin-top:4px; padding:4px 6px; border-radius:5px; font-size:10px;
+  line-height:1.65; display:flex; flex-wrap:wrap; align-items:baseline; gap:3px 5px; }
+.tvsig-cons-side.buy { background:rgba(82, 242, 201, .07); border:1px solid rgba(82, 242, 201, .2); color:#88F1CE; }
+.tvsig-cons-side.sell{ background:rgba(255, 106, 139, .07); border:1px solid rgba(255, 106, 139, .2); color:#FF97AF; }
+.tvsig-cons-voter{ display:inline-flex; align-items:baseline; padding:1px 5px; border-radius:3px;
+  background:rgba(255,255,255,.04); color:var(--text); font-size:9.5px; cursor:help; }
+.tvsig-cons-voter i{ margin-left:4px; font-style:normal; opacity:.55; font-size:8.5px; }
 
 #tvsig-rows{ padding:4px; max-height:340px; overflow:auto; }
 /* мини-заголовок группы синергии: название · агрегат exp/win · описание */

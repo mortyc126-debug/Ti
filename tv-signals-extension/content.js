@@ -175,6 +175,14 @@
   function notifyTickerSet(v) { try { localStorage.setItem('tvsig:notifyticker', v ? '1' : '0'); } catch (e) {} }
   function notifyScanGet() { try { return localStorage.getItem('tvsig:notifyscan') === '1'; } catch (e) { return false; } }
   function notifyScanSet(v) { try { localStorage.setItem('tvsig:notifyscan', v ? '1' : '0'); } catch (e) {} }
+  // Пороги фильтра уведомлений: минимальная точность (winrate %) и/или
+  // минимальная экспектанси (exp в ATR). Раньше был жёсткий exp>0.03 в
+  // notifyCheckMethods — теперь пользователь регулирует. Дефолты — как было
+  // (exp 0.03, win 0 = не режем по win, только по exp).
+  function notifyMinWinGet() { try { const v = parseFloat(localStorage.getItem('tvsig:notifyminwin')); return isFinite(v) ? v : 0; } catch (e) { return 0; } }
+  function notifyMinWinSet(v) { try { localStorage.setItem('tvsig:notifyminwin', String(v)); } catch (e) {} }
+  function notifyMinExpGet() { try { const v = parseFloat(localStorage.getItem('tvsig:notifyminexp')); return isFinite(v) ? v : 0.03; } catch (e) { return 0.03; } }
+  function notifyMinExpSet(v) { try { localStorage.setItem('tvsig:notifyminexp', String(v)); } catch (e) {} }
   // токен AlgoPack (MOEX) — хранится локально, шлётся ТОЛЬКО в apim.moex.com
   function oiTokenGet() { try { return localStorage.getItem('tvsig:moextoken') || ''; } catch (e) { return ''; } }
   function oiTokenSet(v) { try { v ? localStorage.setItem('tvsig:moextoken', v) : localStorage.removeItem('tvsig:moextoken'); } catch (e) {} }
@@ -2195,7 +2203,10 @@
       '<div id="tvsig-status">инициализация…</div>' +
       '<div id="tvsig-consensus" title="Общий текущий сигнал: сумма голосов методов, взвешенных по их exp на этом тикере"></div>' +
       '<div id="tvsig-rows"></div>' +
-      '<div id="tvsig-foot">Цифры считаются на свечах <b>текущего тикера</b>, хранятся по каждому и обновляются при закрытии нового бара. <b>exp</b> — экспектанси, средний P&amp;L сделки в ATR (тейк +1.5 / стоп −0.75 ATR, R:R 2:1 — валидировано; узкий брекет занижал вдвое, издержки 0.12); плюс = метод в прибыли. <b>%</b> — winrate, частота угадывания знака за 12 баров (не путать с win сделки — та выше при широком стопе). <b>n</b> — число сделок. Клик по строке рисует сигналы. <b>🔔</b> вверху — уведомления браузера о новых сигналах ЭТОГО тикера (только рабочие методы, exp&gt;0.03). Для сканера — отдельный 🔔 в «Сканере». Не шлёт про то, что было активно ДО включения — только новые срабатывания.</div>' +
+      '<div id="tvsig-notify-cfg" title="Пороги для 🔔 уведомлений об ЭТОМ тикере. Метод шлёт нотификацию только если сигнал сменил знак И у метода на этом тикере exp ≥ min exp И winrate ≥ min win%. Ставь min win% = 0 чтобы не фильтровать по точности.">' +
+      '🔔 пороги: min exp <input type="number" id="tvsig-notify-minexp" step="0.01" min="0" style="width:52px"> ATR · min win <input type="number" id="tvsig-notify-minwin" step="1" min="0" max="100" style="width:44px">%' +
+      '</div>' +
+      '<div id="tvsig-foot">Цифры считаются на свечах <b>текущего тикера</b>, хранятся по каждому и обновляются при закрытии нового бара. <b>exp</b> — экспектанси, средний P&amp;L сделки в ATR (тейк +1.5 / стоп −0.75 ATR, R:R 2:1 — валидировано; узкий брекет занижал вдвое, издержки 0.12); плюс = метод в прибыли. <b>%</b> — winrate, частота угадывания знака за 12 баров (не путать с win сделки — та выше при широком стопе). <b>n</b> — число сделок. Клик по строке рисует сигналы. <b>🔔</b> вверху — уведомления браузера о новых сигналах ЭТОГО тикера, пороги настраиваются в блоке «🔔 пороги» выше. Для сканера — отдельный 🔔 в «Сканере». Не шлёт про то, что было активно ДО включения — только новые срабатывания.</div>' +
       '</div>' + // /pane-signals
       '<div id="tvsig-pane-compare" class="tvsig-pane" hidden>' +
       '<div id="tvsig-cmp-ctrl">' +
@@ -2305,8 +2316,15 @@
     const notifyBtn = panel.querySelector('#tvsig-notify');
     const notifyReflect = () => notifyBtn.classList.toggle('on', notifyTickerGet());
     notifyBtn.onclick = () => { notifyTickerSet(!notifyTickerGet()); notifyReflect();
-      if (notifyTickerGet()) notifySend('Уведомления по тикеру включены', 'Пришлю сюда, когда на этом тикере появится новый сигнал по рабочему методу (exp>0).'); };
+      if (notifyTickerGet()) notifySend('Уведомления по тикеру включены', 'Пришлю сюда, когда на этом тикере появится новый сигнал по методу с exp≥min exp и winrate≥min win% (настраивается в блоке под таблицей).'); };
     notifyReflect();
+    // инпуты порогов уведомлений — вписываются в localStorage без подтверждения
+    const nExpEl = panel.querySelector('#tvsig-notify-minexp');
+    const nWinEl = panel.querySelector('#tvsig-notify-minwin');
+    if (nExpEl) { nExpEl.value = notifyMinExpGet();
+      nExpEl.addEventListener('change', () => { const v = parseFloat(nExpEl.value); if (isFinite(v) && v >= 0) notifyMinExpSet(v); else nExpEl.value = notifyMinExpGet(); }); }
+    if (nWinEl) { nWinEl.value = notifyMinWinGet();
+      nWinEl.addEventListener('change', () => { const v = parseFloat(nWinEl.value); if (isFinite(v) && v >= 0 && v <= 100) notifyMinWinSet(v); else nWinEl.value = notifyMinWinGet(); }); }
     const tpslBtn = panel.querySelector('#tvsig-tpsl');
     const tpslReflect = () => tpslBtn.classList.toggle('on', tpSlShowGet());
     tpslBtn.onclick = () => {
@@ -2595,9 +2613,13 @@
       const price = S.bars && S.bars.length ? S.bars[S.bars.length - 1].close : null;
       const winSet = new Set(conf.map(cc => cc.winner));
       const loseSet = new Set(conf.map(cc => cc.loser));
+      const minExp = notifyMinExpGet();
+      const minWin = notifyMinWinGet();
       META.forEach(([id]) => {
         const before = prev[id] || 0, now = cur[id]; if (now === 0 || now === before) return;
-        const st = c[id] && c[id].stats; if (!st || st.exp == null || st.exp <= 0.03 || st.n < 10) return;
+        const st = c[id] && c[id].stats; if (!st || st.exp == null || st.exp <= minExp || st.n < 10) return;
+        // Пользовательский порог по точности (win в долях 0..1, в UI %).
+        if (minWin > 0 && (st.acc == null || st.acc * 100 < minWin)) return;
         const dirTxt = now > 0 ? '▲ лонг' : '▼ шорт';
         // если этот метод входит в АКТИВНУЮ синергию — усиливаем заголовок ⚡;
         // если проигрывает в конфликте — суффикс-предупреждение
@@ -2618,6 +2640,9 @@
     const c = S.computed;
     if (!c || !c.__live) { el.innerHTML = ''; return; } // только по свежему расчёту, не по кэшу
     let net = 0, wsum = 0, buy = 0, sell = 0, working = 0;
+    // Сохраняем голосующих для перечисления под сводкой — раньше видно было
+    // "5 за / 2 против", но не было понятно КАКИЕ методы голосуют.
+    const buyVoters = [], sellVoters = [];
     META.forEach(([id]) => {
       const m = c[id]; if (!m || !m.stats) return;
       const exp = m.stats.exp;
@@ -2625,8 +2650,13 @@
       working++;
       const sig = m.last > 0 ? 1 : m.last < 0 ? -1 : 0;
       if (sig === 0) return;
-      const w = Math.min(1, exp); net += sig * w; wsum += w; if (sig > 0) buy++; else sell++;
+      const w = Math.min(1, exp); net += sig * w; wsum += w;
+      if (sig > 0) { buy++; buyVoters.push({ id, w: sig * w, exp }); }
+      else         { sell++; sellVoters.push({ id, w: -sig * w, exp }); }
     });
+    // Сильнейшие вклады первыми — вес = |sig * exp|
+    buyVoters.sort((a, b) => b.w - a.w);
+    sellVoters.sort((a, b) => b.w - a.w);
     if (working === 0) { el.innerHTML = '<div class="tvsig-cons-empty">Консенсус: у методов пока нет подтверждённого edge на этом тикере (мало истории — дай пересчитаться).</div>'; return; }
     const strength = wsum > 0 ? net / wsum : 0; // [-1..1]
     const dir = strength > 0.08 ? 1 : strength < -0.08 ? -1 : 0;
@@ -2664,12 +2694,21 @@
       confHtml = '<div class="tvsig-conf-box" title="Активные конфликты: методы противоречат друг другу, а победитель по combo-тесту известен.">' +
         '<div class="tvsig-conf-head">⚠ Активные конфликты: <b>' + conf.length + '</b> — верь тому, что жирным</div>' + rows + '</div>';
     }
+    // Компактный список голосующих: имя метода + exp в скобках. Раздел
+    // «за покупку» / «за продажу» отсортирован по вкладу (sig × exp) — сильные
+    // первыми, чтобы сразу читалась суть, а не альфавит.
+    const voterTag = v => '<span class="tvsig-cons-voter" title="exp ' + v.exp.toFixed(2) + ' ATR — вклад в голосование ' + v.w.toFixed(2) + '">' + (NAME[v.id] || v.id) + '<i>' + v.exp.toFixed(2) + '</i></span>';
+    const buyList = buyVoters.map(voterTag).join('');
+    const sellList = sellVoters.map(voterTag).join('');
+    let votersHtml = '';
+    if (buyList) votersHtml += '<div class="tvsig-cons-side buy" title="Методы голосующие за покупку (отсортированы по силе вклада)">▲ <b>' + buy + '</b> ' + buyList + '</div>';
+    if (sellList) votersHtml += '<div class="tvsig-cons-side sell" title="Методы голосующие за продажу (отсортированы по силе вклада)">▼ <b>' + sell + '</b> ' + sellList + '</div>';
     el.innerHTML =
       '<div class="tvsig-cons-top"><b style="color:' + col + '">' + label + '</b>' +
       '<span class="tvsig-cons-pct">сила ' + Math.round(Math.abs(strength) * 100) + '%</span></div>' +
       '<div class="tvsig-cons-scale"><span class="tvsig-cons-mid"></span><span class="tvsig-cons-fill" style="' + fill + '"></span></div>' +
       '<div class="tvsig-cons-votes">' + buy + ' за покупку · ' + sell + ' за продажу · из ' + working + ' рабочих методов (exp&gt;0)</div>' +
-      synHtml + confHtml;
+      votersHtml + synHtml + confHtml;
   }
 
   // HTML одной строки метода (вынесено из renderRows, чтобы группировать)
