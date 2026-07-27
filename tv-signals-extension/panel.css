@@ -165,6 +165,14 @@
 #tvsig-notify-cfg input{ background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
   color:var(--text); border-radius:4px; padding:2px 4px; font-family:var(--mono); font-size:10px; }
 #tvsig-notify-cfg input:focus{ outline:none; border-color:var(--amber); }
+/* пороги фильтра уведомлений сканера — в одну строку с 🔔 сканера */
+.tvsig-scan-notify-cfg{ display:inline-flex; align-items:center; gap:3px;
+  margin-left:6px; padding:2px 6px; border-radius:5px;
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06);
+  font-size:10px; color:var(--text2); }
+.tvsig-scan-notify-cfg input{ background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
+  color:var(--text); border-radius:4px; padding:1px 3px; font-family:var(--mono); font-size:10px; }
+.tvsig-scan-notify-cfg input:focus{ outline:none; border-color:var(--amber); }
 /* Голосующие методы в консенсусе — компактные чипы двумя строками */
 .tvsig-cons-side{ margin-top:4px; padding:4px 6px; border-radius:5px; font-size:10px;
   line-height:1.65; display:flex; flex-wrap:wrap; align-items:baseline; gap:3px 5px; }

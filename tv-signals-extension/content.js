@@ -183,6 +183,13 @@
   function notifyMinWinSet(v) { try { localStorage.setItem('tvsig:notifyminwin', String(v)); } catch (e) {} }
   function notifyMinExpGet() { try { const v = parseFloat(localStorage.getItem('tvsig:notifyminexp')); return isFinite(v) ? v : 0.03; } catch (e) { return 0.03; } }
   function notifyMinExpSet(v) { try { localStorage.setItem('tvsig:notifyminexp', String(v)); } catch (e) {} }
+  // Аналогичные пороги для сканера. Раньше на любой новый хит в auto-скане
+  // приходило уведомление; теперь пользователь фильтрует по exp / winrate
+  // лучшего метода-триггера этого хита.
+  function notifyScanMinWinGet() { try { const v = parseFloat(localStorage.getItem('tvsig:notifyscanminwin')); return isFinite(v) ? v : 0; } catch (e) { return 0; } }
+  function notifyScanMinWinSet(v) { try { localStorage.setItem('tvsig:notifyscanminwin', String(v)); } catch (e) {} }
+  function notifyScanMinExpGet() { try { const v = parseFloat(localStorage.getItem('tvsig:notifyscanminexp')); return isFinite(v) ? v : 0; } catch (e) { return 0; } }
+  function notifyScanMinExpSet(v) { try { localStorage.setItem('tvsig:notifyscanminexp', String(v)); } catch (e) {} }
   // токен AlgoPack (MOEX) — хранится локально, шлётся ТОЛЬКО в apim.moex.com
   function oiTokenGet() { try { return localStorage.getItem('tvsig:moextoken') || ''; } catch (e) { return ''; } }
   function oiTokenSet(v) { try { v ? localStorage.setItem('tvsig:moextoken', v) : localStorage.removeItem('tvsig:moextoken'); } catch (e) {} }
@@ -838,7 +845,18 @@
   // запуске автообновления.
   function notifyCheckScan(hits) {
     if (!notifyScanGet()) return;
-    const found = hits.filter(h => h.dir);
+    const minExp = notifyScanMinExpGet();
+    const minWin = notifyScanMinWinGet();
+    // Пропускаем хиты, у которых лучший метод-триггер не проходит пороги.
+    // Синергии (h.syn) не режем — если пользователь ждёт согласия пары, то
+    // само согласие уже фильтр; отсутствие индивидуальных exp/win там ок.
+    const found = hits.filter(h => {
+      if (!h.dir) return false;
+      if (h.syn && h.syn.length) return true;
+      if (minExp > 0 && (h.exp == null || h.exp < minExp)) return false;
+      if (minWin > 0 && (h.win == null || h.win * 100 < minWin)) return false;
+      return true;
+    });
     // Cooldown per тикер: если по тикеру только что было уведомление, не шлём
     // новое ещё N минут, независимо от направления и метода. Раньше ключ был
     // (тикер, метод) — новый метод по тому же тикеру шёл сразу и мог быть в
@@ -1334,8 +1352,14 @@
       if (scanNotifyCb) {
         scanNotifyCb.checked = notifyScanGet();
         scanNotifyCb.addEventListener('change', () => { notifyScanSet(scanNotifyCb.checked);
-          if (scanNotifyCb.checked) notifySend('Уведомления скана включены', 'Пришлю сюда новые хиты при автообновлении.'); });
+          if (scanNotifyCb.checked) notifySend('Уведомления скана включены', 'Пришлю сюда новые хиты при автообновлении. Пороги — рядом с 🔔.'); });
       }
+      const scanMinExpEl = document.getElementById('tvsig-scan-minexp');
+      const scanMinWinEl = document.getElementById('tvsig-scan-minwin');
+      if (scanMinExpEl) { scanMinExpEl.value = notifyScanMinExpGet();
+        scanMinExpEl.addEventListener('change', () => { const v = parseFloat(scanMinExpEl.value); if (isFinite(v) && v >= 0) notifyScanMinExpSet(v); else scanMinExpEl.value = notifyScanMinExpGet(); }); }
+      if (scanMinWinEl) { scanMinWinEl.value = notifyScanMinWinGet();
+        scanMinWinEl.addEventListener('change', () => { const v = parseFloat(scanMinWinEl.value); if (isFinite(v) && v >= 0 && v <= 100) notifyScanMinWinSet(v); else scanMinWinEl.value = notifyScanMinWinGet(); }); }
     }
     scanAutoSync(); // и на повторных заходах (не только первичная инициализация) — вкладка снова видима
   }
@@ -2290,6 +2314,7 @@
       '<div id="tvsig-scan-autorow"><label class="tvsig-scan-onlyactive" id="tvsig-scan-auto-lbl" title="Пересканировать список автоматически, пока открыта вкладка «Сканер». Недоступно для источника «график терминала» — авто-пересканирование им слишком часто дёргало бы твой график."><input type="checkbox" id="tvsig-scan-auto"> автообновление каждые</label>' +
       '<select id="tvsig-scan-auto-iv"><option value="15">15 с</option><option value="30" selected>30 с</option><option value="60">1 мин</option><option value="120">2 мин</option><option value="300">5 мин</option></select>' +
       '<label class="tvsig-scan-onlyactive" title="Уведомление браузера на каждый НОВЫЙ хит при автообновлении (не было в предыдущем скане). Ручной клик по «Скан» не уведомляет — ты и так смотришь на результат."><input type="checkbox" id="tvsig-scan-notify"> 🔔</label>' +
+      '<span class="tvsig-scan-notify-cfg" title="Пороги фильтра уведомлений скана: хит доходит до 🔔 только если у метода-триггера на его тикере exp ≥ min exp И winrate ≥ min win%. Синергии (пара из combo-теста) идут в обход порогов — там сам факт согласия уже фильтр. Ставь 0 чтобы отключить порог.">min exp <input type="number" id="tvsig-scan-minexp" step="0.01" min="0" style="width:48px"> · min win <input type="number" id="tvsig-scan-minwin" step="1" min="0" max="100" style="width:40px">%</span>' +
       '<span id="tvsig-scan-auto-ts" class="dim"></span></div>' +
       '<textarea id="tvsig-scan-list" placeholder="SBER GAZP LKOH SNGS ROSN … (через пробел/запятую)"></textarea>' +
       '<div id="tvsig-scan-sel">Сигнал <select id="tvsig-scan-a"></select> + <select id="tvsig-scan-b"></select>' +
