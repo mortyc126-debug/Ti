@@ -41,25 +41,25 @@
       desc: 'Классические разворотные с сильнейшим вкладом в синергии по актуальному combo-тесту. talib_anti + amihud/cascade/dfa (+0.29..+0.43 lift, 30-57k n_agr); cascade + amihud/dfa/hawkes (+0.29..+0.71); zscore — универсал, синергирует с VPIN_TOXICITY и caсcade (n=57k). Согласие 2+ из ядра ≈ высокая уверенность.' },
     { title: 'Разворотные — extension-only, брекет R:R 2:1', ids: ['fade', 'zonefade', 'vsa_abs', 'waning'],
       desc: 'Валидированные в invest-bot и extension-only (в боте прямых аналогов нет — оценить через combo_methods нельзя). fade + zonefade — классические фейд-стратегии с раскрытым CI [+0.11,+0.20]. Держатся в OOS.' },
-    { title: 'Структурные — контекст, не самостоятельный сигнал', ids: ['order_block', 'fvg', 'liq_sweep', 'false_breakout', 'hawkes'],
+    { title: 'Структурные — контекст, не самостоятельный сигнал', ids: ['order_block', 'fvg', 'false_breakout', 'hawkes'],
       desc: 'Участвуют в синергиях (fvg + vpin/cascade +0.26..+0.51 lift, hawkes + vpin/dfa/cascade +0.26..+0.47) — но в одиночку на брекете R:R 2:1 слабые/минусовые. Держать для голосования в паре, не как первичный сигнал.' },
-    { title: 'Балласт — часто вредят в связках', ids: ['accel', 'alligator_inv', 'nw'],
-      desc: 'По combo-тесту 2026-07: accel — король антагонизмов (10 из 25 топ, PRICE_ACCEL vs TALIB_ANTISIGNAL: −20.1 t на 233k конфликтов, проигрывает почти всем); alligator_inv — постоянные антагонизмы, инверсия недостаточна; nw — проигрывает 4 из 5 конфликтов (ORDER_BLOCK, TALIB_ANTI, WANING). Держать выключенными; при желании — только контекст.' },
+    { title: 'MODS-обработка — инвертированы/режимные (по score_methods.py)', ids: ['accel', 'liq_sweep', 'alligator_inv', 'nw'],
+      desc: 'По BASELINE (420 тикеров, июль 2026) + свежий top-50 ликвидных: методы стабильно anti — их голос инвертируется в computeAll декларативно, чтобы стать signal. accel (PRICE_ACCEL d≈-0.05 в обоих прогонах), liq_sweep (LIQUIDITY_SWEEP d≈-0.10), alligator_inv (ALLIGATOR d≈-0.07, инвертирован ещё раньше — «-inv» в имени). NW — режимный (⚙REG-INV): signal во всех режимах кроме trending_down (там d=-0.11..-0.35), инвертируется только на барах даунтренда. Раньше эти три считались «Балластом», но после инверсии в composite работают в свою пользу. anchored_vwap и elliott_wave тоже anti, но их инверсия сидит ВНУТРИ самих методов — они остались в первой группе.' },
   ];
   // описания для ℹ-окон: что делает · как читать знак · оговорка из прогонов бота
   const DESC = {
     zscore: { what: 'Rolling z-score: отклонение цены от среднего за 20 баров.', read: 'Контрарный возврат к среднему — цена высоко над средней → sell, глубоко под → buy.', note: 'Универсальный сигнал во всех режимах (OOS-подтверждён). Сильнее на менее ликвидных тикерах.' },
-    accel: { what: 'Ускорение цены (2-я производная). Аномальный всплеск ПО тренду = климакс/истощение.', read: 'Фейд: сильное ускорение в сторону тренда → сигнал ПРОТИВ.', note: 'Гонтлет пройден (held-out +0.185 ATR). Эдж живёт при тейке 1.0/стопе 0.5; чувствителен к спреду — торгуй ликвид.' },
+    accel: { what: 'Ускорение цены (2-я производная). Аномальный всплеск ПО тренду = климакс/истощение.', read: 'Фейд: сильное ускорение в сторону тренда → сигнал ПРОТИВ.', note: 'По BASELINE и top-50 стабильно anti (d≈-0.05 в обоих прогонах) — теперь ИНВЕРТИРОВАН в composite (↺anti-бейдж). Сначала считался балластом, после инверсии работает в свою пользу. Эдж живёт при тейке 1.0/стопе 0.5; чувствителен к спреду.' },
     order_block: { what: 'ICT Order Block: последняя противоположная свеча перед импульсом ≥1.2 ATR.', read: 'Возврат цены в зону блока → сигнал ПО направлению импульса (континуация).', note: 'Реальный сигнал, держится в OOS.' },
     fvg: { what: 'Fair Value Gap: 3-свечной гэп-имбаланс (свеча i−2 против i).', read: 'Возврат в гэп → сигнал ПО направлению гэпа (заполнение).', note: 'Универсальный сигнал, огромная выборка, работает во всех режимах.' },
-    liq_sweep: { what: 'Снятие ликвидности: прокол 20-барного хая/лоя с закрытием обратно.', read: 'Контр: прокол вверх с возвратом → sell, вниз → buy.', note: 'В прогонах слабый/режимный; знак уже контрарный.' },
+    liq_sweep: { what: 'Снятие ликвидности: прокол 20-барного хая/лоя с закрытием обратно.', read: 'Контр: прокол вверх с возвратом → sell, вниз → buy.', note: 'BASELINE d=-0.105 глобально; знак был контрарный (сырой сигнал = anti), теперь ИНВЕРТИРОВАН в composite (↺anti-бейдж), голос стал правильным.' },
     false_breakout: { what: 'Ложный пробой: пробой 15-барного уровня с закрытием обратно за него.', read: 'Контр: провал пробоя вверх → sell, вниз → buy.', note: 'Режимный: + в up/ranging, − в down/stress. В OOS ослаб (anti→noise).' },
     vsa_abs: { what: 'VSA-поглощение: большой объём (≥1.8×) при крошечном размахе (≤0.7 ATR).', read: 'Усилие без результата → сигнал ПРОТИВ тела свечи (разворот).', note: 'Нужен объём. In-sample топ, но OOS не подтвердил — доверять осторожно.' },
     waning: { what: 'Затухание импульса: 3 свечи в одну сторону с убывающими телами.', read: 'Против гаснущего движения (разворот).', note: 'Держится сигналом в OOS — слабый, но стабильный.' },
     talib_anti: { what: 'Фейд свечных паттернов: крупное тело ≥1.2 ATR и ≥60% размаха.', read: 'Сигнал ПРОТИВ тела — именованные свечные шаблоны работают наоборот.', note: 'Топ-сигнал по вкладу в боте (win 54.5%, огромная выборка). Фейдить свечи = edge.' },
     hawkes: { what: 'Хоукс-интенсивность: EWMA абсолютных доходностей (кластеризация волатильности).', read: 'Рост интенсивности + ход за 5 баров → континуация в ту сторону.', note: 'Универсальный сигнал во всех режимах (OOS-подтверждён).' },
     cascade: { what: 'Ансамбль: Z-score + Order Block + FVG.', read: 'Сигнал только если ≥2 согласны в одну сторону (конфлюэнс).', note: 'Сильнейший effect-size в боте, но редкий — мало срабатываний.' },
-    nw: { what: 'Nadaraya-Watson память: ядерный поиск похожих прошлых баров (объём×размах/ATR, направленность, ROC-сдвиг).', read: 'Предсказание направления по тому, что было ПОСЛЕ аналогов.', note: 'Режимный, но + в большинстве режимов. Без объёма — прокси по размаху (слабее).' },
+    nw: { what: 'Nadaraya-Watson память: ядерный поиск похожих прошлых баров (объём×размах/ATR, направленность, ROC-сдвиг).', read: 'Предсказание направления по тому, что было ПОСЛЕ аналогов.', note: 'Режимный (⚙REG-INV-бейдж): signal во всех режимах кроме trending_down (d=-0.11 в BASELINE, -0.35 в top-50 ликвидных) — там композит инвертирует его голос. В остальных режимах +0.05..+0.12. Без объёма — прокси по размаху (слабее).' },
     alligator_inv: { what: 'Классический Аллигатор Уильямса: SMMA 13/8/5 по медиане (H+L)/2 со сдвигами вперёд +8/+5/+3. Взят ИНВЕРТИРОВАННО.', read: 'Раскрытая пасть (Аллигатор говорит «тренд») → сигнал ПРОТИВ. Трендследящий Аллигатор на 5-мин РФ системно ошибается — фейдим его.', note: 'Как anti d≈−0.12 (инверт. → сигнал уровня ZSCORE), устойчив в OOS: train −0.15 → test −0.12, n≈166k. Сильнее alt-версии; в боте alt-Аллигатор выключен в его пользу.' },
     zonefade: { what: 'Зона-фейд — валидированная стратегия (invest-bot аудит взамен NW). Зона z(T)<−0.4 & z(P)>0.6 (низкая интенсивность + высокая направленность) → ФЕЙД хода 3 баров, только когда рынок НЕ сонаправлен (breadth) и БОКОВИК (ER-60<0.3).', read: 'В зоне после роста → сигнал ВНИЗ, после падения → ВВЕРХ. Ставка на разворот в mean-reversion режиме.', note: 'Прошла весь чек-лист: TEST short +0.25 ATR, block-bootstrap CI [+0.11,+0.20], permutation p≈0, holdout по тикерам обобщается, синхронность рынка не ломает, P&L размазан. Наивный mean-reversion бьёт NW — вся аналог-память избыточна, это ядро edge. Брекет R:R 2:1 (тейк 2.0/стоп 1.0 ATR). До 20 одновременных позиций — сайзить с учётом коррелированного риска (см. калькулятор).' },
     fade: { what: 'Фейд у уровня + breadth: резкий ход (≥0.5 ATR за 3 бара), упёршийся в прошлый хай/лоу за 100 баров (реджект), И идиосинкразический либо против рынка (не сонаправлен с рынком).', read: 'Ход вверх в прошлый хай → сигнал ВНИЗ (фейд), ход вниз в прошлый лоу → ВВЕРХ. Фейдим только шум: если ход идёт ВМЕСТЕ с рынком — сигнала нет (это моментум).', note: 'ПОЛНАЯ версия both из бэктеста (invest-bot): level (реджект у уровня, −0.26 ATR) + breadth (медиана 3-барных доходностей корзины ~30 ликвидных бумаг MOEX). Пока breadth грузится (статус «фейд полный») — работает level-режим. TEST +0.31 ATR/сделку при R:R 2:1 (тейк ~1.5 / стоп ~0.75 ATR), но эдж режимный — сайзить умеренно.' },
@@ -190,6 +190,30 @@
   function notifyScanMinWinSet(v) { try { localStorage.setItem('tvsig:notifyscanminwin', String(v)); } catch (e) {} }
   function notifyScanMinExpGet() { try { const v = parseFloat(localStorage.getItem('tvsig:notifyscanminexp')); return isFinite(v) ? v : 0; } catch (e) { return 0; } }
   function notifyScanMinExpSet(v) { try { localStorage.setItem('tvsig:notifyscanminexp', String(v)); } catch (e) {} }
+  // Готовые пресеты для настройки строгости уведомлений. Единый список для
+  // тикерных и сканных 🔔 — чтобы пользователь мыслил в одних категориях.
+  // exp — в ATR (используется как порог по стат. edge), win — winrate в %
+  // (0 = не фильтруем по точности). Порядок: от «всё показать» к «только
+  // элитное». Между «строго» и «элитно» разрыв заметный — оба варианта
+  // полезны для разных стилей торговли.
+  const NOTIFY_PRESETS = [
+    { key: 'all',    label: 'всё',      exp: 0,    win: 0,  hint: 'без фильтров — 🔔 на каждое срабатывание' },
+    { key: 'often',  label: 'часто',    exp: 0.03, win: 0,  hint: 'старое поведение: только методы с положительным exp' },
+    { key: 'mid',    label: 'умеренно', exp: 0.05, win: 55, hint: 'отсекает слабые сигналы и методы с точностью <55% на этом тикере' },
+    { key: 'strict', label: 'строго',   exp: 0.10, win: 60, hint: 'только методы с уверенным edge и точностью ≥60%' },
+    { key: 'elite',  label: 'элитно',   exp: 0.15, win: 65, hint: 'редкие, но высококачественные — exp≥0.15 ATR, точность ≥65%' },
+  ];
+  function notifyPresetMatch(exp, win) {
+    for (const p of NOTIFY_PRESETS) {
+      if (Math.abs(p.exp - exp) < 1e-9 && Math.abs(p.win - win) < 1e-9) return p.key;
+    }
+    return 'custom';
+  }
+  function notifyPresetOptionsHtml() {
+    return NOTIFY_PRESETS.map(p =>
+      '<option value="' + p.key + '" title="' + p.hint + '">' + p.label + '</option>'
+    ).join('') + '<option value="custom">свой</option>';
+  }
   // токен AlgoPack (MOEX) — хранится локально, шлётся ТОЛЬКО в apim.moex.com
   function oiTokenGet() { try { return localStorage.getItem('tvsig:moextoken') || ''; } catch (e) { return ''; } }
   function oiTokenSet(v) { try { v ? localStorage.setItem('tvsig:moextoken', v) : localStorage.removeItem('tvsig:moextoken'); } catch (e) {} }
@@ -1356,10 +1380,19 @@
       }
       const scanMinExpEl = document.getElementById('tvsig-scan-minexp');
       const scanMinWinEl = document.getElementById('tvsig-scan-minwin');
+      const scanPresetEl = document.getElementById('tvsig-scan-preset-notif');
+      function scanSyncPreset() { if (scanPresetEl) scanPresetEl.value = notifyPresetMatch(notifyScanMinExpGet(), notifyScanMinWinGet()); }
       if (scanMinExpEl) { scanMinExpEl.value = notifyScanMinExpGet();
-        scanMinExpEl.addEventListener('change', () => { const v = parseFloat(scanMinExpEl.value); if (isFinite(v) && v >= 0) notifyScanMinExpSet(v); else scanMinExpEl.value = notifyScanMinExpGet(); }); }
+        scanMinExpEl.addEventListener('change', () => { const v = parseFloat(scanMinExpEl.value); if (isFinite(v) && v >= 0) { notifyScanMinExpSet(v); scanSyncPreset(); } else scanMinExpEl.value = notifyScanMinExpGet(); }); }
       if (scanMinWinEl) { scanMinWinEl.value = notifyScanMinWinGet();
-        scanMinWinEl.addEventListener('change', () => { const v = parseFloat(scanMinWinEl.value); if (isFinite(v) && v >= 0 && v <= 100) notifyScanMinWinSet(v); else scanMinWinEl.value = notifyScanMinWinGet(); }); }
+        scanMinWinEl.addEventListener('change', () => { const v = parseFloat(scanMinWinEl.value); if (isFinite(v) && v >= 0 && v <= 100) { notifyScanMinWinSet(v); scanSyncPreset(); } else scanMinWinEl.value = notifyScanMinWinGet(); }); }
+      if (scanPresetEl) { scanSyncPreset();
+        scanPresetEl.addEventListener('change', () => {
+          if (scanPresetEl.value === 'custom') return;
+          const p = NOTIFY_PRESETS.find(x => x.key === scanPresetEl.value); if (!p) return;
+          notifyScanMinExpSet(p.exp); notifyScanMinWinSet(p.win);
+          if (scanMinExpEl) scanMinExpEl.value = p.exp; if (scanMinWinEl) scanMinWinEl.value = p.win;
+        }); }
     }
     scanAutoSync(); // и на повторных заходах (не только первичная инициализация) — вкладка снова видима
   }
@@ -2227,8 +2260,9 @@
       '<div id="tvsig-status">инициализация…</div>' +
       '<div id="tvsig-consensus" title="Общий текущий сигнал: сумма голосов методов, взвешенных по их exp на этом тикере"></div>' +
       '<div id="tvsig-rows"></div>' +
-      '<div id="tvsig-notify-cfg" title="Пороги для 🔔 уведомлений об ЭТОМ тикере. Метод шлёт нотификацию только если сигнал сменил знак И у метода на этом тикере exp ≥ min exp И winrate ≥ min win%. Ставь min win% = 0 чтобы не фильтровать по точности.">' +
-      '🔔 пороги: min exp <input type="number" id="tvsig-notify-minexp" step="0.01" min="0" style="width:52px"> ATR · min win <input type="number" id="tvsig-notify-minwin" step="1" min="0" max="100" style="width:44px">%' +
+      '<div id="tvsig-notify-cfg" title="Пороги для 🔔 уведомлений об ЭТОМ тикере. Готовый пресет или свои числа. Метод шлёт нотификацию только если сигнал сменил знак И у метода на этом тикере exp ≥ min exp И winrate ≥ min win%.">' +
+      '🔔 пресет: <select id="tvsig-notify-preset">' + notifyPresetOptionsHtml() + '</select> · ' +
+      'min exp <input type="number" id="tvsig-notify-minexp" step="0.01" min="0" style="width:52px"> ATR · min win <input type="number" id="tvsig-notify-minwin" step="1" min="0" max="100" style="width:44px">%' +
       '</div>' +
       '<div id="tvsig-foot">Цифры считаются на свечах <b>текущего тикера</b>, хранятся по каждому и обновляются при закрытии нового бара. <b>exp</b> — экспектанси, средний P&amp;L сделки в ATR (тейк +1.5 / стоп −0.75 ATR, R:R 2:1 — валидировано; узкий брекет занижал вдвое, издержки 0.12); плюс = метод в прибыли. <b>%</b> — winrate, частота угадывания знака за 12 баров (не путать с win сделки — та выше при широком стопе). <b>n</b> — число сделок. Клик по строке рисует сигналы. <b>🔔</b> вверху — уведомления браузера о новых сигналах ЭТОГО тикера, пороги настраиваются в блоке «🔔 пороги» выше. Для сканера — отдельный 🔔 в «Сканере». Не шлёт про то, что было активно ДО включения — только новые срабатывания.</div>' +
       '</div>' + // /pane-signals
@@ -2314,7 +2348,7 @@
       '<div id="tvsig-scan-autorow"><label class="tvsig-scan-onlyactive" id="tvsig-scan-auto-lbl" title="Пересканировать список автоматически, пока открыта вкладка «Сканер». Недоступно для источника «график терминала» — авто-пересканирование им слишком часто дёргало бы твой график."><input type="checkbox" id="tvsig-scan-auto"> автообновление каждые</label>' +
       '<select id="tvsig-scan-auto-iv"><option value="15">15 с</option><option value="30" selected>30 с</option><option value="60">1 мин</option><option value="120">2 мин</option><option value="300">5 мин</option></select>' +
       '<label class="tvsig-scan-onlyactive" title="Уведомление браузера на каждый НОВЫЙ хит при автообновлении (не было в предыдущем скане). Ручной клик по «Скан» не уведомляет — ты и так смотришь на результат."><input type="checkbox" id="tvsig-scan-notify"> 🔔</label>' +
-      '<span class="tvsig-scan-notify-cfg" title="Пороги фильтра уведомлений скана: хит доходит до 🔔 только если у метода-триггера на его тикере exp ≥ min exp И winrate ≥ min win%. Синергии (пара из combo-теста) идут в обход порогов — там сам факт согласия уже фильтр. Ставь 0 чтобы отключить порог.">min exp <input type="number" id="tvsig-scan-minexp" step="0.01" min="0" style="width:48px"> · min win <input type="number" id="tvsig-scan-minwin" step="1" min="0" max="100" style="width:40px">%</span>' +
+      '<span class="tvsig-scan-notify-cfg" title="Пороги фильтра уведомлений скана: хит доходит до 🔔 только если у метода-триггера на его тикере exp ≥ min exp И winrate ≥ min win%. Синергии (пара из combo-теста) идут в обход порогов — там сам факт согласия уже фильтр. Пресет — быстрые готовые варианты, или свои числа.">пресет <select id="tvsig-scan-preset-notif">' + notifyPresetOptionsHtml() + '</select> · min exp <input type="number" id="tvsig-scan-minexp" step="0.01" min="0" style="width:48px"> · min win <input type="number" id="tvsig-scan-minwin" step="1" min="0" max="100" style="width:40px">%</span>' +
       '<span id="tvsig-scan-auto-ts" class="dim"></span></div>' +
       '<textarea id="tvsig-scan-list" placeholder="SBER GAZP LKOH SNGS ROSN … (через пробел/запятую)"></textarea>' +
       '<div id="tvsig-scan-sel">Сигнал <select id="tvsig-scan-a"></select> + <select id="tvsig-scan-b"></select>' +
@@ -2343,13 +2377,25 @@
     notifyBtn.onclick = () => { notifyTickerSet(!notifyTickerGet()); notifyReflect();
       if (notifyTickerGet()) notifySend('Уведомления по тикеру включены', 'Пришлю сюда, когда на этом тикере появится новый сигнал по методу с exp≥min exp и winrate≥min win% (настраивается в блоке под таблицей).'); };
     notifyReflect();
-    // инпуты порогов уведомлений — вписываются в localStorage без подтверждения
+    // Пороги уведомлений тикера: select-пресет + два инпута. Селект и инпуты
+    // синхронизируются: выбор пресета → обновить оба инпута; ручная правка
+    // инпута → пересчитать pass через notifyPresetMatch и переключить селект
+    // на 'custom', если числа не совпали ни с одним пресетом.
     const nExpEl = panel.querySelector('#tvsig-notify-minexp');
     const nWinEl = panel.querySelector('#tvsig-notify-minwin');
+    const nPresetEl = panel.querySelector('#tvsig-notify-preset');
+    function nSyncPreset() { if (nPresetEl) nPresetEl.value = notifyPresetMatch(notifyMinExpGet(), notifyMinWinGet()); }
     if (nExpEl) { nExpEl.value = notifyMinExpGet();
-      nExpEl.addEventListener('change', () => { const v = parseFloat(nExpEl.value); if (isFinite(v) && v >= 0) notifyMinExpSet(v); else nExpEl.value = notifyMinExpGet(); }); }
+      nExpEl.addEventListener('change', () => { const v = parseFloat(nExpEl.value); if (isFinite(v) && v >= 0) { notifyMinExpSet(v); nSyncPreset(); } else nExpEl.value = notifyMinExpGet(); }); }
     if (nWinEl) { nWinEl.value = notifyMinWinGet();
-      nWinEl.addEventListener('change', () => { const v = parseFloat(nWinEl.value); if (isFinite(v) && v >= 0 && v <= 100) notifyMinWinSet(v); else nWinEl.value = notifyMinWinGet(); }); }
+      nWinEl.addEventListener('change', () => { const v = parseFloat(nWinEl.value); if (isFinite(v) && v >= 0 && v <= 100) { notifyMinWinSet(v); nSyncPreset(); } else nWinEl.value = notifyMinWinGet(); }); }
+    if (nPresetEl) { nSyncPreset();
+      nPresetEl.addEventListener('change', () => {
+        if (nPresetEl.value === 'custom') return; // 'custom' — просто маркер
+        const p = NOTIFY_PRESETS.find(x => x.key === nPresetEl.value); if (!p) return;
+        notifyMinExpSet(p.exp); notifyMinWinSet(p.win);
+        if (nExpEl) nExpEl.value = p.exp; if (nWinEl) nWinEl.value = p.win;
+      }); }
     const tpslBtn = panel.querySelector('#tvsig-tpsl');
     const tpslReflect = () => tpslBtn.classList.toggle('on', tpSlShowGet());
     tpslBtn.onclick = () => {
@@ -2489,9 +2535,9 @@
     waning:        { d: +0.030, win: 0.500, n: 60000,  role: 'signal', note: 'слабый, но стабильный' },
     vsa_abs:       { d: +0.020, win: 0.500, n: 40000,  role: 'signal', note: 'in-sample топ, OOS не подтвердил' },
     alligator_inv: { d: -0.120, win: 0.440, n: 166000, role: 'anti',   note: 'anti d≈-0.12, инвертирован → сигнал уровня zscore' },
-    accel:         { d: -0.180, win: 0.430, n: 233000, role: 'anti',   note: 'король антагонизмов, инвертирован' },
-    nw:            { d: -0.050, win: 0.470, n: 35000,  role: 'noise',  note: 'режимный, edge слабый' },
-    liq_sweep:     { d: -0.030, win: 0.480, n: 20000,  role: 'noise',  note: 'слабый/режимный' },
+    accel:         { d: -0.050, win: 0.470, n: 244000, role: 'anti',   note: 'глобально anti в обоих прогонах, ↺ инвертирован в composite' },
+    nw:            { d: +0.092, win: 0.510, n: 227000, role: 'signal', note: 'режимный: signal везде, ↺ инверт только в trending_down (d=-0.35 top-50)' },
+    liq_sweep:     { d: -0.105, win: 0.460, n:  10000, role: 'anti',   note: 'глобально anti (BASELINE d=-0.105), ↺ инвертирован в composite' },
     false_breakout:{ d:  0.000, win: 0.500, n: 15000,  role: 'noise',  note: 'в OOS: anti→noise' },
     // extension-only (в бот-бэктест не входят) — только TEST-цифры из invest-bot
     fade:          { d: null,   win: null,  n: null,   role: 'signal', note: 'ext-only · TEST +0.31 ATR/сделку (R:R 2:1, level-режим)' },
