@@ -158,6 +158,8 @@
   border:1px solid rgba(180, 130, 240, .35); cursor:help; }
 .tvsig-inv-icon.regime{ background:rgba(94, 230, 168, .12); color:#5EE6A8;
   border-color:rgba(94, 230, 168, .3); }
+.tvsig-inv-icon.off{ background:rgba(160, 160, 160, .12); color:#909090;
+  border-color:rgba(160, 160, 160, .3); }
 /* блок с настройкой порогов уведомлений (min exp / min winrate) */
 #tvsig-notify-cfg{ margin:4px 6px 0; padding:5px 8px; border-radius:6px;
   background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06);

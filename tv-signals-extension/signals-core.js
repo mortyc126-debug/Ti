@@ -506,10 +506,16 @@
   // alligator_inv, но декларативно списком. Пороги/цифры:
   //   accel     (PRICE_ACCEL)    BASE -0.054 / top50 -0.050
   //   liq_sweep (LIQUIDITY_SWEEP) BASE -0.105 / глоб -0.094
-  // anchored_vwap и elliott_wave УЖЕ инвертированы внутри самих методов (см.
-  // "ИНВЕРТИРУЕМ (fade от anchored VWAP)" в M.anchored_vwap и "инверсия (в боте
-  // anti)" в M.elliott_wave) — второй раз крутить нельзя, вернём в anti.
+  // anchored_vwap УЖЕ инвертирован внутри метода (см. "ИНВЕРТИРУЕМ (fade от
+  // anchored VWAP)") — второй раз крутить нельзя, вернём в anti.
   const _INVERTED_GLOBAL = new Set(['accel', 'liq_sweep']);
+
+  // Отключённые методы (по walk_forward 12 окон): ELLIOTT_WAVE — единственный
+  // noise-метод, знак пляшет между окнами (+0.15/-0.24/+0.02/-0.66/...), инверсия
+  // не спасает — он случайный. Не даёт голос в composite, не рисуется. UI-бейдж
+  // «off». anchored_vwap и elliott_wave раньше были инвертированы в имени
+  // "(инв.)" — теперь только anchored_vwap остаётся; elliott выключаем.
+  const _DISABLED_METHODS = new Set(['elliott_wave']);
 
   // Контекстная (режимная) инверсия для NW: в trending_down d от -0.109
   // (BASELINE) до -0.353 (top-50), во всех остальных режимах — signal.
@@ -535,7 +541,12 @@
     IDS.forEach(id => {
       let series; try { series = M[id](bars); } catch (e) { series = bars.map(() => null); }
       let inverted = false;
-      if (_INVERTED_GLOBAL.has(id)) {
+      let disabled = false;
+      if (_DISABLED_METHODS.has(id)) {
+        // Отключённый метод: пустая серия, никакого голоса в composite.
+        series = bars.map(() => 0);
+        disabled = true;
+      } else if (_INVERTED_GLOBAL.has(id)) {
         series = series.map(v => v == null ? null : -v);
         inverted = 'global';
       } else if (id === 'nw') {
@@ -544,7 +555,7 @@
         inverted = 'regime:trending_down';
       }
       let last = 0; for (let i = series.length - 1; i >= 0; i--) if (series[i] != null) { last = series[i]; break; }
-      out[id] = { series, last, stats: btStats(series, bars, horizon), inverted };
+      out[id] = { series, last, stats: btStats(series, bars, horizon), inverted, disabled };
     });
     return out;
   }

@@ -24,7 +24,7 @@
     ['amihud_shock', 'Amihud shock', '#06D6A0'],
     ['vpin_toxicity', 'VPIN токсичность', '#118AB2'],
     ['anchored_vwap', 'Anchored VWAP (инв.)', '#8E44AD'],
-    ['elliott_wave', 'Эллиотт (инв.)', '#C0392B'],
+    ['elliott_wave', 'Эллиотт (off)', '#C0392B'],
   ];
   const NAME = {}, DEF_COLOR = {}, IDX = {}; META.forEach(([id, n, c], i) => { NAME[id] = n; DEF_COLOR[id] = c; IDX[id] = i; });
   // группировка списка по синергии (строгий рейтинг agree_scan: no-overlap + OOS).
@@ -35,8 +35,8 @@
   // в одной паре из топ-15 lift; в «контексте», если только в средних синергиях;
   // в «балласте», если чаще в АНТАГОНИЗМАХ или проигрывает КОНФЛИКТЫ.
   const GROUPS = [
-    { title: '⚡ Ядро синергий — институциональная микроструктура', ids: ['dfa_regime', 'bipower_jump', 'amihud_shock', 'vpin_toxicity', 'anchored_vwap', 'elliott_wave'],
-      desc: 'Портированы после реального 180-дневного бэктеста бота (score_methods.py ALL): DFA_REGIME d=+0.178 (сильнейший), BIPOWER_JUMP d=+0.164, AMIHUD_SHOCK d=+0.144 (98k срабатываний), VPIN_TOXICITY d=+0.127; ANCHORED_VWAP+ELLIOTT_WAVE инвертированы (anti как контр-сигнал). Топ синергия: BIPOWER_JUMP + DFA_REGIME (+1.57 lift, 90% согласия), AMIHUD_SHOCK + VPIN_TOXICITY (+1.27, 85%), VPIN + ZSCORE (+1.22). Согласие пары внутри группы = усиленный триггер.' },
+    { title: '⚡ Ядро синергий — институциональная микроструктура', ids: ['dfa_regime', 'bipower_jump', 'amihud_shock', 'vpin_toxicity', 'anchored_vwap'],
+      desc: 'Портированы после реального 180-дневного бэктеста бота (score_methods.py ALL) и подтверждены walk_forward на 12 90-дневных окнах (stable). DFA_REGIME d=+0.14..+0.34 во всех окнах, BIPOWER_JUMP d=+0.07..+0.44, AMIHUD_SHOCK d=+0.12..+0.44 (сильнейший в свежем прогоне), VPIN_TOXICITY d=+0.13; ANCHORED_VWAP инвертирован (anti как контр-сигнал). Топ синергия: BIPOWER_JUMP + DFA_REGIME (+1.57 lift, 90% согласия), AMIHUD_SHOCK + VPIN_TOXICITY (+1.27, 85%), VPIN + ZSCORE (+1.22). Согласие пары внутри группы = усиленный триггер.' },
     { title: 'Ядро связок — фейд-методы', ids: ['talib_anti', 'zscore', 'cascade'],
       desc: 'Классические разворотные с сильнейшим вкладом в синергии по актуальному combo-тесту. talib_anti + amihud/cascade/dfa (+0.29..+0.43 lift, 30-57k n_agr); cascade + amihud/dfa/hawkes (+0.29..+0.71); zscore — универсал, синергирует с VPIN_TOXICITY и caсcade (n=57k). Согласие 2+ из ядра ≈ высокая уверенность.' },
     { title: 'Разворотные — extension-only, брекет R:R 2:1', ids: ['fade', 'zonefade', 'vsa_abs', 'waning'],
@@ -44,7 +44,9 @@
     { title: 'Структурные — контекст, не самостоятельный сигнал', ids: ['order_block', 'fvg', 'false_breakout', 'hawkes'],
       desc: 'Участвуют в синергиях (fvg + vpin/cascade +0.26..+0.51 lift, hawkes + vpin/dfa/cascade +0.26..+0.47) — но в одиночку на брекете R:R 2:1 слабые/минусовые. Держать для голосования в паре, не как первичный сигнал.' },
     { title: 'MODS-обработка — инвертированы/режимные (по score_methods.py)', ids: ['accel', 'liq_sweep', 'alligator_inv', 'nw'],
-      desc: 'По BASELINE (420 тикеров, июль 2026) + свежий top-50 ликвидных: методы стабильно anti — их голос инвертируется в computeAll декларативно, чтобы стать signal. accel (PRICE_ACCEL d≈-0.05 в обоих прогонах), liq_sweep (LIQUIDITY_SWEEP d≈-0.10), alligator_inv (ALLIGATOR d≈-0.07, инвертирован ещё раньше — «-inv» в имени). NW — режимный (⚙REG-INV): signal во всех режимах кроме trending_down (там d=-0.11..-0.35), инвертируется только на барах даунтренда. Раньше эти три считались «Балластом», но после инверсии в composite работают в свою пользу. anchored_vwap и elliott_wave тоже anti, но их инверсия сидит ВНУТРИ самих методов — они остались в первой группе.' },
+      desc: 'По BASELINE (420 тикеров, июль 2026) + свежий top-50 ликвидных + walk_forward 12 окон: методы стабильно anti — их голос инвертируется в computeAll декларативно, чтобы стать signal. accel (PRICE_ACCEL walk-fw stable -0.05..-0.11), liq_sweep (LIQUIDITY_SWEEP d≈-0.10), alligator_inv (ALLIGATOR walk-fw stable -0.07..-0.18, инвертирован в имени). NW — режимный (⚙REG-INV): в drift, знак положительный в 10 из 12 окон, инверсия только в trending_down. anchored_vwap также anti, но инверсия внутри метода — он в первой группе.' },
+    { title: '⛔ Отключены (noise по walk_forward)', ids: ['elliott_wave'],
+      desc: 'Методы, у которых walk_forward показал: знак d пляшет между окнами (не anti, не signal — случайный шум). Инверсия таким не помогает — они правда бесполезны на 5-мин РФ. Голос заменён нулями и не участвует в composite. ELLIOTT_WAVE: +0.15/+0.13/-0.24/-0.16/+0.02/-0.66 в разных окнах — типичный noise. Ярлык «off».' },
   ];
   // описания для ℹ-окон: что делает · как читать знак · оговорка из прогонов бота
   const DESC = {
@@ -2538,6 +2540,7 @@
     accel:         { d: -0.050, win: 0.470, n: 244000, role: 'anti',   note: 'глобально anti в обоих прогонах, ↺ инвертирован в composite' },
     nw:            { d: +0.092, win: 0.510, n: 227000, role: 'signal', note: 'режимный: signal везде, ↺ инверт только в trending_down (d=-0.35 top-50)' },
     liq_sweep:     { d: -0.105, win: 0.460, n:  10000, role: 'anti',   note: 'глобально anti (BASELINE d=-0.105), ↺ инвертирован в composite' },
+    elliott_wave:  { d:  null,  win: null,  n: null,   role: 'noise',  note: 'walk_forward: единственный noise-метод (знак пляшет по окнам). ОТКЛЮЧЁН.' },
     false_breakout:{ d:  0.000, win: 0.500, n: 15000,  role: 'noise',  note: 'в OOS: anti→noise' },
     // extension-only (в бот-бэктест не входят) — только TEST-цифры из invest-bot
     fade:          { d: null,   win: null,  n: null,   role: 'signal', note: 'ext-only · TEST +0.31 ATR/сделку (R:R 2:1, level-режим)' },
@@ -2835,11 +2838,15 @@
         confIcon = '<span class="tvsig-conf-icon-win" title="✓ В споре с ' + confInfo.opponents.map(p => NAME[p]).join(', ') + ' этот метод статистически побеждает (|t|=' + confInfo.maxT.toFixed(1) + ' в combo-тесте).">✓</span>';
       }
     }
-    // Бейдж инверсии (по signals-core computeAll): 'global' — метод глобальный
-    // anti из BASELINE (score_methods.py, ALL 420 тк + top-50), инвертирован
-    // полностью; 'regime:trending_down' — nw, инверсия только в trending_down.
+    // Бейдж инверсии/выключения (по signals-core computeAll):
+    //   'global' — метод глобальный anti, инвертирован полностью;
+    //   'regime:trending_down' — nw, инверсия только в trending_down;
+    //   disabled — noise-метод (walk-forward показал: знак пляшет между окнами),
+    //   голос заменён на нули и в composite не участвует.
     let invIcon = '';
-    if (c && c.inverted === 'global') {
+    if (c && c.disabled) {
+      invIcon = '<span class="tvsig-inv-icon off" title="Метод отключён: walk_forward на 12 окнах показал, что знак d пляшет между окнами (единственный noise-метод из 54). Инверсия не спасает — эдж случайный. Голос заменён нулями, в composite не участвует.">off</span>';
+    } else if (c && c.inverted === 'global') {
       invIcon = '<span class="tvsig-inv-icon" title="Метод глобально anti по данным score_methods.py (BASELINE 420 тикеров + top-50 ликвидных): d<0 во всех режимах в обоих прогонах. Голос инвертирован — теперь работает как signal.">↺anti</span>';
     } else if (c && c.inverted === 'regime:trending_down') {
       invIcon = '<span class="tvsig-inv-icon regime" title="Режимная инверсия: NW в trending_down d=-0.109 (BASELINE) / -0.353 (top-50) — anti; в остальных режимах +0.05..+0.12 — signal. Инвертируется только на барах в trending_down.">↺td</span>';

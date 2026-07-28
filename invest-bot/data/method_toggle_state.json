@@ -2,6 +2,7 @@
   "disabled": [
     "ALLIGATOR",
     "DONCHIAN",
+    "ELLIOTT_WAVE",
     "KLINGER",
     "LEVEL_QUALITY",
     "MA_TENSION",
@@ -11,15 +12,20 @@
   ],
   "inverted": [
     "ADAPTIVE_MA",
+    "ADAPTIVE_MA_CLASSIC",
+    "ALLIGATOR_CLASSIC",
     "BB_KELTNER_SQUEEZE",
     "BS_PRESSURE",
+    "CUMUL_DELTA",
     "EHLERS_MODE",
-    "ELLIOTT_WAVE",
     "FRACTIONAL_DIFF",
     "LEVEL_ABSORPTION",
     "MAMA_FAMA",
+    "MA_TENSION_CLASSIC",
+    "T3_CLASSIC",
     "T3_SIGNAL",
     "VOL_COMPRESSION",
+    "ZLEMA_CLASSIC",
     "ZLEMA_SIGNAL"
   ]
 }
