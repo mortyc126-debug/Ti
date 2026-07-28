@@ -5,9 +5,17 @@
 комбинировать toggle/веса. Здесь — «как есть» на сыром edge методов (d,
 Cohen's), ДО применения инверсий/выключений в боте.
 
-Применённый набор лежит в `data/method_toggle_state.json` и продублирован
-пресетом «2. Чистка — текущая (11 инверсий + 7 выкл)» в `data/method_presets.json`
-(откат — загрузить пустой набор или пресет «4. Чистка — старый прогон v1»).
+Применённый набор лежит в `data/method_toggle_state.json`.
+
+> **Обновление 27.07.2026:** BASELINE пересчитан + провалидирован через
+> `oos_diff.py` и `walk_forward.py` (12 окон × 90 дней) на топ-50 ликвидных.
+> Результат: **33 stable / 20 drift / 1 noise** (walk-forward подтверждает
+> подавляющее большинство вердиктов). Единственный noise — `ELLIOTT_WAVE`,
+> перенесён в `disabled`. В `inverted` докинуто 6 stable-anti методов, не
+> покрытых первичным BASELINE. Итого сейчас: **9 disabled + 16 inverted**.
+> Подробности — в разделе «Обновление 27.07.2026» ниже. Ссылка на сырые
+> данные: `data/analysis/walk_fw/walk_fw.txt`, `data/analysis/oos/diff.txt`,
+> `docs/baseline_matrix_full.txt`, `docs/baseline_vs_top50_diff.txt`.
 
 > Если гонялся с `--out data/analysis/scores_by_regime.csv` — держи и CSV:
 > там сырые d/n_fires/n_wins по каждой паре (метод × режим), это самый
@@ -168,3 +176,118 @@ ORDER_BLOCK, WANING) — `sp_liq < 0`, edge в 2-3× сильнее на нел�
    ДО применения toggle_state — иначе не с чем.
 3. Обновляешь метод/добавляешь новый → перегони score_methods, обнови этот
    файл (или заведи `_2026-08` рядом), старый оставь для истории.
+
+---
+
+## Обновление 27.07.2026 — валидация walk_forward + top-50
+
+**Что сделано:** повторный прогон `score_methods.py --top-liq 50 --by-regime`
+(на топ-50 ликвидных с фильтром vol) + два новых валидационных скрипта:
+`oos_diff.py` (train 365 дн vs test 120 дн на одном универсе) и
+`walk_forward.py` (12 непересекающихся 90-дневных окон подряд, сначала —
+свежее). Цель: понять, случайны ли вердикты BASELINE или воспроизводятся
+на новых данных.
+
+### walk_forward: 33 stable / 20 drift / 1 noise
+
+**Правило классификации:** знак d одинаковый в ≥75% окон И (при том же
+знаке) std(d) < mean(|d|)/2 → **stable**. Знак один, но std большой →
+**drift**. Знак пляшет между + и − → **noise**.
+
+- **stable (33 методов, 62%)** — знак и сила воспроизводимы во всех окнах.
+  Сюда попали все ключевые из BASELINE: `AMIHUD_SHOCK +0.12..+0.44`,
+  `DFA_REGIME +0.14..+0.34`, `ZSCORE +0.06..+0.31`, `TALIB_ANTISIGNAL
+  +0.07..+0.27`, `BIPOWER_JUMP +0.07..+0.44`, `HAWKES_SIGNAL +0.03..+0.16`,
+  `FVG +0.06..+0.13`, `CASCADE +0.02..+0.23`, `ORDER_BLOCK +0.05..+0.15`,
+  `WANING_IMPULSES +0.02..+0.12` (signal); + `ADAPTIVE_MA -0.07..-0.30`,
+  `BB_KELTNER_SQUEEZE -0.07..-0.19`, `ANCHORED_VWAP -0.07..-0.24`,
+  `ALLIGATOR_CLASSIC -0.07..-0.24`, `T3_CLASSIC -0.06..-0.22`,
+  `PRICE_ACCEL -0.05..-0.11` (anti). Полный список — в
+  `data/analysis/walk_fw/walk_fw.txt`.
+- **drift (20 методов, 37%)** — знак стабильный, сила гуляет. Эдж есть, но
+  ставить фиксированный вес нельзя. Сюда: `NADARAYA_WATSON` (positive в 10
+  из 12 окон), `RSI_DIVERGENCE`, `T3_SIGNAL`, `KLINGER`, `DONCHIAN`,
+  `TWIGGS`, `ATR_EXHAUSTION` и др. Для этих правильно — режимные MODS
+  (см. AUTO ниже), но НЕ глобальная инверсия.
+- **noise (1 метод, 1.8%)** — только `ELLIOTT_WAVE`. Знак пляшет:
+  `+0.15/+0.13/-0.24/-0.16/+0.02/-0.66/…`, куча пропусков. Инверсия не
+  спасает — метод случайный. **Отключён.**
+
+### Изменения в `data/method_toggle_state.json`
+
+**`disabled`: 8 → 9.** Добавлен `ELLIOTT_WAVE` (noise по walk_forward).
+Актуальный список: `ALLIGATOR, DONCHIAN, ELLIOTT_WAVE, KLINGER,
+LEVEL_QUALITY, MA_TENSION, RMI, TWIGGS, WICK_REJECTION`.
+
+**`inverted`: 11 → 16.** Убран `ELLIOTT_WAVE` (теперь в disabled).
+Добавлено 6 stable-anti из walk_forward + top-50 (в первичном BASELINE
+их не было — либо `_CLASSIC`-версии добавлены позже, либо не были в
+топе):
+
+| метод | walk-fw диапазон d | комментарий |
+|---|---|---|
+| `ADAPTIVE_MA_CLASSIC` | −0.06..−0.22 | stable anti во всех 12 окнах |
+| `ALLIGATOR_CLASSIC` | −0.07..−0.24 | stable anti; +top-50 универсал ANTI |
+| `CUMUL_DELTA` | −0.02..−0.10 | stable anti; в первичном BASELINE был noise (-0.045) |
+| `MA_TENSION_CLASSIC` | −0.03..−0.15 | stable anti в 6/6 режимов top-50 |
+| `T3_CLASSIC` | −0.06..−0.22 | stable anti; аналогично `T3_SIGNAL` |
+| `ZLEMA_CLASSIC` | −0.05..−0.18 | stable anti; +top-50 |
+
+Актуальный `inverted`: `ADAPTIVE_MA, ADAPTIVE_MA_CLASSIC, ALLIGATOR_CLASSIC,
+BB_KELTNER_SQUEEZE, BS_PRESSURE, CUMUL_DELTA, EHLERS_MODE, FRACTIONAL_DIFF,
+LEVEL_ABSORPTION, MAMA_FAMA, MA_TENSION_CLASSIC, T3_CLASSIC, T3_SIGNAL,
+VOL_COMPRESSION, ZLEMA_CLASSIC, ZLEMA_SIGNAL`.
+
+### OOS-дифф train vs test (365 дн / 120 дн)
+
+Из 256 сопоставимых клеток (метод × режим, обе стороны с n_tk ≥ 5):
+- **aligned: 175 (68%)** — знак и сила близки → надёжный эдж.
+- **stronger: 28 (11%)** — тот же знак, в test даже сильнее.
+- **weaker: 35 (14%)** — тот же знак, ослаб.
+- **DIVERGE: 10 (4%)** — знак сохранён, но \|Δd\| > 0.10.
+- **★FLIP★: 8 (3%)** — знак поменялся. Все 8 на клетках с n_tk 6-11
+  (граничная статистика). Список — в `data/analysis/oos/diff.txt`.
+
+Вывод: FLIP-доля 3% ≤ 5% → **BASELINE в целом воспроизводим**, MODS_AUTO
+можно применять с оговоркой не тащить конкретные FLIP-клетки в бота.
+
+### top-50 подтверждает и расширяет универсал ANTI
+
+Свежий прогон на топ-50 ликвидных с фильтром `n_tk ≥ 5` даёт **9
+универсал ANTI** методов (было 4 в первичном top-50, 11 в BASELINE, но с
+`_CLASSIC`-версиями):
+
+`ADAPTIVE_MA_CLASSIC, ALLIGATOR, ALLIGATOR_CLASSIC, ANCHORED_VWAP,
+BB_KELTNER_SQUEEZE, CUMUL_DELTA, MA_TENSION_CLASSIC, T3_CLASSIC,
+T3_SIGNAL`.
+
+Все 9 либо уже были в `inverted`, либо теперь добавлены (см. таблицу выше).
+
+### Что применено в расширении tv-signals-extension
+
+Расширение уже использует MODS-логику клиентски (`signals-core.js`):
+`accel, liq_sweep` глобально инвертированы (bейдж ↺anti), `nw` режимно
+инвертирован в trending_down (⚙REG-INV), `elliott_wave` отключён
+(бейдж `off`). Первая версия — коммит 253b5b8 (accel/liq_sweep/nw),
+докинуто в 4e093bd (elliott_wave → off).
+
+### Что не сделано (задел на будущее)
+
+1. **`REGIME_WEIGHT_MODS_AUTO` из свежего прогона** — в текущем виде AUTO
+   грубый (±1.0 vs плавные 0.3-1.6 в ручном `regime.py:REGIME_WEIGHT_MODS`).
+   Правильный путь — не заменять ручной MODS, а мёржить: AUTO рекомендует
+   что инвертировать для методов из score_methods, ручной оставляет свои
+   коэффициенты для методов бэкенд-стратегии (BS_PRESSURE_TS, OB_IMBALANCE
+   и т.п., которых в score_methods нет). Отдельный ход.
+2. **Двухуровневые режимы (macro × micro)** — 6-режимный классификатор
+   работает на 60 барах 5м = 5 часов, ловит микрофазы. Добавить макро на
+   дневных барах → пары `macro × micro`, различать «отскок в даунтренде»
+   от «продолжения аптренда». Правки в `regime.py`, размножение строк
+   MODS. Не срочно.
+3. **Continuous-фьючерсы** — сейчас в кэше отдельные json'ы на каждый
+   контракт (`SiU6, SiZ6, …`), склеенных `Si_c1` нет. Для нормальной
+   валидации фьючерсов через walk_forward нужен continuous-ряд с
+   panama-adjust. Отдельная работа сборщика данных.
+4. **Реальный бэктест композита с новыми `inverted/disabled`** — цифры в
+   заголовках («+2-3 п.п. WR») пока грубая оценка. Прогнать `dashboard.py`
+   с новым toggle_state и сравнить со снимком до изменений.
