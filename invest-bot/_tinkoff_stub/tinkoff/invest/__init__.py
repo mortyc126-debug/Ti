@@ -99,12 +99,28 @@ class _MarketDataStub:
         try:
             with open(oi_path, "r", encoding="utf-8") as f:
                 data = _json.load(f)
-            for item in (data or []):
-                t = item.get("t") or item.get("ticker")
-                fg = item.get("f") or item.get("figi")
-                if t and fg:
-                    f2t[fg] = t
         except (OSError, ValueError):
+            data = None
+        # Поддерживаем два формата: dict {ticker: {figi, name}} (то что
+        # хранит dashboard.load_oi_tickers) и list [{t, f}, ...] (из
+        # merge_oi_tickers). Пробуем оба, любое исключение — просто skip.
+        try:
+            if isinstance(data, dict):
+                for ticker, info in data.items():
+                    if not isinstance(info, dict):
+                        continue
+                    fg = info.get("figi") or info.get("f")
+                    if ticker and fg:
+                        f2t[fg] = ticker
+            elif isinstance(data, list):
+                for item in data:
+                    if not isinstance(item, dict):
+                        continue
+                    t = item.get("t") or item.get("ticker")
+                    fg = item.get("f") or item.get("figi")
+                    if t and fg:
+                        f2t[fg] = t
+        except (AttributeError, TypeError):
             pass
         _MarketDataStub._figi_to_ticker = f2t
         return f2t
