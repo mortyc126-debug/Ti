@@ -176,11 +176,35 @@ class _MarketDataStub:
         return _GetCandlesResponse(candles=candles)
 
 
+class _InstrumentsStub:
+    """client.instruments — минимальный набор пустых списков. INDEX_CONTEXT
+    в бэктесте и futures-хелперы дёргают этот сервис; на пустых ответах
+    метод просто не строится ('не построен — таких данных нет'), warning
+    гасится, бэктест продолжает работать без этого метода."""
+    def trading_schedules(self, *a, **kw):
+        r = type("R", (), {})(); r.exchanges = []; return r
+    def share_by(self, *a, **kw):
+        r = type("R", (), {})(); r.instrument = None; return r
+    def shares(self, *a, **kw):
+        r = type("R", (), {})(); r.instruments = []; return r
+    def futures(self, *a, **kw):
+        r = type("R", (), {})(); r.instruments = []; return r
+    def currencies(self, *a, **kw):
+        r = type("R", (), {})(); r.instruments = []; return r
+    def get_futures_margin(self, *a, **kw):
+        return type("M", (), {"initial_margin_on_buy": None,
+                                "initial_margin_on_sell": None})()
+    def get_instrument_by(self, *a, **kw):
+        r = type("R", (), {})(); r.instrument = None; return r
+
+
 class Client:
-    """Client-заглушка: имеет .market_data со свечами из локального кэша.
-    Реальные вызовы к API упадут AttributeError — офлайн-скрипты в них не ходят."""
+    """Client-заглушка: имеет .market_data со свечами из локального кэша
+    и .instruments с пустыми списками. Реальные вызовы к API упадут
+    AttributeError — офлайн-скрипты в них не ходят."""
     def __init__(self, *a, **kw):
         self.market_data = _MarketDataStub()
+        self.instruments = _InstrumentsStub()
     def __enter__(self): return self
     def __exit__(self, *a): pass
 
