@@ -22,6 +22,18 @@ import hmac
 import json
 import logging
 import os
+import sys as _sys
+
+# Tinkoff Invest SDK может быть не установлен (например, Python 3.14 wheel
+# ещё нет). В этом случае — используем локальную заглушку из _tinkoff_stub/
+# (тот же трюк, что в score_methods._init_worker). Ставим ДО первого
+# `from tinkoff.invest...`, иначе получим ModuleNotFoundError.
+try:
+    import tinkoff.invest  # noqa: F401
+except ImportError:
+    _stub = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_tinkoff_stub")
+    if _stub not in _sys.path:
+        _sys.path.insert(0, _stub)
 
 # Гонка процессов в ProcessPoolExecutor: каждый воркер тянет numpy/scipy,
 # а BLAS (OpenBLAS/MKL) по умолчанию сам расхватывает все ядра под потоки.
