@@ -246,6 +246,7 @@
   display:inline-flex; gap:5px; }
 .tvsig-tpsl .tp{ color:var(--green); }
 .tvsig-tpsl .sl{ color:var(--negative); }
+.tvsig-tpsl i{ font-style:normal; opacity:.65; font-size:8px; margin-left:1px; }
 .tvsig-info-btn:hover{ color:var(--violet); }
 
 /* ползунки в стиле indlab: тонкий трек, повёрнутый на 45° фиолетовый thumb */

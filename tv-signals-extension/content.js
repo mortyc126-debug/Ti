@@ -1788,13 +1788,19 @@
       // тейк/стоп цифрами рядом — раньше были только внутри title (не видны без
       // наведения); теперь отдельный компактный бейдж во всех состояниях сразу.
       if (p.tp != null && p.sl != null) {
-        html += '<span class="tvsig-tpsl" title="Тейк ' + p.tp.toFixed(4) + ' / стоп ' + p.sl.toFixed(4) + ' (R:R 2:1, тейк +1.5 / стоп −0.75 ATR от входа ' + (p.entry != null ? p.entry.toFixed(4) : '?') + ')">' +
-          '<span class="tp">↑' + p.tp.toFixed(2) + '</span><span class="sl">↓' + p.sl.toFixed(2) + '</span></span>';
+        // % хода от входа до уровня — раньше были видны только абсолютные цены,
+        // ширину тейка/стопа приходилось прикидывать в уме. ATR-брекет адаптивный
+        // (R:R 2:1, но абсолютная ширина зависит от текущей волатильности тикера),
+        // поэтому один и тот же R:R может выглядеть то широким, то узким в цифрах.
+        const pctTp = p.entry ? (p.tp / p.entry - 1) * 100 : null;
+        const pctSl = p.entry ? (p.sl / p.entry - 1) * 100 : null;
+        const fmtPct = v => v == null ? '' : ' <i>' + (v >= 0 ? '+' : '') + v.toFixed(2) + '%</i>';
+        html += '<span class="tvsig-tpsl" title="Тейк ' + p.tp.toFixed(4) + ' / стоп ' + p.sl.toFixed(4) + ' (R:R 2:1, тейк +1.5 / стоп −0.75 ATR от входа ' + (p.entry != null ? p.entry.toFixed(4) : '?') + '). % — ход от входа до уровня, не ширина в ATR.">' +
+          '<span class="tp">↑' + p.tp.toFixed(2) + fmtPct(pctTp) + '</span><span class="sl">↓' + p.sl.toFixed(2) + fmtPct(pctSl) + '</span></span>';
         if (fut && fut.price && p.entry) {
-          const pctTp = p.tp / p.entry - 1, pctSl = p.sl / p.entry - 1;
-          const fTp = fut.price * (1 + pctTp), fSl = fut.price * (1 + pctSl);
+          const fTp = fut.price * (1 + pctTp / 100), fSl = fut.price * (1 + pctSl / 100);
           html += '<span class="tvsig-tpsl fut" title="Фьюч ' + fut.code + ' (цена ' + fut.price.toFixed(2) + '): тейк/стоп пересчитаны В ТЕХ ЖЕ % хода, что у акции — не абсолютной разницей. Базис фьючерс↔акция не учтён (обычно мал и почти постоянен для поставочных).">' +
-            '<b>' + fut.code + '</b> <span class="tp">↑' + fTp.toFixed(2) + '</span><span class="sl">↓' + fSl.toFixed(2) + '</span></span>';
+            '<b>' + fut.code + '</b> <span class="tp">↑' + fTp.toFixed(2) + fmtPct(pctTp) + '</span><span class="sl">↓' + fSl.toFixed(2) + fmtPct(pctSl) + '</span></span>';
         }
       }
       if (st === 'stopped') html += '<span class="tvsig-inval" title="Опровергнут: цена уже выбила расчётный стоп ' + p.sl.toFixed(4) + ' ' + since + '">⚠ стоп</span>';
