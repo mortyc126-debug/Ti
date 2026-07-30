@@ -21,6 +21,20 @@
     return r;
   }
 
+  // Причинная EMA по всему ряду (порт invest-bot indicators._ema: сид — первое
+  // значение, дальше стандартная рекурсия). null-дыры в начале не двигают сид.
+  function _emaArr(arr, per) {
+    const n = arr.length, o = new Array(n).fill(null);
+    const k = 2 / (per + 1); let prev = null;
+    for (let i = 0; i < n; i++) {
+      const v = arr[i];
+      if (v == null) { o[i] = prev; continue; }
+      prev = prev == null ? v : k * v + (1 - k) * prev;
+      o[i] = prev;
+    }
+    return o;
+  }
+
   // ── методы (знак = направление, 0/null = нет сигнала) ────────────────────────
   const M = {};
   M.zscore = (cd) => { const cl = cd.map(c => c.close), n = cl.length, w = 20, o = new Array(n).fill(null);
@@ -427,6 +441,229 @@
     return o;
   };
 
+  // ── топ-10 по вкладу в toggle_effect.py (invest-bot): 6 disable-кандидатов
+  // (RMI/KLINGER/TWIGGS/DONCHIAN/WICK_REJECTION/LEVEL_QUALITY — везде носили
+  // ноль/шум в BASELINE+walk_forward) + 4 invert-кандидата (BB_KELTNER_SQUEEZE/
+  // ADAPTIVE_MA/FRACTIONAL_DIFF/CUMUL_DELTA — anti во всех прогонах). Портированы
+  // с той же степенью упрощения, что и остальные extension-методы: базовая
+  // формула сохранена 1:1, второстепенные бонусы (дивергенции, накопление,
+  // long-tail-множители на 40+ баров истории) свёрнуты — они на знак почти не
+  // влияют, только на амплитуду. disable-методы всё равно обнуляются в
+  // computeAll (_DISABLED_METHODS) — их точность не критична для composite,
+  // но сохранена для ⓘ-описаний и потенциального re-enable в будущем.
+
+  M.rmi = (cd) => { const cl = cd.map(c => c.close), n = cl.length, per = 14, mom = 5, o = new Array(n).fill(0);
+    for (let i = per + mom; i < n; i++) {
+      let up = 0, down = 0;
+      for (let j = i - per + 1; j <= i; j++) { const d = cl[j] - cl[j - mom]; if (d > 0) up += d; else down -= d; }
+      const total = up + down; if (total <= 0) { o[i] = 0; continue; }
+      const v = 100 * up / total;
+      o[i] = v > 70 ? -1 : v > 55 ? 0.5 : v < 30 ? 1 : v < 45 ? -0.5 : 0;
+    } return o; };
+
+  M.klinger = (cd) => { const n = cd.length, o = new Array(n).fill(0);
+    if (n < 10) return o;
+    const hlc = cd.map(c => c.high + c.low + c.close);
+    const trend = new Array(n).fill(1); for (let i = 1; i < n; i++) trend[i] = hlc[i] > hlc[i - 1] ? 1 : -1;
+    const dm = cd.map(c => c.high - c.low);
+    const vf = new Array(n).fill(0); let cumDm = dm[0] || 1e-9, prevTrend = trend[0];
+    for (let i = 1; i < n; i++) {
+      if (trend[i] !== prevTrend) cumDm = dm[i] || 1e-9; else cumDm += dm[i];
+      prevTrend = trend[i];
+      const ratio = cumDm ? dm[i] / cumDm : 0;
+      vf[i] = (cd[i].volume || 0) * Math.abs(2 * ratio - 1) * trend[i] * 100;
+    }
+    const fastP = Math.min(34, Math.max(2, n >> 1)), slowP = Math.min(55, Math.max(2, n - 1));
+    const fast = _emaArr(vf, fastP), slow = _emaArr(vf, slowP);
+    for (let i = 1; i < n; i++) {
+      const v = (fast[i] || 0) - (slow[i] || 0), p = (fast[i - 1] || 0) - (slow[i - 1] || 0);
+      o[i] = (v > 0 && p < 0) ? 1 : (v < 0 && p > 0) ? -1 : v > 0 ? 0.5 : v < 0 ? -0.5 : 0;
+    } return o; };
+
+  M.twiggs = (cd) => { const n = cd.length, o = new Array(n).fill(0);
+    if (n < 10) return o;
+    const adv = new Array(n).fill(0);
+    for (let i = 1; i < n; i++) {
+      const trh = Math.max(cd[i].high, cd[i - 1].close), trl = Math.min(cd[i].low, cd[i - 1].close);
+      const rng = (trh - trl) || 1e-9;
+      adv[i] = (cd[i].volume || 0) * (2 * cd[i].close - trh - trl) / rng;
+    }
+    const vol = cd.map(c => c.volume || 0), per = Math.min(21, n - 1);
+    const emaAdv = _emaArr(adv, per), emaVol = _emaArr(vol, per);
+    for (let i = 0; i < n; i++) {
+      const ev = emaVol[i]; if (!ev) { o[i] = 0; continue; }
+      const v = (emaAdv[i] || 0) / ev;
+      o[i] = v > 0.05 ? 1 : v > 0 ? 0.5 : v < -0.05 ? -1 : v < 0 ? -0.5 : 0;
+    } return o; };
+
+  // Асимметрия касаний краёв Дончиана в боковике (<4% диапазона): плотный край
+  // = стена стопов/позиций → выброс идёт в менее плотную сторону.
+  M.donchian = (cd) => { const n = cd.length, o = new Array(n).fill(0), period = 20;
+    for (let i = period; i < n; i++) {
+      let upper = -Infinity, lower = Infinity;
+      for (let j = i - period + 1; j <= i; j++) { upper = Math.max(upper, cd[j].high); lower = Math.min(lower, cd[j].low); }
+      const mid = (upper + lower) / 2, bandRange = upper - lower;
+      if (bandRange < 1e-9) { o[i] = 0; continue; }
+      if (bandRange / (mid || 1e-9) > 0.04) { o[i] = 0; continue; }
+      const touchThr = bandRange * 0.15;
+      let upperT = 0, lowerT = 0;
+      for (let j = i - period + 1; j <= i; j++) { if (cd[j].high >= upper - touchThr) upperT++; if (cd[j].low <= lower + touchThr) lowerT++; }
+      const total = upperT + lowerT; if (total < 2) { o[i] = 0; continue; }
+      const asym = (upperT - lowerT) / total, strength = Math.abs(asym);
+      if (strength < 0.20) { o[i] = 0; continue; }
+      let signal = -Math.tanh(asym * 2.5);
+      const closePos = (cd[i].close - lower) / bandRange;
+      if (signal > 0 && closePos < 0.25) signal *= 1.20;
+      else if (signal < 0 && closePos > 0.75) signal *= 1.20;
+      o[i] = Math.max(-1, Math.min(1, signal * (0.5 + strength * 0.5)));
+    } return o; };
+
+  // Дисбаланс хвостов свечей (взвешен на объём и на "тело мало → хвост важен"),
+  // окно ~2ч (24×5м). +1 = нижние хвосты доминируют (бычье отвержение).
+  M.wick_rejection = (cd) => { const n = cd.length, o = new Array(n).fill(0), W = 24;
+    if (n < W + 5) return o;
+    const at = atr(cd, 14);
+    for (let i = W + 5; i < n; i++) {
+      if (at[i] == null || at[i] <= 0) { o[i] = 0; continue; }
+      let volSum = 0; for (let j = i - W + 1; j <= i; j++) volSum += (cd[j].volume || 0);
+      const avgVol = volSum / W || 1;
+      let upperTotal = 0, lowerTotal = 0;
+      for (let j = i - W + 1; j <= i; j++) {
+        const c = cd[j], rng = (c.high - c.low) || 1e-9;
+        const upperWick = c.high - Math.max(c.open, c.close), lowerWick = Math.min(c.open, c.close) - c.low;
+        const body = Math.abs(c.close - c.open), bodyFactor = Math.max(0.3, 1.0 - body / rng);
+        const volW = ((c.volume || 0) / avgVol) * bodyFactor;
+        upperTotal += upperWick / rng * volW; lowerTotal += lowerWick / rng * volW;
+      }
+      const total = (upperTotal + lowerTotal) || 1e-9;
+      const imbalance = (lowerTotal - upperTotal) / total;
+      let l3u = 0, l3l = 0;
+      for (let j = Math.max(0, i - 2); j <= i; j++) { l3u += cd[j].high - Math.max(cd[j].open, cd[j].close); l3l += Math.min(cd[j].open, cd[j].close) - cd[j].low; }
+      const confirm = ((imbalance > 0 && l3l > l3u) || (imbalance < 0 && l3u > l3l)) ? 1.2 : 0.8;
+      o[i] = Math.max(-1, Math.min(1, imbalance * confirm));
+    } return o; };
+
+  // Упрощено до 2 из 5 критериев confluence (order block + POC-прокси по
+  // максимальному объёму бара в окне 100) — weekly-open/52w/second-touch
+  // пропущены (не имеют внутридневного смысла и метод всё равно disabled).
+  M.level_quality = (cd) => { const n = cd.length, o = new Array(n).fill(0), at = atr(cd, 14);
+    for (let i = 50; i < n; i++) {
+      if (at[i] == null || at[i] <= 0) { o[i] = 0; continue; }
+      const price = cd[i].close, prox = 1.2 * at[i];
+      let criteria = 0, direction = 0;
+      for (let k = 2; k < Math.min(25, i); k++) {
+        const cOb = cd[i - k - 1], cImp = cd[i - k]; if (!cOb || !cImp) continue;
+        if (Math.abs(cImp.close - cImp.open) < 1.2 * at[i]) continue;
+        const isBullOb = cOb.close < cOb.open && cImp.close > cImp.open;
+        const isBearOb = cOb.close > cOb.open && cImp.close < cImp.open;
+        const obLo = Math.min(cOb.open, cOb.close, cOb.low), obHi = Math.max(cOb.open, cOb.close, cOb.high);
+        if (isBullOb && price >= obLo && price <= obHi + prox) { criteria++; direction += 1; break; }
+        if (isBearOb && price >= obLo - prox && price <= obHi) { criteria++; direction -= 1; break; }
+      }
+      let bestV = -1, bestP = price;
+      for (let j = Math.max(0, i - 100); j < i; j++) { const v = cd[j].volume || 0; if (v > bestV) { bestV = v; bestP = (cd[j].high + cd[j].low) / 2; } }
+      if (Math.abs(bestP - price) <= prox) { criteria++; direction += price < bestP ? 1 : -1; }
+      if (criteria < 2 || direction === 0) { o[i] = 0; continue; }
+      o[i] = Math.max(-1, Math.min(1, (criteria / 5) * Math.sign(direction)));
+    } return o; };
+
+  // TTM Squeeze: BB(20,2σ) внутри KC(EMA20, 1.5×ATR14) = компрессия. Выход из
+  // сжатия + TTM-momentum (close vs mid донченовского канала) → направленный
+  // сигнал. Упрощено: без duration_mult (бонус за долготу сжатия по 40-бар
+  // истории BB-std) — второстепенный множитель силы, знак не меняет.
+  M.bb_keltner_squeeze = (cd) => { const n = cd.length, o = new Array(n).fill(0), P = 20;
+    if (n < 25) return o;
+    const closesAll = cd.map(c => c.close), at = atr(cd, 14);
+    const kcMidArr = _emaArr(closesAll, P); // EMA считаем ОДИН раз на весь ряд, не на каждый бар
+    for (let i = P + 5; i < n; i++) {
+      if (at[i] == null || at[i] <= 0) { o[i] = 0; continue; }
+      const win = cd.slice(i - P + 1, i + 1), closes = win.map(c => c.close);
+      let s = 0, s2 = 0; for (const v of closes) { s += v; s2 += v * v; }
+      const bbMid = s / P, bbStd = Math.sqrt(Math.max(0, s2 / P - (bbMid * bbMid)));
+      const bbUpper = bbMid + 2.0 * bbStd, bbLower = bbMid - 2.0 * bbStd;
+      const kcMid = kcMidArr[i] || bbMid, kcAtr = at[i];
+      const kcUpper = kcMid + 1.5 * kcAtr, kcLower = kcMid - 1.5 * kcAtr;
+      const squeezeOn = bbUpper < kcUpper && bbLower > kcLower;
+      const squeezeOff = bbUpper > kcUpper && bbLower < kcLower;
+      const hh = Math.max(...win.map(c => c.high)), ll = Math.min(...win.map(c => c.low));
+      const delta = cd[i].close - (hh + ll + bbMid) / 3.0;
+      if (squeezeOn) { o[i] = Math.abs(delta) > 1e-9 ? Math.sign(delta) * 0.20 : 0; continue; }
+      if (squeezeOff) { o[i] = Math.abs(delta) > 1e-9 ? Math.sign(delta) * 0.55 : 0; continue; }
+      o[i] = 0;
+    } return o; };
+
+  // Отклонение цены от KAMA (Efficiency Ratio Кауфмана), z-score от собственной
+  // волатильности, tanh-сжатие. Базовая формула (без ER-множителя/дивергенции
+  // из полной _candle-версии бота — та лишь модулирует амплитуду, знак тот же).
+  M.adaptive_ma = (cd) => { const n = cd.length, o = new Array(n).fill(0);
+    if (n < 20) return o;
+    const cl = cd.map(c => c.close), period = 10, fast = 2 / 3, slow = 2 / 31;
+    const kama = new Array(n).fill(null);
+    kama[period] = cl[period];
+    for (let i = period + 1; i < n; i++) {
+      const change = Math.abs(cl[i] - cl[i - period]);
+      let vol = 0; for (let j = i - period + 1; j <= i; j++) vol += Math.abs(cl[j] - cl[j - 1]);
+      const er = change / (vol || 1e-9), sc = Math.pow(er * (fast - slow) + slow, 2);
+      kama[i] = kama[i - 1] + sc * (cl[i] - kama[i - 1]);
+    }
+    for (let i = period + 1; i < n; i++) {
+      const km = kama[i]; if (km == null || km <= 0) { o[i] = 0; continue; }
+      const W = Math.min(200, i); let s = 0, s2 = 0;
+      for (let j = i - W + 1; j <= i; j++) { s += cl[j]; s2 += cl[j] * cl[j]; }
+      const m = s / W, sd = Math.sqrt(Math.max(1e-9, s2 / W - m * m)) || (km * 0.005);
+      const z = (cl[i] - km) / (sd || 1e-9);
+      o[i] = Math.max(-1, Math.min(1, Math.tanh(z * 0.5)));
+    } return o; };
+
+  // Дробное дифференцирование (d=0.4): веса w_k=(-1)^k·C(d,k), обрыв при |w|<1e-4
+  // (окно до 40). Знак = позиция цены к взвешенной "памяти" (0.45) + наклон
+  // frac-diff серии, усиленный при совпадении с ускорением (0.55).
+  M.fractional_diff = (cd) => { const n = cd.length, o = new Array(n).fill(0);
+    if (n < 30) return o;
+    const cl = cd.map(c => c.close), d = 0.4, threshold = 1e-4, maxW = 40;
+    const weights = [1.0];
+    for (let k = 1; k <= maxW; k++) {
+      const w = weights[weights.length - 1] * (d - k + 1) / k;
+      if (Math.abs(w) < threshold) break;
+      weights.push(w);
+    }
+    const wlen = weights.length;
+    const fd = (idx) => { let s = 0; for (let k = 0; k < wlen; k++) { if (idx - k < 0) break; s += weights[k] * cl[idx - k]; } return s; };
+    for (let i = wlen + 8; i < n; i++) {
+      const fdNow = fd(i), fdPrev = fd(i - 3), fdOld = fd(i - 8);
+      // Точная python-формула tanh((fd/(|fd|+1e-3))·|fd|/(close·0.005+1e-9))
+      // при |fd|≫1e-3 сводится к tanh(fd/(close·0.005+1e-9)) — тот же знак,
+      // без экзотики с двойным делением на |fd_now|.
+      const signSignal = Math.tanh(fdNow / (cl[i] * 0.005 + 1e-9));
+      const slope = fdNow - fdPrev, slopeOld = fdPrev - fdOld;
+      const accelMult = ((slope > 0 && slopeOld > 0) || (slope < 0 && slopeOld < 0)) ? 1.2 : 0.8;
+      const slopeSignal = Math.tanh(slope / (cl[i] * 0.002 + 1e-9)) * accelMult;
+      o[i] = Math.max(-1, Math.min(1, signSignal * 0.45 + slopeSignal * 0.55));
+    } return o; };
+
+  // Накопленный order-flow прокси: Σ объём×знак(close-open)×min(1,2×тело/размах)
+  // за окно ~1.5ч (18×5м), нормировано в диапазон окна [-1..1] + бонус за
+  // растущую дельту за последние 3 бара.
+  M.cumul_delta = (cd) => { const n = cd.length, o = new Array(n).fill(0), W = 18;
+    if (n < W + 5) return o;
+    for (let i = W + 5; i < n; i++) {
+      const deltas = []; let cum = 0;
+      for (let j = i - W + 1; j <= i; j++) {
+        const c = cd[j], sign = c.close >= c.open ? 1 : -1;
+        const rng = (c.high - c.low) || 1e-9, bodyFrac = Math.abs(c.close - c.open) / rng;
+        cum += (c.volume || 0) * sign * Math.min(1, bodyFrac * 2);
+        deltas.push(cum);
+      }
+      const mn = Math.min(...deltas), mx = Math.max(...deltas), rng2 = mx - mn;
+      if (rng2 < 1e-9) { o[i] = 0; continue; }
+      let norm = (deltas[deltas.length - 1] - mn) / rng2 * 2 - 1;
+      if (deltas.length >= 4) {
+        const recentTrend = (deltas[deltas.length - 1] - deltas[deltas.length - 4]) / (rng2 || 1e-9);
+        norm = Math.max(-1, Math.min(1, norm + recentTrend * 0.3));
+      }
+      o[i] = norm;
+    } return o; };
+
   // ── бэктест: winrate (частота угадывания направления) + exp ATR (экспектанси
   //    сделки с тейком/стопом — как системный прогон дашборда). Для фейдов winrate
   //    врёт (низкая при плюсовом exp), поэтому считаем обе цифры. ──────────────
@@ -498,24 +735,34 @@
 
   // ── всё вместе: серии + последний сигнал + точность ──────────────────────────
   const IDS = ['zscore', 'accel', 'order_block', 'fvg', 'liq_sweep', 'false_breakout', 'vsa_abs', 'waning', 'talib_anti', 'hawkes', 'cascade', 'nw', 'alligator_inv', 'fade', 'zonefade',
-    'dfa_regime', 'bipower_jump', 'amihud_shock', 'vpin_toxicity', 'anchored_vwap', 'elliott_wave'];
+    'dfa_regime', 'bipower_jump', 'amihud_shock', 'vpin_toxicity', 'anchored_vwap', 'elliott_wave',
+    'rmi', 'klinger', 'twiggs', 'donchian', 'wick_rejection', 'level_quality',
+    'bb_keltner_squeeze', 'adaptive_ma', 'fractional_diff', 'cumul_delta'];
 
   // Универсал ANTI по данным score_methods.py (invest-bot/docs/BASELINE_method_
   // verdicts_2026-07.md + свежий top-50 top-liq): методы, у которых d<0 во всех
   // режимах в обоих прогонах. Инвертируем ряд перед агрегатом — так же, как
   // alligator_inv, но декларативно списком. Пороги/цифры:
-  //   accel     (PRICE_ACCEL)    BASE -0.054 / top50 -0.050
-  //   liq_sweep (LIQUIDITY_SWEEP) BASE -0.105 / глоб -0.094
-  // anchored_vwap УЖЕ инвертирован внутри метода (см. "ИНВЕРТИРУЕМ (fade от
-  // anchored VWAP)") — второй раз крутить нельзя, вернём в anti.
-  const _INVERTED_GLOBAL = new Set(['accel', 'liq_sweep']);
+  //   accel              (PRICE_ACCEL)       BASE -0.054 / top50 -0.050
+  //   liq_sweep          (LIQUIDITY_SWEEP)   BASE -0.105 / глоб -0.094
+  //   bb_keltner_squeeze (BB_KELTNER_SQUEEZE) walk-fw stable -0.07..-0.19
+  //   adaptive_ma        (ADAPTIVE_MA)        walk-fw stable -0.07..-0.30
+  //   fractional_diff    (FRACTIONAL_DIFF)    BASE -0.063, top-50 drift но anti
+  //   cumul_delta        (CUMUL_DELTA)        walk-fw stable -0.02..-0.10
+  // По toggle_effect.py (invest-bot): именно эта четвёрка (кроме accel/liq_sweep,
+  // уже учтены) дала +6973/+5084/+3940 к весовому Δ WR — крупнейший вклад среди
+  // invert-кандидатов. anchored_vwap УЖЕ инвертирован внутри метода (см.
+  // "ИНВЕРТИРУЕМ (fade от anchored VWAP)") — второй раз крутить нельзя.
+  const _INVERTED_GLOBAL = new Set(['accel', 'liq_sweep', 'bb_keltner_squeeze', 'adaptive_ma', 'fractional_diff', 'cumul_delta']);
 
-  // Отключённые методы (по walk_forward 12 окон): ELLIOTT_WAVE — единственный
-  // noise-метод, знак пляшет между окнами (+0.15/-0.24/+0.02/-0.66/...), инверсия
-  // не спасает — он случайный. Не даёт голос в composite, не рисуется. UI-бейдж
-  // «off». anchored_vwap и elliott_wave раньше были инвертированы в имени
-  // "(инв.)" — теперь только anchored_vwap остаётся; elliott выключаем.
-  const _DISABLED_METHODS = new Set(['elliott_wave']);
+  // Отключённые методы. ELLIOTT_WAVE — единственный noise по walk_forward
+  // (12 окон): знак пляшет (+0.15/-0.24/+0.02/-0.66/...), инверсия не спасает.
+  // rmi/klinger/twiggs/donchian/wick_rejection/level_quality — 6 disable-
+  // кандидатов из method_toggle_state.json бота (по BASELINE везде нейтраль/шум,
+  // подтверждено toggle_effect.py: их отключение освобождает вес для сигнальных
+  // методов, -20984/-16538/-16074/-14507/-13627/-12264/-9559 к Δ WR если бы
+  // остались голосовать). Не дают голос в composite, не рисуются (UI-бейдж «off»).
+  const _DISABLED_METHODS = new Set(['elliott_wave', 'rmi', 'klinger', 'twiggs', 'donchian', 'wick_rejection', 'level_quality']);
 
   // Контекстная (режимная) инверсия для NW: в trending_down d от -0.109
   // (BASELINE) до -0.353 (top-50), во всех остальных режимах — signal.
