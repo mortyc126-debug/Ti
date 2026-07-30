@@ -229,6 +229,12 @@
 .tvsig-reached{ color:var(--green); border-color:var(--green); }
 .tvsig-expired{ color:var(--text3); }
 .tvsig-eta{ color:var(--blue); border-color:var(--blue); }
+/* тейк/стоп цифрами рядом — компактная пара в одном бейдже, зелёный/красный */
+.tvsig-tpsl{ font-size:9px; font-family:var(--mono); font-weight:600; flex-shrink:0; margin-left:3px;
+  padding:1px 4px; border-radius:4px; border:1px solid var(--border2); white-space:nowrap; cursor:help;
+  display:inline-flex; gap:5px; }
+.tvsig-tpsl .tp{ color:var(--green); }
+.tvsig-tpsl .sl{ color:var(--negative); }
 .tvsig-info-btn:hover{ color:var(--violet); }
 
 /* ползунки в стиле indlab: тонкий трек, повёрнутый на 45° фиолетовый thumb */

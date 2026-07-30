@@ -1722,10 +1722,16 @@
     }
     if (p.live) {
       const st = p.live.state, since = 'с ' + _hhmm(p.startTime) + ' МСК (' + p.ageBars + ' бар. / ' + _fmtDuration(p.ageTime) + ' назад)';
+      // тейк/стоп цифрами рядом — раньше были только внутри title (не видны без
+      // наведения); теперь отдельный компактный бейдж во всех состояниях сразу.
+      if (p.tp != null && p.sl != null) {
+        html += '<span class="tvsig-tpsl" title="Тейк ' + p.tp.toFixed(4) + ' / стоп ' + p.sl.toFixed(4) + ' (R:R 2:1, тейк +1.5 / стоп −0.75 ATR от входа ' + (p.entry != null ? p.entry.toFixed(4) : '?') + ')">' +
+          '<span class="tp">↑' + p.tp.toFixed(2) + '</span><span class="sl">↓' + p.sl.toFixed(2) + '</span></span>';
+      }
       if (st === 'stopped') html += '<span class="tvsig-inval" title="Опровергнут: цена уже выбила расчётный стоп ' + p.sl.toFixed(4) + ' ' + since + '">⚠ стоп</span>';
       else if (st === 'reached') html += '<span class="tvsig-reached" title="Цель ' + p.tp.toFixed(4) + ' уже достигнута ' + since + '">✓ цель</span>';
       else if (st === 'expired') html += '<span class="tvsig-expired" title="Прошло больше горизонта (12 баров, или ×1.5 от их номинального времени по реальным часам — на разрывах сессии баров может не хватить, а часы уже вышли) без тейка/стопа — сигнал устарел, ' + since + '">⏱ истёк</span>';
-      else if (st === 'active') html += '<span class="tvsig-eta" title="Сигнал ' + since + '. Цель ' + p.tp.toFixed(4) + ' · стоп ' + p.sl.toFixed(4) + ' · ~' + _fmtDuration(p.etaTime) + ' (' + p.etaBars + ' бар.) до конца горизонта (12 бар.), если темп сохранится. Срок номинальный (N бар.×шаг ТФ) — не учитывает разрывы сессии, по факту может выйти дольше">→' + p.tp.toFixed(2) + ' ~' + _fmtDuration(p.etaTime) + '</span>';
+      else if (st === 'active') html += '<span class="tvsig-eta" title="Сигнал ' + since + '. Цель ' + p.tp.toFixed(4) + ' · стоп ' + p.sl.toFixed(4) + ' · ~' + _fmtDuration(p.etaTime) + ' (' + p.etaBars + ' бар.) до конца горизонта (12 бар.), если темп сохранится. Срок номинальный (N бар.×шаг ТФ) — не учитывает разрывы сессии, по факту может выйти дольше">~' + _fmtDuration(p.etaTime) + '</span>';
     }
     return html;
   }
