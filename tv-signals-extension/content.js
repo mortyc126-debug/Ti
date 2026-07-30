@@ -2102,6 +2102,11 @@
       if (!changed && !newBar && !force && S.computed && S.computed.__live) {
         status('тикер ' + (S.symbol || '?') + ' · ' + S.bars.length + ' баров · обновлено ' + fmtAgo(S.statsTs));
         renderPeriod(); // освежаем плашку периода при зуме/скролле (бары те же)
+        // Этот путь — самый частый (опрос раз в 2.5с, новый 5-мин бар редкость).
+        // futEnsure сам ограничивает частоту похода в MOEX ISS через FUT_PRICE_TTL
+        // (30с) — без вызова здесь цена фьючерса обновлялась бы раз в 5 мин
+        // (только при закрытии бара), а не как заявлено в UI.
+        futEnsure();
         S.busy = false; return;
       }
       if (!changed) status('считаю…');
