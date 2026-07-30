@@ -665,6 +665,50 @@
     return { ok: false, error: lastErr };
   }
 
+  // ── фьючерс на текущий тикер: ручной маппинг + перевод тейк/стоп в % ──────────
+  // Тейк/стоп методов считаются на цене АКЦИИ, а торгуют многие через поставочный
+  // фьючерс на неё (SBRF/GAZR/LKOH-x.xx и т.п.) — другие единицы + базис. Раз в
+  // FUT_PRICE_TTL секунд (или при смене тикера/кода) тянем текущую цену фьючерса
+  // тем же MOEX ISS cmpFetch, что и «Сравнение», и рядом с тейк/стоп акции
+  // показываем пересчёт В ТЕХ ЖЕ %: fut_tp = fut_price × (tp/entry).
+  // ВАЖНО: работает только для поставочных фьючерсов НА САМУ АКЦИЮ — они
+  // движутся синхронно с ней в %, базис мал и почти постоянен. Для индексных/
+  // товарных (Si, RTS, BR) это математически бессмысленно — они не привязаны к
+  // цене конкретной акции никаким детерминированным соотношением.
+  function futMapGet() { try { return JSON.parse(localStorage.getItem('tvsig:futmap') || '{}') || {}; } catch (e) { return {}; } }
+  function futMapSet(map) { try { localStorage.setItem('tvsig:futmap', JSON.stringify(map)); } catch (e) {} }
+  function futCodeFor(ticker) { return ticker ? (futMapGet()[ticker] || '') : ''; }
+  function futCodeSet(ticker, code) {
+    if (!ticker) return;
+    const m = futMapGet(), v = (code || '').trim().toUpperCase();
+    if (v) m[ticker] = v; else delete m[ticker];
+    futMapSet(m);
+  }
+  const FUT_PRICE_TTL = 30; // секунд — не долбим MOEX ISS чаще при каждом refresh()
+  async function futEnsure(force) {
+    const sym = S.symbol, code = futCodeFor(sym);
+    const statusEl2 = document.getElementById('tvsig-fut-status');
+    if (!code) { S._fut = null; if (statusEl2) statusEl2.textContent = ''; return null; }
+    const now = Math.floor(Date.now() / 1000);
+    if (!force && S._fut && S._fut.code === code && S._fut.sym === sym && (now - S._fut.ts) < FUT_PRICE_TTL) return S._fut;
+    if (S._futBuilding === code) return null;
+    S._futBuilding = code;
+    if (statusEl2) statusEl2.textContent = '· гружу…';
+    try {
+      const r = await cmpFetch(code, 1, now - 3 * 3600, now);
+      S._futBuilding = null;
+      if (!r || !r.ok || !r.rows || !r.rows.length) {
+        S._fut = null;
+        if (statusEl2 && futCodeFor(S.symbol) === code) statusEl2.textContent = '· не найден на MOEX (' + (r && r.error || '?') + ')';
+        return null;
+      }
+      S._fut = { code, sym, price: r.rows[r.rows.length - 1].close, ts: now };
+      if (statusEl2 && futCodeFor(S.symbol) === code) statusEl2.textContent = '· ' + S._fut.price.toFixed(2);
+      try { renderRows(); } catch (e) {}
+      return S._fut;
+    } catch (e) { S._futBuilding = null; return null; }
+  }
+
   // ── сканер тикеров: полный OHLCV с MOEX для расчёта сигналов ───────────────────
   async function scanFetch(code, iv, t0, t1) {
     const d0 = cmpDate(t0 - 86400), d1 = cmpDate(t1 + 86400);
@@ -1710,7 +1754,11 @@
   }
   // компактный кластер бейджей: тренд метода (усил/слаб) + статус живой сделки
   // с начала сигнала (в пути / опровергнут стопом / цель достигнута / устарел)
-  function _planBadges(p) {
+  // fut — опционально {code, price}: текущая цена поставочного фьючерса на этот
+  // же тикер (см. futEnsure). Если задан, рядом с тейк/стопом акции добавляется
+  // пересчёт В ТЕХ ЖЕ % хода: fut_tp = fut_price × (tp/entry). Верно только для
+  // поставочных фьючерсов на саму акцию — не для индексных/товарных.
+  function _planBadges(p, fut) {
     if (!p) return '';
     let html = '';
     if (p.trend && p.trend.state) {
@@ -1727,6 +1775,12 @@
       if (p.tp != null && p.sl != null) {
         html += '<span class="tvsig-tpsl" title="Тейк ' + p.tp.toFixed(4) + ' / стоп ' + p.sl.toFixed(4) + ' (R:R 2:1, тейк +1.5 / стоп −0.75 ATR от входа ' + (p.entry != null ? p.entry.toFixed(4) : '?') + ')">' +
           '<span class="tp">↑' + p.tp.toFixed(2) + '</span><span class="sl">↓' + p.sl.toFixed(2) + '</span></span>';
+        if (fut && fut.price && p.entry) {
+          const pctTp = p.tp / p.entry - 1, pctSl = p.sl / p.entry - 1;
+          const fTp = fut.price * (1 + pctTp), fSl = fut.price * (1 + pctSl);
+          html += '<span class="tvsig-tpsl fut" title="Фьюч ' + fut.code + ' (цена ' + fut.price.toFixed(2) + '): тейк/стоп пересчитаны В ТЕХ ЖЕ % хода, что у акции — не абсолютной разницей. Базис фьючерс↔акция не учтён (обычно мал и почти постоянен для поставочных).">' +
+            '<b>' + fut.code + '</b> <span class="tp">↑' + fTp.toFixed(2) + '</span><span class="sl">↓' + fSl.toFixed(2) + '</span></span>';
+        }
       }
       if (st === 'stopped') html += '<span class="tvsig-inval" title="Опровергнут: цена уже выбила расчётный стоп ' + p.sl.toFixed(4) + ' ' + since + '">⚠ стоп</span>';
       else if (st === 'reached') html += '<span class="tvsig-reached" title="Цель ' + p.tp.toFixed(4) + ' уже достигнута ' + since + '">✓ цель</span>';
@@ -2025,7 +2079,12 @@
     try {
       let sym = ''; try { sym = S.chart.symbol(); } catch (e) {}
       const symChanged = sym !== S.symbol;
-      if (symChanged) { clearAll(); S.symbol = sym; S.lastBarTime = 0; S.barDt = 0; seedFromCache(sym); status('тикер ' + (sym || '?') + ' · пересчёт…'); S._notifyPrev = null; }
+      if (symChanged) { clearAll(); S.symbol = sym; S.lastBarTime = 0; S.barDt = 0; seedFromCache(sym); status('тикер ' + (sym || '?') + ' · пересчёт…'); S._notifyPrev = null;
+        S._fut = null;
+        const futEl = document.getElementById('tvsig-fut-code'), futStEl = document.getElementById('tvsig-fut-status');
+        if (futEl) futEl.value = futCodeFor(sym);
+        if (futStEl) futStEl.textContent = '';
+      }
       const res = await Promise.resolve(S.chart.exportData());
       let bars = window.SignalsCore.parseExport(res);
       if (bars.length > 3000) bars = bars.slice(-3000); // держим NW (O(n^2)) в узде
@@ -2063,6 +2122,7 @@
       status('тикер ' + (S.symbol || '?') + ' · ' + bars.length + ' баров · обновлено ' + fmtAgo(S.statsTs));
       breadthEnsure(bars, dt); // полная версия фейда: рыночный breadth (async, не блокирует)
       indexEnsure(bars, dt); // индексный контекст (corr/beta/lead-lag с IMOEX, async)
+      futEnsure(); // цена фьючерса на этот тикер, если задан код (async, не блокирует)
     } catch (e) { status('ошибка: ' + (e && e.message || e)); }
     S.busy = false;
   }
@@ -2286,6 +2346,9 @@
       '<button class="tvsig-dt danger" data-t="__clear" title="Стереть ВСЮ разметку на графике">✕</button>' +
       '</div>' +
       '<div id="tvsig-status">инициализация…</div>' +
+      '<div id="tvsig-fut-cfg" title="Поставочный фьючерс НА ЭТУ АКЦИЮ (SBRF, GAZR, LKOH-x.xx и т.п.) — НЕ индексный/товарный (Si/RTS/BR), для них пересчёт математически неверен: они не привязаны к цене конкретной акции. Если задан — рядом с тейк/стоп каждого метода появится пересчёт В ТЕХ ЖЕ % на текущую цену фьючерса. Код запоминается для этого тикера.">' +
+      'фьюч на акцию <input type="text" id="tvsig-fut-code" placeholder="напр. SBRF-3.26" style="width:100px;text-transform:uppercase"> <span id="tvsig-fut-status" class="dim"></span>' +
+      '</div>' +
       '<div id="tvsig-consensus" title="Общий текущий сигнал: сумма голосов методов, взвешенных по их exp на этом тикере"></div>' +
       '<div id="tvsig-rows"></div>' +
       '<div id="tvsig-notify-cfg" title="Пороги для 🔔 уведомлений об ЭТОМ тикере. Готовый пресет или свои числа. Метод шлёт нотификацию только если сигнал сменил знак И у метода на этом тикере exp ≥ min exp И winrate ≥ min win%.">' +
@@ -2400,6 +2463,13 @@
     document.documentElement.appendChild(panel);
     try { const wv = parseInt(localStorage.getItem('tvsig:width') || '', 10); if (wv >= 300 && wv <= 640) panel.style.width = wv + 'px'; } catch (e) {}
     rowsEl = panel.querySelector('#tvsig-rows'); statusEl = panel.querySelector('#tvsig-status');
+    // фьючерс на текущий тикер: инпут кода (запоминается per-тикер), обновляет
+    // цену сразу по вводу — не ждёт следующего refresh().
+    const futEl = panel.querySelector('#tvsig-fut-code');
+    if (futEl) {
+      futEl.value = futCodeFor(S.symbol);
+      futEl.addEventListener('change', () => { futCodeSet(S.symbol, futEl.value); futEl.value = futCodeFor(S.symbol); futEnsure(true); });
+    }
     const notifyBtn = panel.querySelector('#tvsig-notify');
     const notifyReflect = () => notifyBtn.classList.toggle('on', notifyTickerGet());
     notifyBtn.onclick = () => { notifyTickerSet(!notifyTickerGet()); notifyReflect();
@@ -2842,7 +2912,7 @@
           const expCol = st && st.exp != null ? (st.exp > 0.03 ? '#52F2C9' : st.exp < -0.03 ? '#FF6A8B' : '#A79BC9') : '#6F648F';
           const win = st && st.acc != null ? (st.acc * 100).toFixed(0) + '%' : '—';
           const nn = st ? st.n : 0;
-          let badges = (c && c.last) ? _planBadges(_signalPlan(id)) : '';
+          let badges = (c && c.last) ? _planBadges(_signalPlan(id), S._fut) : '';
           // бейдж согласия/противоречия с индексом — только когда индекс загружен
           // И актив к нему привязан (не «независим от MOEX-семьи»)
           if (c && c.last && S._indexAligned && !S._indexIndependent) {

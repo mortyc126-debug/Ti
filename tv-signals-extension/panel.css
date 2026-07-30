@@ -175,6 +175,17 @@
 .tvsig-scan-notify-cfg input{ background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
   color:var(--text); border-radius:4px; padding:1px 3px; font-family:var(--mono); font-size:10px; }
 .tvsig-scan-notify-cfg input:focus{ outline:none; border-color:var(--amber); }
+/* блок настройки фьючерса на текущий тикер (код + текущая цена) */
+#tvsig-fut-cfg{ margin:4px 6px 0; padding:5px 8px; border-radius:6px;
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06);
+  font-size:10px; color:var(--text2); display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+#tvsig-fut-cfg input{ background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
+  color:var(--text); border-radius:4px; padding:2px 4px; font-family:var(--mono); font-size:10px; }
+#tvsig-fut-cfg input:focus{ outline:none; border-color:var(--amber); }
+/* пара тейк/стоп фьючерса — тот же вид что у акции, но с кодом и лёгкой рамкой,
+   чтобы визуально отличать пересчитанные (в %) числа от исходных на акции */
+.tvsig-tpsl.fut{ background:rgba(180, 130, 240, .06); border-color:rgba(180, 130, 240, .25); }
+.tvsig-tpsl.fut b{ color:#B482F0; font-weight:600; margin-right:1px; }
 /* Голосующие методы в консенсусе — компактные чипы двумя строками */
 .tvsig-cons-side{ margin-top:4px; padding:4px 6px; border-radius:5px; font-size:10px;
   line-height:1.65; display:flex; flex-wrap:wrap; align-items:baseline; gap:3px 5px; }
