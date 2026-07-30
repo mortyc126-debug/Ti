@@ -689,6 +689,11 @@
     const sym = S.symbol, code = futCodeFor(sym);
     const statusEl2 = document.getElementById('tvsig-fut-status');
     if (!code) { S._fut = null; if (statusEl2) statusEl2.textContent = ''; return null; }
+    // Пока идёт активный скан (десятки параллельных запросов к MOEX ISS через
+    // тот же бридж) — не добавляем ещё один. Не критично: TTL всё равно не
+    // даст запросить чаще раза в 30с, пропущенный тик просто подхватится
+    // следующим refresh() после того, как скан освободит S._scanBusy.
+    if (S._scanBusy && !force) return null;
     const now = Math.floor(Date.now() / 1000);
     if (!force && S._fut && S._fut.code === code && S._fut.sym === sym && (now - S._fut.ts) < FUT_PRICE_TTL) return S._fut;
     if (S._futBuilding === code) return null;
@@ -713,12 +718,16 @@
   async function scanFetch(code, iv, t0, t1) {
     const d0 = cmpDate(t0 - 86400), d1 = cmpDate(t1 + 86400);
     const mkts = [['stock', 'shares'], ['stock', 'index'], ['futures', 'forts'], ['currency', 'selt']];
+    // Раньше причина падения нигде не запоминалась (continue молча на каждом шаге) —
+    // при общем сбое (MOEX недоступен/лимит/бридж не ответил) сообщение сканера было
+    // 'N не отдали свечи' без объяснения ПОЧЕМУ. Теперь как в cmpFetch: копим lastErr.
+    let lastErr = 'не найдено на MOEX (проверь код)';
     for (const [eng, mkt] of mkts) {
       const url = 'https://iss.moex.com/iss/engines/' + eng + '/markets/' + mkt + '/securities/' + encodeURIComponent(code) +
         '/candles.json?iss.meta=off&interval=' + iv + '&from=' + d0 + '&till=' + d1;
-      const r = await oiFetch(url); if (!r.ok) continue;
-      let j; try { j = JSON.parse(r.json); } catch (e) { continue; }
-      const cc = j.candles; if (!cc || !cc.data || !cc.data.length) continue;
+      const r = await oiFetch(url); if (!r.ok) { lastErr = r.error || 'сеть/бридж не ответил'; continue; }
+      let j; try { j = JSON.parse(r.json); } catch (e) { lastErr = 'битый ответ MOEX'; continue; }
+      const cc = j.candles; if (!cc || !cc.data || !cc.data.length) { lastErr = 'нет свечей (код/рынок/период)'; continue; }
       const C = cc.columns, io = C.indexOf('open'), ih = C.indexOf('high'), il = C.indexOf('low'),
         ic = C.indexOf('close'), iv2 = C.indexOf('volume'), ib = C.indexOf('begin');
       const bars = cc.data.map(row => ({
@@ -726,8 +735,9 @@
         open: +row[io], high: +row[ih], low: +row[il], close: +row[ic], volume: +row[iv2]
       })).filter(b => b.time && b.close > 0).sort((a, b) => a.time - b.time);
       if (bars.length) return { ok: true, bars };
+      lastErr = 'свечи пустые после фильтра';
     }
-    return { ok: false };
+    return { ok: false, error: lastErr };
   }
   // ── источник Tinkoff Invest API: точные данные параллельным REST, график не
   // трогает. Нужен токен (права только на чтение котировок) из личного кабинета
@@ -913,8 +923,13 @@
       }
     } else {
       for (const code of codes) {
-        let f; try { f = await scanFetch(code, iv, t0, now); } catch (e) { f = null; }
-        if (!f || !f.ok || f.bars.length < 80) { diag.err++; continue; }
+        let f; try { f = await scanFetch(code, iv, t0, now); } catch (e) { f = { ok: false, error: String(e && e.message || e) }; }
+        if (!f || !f.ok) {
+          diag.err++;
+          if (f && f.error && diag.errMsgs.length < 3 && !diag.errMsgs.includes(f.error)) diag.errMsgs.push(code + ': ' + f.error);
+          continue;
+        }
+        if (f.bars.length < 80) { diag.err++; continue; }
         diag.ok++;
         processTicker(code, f.bars, ivSec);
       }
