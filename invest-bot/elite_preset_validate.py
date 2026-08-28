@@ -20,27 +20,38 @@ tv-signals-extension/content.js) на реальной истории из data/
     пресета — кумулятивно (elite ⊆ strict ⊆ mid ⊆ often ⊆ all, пороги
     NOTIFY_PRESETS монотонно растут по exp и win);
   - печатаем: пресет → пар (тикер×метод) → сделок OOS → win% → exp ATR.
-    Если "элитно" даёт на test не выше win/exp, чем "строго" (или сильно
-    просаженный n), это и есть ответ — ярлык не держится вне выборки.
 
-Важная оговорка: методы здесь — из живого композита бота (oi_composite_
-strategy.METHODS), НЕ побайтово те же 32 JS-метода из tv-signals-extension
-(часть 1:1 портирована, часть названа/устроена иначе — см. IDS в
-signals-core.js). Это ближайший доступный офлайн-прокси для тех же цифр
-(та же формула exp/win, тот же take/stop/cost), а не точная копия.
+Методы — РОВНО те же 32, что в самом расширении (включая ema200_revert —
+возврат к EMA200 после долгого отрыва). Сигналы считает не Python-порт, а
+сам tv-signals-extension/signals-core.js через run_signals_core.js (Node —
+чистый модуль, без DOM, требует только --window/global — см. его шапку).
+Так формулы гарантированно не расходятся с тем, что реально видит
+пользователь в терминале. Нужен node в PATH (--node, если он не в PATH).
+
+Прерывание/продолжение: прогресс (пройденные тикеры + накопленные корзины)
+пишется в --checkpoint (data/elite_preset_checkpoint.json по умолчанию)
+атомарно после КАЖДОГО тикера. Ctrl+C — печатает отчёт по тому, что успело
+посчитаться, и выходит; повторный запуск С ТЕМИ ЖЕ аргументами продолжает с
+первого непройденного тикера (сигнатура аргументов проверяется — при
+изменении --split/--horizon/--days/тикеров и т.п. чекпоинт игнорируется,
+печатается предупреждение). --fresh игнорирует и перезаписывает чекпоинт.
 
 Нужен непустой data/candle_cache (заполняется prefetch_candles.py /
 prefetch_top_liq.py на боевой машине с сетью — здесь его в чистом клоне
 нет). Запуск:
   python elite_preset_validate.py ALL --top-liq 50 --days 180
   python elite_preset_validate.py GAZP,SBER,LKOH --split 0.6 --out out.csv
+  # Ctrl+C посреди прогона, затем тот же вызов ещё раз — продолжит с места остановки.
 """
 from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
+import json
 import math
 import os
+import subprocess
 import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -53,15 +64,18 @@ except ImportError:
     if _stub not in sys.path:
         sys.path.insert(0, _stub)
 
-from trade_system.strategies import oi_composite_strategy as ocs  # noqa: E402
 import score_methods as _sm  # noqa: E402
-from score_methods import _load_from_cache, _row_to_ns, _atr_sma, _filter_by_dates, _list_tickers  # noqa: E402
+from score_methods import _load_from_cache, _list_tickers  # noqa: E402
+from atomic_json import atomic_write_json  # noqa: E402
 
 # _atr_sma читает numpy из module-global _WORKER_NP, который score_methods
 # заполняет только внутри _init_worker() (обычно на каждый mp.Pool-воркер).
 # Мы однопроцессные — вызываем его руками один раз, иначе _WORKER_NP=None
 # и _atr_sma падает на np.full_like(None, ...).
 _sm._init_worker()
+from score_methods import _atr_sma  # noqa: E402
+
+NODE_BRIDGE = os.path.join(_HERE, "run_signals_core.js")
 
 # Та же таблица, что NOTIFY_PRESETS в tv-signals-extension/content.js — держать
 # в синхроне при правке одного из файлов. (key, min_exp ATR, min_win %)
@@ -158,44 +172,42 @@ def tier_of(stats):
     return idx
 
 
-def _dense_scores(fn, candles, window, stride, lo, hi):
-    """scores[i] для i в [lo, hi) с шагом stride, иначе 0 (сигнала «нет» —
-    как если бы индикатор не пересчитывался между барами страйда)."""
-    out = [0.0] * len(candles)
-    for i in range(max(lo, window), hi, stride):
-        try:
-            sc = fn(candles[i - window:i + 1])
-        except Exception:
-            continue
-        if sc is not None:
-            out[i] = sc
-    return out
+def node_scores(rows_raw, node_bin, horizon):
+    """Вызывает run_signals_core.js → {methodId: [score|null,...]} — сигналы
+    ВСЕХ 32 методов signals-core.js, той же формулой, что живое расширение."""
+    p = subprocess.run(
+        [node_bin, NODE_BRIDGE, str(horizon)],
+        input=json.dumps(rows_raw), capture_output=True, text=True,
+    )
+    if p.returncode != 0:
+        raise RuntimeError(f"node упал: {p.stderr[-2000:]}")
+    return json.loads(p.stdout)
 
 
-def process_ticker(ticker, cache_dir, interval, days, window, stride, split_frac,
-                    horizon, methods_filter, n_atr):
+def process_ticker(ticker, cache_dir, interval, days, split_frac, horizon,
+                    methods_filter, n_atr, node_bin):
     rows_raw = _load_from_cache(ticker, cache_dir, interval)
     if not rows_raw:
         return None
     if days:
-        rows_raw = rows_raw[-max(days * (390 // max(interval, 1)), window + horizon + 50):]
-    if len(rows_raw) < window + horizon + 50:
+        rows_raw = rows_raw[-max(days * (390 // max(interval, 1)), 250):]
+    if len(rows_raw) < 250 + horizon:
         return None
-    candles = [_row_to_ns(r) for r in rows_raw]
     closes = [r["close"] for r in rows_raw]
     highs = [r["high"] for r in rows_raw]
     lows = [r["low"] for r in rows_raw]
     import numpy as np
     atr = _atr_sma(np.array(highs, dtype=float), np.array(lows, dtype=float), n_atr).tolist()
-    n = len(candles)
+    n = len(closes)
     split_idx = int(n * split_frac)
-    if split_idx < window + horizon or n - split_idx < horizon + 10:
+    if split_idx < 200 or n - split_idx < horizon + 10:
         return None
 
-    methods = [(name, fn) for name, fn in ocs.METHODS if (not methods_filter) or name in methods_filter]
+    all_scores = node_scores(rows_raw, node_bin, horizon)
     out = {}
-    for name, fn in methods:
-        scores = _dense_scores(fn, candles, window, stride, 0, n)
+    for name, scores in all_scores.items():
+        if methods_filter and name not in methods_filter:
+            continue
         train = bt_stats(scores[:split_idx], closes[:split_idx], highs[:split_idx], lows[:split_idx],
                           atr[:split_idx], horizon=horizon)
         test = bt_stats(scores[split_idx:], closes[split_idx:], highs[split_idx:], lows[split_idx:],
@@ -204,23 +216,51 @@ def process_ticker(ticker, cache_dir, interval, days, window, stride, split_frac
     return out
 
 
+def _run_sig(args, tickers):
+    """Хэш параметров, влияющих на сравнимость прогонов — чекпоинт от другой
+    конфигурации (иной сплит/горизонт/набор тикеров) резюмировать нельзя."""
+    payload = {
+        "tickers": sorted(tickers), "interval": args.interval, "days": args.days,
+        "split": args.split, "horizon": args.horizon, "n_atr": args.n_atr,
+        "methods": sorted(args.methods.lower().split(",")) if args.methods else None,
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def _load_checkpoint(path, sig):
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            cp = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
+    if cp.get("sig") != sig:
+        print(f"[checkpoint] {path} — другая конфигурация прогона, игнорирую (--fresh чтобы убрать предупреждение)",
+              file=sys.stderr)
+        return None
+    return cp
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("tickers", help="тикер, список через запятую, или ALL")
     ap.add_argument("--cache", default=os.path.join(_HERE, "data", "candle_cache"))
     ap.add_argument("--interval", type=int, default=5, choices=(1, 5))
     ap.add_argument("--days", type=int, default=180)
-    ap.add_argument("--window", type=int, default=300, help="окно для score_fn (как в score_methods.py)")
-    ap.add_argument("--stride", type=int, default=3, help="через сколько баров пересчитывать метод (перф)")
     ap.add_argument("--split", type=float, default=0.6, help="доля train (grading), остальное — OOS test")
     ap.add_argument("--horizon", type=int, default=12)
     ap.add_argument("--n-atr", type=int, default=20)
     ap.add_argument("--top-liq", type=int, default=None, help="топ-N по ликвидности (только tickers=ALL)")
-    ap.add_argument("--methods", default=None, help="подмножество методов через запятую")
+    ap.add_argument("--methods", default=None,
+                     help="подмножество id из signals-core.js IDS через запятую (напр. ema200_revert,zscore,nw)")
+    ap.add_argument("--node", default="node", help="путь к node, если не в PATH")
     ap.add_argument("--out", default=None, help="CSV по парам (тикер,метод,tier,train/test stats)")
+    ap.add_argument("--checkpoint", default=os.path.join(_HERE, "data", "elite_preset_checkpoint.json"))
+    ap.add_argument("--fresh", action="store_true", help="игнорировать существующий чекпоинт, начать с нуля")
     args = ap.parse_args()
 
-    methods_filter = {m.strip().upper() for m in args.methods.split(",")} if args.methods else None
+    methods_filter = {m.strip().lower() for m in args.methods.split(",")} if args.methods else None
 
     if args.tickers.upper() == "ALL":
         tickers = _list_tickers(args.cache, args.interval, top_liq=args.top_liq, liq_days=60,
@@ -230,30 +270,58 @@ def main():
     if not tickers:
         sys.exit("нет тикеров (пуст data/candle_cache? см. prefetch_candles.py)")
 
-    # bucket[tier_idx] = [pnl_sum, wins, n] на OOS
-    buckets = {i: [0.0, 0, 0] for i in range(len(PRESETS))}
+    sig = _run_sig(args, tickers)
+    cp = None if args.fresh else _load_checkpoint(args.checkpoint, sig)
+
+    buckets = {i: [0.0, 0, 0] for i in range(len(PRESETS))}  # tier -> [pnl_sum, wins, n] на OOS
     pairs_rows = []
-    done = 0
-    for t in tickers:
-        res = process_ticker(t, args.cache, args.interval, args.days, args.window, args.stride,
-                              args.split, args.horizon, methods_filter, args.n_atr)
-        done += 1
-        print(f"\r{done}/{len(tickers)} {t:<12}", end="", file=sys.stderr, flush=True)
-        if not res:
-            continue
-        for name, (train, test) in res.items():
-            tier = tier_of(train)
-            if tier < 0:
-                continue
-            b = buckets[tier]
-            if test["n"]:
-                b[0] += test["exp"] * test["n"]
-                b[1] += test["win"] * test["n"]
-                b[2] += test["n"]
-            pairs_rows.append((t, name, PRESETS[tier][0],
-                                train["exp"], train["acc"], train["n"],
-                                test["exp"], test["win"], test["n"]))
+    done_set = set()
+    if cp:
+        for i in range(len(PRESETS)):
+            b = cp["buckets"].get(str(i))
+            if b:
+                buckets[i] = b
+        pairs_rows = [tuple(r) for r in cp.get("pairs_rows", [])]
+        done_set = set(cp.get("done_tickers", []))
+        print(f"[checkpoint] продолжаю: {len(done_set)}/{len(tickers)} тикеров уже готовы", file=sys.stderr)
+
+    remaining = [t for t in tickers if t not in done_set]
+    already_done = len(done_set)
+    interrupted = False
+    try:
+        for i, t in enumerate(remaining):
+            try:
+                res = process_ticker(t, args.cache, args.interval, args.days, args.split,
+                                      args.horizon, methods_filter, args.n_atr, args.node)
+            except RuntimeError as e:
+                print(f"\n[{t}] {e}", file=sys.stderr)
+                res = None
+            print(f"\r{already_done + i + 1}/{len(tickers)} {t:<12}", end="", file=sys.stderr, flush=True)
+            if res:
+                for name, (train, test) in res.items():
+                    tier = tier_of(train)
+                    if tier < 0:
+                        continue
+                    b = buckets[tier]
+                    if test["n"]:
+                        b[0] += test["exp"] * test["n"]
+                        b[1] += test["win"] * test["n"]
+                        b[2] += test["n"]
+                    pairs_rows.append((t, name, PRESETS[tier][0],
+                                        train["exp"], train["acc"], train["n"],
+                                        test["exp"], test["win"], test["n"]))
+            done_set.add(t)
+            atomic_write_json(args.checkpoint, {
+                "sig": sig, "done_tickers": sorted(done_set),
+                "buckets": {str(k): v for k, v in buckets.items()},
+                "pairs_rows": pairs_rows,
+            })
+    except KeyboardInterrupt:
+        interrupted = True
     print(file=sys.stderr)
+    if interrupted:
+        print(f"[прервано] {len(done_set)}/{len(tickers)} тикеров готово, прогресс сохранён в {args.checkpoint}. "
+              f"Запусти команду ещё раз с теми же аргументами, чтобы продолжить.", file=sys.stderr)
 
     if args.out:
         with open(args.out, "w", newline="", encoding="utf-8") as f:
@@ -269,7 +337,7 @@ def main():
         idx = next(i for i, p in enumerate(PRESETS) if p[0] == tier_key)
         for j in range(idx + 1):
             n_pairs_at_or_above[j] += 1
-    for i, (key, min_exp, min_win) in enumerate(PRESETS):
+    for i, (key, _min_exp, _min_win) in enumerate(PRESETS):
         pnl = wins = cnt = 0.0
         for j in range(i, len(PRESETS)):
             pnl += buckets[j][0]
@@ -278,6 +346,10 @@ def main():
         win_pct = (wins / cnt * 100) if cnt else float("nan")
         exp = (pnl / cnt) if cnt else float("nan")
         print(f"{key:<8} {n_pairs_at_or_above[i]:>12} {int(cnt):>11} {win_pct:>8.1f}% {exp:>+11.3f}")
+
+    if not interrupted:
+        print(f"\n[готово] чтобы посчитать с нуля в другой раз: --fresh (или удали {args.checkpoint})",
+              file=sys.stderr)
 
 
 if __name__ == "__main__":

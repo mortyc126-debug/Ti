@@ -664,6 +664,28 @@
       o[i] = norm;
     } return o; };
 
+  // Возврат к EMA200: если цена долго (≥MIN_AWAY баров) не касалась EMA200 —
+  // ставим на откат к ней (mean-reversion), сила растёт с давностью отрыва и
+  // удалением в ATR (плато на 3×MIN_AWAY баров / 3 ATR). Ниже EMA и давно не
+  // касались → лонг (ждём роста к средней); выше и давно не касались → шорт.
+  M.ema200_revert = (cd) => { const n = cd.length, o = new Array(n).fill(0);
+    const per = 200, minAway = 40;
+    if (n < per + minAway) return o;
+    const cl = cd.map(c => c.close), ema = _emaArr(cl, per), at = atr(cd, 20);
+    let sinceTouch = 0;
+    for (let i = 0; i < n; i++) {
+      const e = ema[i]; if (e == null) continue;
+      const touched = cd[i].high >= e && cd[i].low <= e;
+      sinceTouch = touched ? 0 : sinceTouch + 1;
+      const e20 = at[i];
+      if (e20 == null || e20 <= 0 || sinceTouch < minAway) continue;
+      const dist = cl[i] - e, distAtr = Math.abs(dist) / e20;
+      const durMult = Math.min(1, (sinceTouch - minAway) / (minAway * 2));
+      const distMult = Math.min(1, distAtr / 3);
+      const mag = 0.3 + 0.7 * Math.min(1, (durMult + distMult) / 2);
+      o[i] = dist > 0 ? -mag : mag;
+    } return o; };
+
   // ── бэктест: winrate (частота угадывания направления) + exp ATR (экспектанси
   //    сделки с тейком/стопом — как системный прогон дашборда). Для фейдов winrate
   //    врёт (низкая при плюсовом exp), поэтому считаем обе цифры. ──────────────
@@ -737,7 +759,7 @@
   const IDS = ['zscore', 'accel', 'order_block', 'fvg', 'liq_sweep', 'false_breakout', 'vsa_abs', 'waning', 'talib_anti', 'hawkes', 'cascade', 'nw', 'alligator_inv', 'fade', 'zonefade',
     'dfa_regime', 'bipower_jump', 'amihud_shock', 'vpin_toxicity', 'anchored_vwap', 'elliott_wave',
     'rmi', 'klinger', 'twiggs', 'donchian', 'wick_rejection', 'level_quality',
-    'bb_keltner_squeeze', 'adaptive_ma', 'fractional_diff', 'cumul_delta'];
+    'bb_keltner_squeeze', 'adaptive_ma', 'fractional_diff', 'cumul_delta', 'ema200_revert'];
 
   // Универсал ANTI по данным score_methods.py (invest-bot/docs/BASELINE_method_
   // verdicts_2026-07.md + свежий top-50 top-liq): методы, у которых d<0 во всех

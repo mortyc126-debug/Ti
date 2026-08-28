@@ -35,6 +35,7 @@
     ['donchian', 'Дончиан-асимметрия (off)', '#7F8C8D'],
     ['wick_rejection', 'Хвостовое отвержение (off)', '#7F8C8D'],
     ['level_quality', 'Качество уровня (off)', '#7F8C8D'],
+    ['ema200_revert', 'Возврат к EMA200', '#F1C40F'],
   ];
   const NAME = {}, DEF_COLOR = {}, IDX = {}; META.forEach(([id, n, c], i) => { NAME[id] = n; DEF_COLOR[id] = c; IDX[id] = i; });
   // группировка списка по синергии (строгий рейтинг agree_scan: no-overlap + OOS).
