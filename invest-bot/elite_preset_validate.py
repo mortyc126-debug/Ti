@@ -54,7 +54,14 @@ except ImportError:
         sys.path.insert(0, _stub)
 
 from trade_system.strategies import oi_composite_strategy as ocs  # noqa: E402
+import score_methods as _sm  # noqa: E402
 from score_methods import _load_from_cache, _row_to_ns, _atr_sma, _filter_by_dates, _list_tickers  # noqa: E402
+
+# _atr_sma читает numpy из module-global _WORKER_NP, который score_methods
+# заполняет только внутри _init_worker() (обычно на каждый mp.Pool-воркер).
+# Мы однопроцессные — вызываем его руками один раз, иначе _WORKER_NP=None
+# и _atr_sma падает на np.full_like(None, ...).
+_sm._init_worker()
 
 # Та же таблица, что NOTIFY_PRESETS в tv-signals-extension/content.js — держать
 # в синхроне при правке одного из файлов. (key, min_exp ATR, min_win %)
