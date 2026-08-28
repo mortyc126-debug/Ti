@@ -2771,7 +2771,7 @@
         '<div class="tvsig-info-sec"><div class="tvsig-info-lbl">Как читать</div>' + d.read + '</div>' +
         '<div class="tvsig-info-sec"><div class="tvsig-info-lbl">Бэктест по тикеру ' + (S.symbol || '?') + '</div>' +
           '<div class="tvsig-chips">' + chips + '</div>' +
-          '<div class="tvsig-info-fine">exp — средний P&amp;L сделки в ATR (тейк 1.0 / стоп 0.5, издержки 0.12) при выходе через N баров · % — winrate · n — сделок</div></div>' +
+          '<div class="tvsig-info-fine">exp — средний P&amp;L сделки в ATR (тейк 1.5 / стоп 0.75 ATR, R:R 2:1, издержки 0.12) при выходе через N баров · % — winrate · n — сделок. <b>Реальный вход этими же цифрами → ставь тот же брекет 1.5/0.75 ATR</b>, иначе результат разойдётся с exp (узкий 1.0/0.5 занижает exp вдвое, чаще выбивает стопом).</div></div>' +
         '<div class="tvsig-info-sec"><div class="tvsig-info-lbl">По режимам на этом тикере</div>' +
           _regimeMiniTable(series, bars) +
           '<div class="tvsig-info-fine">exp/win в разных условиях: тренд/боковик, сжатие/расшир волатильности, идио/с рынком/против. Часто метод «размазан» глобально, но сильный в одном режиме и слабый в другом — это показывает, где ЭТОТ метод реально работает на ЭТОМ тикере (n&lt;10 — цифра шумная, серый).</div></div>' +
@@ -2953,7 +2953,7 @@
             } catch (e) {}
           }
           return pill(c ? c.last : 0) +
-            '<span class="tvsig-exp" style="color:' + expCol + '" title="exp — экспектанси: средний P&L сделки в ATR (тейк +1.0 / стоп −0.5 ATR, издержки 0.12). Плюс = метод в прибыли, даже если winrate низкий.">' + exp + '</span>' +
+            '<span class="tvsig-exp" style="color:' + expCol + '" title="exp — экспектанси: средний P&L сделки в ATR при брекете тейк +1.5 / стоп −0.75 ATR (R:R 2:1, издержки 0.12). Плюс = метод в прибыли, даже если winrate низкий. Реальный вход этими же цифрами — ставь тот же брекет 1.5/0.75 ATR, иначе результат будет другим (узкий стоп чаще выбивает).">' + exp + '</span>' +
             '<span class="tvsig-acc" title="winrate — частота совпадения знака с ходом за 12 баров. У фейдов бывает низкой при плюсовом exp — это норма.">' + win + '</span>' +
             '<span class="tvsig-n" title="Число сделок в exp-симуляции">n' + nn + '</span>' + badges;
         })();
