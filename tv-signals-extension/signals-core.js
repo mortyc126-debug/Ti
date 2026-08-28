@@ -783,8 +783,15 @@
   // кандидатов из method_toggle_state.json бота (по BASELINE везде нейтраль/шум,
   // подтверждено toggle_effect.py: их отключение освобождает вес для сигнальных
   // методов, -20984/-16538/-16074/-14507/-13627/-12264/-9559 к Δ WR если бы
-  // остались голосовать). Не дают голос в composite, не рисуются (UI-бейдж «off»).
-  const _DISABLED_METHODS = new Set(['elliott_wave', 'rmi', 'klinger', 'twiggs', 'donchian', 'wick_rejection', 'level_quality']);
+  // остались голосовать). ema200_revert — OOS-проверка invest-bot/
+  // elite_preset_validate.py (50 тикеров, 180 дней, 5м): в прямом виде
+  // exp OOS стабильно отрицателен (-0.10 ATR на тысячах сделок — не шум), с
+  // --invert (гипотеза «работает наоборот», как раньше оказалось у ряда
+  // методов из _INVERTED_GLOBAL) стало ~0 (-0.001), а не в плюс — то есть
+  // edge нет ни в одном направлении на 5-минутках, идея не подтвердилась
+  // (возможно, сработает на дневных барах — не проверялось). Не дают голос
+  // в composite, не рисуются (UI-бейдж «off»).
+  const _DISABLED_METHODS = new Set(['elliott_wave', 'rmi', 'klinger', 'twiggs', 'donchian', 'wick_rejection', 'level_quality', 'ema200_revert']);
 
   // Контекстная (режимная) инверсия для NW: в trending_down d от -0.109
   // (BASELINE) до -0.353 (top-50), во всех остальных режимах — signal.
