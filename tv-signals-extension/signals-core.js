@@ -681,8 +681,17 @@
   //      minAway). Дальше держим 0, пока не будет нового касания EMA;
   //   2) режимный фильтр: сигнал только когда ER<0.3 (диапазон / слабый
   //      тренд, как в regimeInfo). В сильном тренде — 0.
+  // Параллельный к M.ema200_revert массив брекетов: для баров с сигналом —
+  // {take, stop} в ATR (тейк подгоняется под цель "доехать до EMA", а не под
+  // общий 1.5/0.75), для остальных null. Живой composite/агрегат читает
+  // только скор — брекеты нужны бэктесту (bt_stats.opts.brackets), Node-мосту
+  // (run_signals_core.js) и потенциально расчёту тейк/стоп-меток на графике.
+  // Заводим как атрибут функции, чтобы не менять формат методов и не плодить
+  // глобальные словари.
   M.ema200_revert = (cd) => { const n = cd.length, o = new Array(n).fill(0);
     const per = 200, minAway = 40, W = 60;
+    const brk = new Array(n).fill(null);
+    M.ema200_revert.brackets = brk;
     if (n < per + minAway) return o;
     const cl = cd.map(c => c.close), ema = _emaArr(cl, per), at = atr(cd, 20);
     let sinceTouch = 0, fired = false; // fired: событие уже отработано на этом отрыве
@@ -703,6 +712,13 @@
       const dist = cl[i] - e, distAtr = Math.abs(dist) / e20;
       const mag = 0.3 + 0.7 * Math.min(1, distAtr / 3);
       o[i] = dist > 0 ? -mag : mag;
+      // Fade-брекет: тейк = 60% пути к EMA (не до самой EMA — она может быть
+      // далеко и никогда не сработает), но не меньше 1 ATR и не больше 5 ATR
+      // (верхняя граница — чтобы сделка не висела вечно тайм-выходом). Стоп —
+      // 1 ATR: отрыв продолжился ещё на ATR = наша гипотеза "разворот" не
+      // сбылась. R:R получается от 1:1 (при distAtr≈1.7) до 3:1 (при distAtr≥5).
+      const take = Math.max(1.0, Math.min(5.0, distAtr * 0.6));
+      brk[i] = { take, stop: 1.0 };
       fired = true;
     } return o; };
 
@@ -745,7 +761,13 @@
         const sc = scoreArr[i], e = at[i];
         if (sc != null && sc !== 0 && e != null && e > 0) {
           const dir = sc > 0 ? 1 : -1;
-          pos = { dir, entry: cl, tp: cl + dir * T * e, sl: cl - dir * S * e, eatr: e, i };
+          // opts.brackets — параллельный массив {take,stop}|null от метода,
+          // для которого дефолтный 1.5/0.75 не подходит (см. ema200_revert:
+          // цель "доехать до EMA" может быть в разы дальше 1.5 ATR — узкий
+          // тейк никогда не срабатывает, торгуется шум и exp уходит в минус).
+          const b = opts.brackets && opts.brackets[i];
+          const T_i = b ? b.take : T, S_i = b ? b.stop : S;
+          pos = { dir, entry: cl, tp: cl + dir * T_i * e, sl: cl - dir * S_i * e, eatr: e, i };
         }
       }
     }

@@ -113,7 +113,7 @@ MIN_N = 10  # как в notifyCheckMethods: st.n < 10 → сигнал не сч
 
 
 def bt_stats(scores, closes, highs, lows, atr, horizon=12, take=1.5, stop=0.75, cost=0.12,
-             min_atr_pct=0.0):
+             min_atr_pct=0.0, brackets=None):
     """Порт btStats() из tv-signals-extension/signals-core.js. scores[i] — сырой
     скор метода на баре i (0/None = сигнала нет). Возвращает {acc, exp, win, n}
     ровно как в JS-версии: acc — доля совпадений знака с ходом через horizon
@@ -170,7 +170,13 @@ def bt_stats(scores, closes, highs, lows, atr, horizon=12, take=1.5, stop=0.75, 
             e = atr[i]
             if sc and e and e > 0 and not math.isnan(e) and (not min_atr_pct or e / cl >= min_atr_pct):
                 d = 1 if sc > 0 else -1
-                pos = {"dir": d, "entry": cl, "tp": cl + d * take * e, "sl": cl - d * stop * e, "eatr": e, "i": i}
+                # brackets[i] = {"take":..., "stop":...}|None — per-signal
+                # переопределение от метода (fade-методам нужен свой брекет,
+                # см. signals-core.js: M.ema200_revert.brackets).
+                b = brackets[i] if brackets else None
+                t_i = b["take"] if b else take
+                s_i = b["stop"] if b else stop
+                pos = {"dir": d, "entry": cl, "tp": cl + d * t_i * e, "sl": cl - d * s_i * e, "eatr": e, "i": i}
     return {
         "acc": (hit / hn) if hn else None,
         "exp": (pnl_sum / tn) if tn else None,
@@ -204,8 +210,11 @@ def tier_of(stats):
 
 
 def node_scores(rows_raw, node_bin, horizon):
-    """Вызывает run_signals_core.js → {methodId: [score|null,...]} — сигналы
-    ВСЕХ 32 методов signals-core.js, той же формулой, что живое расширение."""
+    """Вызывает run_signals_core.js → {"scores": {methodId: [...]},
+    "brackets": {methodId: [{take,stop}|None,...]}} — сигналы ВСЕХ 32 методов
+    signals-core.js, той же формулой, что живое расширение. Брекеты не у всех
+    методов: их заполняет только тот, у кого дефолтный 1.5/0.75 неадекватен
+    цели (пока — ema200_revert)."""
     p = subprocess.run(
         [node_bin, NODE_BRIDGE, str(horizon)],
         input=json.dumps(rows_raw), capture_output=True, text=True,
@@ -235,17 +244,22 @@ def process_ticker(ticker, cache_dir, interval, days, split_frac, horizon,
         return None
     min_atr_pct = commission_rt(_is_future(ticker)) * min_atr_factor if min_atr_factor else 0.0
 
-    all_scores = node_scores(rows_raw, node_bin, horizon)
+    node_out = node_scores(rows_raw, node_bin, horizon)
+    all_scores = node_out.get("scores", {})
+    all_brackets = node_out.get("brackets", {})
     out = {}
     for name, scores in all_scores.items():
         if methods_filter and name not in methods_filter:
             continue
         if invert_set and name in invert_set:
             scores = [-s if s else s for s in scores]  # 0/None не трогаем — "нет сигнала" не инвертируется
+        brk = all_brackets.get(name)
         train = bt_stats(scores[:split_idx], closes[:split_idx], highs[:split_idx], lows[:split_idx],
-                          atr[:split_idx], horizon=horizon, min_atr_pct=min_atr_pct)
+                          atr[:split_idx], horizon=horizon, min_atr_pct=min_atr_pct,
+                          brackets=brk[:split_idx] if brk else None)
         test = bt_stats(scores[split_idx:], closes[split_idx:], highs[split_idx:], lows[split_idx:],
-                         atr[split_idx:], horizon=horizon, min_atr_pct=min_atr_pct)
+                         atr[split_idx:], horizon=horizon, min_atr_pct=min_atr_pct,
+                         brackets=brk[split_idx:] if brk else None)
         out[name] = (train, test)
     return out
 
