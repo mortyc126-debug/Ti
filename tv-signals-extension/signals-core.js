@@ -690,21 +690,49 @@
   // глобальные словари.
   M.ema200_revert = (cd) => { const n = cd.length, o = new Array(n).fill(0);
     const per = 200, minAway = 40, W = 60;
+    // Про-инструментальный фильтр: mean-reversion осмысленна только на
+    // тикерах, которые РЕГУЛЯРНО возвращаются к своей EMA (ranging-натура).
+    // Трендовые инструменты неделями проводят по одну сторону EMA — им
+    // "созревший отрыв" означает продолжение тренда, а не разворот. Считаем
+    // скользящую долю баров с касанием EMA за touchWin последних баров:
+    // если ниже minTouchRate (~раз в 60 баров = раз в 5 торговых часов) —
+    // сигнал не выдаём. Порог подобран так, чтобы отсекать сильно трендовые
+    // тикеры, но пропускать среднестатистические 5-мин акции/фьючерсы.
+    const touchWin = 500, minTouchRate = 1.0 / 60;
     const brk = new Array(n).fill(null);
     M.ema200_revert.brackets = brk;
     if (n < per + minAway) return o;
     const cl = cd.map(c => c.close), ema = _emaArr(cl, per), at = atr(cd, 20);
+    // touchesRun[i] = число касаний EMA на последних touchWin барах, скользящее.
+    const touches = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      const e = ema[i];
+      touches[i] = (e != null && cd[i].high >= e && cd[i].low <= e) ? 1 : 0;
+    }
+    const touchesRun = new Array(n).fill(0);
+    let run = 0;
+    for (let i = 0; i < n; i++) {
+      run += touches[i];
+      if (i >= touchWin) run -= touches[i - touchWin];
+      touchesRun[i] = run;
+    }
     let sinceTouch = 0, fired = false; // fired: событие уже отработано на этом отрыве
     for (let i = 0; i < n; i++) {
       const e = ema[i]; if (e == null) continue;
-      const touched = cd[i].high >= e && cd[i].low <= e;
-      if (touched) { sinceTouch = 0; fired = false; continue; }
+      if (touches[i]) { sinceTouch = 0; fired = false; continue; }
       sinceTouch += 1;
       if (fired) continue; // одно событие на один отрыв
       if (sinceTouch !== minAway) continue; // только момент пересечения порога
       const e20 = at[i]; if (e20 == null || e20 <= 0) continue;
-      // Режимный фильтр (efficiency ratio за W баров, тот же критерий, что
-      // в regimeInfo): ER≥0.3 = тренд, mean-reversion туда не лезем.
+      // Фильтр 1 (про-инструментальный): характер тикера — если редко возвращается
+      // к EMA, значит трендовый и метод ему не подходит. Считаем по окну баров
+      // ДО текущего (i-1), чтобы не подглядывать в само событие.
+      if (i >= touchWin) {
+        const rate = touchesRun[i - 1] / touchWin;
+        if (rate < minTouchRate) { fired = true; continue; }
+      }
+      // Фильтр 2 (моментный): efficiency ratio за W баров, тот же критерий,
+      // что в regimeInfo. ER≥0.3 = сильный тренд прямо сейчас = не лезем.
       if (i >= W) {
         let d = 0; for (let j = i - W + 1; j <= i; j++) d += Math.abs(cl[j] - cl[j - 1]);
         if (d > 0 && Math.abs(cl[i] - cl[i - W]) / d >= 0.3) { fired = true; continue; }
