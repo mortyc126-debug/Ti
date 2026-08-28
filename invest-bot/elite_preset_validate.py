@@ -216,7 +216,7 @@ def node_scores(rows_raw, node_bin, horizon):
 
 
 def process_ticker(ticker, cache_dir, interval, days, split_frac, horizon,
-                    methods_filter, n_atr, node_bin, min_atr_factor):
+                    methods_filter, n_atr, node_bin, min_atr_factor, invert_set=None):
     rows_raw = _load_from_cache(ticker, cache_dir, interval)
     if not rows_raw:
         return None
@@ -240,6 +240,8 @@ def process_ticker(ticker, cache_dir, interval, days, split_frac, horizon,
     for name, scores in all_scores.items():
         if methods_filter and name not in methods_filter:
             continue
+        if invert_set and name in invert_set:
+            scores = [-s if s else s for s in scores]  # 0/None не трогаем — "нет сигнала" не инвертируется
         train = bt_stats(scores[:split_idx], closes[:split_idx], highs[:split_idx], lows[:split_idx],
                           atr[:split_idx], horizon=horizon, min_atr_pct=min_atr_pct)
         test = bt_stats(scores[split_idx:], closes[split_idx:], highs[split_idx:], lows[split_idx:],
@@ -256,6 +258,7 @@ def _run_sig(args, tickers):
         "split": args.split, "horizon": args.horizon, "n_atr": args.n_atr,
         "min_atr_factor": args.min_atr_factor,
         "methods": sorted(args.methods.lower().split(",")) if args.methods else None,
+        "invert": sorted(args.invert.lower().split(",")) if args.invert else None,
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:16]
 
@@ -290,6 +293,9 @@ def main():
     ap.add_argument("--top-liq", type=int, default=None, help="топ-N по ликвидности (только tickers=ALL)")
     ap.add_argument("--methods", default=None,
                      help="подмножество id из signals-core.js IDS через запятую (напр. ema200_revert,zscore,nw)")
+    ap.add_argument("--invert", default=None,
+                     help="id методов через запятую, чей скор инвертировать перед bt_stats (проверить "
+                          "'работает наоборот' не трогая сам метод в расширении)")
     ap.add_argument("--node", default="node", help="путь к node, если не в PATH")
     ap.add_argument("--out", default=None, help="CSV по парам (тикер,метод,tier,train/test stats)")
     ap.add_argument("--checkpoint", default=os.path.join(_HERE, "data", "elite_preset_checkpoint.json"))
@@ -297,6 +303,7 @@ def main():
     args = ap.parse_args()
 
     methods_filter = {m.strip().lower() for m in args.methods.split(",")} if args.methods else None
+    invert_set = {m.strip().lower() for m in args.invert.split(",")} if args.invert else None
 
     if args.tickers.upper() == "ALL":
         tickers = _list_tickers(args.cache, args.interval, top_liq=args.top_liq, liq_days=60,
@@ -329,7 +336,7 @@ def main():
             try:
                 res = process_ticker(t, args.cache, args.interval, args.days, args.split,
                                       args.horizon, methods_filter, args.n_atr, args.node,
-                                      args.min_atr_factor)
+                                      args.min_atr_factor, invert_set)
             except RuntimeError as e:
                 print(f"\n[{t}] {e}", file=sys.stderr)
                 res = None
