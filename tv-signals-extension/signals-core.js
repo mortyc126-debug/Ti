@@ -664,26 +664,46 @@
       o[i] = norm;
     } return o; };
 
-  // Возврат к EMA200: если цена долго (≥MIN_AWAY баров) не касалась EMA200 —
-  // ставим на откат к ней (mean-reversion), сила растёт с давностью отрыва и
-  // удалением в ATR (плато на 3×MIN_AWAY баров / 3 ATR). Ниже EMA и давно не
-  // касались → лонг (ждём роста к средней); выше и давно не касались → шорт.
+  // Возврат к EMA200 (mean-reversion от отрыва).
+  //
+  // Идея: цена ниже EMA200 и давно (≥MIN_AWAY баров) не касалась — ждём
+  // отскок вверх, лонг. Выше и давно не касались — ждём откат вниз, шорт.
+  //
+  // Первая версия (без событийности и режимного фильтра) на OOS дала −0.10
+  // ATR exp на тысячах сделок (elite_preset_validate.py, 50 тикеров/180
+  // дней/5м), инверсия — ~0. Диагноз: (1) метод стрелял КАЖДЫЙ бар, пока
+  // условие держится — один отрыв раздувался в 10+ сделок с одной и той же
+  // предпосылкой; (2) в трендовом рынке "давно не касался EMA" означает
+  // продолжение тренда, а не откат — mean-reversion туда лезть нельзя.
+  //
+  // Правки:
+  //   1) стреляем ОДИН БАР — на кроссе (sinceTouch впервые дотягивает до
+  //      minAway). Дальше держим 0, пока не будет нового касания EMA;
+  //   2) режимный фильтр: сигнал только когда ER<0.3 (диапазон / слабый
+  //      тренд, как в regimeInfo). В сильном тренде — 0.
   M.ema200_revert = (cd) => { const n = cd.length, o = new Array(n).fill(0);
-    const per = 200, minAway = 40;
+    const per = 200, minAway = 40, W = 60;
     if (n < per + minAway) return o;
     const cl = cd.map(c => c.close), ema = _emaArr(cl, per), at = atr(cd, 20);
-    let sinceTouch = 0;
+    let sinceTouch = 0, fired = false; // fired: событие уже отработано на этом отрыве
     for (let i = 0; i < n; i++) {
       const e = ema[i]; if (e == null) continue;
       const touched = cd[i].high >= e && cd[i].low <= e;
-      sinceTouch = touched ? 0 : sinceTouch + 1;
-      const e20 = at[i];
-      if (e20 == null || e20 <= 0 || sinceTouch < minAway) continue;
+      if (touched) { sinceTouch = 0; fired = false; continue; }
+      sinceTouch += 1;
+      if (fired) continue; // одно событие на один отрыв
+      if (sinceTouch !== minAway) continue; // только момент пересечения порога
+      const e20 = at[i]; if (e20 == null || e20 <= 0) continue;
+      // Режимный фильтр (efficiency ratio за W баров, тот же критерий, что
+      // в regimeInfo): ER≥0.3 = тренд, mean-reversion туда не лезем.
+      if (i >= W) {
+        let d = 0; for (let j = i - W + 1; j <= i; j++) d += Math.abs(cl[j] - cl[j - 1]);
+        if (d > 0 && Math.abs(cl[i] - cl[i - W]) / d >= 0.3) { fired = true; continue; }
+      }
       const dist = cl[i] - e, distAtr = Math.abs(dist) / e20;
-      const durMult = Math.min(1, (sinceTouch - minAway) / (minAway * 2));
-      const distMult = Math.min(1, distAtr / 3);
-      const mag = 0.3 + 0.7 * Math.min(1, (durMult + distMult) / 2);
+      const mag = 0.3 + 0.7 * Math.min(1, distAtr / 3);
       o[i] = dist > 0 ? -mag : mag;
+      fired = true;
     } return o; };
 
   // ── бэктест: winrate (частота угадывания направления) + exp ATR (экспектанси
@@ -791,7 +811,7 @@
   // edge нет ни в одном направлении на 5-минутках, идея не подтвердилась
   // (возможно, сработает на дневных барах — не проверялось). Не дают голос
   // в composite, не рисуются (UI-бейдж «off»).
-  const _DISABLED_METHODS = new Set(['elliott_wave', 'rmi', 'klinger', 'twiggs', 'donchian', 'wick_rejection', 'level_quality', 'ema200_revert']);
+  const _DISABLED_METHODS = new Set(['elliott_wave', 'rmi', 'klinger', 'twiggs', 'donchian', 'wick_rejection', 'level_quality']);
 
   // Контекстная (режимная) инверсия для NW: в trending_down d от -0.109
   // (BASELINE) до -0.353 (top-50), во всех остальных режимах — signal.
