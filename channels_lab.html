@@ -127,6 +127,7 @@
       <div class="row"><label>стоп (ATR)</label><input type="number" id="tr-stop" value="0.75" min="0.25" max="3" step="0.05"></div>
       <div class="row"><label>горизонт</label><input type="number" id="tr-horizon" value="24" min="6" max="200" step="2"></div>
       <div class="row"><label>ER мах.</label><input type="number" id="tr-er-max" value="0.35" min="0.1" max="0.8" step="0.05"></div>
+      <div class="row"><label>cost (ATR)</label><input type="number" id="tr-cost" value="0.5" min="0" max="2" step="0.05" title="Комиссия+спред round-trip в единицах ATR. На 5-мин акциях реально ~0.5-0.7. Вычитается из pnl каждой сделки."></div>
     </div>
     <div class="legend-row" style="margin-top:10px"><span class="legend-swatch" style="background:var(--ch1)"></span> микро (окно 1)</div>
     <div class="legend-row"><span class="legend-swatch" style="background:var(--ch2)"></span> средний (окно 2)</div>
@@ -152,7 +153,17 @@
     <div class="stat" style="border-top:1px solid var(--border);padding-top:6px;margin-top:6px">
       <span class="k">лонги: win / exp</span><span class="v" id="s-lstat">—</span></div>
     <div class="stat"><span class="k">шорты: win / exp</span><span class="v" id="s-sstat">—</span></div>
-    <div class="stat"><span class="k">★ confluence</span><span class="v" id="s-conf" title="Сигналы с подтверждением горизонтальным уровнем поблизости">—</span></div>
+    <div class="stat" style="border-top:1px solid var(--border);padding-top:6px;margin-top:6px">
+      <span class="k">★ с уровнем</span><span class="v" id="s-conf-y">—</span></div>
+    <div class="stat"><span class="k">без ★</span><span class="v" id="s-conf-n">—</span></div>
+    <h2>По количеству каналов</h2>
+    <div class="stat"><span class="k">1 канал</span><span class="v" id="s-nch-1" title="Сигнал дал только один канал (микро ИЛИ средний ИЛИ большой)">—</span></div>
+    <div class="stat"><span class="k">2 канала</span><span class="v" id="s-nch-2" title="Два канала одновременно сошлись на границе — двойное подтверждение">—</span></div>
+    <div class="stat"><span class="k">3 канала</span><span class="v" id="s-nch-3" title="Все три канала одновременно — редкий и сильный сигнал">—</span></div>
+    <h2>По источнику канала</h2>
+    <div class="stat"><span class="k">микро (в наборе)</span><span class="v" id="s-src-ch1" title="Все сделки, где среди голосующих был микро-канал (окно 1)">—</span></div>
+    <div class="stat"><span class="k">средний</span><span class="v" id="s-src-ch2">—</span></div>
+    <div class="stat"><span class="k">большой</span><span class="v" id="s-src-ch3">—</span></div>
     <h2>Сделки</h2>
     <div id="trades-list" class="trades-list">
       <div class="empty-state">Загрузи файл со свечами или нажми «Демо»</div>
@@ -296,40 +307,49 @@ function clusterLevels(pivots, atrArr, mergeAtr, minTouches) {
   return out;
 }
 
-// ── сигналы: касание границы БОЛЬШОГО канала в ranging режиме ───────────────
+// ── сигналы: касание границы любого канала (микро/средний/большой) ──────────
+// Для каждого бара проверяем все 3 канала. Каждый канал, чья граница касается
+// цены (low<=bot или high>=top) в ranging-режиме — голосует за сигнал.
+// Направление всех согласных каналов должно совпадать; итоговый сигнал
+// помечен списком источников. Отдельно фиксируем confluence с уровнем.
+// Это даёт разбивку "сила сигнала = сколько каналов согласились" — можно
+// в итогах посмотреть, где точность реально выше.
 function detectSignals(bars, chSeries, levels, atrArr, params, iStart, iEnd) {
-  const { erMax, take, stop, horizon } = params;
+  const { erMax, take, stop, horizon, cost = 0 } = params;
   const signals = [];
   const n = bars.length;
   const lo = iStart != null ? iStart : 0;
   const hi = iEnd != null ? iEnd : n;
+  const CH_KEYS = ['ch1', 'ch2', 'ch3'];
   for (let i = lo; i < hi; i++) {
-    const ch = chSeries[i] && chSeries[i].ch3; if (!ch) continue;
+    if (!chSeries[i]) continue;
     const a = atrArr[i]; if (!a || a <= 0) continue;
     const erv = er(bars, i, 60);
     if (erv == null || erv >= erMax) continue; // фильтр тренда
 
-    let dir = 0;
-    // Касание нижней границы → лонг (mean-reversion вверх)
-    if (bars[i].low <= ch.botNow && bars[i].close > ch.botNow - a * 0.2) dir = 1;
-    // Касание верхней → шорт
-    else if (bars[i].high >= ch.topNow && bars[i].close < ch.topNow + a * 0.2) dir = -1;
-    if (!dir) continue;
+    // Проверяем каждый канал: касание top → шорт-голос, касание bot → лонг-голос.
+    const votes = []; // [{key, dir, target}]
+    for (const key of CH_KEYS) {
+      const ch = chSeries[i][key]; if (!ch) continue;
+      if (bars[i].low <= ch.botNow && bars[i].close > ch.botNow - a * 0.2) votes.push({ key, dir: 1, target: ch.botNow });
+      else if (bars[i].high >= ch.topNow && bars[i].close < ch.topNow + a * 0.2) votes.push({ key, dir: -1, target: ch.topNow });
+    }
+    if (!votes.length) continue;
+    // Все голоса должны быть в одну сторону (иначе противоречивый сетап — скипаем).
+    const dir = votes[0].dir;
+    if (votes.some(v => v.dir !== dir)) continue;
+    const chSources = votes.map(v => v.key); // ['ch1','ch3'] и т.п.
 
     // Причинный уровень: только уровни у которых last <= i-N (подтверждены).
-    // Levels пересчитываются на каждом баре ниже (в render/detect чейне), сюда
-    // приходят levels посчитанные ДО этого бара с учётом лага пивотов.
+    const target = votes[votes.length - 1].target; // берём границу самого дальнего канала
     let confluence = false;
-    const target = dir > 0 ? ch.botNow : ch.topNow;
     for (const lv of levels) {
-      if (lv.last >= i) continue; // будущее — не учитываем
+      if (lv.last >= i) continue;
       if (Math.abs(lv.price - target) <= a * 0.5) { confluence = true; break; }
     }
 
     const entry = bars[i].close;
     const tp = entry + dir * take * a, sl = entry - dir * stop * a;
-    // Прогоняем сделку вперёд (это ретроспективный расчёт исхода для показа
-    // цвета сделки; сам факт входа "видно" на баре i без look-ahead).
     let exit = null, exitBar = null, reason = null;
     for (let j = i + 1; j <= Math.min(i + horizon, n - 1); j++) {
       const hi = bars[j].high, lo = bars[j].low;
@@ -344,8 +364,10 @@ function detectSignals(bars, chSeries, levels, atrArr, params, iStart, iEnd) {
     if (exit == null && i + horizon < n) {
       exit = bars[i + horizon].close; exitBar = i + horizon; reason = 'тайм';
     }
-    const pnl = exit != null ? dir * (exit - entry) / a : null;
-    signals.push({ i, dir, entry, tp, sl, atr: a, exit, exitBar, reason, pnl, confluence });
+    const pnlGross = exit != null ? dir * (exit - entry) / a : null;
+    const pnl = pnlGross != null ? pnlGross - cost : null;
+    signals.push({ i, dir, entry, tp, sl, atr: a, exit, exitBar, reason,
+                   pnl, pnlGross, confluence, chSources, votes: votes.length });
   }
   return signals;
 }
@@ -364,6 +386,7 @@ function computeAll() {
   const lvN = +$('lv-pivot').value, lvMerge = +$('lv-merge').value, lvMin = +$('lv-min').value;
   const take = +$('tr-take').value, stop = +$('tr-stop').value;
   const horizon = +$('tr-horizon').value, erMax = +$('tr-er-max').value;
+  const cost = +$('tr-cost').value;
   const atrArr = atrSeries(bars, 14);
   STATE.atr = atrArr;
 
@@ -388,7 +411,7 @@ function computeAll() {
 
   // Сигналы только на видимом окне
   STATE.signals = detectSignals(bars, chSeries, STATE.levels, atrArr,
-    { erMax, take, stop, horizon }, vs, Math.min(n, vs + viewLen));
+    { erMax, take, stop, horizon, cost }, vs, Math.min(n, vs + viewLen));
 }
 
 // ── отрисовка SVG ──────────────────────────────────────────────────────────
@@ -618,7 +641,9 @@ function renderStats() {
   const shorts = sigs.filter(s => s.dir < 0);
   $('s-ls').textContent = `${longs.length} / ${shorts.length}`;
   const closed = sigs.filter(s => s.pnl != null);
-  const cleanRows = ['s-acc', 's-win', 's-exp', 's-pnl', 's-bw', 's-dd', 's-lstat', 's-sstat', 's-conf'];
+  const cleanRows = ['s-acc', 's-win', 's-exp', 's-pnl', 's-bw', 's-dd', 's-lstat', 's-sstat',
+                      's-conf-y', 's-conf-n', 's-nch-1', 's-nch-2', 's-nch-3',
+                      's-src-ch1', 's-src-ch2', 's-src-ch3'];
   if (!closed.length) { cleanRows.forEach(id => { $(id).textContent = '—'; $(id).className = 'v'; }); return; }
   // acc — угадывание направления по ходу через horizon (независимо от брекета)
   let hits = 0, hn = 0;
@@ -661,8 +686,23 @@ function renderStats() {
   setV('s-dd', dd.toFixed(2), dd);
   setV('s-lstat', perDir(longs));
   setV('s-sstat', perDir(shorts));
-  const conf = closed.filter(s => s.confluence);
-  setV('s-conf', conf.length ? `${conf.length} · ${(conf.filter(s => s.pnl > 0).length / conf.length * 100).toFixed(0)}%` : '—');
+  // Разбивка "с ★" vs "без ★". Формат: n · win% · exp — сразу видно, добавляет ли уровень edge.
+  const confY = closed.filter(s => s.confluence);
+  const confN = closed.filter(s => !s.confluence);
+  setV('s-conf-y', perDir(confY));
+  setV('s-conf-n', perDir(confN));
+  // Разбивка по числу голосующих каналов. Гипотеза: чем больше согласных, тем сильнее сигнал.
+  for (const nch of [1, 2, 3]) {
+    const arr = closed.filter(s => (s.chSources && s.chSources.length) === nch);
+    setV('s-nch-' + nch, perDir(arr));
+  }
+  // Разбивка по источнику: сделки где ХОТЬ ОДИН из голосующих был этим каналом.
+  // (Не эксклюзивно — пересекается с "по числу каналов". Показывает, кто активнее
+  // всего голосует за прибыльные сделки.)
+  for (const key of ['ch1', 'ch2', 'ch3']) {
+    const arr = closed.filter(s => s.chSources && s.chSources.includes(key));
+    setV('s-src-' + key, perDir(arr));
+  }
 }
 
 function renderTradesList() {
@@ -796,12 +836,21 @@ function computeFullSignals() {
   const k = +$('ch-k').value;
   const take = +$('tr-take').value, stop = +$('tr-stop').value;
   const horizon = +$('tr-horizon').value, erMax = +$('tr-er-max').value;
+  const cost = +$('tr-cost').value;
   const atrArr = STATE.atr.length ? STATE.atr : atrSeries(bars, 14);
-  // Считаем каналы по всей истории. Только ch3 нужен для сигналов — экономим 3x.
+  // Считаем все 3 канала по всей истории — теперь detectSignals использует
+  // их все как голосующих. Дороже, но даёт полную разбивку по источникам.
   const chFull = new Array(n);
-  for (let i = W3 - 1; i < n; i++) chFull[i] = { ch3: regChannel(bars, i, W3, k) };
+  const Wmin = Math.min(W1, W2, W3);
+  for (let i = Wmin - 1; i < n; i++) {
+    chFull[i] = {
+      ch1: i >= W1 - 1 ? regChannel(bars, i, W1, k) : null,
+      ch2: i >= W2 - 1 ? regChannel(bars, i, W2, k) : null,
+      ch3: i >= W3 - 1 ? regChannel(bars, i, W3, k) : null,
+    };
+  }
   STATE.fullSignals = detectSignals(bars, chFull, STATE.levels, atrArr,
-    { erMax, take, stop, horizon }, 0, n);
+    { erMax, take, stop, horizon, cost }, 0, n);
   STATE.fullOk = true;
 }
 $('btn-view-all').addEventListener('click', () => {
