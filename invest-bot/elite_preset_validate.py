@@ -113,7 +113,7 @@ MIN_N = 10  # как в notifyCheckMethods: st.n < 10 → сигнал не сч
 
 
 def bt_stats(scores, closes, highs, lows, atr, horizon=12, take=1.5, stop=0.75, cost=0.12,
-             min_atr_pct=0.0, brackets=None):
+             min_atr_pct=0.0, brackets=None, commission_pct=None):
     """Порт btStats() из tv-signals-extension/signals-core.js. scores[i] — сырой
     скор метода на баре i (0/None = сигнала нет). Возвращает {acc, exp, win, n}
     ровно как в JS-версии: acc — доля совпадений знака с ходом через horizon
@@ -125,7 +125,15 @@ def bt_stats(scores, closes, highs, lows, atr, horizon=12, take=1.5, stop=0.75, 
     круг с запасом, иначе тейк/стоп теснее реальных издержек — "сделка" в
     бэктесте технически исполнима, а в жизни съедается спредом/комиссией).
     Ни у btStats в signals-core.js, ни здесь раньше такого пола не было —
-    только atr>0. 0.0 = фильтр выключен (как раньше)."""
+    только atr>0. 0.0 = фильтр выключен (как раньше).
+
+    commission_pct — round-trip комиссия в долях от цены (напр. 0.001 = 0.1%
+    для акции TRADER). Если задан, cost per-signal пересчитывается как
+    commission_pct / (atr[i]/close[i]) — реальная комиссия в единицах ATR
+    входа. Это критично для акций на 5-мин баре: ATR ~0.15% цены → cost
+    в ATR ~0.67, а дефолт 0.12 занижает издержки в 5 раз. Для фьючерсов с
+    высоким ATR (~0.8% цены) cost ~0.06, дефолт даже завышен. None —
+    оставить фиксированный cost (обратная совместимость)."""
     n = len(closes)
     hit = hn = 0
     for i in range(n - horizon):
@@ -159,7 +167,11 @@ def bt_stats(scores, closes, highs, lows, atr, horizon=12, take=1.5, stop=0.75, 
             if ex is None and i - pos["i"] >= horizon:
                 ex = cl
             if ex is not None:
-                p = pos["dir"] * (ex - pos["entry"]) / pos["eatr"] - cost
+                # cost per-trade: если задана commission_pct, комиссия round-trip
+                # в единицах ATR входа = commission_pct * entry_price / eatr.
+                # Иначе фиксированный cost из аргумента (обратная совместимость).
+                c_i = pos["cost"]
+                p = pos["dir"] * (ex - pos["entry"]) / pos["eatr"] - c_i
                 pnl_sum += p
                 if p > 0:
                     wins += 1
@@ -176,7 +188,9 @@ def bt_stats(scores, closes, highs, lows, atr, horizon=12, take=1.5, stop=0.75, 
                 b = brackets[i] if brackets else None
                 t_i = b["take"] if b else take
                 s_i = b["stop"] if b else stop
-                pos = {"dir": d, "entry": cl, "tp": cl + d * t_i * e, "sl": cl - d * s_i * e, "eatr": e, "i": i}
+                c_i = (commission_pct * cl / e) if commission_pct else cost
+                pos = {"dir": d, "entry": cl, "tp": cl + d * t_i * e, "sl": cl - d * s_i * e,
+                        "eatr": e, "i": i, "cost": c_i}
     return {
         "acc": (hit / hn) if hn else None,
         "exp": (pnl_sum / tn) if tn else None,
@@ -225,7 +239,8 @@ def node_scores(rows_raw, node_bin, horizon):
 
 
 def process_ticker(ticker, cache_dir, interval, days, split_frac, horizon,
-                    methods_filter, n_atr, node_bin, min_atr_factor, invert_set=None):
+                    methods_filter, n_atr, node_bin, min_atr_factor, invert_set=None,
+                    extra_slippage_pct=0.0, legacy_cost=False):
     rows_raw = _load_from_cache(ticker, cache_dir, interval)
     if not rows_raw:
         return None
@@ -242,7 +257,12 @@ def process_ticker(ticker, cache_dir, interval, days, split_frac, horizon,
     split_idx = int(n * split_frac)
     if split_idx < 200 or n - split_idx < horizon + 10:
         return None
-    min_atr_pct = commission_rt(_is_future(ticker)) * min_atr_factor if min_atr_factor else 0.0
+    is_fut = _is_future(ticker)
+    comm_rt = commission_rt(is_fut)  # round-trip комиссия в долях от цены (акция TRADER=0.001)
+    min_atr_pct = comm_rt * min_atr_factor if min_atr_factor else 0.0
+    # честная per-trade комиссия: реальная комиссия + опциональный спред/проскальзывание.
+    # legacy_cost=True — старый режим с фиксированным cost=0.12 ATR.
+    commission_pct = None if legacy_cost else (comm_rt + extra_slippage_pct)
 
     node_out = node_scores(rows_raw, node_bin, horizon)
     all_scores = node_out.get("scores", {})
@@ -256,10 +276,12 @@ def process_ticker(ticker, cache_dir, interval, days, split_frac, horizon,
         brk = all_brackets.get(name)
         train = bt_stats(scores[:split_idx], closes[:split_idx], highs[:split_idx], lows[:split_idx],
                           atr[:split_idx], horizon=horizon, min_atr_pct=min_atr_pct,
-                          brackets=brk[:split_idx] if brk else None)
+                          brackets=brk[:split_idx] if brk else None,
+                          commission_pct=commission_pct)
         test = bt_stats(scores[split_idx:], closes[split_idx:], highs[split_idx:], lows[split_idx:],
                          atr[split_idx:], horizon=horizon, min_atr_pct=min_atr_pct,
-                         brackets=brk[split_idx:] if brk else None)
+                         brackets=brk[split_idx:] if brk else None,
+                         commission_pct=commission_pct)
         out[name] = (train, test)
     return out
 
@@ -271,6 +293,8 @@ def _run_sig(args, tickers):
         "tickers": sorted(tickers), "interval": args.interval, "days": args.days,
         "split": args.split, "horizon": args.horizon, "n_atr": args.n_atr,
         "min_atr_factor": args.min_atr_factor,
+        "slippage_pct": args.slippage_pct,
+        "legacy_cost": args.legacy_cost,
         "methods": sorted(args.methods.lower().split(",")) if args.methods else None,
         "invert": sorted(args.invert.lower().split(",")) if args.invert else None,
     }
@@ -304,6 +328,12 @@ def main():
     ap.add_argument("--min-atr-factor", type=float, default=MIN_ATR_FACTOR,
                      help=f"ATR-фильтр шума: вход только если ATR/цена >= комиссия_за_круг × этот "
                           f"фактор (как в живом боте, MIN_ATR_FACTOR={MIN_ATR_FACTOR}). 0 — выключить фильтр")
+    ap.add_argument("--slippage-pct", type=float, default=0.0005,
+                     help="Спред + проскальзывание round-trip в долях от цены (default 0.05%%). "
+                          "Складывается с реальной комиссией из settings.ini. Ставь 0 чтобы считать чистый эдж")
+    ap.add_argument("--legacy-cost", action="store_true",
+                     help="Использовать старый фиксированный cost=0.12 ATR (для сравнения со старыми "
+                          "отчётами). По умолчанию считаем честный per-trade cost из комиссии.")
     ap.add_argument("--top-liq", type=int, default=None, help="топ-N по ликвидности (только tickers=ALL)")
     ap.add_argument("--methods", default=None,
                      help="подмножество id из signals-core.js IDS через запятую (напр. ema200_revert,zscore,nw)")
@@ -359,7 +389,9 @@ def main():
             try:
                 res = process_ticker(t, args.cache, args.interval, args.days, args.split,
                                       args.horizon, methods_filter, args.n_atr, args.node,
-                                      args.min_atr_factor, invert_set)
+                                      args.min_atr_factor, invert_set,
+                                      extra_slippage_pct=args.slippage_pct,
+                                      legacy_cost=args.legacy_cost)
             except RuntimeError as e:
                 print(f"\n[{t}] {e}", file=sys.stderr)
                 res = None
