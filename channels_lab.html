@@ -128,6 +128,13 @@
       <div class="row"><label>горизонт</label><input type="number" id="tr-horizon" value="24" min="6" max="200" step="2"></div>
       <div class="row"><label>ER мах.</label><input type="number" id="tr-er-max" value="0.35" min="0.1" max="0.8" step="0.05"></div>
       <div class="row"><label>cost (ATR)</label><input type="number" id="tr-cost" value="0.5" min="0" max="2" step="0.05" title="Комиссия+спред round-trip в единицах ATR. На 5-мин акциях реально ~0.5-0.7. Вычитается из pnl каждой сделки."></div>
+      <div class="row"><label>источник</label>
+        <select id="tr-source" style="width:120px" title="Что генерирует сигнал. 'level' — отскок от кластерного уровня + каналы как контекст-фильтр (правильная механика по итогам последнего разбора). 'channel' — старое: касание границы канала. 'combo' — только когда уровень и канал согласны.">
+          <option value="level" selected>уровень</option>
+          <option value="channel">канал</option>
+          <option value="combo">уровень + канал</option>
+        </select></div>
+      <div class="row"><label>каналов max</label><input type="number" id="tr-max-ch" value="1" min="0" max="3" step="1" title="Максимум каналов, которые могут быть на границе в СТОРОНУ сигнала. Если ≥ этого числа каналов согласны — сигнал скипается (глубокая трендовая нога, не разворот). По итогам разбора 2-3 каналов даёт худший edge — держим ≤1."></div>
     </div>
     <div class="legend-row" style="margin-top:10px"><span class="legend-swatch" style="background:var(--ch1)"></span> микро (окно 1)</div>
     <div class="legend-row"><span class="legend-swatch" style="background:var(--ch2)"></span> средний (окно 2)</div>
@@ -156,14 +163,19 @@
     <div class="stat" style="border-top:1px solid var(--border);padding-top:6px;margin-top:6px">
       <span class="k">★ с уровнем</span><span class="v" id="s-conf-y">—</span></div>
     <div class="stat"><span class="k">без ★</span><span class="v" id="s-conf-n">—</span></div>
-    <h2>По количеству каналов</h2>
-    <div class="stat"><span class="k">1 канал</span><span class="v" id="s-nch-1" title="Сигнал дал только один канал (микро ИЛИ средний ИЛИ большой)">—</span></div>
-    <div class="stat"><span class="k">2 канала</span><span class="v" id="s-nch-2" title="Два канала одновременно сошлись на границе — двойное подтверждение">—</span></div>
-    <div class="stat"><span class="k">3 канала</span><span class="v" id="s-nch-3" title="Все три канала одновременно — редкий и сильный сигнал">—</span></div>
-    <h2>По источнику канала</h2>
-    <div class="stat"><span class="k">микро (в наборе)</span><span class="v" id="s-src-ch1" title="Все сделки, где среди голосующих был микро-канал (окно 1)">—</span></div>
-    <div class="stat"><span class="k">средний</span><span class="v" id="s-src-ch2">—</span></div>
-    <div class="stat"><span class="k">большой</span><span class="v" id="s-src-ch3">—</span></div>
+    <h2>Каналы <span style="font-weight:400;color:var(--muted);text-transform:none">в режиме "уровень"</span></h2>
+    <div class="stat"><span class="k">0 согласны</span><span class="v" id="s-ncv-0" title="Уровень триггернул, каналы не подтверждают направление сигнала — чистый уровень">—</span></div>
+    <div class="stat"><span class="k">1 согласен</span><span class="v" id="s-ncv-1" title="Один канал на границе в сторону сигнала — здоровое confluence">—</span></div>
+    <div class="stat"><span class="k">2+ согласны</span><span class="v" id="s-ncv-2" title="Скипается по умолчанию (maxCh=1) — глубокая трендовая нога, не разворот">—</span></div>
+    <div class="stat"><span class="k">микро согласен</span><span class="v" id="s-conf-micro" title="Сигнал уровня + микро-канал в перепроданности/перекупленности одновременно = супер-setup">—</span></div>
+    <h2>По силе уровня</h2>
+    <div class="stat"><span class="k">2-3 касания</span><span class="v" id="s-lvs-lo">—</span></div>
+    <div class="stat"><span class="k">4-5 касаний</span><span class="v" id="s-lvs-mid">—</span></div>
+    <div class="stat"><span class="k">6+ касаний</span><span class="v" id="s-lvs-hi" title="Часто-касаемый уровень — рынок хорошо его знает">—</span></div>
+    <h2>По каналам (старый режим)</h2>
+    <div class="stat"><span class="k">1 канал</span><span class="v" id="s-nch-1">—</span></div>
+    <div class="stat"><span class="k">2 канала</span><span class="v" id="s-nch-2">—</span></div>
+    <div class="stat"><span class="k">3 канала</span><span class="v" id="s-nch-3">—</span></div>
     <h2>Сделки</h2>
     <div id="trades-list" class="trades-list">
       <div class="empty-state">Загрузи файл со свечами или нажми «Демо»</div>
@@ -307,6 +319,83 @@ function clusterLevels(pivots, atrArr, mergeAtr, minTouches) {
   return out;
 }
 
+// ── сигналы: отскок от кластерного уровня, каналы как фильтр контекста ────
+// Механика: цена коснулась горизонтального уровня (support/resistance),
+// закрытие бара в противоположную от касания сторону = подтверждение отскока.
+// Каналы НЕ являются триггером — они контекст-фильтр:
+//   - если ≥ maxCh каналов на границе в СТОРОНУ сигнала → скип (глубокая
+//     трендовая нога, не разворот — по итогам предыдущего прогона 2+ каналов
+//     давали exp -0.35..-0.69);
+//   - иначе — сигнал валиден, метка confluenceChannel если микро согласен
+//     (потенциальный супер-setup).
+function detectLevelSignals(bars, chSeries, levels, atrArr, params, iStart, iEnd) {
+  const { erMax, take, stop, horizon, cost = 0, maxCh = 1 } = params;
+  const signals = [];
+  const n = bars.length;
+  const lo = iStart != null ? iStart : 0;
+  const hi = iEnd != null ? iEnd : n;
+  const CH_KEYS = ['ch1', 'ch2', 'ch3'];
+  for (let i = lo; i < hi; i++) {
+    const a = atrArr[i]; if (!a || a <= 0) continue;
+    const erv = er(bars, i, 60);
+    if (erv == null || erv >= erMax) continue;
+
+    // Найти causal уровень, к которому цена подошла на этом баре (в пределах
+    // 0.3 ATR от high или low). Причинность: last-касание уровня в прошлом
+    // (< i-lvN, лаг подтверждения через кластеризацию не даёт эти данные).
+    const b = bars[i];
+    let hitLevel = null, hitSide = 0; // hitSide=+1 (снизу к support → лонг), -1 (сверху к resistance → шорт)
+    for (const lv of levels) {
+      if (lv.last >= i) continue; // будущее
+      if (b.low <= lv.price + a * 0.3 && b.close > lv.price && b.open >= lv.price) {
+        // цена сходила ниже уровня хвостом, но закрылась выше = support hold → лонг
+        hitLevel = lv; hitSide = 1; break;
+      }
+      if (b.high >= lv.price - a * 0.3 && b.close < lv.price && b.open <= lv.price) {
+        // цена сходила выше уровня хвостом, но закрылась ниже = resistance hold → шорт
+        hitLevel = lv; hitSide = -1; break;
+      }
+    }
+    if (!hitLevel) continue;
+    const dir = hitSide;
+
+    // Контекст-фильтр каналов: сколько из 3 согласны в СТОРОНУ сигнала.
+    let chVotes = 0, microAgree = false;
+    if (chSeries[i]) {
+      for (const key of CH_KEYS) {
+        const ch = chSeries[i][key]; if (!ch) continue;
+        // Согласие с направлением сигнала: цена у нижней границы (при лонге) / верхней (при шорте)
+        if (dir > 0 && b.low <= ch.botNow) { chVotes++; if (key === 'ch1') microAgree = true; }
+        else if (dir < 0 && b.high >= ch.topNow) { chVotes++; if (key === 'ch1') microAgree = true; }
+      }
+    }
+    if (chVotes >= maxCh + 1) continue; // ≥ maxCh+1 каналов согласны — трендовая ловушка
+
+    const entry = b.close;
+    const tp = entry + dir * take * a, sl = entry - dir * stop * a;
+    let exit = null, exitBar = null, reason = null;
+    for (let j = i + 1; j <= Math.min(i + horizon, n - 1); j++) {
+      const hi2 = bars[j].high, lo2 = bars[j].low;
+      if (dir > 0) {
+        if (lo2 <= sl) { exit = sl; exitBar = j; reason = 'стоп'; break; }
+        if (hi2 >= tp) { exit = tp; exitBar = j; reason = 'тейк'; break; }
+      } else {
+        if (hi2 >= sl) { exit = sl; exitBar = j; reason = 'стоп'; break; }
+        if (lo2 <= tp) { exit = tp; exitBar = j; reason = 'тейк'; break; }
+      }
+    }
+    if (exit == null && i + horizon < n) { exit = bars[i + horizon].close; exitBar = i + horizon; reason = 'тайм'; }
+    const pnlGross = exit != null ? dir * (exit - entry) / a : null;
+    const pnl = pnlGross != null ? pnlGross - cost : null;
+    signals.push({ i, dir, entry, tp, sl, atr: a, exit, exitBar, reason,
+                    pnl, pnlGross, confluence: true, confluenceChannel: microAgree,
+                    chSources: microAgree ? ['ch1'] : [], votes: 0,
+                    level: hitLevel, chVotes,
+                    levelStrength: hitLevel.touches, levelAgeBars: i - hitLevel.first });
+  }
+  return signals;
+}
+
 // ── сигналы: касание границы любого канала (микро/средний/большой) ──────────
 // Для каждого бара проверяем все 3 канала. Каждый канал, чья граница касается
 // цены (low<=bot или high>=top) в ranging-режиме — голосует за сигнал.
@@ -387,6 +476,7 @@ function computeAll() {
   const take = +$('tr-take').value, stop = +$('tr-stop').value;
   const horizon = +$('tr-horizon').value, erMax = +$('tr-er-max').value;
   const cost = +$('tr-cost').value;
+  const source = $('tr-source').value, maxCh = +$('tr-max-ch').value;
   const atrArr = atrSeries(bars, 14);
   STATE.atr = atrArr;
 
@@ -410,8 +500,20 @@ function computeAll() {
   STATE.levels = clusterLevels(pivots, atrArr, lvMerge, lvMin);
 
   // Сигналы только на видимом окне
-  STATE.signals = detectSignals(bars, chSeries, STATE.levels, atrArr,
-    { erMax, take, stop, horizon, cost }, vs, Math.min(n, vs + viewLen));
+  STATE.signals = pickSignals(source, bars, chSeries, STATE.levels, atrArr,
+    { erMax, take, stop, horizon, cost, maxCh }, vs, Math.min(n, vs + viewLen));
+}
+
+// Роутер источников сигналов. 'level' — новая механика (уровень триггер,
+// канал контекст), 'channel' — старая (канал триггер), 'combo' — сигнал ТОЛЬКО
+// когда И уровень, И микро-канал согласны на этом баре.
+function pickSignals(source, bars, chSeries, levels, atrArr, params, iStart, iEnd) {
+  if (source === 'channel') return detectSignals(bars, chSeries, levels, atrArr, params, iStart, iEnd);
+  if (source === 'combo') {
+    const lvl = detectLevelSignals(bars, chSeries, levels, atrArr, params, iStart, iEnd);
+    return lvl.filter(s => s.confluenceChannel); // только с микро-каналом согласным
+  }
+  return detectLevelSignals(bars, chSeries, levels, atrArr, params, iStart, iEnd);
 }
 
 // ── отрисовка SVG ──────────────────────────────────────────────────────────
@@ -642,8 +744,10 @@ function renderStats() {
   $('s-ls').textContent = `${longs.length} / ${shorts.length}`;
   const closed = sigs.filter(s => s.pnl != null);
   const cleanRows = ['s-acc', 's-win', 's-exp', 's-pnl', 's-bw', 's-dd', 's-lstat', 's-sstat',
-                      's-conf-y', 's-conf-n', 's-nch-1', 's-nch-2', 's-nch-3',
-                      's-src-ch1', 's-src-ch2', 's-src-ch3'];
+                      's-conf-y', 's-conf-n',
+                      's-ncv-0', 's-ncv-1', 's-ncv-2', 's-conf-micro',
+                      's-lvs-lo', 's-lvs-mid', 's-lvs-hi',
+                      's-nch-1', 's-nch-2', 's-nch-3'];
   if (!closed.length) { cleanRows.forEach(id => { $(id).textContent = '—'; $(id).className = 'v'; }); return; }
   // acc — угадывание направления по ходу через horizon (независимо от брекета)
   let hits = 0, hn = 0;
@@ -691,17 +795,20 @@ function renderStats() {
   const confN = closed.filter(s => !s.confluence);
   setV('s-conf-y', perDir(confY));
   setV('s-conf-n', perDir(confN));
-  // Разбивка по числу голосующих каналов. Гипотеза: чем больше согласных, тем сильнее сигнал.
+  // Разбивка "уровневого" режима: сколько каналов согласны в СТОРОНУ сигнала.
+  // 0 = чистый уровень, 1 = здоровое confluence, 2+ = трендовая нога (скипается).
+  setV('s-ncv-0', perDir(closed.filter(s => s.chVotes === 0)));
+  setV('s-ncv-1', perDir(closed.filter(s => s.chVotes === 1)));
+  setV('s-ncv-2', perDir(closed.filter(s => s.chVotes >= 2)));
+  setV('s-conf-micro', perDir(closed.filter(s => s.confluenceChannel)));
+  // Разбивка по силе уровня (число касаний в кластере)
+  setV('s-lvs-lo', perDir(closed.filter(s => s.levelStrength >= 2 && s.levelStrength <= 3)));
+  setV('s-lvs-mid', perDir(closed.filter(s => s.levelStrength >= 4 && s.levelStrength <= 5)));
+  setV('s-lvs-hi', perDir(closed.filter(s => s.levelStrength >= 6)));
+  // Разбивка "каналового" режима (voting): сколько каналов голосовали.
   for (const nch of [1, 2, 3]) {
     const arr = closed.filter(s => (s.chSources && s.chSources.length) === nch);
     setV('s-nch-' + nch, perDir(arr));
-  }
-  // Разбивка по источнику: сделки где ХОТЬ ОДИН из голосующих был этим каналом.
-  // (Не эксклюзивно — пересекается с "по числу каналов". Показывает, кто активнее
-  // всего голосует за прибыльные сделки.)
-  for (const key of ['ch1', 'ch2', 'ch3']) {
-    const arr = closed.filter(s => s.chSources && s.chSources.includes(key));
-    setV('s-src-' + key, perDir(arr));
   }
 }
 
@@ -811,7 +918,8 @@ function invalidateFull() {
   STATE.fullOk = false; STATE.fullSignals = [];
   if (STATE.statsScope === 'full') { STATE.statsScope = 'view'; renderStats(); }
 }
-['ch-w1','ch-w2','ch-w3','ch-k','lv-pivot','lv-merge','lv-min','tr-take','tr-stop','tr-horizon','tr-er-max']
+['ch-w1','ch-w2','ch-w3','ch-k','lv-pivot','lv-merge','lv-min','tr-take','tr-stop','tr-horizon','tr-er-max',
+ 'tr-cost','tr-source','tr-max-ch']
   .forEach(id => $(id).addEventListener('change', () => { invalidateFull(); recompute(); }));
 $('view-len').addEventListener('change', recompute);
 $('ch-style').addEventListener('change', render);
@@ -837,9 +945,8 @@ function computeFullSignals() {
   const take = +$('tr-take').value, stop = +$('tr-stop').value;
   const horizon = +$('tr-horizon').value, erMax = +$('tr-er-max').value;
   const cost = +$('tr-cost').value;
+  const source = $('tr-source').value, maxCh = +$('tr-max-ch').value;
   const atrArr = STATE.atr.length ? STATE.atr : atrSeries(bars, 14);
-  // Считаем все 3 канала по всей истории — теперь detectSignals использует
-  // их все как голосующих. Дороже, но даёт полную разбивку по источникам.
   const chFull = new Array(n);
   const Wmin = Math.min(W1, W2, W3);
   for (let i = Wmin - 1; i < n; i++) {
@@ -849,8 +956,8 @@ function computeFullSignals() {
       ch3: i >= W3 - 1 ? regChannel(bars, i, W3, k) : null,
     };
   }
-  STATE.fullSignals = detectSignals(bars, chFull, STATE.levels, atrArr,
-    { erMax, take, stop, horizon, cost }, 0, n);
+  STATE.fullSignals = pickSignals(source, bars, chFull, STATE.levels, atrArr,
+    { erMax, take, stop, horizon, cost, maxCh }, 0, n);
   STATE.fullOk = true;
 }
 $('btn-view-all').addEventListener('click', () => {
