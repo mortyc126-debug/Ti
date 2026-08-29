@@ -936,20 +936,27 @@ $('s-scope-view').addEventListener('click', () => {
   STATE.statsScope = 'view'; renderStats();
 });
 $('s-scope-full').addEventListener('click', () => {
-  // Если ещё не считался — сначала пересчитать.
-  if (!STATE.fullOk) {
-    const n = STATE.bars.length;
-    if (n > 30000 && !confirm(`Посчитать сигналы по всей истории (${n} баров)? Это может занять несколько секунд.`)) return;
-    const btn = $('s-scope-full'); const label = $('s-scope-full-n');
-    label.textContent = 'считаю...';
-    setTimeout(() => {
+  // Если уже посчитан — просто переключаем.
+  if (STATE.fullOk) { STATE.statsScope = 'full'; renderStats(); return; }
+  const label = $('s-scope-full-n');
+  const n = STATE.bars.length;
+  label.textContent = `считаю ${n}...`;
+  // setTimeout(0) даёт браузеру перерисовать "считаю..." прежде чем блокировать
+  // поток тяжёлым расчётом. На 174k минуток занимает 2-5 секунд.
+  setTimeout(() => {
+    try {
+      const t0 = performance.now();
       computeFullSignals();
+      const dt = ((performance.now() - t0) / 1000).toFixed(1);
+      console.log(`[full] посчитано ${STATE.fullSignals.length} сигналов на ${n} баров за ${dt}s`);
       STATE.statsScope = 'full';
       renderStats();
-    }, 20);
-    return;
-  }
-  STATE.statsScope = 'full'; renderStats();
+    } catch (e) {
+      console.error('computeFullSignals упал:', e);
+      label.textContent = 'ошибка: ' + (e.message || e).toString().slice(0, 40);
+      alert('Не удалось посчитать весь пул: ' + (e.message || e));
+    }
+  }, 20);
 });
 
 function computeFullSignals() {
