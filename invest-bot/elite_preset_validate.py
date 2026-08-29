@@ -330,13 +330,22 @@ def main():
     sig = _run_sig(args, tickers)
     cp = None if args.fresh else _load_checkpoint(args.checkpoint, sig)
 
-    buckets = {i: [0.0, 0, 0] for i in range(len(PRESETS))}  # tier -> [pnl_sum, wins, n] на OOS
+    # tier -> [pnl_sum, wins_brk, n_brk, acc_weighted, hn] на OOS. wins_brk/n_brk —
+    # брекет-статистика (win-rate сделок при tp/sl), acc_weighted/hn — точность
+    # направления (та цифра, что живёт в панели расширения и используется
+    # порогами пресетов). Две разные "точности", их важно различать в отчёте.
+    buckets = {i: [0.0, 0, 0, 0.0, 0] for i in range(len(PRESETS))}
     pairs_rows = []
     done_set = set()
     if cp:
         for i in range(len(PRESETS)):
             b = cp["buckets"].get(str(i))
             if b:
+                # старый формат чекпоинта был [pnl, wins, n] (3 поля) — дополняем нулями
+                # до нового 5-полевого формата, чтобы не терять уже посчитанное.
+                b = list(b)
+                while len(b) < 5:
+                    b.append(0.0)
                 buckets[i] = b
         pairs_rows = [tuple(r) for r in cp.get("pairs_rows", [])]
         done_set = set(cp.get("done_tickers", []))
@@ -365,6 +374,16 @@ def main():
                         b[0] += test["exp"] * test["n"]
                         b[1] += test["win"] * test["n"]
                         b[2] += test["n"]
+                    # acc/hn — точность направления (та цифра, что расширение
+                    # показывает как % и что фильтрует пресеты). У сделок с
+                    # брекетом и у баров направления могут быть разные счёты,
+                    # так что храним отдельно.
+                    if test["acc"] is not None:
+                        # bt_stats возвращает acc = hit/hn, но не сами hn. Раз hn
+                        # не выведен, копим взвешенное среднее по n брекет-сделок —
+                        # это приближение (обычно hn ≈ n при активном методе).
+                        b[3] += test["acc"] * test["n"]
+                        b[4] += test["n"]
                     pairs_rows.append((t, name, PRESETS[tier][0],
                                         train["exp"], train["acc"], train["n"],
                                         test["exp"], test["win"], test["n"]))
@@ -389,21 +408,26 @@ def main():
             w.writerows(pairs_rows)
         print(f"пары записаны в {args.out}", file=sys.stderr)
 
-    print(f"\n{'пресет':<8} {'пар (train)':>12} {'сделок OOS':>11} {'win% OOS':>9} {'exp ATR OOS':>12}")
+    print(f"\n{'пресет':<8} {'пар':>5} {'сделок':>8} {'acc% OOS':>9} {'win% OOS':>9} {'exp ATR OOS':>12}")
+    print(f"{'':8} {'':5} {'':8} направление  брекет 1.5/0.75 (R:R 2:1)")
+    print(f"{'':8} {'':5} {'':8} (панель %)   break-even ≈ 33%")
     n_pairs_at_or_above = [0] * len(PRESETS)
     for _, _, tier_key, *_ in pairs_rows:
         idx = next(i for i, p in enumerate(PRESETS) if p[0] == tier_key)
         for j in range(idx + 1):
             n_pairs_at_or_above[j] += 1
     for i, (key, _min_exp, _min_win) in enumerate(PRESETS):
-        pnl = wins = cnt = 0.0
+        pnl = wins = cnt = acc_w = acc_n = 0.0
         for j in range(i, len(PRESETS)):
             pnl += buckets[j][0]
             wins += buckets[j][1]
             cnt += buckets[j][2]
+            acc_w += buckets[j][3] if len(buckets[j]) > 3 else 0
+            acc_n += buckets[j][4] if len(buckets[j]) > 4 else 0
         win_pct = (wins / cnt * 100) if cnt else float("nan")
+        acc_pct = (acc_w / acc_n * 100) if acc_n else float("nan")
         exp = (pnl / cnt) if cnt else float("nan")
-        print(f"{key:<8} {n_pairs_at_or_above[i]:>12} {int(cnt):>11} {win_pct:>8.1f}% {exp:>+11.3f}")
+        print(f"{key:<8} {n_pairs_at_or_above[i]:>5} {int(cnt):>8} {acc_pct:>8.1f}% {win_pct:>8.1f}% {exp:>+11.3f}")
 
     if not interrupted:
         print(f"\n[готово] чтобы посчитать с нуля в другой раз: --fresh (или удали {args.checkpoint})",
