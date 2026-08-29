@@ -140,13 +140,19 @@
   </div>
 
   <div id="sidebar-right">
-    <h2>Статистика</h2>
+    <h2>Итоги <span id="s-scope" style="font-weight:400;text-transform:none;color:#4bc3ff;cursor:pointer" title="Клик — переключить">видимое</span></h2>
     <div class="stat"><span class="k">сигналов</span><span class="v" id="s-total">—</span></div>
-    <div class="stat"><span class="k">лонгов</span><span class="v" id="s-long">—</span></div>
-    <div class="stat"><span class="k">шортов</span><span class="v" id="s-short">—</span></div>
-    <div class="stat"><span class="k">win % направл.</span><span class="v" id="s-acc">—</span></div>
-    <div class="stat"><span class="k">win % брекета</span><span class="v" id="s-win">—</span></div>
-    <div class="stat"><span class="k">exp (ATR)</span><span class="v" id="s-exp">—</span></div>
+    <div class="stat"><span class="k">лонгов / шортов</span><span class="v" id="s-ls">—</span></div>
+    <div class="stat"><span class="k">acc %</span><span class="v" id="s-acc" title="Точность направления: совпадение знака сигнала с ходом за horizon (та же метрика, что в панели расширения)">—</span></div>
+    <div class="stat"><span class="k">win % (брекет)</span><span class="v" id="s-win" title="Доля прибыльных сделок с тейком/стопом. При R:R 2:1 break-even ≈ 33%">—</span></div>
+    <div class="stat"><span class="k">exp/сделку (ATR)</span><span class="v" id="s-exp">—</span></div>
+    <div class="stat"><span class="k">сумма P&amp;L (ATR)</span><span class="v" id="s-pnl">—</span></div>
+    <div class="stat"><span class="k">лучшая / худшая</span><span class="v" id="s-bw">—</span></div>
+    <div class="stat"><span class="k">max просадка</span><span class="v" id="s-dd" title="Максимальная просадка кумулятивной P&amp;L в ATR">—</span></div>
+    <div class="stat" style="border-top:1px solid var(--border);padding-top:6px;margin-top:6px">
+      <span class="k">лонги: win / exp</span><span class="v" id="s-lstat">—</span></div>
+    <div class="stat"><span class="k">шорты: win / exp</span><span class="v" id="s-sstat">—</span></div>
+    <div class="stat"><span class="k">★ confluence</span><span class="v" id="s-conf" title="Сигналы с подтверждением горизонтальным уровнем поблизости">—</span></div>
     <h2>Сделки</h2>
     <div id="trades-list" class="trades-list">
       <div class="empty-state">Загрузи файл со свечами или нажми «Демо»</div>
@@ -187,11 +193,14 @@ let STATE = {
   bars: [],
   ticker: '',
   atr: [],           // ATR серия по всей истории (для причинных расчётов уровней)
-  channels: [],      // [[{ch1, ch2, ch3} per bar]]
+  channels: [],      // sparse [{ch1, ch2, ch3} | undefined per bar] — только видимое окно
   levels: [],        // [{price, touches, first, last}]
-  signals: [],       // [{i, dir, entry, price, tp, sl, confluence, exit}]
+  signals: [],       // сигналы в видимом окне (для отрисовки)
+  fullSignals: [],   // сигналы по ВСЕЙ истории (для итогов "весь пул")
+  fullOk: false,     // рассчитан ли fullSignals (тяжёлый расчёт — лениво)
   layers: { channels: true, levels: true, trades: true },
   viewStart: 0,      // индекс левого края видимого окна
+  statsScope: 'view', // 'view' | 'full' — по чему считать итоги
 };
 
 // ── math ────────────────────────────────────────────────────────────────────
@@ -413,18 +422,15 @@ function renderImpl() {
   const PL = 8, PR = 78, PT = 12, PB = 22;
   const plotW = W - PL - PR, plotH = H - PT - PB;
 
+  // Bounds ТОЛЬКО по свечам. Если расширять по каналам — на фьючерсах с
+  // роллами (гэпы 100-500 пунктов в один бар) σ регрессии взлетает,
+  // границы канала уезжают за экран, свечи сжимаются в неразличимую
+  // полоску. Каналы могут выходить за viewBox — обрежутся SVG-клиппингом,
+  // это визуально понятнее чем сжатые свечи.
   let minP = Infinity, maxP = -Infinity;
   for (const b of bars) { if (b.low < minP) minP = b.low; if (b.high > maxP) maxP = b.high; }
-  if (STATE.layers.channels) {
-    // Расширим bounds по каналам В ВИДИМОМ ОКНЕ (не по последнему бару всей истории)
-    for (let idx = 0; idx < bars.length; idx++) {
-      const ch = STATE.channels[vs + idx] && STATE.channels[vs + idx].ch3;
-      if (!ch) continue;
-      if (ch.topNow > maxP) maxP = ch.topNow;
-      if (ch.botNow < minP) minP = ch.botNow;
-    }
-  }
-  const pad = (maxP - minP) * 0.03;
+  if (!isFinite(minP) || !isFinite(maxP) || maxP <= minP) { minP = 0; maxP = 1; }
+  const pad = (maxP - minP) * 0.05;
   minP -= pad; maxP += pad;
   const priceRange = maxP - minP || 1;
 
@@ -432,6 +438,11 @@ function renderImpl() {
   const x = idx => PL + (idx / Math.max(1, bars.length - 1)) * plotW;
   const y = p => PT + (1 - (p - minP) / priceRange) * plotH;
   const bw = Math.max(1.5, plotW / bars.length * 0.72);
+
+  // Clip-path: всё что рисуется каналами/уровнями/сделками обрезается по plot-area.
+  // Это защита от улетевших за границы линий (на фьючерсах с роллами σ регрессии
+  // может уехать далеко за bounds свечей).
+  const defs = `<defs><clipPath id="plot-clip"><rect x="${PL}" y="${PT}" width="${plotW}" height="${plotH}"/></clipPath></defs>`;
 
   // Оси/сетка (простая) — 5 горизонтальных линий с ценами справа
   let axis = '';
@@ -590,37 +601,68 @@ function renderImpl() {
     }
   }
 
-  svg.innerHTML = axis + channelSvg + levelsSvg + candles + tradesSvg;
+  // Каналы/уровни/сделки — внутри clip-path (обрезаются по plot-area).
+  // Свечи не в clip'e — они и так по построению в bounds.
+  const clipped = `<g clip-path="url(#plot-clip)">${channelSvg}${levelsSvg}${tradesSvg}</g>`;
+  svg.innerHTML = defs + axis + candles + clipped;
   renderStats();
   renderTradesList();
 }
 
 function renderStats() {
-  const sigs = STATE.signals;
+  const scope = STATE.statsScope;
+  const sigs = scope === 'full' ? STATE.fullSignals : STATE.signals;
+  $('s-scope').textContent = scope === 'full' ? 'весь пул' : 'видимое';
   $('s-total').textContent = sigs.length;
-  const longs = sigs.filter(s => s.dir > 0).length;
-  const shorts = sigs.filter(s => s.dir < 0).length;
-  $('s-long').textContent = longs; $('s-short').textContent = shorts;
+  const longs = sigs.filter(s => s.dir > 0);
+  const shorts = sigs.filter(s => s.dir < 0);
+  $('s-ls').textContent = `${longs.length} / ${shorts.length}`;
   const closed = sigs.filter(s => s.pnl != null);
-  if (!closed.length) { $('s-acc').textContent = '—'; $('s-win').textContent = '—'; $('s-exp').textContent = '—'; return; }
-  const wins = closed.filter(s => s.pnl > 0).length;
-  const winPct = (wins / closed.length * 100).toFixed(1);
-  const expAvg = closed.reduce((s, x) => s + x.pnl, 0) / closed.length;
+  const cleanRows = ['s-acc', 's-win', 's-exp', 's-pnl', 's-bw', 's-dd', 's-lstat', 's-sstat', 's-conf'];
+  if (!closed.length) { cleanRows.forEach(id => { $(id).textContent = '—'; $(id).className = 'v'; }); return; }
   // acc — угадывание направления по ходу через horizon (независимо от брекета)
   let hits = 0, hn = 0;
+  const h = +$('tr-horizon').value;
   for (const s of closed) {
-    const h = +$('tr-horizon').value;
     const j = s.i + h; if (j >= STATE.bars.length) continue;
     const fut = STATE.bars[j].close - s.entry; if (fut === 0) continue;
     hn++; if ((s.dir > 0 && fut > 0) || (s.dir < 0 && fut < 0)) hits++;
   }
-  const accPct = hn ? (hits / hn * 100).toFixed(1) : '—';
-  const winEl = $('s-win'), expEl = $('s-exp');
-  $('s-acc').textContent = accPct + '%';
-  winEl.textContent = winPct + '%';
-  winEl.className = 'v ' + (wins / closed.length > 0.33 ? 'pos' : 'neg');
-  expEl.textContent = (expAvg >= 0 ? '+' : '') + expAvg.toFixed(3);
-  expEl.className = 'v ' + (expAvg > 0 ? 'pos' : 'neg');
+  const wins = closed.filter(s => s.pnl > 0).length;
+  const winPct = wins / closed.length * 100;
+  const expAvg = closed.reduce((s, x) => s + x.pnl, 0) / closed.length;
+  const pnlSum = closed.reduce((s, x) => s + x.pnl, 0);
+  const best = Math.max(...closed.map(s => s.pnl));
+  const worst = Math.min(...closed.map(s => s.pnl));
+  // max drawdown по кумулятивной P&L
+  let peak = 0, dd = 0, cum = 0;
+  for (const s of closed) {
+    cum += s.pnl;
+    if (cum > peak) peak = cum;
+    const d = cum - peak;
+    if (d < dd) dd = d;
+  }
+  const perDir = (arr) => {
+    const cl = arr.filter(s => s.pnl != null);
+    if (!cl.length) return '—';
+    const w = cl.filter(s => s.pnl > 0).length / cl.length * 100;
+    const e = cl.reduce((s, x) => s + x.pnl, 0) / cl.length;
+    return `${w.toFixed(0)}% / ${e >= 0 ? '+' : ''}${e.toFixed(2)} (${cl.length})`;
+  };
+  const setV = (id, txt, pnlLike) => {
+    const el = $(id); el.textContent = txt;
+    el.className = 'v' + (pnlLike == null ? '' : ' ' + (pnlLike > 0 ? 'pos' : (pnlLike < 0 ? 'neg' : '')));
+  };
+  setV('s-acc', (hn ? (hits / hn * 100).toFixed(1) : '—') + '%');
+  setV('s-win', winPct.toFixed(1) + '%', wins / closed.length - 0.33);
+  setV('s-exp', (expAvg >= 0 ? '+' : '') + expAvg.toFixed(3), expAvg);
+  setV('s-pnl', (pnlSum >= 0 ? '+' : '') + pnlSum.toFixed(1), pnlSum);
+  setV('s-bw', `+${best.toFixed(2)} / ${worst.toFixed(2)}`);
+  setV('s-dd', dd.toFixed(2), dd);
+  setV('s-lstat', perDir(longs));
+  setV('s-sstat', perDir(shorts));
+  const conf = closed.filter(s => s.confluence);
+  setV('s-conf', conf.length ? `${conf.length} · ${(conf.filter(s => s.pnl > 0).length / conf.length * 100).toFixed(0)}%` : '—');
 }
 
 function renderTradesList() {
@@ -724,10 +766,44 @@ $('svg').addEventListener('mouseleave', () => { $('tt').style.display = 'none'; 
 
 // ── input events ────────────────────────────────────────────────────────────
 function recompute() { computeAll(); render(); }
+function invalidateFull() {
+  // Параметры каналов/сигналов изменились → прошлый full-расчёт устарел, скидываем.
+  STATE.fullOk = false; STATE.fullSignals = [];
+  if (STATE.statsScope === 'full') { STATE.statsScope = 'view'; renderStats(); }
+}
 ['ch-w1','ch-w2','ch-w3','ch-k','lv-pivot','lv-merge','lv-min','tr-take','tr-stop','tr-horizon','tr-er-max']
-  .forEach(id => $(id).addEventListener('change', recompute));
+  .forEach(id => $(id).addEventListener('change', () => { invalidateFull(); recompute(); }));
 $('view-len').addEventListener('change', recompute);
 $('ch-style').addEventListener('change', render);
+$('s-scope').addEventListener('click', () => {
+  if (STATE.statsScope === 'full') { STATE.statsScope = 'view'; renderStats(); return; }
+  // Переключение на full: считаем каналы+сигналы по ВСЕЙ истории (тяжёлый вызов).
+  // При > 30k баров предупреждаем — расчёт может занять секунды.
+  const n = STATE.bars.length;
+  if (n > 30000 && !confirm(`Посчитать сигналы по всей истории (${n} баров)? Это может занять несколько секунд.`)) return;
+  const scope = $('s-scope'); scope.textContent = 'считаю...';
+  setTimeout(() => {
+    computeFullSignals();
+    STATE.statsScope = 'full';
+    renderStats();
+  }, 20);
+});
+
+function computeFullSignals() {
+  const bars = STATE.bars, n = bars.length;
+  if (!n) { STATE.fullSignals = []; return; }
+  const W1 = +$('ch-w1').value, W2 = +$('ch-w2').value, W3 = +$('ch-w3').value;
+  const k = +$('ch-k').value;
+  const take = +$('tr-take').value, stop = +$('tr-stop').value;
+  const horizon = +$('tr-horizon').value, erMax = +$('tr-er-max').value;
+  const atrArr = STATE.atr.length ? STATE.atr : atrSeries(bars, 14);
+  // Считаем каналы по всей истории. Только ch3 нужен для сигналов — экономим 3x.
+  const chFull = new Array(n);
+  for (let i = W3 - 1; i < n; i++) chFull[i] = { ch3: regChannel(bars, i, W3, k) };
+  STATE.fullSignals = detectSignals(bars, chFull, STATE.levels, atrArr,
+    { erMax, take, stop, horizon }, 0, n);
+  STATE.fullOk = true;
+}
 $('btn-view-all').addEventListener('click', () => {
   $('view-len').value = STATE.bars.length; STATE.viewStart = 0; recompute();
 });
@@ -755,6 +831,7 @@ $('file-input').addEventListener('change', async ev => {
 });
 
 function loadBars(raw, ticker) {
+  invalidateFull();
   const bars = raw.map(r => ({
     time: typeof r.time === 'number' ? new Date(r.time * (r.time > 1e12 ? 1 : 1000)).toISOString().slice(0, 16).replace('T', ' ') : String(r.time || '').slice(0, 16).replace('T', ' '),
     open: +r.open, high: +r.high, low: +r.low, close: +r.close,
