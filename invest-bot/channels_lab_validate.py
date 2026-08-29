@@ -294,23 +294,50 @@ def detect_channel_signals(bars, ch_series, atr, params):
     return signals
 
 
+# ── агрегация: N последовательных баров сливаются в один ───────────────────
+# open первого, close последнего, high/low крайние, volume суммируется.
+# Позволяет из 5-мин кэша получить 30-мин (agg=6), 1ч (agg=12), 4ч (agg=48),
+# дневки (agg=78) без перекачки данных. На большем ТФ ATR растёт в абсолюте,
+# а комиссия остаётся той же в % цены → cost в единицах ATR падает
+# пропорционально (5м→30м = cost упадёт в ~2.5-3 раза).
+def aggregate_bars(bars, factor):
+    if factor <= 1:
+        return bars
+    out = []
+    for i in range(0, len(bars) - factor + 1, factor):
+        chunk = bars[i:i + factor]
+        out.append({
+            "time": chunk[0]["time"],
+            "open": chunk[0]["open"],
+            "high": max(b["high"] for b in chunk),
+            "low": min(b["low"] for b in chunk),
+            "close": chunk[-1]["close"],
+            "volume": sum(b.get("volume", 0) for b in chunk),
+        })
+    return out
+
+
 # ── прогон одного тикера ────────────────────────────────────────────────────
 def process_ticker(ticker, cache_dir, interval, days, params):
     rows_raw = _load_from_cache(ticker, cache_dir, interval)
     if not rows_raw:
         return None
     if days:
-        # bars_per_day для 5-мин ≈ 78, для 1-мин ≈ 390
+        # bars_per_day для 5-мин ≈ 78, для 1-мин ≈ 390. Отсекаем ПЕРЕД
+        # агрегацией, иначе последний неполный кусок съест лишнее.
         bpd = 390 // max(interval, 1)
-        rows_raw = rows_raw[-max(days * bpd, 300):]
-    n = len(rows_raw)
-    if n < max(params["w3"], 300) + params["horizon"]:
-        return None
+        rows_raw = rows_raw[-max(days * bpd, 300 * params.get("agg", 1)):]
+    liq, vol = _liq_vol(rows_raw)  # ликв/вол считаем на исходных 5-мин барах
     bars = [{"open": float(r["open"]), "high": float(r["high"]),
               "low": float(r["low"]), "close": float(r["close"]),
               "volume": float(r["volume"]), "time": r["time"]} for r in rows_raw]
+    agg = params.get("agg", 1)
+    if agg > 1:
+        bars = aggregate_bars(bars, agg)
+    n = len(bars)
+    if n < max(params["w3"], 300) + params["horizon"]:
+        return None
     atr = atr_series(bars, 14)
-    liq, vol = _liq_vol(rows_raw)
 
     W1, W2, W3, k = params["w1"], params["w2"], params["w3"], params["k"]
     ch_series = [None] * n
@@ -532,6 +559,11 @@ def main():
     ap.add_argument("--er-max", type=float, default=0.35)
     ap.add_argument("--cost", type=float, default=0.5)
     ap.add_argument("--max-ch", type=int, default=1)
+    ap.add_argument("--agg", type=int, default=1,
+                     help="Агрегировать N исходных баров в один. Для 5-мин кэша: "
+                          "6=30мин, 12=1ч, 48=4ч, 78=дневки. На большем ТФ ATR больше "
+                          "в абсолюте → снижай --cost пропорционально (5м cost 0.5 → "
+                          "30м cost 0.2 → 1ч cost 0.12).")
     ap.add_argument("--modes", default="level,channel,combo")
     ap.add_argument("--checkpoint",
                      default=os.path.join(_HERE, "data", "channels_lab_cp.json"))
@@ -545,8 +577,11 @@ def main():
         "lv_pivot": args.lv_pivot, "lv_merge": args.lv_merge, "lv_min": args.lv_min,
         "take": args.take, "stop": args.stop, "horizon": args.horizon,
         "er_max": args.er_max, "cost": args.cost, "max_ch": args.max_ch,
-        "modes": modes,
+        "agg": args.agg, "modes": modes,
     }
+    if args.agg > 1:
+        print(f"[agg] баров сливаем ×{args.agg}: {args.interval}-мин → "
+               f"{args.interval * args.agg}-мин", file=sys.stderr)
 
     if args.tickers.upper() == "ALL":
         tickers = _list_tickers(args.cache, args.interval, top_liq=args.top_liq,
