@@ -384,6 +384,14 @@ function computeAll() {
 
 // ── отрисовка SVG ──────────────────────────────────────────────────────────
 function render() {
+  try { renderImpl(); }
+  catch (e) {
+    console.error('render() упал:', e);
+    const svg = $('svg');
+    svg.innerHTML = `<text x="20" y="30" fill="#ff6a8b" font-size="14" font-family="ui-monospace,monospace">render error: ${(e && e.message || e).toString().replace(/[<>&]/g,'')}</text>`;
+  }
+}
+function renderImpl() {
   const svg = $('svg');
   const barsAll = STATE.bars;
   const rect = svg.getBoundingClientRect();
@@ -448,6 +456,15 @@ function render() {
     candles += `<rect x="${cx - bw / 2}" y="${ybt}" width="${bw}" height="${Math.max(1, ytp - ybt)}" fill="${col}"/>`;
   }
 
+  // Свечи должны попасть на экран ДАЖЕ если каналы или уровни упадут при
+  // отрисовке (я делаю try вокруг каждого блока ниже, а innerHTML пишу один
+  // раз в конце — так что svg заполняется в самом финале). Если один из
+  // блоков бросит — соответствующая часть будет пустой, но остальное
+  // отрисуется.
+  const safe = (fn, label) => {
+    try { return fn(); }
+    catch (e) { console.error(label + ' failed:', e); return ''; }
+  };
   // Каналы. Два стиля:
   //   piecewise (default): для каждого окна W разбиваем видимую историю на
   //     НЕПЕРЕСЕКАЮЩИЕСЯ сегменты по W баров. Для каждого сегмента канал —
@@ -457,9 +474,11 @@ function render() {
   //     как видит трейдер в текущий момент, обновляется на каждом баре).
   //   rolling: старое поведение — соединяем правые края скользящих
   //     регрессий, получается гладкая лента (по факту Bollinger на регрессии).
-  let channelSvg = '';
-  if (STATE.layers.channels) {
-    const style = $('ch-style').value;
+  const channelSvg = safe(() => {
+    if (!STATE.layers.channels) return '';
+    let out = '';
+    const styleEl = $('ch-style');
+    const style = styleEl ? styleEl.value : 'piecewise';
     const drawCh = (color, opacity, key, W) => {
       if (style === 'rolling') {
         let pathCenter = '', pathTop = '', pathBot = '';
@@ -472,9 +491,9 @@ function render() {
           pathBot += (pathBot ? 'L' : 'M') + cx + ',' + y(ch.botNow);
         }
         if (pathCenter) {
-          channelSvg += `<path d="${pathTop}" fill="none" stroke="${color}" stroke-width="1" opacity="${opacity}"/>`;
-          channelSvg += `<path d="${pathBot}" fill="none" stroke="${color}" stroke-width="1" opacity="${opacity}"/>`;
-          channelSvg += `<path d="${pathCenter}" fill="none" stroke="${color}" stroke-width="0.6" opacity="${opacity * 0.6}" stroke-dasharray="3,3"/>`;
+          out += `<path d="${pathTop}" fill="none" stroke="${color}" stroke-width="1" opacity="${opacity}"/>`;
+          out += `<path d="${pathBot}" fill="none" stroke="${color}" stroke-width="1" opacity="${opacity}"/>`;
+          out += `<path d="${pathCenter}" fill="none" stroke="${color}" stroke-width="0.6" opacity="${opacity * 0.6}" stroke-dasharray="3,3"/>`;
         }
         return;
       }
@@ -498,9 +517,9 @@ function render() {
         const yt1 = yc1 + k_sigma * ch.sigma, yt2 = yc2 + k_sigma * ch.sigma;
         const yb1 = yc1 - k_sigma * ch.sigma, yb2 = yc2 - k_sigma * ch.sigma;
         const x1 = x(drawFrom - vs), x2 = x(drawTo - vs);
-        channelSvg += `<line x1="${x1}" y1="${y(yt1)}" x2="${x2}" y2="${y(yt2)}" stroke="${color}" stroke-width="1" opacity="${opacity}"/>`;
-        channelSvg += `<line x1="${x1}" y1="${y(yb1)}" x2="${x2}" y2="${y(yb2)}" stroke="${color}" stroke-width="1" opacity="${opacity}"/>`;
-        channelSvg += `<line x1="${x1}" y1="${y(yc1)}" x2="${x2}" y2="${y(yc2)}" stroke="${color}" stroke-width="0.6" opacity="${opacity * 0.5}" stroke-dasharray="3,3"/>`;
+        out += `<line x1="${x1}" y1="${y(yt1)}" x2="${x2}" y2="${y(yt2)}" stroke="${color}" stroke-width="1" opacity="${opacity}"/>`;
+        out += `<line x1="${x1}" y1="${y(yb1)}" x2="${x2}" y2="${y(yb2)}" stroke="${color}" stroke-width="1" opacity="${opacity}"/>`;
+        out += `<line x1="${x1}" y1="${y(yc1)}" x2="${x2}" y2="${y(yc2)}" stroke="${color}" stroke-width="0.6" opacity="${opacity * 0.5}" stroke-dasharray="3,3"/>`;
       }
       // Плюс "канал СЕЙЧАС" — на последнем баре видимого окна, ярче остальных.
       // Показывает актуальную оценку канала (то что трейдер видит в момент t=ve-1).
@@ -513,8 +532,8 @@ function render() {
         const yt1 = yc1 + k_sigma * chNow.sigma, yt2 = yc2 + k_sigma * chNow.sigma;
         const yb1 = yc1 - k_sigma * chNow.sigma, yb2 = yc2 - k_sigma * chNow.sigma;
         const x1 = x(fromBar - vs), x2 = x(nowBar - vs);
-        channelSvg += `<line x1="${x1}" y1="${y(yt1)}" x2="${x2}" y2="${y(yt2)}" stroke="${color}" stroke-width="1.8" opacity="0.95"/>`;
-        channelSvg += `<line x1="${x1}" y1="${y(yb1)}" x2="${x2}" y2="${y(yb2)}" stroke="${color}" stroke-width="1.8" opacity="0.95"/>`;
+        out += `<line x1="${x1}" y1="${y(yt1)}" x2="${x2}" y2="${y(yt2)}" stroke="${color}" stroke-width="1.8" opacity="0.95"/>`;
+        out += `<line x1="${x1}" y1="${y(yb1)}" x2="${x2}" y2="${y(yb2)}" stroke="${color}" stroke-width="1.8" opacity="0.95"/>`;
       }
     };
     const k_sigma = +$('ch-k').value;
@@ -522,7 +541,8 @@ function render() {
     drawCh('var(--ch1)', 0.55, 'ch1', W1);
     drawCh('var(--ch2)', 0.65, 'ch2', W2);
     drawCh('var(--ch3)', 0.8, 'ch3', W3);
-  }
+    return out;
+  }, 'channels');
 
   // Уровни: показываем только те, чей ценовой диапазон пересекается с видимым
   // окном, и первое касание которых — до конца видимого окна (иначе уровень ещё
