@@ -148,7 +148,15 @@
   </div>
 
   <div id="sidebar-right">
-    <h2>Итоги <span id="s-scope" style="font-weight:400;text-transform:none;color:#4bc3ff;cursor:pointer" title="Клик — переключить">видимое</span></h2>
+    <h2>Итоги</h2>
+    <div style="display:flex;gap:4px;margin-bottom:6px">
+      <button id="s-scope-view" class="on" style="flex:1;padding:4px 6px;font-size:11px;background:#2b4d6b;border:1px solid #3a6a8f;color:#bfe5ff;border-radius:3px;cursor:pointer">
+        видимое · <span id="s-scope-view-n">—</span>
+      </button>
+      <button id="s-scope-full" style="flex:1;padding:4px 6px;font-size:11px;background:#212a38;border:1px solid var(--border);color:var(--fg);border-radius:3px;cursor:pointer" title="Пересчитать сигналы по ВСЕЙ истории. Тяжело, на 100k+ баров может занять секунды.">
+        весь пул · <span id="s-scope-full-n">не посчитан</span>
+      </button>
+    </div>
     <div class="stat"><span class="k">сигналов</span><span class="v" id="s-total">—</span></div>
     <div class="stat"><span class="k">лонгов / шортов</span><span class="v" id="s-ls">—</span></div>
     <div class="stat"><span class="k">acc %</span><span class="v" id="s-acc" title="Точность направления: совпадение знака сигнала с ходом за horizon (та же метрика, что в панели расширения)">—</span></div>
@@ -160,19 +168,17 @@
     <div class="stat" style="border-top:1px solid var(--border);padding-top:6px;margin-top:6px">
       <span class="k">лонги: win / exp</span><span class="v" id="s-lstat">—</span></div>
     <div class="stat"><span class="k">шорты: win / exp</span><span class="v" id="s-sstat">—</span></div>
-    <div class="stat" style="border-top:1px solid var(--border);padding-top:6px;margin-top:6px">
-      <span class="k">★ с уровнем</span><span class="v" id="s-conf-y">—</span></div>
-    <div class="stat"><span class="k">без ★</span><span class="v" id="s-conf-n">—</span></div>
-    <h2>Каналы <span style="font-weight:400;color:var(--muted);text-transform:none">в режиме "уровень"</span></h2>
-    <div class="stat"><span class="k">0 согласны</span><span class="v" id="s-ncv-0" title="Уровень триггернул, каналы не подтверждают направление сигнала — чистый уровень">—</span></div>
-    <div class="stat"><span class="k">1 согласен</span><span class="v" id="s-ncv-1" title="Один канал на границе в сторону сигнала — здоровое confluence">—</span></div>
-    <div class="stat"><span class="k">2+ согласны</span><span class="v" id="s-ncv-2" title="Скипается по умолчанию (maxCh=1) — глубокая трендовая нога, не разворот">—</span></div>
-    <div class="stat"><span class="k">микро согласен</span><span class="v" id="s-conf-micro" title="Сигнал уровня + микро-канал в перепроданности/перекупленности одновременно = супер-setup">—</span></div>
+    <h2>Каналы (в сторону сигнала)</h2>
+    <div class="stat"><span class="k">0 согласны</span><span class="v" id="s-ncv-0" title="Уровень триггернул, ни один канал не подтверждает — чистый уровень без confluence">—</span></div>
+    <div class="stat"><span class="k">1 согласен</span><span class="v" id="s-ncv-1" title="Один канал на границе в сторону сигнала — здоровое confluence (супер-setup)">—</span></div>
+    <div class="stat"><span class="k">2+ согласны</span><span class="v" id="s-ncv-2" title="Скипается по умолчанию (maxCh=1) — глубокая трендовая нога">—</span></div>
+    <div class="stat"><span class="k">микро согласен</span><span class="v" id="s-conf-micro" title="Микро-канал в перепроданности/перекупленности одновременно с уровнем">—</span></div>
     <h2>По силе уровня</h2>
-    <div class="stat"><span class="k">2-3 касания</span><span class="v" id="s-lvs-lo">—</span></div>
-    <div class="stat"><span class="k">4-5 касаний</span><span class="v" id="s-lvs-mid">—</span></div>
-    <div class="stat"><span class="k">6+ касаний</span><span class="v" id="s-lvs-hi" title="Часто-касаемый уровень — рынок хорошо его знает">—</span></div>
-    <h2>По каналам (старый режим)</h2>
+    <div class="stat"><span class="k">2 касания</span><span class="v" id="s-lvs-2">—</span></div>
+    <div class="stat"><span class="k">3 касания</span><span class="v" id="s-lvs-3">—</span></div>
+    <div class="stat"><span class="k">4-5 касаний</span><span class="v" id="s-lvs-mid" title="По твоим прогонам — оптимум силы уровня">—</span></div>
+    <div class="stat"><span class="k">6+ касаний</span><span class="v" id="s-lvs-hi" title="Часто-касаемые уровни: рынок их 'знает', едут на пробой чаще чем отскок">—</span></div>
+    <h2>По каналам (в channel-режиме)</h2>
     <div class="stat"><span class="k">1 канал</span><span class="v" id="s-nch-1">—</span></div>
     <div class="stat"><span class="k">2 канала</span><span class="v" id="s-nch-2">—</span></div>
     <div class="stat"><span class="k">3 канала</span><span class="v" id="s-nch-3">—</span></div>
@@ -737,16 +743,23 @@ function renderImpl() {
 function renderStats() {
   const scope = STATE.statsScope;
   const sigs = scope === 'full' ? STATE.fullSignals : STATE.signals;
-  $('s-scope').textContent = scope === 'full' ? 'весь пул' : 'видимое';
+  // Активная кнопка — синяя, неактивная — тёмная.
+  const setBtn = (el, on) => {
+    if (on) { el.style.background = '#2b4d6b'; el.style.borderColor = '#3a6a8f'; el.style.color = '#bfe5ff'; }
+    else { el.style.background = '#212a38'; el.style.borderColor = 'var(--border)'; el.style.color = 'var(--fg)'; }
+  };
+  setBtn($('s-scope-view'), scope === 'view');
+  setBtn($('s-scope-full'), scope === 'full');
+  $('s-scope-view-n').textContent = STATE.signals.length + ' сиг.';
+  $('s-scope-full-n').textContent = STATE.fullOk ? (STATE.fullSignals.length + ' сиг.') : 'не посчитан';
   $('s-total').textContent = sigs.length;
   const longs = sigs.filter(s => s.dir > 0);
   const shorts = sigs.filter(s => s.dir < 0);
   $('s-ls').textContent = `${longs.length} / ${shorts.length}`;
   const closed = sigs.filter(s => s.pnl != null);
   const cleanRows = ['s-acc', 's-win', 's-exp', 's-pnl', 's-bw', 's-dd', 's-lstat', 's-sstat',
-                      's-conf-y', 's-conf-n',
                       's-ncv-0', 's-ncv-1', 's-ncv-2', 's-conf-micro',
-                      's-lvs-lo', 's-lvs-mid', 's-lvs-hi',
+                      's-lvs-2', 's-lvs-3', 's-lvs-mid', 's-lvs-hi',
                       's-nch-1', 's-nch-2', 's-nch-3'];
   if (!closed.length) { cleanRows.forEach(id => { $(id).textContent = '—'; $(id).className = 'v'; }); return; }
   // acc — угадывание направления по ходу через horizon (независимо от брекета)
@@ -790,19 +803,15 @@ function renderStats() {
   setV('s-dd', dd.toFixed(2), dd);
   setV('s-lstat', perDir(longs));
   setV('s-sstat', perDir(shorts));
-  // Разбивка "с ★" vs "без ★". Формат: n · win% · exp — сразу видно, добавляет ли уровень edge.
-  const confY = closed.filter(s => s.confluence);
-  const confN = closed.filter(s => !s.confluence);
-  setV('s-conf-y', perDir(confY));
-  setV('s-conf-n', perDir(confN));
   // Разбивка "уровневого" режима: сколько каналов согласны в СТОРОНУ сигнала.
   // 0 = чистый уровень, 1 = здоровое confluence, 2+ = трендовая нога (скипается).
   setV('s-ncv-0', perDir(closed.filter(s => s.chVotes === 0)));
   setV('s-ncv-1', perDir(closed.filter(s => s.chVotes === 1)));
   setV('s-ncv-2', perDir(closed.filter(s => s.chVotes >= 2)));
   setV('s-conf-micro', perDir(closed.filter(s => s.confluenceChannel)));
-  // Разбивка по силе уровня (число касаний в кластере)
-  setV('s-lvs-lo', perDir(closed.filter(s => s.levelStrength >= 2 && s.levelStrength <= 3)));
+  // Разбивка по силе уровня — 4 корзины, чтобы увидеть монотонность (или её отсутствие)
+  setV('s-lvs-2', perDir(closed.filter(s => s.levelStrength === 2)));
+  setV('s-lvs-3', perDir(closed.filter(s => s.levelStrength === 3)));
   setV('s-lvs-mid', perDir(closed.filter(s => s.levelStrength >= 4 && s.levelStrength <= 5)));
   setV('s-lvs-hi', perDir(closed.filter(s => s.levelStrength >= 6)));
   // Разбивка "каналового" режима (voting): сколько каналов голосовали.
@@ -923,18 +932,24 @@ function invalidateFull() {
   .forEach(id => $(id).addEventListener('change', () => { invalidateFull(); recompute(); }));
 $('view-len').addEventListener('change', recompute);
 $('ch-style').addEventListener('change', render);
-$('s-scope').addEventListener('click', () => {
-  if (STATE.statsScope === 'full') { STATE.statsScope = 'view'; renderStats(); return; }
-  // Переключение на full: считаем каналы+сигналы по ВСЕЙ истории (тяжёлый вызов).
-  // При > 30k баров предупреждаем — расчёт может занять секунды.
-  const n = STATE.bars.length;
-  if (n > 30000 && !confirm(`Посчитать сигналы по всей истории (${n} баров)? Это может занять несколько секунд.`)) return;
-  const scope = $('s-scope'); scope.textContent = 'считаю...';
-  setTimeout(() => {
-    computeFullSignals();
-    STATE.statsScope = 'full';
-    renderStats();
-  }, 20);
+$('s-scope-view').addEventListener('click', () => {
+  STATE.statsScope = 'view'; renderStats();
+});
+$('s-scope-full').addEventListener('click', () => {
+  // Если ещё не считался — сначала пересчитать.
+  if (!STATE.fullOk) {
+    const n = STATE.bars.length;
+    if (n > 30000 && !confirm(`Посчитать сигналы по всей истории (${n} баров)? Это может занять несколько секунд.`)) return;
+    const btn = $('s-scope-full'); const label = $('s-scope-full-n');
+    label.textContent = 'считаю...';
+    setTimeout(() => {
+      computeFullSignals();
+      STATE.statsScope = 'full';
+      renderStats();
+    }, 20);
+    return;
+  }
+  STATE.statsScope = 'full'; renderStats();
 });
 
 function computeFullSignals() {
