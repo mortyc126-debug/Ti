@@ -94,6 +94,10 @@
     <span class="sep">·</span>
     <label>слои:</label>
     <button id="toggle-channels" class="on">каналы</button>
+    <select id="ch-style" title="Стиль каналов: piecewise = прямые линии на непересекающихся сегментах (как в TradingView Linear Regression Channel), rolling = σ-лента вокруг скользящей регрессии (по сути Bollinger)">
+      <option value="piecewise" selected>прямые</option>
+      <option value="rolling">лента σ</option>
+    </select>
     <button id="toggle-levels" class="on">уровни</button>
     <button id="toggle-trades" class="on">сделки</button>
     <span class="sep">·</span>
@@ -444,30 +448,80 @@ function render() {
     candles += `<rect x="${cx - bw / 2}" y="${ybt}" width="${bw}" height="${Math.max(1, ytp - ybt)}" fill="${col}"/>`;
   }
 
-  // Каналы: только видимое окно. Границы канала на баре (vs+idx) вычислены
-  // причинно на barsAll до этого бара — тот же расчёт был бы у пользователя
-  // в живой торговле в тот момент. Мы просто скроллим по истории.
+  // Каналы. Два стиля:
+  //   piecewise (default): для каждого окна W разбиваем видимую историю на
+  //     НЕПЕРЕСЕКАЮЩИЕСЯ сегменты по W баров. Для каждого сегмента канал —
+  //     ПРЯМАЯ линия (центр + top + bot), tangent сегменту. Так выглядит
+  //     Linear Regression Channel в TradingView: настоящий "канал", а не
+  //     σ-лента. + одна яркая линия для "канала СЕЙЧАС" (последние W баров,
+  //     как видит трейдер в текущий момент, обновляется на каждом баре).
+  //   rolling: старое поведение — соединяем правые края скользящих
+  //     регрессий, получается гладкая лента (по факту Bollinger на регрессии).
   let channelSvg = '';
   if (STATE.layers.channels) {
-    const drawCh = (color, opacity, key) => {
-      let pathCenter = '', pathTop = '', pathBot = '';
-      for (let idx = 0; idx < bars.length; idx++) {
-        const ch = STATE.channels[vs + idx] && STATE.channels[vs + idx][key];
-        if (!ch) continue;
-        const cx = x(idx);
-        pathCenter += (pathCenter ? 'L' : 'M') + cx + ',' + y(ch.centerNow);
-        pathTop += (pathTop ? 'L' : 'M') + cx + ',' + y(ch.topNow);
-        pathBot += (pathBot ? 'L' : 'M') + cx + ',' + y(ch.botNow);
+    const style = $('ch-style').value;
+    const drawCh = (color, opacity, key, W) => {
+      if (style === 'rolling') {
+        let pathCenter = '', pathTop = '', pathBot = '';
+        for (let idx = 0; idx < bars.length; idx++) {
+          const ch = STATE.channels[vs + idx] && STATE.channels[vs + idx][key];
+          if (!ch) continue;
+          const cx = x(idx);
+          pathCenter += (pathCenter ? 'L' : 'M') + cx + ',' + y(ch.centerNow);
+          pathTop += (pathTop ? 'L' : 'M') + cx + ',' + y(ch.topNow);
+          pathBot += (pathBot ? 'L' : 'M') + cx + ',' + y(ch.botNow);
+        }
+        if (pathCenter) {
+          channelSvg += `<path d="${pathTop}" fill="none" stroke="${color}" stroke-width="1" opacity="${opacity}"/>`;
+          channelSvg += `<path d="${pathBot}" fill="none" stroke="${color}" stroke-width="1" opacity="${opacity}"/>`;
+          channelSvg += `<path d="${pathCenter}" fill="none" stroke="${color}" stroke-width="0.6" opacity="${opacity * 0.6}" stroke-dasharray="3,3"/>`;
+        }
+        return;
       }
-      if (pathCenter) {
-        channelSvg += `<path d="${pathTop}" fill="none" stroke="${color}" stroke-width="1" opacity="${opacity}"/>`;
-        channelSvg += `<path d="${pathBot}" fill="none" stroke="${color}" stroke-width="1" opacity="${opacity}"/>`;
-        channelSvg += `<path d="${pathCenter}" fill="none" stroke="${color}" stroke-width="0.6" opacity="${opacity * 0.6}" stroke-dasharray="3,3"/>`;
+      // piecewise: сегменты выравниваем к вcей истории (не только к видимому окну), чтобы
+      // границы сегментов не "перескакивали" при скролле. Сегмент [k*W .. k*W+W-1] в barsAll.
+      const kStart = Math.floor(vs / W);
+      const kEnd = Math.floor((ve - 1) / W) + 1;
+      for (let k = kStart; k < kEnd; k++) {
+        const segEnd = k * W + W - 1;
+        if (segEnd >= barsAll.length) break;
+        // причинный канал В КОНЦЕ сегмента (уже посчитан для видимого окна)
+        const ch = STATE.channels[segEnd] && STATE.channels[segEnd][key];
+        if (!ch) continue;
+        const segStart = k * W;
+        // Рисуем прямые ТОЛЬКО в пределах видимого окна.
+        const drawFrom = Math.max(segStart, vs), drawTo = Math.min(segEnd, ve - 1);
+        // ch хранит intercept, slope, sigma. Пересчитываем цены в drawFrom / drawTo
+        // относительно начала СЕГМЕНТА (t=0 в segStart, t=W-1 в segEnd).
+        const tFrom = drawFrom - segStart, tTo = drawTo - segStart;
+        const yc1 = ch.slope * tFrom + ch.intercept, yc2 = ch.slope * tTo + ch.intercept;
+        const yt1 = yc1 + k_sigma * ch.sigma, yt2 = yc2 + k_sigma * ch.sigma;
+        const yb1 = yc1 - k_sigma * ch.sigma, yb2 = yc2 - k_sigma * ch.sigma;
+        const x1 = x(drawFrom - vs), x2 = x(drawTo - vs);
+        channelSvg += `<line x1="${x1}" y1="${y(yt1)}" x2="${x2}" y2="${y(yt2)}" stroke="${color}" stroke-width="1" opacity="${opacity}"/>`;
+        channelSvg += `<line x1="${x1}" y1="${y(yb1)}" x2="${x2}" y2="${y(yb2)}" stroke="${color}" stroke-width="1" opacity="${opacity}"/>`;
+        channelSvg += `<line x1="${x1}" y1="${y(yc1)}" x2="${x2}" y2="${y(yc2)}" stroke="${color}" stroke-width="0.6" opacity="${opacity * 0.5}" stroke-dasharray="3,3"/>`;
+      }
+      // Плюс "канал СЕЙЧАС" — на последнем баре видимого окна, ярче остальных.
+      // Показывает актуальную оценку канала (то что трейдер видит в момент t=ve-1).
+      const nowBar = ve - 1;
+      const chNow = STATE.channels[nowBar] && STATE.channels[nowBar][key];
+      if (chNow && nowBar >= W - 1) {
+        const fromBar = Math.max(vs, nowBar - W + 1);
+        const tFrom = fromBar - (nowBar - W + 1), tTo = W - 1;
+        const yc1 = chNow.slope * tFrom + chNow.intercept, yc2 = chNow.slope * tTo + chNow.intercept;
+        const yt1 = yc1 + k_sigma * chNow.sigma, yt2 = yc2 + k_sigma * chNow.sigma;
+        const yb1 = yc1 - k_sigma * chNow.sigma, yb2 = yc2 - k_sigma * chNow.sigma;
+        const x1 = x(fromBar - vs), x2 = x(nowBar - vs);
+        channelSvg += `<line x1="${x1}" y1="${y(yt1)}" x2="${x2}" y2="${y(yt2)}" stroke="${color}" stroke-width="1.8" opacity="0.95"/>`;
+        channelSvg += `<line x1="${x1}" y1="${y(yb1)}" x2="${x2}" y2="${y(yb2)}" stroke="${color}" stroke-width="1.8" opacity="0.95"/>`;
       }
     };
-    drawCh('var(--ch1)', 0.55, 'ch1');
-    drawCh('var(--ch2)', 0.65, 'ch2');
-    drawCh('var(--ch3)', 0.8, 'ch3');
+    const k_sigma = +$('ch-k').value;
+    const W1 = +$('ch-w1').value, W2 = +$('ch-w2').value, W3 = +$('ch-w3').value;
+    drawCh('var(--ch1)', 0.55, 'ch1', W1);
+    drawCh('var(--ch2)', 0.65, 'ch2', W2);
+    drawCh('var(--ch3)', 0.8, 'ch3', W3);
   }
 
   // Уровни: показываем только те, чей ценовой диапазон пересекается с видимым
@@ -653,6 +707,7 @@ function recompute() { computeAll(); render(); }
 ['ch-w1','ch-w2','ch-w3','ch-k','lv-pivot','lv-merge','lv-min','tr-take','tr-stop','tr-horizon','tr-er-max']
   .forEach(id => $(id).addEventListener('change', recompute));
 $('view-len').addEventListener('change', recompute);
+$('ch-style').addEventListener('change', render);
 $('btn-view-all').addEventListener('click', () => {
   $('view-len').value = STATE.bars.length; STATE.viewStart = 0; recompute();
 });
