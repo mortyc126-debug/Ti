@@ -376,11 +376,21 @@ def aggregate_bars(bars, factor):
     return out
 
 
-def _apply_method_filter(sigs, agree_list, disagree_list):
-    """Оставить только сигналы, для которых:
-      - каждый метод из agree_list имеет sign * dir > 0 (согласен по направлению)
-      - каждый метод из disagree_list имеет sign * dir < 0 (против направления)
-    Нейтральный знак (=0) не проходит ни то ни другое — сделка исключается."""
+def _apply_method_filter(sigs, agree_list, disagree_list, strict=False):
+    """Фильтр сделок по знакам методов на баре сделки.
+
+    Мягкий режим (default): требуем "нет противоречия".
+      - agree_list: каждый метод должен НЕ голосовать против (sign * dir >= 0);
+                     нейтральный знак разрешён.
+      - disagree_list: каждый метод должен НЕ голосовать ЗА (sign * dir <= 0);
+                       нейтральный знак разрешён.
+    Так фильтр отсекает противоречия, не срезая выборку при молчащем методе
+    (многие anti-методы вроде liq_sweep активны только в 10-20% баров).
+
+    Строгий режим (--strict-filter):
+      - agree: метод АКТИВЕН И согласен (sign * dir > 0), молчит = отсеять
+      - disagree: метод АКТИВЕН И против (sign * dir < 0), молчит = отсеять
+    Даёт меньше сделок, но каждая с реальным confluence."""
     if not agree_list and not disagree_list:
         return sigs
     out = []
@@ -389,12 +399,14 @@ def _apply_method_filter(sigs, agree_list, disagree_list):
         dir_ = s["dir"]
         ok = True
         for name in agree_list:
-            if mth.get(name, 0) * dir_ <= 0:
+            v = mth.get(name, 0) * dir_
+            if (strict and v <= 0) or (not strict and v < 0):
                 ok = False
                 break
         if ok:
             for name in disagree_list:
-                if mth.get(name, 0) * dir_ >= 0:
+                v = mth.get(name, 0) * dir_
+                if (strict and v >= 0) or (not strict and v > 0):
                     ok = False
                     break
         if ok:
@@ -468,7 +480,7 @@ def process_ticker(ticker, cache_dir, interval, days, params):
         fa = params.get("filter_agree") or []
         fd = params.get("filter_disagree") or []
         if fa or fd:
-            sigs = _apply_method_filter(sigs, fa, fd)
+            sigs = _apply_method_filter(sigs, fa, fd, strict=params.get("strict_filter", False))
         out[mode] = _aggregate_signals(sigs, mode)
     return out
 
@@ -825,6 +837,11 @@ def main():
                           "ПРОТИВ направления сделки (dir и sign разных знаков). "
                           "Пример: --filter-disagree liq_sweep,fractional_diff. "
                           "Требует --methods.")
+    ap.add_argument("--strict-filter", action="store_true",
+                     help="Строгий режим фильтра: метод должен быть АКТИВЕН (нейтрал "
+                          "не проходит). По умолчанию — мягкий (нейтрал считается "
+                          "неконфликтом). Строгий даёт меньше сделок, но каждая с "
+                          "реальным confluence.")
     ap.add_argument("--node", default="node", help="путь к node (для --methods)")
     ap.add_argument("--modes", default="level,channel,combo")
     ap.add_argument("--checkpoint",
@@ -849,10 +866,12 @@ def main():
         "agg": args.agg, "modes": modes,
         "methods": args.methods, "node": args.node,
         "filter_agree": filter_agree, "filter_disagree": filter_disagree,
+        "strict_filter": args.strict_filter,
     }
     if filter_agree or filter_disagree:
-        print(f"[filter] agree={filter_agree or '—'}  disagree={filter_disagree or '—'}",
-              file=sys.stderr)
+        mode_lbl = "строгий (метод активен)" if args.strict_filter else "мягкий (нейтрал ок)"
+        print(f"[filter] {mode_lbl}  agree={filter_agree or '—'}  "
+              f"disagree={filter_disagree or '—'}", file=sys.stderr)
     if args.agg > 1:
         print(f"[agg] баров сливаем ×{args.agg}: {args.interval}-мин → "
                f"{args.interval * args.agg}-мин", file=sys.stderr)
