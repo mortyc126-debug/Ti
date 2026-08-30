@@ -452,6 +452,28 @@ def _apply_method_filter(sigs, agree_list, disagree_list, strict=False):
     return out
 
 
+def _apply_ctx_filter(sigs, contra, zmax, volmax):
+    # Ценовые фильтры пакета A. Разрез показал:
+    #   contra — брать только контр-трендовый fade (cwith<0), по-тренду убыточен;
+    #   zmax   — выкинуть |z|>zmax (далеко за σ = пробой, fade гибнет);
+    #   volmax — выкинуть объём>volmax·SMA (всплеск = climax-пробой).
+    # Если у сигнала нет нужного поля (нет ch2/объёма), не отсекаем по нему —
+    # кроме contra, где отсутствие наклона = не подтверждён контр-тренд → отсекаем.
+    if not contra and zmax is None and volmax is None:
+        return sigs
+    out = []
+    for s in sigs:
+        if contra:
+            if s.get("cwith", 0) >= 0:
+                continue
+        if zmax is not None and "cz" in s and abs(s["cz"]) > zmax:
+            continue
+        if volmax is not None and "cvol" in s and s["cvol"] > volmax:
+            continue
+        out.append(s)
+    return out
+
+
 # ── прогон одного тикера ────────────────────────────────────────────────────
 def process_ticker(ticker, cache_dir, interval, days, params):
     rows_raw = _load_from_cache(ticker, cache_dir, interval)
@@ -517,6 +539,10 @@ def process_ticker(ticker, cache_dir, interval, days, params):
         # метода в filter_agree/filter_disagree трактуется как несоответствие
         # (сделка исключается) — иначе фильтр был бы бесполезен на баре, где
         # метод молчит.
+        # Контекст-фильтры пакета A (ценовые, без расширения): применяем ДО
+        # method-фильтра, чтобы стекались.
+        sigs = _apply_ctx_filter(sigs, params.get("ctx_contra", False),
+                                 params.get("ctx_zmax"), params.get("ctx_volmax"))
         fa = params.get("filter_agree") or []
         fd = params.get("filter_disagree") or []
         if fa or fd:
@@ -956,6 +982,16 @@ def main():
                           "не проходит). По умолчанию — мягкий (нейтрал считается "
                           "неконфликтом). Строгий даёт меньше сделок, но каждая с "
                           "реальным confluence.")
+    ap.add_argument("--ctx-contra", action="store_true",
+                     help="Пакет A: брать только контр-трендовый fade (наклон "
+                          "канала ch2 против направления сделки). Разрез показал: "
+                          "по-тренду убыточен, работает только возврат против наклона.")
+    ap.add_argument("--ctx-zmax", type=float, default=None,
+                     help="Пакет A: выкинуть сделки где |z| в канале ch2 > zmax "
+                          "(далеко за σ = пробой, fade гибнет). Разумно ~2.0.")
+    ap.add_argument("--ctx-volmax", type=float, default=None,
+                     help="Пакет A: выкинуть сделки где объём > volmax·SMA20 "
+                          "(всплеск = climax-пробой). Разумно ~1.5.")
     ap.add_argument("--node", default="node", help="путь к node (для --methods)")
     ap.add_argument("--modes", default="level,channel,combo")
     ap.add_argument("--checkpoint",
@@ -981,7 +1017,12 @@ def main():
         "methods": args.methods, "node": args.node,
         "filter_agree": filter_agree, "filter_disagree": filter_disagree,
         "strict_filter": args.strict_filter,
+        "ctx_contra": args.ctx_contra, "ctx_zmax": args.ctx_zmax,
+        "ctx_volmax": args.ctx_volmax,
     }
+    if args.ctx_contra or args.ctx_zmax is not None or args.ctx_volmax is not None:
+        print(f"[ctx] пакет A фильтр: contra={args.ctx_contra} "
+              f"zmax={args.ctx_zmax} volmax={args.ctx_volmax}", file=sys.stderr)
     if filter_agree or filter_disagree:
         mode_lbl = "строгий (метод активен)" if args.strict_filter else "мягкий (нейтрал ок)"
         print(f"[filter] {mode_lbl}  agree={filter_agree or '—'}  "
