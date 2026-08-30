@@ -247,6 +247,7 @@ def detect_level_signals(bars, ch_series, levels, atr, params):
             "i": i, "dir": dir_, "pnl": pnl_gross - cost,
             "reason": reason, "confluence_channel": micro_agree,
             "ch_votes": ch_votes, "level_strength": hit_level["touches"],
+            "time": b.get("time", ""),
         })
     return signals
 
@@ -290,8 +291,20 @@ def detect_channel_signals(bars, ch_series, atr, params):
         signals.append({
             "i": i, "dir": dir_, "pnl": pnl_gross - cost,
             "reason": reason, "n_channels": len(votes),
+            "time": b.get("time", ""),
         })
     return signals
+
+
+def _quarter(time_iso):
+    """'2026-03-15T14:20:00' → '2026-Q1'. Пустая строка → 'unknown'."""
+    if not time_iso or len(time_iso) < 7:
+        return "unknown"
+    try:
+        y = time_iso[:4]; m = int(time_iso[5:7])
+        return f"{y}-Q{(m - 1) // 3 + 1}"
+    except (ValueError, IndexError):
+        return "unknown"
 
 
 # ── агрегация: N последовательных баров сливаются в один ───────────────────
@@ -394,6 +407,17 @@ def _aggregate_signals(sigs, mode):
         "pnl_long": sum(s["pnl"] for s in longs),
         "pnl_short": sum(s["pnl"] for s in shorts),
     }
+    # Разбивка по кварталам — увидеть, был ли период когда edge держался и
+    # сломался, или это стабильное поведение
+    by_q = defaultdict(lambda: {"n": 0, "wins": 0, "pnl": 0.0})
+    for s in sigs:
+        q = _quarter(s.get("time", ""))
+        bq = by_q[q]
+        bq["n"] += 1
+        bq["pnl"] += s["pnl"]
+        if s["pnl"] > 0:
+            bq["wins"] += 1
+    r["by_q"] = dict(by_q)
     if mode in ("level", "combo"):
         # разбивка по силе уровня
         for lo, hi, key in [(2, 2, "lv_2"), (3, 3, "lv_3"), (4, 5, "lv_45"), (6, 999, "lv_6p")]:
@@ -508,6 +532,57 @@ def print_summary(rows, modes):
             print(f"  каналов: {_fmt_split('cv', agg, [('cv_0','0'),('cv_1','1'),('cv_2p','2+')])}")
         if mode == "channel":
             print(f"  каналов: {_fmt_split('nch', agg, [('nch_1','1'),('nch_2','2'),('nch_3','3')])}")
+
+    # ═══ Per-ticker распределение ═══
+    # Средневзвешенное exp по всем сделкам ссыпает вместе тикеры где +0.5(30 сд)
+    # и тикеры где -0.5(1000 сд) — плохие с массой сделок топят хорошие. Считаем
+    # exp per-ticker (равновзвешенно по тикеру), медиану, % в плюсе — сразу
+    # видно, edge универсальный или сидит в 2-3 тикерах.
+    print("\n═══ PER-TICKER (равновзвешенно) ═══")
+    for mode in modes:
+        per = []
+        for r in rows:
+            a = r.get(mode, {})
+            if not a.get("n"):
+                continue
+            exp = a["pnl_sum"] / a["n"]
+            per.append((r["ticker"], a["n"], a["wins"] / a["n"] * 100, exp, a["pnl_sum"]))
+        if not per:
+            print(f"\n{mode}: нет сигналов")
+            continue
+        per.sort(key=lambda t: t[3], reverse=True)
+        n_total = len(per)
+        n_pos = sum(1 for t in per if t[3] > 0)
+        exps = sorted(t[3] for t in per)
+        median_exp = exps[n_total // 2]
+        mean_exp = sum(exps) / n_total  # среднее по тикерам, а не по сделкам
+        print(f"\n{mode}: {n_total} тикеров с сигналами · в плюсе {n_pos} ({n_pos/n_total*100:.0f}%) "
+               f"· медианный exp {median_exp:+.3f} · среднее по тикерам {mean_exp:+.3f}")
+        print(f"  TOP-10:")
+        for t in per[:10]:
+            print(f"    {t[0]:<10} n={t[1]:>4}  win={t[2]:>5.1f}%  exp={t[3]:>+6.3f}  sum={t[4]:>+7.2f}")
+        print(f"  BOTTOM-10:")
+        for t in per[-10:]:
+            print(f"    {t[0]:<10} n={t[1]:>4}  win={t[2]:>5.1f}%  exp={t[3]:>+6.3f}  sum={t[4]:>+7.2f}")
+
+    # ═══ По кварталам ═══
+    print("\n═══ ПО КВАРТАЛАМ (все тикеры) ═══")
+    for mode in modes:
+        by_q_global = defaultdict(lambda: {"n": 0, "wins": 0, "pnl": 0.0})
+        for r in rows:
+            for q, v in r.get(mode, {}).get("by_q", {}).items():
+                bq = by_q_global[q]
+                bq["n"] += v["n"]; bq["wins"] += v["wins"]; bq["pnl"] += v["pnl"]
+        if not by_q_global:
+            continue
+        print(f"\n{mode}:")
+        print(f"  {'квартал':<10} {'n':>7} {'win%':>6} {'exp':>7} {'sum':>8}")
+        for q in sorted(by_q_global):
+            v = by_q_global[q]
+            if not v["n"]:
+                continue
+            print(f"  {q:<10} {v['n']:>7} {v['wins']/v['n']*100:>5.1f}% "
+                   f"{v['pnl']/v['n']:>+7.3f} {v['pnl']:>+8.1f}")
 
 
 def _fmt_dir(agg, side):
