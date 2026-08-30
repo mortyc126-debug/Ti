@@ -43,6 +43,7 @@ import math
 import os
 import re
 import statistics
+import subprocess
 import sys
 from collections import defaultdict
 
@@ -62,6 +63,51 @@ from score_methods import _load_from_cache, _list_tickers, _liq_vol  # noqa: E40
 _FUT_RE = re.compile(r"^[A-Z]{1,4}[FGHJKMNQUVXZ]\d$")
 def _is_future(ticker: str) -> bool:
     return bool(_FUT_RE.match(ticker.upper()))
+
+NODE_BRIDGE = os.path.join(_HERE, "run_signals_core.js")
+
+
+def _extension_method_signs(bars_raw, sig_bar_indices, agg_factor, node_bin):
+    """Вызов run_signals_core.js на ИСХОДНЫХ 5-мин барах — получаем сигналы всех
+    32 методов расширения для каждого исходного бара. Затем для каждого
+    агрегированного сигнала channels_lab (индекс j в агрегированных барах)
+    берём знак метода на ПОСЛЕДНЕМ исходном баре в чанке (j*agg + agg-1) —
+    т.к. агрегация берёт close с последнего бара, знак метода тоже "как виден
+    в конце чанка". Возвращает {method_name: [sign for each sig]}.
+
+    Причинность: методы signals-core.js сами по себе причинны (окно только в
+    прошлое), + мы берём знак на баре СИГНАЛА, не позже — look-ahead нет."""
+    if not sig_bar_indices:
+        return {}
+    try:
+        p = subprocess.run(
+            [node_bin, NODE_BRIDGE, "0"],
+            input=json.dumps(bars_raw), capture_output=True, text=True,
+        )
+    except FileNotFoundError:
+        return {}
+    if p.returncode != 0:
+        return {}
+    try:
+        data = json.loads(p.stdout)
+    except json.JSONDecodeError:
+        return {}
+    scores = data.get("scores", {})
+    n_raw = len(bars_raw)
+    out = {}
+    for name, series in scores.items():
+        signs = []
+        for j in sig_bar_indices:
+            raw_i = min(j * agg_factor + agg_factor - 1, n_raw - 1)
+            v = series[raw_i] if 0 <= raw_i < n_raw else None
+            if v is None or v == 0:
+                signs.append(0)
+            elif v > 0:
+                signs.append(1)
+            else:
+                signs.append(-1)
+        out[name] = signs
+    return out
 
 
 # ── математика (порт 1:1 с channels_lab.html) ──────────────────────────────
@@ -378,6 +424,15 @@ def process_ticker(ticker, cache_dir, interval, days, params):
             sigs = [s for s in lvl if s.get("confluence_channel")]
         else:  # level
             sigs = detect_level_signals(bars, ch_series, levels, atr, p)
+        # Обогащаем сигналы знаками методов расширения (если включено). Дорогой
+        # вызов Node bridge — один раз на тикер, cache отсутствует (пересчёт при
+        # каждом --fresh).
+        if params.get("methods") and sigs:
+            sig_bar_idx = [s["i"] for s in sigs]
+            method_signs = _extension_method_signs(rows_raw, sig_bar_idx, agg, params.get("node", "node"))
+            for name, signs in method_signs.items():
+                for s, sn in zip(sigs, signs):
+                    s.setdefault("mth", {})[name] = sn
         out[mode] = _aggregate_signals(sigs, mode)
     return out
 
@@ -418,6 +473,36 @@ def _aggregate_signals(sigs, mode):
         if s["pnl"] > 0:
             bq["wins"] += 1
     r["by_q"] = dict(by_q)
+
+    # Разбивка по методам расширения (если сигналы обогащены знаками методов).
+    # Для каждой сделки sig.dir × sig.mth[method] ∈ {-1, 0, +1}:
+    #   +1 = метод согласен с направлением сделки (лонг+лонг или шорт+шорт)
+    #    0 = метод молчит (нейтрален)
+    #   -1 = метод против направления сделки
+    # Считаем n/wins/pnl отдельно для agrees/disagrees/neutral → это позволяет
+    # найти confluence-фильтры и anti-фильтры.
+    by_method = {}
+    if sigs and "mth" in sigs[0]:
+        method_names = set()
+        for s in sigs:
+            method_names.update(s["mth"].keys())
+        for name in method_names:
+            bm = {"agr_n": 0, "agr_w": 0, "agr_p": 0.0,
+                  "dis_n": 0, "dis_w": 0, "dis_p": 0.0,
+                  "neu_n": 0, "neu_w": 0, "neu_p": 0.0}
+            for s in sigs:
+                sn = s["mth"].get(name, 0)
+                bucket = "neu"
+                if sn * s["dir"] > 0:
+                    bucket = "agr"
+                elif sn * s["dir"] < 0:
+                    bucket = "dis"
+                bm[bucket + "_n"] += 1
+                bm[bucket + "_p"] += s["pnl"]
+                if s["pnl"] > 0:
+                    bm[bucket + "_w"] += 1
+            by_method[name] = bm
+    r["by_method"] = by_method
     if mode in ("level", "combo"):
         # разбивка по силе уровня
         for lo, hi, key in [(2, 2, "lv_2"), (3, 3, "lv_3"), (4, 5, "lv_45"), (6, 999, "lv_6p")]:
@@ -584,6 +669,55 @@ def print_summary(rows, modes):
             print(f"  {q:<10} {v['n']:>7} {v['wins']/v['n']*100:>5.1f}% "
                    f"{v['pnl']/v['n']:>+7.3f} {v['pnl']:>+8.1f}")
 
+    # ═══ Confluence с методами расширения ═══
+    # Для каждого метода: exp сделок channels_lab когда метод СОГЛАСЕН по
+    # направлению vs когда ПРОТИВ. Ищем "разделяющие" методы — те, где
+    # разница exp_agree − exp_disagree большая по модулю. Положительный lift =
+    # метод-фильтр (следуй ему), отрицательный = anti-фильтр (делай наоборот).
+    for mode in modes:
+        by_m_global = defaultdict(lambda: {"agr_n": 0, "agr_w": 0, "agr_p": 0.0,
+                                             "dis_n": 0, "dis_w": 0, "dis_p": 0.0,
+                                             "neu_n": 0, "neu_w": 0, "neu_p": 0.0})
+        has_data = False
+        for r in rows:
+            bym = r.get(mode, {}).get("by_method", {})
+            if bym:
+                has_data = True
+            for name, v in bym.items():
+                bg = by_m_global[name]
+                for k in bg:
+                    bg[k] += v.get(k, 0)
+        if not has_data:
+            continue
+        # Считаем lift = exp_agree − exp_disagree для каждого метода (только
+        # где обе стороны имеют статистически значимую выборку, ≥30 сд).
+        MIN_N = 30
+        rows_m = []
+        for name, v in by_m_global.items():
+            if v["agr_n"] < MIN_N or v["dis_n"] < MIN_N:
+                continue
+            exp_a = v["agr_p"] / v["agr_n"]
+            exp_d = v["dis_p"] / v["dis_n"]
+            exp_n = v["neu_p"] / v["neu_n"] if v["neu_n"] else float("nan")
+            rows_m.append((name, exp_a, v["agr_n"], v["agr_w"] / v["agr_n"] * 100,
+                            exp_d, v["dis_n"], v["dis_w"] / v["dis_n"] * 100,
+                            exp_n, v["neu_n"], exp_a - exp_d))
+        if not rows_m:
+            continue
+        rows_m.sort(key=lambda t: t[-1], reverse=True)  # по lift
+        print(f"\n═══ CONFLUENCE С МЕТОДАМИ РАСШИРЕНИЯ ({mode}) ═══")
+        print(f"  Топ методов, где сделки channels_lab работают ЛУЧШЕ когда метод СОГЛАСЕН")
+        print(f"  {'method':<22} {'agree':>16} {'disagree':>16} {'neutral':>10} {'lift':>7}")
+        for t in rows_m[:10]:
+            print(f"  {t[0]:<22} {t[2]:>4} {t[3]:>4.0f}% {t[1]:>+6.3f}   "
+                   f"{t[5]:>4} {t[6]:>4.0f}% {t[4]:>+6.3f}   "
+                   f"{t[8]:>4} {t[7]:>+6.3f}   {t[9]:>+6.3f}")
+        print(f"  ─── ANTI-фильтры (сделки лучше когда метод ПРОТИВ) ───")
+        for t in rows_m[-10:][::-1]:
+            print(f"  {t[0]:<22} {t[2]:>4} {t[3]:>4.0f}% {t[1]:>+6.3f}   "
+                   f"{t[5]:>4} {t[6]:>4.0f}% {t[4]:>+6.3f}   "
+                   f"{t[8]:>4} {t[7]:>+6.3f}   {t[9]:>+6.3f}")
+
 
 def _fmt_dir(agg, side):
     n = agg.get("n_" + side, 0)
@@ -639,6 +773,13 @@ def main():
                           "6=30мин, 12=1ч, 48=4ч, 78=дневки. На большем ТФ ATR больше "
                           "в абсолюте → снижай --cost пропорционально (5м cost 0.5 → "
                           "30м cost 0.2 → 1ч cost 0.12).")
+    ap.add_argument("--methods", action="store_true",
+                     help="Считать confluence с методами расширения (все 32 из "
+                          "signals-core.js). Для каждой сделки channels_lab на баре "
+                          "фиксируем знак каждого метода → в отчёте видим топ "
+                          "confluence-фильтров и anti-фильтров. Дорого: +1 Node "
+                          "вызов на тикер, +5-10 сек на 50 тикеров/1ч.")
+    ap.add_argument("--node", default="node", help="путь к node (для --methods)")
     ap.add_argument("--modes", default="level,channel,combo")
     ap.add_argument("--checkpoint",
                      default=os.path.join(_HERE, "data", "channels_lab_cp.json"))
@@ -653,6 +794,7 @@ def main():
         "take": args.take, "stop": args.stop, "horizon": args.horizon,
         "er_max": args.er_max, "cost": args.cost, "max_ch": args.max_ch,
         "agg": args.agg, "modes": modes,
+        "methods": args.methods, "node": args.node,
     }
     if args.agg > 1:
         print(f"[agg] баров сливаем ×{args.agg}: {args.interval}-мин → "
