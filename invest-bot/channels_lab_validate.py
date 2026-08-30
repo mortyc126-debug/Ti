@@ -376,6 +376,32 @@ def aggregate_bars(bars, factor):
     return out
 
 
+def _apply_method_filter(sigs, agree_list, disagree_list):
+    """Оставить только сигналы, для которых:
+      - каждый метод из agree_list имеет sign * dir > 0 (согласен по направлению)
+      - каждый метод из disagree_list имеет sign * dir < 0 (против направления)
+    Нейтральный знак (=0) не проходит ни то ни другое — сделка исключается."""
+    if not agree_list and not disagree_list:
+        return sigs
+    out = []
+    for s in sigs:
+        mth = s.get("mth", {})
+        dir_ = s["dir"]
+        ok = True
+        for name in agree_list:
+            if mth.get(name, 0) * dir_ <= 0:
+                ok = False
+                break
+        if ok:
+            for name in disagree_list:
+                if mth.get(name, 0) * dir_ >= 0:
+                    ok = False
+                    break
+        if ok:
+            out.append(s)
+    return out
+
+
 # ── прогон одного тикера ────────────────────────────────────────────────────
 def process_ticker(ticker, cache_dir, interval, days, params):
     rows_raw = _load_from_cache(ticker, cache_dir, interval)
@@ -433,6 +459,16 @@ def process_ticker(ticker, cache_dir, interval, days, params):
             for name, signs in method_signs.items():
                 for s, sn in zip(sigs, signs):
                     s.setdefault("mth", {})[name] = sn
+        # Фильтр по методам-соучастникам: оставляем только сделки, где ВСЕ
+        # методы из filter_agree согласны с направлением, И ВСЕ методы из
+        # filter_disagree — ПРОТИВ направления. Нейтральный знак (=0) для
+        # метода в filter_agree/filter_disagree трактуется как несоответствие
+        # (сделка исключается) — иначе фильтр был бы бесполезен на баре, где
+        # метод молчит.
+        fa = params.get("filter_agree") or []
+        fd = params.get("filter_disagree") or []
+        if fa or fd:
+            sigs = _apply_method_filter(sigs, fa, fd)
         out[mode] = _aggregate_signals(sigs, mode)
     return out
 
@@ -779,6 +815,16 @@ def main():
                           "фиксируем знак каждого метода → в отчёте видим топ "
                           "confluence-фильтров и anti-фильтров. Дорого: +1 Node "
                           "вызов на тикер, +5-10 сек на 50 тикеров/1ч.")
+    ap.add_argument("--filter-agree", default=None,
+                     help="Оставить только сделки, где ВСЕ перечисленные методы "
+                          "СОГЛАСНЫ с направлением сделки (dir и sign одного знака). "
+                          "Пример: --filter-agree donchian,order_block,hawkes. Требует "
+                          "--methods.")
+    ap.add_argument("--filter-disagree", default=None,
+                     help="Оставить только сделки, где ВСЕ перечисленные методы "
+                          "ПРОТИВ направления сделки (dir и sign разных знаков). "
+                          "Пример: --filter-disagree liq_sweep,fractional_diff. "
+                          "Требует --methods.")
     ap.add_argument("--node", default="node", help="путь к node (для --methods)")
     ap.add_argument("--modes", default="level,channel,combo")
     ap.add_argument("--checkpoint",
@@ -788,6 +834,13 @@ def main():
     args = ap.parse_args()
 
     modes = [m.strip() for m in args.modes.split(",") if m.strip()]
+    filter_agree = [m.strip().lower() for m in (args.filter_agree or "").split(",") if m.strip()]
+    filter_disagree = [m.strip().lower() for m in (args.filter_disagree or "").split(",") if m.strip()]
+    # Активные фильтры требуют --methods (иначе mth пусто → всё отсеется)
+    if (filter_agree or filter_disagree) and not args.methods:
+        args.methods = True
+        print("[filter] --filter-* требует --methods, включаю автоматически", file=sys.stderr)
+
     params = {
         "w1": args.w1, "w2": args.w2, "w3": args.w3, "k": args.k,
         "lv_pivot": args.lv_pivot, "lv_merge": args.lv_merge, "lv_min": args.lv_min,
@@ -795,7 +848,11 @@ def main():
         "er_max": args.er_max, "cost": args.cost, "max_ch": args.max_ch,
         "agg": args.agg, "modes": modes,
         "methods": args.methods, "node": args.node,
+        "filter_agree": filter_agree, "filter_disagree": filter_disagree,
     }
+    if filter_agree or filter_disagree:
+        print(f"[filter] agree={filter_agree or '—'}  disagree={filter_disagree or '—'}",
+              file=sys.stderr)
     if args.agg > 1:
         print(f"[agg] баров сливаем ×{args.agg}: {args.interval}-мин → "
                f"{args.interval * args.agg}-мин", file=sys.stderr)
