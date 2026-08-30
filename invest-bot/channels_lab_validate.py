@@ -241,6 +241,38 @@ def _run_trade(bars, i, dir_, entry, tp, sl, horizon, atr):
     return None, None, None
 
 
+def _vol_sma(bars, per=20):
+    # Скользящее среднее объёма — для оценки всплеска/затишья в точке входа.
+    n = len(bars); out = [None] * n; s = 0.0
+    for i in range(n):
+        s += bars[i]["volume"]
+        if i >= per:
+            s -= bars[i - per]["volume"]
+        if i >= per - 1:
+            out[i] = s / per
+    return out
+
+
+def _ctx_features(bars, i, chs, atr, vol_sma, w2, dir_):
+    # Контекст сделки: положение внутри канала ch2, наклон канала, его ширина,
+    # объём в точке входа. Сырые числа — бакетизация позже, в _aggregate_signals.
+    a = atr[i] or 1.0
+    ch = chs.get("ch2") if chs else None
+    out = {}
+    if ch and ch["sigma"] > 0:
+        out["cz"] = (bars[i]["close"] - ch["center_now"]) / ch["sigma"]
+        # дрейф центра за окно W2 в ATR — сила тренда канала (флэт ≈ 0)
+        out["ctrend"] = ch["slope"] * w2 / a
+        out["cwidth"] = ch["sigma"] / a
+        # fade идёт ПО тренду (+1) или ПРОТИВ (-1, классич. mean-revert)
+        sl = ch["slope"]
+        out["cwith"] = dir_ * (1 if sl > 0 else -1 if sl < 0 else 0)
+    vs = vol_sma[i] if i < len(vol_sma) else None
+    if vs and vs > 0:
+        out["cvol"] = bars[i]["volume"] / vs
+    return out
+
+
 def detect_level_signals(bars, ch_series, levels, atr, params):
     er_max = params["er_max"]; take = params["take"]; stop = params["stop"]
     horizon = params["horizon"]; cost = params.get("cost", 0)
@@ -289,12 +321,15 @@ def detect_level_signals(bars, ch_series, levels, atr, params):
         pnl_gross, exit_bar, reason = _run_trade(bars, i, dir_, entry, tp, sl, horizon, a)
         if pnl_gross is None:
             continue
-        signals.append({
+        sig = {
             "i": i, "dir": dir_, "pnl": pnl_gross - cost,
             "reason": reason, "confluence_channel": micro_agree,
             "ch_votes": ch_votes, "level_strength": hit_level["touches"],
             "time": b.get("time", ""),
-        })
+        }
+        sig.update(_ctx_features(bars, i, chs, atr,
+                                 params.get("vol_sma", []), params.get("w2", 80), dir_))
+        signals.append(sig)
     return signals
 
 
@@ -334,11 +369,14 @@ def detect_channel_signals(bars, ch_series, atr, params):
         pnl_gross, exit_bar, reason = _run_trade(bars, i, dir_, entry, tp, sl, horizon, a)
         if pnl_gross is None:
             continue
-        signals.append({
+        sig = {
             "i": i, "dir": dir_, "pnl": pnl_gross - cost,
             "reason": reason, "n_channels": len(votes),
             "time": b.get("time", ""),
-        })
+        }
+        sig.update(_ctx_features(bars, i, chs, atr,
+                                 params.get("vol_sma", []), params.get("w2", 80), dir_))
+        signals.append(sig)
     return signals
 
 
@@ -435,6 +473,7 @@ def process_ticker(ticker, cache_dir, interval, days, params):
     if n < max(params["w3"], 300) + params["horizon"]:
         return None
     atr = atr_series(bars, 14)
+    vol_sma = _vol_sma(bars, 20)
 
     W1, W2, W3, k = params["w1"], params["w2"], params["w3"], params["k"]
     ch_series = [None] * n
@@ -453,6 +492,7 @@ def process_ticker(ticker, cache_dir, interval, days, params):
     p = {
         "er_max": params["er_max"], "take": params["take"], "stop": params["stop"],
         "horizon": params["horizon"], "cost": params["cost"], "max_ch": params["max_ch"],
+        "w2": W2, "vol_sma": vol_sma,
     }
     for mode in params["modes"]:
         if mode == "channel":
@@ -576,6 +616,40 @@ def _aggregate_signals(sigs, mode):
                 r["nch_%d_n" % n_ch] = len(arr)
                 r["nch_%d_wins" % n_ch] = sum(1 for s in arr if s["pnl"] > 0)
                 r["nch_%d_pnl" % n_ch] = sum(s["pnl"] for s in arr)
+
+    # ═══ Контекст (пакет A): наклон / позиция в канале / ширина / объём ═══
+    # Каждая ось бьётся на бакеты, exp по бакету показывает где fade сильнее.
+    ctx = {"trend": {}, "zpos": {}, "width": {}, "vol": {}}
+    def _acc(axis, key, s):
+        d = ctx[axis].setdefault(key, {"n": 0, "wins": 0, "pnl": 0.0})
+        d["n"] += 1; d["pnl"] += s["pnl"]
+        if s["pnl"] > 0:
+            d["wins"] += 1
+    for s in sigs:
+        if "ctrend" in s:
+            t = s["ctrend"]; w = s.get("cwith", 0)
+            if abs(t) < 0.3:
+                key = "флэт"
+            elif w > 0:
+                key = "по-тренду"
+            elif w < 0:
+                key = "против"
+            else:
+                key = "флэт"
+            _acc("trend", key, s)
+        if "cz" in s:
+            az = abs(s["cz"])
+            key = "z<1" if az < 1 else ("z1-2" if az < 2 else "z2+")
+            _acc("zpos", key, s)
+        if "cwidth" in s:
+            cw = s["cwidth"]
+            key = "узк<1.5" if cw < 1.5 else ("ср1.5-3" if cw < 3 else "шир3+")
+            _acc("width", key, s)
+        if "cvol" in s:
+            cv = s["cvol"]
+            key = "vlo<0.8" if cv < 0.8 else ("vmid0.8-1.5" if cv < 1.5 else "vhi1.5+")
+            _acc("vol", key, s)
+    r["ctx"] = ctx
     return r
 
 
@@ -716,6 +790,46 @@ def print_summary(rows, modes):
                 continue
             print(f"  {q:<10} {v['n']:>7} {v['wins']/v['n']*100:>5.1f}% "
                    f"{v['pnl']/v['n']:>+7.3f} {v['pnl']:>+8.1f}")
+
+    # ═══ Контекст (пакет A): наклон / позиция / ширина / объём ═══
+    # Разрез exp по контекстным осям — ищем где fade реально работает: во флэте
+    # или тренде, у какой границы канала, при каком объёме.
+    print("\n═══ КОНТЕКСТ: наклон / позиция / ширина / объём (все тикеры) ═══")
+    axes_order = [("trend", "наклон канала"), ("zpos", "позиция |z| ch2"),
+                  ("width", "ширина σ/ATR"), ("vol", "объём/SMA20")]
+    # порядок бакетов внутри оси для читаемости (не по алфавиту)
+    bucket_order = {
+        "trend": ["против", "флэт", "по-тренду"],
+        "zpos": ["z<1", "z1-2", "z2+"],
+        "width": ["узк<1.5", "ср1.5-3", "шир3+"],
+        "vol": ["vlo<0.8", "vmid0.8-1.5", "vhi1.5+"],
+    }
+    for mode in modes:
+        glob = {ax: {} for ax, _ in axes_order}
+        any_data = False
+        for r in rows:
+            c = r.get(mode, {}).get("ctx")
+            if not c:
+                continue
+            for ax, _ in axes_order:
+                for key, v in c.get(ax, {}).items():
+                    d = glob[ax].setdefault(key, {"n": 0, "wins": 0, "pnl": 0.0})
+                    d["n"] += v["n"]; d["wins"] += v["wins"]; d["pnl"] += v["pnl"]
+                    any_data = True
+        if not any_data:
+            continue
+        print(f"\n{mode}:")
+        for ax, label in axes_order:
+            keys = [k for k in bucket_order[ax] if k in glob[ax]]
+            keys += [k for k in sorted(glob[ax]) if k not in bucket_order[ax]]
+            parts = []
+            for key in keys:
+                v = glob[ax][key]
+                if not v["n"]:
+                    continue
+                parts.append(f"{key} {v['wins']/v['n']*100:.0f}%/{v['pnl']/v['n']:+.2f}({v['n']})")
+            if parts:
+                print(f"  {label:<18} " + "  ".join(parts))
 
     # ═══ Confluence с методами расширения ═══
     # Для каждого метода: exp сделок channels_lab когда метод СОГЛАСЕН по
