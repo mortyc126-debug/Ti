@@ -35,12 +35,20 @@ def main() -> None:
                     help="опц. пресет методов для composite-референса")
     a = ap.parse_args()
 
+    # dashboard.py читает settings.ini относительно CWD (CONFIG_FILE=
+    # "settings.ini") ещё на импорте. Чтобы скрипт работал из любой папки —
+    # переходим в директорию самого скрипта (там лежит settings.ini бота).
+    import os
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
     # Импорт тяжёлый (тянет конфиг бота) — держим внутри main, чтобы --help был
     # мгновенным и без побочных эффектов.
     try:
         import dashboard
+    except KeyError as e:
+        sys.exit(f"[конфиг] в settings.ini нет секции/ключа {e}. Нужен рабочий "
+                 f"settings.ini бота (с [INVEST_API]) в папке invest-bot.")
     except Exception as e:
-        sys.exit(f"[import dashboard] {e}\nЗапускать из папки invest-bot с рабочим конфигом бота.")
+        sys.exit(f"[import dashboard] {type(e).__name__}: {e}")
 
     tickers = None
     if a.tickers:
