@@ -558,18 +558,20 @@ def process_ticker(ticker, cache_dir, interval, days, params):
         fd = params.get("filter_disagree") or []
         if fa or fd:
             sigs = _apply_method_filter(sigs, fa, fd, strict=params.get("strict_filter", False))
-        agg = _aggregate_signals(sigs, mode)
+        magg = _aggregate_signals(sigs, mode)
         # Train/test split по времени: сделки первой доли истории (train) vs
         # хвост (test). Честная проверка: фильтр выбираем глядя только в train,
         # цифру доверия читаем в test (данные, на которых ничего не крутили).
+        # ВАЖНО: не называть результат `agg` — это имя занято фактором агрегации
+        # баров (используется в _extension_method_signs на след. итерации режима).
         frac = params.get("split_frac")
         if frac and 0 < frac < 1:
             cutoff = int(n * frac)
             train = [s for s in sigs if s["i"] < cutoff]
             test = [s for s in sigs if s["i"] >= cutoff]
-            agg["split"] = {"train": _aggregate_signals(train, mode),
-                            "test": _aggregate_signals(test, mode)}
-        out[mode] = agg
+            magg["split"] = {"train": _aggregate_signals(train, mode),
+                             "test": _aggregate_signals(test, mode)}
+        out[mode] = magg
     return out
 
 
