@@ -760,6 +760,13 @@
     const N = 5, mergeAtr = 0.5, minTouches = 3;      // пивоты ±N → кластер-уровни
     const erW = 60, erMax = 0.35;                     // range-режим (ER<erMax)
     const W1 = 30, W2 = 80, W3 = 200, kCh = 2.0, maxCh = 1; // вложенные каналы + кап голосов
+    // Брекет 2.0/1.0 (R:R 2:1): TP-грид на train/test (channels_lab) показал
+    // монотонный рост test-exp с шириной тейка при том же наборе сигналов и
+    // train≈test — «дай прибыли течь» после отскока. 1.5/0.75 давал test +0.221,
+    // 2.0/1.0 → +0.318 (+44%). Дальше (2.5-3.0) exp растёт ещё, но растёт и
+    // длительность/gap-риск, невидимый в exp-ATR — останавливаемся на 2:1.
+    const brk = new Array(n).fill(null);
+    M.channel_level_fut.brackets = brk;
     if (n < W3 + 30) return o;
     const at = atr(cd, 14), cl = cd.map(c => c.close);
     // 1) пивоты (локальные экстремумы ±N) → кластеры в ATR (медиана, ≥minTouches)
@@ -813,7 +820,7 @@
       if ((twg[i] || 0) * dir < 0) continue;
       if ((liq[i] || 0) * dir > 0) continue;
       if ((frac[i] || 0) * dir > 0) continue;
-      o[i] = dir; // важен знак; брекет дефолтный 1.5/0.75 (=channels_lab take/stop)
+      o[i] = dir; brk[i] = { take: 2.0, stop: 1.0 }; // R:R 2:1, оптимум TP-грида
     } return o; };
 
   // ── бэктест: winrate (частота угадывания направления) + exp ATR (экспектанси
