@@ -452,24 +452,34 @@ def _apply_method_filter(sigs, agree_list, disagree_list, strict=False):
     return out
 
 
-def _apply_ctx_filter(sigs, contra, zmax, volmax):
-    # Ценовые фильтры пакета A. Разрез показал:
+def _apply_ctx_filter(sigs, contra, zmax, volmax, zmin=None, volmin=None):
+    # Ценовые фильтры пакета A. Разрез показал ПОЛОСОВУЮ структуру, а не порог:
     #   contra — брать только контр-трендовый fade (cwith<0), по-тренду убыточен;
-    #   zmax   — выкинуть |z|>zmax (далеко за σ = пробой, fade гибнет);
-    #   volmax — выкинуть объём>volmax·SMA (всплеск = climax-пробой).
+    #   |z| ∈ [zmin, zmax] — z<1 (в теле канала) убыточен, z>2 (пробой) убыточен,
+    #                         рабочая зона [1,2];
+    #   объём ∈ [volmin, volmax] — тишина (<0.8) и climax (>1.5) убыточны, зона
+    #                              [0.8,1.5].
     # Если у сигнала нет нужного поля (нет ch2/объёма), не отсекаем по нему —
     # кроме contra, где отсутствие наклона = не подтверждён контр-тренд → отсекаем.
-    if not contra and zmax is None and volmax is None:
+    if (not contra and zmax is None and volmax is None
+            and zmin is None and volmin is None):
         return sigs
     out = []
     for s in sigs:
-        if contra:
-            if s.get("cwith", 0) >= 0:
+        if contra and s.get("cwith", 0) >= 0:
+            continue
+        if "cz" in s:
+            az = abs(s["cz"])
+            if zmax is not None and az > zmax:
                 continue
-        if zmax is not None and "cz" in s and abs(s["cz"]) > zmax:
-            continue
-        if volmax is not None and "cvol" in s and s["cvol"] > volmax:
-            continue
+            if zmin is not None and az < zmin:
+                continue
+        if "cvol" in s:
+            cv = s["cvol"]
+            if volmax is not None and cv > volmax:
+                continue
+            if volmin is not None and cv < volmin:
+                continue
         out.append(s)
     return out
 
@@ -542,7 +552,8 @@ def process_ticker(ticker, cache_dir, interval, days, params):
         # Контекст-фильтры пакета A (ценовые, без расширения): применяем ДО
         # method-фильтра, чтобы стекались.
         sigs = _apply_ctx_filter(sigs, params.get("ctx_contra", False),
-                                 params.get("ctx_zmax"), params.get("ctx_volmax"))
+                                 params.get("ctx_zmax"), params.get("ctx_volmax"),
+                                 params.get("ctx_zmin"), params.get("ctx_volmin"))
         fa = params.get("filter_agree") or []
         fd = params.get("filter_disagree") or []
         if fa or fd:
@@ -989,9 +1000,15 @@ def main():
     ap.add_argument("--ctx-zmax", type=float, default=None,
                      help="Пакет A: выкинуть сделки где |z| в канале ch2 > zmax "
                           "(далеко за σ = пробой, fade гибнет). Разумно ~2.0.")
+    ap.add_argument("--ctx-zmin", type=float, default=None,
+                     help="Пакет A: выкинуть сделки где |z| < zmin (в теле канала "
+                          "fade мёртв). Разрез: рабочая зона |z| ∈ [1,2].")
     ap.add_argument("--ctx-volmax", type=float, default=None,
                      help="Пакет A: выкинуть сделки где объём > volmax·SMA20 "
                           "(всплеск = climax-пробой). Разумно ~1.5.")
+    ap.add_argument("--ctx-volmin", type=float, default=None,
+                     help="Пакет A: выкинуть сделки где объём < volmin·SMA20 "
+                          "(тишина). Разрез: рабочая зона объём ∈ [0.8,1.5].")
     ap.add_argument("--node", default="node", help="путь к node (для --methods)")
     ap.add_argument("--modes", default="level,channel,combo")
     ap.add_argument("--checkpoint",
@@ -1018,11 +1035,14 @@ def main():
         "filter_agree": filter_agree, "filter_disagree": filter_disagree,
         "strict_filter": args.strict_filter,
         "ctx_contra": args.ctx_contra, "ctx_zmax": args.ctx_zmax,
-        "ctx_volmax": args.ctx_volmax,
+        "ctx_volmax": args.ctx_volmax, "ctx_zmin": args.ctx_zmin,
+        "ctx_volmin": args.ctx_volmin,
     }
-    if args.ctx_contra or args.ctx_zmax is not None or args.ctx_volmax is not None:
+    if (args.ctx_contra or args.ctx_zmax is not None or args.ctx_volmax is not None
+            or args.ctx_zmin is not None or args.ctx_volmin is not None):
         print(f"[ctx] пакет A фильтр: contra={args.ctx_contra} "
-              f"zmax={args.ctx_zmax} volmax={args.ctx_volmax}", file=sys.stderr)
+              f"z∈[{args.ctx_zmin},{args.ctx_zmax}] "
+              f"vol∈[{args.ctx_volmin},{args.ctx_volmax}]", file=sys.stderr)
     if filter_agree or filter_disagree:
         mode_lbl = "строгий (метод активен)" if args.strict_filter else "мягкий (нейтрал ок)"
         print(f"[filter] {mode_lbl}  agree={filter_agree or '—'}  "
