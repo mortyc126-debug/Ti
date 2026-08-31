@@ -558,7 +558,18 @@ def process_ticker(ticker, cache_dir, interval, days, params):
         fd = params.get("filter_disagree") or []
         if fa or fd:
             sigs = _apply_method_filter(sigs, fa, fd, strict=params.get("strict_filter", False))
-        out[mode] = _aggregate_signals(sigs, mode)
+        agg = _aggregate_signals(sigs, mode)
+        # Train/test split по времени: сделки первой доли истории (train) vs
+        # хвост (test). Честная проверка: фильтр выбираем глядя только в train,
+        # цифру доверия читаем в test (данные, на которых ничего не крутили).
+        frac = params.get("split_frac")
+        if frac and 0 < frac < 1:
+            cutoff = int(n * frac)
+            train = [s for s in sigs if s["i"] < cutoff]
+            test = [s for s in sigs if s["i"] >= cutoff]
+            agg["split"] = {"train": _aggregate_signals(train, mode),
+                            "test": _aggregate_signals(test, mode)}
+        out[mode] = agg
     return out
 
 
@@ -868,6 +879,25 @@ def print_summary(rows, modes):
             if parts:
                 print(f"  {label:<18} " + "  ".join(parts))
 
+    # ═══ Train/test split ═══
+    # Суммируем train- и test-агрегаты по всем тикерам. Если edge реальный, а
+    # не подгонка — exp на test близок к train. Провал test при плюсовом train =
+    # переобучение.
+    has_split = any(r.get(m, {}).get("split") for r in rows for m in modes)
+    if has_split:
+        print("\n═══ TRAIN/TEST SPLIT (все тикеры) ═══")
+        print("  Реальный edge → test ≈ train. test≈0 при train>0 = переобучение.")
+        for mode in modes:
+            tr = _sum_aggs([r[mode]["split"]["train"] for r in rows
+                            if r.get(mode, {}).get("split") and r[mode]["split"]["train"].get("n")])
+            te = _sum_aggs([r[mode]["split"]["test"] for r in rows
+                            if r.get(mode, {}).get("split") and r[mode]["split"]["test"].get("n")])
+            if not tr and not te:
+                continue
+            print(f"\n{mode}:")
+            print(f"  train: {_fmt_mode(tr)}")
+            print(f"  test:  {_fmt_mode(te)}")
+
     # ═══ Confluence с методами расширения ═══
     # Для каждого метода: exp сделок channels_lab когда метод СОГЛАСЕН по
     # направлению vs когда ПРОТИВ. Ищем "разделяющие" методы — те, где
@@ -1009,6 +1039,12 @@ def main():
     ap.add_argument("--ctx-volmin", type=float, default=None,
                      help="Пакет A: выкинуть сделки где объём < volmin·SMA20 "
                           "(тишина). Разрез: рабочая зона объём ∈ [0.8,1.5].")
+    ap.add_argument("--split-frac", type=float, default=None,
+                     help="Train/test split по времени: доля истории для train "
+                          "(напр. 0.6 = первые 60%% баров — train, хвост 40%% — "
+                          "test). Честная OOS-проверка: фильтр подбираешь глядя "
+                          "ТОЛЬКО в train, доверяешь цифре test. В отчёте секция "
+                          "TRAIN/TEST по каждому режиму.")
     ap.add_argument("--node", default="node", help="путь к node (для --methods)")
     ap.add_argument("--modes", default="level,channel,combo")
     ap.add_argument("--checkpoint",
@@ -1036,8 +1072,11 @@ def main():
         "strict_filter": args.strict_filter,
         "ctx_contra": args.ctx_contra, "ctx_zmax": args.ctx_zmax,
         "ctx_volmax": args.ctx_volmax, "ctx_zmin": args.ctx_zmin,
-        "ctx_volmin": args.ctx_volmin,
+        "ctx_volmin": args.ctx_volmin, "split_frac": args.split_frac,
     }
+    if args.split_frac:
+        print(f"[split] train={args.split_frac:.0%} / test={1-args.split_frac:.0%} "
+              f"по времени", file=sys.stderr)
     if (args.ctx_contra or args.ctx_zmax is not None or args.ctx_volmax is not None
             or args.ctx_zmin is not None or args.ctx_volmin is not None):
         print(f"[ctx] пакет A фильтр: contra={args.ctx_contra} "
