@@ -571,7 +571,40 @@ def process_ticker(ticker, cache_dir, interval, days, params):
             test = [s for s in sigs if s["i"] >= cutoff]
             magg["split"] = {"train": _aggregate_signals(train, mode),
                              "test": _aggregate_signals(test, mode)}
+        # TP-грид: тот же набор сигналов, разные брекеты take/stop. Детект дорогой
+        # (один раз), пересимуляция сделок дешёвая — сравнение брекетов честное,
+        # без повторного детекта. Каждый брекет со своим train/test split.
+        tpg = params.get("tp_grid")
+        if tpg:
+            grid = {}
+            for (T, S) in tpg:
+                gs = _rebracket(sigs, bars, atr, params["horizon"], params["cost"], T, S)
+                cell = {"all": _aggregate_signals(gs, mode)}
+                if frac and 0 < frac < 1:
+                    cut = int(n * frac)
+                    cell["train"] = _aggregate_signals([s for s in gs if s["i"] < cut], mode)
+                    cell["test"] = _aggregate_signals([s for s in gs if s["i"] >= cut], mode)
+                grid["%g/%g" % (T, S)] = cell
+            magg["tp_grid"] = grid
         out[mode] = magg
+    return out
+
+
+def _rebracket(sigs, bars, atr, horizon, cost, T, S):
+    # Пересимуляция уже отобранных сигналов с брекетом (T·ATR тейк, S·ATR стоп).
+    # cost (комиссия в ATR) от брекета не зависит. Сохраняем контекст/mth/time.
+    out = []
+    for s in sigs:
+        i = s["i"]; d = s["dir"]; a = atr[i]
+        if not a or a <= 0:
+            continue
+        entry = bars[i]["close"]
+        tp = entry + d * T * a; sl = entry - d * S * a
+        pg, _, reason = _run_trade(bars, i, d, entry, tp, sl, horizon, a)
+        if pg is None:
+            continue
+        ns = dict(s); ns["pnl"] = pg - cost; ns["reason"] = reason
+        out.append(ns)
     return out
 
 
@@ -900,6 +933,40 @@ def print_summary(rows, modes):
             print(f"  train: {_fmt_mode(tr)}")
             print(f"  test:  {_fmt_mode(te)}")
 
+    # ═══ TP-грид ═══
+    # Один набор сигналов, разные брекеты. Судим по test-колонке: лучший по all
+    # или train — потенциальная подгонка выхода под данные.
+    has_grid = any(r.get(m, {}).get("tp_grid") for r in rows for m in modes)
+    if has_grid:
+        print("\n═══ TP-ГРИД: брекет take/stop (все тикеры) ═══")
+        print("  Судить по TEST. all/train лучший ≠ рабочий — брекет тоже переобучается.")
+        for mode in modes:
+            # собрать все ключи брекетов из первого попавшегося тикера с гридом
+            keys = None
+            for r in rows:
+                g = r.get(mode, {}).get("tp_grid")
+                if g:
+                    keys = list(g.keys()); break
+            if not keys:
+                continue
+            print(f"\n{mode}:  {'T/S':>8} {'all n':>7} {'all exp':>9} {'train exp':>10} {'test exp':>9}")
+            for key in keys:
+                acc = {"all": [], "train": [], "test": []}
+                for r in rows:
+                    g = r.get(mode, {}).get("tp_grid")
+                    if not g or key not in g:
+                        continue
+                    for part in ("all", "train", "test"):
+                        a = g[key].get(part)
+                        if a and a.get("n"):
+                            acc[part].append(a)
+                sa = _sum_aggs(acc["all"]); st = _sum_aggs(acc["train"]); se = _sum_aggs(acc["test"])
+                if not sa:
+                    continue
+                def _e(x):
+                    return f"{x['pnl_sum']/x['n']:+.3f}" if x and x.get("n") else "   —  "
+                print(f"  {key:>18} {sa['n']:>7} {_e(sa):>9} {_e(st):>10} {_e(se):>9}")
+
     # ═══ Confluence с методами расширения ═══
     # Для каждого метода: exp сделок channels_lab когда метод СОГЛАСЕН по
     # направлению vs когда ПРОТИВ. Ищем "разделяющие" методы — те, где
@@ -1053,6 +1120,12 @@ def main():
                      default=os.path.join(_HERE, "data", "channels_lab_cp.json"))
     ap.add_argument("--fresh", action="store_true")
     ap.add_argument("--out", default=None, help="CSV per-ticker per-mode")
+    ap.add_argument("--tp-grid", default=None,
+                     help="Сравнить брекеты take/stop на ОДНОМ наборе сигналов "
+                          "(детект один раз, пересимуляция дешёвая). Формат: "
+                          "'1.0/0.5,1.5/0.75,2.0/1.0,2.5/1.0'. С --split-frac "
+                          "печатает train/test exp по каждому брекету. Судить "
+                          "ТОЛЬКО по test — иначе подгонка брекета под данные.")
     ap.add_argument("--only-fut", action="store_true",
                      help="Оставить только фьючерсы (по _is_future). Для ALL "
                           "применяется ПОСЛЕ отбора top-liq — т.е. фьючерсы среди "
@@ -1081,7 +1154,18 @@ def main():
         "ctx_contra": args.ctx_contra, "ctx_zmax": args.ctx_zmax,
         "ctx_volmax": args.ctx_volmax, "ctx_zmin": args.ctx_zmin,
         "ctx_volmin": args.ctx_volmin, "split_frac": args.split_frac,
+        "tp_grid": None,
     }
+    if args.tp_grid:
+        grid = []
+        for pair in args.tp_grid.split(","):
+            pair = pair.strip()
+            if not pair:
+                continue
+            t, s = pair.split("/")
+            grid.append((float(t), float(s)))
+        params["tp_grid"] = grid
+        print(f"[tp-grid] брекеты: {grid}", file=sys.stderr)
     if args.split_frac:
         print(f"[split] train={args.split_frac:.0%} / test={1-args.split_frac:.0%} "
               f"по времени", file=sys.stderr)
