@@ -1053,6 +1053,12 @@ def main():
                      default=os.path.join(_HERE, "data", "channels_lab_cp.json"))
     ap.add_argument("--fresh", action="store_true")
     ap.add_argument("--out", default=None, help="CSV per-ticker per-mode")
+    ap.add_argument("--only-fut", action="store_true",
+                     help="Оставить только фьючерсы (по _is_future). Для ALL "
+                          "применяется ПОСЛЕ отбора top-liq — т.е. фьючерсы среди "
+                          "самых ликвидных.")
+    ap.add_argument("--only-stk", action="store_true",
+                     help="Оставить только акции (не фьючерсы).")
     args = ap.parse_args()
 
     modes = [m.strip() for m in args.modes.split(",") if m.strip()]
@@ -1098,6 +1104,12 @@ def main():
                                  workers=1)
     else:
         tickers = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
+    if args.only_fut:
+        tickers = [t for t in tickers if _is_future(t)]
+        print(f"[only-fut] осталось {len(tickers)} фьючерсов", file=sys.stderr)
+    elif args.only_stk:
+        tickers = [t for t in tickers if not _is_future(t)]
+        print(f"[only-stk] осталось {len(tickers)} акций", file=sys.stderr)
     if not tickers:
         sys.exit("нет тикеров")
 
