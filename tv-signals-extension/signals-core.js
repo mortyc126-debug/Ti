@@ -750,6 +750,72 @@
       fired = true;
     } return o; };
 
+  // Порт стратегии channels_lab (invest-bot), OOS-подтверждённой на фьючерсах
+  // 1ч: level-fade от кластер-уровня во флэте + гейт методами расширения.
+  // train +0.092 / test +0.221 ATR/сделка (донч+твиггс согласны по направлению,
+  // liq_sweep+fractional_diff не против; сырые знаки — как в Node-мосте, которым
+  // валидировали). На акциях edge ~0 → метод для фьючерсов, включается
+  // futures-пресетом. Рассчитан на 1ч ТФ (agg=12 от 5-мин в бэктесте).
+  M.channel_level_fut = (cd) => { const n = cd.length, o = new Array(n).fill(0);
+    const N = 5, mergeAtr = 0.5, minTouches = 3;      // пивоты ±N → кластер-уровни
+    const erW = 60, erMax = 0.35;                     // range-режим (ER<erMax)
+    const W1 = 30, W2 = 80, W3 = 200, kCh = 2.0, maxCh = 1; // вложенные каналы + кап голосов
+    if (n < W3 + 30) return o;
+    const at = atr(cd, 14), cl = cd.map(c => c.close);
+    // 1) пивоты (локальные экстремумы ±N) → кластеры в ATR (медиана, ≥minTouches)
+    const pivots = [];
+    for (let i = N; i < n - N; i++) {
+      let hi = true, lo = true; const hI = cd[i].high, lI = cd[i].low;
+      for (let j = i - N; j <= i + N; j++) { if (j === i) continue;
+        if (cd[j].high >= hI) hi = false; if (cd[j].low <= lI) lo = false; if (!hi && !lo) break; }
+      if (hi) pivots.push({ i, price: hI }); if (lo) pivots.push({ i, price: lI });
+    }
+    pivots.sort((a, b) => a.price - b.price);
+    const levels = []; let cur = null;
+    const flush = () => { if (cur && cur.is.length >= minTouches) {
+      const ps = cur.prices.slice().sort((a, b) => a - b);
+      levels.push({ price: ps[ps.length >> 1], last: Math.max.apply(null, cur.is) }); } };
+    for (const p of pivots) { const a = at[p.i] || 1;
+      if (!cur) { cur = { prices: [p.price], is: [p.i] }; continue; }
+      const mid = cur.prices.reduce((s, x) => s + x, 0) / cur.prices.length;
+      if (Math.abs(p.price - mid) <= mergeAtr * a) { cur.prices.push(p.price); cur.is.push(p.i); }
+      else { flush(); cur = { prices: [p.price], is: [p.i] }; } }
+    flush();
+    // линейный канал за окно W на баре i → {top,bot} по ±kCh·σ остатков
+    const regCh = (i, W) => { if (i < W - 1) return null; const st = i - W + 1;
+      let sx = 0, sy = 0, sxx = 0, sxy = 0;
+      for (let j = 0; j < W; j++) { const y = cl[st + j]; sx += j; sy += y; sxx += j * j; sxy += j * y; }
+      const mx = sx / W, my = sy / W, den = sxx - sx * mx;
+      const slope = den > 0 ? (sxy - sx * my) / den : 0, icpt = my - slope * mx;
+      let ss = 0; for (let j = 0; j < W; j++) { const r = cl[st + j] - (slope * j + icpt); ss += r * r; }
+      const sg = Math.sqrt(ss / W), c = slope * (W - 1) + icpt;
+      return { top: c + kCh * sg, bot: c - kCh * sg }; };
+    // 2) гейт-методы (сырые знаки, как Node-мост при валидации)
+    const don = M.donchian(cd), twg = M.twiggs(cd), liq = M.liq_sweep(cd), frac = M.fractional_diff(cd);
+    for (let i = erW; i < n; i++) { const a = at[i]; if (a == null || a <= 0) continue;
+      // range-режим: efficiency ratio за erW баров
+      let dd = 0; for (let j = i - erW + 1; j <= i; j++) dd += Math.abs(cl[j] - cl[j - 1]);
+      if (dd <= 0 || Math.abs(cl[i] - cl[i - erW]) / dd >= erMax) continue;
+      const b = cd[i];
+      // касание кластер-уровня, сформированного строго до i
+      let dir = 0;
+      for (const lv of levels) { if (lv.last >= i) continue;
+        if (b.low <= lv.price + a * 0.3 && b.close > lv.price && b.open >= lv.price) { dir = 1; break; }
+        if (b.high >= lv.price - a * 0.3 && b.close < lv.price && b.open <= lv.price) { dir = -1; break; } }
+      if (!dir) continue;
+      // кап голосов: skip если 2+ вложенных канала пробиты на стороне fade
+      let votes = 0;
+      for (const W of [W1, W2, W3]) { const ch = regCh(i, W); if (!ch) continue;
+        if (dir > 0 && b.low <= ch.bot) votes++; else if (dir < 0 && b.high >= ch.top) votes++; }
+      if (votes >= maxCh + 1) continue;
+      // гейт (soft, нейтрал ок): донч+твиггс не против, liq_sweep+fractional_diff не за
+      if ((don[i] || 0) * dir < 0) continue;
+      if ((twg[i] || 0) * dir < 0) continue;
+      if ((liq[i] || 0) * dir > 0) continue;
+      if ((frac[i] || 0) * dir > 0) continue;
+      o[i] = dir; // важен знак; брекет дефолтный 1.5/0.75 (=channels_lab take/stop)
+    } return o; };
+
   // ── бэктест: winrate (частота угадывания направления) + exp ATR (экспектанси
   //    сделки с тейком/стопом — как системный прогон дашборда). Для фейдов winrate
   //    врёт (низкая при плюсовом exp), поэтому считаем обе цифры. ──────────────
@@ -829,7 +895,8 @@
   const IDS = ['zscore', 'accel', 'order_block', 'fvg', 'liq_sweep', 'false_breakout', 'vsa_abs', 'waning', 'talib_anti', 'hawkes', 'cascade', 'nw', 'alligator_inv', 'fade', 'zonefade',
     'dfa_regime', 'bipower_jump', 'amihud_shock', 'vpin_toxicity', 'anchored_vwap', 'elliott_wave',
     'rmi', 'klinger', 'twiggs', 'donchian', 'wick_rejection', 'level_quality',
-    'bb_keltner_squeeze', 'adaptive_ma', 'fractional_diff', 'cumul_delta', 'ema200_revert'];
+    'bb_keltner_squeeze', 'adaptive_ma', 'fractional_diff', 'cumul_delta', 'ema200_revert',
+    'channel_level_fut'];
 
   // Универсал ANTI по данным score_methods.py (invest-bot/docs/BASELINE_method_
   // verdicts_2026-07.md + свежий top-50 top-liq): методы, у которых d<0 во всех
