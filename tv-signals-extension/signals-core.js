@@ -751,11 +751,11 @@
     } return o; };
 
   // Порт стратегии channels_lab (invest-bot), OOS-подтверждённой на фьючерсах
-  // 1ч: level-fade от кластер-уровня во флэте + гейт методами расширения.
-  // train +0.092 / test +0.221 ATR/сделка (донч+твиггс согласны по направлению,
-  // liq_sweep+fractional_diff не против; сырые знаки — как в Node-мосте, которым
-  // валидировали). На акциях edge ~0 → метод для фьючерсов, включается
-  // futures-пресетом. Рассчитан на 1ч ТФ (agg=12 от 5-мин в бэктесте).
+  // 1ч: level-fade от кластер-уровня во флэте + гейт 5 методами расширения.
+  // train +0.312 / test +0.518 ATR/сделка на train/test split (донч+твиггс+
+  // клингер согласны по направлению, liq_sweep+fractional_diff не против; сырые
+  // знаки — как в Node-мосте, которым валидировали; брекет 2.0/1.0). На акциях
+  // edge ~0 → метод для фьючерсов, включается futures-пресетом. 1ч ТФ.
   M.channel_level_fut = (cd) => { const n = cd.length, o = new Array(n).fill(0);
     const N = 5, mergeAtr = 0.5, minTouches = 3;      // пивоты ±N → кластер-уровни
     const erW = 60, erMax = 0.35;                     // range-режим (ER<erMax)
@@ -798,7 +798,7 @@
       const sg = Math.sqrt(ss / W), c = slope * (W - 1) + icpt;
       return { top: c + kCh * sg, bot: c - kCh * sg }; };
     // 2) гейт-методы (сырые знаки, как Node-мост при валидации)
-    const don = M.donchian(cd), twg = M.twiggs(cd), liq = M.liq_sweep(cd), frac = M.fractional_diff(cd);
+    const don = M.donchian(cd), twg = M.twiggs(cd), kli = M.klinger(cd), liq = M.liq_sweep(cd), frac = M.fractional_diff(cd);
     for (let i = erW; i < n; i++) { const a = at[i]; if (a == null || a <= 0) continue;
       // range-режим: efficiency ratio за erW баров
       let dd = 0; for (let j = i - erW + 1; j <= i; j++) dd += Math.abs(cl[j] - cl[j - 1]);
@@ -815,9 +815,11 @@
       for (const W of [W1, W2, W3]) { const ch = regCh(i, W); if (!ch) continue;
         if (dir > 0 && b.low <= ch.bot) votes++; else if (dir < 0 && b.high >= ch.top) votes++; }
       if (votes >= maxCh + 1) continue;
-      // гейт (soft, нейтрал ок): донч+твиггс не против, liq_sweep+fractional_diff не за
+      // гейт (soft, нейтрал ок): донч+твиггс+клингер не против, liq_sweep+fractional_diff не за.
+      // klinger добавлен по split-тесту (test +0.318→+0.518, test≥train, 14/19 тикеров+).
       if ((don[i] || 0) * dir < 0) continue;
       if ((twg[i] || 0) * dir < 0) continue;
+      if ((kli[i] || 0) * dir < 0) continue;
       if ((liq[i] || 0) * dir > 0) continue;
       if ((frac[i] || 0) * dir > 0) continue;
       o[i] = dir; brk[i] = { take: 2.0, stop: 1.0 }; // R:R 2:1, оптимум TP-грида
