@@ -33,6 +33,12 @@ def main() -> None:
                     help="через запятую; пусто = все тикеры из settings бота")
     ap.add_argument("--preset", default=None,
                     help="опц. пресет методов для composite-референса")
+    ap.add_argument("--force-strategy", default=None,
+                    help="прогнать ВСЕ тикеры через эту стратегию, минуя живой "
+                         "маппинг (OICompositeStrategy/HierarchicalStrategy/"
+                         "LevelReactionStrategy/AccelFadeStrategy/NWMemoryStrategy/"
+                         "NWGlobalStrategy). Для сравнения всех стратегий на одних "
+                         "фьючерсах.")
     a = ap.parse_args()
 
     # dashboard.py читает settings.ini относительно CWD (CONFIG_FILE=
@@ -49,6 +55,16 @@ def main() -> None:
                  f"settings.ini бота (с [INVEST_API]) в папке invest-bot.")
     except Exception as e:
         sys.exit(f"[import dashboard] {type(e).__name__}: {e}")
+
+    # Форсируем стратегию для всех тикеров: override перебивает дефолт, но
+    # strategy_map(base) перебивает override — поэтому чистим и карту.
+    if a.force_strategy:
+        try:
+            dashboard._config.trading_settings.strategy_override = a.force_strategy
+            dashboard._config.futures_trading_settings.strategy_map = {}
+        except Exception as e:
+            sys.exit(f"[force] не смог выставить стратегию override: {e}")
+        print(f"[force] все тикеры → {a.force_strategy}", file=sys.stderr)
 
     tickers = None
     if a.tickers:
