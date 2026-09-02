@@ -47,9 +47,11 @@ _METHOD = "channel_level_fut"
 _ATR_PER = 14                 # как в channels_lab (atr_series(bars,14))
 _TAKE_ATR = 2.0               # дефолт брекета, если мост не вернул свой
 _STOP_ATR = 1.0
-# Буфер: методу нужно W3=200 + ER(60) + пивоты; кап — чтобы вызов моста был быстрым.
-_MIN_BUFFER_BARS = 280
-_MAX_BUFFER_BARS = 2000
+# Метод валидирован на 1ч (agg=12 от 5м). Трейдер стримит только 1/5-мин
+# (trader._imap), часового нет → агрегируем в 1ч ВНУТРИ по часам стенных
+# часов (open=первый, high=max, low=min, close=последний, volume=сумма).
+_MIN_HOURLY_BARS = 280        # методу нужно W3=200 + ER(60) + пивоты
+_MAX_RAW_BARS = 6000          # сырой 5-мин буфер (~20 торговых дней 1ч истории)
 
 
 def _candle_to_bar(c: HistoricCandle) -> dict:
@@ -75,6 +77,29 @@ def _atr_last(bars: list[dict], per: int) -> Optional[float]:
         pc = bars[k - 1]["c"]
         tr_sum += max(h - l, abs(h - pc), abs(l - pc))
     return tr_sum / per
+
+
+def _hourly(raw: list[dict]) -> list[dict]:
+    """Агрегация сырых (5-мин) баров в 1ч по стенным часам. Возвращает ТОЛЬКО
+    ЗАКРЫТЫЕ часы — последний (текущий формирующийся) час отбрасываем, чтобы не
+    торговать по недосформированной свече. Ключ часа = (год,мес,день,час) из t."""
+    if not raw:
+        return []
+    groups = []  # [(key, bar1h)]
+    cur_key = None
+    for b in raw:
+        t = b["t"]
+        key = (t.year, t.month, t.day, t.hour)
+        if key != cur_key:
+            groups.append([key, {"t": t, "o": b["o"], "h": b["h"], "l": b["l"],
+                                 "c": b["c"], "v": b["v"]}])
+            cur_key = key
+        else:
+            g = groups[-1][1]
+            g["h"] = max(g["h"], b["h"]); g["l"] = min(g["l"], b["l"])
+            g["c"] = b["c"]; g["v"] += b["v"]
+    # последний час ещё формируется → отбрасываем
+    return [g[1] for g in groups[:-1]]
 
 
 def _bridge_last(bars: list[dict]) -> tuple:
@@ -141,30 +166,33 @@ class ChannelLevelFutStrategy(IStrategy):
             return
         for c in sorted(hist, key=lambda x: x.time):
             self._append(c)
-        if len(self._bars) > _MAX_BUFFER_BARS:
-            self._bars = self._bars[-_MAX_BUFFER_BARS:]
-        logger.info("ChannelLevelFutStrategy: буфер прогрет историей — %d баров",
-                    len(self._bars))
+        if len(self._bars) > _MAX_RAW_BARS:
+            self._bars = self._bars[-_MAX_RAW_BARS:]
+        logger.info("ChannelLevelFutStrategy: буфер прогрет историей — %d баров "
+                    "(5-мин), 1ч=%d", len(self._bars), len(_hourly(self._bars)))
 
     def analyze_candles(self, candles: list[HistoricCandle]) -> Optional[Signal]:
         if not self._warmed:
             self._warmup()
         for c in candles:
             self._append(c)
-        if len(self._bars) > _MAX_BUFFER_BARS:
-            self._bars = self._bars[-_MAX_BUFFER_BARS:]
-        if len(self._bars) < _MIN_BUFFER_BARS:
+        if len(self._bars) > _MAX_RAW_BARS:
+            self._bars = self._bars[-_MAX_RAW_BARS:]
+
+        # агрегируем 5-мин → 1ч (только закрытые часы) — метод валидирован на 1ч
+        h1 = _hourly(self._bars)
+        if len(h1) < _MIN_HOURLY_BARS:
             return None
 
-        score, bracket = _bridge_last(self._bars)
+        score, bracket = _bridge_last(h1)
         if not score:
             return None
-        atr = _atr_last(self._bars, _ATR_PER)
+        atr = _atr_last(h1, _ATR_PER)
         if not atr or atr <= 0:
             return None
 
-        i = len(self._bars) - 1
-        t_now = self._bars[i]["t"]
+        i = len(h1) - 1
+        t_now = h1[i]["t"]   # время последнего ЗАКРЫТОГО часа
         if self._last_signal_t is not None and t_now <= self._last_signal_t:
             return None
 
@@ -175,7 +203,7 @@ class ChannelLevelFutStrategy(IStrategy):
 
         take_atr = float(bracket["take"]) if bracket and "take" in bracket else _TAKE_ATR
         stop_atr = float(bracket["stop"]) if bracket and "stop" in bracket else _STOP_ATR
-        entry = Decimal(str(self._bars[i]["c"]))
+        entry = Decimal(str(h1[i]["c"]))
         atr_d = Decimal(str(atr))
         take = Decimal(str(take_atr)) * atr_d
         stop = Decimal(str(stop_atr)) * atr_d
@@ -190,5 +218,5 @@ class ChannelLevelFutStrategy(IStrategy):
         signal = Signal(figi=figi, signal_type=stype,
                         take_profit_level=tp, stop_loss_level=sl)
         logger.info("ChannelLevelFut signal: %s entry=%.6f dir=%d take=%.2f stop=%.2f "
-                    "atr=%.6f", signal, self._bars[i]["c"], dir_, take_atr, stop_atr, atr)
+                    "atr=%.6f", signal, h1[i]["c"], dir_, take_atr, stop_atr, atr)
         return signal
