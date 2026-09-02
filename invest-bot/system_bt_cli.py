@@ -101,6 +101,10 @@ def main() -> None:
             print(f"  {tk:<8} {live:<24} {'мало свечей':>24}", flush=True)
             continue
         split_idx = int(len(candles) * a.split_frac)
+        # Прогресс ДО расчёта — видно, какой тикер считается прямо сейчас
+        # (медленные стратегии типа LevelReaction идут часами на тикер).
+        print(f"  … считаю {tk} ({len(candles)} свечей, тест с {split_idx})…",
+              file=sys.stderr, flush=True)
         try:
             st = dataclasses.replace(D._backtest_strategy_settings(settings), name=live)
             strat = D.StrategyFactory.new_factory(live, st)
