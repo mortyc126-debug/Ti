@@ -41,6 +41,9 @@ def main() -> None:
     ap.add_argument("--out", default=None,
                     help="CSV для инкрементальной записи (default: "
                          "data/system_bt_<strategy>.csv)")
+    ap.add_argument("--fresh", action="store_true",
+                    help="начать заново (перезаписать CSV). По умолчанию — "
+                         "докачка: уже посчитанные тикеры из CSV пропускаются.")
     a = ap.parse_args()
 
     # dashboard.py читает settings.ini относительно CWD ещё на импорте — переходим
@@ -73,18 +76,35 @@ def main() -> None:
     out_path = a.out or os.path.join("data",
                 f"system_bt_{a.force_strategy or 'live'}.csv")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    fout = open(out_path, "w", newline="", encoding="utf-8")
+
+    # Докачка: читаем уже посчитанные тикеры из CSV, пропускаем их. Прошлые
+    # строки подхватываем в rows, чтобы свод учёл и их. --fresh = начать заново.
+    done = set()
+    rows = []
+    resume = os.path.exists(out_path) and not a.fresh
+    if resume:
+        try:
+            with open(out_path, newline="", encoding="utf-8") as f:
+                for row in csv.DictReader(f):
+                    done.add(row["ticker"])
+                    if row.get("n") and int(float(row["n"])):
+                        rows.append({"strategy": row["strategy"], "n": int(float(row["n"])),
+                                     "win": float(row["win"]), "exp_atr": float(row["exp_atr"])})
+        except Exception:
+            done = set(); rows = []; resume = False
+    fout = open(out_path, "a" if resume else "w", newline="", encoding="utf-8")
     wr = csv.writer(fout)
-    wr.writerow(["ticker", "strategy", "n", "win", "exp_atr"])
-    fout.flush()
+    if not resume:
+        wr.writerow(["ticker", "strategy", "n", "win", "exp_atr"]); fout.flush()
 
     print(f"\nСИСТЕМНЫЙ OOS  days={a.days} split={a.split_frac} cost={a.cost}  "
-          f"→ пишу в {out_path}")
+          f"→ пишу в {out_path}" + (f"  (докачка: {len(done)} готово)" if done else ""))
     print(f"  {'тикер':<8} {'стратегия':<24} {'N':>6} {'win%':>6} {'exp_atr':>9}",
           flush=True)
 
-    rows = []
     for tk in names:
+        if tk in done:
+            continue  # уже посчитан в прошлом запуске (докачка)
         settings = by_ticker.get(tk)
         if settings is None:
             print(f"  {tk:<8} {'—':<24} {'нет в settings':>24}", flush=True)
