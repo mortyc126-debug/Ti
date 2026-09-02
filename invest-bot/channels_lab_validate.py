@@ -273,6 +273,20 @@ def _ctx_features(bars, i, chs, atr, vol_sma, w2, dir_):
     return out
 
 
+def _entry_price(bars, i, b, mode, n):
+    # close: вход по close бара сигнала — но его видно только на закрытии бара,
+    #        значит войти РОВНО по нему нельзя (оптимистично на величину хода
+    #        внутри следующего бара). Так считалось раньше.
+    # next_open: честный рыночный вход на ОТКРЫТИИ следующего бара — реально
+    #        исполнимо (увидел сигнал на close[i], купил по open[i+1]). На
+    #        фейде-отскоке след. бар часто уже уехал в нашу сторону → входим хуже.
+    if mode == "next_open":
+        if i + 1 >= n:
+            return None
+        return bars[i + 1]["open"]
+    return b["close"]
+
+
 def detect_level_signals(bars, ch_series, levels, atr, params):
     er_max = params["er_max"]; take = params["take"]; stop = params["stop"]
     horizon = params["horizon"]; cost = params.get("cost", 0)
@@ -315,7 +329,9 @@ def detect_level_signals(bars, ch_series, levels, atr, params):
                         micro_agree = True
         if ch_votes >= max_ch + 1:
             continue
-        entry = b["close"]
+        entry = _entry_price(bars, i, b, params.get("entry_mode", "close"), n)
+        if entry is None:
+            continue
         tp = entry + dir_ * take * a
         sl = entry - dir_ * stop * a
         pnl_gross, exit_bar, reason = _run_trade(bars, i, dir_, entry, tp, sl, horizon, a)
@@ -363,7 +379,9 @@ def detect_channel_signals(bars, ch_series, atr, params):
         dir_ = votes[0][1]
         if any(v[1] != dir_ for v in votes):
             continue
-        entry = b["close"]
+        entry = _entry_price(bars, i, b, params.get("entry_mode", "close"), n)
+        if entry is None:
+            continue
         tp = entry + dir_ * take * a
         sl = entry - dir_ * stop * a
         pnl_gross, exit_bar, reason = _run_trade(bars, i, dir_, entry, tp, sl, horizon, a)
@@ -524,7 +542,7 @@ def process_ticker(ticker, cache_dir, interval, days, params):
     p = {
         "er_max": params["er_max"], "take": params["take"], "stop": params["stop"],
         "horizon": params["horizon"], "cost": params["cost"], "max_ch": params["max_ch"],
-        "w2": W2, "vol_sma": vol_sma,
+        "w2": W2, "vol_sma": vol_sma, "entry_mode": params.get("entry_mode", "close"),
     }
     for mode in params["modes"]:
         if mode == "channel":
@@ -1120,6 +1138,12 @@ def main():
                      default=os.path.join(_HERE, "data", "channels_lab_cp.json"))
     ap.add_argument("--fresh", action="store_true")
     ap.add_argument("--out", default=None, help="CSV per-ticker per-mode")
+    ap.add_argument("--entry", default="close", choices=("close", "next_open"),
+                     help="Модель входа: close — по close бара сигнала (нельзя "
+                          "исполнить ровно, оптимистично); next_open — честный "
+                          "рыночный вход на открытии след. бара (реально "
+                          "исполнимо). Комиссия не меняется. Проверка §13 "
+                          "invest-bot: уровневый +0.35 умер под честным наливом.")
     ap.add_argument("--tp-grid", default=None,
                      help="Сравнить брекеты take/stop на ОДНОМ наборе сигналов "
                           "(детект один раз, пересимуляция дешёвая). Формат: "
@@ -1154,8 +1178,10 @@ def main():
         "ctx_contra": args.ctx_contra, "ctx_zmax": args.ctx_zmax,
         "ctx_volmax": args.ctx_volmax, "ctx_zmin": args.ctx_zmin,
         "ctx_volmin": args.ctx_volmin, "split_frac": args.split_frac,
-        "tp_grid": None,
+        "tp_grid": None, "entry_mode": args.entry,
     }
+    if args.entry != "close":
+        print(f"[entry] режим входа: {args.entry} (честный рыночный налив)", file=sys.stderr)
     if args.tp_grid:
         grid = []
         for pair in args.tp_grid.split(","):
