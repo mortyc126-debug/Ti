@@ -23,7 +23,14 @@ class BlogWorker:
         self.__messages_queue = messages_queue
         self.__tg_status = False
 
-        self.__init_tg(blog_settings.bot_token, blog_settings.chat_id)
+        # STATUS=0 в [BLOG] — мастер-выключатель: не поднимаем TG вовсе (иначе
+        # воркер спамит 'TG messages worker error' на каждую отправку, когда
+        # api.telegram.org недоступен из-за блокировки/MITM). Очередь всё равно
+        # вычитывается вхолостую — торговля не зависит от TG.
+        if blog_settings.blog_status:
+            self.__init_tg(blog_settings.bot_token, blog_settings.chat_id)
+        else:
+            logger.info("BlogWorker: TG отключён (BLOG.STATUS=0) — сообщения гасятся")
 
     def __init_tg(self, token: str, chat_id: str) -> None:
         """

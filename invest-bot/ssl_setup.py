@@ -38,9 +38,14 @@ if _ca:
 
 
 def ssl_context() -> ssl.SSLContext:
-    """Общий SSL-контекст с certifi CA (fallback на системный)."""
+    """Общий SSL-контекст. Приоритет CA: заданный пользователем SSL_CERT_FILE
+    (напр. экспорт Windows-корней с корнем антивируса/прокси, который делает
+    MITM — его нет в certifi, отсюда 'self-signed certificate in chain') →
+    certifi → системный. Без этого mega_alerts/tradestats/news, ходящие через
+    этот контекст, падали на MITM-прокси, хотя gRPC (свой CA) работал."""
     global _CTX
     if _CTX is None:
-        ca = _certifi_where()
+        env_ca = os.environ.get("SSL_CERT_FILE")
+        ca = env_ca if (env_ca and os.path.exists(env_ca)) else _certifi_where()
         _CTX = ssl.create_default_context(cafile=ca) if ca else ssl.create_default_context()
     return _CTX
