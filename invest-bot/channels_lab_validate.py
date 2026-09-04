@@ -578,12 +578,18 @@ def process_ticker(ticker, cache_dir, interval, days, params):
         else:  # level
             sigs = detect_level_signals(bars, ch_series, levels, atr, p)
         # Режим рынка на баре сигнала (regime.py classify_regime, причинно).
-        # Навешиваем рано — переживёт все фильтры до агрегации.
-        if params.get("by_regime") and sigs:
+        # Навешиваем рано — переживёт все фильтры до агрегации. Нужно и для
+        # --by-regime (разрез), и для --regime-only (фильтр).
+        regime_only = params.get("regime_only")
+        if (params.get("by_regime") or regime_only) and sigs:
             _cl = [b["close"] for b in bars]
             _vl = [b.get("volume", 0) for b in bars]
             for s in sigs:
                 s["regime"] = _regime_at(_cl, _vl, s["i"])
+        # --regime-only: торгуем ТОЛЬКО в заданном режиме. Причинно (режим на
+        # баре сигнала считается по закрытым данным), фильтр до всех прочих.
+        if regime_only and sigs:
+            sigs = [s for s in sigs if s.get("regime") == regime_only]
         # Обогащаем сигналы знаками методов расширения (если включено). Дорогой
         # вызов Node bridge — один раз на тикер, cache отсутствует (пересчёт при
         # каждом --fresh).
@@ -1288,6 +1294,14 @@ def main():
                           "самых ликвидных.")
     ap.add_argument("--only-stk", action="store_true",
                      help="Оставить только акции (не фьючерсы).")
+    ap.add_argument("--regime-only", default=None,
+                     choices=("trending_up", "trending_down", "ranging",
+                              "high_vol", "low_vol", "stress"),
+                     help="Торговать ТОЛЬКО в заданном режиме рынка (regime.py "
+                          "на баре сигнала). Операционализирует находку --by-regime: "
+                          "с --split-frac даёт честный train/test одного режима. "
+                          "Пример: --regime-only trending_down (проверить гипотезу "
+                          "«шорт отскока в даунтренде»).")
     args = ap.parse_args()
 
     modes = [m.strip() for m in args.modes.split(",") if m.strip()]
@@ -1311,11 +1325,16 @@ def main():
         "ctx_volmax": args.ctx_volmax, "ctx_zmin": args.ctx_zmin,
         "ctx_volmin": args.ctx_volmin, "split_frac": args.split_frac,
         "tp_grid": None, "entry_mode": args.entry, "ablate": args.ablate,
-        "by_regime": args.by_regime,
+        "by_regime": args.by_regime, "regime_only": args.regime_only,
     }
-    if args.by_regime and _classify_regime is None:
-        print("[regime] regime.py не импортировался — разрез по режимам отключён",
+    if (args.by_regime or args.regime_only) and _classify_regime is None:
+        print("[regime] regime.py не импортировался — режимные флаги отключены",
               file=sys.stderr)
+        params["by_regime"] = False
+        params["regime_only"] = None
+    if args.regime_only:
+        print(f"[regime] --regime-only {args.regime_only}: торгуем только в этом "
+              f"режиме", file=sys.stderr)
     if args.entry != "close":
         print(f"[entry] режим входа: {args.entry} (честный рыночный налив)", file=sys.stderr)
     if args.tp_grid:
