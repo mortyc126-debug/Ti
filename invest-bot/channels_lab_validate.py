@@ -241,6 +241,31 @@ def _run_trade(bars, i, dir_, entry, tp, sl, horizon, atr):
     return None, None, None
 
 
+# Классификатор режимов бота (regime.py). Guarded — если import упал, режимный
+# разрез просто отключается, остальной прогон работает.
+try:
+    from regime import classify_regime as _classify_regime
+except Exception:
+    _classify_regime = None
+
+_REGIME_WIN = 60  # окно баров для классификации режима (как в score_methods)
+
+
+def _regime_at(closes, vols, i):
+    # Режим на трейлинг-окне ДО и включая бар i (причинно). Возвращает строку
+    # режима или "?" если нет классификатора/мало истории.
+    if _classify_regime is None or i < 10:
+        return "?"
+    lo = max(0, i - _REGIME_WIN + 1)
+    cw = closes[lo:i + 1]
+    vw = vols[lo:i + 1] if vols else None
+    try:
+        reg, _conf = _classify_regime(cw, vw)
+        return reg
+    except Exception:
+        return "?"
+
+
 def _vol_sma(bars, per=20):
     # Скользящее среднее объёма — для оценки всплеска/затишья в точке входа.
     n = len(bars); out = [None] * n; s = 0.0
@@ -552,6 +577,13 @@ def process_ticker(ticker, cache_dir, interval, days, params):
             sigs = [s for s in lvl if s.get("confluence_channel")]
         else:  # level
             sigs = detect_level_signals(bars, ch_series, levels, atr, p)
+        # Режим рынка на баре сигнала (regime.py classify_regime, причинно).
+        # Навешиваем рано — переживёт все фильтры до агрегации.
+        if params.get("by_regime") and sigs:
+            _cl = [b["close"] for b in bars]
+            _vl = [b.get("volume", 0) for b in bars]
+            for s in sigs:
+                s["regime"] = _regime_at(_cl, _vl, s["i"])
         # Обогащаем сигналы знаками методов расширения (если включено). Дорогой
         # вызов Node bridge — один раз на тикер, cache отсутствует (пересчёт при
         # каждом --fresh).
@@ -683,6 +715,18 @@ def _aggregate_signals(sigs, mode):
         if s["pnl"] > 0:
             bq["wins"] += 1
     r["by_q"] = dict(by_q)
+
+    # Разбивка по режиму рынка (regime.py) — какой режим кормит edge, а в каком
+    # он ломается/инвертируется. Только если сигналы помечены (--by-regime).
+    if sigs and "regime" in sigs[0]:
+        by_reg = defaultdict(lambda: {"n": 0, "wins": 0, "pnl": 0.0})
+        for s in sigs:
+            br = by_reg[s.get("regime", "?")]
+            br["n"] += 1
+            br["pnl"] += s["pnl"]
+            if s["pnl"] > 0:
+                br["wins"] += 1
+        r["by_regime"] = dict(by_reg)
 
     # Разбивка по методам расширения (если сигналы обогащены знаками методов).
     # Для каждой сделки sig.dir × sig.mth[method] ∈ {-1, 0, +1}:
@@ -912,6 +956,28 @@ def print_summary(rows, modes):
                 continue
             print(f"  {q:<10} {v['n']:>7} {v['wins']/v['n']*100:>5.1f}% "
                    f"{v['pnl']/v['n']:>+7.3f} {v['pnl']:>+8.1f}")
+
+    # ═══ По режиму рынка ═══
+    # В каком режиме сетап кормит edge, а в каком ломается/инвертируется.
+    has_reg = any(r.get(m, {}).get("by_regime") for r in rows for m in modes)
+    if has_reg:
+        print("\n═══ ПО РЕЖИМУ РЫНКА (regime.py, все тикеры) ═══")
+        for mode in modes:
+            reg_g = defaultdict(lambda: {"n": 0, "wins": 0, "pnl": 0.0})
+            for r in rows:
+                for rg, v in r.get(mode, {}).get("by_regime", {}).items():
+                    g = reg_g[rg]
+                    g["n"] += v["n"]; g["wins"] += v["wins"]; g["pnl"] += v["pnl"]
+            if not reg_g:
+                continue
+            print(f"\n{mode}:")
+            print(f"  {'режим':<14} {'n':>7} {'win%':>6} {'exp':>7} {'sum':>8}")
+            for rg in sorted(reg_g, key=lambda k: reg_g[k]["pnl"] / (reg_g[k]["n"] or 1), reverse=True):
+                v = reg_g[rg]
+                if not v["n"]:
+                    continue
+                print(f"  {rg:<14} {v['n']:>7} {v['wins']/v['n']*100:>5.1f}% "
+                       f"{v['pnl']/v['n']:>+7.3f} {v['pnl']:>+8.1f}")
 
     # ═══ Контекст (пакет A): наклон / позиция / ширина / объём ═══
     # Разрез exp по контекстным осям — ищем где fade реально работает: во флэте
@@ -1199,6 +1265,11 @@ def main():
                           "рыночный вход на открытии след. бара (реально "
                           "исполнимо). Комиссия не меняется. Проверка §13 "
                           "invest-bot: уровневый +0.35 умер под честным наливом.")
+    ap.add_argument("--by-regime", action="store_true",
+                     help="Разрез exp по режиму рынка (regime.py classify_regime "
+                          "на баре сигнала): trending_up/down, ranging, high_vol, "
+                          "low_vol, stress. Видно, в каком режиме сетап работает, "
+                          "а в каком ломается/инвертируется.")
     ap.add_argument("--ablate", action="store_true",
                      help="Ablation гейта: прогнать базу (полный фильтр), каждый "
                           "вариант «минус один метод» и «без фильтра» на ОДНОМ "
@@ -1240,7 +1311,11 @@ def main():
         "ctx_volmax": args.ctx_volmax, "ctx_zmin": args.ctx_zmin,
         "ctx_volmin": args.ctx_volmin, "split_frac": args.split_frac,
         "tp_grid": None, "entry_mode": args.entry, "ablate": args.ablate,
+        "by_regime": args.by_regime,
     }
+    if args.by_regime and _classify_regime is None:
+        print("[regime] regime.py не импортировался — разрез по режимам отключён",
+              file=sys.stderr)
     if args.entry != "close":
         print(f"[entry] режим входа: {args.entry} (честный рыночный налив)", file=sys.stderr)
     if args.tp_grid:
