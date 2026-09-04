@@ -574,8 +574,10 @@ def process_ticker(ticker, cache_dir, interval, days, params):
                                  params.get("ctx_zmin"), params.get("ctx_volmin"))
         fa = params.get("filter_agree") or []
         fd = params.get("filter_disagree") or []
+        strict = params.get("strict_filter", False)
+        base = sigs  # сигналы ДО method-фильтра (для ablation) — уже с mth и ctx
         if fa or fd:
-            sigs = _apply_method_filter(sigs, fa, fd, strict=params.get("strict_filter", False))
+            sigs = _apply_method_filter(sigs, fa, fd, strict=strict)
         magg = _aggregate_signals(sigs, mode)
         # Train/test split по времени: сделки первой доли истории (train) vs
         # хвост (test). Честная проверка: фильтр выбираем глядя только в train,
@@ -604,6 +606,25 @@ def process_ticker(ticker, cache_dir, interval, days, params):
                     cell["test"] = _aggregate_signals([s for s in gs if s["i"] >= cut], mode)
                 grid["%g/%g" % (T, S)] = cell
             magg["tp_grid"] = grid
+        # Ablation (leave-one-out): из набора ДО фильтра прогоняем базу и каждый
+        # вариант «минус один метод гейта» + «без фильтра». Видно, какой метод
+        # реально добавляет exp, а какой лишь режет частоту впустую.
+        if params.get("ablate") and (fa or fd):
+            variants = [("ВСЕ (полный гейт)", fa, fd), ("БЕЗ гейта", [], [])]
+            for m in fa:
+                variants.append(("−%s (agree)" % m, [x for x in fa if x != m], fd))
+            for m in fd:
+                variants.append(("−%s (disagree)" % m, fa, [x for x in fd if x != m]))
+            abl = {}
+            for label, a, d in variants:
+                vs = _apply_method_filter(base, a, d, strict=strict) if (a or d) else base
+                cell = {"all": _aggregate_signals(vs, mode)}
+                if frac and 0 < frac < 1:
+                    cut = int(n * frac)
+                    cell["train"] = _aggregate_signals([s for s in vs if s["i"] < cut], mode)
+                    cell["test"] = _aggregate_signals([s for s in vs if s["i"] >= cut], mode)
+                abl[label] = cell
+            magg["ablate"] = abl
         out[mode] = magg
     return out
 
@@ -985,6 +1006,40 @@ def print_summary(rows, modes):
                     return f"{x['pnl_sum']/x['n']:+.3f}" if x and x.get("n") else "   —  "
                 print(f"  {key:>18} {sa['n']:>7} {_e(sa):>9} {_e(st):>10} {_e(se):>9}")
 
+    # ═══ Ablation гейта ═══
+    # База vs «минус один метод» vs «без гейта». Метод-балласт: убрали его —
+    # n вырос, а test-exp почти не упал (или вырос). Метод-несущий: убрали —
+    # test-exp просел. Идеал для частоты: выкинуть балласт, поднять число сделок.
+    has_abl = any(r.get(m, {}).get("ablate") for r in rows for m in modes)
+    if has_abl:
+        print("\n═══ ABLATION ГЕЙТА (все тикеры) ═══")
+        print("  База vs минус-один-метод. Балласт = убрали → n↑, test-exp ≈ или ↑.")
+        for mode in modes:
+            labels = None
+            for r in rows:
+                a = r.get(mode, {}).get("ablate")
+                if a:
+                    labels = list(a.keys()); break
+            if not labels:
+                continue
+            print(f"\n{mode}:  {'вариант':<22} {'n':>6} {'all exp':>9} {'train':>8} {'test':>8}")
+            for lb in labels:
+                acc = {"all": [], "train": [], "test": []}
+                for r in rows:
+                    a = r.get(mode, {}).get("ablate")
+                    if not a or lb not in a:
+                        continue
+                    for part in ("all", "train", "test"):
+                        c = a[lb].get(part)
+                        if c and c.get("n"):
+                            acc[part].append(c)
+                sa = _sum_aggs(acc["all"]); st = _sum_aggs(acc["train"]); se = _sum_aggs(acc["test"])
+                if not sa:
+                    continue
+                def _e(x):
+                    return f"{x['pnl_sum']/x['n']:+.3f}" if x and x.get("n") else "   —  "
+                print(f"  {lb:<22} {sa.get('n', 0):>6} {_e(sa):>9} {_e(st):>8} {_e(se):>8}")
+
     # ═══ Confluence с методами расширения ═══
     # Для каждого метода: exp сделок channels_lab когда метод СОГЛАСЕН по
     # направлению vs когда ПРОТИВ. Ищем "разделяющие" методы — те, где
@@ -1144,6 +1199,12 @@ def main():
                           "рыночный вход на открытии след. бара (реально "
                           "исполнимо). Комиссия не меняется. Проверка §13 "
                           "invest-bot: уровневый +0.35 умер под честным наливом.")
+    ap.add_argument("--ablate", action="store_true",
+                     help="Ablation гейта: прогнать базу (полный фильтр), каждый "
+                          "вариант «минус один метод» и «без фильтра» на ОДНОМ "
+                          "наборе сигналов. Видно, какой метод добавляет exp, а "
+                          "какой лишь режет частоту. Требует --filter-*. Судить "
+                          "по test-exp И по n (частоте).")
     ap.add_argument("--tp-grid", default=None,
                      help="Сравнить брекеты take/stop на ОДНОМ наборе сигналов "
                           "(детект один раз, пересимуляция дешёвая). Формат: "
@@ -1178,7 +1239,7 @@ def main():
         "ctx_contra": args.ctx_contra, "ctx_zmax": args.ctx_zmax,
         "ctx_volmax": args.ctx_volmax, "ctx_zmin": args.ctx_zmin,
         "ctx_volmin": args.ctx_volmin, "split_frac": args.split_frac,
-        "tp_grid": None, "entry_mode": args.entry,
+        "tp_grid": None, "entry_mode": args.entry, "ablate": args.ablate,
     }
     if args.entry != "close":
         print(f"[entry] режим входа: {args.entry} (честный рыночный налив)", file=sys.stderr)
