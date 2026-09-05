@@ -76,53 +76,79 @@ def _run_ticker(job: dict) -> tuple:
     atr = sm._atr_sma(highs, lows, job["n_atr"])
 
     methods = [(n, fn) for n, fn in sm._WORKER_METHODS if n in job["methods"]]
+    per_method = job.get("per_method", False)
+    entry_mode = job.get("entry", "next_open")
     n = len(candles)
-    # позиции: нужен вход по open[i+1] и выход по close[i+k] → i+K ≤ n-1
+    # позиции: нужен вход и выход по close[i+k] → i+K ≤ n-1 (для next_open ещё i+1)
     positions = range(W, n - K - 1, S)
     split_i = int(n * FRAC)   # бары до split_i — train, после — test
 
-    # аккумуляторы: (n_trades, sum_ret, wins)
-    acc = {"train": [0, 0.0, 0], "test": [0, 0.0, 0], "all": [0, 0.0, 0]}
+    # M[key] = {"train":[n,sum,wins], "test":[...], "all":[...]}; key = имя метода
+    # (в per-method режиме) или "ENS" (ансамблевый голос).
+    def _blank():
+        return {"train": [0, 0.0, 0], "test": [0, 0.0, 0], "all": [0, 0.0, 0]}
+    M = {}
+
+    def _record(key, dirn, i, a):
+        if entry_mode == "close":
+            entry = closes[i]           # «нечестно»: вход по close сигнального бара
+        else:
+            entry = opens[i + 1]        # честно: вход рынком на след. баре
+        ret = dirn * (closes[i + K] - entry) / a - COST
+        acc = M.setdefault(key, _blank())
+        bucket = "train" if i < split_i else "test"
+        for b in (bucket, "all"):
+            acc[b][0] += 1; acc[b][1] += ret; acc[b][2] += (1 if ret > 0 else 0)
+
     for i in positions:
         a = atr[i]
         if np.isnan(a) or a <= 0:
             continue
-        votes = 0
-        for _name, fn in methods:
-            try:
-                sc = fn(candles[i - W:i + 1])
-            except Exception:
-                continue
-            if sc is None:
-                continue
-            if sc >= AGREE:
-                votes += 1
-            elif sc <= -AGREE:
-                votes -= 1
-        if abs(votes) < MINV:
-            continue
-        dirn = 1 if votes > 0 else -1
-        entry = opens[i + 1]        # честно: вход рынком на след. баре
-        exitp = closes[i + K]
-        ret = dirn * (exitp - entry) / a - COST
-        win = 1 if ret > 0 else 0
-        bucket = "train" if i < split_i else "test"
-        for b in (bucket, "all"):
-            acc[b][0] += 1; acc[b][1] += ret; acc[b][2] += win
+        if per_method:
+            # каждый метод — своя направленная сделка
+            for name, fn in methods:
+                try:
+                    sc = fn(candles[i - W:i + 1])
+                except Exception:
+                    continue
+                if sc is None:
+                    continue
+                if sc >= AGREE:
+                    _record(name, 1, i, a)
+                elif sc <= -AGREE:
+                    _record(name, -1, i, a)
+        else:
+            votes = 0
+            for _name, fn in methods:
+                try:
+                    sc = fn(candles[i - W:i + 1])
+                except Exception:
+                    continue
+                if sc is None:
+                    continue
+                if sc >= AGREE:
+                    votes += 1
+                elif sc <= -AGREE:
+                    votes -= 1
+            if abs(votes) >= MINV:
+                _record("ENS", 1 if votes > 0 else -1, i, a)
 
-    if acc["all"][0] == 0:
+    if not M:
         return ticker, None
-    rec = {"liq": liq, "vol": vol, "is_fut": _is_future(ticker),
-           "train": tuple(acc["train"]), "test": tuple(acc["test"]),
-           "all": tuple(acc["all"])}
+    # tuple-ify для пикла
+    M = {k: {b: tuple(v) for b, v in d.items()} for k, d in M.items()}
+    rec = {"liq": liq, "vol": vol, "is_fut": _is_future(ticker), "M": M}
     return ticker, rec
 
 
-def _agg(recs, key):
-    """Пул по списку rec: суммарные n, exp (sum/n), win%."""
-    n = sum(r[key][0] for r in recs)
-    s = sum(r[key][1] for r in recs)
-    w = sum(r[key][2] for r in recs)
+def _agg(recs, mkey, split):
+    """Пул по списку rec для метода mkey и сплита split: n, exp (sum/n), win%."""
+    n = s = w = 0
+    for r in recs:
+        d = r["M"].get(mkey)
+        if not d:
+            continue
+        n += d[split][0]; s += d[split][1]; w += d[split][2]
     if n == 0:
         return (0, None, None)
     return (n, s / n, w / n)
@@ -159,6 +185,12 @@ def main():
     ap.add_argument("--only-fut", action="store_true")
     ap.add_argument("--workers", type=int, default=None)
     ap.add_argument("--out", default=None, help="CSV per-ticker")
+    ap.add_argument("--per-method", action="store_true",
+                     help="вместо ансамбля — каждый метод соло (диагностика: "
+                          "какой держит честный вход)")
+    ap.add_argument("--entry", default="next_open", choices=("next_open", "close"),
+                     help="next_open=честно (рынком на след. баре); close=«нечестно» "
+                          "(по close сигнала) — измерить, сколько альфы съедает gap")
     args = ap.parse_args()
 
     ens = ([m.strip() for m in args.methods.split(",") if m.strip()]
@@ -182,8 +214,9 @@ def main():
     if not tickers:
         sys.exit("нет тикеров после фильтров")
 
+    mode = "per-method" if args.per_method else f"ансамбль(min_votes={args.min_votes})"
     print(f"[ens] методы: {ens}", file=sys.stderr)
-    print(f"[ens] тикеров: {len(tickers)}  min_votes={args.min_votes}  "
+    print(f"[ens] тикеров: {len(tickers)}  режим={mode}  entry={args.entry}  "
           f"cost={args.cost}  split={args.split_frac}  k={args.k}", file=sys.stderr)
 
     jobs = [{"ticker": t, "cache_dir": args.cache, "interval": args.interval,
@@ -191,7 +224,8 @@ def main():
              "stride": args.stride, "k": args.k, "n_atr": args.n_atr,
              "agree_min": args.agree_min, "min_votes": args.min_votes,
              "cost": args.cost, "split_frac": args.split_frac,
-             "methods": ens_set} for t in tickers]
+             "methods": ens_set, "per_method": args.per_method,
+             "entry": args.entry} for t in tickers]
 
     n_wk = args.workers or max(1, (mp.cpu_count() or 2) - 1)
     recs = {}
@@ -218,41 +252,55 @@ def main():
         sys.exit("нет ни одной сделки на всём наборе")
 
     rl = list(recs.values())
-    print(f"\n=== АНСАМБЛЬ {ens} ===")
-    print(f"тикеров со сделками: {len(rl)}  ({sum(r['is_fut'] for r in rl)} фью)")
-    print(f"TRAIN : {_fmt(_agg(rl, 'train'))}")
-    print(f"TEST  : {_fmt(_agg(rl, 'test'))}   ← судим по нему")
-    print(f"ALL   : {_fmt(_agg(rl, 'all'))}")
-    n_all = _agg(rl, "all")[0]
-    print(f"частота: {n_all/max(len(rl),1):.1f} сделок/тикер за период")
+    print(f"\n=== вход={args.entry}  тикеров со сделками: {len(rl)} "
+          f"({sum(r['is_fut'] for r in rl)} фью) ===")
 
-    # Разрез TEST по терцилям ликвидности тикера (бот торгует верхнюю треть).
-    liq_recs = [r for r in rl if r["liq"] is not None and r["test"][0] > 0]
-    if len(liq_recs) >= 6:
-        liq_recs.sort(key=lambda r: r["liq"])
-        t = len(liq_recs) // 3
-        lo, mid, hi = liq_recs[:t], liq_recs[t:2 * t], liq_recs[2 * t:]
-        print("\n=== TEST по ликвидности тикера (терцили) ===")
-        print(f"низкая  : {_fmt(_agg(lo, 'test'))}")
-        print(f"средняя : {_fmt(_agg(mid, 'test'))}")
-        print(f"ВЫСОКАЯ : {_fmt(_agg(hi, 'test'))}   ← где бот реально стоит")
+    if args.per_method:
+        # каждый метод соло: train/test exp/win. Сортировка по test-exp.
+        keys = sorted({k for r in rl for k in r["M"].keys()})
+        print(f"{'метод':<20} {'TRAIN':>28}   {'TEST (судим)':>28}")
+        rows = []
+        for k in keys:
+            tr = _agg(rl, k, "train"); te = _agg(rl, k, "test")
+            rows.append((te[1] if te[1] is not None else -9, k, tr, te))
+        for _s, k, tr, te in sorted(rows, reverse=True):
+            print(f"{k:<20} {_fmt(tr):>28}   {_fmt(te):>28}")
+    else:
+        print(f"АНСАМБЛЬ {ens}")
+        print(f"TRAIN : {_fmt(_agg(rl, 'ENS', 'train'))}")
+        print(f"TEST  : {_fmt(_agg(rl, 'ENS', 'test'))}   ← судим по нему")
+        print(f"ALL   : {_fmt(_agg(rl, 'ENS', 'all'))}")
+        n_all = _agg(rl, "ENS", "all")[0]
+        print(f"частота: {n_all/max(len(rl),1):.1f} сделок/тикер за период")
+        # Разрез TEST по терцилям ликвидности (бот торгует верхнюю треть).
+        liq_recs = [r for r in rl if r["liq"] is not None
+                    and r["M"].get("ENS", {}).get("test", (0,))[0] > 0]
+        if len(liq_recs) >= 6:
+            liq_recs.sort(key=lambda r: r["liq"])
+            t = len(liq_recs) // 3
+            lo, mid, hi = liq_recs[:t], liq_recs[t:2 * t], liq_recs[2 * t:]
+            print("\n=== TEST по ликвидности тикера (терцили) ===")
+            print(f"низкая  : {_fmt(_agg(lo, 'ENS', 'test'))}")
+            print(f"средняя : {_fmt(_agg(mid, 'ENS', 'test'))}")
+            print(f"ВЫСОКАЯ : {_fmt(_agg(hi, 'ENS', 'test'))}   ← где бот реально стоит")
 
     if args.out:
         os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
         with open(args.out, "w", newline="", encoding="utf-8") as f:
             wr = csv.writer(f)
-            wr.writerow(["ticker", "is_fut", "liq_mln", "vol_pct",
+            wr.writerow(["ticker", "method", "is_fut", "liq_mln", "vol_pct",
                          "test_n", "test_exp", "test_win",
                          "all_n", "all_exp", "all_win"])
             for tk, r in sorted(recs.items()):
-                tn, ts, tw = r["test"]; an, as_, aw = r["all"]
-                wr.writerow([tk, int(r["is_fut"]),
-                             f"{r['liq']:.2f}" if r['liq'] else "",
-                             f"{r['vol']:.3f}" if r['vol'] else "",
-                             tn, f"{ts/tn:+.4f}" if tn else "",
-                             f"{tw/tn:.4f}" if tn else "",
-                             an, f"{as_/an:+.4f}" if an else "",
-                             f"{aw/an:.4f}" if an else ""])
+                for mk, d in sorted(r["M"].items()):
+                    tn, ts, tw = d["test"]; an, as_, aw = d["all"]
+                    wr.writerow([tk, mk, int(r["is_fut"]),
+                                 f"{r['liq']:.2f}" if r['liq'] else "",
+                                 f"{r['vol']:.3f}" if r['vol'] else "",
+                                 tn, f"{ts/tn:+.4f}" if tn else "",
+                                 f"{tw/tn:.4f}" if tn else "",
+                                 an, f"{as_/an:+.4f}" if an else "",
+                                 f"{aw/an:.4f}" if an else ""])
         print(f"\n[out] {args.out}", file=sys.stderr)
 
 
