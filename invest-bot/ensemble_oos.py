@@ -126,6 +126,9 @@ def _run_ticker(job: dict) -> tuple:
             acc = d.setdefault(b, [0, 0.0, 0])
             acc[0] += 1; acc[1] += ret; acc[2] += (1 if ret > 0 else 0)
 
+    market_neutral = job.get("market_neutral", False)
+    mn = []   # market-neutral: [(ym, dir, raw_ret_pct)] честный вход, fixed-K
+
     def _record(base, dirn, i, a):
         entry = _entry_price(i)
         if brackets:
@@ -135,6 +138,14 @@ def _run_ticker(job: dict) -> tuple:
         else:
             r = dirn * (closes[i + K] - entry) / a - COST
             _push(base, r, i)
+        if market_neutral:
+            # цена входа/выхода в %: доходность, сравнимая между тикерами; месяц
+            # входа для кросс-секционной демеанизации (снятие макро-прилива)
+            ep = closes[i] if entry_mode == "close" else opens[i + 1]
+            if ep > 0:
+                raw = (closes[i + K] - ep) / ep
+                ym = rows[i + 1]["time"][:7]
+                mn.append((ym, dirn, raw))
 
     for i in positions:
         a = atr[i]
@@ -174,6 +185,8 @@ def _run_ticker(job: dict) -> tuple:
     # tuple-ify для пикла
     M = {k: {b: tuple(v) for b, v in d.items()} for k, d in M.items()}
     rec = {"liq": liq, "vol": vol, "is_fut": _is_future(ticker), "M": M}
+    if market_neutral:
+        rec["mn"] = mn
     return ticker, rec
 
 
@@ -240,6 +253,10 @@ def main():
                      help="N последовательных окон вместо train/test: печатает exp "
                           "по каждому окну. Плюс на БОЛЬШИНСТВЕ окон = робастно; "
                           "плюс на одном = мираж (тест устойчивости во времени).")
+    ap.add_argument("--market-neutral", action="store_true",
+                     help="Снять макро-прилив: abnormal = доходность − кросс-секц. "
+                          "средняя по всем тикерам за тот же месяц. Печатает raw vs "
+                          "neutral по годам (ансамбль, honest вход, fixed-k).")
     args = ap.parse_args()
 
     brackets = []
@@ -286,7 +303,8 @@ def main():
              "cost": args.cost, "split_frac": args.split_frac,
              "methods": ens_set, "per_method": args.per_method,
              "entry": args.entry, "brackets": brackets,
-             "horizon": args.horizon, "folds": args.folds} for t in tickers]
+             "horizon": args.horizon, "folds": args.folds,
+             "market_neutral": args.market_neutral} for t in tickers]
 
     n_wk = args.workers or max(1, (mp.cpu_count() or 2) - 1)
     recs = {}
@@ -315,6 +333,43 @@ def main():
     rl = list(recs.values())
     print(f"\n=== вход={args.entry}  тикеров со сделками: {len(rl)} "
           f"({sum(r['is_fut'] for r in rl)} фью) ===")
+
+    if args.market_neutral:
+        # Все сделки: (ym, dir, raw_ret). Рыночный ход месяца = средняя raw_ret
+        # по ВСЕМ сделкам этого месяца (кросс-секц.). abnormal = raw − market.
+        allt = [t for r in rl for t in r.get("mn", [])]
+        if not allt:
+            sys.exit("market-neutral: нет сделок")
+        mkt = {}
+        for ym, _d, ret in allt:
+            mkt.setdefault(ym, []).append(ret)
+        mkt_mean = {ym: (sum(v) / len(v)) for ym, v in mkt.items()}
+        # агрегируем по ГОДУ: raw-signed vs neutral-signed (gross, %)
+        by_year = {}
+        for ym, d, ret in allt:
+            yr = ym[:4]
+            a = by_year.setdefault(yr, {"n": 0, "rs": 0.0, "rw": 0, "ns": 0.0, "nw": 0})
+            rs = d * ret                       # raw signed
+            ns = d * (ret - mkt_mean[ym])      # neutral signed (макро снят)
+            a["n"] += 1
+            a["rs"] += rs; a["rw"] += 1 if rs > 0 else 0
+            a["ns"] += ns; a["nw"] += 1 if ns > 0 else 0
+        print(f"\n=== MARKET-NEUTRAL (ансамбль {DEFAULT_ENSEMBLE if not args.methods else ens}, "
+              f"k={args.k}, gross %) ===")
+        print(f"{'год':<6}{'n':>7}{'RAW hit':>9}{'RAW ср%':>9}{'NEU hit':>9}{'NEU ср%':>9}")
+        tot = {"n": 0, "rs": 0.0, "rw": 0, "ns": 0.0, "nw": 0}
+        for yr in sorted(by_year):
+            a = by_year[yr]
+            for kk in tot: tot[kk] += a[kk]
+            print(f"{yr:<6}{a['n']:>7}{a['rw']/a['n']*100:>8.1f}%{a['rs']/a['n']*100:>+9.3f}"
+                  f"{a['nw']/a['n']*100:>8.1f}%{a['ns']/a['n']*100:>+9.3f}")
+        N = tot["n"]
+        print(f"{'ВСЕГО':<6}{N:>7}{tot['rw']/N*100:>8.1f}%{tot['rs']/N*100:>+9.3f}"
+              f"{tot['nw']/N*100:>8.1f}%{tot['ns']/N*100:>+9.3f}")
+        print("\nчитать: RAW ≈ то, что ловит макро; NEU — чистый фундаментальный "
+              "спред. Если NEU hit>52% и ср%>0 УСТОЙЧИВО по годам, а RAW скачет — "
+              "макро маскировал сигнал (гипотеза подтверждена). cost не вычтен (gross).")
+        return
 
     keys = sorted({k for r in rl for k in r["M"].keys()})
 
