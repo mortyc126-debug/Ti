@@ -37,6 +37,23 @@ import score_methods as sm
 
 _FUT_RE = re.compile(r"^[A-Z]{1,4}[FGHJKMNQUVXZ]\d$")
 
+# Секторы ликвидных РФ-акций — пары ищем ТОЛЬКО внутри сектора (экономическая
+# связь), иначе ловится ложная коинтеграция (SMLT/VKCO co-moved случайно).
+_SECTOR = {}
+for _sec, _names in {
+    "oil_gas": "LKOH ROSN TATN TATNP SNGS SNGSP NVTK GAZP BANE BANEP RNFT",
+    "banks_fin": "SBER SBERP VTBR TCSG T CBOM BSPB MOEX SVCB RENI SPBE",
+    "metals": "GMKN NLMK MAGN CHMF RUAL MTLR MTLRP ALRS PLZL POLY SELG VSMO ENPG",
+    "retail_ecom": "MGNT FIVE X5 LENT MVID FIXP OZON BELU BSPB",
+    "tech_telecom": "MTSS RTKM YDEX VKCO HHRU POSI ASTR SOFL DIAS",
+    "power": "HYDR IRAO FEES UPRO MSNG OGKB TGKA MRKC LSNG ELFV",
+    "realestate": "PIKK SMLT LSRG ETLN",
+    "transport": "AFLT FLOT NMTP FESH",
+    "chem_agri": "PHOR AKRN KAZT AGRO",
+}.items():
+    for _t in _names.split():
+        _SECTOR[_t] = _sec
+
 
 def _is_future(t):
     return bool(_FUT_RE.match(t.upper()))
@@ -98,6 +115,9 @@ def main():
     ap.add_argument("--z-exit", type=float, default=0.5)
     ap.add_argument("--z-stop", type=float, default=4.0)
     ap.add_argument("--cost", type=float, default=0.0005, help="кост ОДНОЙ ноги в одну сторону")
+    ap.add_argument("--cross-sector", action="store_true",
+                     help="разрешить пары из РАЗНЫХ секторов (по умолчанию только "
+                          "внутри сектора — убирает ложную коинтеграцию)")
     ap.add_argument("--workers", type=int, default=None)
     args = ap.parse_args()
 
@@ -131,6 +151,10 @@ def main():
     for i in range(len(names)):
         for j in range(i + 1, len(names)):
             A, B = names[i], names[j]
+            if not args.cross_sector:
+                sa, sb = _SECTOR.get(A), _SECTOR.get(B)
+                if sa is None or sb is None or sa != sb:
+                    continue   # только внутрисекторные пары (экономическая связь)
             common = sorted(set(series[A]) & set(series[B]))
             if len(common) < args.min_days:
                 continue
