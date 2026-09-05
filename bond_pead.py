@@ -51,8 +51,9 @@ for _s in (sys.stdout, sys.stderr):
 
 DEFAULT_BASE = "https://bondan-backend.marginacall.workers.dev"
 ENTRY_WIN = 10   # дней на поиск торгового дня у даты события
-_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-       "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+# короткий UA: длинный Chrome-UA воркер отдавал пустой data (проверено ручным
+# curl — short works, long → count:0). "Mozilla/5.0" достаточно, чтобы не 403.
+_UA = "Mozilla/5.0"
 # curl.exe (Win10+/*nix) идёт через системный прокси+сертификаты КАК браузер.
 # urllib на этой машине виснет на крупных телах (антивирус-прокси сканирует TLS),
 # а curl — нет. Поэтому качаем через curl, urllib оставлен фолбэком.
