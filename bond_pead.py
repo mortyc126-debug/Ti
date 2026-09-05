@@ -64,9 +64,16 @@ def _get(base, path, cache_dir, ttl_days=30):
             except Exception:
                 pass
     url = base.rstrip("/") + path
+    headers = {
+        "Accept": "application/json, */*;q=0.1",
+        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
+        # дефолтный Python-urllib UA воркер/Cloudflare отбивает 403 — притворяемся браузером
+        "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                       "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"),
+    }
     for attempt in range(3):
         try:
-            req = urllib.request.Request(url, headers={"Accept": "application/json"})
+            req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=30) as r:
                 data = json.loads(r.read().decode("utf-8"))
             with open(cpath, "w", encoding="utf-8") as f:
