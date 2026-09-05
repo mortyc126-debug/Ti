@@ -38,6 +38,8 @@ import os
 import statistics
 import sys
 import time
+import shutil
+import subprocess
 import urllib.request
 from datetime import date, datetime, timedelta
 
@@ -49,10 +51,30 @@ for _s in (sys.stdout, sys.stderr):
 
 DEFAULT_BASE = "https://bondan-backend.marginacall.workers.dev"
 ENTRY_WIN = 10   # дней на поиск торгового дня у даты события
+_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+       "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+# curl.exe (Win10+/*nix) идёт через системный прокси+сертификаты КАК браузер.
+# urllib на этой машине виснет на крупных телах (антивирус-прокси сканирует TLS),
+# а curl — нет. Поэтому качаем через curl, urllib оставлен фолбэком.
+_CURL = shutil.which("curl") or shutil.which("curl.exe")
 
 
-def _get(base, path, cache_dir, ttl_days=30, timeout=30):
-    """GET c дисковым кэшем. Возвращает распарсенный JSON или None."""
+def _fetch_raw(url, timeout):
+    if _CURL:
+        p = subprocess.run(
+            [_CURL, "-s", "-S", "-m", str(timeout), "-A", _UA,
+             "-H", "Accept: application/json", url],
+            capture_output=True, timeout=timeout + 15)
+        if p.returncode != 0:
+            raise RuntimeError(f"curl rc={p.returncode}: {(p.stderr or b'')[:150].decode('utf-8','replace')}")
+        return p.stdout.decode("utf-8")
+    req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": _UA})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode("utf-8")
+
+
+def _get(base, path, cache_dir, ttl_days=30, timeout=60):
+    """GET c дисковым кэшем (через curl.exe). Возвращает распарсенный JSON или None."""
     safe = path.replace("/", "_").replace("?", "_").replace("&", "_").replace("=", "_")
     cpath = os.path.join(cache_dir, safe + ".json")
     if os.path.exists(cpath):
@@ -64,18 +86,9 @@ def _get(base, path, cache_dir, ttl_days=30, timeout=30):
             except Exception:
                 pass
     url = base.rstrip("/") + path
-    headers = {
-        "Accept": "application/json, */*;q=0.1",
-        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
-        # дефолтный Python-urllib UA воркер/Cloudflare отбивает 403 — притворяемся браузером
-        "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                       "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"),
-    }
     for attempt in range(3):
         try:
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                data = json.loads(r.read().decode("utf-8"))
+            data = json.loads(_fetch_raw(url, timeout))
             with open(cpath, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False)
             return data
