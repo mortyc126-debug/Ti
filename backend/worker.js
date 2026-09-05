@@ -90,6 +90,7 @@ export default {
       if(url.pathname === '/catalog')         return await handleCatalog(env);
       if(url.pathname === '/reports/latest')  return await handleReportsLatest(env, url);
       if(url.pathname === '/analysis/credit_pead') return await handleCreditPead(env, url);
+      if(url.pathname === '/admin/reindex')   return jsonResp(await handleReindex(env));
       if(url.pathname === '/issuers/report_years') return await handleIssuerReportYears(env, url);
       if(url.pathname === '/diag/dadata')     return await handleDiagDadata(env, url);
       if(url.pathname === '/diag/girbo')      return await handleDiagGirbo(env, url);
@@ -114,7 +115,6 @@ export default {
         if(url.pathname === '/collect/reports')      return jsonResp(await collectReports(env, url));
         if(url.pathname === '/collect/affiliations') return jsonResp(await collectAffiliations(env, url));
         if(url.pathname === '/ai/extract')       return await handleAiExtract(env, req);
-        if(url.pathname === '/admin/reindex')    return jsonResp(await handleReindex(env));
       }
 
       return errResp(
