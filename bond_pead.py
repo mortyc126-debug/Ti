@@ -62,7 +62,7 @@ _CURL = shutil.which("curl") or shutil.which("curl.exe")
 def _fetch_raw(url, timeout):
     if _CURL:
         p = subprocess.run(
-            [_CURL, "-s", "-S", "-m", str(timeout), "-A", _UA,
+            [_CURL, "-s", "-S", "--compressed", "-m", str(timeout), "-A", _UA,
              "-H", "Accept: application/json", url],
             capture_output=True, timeout=timeout + 15)
         if p.returncode != 0:
