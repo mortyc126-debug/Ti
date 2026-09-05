@@ -73,8 +73,11 @@ def _fetch_raw(url, timeout):
         return r.read().decode("utf-8")
 
 
-def _get(base, path, cache_dir, ttl_days=30, timeout=60):
-    """GET c дисковым кэшем (через curl.exe). Возвращает распарсенный JSON или None."""
+def _get(base, path, cache_dir, ttl_days=30, timeout=60, nonempty=None, tries=4):
+    """GET c дисковым кэшем (через curl.exe). Возвращает распарсенный JSON или None.
+    nonempty: имя ключа, чей пустой список/словарь трактуется как transient-ошибка
+    воркера (handleIssuer* при таймауте D1 молча отдаёт count:0) → повтор, НЕ
+    кэшируем. Пустой кэш не переиспользуем."""
     safe = path.replace("/", "_").replace("?", "_").replace("&", "_").replace("=", "_")
     cpath = os.path.join(cache_dir, safe + ".json")
     if os.path.exists(cpath):
@@ -82,21 +85,25 @@ def _get(base, path, cache_dir, ttl_days=30, timeout=60):
         if age < ttl_days * 86400:
             try:
                 with open(cpath, encoding="utf-8") as f:
-                    return json.load(f)
+                    cached = json.load(f)
+                if not nonempty or cached.get(nonempty):
+                    return cached   # непустой кэш ок; пустой — перезапросим
             except Exception:
                 pass
     url = base.rstrip("/") + path
-    for attempt in range(3):
+    for attempt in range(tries):
         try:
             data = json.loads(_fetch_raw(url, timeout))
+            if nonempty and not data.get(nonempty):
+                raise RuntimeError(f"пустой {nonempty} (D1 transient?)")
             with open(cpath, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False)
             return data
         except Exception as e:
-            if attempt == 2:
+            if attempt == tries - 1:
                 print(f"[warn] {path}: {e}", file=sys.stderr)
                 return None
-            time.sleep(1.5 * (attempt + 1))
+            time.sleep(1.0 * (attempt + 1))
     return None
 
 
@@ -168,6 +175,8 @@ def main():
     ap.add_argument("--from-year", type=int, default=2019,
                      help="мин. fy_year события (нужен предыдущий год для дельты)")
     ap.add_argument("--limit-issuers", type=int, default=None)
+    ap.add_argument("--sleep", type=float, default=0.3,
+                     help="пауза между эмитентами, сек (D1 воркера при потоке отдаёт count:0)")
     args = ap.parse_args()
     os.makedirs(args.cache_dir, exist_ok=True)
 
@@ -176,7 +185,8 @@ def main():
     # /reports/latest) на этой сети рвутся после ~24КБ (антивирус-прокси душит
     # большое TLS-тело), поэтому берём только мелкие ответы: карту ИНН здесь,
     # далее по одному эмитенту и по узкому окну цен бонда.
-    ry = _get(args.base, "/issuers/report_years", args.cache_dir, ttl_days=7, timeout=60)
+    ry = _get(args.base, "/issuers/report_years", args.cache_dir, ttl_days=7, timeout=60,
+              nonempty="map")
     if not ry:
         sys.exit("не удалось получить /issuers/report_years")
     inns = list((ry.get("map") or {}).keys())
@@ -196,7 +206,8 @@ def main():
     for k, inn in enumerate(inns):
         if k % 25 == 0:
             print(f"[{k}/{len(inns)}] events={n_events} trades={n_trades} drops={dbg}", file=sys.stderr)
-        rep = _get(args.base, f"/issuer/{inn}/reports", args.cache_dir)
+        rep = _get(args.base, f"/issuer/{inn}/reports", args.cache_dir, nonempty="data")
+        time.sleep(args.sleep)   # пауза — не заваливать D1 воркера (иначе count:0)
         if not rep:
             dbg["no_rep"] += 1
             continue
