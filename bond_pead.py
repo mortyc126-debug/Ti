@@ -68,7 +68,10 @@ def _fetch_raw(url, timeout):
             capture_output=True, timeout=timeout + 15)
         if p.returncode != 0:
             raise RuntimeError(f"curl rc={p.returncode}: {(p.stderr or b'')[:150].decode('utf-8','replace')}")
-        return p.stdout.decode("utf-8")
+        out = p.stdout.decode("utf-8")
+        if os.environ.get("PEAD_DEBUG"):
+            print(f"[dbg] {url[-45:]} -> {len(out)}b: {out[:70]!r}", file=sys.stderr)
+        return out
     req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": _UA})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read().decode("utf-8")
