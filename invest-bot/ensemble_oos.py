@@ -80,16 +80,19 @@ def _run_ticker(job: dict) -> tuple:
     entry_mode = job.get("entry", "next_open")
     brackets = job.get("brackets") or []   # [(take, stop), ...]; пусто → fixed-k
     H = job.get("horizon", 24)             # макс. держание для брекета (баров)
+    folds = job.get("folds", 1)
     n = len(candles)
     # для брекета нужен запас H баров вперёд; для fixed-k — K.
     fwd_need = (H if brackets else K) + 1
     positions = range(W, n - fwd_need - 1, S)
     split_i = int(n * FRAC)   # бары до split_i — train, после — test
 
-    # M[key] = {"train":[n,sum,wins], "test":[...], "all":[...]}; key = имя метода
-    # (или "ENS") + суффикс брекета @take/stop, если сетка задана.
-    def _blank():
-        return {"train": [0, 0.0, 0], "test": [0, 0.0, 0], "all": [0, 0.0, 0]}
+    # M[key][bucket] = [n,sum,wins]. key = метод (или ENS) + @take/stop.
+    # bucket: при folds>1 — "f0".."f{N-1}"; иначе train/test. Плюс "all".
+    def _bkt(i):
+        if folds > 1:
+            return f"f{min(folds - 1, int(i * folds / n))}"
+        return "train" if i < split_i else "test"
     M = {}
 
     def _entry_price(i):
@@ -118,10 +121,10 @@ def _run_ticker(job: dict) -> tuple:
         return dirn * (closes[end] - entry) / a   # тайм-стоп
 
     def _push(key, ret, i):
-        acc = M.setdefault(key, _blank())
-        bucket = "train" if i < split_i else "test"
-        for b in (bucket, "all"):
-            acc[b][0] += 1; acc[b][1] += ret; acc[b][2] += (1 if ret > 0 else 0)
+        d = M.setdefault(key, {})
+        for b in (_bkt(i), "all"):
+            acc = d.setdefault(b, [0, 0.0, 0])
+            acc[0] += 1; acc[1] += ret; acc[2] += (1 if ret > 0 else 0)
 
     def _record(base, dirn, i, a):
         entry = _entry_price(i)
@@ -181,7 +184,10 @@ def _agg(recs, mkey, split):
         d = r["M"].get(mkey)
         if not d:
             continue
-        n += d[split][0]; s += d[split][1]; w += d[split][2]
+        sd = d.get(split)
+        if not sd:
+            continue
+        n += sd[0]; s += sd[1]; w += sd[2]
     if n == 0:
         return (0, None, None)
     return (n, s / n, w / n)
@@ -230,6 +236,10 @@ def main():
                           "по --horizon. Судить ТОЛЬКО по TEST (иначе подгон брекета).")
     ap.add_argument("--horizon", type=int, default=24,
                      help="макс. держание брекета в барах (тайм-стоп)")
+    ap.add_argument("--folds", type=int, default=1,
+                     help="N последовательных окон вместо train/test: печатает exp "
+                          "по каждому окну. Плюс на БОЛЬШИНСТВЕ окон = робастно; "
+                          "плюс на одном = мираж (тест устойчивости во времени).")
     args = ap.parse_args()
 
     brackets = []
@@ -276,7 +286,7 @@ def main():
              "cost": args.cost, "split_frac": args.split_frac,
              "methods": ens_set, "per_method": args.per_method,
              "entry": args.entry, "brackets": brackets,
-             "horizon": args.horizon} for t in tickers]
+             "horizon": args.horizon, "folds": args.folds} for t in tickers]
 
     n_wk = args.workers or max(1, (mp.cpu_count() or 2) - 1)
     recs = {}
@@ -306,9 +316,27 @@ def main():
     print(f"\n=== вход={args.entry}  тикеров со сделками: {len(rl)} "
           f"({sum(r['is_fut'] for r in rl)} фью) ===")
 
-    if args.per_method:
+    keys = sorted({k for r in rl for k in r["M"].keys()})
+
+    if args.folds > 1:
+        # Режим устойчивости: exp по каждому окну. Ключи (методы/брекеты) —
+        # строки, окна f0..fN — колонки. n_pos справа = сколько окон в плюсе.
+        fold_labels = [f"f{j}" for j in range(args.folds)]
+        head = f"{'метод/брекет':<22}" + "".join(f"{fl:>9}" for fl in fold_labels) + "   +окон"
+        print(head)
+        rows = []
+        for k in keys:
+            exps = [_agg(rl, k, fl)[1] for fl in fold_labels]
+            npos = sum(1 for e in exps if e is not None and e > 0)
+            allexp = _agg(rl, k, "all")[1]
+            rows.append((npos, allexp if allexp is not None else -9, k, exps))
+        # сортировка: сперва по числу плюсовых окон, потом по общей exp
+        for npos, _ae, k, exps in sorted(rows, key=lambda x: (x[0], x[1]), reverse=True):
+            cells = "".join(f"{e:>+9.3f}" if e is not None else f"{'—':>9}" for e in exps)
+            print(f"{k:<22}{cells}   {npos}/{args.folds}")
+        print("\nробастно = плюс на большинстве окон; плюс на 1-2 из N = мираж")
+    elif args.per_method:
         # каждый метод соло: train/test exp/win. Сортировка по test-exp.
-        keys = sorted({k for r in rl for k in r["M"].keys()})
         print(f"{'метод':<20} {'TRAIN':>28}   {'TEST (судим)':>28}")
         rows = []
         for k in keys:
@@ -344,7 +372,7 @@ def main():
                          "all_n", "all_exp", "all_win"])
             for tk, r in sorted(recs.items()):
                 for mk, d in sorted(r["M"].items()):
-                    tn, ts, tw = d["test"]; an, as_, aw = d["all"]
+                    tn, ts, tw = d.get("test", (0, 0.0, 0)); an, as_, aw = d.get("all", (0, 0.0, 0))
                     wr.writerow([tk, mk, int(r["is_fut"]),
                                  f"{r['liq']:.2f}" if r['liq'] else "",
                                  f"{r['vol']:.3f}" if r['vol'] else "",
