@@ -114,6 +114,7 @@ export default {
         if(url.pathname === '/collect/reports')      return jsonResp(await collectReports(env, url));
         if(url.pathname === '/collect/affiliations') return jsonResp(await collectAffiliations(env, url));
         if(url.pathname === '/ai/extract')       return await handleAiExtract(env, req);
+        if(url.pathname === '/admin/reindex')    return jsonResp(await handleReindex(env));
       }
 
       return errResp(
@@ -3255,6 +3256,22 @@ function _pFundDir(cur, prev, minv){
   if(nz.length < 2) return 0;
   const s = v.reduce((p, c) => p + c, 0);
   return Math.abs(s) < minv ? 0 : (s > 0 ? 1 : -1);
+}
+
+async function handleReindex(env){
+  // Разовое индексирование: без индексов запрос цен по emitent_inn сканирует
+  // все 403k строк bond_daily → таймаут D1 → catch отдаёт пусто (n_trades=0).
+  const stmts = [
+    "CREATE INDEX IF NOT EXISTS idx_bond_inn_date ON bond_daily(emitent_inn, date)",
+    "CREATE INDEX IF NOT EXISTS idx_bond_secid_date ON bond_daily(secid, date)",
+    "CREATE INDEX IF NOT EXISTS idx_rep_inn_year ON issuer_reports(inn, fy_year)",
+  ];
+  const done = [];
+  for(const s of stmts){
+    try { await env.DB.prepare(s).run(); done.push({sql: s, ok: true}); }
+    catch(e){ done.push({sql: s, ok: false, err: String(e).slice(0, 200)}); }
+  }
+  return { reindex: done };
 }
 
 async function handleCreditPead(env, url){
