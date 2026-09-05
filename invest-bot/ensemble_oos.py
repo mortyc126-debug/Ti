@@ -257,7 +257,9 @@ def main():
     ap.add_argument("--market-neutral", action="store_true",
                      help="Снять макро-прилив: abnormal = доходность − кросс-секц. "
                           "средняя по всем тикерам за тот же месяц. Печатает raw vs "
-                          "neutral по годам (ансамбль, honest вход, fixed-k).")
+                          "neutral по состоянию рынка + нетто/OOS (ансамбль, honest, fixed-k).")
+    ap.add_argument("--mn-cost", type=float, default=0.001,
+                     help="кост round-trip в ДОЛЯХ для market-neutral нетто (0.001=0.1%)")
     args = ap.parse_args()
 
     brackets = []
@@ -381,6 +383,35 @@ def main():
         print("\nчитать: если в '1_плохой_рынок' RAW уходит в минус, а NEU держит "
               "плюс — макро маскировал сигнал (твоя гипотеза). Если NEU≈RAW во всех "
               "терцилях — нейтрализация ничего не добавляет. cost не вычтен (gross).")
+
+        # ── НЕТТО + OOS: хронологический train/test по месяцам ──
+        chrono = sorted(mkt_mean)               # месяцы по времени
+        cut = int(len(chrono) * 0.7)
+        train_ms = set(chrono[:cut]); test_ms = set(chrono[cut:])
+        C = args.mn_cost
+        def _split(ms):
+            n = ns = nw = ns_net = nwnet = 0
+            for ym, d, ret in allt:
+                if ym not in ms:
+                    continue
+                s = d * (ret - mkt_mean[ym])    # neutral signed
+                n += 1
+                ns += s; nw += 1 if s > 0 else 0
+                ns_net += s - C; nwnet += 1 if (s - C) > 0 else 0
+            if not n:
+                return None
+            return (n, ns/n, nw/n, ns_net/n, nwnet/n)
+        print(f"\n=== NEU нетто/OOS (cost round-trip {C*100:.2f}%, "
+              f"train {len(train_ms)}мес / test {len(test_ms)}мес) ===")
+        print(f"{'сплит':<8}{'n':>8}{'NEU gross%':>12}{'NEU net%':>11}{'net hit':>9}")
+        for lbl, ms in (("TRAIN", train_ms), ("TEST", test_ms)):
+            r = _split(ms)
+            if not r:
+                print(f"{lbl:<8} —"); continue
+            n, g, _hg, net, hnet = r
+            print(f"{lbl:<8}{n:>8}{g*100:>+12.4f}{net*100:>+11.4f}{hnet*100:>8.1f}%")
+        print("\nвердикт: TEST NEU net% > 0 и net hit > 50% → живой торгуемый "
+              "рыночно-нейтральный сигнал на акциях. ≤0 → съедается костами (near-miss).")
         return
 
     keys = sorted({k for r in rl for k in r["M"].keys()})
