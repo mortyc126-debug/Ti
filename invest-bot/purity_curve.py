@@ -109,6 +109,11 @@ def main():
     ap.add_argument("--only-stk", action="store_true")
     ap.add_argument("--only-fut", action="store_true")
     ap.add_argument("--workers", type=int, default=None)
+    ap.add_argument("--fade-er", type=float, default=None,
+                     help="порог ER: тест ФЕЙДА (против тренда) на барах с ER≥порог, "
+                          "нетто+OOS (train/test по месяцам)")
+    ap.add_argument("--cost", type=float, default=0.001,
+                     help="кост round-trip в долях для fade-нетто (0.001=0.1%)")
     args = ap.parse_args()
 
     from datetime import datetime, timedelta
@@ -177,6 +182,42 @@ def main():
     print("\nчитать: если RAW/NEU растёт от нуля к середине ER, а на высоких ER "
           "уходит в МИНУС — гипотеза верна: умеренная чистота = momentum, "
           "экстремальная = разворот (fade). Тогда сигнал = знак, зависящий от ER.")
+
+    if args.fade_er is not None:
+        # ФЕЙД (против тренда) на барах ER≥порог: нетто + OOS. fade = −dir·fwd.
+        # Данные из mn[(ym,b)]=[n, Σdir·fwd, Σdir]; берём бины b≥thr_bin.
+        thr = int(args.fade_er * NB)
+        C = args.cost
+        by_ym = {}   # ym -> [n, Σdir·fwd, Σdir]
+        for r in recs:
+            for mk, v in r["mn"].items():
+                ym, b = mk.split("|")
+                if int(b) < thr:
+                    continue
+                a = by_ym.setdefault(ym, [0, 0.0, 0])
+                a[0] += v[0]; a[1] += v[1]; a[2] += v[2]
+        chrono = sorted(by_ym)
+        cut = int(len(chrono) * 0.7)
+        splits = {"TRAIN": chrono[:cut], "TEST": chrono[cut:]}
+        print(f"\n=== ФЕЙД при ER≥{args.fade_er} (нетто cost {C*100:.2f}%, "
+              f"train {cut}мес / test {len(chrono)-cut}мес) ===")
+        print(f"{'сплит':<8}{'n':>9}{'RAW ф.gross%':>14}{'RAW net%':>11}"
+              f"{'NEU net%':>11}")
+        for lbl, ms in splits.items():
+            n = 0; sdf = 0.0; sneu = 0.0
+            for ym in ms:
+                a = by_ym[ym]
+                n += a[0]
+                sdf += a[1]                       # Σ dir·fwd
+                sneu += a[1] - mkt.get(ym, 0.0) * a[2]
+            if not n:
+                print(f"{lbl:<8} —"); continue
+            fade_raw = -sdf / n                   # фейд = минус follow
+            fade_neu = -sneu / n
+            print(f"{lbl:<8}{n:>9}{fade_raw*100:>+14.4f}{(fade_raw-C)*100:>+11.4f}"
+                  f"{(fade_neu-C)*100:>+11.4f}")
+        print("\nвердикт: TEST RAW/NEU net% > 0 → фейд-истощение переживает косты "
+              "OOS (рабочий mean-reversion edge). ≤0 → съедается костами.")
 
 
 if __name__ == "__main__":
