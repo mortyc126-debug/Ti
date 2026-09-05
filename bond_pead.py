@@ -187,11 +187,19 @@ def main():
     tot = {"n_issuers": 0, "n_events": 0, "n_trades": 0}
     start = 0
     while True:
-        path = (f"/analysis/credit_pead?start={start}&count={args.page}"
-                f"&horizon={args.horizon}&min_vote={args.min_vote}"
-                f"&from_year={args.from_year}")
-        # ttl_days=0 — не кэшируем (параметрический расчёт); повторы на transient
-        r = _get(args.base, path, args.cache_dir, ttl_days=0, timeout=120)
+        # D1 воркера изредка таймаутит запросы внутри вызова → страница
+        # приходит с n_trades:0 (браузерный вызов при этом даёт данные).
+        # Считаем это transient: повторяем до 5 раз с cache-buster (&_ts),
+        # пока n_trades>0. ttl_days=0 — локально не кэшируем.
+        r = None
+        for att in range(5):
+            path = (f"/analysis/credit_pead?start={start}&count={args.page}"
+                    f"&horizon={args.horizon}&min_vote={args.min_vote}"
+                    f"&from_year={args.from_year}&_ts={int(time.time()*1000)}")
+            r = _get(args.base, path, args.cache_dir, ttl_days=0, timeout=120)
+            if r and (r.get("n_trades", 0) > 0 or r.get("returned", 0) == 0):
+                break
+            time.sleep(1.5)
         if not r:
             print(f"[warn] страница start={start} не получена — стоп", file=sys.stderr)
             break
@@ -202,7 +210,7 @@ def main():
             for kk in m:
                 m[kk] += a.get(kk, 0)
         returned = r.get("returned", 0)
-        print(f"[pead] start={start} returned={returned} "
+        print(f"[pead] start={start} returned={returned} n_tr(page)={r.get('n_trades',0)} "
               f"events={tot['n_events']} trades={tot['n_trades']}", file=sys.stderr)
         if returned < args.page:
             break
