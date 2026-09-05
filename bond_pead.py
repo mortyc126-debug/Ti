@@ -171,19 +171,19 @@ def main():
     args = ap.parse_args()
     os.makedirs(args.cache_dir, exist_ok=True)
 
-    # Универсум эмитентов — из лёгкого /reports/latest (у /catalog тяжёлый JOIN
-    # по 400к строк → таймаут воркера). Бонды тянем по каждому ИНН отдельно
-    # (/bond/issuer — запрос по одному inn, быстрый). Карта inn→isins строится
-    # в цикле.
-    rl = _get(args.base, "/reports/latest?limit=500", args.cache_dir, ttl_days=7, timeout=60)
-    if not rl:
-        sys.exit("не удалось получить /reports/latest")
-    seed = rl.get("data") or []
-    inns = list(dict.fromkeys(str(r["inn"]) for r in seed if r.get("inn")))
+    # Универсум эмитентов — из /issuers/report_years (компактная карта
+    # {inn: max_year}, ~8КБ на 324 эмитента). Крупные эндпоинты (/catalog 252КБ,
+    # /reports/latest) на этой сети рвутся после ~24КБ (антивирус-прокси душит
+    # большое TLS-тело), поэтому берём только мелкие ответы: карту ИНН здесь,
+    # далее по одному эмитенту и по узкому окну цен бонда.
+    ry = _get(args.base, "/issuers/report_years", args.cache_dir, ttl_days=7, timeout=60)
+    if not ry:
+        sys.exit("не удалось получить /issuers/report_years")
+    inns = list((ry.get("map") or {}).keys())
     if args.limit_issuers:
         inns = inns[:args.limit_issuers]
     inn_bonds = {}
-    print(f"[pead] эмитентов в универсуме (из /reports/latest): {len(inns)}", file=sys.stderr)
+    print(f"[pead] эмитентов с отчётами (из /issuers/report_years): {len(inns)}", file=sys.stderr)
 
     # events[event_year] = list of signed outcomes
     ev_price = {}   # year -> list signed price-return
@@ -214,7 +214,8 @@ def main():
                               if b.get("secid")]
         if not inn_bonds[inn]:
             continue
-        # предзагрузим ряды бондов эмитента один раз
+        # ряды цен бондов — УЗКИМ окном вокруг события (крупные тела рвёт прокси).
+        # Ключ кэша (isin, yr): для каждого года события своё окно.
         series_cache = {}
         for yr in years:
             if yr - 1 not in by_year or yr < args.from_year:
@@ -224,12 +225,16 @@ def main():
                 continue
             n_events += 1
             entry_dt = date(yr + 1, 4, 1)   # ~раскрытие РСБУ за yr
+            frm = f"{yr + 1}-03-01"          # окно: март..декабрь года раскрытия
+            to  = f"{yr + 1}-12-31"          # покрывает вход ~1 апр + горизонт до ~120 дн
             for isin in inn_bonds.get(inn, []):
-                if isin not in series_cache:
-                    h = _get(args.base, f"/bond/history?secid={isin}&from={yr}-01-01",
+                ck = (isin, yr)
+                if ck not in series_cache:
+                    h = _get(args.base,
+                             f"/bond/history?secid={isin}&from={frm}&to={to}",
                              args.cache_dir)
-                    series_cache[isin] = (h.get("data") if h else []) or []
-                series = series_cache[isin]
+                    series_cache[ck] = (h.get("data") if h else []) or []
+                series = series_cache[ck]
                 if not series:
                     continue
                 p0 = _find_at(series, entry_dt, ENTRY_WIN)
