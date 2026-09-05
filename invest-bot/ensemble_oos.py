@@ -235,6 +235,7 @@ def main():
                      help="переопределить ансамбль (через запятую)")
     ap.add_argument("--top-liq", type=int, default=None)
     ap.add_argument("--only-fut", action="store_true")
+    ap.add_argument("--only-stk", action="store_true", help="только акции (не фьючерсы)")
     ap.add_argument("--workers", type=int, default=None)
     ap.add_argument("--out", default=None, help="CSV per-ticker")
     ap.add_argument("--per-method", action="store_true",
@@ -286,6 +287,8 @@ def main():
         tickers = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
     if args.only_fut:
         tickers = [t for t in tickers if _is_future(t)]
+    if args.only_stk:
+        tickers = [t for t in tickers if not _is_future(t)]
     if not tickers:
         sys.exit("нет тикеров после фильтров")
 
