@@ -3290,12 +3290,11 @@ async function handleCreditPead(env, url){
     ).bind(count, start).all()).results || [];
   } catch(e){ return errResp('inn page query failed: ' + e, 500); }
 
-  const agg = {};   // year -> {np,sp,wp, ny,sy,wy}
-  const add = (y, key, val, win) => {
-    const a = agg[y] || (agg[y] = {np:0, sp:0, wp:0, ny:0, sy:0, wy:0});
-    if(key === 'p'){ a.np++; a.sp += val; if(win) a.wp++; }
-    else           { a.ny++; a.sy += val; if(win) a.wy++; }
-  };
+  // agg по годам: np/sp/wp — raw-signed цена (dir·ret); ny/sy/wy — signed −Δyield;
+  // un/us, dn/ds — СЫРАЯ (без dir) сумма price_ret по когортам улучшения(+1)/
+  // ухудшения(−1). Лонг-шорт = us/un − ds/dn рыночно-нейтрален (макро сокращается).
+  const agg = {};
+  const ensure = (y) => agg[y] || (agg[y] = {np:0,sp:0,wp:0, ny:0,sy:0,wy:0, un:0,us:0, dn:0,ds:0});
   let n_events = 0, n_trades = 0, n_issuers = 0;
 
   for(const row of innRows){
@@ -3345,11 +3344,14 @@ async function handleCreditPead(env, url){
         if(ei < 0 || ei + HZ >= arr.length) continue;
         const e = arr[ei], x = arr[ei + HZ];
         if(!(e.price > 0) || !(x.price > 0)) continue;
-        const sp = dir * (x.price - e.price) / e.price;
-        add(y, 'p', sp, sp > 0);
+        const raw = (x.price - e.price) / e.price;   // сырая доходность бонда
+        const sp = dir * raw;
+        const a = ensure(y);
+        a.np++; a.sp += sp; if(sp > 0) a.wp++;
+        if(dir > 0){ a.un++; a.us += raw; } else { a.dn++; a.ds += raw; }
         if(e.yield != null && x.yield != null){
           const sy = -dir * (x.yield - e.yield);
-          add(y, 'y', sy, sy > 0);
+          a.ny++; a.sy += sy; if(sy > 0) a.wy++;
         }
         n_trades++;
       }
