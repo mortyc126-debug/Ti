@@ -176,6 +176,7 @@ def main():
     ap.add_argument("--min-vote", type=int, default=2, help="мин.|net голос| из 4 метрик")
     ap.add_argument("--from-year", type=int, default=2019)
     ap.add_argument("--page", type=int, default=40, help="эмитентов на один запрос воркера")
+    ap.add_argument("--max-start", type=int, default=400, help="верхний предел offset (эмитентов ~324)")
     ap.add_argument("--sleep", type=float, default=0.5, help="пауза между страницами, сек")
     args = ap.parse_args()
     os.makedirs(args.cache_dir, exist_ok=True)
@@ -185,21 +186,22 @@ def main():
     # рвётся/троттлится). Мёржим страницы, печатаем сводку.
     merged = {}   # year -> {np,sp,wp,ny,sy,wy}
     tot = {"n_issuers": 0, "n_events": 0, "n_trades": 0}
-    start = 0
-    while True:
-        # D1 воркера изредка таймаутит запросы внутри вызова → страница
-        # приходит с n_trades:0 (браузерный вызов при этом даёт данные).
-        # Считаем это transient: повторяем до 5 раз с cache-buster (&_ts),
-        # пока n_trades>0. ttl_days=0 — локально не кэшируем.
+    # D1 воркера изредка таймаутит ЛЮБОЙ запрос в вызове (и GROUP BY страницы,
+    # и внутренние) → returned:0 или n_trades:0, хотя браузер даёт данные.
+    # Всё это transient: перебираем страницы по фикс. диапазону (эмитентов ~324),
+    # каждую повторяем с cache-buster (&_ts), пока n_trades>0; returned:0 —
+    # «конец» только после 2 пустых подряд (после ретраев).
+    empty_streak = 0
+    for start in range(0, args.max_start, args.page):
         r = None
-        for att in range(5):
+        for att in range(6):
             path = (f"/analysis/credit_pead?start={start}&count={args.page}"
                     f"&horizon={args.horizon}&min_vote={args.min_vote}"
                     f"&from_year={args.from_year}&_ts={int(time.time()*1000)}")
             r = _get(args.base, path, args.cache_dir, ttl_days=0, timeout=120)
-            if r and (r.get("n_trades", 0) > 0 or r.get("returned", 0) == 0):
+            if r and r.get("n_trades", 0) > 0:
                 break
-            time.sleep(1.5)
+            time.sleep(1.3)
         if not r:
             print(f"[warn] страница start={start} не получена — стоп", file=sys.stderr)
             break
@@ -209,12 +211,15 @@ def main():
             m = merged.setdefault(int(y), {"np":0,"sp":0.0,"wp":0,"ny":0,"sy":0.0,"wy":0})
             for kk in m:
                 m[kk] += a.get(kk, 0)
-        returned = r.get("returned", 0)
-        print(f"[pead] start={start} returned={returned} n_tr(page)={r.get('n_trades',0)} "
+        ret = r.get("returned", 0)
+        print(f"[pead] start={start} returned={ret} n_tr(page)={r.get('n_trades',0)} "
               f"events={tot['n_events']} trades={tot['n_trades']}", file=sys.stderr)
-        if returned < args.page:
-            break
-        start += args.page
+        if ret == 0:
+            empty_streak += 1
+            if empty_streak >= 2:
+                break   # два пустых подряд после ретраев — конец данных
+        else:
+            empty_streak = 0
         time.sleep(args.sleep)
 
     if not merged:
