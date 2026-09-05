@@ -51,7 +51,7 @@ DEFAULT_BASE = "https://bondan-backend.marginacall.workers.dev"
 ENTRY_WIN = 10   # дней на поиск торгового дня у даты события
 
 
-def _get(base, path, cache_dir, ttl_days=30):
+def _get(base, path, cache_dir, ttl_days=30, timeout=30):
     """GET c дисковым кэшем. Возвращает распарсенный JSON или None."""
     safe = path.replace("/", "_").replace("?", "_").replace("&", "_").replace("=", "_")
     cpath = os.path.join(cache_dir, safe + ".json")
@@ -74,7 +74,7 @@ def _get(base, path, cache_dir, ttl_days=30):
     for attempt in range(3):
         try:
             req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
                 data = json.loads(r.read().decode("utf-8"))
             with open(cpath, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False)
@@ -158,7 +158,7 @@ def main():
     args = ap.parse_args()
     os.makedirs(args.cache_dir, exist_ok=True)
 
-    cat = _get(args.base, "/catalog", args.cache_dir, ttl_days=7)
+    cat = _get(args.base, "/catalog", args.cache_dir, ttl_days=7, timeout=120)
     if not cat:
         sys.exit("не удалось получить /catalog")
     issuers = cat.get("issuers") or []
