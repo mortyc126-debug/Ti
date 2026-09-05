@@ -172,137 +172,67 @@ def main():
     ap.add_argument("--base", default=DEFAULT_BASE)
     ap.add_argument("--cache-dir", default=os.path.join(os.path.dirname(
         os.path.abspath(__file__)), "data", "pead_cache"))
-    ap.add_argument("--horizon", type=int, default=60,
-                     help="горизонт удержания в ТОРГОВЫХ днях")
-    ap.add_argument("--min-vote", type=int, default=2,
-                     help="мин. |net голос| из 4 метрик для сигнала")
-    ap.add_argument("--from-year", type=int, default=2019,
-                     help="мин. fy_year события (нужен предыдущий год для дельты)")
-    ap.add_argument("--limit-issuers", type=int, default=None)
-    ap.add_argument("--sleep", type=float, default=0.3,
-                     help="пауза между эмитентами, сек (D1 воркера при потоке отдаёт count:0)")
+    ap.add_argument("--horizon", type=int, default=60, help="горизонт удержания, торг.дн")
+    ap.add_argument("--min-vote", type=int, default=2, help="мин.|net голос| из 4 метрик")
+    ap.add_argument("--from-year", type=int, default=2019)
+    ap.add_argument("--page", type=int, default=40, help="эмитентов на один запрос воркера")
+    ap.add_argument("--sleep", type=float, default=0.5, help="пауза между страницами, сек")
     args = ap.parse_args()
     os.makedirs(args.cache_dir, exist_ok=True)
 
-    # Универсум эмитентов — из /issuers/report_years (компактная карта
-    # {inn: max_year}, ~8КБ на 324 эмитента). Крупные эндпоинты (/catalog 252КБ,
-    # /reports/latest) на этой сети рвутся после ~24КБ (антивирус-прокси душит
-    # большое TLS-тело), поэтому берём только мелкие ответы: карту ИНН здесь,
-    # далее по одному эмитенту и по узкому окну цен бонда.
-    ry = _get(args.base, "/issuers/report_years", args.cache_dir, ttl_days=7, timeout=60,
-              nonempty="map")
-    if not ry:
-        sys.exit("не удалось получить /issuers/report_years")
-    inns = list((ry.get("map") or {}).keys())
-    if args.limit_issuers:
-        inns = inns[:args.limit_issuers]
-    inn_bonds = {}
-    print(f"[pead] эмитентов с отчётами (из /issuers/report_years): {len(inns)}", file=sys.stderr)
+    # Весь event-study считает ВОРКЕР (D1 локально) — /analysis/credit_pead,
+    # пагинация по эмитентам (пер-запросная тяга 300+ эмитентов с клиента
+    # рвётся/троттлится). Мёржим страницы, печатаем сводку.
+    merged = {}   # year -> {np,sp,wp,ny,sy,wy}
+    tot = {"n_issuers": 0, "n_events": 0, "n_trades": 0}
+    start = 0
+    while True:
+        path = (f"/analysis/credit_pead?start={start}&count={args.page}"
+                f"&horizon={args.horizon}&min_vote={args.min_vote}"
+                f"&from_year={args.from_year}")
+        # ttl_days=0 — не кэшируем (параметрический расчёт); повторы на transient
+        r = _get(args.base, path, args.cache_dir, ttl_days=0, timeout=120)
+        if not r:
+            print(f"[warn] страница start={start} не получена — стоп", file=sys.stderr)
+            break
+        for k in tot:
+            tot[k] += r.get(k, 0)
+        for y, a in (r.get("agg") or {}).items():
+            m = merged.setdefault(int(y), {"np":0,"sp":0.0,"wp":0,"ny":0,"sy":0.0,"wy":0})
+            for kk in m:
+                m[kk] += a.get(kk, 0)
+        returned = r.get("returned", 0)
+        print(f"[pead] start={start} returned={returned} "
+              f"events={tot['n_events']} trades={tot['n_trades']}", file=sys.stderr)
+        if returned < args.page:
+            break
+        start += args.page
+        time.sleep(args.sleep)
 
-    # events[event_year] = list of signed outcomes
-    ev_price = {}   # year -> list signed price-return
-    ev_yield = {}   # year -> list signed -Δyield
-    n_events = 0    # (issuer,year) с валидным направлением
-    n_trades = 0    # (issuer,year,bond) с валидным исходом
-    dbg = {"no_rep": 0, "lt2yr": 0, "no_bonds": 0, "dir0": 0, "no_price": 0}
-    HZ = args.horizon
+    if not merged:
+        sys.exit("нет данных (agg пуст)")
 
-    for k, inn in enumerate(inns):
-        if k % 25 == 0:
-            print(f"[{k}/{len(inns)}] events={n_events} trades={n_trades} drops={dbg}", file=sys.stderr)
-        rep = _get(args.base, f"/issuer/{inn}/reports", args.cache_dir, nonempty="data")
-        time.sleep(args.sleep)   # пауза — не заваливать D1 воркера (иначе count:0)
-        if not rep:
-            dbg["no_rep"] += 1
-            continue
-        rows = rep.get("data") or []
-        by_year = {}
-        for r in rows:
-            y = r.get("fy_year")
-            if y is not None:
-                by_year[int(y)] = r      # если period-дубли — берём последний
-        years = sorted(by_year)
-        if len(years) < 2:
-            dbg["lt2yr"] += 1
-            continue
-        # бонды эмитента — запрос по одному ИНН (быстрый, в отличие от /catalog)
-        if inn not in inn_bonds:
-            bl = _get(args.base, f"/bond/issuer?inn={inn}", args.cache_dir)
-            inn_bonds[inn] = [b.get("secid") for b in ((bl.get("data") if bl else []) or [])
-                              if b.get("secid")]
-        if not inn_bonds[inn]:
-            dbg["no_bonds"] += 1
-            continue
-        # ряды цен бондов — УЗКИМ окном вокруг события (крупные тела рвёт прокси).
-        # Ключ кэша (isin, yr): для каждого года события своё окно.
-        series_cache = {}
-        for yr in years:
-            if yr - 1 not in by_year or yr < args.from_year:
-                continue
-            direction = _fund_direction(by_year[yr], by_year[yr - 1], args.min_vote)
-            if direction == 0:
-                dbg["dir0"] += 1
-                continue
-            n_events += 1
-            trades_before = n_trades
-            entry_dt = date(yr + 1, 4, 1)   # ~раскрытие РСБУ за yr
-            frm = f"{yr + 1}-03-01"          # окно: март..декабрь года раскрытия
-            to  = f"{yr + 1}-12-31"          # покрывает вход ~1 апр + горизонт до ~120 дн
-            for isin in inn_bonds.get(inn, []):
-                ck = (isin, yr)
-                if ck not in series_cache:
-                    h = _get(args.base,
-                             f"/bond/history?secid={isin}&from={frm}&to={to}",
-                             args.cache_dir)
-                    series_cache[ck] = (h.get("data") if h else []) or []
-                series = series_cache[ck]
-                if not series:
-                    continue
-                p0 = _find_at(series, entry_dt, ENTRY_WIN)
-                if not p0:
-                    continue
-                # выход: HZ торговых дней спустя — берём HZ-ю точку ≥ entry
-                after = [row for row in series
-                         if row.get("date", "")[:10] >= entry_dt.isoformat()]
-                if len(after) <= HZ:
-                    continue
-                exit_row = after[HZ]
-                p1 = _num(exit_row.get("price"))
-                y1 = _num(exit_row.get("yield"))
-                if not p1 or p1 <= 0:
-                    continue
-                price_ret = (p1 - p0[0]) / p0[0]
-                signed_p = direction * price_ret
-                ev_price.setdefault(yr, []).append(signed_p)
-                if p0[1] is not None and y1 is not None:
-                    signed_y = -direction * (y1 - p0[1])   # улучшение → yield падает → +
-                    ev_yield.setdefault(yr, []).append(signed_y)
-                n_trades += 1
-            if n_trades == trades_before:
-                dbg["no_price"] += 1   # событие было, но ни одного бонда с ценой в окне
-        time.sleep(0.02)
+    print(f"\nэмитентов с сигналом: {tot['n_issuers']}   событий: {tot['n_events']}   "
+          f"сделок (×бонд): {tot['n_trades']}")
 
-    def _report(dct, label, unit):
-        allv = [x for lst in dct.values() for x in lst]
-        if not allv:
-            print(f"\n{label}: нет данных")
-            return
-        hit = sum(1 for x in allv if x > 0) / len(allv)
-        print(f"\n=== {label} (горизонт {HZ} торг.дн, min_vote={args.min_vote}) ===")
-        print(f"ВСЕГО: n={len(allv)}  hit={hit*100:.1f}%  ср.={statistics.mean(allv):+.4f}{unit}  "
-              f"медиана={statistics.median(allv):+.4f}{unit}")
+    def _tbl(kind, label, unit):
+        nk, sk, wk = ("np","sp","wp") if kind=="p" else ("ny","sy","wy")
+        N = sum(m[nk] for m in merged.values())
+        if not N:
+            print(f"\n{label}: нет данных"); return
+        S = sum(m[sk] for m in merged.values()); W = sum(m[wk] for m in merged.values())
+        print(f"\n=== {label} (горизонт {args.horizon} торг.дн, min_vote={args.min_vote}) ===")
+        print(f"ВСЕГО: n={N}  hit={W/N*100:.1f}%  ср.={S/N:+.4f}{unit}")
         print(f"{'год события':<12}{'n':>7}{'hit%':>8}{'ср.'+unit:>12}")
-        for yr in sorted(dct):
-            v = dct[yr]
-            h = sum(1 for x in v if x > 0) / len(v)
-            print(f"{yr:<12}{len(v):>7}{h*100:>7.1f}%{statistics.mean(v):>+12.4f}")
+        for y in sorted(merged):
+            m = merged[y]; n = m[nk]
+            if not n: continue
+            print(f"{y:<12}{n:>7}{m[wk]/n*100:>7.1f}%{m[sk]/n:>+12.4f}")
 
-    print(f"\nсобытий (эмитент×год с направлением): {n_events}   сделок (×бонд×исход): {n_trades}")
-    print(f"отсев: {dbg}")
-    _report(ev_price, "signed ЦЕНА бонда (dir · price_ret)", "")
-    _report(ev_yield, "signed −Δ ДОХОДНОСТЬ (dir · −Δyield, п.п.)", "пп")
+    _tbl("p", "signed ЦЕНА бонда (dir · price_ret)", "")
+    _tbl("y", "signed -Δ ДОХОДНОСТЬ (dir · -Δyield, п.п.)", "пп")
     print("\nчитать: hit>55% и ср.>0 УСТОЙЧИВО по годам = кредитный PEAD есть. "
-          "Плюс в 1-2 годах из N = шум. Доходность (Δyield) чище цены для разных дюраций.")
+          "Плюс в 1-2 годах из N = шум. Доходность (Δyield) чище цены для дюраций.")
 
 
 if __name__ == "__main__":

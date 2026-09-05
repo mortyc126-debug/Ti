@@ -89,6 +89,7 @@ export default {
       if(url.pathname === '/bond/issuer')     return await handleBondIssuer(env, url);
       if(url.pathname === '/catalog')         return await handleCatalog(env);
       if(url.pathname === '/reports/latest')  return await handleReportsLatest(env, url);
+      if(url.pathname === '/analysis/credit_pead') return await handleCreditPead(env, url);
       if(url.pathname === '/issuers/report_years') return await handleIssuerReportYears(env, url);
       if(url.pathname === '/diag/dadata')     return await handleDiagDadata(env, url);
       if(url.pathname === '/diag/girbo')      return await handleDiagGirbo(env, url);
@@ -3233,6 +3234,116 @@ async function handleReportsLatest(env, url){
     LIMIT ?
   `).bind(limit).all();
   return jsonResp({ count: r.results?.length || 0, data: r.results || [] });
+}
+
+// ═══ Credit-PEAD: изменение годовой отчётности → дрейф облигации ═══════════
+// Считаем event-study НА СТОРОНЕ ВОРКЕРА (D1 локально): пер-запросная тяга
+// 300+ эмитентов рвётся на клиентской сети/троттлится. Пагинация по эмитентам
+// (start/count) — чтобы не упереться в CPU-лимит; клиент мёржит страницы.
+// Без look-ahead: отчёт за fy_year известен к ~1 апр (fy_year+1) → с этой даты
+// вход, дельта считается fy_year vs fy_year-1.
+function _pSgn(x){ return x == null ? 0 : (x > 0 ? 1 : (x < 0 ? -1 : 0)); }
+function _pFundDir(cur, prev, minv){
+  const d = (a, b) => (a == null || b == null) ? null : a - b;
+  const v = [
+    _pSgn(d(cur.rev, prev.rev)),
+    _pSgn(d(cur.np, prev.np)),
+    _pSgn(d(cur.ebitda_marg, prev.ebitda_marg)),
+    -_pSgn(d(cur.net_debt_eq, prev.net_debt_eq)),
+  ];
+  const nz = v.filter(x => x !== 0);
+  if(nz.length < 2) return 0;
+  const s = v.reduce((p, c) => p + c, 0);
+  return Math.abs(s) < minv ? 0 : (s > 0 ? 1 : -1);
+}
+
+async function handleCreditPead(env, url){
+  const start = Math.max(0, parseInt(url.searchParams.get('start') || '0', 10));
+  const count = Math.min(60, parseInt(url.searchParams.get('count') || '40', 10));
+  const HZ    = Math.max(1, parseInt(url.searchParams.get('horizon') || '60', 10));
+  const MINV  = Math.max(1, parseInt(url.searchParams.get('min_vote') || '2', 10));
+  const FROMY = parseInt(url.searchParams.get('from_year') || '2019', 10);
+
+  // эмитенты с ≥2 годами отчётов, детерминированный порядок, страница
+  let innRows = [];
+  try {
+    innRows = (await env.DB.prepare(
+      `SELECT inn, COUNT(*) c FROM issuer_reports WHERE fy_year IS NOT NULL
+       GROUP BY inn HAVING c >= 2 ORDER BY inn LIMIT ? OFFSET ?`
+    ).bind(count, start).all()).results || [];
+  } catch(e){ return errResp('inn page query failed: ' + e, 500); }
+
+  const agg = {};   // year -> {np,sp,wp, ny,sy,wy}
+  const add = (y, key, val, win) => {
+    const a = agg[y] || (agg[y] = {np:0, sp:0, wp:0, ny:0, sy:0, wy:0});
+    if(key === 'p'){ a.np++; a.sp += val; if(win) a.wp++; }
+    else           { a.ny++; a.sy += val; if(win) a.wy++; }
+  };
+  let n_events = 0, n_trades = 0, n_issuers = 0;
+
+  for(const row of innRows){
+    const inn = row.inn;
+    let reps = [];
+    try {
+      reps = (await env.DB.prepare(
+        `SELECT fy_year, rev, np, ebitda_marg, net_debt_eq FROM issuer_reports
+         WHERE inn = ? AND fy_year IS NOT NULL`
+      ).bind(inn).all()).results || [];
+    } catch(_){ continue; }
+    const byYear = {};
+    for(const r of reps) byYear[r.fy_year] = r;
+    const years = Object.keys(byYear).map(Number).sort((a,b)=>a-b);
+    const events = [];
+    for(const y of years){
+      if(!byYear[y-1] || y < FROMY) continue;
+      const dir = _pFundDir(byYear[y], byYear[y-1], MINV);
+      if(dir !== 0) events.push({y, dir});
+    }
+    if(!events.length) continue;
+    n_issuers++;
+    n_events += events.length;
+
+    const minY = events[0].y, maxY = events[events.length-1].y;
+    const from = `${minY + 1}-03-01`;
+    const to   = `${maxY + 1}-12-31`;
+    let px = [];
+    try {
+      px = (await env.DB.prepare(
+        `SELECT secid, date, price, yield FROM bond_daily
+         WHERE emitent_inn = ? AND date >= ? AND date <= ? AND price > 0
+         ORDER BY secid, date`
+      ).bind(String(inn), from, to).all()).results || [];
+    } catch(_){ continue; }
+    if(!px.length) continue;
+    // группируем по secid
+    const bySec = {};
+    for(const r of px) (bySec[r.secid] || (bySec[r.secid] = [])).push(r);
+
+    for(const {y, dir} of events){
+      const entryStr = `${y + 1}-04-01`;
+      for(const secid in bySec){
+        const arr = bySec[secid];
+        let ei = -1;
+        for(let i = 0; i < arr.length; i++){ if(arr[i].date >= entryStr){ ei = i; break; } }
+        if(ei < 0 || ei + HZ >= arr.length) continue;
+        const e = arr[ei], x = arr[ei + HZ];
+        if(!(e.price > 0) || !(x.price > 0)) continue;
+        const sp = dir * (x.price - e.price) / e.price;
+        add(y, 'p', sp, sp > 0);
+        if(e.yield != null && x.yield != null){
+          const sy = -dir * (x.yield - e.yield);
+          add(y, 'y', sy, sy > 0);
+        }
+        n_trades++;
+      }
+    }
+  }
+
+  return jsonResp({
+    start, count, returned: innRows.length,
+    horizon: HZ, min_vote: MINV,
+    n_issuers, n_events, n_trades, agg,
+  });
 }
 
 // Сократить имя: убрать ОПФ-префиксы и лишние «‎» — для дисплея и
