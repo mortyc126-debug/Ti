@@ -347,31 +347,40 @@ def main():
         for ym, _d, ret in allt:
             mkt.setdefault(ym, []).append(ret)
         mkt_mean = {ym: (sum(v) / len(v)) for ym, v in mkt.items()}
-        # агрегируем по ГОДУ: raw-signed vs neutral-signed (gross, %)
-        by_year = {}
+        # Разрез по СОСТОЯНИЮ РЫНКА: месяцы в терцили по рыночному ходу
+        # (худшие/средние/лучшие). Прямой тест гипотезы: кратерит ли RAW в плохой
+        # фон, пока NEU держится. Год слишком крупен — берём месяц как единицу.
+        months = sorted(mkt_mean, key=lambda m: mkt_mean[m])
+        t = max(1, len(months) // 3)
+        tier = {}
+        for idx, m in enumerate(months):
+            tier[m] = ("1_плохой_рынок" if idx < t else
+                       "3_хороший_рынок" if idx >= 2 * t else "2_средний")
+        buckets = {}
         for ym, d, ret in allt:
-            yr = ym[:4]
-            a = by_year.setdefault(yr, {"n": 0, "rs": 0.0, "rw": 0, "ns": 0.0, "nw": 0})
+            b = tier[ym]
+            a = buckets.setdefault(b, {"n": 0, "rs": 0.0, "rw": 0, "ns": 0.0, "nw": 0})
             rs = d * ret                       # raw signed
             ns = d * (ret - mkt_mean[ym])      # neutral signed (макро снят)
             a["n"] += 1
             a["rs"] += rs; a["rw"] += 1 if rs > 0 else 0
             a["ns"] += ns; a["nw"] += 1 if ns > 0 else 0
-        print(f"\n=== MARKET-NEUTRAL (ансамбль {DEFAULT_ENSEMBLE if not args.methods else ens}, "
-              f"k={args.k}, gross %) ===")
-        print(f"{'год':<6}{'n':>7}{'RAW hit':>9}{'RAW ср%':>9}{'NEU hit':>9}{'NEU ср%':>9}")
+        print(f"\n=== MARKET-NEUTRAL по состоянию рынка (ансамбль "
+              f"{DEFAULT_ENSEMBLE if not args.methods else ens}, k={args.k}, gross %) ===")
+        print(f"(месяцы в терцили по рыночному ходу; {len(months)} мес всего)")
+        print(f"{'бакет':<18}{'n':>7}{'RAW hit':>9}{'RAW ср%':>9}{'NEU hit':>9}{'NEU ср%':>9}")
         tot = {"n": 0, "rs": 0.0, "rw": 0, "ns": 0.0, "nw": 0}
-        for yr in sorted(by_year):
-            a = by_year[yr]
+        for b in sorted(buckets):
+            a = buckets[b]
             for kk in tot: tot[kk] += a[kk]
-            print(f"{yr:<6}{a['n']:>7}{a['rw']/a['n']*100:>8.1f}%{a['rs']/a['n']*100:>+9.3f}"
+            print(f"{b:<18}{a['n']:>7}{a['rw']/a['n']*100:>8.1f}%{a['rs']/a['n']*100:>+9.3f}"
                   f"{a['nw']/a['n']*100:>8.1f}%{a['ns']/a['n']*100:>+9.3f}")
         N = tot["n"]
-        print(f"{'ВСЕГО':<6}{N:>7}{tot['rw']/N*100:>8.1f}%{tot['rs']/N*100:>+9.3f}"
+        print(f"{'ВСЕГО':<18}{N:>7}{tot['rw']/N*100:>8.1f}%{tot['rs']/N*100:>+9.3f}"
               f"{tot['nw']/N*100:>8.1f}%{tot['ns']/N*100:>+9.3f}")
-        print("\nчитать: RAW ≈ то, что ловит макро; NEU — чистый фундаментальный "
-              "спред. Если NEU hit>52% и ср%>0 УСТОЙЧИВО по годам, а RAW скачет — "
-              "макро маскировал сигнал (гипотеза подтверждена). cost не вычтен (gross).")
+        print("\nчитать: если в '1_плохой_рынок' RAW уходит в минус, а NEU держит "
+              "плюс — макро маскировал сигнал (твоя гипотеза). Если NEU≈RAW во всех "
+              "терцилях — нейтрализация ничего не добавляет. cost не вычтен (gross).")
         return
 
     keys = sorted({k for r in rl for k in r["M"].keys()})
