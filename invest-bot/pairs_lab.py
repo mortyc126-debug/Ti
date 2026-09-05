@@ -118,6 +118,9 @@ def main():
     ap.add_argument("--cross-sector", action="store_true",
                      help="разрешить пары из РАЗНЫХ секторов (по умолчанию только "
                           "внутри сектора — убирает ложную коинтеграцию)")
+    ap.add_argument("--pairs", default=None,
+                     help="явные пары через запятую (A/B,C/D), минуя скан и фильтры "
+                          "half-life/corr: для эталонных обычка/префы SBER/SBERP…")
     ap.add_argument("--workers", type=int, default=None)
     args = ap.parse_args()
 
@@ -148,15 +151,33 @@ def main():
     all_trades = []   # (pair, pnl_net)
     per_pair = []     # (pair, n, sum_net, wins)
 
-    for i in range(len(names)):
-        for j in range(i + 1, len(names)):
-            A, B = names[i], names[j]
-            if not args.cross_sector:
-                sa, sb = _SECTOR.get(A), _SECTOR.get(B)
-                if sa is None or sb is None or sa != sb:
-                    continue   # только внутрисекторные пары (экономическая связь)
+    explicit = None
+    if args.pairs:
+        explicit = []
+        for p in args.pairs.split(","):
+            p = p.strip().upper()
+            if "/" in p:
+                a, b = p.split("/")
+                explicit.append((a.strip(), b.strip()))
+        cand = explicit
+    else:
+        cand = [(names[i], names[j]) for i in range(len(names))
+                for j in range(i + 1, len(names))]
+
+    for A, B in cand:
+        if not explicit and not args.cross_sector:
+            sa, sb = _SECTOR.get(A), _SECTOR.get(B)
+            if sa is None or sb is None or sa != sb:
+                continue   # только внутрисекторные пары (экономическая связь)
+        if A not in series or B not in series:
+            if explicit:
+                print(f"[skip] {A}/{B}: нет данных в кэше", file=sys.stderr)
+            continue
+        if True:
             common = sorted(set(series[A]) & set(series[B]))
             if len(common) < args.min_days:
+                if explicit:
+                    print(f"[skip] {A}/{B}: общих дней {len(common)}<{args.min_days}", file=sys.stderr)
                 continue
             la = [math.log(series[A][d]) for d in common if series[A][d] > 0 and series[B][d] > 0]
             lb = [math.log(series[B][d]) for d in common if series[A][d] > 0 and series[B][d] > 0]
@@ -165,18 +186,20 @@ def main():
             cut = int(len(la) * args.split_frac)
             la_tr, lb_tr = la[:cut], lb[:cut]
             la_te, lb_te = la[cut:], lb[cut:]
-            # отбор на TRAIN
+            # отбор на TRAIN (для явных пар фильтры corr/half-life пропускаем)
             ra = [la_tr[k+1]-la_tr[k] for k in range(len(la_tr)-1)]
             rb = [lb_tr[k+1]-lb_tr[k] for k in range(len(lb_tr)-1)]
-            if _corr(ra, rb) < args.min_corr:
+            if not explicit and _corr(ra, rb) < args.min_corr:
                 continue
             beta, alpha = _ols(la_tr, lb_tr)
             if beta <= 0:
                 continue
             spr_tr = [la_tr[k] - (alpha + beta * lb_tr[k]) for k in range(len(la_tr))]
             hl = _half_life(spr_tr)
-            if hl is None or not (args.hl_min <= hl <= args.hl_max):
+            if not explicit and (hl is None or not (args.hl_min <= hl <= args.hl_max)):
                 continue
+            if hl is None:
+                hl = 0.0
             m = sum(spr_tr) / len(spr_tr)
             sd = (sum((x - m) ** 2 for x in spr_tr) / len(spr_tr)) ** 0.5
             if sd <= 0:
