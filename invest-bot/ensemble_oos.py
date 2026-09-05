@@ -78,27 +78,60 @@ def _run_ticker(job: dict) -> tuple:
     methods = [(n, fn) for n, fn in sm._WORKER_METHODS if n in job["methods"]]
     per_method = job.get("per_method", False)
     entry_mode = job.get("entry", "next_open")
+    brackets = job.get("brackets") or []   # [(take, stop), ...]; пусто → fixed-k
+    H = job.get("horizon", 24)             # макс. держание для брекета (баров)
     n = len(candles)
-    # позиции: нужен вход и выход по close[i+k] → i+K ≤ n-1 (для next_open ещё i+1)
-    positions = range(W, n - K - 1, S)
+    # для брекета нужен запас H баров вперёд; для fixed-k — K.
+    fwd_need = (H if brackets else K) + 1
+    positions = range(W, n - fwd_need - 1, S)
     split_i = int(n * FRAC)   # бары до split_i — train, после — test
 
     # M[key] = {"train":[n,sum,wins], "test":[...], "all":[...]}; key = имя метода
-    # (в per-method режиме) или "ENS" (ансамблевый голос).
+    # (или "ENS") + суффикс брекета @take/stop, если сетка задана.
     def _blank():
         return {"train": [0, 0.0, 0], "test": [0, 0.0, 0], "all": [0, 0.0, 0]}
     M = {}
 
-    def _record(key, dirn, i, a):
-        if entry_mode == "close":
-            entry = closes[i]           # «нечестно»: вход по close сигнального бара
-        else:
-            entry = opens[i + 1]        # честно: вход рынком на след. баре
-        ret = dirn * (closes[i + K] - entry) / a - COST
+    def _entry_price(i):
+        return closes[i] if entry_mode == "close" else opens[i + 1]
+
+    def _bracket_ret(dirn, entry, i, a, take, stop):
+        """Симуляция брекета от entry: интрабар TP/SL, иначе тайм-стоп по close.
+        Возвращает доходность в ATR (без cost). При одновременном касании
+        TP и SL в одном баре считаем СТОП (консервативно)."""
+        tp = entry + dirn * take * a
+        sl = entry - dirn * stop * a
+        start = i if entry_mode == "close" else i + 1
+        end = min(i + H, n - 1)
+        for j in range(start, end + 1):
+            hi, lo = highs[j], lows[j]
+            if dirn > 0:
+                if lo <= sl:
+                    return -stop
+                if hi >= tp:
+                    return take
+            else:
+                if hi >= sl:
+                    return -stop
+                if lo <= tp:
+                    return take
+        return dirn * (closes[end] - entry) / a   # тайм-стоп
+
+    def _push(key, ret, i):
         acc = M.setdefault(key, _blank())
         bucket = "train" if i < split_i else "test"
         for b in (bucket, "all"):
             acc[b][0] += 1; acc[b][1] += ret; acc[b][2] += (1 if ret > 0 else 0)
+
+    def _record(base, dirn, i, a):
+        entry = _entry_price(i)
+        if brackets:
+            for take, stop in brackets:
+                r = _bracket_ret(dirn, entry, i, a, take, stop) - COST
+                _push(f"{base}@{take:g}/{stop:g}", r, i)
+        else:
+            r = dirn * (closes[i + K] - entry) / a - COST
+            _push(base, r, i)
 
     for i in positions:
         a = atr[i]
@@ -191,7 +224,22 @@ def main():
     ap.add_argument("--entry", default="next_open", choices=("next_open", "close"),
                      help="next_open=честно (рынком на след. баре); close=«нечестно» "
                           "(по close сигнала) — измерить, сколько альфы съедает gap")
+    ap.add_argument("--bracket", default=None,
+                     help="сетка брекетов TP/SL в ATR вместо fixed-k выхода: "
+                          "'2.0/1.0,3.0/1.0,1.5/1.0'. Интрабар TP/SL + тайм-стоп "
+                          "по --horizon. Судить ТОЛЬКО по TEST (иначе подгон брекета).")
+    ap.add_argument("--horizon", type=int, default=24,
+                     help="макс. держание брекета в барах (тайм-стоп)")
     args = ap.parse_args()
+
+    brackets = []
+    if args.bracket:
+        for pair in args.bracket.split(","):
+            pair = pair.strip()
+            if not pair:
+                continue
+            tk, st = pair.split("/")
+            brackets.append((float(tk), float(st)))
 
     ens = ([m.strip() for m in args.methods.split(",") if m.strip()]
            if args.methods else DEFAULT_ENSEMBLE)
@@ -215,9 +263,11 @@ def main():
         sys.exit("нет тикеров после фильтров")
 
     mode = "per-method" if args.per_method else f"ансамбль(min_votes={args.min_votes})"
+    exit_str = (f"bracket[{args.bracket}] H={args.horizon}" if brackets
+                else f"fixed-k={args.k}")
     print(f"[ens] методы: {ens}", file=sys.stderr)
     print(f"[ens] тикеров: {len(tickers)}  режим={mode}  entry={args.entry}  "
-          f"cost={args.cost}  split={args.split_frac}  k={args.k}", file=sys.stderr)
+          f"exit={exit_str}  cost={args.cost}  split={args.split_frac}", file=sys.stderr)
 
     jobs = [{"ticker": t, "cache_dir": args.cache, "interval": args.interval,
              "date_from": date_from, "date_to": date_to, "window": args.window,
@@ -225,7 +275,8 @@ def main():
              "agree_min": args.agree_min, "min_votes": args.min_votes,
              "cost": args.cost, "split_frac": args.split_frac,
              "methods": ens_set, "per_method": args.per_method,
-             "entry": args.entry} for t in tickers]
+             "entry": args.entry, "brackets": brackets,
+             "horizon": args.horizon} for t in tickers]
 
     n_wk = args.workers or max(1, (mp.cpu_count() or 2) - 1)
     recs = {}
