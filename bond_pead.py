@@ -190,13 +190,15 @@ def main():
     ev_yield = {}   # year -> list signed -Δyield
     n_events = 0    # (issuer,year) с валидным направлением
     n_trades = 0    # (issuer,year,bond) с валидным исходом
+    dbg = {"no_rep": 0, "lt2yr": 0, "no_bonds": 0, "dir0": 0, "no_price": 0}
     HZ = args.horizon
 
     for k, inn in enumerate(inns):
         if k % 25 == 0:
-            print(f"[{k}/{len(inns)}] events={n_events} trades={n_trades}", file=sys.stderr)
+            print(f"[{k}/{len(inns)}] events={n_events} trades={n_trades} drops={dbg}", file=sys.stderr)
         rep = _get(args.base, f"/issuer/{inn}/reports", args.cache_dir)
         if not rep:
+            dbg["no_rep"] += 1
             continue
         rows = rep.get("data") or []
         by_year = {}
@@ -206,6 +208,7 @@ def main():
                 by_year[int(y)] = r      # если period-дубли — берём последний
         years = sorted(by_year)
         if len(years) < 2:
+            dbg["lt2yr"] += 1
             continue
         # бонды эмитента — запрос по одному ИНН (быстрый, в отличие от /catalog)
         if inn not in inn_bonds:
@@ -213,6 +216,7 @@ def main():
             inn_bonds[inn] = [b.get("secid") for b in ((bl.get("data") if bl else []) or [])
                               if b.get("secid")]
         if not inn_bonds[inn]:
+            dbg["no_bonds"] += 1
             continue
         # ряды цен бондов — УЗКИМ окном вокруг события (крупные тела рвёт прокси).
         # Ключ кэша (isin, yr): для каждого года события своё окно.
@@ -222,8 +226,10 @@ def main():
                 continue
             direction = _fund_direction(by_year[yr], by_year[yr - 1], args.min_vote)
             if direction == 0:
+                dbg["dir0"] += 1
                 continue
             n_events += 1
+            trades_before = n_trades
             entry_dt = date(yr + 1, 4, 1)   # ~раскрытие РСБУ за yr
             frm = f"{yr + 1}-03-01"          # окно: март..декабрь года раскрытия
             to  = f"{yr + 1}-12-31"          # покрывает вход ~1 апр + горизонт до ~120 дн
@@ -257,6 +263,8 @@ def main():
                     signed_y = -direction * (y1 - p0[1])   # улучшение → yield падает → +
                     ev_yield.setdefault(yr, []).append(signed_y)
                 n_trades += 1
+            if n_trades == trades_before:
+                dbg["no_price"] += 1   # событие было, но ни одного бонда с ценой в окне
         time.sleep(0.02)
 
     def _report(dct, label, unit):
@@ -275,6 +283,7 @@ def main():
             print(f"{yr:<12}{len(v):>7}{h*100:>7.1f}%{statistics.mean(v):>+12.4f}")
 
     print(f"\nсобытий (эмитент×год с направлением): {n_events}   сделок (×бонд×исход): {n_trades}")
+    print(f"отсев: {dbg}")
     _report(ev_price, "signed ЦЕНА бонда (dir · price_ret)", "")
     _report(ev_yield, "signed −Δ ДОХОДНОСТЬ (dir · −Δyield, п.п.)", "пп")
     print("\nчитать: hit>55% и ср.>0 УСТОЙЧИВО по годам = кредитный PEAD есть. "
