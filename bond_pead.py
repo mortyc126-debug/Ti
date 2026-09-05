@@ -158,22 +158,19 @@ def main():
     args = ap.parse_args()
     os.makedirs(args.cache_dir, exist_ok=True)
 
-    cat = _get(args.base, "/catalog", args.cache_dir, ttl_days=7, timeout=120)
-    if not cat:
-        sys.exit("не удалось получить /catalog")
-    issuers = cat.get("issuers") or []
-    bonds = cat.get("bonds") or []
-    inn_bonds = {}
-    for b in bonds:
-        inn = str(b.get("issuerInn") or "")
-        isin = b.get("isin")
-        if inn and isin:
-            inn_bonds.setdefault(inn, []).append(isin)
-    inns = [str(i.get("inn")) for i in issuers if i.get("inn") and str(i.get("inn")) in inn_bonds]
+    # Универсум эмитентов — из лёгкого /reports/latest (у /catalog тяжёлый JOIN
+    # по 400к строк → таймаут воркера). Бонды тянем по каждому ИНН отдельно
+    # (/bond/issuer — запрос по одному inn, быстрый). Карта inn→isins строится
+    # в цикле.
+    rl = _get(args.base, "/reports/latest?limit=500", args.cache_dir, ttl_days=7, timeout=60)
+    if not rl:
+        sys.exit("не удалось получить /reports/latest")
+    seed = rl.get("data") or []
+    inns = list(dict.fromkeys(str(r["inn"]) for r in seed if r.get("inn")))
     if args.limit_issuers:
         inns = inns[:args.limit_issuers]
-    print(f"[pead] эмитентов с бондами: {len(inns)}  бондов в карте: {sum(len(v) for v in inn_bonds.values())}",
-          file=sys.stderr)
+    inn_bonds = {}
+    print(f"[pead] эмитентов в универсуме (из /reports/latest): {len(inns)}", file=sys.stderr)
 
     # events[event_year] = list of signed outcomes
     ev_price = {}   # year -> list signed price-return
@@ -196,6 +193,13 @@ def main():
                 by_year[int(y)] = r      # если period-дубли — берём последний
         years = sorted(by_year)
         if len(years) < 2:
+            continue
+        # бонды эмитента — запрос по одному ИНН (быстрый, в отличие от /catalog)
+        if inn not in inn_bonds:
+            bl = _get(args.base, f"/bond/issuer?inn={inn}", args.cache_dir)
+            inn_bonds[inn] = [b.get("secid") for b in ((bl.get("data") if bl else []) or [])
+                              if b.get("secid")]
+        if not inn_bonds[inn]:
             continue
         # предзагрузим ряды бондов эмитента один раз
         series_cache = {}
