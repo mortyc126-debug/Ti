@@ -75,7 +75,10 @@ def _run_ticker(job: dict) -> tuple:
     lows   = np.array([r["low"]   for r in rows], dtype=float)
     atr = sm._atr_sma(highs, lows, job["n_atr"])
 
-    methods = [(n, fn) for n, fn in sm._WORKER_METHODS if n in job["methods"]]
+    if job.get("all_methods"):
+        methods = list(sm._WORKER_METHODS)          # скан по всей библиотеке
+    else:
+        methods = [(n, fn) for n, fn in sm._WORKER_METHODS if n in job["methods"]]
     per_method = job.get("per_method", False)
     entry_mode = job.get("entry", "next_open")
     brackets = job.get("brackets") or []   # [(take, stop), ...]; пусто → fixed-k
@@ -140,12 +143,13 @@ def _run_ticker(job: dict) -> tuple:
             _push(base, r, i)
         if market_neutral:
             # цена входа/выхода в %: доходность, сравнимая между тикерами; месяц
-            # входа для кросс-секционной демеанизации (снятие макро-прилива)
+            # входа для кросс-секционной демеанизации (снятие макро-прилива).
+            # base = имя метода (per-method скан) или "ENS".
             ep = closes[i] if entry_mode == "close" else opens[i + 1]
             if ep > 0:
                 raw = (closes[i + K] - ep) / ep
                 ym = rows[i + 1]["time"][:7]
-                mn.append((ym, dirn, raw))
+                mn.append((base, ym, dirn, raw))
 
     for i in positions:
         a = atr[i]
@@ -260,6 +264,8 @@ def main():
                           "neutral по состоянию рынка + нетто/OOS (ансамбль, honest, fixed-k).")
     ap.add_argument("--mn-cost", type=float, default=0.001,
                      help="кост round-trip в ДОЛЯХ для market-neutral нетто (0.001=0.1%)")
+    ap.add_argument("--all-methods", action="store_true",
+                     help="скан по всей библиотеке методов (с --per-method --market-neutral)")
     args = ap.parse_args()
 
     brackets = []
@@ -309,7 +315,8 @@ def main():
              "methods": ens_set, "per_method": args.per_method,
              "entry": args.entry, "brackets": brackets,
              "horizon": args.horizon, "folds": args.folds,
-             "market_neutral": args.market_neutral} for t in tickers]
+             "market_neutral": args.market_neutral,
+             "all_methods": args.all_methods} for t in tickers]
 
     n_wk = args.workers or max(1, (mp.cpu_count() or 2) - 1)
     recs = {}
@@ -340,18 +347,55 @@ def main():
           f"({sum(r['is_fut'] for r in rl)} фью) ===")
 
     if args.market_neutral:
-        # Все сделки: (ym, dir, raw_ret). Рыночный ход месяца = средняя raw_ret
-        # по ВСЕМ сделкам этого месяца (кросс-секц.). abnormal = raw − market.
+        # Все сделки: (base, ym, dir, raw_ret). base = метод (per-method) или ENS.
+        # Рыночный ход месяца = средняя raw_ret по ВСЕМ сделкам этого месяца
+        # (кросс-секц., все методы вместе = рыночный прокси). abnormal = raw − market.
         allt = [t for r in rl for t in r.get("mn", [])]
         if not allt:
             sys.exit("market-neutral: нет сделок")
         mkt = {}
-        for ym, _d, ret in allt:
+        for _b, ym, _d, ret in allt:
             mkt.setdefault(ym, []).append(ret)
         mkt_mean = {ym: (sum(v) / len(v)) for ym, v in mkt.items()}
-        # Разрез по СОСТОЯНИЮ РЫНКА: месяцы в терцили по рыночному ходу
-        # (худшие/средние/лучшие). Прямой тест гипотезы: кратерит ли RAW в плохой
-        # фон, пока NEU держится. Год слишком крупен — берём месяц как единицу.
+        chrono = sorted(mkt_mean)
+        cut = int(len(chrono) * 0.7)
+        train_ms = set(chrono[:cut]); test_ms = set(chrono[cut:])
+        C = args.mn_cost
+
+        def _neu_split(trades, ms):
+            n = ns = nw = nnet = 0
+            for _b, ym, d, ret in trades:
+                if ym not in ms:
+                    continue
+                s = d * (ret - mkt_mean[ym])
+                n += 1; ns += s
+                if s > 0: nw += 1
+                if s - C > 0: nnet += 1
+            if not n:
+                return None
+            return (n, ns/n, ns/n - C, nw/n, nnet/n)   # n, gross, net, hit, net_hit
+
+        if args.per_method:
+            # СКАН по методам: NEU net TEST по каждому. Множественное тестирование —
+            # верим только заметному TEST-плюсу, устойчивому и не одинокому.
+            keys_m = sorted({b for b, *_ in allt})
+            print(f"\n=== MARKET-NEUTRAL СКАН ПО МЕТОДАМ (k={args.k}, "
+                  f"cost {C*100:.2f}%, TEST={len(test_ms)}мес) ===")
+            print(f"{'метод':<22}{'n_test':>8}{'gross%':>9}{'NET%':>9}{'net hit':>9}")
+            rows_m = []
+            for km in keys_m:
+                tr = [t for t in allt if t[0] == km]
+                te = _neu_split(tr, test_ms)
+                if te:
+                    rows_m.append((te[2], km, te))   # sort by net
+            for _net, km, te in sorted(rows_m, reverse=True):
+                n, g, net, _h, nh = te
+                print(f"{km:<22}{n:>8}{g*100:>+9.4f}{net*100:>+9.4f}{nh*100:>8.1f}%")
+            print("\nвердикт: ищем метод с NET% заметно >0 на TEST. Помни про "
+                  "множественное тестирование — один-два случайных плюса ожидаемы.")
+            return
+
+        # ── Ансамбль: разрез по состоянию рынка (gross) ──
         months = sorted(mkt_mean, key=lambda m: mkt_mean[m])
         t = max(1, len(months) // 3)
         tier = {}
@@ -359,11 +403,9 @@ def main():
             tier[m] = ("1_плохой_рынок" if idx < t else
                        "3_хороший_рынок" if idx >= 2 * t else "2_средний")
         buckets = {}
-        for ym, d, ret in allt:
-            b = tier[ym]
-            a = buckets.setdefault(b, {"n": 0, "rs": 0.0, "rw": 0, "ns": 0.0, "nw": 0})
-            rs = d * ret                       # raw signed
-            ns = d * (ret - mkt_mean[ym])      # neutral signed (макро снят)
+        for _b, ym, d, ret in allt:
+            a = buckets.setdefault(tier[ym], {"n":0,"rs":0.0,"rw":0,"ns":0.0,"nw":0})
+            rs = d * ret; ns = d * (ret - mkt_mean[ym])
             a["n"] += 1
             a["rs"] += rs; a["rw"] += 1 if rs > 0 else 0
             a["ns"] += ns; a["nw"] += 1 if ns > 0 else 0
@@ -371,7 +413,7 @@ def main():
               f"{DEFAULT_ENSEMBLE if not args.methods else ens}, k={args.k}, gross %) ===")
         print(f"(месяцы в терцили по рыночному ходу; {len(months)} мес всего)")
         print(f"{'бакет':<18}{'n':>7}{'RAW hit':>9}{'RAW ср%':>9}{'NEU hit':>9}{'NEU ср%':>9}")
-        tot = {"n": 0, "rs": 0.0, "rw": 0, "ns": 0.0, "nw": 0}
+        tot = {"n":0,"rs":0.0,"rw":0,"ns":0.0,"nw":0}
         for b in sorted(buckets):
             a = buckets[b]
             for kk in tot: tot[kk] += a[kk]
@@ -380,38 +422,18 @@ def main():
         N = tot["n"]
         print(f"{'ВСЕГО':<18}{N:>7}{tot['rw']/N*100:>8.1f}%{tot['rs']/N*100:>+9.3f}"
               f"{tot['nw']/N*100:>8.1f}%{tot['ns']/N*100:>+9.3f}")
-        print("\nчитать: если в '1_плохой_рынок' RAW уходит в минус, а NEU держит "
-              "плюс — макро маскировал сигнал (твоя гипотеза). Если NEU≈RAW во всех "
-              "терцилях — нейтрализация ничего не добавляет. cost не вычтен (gross).")
-
-        # ── НЕТТО + OOS: хронологический train/test по месяцам ──
-        chrono = sorted(mkt_mean)               # месяцы по времени
-        cut = int(len(chrono) * 0.7)
-        train_ms = set(chrono[:cut]); test_ms = set(chrono[cut:])
-        C = args.mn_cost
-        def _split(ms):
-            n = ns = nw = ns_net = nwnet = 0
-            for ym, d, ret in allt:
-                if ym not in ms:
-                    continue
-                s = d * (ret - mkt_mean[ym])    # neutral signed
-                n += 1
-                ns += s; nw += 1 if s > 0 else 0
-                ns_net += s - C; nwnet += 1 if (s - C) > 0 else 0
-            if not n:
-                return None
-            return (n, ns/n, nw/n, ns_net/n, nwnet/n)
+        # ── Нетто + OOS ──
         print(f"\n=== NEU нетто/OOS (cost round-trip {C*100:.2f}%, "
               f"train {len(train_ms)}мес / test {len(test_ms)}мес) ===")
         print(f"{'сплит':<8}{'n':>8}{'NEU gross%':>12}{'NEU net%':>11}{'net hit':>9}")
         for lbl, ms in (("TRAIN", train_ms), ("TEST", test_ms)):
-            r = _split(ms)
+            r = _neu_split(allt, ms)
             if not r:
                 print(f"{lbl:<8} —"); continue
-            n, g, _hg, net, hnet = r
-            print(f"{lbl:<8}{n:>8}{g*100:>+12.4f}{net*100:>+11.4f}{hnet*100:>8.1f}%")
+            n, g, net, _h, nh = r
+            print(f"{lbl:<8}{n:>8}{g*100:>+12.4f}{net*100:>+11.4f}{nh*100:>8.1f}%")
         print("\nвердикт: TEST NEU net% > 0 и net hit > 50% → живой торгуемый "
-              "рыночно-нейтральный сигнал на акциях. ≤0 → съедается костами (near-miss).")
+              "рыночно-нейтральный сигнал. ≤0 → съедается костами (near-miss).")
         return
 
     keys = sorted({k for r in rl for k in r["M"].keys()})
