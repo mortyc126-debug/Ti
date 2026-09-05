@@ -151,18 +151,7 @@ def analyze_news(title: str, summary: str, ticker: str) -> dict:
         "expected_strength":  "weak",
         "reasoning":          "ошибка классификации",
     }
-    try:
-        from cerebras.cloud.sdk import Cerebras
-        from news_config import CEREBRAS_API_KEY
-
-        api_key = CEREBRAS_API_KEY
-        if not api_key:
-            logger.warning("CEREBRAS_API_KEY не задан")
-            return fallback
-
-        client = Cerebras(api_key=api_key)
-
-        prompt = f"""Ты финансовый аналитик российского рынка акций.
+    prompt = f"""Ты финансовый аналитик российского рынка акций.
 Оцени влияние новости на акцию {ticker}.
 
 Заголовок: {title}
@@ -181,14 +170,14 @@ def analyze_news(title: str, summary: str, ticker: str) -> dict:
   moderate — ожидаемое движение 0.5–2% (заметная реакция)
   strong   — ожидаемое движение > 2% (сильный импульс)
 """
-
-        response = client.chat.completions.create(
-            model="llama-3.3-70b",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=120,
-            temperature=0.0,
-        )
-        raw_text = response.choices[0].message.content.strip()
+    try:
+        from news_config import NEWS_LLM_PROVIDER
+        if NEWS_LLM_PROVIDER == "cerebras":
+            raw_text = _llm_cerebras(prompt)
+        else:
+            raw_text = _llm_yandex(prompt)
+        if not raw_text:
+            return fallback
 
         # Вырезаем JSON даже если модель добавила что-то лишнее
         match = re.search(r"\{.*\}", raw_text, re.DOTALL)
@@ -197,27 +186,71 @@ def analyze_news(title: str, summary: str, ticker: str) -> dict:
             return fallback
 
         parsed = json.loads(match.group())
-
         result = {
             "sentiment":          parsed.get("sentiment", "neutral"),
             "expected_direction": parsed.get("expected_direction", "neutral"),
             "expected_strength":  parsed.get("expected_strength", "weak"),
             "reasoning":          parsed.get("reasoning", ""),
         }
-
-        # Валидация значений
         if result["sentiment"] not in SENTIMENT_VALUES:
             result["sentiment"] = "neutral"
         if result["expected_direction"] not in DIRECTION_VALUES:
             result["expected_direction"] = "neutral"
         if result["expected_strength"] not in STRENGTH_VALUES:
             result["expected_strength"] = "weak"
-
         return result
 
     except Exception as e:
         logger.error(f"analyze_news: {e}")
         return fallback
+
+
+def _llm_cerebras(prompt: str) -> str | None:
+    """Cerebras (llama-3.3-70b). Заблокирован Cloudflare для рос. IP — только
+    через VPN. Возвращает сырой текст ответа или None."""
+    from cerebras.cloud.sdk import Cerebras
+    from news_config import CEREBRAS_API_KEY
+    if not CEREBRAS_API_KEY:
+        logger.warning("CEREBRAS_API_KEY не задан")
+        return None
+    client = Cerebras(api_key=CEREBRAS_API_KEY)
+    response = client.chat.completions.create(
+        model="llama-3.3-70b",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=120,
+        temperature=0.0,
+    )
+    return response.choices[0].message.content.strip()
+
+
+def _llm_yandex(prompt: str) -> str | None:
+    """YandexGPT через REST (llm.api.cloud.yandex.net) — работает с рос. IP без
+    VPN. Чистый urllib (без SDK). Возвращает сырой текст ответа или None."""
+    from news_config import YANDEX_API_KEY, YANDEX_FOLDER_ID, YANDEX_MODEL
+    if not YANDEX_API_KEY or not YANDEX_FOLDER_ID:
+        logger.warning("YANDEX_API_KEY / YANDEX_FOLDER_ID не заданы")
+        return None
+    url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+    body = json.dumps({
+        "modelUri": f"gpt://{YANDEX_FOLDER_ID}/{YANDEX_MODEL}/latest",
+        "completionOptions": {"stream": False, "temperature": 0.0,
+                              "maxTokens": "200"},
+        "messages": [{"role": "user", "text": prompt}],
+    }).encode("utf-8")
+    req = urllib.request.Request(url, data=body, method="POST", headers={
+        "Authorization": f"Api-Key {YANDEX_API_KEY}",
+        "x-folder-id": YANDEX_FOLDER_ID,
+        "Content-Type": "application/json",
+    })
+    with urllib.request.urlopen(req, timeout=30,
+                                context=ssl_setup.ssl_context()) as r:
+        data = json.loads(r.read().decode("utf-8"))
+    # {"result":{"alternatives":[{"message":{"role":"assistant","text":"..."}}]}}
+    alts = data.get("result", {}).get("alternatives") or []
+    if not alts:
+        logger.warning(f"analyze_news(yandex): пустой ответ: {str(data)[:150]}")
+        return None
+    return alts[0].get("message", {}).get("text", "").strip()
 
 
 # ── Вспомогательные функции ───────────────────────────────────────────────────
