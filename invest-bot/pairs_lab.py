@@ -130,6 +130,18 @@ def main():
     tickers = sm._list_tickers(args.cache, args.interval, top_liq=args.top_liq,
                                workers=args.workers)
     tickers = [t for t in tickers if not _is_future(t)]   # только акции
+    # ноги явных пар грузим ПРИНУДИТЕЛЬНО — они могут не попасть в top-liq
+    # (свежедокачанные префы), иначе series их не увидит → «нет данных»
+    if args.pairs:
+        legs = set()
+        for p in args.pairs.split(","):
+            p = p.strip().upper()
+            if "/" in p:
+                a, b = p.split("/")
+                legs.add(a.strip()); legs.add(b.strip())
+        for lg in legs:
+            if lg and lg not in tickers:
+                tickers.append(lg)
     # загрузим дневные ряды
     series = {}
     for t in tickers:
