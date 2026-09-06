@@ -64,6 +64,15 @@ def _bin(disp):
     return NB - 1
 
 
+def _pkey(ds, mode):
+    """ключ периода из даты YYYY-MM-DD: месяц (YYYY-MM) или ISO-неделя (YYYY-Www)."""
+    if mode == "week":
+        from datetime import datetime as _dt
+        iso = _dt(int(ds[:4]), int(ds[5:7]), int(ds[8:10])).isocalendar()
+        return f"{iso[0]}-W{iso[1]:02d}"
+    return ds[:7]
+
+
 def _run(job):
     t = job["ticker"]
     rows = sm._load_from_cache(t, job["cache_dir"], job["interval"])
@@ -71,6 +80,7 @@ def _run(job):
         return t, None
     rows = sm._filter_by_dates(rows, job["date_from"], None)
     K, S, warm = job["k"], job["stride"], max(PERIODS) + 5
+    pm = job["split_by"]
     n = len(rows)
     if n < warm + K + 5:
         return t, None
@@ -93,7 +103,7 @@ def _run(job):
         b = _bin(disp)
         fwd = (closes[i + K] - opens[i + 1]) / opens[i + 1]
         df = d * fwd
-        ym = rows[i + 1]["time"][:7]
+        ym = _pkey(rows[i + 1]["time"][:10], pm)
         pb = perbin.setdefault(b, [0, 0.0, 0])
         pb[0] += 1; pb[1] += df; pb[2] += 1 if df > 0 else 0
         m = mn.setdefault(f"{ym}|{b}", [0, 0.0, 0])
@@ -118,7 +128,12 @@ def main():
     ap.add_argument("--only-stk", action="store_true")
     ap.add_argument("--only-fut", action="store_true")
     ap.add_argument("--fade-disp", type=float, default=None,
-                     help="порог dispersion (доля цены): нетто+OOS фейда при веере≥порог")
+                     help="порог dispersion (доля цены): нетто+OOS при веере≥порог")
+    ap.add_argument("--follow", action="store_true",
+                     help="ставка на ПРОДОЛЖЕНИЕ тренда веера (а не схождение): "
+                          "d=+sign(EMA20−EMA200). По умолчанию — фейд.")
+    ap.add_argument("--split-by", choices=("month", "week"), default="month",
+                     help="разбивка OOS train/test: по месяцам или неделям")
     ap.add_argument("--cost", type=float, default=0.001, help="кост round-trip в долях")
     ap.add_argument("--workers", type=int, default=None)
     args = ap.parse_args()
@@ -139,66 +154,73 @@ def main():
     print(f"[emafan] тикеров: {len(tickers)}  TF={args.interval}м  k={args.k}", file=sys.stderr)
 
     jobs = [{"ticker": t, "cache_dir": args.cache, "interval": args.interval,
-             "date_from": date_from, "k": args.k, "stride": args.stride} for t in tickers]
+             "date_from": date_from, "k": args.k, "stride": args.stride,
+             "split_by": args.split_by} for t in tickers]
     nwk = args.workers or max(1, (mp.cpu_count() or 2) - 1)
-    recs = []
+    recs = []                      # (ticker, {perbin, mn, mtot})
     with mp.Pool(nwk) as pool:
         for _t, r in pool.imap_unordered(_run, jobs, chunksize=1):
             if r:
-                recs.append(r)
+                recs.append((_t, r))
     if not recs:
         sys.exit("нет данных")
 
     PB = {}
-    for r in recs:
+    for _t, r in recs:
         for b, v in r["perbin"].items():
             a = PB.setdefault(b, [0, 0.0, 0])
             a[0] += v[0]; a[1] += v[1]; a[2] += v[2]
     MT = {}
-    for r in recs:
+    for _t, r in recs:
         for ym, v in r["mtot"].items():
             a = MT.setdefault(ym, [0, 0.0])
             a[0] += v[0]; a[1] += v[1]
     mkt = {ym: (v[1] / v[0] if v[0] else 0.0) for ym, v in MT.items()}
     NEU = {}
-    for r in recs:
+    for _t, r in recs:
         for mk, v in r["mn"].items():
             ym, b = mk.split("|"); b = int(b)
             a = NEU.setdefault(b, [0, 0.0])
             a[0] += v[0]; a[1] += v[1] - mkt.get(ym, 0.0) * v[2]
 
-    print(f"\n=== ВЕЕР EMA{PERIODS}: разброс → фейд·форвард, k={args.k}, TF={args.interval}м ===")
+    # sgn: +1 фейд (как в perbin/mn), −1 follow (продолжение). RAW/NEU/hit flip.
+    sgn = -1 if args.follow else 1
+    mode = "FOLLOW (продолжение)" if args.follow else "ФЕЙД (схождение)"
+    print(f"\n=== ВЕЕР EMA{PERIODS}: разброс → {mode}·форвард, k={args.k}, TF={args.interval}м ===")
     print(f"{'disp бин':<14}{'n':>10}{'RAW ср%':>10}{'RAW hit':>9}{'NEU ср%':>10}")
     for b in range(NB):
         p = PB.get(b)
         if not p or not p[0]:
             continue
         nb = NEU.get(b, [0, 0.0])
-        raw = p[1] / p[0] * 100; hit = p[2] / p[0] * 100
-        neu = (nb[1] / nb[0] * 100) if nb[0] else 0.0
+        raw = sgn * p[1] / p[0] * 100
+        hit = (p[2] if not args.follow else p[0] - p[2]) / p[0] * 100
+        neu = (sgn * nb[1] / nb[0] * 100) if nb[0] else 0.0
         print(f"{_EDGES[b]*100:.2f}-{_EDGES[b+1]*100:.2f}% {p[0]:>10}{raw:>+10.4f}"
               f"{hit:>8.1f}%{neu:>+10.4f}")
-    print("\nчитать: если фейд·форвард растёт с разбросом веера (плюс на широком "
-          "веере) — экстремальное расхождение действительно сходится (гипотеза). "
-          "Плоско/минус — веер не предсказывает схождение.")
+    print(f"\nчитать: столбцы для режима «{mode}». Плюс, растущий с разбросом веера, "
+          "= направление работает на широком веере; плоско/минус = нет.")
 
     if args.fade_disp is not None:
         thr = _bin(args.fade_disp)
         C = args.cost
+        unit = "нед" if args.split_by == "week" else "мес"
+        # общий сплит по периодам (месяц/неделя): агрегат по всем тикерам
         by_ym = {}
-        for r in recs:
+        for _t, r in recs:
             for mk, v in r["mn"].items():
                 ym, b = mk.split("|")
                 if int(b) < thr:
                     continue
                 a = by_ym.setdefault(ym, [0, 0.0, 0])
-                a[0] += v[0]; a[1] += v[1]; a[2] += v[2]
+                a[0] += v[0]; a[1] += sgn * v[1]; a[2] += sgn * v[2]
         chrono = sorted(by_ym)
         cut = int(len(chrono) * 0.7)
         splits = {"TRAIN": chrono[:cut], "TEST": chrono[cut:]}
-        print(f"\n=== ФЕЙД при разбросе≥{args.fade_disp*100:.1f}% (нетто cost {C*100:.2f}%, "
-              f"train {cut}м / test {len(chrono)-cut}м) ===")
+        print(f"\n=== {mode} при разбросе≥{args.fade_disp*100:.1f}% (нетто cost {C*100:.2f}%, "
+              f"train {cut}{unit} / test {len(chrono)-cut}{unit}) ===")
         print(f"{'сплит':<8}{'n':>9}{'gross%':>11}{'RAW net%':>11}{'NEU net%':>11}")
+        test_periods = set(splits["TEST"])
         for lbl, ms in splits.items():
             nn = 0; sdf = 0.0; sneu = 0.0
             for ym in ms:
@@ -208,7 +230,34 @@ def main():
                 print(f"{lbl:<8} —"); continue
             print(f"{lbl:<8}{nn:>9}{sdf/nn*100:>+11.4f}{(sdf/nn-C)*100:>+11.4f}"
                   f"{(sneu/nn-C)*100:>+11.4f}")
-        print("\nвердикт: TEST net% > 0 → схождение веера переживает косты OOS.")
+
+        # ── по тикерам отдельно: нетто на TEST-периодах (общий хроно-сплит) ──
+        per_t = {}   # ticker -> [n, Σsgn·df, Σsgn·(df − mkt·dir)]
+        for tk, r in recs:
+            for mk, v in r["mn"].items():
+                ym, b = mk.split("|")
+                if int(b) < thr or ym not in test_periods:
+                    continue
+                a = per_t.setdefault(tk, [0, 0.0, 0.0])
+                a[0] += v[0]
+                a[1] += sgn * v[1]
+                a[2] += sgn * (v[1] - mkt.get(ym, 0.0) * v[2])
+        rows_t = [(tk, a[0], a[1] / a[0] - C, a[2] / a[0] - C)
+                  for tk, a in per_t.items() if a[0] >= 20]
+        rows_t.sort(key=lambda x: -x[3])
+        print(f"\n=== ПО ТИКЕРАМ на TEST ({len(test_periods)}{unit}, нетто), "
+              f"сорт по NEU net, n≥20 ===")
+        print(f"{'тикер':<10}{'n':>8}{'RAW net%':>11}{'NEU net%':>11}")
+        pos = 0
+        for tk, n, rn, nn2 in rows_t:
+            if nn2 > 0:
+                pos += 1
+            print(f"{tk:<10}{n:>8}{rn*100:>+11.4f}{nn2*100:>+11.4f}")
+        if rows_t:
+            print(f"\nтикеров с NEU net%>0 на TEST: {pos}/{len(rows_t)} "
+                  f"({pos/len(rows_t)*100:.0f}%)")
+        print("\nвердикт: TEST net%>0 в целом И у большинства тикеров = направление "
+              f"веера ({mode}) переживает косты OOS. Иначе — артефакт пары тикеров.")
 
 
 if __name__ == "__main__":
