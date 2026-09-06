@@ -107,6 +107,19 @@ def _fresh(path):
         return False
 
 
+def _fresh_nonempty(path):
+    """как _fresh, но count:0 считается НЕ готовым — перезапросим (транзиентный
+    таймаут D1 мог записать пустой список бондов). Для issuer_bonds."""
+    if not os.path.exists(path) or os.path.getsize(path) < 3:
+        return False
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+        return isinstance(d, dict) and d.get("count", 0) > 0
+    except Exception:
+        return False
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default=DEFAULT_BASE)
@@ -138,11 +151,11 @@ def main():
         if _fresh(rp):
             n_rep += 1
         ib = os.path.join(out, "issuer_bonds", f"{inn}.json")
-        if not _fresh(ib):
+        if not _fresh_nonempty(ib):
             d = _fetch_issuer_bonds(args.base, inn)
             if d is not None:
                 _save(ib, d)
-        if _fresh(ib):
+        if _fresh_nonempty(ib):
             n_ib += 1
             try:
                 with open(ib, encoding="utf-8") as f:
