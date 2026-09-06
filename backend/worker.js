@@ -99,6 +99,7 @@ export default {
         // /issuer/:inn/reports        — годовые РСБУ-показатели
         // /issuer/:inn/affiliations   — учредители + руководитель из ЕГРЮЛ
         if(url.pathname.endsWith('/reports'))      return await handleIssuerReports(env, url);
+        if(url.pathname.endsWith('/bonds'))        return await handleIssuerBonds(env, url);
         if(url.pathname.endsWith('/affiliations')) return await handleIssuerAffiliations(env, url);
         return await handleIssuerCard(env, url);
       }
@@ -121,7 +122,7 @@ export default {
         'Not Found. Endpoints: /status, /stock/latest, /stock/history?secid=X, '
         + '/futures/latest?asset=X, /basis?asset=X, /basis/history?asset=X, '
         + '/bond/latest?board=TQCB, /bond/history?secid=X, /bond/issuer?inn=X, '
-        + '/catalog, /issuer/:inn, /issuer/:inn/reports, /reports/latest, '
+        + '/catalog, /issuer/:inn, /issuer/:inn/reports, /issuer/:inn/bonds, /reports/latest, '
         + 'POST /collect/{stock|futures|bonds|issuers|reports}, POST /ai/extract',
         404
       );
@@ -3135,6 +3136,31 @@ async function handleIssuerReports(env, url){
       WHERE inn = ?
       ORDER BY fy_year DESC, period
     `).bind(inn).all();
+    rows = r.results || [];
+  } catch(_){}
+  return jsonResp({ inn, count: rows.length, data: rows });
+}
+
+async function handleIssuerBonds(env, url){
+  // /issuer/{inn}/bonds → список ВСЕХ secid эмитента (вкл. погашенные) с окном
+  // дат. Лёгкий: индекс idx_bond_inn_date, тело крошечное. Для локальной
+  // выгрузки истории (bond_dump.py) — минуя тяжёлый /catalog.
+  const m = url.pathname.match(/^\/issuer\/(\d{10,12})\/bonds$/);
+  if(!m) return errResp('inn required, /issuer/{inn}/bonds', 400);
+  const inn = m[1];
+  let rows = [];
+  try {
+    const r = await env.DB.prepare(`
+      SELECT secid,
+             MIN(date) AS first_date,
+             MAX(date) AS last_date,
+             MAX(mat_date) AS mat_date,
+             MAX(shortname) AS name
+      FROM bond_daily
+      WHERE emitent_inn = ?
+      GROUP BY secid
+      ORDER BY secid
+    `).bind(String(inn)).all();
     rows = r.results || [];
   } catch(_){}
   return jsonResp({ inn, count: rows.length, data: rows });

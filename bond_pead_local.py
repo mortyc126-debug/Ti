@@ -125,18 +125,34 @@ def main():
     ap.add_argument("--std", default=None, help="предпочесть тип отчётности: РСБУ / МСФО")
     args = ap.parse_args()
 
-    cat_path = os.path.join(args.dump, "catalog.json")
-    if not os.path.exists(cat_path):
-        sys.exit(f"нет {cat_path} — сначала bond_dump.py")
-    with open(cat_path, encoding="utf-8") as f:
-        catalog = json.load(f)
-    # карта inn -> [secid]
+    # карта inn -> [secid] из issuer_bonds/{inn}.json (bond_dump без /catalog)
+    ib_dir = os.path.join(args.dump, "issuer_bonds")
     inn_bonds = {}
-    for b in catalog.get("bonds", []):
-        inn = str(b.get("issuerInn") or "")
-        secid = (b.get("isin") or "").upper()
-        if inn and secid:
-            inn_bonds.setdefault(inn, []).append(secid)
+    if os.path.isdir(ib_dir):
+        for fn in os.listdir(ib_dir):
+            if not fn.endswith(".json"):
+                continue
+            inn = fn[:-5]
+            try:
+                with open(os.path.join(ib_dir, fn), encoding="utf-8") as f:
+                    for row in json.load(f).get("data", []):
+                        sc = (row.get("secid") or "").upper()
+                        if sc:
+                            inn_bonds.setdefault(inn, []).append(sc)
+            except Exception:
+                continue
+    # фолбэк на старый catalog.json, если issuer_bonds нет
+    if not inn_bonds:
+        cat_path = os.path.join(args.dump, "catalog.json")
+        if os.path.exists(cat_path):
+            with open(cat_path, encoding="utf-8") as f:
+                for b in json.load(f).get("bonds", []):
+                    inn = str(b.get("issuerInn") or "")
+                    sc = (b.get("isin") or "").upper()
+                    if inn and sc:
+                        inn_bonds.setdefault(inn, []).append(sc)
+    if not inn_bonds:
+        sys.exit("нет карты inn→бонды (issuer_bonds/ пуст) — сначала bond_dump.py")
 
     rep_dir = os.path.join(args.dump, "reports")
     bond_dir = os.path.join(args.dump, "bonds")
