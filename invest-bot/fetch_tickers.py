@@ -14,6 +14,7 @@ prefetch_candles качает только сконфигурированные 
 хватает (pairs_lab ресемплит 5-мин → дни).
 """
 import argparse
+import logging
 import sys
 
 from candle_archive import get_candles_cached
@@ -21,12 +22,26 @@ from dashboard import _config, _db, _market_data
 from invest_api.services.instruments_service import InstrumentService
 
 
+class _NoDb:
+    """Заглушка вместо DbApiClient: configured=False → get_candles_cached идёт
+    прямо в Tinkoff, минуя переполненную/медленную D1 (ни чтения, ни записи)."""
+    configured = False
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("tickers", help="через запятую, напр. SBERP,TATNP,SNGSP")
     ap.add_argument("--days", type=int, default=1500)
+    ap.add_argument("--no-d1", action="store_true",
+                     help="не трогать облачную D1 (в обход переполнения): качать "
+                          "прямо у Tinkoff, писать только в локальный кэш")
     args = ap.parse_args()
 
+    # прогресс в консоль — иначе долгие докачки выглядят как «зависло»
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s",
+                        stream=sys.stderr)
+
+    db = _NoDb() if args.no_d1 else _db
     inst = InstrumentService(_config.tinkoff_token, _config.tinkoff_app_name)
     want = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
     print(f"Качаю {len(want)} тикеров на {args.days} дн...")
@@ -43,8 +58,9 @@ def main():
             continue
         _, figi = found
         try:
-            candles = get_candles_cached(t, figi, args.days, _market_data, _db)
-            print(f"{t:<10} {len(candles)} свечей в кэше")
+            print(f"{t:<10} качаю {args.days} дн...", flush=True)
+            candles = get_candles_cached(t, figi, args.days, _market_data, db)
+            print(f"{t:<10} {len(candles)} свечей в кэше", flush=True)
             ok += 1
         except Exception as e:
             fail.append(t)
