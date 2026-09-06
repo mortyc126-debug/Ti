@@ -71,6 +71,24 @@ def _get_json(base, path, timeout=45, tries=5, nonempty=None):
     return None
 
 
+def _fetch_issuer_bonds(base, inn):
+    """secid'ы эмитента. Сначала новый лёгкий /issuer/{inn}/bonds; если воркер
+    не задеплоен (вернул карточку — есть ключ 'issuer', нет 'data') — фолбэк на
+    старый /bond/issuer?inn=X (живые бумаги; работает в текущем воркере)."""
+    d = _get_json(base, f"/issuer/{inn}/bonds", timeout=45)
+    if d and isinstance(d.get("data"), list) and "issuer" not in d:
+        return {"inn": inn, "count": len(d["data"]),
+                "data": [{"secid": (r.get("secid") or "").upper(),
+                          "mat_date": r.get("mat_date")} for r in d["data"] if r.get("secid")]}
+    # фолбэк — старый эндпоинт
+    d2 = _get_json(base, f"/bond/issuer?inn={inn}", timeout=45)
+    if d2 and isinstance(d2.get("data"), list):
+        return {"inn": inn, "count": len(d2["data"]),
+                "data": [{"secid": (r.get("secid") or "").upper(),
+                          "mat_date": r.get("mat_date")} for r in d2["data"] if r.get("secid")]}
+    return None
+
+
 def _save(path, obj):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False)
@@ -121,7 +139,7 @@ def main():
             n_rep += 1
         ib = os.path.join(out, "issuer_bonds", f"{inn}.json")
         if not _fresh(ib):
-            d = _get_json(args.base, f"/issuer/{inn}/bonds", timeout=45)
+            d = _fetch_issuer_bonds(args.base, inn)
             if d is not None:
                 _save(ib, d)
         if _fresh(ib):
