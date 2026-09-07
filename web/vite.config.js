@@ -8,6 +8,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    strictPort: true,   // всегда 5173, не прыгать на 5174 — адрес стабильный
     proxy: {
       '/api': {
         target: 'https://bondan-backend.marginacall.workers.dev',
