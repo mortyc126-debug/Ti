@@ -7,6 +7,7 @@ import Tabs from '../components/industries/Tabs.jsx';
 import Comparison from '../components/industries/Comparison.jsx';
 import Medians from '../components/industries/Medians.jsx';
 import Norms from '../components/industries/Norms.jsx';
+import VintageControl from '../components/industries/VintageControl.jsx';
 
 const TABS = [
   { id: 'comparison', label: 'Сравнение' },
@@ -43,7 +44,10 @@ export default function Industries(){
         </div>
       </div>
 
-      <Tabs items={TABS} value={tab} onChange={setTab} />
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <Tabs items={TABS} value={tab} onChange={setTab} />
+      </div>
+      <VintageControl />
 
       <div className="pt-2">
         {tab === 'comparison' && <Comparison />}

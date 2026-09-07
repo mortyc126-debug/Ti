@@ -153,6 +153,12 @@ function CompanyRow({ item, color, layerOn, onToggleVis, onRemove, hovered, onHo
           >
             {iss.name}
             {iss.ticker && <span className="text-text3 ml-1.5 text-[11px]">{iss.ticker}</span>}
+            {iss.reportYear && (
+              <span className="text-text3 ml-1.5 text-[10px] font-normal"
+                    title={`Отчёт за ${iss.reportYear}${iss.reportStd ? ' · ' + iss.reportStd : ''}`}>
+                {iss.reportYear}{iss.reportStd ? ' ' + iss.reportStd : ''}
+              </span>
+            )}
           </button>
           <MiniMetrics mults={iss.mults} industry={iss.industry} />
         </div>

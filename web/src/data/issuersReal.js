@@ -47,13 +47,30 @@ const _SECTOR_MAP = {
   insurance: 'insurance', services: 'services', state: 'state',
 };
 
-function _annualLatest(reports){
-  let best = null;
+// тип отчётности: в базе РСБУ приходит в битой кодировке ("Р РЎР‘РЈ") — нормализуем
+function _normStd(s){
+  if(!s) return 'РСБУ';
+  return /МСФО|IFRS/i.test(String(s)) ? 'МСФО' : 'РСБУ';
+}
+
+// все годовые отчёты эмитента → [{year, std, mults}] по убыванию года,
+// дедуп по (год+тип): при дубле берём первый (буквально любой валидный)
+function _annualReports(reports){
+  const anns = [];
   for(const r of reports){
     if(!_ANNUAL.has((r.period || '').trim().toUpperCase())) continue;
-    if(!best || (r.fy_year || 0) > (best.fy_year || 0)) best = r;
+    if(r.fy_year == null) continue;
+    anns.push({ year: Number(r.fy_year), std: _normStd(r.std), mults: reportToMults(r) });
   }
-  return best;
+  anns.sort((a, b) => b.year - a.year);
+  const seen = new Set();
+  const out = [];
+  for(const r of anns){
+    const k = r.year + '|' + r.std;
+    if(seen.has(k)) continue;
+    seen.add(k); out.push(r);
+  }
+  return out;
 }
 
 const REP_TTL = 7 * 864e5;   // отчёты меняются редко → кеш на неделю
@@ -93,8 +110,8 @@ export async function loadIssuersReal(){
     while(idx < inns.length){
       const inn = inns[idx++];
       const rows = await _fetchReports(inn);
-      const best = _annualLatest(rows);
-      if(!best) continue;
+      const reps = _annualReports(rows);
+      if(!reps.length) continue;
       const mm = meta[inn] || {};
       out.push({
         id: inn, inn,
@@ -102,10 +119,7 @@ export async function loadIssuersReal(){
         ticker: mm.ticker || null,
         industry: _SECTOR_MAP[mm.sector] || mm.sector || 'other',
         kinds: ['bond'],
-        mults: reportToMults(best),
-        reportYear: best.fy_year || null,
-        reportDaysAgo: null,
-        sampleSecid: null,
+        reports: reps,            // [{year, std, mults}] по убыванию года
       });
     }
   }
