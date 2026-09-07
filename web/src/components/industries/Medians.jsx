@@ -8,7 +8,7 @@ import { useMemo, useState } from 'react';
 import { Factory, ChevronRight, Plus } from 'lucide-react';
 import { INDUSTRIES, INDUSTRY_GROUPS } from '../../data/industries.js';
 import { COMP_METRICS } from '../../data/comparisonMetrics.js';
-import { getAllIssuers } from '../../data/issuersMock.js';
+import { useIssuers } from '../../store/issuers.js';
 import { useComparison } from '../../store/comparison.js';
 import { useWindows } from '../../store/windows.js';
 
@@ -78,7 +78,7 @@ const VIEW_TABS = [
 ];
 
 export default function Medians(){
-  const issuers = useMemo(() => getAllIssuers(), []);
+  const issuers = useIssuers();
   const medians = useMemo(() => buildMedians(issuers), [issuers]);
   const [view, setView] = useState('industries');
 

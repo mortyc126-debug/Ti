@@ -15,9 +15,10 @@ import {
   buildPool, applyMultFilters,
   applyTopNSum, applyTopNSequential, buildSelectedView,
 } from '../../lib/comparisonSet.js';
-import { getAllIssuers } from '../../data/issuersMock.js';
+import { useIssuers, currentIssuers } from '../../store/issuers.js';
 
 export default function Comparison(){
+  useIssuers();   // триггерит загрузку реальных эмитентов в общий стор
   const sources         = useComparison(s => s.sources);
   const industryFilter  = useComparison(s => s.industryFilter);
   const filters         = useComparison(s => s.filters);
@@ -67,7 +68,7 @@ export default function Comparison(){
 
   // Применить top-N.
   const applyTopN = () => {
-    const issuers = getAllIssuers();
+    const issuers = currentIssuers();
     const ctx = { issuers, autocalibrate: autocal, overrides };
     let out;
     if(topN.mode === 'sum'){

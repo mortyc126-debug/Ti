@@ -14,7 +14,7 @@ import { useWindows } from '../../store/windows.js';
 import { metricSpec } from '../../data/comparisonMetrics.js';
 import { colorFor } from './colorPalette.js';
 import { resolveNorm, classifyValue } from '../../lib/norms.js';
-import { getAllIssuers } from '../../data/issuersMock.js';
+import { useIssuers } from '../../store/issuers.js';
 
 const KIND_GROUPS = [
   { kind: 'stock',  title: 'Акции',         tone: 'text-green' },
@@ -172,7 +172,7 @@ function CompanyRow({ item, color, layerOn, onToggleVis, onRemove, hovered, onHo
 function MiniMetrics({ mults, industry }){
   const autocal     = useIndustryNorms(s => s.autocalibrate);
   const overrides   = useIndustryNorms(s => s.overrides);
-  const issuers = getAllIssuers();
+  const issuers = useIssuers();
   const ctx = { issuers, autocalibrate: autocal, overrides };
 
   const items = [
