@@ -90,11 +90,15 @@ def _entry_idx(series, target, win):
     return None
 
 
+# бэкенд пишет годовой период как "FY" (ГИР БО/buxbalans); держим и рус-варианты
+_ANNUAL = {"FY", "ГОД", "12М", "12M", "Y"}
+
+
 def _annual_by_year(reports, std_pref):
     """{fy_year: report} только годовые; при конфликте std берём предпочтительный."""
     by = {}
     for r in reports:
-        if (r.get("period") or "").strip() != "Год":
+        if (r.get("period") or "").strip().upper() not in _ANNUAL:
             continue
         y = r.get("fy_year")
         if y is None:
