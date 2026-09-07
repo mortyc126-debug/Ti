@@ -169,6 +169,7 @@ def main():
     # раскол по направлению: сырой форвард цены (не signed) — падают ли ухудшившиеся
     dir_split = {1: [0, 0.0], -1: [0, 0.0]}   # dir -> [n, Σ raw price_ret]
     n_issuers = n_events = n_trades = 0
+    _trades = []   # (event_year, dir, raw_price_ret) — для market-neutral разреза
     series_cache = {}
     _dbg = {"rep_files": 0, "with_secids": 0, "annual_pairs": 0, "dir_nz": 0,
             "no_series": 0, "entry_none": 0, "fwd_short": 0, "ok": 0}
@@ -236,6 +237,7 @@ def main():
                 if not p0 or not p1 or p0 <= 0:
                     continue
                 raw = (p1 - p0) / p0
+                _trades.append((ay, d, raw))
                 sp = d * raw
                 m = agg.setdefault(ay, {"np":0,"sp":0.0,"wp":0,"ny":0,"sy":0.0,"wy":0})
                 m["np"] += 1; m["sp"] += sp; m["wp"] += 1 if sp > 0 else 0
@@ -273,7 +275,33 @@ def main():
             v = m[sk]/n*(100 if kind == "p" else 1)
             print(f"{y:<12}{n:>7}{m[wk]/n*100:>7.1f}%{v:>+12.4f}")
 
-    _tbl("p", "signed ЦЕНА бонда (dir · price_ret)", "%")
+    # market-neutral: из каждого форварда вычитаем средний ход ВСЕХ бондов
+    # того же года события — убирает общий ставочный прилив/отлив
+    mkt = {}   # year -> [n, Σraw]
+    for ay, d, raw in _trades:
+        a = mkt.setdefault(ay, [0, 0.0]); a[0] += 1; a[1] += raw
+    mean_raw = {y: (a[1] / a[0] if a[0] else 0.0) for y, a in mkt.items()}
+    neu = {}   # year -> [n, Σ dir·(raw-mean), wins]
+    for ay, d, raw in _trades:
+        a = neu.setdefault(ay, [0, 0.0, 0])
+        v = d * (raw - mean_raw[ay])
+        a[0] += 1; a[1] += v; a[2] += 1 if v > 0 else 0
+    print(f"\n=== signed ЦЕНА · MARKET-NEUTRAL (dir·(ret − средний бонд года)), "
+          f"горизонт {H} ===")
+    NN = sum(a[0] for a in neu.values()); SS = sum(a[1] for a in neu.values())
+    WW = sum(a[2] for a in neu.values())
+    if NN:
+        print(f"ВСЕГО: n={NN}  hit={WW/NN*100:.1f}%  ср.={SS/NN*100:+.4f}%")
+        print(f"{'год события':<12}{'n':>7}{'hit%':>8}{'ср.%':>12}")
+        for y in sorted(neu):
+            a = neu[y]
+            if a[0]:
+                print(f"{y:<12}{a[0]:>7}{a[2]/a[0]*100:>7.1f}%{a[1]/a[0]*100:>+12.4f}")
+        print("вердикт NEU: если и после вычитания рыночного хода бондов ср.>0 "
+              "УСТОЙЧИВО по годам — это уже не ставочная бета. Если исчезает/скачет — "
+              "исходный плюс был приливом ставок + survivorship (живые бумаги).")
+
+    _tbl("p", "signed ЦЕНА бонда · RAW (dir · price_ret)", "%")
     _tbl("y", "signed −Δ ДОХОДНОСТЬ (dir · −Δyield)", "пп")
 
     print(f"\n=== РАСКОЛ по направлению (сырой форвард цены, горизонт {H}) ===")
