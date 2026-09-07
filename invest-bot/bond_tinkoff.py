@@ -27,7 +27,9 @@ from tinkoff.invest import Client, CandleInterval, InstrumentStatus
 from invest_api.invest_target import INVEST_TARGET
 from dashboard import _config
 
-DUMP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "bond_dump")
+# выгрузка лежит в КОРНЕ репо (bond_dump.py в корне), а этот скрипт в invest-bot/
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DUMP = os.path.join(_ROOT, "data", "bond_dump")
 BONDS = os.path.join(DUMP, "bonds")
 
 
