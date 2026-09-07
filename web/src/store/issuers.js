@@ -110,8 +110,22 @@ export function useVintage(){
   const years = useIssuersStore(s => s.years);
   const source = useIssuersStore(s => s.source);
   const loading = useIssuersStore(s => s.loading);
+  const error = useIssuersStore(s => s.error);
   const count = useIssuersStore(s => s.issuers?.length ?? 0);
   const setYear = useIssuersStore(s => s.setYear);
   const setStd = useIssuersStore(s => s.setStd);
-  return { year, std, years, source, loading, count, setYear, setStd };
+  return { year, std, years, source, loading, error, count, setYear, setStd };
+}
+
+// принудительная перезагрузка: сносим кэши эмитентов и тянем заново
+export function reloadIssuers(){
+  try {
+    for(const k of Object.keys(localStorage)){
+      if(k === CACHE_KEY || k.startsWith('ba_rep_') || k.startsWith('ba_issuers_')) {
+        localStorage.removeItem(k);
+      }
+    }
+  } catch(_){}
+  useIssuersStore.setState({ raw: null, issuers: null, years: [], loading: false, error: null, source: 'mock' });
+  useIssuersStore.getState().load();
 }

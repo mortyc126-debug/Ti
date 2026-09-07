@@ -3,12 +3,13 @@
 // смешаны, но год виден на карточке). Конкретный год — строгий срез: только
 // эмитенты, у кого есть отчёт за этот год (чистое сравнение одногодок).
 
-import { useVintage } from '../../store/issuers.js';
+import { useVintage, reloadIssuers } from '../../store/issuers.js';
 
 export default function VintageControl(){
-  const { year, std, years, source, loading, count, setYear, setStd } = useVintage();
+  const { year, std, years, source, loading, error, count, setYear, setStd } = useVintage();
 
   const sel = 'bg-bg2 border border-border rounded-md px-2 py-1 text-xs text-text';
+  const real = source === 'backend' || source === 'cache';
 
   return (
     <div className="flex items-center gap-2 flex-wrap text-xs" data-no-drag>
@@ -23,11 +24,19 @@ export default function VintageControl(){
         <option value="РСБУ">РСБУ</option>
         <option value="МСФО">МСФО</option>
       </select>
-      <span className="text-text3">
-        {loading ? 'загрузка…'
-          : `${count} компаний · ${source === 'backend' || source === 'cache' ? 'данные backend' : 'демо-данные'}`}
+
+      <button type="button" onClick={reloadIssuers} className={sel + ' hover:text-acc'} title="Сбросить кэш и перезагрузить данные с backend">
+        ⟳ перезагрузить
+      </button>
+
+      {/* статус — видно прямо на странице, без консоли */}
+      <span className={real ? 'text-green/80' : 'text-yellow'}>
+        {loading ? 'загрузка данных…'
+          : real ? `${count} компаний · лет: ${years.length} · backend`
+          : `ДЕМО-данные (backend не отдал)${error ? ' · ' + error : ''}`}
       </span>
-      {year === 'latest' && (
+
+      {real && year === 'latest' && (
         <span className="text-yellow/80" title="У разных эмитентов последний отчёт за разные годы — винтажи смешаны. Для чистого сравнения выбери конкретный год.">
           ⚠ винтажи смешаны — год на карточке
         </span>
