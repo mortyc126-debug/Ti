@@ -144,11 +144,11 @@ def main():
     n_rep = n_ib = 0
     for k, inn in enumerate(inns):
         rp = os.path.join(out, "reports", f"{inn}.json")
-        if not _fresh(rp):
+        if not _fresh_nonempty(rp):
             d = _get_json(args.base, f"/issuer/{inn}/reports", timeout=45)
             if d is not None:
                 _save(rp, d)
-        if _fresh(rp):
+        if _fresh_nonempty(rp):
             n_rep += 1
         ib = os.path.join(out, "issuer_bonds", f"{inn}.json")
         if not _fresh_nonempty(ib):
