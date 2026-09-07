@@ -170,6 +170,12 @@ def main():
     dir_split = {1: [0, 0.0], -1: [0, 0.0]}   # dir -> [n, Σ raw price_ret]
     n_issuers = n_events = n_trades = 0
     series_cache = {}
+    _dbg = {"rep_files": 0, "with_secids": 0, "annual_pairs": 0, "dir_nz": 0,
+            "no_series": 0, "entry_none": 0, "fwd_short": 0, "ok": 0}
+    print(f"[dbg] inn_bonds: {len(inn_bonds)} эмитентов, "
+          f"{sum(len(v) for v in inn_bonds.values())} secid; "
+          f"файлов истории бондов: {len(os.listdir(bond_dir)) if os.path.isdir(bond_dir) else 0}",
+          file=sys.stderr)
 
     def _series(secid):
         if secid in series_cache:
@@ -194,27 +200,37 @@ def main():
                 reports = json.load(f).get("data", [])
         except Exception:
             continue
+        _dbg["rep_files"] += 1
         by_year = _annual_by_year(reports, args.std)
         secids = inn_bonds.get(inn, [])
         if not secids:
             continue
+        _dbg["with_secids"] += 1
         issuer_had_event = False
         for fy in sorted(by_year):
             if fy < args.from_year or (fy - 1) not in by_year:
                 continue
+            _dbg["annual_pairs"] += 1
             d = _fund_dir(by_year[fy], by_year[fy - 1], args.min_vote)
             if d == 0:
                 continue
+            _dbg["dir_nz"] += 1
             ev = date(fy + 1, 4, 1)
             ay = fy + 1
             had_trade = False
             for secid in secids:
                 s = _series(secid)
                 if not s:
+                    _dbg["no_series"] += 1
                     continue
                 i0 = _entry_idx(s, ev, ENTRY_WIN)
-                if i0 is None or i0 + H >= len(s):
+                if i0 is None:
+                    _dbg["entry_none"] += 1
                     continue
+                if i0 + H >= len(s):
+                    _dbg["fwd_short"] += 1
+                    continue
+                _dbg["ok"] += 1
                 p0, y0 = s[i0][1], s[i0][2]
                 p1, y1 = s[i0 + H][1], s[i0 + H][2]
                 if not p0 or not p1 or p0 <= 0:
@@ -234,7 +250,9 @@ def main():
             n_issuers += 1
 
     if not agg:
-        sys.exit("нет событий/сделок — проверь выгрузку (bonds/*.json, reports/*.json)")
+        print(f"[dbg] {_dbg}", file=sys.stderr)
+        sys.exit("нет событий/сделок — см. [dbg]: где обнулилось (with_secids / "
+                 "annual_pairs / dir_nz / no_series / entry_none / fwd_short / ok)")
 
     print(f"\nэмитентов с сигналом: {n_issuers}   событий: {n_events}   сделок(×бонд): {n_trades}")
 
