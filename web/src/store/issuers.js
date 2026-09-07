@@ -10,8 +10,8 @@ import { loadIssuersReal } from '../data/issuersReal.js';
 import { getAllIssuers } from '../data/issuersMock.js';
 
 const MOCK = getAllIssuers();
-const CACHE_KEY = 'ba_issuers_real_v1';
-const TTL = 3600e3;
+const CACHE_KEY = 'ba_issuers_real_v2';   // v2: все эмитенты + полные метрики
+const TTL = 6 * 3600e3;
 
 export const useIssuersStore = create((set, get) => ({
   issuers: null,       // null → ещё не загружено (отдаём мок)
