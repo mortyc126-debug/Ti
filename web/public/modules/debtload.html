@@ -515,6 +515,7 @@ tr.row-redeemed td{opacity:.5;}
       <div><label class="il">Дата изменения</label><input type="date" id="cbr-add-date" style="max-width:150px"/></div>
       <div><label class="il">Ставка %</label><input type="number" id="cbr-add-rate" step="0.25" placeholder="21.0" style="max-width:110px"/></div>
       <button type="button" class="btn" id="cbr-add-btn" style="padding:7px 14px">+ добавить</button>
+      <button type="button" class="btn" id="cbr-seed-btn" title="Заполнить официальным рядом ключевой ставки ЦБ" style="padding:7px 14px;background:rgba(170,90,255,.12);border:1px solid rgba(170,90,255,.3);color:var(--pur)">↓ загрузить историю ЦБ</button>
       <span style="font-size:10px;color:var(--t3);align-self:center">Заводи дату каждого решения ЦБ — доходности флоатеров и контекст периодов считаются по ставке на нужную дату.</span>
     </div>
     <div id="cbr-hist-list" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto"></div>
@@ -2736,8 +2737,40 @@ function applyCbrToKeyrate(force){
   const el=$('keyrate');if(!el)return;
   if(force||!parseFloat(el.value)){el.value=(+last).toFixed(2);kr=+last;}
 }
+// Официальный ряд ключевой ставки ЦБ РФ (дата вступления в силу → %).
+// Точный по 28.10.2024 (21%). Хвост 2025–2026 — по графику пользователя,
+// требует сверки (на грани среза знаний).
+const CBR_SEED=[
+  ['2013-09-13',5.50],['2014-03-03',7.00],['2014-04-28',7.50],['2014-07-28',8.00],
+  ['2014-11-05',9.50],['2014-12-12',10.50],['2014-12-16',17.00],['2015-02-02',15.00],
+  ['2015-03-16',14.00],['2015-05-05',12.50],['2015-06-16',11.50],['2015-08-03',11.00],
+  ['2016-06-14',10.50],['2016-09-19',10.00],['2017-03-27',9.75],['2017-05-02',9.25],
+  ['2017-06-19',9.00],['2017-09-18',8.50],['2017-10-30',8.25],['2017-12-18',7.75],
+  ['2018-02-12',7.50],['2018-03-26',7.25],['2018-09-17',7.50],['2018-12-17',7.75],
+  ['2019-06-17',7.50],['2019-07-29',7.25],['2019-09-09',7.00],['2019-10-28',6.50],
+  ['2019-12-16',6.25],['2020-02-10',6.00],['2020-04-27',5.50],['2020-06-22',4.50],
+  ['2020-07-27',4.25],['2021-03-22',4.50],['2021-04-26',5.00],['2021-06-15',5.50],
+  ['2021-07-26',6.50],['2021-09-13',6.75],['2021-10-25',7.50],['2021-12-20',8.50],
+  ['2022-02-14',9.50],['2022-02-28',20.00],['2022-04-11',17.00],['2022-05-04',14.00],
+  ['2022-05-27',11.00],['2022-06-14',9.50],['2022-07-25',8.00],['2022-09-19',7.50],
+  ['2023-07-24',8.50],['2023-08-15',12.00],['2023-09-18',13.00],['2023-10-30',15.00],
+  ['2023-12-18',16.00],['2024-07-29',18.00],['2024-09-16',19.00],['2024-10-28',21.00],
+  // ↓ хвост 2025–2026 — СВЕРЬ по своему графику
+  ['2025-06-09',20.00],['2025-07-28',18.00],['2025-09-15',17.00],['2025-10-27',16.00],
+  ['2025-12-22',15.00],['2026-03-23',14.50],['2026-06-08',14.00],
+];
+function cbrSeed(){
+  const cur=cbrHistLoad();
+  const have=new Set(cur.map(x=>x.d));
+  let added=0;
+  for(const [d,r] of CBR_SEED){ if(!have.has(d)){ cur.push({d,r}); added++; } }
+  cur.sort((p,q)=>p.d<q.d?-1:1);
+  cbrHistSave(cur);renderCbrHist();applyCbrToKeyrate(false);
+  const btn=$('cbr-seed-btn');if(btn){const o=btn.textContent;btn.textContent=added?('добавлено '+added):'уже загружено';setTimeout(()=>{btn.textContent=o;},1800);}
+}
 (function initCbrHist(){
   const t=$('cbr-hist-toggle');
+  const sb=$('cbr-seed-btn');if(sb)sb.addEventListener('click',cbrSeed);
   if(t)t.addEventListener('click',()=>{const p=$('cbr-hist');if(p){const open=p.style.display!=='none';p.style.display=open?'none':'block';if(!open)renderCbrHist();}});
   const ab=$('cbr-add-btn');if(ab)ab.addEventListener('click',cbrAdd);
   const ad=$('cbr-add-date');if(ad&&!ad.value){try{ad.value=new Date().toISOString().slice(0,10);}catch(e){}}
