@@ -44,7 +44,11 @@ export const useWindows = create(
           title: payload.title || payload.id,
           ticker: payload.ticker || null,
           mode,
-          tab: payload.tab || 'finances',
+          // По умолчанию — вкладка «Отчётность»: она берёт данные из
+          // локального снимка reports-cache и работает офлайн. Остальные
+          // вкладки (finances/links/…) ходят в backend (D1), который сейчас
+          // деградировал/в лимите. Явный payload.tab перебивает.
+          tab: payload.tab || (payload.kind === 'issuer' ? 'report' : 'finances'),
           tabState: {},
           x: baseX + offset, y: baseY + offset,
           w: size.w, h: size.h,
