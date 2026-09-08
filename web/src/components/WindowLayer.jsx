@@ -296,7 +296,11 @@ function TabReportModule({ inn, name }){
       src={`/modules/analysiscompany.html?embed=1&inn=${encodeURIComponent(inn)}${name ? '&name=' + encodeURIComponent(name) : ''}`}
       title="Отчётность эмитента"
       className="w-full"
-      style={{ border: 0, display: 'block', flex: 1, minHeight: 360 }}
+      // окно позиционируется через CSS transform (react-rnd) — iframe внутри
+      // transform-слоя браузер растрирует и текст «мылит». Выносим iframe в
+      // собственный композит-слой, тогда он рендерится в нативном разрешении.
+      style={{ border: 0, display: 'block', flex: 1, minHeight: 360,
+        transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
     />
   );
 }
