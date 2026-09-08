@@ -11,7 +11,7 @@ import { useSidebar } from '../store/sidebar.js';
 
 const ITEMS = [
   { id: 'issuers', icon: Building2,  label: 'Эмитенты',  to: '#' },
-  { id: 'reports', icon: FileText,   label: 'Отчёты',    to: '#' },
+  { id: 'reports', icon: FileText,   label: 'Отчёты',    to: '/reports' },
   { id: 'sectors', icon: Factory,    label: 'Отрасли',   to: '/industries' },
   { id: 'cbr',     icon: Percent,    label: 'КС',        to: '#' },
   { id: 'ytm',     icon: TrendingUp, label: 'YTM/P&L',   to: '#' },
