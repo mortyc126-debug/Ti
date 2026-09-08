@@ -164,18 +164,26 @@ function useIssuerData(inn){
     }
     let cancelled = false;
     setState(s => ({ ...s, loading: true, error: null }));
+    // Отчёты берём из локального снимка (reports-cache) — backend/D1 в лимите.
+    // card/affiliations пробуем с backend best-effort (обычно пусто → null).
+    const snap = fetch('/reports-cache/' + inn + '.json')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => Array.isArray(d?.data) ? d.data : [])
+      .catch(() => []);
     Promise.allSettled([
-      api.issuerCard(inn),
-      api.issuerReports(inn),
-      api.issuerAffiliations(inn),
-    ]).then(([cardR, repR, affR]) => {
+      snap,
+      api.issuerCard(inn).catch(() => null),
+      api.issuerReports(inn).catch(() => null),
+      api.issuerAffiliations(inn).catch(() => null),
+    ]).then(([snapR, cardR, repR, affR]) => {
       if(cancelled) return;
       const card = cardR.status === 'fulfilled' ? cardR.value : null;
-      const reports = repR.status === 'fulfilled' ? (repR.value?.data || []) : [];
+      const snapRows = snapR.status === 'fulfilled' ? (snapR.value || []) : [];
+      const beRows = repR.status === 'fulfilled' ? (repR.value?.data || []) : [];
+      // приоритет — снимок; если пуст, берём backend
+      const reports = snapRows.length ? snapRows : beRows;
       const affiliations = affR.status === 'fulfilled' ? affR.value : null;
-      const err = !card && !reports?.length && !affiliations
-        ? (cardR.reason?.message || repR.reason?.message || 'no-data')
-        : null;
+      const err = !card && !reports?.length && !affiliations ? 'no-data' : null;
       const data = { at: Date.now(), card, reports, affiliations };
       ISSUER_CACHE.set(inn, data);
       setState({ loading: false, error: err, ...data });
@@ -201,12 +209,12 @@ function IssuerTabContent({ win }){
 
   const rawInn = win.inn || (typeof win.id === 'string' && /^\d{10,12}$/.test(win.id) ? win.id : null);
   const alias = aliasGet(win.title);
-  // Пока список отчётных не загружен — доверяем rawInn/связке. Когда загружен —
-  // требуем, чтобы ИНН был среди отчётных, иначе предложим подбор по названию.
+  // Подтверждённая пользователем связка (alias) — доверяем безусловно.
+  // Затем rawInn, если он среди отчётных (или список ещё не готов). Иначе —
+  // предложим подбор по названию.
   let resolvedInn = null;
-  if(!universeReady) resolvedInn = rawInn || alias || null;
-  else if(rawInn && knownInns.has(String(rawInn))) resolvedInn = String(rawInn);
-  else if(alias && knownInns.has(String(alias))) resolvedInn = String(alias);
+  if(alias) resolvedInn = String(alias);
+  else if(rawInn && (!universeReady || knownInns.has(String(rawInn)))) resolvedInn = String(rawInn);
 
   const { loading, error, card, reports, affiliations } = useIssuerData(resolvedInn);
 
