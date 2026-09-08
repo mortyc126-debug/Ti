@@ -50,9 +50,9 @@ export function reportToMults(r){
     roic: _roic(ebit, tax, np, eq, debt, cash),
     roe: (np != null && eq && eq > 0) ? np / eq * 100 : null,
     pe: null, yield: null,
-    // сырьё для E/P акций (в тех же единицах, что пришли — обычно млн);
-    // приведение к млрд делаем при расчёте E/P
-    npRaw: np, revRaw: rev,
+    // сырьё для мультипликаторов оценки акций (в тех же единицах, что пришли —
+    // обычно млн); приведение делаем при расчёте
+    npRaw: np, revRaw: rev, eqRaw: eq, debtRaw: debt, cashRaw: cash, ebitdaRaw: ebitda,
   };
   m.bqi = bqiScore({ mults: m });
   m.safety = safetyScore({ mults: m });

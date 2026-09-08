@@ -5,6 +5,8 @@ import { api } from '../api.js';
 import { useIssuers, useIssuersStore } from '../store/issuers.js';
 import { suggestIssuers, aliasGet, aliasSet } from '../lib/issuerMatch.js';
 import { interpretPeriods } from '../lib/finNarrative.js';
+import { useStockUniverse } from '../store/marketData.js';
+import { MULT_META, computeMultiples, valuationUniverse, cheaperThanPct, findStockForIssuer, issuerMults } from '../lib/valuation.js';
 
 // Слой плавающих окон. Рендерится один раз в App.jsx поверх Outlet.
 // Каркас окна + живой контент в MediumBody (вкладки Финансы/Бумаги/
@@ -241,7 +243,7 @@ function IssuerTabContent({ win }){
   const industry = issCard?.industry || null;
 
   switch(win.tab){
-    case 'finances':  return <TabFinances card={card} reports={reports} industry={industry} />;
+    case 'finances':  return <TabFinances card={card} reports={reports} industry={industry} inn={resolvedInn} issuerName={issCard?.name || win.title} />;
     case 'papers':    return <TabPapers card={card} />;
     case 'links':     return <TabLinks affiliations={affiliations} />;
     case 'events':    return <TabEvents card={card} />;
@@ -324,7 +326,7 @@ function IssuerMatcher({ name, rawInn, issuers, onPick }){
   );
 }
 
-function TabFinances({ card, reports, industry }){
+function TabFinances({ card, reports, industry, inn, issuerName }){
   const issuer = card?.issuer;
   const stock = card?.stock;
   if(!reports?.length){
@@ -381,7 +383,60 @@ function TabFinances({ card, reports, industry }){
         Источник: {series[0]?.source || '—'} · последнее обновление {series[0]?.fetched_at?.slice(0, 10) || '—'}
       </div>
 
+      <ValuationPanel inn={inn} issuerName={issuerName} />
       <PeriodNarrative reports={reports} industry={industry} />
+    </div>
+  );
+}
+
+// Мультипликаторы оценки для торгуемой акции эмитента + «дешевле X% рынка» и подвохи.
+function ValuationPanel({ inn, issuerName }){
+  const stockUniverse = useStockUniverse();   // триггерим загрузку + ре-рендер
+  const allIssuers = useIssuers();
+  const data = useMemo(() => {
+    const stock = findStockForIssuer(issuerName, inn);
+    if(!stock) return null;
+    const m = issuerMults(inn);
+    if(!m) return null;
+    const mm = computeMultiples(stock.price, stock.shares, m);
+    if(!mm) return null;
+    const uni = valuationUniverse();
+    return { stock, mm, uni };
+  }, [inn, issuerName, stockUniverse, allIssuers]);
+
+  if(!data) return null;
+  const { mm, uni } = data;
+  const fmt = v => v == null ? '—' : (Math.round(v * 100) / 100).toString() + '×';
+  return (
+    <div className="mt-3 border-t border-border/60 pt-3 space-y-2">
+      <div className="text-text3 text-[10px] uppercase tracking-wider">
+        Оценка · кап-ция {mm.mktCapBn >= 1000 ? (mm.mktCapBn / 1000).toFixed(1) + ' трлн' : mm.mktCapBn.toFixed(0) + ' млрд ₽'}
+      </div>
+      <div className="space-y-1.5">
+        {MULT_META.map(meta => {
+          const v = mm[meta.id];
+          const isEp = meta.id === 'ep';
+          const pct = cheaperThanPct(v, uni.arrays[meta.id], meta.lowerCheaper);
+          return (
+            <details key={meta.id} className="group">
+              <summary className="cursor-pointer flex items-center gap-2 text-xs">
+                <span className="text-text2 w-24 shrink-0">{meta.label}</span>
+                <span className="text-text font-mono w-16 shrink-0">{isEp ? (v == null ? '—' : v.toFixed(1) + '%') : fmt(v)}</span>
+                {pct != null && (
+                  <span className="flex-1 flex items-center gap-1.5 min-w-0">
+                    <span className="flex-1 h-1.5 rounded bg-s2 overflow-hidden">
+                      <span className="block h-full bg-acc" style={{ width: pct + '%' }} />
+                    </span>
+                    <span className="text-text3 text-[10px] shrink-0">дешевле {pct}%</span>
+                  </span>
+                )}
+              </summary>
+              <div className="text-text3 text-[11px] leading-snug mt-1 ml-24 pl-2">{meta.pitfall}</div>
+            </details>
+          );
+        })}
+      </div>
+      <div className="text-text3 text-[10px] italic">«дешевле X%» — доля торгуемых акций с отчётностью, которые оценены дороже по этому мультипликатору.</div>
     </div>
   );
 }
