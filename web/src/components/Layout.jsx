@@ -38,13 +38,17 @@ export default function Layout(){
         </div>
       )}
 
-      <div className="flex-1 flex">
-        <main className="flex-1 px-4 sm:px-6 py-5 max-w-7xl w-full mx-auto min-w-0">
+      <div className="flex-1 flex min-h-0">
+        <main className={
+          loc.pathname.startsWith('/reports')
+            ? 'flex-1 min-w-0 flex flex-col'   // полноэкранные модули (iframe) — без отступов/лимита ширины
+            : 'flex-1 px-4 sm:px-6 py-5 max-w-7xl w-full mx-auto min-w-0'
+        }>
           <Outlet />
         </main>
         <AppSidebar />
       </div>
-      <Footer />
+      {!loc.pathname.startsWith('/reports') && <Footer />}
     </div>
   );
 }
