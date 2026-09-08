@@ -29856,11 +29856,17 @@ function _repArchiveModal(){
       + 'body{background:var(--bg,#0B0613)!important;margin:0!important}';
     document.head.appendChild(st);
     document.body.classList.add('rep-embed');
+    // ВАЖНО: reportsDB объявлен через `let` (не на window) — доступен только
+    // по голому имени в общем лексическом скоупе классических <script>. Ранее
+    // здесь стояло window.reportsDB (=undefined) → ветка готовности не
+    // срабатывала, окно оставалось пустым.
+    function _rdb(){ try{ return (typeof reportsDB !== 'undefined') ? reportsDB : null; }catch(e){ return null; } }
     function findId(){
-      if(wantId && (window.reportsDB||{})[wantId]) return wantId;
+      var rdb = _rdb() || {};
+      if(wantId && rdb[wantId]) return wantId;
       if(inn){
-        for(var id in (window.reportsDB||{})){
-          if(String((window.reportsDB[id]||{}).inn) === String(inn)) return id;
+        for(var id in rdb){
+          if(String((rdb[id]||{}).inn) === String(inn)) return id;
         }
       }
       return null;
@@ -29874,12 +29880,13 @@ function _repArchiveModal(){
       fetch('/reports-cache/' + inn + '.json').then(function(r){ return r.ok ? r.json() : null; })
         .then(function(d){
           var rows = d && Array.isArray(d.data) ? d.data : [];
-          if(!rows.length || !window.reportsDB || typeof _d1MergeReports !== 'function'){ cb(false); return; }
+          var rdb = _rdb();
+          if(!rows.length || !rdb || typeof _d1MergeReports !== 'function'){ cb(false); return; }
           var id = findId();
           if(!id){
             id = 'i_' + inn;
-            if(!window.reportsDB[id]){
-              window.reportsDB[id] = { name: wantName || inn, inn: String(inn), ind: 'other', related: [], periods: {} };
+            if(!rdb[id]){
+              rdb[id] = { name: wantName || inn, inn: String(inn), ind: 'other', related: [], periods: {} };
             }
           }
           try{ _d1MergeReports(id, String(inn), rows); }catch(e){}
@@ -29891,7 +29898,7 @@ function _repArchiveModal(){
     var tries = 0;
     var t = setInterval(function(){
       tries++;
-      if(typeof repSelectIssuerById === 'function' && window.reportsDB){
+      if(typeof repSelectIssuerById === 'function' && _rdb()){
         // По умолчанию модуль открывается на странице YTM → #page-reports
         // скрыт и финвид эмитента не виден. Переключаемся на «Отчётность».
         if(!_pageShown && typeof showPage === 'function'){ try{ showPage('reports'); }catch(e){} _pageShown = true; }
