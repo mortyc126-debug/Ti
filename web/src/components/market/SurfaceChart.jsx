@@ -184,7 +184,7 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
     if(drag.current?.moved) return;   // не открывать окно после панорамы
     setSelected(p.secid);
     openWin({ kind: 'issuer', id: p.inn || p.issuer, inn: p.inn || null,
-      title: p.issuer, ticker: null, mode: 'medium', tab: p.inn ? 'report' : 'finances' });
+      title: p.issuer, ticker: null, mode: 'medium', tab: 'report' });
   };
   const zoomed = view != null;
 

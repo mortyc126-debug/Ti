@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Rnd } from 'react-rnd';
 import { useWindows } from '../store/windows.js';
 import { api } from '../api.js';
+import { useIssuers, useIssuersStore } from '../store/issuers.js';
+import { suggestIssuers, aliasGet, aliasSet } from '../lib/issuerMatch.js';
 
 // Слой плавающих окон. Рендерится один раз в App.jsx поверх Outlet.
 // Каркас окна + живой контент в MediumBody (вкладки Финансы/Бумаги/
@@ -186,16 +188,45 @@ function useIssuerData(inn){
 
 // ───── Контент вкладок ─────────────────────────────────────────────
 function IssuerTabContent({ win }){
-  const inn = win.inn || (typeof win.id === 'string' && /^\d{10,12}$/.test(win.id) ? win.id : null);
-  const { loading, error, card, reports, affiliations } = useIssuerData(inn);
+  const allIssuers = useIssuers();
+  const source = useIssuersStore(s => s.source);
+  const patch = useWindows(s => s.patch);
 
-  if(!inn){
-    return <div className="text-text3 text-xs italic">У этого эмитента нет ИНН в наших данных — без него не получится подтянуть отчётность. Откройте облигацию из таблицы — там ИНН проставляется автоматически.</div>;
-  }
+  // Универсум отчётных эмитентов готов (не мок).
+  const universeReady = source !== 'mock' && allIssuers.length > 0;
+  const knownInns = useMemo(
+    () => new Set(allIssuers.filter(i => i.inn).map(i => String(i.inn))),
+    [allIssuers]
+  );
+
+  const rawInn = win.inn || (typeof win.id === 'string' && /^\d{10,12}$/.test(win.id) ? win.id : null);
+  const alias = aliasGet(win.title);
+  // Пока список отчётных не загружен — доверяем rawInn/связке. Когда загружен —
+  // требуем, чтобы ИНН был среди отчётных, иначе предложим подбор по названию.
+  let resolvedInn = null;
+  if(!universeReady) resolvedInn = rawInn || alias || null;
+  else if(rawInn && knownInns.has(String(rawInn))) resolvedInn = String(rawInn);
+  else if(alias && knownInns.has(String(alias))) resolvedInn = String(alias);
+
+  const { loading, error, card, reports, affiliations } = useIssuerData(resolvedInn);
+
   // Модуль отчётности (шкалы) читает данные из общего localStorage — не ждём backend.
-  if(win.tab === 'report') return <TabReportModule inn={inn} name={win.title} />;
+  if(win.tab === 'report'){
+    if(resolvedInn) return <TabReportModule inn={resolvedInn} name={win.title} />;
+    // ИНН не сопоставлен с отчётностью — предлагаем подобрать по названию.
+    return (
+      <IssuerMatcher
+        name={win.title} rawInn={rawInn} issuers={allIssuers}
+        onPick={(inn) => { aliasSet(win.title, inn); patch(win.wid, { inn: String(inn), tab: 'report' }); }}
+      />
+    );
+  }
+
+  if(!resolvedInn){
+    return <div className="text-text3 text-xs italic">У этого эмитента нет ИНН с отчётностью. Откройте вкладку «Отчётность» — там можно подобрать компанию по названию.</div>;
+  }
   if(loading) return <div className="text-text3 text-xs">Загружаю данные…</div>;
-  if(error === 'no-data') return <div className="text-text3 text-xs italic">По ИНН {inn} в БД пока ничего нет. Запустите сбор отчётности из admin-панели.</div>;
+  if(error === 'no-data') return <div className="text-text3 text-xs italic">По ИНН {resolvedInn} в БД пока ничего нет. Запустите сбор отчётности из admin-панели.</div>;
 
   switch(win.tab){
     case 'finances':  return <TabFinances card={card} reports={reports} />;
@@ -216,6 +247,68 @@ function TabReportModule({ inn, name }){
       className="w-full"
       style={{ border: 0, display: 'block', flex: 1, minHeight: 360 }}
     />
+  );
+}
+
+// Подбор материнской компании с отчётностью по названию бумаги/SPV.
+// Показываем вероятных кандидатов + ручной поиск. По клику — подтверждаем
+// связку (сохраняется), окно тут же открывает отчётность выбранной компании.
+function IssuerMatcher({ name, rawInn, issuers, onPick }){
+  const [q, setQ] = useState('');
+  const suggestions = useMemo(() => suggestIssuers(name, issuers), [name, issuers]);
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if(!s) return [];
+    return issuers
+      .filter(i => i.inn && ((i.name || '').toLowerCase().includes(s) || String(i.inn).includes(s)))
+      .slice(0, 20);
+  }, [q, issuers]);
+
+  const Row = ({ it, score }) => (
+    <button type="button" onClick={() => onPick(it.inn)}
+      className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded hover:bg-acc-dim/40 border border-transparent hover:border-acc/40">
+      <span className="flex-1 min-w-0">
+        <span className="text-text text-xs truncate block">{it.name}</span>
+        <span className="text-text3 text-[10px] font-mono">
+          ИНН {it.inn}{it.reportYear ? ` · отчёт ${it.reportYear}` : ''}{it.industry ? ` · ${it.industry}` : ''}
+        </span>
+      </span>
+      {score != null && (
+        <span className="text-[10px] font-mono text-acc shrink-0">{Math.round(score * 100)}%</span>
+      )}
+    </button>
+  );
+
+  return (
+    <div className="text-xs space-y-3">
+      <div className="text-text2">
+        У «<span className="text-text">{name}</span>» {rawInn ? <>ИНН <span className="font-mono">{rawInn}</span> без отчётности в снимке.</> : 'нет ИНН.'}{' '}
+        Часто отчётность лежит под материнской компанией (бумагу выпускает SPV вида «… Финанс»). Выберите её — свяжу и запомню.
+      </div>
+
+      {suggestions.length > 0 && (
+        <div>
+          <div className="text-text3 uppercase tracking-wider text-[10px] mb-1">Вероятные совпадения</div>
+          <div className="space-y-0.5">
+            {suggestions.map(s => <Row key={s.issuer.inn} it={s.issuer} score={s.score} />)}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <div className="text-text3 uppercase tracking-wider text-[10px] mb-1">Найти вручную</div>
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="название или ИНН…"
+          className="w-full bg-bg2 border border-border rounded px-2 py-1 text-xs text-text" />
+        {filtered.length > 0 && (
+          <div className="space-y-0.5 mt-1 max-h-52 overflow-y-auto">
+            {filtered.map(it => <Row key={it.inn} it={it} />)}
+          </div>
+        )}
+        {q.trim() && !filtered.length && (
+          <div className="text-text3 text-[11px] mt-1">Ничего не найдено среди {issuers.length} компаний с отчётностью.</div>
+        )}
+      </div>
+    </div>
   );
 }
 

@@ -9,7 +9,7 @@ import { loadRealBonds } from '../data/marketReal.js';
 import { bondsMock } from '../data/bondsCatalog.js';
 import { useIssuersStore } from './issuers.js';
 
-const CACHE_KEY = 'ba_bonds_universe_v1';
+const CACHE_KEY = 'ba_bonds_universe_v2';   // v2: в записях появился inn
 const TTL = 6 * 3600e3;
 
 export const useBondStore = create((set, get) => ({
