@@ -28210,14 +28210,20 @@ async function _repD1Load(){
     var issuers = Array.isArray(cat.issuers) ? cat.issuers : [];
     setLog('Шаг 1/3: каталог ✓ (' + issuers.length + ' эмитентов)');
 
-    // Кто реально имеет отчёты — грузим/оставляем ТОЛЬКО их (иначе список
-    // забивается тысячами пустых карточек без названий). /issuers/report_years
-    // отдаёт map { inn: год }. Если недоступно — reportedInns=null (мёрдж всех, как раньше).
+    // Кто реально имеет отчёты. ПРИОРИТЕТ — локальный снимок
+    // (web/public/reports-cache/_index.json): не зависит от деградировавшей D1.
+    // Fallback — backend /issuers/report_years (если снимка нет).
     var reportedInns = null;
     try{
-      var ryResp0 = await fetch(base + '/issuers/report_years');
-      if(ryResp0.ok){ var ryJson0 = await ryResp0.json(); if(ryJson0 && ryJson0.map) reportedInns = new Set(Object.keys(ryJson0.map)); }
+      var idxResp = await fetch('/reports-cache/_index.json');
+      if(idxResp.ok){ var idxArr = await idxResp.json(); if(Array.isArray(idxArr) && idxArr.length) reportedInns = new Set(idxArr.map(String)); }
     }catch(_){}
+    if(!reportedInns){
+      try{
+        var ryResp0 = await fetch(base + '/issuers/report_years');
+        if(ryResp0.ok){ var ryJson0 = await ryResp0.json(); if(ryJson0 && ryJson0.map) reportedInns = new Set(Object.keys(ryJson0.map)); }
+      }catch(_){}
+    }
 
     // 2. Мёрдж эмитентов в reportsDB
     // ВАЖНО: мутируем объект на месте, не переприсваиваем reportsDB —
@@ -28276,6 +28282,18 @@ async function _repD1Load(){
         if(ci2.bonds_count != null) ex.bondsCount = ci2.bonds_count;
         updated++;
       }
+    }
+    // Гарантия: карточка для каждого ИНН из снимка, даже если каталог (имена)
+    // недоступен — тогда name = ИНН (лучше, чем пропасть).
+    if(reportedInns){
+      reportedInns.forEach(function(inn){
+        var has = false;
+        for(var eid in rdb){ if(rdb[eid] && rdb[eid].inn === inn){ has = true; break; } }
+        if(!has){
+          rdb['i_' + inn] = { name: inn, inn: inn, ind: 'other', related: [], periods: {} };
+          added++;
+        }
+      });
     }
     setLog('Шаг 2/3: +' + added + ' новых, ' + updated + ' обновлено');
     repRenderIssuerList();
