@@ -28261,16 +28261,25 @@ async function _repD1Load(){
       if(issuers[ci3].inn) catalogByInn[issuers[ci3].inn] = issuers[ci3];
     }
 
+    // Кто реально имеет отчёты — берём из /issuers/report_years (каталог поле
+    // has_reports не отдаёт). Fallback на catEntry.has_reports, если недоступно.
+    var reportedInns = null;
+    try{
+      var ryResp = await fetch(base + '/issuers/report_years');
+      if(ryResp.ok){ var ryJson = await ryResp.json(); if(ryJson && ryJson.map) reportedInns = new Set(Object.keys(ryJson.map)); }
+    }catch(_){}
+
     var toFetch = [];
     var rdb2 = reportsDB || {};
     for(var eid2 in rdb2){
       var e2 = rdb2[eid2];
       if(!e2 || !e2.inn) continue;
       if(Object.keys(e2.periods || {}).length > 0) continue;
-      if(e2._d1_checked) continue;
+      // _d1_checked НЕ пропускаем: на прошлом (пустом) прогоне он мог
+      // проставиться всем; решаем по reportedInns заново.
       var catEntry = catalogByInn[e2.inn];
-      // Загружаем только тех у кого has_reports:true в каталоге
-      if(!catEntry || !catEntry.has_reports){
+      var hasRep = reportedInns ? reportedInns.has(String(e2.inn)) : !!(catEntry && catEntry.has_reports);
+      if(!hasRep){
         e2._d1_checked = true;
         continue;
       }
