@@ -88,6 +88,7 @@ function HeaderBtn({ title, onClick, children }){
 
 const TABS = [
   { id: 'finances', label: 'Финансы' },
+  { id: 'report',   label: 'Отчётность' },
   { id: 'papers',   label: 'Бумаги' },
   { id: 'links',    label: 'Связи' },
   { id: 'events',   label: 'События' },
@@ -109,7 +110,9 @@ function MediumBody({ win, setTab }){
           >{t.label}</button>
         ))}
       </div>
-      <div className="flex-1 overflow-y-auto p-4 text-text2 text-sm">
+      <div className={win.tab === 'report'
+        ? 'flex-1 min-h-0 flex flex-col'
+        : 'flex-1 overflow-y-auto p-4 text-text2 text-sm'}>
         <IssuerTabContent win={win} />
       </div>
     </div>
@@ -189,6 +192,8 @@ function IssuerTabContent({ win }){
   if(!inn){
     return <div className="text-text3 text-xs italic">У этого эмитента нет ИНН в наших данных — без него не получится подтянуть отчётность. Откройте облигацию из таблицы — там ИНН проставляется автоматически.</div>;
   }
+  // Модуль отчётности (шкалы) читает данные из общего localStorage — не ждём backend.
+  if(win.tab === 'report') return <TabReportModule inn={inn} />;
   if(loading) return <div className="text-text3 text-xs">Загружаю данные…</div>;
   if(error === 'no-data') return <div className="text-text3 text-xs italic">По ИНН {inn} в БД пока ничего нет. Запустите сбор отчётности из admin-панели.</div>;
 
@@ -199,6 +204,19 @@ function IssuerTabContent({ win }){
     case 'events':    return <TabEvents card={card} />;
     default:          return <TabFinances card={card} reports={reports} />;
   }
+}
+
+// Встроенный модуль отчётности (analysiscompany.html) в embed-режиме —
+// per-issuer финвид со шкалами сравнения. Данные из общего localStorage.
+function TabReportModule({ inn }){
+  return (
+    <iframe
+      src={`/modules/analysiscompany.html?embed=1&inn=${encodeURIComponent(inn)}`}
+      title="Отчётность эмитента"
+      className="w-full"
+      style={{ border: 0, display: 'block', flex: 1, minHeight: 360 }}
+    />
+  );
 }
 
 function TabFinances({ card, reports }){

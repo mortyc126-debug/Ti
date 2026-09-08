@@ -29989,6 +29989,57 @@ function _repIgnoreModal(){
     return result;
   };
 })();
+
+// ══════════════════════════════════════════════════════════════════
+// EMBED-режим: модуль внутри плавающего окна эмитента (React-приложение).
+// ?embed=1&inn=XXXX[&id=YYY] — прячем сайдбар/шапку модуля, авто-выбираем
+// эмитента и показываем только его финвид со шкалами. Данные — из общего
+// localStorage.reportsDB (тот же origin). Ждём готовности reportsDB и
+// repSelectIssuerById (модуль/загрузка D1 инициализируются асинхронно).
+// ══════════════════════════════════════════════════════════════════
+(function(){
+  try{
+    var q = new URLSearchParams(location.search);
+    if(q.get('embed') !== '1') return;
+    var inn = q.get('inn'); var wantId = q.get('id');
+    var st = document.createElement('style');
+    st.textContent =
+      '#page-reports > .page-title, #page-reports > .page-sub{display:none!important}'
+      + '#rep-sidebar{display:none!important}'
+      + '#page-reports{padding:0!important}'
+      + '#page-reports > div[style*="display:flex"]{gap:0!important;margin-top:0!important}'
+      + '#rep-issuer-view{width:100%!important}'
+      + 'body{background:var(--bg,#0B0613)!important;margin:0!important}';
+    document.head.appendChild(st);
+    document.body.classList.add('rep-embed');
+    function findId(){
+      if(wantId && (window.reportsDB||{})[wantId]) return wantId;
+      if(inn){
+        for(var id in (window.reportsDB||{})){
+          if(String((window.reportsDB[id]||{}).inn) === String(inn)) return id;
+        }
+      }
+      return null;
+    }
+    var tries = 0;
+    var t = setInterval(function(){
+      tries++;
+      if(typeof repSelectIssuerById === 'function' && window.reportsDB){
+        var id = findId();
+        if(id){ clearInterval(t); try{ repSelectIssuerById(id); }catch(e){} return; }
+        if(tries > 40){   // ~8с ждали, данных по этому ИНН нет
+          clearInterval(t);
+          var ep = document.getElementById('rep-empty');
+          var iv = document.getElementById('rep-issuer-view');
+          if(iv) iv.style.display = 'none';
+          if(ep){ ep.style.display = 'block';
+            ep.innerHTML = '<div style="padding:24px;color:var(--t3,#8a8)">По ИНН '
+              + (inn||'—') + ' в базе отчётности пусто. Добавьте период во вкладке «Отчёты».</div>'; }
+        }
+      } else if(tries > 80){ clearInterval(t); }
+    }, 200);
+  }catch(e){}
+})();
 </script>
 </body>
 </html>
