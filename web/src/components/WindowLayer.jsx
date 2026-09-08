@@ -5,7 +5,7 @@ import { api } from '../api.js';
 import { useIssuers, useIssuersStore } from '../store/issuers.js';
 import { suggestIssuers, aliasGet, aliasSet } from '../lib/issuerMatch.js';
 import { interpretPeriods } from '../lib/finNarrative.js';
-import { useStockUniverse } from '../store/marketData.js';
+import { useStockUniverse, useMacro } from '../store/marketData.js';
 import { MULT_META, computeMultiples, valuationUniverse, cheaperThanPct, findStockForIssuer, issuerMults } from '../lib/valuation.js';
 import { computeLinkages } from '../lib/finLinkages.js';
 import { driversFor } from '../lib/industryDrivers.js';
@@ -387,7 +387,7 @@ function TabFinances({ card, reports, industry, inn, issuerName }){
 
       <ValuationPanel inn={inn} issuerName={issuerName} />
       <MetricLinkages inn={inn} issuerName={issuerName} />
-      <IndustryDrivers industry={industry} />
+      <IndustryDrivers industry={industry} year={series[0]?.fy_year} prevYear={series[1]?.fy_year} />
       <PeriodNarrative reports={reports} industry={industry} />
     </div>
   );
@@ -424,14 +424,59 @@ function MetricLinkages({ inn, issuerName }){
   );
 }
 
-// «Что двигает результат» — драйвер-модель отрасли: цепочки + чек-лист.
-function IndustryDrivers({ industry }){
+// «Макро за период» — что было с курсами/Brent/ставкой в год отчёта vs пред.
+function MacroBlock({ macro, year, prevYear }){
+  if(!macro || !year || !prevYear) return null;
+  const Y = String(year), P = String(prevYear);
+  const rows = [
+    { key: 'usd', label: '₽/$', kind: 'pct' },
+    { key: 'cny', label: '₽/¥', kind: 'pct' },
+    { key: 'brent', label: 'Brent', kind: 'pct', suf: ' $/бр' },
+    { key: 'rate', label: 'Ставка ЦБ', kind: 'pp', suf: '%' },
+  ].map(r => {
+    const c = macro[r.key]?.[Y], p = macro[r.key]?.[P];
+    if(c == null || p == null) return null;
+    const chg = r.kind === 'pct' ? (c - p) / Math.abs(p) * 100 : (c - p);
+    return { ...r, c, p, chg };
+  }).filter(Boolean);
+  if(!rows.length) return null;
+  return (
+    <div className="bg-s2/30 border border-border/60 rounded px-2 py-1.5 space-y-1">
+      <div className="text-text3 text-[10px]">Макро за период {P} → {Y}</div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {rows.map(r => {
+          const up = r.chg >= 0;
+          const tone = r.key === 'rate'
+            ? (up ? 'text-warn' : 'text-green')       // рост ставки — минус для бизнеса
+            : (up ? 'text-green' : 'text-danger');    // рост курса/нефти — плюс экспортёру
+          const val = r.kind === 'pct'
+            ? `${up ? '+' : ''}${r.chg.toFixed(0)}%`
+            : `${up ? '+' : ''}${r.chg.toFixed(1)} пп`;
+          return (
+            <span key={r.key} className="text-[11px] font-mono">
+              <span className="text-text2">{r.label}</span>{' '}
+              <span className="text-text">{r.kind === 'pct' ? r.c.toFixed(r.key === 'brent' ? 1 : 2) : r.c.toFixed(1)}{r.suf || ''}</span>{' '}
+              <span className={tone}>{val}</span>
+            </span>
+          );
+        })}
+      </div>
+      <div className="text-text3 text-[9px] italic">Контекст к цепочкам, не раскладка прибыли. Brent — индикативно (фьючерсы), Urals не биржевой.</div>
+    </div>
+  );
+}
+
+// «Что двигает результат» — драйвер-модель отрасли: цепочки + чек-лист + макро.
+function IndustryDrivers({ industry, year, prevYear }){
   const d = useMemo(() => driversFor(industry), [industry]);
+  const macro = useMacro();
   if(!d) return null;
   return (
     <div className="mt-3 border-t border-border/60 pt-3 space-y-2">
       <div className="text-text3 text-[10px] uppercase tracking-wider">Что двигает результат (отрасль)</div>
       <div className="text-text2 text-[11px] leading-snug">{d.summary}</div>
+
+      <MacroBlock macro={macro} year={year} prevYear={prevYear} />
       <div className="space-y-1">
         {d.chains.map((chain, i) => (
           <div key={i} className="flex items-center flex-wrap gap-1 text-[11px]">

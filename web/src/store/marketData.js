@@ -171,3 +171,19 @@ export function reloadFutures(){
   useFutureStore.setState({ futures: null, loading: false, error: null, source: 'mock' });
   useFutureStore.getState().load();
 }
+
+// ── МАКРО (курсы, Brent, ставка ЦБ по годам) ───────────────────────────
+export const useMacroStore = create((set, get) => ({
+  macro: null,
+  load: async () => {
+    if(get().macro) return;
+    try { const r = await fetch('/macro-cache.json'); if(r.ok){ set({ macro: await r.json() }); return; } } catch(_){}
+    set({ macro: {} });   // нет файла — помечаем «пусто», не дёргаем повторно
+  },
+}));
+export function useMacro(){
+  const macro = useMacroStore(s => s.macro);
+  const load = useMacroStore(s => s.load);
+  useEffect(() => { load(); }, [load]);
+  return macro;
+}
