@@ -21,13 +21,26 @@ export function annualTrends(reports){
   const dc = _n(c.debt), dp = _n(p.debt);
   const icrC = (_n(c.int_exp) && _n(c.ebit) != null) ? _n(c.ebit) / _n(c.int_exp) : null;
   const icrP = (_n(p.int_exp) && _n(p.ebit) != null) ? _n(p.ebit) / _n(p.int_exp) : null;
+  const ec = _n(c.ebitda), ep = _n(p.ebitda);
+  const revG = (rc != null && rp != null && rp > 0) ? rc / rp - 1 : null;
+  const npG = (nc != null && np_ != null && np_ > 0) ? nc / np_ - 1 : null;
+  const ebitdaG = (ec != null && ep != null && ep > 0) ? ec / ep - 1 : null;
+  // качество роста: выручка растёт, а прибыль/EBITDA почти нет → низкое (объём/опт);
+  // прибыль растёт заметно быстрее выручки → высокое (расширение маржи)
+  let growthQuality = null;
+  const profitG = npG != null ? npG : ebitdaG;
+  if(revG != null && revG > 0.1 && profitG != null){
+    if(profitG < revG * 0.3) growthQuality = 'low';
+    else if(profitG > revG * 1.5) growthQuality = 'high';
+  }
   return {
-    revUp: (rc != null && rp != null && rp > 0) ? rc > rp * 1.03 : false,
+    revUp: revG != null && revG > 0.03,
     npDown: (nc != null && np_ != null && np_ > 0) ? nc < np_ * 0.9 : false,
     npNeg: nc != null && nc < 0,
     debtUp: (dc != null && dp != null && dp > 0) ? dc > dp * 1.1 : false,
     icrDown: (icrC != null && icrP != null) ? icrC < icrP : false,
     netMargin: (rc && rc > 0 && nc != null) ? nc / rc * 100 : null,
+    revG, npG, ebitdaG, growthQuality,
   };
 }
 
@@ -38,8 +51,13 @@ export function buildWatch({ industry, mults, payout, opexScaleTrap, dyn } = {})
 
   // — по данным (динамика год-к-году): приоритет, это про конкретный отчёт —
   if(dyn){
+    const pc = v => `${v >= 0 ? '+' : ''}${Math.round(v * 100)}%`;
     if(dyn.revUp && dyn.npDown){
       out.push({ level: 'warn', text: 'Выручка растёт, а прибыль падает — дело в миксе/марже, а не в объёме. Смотри структуру продаж: низкомаржинальный сегмент может давать 80% выручки и 20% прибыли.' });
+    } else if(dyn.growthQuality === 'low'){
+      out.push({ level: 'warn', text: `Рост низкого качества: выручка ${pc(dyn.revG)}, а прибыль/EBITDA почти не растёт${dyn.npG != null ? ` (${pc(dyn.npG)})` : ''}. Вероятно растёт низкомаржинальный/оптовый сегмент — темп выручки обманчив.` });
+    } else if(dyn.growthQuality === 'high'){
+      out.push({ level: 'info', text: `Качественный рост: прибыль${dyn.npG != null ? ` ${pc(dyn.npG)}` : ''} растёт быстрее выручки (${pc(dyn.revG)}) — расширение маржи, а не только объём.` });
     }
     if(dyn.npNeg){
       out.push({ level: 'warn', text: 'Убыток/слабая прибыль — нормальные дивиденды под вопросом. Иногда даже капитализация части расходов не даёт вытянуть результат в плюс.' });
