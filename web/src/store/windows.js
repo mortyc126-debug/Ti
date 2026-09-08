@@ -104,13 +104,17 @@ export const useWindows = create(
       // resize окна браузера.
       clampToViewport(){
         const vw = window.innerWidth, vh = window.innerHeight;
+        // верхняя панель приложения (sticky, z-40) перекрывает слой окон
+        // (z-30): если y < высоты панели, шапка окна прячется ПОД ней и её
+        // не схватить. Поэтому нижняя граница y — ниже панели (~52px).
+        const TOP = 52;
         const maxX = Math.max(0, vw - 160);   // хотя бы 160px шапки видно
-        const maxY = Math.max(0, vh - 44);    // шапка не ныряет под низ
+        const maxY = Math.max(TOP, vh - 44);  // шапка не ныряет под низ
         let changed = false;
         const windows = get().windows.map(w => {
           if(w.mode === 'full') return w;
           const x = Math.min(Math.max(0, w.x || 0), maxX);
-          const y = Math.min(Math.max(0, w.y || 0), maxY);
+          const y = Math.min(Math.max(TOP, w.y || 0), maxY);
           if(x === w.x && y === w.y) return w;
           changed = true;
           return { ...w, x, y };
