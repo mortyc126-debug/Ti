@@ -48,7 +48,9 @@ function _mkBond(row, innMap, nameMap){
 
   const mat = _pick(row, ['mat_date', 'maturity_date', 'matdate', 'maturity']);
   const ytm = _num(_pick(row, ['ytm', 'yield_to_mat', 'yieldtomaturity', 'effectiveyield', 'yield']));
-  if(!mat || ytm == null) return null;   // без срока/доходности точка на карте бессмысленна
+  // без срока/доходности точка бессмысленна; YTM>100% = битая цена дефолтной
+  // бумаги (иначе один выброс растягивает всю ось Y в линию)
+  if(!mat || ytm == null || ytm <= 0 || ytm > 100) return null;
 
   const volRaw = _num(_pick(row, ['volume_bn', 'volumebn']));
   const volAbs = _num(_pick(row, ['volume', 'issue_size', 'facevalue_total', 'turnover']));

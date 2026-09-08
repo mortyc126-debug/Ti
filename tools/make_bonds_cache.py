@@ -30,8 +30,10 @@ def _num(v):
         return None
 
 
-def _last_yield(secid):
-    """последняя непустая доходность из истории бонда (data отсортирована по дате)."""
+def _robust_yield(secid):
+    """устойчивая доходность: медиана последних валидных котировок. Одиночная
+    последняя цена бывает битой (дефолт/неликвид → YTM в тысячи %), поэтому
+    берём медиану последних до 7 значений в разумном диапазоне 0..100%."""
     path = os.path.join(DUMP, "bonds", f"{secid}.json")
     if not os.path.exists(path):
         return None
@@ -40,11 +42,17 @@ def _last_yield(secid):
             data = json.load(f).get("data", [])
     except Exception:
         return None
+    vals = []
     for row in reversed(data):
         y = _num(row.get("yield"))
-        if y is not None and y > 0:
-            return y
-    return None
+        if y is not None and 0 < y <= 100:   # >100% = битая цена дефолтной бумаги
+            vals.append(y)
+        if len(vals) >= 7:
+            break
+    if not vals:
+        return None
+    vals.sort()
+    return vals[len(vals) // 2]
 
 
 def main():

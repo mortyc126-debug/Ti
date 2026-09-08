@@ -70,7 +70,7 @@ function makeStore(name, defaults){
         reset(){ set({ ...defaults, hoverId: null, selectedId: null }); },
       }),
       {
-        name, version: 3,
+        name, version: 4,
         partialize: (s) => {
           const { hoverId, selectedId, ...rest } = s;
           return rest;
@@ -83,6 +83,12 @@ function makeStore(name, defaults){
           delete out.showHeatmap;
           delete out.showContours;
           delete out.horizonXOld;
+          // v4: сбросить настройки горизонта к дефолту по kind'у (у бондов —
+          // СРОК). Иначе залипший «1 параметр / Equity Ratio» схлопывает X в линию.
+          delete out.horizonX;
+          delete out.horizonMultiplier;
+          delete out.horizonMetrics;
+          delete out.horizonMode;
           return out;
         },
       }
