@@ -5,7 +5,7 @@
 // E[YTM] в bps). 0 = поверхность; точки выше «торчат», ниже —
 // «утонули».
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { useMarketStore } from '../../store/marketSurface.js';
 import { useWindows } from '../../store/windows.js';
 import { zScoreColor } from '../../lib/kernelSurface.js';
@@ -59,12 +59,89 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
     return { yMin: -maxAbs, yMax: maxAbs };
   }, [points, overlayFutWithX]);
 
-  const xMin = xMinRaw, xMax = xMaxRaw;
   const innerW = W - PAD.left - PAD.right;
   const innerH = H - PAD.top - PAD.bottom;
   const padTop = PAD.top;
+
+  // Полный экстент данных (сброс зума ведёт сюда).
+  const full = useMemo(
+    () => ({ xMin: xMinRaw, xMax: xMaxRaw, yMin: yBbox.yMin, yMax: yBbox.yMax }),
+    [xMinRaw, xMaxRaw, yBbox.yMin, yBbox.yMax]
+  );
+
+  // Видимая область (зум/пан). null = весь экстент. Сбрасываем при смене
+  // данных/фильтров (меняется full).
+  const [view, setView] = useState(null);
+  useEffect(() => { setView(null); }, [full]);
+  const dom = view || full;
+  const xMin = dom.xMin, xMax = dom.xMax;
+
   const sx = v => PAD.left + (v - xMin) / Math.max(1e-9, xMax - xMin) * innerW;
-  const sy = v => padTop + (1 - (v - yBbox.yMin) / Math.max(1e-9, yBbox.yMax - yBbox.yMin)) * innerH;
+  const sy = v => padTop + (1 - (v - dom.yMin) / Math.max(1e-9, dom.yMax - dom.yMin)) * innerH;
+
+  // client-координаты мыши → координаты данных (учёт масштаба viewBox→пиксели)
+  const clientToData = useCallback((clientX, clientY) => {
+    const r = svgRef.current?.getBoundingClientRect();
+    if(!r) return null;
+    const svgX = (clientX - r.left) / r.width * W;
+    const svgY = (clientY - r.top) / r.height * H;
+    return {
+      x: xMin + (svgX - PAD.left) / innerW * (xMax - xMin),
+      y: dom.yMin + (1 - (svgY - padTop) / innerH) * (dom.yMax - dom.yMin),
+    };
+  }, [xMin, xMax, dom.yMin, dom.yMax, innerW, innerH, padTop]);
+
+  // Зум колёсиком — к точке под курсором. Слушатель нативный (passive:false),
+  // чтобы можно было отменить прокрутку страницы.
+  useEffect(() => {
+    const el = svgRef.current;
+    if(!el) return;
+    const onWheel = (e) => {
+      e.preventDefault();
+      const d = clientToData(e.clientX, e.clientY);
+      if(!d) return;
+      const f = e.deltaY < 0 ? 0.82 : 1 / 0.82;   // вверх — приблизить
+      const cur = view || full;
+      const nxMin = d.x - (d.x - cur.xMin) * f;
+      const nxMax = d.x + (cur.xMax - d.x) * f;
+      const nyMin = d.y - (d.y - cur.yMin) * f;
+      const nyMax = d.y + (cur.yMax - d.y) * f;
+      // не даём зумить сильнее ~50x и не разрешаем «отзумить» шире экстента
+      const spanX = nxMax - nxMin, fullX = full.xMax - full.xMin;
+      if(spanX >= fullX * 0.99 && f > 1){ setView(null); return; }
+      setView({
+        xMin: Math.max(full.xMin, nxMin), xMax: Math.min(full.xMax, nxMax),
+        yMin: nyMin, yMax: nyMax,
+      });
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [clientToData, view, full]);
+
+  // Панорама перетаскиванием фона (не по точке).
+  const drag = useRef(null);
+  const onBgDown = (e) => {
+    drag.current = { x: e.clientX, y: e.clientY, dom: view || full, moved: false };
+  };
+  useEffect(() => {
+    const onMove = (e) => {
+      if(!drag.current) return;
+      const r = svgRef.current?.getBoundingClientRect();
+      if(!r) return;
+      const dxData = (e.clientX - drag.current.x) / r.width * W / innerW * (xMax - xMin);
+      const dyData = (e.clientY - drag.current.y) / r.height * H / innerH * (dom.yMax - dom.yMin);
+      if(Math.abs(e.clientX - drag.current.x) > 3 || Math.abs(e.clientY - drag.current.y) > 3) drag.current.moved = true;
+      const b = drag.current.dom;
+      setView({
+        xMin: b.xMin - dxData, xMax: b.xMax - dxData,
+        yMin: b.yMin + dyData, yMax: b.yMax + dyData,
+      });
+    };
+    const onUp = () => { if(drag.current){ setTimeout(() => { drag.current = null; }, 0); } };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, [xMin, xMax, dom.yMin, dom.yMax, innerW, innerH]);
 
   const sr = (vol) => {
     if(!vol || vol <= 0) return 4;
@@ -73,18 +150,22 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
   };
 
   const yTicks = useMemo(() => {
-    const span = (yBbox.yMax - yBbox.yMin) / 2;
+    const span = (dom.yMax - dom.yMin) / 2;
     let step;
     if(span > 5) step = 2;
     else if(span > 2) step = 1;
     else if(span > 1) step = 0.5;
-    else step = 0.25;
+    else if(span > 0.4) step = 0.25;
+    else step = 0.1;
     const ticks = [];
-    for(let v = -10; v <= 10; v += step){
-      if(v >= yBbox.yMin && v <= yBbox.yMax) ticks.push(+v.toFixed(2));
+    for(let v = -20; v <= 20; v += step){
+      if(v >= dom.yMin && v <= dom.yMax) ticks.push(+v.toFixed(2));
     }
     return ticks;
-  }, [yBbox.yMin, yBbox.yMax]);
+  }, [dom.yMin, dom.yMax]);
+
+  // тики X, попадающие в видимую область
+  const xTicksVis = useMemo(() => xTicks.filter(t => t.v >= xMin && t.v <= xMax), [xTicks, xMin, xMax]);
 
   const ref = useRef(null);
   const svgRef = useRef(null);
@@ -100,24 +181,36 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
   };
   const onPointLeave = () => { setHover(null); setTip(null); };
   const onPointClick = (p) => {
+    if(drag.current?.moved) return;   // не открывать окно после панорамы
     setSelected(p.secid);
     openWin({ kind: 'issuer', id: p.issuer, title: p.issuer, ticker: null, mode: 'medium' });
   };
+  const zoomed = view != null;
 
   return (
     <div className="relative" ref={ref}>
       <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`}
         className="w-full h-auto select-none"
+        style={{ cursor: 'grab' }}
         preserveAspectRatio="xMidYMid meet">
 
+        <defs>
+          <clipPath id={`plotclip-${kind}`}>
+            <rect x={PAD.left} y={padTop} width={innerW} height={innerH} />
+          </clipPath>
+        </defs>
+
+        {/* Фон плоскости = зона захвата для панорамы (drag). */}
         <rect x={PAD.left} y={padTop} width={innerW} height={innerH}
-          fill="#0a0e14" stroke="#222a37" />
+          fill="#0a0e14" stroke="#222a37" onMouseDown={onBgDown} />
 
         {/* Зоны над/под горизонтом — тёплый ↑ / холодный ↓. */}
-        <rect x={PAD.left} y={padTop} width={innerW} height={Math.max(0, sy(0) - padTop)}
-          fill="#ff4d6d" fillOpacity="0.03" pointerEvents="none" />
-        <rect x={PAD.left} y={sy(0)} width={innerW} height={Math.max(0, padTop + innerH - sy(0))}
-          fill="#00d4ff" fillOpacity="0.04" pointerEvents="none" />
+        <g clipPath={`url(#plotclip-${kind})`}>
+          <rect x={PAD.left} y={padTop} width={innerW} height={Math.max(0, sy(0) - padTop)}
+            fill="#ff4d6d" fillOpacity="0.03" pointerEvents="none" />
+          <rect x={PAD.left} y={sy(0)} width={innerW} height={Math.max(0, padTop + innerH - sy(0))}
+            fill="#00d4ff" fillOpacity="0.04" pointerEvents="none" />
+        </g>
 
         {/* Сетка */}
         {yTicks.map(t => (
@@ -126,7 +219,7 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
             y1={sy(t)} y2={sy(t)}
             stroke="#1a212c" strokeDasharray="2 4" pointerEvents="none" />
         ))}
-        {xTicks.map(t => (
+        {xTicksVis.map(t => (
           <line key={'gx' + t.v}
             x1={sx(t.v)} x2={sx(t.v)} y1={padTop} y2={padTop + innerH}
             stroke="#1a212c" strokeDasharray="2 4" pointerEvents="none" />
@@ -155,7 +248,7 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
         </text>
 
         {/* Подписи тиков X */}
-        {xTicks.map(t => (
+        {xTicksVis.map(t => (
           <text key={'tx' + t.v}
             x={sx(t.v)} y={padTop + innerH + 14}
             fill="#9ba3b1" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
@@ -197,6 +290,7 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
             : 'фактическая E/P − ожидаемая (п.п.)'}
         </text>
 
+        <g clipPath={`url(#plotclip-${kind})`}>
         {/* Соединительные линии акция↔фьюч (только в overlay).
             Рисуем под точками, чтобы не перекрывали маркеры. */}
         {kind === 'overlay' && overlayFutWithX.map(f => {
@@ -276,7 +370,22 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
             </g>
           );
         })}
+        </g>
       </svg>
+
+      {/* Управление зумом: колесо — приблизить/отдалить, перетаскивание —
+          сдвиг. Кнопка сброса появляется, когда карта увеличена. */}
+      <div className="absolute top-2 right-2 flex items-center gap-2" data-no-drag>
+        {zoomed && (
+          <button type="button" onClick={() => setView(null)}
+            className="bg-bg2/90 border border-border rounded px-2 py-1 text-[10px] font-mono text-text2 hover:text-acc">
+            ⤢ сбросить зум
+          </button>
+        )}
+      </div>
+      <div className="absolute bottom-2 left-16 text-[9px] font-mono text-text3 pointer-events-none">
+        колесо — зум · тянуть — сдвиг
+      </div>
 
       {tip && <PointTooltip tip={tip} kind={kind} containerWidth={containerSize.w} containerHeight={containerSize.h} xLabel={xLabel.main} />}
 
