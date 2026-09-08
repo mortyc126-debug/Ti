@@ -2,11 +2,12 @@
 // требует премию) и «ниже» (рынок принимает меньшую доходность).
 // Сортировка по |z|, фильтр по видимости (только не sparse).
 
+import { useState } from 'react';
 import { useComparison } from '../../store/comparison.js';
 import { useMarketStore } from '../../store/marketSurface.js';
 import { useWindows } from '../../store/windows.js';
 
-const TOP_N = 8;
+const TOPN_OPTS = [8, 15, 30, 50, 200];
 
 export default function SideTops({ kind = 'bond', points, overlayFutures }){
   const useStore = useMarketStore(kind);
@@ -15,6 +16,8 @@ export default function SideTops({ kind = 'bond', points, overlayFutures }){
   const selectedId  = useStore(s => s.selectedId);
   const addToComparison = useComparison(s => s.addIssuer);
   const openWin     = useWindows(s => s.open);
+  const [topN, setTopN] = useState(15);
+  const TOP_N = topN;
 
   const onOpen = p => {
     setSelected(p.secid);
@@ -44,6 +47,13 @@ export default function SideTops({ kind = 'bond', points, overlayFutures }){
 
   return (
     <div className="space-y-3">
+      <div className="flex items-center justify-end gap-2 text-[10px] font-mono text-text3" data-no-drag>
+        <span className="uppercase tracking-wider">строк</span>
+        <select value={topN} onChange={e => setTopN(Number(e.target.value))}
+          className="bg-bg2 border border-border rounded px-1.5 py-0.5 text-text2">
+          {TOPN_OPTS.map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </div>
       <Block
         title="Выше поверхности"
         subtitle="рынок требует премию · риск либо опасения"

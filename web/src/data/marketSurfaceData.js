@@ -9,24 +9,34 @@ import { safetyScore, bqiScore } from './bondsCatalog.js';
 import { stocksMock, futuresMock } from './stocksMock.js';
 import { qualityY, maturityYears } from '../lib/qualityComposite.js';
 import { currentBonds } from '../store/marketData.js';
+import { currentIssuers } from '../store/issuers.js';
 
 // ─── ОБЛИГАЦИИ ─────────────────────────────────────────────────────
 //   x = срок до погашения (годы), y = качество (composite/rating),
 //   z = YTM (%). Источник — реальная вселенная (цены+отчётность) либо демо.
+//   Фундамент (mults) берём по ТЕКУЩЕМУ винтажу из стора эмитентов (год/тип),
+//   а не из кеша вселенной — иначе смешивались бы разные периоды.
 export function loadBondPoints({ yMode = 'scoring', typeFilter = null, bonds = null } = {}){
   const out = [];
   const src = bonds || currentBonds();
+  // карта inn → mults эмитента под выбранный винтаж
+  const innMults = new Map();
+  for(const it of currentIssuers()){
+    if(it.inn && it.mults) innMults.set(String(it.inn), it.mults);
+  }
   for(const b of src){
     if(typeFilter && !typeFilter.has(b.type)) continue;
+    const mults = (b.inn && innMults.get(String(b.inn))) || b.mults || {};
+    const bm = { ...b, mults };
     const x = maturityYears(b.mat_date);
-    const y = qualityY(b, yMode);
+    const y = qualityY(bm, yMode);
     const z = b.ytm;
     if(x == null || y == null || z == null) continue;
     out.push({
       secid: b.secid, name: b.name, issuer: b.issuer, inn: b.inn || null,
       type: b.type, rating: b.rating, industry: b.industry,
       volumeBn: b.volume_bn,
-      mults: { ...b.mults, safety: safetyScore(b), bqi: bqiScore(b) },
+      mults: { ...mults, safety: safetyScore(bm), bqi: bqiScore(bm) },
       x, y, z,
     });
   }

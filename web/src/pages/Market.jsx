@@ -5,12 +5,16 @@ import { useEffect, useState } from 'react';
 import Tabs from '../components/industries/Tabs.jsx';
 import Surface from '../components/market/Surface.jsx';
 import MarketStatus from '../components/market/MarketStatus.jsx';
+import VintageControl from '../components/industries/VintageControl.jsx';
 
+// Акции/фьючерсы/спред — пока демо-данные (реальных котировок по акциям в
+// снимке нет). Скрыты, чтобы не путать заглушками. Вернём, когда подъедут
+// реальные данные: раскомментировать строки ниже.
 const TABS = [
   { id: 'bonds',   label: 'Облигации' },
-  { id: 'stocks',  label: 'Акции' },
-  { id: 'futures', label: 'Фьючерсы' },
-  { id: 'spread',  label: 'Спред (акции + фьюч)' },
+  // { id: 'stocks',  label: 'Акции' },
+  // { id: 'futures', label: 'Фьючерсы' },
+  // { id: 'spread',  label: 'Спред (акции + фьюч)' },
 ];
 
 function readTab(){
@@ -38,7 +42,12 @@ export default function Market(){
 
       <Tabs items={TABS} value={tab} onChange={setTab} />
 
-      {tab === 'bonds' && <MarketStatus />}
+      {tab === 'bonds' && (
+        <div className="space-y-2">
+          <MarketStatus />
+          <VintageControl />
+        </div>
+      )}
 
       <div className="pt-2">
         {tab === 'bonds'   && <Surface kind="bond" />}

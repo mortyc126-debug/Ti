@@ -68,8 +68,8 @@ function _mkBond(row, innMap, nameMap){
     volume_bn: volume_bn != null ? volume_bn : 1,
     mat_date: mat,
     ytm,
-    // фундамент из отчётности — если эмитент найден
-    mults: iss?.mults || {},
+    // mults НЕ пришиваем здесь — подмешиваются в loadBondPoints по текущему
+    // винтажу (год/тип отчётности), иначе смешивались бы разные периоды.
   };
 }
 
