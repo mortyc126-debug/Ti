@@ -456,7 +456,53 @@ function TabFinances({ card, reports, industry, inn, issuerName }){
       <MScorePanel reports={reports} inn={inn} />
       <IndustryDrivers industry={industry} year={series[0]?.fy_year} prevYear={series[1]?.fy_year} />
       <PeriodNarrative reports={reports} industry={industry} />
+      <AnalysisLenses />
     </div>
+  );
+}
+
+// «Как читать отчёт» — универсальные линзы/ловушки анализа + мастер-цепочка.
+function AnalysisLenses(){
+  const bridge = [
+    'макроэкономика', 'ставки / FX / спрос / регулирование', 'поведение компании',
+    'цены / объёмы / кредитование / закрытие офисов / CAPEX / M&A',
+    'выручка + OPEX + себестоимость', 'EBITDA / маржа',
+    'фин. статьи + переоценки + резервы', 'Net income',
+    'оборотный капитал + CAPEX', 'FCF', 'дивиденды / buyback / долг', 'стоимость компании',
+  ];
+  const lenses = [
+    ['Три вопроса к любой цифре', 'Что произошло → почему → повторится ли? Третий вопрос — главный: без причины нельзя прогнозировать следующий период.'],
+    ['OPEX ↓ ≠ эффективность', 'Расходы могут падать вместе с масштабом (закрытие офисов/сегмента), быть разовыми или перенесёнными. Всегда рядом: OPEX + выручка + объёмы/активность.'],
+    ['Прибыль ≠ деньги', 'Net income → +неденежные − Δоборотный капитал − CAPEX = FCF, и только потом дивиденды/buyback. Выплаты могут превышать прибыль — значит финансируются долгом/резервами.'],
+    ['Бумажная переоценка переворачивает квартал', 'У банков и особенно страховых переоценка ценных бумаг попадает в результат. Отделяй операционный результат от рыночной переоценки — иначе «прибыль упала» ≠ «бизнес ухудшился».'],
+    ['Рост ≠ всегда хорошо (банки)', 'Доп. кредитный портфель → сколько капитала съел → сколько NII принёс → сколько резервов потребовал → какой ROE. Иногда отказ от роста ради капитала — разумно (или вынужденно).'],
+    ['EBITDA — это bridge, а не цифра', 'Изменение EBITDA раскладывай: цена / объём / FX / себестоимость / разовые статьи / микс. Важна декомпозиция, а не сам итог.'],
+    ['YoY · QoQ · YTD — три разреза', 'YoY — структурно/сезонно (к той же точке прошлого года). QoQ — динамика прямо сейчас. YTD/полугодие — контроль, не выброс ли удачный квартал.'],
+  ];
+  return (
+    <details className="mt-3 border-t border-border/60 pt-3">
+      <summary className="cursor-pointer text-text3 text-[10px] uppercase tracking-wider">Как читать отчёт · ловушки</summary>
+      <ul className="mt-2 space-y-1.5">
+        {lenses.map(([t, d], i) => (
+          <li key={i}>
+            <div className="text-text text-xs">{t}</div>
+            <div className="text-text3 text-[11px] leading-snug">{d}</div>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2 text-text3 text-[10px] uppercase tracking-wider">Как одно вытекает из другого</div>
+      <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px]">
+        {bridge.map((s, i) => (
+          <span key={i} className="flex items-center gap-1">
+            <span className={i === bridge.length - 1 ? 'text-text font-medium' : 'text-text2'}>{s}</span>
+            {i < bridge.length - 1 && <span className="text-acc">↓</span>}
+          </span>
+        ))}
+      </div>
+      <div className="mt-1.5 text-text3 text-[11px] leading-snug">
+        Отдельная ветка риска: баланс → долг → валюта долга → ставка → финансовые расходы → риск.
+      </div>
+    </details>
   );
 }
 
