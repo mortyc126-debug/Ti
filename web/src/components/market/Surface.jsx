@@ -11,15 +11,18 @@ import { loadPointsByKind, loadOverlayPoints } from '../../data/marketSurfaceDat
 import { fitSurface } from '../../lib/kernelSurface.js';
 import { ratingOrd } from '../../lib/qualityComposite.js';
 import { useBondUniverse } from '../../store/marketData.js';
-import { useVintage } from '../../store/issuers.js';
+import { useIssuers, useVintage } from '../../store/issuers.js';
 
 export default function Surface({ kind = 'bond' }){
   const useStore = useMarketStore(kind);
   // Для облигаций тянем реальную вселенную (цены + отчётность). Хук
   // возвращает массив и заставляет пересчитать фит, когда данные подъедут.
   const bondUniverse = useBondUniverse();
-  // Винтаж отчётности (год/тип) — влияет на фундамент (mults) точек. Меняется
-  // → пересобираем фит. count добавляем, чтобы поймать доезд данных.
+  // ВАЖНО: гарантируем загрузку стора эмитентов (mults пришиваются к точкам
+  // на рендере по инн). Если вселенная бондов взята из кеша, marketData.load
+  // не дожидается эмитентов — без этого хука join не находит фундамент и
+  // карта пустеет. count в deps ловит доезд данных.
+  const allIssuers = useIssuers();
   const { year: vYear, std: vStd, count: vCount } = useVintage();
 
   const yMode = useStore(s => s.yMode);
@@ -51,7 +54,7 @@ export default function Surface({ kind = 'bond' }){
       return true;
     });
     return fitSurface(filtered, { bandwidth: { x: bwX, y: bwY } });
-  }, [kind, yMode, types, ratingMin, ratingMax, matMin, matMax, mktCapMin, mktCapMax, bwX, bwY, bondUniverse, vYear, vStd, vCount]);
+  }, [kind, yMode, types, ratingMin, ratingMax, matMin, matMax, mktCapMin, mktCapMax, bwX, bwY, bondUniverse, vYear, vStd, vCount, allIssuers]);
 
   // Для overlay подсчитываем фьючерсы и пары; residual у фьюча
   // считаем относительно ТОЙ ЖЕ surface'а (фит на акциях).

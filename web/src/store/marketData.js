@@ -20,6 +20,9 @@ export const useBondStore = create((set, get) => ({
 
   load: async () => {
     if(get().loading || get().bonds) return;
+    // фундамент (mults) пришивается к точкам по инн из стора эмитентов —
+    // грузим его в любом случае, даже если бонды берём из кеша
+    try { useIssuersStore.getState().load(); } catch(_){}
     try {
       const cached = localStorage.getItem(CACHE_KEY);
       if(cached){
