@@ -442,6 +442,10 @@ tr.row-redeemed td{opacity:.5;}
   .irow{flex-direction:column;align-items:stretch}
   .ig{min-width:auto}
 }
+/* Меньше скруглений — ближе к «квадратному» стилю других модулей */
+.panel,.arch-panel,.fut-info{border-radius:8px!important}
+.card,.err,.tip,.dropdown,.ip-header,.anomaly-bar,.tbl-w,.cbr-hist{border-radius:6px!important}
+.btn,input,select,.search-input{border-radius:5px!important}
 </style>
 </head>
 <body>
@@ -490,8 +494,30 @@ tr.row-redeemed td{opacity:.5;}
       <div class="dropdown" id="dropdown"></div>
     </div>
     <div class="ig" style="max-width:200px"><label class="il">EBITDA млрд ₽/год</label><input type="number" id="ebitda" placeholder="85.0" step="0.1"/></div>
-    <div class="ig" style="max-width:160px"><label class="il">Ключевая ставка %</label><input type="number" id="keyrate" placeholder="21.0" step="0.25"/></div>
+    <div class="ig" style="max-width:160px">
+      <label class="il" style="display:flex;align-items:center;gap:6px">Ключевая ставка %
+        <button type="button" id="cbr-hist-toggle" title="История ключевой ставки" style="background:rgba(255,0,110,.10);border:1px solid rgba(255,0,110,.22);color:var(--acc);border-radius:4px;padding:0 5px;font-size:9px;font-family:inherit;cursor:pointer;font-weight:600;letter-spacing:0;text-transform:none">история</button>
+      </label>
+      <input type="number" id="keyrate" placeholder="21.0" step="0.25"/>
+    </div>
     <button class="btn" id="btngo" disabled>АНАЛИЗ</button>
+  </div>
+
+  <!-- История ключевой ставки ЦБ: вводится один раз, хранится в localStorage
+       (bondan_cbr_history), общий с модулем отчётности. Текущая ставка =
+       последняя по дате запись; поле КС подставляется автоматически. -->
+  <div class="cbr-hist" id="cbr-hist" style="display:none;margin-top:10px;padding:12px 14px;background:rgba(255,255,255,.02);border:1px solid rgba(255,0,110,.15)">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t2)">История ставки ЦБ</span>
+      <span style="font-size:10px;color:var(--t3)">— вводишь один раз, ставка сама подставится и станет контекстом в отчётности</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
+      <div><label class="il">Дата изменения</label><input type="date" id="cbr-add-date" style="max-width:150px"/></div>
+      <div><label class="il">Ставка %</label><input type="number" id="cbr-add-rate" step="0.25" placeholder="21.0" style="max-width:110px"/></div>
+      <button type="button" class="btn" id="cbr-add-btn" style="padding:7px 14px">+ добавить</button>
+      <span style="font-size:10px;color:var(--t3);align-self:center">Заводи дату каждого решения ЦБ — доходности флоатеров и контекст периодов считаются по ставке на нужную дату.</span>
+    </div>
+    <div id="cbr-hist-list" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto"></div>
   </div>
   <!-- T-Invest token row -->
   <div class="irow" style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.05)">
@@ -1087,7 +1113,7 @@ async function go(){
 
     if(!blist.length) throw new Error('Облигаций не найдено для «'+searchQ+'»');
     $('hname').textContent=selectedQuery; $('hs1').style.display=''; sp(25);
-    if(!parseFloat($('keyrate').value)){try{const md=await proxyFetch('/engines/stock/markets/bonds/securities/'+blist[0].SECID+'.json');const mdata=md.marketdata;if(mdata&&mdata.columns&&mdata.data&&mdata.data.length){const mcols=mdata.columns.map(x=>x.toUpperCase()),mrow=mdata.data[0],cbrIdx=mcols.indexOf('CBRCLOSE');if(cbrIdx!==-1&&mrow[cbrIdx]!=null&&parseFloat(mrow[cbrIdx])>0){$('keyrate').value=parseFloat(mrow[cbrIdx]);kr=parseFloat(mrow[cbrIdx]);}}}catch(e){}}else{kr=parseFloat($('keyrate').value)||null;}
+    if(!parseFloat($('keyrate').value)){try{const md=await proxyFetch('/engines/stock/markets/bonds/securities/'+blist[0].SECID+'.json');const mdata=md.marketdata;if(mdata&&mdata.columns&&mdata.data&&mdata.data.length){const mcols=mdata.columns.map(x=>x.toUpperCase()),mrow=mdata.data[0],cbrIdx=mcols.indexOf('CBRCLOSE');if(cbrIdx!==-1&&mrow[cbrIdx]!=null&&parseFloat(mrow[cbrIdx])>0){const cv=parseFloat(mrow[cbrIdx]);$('keyrate').value=cv;kr=cv;try{const today=new Date().toISOString().slice(0,10);const h=cbrHistLoad();if(!h.some(x=>x.d===today)&&cbrLatest()!==cv){h.push({d:today,r:cv});h.sort((p,q)=>p.d<q.d?-1:1);cbrHistSave(h);renderCbrHist();}}catch(e){}}}}catch(e){}}else{kr=parseFloat($('keyrate').value)||null;}
     const res=[];
     for(let i=0;i<blist.length;i++){
       const b=blist[i];
@@ -2667,6 +2693,63 @@ document.querySelectorAll('#horizonPills .pill').forEach(p=>p.addEventListener('
   ak=null;
   if(bonds.length){renderChart();renderTip();}
 }));
+
+// ============ История ключевой ставки ЦБ (общая с отчётностью) ============
+// Хранится в localStorage['bondan_cbr_history'] = [{d:'YYYY-MM-DD', r:число}].
+// Тот же ключ читает модуль отчётности (analysiscompany) для контекста периодов.
+const CBR_KEY='bondan_cbr_history';
+function cbrHistLoad(){
+  try{const raw=localStorage.getItem(CBR_KEY);const a=raw?JSON.parse(raw):[];
+    return Array.isArray(a)?a.filter(x=>x&&x.d&&x.r!=null).sort((p,q)=>p.d<q.d?-1:1):[];}
+  catch(e){return[];}
+}
+function cbrHistSave(arr){try{localStorage.setItem(CBR_KEY,JSON.stringify(arr));}catch(e){}}
+function cbrLatest(){const a=cbrHistLoad();return a.length?a[a.length-1].r:null;}
+function renderCbrHist(){
+  const box=$('cbr-hist-list');if(!box)return;
+  const a=cbrHistLoad();
+  if(!a.length){box.innerHTML='<div style="font-size:11px;color:var(--t3);font-style:italic">Пока пусто. Добавь даты решений ЦБ — например, 2024-10-28 → 21.0</div>';return;}
+  // показываем свежие сверху
+  box.innerHTML=a.slice().reverse().map((x,i)=>{
+    const idx=a.length-1-i;const isLast=idx===a.length-1;
+    return '<div style="display:flex;align-items:center;gap:10px;padding:4px 8px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:4px">'
+      +'<span style="font-family:monospace;font-size:11px;color:var(--t2);min-width:88px">'+x.d+'</span>'
+      +'<span style="font-family:monospace;font-size:12px;font-weight:700;color:'+(isLast?'var(--acc)':'var(--t1)')+'">'+(+x.r).toFixed(2)+'%</span>'
+      +(isLast?'<span style="font-size:9px;color:var(--acc);text-transform:uppercase;letter-spacing:.06em">текущая</span>':'')
+      +'<button type="button" data-cbr-del="'+idx+'" title="Удалить" style="margin-left:auto;background:none;border:none;color:var(--t3);cursor:pointer;font-size:13px;line-height:1;padding:0 4px">×</button></div>';
+  }).join('');
+}
+function cbrAdd(){
+  const d=$('cbr-add-date').value, r=parseFloat($('cbr-add-rate').value);
+  if(!d||!(r>0)){return;}
+  const a=cbrHistLoad().filter(x=>x.d!==d);   // одна запись на дату — перезапись
+  a.push({d,r});a.sort((p,q)=>p.d<q.d?-1:1);
+  cbrHistSave(a);renderCbrHist();
+  $('cbr-add-rate').value='';
+  // если поле КС пустое — сразу подставим последнюю
+  applyCbrToKeyrate(false);
+}
+// Подставить последнюю ставку в поле КС. force=true перезаписывает даже
+// заполненное поле; иначе только пустое (чтобы не затирать ручной ввод).
+function applyCbrToKeyrate(force){
+  const last=cbrLatest();if(last==null)return;
+  const el=$('keyrate');if(!el)return;
+  if(force||!parseFloat(el.value)){el.value=(+last).toFixed(2);kr=+last;}
+}
+(function initCbrHist(){
+  const t=$('cbr-hist-toggle');
+  if(t)t.addEventListener('click',()=>{const p=$('cbr-hist');if(p){const open=p.style.display!=='none';p.style.display=open?'none':'block';if(!open)renderCbrHist();}});
+  const ab=$('cbr-add-btn');if(ab)ab.addEventListener('click',cbrAdd);
+  const ad=$('cbr-add-date');if(ad&&!ad.value){try{ad.value=new Date().toISOString().slice(0,10);}catch(e){}}
+  const list=$('cbr-hist-list');
+  if(list)list.addEventListener('click',e=>{
+    const b=e.target.closest('[data-cbr-del]');if(!b)return;
+    const i=+b.getAttribute('data-cbr-del');const a=cbrHistLoad();
+    if(i>=0&&i<a.length){a.splice(i,1);cbrHistSave(a);renderCbrHist();}
+  });
+  renderCbrHist();
+  applyCbrToKeyrate(false);   // на старте подставляем последнюю — не вводить заново
+})();
 
 // ===================== INIT =====================
 renderArchive();
