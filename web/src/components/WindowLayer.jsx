@@ -9,6 +9,7 @@ import { useStockUniverse, useMacro } from '../store/marketData.js';
 import { MULT_META, computeMultiples, valuationUniverse, cheaperThanPct, findStockForIssuer, issuerMults } from '../lib/valuation.js';
 import { computeLinkages } from '../lib/finLinkages.js';
 import { driversFor } from '../lib/industryDrivers.js';
+import { computeMScore, MSCORE_FIELDS, extraGet, extraSetField } from '../lib/mscore.js';
 
 // Слой плавающих окон. Рендерится один раз в App.jsx поверх Outlet.
 // Каркас окна + живой контент в MediumBody (вкладки Финансы/Бумаги/
@@ -452,6 +453,7 @@ function TabFinances({ card, reports, industry, inn, issuerName }){
 
       <ValuationPanel inn={inn} issuerName={issuerName} />
       <MetricLinkages inn={inn} issuerName={issuerName} />
+      <MScorePanel reports={reports} inn={inn} />
       <IndustryDrivers industry={industry} year={series[0]?.fy_year} prevYear={series[1]?.fy_year} />
       <PeriodNarrative reports={reports} industry={industry} />
     </div>
@@ -527,6 +529,94 @@ function MacroBlock({ macro, year, prevYear }){
         })}
       </div>
       <div className="text-text3 text-[9px] italic">Контекст к цепочкам, не раскладка прибыли. Brent — индикативно (фьючерсы), Urals не биржевой.</div>
+    </div>
+  );
+}
+
+// Beneish M-score — индикативный, с возможностью дозаполнить недостающие данные.
+const _ANN_MS = new Set(['FY', 'ГОД', 'ГОД', 'YEAR', 'ANNUAL', '12M', 'Y']);
+function MScorePanel({ reports, inn }){
+  const [ver, setVer] = useState(0);   // форс-ререндер после ввода
+  const [open, setOpen] = useState(false);
+  const data = useMemo(() => {
+    if(!Array.isArray(reports)) return null;
+    const ann = reports.filter(r => { const p = String(r.period || '').trim(); return !p || _ANN_MS.has(p.toUpperCase()) || /год|annual|fy/i.test(p); })
+      .sort((a, b) => (b.fy_year || 0) - (a.fy_year || 0));
+    const src = ann.length >= 2 ? ann : [...reports].sort((a, b) => (b.fy_year || 0) - (a.fy_year || 0));
+    if(src.length < 2) return null;
+    const cur = src[0], prev = src[1];
+    const ex = extraGet(inn);
+    const m = computeMScore(cur, prev, ex[String(cur.fy_year)], ex[String(prev.fy_year)]);
+    return { cur, prev, m };
+  }, [reports, inn, ver]);
+  if(!data || !data.m) return null;
+  const { cur, prev, m } = data;
+  const flag = m.value > -1.78;
+  const tone = flag ? 'text-warn' : 'text-green';
+
+  const varRows = [
+    ['SGI', 'рост выручки', true], ['LVGI', 'леверидж', true], ['TATA', 'начисления (инд.)', true],
+    ['DSRI', 'дебиторка/выручка', m.provided.DSRI], ['GMI', 'валовая маржа', m.provided.GMI],
+    ['AQI', 'качество активов', m.provided.AQI], ['DEPI', 'амортизация', m.provided.DEPI],
+    ['SGAI', 'SG&A/выручка', m.provided.SGAI],
+  ];
+
+  return (
+    <div className="mt-3 border-t border-border/60 pt-3 space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-text3 text-[10px] uppercase tracking-wider">M-score (Beneish)</span>
+        <span className={`text-sm font-mono ${tone}`}>{m.value.toFixed(2)}</span>
+        <span className="text-text3 text-[10px]">{m.full ? 'полный' : 'индикативный'}</span>
+      </div>
+      <div className={`text-xs ${tone}`}>
+        {flag ? 'Выше −1.78 — есть статистические признаки возможных манипуляций с отчётностью. Повод копать глубже, не приговор.'
+              : 'Ниже −1.78 — признаков манипуляций по модели нет.'}
+      </div>
+      {!m.full && (
+        <div className="text-text3 text-[11px] leading-snug">
+          Считается по {Object.values(m.provided).filter(Boolean).length + 3} из 8 переменных (остальные приняты нейтральными = 1). Дозаполни построчные данные за {prev.fy_year} и {cur.fy_year} — станет полным.
+        </div>
+      )}
+
+      <details open={open} onToggle={e => setOpen(e.target.open)}>
+        <summary className="cursor-pointer text-[11px] text-text2">Переменные и ввод недостающих данных</summary>
+
+        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] font-mono">
+          {varRows.map(([k, lbl, ok]) => (
+            <span key={k} className={ok ? 'text-text2' : 'text-text3'}>
+              {ok ? '✓' : '·'} {k} <span className="text-text3">{m.vars[k] != null ? m.vars[k].toFixed(2) : '—'}</span>
+            </span>
+          ))}
+        </div>
+
+        <div className="mt-2 overflow-x-auto">
+          <table className="text-[11px]">
+            <thead className="text-text3">
+              <tr><th className="text-left p-1">Строка (млн ₽)</th><th className="p-1">{prev.fy_year}</th><th className="p-1">{cur.fy_year}</th></tr>
+            </thead>
+            <tbody>
+              {MSCORE_FIELDS.map(f => (
+                <tr key={f.id}>
+                  <td className="p-1 text-text2">{f.label}</td>
+                  {[prev, cur].map(row => {
+                    const ex = extraGet(inn)[String(row.fy_year)] || {};
+                    return (
+                      <td key={row.fy_year} className="p-1">
+                        <input type="number" defaultValue={ex[f.id] ?? ''} placeholder="—"
+                          onBlur={e => { extraSetField(inn, row.fy_year, f.id, e.target.value); setVer(v => v + 1); }}
+                          className="w-24 bg-bg2 border border-border rounded px-1.5 py-0.5 text-text font-mono" />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="text-text3 text-[10px] italic mt-1">
+          Значения в тех же единицах, что и отчёт (млн ₽). Данные сохраняются локально. Источник построчных данных — баланс/ОПУ эмитента (ГИР БО, audit-it, годовой отчёт).
+        </div>
+      </details>
     </div>
   );
 }
