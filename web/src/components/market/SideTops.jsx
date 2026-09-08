@@ -18,7 +18,8 @@ export default function SideTops({ kind = 'bond', points, overlayFutures }){
 
   const onOpen = p => {
     setSelected(p.secid);
-    openWin({ kind: 'issuer', id: p.issuer, title: p.issuer, ticker: p.ticker || null, mode: 'medium' });
+    openWin({ kind: 'issuer', id: p.inn || p.issuer, inn: p.inn || null,
+      title: p.issuer, ticker: p.ticker || null, mode: 'medium', tab: p.inn ? 'report' : 'finances' });
   };
 
   // В overlay-режиме показываем топы контанго / бэквардации

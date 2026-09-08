@@ -29845,7 +29845,7 @@ function _repArchiveModal(){
   try{
     var q = new URLSearchParams(location.search);
     if(q.get('embed') !== '1') return;
-    var inn = q.get('inn'); var wantId = q.get('id');
+    var inn = q.get('inn'); var wantId = q.get('id'); var wantName = q.get('name');
     var st = document.createElement('style');
     st.textContent =
       '#page-reports > .page-title, #page-reports > .page-sub{display:none!important}'
@@ -29865,12 +29865,40 @@ function _repArchiveModal(){
       }
       return null;
     }
+    // Догрузить отчётность одного эмитента из снимка (если полный мёрдж на
+    // странице «Отчёты» не запускался — reportsDB тогда пуст). Не зависит от D1.
+    var _snapTried = false;
+    function _snapLoad(cb){
+      if(_snapTried || !inn){ cb(false); return; }
+      _snapTried = true;
+      fetch('/reports-cache/' + inn + '.json').then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(d){
+          var rows = d && Array.isArray(d.data) ? d.data : [];
+          if(!rows.length || !window.reportsDB || typeof _d1MergeReports !== 'function'){ cb(false); return; }
+          var id = findId();
+          if(!id){
+            id = 'i_' + inn;
+            if(!window.reportsDB[id]){
+              window.reportsDB[id] = { name: wantName || inn, inn: String(inn), ind: 'other', related: [], periods: {} };
+            }
+          }
+          try{ _d1MergeReports(id, String(inn), rows); }catch(e){}
+          cb(id);
+        })
+        .catch(function(){ cb(false); });
+    }
     var tries = 0;
     var t = setInterval(function(){
       tries++;
       if(typeof repSelectIssuerById === 'function' && window.reportsDB){
         var id = findId();
         if(id){ clearInterval(t); try{ repSelectIssuerById(id); }catch(e){} return; }
+        // нет в reportsDB — один раз пробуем снимок по этому ИНН
+        if(!_snapTried){
+          _snapLoad(function(newId){
+            if(newId){ clearInterval(t); try{ repSelectIssuerById(newId); }catch(e){} }
+          });
+        }
         if(tries > 40){   // ~8с ждали, данных по этому ИНН нет
           clearInterval(t);
           var ep = document.getElementById('rep-empty');

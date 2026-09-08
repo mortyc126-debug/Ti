@@ -183,7 +183,8 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
   const onPointClick = (p) => {
     if(drag.current?.moved) return;   // не открывать окно после панорамы
     setSelected(p.secid);
-    openWin({ kind: 'issuer', id: p.issuer, title: p.issuer, ticker: null, mode: 'medium' });
+    openWin({ kind: 'issuer', id: p.inn || p.issuer, inn: p.inn || null,
+      title: p.issuer, ticker: null, mode: 'medium', tab: p.inn ? 'report' : 'finances' });
   };
   const zoomed = view != null;
 

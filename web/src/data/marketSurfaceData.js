@@ -23,7 +23,7 @@ export function loadBondPoints({ yMode = 'scoring', typeFilter = null, bonds = n
     const z = b.ytm;
     if(x == null || y == null || z == null) continue;
     out.push({
-      secid: b.secid, name: b.name, issuer: b.issuer,
+      secid: b.secid, name: b.name, issuer: b.issuer, inn: b.inn || null,
       type: b.type, rating: b.rating, industry: b.industry,
       volumeBn: b.volume_bn,
       mults: { ...b.mults, safety: safetyScore(b), bqi: bqiScore(b) },

@@ -60,6 +60,7 @@ function _mkBond(row, innMap, nameMap){
     secid,
     name: _pick(row, ['name', 'shortname', 'secname']) || secid,
     issuer: issuerName,
+    inn: inn ? String(inn) : (iss?.inn || null),
     ticker: iss?.ticker || null,
     type: _bondType(secid, _pick(row, ['type', 'sec_type', 'listlevel'])),
     rating: _normRating(_pick(row, ['rating', 'credit_rating', 'ratingval'])),

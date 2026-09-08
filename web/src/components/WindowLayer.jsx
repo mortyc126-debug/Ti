@@ -193,7 +193,7 @@ function IssuerTabContent({ win }){
     return <div className="text-text3 text-xs italic">У этого эмитента нет ИНН в наших данных — без него не получится подтянуть отчётность. Откройте облигацию из таблицы — там ИНН проставляется автоматически.</div>;
   }
   // Модуль отчётности (шкалы) читает данные из общего localStorage — не ждём backend.
-  if(win.tab === 'report') return <TabReportModule inn={inn} />;
+  if(win.tab === 'report') return <TabReportModule inn={inn} name={win.title} />;
   if(loading) return <div className="text-text3 text-xs">Загружаю данные…</div>;
   if(error === 'no-data') return <div className="text-text3 text-xs italic">По ИНН {inn} в БД пока ничего нет. Запустите сбор отчётности из admin-панели.</div>;
 
@@ -208,10 +208,10 @@ function IssuerTabContent({ win }){
 
 // Встроенный модуль отчётности (analysiscompany.html) в embed-режиме —
 // per-issuer финвид со шкалами сравнения. Данные из общего localStorage.
-function TabReportModule({ inn }){
+function TabReportModule({ inn, name }){
   return (
     <iframe
-      src={`/modules/analysiscompany.html?embed=1&inn=${encodeURIComponent(inn)}`}
+      src={`/modules/analysiscompany.html?embed=1&inn=${encodeURIComponent(inn)}${name ? '&name=' + encodeURIComponent(name) : ''}`}
       title="Отчётность эмитента"
       className="w-full"
       style={{ border: 0, display: 'block', flex: 1, minHeight: 360 }}
