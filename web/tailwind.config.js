@@ -3,23 +3,24 @@ export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
-      // Тёмная палитра в духе текущего SPA — чтобы переход выглядел
-      // органично, не «другое приложение».
+      // Палитра синхронизирована с модулями (analysiscompany.html) —
+      // тёмно-фиолетовый фон, магента-акцент, бирюзовый «плюс». Раньше сайт
+      // был сине-циановым и выбивался из модулей; теперь единый стиль.
       colors: {
-        bg:       '#0a0e14',
-        bg2:      '#11161e',
-        s2:       '#1a212c',
-        border:   '#222a37',
-        border2:  '#2e3847',
-        text:     '#e6edf3',
-        text2:    '#9ba3b1',
-        text3:    '#5e6573',
-        acc:      '#00d4ff',
-        'acc-dim': '#0a3a4a',
-        green:    '#22d3a0',
-        warn:     '#f5a623',
-        danger:   '#ff4d6d',
-        purple:   '#a78bfa',
+        bg:       '#0B0613',
+        bg2:      '#140A24',
+        s2:       '#1A1030',
+        border:   '#241638',
+        border2:  '#3A1F44',
+        text:     '#F2F0FF',
+        text2:    '#A79BC9',
+        text3:    '#6F648F',
+        acc:      '#FF006E',
+        'acc-dim': 'rgba(255,0,110,0.12)',
+        green:    '#52F2C9',
+        warn:     '#E8895A',
+        danger:   '#FF4D7A',
+        purple:   '#AA5AFF',
       },
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
@@ -28,7 +29,7 @@ export default {
       },
       boxShadow: {
         // Мягкие тени для карточек и hover-состояний на тёмном фоне.
-        glow:    '0 0 0 1px rgba(0,212,255,0.15), 0 4px 24px -8px rgba(0,212,255,0.25)',
+        glow:    '0 0 0 1px rgba(255,0,110,0.15), 0 4px 24px -8px rgba(255,0,110,0.25)',
         card:    '0 1px 0 rgba(255,255,255,0.02) inset, 0 4px 16px -8px rgba(0,0,0,0.5)',
         cardHover: '0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px -12px rgba(0,0,0,0.7)',
       },

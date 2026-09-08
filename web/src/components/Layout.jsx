@@ -13,6 +13,9 @@ export default function Layout(){
 
   useEffect(() => { setMenuOpen(false); }, [loc.pathname]);
 
+  // полноэкранные модули-iframe (своя шапка, без отступов и лимита ширины)
+  const isModule = loc.pathname.startsWith('/reports') || loc.pathname.startsWith('/debt');
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-bg2/80 backdrop-blur border-b border-border px-4 sm:px-5 py-2.5 flex items-center gap-3 sm:gap-4 sticky top-0 z-40">
@@ -40,7 +43,7 @@ export default function Layout(){
 
       <div className="flex-1 flex min-h-0">
         <main className={
-          loc.pathname.startsWith('/reports')
+          isModule
             ? 'flex-1 min-w-0 flex flex-col'   // полноэкранные модули (iframe) — без отступов/лимита ширины
             : 'flex-1 px-4 sm:px-6 py-5 max-w-7xl w-full mx-auto min-w-0'
         }>
@@ -48,7 +51,7 @@ export default function Layout(){
         </main>
         <AppSidebar />
       </div>
-      {!loc.pathname.startsWith('/reports') && <Footer />}
+      {!isModule && <Footer />}
     </div>
   );
 }

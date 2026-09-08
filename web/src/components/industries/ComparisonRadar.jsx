@@ -58,7 +58,7 @@ export default function ComparisonRadar({ selectedView, hoveredKey, onHover }){
       )}
       <ResponsiveContainer>
         <RadarChart data={data} outerRadius="72%" margin={{ top: 22, right: 70, bottom: 16, left: 70 }}>
-          <PolarGrid stroke="#222a37" />
+          <PolarGrid stroke="#241638" />
           <PolarAngleAxis
             dataKey="axis"
             tick={(props) => <AxisTick {...props} />}
@@ -66,8 +66,8 @@ export default function ComparisonRadar({ selectedView, hoveredKey, onHover }){
           <PolarRadiusAxis
             angle={90}
             domain={[0, 100]}
-            tick={{ fill: '#3a4150', fontSize: 9 }}
-            stroke="#222a37"
+            tick={{ fill: '#4A3D63', fontSize: 9 }}
+            stroke="#241638"
             tickCount={5}
           />
           {visible.map(x => {
@@ -114,7 +114,7 @@ function AxisTick({ x, y, cx, cy, payload }){
   return (
     <text
       x={tx} y={ty}
-      fill="#9ba3b1"
+      fill="#A79BC9"
       fontSize="11"
       fontFamily="JetBrains Mono, monospace"
       textAnchor="middle"
@@ -143,7 +143,7 @@ function ValueLabel({ x, y, cx, cy, payload, dataKey, color }){
       <rect
         x={cx + dx * k - w / 2} y={cy + dy * k - 8}
         width={w} height="15" rx="3"
-        fill="#0a0e14" fillOpacity="0.92" stroke={color} strokeOpacity="0.7"
+        fill="#0B0613" fillOpacity="0.92" stroke={color} strokeOpacity="0.7"
       />
       <text
         x={cx + dx * k} y={cy + dy * k + 3}

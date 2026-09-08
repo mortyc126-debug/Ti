@@ -38,11 +38,11 @@ export function ratingTier(r){
 
 export function tierColor(t){
   switch(t){
-    case 'ig':    return '#22d3a0';
-    case 'cross': return '#00d4ff';
-    case 'hy':    return '#f5a623';
-    case 'dist':  return '#ff4d6d';
-    default:      return '#5e6573';
+    case 'ig':    return '#52F2C9';
+    case 'cross': return '#FF006E';
+    case 'hy':    return '#E8895A';
+    case 'dist':  return '#FF4D7A';
+    default:      return '#6F648F';
   }
 }
 

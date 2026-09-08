@@ -131,12 +131,12 @@ export function ytmColor(v){
 // доходность), 0 нейтральный, >+1 красный (премия за риск). Размер
 // точки — отдельно, по объёму выпуска.
 export function zScoreColor(z){
-  if(z == null) return '#5e6573';
+  if(z == null) return '#6F648F';
   // clamp ±2.5σ
   const t = Math.max(-2.5, Math.min(2.5, z)) / 2.5;   // [-1..1]
-  // -1 → 200 (синий), 0 → серый, +1 → 0 (красный)
-  if(Math.abs(t) < 0.05) return '#9ba3b1';
-  const hue = t > 0 ? 0 : 200;
+  // -1 → 166 (бирюза), 0 → серый, +1 → 0 (красный)
+  if(Math.abs(t) < 0.05) return '#A79BC9';
+  const hue = t > 0 ? 0 : 166;
   const sat = 60 + Math.abs(t) * 30;
   const lig = 50 + (1 - Math.abs(t)) * 8;
   return `hsl(${hue} ${sat}% ${lig}%)`;

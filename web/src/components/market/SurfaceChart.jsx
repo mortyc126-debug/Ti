@@ -203,14 +203,14 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
 
         {/* Фон плоскости = зона захвата для панорамы (drag). */}
         <rect x={PAD.left} y={padTop} width={innerW} height={innerH}
-          fill="#0a0e14" stroke="#222a37" onMouseDown={onBgDown} />
+          fill="#0B0613" stroke="#241638" onMouseDown={onBgDown} />
 
         {/* Зоны над/под горизонтом — тёплый ↑ / холодный ↓. */}
         <g clipPath={`url(#plotclip-${kind})`}>
           <rect x={PAD.left} y={padTop} width={innerW} height={Math.max(0, sy(0) - padTop)}
-            fill="#ff4d6d" fillOpacity="0.03" pointerEvents="none" />
+            fill="#FF4D7A" fillOpacity="0.03" pointerEvents="none" />
           <rect x={PAD.left} y={sy(0)} width={innerW} height={Math.max(0, padTop + innerH - sy(0))}
-            fill="#00d4ff" fillOpacity="0.04" pointerEvents="none" />
+            fill="#52F2C9" fillOpacity="0.04" pointerEvents="none" />
         </g>
 
         {/* Сетка */}
@@ -218,19 +218,19 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
           <line key={'gy' + t}
             x1={PAD.left} x2={W - PAD.right}
             y1={sy(t)} y2={sy(t)}
-            stroke="#1a212c" strokeDasharray="2 4" pointerEvents="none" />
+            stroke="#1A1030" strokeDasharray="2 4" pointerEvents="none" />
         ))}
         {xTicksVis.map(t => (
           <line key={'gx' + t.v}
             x1={sx(t.v)} x2={sx(t.v)} y1={padTop} y2={padTop + innerH}
-            stroke="#1a212c" strokeDasharray="2 4" pointerEvents="none" />
+            stroke="#1A1030" strokeDasharray="2 4" pointerEvents="none" />
         ))}
 
         {/* Линия горизонта */}
         <line x1={PAD.left} x2={W - PAD.right} y1={sy(0)} y2={sy(0)}
-          stroke="#9ba3b1" strokeOpacity="0.85" strokeWidth="1.4" />
+          stroke="#A79BC9" strokeOpacity="0.85" strokeWidth="1.4" />
         <text x={W - PAD.right - 4} y={sy(0) - 4}
-          fill="#9ba3b1" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="end">
+          fill="#A79BC9" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="end">
           поверхность · E[{kind === 'bond' ? 'YTM' : 'E/P'}]
         </text>
 
@@ -238,12 +238,12 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
             чарта, прямо в зонах «выше / ниже горизонта» — чтобы
             не нужно было читать боковую подпись оси. */}
         <text x={W - PAD.right - 4} y={Math.max(padTop + 16, sy(0) - 24)}
-          fill="#ff4d6d" fillOpacity="0.85"
+          fill="#FF4D7A" fillOpacity="0.85"
           fontSize="11" fontFamily="JetBrains Mono, monospace" textAnchor="end">
           ↑ премия за риск
         </text>
         <text x={W - PAD.right - 4} y={Math.min(padTop + innerH - 6, sy(0) + 28)}
-          fill="#00d4ff" fillOpacity="0.85"
+          fill="#52F2C9" fillOpacity="0.85"
           fontSize="11" fontFamily="JetBrains Mono, monospace" textAnchor="end">
           ↓ дороже аналогов
         </text>
@@ -252,7 +252,7 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
         {xTicksVis.map(t => (
           <text key={'tx' + t.v}
             x={sx(t.v)} y={padTop + innerH + 14}
-            fill="#9ba3b1" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
+            fill="#A79BC9" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
             {t.label}
           </text>
         ))}
@@ -261,7 +261,7 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
           const isBps = kind === 'bond';
           const val = isBps ? Math.round(t * 100) : +t.toFixed(1);
           const suffix = isBps ? 'bps' : 'пп';
-          const c = val > 0 ? '#ff4d6d' : val < 0 ? '#00d4ff' : '#9ba3b1';
+          const c = val > 0 ? '#FF4D7A' : val < 0 ? '#52F2C9' : '#A79BC9';
           if(val === 0) return null;
           return (
             <text key={'ty' + t}
@@ -276,15 +276,15 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
         {/* Подписи осей. X — основная + hint направления внизу.
             Y — одна вертикальная строка с расшифровкой residual'а
             (название и единицы зависят от kind'а). */}
-        <text x={W / 2} y={H - 18} fill="#cce4f0" fontSize="12" fontFamily="JetBrains Mono, monospace" textAnchor="middle" fontWeight="500">
+        <text x={W / 2} y={H - 18} fill="#F2F0FF" fontSize="12" fontFamily="JetBrains Mono, monospace" textAnchor="middle" fontWeight="500">
           {xLabel.main}
         </text>
         {xLabel.hint && (
-          <text x={W / 2} y={H - 4} fill="#7aa0b8" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
+          <text x={W / 2} y={H - 4} fill="#A79BC9" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
             {xLabel.hint}
           </text>
         )}
-        <text x={16} y={H / 2} fill="#cce4f0" fontSize="11" fontFamily="JetBrains Mono, monospace" fontWeight="500"
+        <text x={16} y={H / 2} fill="#F2F0FF" fontSize="11" fontFamily="JetBrains Mono, monospace" fontWeight="500"
           transform={`rotate(-90 16 ${H / 2})`} textAnchor="middle">
           {kind === 'bond'
             ? 'фактическая YTM − ожидаемая (bps)'
@@ -302,7 +302,7 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
           const x2 = sx(f.xH),   y2 = sy(f.residual);
           // Контанго (basis>0) → фьюч ниже стопа по Y → жёлтый;
           // бэквардация (basis<0) → фьюч выше → пурпурный.
-          const c = (f.basisPp || 0) > 0 ? '#f5a623' : '#a78bfa';
+          const c = (f.basisPp || 0) > 0 ? '#E8895A' : '#AA5AFF';
           return (
             <line key={'pair-' + f.secid}
               x1={x1} y1={y1} x2={x2} y2={y2}
@@ -321,10 +321,10 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
           const isHover = hoverId === p.secid;
           const isSel = selectedId === p.secid;
           const above = p.residual > 0;
-          const stickColor = above ? '#ff4d6d' : '#00d4ff';
+          const stickColor = above ? '#FF4D7A' : '#52F2C9';
           const fill = zScoreColor(p.zscore);
           const fillOpacity = above ? (p.sparse ? 0.5 : 0.95) : (p.sparse ? 0.18 : 0.4);
-          const stroke = isSel ? '#00d4ff' : '#0a0e14';
+          const stroke = isSel ? '#FF006E' : '#0B0613';
           return (
             <g key={p.secid}
               style={{ cursor: 'pointer' }}
@@ -365,7 +365,7 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
               onClick={() => onPointClick(f)}>
               <circle cx={xPos + xOff} cy={yPos} r={isHover ? r + 1 : r * 0.85}
                 fill="transparent"
-                stroke={isSel ? '#00d4ff' : (fill || '#9ba3b1')}
+                stroke={isSel ? '#FF006E' : (fill || '#A79BC9')}
                 strokeWidth={isSel ? 2.5 : 1.8}
                 strokeDasharray="2 2" />
             </g>

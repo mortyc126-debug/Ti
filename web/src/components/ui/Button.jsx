@@ -2,7 +2,7 @@
 // variant и size, остальные пропсы пробрасываются.
 
 const VARIANTS = {
-  primary:   'bg-acc text-bg hover:bg-acc/90 active:bg-acc/80 shadow-[0_0_0_1px_rgba(0,212,255,0.4)]',
+  primary:   'bg-acc text-bg hover:bg-acc/90 active:bg-acc/80 shadow-[0_0_0_1px_rgba(255,0,110,0.4)]',
   secondary: 'bg-s2 text-text border border-border hover:border-border2 hover:bg-bg2',
   ghost:     'text-text2 hover:text-text hover:bg-s2',
   danger:    'bg-danger/10 text-danger border border-danger/30 hover:bg-danger/20',
