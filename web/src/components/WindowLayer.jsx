@@ -10,7 +10,7 @@ import { MULT_META, computeMultiples, valuationUniverse, cheaperThanPct, findSto
 import { computeLinkages } from '../lib/finLinkages.js';
 import { driversFor } from '../lib/industryDrivers.js';
 import { computeMScore, MSCORE_FIELDS, extraGet, extraSetField } from '../lib/mscore.js';
-import { buildWatch } from '../lib/autoWatch.js';
+import { buildWatch, annualTrends } from '../lib/autoWatch.js';
 
 // Слой плавающих окон. Рендерится один раз в App.jsx поверх Outlet.
 // Каркас окна + живой контент в MediumBody (вкладки Финансы/Бумаги/
@@ -480,6 +480,11 @@ function AnalysisLenses(){
     ['Рост ≠ всегда хорошо (банки)', 'Доп. кредитный портфель → сколько капитала съел → сколько NII принёс → сколько резервов потребовал → какой ROE. Иногда отказ от роста ради капитала — разумно (или вынужденно).'],
     ['EBITDA — это bridge, а не цифра', 'Изменение EBITDA раскладывай: цена / объём / FX / себестоимость / разовые статьи / микс. Важна декомпозиция, а не сам итог.'],
     ['YoY · QoQ · YTD — три разреза', 'YoY — структурно/сезонно (к той же точке прошлого года). QoQ — динамика прямо сейчас. YTD/полугодие — контроль, не выброс ли удачный квартал.'],
+    ['Выручка ≠ прибыль (микс)', 'Выручка может расти, а прибыль падать: низкомаржинальный сегмент даёт большую часть выручки и малую часть прибыли. Смотри на структуру, а не только на верхнюю строку.'],
+    ['CAPEX — минус сегодня, плюс завтра', 'Инвестиции ухудшают текущий FCF, но создают будущие мощности → выручку/прибыль позже (лаг от года до нескольких). Отделяй CAPEX роста от поддерживающего.'],
+    ['M&A: не суди по первому году', 'Покупка бизнеса сначала ухудшает показатели (интеграция, расходы), синергия приходит через 1–4+ кв. Оценивай сделку не по первому отчёту.'],
+    ['Цена ↓ → загрузка ↑ → износ ↑', 'Снижение цены поднимает загрузку/спрос, но ускоряет износ активов → будущие расходы на ремонт/замену (хорошо видно на каршеринге/парке техники).'],
+    ['Долг → рейтинг → фондирование', 'Ухудшение метрик снижает рейтинг → дороже и сложнее занимать → ещё больше долг. Возможна негативная петля — следи за ICR и стоимостью долга вместе.'],
   ];
   return (
     <details className="mt-3 border-t border-border/60 pt-3">
@@ -720,7 +725,8 @@ function AutoWatch({ inn, issuerName, industry, reports }){
     const payout = stock ? computeMultiples(stock.price, stock.shares, mults, stock.div12m)?.payout : null;
     const nar = interpretPeriods(reports, industry);
     const opexScaleTrap = !!nar?.flags?.some(f => f.title === 'Расходы упали вместе с масштабом');
-    return buildWatch({ industry, mults, payout, opexScaleTrap });
+    const dyn = annualTrends(reports);
+    return buildWatch({ industry, mults, payout, opexScaleTrap, dyn });
   }, [inn, issuerName, industry, reports, stockUniverse, allIssuers]);
   if(!items.length) return null;
   return (

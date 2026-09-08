@@ -6,11 +6,51 @@
 import { INDUSTRIES } from '../data/industries.js';
 
 const EXPORTERS = new Set(['oil-gas', 'metals', 'chemistry', 'agro']);
+const _n = v => (v == null || v === '' || isNaN(Number(v))) ? null : Number(v);
+const _ANN = new Set(['FY', 'ГОД', 'YEAR', 'ANNUAL', '12M', 'Y']);
 
-// {industry, mults, payout, opexScaleTrap} → [{level:'warn'|'info', text}]
-export function buildWatch({ industry, mults, payout, opexScaleTrap } = {}){
+// Динамика последнего годового периода к предыдущему — для авто-выводов.
+export function annualTrends(reports){
+  if(!Array.isArray(reports)) return null;
+  const ann = reports.filter(r => { const p = String(r.period || '').trim(); return !p || _ANN.has(p.toUpperCase()) || /год|annual|fy/i.test(p); })
+    .sort((a, b) => (b.fy_year || 0) - (a.fy_year || 0));
+  const src = ann.length >= 2 ? ann : [...reports].sort((a, b) => (b.fy_year || 0) - (a.fy_year || 0));
+  if(src.length < 2) return null;
+  const c = src[0], p = src[1];
+  const rc = _n(c.rev), rp = _n(p.rev), nc = _n(c.np), np_ = _n(p.np);
+  const dc = _n(c.debt), dp = _n(p.debt);
+  const icrC = (_n(c.int_exp) && _n(c.ebit) != null) ? _n(c.ebit) / _n(c.int_exp) : null;
+  const icrP = (_n(p.int_exp) && _n(p.ebit) != null) ? _n(p.ebit) / _n(p.int_exp) : null;
+  return {
+    revUp: (rc != null && rp != null && rp > 0) ? rc > rp * 1.03 : false,
+    npDown: (nc != null && np_ != null && np_ > 0) ? nc < np_ * 0.9 : false,
+    npNeg: nc != null && nc < 0,
+    debtUp: (dc != null && dp != null && dp > 0) ? dc > dp * 1.1 : false,
+    icrDown: (icrC != null && icrP != null) ? icrC < icrP : false,
+    netMargin: (rc && rc > 0 && nc != null) ? nc / rc * 100 : null,
+  };
+}
+
+// {industry, mults, payout, opexScaleTrap, dyn} → [{level:'warn'|'info', text}]
+export function buildWatch({ industry, mults, payout, opexScaleTrap, dyn } = {}){
   const out = [];
   const g = INDUSTRIES[industry]?.groupId;
+
+  // — по данным (динамика год-к-году): приоритет, это про конкретный отчёт —
+  if(dyn){
+    if(dyn.revUp && dyn.npDown){
+      out.push({ level: 'warn', text: 'Выручка растёт, а прибыль падает — дело в миксе/марже, а не в объёме. Смотри структуру продаж: низкомаржинальный сегмент может давать 80% выручки и 20% прибыли.' });
+    }
+    if(dyn.npNeg){
+      out.push({ level: 'warn', text: 'Убыток/слабая прибыль — нормальные дивиденды под вопросом. Иногда даже капитализация части расходов не даёт вытянуть результат в плюс.' });
+    }
+    if(dyn.debtUp && dyn.icrDown){
+      out.push({ level: 'warn', text: 'Долг растёт, а покрытие процентов падает — риск петли: хуже метрики → ниже рейтинг → дороже фондирование → ещё больше долг.' });
+    }
+    if(dyn.netMargin != null && dyn.netMargin < 5 && g !== 'finance'){
+      out.push({ level: 'info', text: `Тонкая чистая маржа (${dyn.netMargin.toFixed(1)}%): большая выручка ≠ большая прибыль, всё решает микс и издержки.` });
+    }
+  }
 
   // — по отрасли —
   if(g === 'finance'){
@@ -19,9 +59,11 @@ export function buildWatch({ industry, mults, payout, opexScaleTrap } = {}){
     out.push({ level: 'warn', text: 'Девелопер: выручка признаётся по мере стройки ≠ денежный поток. Смотри эскроу/распроданность и сильную зависимость от банка-кредитора (петля обратной связи).' });
   } else if(EXPORTERS.has(industry)){
     out.push({ level: 'warn', text: 'Экспортёр: результат = цена товара × курс × объём (± дисконт и налоги). Нельзя судить по одному фактору — проверь каждый; крепкий рубль может съесть рост цены.' });
+  } else if(industry === 'retail'){
+    out.push({ level: 'warn', text: 'Ритейл: спрос по ставкам/доходам сильнее бьёт по премиальному сегменту. Смотри LFL-продажи, а не только общую выручку (рост за счёт новых магазинов маскирует падение LFL).' });
   }
 
-  // — по данным —
+  // — по данным (структурные) —
   if(opexScaleTrap){
     out.push({ level: 'warn', text: 'Расходы снизились вместе с выручкой — это сжатие масштаба, а не рост эффективности. Ставь рядом OPEX + выручку + объёмы.' });
   }
@@ -35,5 +77,5 @@ export function buildWatch({ industry, mults, payout, opexScaleTrap } = {}){
   // общий напоминатель про лаг — всегда последним
   out.push({ level: 'info', text: 'Лаг: эффект факторов доходит до отчёта не сразу — переоценка мгновенно, Cost of Risk 1–4 кв., отдача от CAPEX 2–8 кв. И три вопроса к любой цифре: что произошло → почему → повторится ли.' });
 
-  return out.slice(0, 4);
+  return out.slice(0, 5);
 }
