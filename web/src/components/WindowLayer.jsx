@@ -281,7 +281,9 @@ function IssuerMatcher({ name, rawInn, issuers, onPick }){
   }, [q, issuers]);
 
   const Row = ({ it, score }) => (
-    <button type="button" onClick={() => onPick(it.inn)}
+    <button type="button" data-no-drag
+      onMouseDown={e => e.stopPropagation()}
+      onClick={() => onPick(it.inn)}
       className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded hover:bg-acc-dim/40 border border-transparent hover:border-acc/40">
       <span className="flex-1 min-w-0">
         <span className="text-text text-xs truncate block">{it.name}</span>
@@ -296,7 +298,7 @@ function IssuerMatcher({ name, rawInn, issuers, onPick }){
   );
 
   return (
-    <div className="text-xs space-y-3 p-4 overflow-y-auto flex-1 min-h-0">
+    <div className="text-xs space-y-3 p-4 overflow-y-auto flex-1 min-h-0" data-no-drag onMouseDown={e => e.stopPropagation()}>
       <div className="text-text2">
         У «<span className="text-text">{name}</span>» {rawInn ? <>ИНН <span className="font-mono">{rawInn}</span> без отчётности в снимке.</> : 'нет ИНН.'}{' '}
         Часто отчётность лежит под материнской компанией (бумагу выпускает SPV вида «… Финанс»). Выберите её — свяжу и запомню.
@@ -361,7 +363,12 @@ function TabFinances({ card, reports, industry, inn, issuerName }){
           <thead className="text-text3 text-[10px] uppercase">
             <tr>
               <th className="text-left p-1.5">Метрика</th>
-              {series.map(r => <th key={r.fy_year} className="text-right p-1.5">{r.fy_year}</th>)}
+              {series.map(r => (
+                <th key={r.fy_year} className="text-right p-1.5">
+                  {r.fy_year}
+                  <div className="text-[9px] text-text3 font-normal normal-case">{normStd(r.std)}</div>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="font-mono">
@@ -381,8 +388,8 @@ function TabFinances({ card, reports, industry, inn, issuerName }){
           </tbody>
         </table>
       </div>
-      <div className="text-text3 text-[10px]">
-        Источник: {series[0]?.source || '—'} · последнее обновление {series[0]?.fetched_at?.slice(0, 10) || '—'}
+      <div className="text-text3 text-[10px] leading-snug">
+        Значения в млрд ₽. <b className="text-text2">РСБУ</b> — отчётность по российским стандартам (юрлицо), <b className="text-text2">МСФО</b> — международные (группа, консолидировано). ГИР БО/ФНС — это источник данных РСБУ, не отдельный тип.
       </div>
 
       <ValuationPanel inn={inn} issuerName={issuerName} />
@@ -583,7 +590,7 @@ function PeriodNarrative({ reports, industry }){
     <div className="mt-3 border-t border-border/60 pt-3 space-y-2">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-text3 text-[10px] uppercase tracking-wider">Что изменилось</span>
-        <span className="text-text2 text-[11px] font-mono">{nar.prevYear} → {nar.year}{nar.std ? ` · ${nar.std}` : ''}</span>
+        <span className="text-text2 text-[11px] font-mono">{nar.prevYear} → {nar.year}{nar.std ? ` · ${normStd(nar.std)}` : ''}</span>
       </div>
       <div className={`text-xs ${vtone[nar.verdict.level]}`}>{nar.verdict.text}</div>
 
@@ -775,6 +782,9 @@ function withDerived(r){
     roa_pct, ros_pct, roic_pct, roe_pct, ebitda_marg, net_debt_eq,
   };
 }
+
+// Тип отчётности: только РСБУ/МСФО. ГИР БО — источник, не стандарт.
+function normStd(s){ return /МСФО|IFRS/i.test(String(s || '')) ? 'МСФО' : 'РСБУ'; }
 
 // ───── Форматтеры ──────────────────────────────────────────────────
 function fmtBn(v){

@@ -698,7 +698,6 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
         <select id="rep-np-type">
           <option value="МСФО">МСФО</option>
           <option value="РСБУ">РСБУ</option>
-          <option value="ГИРБО">ГИРБО</option>
         </select>
       </div>
       <!-- File upload -->
@@ -2804,6 +2803,24 @@ function loadState(){
     ytmBonds=d.ytmBonds||[]; portfolio=d.portfolio||[]; watchlists=d.watchlists||{};
     calEvents=d.calEvents||[]; reportsDB=d.reportsDB||{};
     compareSets=d.compareSets||{};
+    _migrateGirboType();   // ГИР БО — источник, не тип: старые периоды → РСБУ
+  }catch(e){}
+}
+// Одноразовая миграция: тип периода ГИРБО/GIRBO → РСБУ (ГИР БО — источник,
+// стандарт бывает только РСБУ/МСФО). Переименовываем и ключ периода.
+function _migrateGirboType(){
+  try{
+    for(var id in reportsDB){
+      var iss = reportsDB[id]; if(!iss || !iss.periods) continue;
+      var per = iss.periods, keys = Object.keys(per);
+      for(var i=0;i<keys.length;i++){
+        var k = keys[i], p = per[k];
+        if(!p || !/ГИРБО|GIRBO/i.test(String(p.type||''))) continue;
+        p.type = 'РСБУ';
+        var nk = (p.year)+'_'+(p.period||'Год')+'_РСБУ';
+        if(nk !== k){ if(!per[nk]) per[nk] = p; delete per[k]; }
+      }
+    }
   }catch(e){}
 }
 function save(){
@@ -28421,10 +28438,13 @@ function _d1MergeReports(issId, inn, rows){
   for(var i = 0; i < rows.length; i++){
     var row = rows[i];
     var periodName = _D1_PERIOD_MAP[row.period] || row.period || 'Год';
-    var pk = row.fy_year + '_' + periodName + '_' + (row.std || 'РСБУ');
+    // ГИР БО — это ИСТОЧНИК, а не стандарт. Данные ГИР БО = РСБУ. Тип отчёта
+    // может быть только РСБУ или МСФО.
+    var std = _d1NormStd(row.std);
+    var pk = row.fy_year + '_' + periodName + '_' + std;
     if(!iss.periods[pk]){
       iss.periods[pk] = {
-        year: row.fy_year, period: periodName, type: row.std || 'РСБУ',
+        year: row.fy_year, period: periodName, type: std,
         // D1 хранит значения в млн ₽, app.js ожидает млрд → делим на 1000
         rev:    _d1bn(row.rev),   ebitda: _d1bn(row.ebitda), ebit: _d1bn(row.ebit),
         np:     _d1bn(row.np),    int:    _d1bn(row.int_exp), tax: _d1bn(row.tax_exp),
@@ -28437,6 +28457,8 @@ function _d1MergeReports(issId, inn, rows){
 }
 // D1 хранит финансовые показатели в млн ₽; app.js везде работает в млрд ₽
 function _d1bn(v){ return v != null ? Number(v) / 1000 : null; }
+// Стандарт отчётности: только РСБУ/МСФО. ГИР БО (и мусорные значения) → РСБУ.
+function _d1NormStd(s){ return /МСФО|IFRS/i.test(String(s || '')) ? 'МСФО' : 'РСБУ'; }
 function _d1v(v){ return v != null ? Number(v) : null; }
 
 // Маппинг sector (из D1 issuers) → ind (наши ключи из industry-peers)
