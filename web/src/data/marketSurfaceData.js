@@ -8,8 +8,10 @@
 import { safetyScore, bqiScore } from './bondsCatalog.js';
 import { stocksMock, futuresMock } from './stocksMock.js';
 import { qualityY, maturityYears } from '../lib/qualityComposite.js';
-import { currentBonds } from '../store/marketData.js';
+import { currentBonds, currentStocks } from '../store/marketData.js';
 import { currentIssuers } from '../store/issuers.js';
+import { sectorToIndustry } from './marketReal.js';
+import { normName } from '../lib/issuerMatch.js';
 
 // ─── ОБЛИГАЦИИ ─────────────────────────────────────────────────────
 //   x = срок до погашения (годы), y = качество (composite/rating),
@@ -50,32 +52,43 @@ export function loadBondPoints({ yMode = 'scoring', typeFilter = null, bonds = n
 //   y = качество (composite по yMode).
 //   z = E/P (%) — earnings yield, аналог YTM для акции.
 //   ratingC хранится в b.rating, ratingOrd работает.
-export function loadStockPoints({ yMode = 'scoring' } = {}){
+export function loadStockPoints({ yMode = 'scoring', stocks = null } = {}){
+  const src = stocks || currentStocks();
+  // индекс эмитентов по названию/инн для реальных записей (у них нет фундамента)
+  const nameMap = new Map(), innMap = new Map();
+  for(const it of currentIssuers()){
+    if(it.name) nameMap.set(normName(it.name), it);
+    if(it.inn) innMap.set(String(it.inn), it);
+  }
   const out = [];
-  for(const s of stocksMock){
-    if(s.ep == null) continue;
-    const y = qualityY(s, yMode);
+  for(const s of src){
+    let mults = s.mults, ep = s.ep, marketCapBn = s.marketCapBn, pe = s.pe;
+    let industry = s.industry, rating = s.rating || 'none', issuer = s.issuer, inn = s.inn || null;
+    // реальная запись (цена+акции, без фундамента) — джойним отчётность и
+    // считаем E/P = чистая прибыль / капитализация
+    if((!mults || ep == null) && s.price != null){
+      const iss = (inn && innMap.get(String(inn))) || nameMap.get(normName(s.name)) || null;
+      mults = iss?.mults || null;
+      industry = iss?.industry || sectorToIndustry(s.sector);
+      issuer = iss?.name || s.name;
+      inn = iss?.inn || null;
+      marketCapBn = (s.shares && s.price) ? s.price * s.shares / 1e9 : null;
+      const npRaw = mults?.npRaw;   // чистая прибыль (обычно млн ₽)
+      ep = (npRaw != null && marketCapBn > 0) ? (npRaw * 1e6) / (marketCapBn * 1e9) * 100 : null;
+      pe = (ep && ep !== 0) ? 100 / ep : null;
+    }
+    if(!mults || ep == null) continue;
+    const y = qualityY({ mults, rating }, yMode);
     if(y == null) continue;
-    const fakeBondForScores = { mults: s.mults };
+    const fakeBondForScores = { mults };
     out.push({
-      secid: s.secid, name: s.name, issuer: s.issuer,
-      ticker: s.ticker,
-      industry: s.industry, rating: s.rating,
-      // Размер точки и фильтры по «объёму» — теперь капитализация.
-      volumeBn: s.marketCapBn,
-      pe: s.pe, beta: s.beta,
-      mults: {
-        ...s.mults,
-        pe: s.pe,
-        safety: safetyScore(fakeBondForScores),
-        bqi:    bqiScore(fakeBondForScores),
-      },
-      // x в горизонте обычно перебивается buildHorizonX, но fitSurface
-      // ждёт оба измерения — без второй оси сдвигаем чуть случайно по x
-      // (не имеет значения для 1D-сглаживания).
-      x: y,
-      y,
-      z: s.ep,
+      secid: s.secid || s.ticker, name: s.name, issuer: issuer || s.name,
+      ticker: s.ticker, inn: inn || null,
+      industry, rating,
+      volumeBn: marketCapBn,
+      pe, beta: s.beta || null,
+      mults: { ...mults, pe, safety: safetyScore(fakeBondForScores), bqi: bqiScore(fakeBondForScores) },
+      x: y, y, z: ep,
     });
   }
   return out;

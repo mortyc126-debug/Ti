@@ -5,8 +5,9 @@
 
 import { useEffect } from 'react';
 import { create } from 'zustand';
-import { loadRealBonds } from '../data/marketReal.js';
+import { loadRealBonds, loadRealStocks } from '../data/marketReal.js';
 import { bondsMock } from '../data/bondsCatalog.js';
+import { stocksMock } from '../data/stocksMock.js';
 import { useIssuersStore } from './issuers.js';
 
 const CACHE_KEY = 'ba_bonds_universe_v3';   // v3: mults не бейкаем (винтаж на рендере)
@@ -75,4 +76,51 @@ export function reloadBonds(){
   try { localStorage.removeItem(CACHE_KEY); } catch(_){}
   useBondStore.setState({ bonds: null, loading: false, error: null, source: 'mock' });
   useBondStore.getState().load();
+}
+
+// ── АКЦИИ ─────────────────────────────────────────────────────────────
+const STOCK_CACHE_KEY = 'ba_stocks_universe_v1';
+
+export const useStockStore = create((set, get) => ({
+  stocks: null, loading: false, error: null, source: 'mock',
+  load: async () => {
+    if(get().loading || get().stocks) return;
+    try { useIssuersStore.getState().load(); } catch(_){}
+    try {
+      const cached = localStorage.getItem(STOCK_CACHE_KEY);
+      if(cached){
+        const c = JSON.parse(cached);
+        if(c && Date.now() - c.ts < TTL && Array.isArray(c.data) && c.data.length){
+          set({ stocks: c.data, source: 'cache' }); return;
+        }
+      }
+    } catch(_){}
+    set({ loading: true });
+    try {
+      const stocks = await loadRealStocks();
+      if(stocks && stocks.length){
+        set({ stocks, loading: false, source: 'live', error: null });
+        try { localStorage.setItem(STOCK_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: stocks })); } catch(_){}
+      } else { set({ loading: false, source: 'mock' }); }
+    } catch(e){ set({ loading: false, error: String(e), source: 'mock' }); }
+  },
+}));
+
+export function currentStocks(){ return useStockStore.getState().stocks ?? stocksMock; }
+export function useStockUniverse(){
+  const stocks = useStockStore(s => s.stocks);
+  const load = useStockStore(s => s.load);
+  useEffect(() => { load(); }, [load]);
+  return stocks ?? stocksMock;
+}
+export function useStockSource(){
+  const source = useStockStore(s => s.source);
+  const loading = useStockStore(s => s.loading);
+  const count = useStockStore(s => s.stocks?.length ?? 0);
+  return { source, loading, count };
+}
+export function reloadStocks(){
+  try { localStorage.removeItem(STOCK_CACHE_KEY); } catch(_){}
+  useStockStore.setState({ stocks: null, loading: false, error: null, source: 'mock' });
+  useStockStore.getState().load();
 }

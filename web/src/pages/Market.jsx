@@ -6,6 +6,7 @@ import Tabs from '../components/industries/Tabs.jsx';
 import Surface from '../components/market/Surface.jsx';
 import MarketStatus from '../components/market/MarketStatus.jsx';
 import VintageControl from '../components/industries/VintageControl.jsx';
+import { useStockSource, reloadStocks } from '../store/marketData.js';
 
 // Облигации — реальные данные (снимок цен + отчётность). Акции/фьючерсы/спред
 // пока на демо-данных (реальных котировок по акциям в снимке нет) — помечены
@@ -16,7 +17,8 @@ const TABS = [
   { id: 'futures', label: 'Фьючерсы' },
   { id: 'spread',  label: 'Спред (акции + фьюч)' },
 ];
-const DEMO_TABS = new Set(['stocks', 'futures', 'spread']);
+// Фьючерсы/спред пока на демо (нужна логика базиса против спота).
+const DEMO_TABS = new Set(['futures', 'spread']);
 
 function readTab(){
   const m = location.hash.match(/[?&]tab=([a-z]+)/);
@@ -26,6 +28,23 @@ function readTab(){
 function writeTab(id){
   const base = location.hash.split('?')[0] || '#/market';
   history.replaceState(null, '', `${location.pathname}${base}?tab=${id}`);
+}
+
+function StockStatus(){
+  const { source, loading, count } = useStockSource();
+  const real = source === 'live' || source === 'cache';
+  const cls = 'bg-bg2 border border-border rounded-md px-2 py-1 text-xs text-text';
+  return (
+    <div className="flex items-center gap-2 flex-wrap text-xs" data-no-drag>
+      <button type="button" onClick={reloadStocks} className={cls + ' hover:text-acc'}
+        title="Сбросить кэш и перезагрузить котировки акций">⟳ перезагрузить</button>
+      <span className={real ? 'text-green/80' : 'text-yellow'}>
+        {loading ? 'загрузка акций…'
+          : real ? `${count} акций · цены T-Invest + отчётность`
+          : 'ДЕМО: запусти invest-bot/make_equities_cache.py и обнови'}
+      </span>
+    </div>
+  );
 }
 
 export default function Market(){
@@ -50,9 +69,13 @@ export default function Market(){
         </div>
       )}
 
+      {tab === 'stocks' && <StockStatus />}
+
       {DEMO_TABS.has(tab) && (
         <div className="text-xs text-yellow border border-yellow/30 bg-yellow/5 rounded px-3 py-1.5">
-          ⚠ демо-данные: реальных котировок по акциям/фьючерсам в снимке пока нет. Показана мок-выборка для проверки вида.
+          ⚠ демо-данные: {tab === 'futures'
+            ? 'реальные котировки фьючерсов есть в снимке, но карта фьючерсов ещё требует расчёта базиса против спота.'
+            : 'спред акция↔фьюч требует расчёта базиса — пока мок.'}
         </div>
       )}
 

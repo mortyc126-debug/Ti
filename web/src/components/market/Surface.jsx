@@ -10,7 +10,7 @@ import { useMarketStore } from '../../store/marketSurface.js';
 import { loadPointsByKind, loadOverlayPoints } from '../../data/marketSurfaceData.js';
 import { fitSurface } from '../../lib/kernelSurface.js';
 import { ratingOrd } from '../../lib/qualityComposite.js';
-import { useBondUniverse } from '../../store/marketData.js';
+import { useBondUniverse, useStockUniverse } from '../../store/marketData.js';
 import { useIssuers, useVintage } from '../../store/issuers.js';
 
 export default function Surface({ kind = 'bond' }){
@@ -18,6 +18,7 @@ export default function Surface({ kind = 'bond' }){
   // Для облигаций тянем реальную вселенную (цены + отчётность). Хук
   // возвращает массив и заставляет пересчитать фит, когда данные подъедут.
   const bondUniverse = useBondUniverse();
+  const stockUniverse = useStockUniverse();
   // ВАЖНО: гарантируем загрузку стора эмитентов (mults пришиваются к точкам
   // на рендере по инн). Если вселенная бондов взята из кеша, marketData.load
   // не дожидается эмитентов — без этого хука join не находит фундамент и
@@ -42,7 +43,7 @@ export default function Surface({ kind = 'bond' }){
       ? new Set(Object.entries(types).filter(([, v]) => v).map(([k]) => k))
       : null;
     const sourceKind = kind === 'overlay' ? 'stock' : kind;
-    const all = loadPointsByKind(sourceKind, { yMode, typeFilter: typeSet, bonds: bondUniverse });
+    const all = loadPointsByKind(sourceKind, { yMode, typeFilter: typeSet, bonds: bondUniverse, stocks: stockUniverse });
     const filtered = all.filter(p => {
       const ord = ratingOrd(p.rating);
       if(ord != null && (ord < ratingMin || ord > ratingMax)) return false;
@@ -54,7 +55,7 @@ export default function Surface({ kind = 'bond' }){
       return true;
     });
     return fitSurface(filtered, { bandwidth: { x: bwX, y: bwY } });
-  }, [kind, yMode, types, ratingMin, ratingMax, matMin, matMax, mktCapMin, mktCapMax, bwX, bwY, bondUniverse, vYear, vStd, vCount, allIssuers]);
+  }, [kind, yMode, types, ratingMin, ratingMax, matMin, matMax, mktCapMin, mktCapMax, bwX, bwY, bondUniverse, stockUniverse, vYear, vStd, vCount, allIssuers]);
 
   // Для overlay подсчитываем фьючерсы и пары; residual у фьюча
   // считаем относительно ТОЙ ЖЕ surface'а (фит на акциях).

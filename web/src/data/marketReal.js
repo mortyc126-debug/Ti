@@ -114,3 +114,38 @@ export async function loadRealBonds(){
   }
   return out;
 }
+
+// ── АКЦИИ ─────────────────────────────────────────────────────────────
+// Снимок котировок акций (web/public/stocks-cache.json из make_equities_cache.py):
+// [{ticker,name,isin,sector,shares,price}]. Фундамент (mults, чистая прибыль)
+// и E/P пришиваются на рендере в loadStockPoints по названию эмитента — как у
+// облигаций, чтобы уважать винтаж. Здесь только идентификация + цена.
+export async function loadRealStocks(){
+  let rows;
+  try {
+    const r = await fetch('/stocks-cache.json');
+    rows = r.ok ? await r.json() : null;
+  } catch(_){ return []; }
+  if(!Array.isArray(rows) || !rows.length) return [];
+  const out = [];
+  const seen = new Set();
+  for(const s of rows){
+    const tk = s.ticker;
+    if(!tk || seen.has(tk) || !(s.price > 0)) continue;
+    seen.add(tk);
+    out.push({
+      ticker: tk, secid: tk, name: s.name || tk, isin: s.isin || null,
+      sector: s.sector || null, shares: _num(s.shares), price: _num(s.price),
+    });
+  }
+  return out;
+}
+
+// сектор T-Invest → наш industry-ключ
+const _SECTOR_IND = {
+  financial: 'holdings', banks: 'banks', materials: 'metals', energy: 'oil-gas',
+  utilities: 'utilities', telecom: 'telecom', it: 'it', consumer: 'retail',
+  health_care: 'pharma', industrials: 'machinery', real_estate: 'realestate',
+  electrocars: 'auto', ecomaterials: 'chemistry', green_energy: 'utilities',
+};
+export function sectorToIndustry(s){ return (s && _SECTOR_IND[s]) || 'other'; }
