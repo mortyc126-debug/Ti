@@ -59,6 +59,12 @@ export function buildWatch({ industry, mults, payout, opexScaleTrap, dyn } = {})
     } else if(dyn.growthQuality === 'high'){
       out.push({ level: 'info', text: `Качественный рост: прибыль${dyn.npG != null ? ` ${pc(dyn.npG)}` : ''} растёт быстрее выручки (${pc(dyn.revG)}) — расширение маржи, а не только объём.` });
     }
+    // прибыль резко упала при устойчивой EBITDA → вероятно неденежные статьи
+    if(dyn.npG != null && dyn.npG < -0.4 && dyn.ebitdaG != null && dyn.ebitdaG > -0.1){
+      out.push({ level: 'warn', text: `Прибыль упала (${pc(dyn.npG)}) при устойчивой EBITDA — вероятно неденежные статьи (списание/переоценка/деконсолидация). Смотри CFO/FCF, а не Net income. Спроси: это cash или non-cash? повторится ли?` });
+    } else if(dyn.npG != null && dyn.npG > 0.5 && dyn.ebitdaG != null && dyn.ebitdaG < 0.15){
+      out.push({ level: 'info', text: `Прибыль подскочила (${pc(dyn.npG)}) при слабой динамике EBITDA — возможно разовые/неоперационные статьи. Проверь, повторится ли.` });
+    }
     if(dyn.npNeg){
       out.push({ level: 'warn', text: 'Убыток/слабая прибыль — нормальные дивиденды под вопросом. Иногда даже капитализация части расходов не даёт вытянуть результат в плюс.' });
     }
