@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Rnd } from 'react-rnd';
 import { useWindows } from '../store/windows.js';
 import { api } from '../api.js';
@@ -32,6 +32,21 @@ function FloatingWindow({ win }){
   const isMicro = win.mode === 'micro';
   const isFull  = win.mode === 'full';
 
+  // react-rnd двигает окно через CSS transform (translate). iframe модуля
+  // отчётности внутри transform-слоя браузер растрирует в текстуру и на
+  // HiDPI/дробном масштабе Windows «мылит» шрифты. Пока окно неподвижно —
+  // переносим позицию на top/left и убираем transform: нет transform-слоя →
+  // iframe рисуется в нативном разрешении. На время drag/resize возвращаем
+  // transform, чтобы react-rnd тащил окно как обычно.
+  const rndRef = useRef(null);
+  const busyRef = useRef(false);
+  const posX = isFull ? 12 : win.x;
+  const posY = isFull ? 64 : win.y;
+  const nodeEl = () => rndRef.current?.getSelfElement?.() || null;
+  const toTransformMode = () => { const n = nodeEl(); if(n){ n.style.left = '0px'; n.style.top = '0px'; n.style.transform = ''; } };
+  const toCrispMode = () => { const n = nodeEl(); if(n){ n.style.transform = 'none'; n.style.left = posX + 'px'; n.style.top = posY + 'px'; } };
+  useLayoutEffect(() => { if(!busyRef.current) toCrispMode(); });
+
   // в fullscreen окно занимает почти весь экран (с отступом под шапку)
   const rndProps = isFull
     ? { size: { width: window.innerWidth - 24, height: window.innerHeight - 80 },
@@ -45,12 +60,19 @@ function FloatingWindow({ win }){
         // ссылки и кнопки внутри работали как обычно.
         cancel: 'button, a, input, textarea, select, [data-no-drag]',
         minWidth: 280, minHeight: 160,
-        onDragStop: (_, d) => patch(win.wid, { x: d.x, y: d.y }),
-        onResizeStop: (_, __, ref, ___, pos) =>
-          patch(win.wid, { w: parseInt(ref.style.width, 10), h: parseInt(ref.style.height, 10), x: pos.x, y: pos.y }) };
+        // на старте — режим transform (react-rnd тащит), на стопе только
+        // сбрасываем флаг и коммитим позицию: useLayoutEffect после ре-рендера
+        // вернёт top/left уже со свежими координатами (crisp).
+        onDragStart: () => { busyRef.current = true; toTransformMode(); },
+        onDragStop: (_, d) => { busyRef.current = false; patch(win.wid, { x: d.x, y: d.y }); },
+        onResizeStart: () => { busyRef.current = true; toTransformMode(); },
+        onResizeStop: (_, __, ref, ___, pos) => {
+          busyRef.current = false;
+          patch(win.wid, { w: parseInt(ref.style.width, 10), h: parseInt(ref.style.height, 10), x: pos.x, y: pos.y }); } };
 
   return (
     <Rnd
+      ref={rndRef}
       {...rndProps}
       style={{ zIndex: win.z, pointerEvents: 'auto' }}
       onMouseDown={() => focus(win.wid)}
@@ -296,11 +318,7 @@ function TabReportModule({ inn, name }){
       src={`/modules/analysiscompany.html?embed=1&inn=${encodeURIComponent(inn)}${name ? '&name=' + encodeURIComponent(name) : ''}`}
       title="Отчётность эмитента"
       className="w-full"
-      // окно позиционируется через CSS transform (react-rnd) — iframe внутри
-      // transform-слоя браузер растрирует и текст «мылит». Выносим iframe в
-      // собственный композит-слой, тогда он рендерится в нативном разрешении.
-      style={{ border: 0, display: 'block', flex: 1, minHeight: 360,
-        transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
+      style={{ border: 0, display: 'block', flex: 1, minHeight: 360 }}
     />
   );
 }
