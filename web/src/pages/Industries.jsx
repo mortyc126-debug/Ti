@@ -7,12 +7,14 @@ import Tabs from '../components/industries/Tabs.jsx';
 import Comparison from '../components/industries/Comparison.jsx';
 import Medians from '../components/industries/Medians.jsx';
 import Norms from '../components/industries/Norms.jsx';
+import FactorSensitivity from '../components/industries/FactorSensitivity.jsx';
 import VintageControl from '../components/industries/VintageControl.jsx';
 
 const TABS = [
   { id: 'comparison', label: 'Сравнение' },
   { id: 'medians',    label: 'Медианы' },
   { id: 'norms',      label: 'Нормы' },
+  { id: 'drivers',    label: 'Драйверы' },
 ];
 
 function readTab(){
@@ -53,6 +55,7 @@ export default function Industries(){
         {tab === 'comparison' && <Comparison />}
         {tab === 'medians'    && <Medians />}
         {tab === 'norms'      && <Norms />}
+        {tab === 'drivers'    && <FactorSensitivity />}
       </div>
     </div>
   );

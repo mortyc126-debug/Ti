@@ -541,11 +541,11 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
         <option value="">— выберите эмитента —</option>
       </select>
     </div>
-    <button class="btn btn-sm btn-p" onclick="repNewIssuerModal()">＋ Эмитент</button>
+    <button class="btn btn-sm" onclick="repNewIssuerModal()">＋ Эмитент</button>
     <button class="btn btn-sm" id="rep-add-period-btn" style="display:none" onclick="repNewPeriodModal()">＋ Добавить период</button>
     <button class="btn btn-sm" id="rep-edit-period-btn" style="display:none" onclick="repEditPeriod()" title="Открыть форму с заполненными значениями активного периода — поправить значения, дату или тип"> Редактировать период</button>
     <button class="btn btn-sm" id="rep-del-period-btn" style="display:none" onclick="repDeletePeriod()" title="Удалить активный период (с подтверждением)"> Удалить период</button>
-    <button class="btn btn-sm" id="rep-pdf-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repUploadFileShortcut()" title="Прочитать отчёт и создать период автоматически (PDF, DOCX, XLSX; для PDF-сканов — OCR)"> Загрузить отчёт</button>
+    <button class="btn btn-sm" id="rep-pdf-btn" style="display:none" onclick="repUploadFileShortcut()" title="Прочитать отчёт и создать период автоматически (PDF, DOCX, XLSX; для PDF-сканов — OCR)"> Загрузить отчёт</button>
     
     
     
@@ -554,9 +554,9 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
     <button class="btn btn-sm" onclick="document.getElementById('rep-issuer-import').click()" title="Импорт одного эмитента с периодами из JSON-файла (bondan/issuer/v1). Не затирает остальных эмитентов."> Импорт эмитента</button>
     <div style="margin-left:auto;display:flex;gap:6px">
       <button class="btn btn-sm" id="rep-compare-btn" style="display:none" onclick="repShowCompare()">⇄ Сравнить периоды</button>
-      <button class="btn btn-sm" id="rep-dossier-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="dossierOpen()" title="Досье эмитента: финансовый профиль (авто), бизнес-профиль, модификаторы, параметры выпусков. Шаблон анализа в духе рейтинговых агентств."> Досье</button>
+      <button class="btn btn-sm" id="rep-dossier-btn" style="display:none" onclick="dossierOpen()" title="Досье эмитента: финансовый профиль (авто), бизнес-профиль, модификаторы, параметры выпусков. Шаблон анализа в духе рейтинговых агентств."> Досье</button>
       <button class="btn btn-sm" id="rep-edit-issuer-btn" style="display:none" onclick="repEditIssuerModal()" title="Редактировать эмитента: ISIN, ИНН, ОГРН, ссылка на раскрытие"> Редактировать</button>
-      <button class="btn btn-sm" id="rep-export-issuer-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repExportIssuer()" title="Скачать JSON только по текущему эмитенту"> Экспорт эмитента</button>
+      <button class="btn btn-sm" id="rep-export-issuer-btn" style="display:none" onclick="repExportIssuer()" title="Скачать JSON только по текущему эмитенту"> Экспорт эмитента</button>
       <button class="btn btn-sm" id="rep-del-issuer-btn" style="display:none" onclick="repDeleteIssuer()"> Удалить эмитента</button>
     </div>
   </div>
