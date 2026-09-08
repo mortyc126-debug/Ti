@@ -10,6 +10,7 @@ import { MULT_META, computeMultiples, valuationUniverse, cheaperThanPct, findSto
 import { computeLinkages } from '../lib/finLinkages.js';
 import { driversFor } from '../lib/industryDrivers.js';
 import { computeMScore, MSCORE_FIELDS, extraGet, extraSetField } from '../lib/mscore.js';
+import { buildWatch } from '../lib/autoWatch.js';
 
 // Слой плавающих окон. Рендерится один раз в App.jsx поверх Outlet.
 // Каркас окна + живой контент в MediumBody (вкладки Финансы/Бумаги/
@@ -404,6 +405,7 @@ function TabFinances({ card, reports, industry, inn, issuerName }){
     .map(withDerived);
   return (
     <div className="space-y-3">
+      <AutoWatch inn={inn} issuerName={issuerName} industry={industry} reports={reports} />
       {issuer && (
         <div className="text-text3 text-xs">
           <span className="text-text">{issuer.short_name || issuer.name}</span>
@@ -703,6 +705,34 @@ function IndustryDrivers({ industry, year, prevYear }){
           ⚠ {d.caution}
         </div>
       )}
+    </div>
+  );
+}
+
+// Авто-плашка «на что смотреть» — контекстные предупреждения по отрасли и
+// данным, всплывают сверху карточки без хождения по разделам.
+function AutoWatch({ inn, issuerName, industry, reports }){
+  const stockUniverse = useStockUniverse();
+  const allIssuers = useIssuers();
+  const items = useMemo(() => {
+    const mults = issuerMults(inn);
+    const stock = findStockForIssuer(issuerName, inn);
+    const payout = stock ? computeMultiples(stock.price, stock.shares, mults, stock.div12m)?.payout : null;
+    const nar = interpretPeriods(reports, industry);
+    const opexScaleTrap = !!nar?.flags?.some(f => f.title === 'Расходы упали вместе с масштабом');
+    return buildWatch({ industry, mults, payout, opexScaleTrap });
+  }, [inn, issuerName, industry, reports, stockUniverse, allIssuers]);
+  if(!items.length) return null;
+  return (
+    <div className="space-y-1">
+      {items.map((it, i) => (
+        <div key={i} className={[
+          'text-[11px] leading-snug rounded px-2 py-1.5 border',
+          it.level === 'warn' ? 'text-warn bg-warn/5 border-warn/25' : 'text-text3 bg-s2/30 border-border/60',
+        ].join(' ')}>
+          {it.level === 'warn' ? '⚠ ' : 'ⓘ '}{it.text}
+        </div>
+      ))}
     </div>
   );
 }
