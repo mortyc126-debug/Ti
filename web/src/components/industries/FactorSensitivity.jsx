@@ -6,6 +6,7 @@
 import { useMemo, useState } from 'react';
 import { FACTORS, effectsFor, factorsForGroup, EFFECT_META } from '../../lib/factorSensitivity.js';
 import { NORM_GROUPS } from '../../data/industryNorms.js';
+import { TRANSMISSION } from '../../lib/transmission.js';
 
 const TONE = {
   green:  { badge: 'bg-green/15 text-green border-green/30', dot: 'text-green' },
@@ -40,7 +41,7 @@ export default function FactorSensitivity(){
 
       {/* Переключатель разреза */}
       <div className="flex gap-0.5 rounded overflow-hidden border border-border w-fit">
-        {[['factor', 'По фактору'], ['sector', 'По отрасли']].map(([id, lbl]) => (
+        {[['factor', 'По фактору'], ['sector', 'По отрасли'], ['channels', 'Каналы (лаг)']].map(([id, lbl]) => (
           <button key={id} type="button" onClick={() => { setMode(id); setFilter('all'); }}
             className={[
               'px-3 py-1 text-xs transition-colors',
@@ -49,6 +50,9 @@ export default function FactorSensitivity(){
         ))}
       </div>
 
+      {mode === 'channels' && <TransmissionTable />}
+
+      {mode !== 'channels' && <>
       {/* Выбор фактора / отрасли */}
       <div className="flex flex-wrap gap-1.5">
         {mode === 'factor'
@@ -109,6 +113,50 @@ export default function FactorSensitivity(){
       <div className="text-text3 text-[10px] italic">
         Качественная оценка типовой реакции сектора, а не прогноз по конкретной компании — у отдельного эмитента может быть хедж, экспортная доля или структура долга, меняющие знак.
       </div>
+      </>}
+    </div>
+  );
+}
+
+function TransmissionTable(){
+  const [q, setQ] = useState('');
+  const rows = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if(!s) return TRANSMISSION;
+    return TRANSMISSION.filter(r => (r.factor + r.channel + r.report + r.watch).toLowerCase().includes(s));
+  }, [q]);
+  return (
+    <div className="space-y-2">
+      <div className="text-text3 text-xs bg-s2/30 border border-border/60 rounded px-3 py-2">
+        Как импульс доходит до цифр отчёта: фактор → канал → что меняется → типичный лаг → что смотреть. Лаг важен: между событием и цифрой в отчёте проходит время.
+      </div>
+      <input value={q} onChange={e => setQ(e.target.value)} placeholder="фильтр: ставка, FX, CAPEX, дивиденды…"
+        className="w-full bg-bg2 border border-border rounded px-2 py-1 text-xs text-text" />
+      <div className="overflow-x-auto">
+        <table className="w-full text-[11px] border-collapse">
+          <thead className="text-text3 uppercase text-[10px]">
+            <tr className="border-b border-border">
+              <th className="text-left p-1.5">Фактор</th>
+              <th className="text-left p-1.5">Канал</th>
+              <th className="text-left p-1.5">В отчёте</th>
+              <th className="text-left p-1.5 whitespace-nowrap">Лаг</th>
+              <th className="text-left p-1.5">Что смотреть</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} className="border-b border-border/40 align-top">
+                <td className="p-1.5 text-text font-medium whitespace-nowrap">{r.factor}</td>
+                <td className="p-1.5 text-text2">{r.channel}</td>
+                <td className="p-1.5 text-text2 font-mono">{r.report}</td>
+                <td className="p-1.5 text-text3 whitespace-nowrap">{r.lag}</td>
+                <td className="p-1.5 text-text3">{r.watch}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!rows.length && <div className="text-text3 text-xs">Ничего не найдено.</div>}
     </div>
   );
 }
