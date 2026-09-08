@@ -55,6 +55,27 @@ export function suggestIssuers(name, issuers, limit = 6){
   return out.filter(x => x.score >= 0.34).slice(0, limit);
 }
 
+// Лучшее совпадение эмитента для названия (для авто-джойна акций с отчётностью):
+// точное → вхождение одного нормализованного имени в другое → токен-скор.
+export function bestIssuerMatch(name, issuers){
+  const t = normName(name);
+  if(!t || !Array.isArray(issuers)) return null;
+  let exact = null, contain = null;
+  for(const it of issuers){
+    if(!it || !it.inn) continue;
+    const c = normName(it.name);
+    if(!c) continue;
+    if(c === t){ exact = it; break; }
+    if(c.length >= 4 && t.length >= 4 && (c.includes(t) || t.includes(c))){
+      if(!contain || Math.abs(c.length - t.length) < Math.abs(normName(contain.name).length - t.length)) contain = it;
+    }
+  }
+  if(exact) return exact;
+  if(contain) return contain;
+  const s = suggestIssuers(name, issuers, 1);
+  return (s.length && s[0].score >= 0.5) ? s[0].issuer : null;
+}
+
 // ── Подтверждённые связки имя→ИНН (localStorage) ──────────────────────
 const ALIAS_KEY = 'bondan_issuer_aliases';
 function _readAliases(){

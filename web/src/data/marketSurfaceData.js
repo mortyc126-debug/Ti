@@ -11,7 +11,7 @@ import { qualityY, maturityYears } from '../lib/qualityComposite.js';
 import { currentBonds, currentStocks } from '../store/marketData.js';
 import { currentIssuers } from '../store/issuers.js';
 import { sectorToIndustry } from './marketReal.js';
-import { normName } from '../lib/issuerMatch.js';
+import { bestIssuerMatch } from '../lib/issuerMatch.js';
 
 // ─── ОБЛИГАЦИИ ─────────────────────────────────────────────────────
 //   x = срок до погашения (годы), y = качество (composite/rating),
@@ -54,12 +54,10 @@ export function loadBondPoints({ yMode = 'scoring', typeFilter = null, bonds = n
 //   ratingC хранится в b.rating, ratingOrd работает.
 export function loadStockPoints({ yMode = 'scoring', stocks = null } = {}){
   const src = stocks || currentStocks();
-  // индекс эмитентов по названию/инн для реальных записей (у них нет фундамента)
-  const nameMap = new Map(), innMap = new Map();
-  for(const it of currentIssuers()){
-    if(it.name) nameMap.set(normName(it.name), it);
-    if(it.inn) innMap.set(String(it.inn), it);
-  }
+  // индекс эмитентов по инн + список для нечёткого матчинга по названию
+  const issuersList = currentIssuers();
+  const innMap = new Map();
+  for(const it of issuersList){ if(it.inn) innMap.set(String(it.inn), it); }
   const out = [];
   for(const s of src){
     let mults = s.mults, ep = s.ep, marketCapBn = s.marketCapBn, pe = s.pe;
@@ -67,7 +65,7 @@ export function loadStockPoints({ yMode = 'scoring', stocks = null } = {}){
     // реальная запись (цена+акции, без фундамента) — джойним отчётность и
     // считаем E/P = чистая прибыль / капитализация
     if((!mults || ep == null) && s.price != null){
-      const iss = (inn && innMap.get(String(inn))) || nameMap.get(normName(s.name)) || null;
+      const iss = (inn && innMap.get(String(inn))) || bestIssuerMatch(s.name, issuersList) || null;
       mults = iss?.mults || null;
       industry = iss?.industry || sectorToIndustry(s.sector);
       issuer = iss?.name || s.name;
