@@ -49,6 +49,7 @@ export default function SurfaceFilters({ kind = 'bond' }){
   const matMax            = useStore(s => s.matMax);
   const mktCapMin         = useStore(s => s.mktCapMin);
   const mktCapMax         = useStore(s => s.mktCapMax);
+  const divFilter         = useStore(s => s.divFilter);
   const bwX               = useStore(s => s.bwX);
   const bwY               = useStore(s => s.bwY);
   const setRange          = useStore(s => s.setRange);
@@ -86,6 +87,21 @@ export default function SurfaceFilters({ kind = 'bond' }){
             >{m.label}</button>
           ))}
         </div>
+        {!isBond && (
+          <>
+            <span className="text-text3 text-[10px] uppercase tracking-wider font-mono ml-2 mr-1">дивиденды</span>
+            <div className="flex gap-0.5 rounded overflow-hidden border border-border">
+              {[['any', 'все'], ['with', 'с див.'], ['without', 'без']].map(([id, lbl]) => (
+                <button key={id} type="button" onClick={() => setRange('divFilter', id)}
+                  className={[
+                    'px-2 py-1 text-[11px] font-mono transition-colors',
+                    divFilter === id ? 'bg-acc-dim text-acc' : 'bg-s2 text-text3 hover:text-text',
+                  ].join(' ')}
+                >{lbl}</button>
+              ))}
+            </div>
+          </>
+        )}
         {isBond && types && (
           <>
             <span className="text-text3 text-[10px] uppercase tracking-wider font-mono ml-2 mr-1">типы</span>

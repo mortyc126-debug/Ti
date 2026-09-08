@@ -35,6 +35,7 @@ export default function Surface({ kind = 'bond' }){
   const matMax = useStore(s => s.matMax);
   const mktCapMin = useStore(s => s.mktCapMin);
   const mktCapMax = useStore(s => s.mktCapMax);
+  const divFilter = useStore(s => s.divFilter);
   const bwX = useStore(s => s.bwX);
   const bwY = useStore(s => s.bwY);
 
@@ -52,11 +53,13 @@ export default function Surface({ kind = 'bond' }){
         if(p.x < matMin || p.x > matMax) return false;
       } else {
         if(p.volumeBn != null && (p.volumeBn < mktCapMin || p.volumeBn > mktCapMax)) return false;
+        if(divFilter === 'with' && !(p.divYield > 0)) return false;
+        if(divFilter === 'without' && p.divYield > 0) return false;
       }
       return true;
     });
     return fitSurface(filtered, { bandwidth: { x: bwX, y: bwY } });
-  }, [kind, yMode, types, ratingMin, ratingMax, matMin, matMax, mktCapMin, mktCapMax, bwX, bwY, bondUniverse, stockUniverse, futureUniverse, vYear, vStd, vCount, allIssuers]);
+  }, [kind, yMode, types, ratingMin, ratingMax, matMin, matMax, mktCapMin, mktCapMax, divFilter, bwX, bwY, bondUniverse, stockUniverse, futureUniverse, vYear, vStd, vCount, allIssuers]);
 
   // Для overlay подсчитываем фьючерсы и пары; residual у фьюча
   // считаем относительно ТОЙ ЖЕ surface'а (фит на акциях).

@@ -29,6 +29,7 @@ const STOCK_DEFAULTS = {
   ...COMMON,
   // У акций нет сроков и типов выпуска — есть капитализация.
   mktCapMin: 0, mktCapMax: 30000,    // млрд ₽
+  divFilter: 'any',                  // 'any' | 'with' | 'without'
   horizonX: 'composite',
   horizonMetrics: ['roa', 'safety', 'bqi'],
 };
@@ -36,6 +37,7 @@ const STOCK_DEFAULTS = {
 const FUTURE_DEFAULTS = {
   ...COMMON,
   mktCapMin: 0, mktCapMax: 30000,
+  divFilter: 'any',
   horizonX: 'composite',
   horizonMetrics: ['roa', 'safety'],
 };

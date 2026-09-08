@@ -85,6 +85,7 @@ export function loadStockPoints({ yMode = 'scoring', stocks = null } = {}){
       industry, rating,
       volumeBn: marketCapBn,
       price: s.price != null ? s.price : null,   // спот — нужен фьючерсам для базиса
+      divYield: (s.div12m > 0 && s.price) ? s.div12m / s.price * 100 : (s.divYield ?? null),
       pe, beta: s.beta || null,
       mults: { ...mults, pe, safety: safetyScore(fakeBondForScores), bqi: bqiScore(fakeBondForScores) },
       x: y, y, z: ep,
