@@ -5,16 +5,18 @@
 // (loadBondPoints, loadStockPoints, loadFuturePoints). Всё остальное
 // продолжит работать.
 
-import { bondsMock, safetyScore, bqiScore } from './bondsCatalog.js';
+import { safetyScore, bqiScore } from './bondsCatalog.js';
 import { stocksMock, futuresMock } from './stocksMock.js';
 import { qualityY, maturityYears } from '../lib/qualityComposite.js';
+import { currentBonds } from '../store/marketData.js';
 
 // ─── ОБЛИГАЦИИ ─────────────────────────────────────────────────────
 //   x = срок до погашения (годы), y = качество (composite/rating),
-//   z = YTM (%).
-export function loadBondPoints({ yMode = 'scoring', typeFilter = null } = {}){
+//   z = YTM (%). Источник — реальная вселенная (цены+отчётность) либо демо.
+export function loadBondPoints({ yMode = 'scoring', typeFilter = null, bonds = null } = {}){
   const out = [];
-  for(const b of bondsMock){
+  const src = bonds || currentBonds();
+  for(const b of src){
     if(typeFilter && !typeFilter.has(b.type)) continue;
     const x = maturityYears(b.mat_date);
     const y = qualityY(b, yMode);

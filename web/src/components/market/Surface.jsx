@@ -10,9 +10,13 @@ import { useMarketStore } from '../../store/marketSurface.js';
 import { loadPointsByKind, loadOverlayPoints } from '../../data/marketSurfaceData.js';
 import { fitSurface } from '../../lib/kernelSurface.js';
 import { ratingOrd } from '../../lib/qualityComposite.js';
+import { useBondUniverse } from '../../store/marketData.js';
 
 export default function Surface({ kind = 'bond' }){
   const useStore = useMarketStore(kind);
+  // Для облигаций тянем реальную вселенную (цены + отчётность). Хук
+  // возвращает массив и заставляет пересчитать фит, когда данные подъедут.
+  const bondUniverse = useBondUniverse();
 
   const yMode = useStore(s => s.yMode);
   const types = useStore(s => s.types);
@@ -31,7 +35,7 @@ export default function Surface({ kind = 'bond' }){
       ? new Set(Object.entries(types).filter(([, v]) => v).map(([k]) => k))
       : null;
     const sourceKind = kind === 'overlay' ? 'stock' : kind;
-    const all = loadPointsByKind(sourceKind, { yMode, typeFilter: typeSet });
+    const all = loadPointsByKind(sourceKind, { yMode, typeFilter: typeSet, bonds: bondUniverse });
     const filtered = all.filter(p => {
       const ord = ratingOrd(p.rating);
       if(ord != null && (ord < ratingMin || ord > ratingMax)) return false;
@@ -43,7 +47,7 @@ export default function Surface({ kind = 'bond' }){
       return true;
     });
     return fitSurface(filtered, { bandwidth: { x: bwX, y: bwY } });
-  }, [kind, yMode, types, ratingMin, ratingMax, matMin, matMax, mktCapMin, mktCapMax, bwX, bwY]);
+  }, [kind, yMode, types, ratingMin, ratingMax, matMin, matMax, mktCapMin, mktCapMax, bwX, bwY, bondUniverse]);
 
   // Для overlay подсчитываем фьючерсы и пары; residual у фьюча
   // считаем относительно ТОЙ ЖЕ surface'а (фит на акциях).

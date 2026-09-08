@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import Tabs from '../components/industries/Tabs.jsx';
 import Surface from '../components/market/Surface.jsx';
+import MarketStatus from '../components/market/MarketStatus.jsx';
 
 const TABS = [
   { id: 'bonds',   label: 'Облигации' },
@@ -36,6 +37,8 @@ export default function Market(){
       </div>
 
       <Tabs items={TABS} value={tab} onChange={setTab} />
+
+      {tab === 'bonds' && <MarketStatus />}
 
       <div className="pt-2">
         {tab === 'bonds'   && <Surface kind="bond" />}

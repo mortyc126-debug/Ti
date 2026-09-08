@@ -18,14 +18,18 @@ function _timeout(p, ms){
   return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
 }
 
-// сырая строка отчёта → мультипликаторы (ключи как в COMP_METRICS)
+// сырая строка отчёта → мультипликаторы (ключи как в COMP_METRICS).
+// Значения могут быть в млн или млрд ₽ — все метрики ниже это ОТНОШЕНИЯ,
+// поэтому единица не важна. Проценты (ebitdaMarg/roa/ros) берём из готовых
+// полей backend, а если их нет (снимок) — считаем из сырья.
 export function reportToMults(r){
   const debt = _n(r.debt), eq = _n(r.eq), assets = _n(r.assets), ebitda = _n(r.ebitda),
-        cash = _n(r.cash), ca = _n(r.ca), cl = _n(r.cl), intx = _n(r.int_exp);
+        cash = _n(r.cash), ca = _n(r.ca), cl = _n(r.cl), intx = _n(r.int_exp),
+        rev = _n(r.rev), np = _n(r.np);
   const m = {
-    ebitdaMarg: _n(r.ebitda_marg),
-    roa: _n(r.roa_pct),
-    ros: _n(r.ros_pct),
+    ebitdaMarg: _n(r.ebitda_marg) ?? ((rev && rev > 0 && ebitda != null) ? ebitda / rev * 100 : null),
+    roa: _n(r.roa_pct) ?? ((assets && assets > 0 && np != null) ? np / assets * 100 : null),
+    ros: _n(r.ros_pct) ?? ((rev && rev > 0 && np != null) ? np / rev * 100 : null),
     de: (ebitda && ebitda > 0 && debt != null) ? debt / ebitda : null,
     nde: (ebitda && ebitda > 0 && debt != null && cash != null) ? (debt - cash) / ebitda : null,
     icr: (intx && intx > 0 && ebitda != null) ? ebitda / intx : null,
@@ -75,7 +79,25 @@ function _annualReports(reports){
 
 const REP_TTL = 7 * 864e5;   // отчёты меняются редко → кеш на неделю
 
-async function _fetchReports(inn){
+// Локальный снимок (web/public/reports-cache/{inn}.json = {data:[rows]},
+// _index.json = [inn,...]) — тот же, что читает модуль отчётности. Живёт
+// офлайн, не зависит от деградировавшей D1. Приоритет над backend.
+async function _snapshotInns(){
+  try {
+    const r = await _timeout(fetch('/reports-cache/_index.json'), 8000);
+    if(r.ok){ const a = await r.json(); if(Array.isArray(a) && a.length) return a.map(String); }
+  } catch(_){}
+  return null;
+}
+async function _fetchReportsSnap(inn){
+  try {
+    const r = await _timeout(fetch('/reports-cache/' + inn + '.json'), 8000);
+    if(r.ok){ const d = await r.json(); return Array.isArray(d?.data) ? d.data : []; }
+  } catch(_){}
+  return [];
+}
+
+async function _fetchReportsBackend(inn){
   try {
     const raw = localStorage.getItem('ba_rep_' + inn);
     if(raw){ const c = JSON.parse(raw); if(c && Date.now() - c.ts < REP_TTL) return c.data || []; }
@@ -89,11 +111,17 @@ async function _fetchReports(inn){
 }
 
 export async function loadIssuersReal(){
-  const ry = await api.issuerReportYears();
-  const inns = Object.keys(ry?.map || {});
-  if(!inns.length) return [];
+  // Кто имеет отчёты: снимок → иначе backend report_years
+  const snapInns = await _snapshotInns();
+  let inns = snapInns;
+  if(!inns){
+    try { const ry = await _timeout(api.issuerReportYears(), 12000); inns = Object.keys(ry?.map || {}); }
+    catch(_){ inns = []; }
+  }
+  if(!inns || !inns.length) return [];
+  const fromSnap = !!snapInns;
 
-  // имена/сектора — best-effort (тяжёлый /catalog, с таймаутом)
+  // имена/сектора — best-effort (тяжёлый /catalog кэширован на edge, с таймаутом)
   const meta = {};
   try {
     const cat = await _timeout(api.catalog(), 15000);
@@ -102,14 +130,14 @@ export async function loadIssuersReal(){
     }
   } catch(_){ /* без секторов → industry='other' */ }
 
-  // per-issuer отчёты пулом
+  // per-issuer отчёты пулом (из снимка либо backend)
   const out = [];
   let idx = 0;
-  const CONC = 6;
+  const CONC = fromSnap ? 12 : 6;
   async function worker(){
     while(idx < inns.length){
       const inn = inns[idx++];
-      const rows = await _fetchReports(inn);
+      const rows = fromSnap ? await _fetchReportsSnap(inn) : await _fetchReportsBackend(inn);
       const reps = _annualReports(rows);
       if(!reps.length) continue;
       const mm = meta[inn] || {};
