@@ -1,6 +1,6 @@
 """make_equities_cache.py — снимок котировок акций и фьючерсов из T-Invest
 для «Карты» веб-приложения. Пишет:
-  web/public/stocks-cache.json  = [{ticker,name,isin,sector,currency,shares,price}]
+  web/public/stocks-cache.json  = [{ticker,name,isin,sector,currency,shares,price,div12m,beta}]
   web/public/futures-cache.json = [{ticker,name,basicAsset,basicAssetSize,lot,price,expiration}]
 
 Акции: справочник client.instruments.shares(BASE) → тикер/isin/сектор/число
@@ -18,7 +18,7 @@ import sys
 import time
 from datetime import datetime, timedelta, timezone
 
-from tinkoff.invest import Client, InstrumentStatus
+from tinkoff.invest import Client, InstrumentStatus, CandleInterval
 from invest_api.invest_target import INVEST_TARGET
 from dashboard import _config
 
@@ -67,12 +67,77 @@ def _div12m(client, figi, now):
     return round(total, 4) if got else None
 
 
+# дневные закрытия за ~days дней: {date_iso -> close}
+def _daily_closes(client, figi, days=400):
+    out = {}
+    now = datetime.now(timezone.utc)
+    try:
+        for c in client.get_all_candles(
+            figi=figi,
+            from_=now - timedelta(days=days),
+            interval=CandleInterval.CANDLE_INTERVAL_DAY,
+        ):
+            cl = _q(c.close)
+            if cl > 0:
+                out[c.time.date().isoformat()] = cl
+    except Exception as e:
+        print(f"[eq] candles {figi}: {e}", file=sys.stderr)
+    return out
+
+
+# бета акции к индексу по дневным доходностям: cov(r_s, r_m)/var(r_m)
+def _beta(stock_closes, idx_closes):
+    dates = sorted(set(stock_closes) & set(idx_closes))
+    if len(dates) < 40:
+        return None
+    sr, ir = [], []
+    for i in range(1, len(dates)):
+        p0, p1 = stock_closes[dates[i - 1]], stock_closes[dates[i]]
+        m0, m1 = idx_closes[dates[i - 1]], idx_closes[dates[i]]
+        if p0 > 0 and m0 > 0:
+            sr.append(p1 / p0 - 1)
+            ir.append(m1 / m0 - 1)
+    n = len(sr)
+    if n < 30:
+        return None
+    mi = sum(ir) / n
+    ms = sum(sr) / n
+    cov = sum((ir[k] - mi) * (sr[k] - ms) for k in range(n)) / n
+    var = sum((ir[k] - mi) ** 2 for k in range(n)) / n
+    if var <= 0:
+        return None
+    return round(cov / var, 3)
+
+
+# figi индекса МосБиржи (IMOEX) — для расчёта беты. Ищем по справочнику.
+def _index_figi(client):
+    for q in ("IMOEX", "Индекс МосБиржи", "MOEX Russia Index"):
+        try:
+            res = client.instruments.find_instrument(query=q)
+            for it in res.instruments:
+                itype = (getattr(it, "instrument_type", "") or "").lower()
+                if getattr(it, "ticker", "") == "IMOEX" or itype == "index":
+                    return it.figi
+        except Exception:
+            continue
+    return None
+
+
 def dump_shares(client):
     shares = client.instruments.shares(
         instrument_status=InstrumentStatus.INSTRUMENT_STATUS_BASE).instruments
     figis = [s.figi for s in shares if (s.currency or "").lower() == "rub"]
     prices = _last_prices(client, figis)
     now = datetime.now(timezone.utc)
+
+    # индекс для беты — тянем свечи один раз
+    idx_figi = _index_figi(client)
+    idx_closes = _daily_closes(client, idx_figi) if idx_figi else {}
+    if idx_closes:
+        print(f"[eq] индекс IMOEX: {len(idx_closes)} дн. свечей → считаю бету", file=sys.stderr)
+    else:
+        print("[eq] индекс IMOEX не найден — бета не будет посчитана", file=sys.stderr)
+
     out = []
     for s in shares:
         if (s.currency or "").lower() != "rub":
@@ -81,6 +146,12 @@ def dump_shares(client):
         if not price:
             continue
         div12m = _div12m(client, s.figi, now)
+        # бета: дневные свечи акции vs индекса
+        beta = None
+        if idx_closes:
+            sc = _daily_closes(client, s.figi)
+            beta = _beta(sc, idx_closes)
+            time.sleep(0.05)
         time.sleep(0.05)
         out.append({
             "ticker": s.ticker,
@@ -91,6 +162,7 @@ def dump_shares(client):
             "shares": int(getattr(s, "issue_size", 0) or 0) or None,
             "price": round(price, 4),
             "div12m": div12m,
+            "beta": beta,
         })
     path = os.path.join(PUB, "stocks-cache.json")
     json.dump(out, open(path, "w", encoding="utf-8"), ensure_ascii=False)

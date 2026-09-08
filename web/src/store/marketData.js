@@ -79,7 +79,7 @@ export function reloadBonds(){
 }
 
 // ── АКЦИИ ─────────────────────────────────────────────────────────────
-const STOCK_CACHE_KEY = 'ba_stocks_universe_v2';   // v2: добавлен div12m
+const STOCK_CACHE_KEY = 'ba_stocks_universe_v3';   // v3: добавлена beta (v2: div12m)
 
 export const useStockStore = create((set, get) => ({
   stocks: null, loading: false, error: null, source: 'mock',

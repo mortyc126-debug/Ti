@@ -136,7 +136,7 @@ export async function loadRealStocks(){
     out.push({
       ticker: tk, secid: tk, name: s.name || tk, isin: s.isin || null,
       sector: s.sector || null, shares: _num(s.shares), price: _num(s.price),
-      div12m: _num(s.div12m),
+      div12m: _num(s.div12m), beta: _num(s.beta),
     });
   }
   return out;

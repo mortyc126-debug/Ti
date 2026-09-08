@@ -4,6 +4,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import Tabs from '../components/industries/Tabs.jsx';
 import Surface from '../components/market/Surface.jsx';
+import BetaMap from '../components/market/BetaMap.jsx';
 import MarketStatus from '../components/market/MarketStatus.jsx';
 import VintageControl from '../components/industries/VintageControl.jsx';
 import { useStockSource, reloadStocks, useFutureSource, reloadFutures } from '../store/marketData.js';
@@ -18,6 +19,7 @@ const TABS = [
   { id: 'stocks',  label: 'Акции' },
   { id: 'futures', label: 'Фьючерсы' },
   { id: 'spread',  label: 'Спред (акции + фьюч)' },
+  { id: 'beta',    label: 'Бета' },
 ];
 
 function readTab(){
@@ -98,7 +100,7 @@ export default function Market(){
         </div>
       )}
 
-      {tab === 'stocks' && <StockStatus />}
+      {(tab === 'stocks' || tab === 'beta') && <StockStatus />}
       {(tab === 'futures' || tab === 'spread') && <FutureStatus />}
 
       <div className="pt-2">
@@ -106,6 +108,7 @@ export default function Market(){
         {tab === 'stocks'  && <Surface kind="stock" />}
         {tab === 'futures' && <Surface kind="future" />}
         {tab === 'spread'  && <Surface kind="overlay" />}
+        {tab === 'beta'    && <BetaMap />}
       </div>
     </div>
   );
