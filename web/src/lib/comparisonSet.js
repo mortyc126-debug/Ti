@@ -1,7 +1,7 @@
 // Сборка набора кандидатов и финального селекшна для радара.
 // Используется в Comparison.jsx — здесь чистая логика, без UI.
 
-import { getAllIssuers } from '../data/issuersMock.js';
+import { currentIssuers } from '../store/issuers.js';
 import { positions as portfolioPositions } from '../data/mockPortfolio.js';
 import { metricSpec, RADAR_AXES } from '../data/comparisonMetrics.js';
 import { resolveNorm, classifyValue } from './norms.js';
@@ -12,7 +12,7 @@ import { percentileRanks } from './percentile.js';
 // эмитент может фигурировать сразу в нескольких kind'ах (если у него,
 // например, и облигации в портфеле, и акция в просмотренных).
 export function buildPool({ sources, industryFilter, recentItems, favItems }){
-  const issuers = getAllIssuers();
+  const issuers = currentIssuers();
   const byId = new Map(issuers.map(i => [i.id, i]));
   const pool = new Map();   // ключ `${id}/${kind}` → { id, kind, iss }
 
@@ -118,7 +118,7 @@ export function applyTopNSequential(pool, metrics, normsCtx){
 // Финальный набор для радара. selected — массив { id, kind, visible }
 // из стора. visibleOnly=true даёт только видимых.
 export function buildSelectedView(selected, visibleOnly){
-  const issuers = getAllIssuers();
+  const issuers = currentIssuers();
   const byId = new Map(issuers.map(i => [i.id, i]));
   return selected
     .filter(x => !visibleOnly || x.visible)

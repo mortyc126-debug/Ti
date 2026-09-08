@@ -18,7 +18,7 @@ import {
 import { useIssuers, currentIssuers } from '../../store/issuers.js';
 
 export default function Comparison(){
-  useIssuers();   // триггерит загрузку реальных эмитентов в общий стор
+  const allIssuers = useIssuers();   // реальные эмитенты под выбранный год; смена → пересчёт
   const sources         = useComparison(s => s.sources);
   const industryFilter  = useComparison(s => s.industryFilter);
   const filters         = useComparison(s => s.filters);
@@ -61,10 +61,10 @@ export default function Comparison(){
       favItems: favSlots,
     });
     return applyMultFilters(pool, filters);
-  }, [sources, industryFilter, filters, recentItems, favSlots]);
+  }, [sources, industryFilter, filters, recentItems, favSlots, allIssuers]);
 
-  // Текущий selected → view с iss-данными.
-  const selectedView = useMemo(() => buildSelectedView(selected, false), [selected]);
+  // Текущий selected → view с iss-данными (пересчёт при смене года/данных).
+  const selectedView = useMemo(() => buildSelectedView(selected, false), [selected, allIssuers]);
 
   // Применить top-N.
   const applyTopN = () => {
