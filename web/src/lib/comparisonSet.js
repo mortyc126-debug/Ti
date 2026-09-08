@@ -3,7 +3,7 @@
 
 import { currentIssuers } from '../store/issuers.js';
 import { positions as portfolioPositions } from '../data/mockPortfolio.js';
-import { metricSpec, RADAR_AXES } from '../data/comparisonMetrics.js';
+import { metricSpec, RADAR_AXES, COMP_METRICS } from '../data/comparisonMetrics.js';
 import { resolveNorm, classifyValue } from './norms.js';
 import { percentileRanks } from './percentile.js';
 
@@ -140,7 +140,14 @@ export function buildSelectedView(selected, visibleOnly){
 export function buildRadarData(selectedView){
   const visible = selectedView.filter(x => x.visible);
   if(!visible.length) return [];
-  const data = RADAR_AXES.map(axisId => {
+  // Адаптивные оси: каждая метрика, по которой есть хоть одно значение в
+  // выборке (порядок — как в COMP_METRICS). Пустые (P/E, YTM без данных)
+  // сами отпадают. Радар рисует всё, что реально есть в данных.
+  const axes = Object.values(COMP_METRICS)
+    .map(m => m.id)
+    .filter(id => visible.some(x => x.iss?.mults?.[id] != null));
+  const useAxes = axes.length ? axes : RADAR_AXES;
+  const data = useAxes.map(axisId => {
     const spec = metricSpec(axisId);
     const vals = visible.map(x => x.iss.mults?.[axisId] ?? null);
     const ranks = percentileRanks(vals, spec.higher !== false);
