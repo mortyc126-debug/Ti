@@ -326,8 +326,13 @@ function TabFinances({ card, reports }){
   if(!reports?.length){
     return <div className="text-text3 text-xs italic">Отчётность не собрана. В admin → 📊 Отчётность.</div>;
   }
-  // Сортируем по году убыванию, берём до 5 лет
-  const series = [...reports].sort((a, b) => (b.fy_year || 0) - (a.fy_year || 0)).slice(0, 5);
+  // Сортируем по году убыванию, берём до 5 лет + досчитываем производные
+  // проценты/коэффициенты, если backend/снимок их не отдал (в снимке — только
+  // сырые суммы). Все отношения безразмерны, единица (млн/млрд) не важна.
+  const series = [...reports]
+    .sort((a, b) => (b.fy_year || 0) - (a.fy_year || 0))
+    .slice(0, 5)
+    .map(withDerived);
   return (
     <div className="space-y-3">
       {issuer && (
@@ -490,6 +495,25 @@ function LinkRow({ name, inn, kind, role, share }){
 
 function TabEvents({ card }){
   return <div className="text-text3 text-xs italic">События — следующий коммит (TRACK C: e-disclosure / RSS / Cerebras).</div>;
+}
+
+// Достраивает строку отчёта: производные %/коэффициенты (если их нет) и
+// перевод сумм млн→млрд (снимок хранит млн, а fmtBn ждёт млрд).
+function withDerived(r){
+  const num = v => (v == null || v === '' || isNaN(Number(v))) ? null : Number(v);
+  const rev = num(r.rev), np = num(r.np), ebitda = num(r.ebitda), assets = num(r.assets),
+        debt = num(r.debt), cash = num(r.cash), eq = num(r.eq);
+  const roa_pct      = r.roa_pct      != null ? num(r.roa_pct)      : (assets ? np / assets * 100 : null);
+  const ros_pct      = r.ros_pct      != null ? num(r.ros_pct)      : (rev ? np / rev * 100 : null);
+  const ebitda_marg  = r.ebitda_marg  != null ? num(r.ebitda_marg)  : (rev ? ebitda / rev * 100 : null);
+  const net_debt_eq  = r.net_debt_eq  != null ? num(r.net_debt_eq)  : (eq ? ((debt || 0) - (cash || 0)) / eq : null);
+  const bn = v => v == null ? null : v / 1000;   // млн → млрд
+  return {
+    ...r,
+    rev: bn(rev), ebit: bn(num(r.ebit)), np: bn(np), ebitda: bn(ebitda),
+    assets: bn(assets), eq: bn(eq), debt: bn(debt), cash: bn(cash),
+    roa_pct, ros_pct, ebitda_marg, net_debt_eq,
+  };
 }
 
 // ───── Форматтеры ──────────────────────────────────────────────────
