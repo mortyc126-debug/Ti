@@ -1,12 +1,14 @@
 // Страница «Карта». Три таба, у всех одинаковый «горизонт»-вью с
 // kind-специфичным набором данных и фильтров.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Tabs from '../components/industries/Tabs.jsx';
 import Surface from '../components/market/Surface.jsx';
 import MarketStatus from '../components/market/MarketStatus.jsx';
 import VintageControl from '../components/industries/VintageControl.jsx';
 import { useStockSource, reloadStocks } from '../store/marketData.js';
+import { useIssuers } from '../store/issuers.js';
+import { diagnoseStocks } from '../data/marketSurfaceData.js';
 
 // Облигации — реальные данные (снимок цен + отчётность). Акции/фьючерсы/спред
 // пока на демо-данных (реальных котировок по акциям в снимке нет) — помечены
@@ -32,7 +34,9 @@ function writeTab(id){
 
 function StockStatus(){
   const { source, loading, count } = useStockSource();
+  const allIssuers = useIssuers();   // гарантируем загрузку отчётности + ре-рендер
   const real = source === 'live' || source === 'cache';
+  const d = useMemo(() => diagnoseStocks(), [source, count, allIssuers]);
   const cls = 'bg-bg2 border border-border rounded-md px-2 py-1 text-xs text-text';
   return (
     <div className="flex items-center gap-2 flex-wrap text-xs" data-no-drag>
@@ -40,9 +44,14 @@ function StockStatus(){
         title="Сбросить кэш и перезагрузить котировки акций">⟳ перезагрузить</button>
       <span className={real ? 'text-green/80' : 'text-yellow'}>
         {loading ? 'загрузка акций…'
-          : real ? `${count} акций · цены T-Invest + отчётность`
+          : real ? `${count} акций T-Invest`
           : 'ДЕМО: запусти invest-bot/make_equities_cache.py и обнови'}
       </span>
+      {real && (
+        <span className="text-text3 font-mono">
+          сматчено {d.matched}/{d.real} · с числом акций {d.withShares} · с E/P {d.withEp} · эмитентов {d.issuers}
+        </span>
+      )}
     </div>
   );
 }

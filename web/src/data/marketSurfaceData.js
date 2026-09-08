@@ -92,6 +92,28 @@ export function loadStockPoints({ yMode = 'scoring', stocks = null } = {}){
   return out;
 }
 
+// Диагностика джойна акций (для плашки статуса): где отваливаются точки.
+export function diagnoseStocks(){
+  const src = currentStocks();
+  const issuersList = currentIssuers();
+  const innMap = new Map();
+  for(const it of issuersList){ if(it.inn) innMap.set(String(it.inn), it); }
+  let loaded = 0, real = 0, matched = 0, withShares = 0, withEp = 0;
+  for(const s of src){
+    loaded++;
+    const isReal = (s.price != null && (!s.mults || s.ep == null));
+    if(!isReal){ if(s.ep != null) withEp++; continue; }
+    real++;
+    if(s.shares) withShares++;
+    const iss = (s.inn && innMap.get(String(s.inn))) || bestIssuerMatch(s.name, issuersList);
+    if(iss) matched++;
+    const npRaw = iss?.mults?.npRaw;
+    const mc = (s.shares && s.price) ? s.price * s.shares / 1e9 : null;
+    if(npRaw != null && mc > 0) withEp++;
+  }
+  return { loaded, real, matched, withShares, withEp, issuers: issuersList.length };
+}
+
 // ─── ФЬЮЧЕРСЫ ─────────────────────────────────────────────────────
 // Фьюч на акцию наследует мультипликаторы базовой бумаги. Для фьюча
 // «доходность» = E/P базовой акции − basisPp (контанго → ниже E/P,
