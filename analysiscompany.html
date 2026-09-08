@@ -29772,6 +29772,13 @@ function _repArchiveModal(){
   };
 })();
 
+// Стоп-лист заблокированных ИНН — инициализация из localStorage.
+// (Объявление было утеряно; без него _repD1Load падал ReferenceError.)
+var _repIgnoredInns = (function(){
+  try{ return new Set(JSON.parse(localStorage.getItem('bondan_ignored_inns') || '[]')); }
+  catch(e){ return new Set(); }
+})();
+
 function _repIgnoreSave(){
   try{ localStorage.setItem('bondan_ignored_inns', JSON.stringify(Array.from(_repIgnoredInns))); }catch(e){}
 }
