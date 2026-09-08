@@ -11299,16 +11299,18 @@ function repRenderCards(p){
   ].filter(Boolean).join('');
 
   grid.innerHTML = `
-    <div style="font-size:.57rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">Исходные показатели</div>
+    <div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin-bottom:8px">Исходные показатели</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:16px">${cards||'<div style="color:var(--text3);font-size:.7rem">Нет данных</div>'}</div>
-    ${ratioCards?`<div style="font-size:.57rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">Расчётные коэффициенты</div>
+    ${ratioCards?`<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin-bottom:8px">Расчётные коэффициенты</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">${ratioCards}</div>`:''}`;
 }
 
 function repRatioCard(label, value, color, sub){
+  // на тёмном фоне Inter при grayscale-сглаживании выглядит тонко —
+  // держим лейблы 500, значение 700, чтобы читалось плотнее
   return `<div style="background:var(--s1);border:1px solid var(--border);border-left:3px solid ${color};padding:11px 13px">
-    <div style="font-size:.57rem;color:var(--text3);margin-bottom:3px">${label}</div>
-    <div style="font-size:1rem;font-weight:600;color:${color}">${value}</div>
+    <div style="font-size:.57rem;font-weight:500;color:var(--text2);margin-bottom:3px">${label}</div>
+    <div style="font-size:1rem;font-weight:700;color:${color}">${value}</div>
     <div style="font-size:.56rem;color:var(--text3)">${sub}</div>
   </div>`;
 }
