@@ -28315,25 +28315,32 @@ async function _repD1Load(){
 
     // D1 под нагрузкой молча отдаёт пустой ответ (таймаут внутри worker'а) —
     // поэтому маленький параллелизм + РЕТРАИ пустых/ошибочных ответов с бэкоффом.
+    // Источники: сначала ЛОКАЛЬНЫЙ снимок (data/bond_dump/reports →
+    // web/public/reports-cache/{inn}.json) — полный и не зависит от
+    // деградировавшей D1; затем живой backend как запасной.
+    var _isLocal = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+    async function _tryUrl(entry, url, useAbort){
+      var to = null, opt = {};
+      if(useAbort){ var ctrl = new AbortController(); opt.signal = ctrl.signal; to = setTimeout(function(){ ctrl.abort(); }, 12000); }
+      try{
+        var r2 = await fetch(url, opt);
+        if(to) clearTimeout(to);
+        if(!r2.ok) return false;
+        var data = await r2.json();
+        if(data && Array.isArray(data.data) && data.data.length){
+          _d1MergeReports(entry.id, entry.inn, data.data);
+          loaded++;
+          var rr = reportsDB || {};
+          if(rr[entry.id]) rr[entry.id]._d1_checked = true;
+          return true;
+        }
+      }catch(e){ if(to) clearTimeout(to); }
+      return false;
+    }
     async function _fetchOne(entry){
-      for(var att = 0; att < 4; att++){
-        try{
-          var ctrl = new AbortController();
-          var to = setTimeout(function(){ ctrl.abort(); }, 12000);
-          var r2 = await fetch(base + '/issuer/' + entry.inn + '/reports', { signal: ctrl.signal });
-          clearTimeout(to);
-          if(r2.ok){
-            var data = await r2.json();
-            if(data && Array.isArray(data.data) && data.data.length){
-              _d1MergeReports(entry.id, entry.inn, data.data);
-              loaded++;
-              var rr = reportsDB || {};
-              if(rr[entry.id]) rr[entry.id]._d1_checked = true;
-              return;
-            }
-            // пустой data.data — вероятно транзиентный таймаут D1 → ретрай
-          }
-        }catch(e){ /* сеть/abort → ретрай */ }
+      if(_isLocal && await _tryUrl(entry, '/reports-cache/' + entry.inn + '.json', false)) return;
+      for(var att = 0; att < 3; att++){
+        if(await _tryUrl(entry, base + '/issuer/' + entry.inn + '/reports', true)) return;
         await new Promise(function(res){ setTimeout(res, 500 * (att + 1)); });
       }
       errors++;
