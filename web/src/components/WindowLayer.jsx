@@ -20,6 +20,18 @@ import { buildWatch, annualTrends } from '../lib/autoWatch.js';
 
 export default function WindowLayer(){
   const windows = useWindows(s => s.windows);
+  const clampToViewport = useWindows(s => s.clampToViewport);
+
+  // Возвращаем окна в кадр при загрузке и при ресайзе окна браузера —
+  // чтобы шапка не оставалась вне видимой области и её всегда можно было
+  // схватить (восстановление «застрявших» окон).
+  useEffect(() => {
+    clampToViewport();
+    const onResize = () => clampToViewport();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [clampToViewport]);
+
   return (
     <div className="pointer-events-none fixed inset-0 z-30">
       {windows.map(w => <FloatingWindow key={w.wid} win={w} />)}

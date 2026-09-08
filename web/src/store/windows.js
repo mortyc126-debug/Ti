@@ -98,6 +98,26 @@ export const useWindows = create(
 
       setTab(wid, tab){ get().patch(wid, { tab }); },
 
+      // Вернуть окна в кадр: шапка (верхние ~36px) всегда должна быть
+      // доступна для перетаскивания. Если окно утащили за край или экран
+      // стал меньше — координаты подрезаются. Вызывается на старте и при
+      // resize окна браузера.
+      clampToViewport(){
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const maxX = Math.max(0, vw - 160);   // хотя бы 160px шапки видно
+        const maxY = Math.max(0, vh - 44);    // шапка не ныряет под низ
+        let changed = false;
+        const windows = get().windows.map(w => {
+          if(w.mode === 'full') return w;
+          const x = Math.min(Math.max(0, w.x || 0), maxX);
+          const y = Math.min(Math.max(0, w.y || 0), maxY);
+          if(x === w.x && y === w.y) return w;
+          changed = true;
+          return { ...w, x, y };
+        });
+        if(changed) set({ windows });
+      },
+
       patchTabState(wid, partial){
         const w = get().windows.find(x => x.wid === wid);
         if(!w) return;
