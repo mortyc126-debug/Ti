@@ -47,7 +47,7 @@ function StockStatus(){
       </span>
       {real && (
         <span className="text-text3 font-mono">
-          сматчено {d.matched}/{d.real} · с числом акций {d.withShares} · с E/P {d.withEp} · эмитентов {d.issuers}
+          сматчено {d.matched}/{d.real} · с E/P {d.withEp} · с дивид. {d.withDiv} · эмитентов {d.issuers}
         </span>
       )}
     </div>

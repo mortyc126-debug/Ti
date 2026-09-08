@@ -99,9 +99,10 @@ export function diagnoseStocks(){
   const issuersList = currentIssuers();
   const innMap = new Map();
   for(const it of issuersList){ if(it.inn) innMap.set(String(it.inn), it); }
-  let loaded = 0, real = 0, matched = 0, withShares = 0, withEp = 0;
+  let loaded = 0, real = 0, matched = 0, withShares = 0, withEp = 0, withDiv = 0;
   for(const s of src){
     loaded++;
+    if(s.div12m > 0) withDiv++;
     const isReal = (s.price != null && (!s.mults || s.ep == null));
     if(!isReal){ if(s.ep != null) withEp++; continue; }
     real++;
@@ -112,7 +113,7 @@ export function diagnoseStocks(){
     const mc = (s.shares && s.price) ? s.price * s.shares / 1e9 : null;
     if(npRaw != null && mc > 0) withEp++;
   }
-  return { loaded, real, matched, withShares, withEp, issuers: issuersList.length };
+  return { loaded, real, matched, withShares, withEp, withDiv, issuers: issuersList.length };
 }
 
 // Диагностика фьючерсов для плашки.
