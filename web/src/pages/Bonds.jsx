@@ -19,21 +19,26 @@ import { api } from '../api.js';
 // плавающее окно (через useWindows). Внутри страницы три вкладки:
 // Список / Избранное-просмотр-результата / Последние просмотренные.
 //
-// Данные тащатся из бэкенда через api.bondLatest(limit=2000). Кешируем
-// в localStorage 5 минут чтобы не дёргать каждый рендер.
+// Данные тащатся из бэкенда через api.bondLatest(limit=2000). D1 бесплатного
+// тарифа упирается в дневной лимит чтения строк, а запрос 2000 бумаг его
+// быстро выжигает — поэтому кешируем надолго (12ч) и не дёргаем backend, пока
+// кеш свежий. На ошибке всегда показываем последний удачный снимок (даже
+// протухший), а не пустую таблицу. Обновление — по кнопке.
 
 const TYPE_LABEL = Object.fromEntries(BOND_TYPES.map(t => [t.id, t.label]));
 const CACHE_KEY = 'bonds_latest_v1';
-const CACHE_TTL = 5 * 60 * 1000; // 5 минут
+const CACHE_TTL = 12 * 60 * 60 * 1000; // 12 часов
 
-function loadCached(){
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if(!raw) return null;
-    const { at, data } = JSON.parse(raw);
-    if(Date.now() - at > CACHE_TTL) return null;
-    return data;
-  } catch(_){ return null; }
+function readCache(){
+  try { const raw = localStorage.getItem(CACHE_KEY); return raw ? JSON.parse(raw) : null; }
+  catch(_){ return null; }
+}
+function loadCached(){                        // свежий (в пределах TTL)
+  const c = readCache();
+  return c && Date.now() - c.at <= CACHE_TTL ? c.data : null;
+}
+function loadStale(){                          // любой сохранённый, без учёта возраста
+  return readCache()?.data || null;
 }
 function saveCache(data){
   try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), data })); } catch(_){}
@@ -42,7 +47,7 @@ function saveCache(data){
 export default function Bonds(){
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [tab, setTab] = useState('list');         // list | favs | recent
-  const [bonds, setBonds] = useState(() => loadCached() || []);
+  const [bonds, setBonds] = useState(() => loadCached() || loadStale() || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [updatedAt, setUpdatedAt] = useState(null);
@@ -81,6 +86,9 @@ export default function Bonds(){
       setUpdatedAt(new Date().toISOString());
     } catch(e){
       setError(e.message || String(e));
+      // D1 недоступен/лимит — показываем последний удачный снимок, не пустоту
+      const stale = loadStale();
+      if(stale?.length) setBonds(stale);
     } finally {
       setLoading(false);
     }
