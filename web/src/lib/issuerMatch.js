@@ -81,13 +81,23 @@ const ALIAS_KEY = 'bondan_issuer_aliases';
 function _readAliases(){
   try { return JSON.parse(localStorage.getItem(ALIAS_KEY)) || {}; } catch(_){ return {}; }
 }
+// Связка может указывать на НЕСКОЛЬКО компаний (SPV → группа связанных
+// юрлиц). Храним массив [{inn,name}]; старый формат (строка-ИНН) поддержан.
 export function aliasGet(name){
   const m = _readAliases();
-  return m[normName(name)] || null;
+  const v = m[normName(name)];
+  if(!v) return null;
+  if(Array.isArray(v)) return v.filter(x => x && x.inn).map(x => ({ inn: String(x.inn), name: x.name || '' }));
+  return [{ inn: String(v), name: '' }];   // легаси
 }
-export function aliasSet(name, inn){
+export function aliasSet(name, list){
+  const arr = Array.isArray(list) ? list : [list];
+  const norm = arr.map(x => (typeof x === 'string' || typeof x === 'number')
+    ? { inn: String(x), name: '' }
+    : { inn: String(x.inn), name: x.name || '' }).filter(x => x.inn);
+  if(!norm.length) return;
   const m = _readAliases();
-  m[normName(name)] = String(inn);
+  m[normName(name)] = norm;
   try { localStorage.setItem(ALIAS_KEY, JSON.stringify(m)); } catch(_){}
 }
 export function aliasClear(name){

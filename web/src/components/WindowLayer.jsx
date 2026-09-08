@@ -213,24 +213,32 @@ function IssuerTabContent({ win }){
   );
 
   const rawInn = win.inn || (typeof win.id === 'string' && /^\d{10,12}$/.test(win.id) ? win.id : null);
-  const alias = aliasGet(win.title);
-  // Подтверждённая пользователем связка (alias) — доверяем безусловно.
-  // Затем rawInn, если он среди отчётных (или список ещё не готов). Иначе —
-  // предложим подбор по названию.
+  const aliasList = aliasGet(win.title);   // массив {inn,name} или null
+  // Активный ИНН: явный win.inn (переключение чипами), иначе первая связка,
+  // иначе rawInn если он среди отчётных.
   let resolvedInn = null;
-  if(alias) resolvedInn = String(alias);
+  if(win.inn && (!universeReady || knownInns.has(String(win.inn)))) resolvedInn = String(win.inn);
+  else if(aliasList?.length) resolvedInn = String(aliasList[0].inn);
   else if(rawInn && (!universeReady || knownInns.has(String(rawInn)))) resolvedInn = String(rawInn);
 
   const { loading, error, card, reports, affiliations } = useIssuerData(resolvedInn);
 
   // Модуль отчётности (шкалы) читает данные из общего localStorage — не ждём backend.
   if(win.tab === 'report'){
-    if(resolvedInn) return <TabReportModule inn={resolvedInn} name={win.title} />;
+    if(resolvedInn) return (
+      <ReportWithLinks inn={resolvedInn} name={win.title} links={aliasList}
+        onSwitch={(i) => patch(win.wid, { inn: String(i) })} />
+    );
     // ИНН не сопоставлен с отчётностью — предлагаем подобрать по названию.
     return (
       <IssuerMatcher
         name={win.title} rawInn={rawInn} issuers={allIssuers}
-        onPick={(inn) => { aliasSet(win.title, inn); patch(win.wid, { inn: String(inn), tab: 'report' }); }}
+        onPick={(list) => {
+          const arr = (Array.isArray(list) ? list : [list]).map(x => ({ inn: String(x.inn), name: x.name || '' }));
+          if(!arr.length) return;
+          aliasSet(win.title, arr);
+          patch(win.wid, { inn: arr[0].inn, tab: 'report' });
+        }}
       />
     );
   }
@@ -253,6 +261,31 @@ function IssuerTabContent({ win }){
   }
 }
 
+// Отчётность + чипы переключения между связанными компаниями (если их >1).
+function ReportWithLinks({ inn, name, links, onSwitch }){
+  const list = Array.isArray(links) ? links.filter(l => l.inn) : [];
+  return (
+    <>
+      {list.length > 1 && (
+        <div className="flex items-center gap-1 flex-wrap px-2 py-1.5 border-b border-border bg-bg2" data-no-drag onMouseDown={e => e.stopPropagation()}>
+          <span className="text-text3 text-[10px] uppercase tracking-wider mr-1">связаны:</span>
+          {list.map(l => {
+            const active = String(l.inn) === String(inn);
+            return (
+              <button key={l.inn} type="button" onClick={() => onSwitch(l.inn)}
+                title={l.name ? `${l.name} · ИНН ${l.inn}` : `ИНН ${l.inn}`}
+                className={`px-2 py-0.5 rounded text-[10px] font-mono border ${active ? 'bg-acc-dim text-acc border-acc/40' : 'bg-s2 text-text2 border-border hover:text-text'}`}>
+                {l.name ? l.name.slice(0, 18) : l.inn}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <TabReportModule inn={inn} name={name} />
+    </>
+  );
+}
+
 // Встроенный модуль отчётности (analysiscompany.html) в embed-режиме —
 // per-issuer финвид со шкалами сравнения. Данные из общего localStorage.
 function TabReportModule({ inn, name }){
@@ -271,6 +304,7 @@ function TabReportModule({ inn, name }){
 // связку (сохраняется), окно тут же открывает отчётность выбранной компании.
 function IssuerMatcher({ name, rawInn, issuers, onPick }){
   const [q, setQ] = useState('');
+  const [sel, setSel] = useState({});   // inn -> {inn,name}
   const suggestions = useMemo(() => suggestIssuers(name, issuers), [name, issuers]);
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -280,29 +314,52 @@ function IssuerMatcher({ name, rawInn, issuers, onPick }){
       .slice(0, 20);
   }, [q, issuers]);
 
-  const Row = ({ it, score }) => (
-    <button type="button" data-no-drag
-      onMouseDown={e => e.stopPropagation()}
-      onClick={() => onPick(it.inn)}
-      className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded hover:bg-acc-dim/40 border border-transparent hover:border-acc/40">
-      <span className="flex-1 min-w-0">
-        <span className="text-text text-xs truncate block">{it.name}</span>
-        <span className="text-text3 text-[10px] font-mono">
-          ИНН {it.inn}{it.reportYear ? ` · отчёт ${it.reportYear}` : ''}{it.industry ? ` · ${it.industry}` : ''}
-        </span>
-      </span>
-      {score != null && (
-        <span className="text-[10px] font-mono text-acc shrink-0">{Math.round(score * 100)}%</span>
-      )}
-    </button>
-  );
+  const toggle = (it) => setSel(prev => {
+    const n = { ...prev };
+    if(n[it.inn]) delete n[it.inn]; else n[it.inn] = { inn: String(it.inn), name: it.name || '' };
+    return n;
+  });
+  const selArr = Object.values(sel);
+  const revBn = it => (it.mults?.revRaw != null ? Math.round(it.mults.revRaw / 1000) : null);
+
+  const Row = ({ it, score }) => {
+    const checked = !!sel[it.inn];
+    const rb = revBn(it);
+    return (
+      <div data-no-drag onMouseDown={e => e.stopPropagation()}
+        className={`flex items-center gap-2 px-2 py-1.5 rounded border ${checked ? 'border-acc/50 bg-acc-dim/30' : 'border-transparent hover:bg-acc-dim/20'}`}>
+        <input type="checkbox" checked={checked} onChange={() => toggle(it)} className="shrink-0" />
+        <button type="button" onClick={() => onPick([{ inn: String(it.inn), name: it.name || '' }])}
+          className="flex-1 min-w-0 text-left" title="Выбрать только эту">
+          <span className="text-text text-xs truncate block">{it.name}</span>
+          <span className="text-text3 text-[10px] font-mono">
+            ИНН {it.inn}{it.reportYear ? ` · отчёт ${it.reportYear}` : ''}{rb != null ? ` · выручка ${rb} млрд` : ''}
+          </span>
+        </button>
+        {score != null && <span className="text-[10px] font-mono text-acc shrink-0">{Math.round(score * 100)}%</span>}
+      </div>
+    );
+  };
 
   return (
     <div className="text-xs space-y-3 p-4 overflow-y-auto flex-1 min-h-0" data-no-drag onMouseDown={e => e.stopPropagation()}>
       <div className="text-text2">
         У «<span className="text-text">{name}</span>» {rawInn ? <>ИНН <span className="font-mono">{rawInn}</span> без отчётности в снимке.</> : 'нет ИНН.'}{' '}
-        Часто отчётность лежит под материнской компанией (бумагу выпускает SPV вида «… Финанс»). Выберите её — свяжу и запомню.
+        Часто отчётность лежит под материнской компанией. Если связанных несколько (группа) — отметьте галочками все, первой станет крупнейшая по выручке. Клик по названию — выбрать только её.
       </div>
+
+      {selArr.length > 0 && (
+        <button type="button" data-no-drag onMouseDown={e => e.stopPropagation()}
+          onClick={() => {
+            // порядок: по убыванию выручки → «главная» первой
+            const ranked = selArr.map(s => ({ ...s, rev: issuers.find(i => String(i.inn) === s.inn)?.mults?.revRaw ?? -1 }))
+              .sort((a, b) => b.rev - a.rev).map(({ inn, name }) => ({ inn, name }));
+            onPick(ranked);
+          }}
+          className="w-full bg-acc-dim text-acc border border-acc/40 rounded px-2 py-1.5 text-xs hover:bg-acc-dim/70">
+          Связать выбранные ({selArr.length})
+        </button>
+      )}
 
       {suggestions.length > 0 && (
         <div>
@@ -316,6 +373,7 @@ function IssuerMatcher({ name, rawInn, issuers, onPick }){
       <div>
         <div className="text-text3 uppercase tracking-wider text-[10px] mb-1">Найти вручную</div>
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="название или ИНН…"
+          data-no-drag onMouseDown={e => e.stopPropagation()}
           className="w-full bg-bg2 border border-border rounded px-2 py-1 text-xs text-text" />
         {filtered.length > 0 && (
           <div className="space-y-0.5 mt-1 max-h-52 overflow-y-auto">
