@@ -29887,10 +29887,14 @@ function _repArchiveModal(){
         })
         .catch(function(){ cb(false); });
     }
+    var _pageShown = false;
     var tries = 0;
     var t = setInterval(function(){
       tries++;
       if(typeof repSelectIssuerById === 'function' && window.reportsDB){
+        // По умолчанию модуль открывается на странице YTM → #page-reports
+        // скрыт и финвид эмитента не виден. Переключаемся на «Отчётность».
+        if(!_pageShown && typeof showPage === 'function'){ try{ showPage('reports'); }catch(e){} _pageShown = true; }
         var id = findId();
         if(id){ clearInterval(t); try{ repSelectIssuerById(id); }catch(e){} return; }
         // нет в reportsDB — один раз пробуем снимок по этому ИНН
