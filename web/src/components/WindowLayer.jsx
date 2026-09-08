@@ -237,8 +237,11 @@ function IssuerTabContent({ win }){
   if(loading) return <div className="text-text3 text-xs">Загружаю данные…</div>;
   if(error === 'no-data') return <div className="text-text3 text-xs italic">По ИНН {resolvedInn} в БД пока ничего нет. Запустите сбор отчётности из admin-панели.</div>;
 
+  const issCard = allIssuers.find(i => String(i.inn) === String(resolvedInn));
+  const industry = issCard?.industry || null;
+
   switch(win.tab){
-    case 'finances':  return <TabFinances card={card} reports={reports} />;
+    case 'finances':  return <TabFinances card={card} reports={reports} industry={industry} />;
     case 'papers':    return <TabPapers card={card} />;
     case 'links':     return <TabLinks affiliations={affiliations} />;
     case 'events':    return <TabEvents card={card} />;
@@ -321,7 +324,7 @@ function IssuerMatcher({ name, rawInn, issuers, onPick }){
   );
 }
 
-function TabFinances({ card, reports }){
+function TabFinances({ card, reports, industry }){
   const issuer = card?.issuer;
   const stock = card?.stock;
   if(!reports?.length){
@@ -378,24 +381,33 @@ function TabFinances({ card, reports }){
         Источник: {series[0]?.source || '—'} · последнее обновление {series[0]?.fetched_at?.slice(0, 10) || '—'}
       </div>
 
-      <PeriodNarrative reports={reports} />
+      <PeriodNarrative reports={reports} industry={industry} />
     </div>
   );
 }
 
-// «Что изменилось» — разбор динамики последнего года к предыдущему.
-function PeriodNarrative({ reports }){
-  const nar = useMemo(() => interpretPeriods(reports), [reports]);
+// «Что изменилось» — разбор динамики последнего года к предыдущему + F-score.
+function PeriodNarrative({ reports, industry }){
+  const nar = useMemo(() => interpretPeriods(reports, industry), [reports, industry]);
   if(!nar) return null;
   const dot = { red: 'bg-danger', yellow: 'bg-warn', green: 'bg-green' };
   const vtone = { red: 'text-danger', yellow: 'text-warn', green: 'text-green' };
+  const fs = nar.fscore;
+  const fsTone = fs.value >= 7 ? 'text-green' : fs.value <= 3 ? 'text-danger' : 'text-warn';
   return (
     <div className="mt-3 border-t border-border/60 pt-3 space-y-2">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <span className="text-text3 text-[10px] uppercase tracking-wider">Что изменилось</span>
         <span className="text-text2 text-[11px] font-mono">{nar.prevYear} → {nar.year}{nar.std ? ` · ${nar.std}` : ''}</span>
       </div>
       <div className={`text-xs ${vtone[nar.verdict.level]}`}>{nar.verdict.text}</div>
+
+      {nar.industry && (
+        <div className="text-text3 text-[11px] leading-snug bg-s2/30 border border-border/60 rounded px-2 py-1.5">
+          <span className="text-text2">Особенности отрасли:</span> {nar.industry.text}
+        </div>
+      )}
+
       <ul className="space-y-1.5">
         {nar.flags.map((f, i) => (
           <li key={i} className="flex gap-2">
@@ -407,6 +419,24 @@ function PeriodNarrative({ reports }){
           </li>
         ))}
       </ul>
+
+      {/* Piotroski F-score — раскладка сигналов */}
+      <details className="mt-1">
+        <summary className="cursor-pointer text-[11px] text-text2">
+          Piotroski F-score: <span className={fsTone}>{fs.value}/{fs.max}</span> — из чего сложился
+        </summary>
+        <ul className="mt-1.5 space-y-0.5">
+          {fs.signals.map((s, i) => (
+            <li key={i} className="text-[11px] flex gap-1.5">
+              <span className={s.ok ? 'text-green' : 'text-text3'}>{s.ok ? '✓' : '·'}</span>
+              <span className={s.ok ? 'text-text2' : 'text-text3'}>{s.label}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="text-text3 text-[10px] mt-1 italic">
+          Адаптирован (8 из 9): эмиссию акций не проверяем; денежный поток оценён как ЧП + амортизация. 7–8 — сильный, 0–3 — слабый.
+        </div>
+      </details>
     </div>
   );
 }
