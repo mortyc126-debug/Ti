@@ -41,8 +41,10 @@ function _mkBond(row, innMap, nameMap){
   const secid = (_pick(row, ['secid', 'SECID', 'isin', 'ISIN']) || '').toString().toUpperCase();
   if(!secid) return null;
   const inn = _pick(row, ['inn', 'issuer_inn', 'emitent_inn']);
-  const issuerName = _pick(row, ['issuer', 'issuer_name', 'emitent', 'org_name', 'shortname', 'name']) || secid;
-  const iss = (inn && innMap.get(String(inn))) || nameMap.get(String(issuerName).toLowerCase()) || null;
+  const rawIssuerName = _pick(row, ['issuer', 'issuer_name', 'emitent', 'org_name', 'shortname', 'name']);
+  const iss = (inn && innMap.get(String(inn))) || (rawIssuerName && nameMap.get(String(rawIssuerName).toLowerCase())) || null;
+  // имя эмитента предпочтительно из фундамента (снимок цен его не содержит)
+  const issuerName = iss?.name || rawIssuerName || secid;
 
   const mat = _pick(row, ['mat_date', 'maturity_date', 'matdate', 'maturity']);
   const ytm = _num(_pick(row, ['ytm', 'yield_to_mat', 'yieldtomaturity', 'effectiveyield', 'yield']));
@@ -68,13 +70,26 @@ function _mkBond(row, innMap, nameMap){
   };
 }
 
-// вытянуть все выпуски (backend может отдавать {data:[...]} либо массив)
-export async function loadRealBonds(){
-  let rows;
+// локальный снимок цен (web/public/bonds-cache.json = [{secid,inn,mat_date,ytm}])
+// — генерится из data/bond_dump скриптом tools/make_bonds_cache.py. Живёт офлайн,
+// не зависит от деградировавшей D1. Приоритет над backend.
+async function _snapshotRows(){
   try {
-    const d = await api.bondLatest({ limit: 5000 });
-    rows = Array.isArray(d) ? d : (d?.data || d?.bonds || []);
-  } catch(_){ return []; }
+    const r = await fetch('/bonds-cache.json');
+    if(r.ok){ const a = await r.json(); if(Array.isArray(a) && a.length) return a; }
+  } catch(_){}
+  return null;
+}
+
+// вытянуть все выпуски: снимок цен → иначе живой /bond/latest
+export async function loadRealBonds(){
+  let rows = await _snapshotRows();
+  if(!rows){
+    try {
+      const d = await api.bondLatest({ limit: 5000 });
+      rows = Array.isArray(d) ? d : (d?.data || d?.bonds || []);
+    } catch(_){ return []; }
+  }
   if(!Array.isArray(rows) || !rows.length) return [];
 
   // индексы фундамента по инн и по имени (для join'а)
