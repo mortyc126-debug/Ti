@@ -44,6 +44,11 @@ export const COMP_METRICS = {
     higher: true,  fmt: '%', radar: false, percentileBased: true,
     tip: 'NOPAT / инвестированный капитал = EBIT·(1−налог) / (капитал + долг − деньги). Отдача на вложенный капитал; сравнивать с стоимостью капитала.',
   },
+  roe: {
+    id: 'roe', label: 'ROE', short: 'ROE',
+    higher: true,  fmt: '%', radar: false, percentileBased: true,
+    tip: 'Чистая прибыль / собственный капитал. Отдача на капитал акционеров. Высокий ROE при низком ROIC = эффект долга (риск).',
+  },
   bqi: {
     id: 'bqi', label: 'Качество баланса', short: 'BQI',
     higher: true,  fmt: '', radar: true,

@@ -4,6 +4,7 @@ import { useWindows } from '../store/windows.js';
 import { api } from '../api.js';
 import { useIssuers, useIssuersStore } from '../store/issuers.js';
 import { suggestIssuers, aliasGet, aliasSet } from '../lib/issuerMatch.js';
+import { interpretPeriods } from '../lib/finNarrative.js';
 
 // Слой плавающих окон. Рендерится один раз в App.jsx поверх Outlet.
 // Каркас окна + живой контент в MediumBody (вкладки Финансы/Бумаги/
@@ -366,6 +367,7 @@ function TabFinances({ card, reports }){
             <MetricRow label="Деньги"         series={series} field="cash"     fmt={fmtBn} />
             <MetricRow label="ROA, %"         series={series} field="roa_pct"  fmt={fmtPct} colorize />
             <MetricRow label="ROIC, %"        series={series} field="roic_pct" fmt={fmtPct} colorize />
+            <MetricRow label="ROE, %"         series={series} field="roe_pct"  fmt={fmtPct} colorize />
             <MetricRow label="ROS, %"         series={series} field="ros_pct"  fmt={fmtPct} colorize />
             <MetricRow label="EBITDA-марж, %" series={series} field="ebitda_marg" fmt={fmtPct} />
             <MetricRow label="ND/Eq"          series={series} field="net_debt_eq" fmt={fmtX} />
@@ -375,6 +377,36 @@ function TabFinances({ card, reports }){
       <div className="text-text3 text-[10px]">
         Источник: {series[0]?.source || '—'} · последнее обновление {series[0]?.fetched_at?.slice(0, 10) || '—'}
       </div>
+
+      <PeriodNarrative reports={reports} />
+    </div>
+  );
+}
+
+// «Что изменилось» — разбор динамики последнего года к предыдущему.
+function PeriodNarrative({ reports }){
+  const nar = useMemo(() => interpretPeriods(reports), [reports]);
+  if(!nar) return null;
+  const dot = { red: 'bg-danger', yellow: 'bg-warn', green: 'bg-green' };
+  const vtone = { red: 'text-danger', yellow: 'text-warn', green: 'text-green' };
+  return (
+    <div className="mt-3 border-t border-border/60 pt-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-text3 text-[10px] uppercase tracking-wider">Что изменилось</span>
+        <span className="text-text2 text-[11px] font-mono">{nar.prevYear} → {nar.year}{nar.std ? ` · ${nar.std}` : ''}</span>
+      </div>
+      <div className={`text-xs ${vtone[nar.verdict.level]}`}>{nar.verdict.text}</div>
+      <ul className="space-y-1.5">
+        {nar.flags.map((f, i) => (
+          <li key={i} className="flex gap-2">
+            <span className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${dot[f.level]}`} />
+            <div className="min-w-0">
+              <div className="text-text text-xs">{f.title}</div>
+              <div className="text-text3 text-[11px] leading-snug">{f.text}</div>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -509,6 +541,7 @@ function withDerived(r){
   const ros_pct      = r.ros_pct      != null ? num(r.ros_pct)      : (rev ? np / rev * 100 : null);
   const ebitda_marg  = r.ebitda_marg  != null ? num(r.ebitda_marg)  : (rev ? ebitda / rev * 100 : null);
   const net_debt_eq  = r.net_debt_eq  != null ? num(r.net_debt_eq)  : (eq ? ((debt || 0) - (cash || 0)) / eq : null);
+  const roe_pct      = r.roe_pct      != null ? num(r.roe_pct)      : (eq && eq > 0 ? np / eq * 100 : null);
   // ROIC = EBIT·(1−эфф.налог) / (капитал+долг−деньги)
   let roic_pct = num(r.roic_pct);
   if(roic_pct == null && ebit != null){
@@ -524,7 +557,7 @@ function withDerived(r){
     ...r,
     rev: bn(rev), ebit: bn(num(r.ebit)), np: bn(np), ebitda: bn(ebitda),
     assets: bn(assets), eq: bn(eq), debt: bn(debt), cash: bn(cash),
-    roa_pct, ros_pct, roic_pct, ebitda_marg, net_debt_eq,
+    roa_pct, ros_pct, roic_pct, roe_pct, ebitda_marg, net_debt_eq,
   };
 }
 

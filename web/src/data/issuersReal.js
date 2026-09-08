@@ -48,6 +48,7 @@ export function reportToMults(r){
     cashR: (cl && cl > 0 && cash != null) ? cash / cl : null,
     equityR: (eq != null && assets && assets > 0) ? eq / assets * 100 : null,
     roic: _roic(ebit, tax, np, eq, debt, cash),
+    roe: (np != null && eq && eq > 0) ? np / eq * 100 : null,
     pe: null, yield: null,
     // сырьё для E/P акций (в тех же единицах, что пришли — обычно млн);
     // приведение к млрд делаем при расчёте E/P
