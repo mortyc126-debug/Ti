@@ -7,15 +7,16 @@ import Surface from '../components/market/Surface.jsx';
 import MarketStatus from '../components/market/MarketStatus.jsx';
 import VintageControl from '../components/industries/VintageControl.jsx';
 
-// Акции/фьючерсы/спред — пока демо-данные (реальных котировок по акциям в
-// снимке нет). Скрыты, чтобы не путать заглушками. Вернём, когда подъедут
-// реальные данные: раскомментировать строки ниже.
+// Облигации — реальные данные (снимок цен + отчётность). Акции/фьючерсы/спред
+// пока на демо-данных (реальных котировок по акциям в снимке нет) — помечены
+// плашкой «демо».
 const TABS = [
   { id: 'bonds',   label: 'Облигации' },
-  // { id: 'stocks',  label: 'Акции' },
-  // { id: 'futures', label: 'Фьючерсы' },
-  // { id: 'spread',  label: 'Спред (акции + фьюч)' },
+  { id: 'stocks',  label: 'Акции' },
+  { id: 'futures', label: 'Фьючерсы' },
+  { id: 'spread',  label: 'Спред (акции + фьюч)' },
 ];
+const DEMO_TABS = new Set(['stocks', 'futures', 'spread']);
 
 function readTab(){
   const m = location.hash.match(/[?&]tab=([a-z]+)/);
@@ -46,6 +47,12 @@ export default function Market(){
         <div className="space-y-2">
           <MarketStatus />
           <VintageControl />
+        </div>
+      )}
+
+      {DEMO_TABS.has(tab) && (
+        <div className="text-xs text-yellow border border-yellow/30 bg-yellow/5 rounded px-3 py-1.5">
+          ⚠ демо-данные: реальных котировок по акциям/фьючерсам в снимке пока нет. Показана мок-выборка для проверки вида.
         </div>
       )}
 
