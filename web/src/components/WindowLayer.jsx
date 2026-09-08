@@ -7,6 +7,8 @@ import { suggestIssuers, aliasGet, aliasSet } from '../lib/issuerMatch.js';
 import { interpretPeriods } from '../lib/finNarrative.js';
 import { useStockUniverse } from '../store/marketData.js';
 import { MULT_META, computeMultiples, valuationUniverse, cheaperThanPct, findStockForIssuer, issuerMults } from '../lib/valuation.js';
+import { computeLinkages } from '../lib/finLinkages.js';
+import { driversFor } from '../lib/industryDrivers.js';
 
 // Слой плавающих окон. Рендерится один раз в App.jsx поверх Outlet.
 // Каркас окна + живой контент в MediumBody (вкладки Финансы/Бумаги/
@@ -384,7 +386,77 @@ function TabFinances({ card, reports, industry, inn, issuerName }){
       </div>
 
       <ValuationPanel inn={inn} issuerName={issuerName} />
+      <MetricLinkages inn={inn} issuerName={issuerName} />
+      <IndustryDrivers industry={industry} />
       <PeriodNarrative reports={reports} industry={industry} />
+    </div>
+  );
+}
+
+// Связки метрик: ROE↔ROIC, DuPont, ROIC↔E/P.
+function MetricLinkages({ inn, issuerName }){
+  const stockUniverse = useStockUniverse();
+  const allIssuers = useIssuers();
+  const links = useMemo(() => {
+    const m = issuerMults(inn);
+    if(!m) return [];
+    const stock = findStockForIssuer(issuerName, inn);
+    const ep = stock ? computeMultiples(stock.price, stock.shares, m, stock.div12m)?.ep : null;
+    return computeLinkages(m, ep);
+  }, [inn, issuerName, stockUniverse, allIssuers]);
+  if(!links.length) return null;
+  const dot = { red: 'bg-danger', yellow: 'bg-warn', green: 'bg-green' };
+  return (
+    <div className="mt-3 border-t border-border/60 pt-3 space-y-2">
+      <div className="text-text3 text-[10px] uppercase tracking-wider">Связки метрик</div>
+      <ul className="space-y-1.5">
+        {links.map((l, i) => (
+          <li key={i} className="flex gap-2">
+            <span className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${dot[l.level] || 'bg-text3'}`} />
+            <div className="min-w-0">
+              <div className="text-text text-xs">{l.title}</div>
+              <div className="text-text3 text-[11px] leading-snug">{l.text}</div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// «Что двигает результат» — драйвер-модель отрасли: цепочки + чек-лист.
+function IndustryDrivers({ industry }){
+  const d = useMemo(() => driversFor(industry), [industry]);
+  if(!d) return null;
+  return (
+    <div className="mt-3 border-t border-border/60 pt-3 space-y-2">
+      <div className="text-text3 text-[10px] uppercase tracking-wider">Что двигает результат (отрасль)</div>
+      <div className="text-text2 text-[11px] leading-snug">{d.summary}</div>
+      <div className="space-y-1">
+        {d.chains.map((chain, i) => (
+          <div key={i} className="flex items-center flex-wrap gap-1 text-[11px]">
+            {chain.map((step, j) => (
+              <span key={j} className="flex items-center gap-1">
+                <span className={j === chain.length - 1 ? 'text-text font-medium' : 'text-text2'}>{step}</span>
+                {j < chain.length - 1 && <span className="text-acc">→</span>}
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
+      <details>
+        <summary className="cursor-pointer text-[11px] text-text2">Чек-лист: что проверить за период</summary>
+        <ul className="mt-1 space-y-0.5">
+          {d.drivers.map((x, i) => (
+            <li key={i} className="text-[11px] text-text3 flex gap-1.5"><span className="text-text3">□</span>{x}</li>
+          ))}
+        </ul>
+      </details>
+      {d.caution && (
+        <div className="text-warn text-[11px] leading-snug bg-warn/5 border border-warn/20 rounded px-2 py-1.5">
+          ⚠ {d.caution}
+        </div>
+      )}
     </div>
   );
 }

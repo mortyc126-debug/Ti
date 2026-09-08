@@ -52,7 +52,7 @@ export function reportToMults(r){
     pe: null, yield: null,
     // сырьё для мультипликаторов оценки акций (в тех же единицах, что пришли —
     // обычно млн); приведение делаем при расчёте
-    npRaw: np, revRaw: rev, eqRaw: eq, debtRaw: debt, cashRaw: cash, ebitdaRaw: ebitda,
+    npRaw: np, revRaw: rev, eqRaw: eq, debtRaw: debt, cashRaw: cash, ebitdaRaw: ebitda, assetsRaw: assets,
   };
   m.bqi = bqiScore({ mults: m });
   m.safety = safetyScore({ mults: m });
