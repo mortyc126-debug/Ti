@@ -43,7 +43,11 @@ function FloatingWindow({ win }){
   const posX = isFull ? 12 : win.x;
   const posY = isFull ? 64 : win.y;
   const nodeEl = () => rndRef.current?.getSelfElement?.() || null;
-  const toTransformMode = () => { const n = nodeEl(); if(n){ n.style.left = '0px'; n.style.top = '0px'; n.style.transform = ''; } };
+  // важно: не двигать элемент визуально — react-rnd в onDragStart читает
+  // selfRect для offsetFromParent ДО начала перетаскивания. Ставим transform
+  // на те же координаты (модель Draggable) и left/top:0, элемент остаётся на
+  // месте → offset считается верно, окно не прыгает.
+  const toTransformMode = () => { const n = nodeEl(); if(n){ n.style.left = '0px'; n.style.top = '0px'; n.style.transform = `translate(${posX}px, ${posY}px)`; } };
   const toCrispMode = () => { const n = nodeEl(); if(n){ n.style.transform = 'none'; n.style.left = posX + 'px'; n.style.top = posY + 'px'; } };
   useLayoutEffect(() => { if(!busyRef.current) toCrispMode(); });
 
