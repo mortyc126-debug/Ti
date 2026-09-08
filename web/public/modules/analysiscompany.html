@@ -29894,6 +29894,14 @@ function _repArchiveModal(){
         })
         .catch(function(){ cb(false); });
     }
+    // Выбор эмитента: repSelectIssuerById ставит value у #rep-issuer-sel, но
+    // это срабатывает только если <option> для id уже есть в селекте. После
+    // подмешивания в reportsDB нужно пересобрать список/селект.
+    function _doSelect(id){
+      try{ if(typeof repRenderIssuerList === 'function') repRenderIssuerList(); }catch(e){}
+      try{ if(typeof repRebuildSelect === 'function') repRebuildSelect(); }catch(e){}
+      try{ repSelectIssuerById(id); }catch(e){}
+    }
     var _pageShown = false;
     var tries = 0;
     var t = setInterval(function(){
@@ -29903,11 +29911,11 @@ function _repArchiveModal(){
         // скрыт и финвид эмитента не виден. Переключаемся на «Отчётность».
         if(!_pageShown && typeof showPage === 'function'){ try{ showPage('reports'); }catch(e){} _pageShown = true; }
         var id = findId();
-        if(id){ clearInterval(t); try{ repSelectIssuerById(id); }catch(e){} return; }
+        if(id){ clearInterval(t); _doSelect(id); return; }
         // нет в reportsDB — один раз пробуем снимок по этому ИНН
         if(!_snapTried){
           _snapLoad(function(newId){
-            if(newId){ clearInterval(t); try{ repSelectIssuerById(newId); }catch(e){} }
+            if(newId){ clearInterval(t); _doSelect(newId); }
           });
         }
         if(tries > 40){   // ~8с ждали, данных по этому ИНН нет

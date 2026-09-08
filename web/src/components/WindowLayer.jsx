@@ -280,7 +280,7 @@ function IssuerMatcher({ name, rawInn, issuers, onPick }){
   );
 
   return (
-    <div className="text-xs space-y-3">
+    <div className="text-xs space-y-3 p-4 overflow-y-auto flex-1 min-h-0">
       <div className="text-text2">
         У «<span className="text-text">{name}</span>» {rawInn ? <>ИНН <span className="font-mono">{rawInn}</span> без отчётности в снимке.</> : 'нет ИНН.'}{' '}
         Часто отчётность лежит под материнской компанией (бумагу выпускает SPV вида «… Финанс»). Выберите её — свяжу и запомню.
