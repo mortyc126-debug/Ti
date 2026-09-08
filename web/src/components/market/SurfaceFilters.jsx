@@ -33,8 +33,8 @@ function xSourcesFor(kind){
   ];
 }
 
-const BOND_MULT_OPTIONS  = ['safety','bqi','icr','nde','de','roa','ebitdaMarg','currentR','equityR','cashR'];
-const STOCK_MULT_OPTIONS = ['safety','bqi','pe','roa','icr','nde','ebitdaMarg','currentR','equityR'];
+const BOND_MULT_OPTIONS  = ['safety','bqi','icr','nde','de','roa','roic','ebitdaMarg','currentR','equityR','cashR'];
+const STOCK_MULT_OPTIONS = ['safety','bqi','pe','roa','roic','icr','nde','ebitdaMarg','currentR','equityR'];
 
 export default function SurfaceFilters({ kind = 'bond' }){
   const useStore = useMarketStore(kind);

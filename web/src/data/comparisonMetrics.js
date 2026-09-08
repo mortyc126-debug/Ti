@@ -39,6 +39,11 @@ export const COMP_METRICS = {
     higher: true,  fmt: '%', radar: true, percentileBased: true,
     tip: 'Net Income / Activitys. Зависит от отрасли — нормы перцентильные.',
   },
+  roic: {
+    id: 'roic', label: 'ROIC', short: 'ROIC',
+    higher: true,  fmt: '%', radar: false, percentileBased: true,
+    tip: 'NOPAT / инвестированный капитал = EBIT·(1−налог) / (капитал + долг − деньги). Отдача на вложенный капитал; сравнивать с стоимостью капитала.',
+  },
   bqi: {
     id: 'bqi', label: 'Качество баланса', short: 'BQI',
     higher: true,  fmt: '', radar: true,

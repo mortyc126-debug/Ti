@@ -12,6 +12,17 @@ import { api } from '../api.js';
 import { bqiScore, safetyScore } from './bondsCatalog.js';
 
 const _n = v => (v == null || v === '' || isNaN(Number(v))) ? null : Number(v);
+
+// ROIC = NOPAT / инвестированный капитал = EBIT·(1−эфф.налог) / (капитал+долг−деньги).
+// Единицы сокращаются (отношение), поэтому млн/млрд не важны.
+function _roic(ebit, tax, np, eq, debt, cash){
+  if(ebit == null) return null;
+  const ic = (eq || 0) + (debt || 0) - (cash || 0);
+  if(!(ic > 0)) return null;
+  let t = 0.2;   // дефолтная ставка, если налог не дан
+  if(tax != null && np != null && (np + tax) > 0) t = Math.min(0.5, Math.max(0, tax / (np + tax)));
+  return ebit * (1 - t) / ic * 100;
+}
 const _ANNUAL = new Set(['FY', 'ГОД', '12М', '12M', 'Y']);
 
 function _timeout(p, ms){
@@ -25,7 +36,7 @@ function _timeout(p, ms){
 export function reportToMults(r){
   const debt = _n(r.debt), eq = _n(r.eq), assets = _n(r.assets), ebitda = _n(r.ebitda),
         cash = _n(r.cash), ca = _n(r.ca), cl = _n(r.cl), intx = _n(r.int_exp),
-        rev = _n(r.rev), np = _n(r.np);
+        rev = _n(r.rev), np = _n(r.np), ebit = _n(r.ebit), tax = _n(r.tax_exp);
   const m = {
     ebitdaMarg: _n(r.ebitda_marg) ?? ((rev && rev > 0 && ebitda != null) ? ebitda / rev * 100 : null),
     roa: _n(r.roa_pct) ?? ((assets && assets > 0 && np != null) ? np / assets * 100 : null),
@@ -36,6 +47,7 @@ export function reportToMults(r){
     currentR: (cl && cl > 0 && ca != null) ? ca / cl : null,
     cashR: (cl && cl > 0 && cash != null) ? cash / cl : null,
     equityR: (eq != null && assets && assets > 0) ? eq / assets * 100 : null,
+    roic: _roic(ebit, tax, np, eq, debt, cash),
     pe: null, yield: null,
     // сырьё для E/P акций (в тех же единицах, что пришли — обычно млн);
     // приведение к млрд делаем при расчёте E/P

@@ -365,6 +365,7 @@ function TabFinances({ card, reports }){
             <MetricRow label="Долг"           series={series} field="debt"     fmt={fmtBn} />
             <MetricRow label="Деньги"         series={series} field="cash"     fmt={fmtBn} />
             <MetricRow label="ROA, %"         series={series} field="roa_pct"  fmt={fmtPct} colorize />
+            <MetricRow label="ROIC, %"        series={series} field="roic_pct" fmt={fmtPct} colorize />
             <MetricRow label="ROS, %"         series={series} field="ros_pct"  fmt={fmtPct} colorize />
             <MetricRow label="EBITDA-марж, %" series={series} field="ebitda_marg" fmt={fmtPct} />
             <MetricRow label="ND/Eq"          series={series} field="net_debt_eq" fmt={fmtX} />
@@ -503,16 +504,27 @@ function withDerived(r){
   const num = v => (v == null || v === '' || isNaN(Number(v))) ? null : Number(v);
   const rev = num(r.rev), np = num(r.np), ebitda = num(r.ebitda), assets = num(r.assets),
         debt = num(r.debt), cash = num(r.cash), eq = num(r.eq);
+  const ebit = num(r.ebit), tax = num(r.tax_exp);
   const roa_pct      = r.roa_pct      != null ? num(r.roa_pct)      : (assets ? np / assets * 100 : null);
   const ros_pct      = r.ros_pct      != null ? num(r.ros_pct)      : (rev ? np / rev * 100 : null);
   const ebitda_marg  = r.ebitda_marg  != null ? num(r.ebitda_marg)  : (rev ? ebitda / rev * 100 : null);
   const net_debt_eq  = r.net_debt_eq  != null ? num(r.net_debt_eq)  : (eq ? ((debt || 0) - (cash || 0)) / eq : null);
+  // ROIC = EBIT·(1−эфф.налог) / (капитал+долг−деньги)
+  let roic_pct = num(r.roic_pct);
+  if(roic_pct == null && ebit != null){
+    const ic = (eq || 0) + (debt || 0) - (cash || 0);
+    if(ic > 0){
+      let t = 0.2;
+      if(tax != null && np != null && (np + tax) > 0) t = Math.min(0.5, Math.max(0, tax / (np + tax)));
+      roic_pct = ebit * (1 - t) / ic * 100;
+    }
+  }
   const bn = v => v == null ? null : v / 1000;   // млн → млрд
   return {
     ...r,
     rev: bn(rev), ebit: bn(num(r.ebit)), np: bn(np), ebitda: bn(ebitda),
     assets: bn(assets), eq: bn(eq), debt: bn(debt), cash: bn(cash),
-    roa_pct, ros_pct, ebitda_marg, net_debt_eq,
+    roa_pct, ros_pct, roic_pct, ebitda_marg, net_debt_eq,
   };
 }
 
