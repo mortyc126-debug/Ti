@@ -10,7 +10,7 @@ import { useMarketStore } from '../../store/marketSurface.js';
 import { loadPointsByKind, loadOverlayPoints } from '../../data/marketSurfaceData.js';
 import { fitSurface } from '../../lib/kernelSurface.js';
 import { ratingOrd } from '../../lib/qualityComposite.js';
-import { useBondUniverse, useStockUniverse } from '../../store/marketData.js';
+import { useBondUniverse, useStockUniverse, useFutureUniverse } from '../../store/marketData.js';
 import { useIssuers, useVintage } from '../../store/issuers.js';
 
 export default function Surface({ kind = 'bond' }){
@@ -19,6 +19,7 @@ export default function Surface({ kind = 'bond' }){
   // возвращает массив и заставляет пересчитать фит, когда данные подъедут.
   const bondUniverse = useBondUniverse();
   const stockUniverse = useStockUniverse();
+  const futureUniverse = useFutureUniverse();
   // ВАЖНО: гарантируем загрузку стора эмитентов (mults пришиваются к точкам
   // на рендере по инн). Если вселенная бондов взята из кеша, marketData.load
   // не дожидается эмитентов — без этого хука join не находит фундамент и
@@ -43,7 +44,7 @@ export default function Surface({ kind = 'bond' }){
       ? new Set(Object.entries(types).filter(([, v]) => v).map(([k]) => k))
       : null;
     const sourceKind = kind === 'overlay' ? 'stock' : kind;
-    const all = loadPointsByKind(sourceKind, { yMode, typeFilter: typeSet, bonds: bondUniverse, stocks: stockUniverse });
+    const all = loadPointsByKind(sourceKind, { yMode, typeFilter: typeSet, bonds: bondUniverse, stocks: stockUniverse, futures: futureUniverse });
     const filtered = all.filter(p => {
       const ord = ratingOrd(p.rating);
       if(ord != null && (ord < ratingMin || ord > ratingMax)) return false;
@@ -55,13 +56,13 @@ export default function Surface({ kind = 'bond' }){
       return true;
     });
     return fitSurface(filtered, { bandwidth: { x: bwX, y: bwY } });
-  }, [kind, yMode, types, ratingMin, ratingMax, matMin, matMax, mktCapMin, mktCapMax, bwX, bwY, bondUniverse, stockUniverse, vYear, vStd, vCount, allIssuers]);
+  }, [kind, yMode, types, ratingMin, ratingMax, matMin, matMax, mktCapMin, mktCapMax, bwX, bwY, bondUniverse, stockUniverse, futureUniverse, vYear, vStd, vCount, allIssuers]);
 
   // Для overlay подсчитываем фьючерсы и пары; residual у фьюча
   // считаем относительно ТОЙ ЖЕ surface'а (фит на акциях).
   const overlay = useMemo(() => {
     if(kind !== 'overlay') return null;
-    const { futures, pairs } = loadOverlayPoints({ yMode });
+    const { futures, pairs } = loadOverlayPoints({ yMode, stocks: stockUniverse, futures: futureUniverse });
     // Прицепляем expected/residual к каждому фьючу, используя
     // соответствующий stock из fitted.points (тот же y).
     const stockBySecid = new Map(fitted.points.map(s => [s.secid, s]));
@@ -73,7 +74,7 @@ export default function Surface({ kind = 'bond' }){
       return { ...f, expected, residual, sparse: stk.sparse };
     }).filter(Boolean);
     return { futures: futWithRes, pairs };
-  }, [kind, yMode, fitted.points]);
+  }, [kind, yMode, fitted.points, stockUniverse, futureUniverse]);
 
   return (
     <div className="space-y-4">

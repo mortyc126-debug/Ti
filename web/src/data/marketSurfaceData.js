@@ -8,7 +8,7 @@
 import { safetyScore, bqiScore } from './bondsCatalog.js';
 import { stocksMock, futuresMock } from './stocksMock.js';
 import { qualityY, maturityYears } from '../lib/qualityComposite.js';
-import { currentBonds, currentStocks } from '../store/marketData.js';
+import { currentBonds, currentStocks, currentFutures } from '../store/marketData.js';
 import { currentIssuers } from '../store/issuers.js';
 import { sectorToIndustry } from './marketReal.js';
 import { bestIssuerMatch } from '../lib/issuerMatch.js';
@@ -84,6 +84,7 @@ export function loadStockPoints({ yMode = 'scoring', stocks = null } = {}){
       ticker: s.ticker, inn: inn || null,
       industry, rating,
       volumeBn: marketCapBn,
+      price: s.price != null ? s.price : null,   // спот — нужен фьючерсам для базиса
       pe, beta: s.beta || null,
       mults: { ...mults, pe, safety: safetyScore(fakeBondForScores), bqi: bqiScore(fakeBondForScores) },
       x: y, y, z: ep,
@@ -114,29 +115,69 @@ export function diagnoseStocks(){
   return { loaded, real, matched, withShares, withEp, issuers: issuersList.length };
 }
 
+// Диагностика фьючерсов для плашки.
+export function diagnoseFutures(){
+  const futSrc = currentFutures();
+  const stockPts = loadStockPoints({});
+  const stockMap = new Map(stockPts.map(s => [String(s.ticker || '').toUpperCase(), s]));
+  let loaded = 0, matched = 0, withBasis = 0;
+  for(const f of futSrc){
+    loaded++;
+    const base = stockMap.get(String(f.baseTicker || f.basicAsset || '').toUpperCase());
+    if(!base || base.z == null) continue;
+    matched++;
+    let basis = f.basisPp;
+    if(basis == null && f.price != null && base.price){
+      const perShare = f.price / (f.basicAssetSize || 1);
+      basis = (perShare / base.price - 1) * 100;
+      if(f.expiration){
+        const days = (new Date(f.expiration).getTime() - Date.now()) / 86400000;
+        if(days > 3) basis = basis * (365 / days);
+      }
+    }
+    if(basis != null && isFinite(basis) && Math.abs(basis) <= 60) withBasis++;
+  }
+  return { loaded, matched, withBasis };
+}
+
 // ─── ФЬЮЧЕРСЫ ─────────────────────────────────────────────────────
 // Фьюч на акцию наследует мультипликаторы базовой бумаги. Для фьюча
 // «доходность» = E/P базовой акции − basisPp (контанго → ниже E/P,
 // бэквардация → выше E/P). basisPp задан в futuresMock.
-export function loadFuturePoints({ yMode = 'scoring' } = {}){
-  const stockMap = new Map(stocksMock.map(s => [s.ticker, s]));
+export function loadFuturePoints({ yMode = 'scoring', stocks = null, futures = null } = {}){
+  const futSrc = futures || currentFutures();
+  // базовые акции как точки (реальные либо мок) — по тикеру
+  const stockPts = loadStockPoints({ yMode, stocks });
+  const stockMap = new Map(stockPts.map(s => [String(s.ticker || '').toUpperCase(), s]));
   const out = [];
-  for(const f of futuresMock){
-    const base = stockMap.get(f.baseTicker);
-    if(!base || base.ep == null) continue;
-    const y = qualityY(base, yMode);
+  for(const f of futSrc){
+    const baseTicker = String(f.baseTicker || f.basicAsset || '').toUpperCase();
+    const base = stockMap.get(baseTicker);
+    if(!base || base.z == null) continue;      // base.z = E/P базовой акции
+    const y = qualityY({ mults: base.mults, rating: base.rating }, yMode);
     if(y == null) continue;
+
+    // базис: мок задаёт basisPp напрямую; для реального фьюча считаем из цены
+    let basis = f.basisPp;
+    if(basis == null && f.price != null && base.price){
+      const perShare = f.price / (f.basicAssetSize || 1);   // фьюч на 1 акцию
+      basis = (perShare / base.price - 1) * 100;
+      // годовой базис (для сопоставимости разных экспираций)
+      if(f.expiration){
+        const days = (new Date(f.expiration).getTime() - Date.now()) / 86400000;
+        if(days > 3) basis = basis * (365 / days);
+      }
+    }
+    if(basis == null || !isFinite(basis) || Math.abs(basis) > 60) continue; // масштаб/мусор
+
+    const epF = base.z - basis;
     const fakeBondForScores = { mults: base.mults };
-    // Базис: контанго (фьюч дороже спота) → доходность фьюча ниже,
-    // т.е. ep_future = ep_stock − basisPp.
-    const basis = f.basisPp || 0;
-    const epF = base.ep - basis;
     out.push({
-      secid: f.secid, name: f.name, issuer: f.issuer, ticker: f.ticker,
-      industry: f.industry, rating: base.rating,
-      baseTicker: f.baseTicker,
+      secid: f.secid || f.ticker, name: f.name, issuer: base.issuer || f.issuer, ticker: f.ticker,
+      industry: base.industry || f.industry, rating: base.rating,
+      baseTicker,
       basisPp: basis,
-      volumeBn: base.marketCapBn,
+      volumeBn: base.volumeBn,
       pe: epF > 0 ? 100 / epF : null, beta: base.beta,
       mults: {
         ...base.mults, pe: epF > 0 ? 100 / epF : null,

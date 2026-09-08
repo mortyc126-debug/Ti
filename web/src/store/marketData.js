@@ -5,9 +5,9 @@
 
 import { useEffect } from 'react';
 import { create } from 'zustand';
-import { loadRealBonds, loadRealStocks } from '../data/marketReal.js';
+import { loadRealBonds, loadRealStocks, loadRealFutures } from '../data/marketReal.js';
 import { bondsMock } from '../data/bondsCatalog.js';
-import { stocksMock } from '../data/stocksMock.js';
+import { stocksMock, futuresMock } from '../data/stocksMock.js';
 import { useIssuersStore } from './issuers.js';
 
 const CACHE_KEY = 'ba_bonds_universe_v3';   // v3: mults не бейкаем (винтаж на рендере)
@@ -123,4 +123,51 @@ export function reloadStocks(){
   try { localStorage.removeItem(STOCK_CACHE_KEY); } catch(_){}
   useStockStore.setState({ stocks: null, loading: false, error: null, source: 'mock' });
   useStockStore.getState().load();
+}
+
+// ── ФЬЮЧЕРСЫ ───────────────────────────────────────────────────────────
+const FUT_CACHE_KEY = 'ba_futures_universe_v1';
+
+export const useFutureStore = create((set, get) => ({
+  futures: null, loading: false, error: null, source: 'mock',
+  load: async () => {
+    if(get().loading || get().futures) return;
+    try { useStockStore.getState().load(); } catch(_){}   // фьючу нужен спот акции
+    try {
+      const cached = localStorage.getItem(FUT_CACHE_KEY);
+      if(cached){
+        const c = JSON.parse(cached);
+        if(c && Date.now() - c.ts < TTL && Array.isArray(c.data) && c.data.length){
+          set({ futures: c.data, source: 'cache' }); return;
+        }
+      }
+    } catch(_){}
+    set({ loading: true });
+    try {
+      const futures = await loadRealFutures();
+      if(futures && futures.length){
+        set({ futures, loading: false, source: 'live', error: null });
+        try { localStorage.setItem(FUT_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: futures })); } catch(_){}
+      } else { set({ loading: false, source: 'mock' }); }
+    } catch(e){ set({ loading: false, error: String(e), source: 'mock' }); }
+  },
+}));
+
+export function currentFutures(){ return useFutureStore.getState().futures ?? futuresMock; }
+export function useFutureUniverse(){
+  const futures = useFutureStore(s => s.futures);
+  const load = useFutureStore(s => s.load);
+  useEffect(() => { load(); }, [load]);
+  return futures ?? futuresMock;
+}
+export function useFutureSource(){
+  const source = useFutureStore(s => s.source);
+  const loading = useFutureStore(s => s.loading);
+  const count = useFutureStore(s => s.futures?.length ?? 0);
+  return { source, loading, count };
+}
+export function reloadFutures(){
+  try { localStorage.removeItem(FUT_CACHE_KEY); } catch(_){}
+  useFutureStore.setState({ futures: null, loading: false, error: null, source: 'mock' });
+  useFutureStore.getState().load();
 }

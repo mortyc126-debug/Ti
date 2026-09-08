@@ -6,9 +6,9 @@ import Tabs from '../components/industries/Tabs.jsx';
 import Surface from '../components/market/Surface.jsx';
 import MarketStatus from '../components/market/MarketStatus.jsx';
 import VintageControl from '../components/industries/VintageControl.jsx';
-import { useStockSource, reloadStocks } from '../store/marketData.js';
+import { useStockSource, reloadStocks, useFutureSource, reloadFutures } from '../store/marketData.js';
 import { useIssuers } from '../store/issuers.js';
-import { diagnoseStocks } from '../data/marketSurfaceData.js';
+import { diagnoseStocks, diagnoseFutures } from '../data/marketSurfaceData.js';
 
 // Облигации — реальные данные (снимок цен + отчётность). Акции/фьючерсы/спред
 // пока на демо-данных (реальных котировок по акциям в снимке нет) — помечены
@@ -19,8 +19,6 @@ const TABS = [
   { id: 'futures', label: 'Фьючерсы' },
   { id: 'spread',  label: 'Спред (акции + фьюч)' },
 ];
-// Фьючерсы/спред пока на демо (нужна логика базиса против спота).
-const DEMO_TABS = new Set(['futures', 'spread']);
 
 function readTab(){
   const m = location.hash.match(/[?&]tab=([a-z]+)/);
@@ -56,6 +54,28 @@ function StockStatus(){
   );
 }
 
+function FutureStatus(){
+  const { source, loading, count } = useFutureSource();
+  const allIssuers = useIssuers();
+  const real = source === 'live' || source === 'cache';
+  const d = useMemo(() => diagnoseFutures(), [source, count, allIssuers]);
+  const cls = 'bg-bg2 border border-border rounded-md px-2 py-1 text-xs text-text';
+  return (
+    <div className="flex items-center gap-2 flex-wrap text-xs" data-no-drag>
+      <button type="button" onClick={reloadFutures} className={cls + ' hover:text-acc'}
+        title="Сбросить кэш и перезагрузить фьючерсы">⟳ перезагрузить</button>
+      <span className={real ? 'text-green/80' : 'text-yellow'}>
+        {loading ? 'загрузка фьючерсов…'
+          : real ? `${count} фьючерсов T-Invest`
+          : 'ДЕМО: запусти invest-bot/make_equities_cache.py и обнови'}
+      </span>
+      {real && (
+        <span className="text-text3 font-mono">на карте {d.withBasis} · привязано к акции {d.matched}/{d.loaded}</span>
+      )}
+    </div>
+  );
+}
+
 export default function Market(){
   const [tab, setTab] = useState(readTab);
   useEffect(() => { writeTab(tab); }, [tab]);
@@ -79,14 +99,7 @@ export default function Market(){
       )}
 
       {tab === 'stocks' && <StockStatus />}
-
-      {DEMO_TABS.has(tab) && (
-        <div className="text-xs text-yellow border border-yellow/30 bg-yellow/5 rounded px-3 py-1.5">
-          ⚠ демо-данные: {tab === 'futures'
-            ? 'реальные котировки фьючерсов есть в снимке, но карта фьючерсов ещё требует расчёта базиса против спота.'
-            : 'спред акция↔фьюч требует расчёта базиса — пока мок.'}
-        </div>
-      )}
+      {(tab === 'futures' || tab === 'spread') && <FutureStatus />}
 
       <div className="pt-2">
         {tab === 'bonds'   && <Surface kind="bond" />}

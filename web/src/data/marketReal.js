@@ -141,6 +141,33 @@ export async function loadRealStocks(){
   return out;
 }
 
+// ── ФЬЮЧЕРСЫ ──────────────────────────────────────────────────────────
+// Снимок web/public/futures-cache.json: [{ticker,name,basicAsset,basicAssetSize,lot,price,expiration}].
+// Базис (фьюч−спот) считается на рендере в loadFuturePoints по базовой акции.
+export async function loadRealFutures(){
+  let rows;
+  try {
+    const r = await fetch('/futures-cache.json');
+    rows = r.ok ? await r.json() : null;
+  } catch(_){ return []; }
+  if(!Array.isArray(rows) || !rows.length) return [];
+  const out = [];
+  const seen = new Set();
+  for(const f of rows){
+    const tk = f.ticker;
+    if(!tk || seen.has(tk) || !(f.price > 0)) continue;
+    seen.add(tk);
+    out.push({
+      ticker: tk, secid: tk, name: f.name || tk,
+      basicAsset: (f.basicAsset || '').toUpperCase() || null,
+      basicAssetSize: _num(f.basicAssetSize),
+      lot: _num(f.lot), price: _num(f.price),
+      expiration: f.expiration || null,
+    });
+  }
+  return out;
+}
+
 // сектор T-Invest → наш industry-ключ
 const _SECTOR_IND = {
   financial: 'holdings', banks: 'banks', materials: 'metals', energy: 'oil-gas',
