@@ -28172,6 +28172,11 @@ function risksClearDrill(){
 var _d1Base = null;
 function _getD1Base(){
   if(_d1Base) return _d1Base;
+  // Под локальным web-приложением (Vite, localhost) ходим через прокси /api:
+  // прямые массовые запросы к workers.dev режет локальный антивирус-прокси
+  // (одиночный /catalog проходит, а 324 запроса — нет).
+  var h = location.hostname;
+  if(h === 'localhost' || h === '127.0.0.1'){ _d1Base = '/api'; return _d1Base; }
   var v = localStorage.getItem('bondan_girbo_proxy') || localStorage.getItem('shell_api_url') || '';
   _d1Base = v.replace(/\/$/, '') || 'https://bondan-backend.marginacall.workers.dev';
   return _d1Base;
@@ -28314,7 +28319,7 @@ async function _repD1Load(){
       for(var att = 0; att < 4; att++){
         try{
           var ctrl = new AbortController();
-          var to = setTimeout(function(){ ctrl.abort(); }, 20000);
+          var to = setTimeout(function(){ ctrl.abort(); }, 12000);
           var r2 = await fetch(base + '/issuer/' + entry.inn + '/reports', { signal: ctrl.signal });
           clearTimeout(to);
           if(r2.ok){
