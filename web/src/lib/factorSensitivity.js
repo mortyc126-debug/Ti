@@ -107,6 +107,14 @@ export function effectsFor(factorId){
   }));
 }
 
+// Все факторы, влияющие на одну группу отраслей (транспонированный вид).
+export function factorsForGroup(groupId){
+  return FACTORS.map(f => ({
+    factorId: f.id, factorLabel: f.label,
+    ...((M[f.id] && M[f.id][groupId]) || { e: '~', metric: '—', note: '' }),
+  }));
+}
+
 export const EFFECT_META = {
   '+': { label: 'помогает', tone: 'green', order: 0 },
   '±': { label: 'неоднозначно', tone: 'warn', order: 1 },
