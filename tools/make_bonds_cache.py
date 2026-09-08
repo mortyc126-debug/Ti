@@ -76,7 +76,7 @@ def main():
             mat = b.get("mat_date")
             if not secid or not mat or secid in seen:
                 continue
-            ytm = _last_yield(secid)
+            ytm = _robust_yield(secid)
             if ytm is None:
                 continue
             seen.add(secid)
