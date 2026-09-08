@@ -398,7 +398,7 @@ function ValuationPanel({ inn, issuerName }){
     if(!stock) return null;
     const m = issuerMults(inn);
     if(!m) return null;
-    const mm = computeMultiples(stock.price, stock.shares, m);
+    const mm = computeMultiples(stock.price, stock.shares, m, stock.div12m);
     if(!mm) return null;
     const uni = valuationUniverse();
     return { stock, mm, uni };
@@ -415,7 +415,7 @@ function ValuationPanel({ inn, issuerName }){
       <div className="space-y-1.5">
         {MULT_META.map(meta => {
           const v = mm[meta.id];
-          const isEp = meta.id === 'ep';
+          const isEp = meta.id === 'ep' || meta.id === 'divYield';
           const pct = cheaperThanPct(v, uni.arrays[meta.id], meta.lowerCheaper);
           return (
             <details key={meta.id} className="group">
@@ -427,7 +427,7 @@ function ValuationPanel({ inn, issuerName }){
                     <span className="flex-1 h-1.5 rounded bg-s2 overflow-hidden">
                       <span className="block h-full bg-acc" style={{ width: pct + '%' }} />
                     </span>
-                    <span className="text-text3 text-[10px] shrink-0">дешевле {pct}%</span>
+                    <span className="text-text3 text-[10px] shrink-0">{meta.lowerCheaper ? 'дешевле' : 'доходнее'} {pct}%</span>
                   </span>
                 )}
               </summary>
@@ -436,7 +436,20 @@ function ValuationPanel({ inn, issuerName }){
           );
         })}
       </div>
-      <div className="text-text3 text-[10px] italic">«дешевле X%» — доля торгуемых акций с отчётностью, которые оценены дороже по этому мультипликатору.</div>
+      {mm.payout != null && (
+        <div className="text-[11px] flex items-start gap-2 pt-1">
+          <span className="text-text2 w-24 shrink-0">Payout</span>
+          <span className="text-text font-mono w-16 shrink-0">{Math.round(mm.payout)}%</span>
+          <span className="text-text3 leading-snug">
+            доля прибыли на дивиденды.{' '}
+            {mm.payout > 100 ? 'Платят больше, чем зарабатывают — из долга/резервов, неустойчиво.'
+              : mm.payout >= 50 ? 'Щедро распределяют прибыль — меньше остаётся на рост.'
+              : mm.payout > 0 ? 'Умеренная выплата, есть запас на реинвест.'
+              : 'Дивиденды не платят — вся прибыль в бизнес.'}
+          </span>
+        </div>
+      )}
+      <div className="text-text3 text-[10px] italic">«дешевле X%» — доля торгуемых акций с отчётностью, которые оценены дороже (для див. доходности — доходнее) по этому показателю.</div>
     </div>
   );
 }

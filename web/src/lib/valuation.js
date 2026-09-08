@@ -20,10 +20,12 @@ export const MULT_META = [
     pitfall: 'Не смотрит на прибыльность вообще: дешёвый P/S при убытке или тонкой марже — классическая ловушка. Полезен для сравнения внутри одной отрасли с похожей маржой.' },
   { id: 'ep', label: 'E/P (дох-ть)', lowerCheaper: false,
     pitfall: 'Обратная к P/E доходность прибыли. Сравнивай с доходностью ОФЗ: если E/P ниже безрисковой ставки — рынок закладывает сильный рост (или переоценён).' },
+  { id: 'divYield', label: 'Див. доходность', lowerCheaper: false,
+    pitfall: 'За 12 мес по факту выплат. Подвохи: разовые/спецдивиденды завышают картину; будущие выплаты не гарантированы; высокая доходность часто = упавшая цена (рынок ждёт проблем).' },
 ];
 
-// price, shares + сырьё m → мультипликаторы (числа либо null)
-export function computeMultiples(price, shares, m){
+// price, shares, сырьё m, дивиденд на акцию за 12 мес → мультипликаторы
+export function computeMultiples(price, shares, m, div12m){
   if(!(price > 0) || !(shares > 0) || !m) return null;
   const mktCap = price * shares;                 // ₽
   const np = m.npRaw != null ? m.npRaw * MLN : null;
@@ -33,6 +35,7 @@ export function computeMultiples(price, shares, m){
   const debt = m.debtRaw != null ? m.debtRaw * MLN : 0;
   const cash = m.cashRaw != null ? m.cashRaw * MLN : 0;
   const ev = mktCap + debt - cash;
+  const divTotal = (div12m != null && div12m > 0) ? div12m * shares : null;   // ₽ всего
   return {
     mktCapBn: mktCap / 1e9,
     pe: (np && np > 0) ? mktCap / np : null,
@@ -40,6 +43,8 @@ export function computeMultiples(price, shares, m){
     ps: (rev && rev > 0) ? mktCap / rev : null,
     evEbitda: (ebitda && ebitda > 0) ? ev / ebitda : null,
     ep: (np && np > 0) ? np / mktCap * 100 : null,
+    divYield: (div12m != null && div12m > 0) ? div12m / price * 100 : null,
+    payout: (divTotal != null && np && np > 0) ? divTotal / np * 100 : null,
   };
 }
 
@@ -50,13 +55,13 @@ export function valuationUniverse(){
   const issuers = currentIssuers();
   const innMap = new Map();
   for(const it of issuers){ if(it.inn) innMap.set(String(it.inn), it); }
-  const arrays = { pe: [], evEbitda: [], pb: [], ps: [], ep: [] };
+  const arrays = { pe: [], evEbitda: [], pb: [], ps: [], ep: [], divYield: [] };
   const byName = new Map();
   for(const s of stocks){
     if(s.price == null) continue;   // только реальные записи с ценой
     const iss = (s.inn && innMap.get(String(s.inn))) || bestIssuerMatch(s.name, issuers);
     if(!iss?.mults) continue;
-    const mm = computeMultiples(s.price, s.shares, iss.mults);
+    const mm = computeMultiples(s.price, s.shares, iss.mults, s.div12m);
     if(!mm) continue;
     byName.set(String(s.name).toLowerCase(), mm);
     for(const k of Object.keys(arrays)) if(mm[k] != null && isFinite(mm[k]) && mm[k] > 0) arrays[k].push(mm[k]);

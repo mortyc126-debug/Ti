@@ -16,6 +16,7 @@ import json
 import os
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 
 from tinkoff.invest import Client, InstrumentStatus
 from invest_api.invest_target import INVEST_TARGET
@@ -46,11 +47,32 @@ def _last_prices(client, figis):
     return out
 
 
+# сумма дивидендов (нетто, на акцию) за последние 12 месяцев
+def _div12m(client, figi, now):
+    try:
+        resp = client.instruments.get_dividends(
+            figi=figi, from_=now - timedelta(days=365), to=now + timedelta(days=1))
+    except Exception:
+        return None
+    total = 0.0
+    got = False
+    for d in resp.dividends:
+        dt = getattr(d, "payment_date", None) or getattr(d, "record_date", None)
+        if dt is not None and dt.replace(tzinfo=timezone.utc) < now - timedelta(days=365):
+            continue
+        amt = getattr(d, "dividend_net", None)
+        if amt is not None:
+            total += _q(amt)
+            got = True
+    return round(total, 4) if got else None
+
+
 def dump_shares(client):
     shares = client.instruments.shares(
         instrument_status=InstrumentStatus.INSTRUMENT_STATUS_BASE).instruments
     figis = [s.figi for s in shares if (s.currency or "").lower() == "rub"]
     prices = _last_prices(client, figis)
+    now = datetime.now(timezone.utc)
     out = []
     for s in shares:
         if (s.currency or "").lower() != "rub":
@@ -58,6 +80,8 @@ def dump_shares(client):
         price = prices.get(s.figi)
         if not price:
             continue
+        div12m = _div12m(client, s.figi, now)
+        time.sleep(0.05)
         out.append({
             "ticker": s.ticker,
             "name": s.name,
@@ -66,6 +90,7 @@ def dump_shares(client):
             "currency": s.currency,
             "shares": int(getattr(s, "issue_size", 0) or 0) or None,
             "price": round(price, 4),
+            "div12m": div12m,
         })
     path = os.path.join(PUB, "stocks-cache.json")
     json.dump(out, open(path, "w", encoding="utf-8"), ensure_ascii=False)
