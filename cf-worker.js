@@ -43,6 +43,8 @@ export default {
       // Прямые ссылки на XLSX/PDF документы ЦБ (статистика инфляции,
       // KeyRate и т.д.) — статические файлы под /Content/Document/File/<id>/
       /^https:\/\/(www\.)?cbr\.ru\/Content\/Document\/File\//,
+      // SOAP/HTTP-сервис ЦБ: KeyRate (история ключевой ставки) и др. методы
+      /^https:\/\/(www\.)?cbr\.ru\/DailyInfoWebServ\//,
       // Мировые источники (для страницы «🔗 Связи»):
       /^https:\/\/api\.stlouisfed\.org\/fred\//,    // FRED REST API (US Fed, world macro, требует API-key)
       /^https:\/\/query[12]\.finance\.yahoo\.com\//, // Yahoo Finance — котировки, курсы, Brent, индексы
@@ -58,7 +60,7 @@ export default {
         target = 'https://bo.nalog.gov.ru' + url.pathname + url.search;
       } else if (url.pathname.startsWith('/buh_otchet') || url.pathname.startsWith('/search') || url.pathname.startsWith('/contragent')) {
         target = 'https://www.audit-it.ru' + url.pathname + url.search;
-      } else if (url.pathname.startsWith('/dataservice') || url.pathname.startsWith('/Content/Document/File/')) {
+      } else if (url.pathname.startsWith('/dataservice') || url.pathname.startsWith('/Content/Document/File/') || url.pathname.startsWith('/DailyInfoWebServ/')) {
         target = 'https://www.cbr.ru' + url.pathname + url.search;
       } else if (url.pathname.startsWith('/fred/')) {
         target = 'https://api.stlouisfed.org' + url.pathname + url.search;

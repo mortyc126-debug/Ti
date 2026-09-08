@@ -515,7 +515,8 @@ tr.row-redeemed td{opacity:.5;}
       <div><label class="il">Дата изменения</label><input type="date" id="cbr-add-date" style="max-width:150px"/></div>
       <div><label class="il">Ставка %</label><input type="number" id="cbr-add-rate" step="0.25" placeholder="21.0" style="max-width:110px"/></div>
       <button type="button" class="btn" id="cbr-add-btn" style="padding:7px 14px">+ добавить</button>
-      <button type="button" class="btn" id="cbr-seed-btn" title="Заполнить официальным рядом ключевой ставки ЦБ" style="padding:7px 14px;background:rgba(170,90,255,.12);border:1px solid rgba(170,90,255,.3);color:var(--pur)">↓ загрузить историю ЦБ</button>
+      <button type="button" class="btn" id="cbr-seed-btn" title="Заполнить встроенным официальным рядом (оффлайн)" style="padding:7px 14px;background:rgba(170,90,255,.12);border:1px solid rgba(170,90,255,.3);color:var(--pur)">↓ загрузить историю ЦБ</button>
+      <button type="button" class="btn" id="cbr-pull-btn" title="Подтянуть свежий ряд напрямую с cbr.ru через прокси" style="padding:7px 14px;background:rgba(82,242,201,.10);border:1px solid rgba(82,242,201,.3);color:var(--pos)">⟳ тянуть с ЦБ</button>
       <span style="font-size:10px;color:var(--t3);align-self:center">Заводи дату каждого решения ЦБ — доходности флоатеров и контекст периодов считаются по ставке на нужную дату.</span>
     </div>
     <div id="cbr-hist-list" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto"></div>
@@ -2768,9 +2769,63 @@ function cbrSeed(){
   cbrHistSave(cur);renderCbrHist();applyCbrToKeyrate(false);
   const btn=$('cbr-seed-btn');if(btn){const o=btn.textContent;btn.textContent=added?('добавлено '+added):'уже загружено';setTimeout(()=>{btn.textContent=o;},1800);}
 }
+// Живой ряд ключевой ставки прямо с cbr.ru. Браузеру напрямую нельзя (CORS),
+// поэтому идём через тот же прокси-воркер, что и ГИР БО/ЦБ в основном
+// приложении (localStorage['bondan_girbo_proxy'], соглашение ?u=<url>).
+// KeyRate возвращает XML по дням — схлопываем в точки изменения ставки.
+function _cbrProxy(){try{return localStorage.getItem('bondan_girbo_proxy')||'';}catch(e){return '';}}
+function _cbrProxyWrap(src){
+  const p=_cbrProxy();if(!p)return null;
+  return /[?&]u=$/.test(p) ? p+encodeURIComponent(src)
+       : p.includes('?u=') ? p+encodeURIComponent(src)
+       : p.replace(/\/$/,'')+'/?u='+encodeURIComponent(src);
+}
+async function cbrPullLive(){
+  const btn=$('cbr-pull-btn');const say=t=>{if(btn){btn.textContent=t;}};
+  const orig=btn?btn.textContent:'';
+  const today=new Date().toISOString().slice(0,10);
+  const src='https://www.cbr.ru/DailyInfoWebServ/DailyInfo.asmx/KeyRate?fromDate=2013-09-01&ToDate='+today;
+  const url=_cbrProxyWrap(src);
+  if(!url){
+    say('нужен прокси');
+    alert('Чтобы тянуть напрямую с ЦБ, в основном приложении настрой прокси ГИР БО/ЦБ (Cloudflare Worker) — он сохраняется в bondan_girbo_proxy. После этого воркер (cf-worker.js) должен разрешать /DailyInfoWebServ/. Пока прокси нет — жми «загрузить историю ЦБ» (встроенный ряд).');
+    setTimeout(()=>say(orig),2200);return;
+  }
+  say('…запрос');
+  try{
+    const res=await fetch(url,{signal:AbortSignal.timeout(20000)});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const txt=await res.text();
+    const doc=new DOMParser().parseFromString(txt,'text/xml');
+    let krs=[...doc.getElementsByTagName('KR')];
+    if(!krs.length)krs=[...doc.getElementsByTagNameNS('*','KR')];
+    const pts=[];
+    for(const kr of krs){
+      const dtEl=kr.getElementsByTagName('DT')[0]||kr.getElementsByTagNameNS('*','DT')[0];
+      const rEl =kr.getElementsByTagName('Rate')[0]||kr.getElementsByTagNameNS('*','Rate')[0];
+      if(!dtEl||!rEl)continue;
+      const d=String(dtEl.textContent).slice(0,10);
+      const r=parseFloat(String(rEl.textContent).replace(',','.'));
+      if(d&&isFinite(r))pts.push({d,r});
+    }
+    if(!pts.length)throw new Error('пустой ответ (проверь, что воркер разрешает /DailyInfoWebServ/)');
+    pts.sort((a,b)=>a.d<b.d?-1:1);
+    // схлопываем подряд идущие одинаковые ставки в точки изменения
+    const out=[];let last=null;for(const p of pts){if(last==null||p.r!==last){out.push(p);last=p.r;}}
+    const cur=cbrHistLoad();const have=new Set(cur.map(x=>x.d));
+    let added=0;for(const p of out){if(!have.has(p.d)){cur.push(p);added++;}}
+    cur.sort((p,q)=>p.d<q.d?-1:1);cbrHistSave(cur);renderCbrHist();applyCbrToKeyrate(true);
+    say(added?('+'+added+' с ЦБ'):'уже актуально');
+  }catch(e){
+    say('ошибка');
+    alert('Не вышло подтянуть с ЦБ: '+e.message+'\nПрокси: '+(_cbrProxy()||'не задан')+'\nМожно нажать «загрузить историю ЦБ» (встроенный ряд).');
+  }
+  setTimeout(()=>say(orig),2600);
+}
 (function initCbrHist(){
   const t=$('cbr-hist-toggle');
   const sb=$('cbr-seed-btn');if(sb)sb.addEventListener('click',cbrSeed);
+  const pb=$('cbr-pull-btn');if(pb)pb.addEventListener('click',cbrPullLive);
   if(t)t.addEventListener('click',()=>{const p=$('cbr-hist');if(p){const open=p.style.display!=='none';p.style.display=open?'none':'block';if(!open)renderCbrHist();}});
   const ab=$('cbr-add-btn');if(ab)ab.addEventListener('click',cbrAdd);
   const ad=$('cbr-add-date');if(ad&&!ad.value){try{ad.value=new Date().toISOString().slice(0,10);}catch(e){}}
