@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react';
 import SourceBar from './SourceBar.jsx';
 import CompFilters from './CompFilters.jsx';
 import ComparisonRadar from './ComparisonRadar.jsx';
+import ComparisonHeatmap from './ComparisonHeatmap.jsx';
+import ComparisonBar from './ComparisonBar.jsx';
 import CompaniesPanel from './CompaniesPanel.jsx';
 import CandidatePicker from './CandidatePicker.jsx';
 import { useComparison } from '../../store/comparison.js';
@@ -35,6 +37,7 @@ export default function Comparison(){
   const overrides = useIndustryNorms(s => s.overrides);
 
   const [showPicker, setShowPicker] = useState(false);
+  const [view, setView] = useState('radar');   // 'radar' | 'heatmap' | 'bar'
   // Транзиентное hover-состояние: какой полигон/строку сейчас выделить.
   // Локально (не в persistent store) — эфемерное.
   const [hoveredKey, setHoveredKey] = useState(null);
@@ -102,13 +105,26 @@ export default function Comparison(){
         </span>
       </div>
 
+      {/* переключатель вида: радар / тепловая карта / бары */}
+      <div className="flex gap-0.5 rounded overflow-hidden border border-border w-fit">
+        {[['radar', 'Радар'], ['heatmap', 'Тепловая'], ['bar', 'Бары']].map(([id, lbl]) => (
+          <button key={id} type="button" onClick={() => setView(id)}
+            className={['px-3 py-1 text-xs transition-colors',
+              view === id ? 'bg-acc-dim text-acc' : 'bg-bg2 text-text3 hover:text-text'].join(' ')}>{lbl}</button>
+        ))}
+      </div>
+
       <div className="grid lg:grid-cols-[1fr_360px] gap-4">
         <div className="bg-bg2 border border-border rounded-lg p-3">
-          <ComparisonRadar
-            selectedView={selectedView}
-            hoveredKey={hoveredKey}
-            onHover={setHoveredKey}
-          />
+          {view === 'radar' && (
+            <ComparisonRadar selectedView={selectedView} hoveredKey={hoveredKey} onHover={setHoveredKey} />
+          )}
+          {view === 'heatmap' && (
+            <ComparisonHeatmap selectedView={selectedView} hoveredKey={hoveredKey} onHover={setHoveredKey} />
+          )}
+          {view === 'bar' && (
+            <ComparisonBar selectedView={selectedView} hoveredKey={hoveredKey} onHover={setHoveredKey} />
+          )}
         </div>
         <CompaniesPanel
           selectedView={selectedView}
