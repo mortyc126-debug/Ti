@@ -755,7 +755,31 @@ function IndustryDrivers({ industry, year, prevYear }){
             <li key={i} className="text-[11px] text-text3 flex gap-1.5"><span className="text-text3">□</span>{x}</li>
           ))}
         </ul>
+        {d.marketWatch && (
+          <div className="mt-2">
+            <div className="text-[10px] uppercase tracking-wider text-text3">Для маркетплейса/экосистемы</div>
+            <ul className="mt-1 space-y-0.5">
+              {d.marketWatch.map((x, i) => (
+                <li key={i} className="text-[11px] text-text3 flex gap-1.5"><span className="text-text3">□</span>{x}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </details>
+      {d.hypotheses && (
+        <details>
+          <summary className="cursor-pointer text-[11px] text-text2">Гипотезы: если верна → что увидим</summary>
+          <div className="mt-1 space-y-1">
+            {d.hypotheses.map(([h, p], i) => (
+              <div key={i} className="flex items-start gap-1.5 text-[11px] leading-snug">
+                <span className="text-text2 flex-1">{h}</span>
+                <span className="text-acc shrink-0">→</span>
+                <span className="text-text3 flex-1">{p}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
       {d.caution && (
         <div className="text-warn text-[11px] leading-snug bg-warn/5 border border-warn/20 rounded px-2 py-1.5">
           ⚠ {d.caution}
