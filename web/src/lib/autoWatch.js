@@ -87,6 +87,19 @@ export function buildWatch({ industry, mults, payout, opexScaleTrap, dyn } = {})
     out.push({ level: 'warn', text: 'Ритейл: спрос по ставкам/доходам сильнее бьёт по премиальному сегменту. Смотри LFL-продажи, а не только общую выручку (рост за счёт новых магазинов маскирует падение LFL).' });
   }
 
+  // — денежный поток (если есть ОДДС): прибыль ≠ деньги на реальных числах —
+  if(mults?.cfoConv != null && mults.cfoConv < 60 && g !== 'finance'){
+    out.push({ level: 'warn', text: `Слабая конверсия EBITDA в кэш (CFO/EBITDA ${Math.round(mults.cfoConv)}%): прибыль есть, а денег мало — оседают в оборотке/дебиторке или прибыль «бумажная». Смотри Δоборотный капитал.` });
+  }
+  if(mults?.cfoNp != null && mults.cfoNp < 0.6){
+    out.push({ level: 'warn', text: `Прибыль слабо подтверждается деньгами (CFO/Прибыль ${mults.cfoNp.toFixed(2)}×): большая часть прибыли неденежная. Ориентируйся на CFO/FCF, а не Net income.` });
+  }
+  if(mults?.divFcf != null && mults.divFcf >= 100){
+    out.push({ level: 'warn', text: `Дивиденды не покрываются свободным потоком (дивиденды/FCF ${Math.round(mults.divFcf)}%) — платят из долга/резервов. Долго так нельзя, риск для устойчивости выплат.` });
+  } else if(mults?.fcf != null && mults.fcf < 0){
+    out.push({ level: 'warn', text: 'Отрицательный FCF (CFO < CAPEX): бизнес сжигает деньги — либо фаза стройки/роста, либо проблема. Проверь, за счёт чего живёт (долг/эмиссия) и когда FCF выйдет в плюс.' });
+  }
+
   // — по данным (структурные) —
   if(opexScaleTrap){
     out.push({ level: 'warn', text: 'Расходы снизились вместе с выручкой — это сжатие масштаба, а не рост эффективности. Ставь рядом OPEX + выручку + объёмы.' });

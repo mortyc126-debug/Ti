@@ -37,6 +37,11 @@ export function reportToMults(r){
   const debt = _n(r.debt), eq = _n(r.eq), assets = _n(r.assets), ebitda = _n(r.ebitda),
         cash = _n(r.cash), ca = _n(r.ca), cl = _n(r.cl), intx = _n(r.int_exp),
         rev = _n(r.rev), np = _n(r.np), ebit = _n(r.ebit), tax = _n(r.tax_exp);
+  // денежный поток (короткие ключи reportsDB и возможные ключи снимка)
+  const cfo = _n(r.cfo) ?? _n(r.cfo_ops) ?? _n(r.op_cf),
+        capex = _n(r.capex) ?? _n(r.capex_val),
+        divp = _n(r.divp) ?? _n(r.div_paid);
+  const fcf = (cfo != null && capex != null) ? cfo - capex : null;
   const m = {
     ebitdaMarg: _n(r.ebitda_marg) ?? ((rev && rev > 0 && ebitda != null) ? ebitda / rev * 100 : null),
     roa: _n(r.roa_pct) ?? ((assets && assets > 0 && np != null) ? np / assets * 100 : null),
@@ -50,9 +55,16 @@ export function reportToMults(r){
     roic: _roic(ebit, tax, np, eq, debt, cash),
     roe: (np != null && eq && eq > 0) ? np / eq * 100 : null,
     pe: null, yield: null,
+    // денежный поток: FCF и производные (null, если нет ОДДС в данных)
+    fcf,
+    cfoConv: (cfo != null && ebitda && ebitda > 0) ? cfo / ebitda * 100 : null,   // конверсия EBITDA→кэш, %
+    cfoNp: (cfo != null && np && np !== 0) ? cfo / np : null,                       // качество прибыли
+    capexRev: (capex != null && rev && rev > 0) ? capex / rev * 100 : null,         // капиталоёмкость, %
+    divFcf: (divp != null && fcf != null && fcf > 0) ? divp / fcf * 100 : null,     // покрытие дивидендов FCF, %
     // сырьё для мультипликаторов оценки акций (в тех же единицах, что пришли —
     // обычно млн); приведение делаем при расчёте
     npRaw: np, revRaw: rev, eqRaw: eq, debtRaw: debt, cashRaw: cash, ebitdaRaw: ebitda, assetsRaw: assets,
+    cfoRaw: cfo, capexRaw: capex, divpRaw: divp, fcfRaw: fcf,
   };
   m.bqi = bqiScore({ mults: m });
   m.safety = safetyScore({ mults: m });
