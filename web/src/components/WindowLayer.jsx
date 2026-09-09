@@ -512,6 +512,7 @@ function TabFinances({ card, reports, industry, inn, issuerName }){
         Значения в млрд ₽. <b className="text-text2">РСБУ</b> — отчётность по российским стандартам (юрлицо), <b className="text-text2">МСФО</b> — международные (группа, консолидировано). ГИР БО/ФНС — это источник данных РСБУ, не отдельный тип.
       </div>
 
+      <GrowthSummary series={series} />
       <ValuationPanel inn={inn} issuerName={issuerName} />
       <MetricLinkages inn={inn} issuerName={issuerName} />
       <MScorePanel reports={reports} inn={inn} />
@@ -1143,4 +1144,38 @@ function fmtX(v){
 function fmtDays(v){
   if(v == null || !isFinite(v)) return '—';
   return Math.round(v) + ' дн';
+}
+
+// Динамика: CAGR за доступный период + последний год-к-году по ключевым
+// строкам. Считается из series (уже в млрд, отсортирована по убыванию года).
+function GrowthSummary({ series }){
+  const rows = useMemo(() => {
+    const items = [...(series || [])].filter(s => s.fy_year != null).sort((a, b) => a.fy_year - b.fy_year);
+    if(items.length < 2) return null;
+    const first = items[0], last = items[items.length - 1];
+    const yrs = (last.fy_year - first.fy_year) || 1;
+    const prev = items[items.length - 2];
+    const pc = v => v == null ? null : `${v >= 0 ? '+' : ''}${(v * 100).toFixed(0)}%`;
+    const cagr = (a, b) => (a != null && b != null && a > 0 && b > 0) ? Math.pow(b / a, 1 / yrs) - 1 : null;
+    const yoy = (a, b) => (a != null && b != null && a > 0) ? b / a - 1 : null;
+    const defn = [['Выручка', 'rev'], ['EBITDA', 'ebitda'], ['Прибыль', 'np']];
+    return { yrs, span: `${first.fy_year}→${last.fy_year}`, prevY: prev.fy_year, lastY: last.fy_year,
+      list: defn.map(([label, f]) => ({ label, cagr: cagr(first[f], last[f]), yoy: yoy(prev[f], last[f]), pc })) };
+  }, [series]);
+  if(!rows) return null;
+  const col = v => v == null ? 'text-text3' : v >= 0 ? 'text-green' : 'text-danger';
+  return (
+    <div className="mt-3 border-t border-border/60 pt-3">
+      <div className="text-text3 text-[10px] uppercase tracking-wider mb-1.5">Динамика · CAGR {rows.span} ({rows.yrs} г)</div>
+      <div className="grid grid-cols-3 gap-2">
+        {rows.list.map(r => (
+          <div key={r.label} className="bg-bg2 border border-border rounded px-2.5 py-1.5">
+            <div className="text-text3 text-[10px]">{r.label}</div>
+            <div className={`font-mono text-sm font-semibold ${col(r.cagr)}`}>{r.cagr == null ? '—' : r.pc(r.cagr)}<span className="text-text3 text-[9px] font-normal ml-1">CAGR</span></div>
+            <div className={`font-mono text-[10px] ${col(r.yoy)}`}>{r.yoy == null ? '—' : r.pc(r.yoy)}<span className="text-text3 ml-1">г/г {rows.prevY}→{rows.lastY}</span></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
