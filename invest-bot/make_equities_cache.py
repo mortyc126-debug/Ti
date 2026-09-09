@@ -67,22 +67,42 @@ def _div12m(client, figi, now):
     return round(total, 4) if got else None
 
 
-# дневные закрытия за ~days дней: {date_iso -> close}
-def _daily_closes(client, figi, days=400):
+# дневные закрытия за ~days дней: {date_iso -> close}. Принимает figi ИЛИ
+# instrument_id (uid) — у индексов надёжнее uid.
+def _daily_closes(client, figi=None, instrument_id=None, days=400):
     out = {}
     now = datetime.now(timezone.utc)
+    kw = {"instrument_id": instrument_id} if instrument_id else {"figi": figi}
     try:
         for c in client.get_all_candles(
-            figi=figi,
             from_=now - timedelta(days=days),
             interval=CandleInterval.CANDLE_INTERVAL_DAY,
+            **kw,
         ):
             cl = _q(c.close)
             if cl > 0:
                 out[c.time.date().isoformat()] = cl
     except Exception as e:
-        print(f"[eq] candles {figi}: {e}", file=sys.stderr)
+        print(f"[eq] candles {figi or instrument_id}: {e}", file=sys.stderr)
     return out
+
+
+# Прокси-рынок из самих акций: равновзвешенная дневная доходность по всем
+# бумагам → синтетический уровень индекса. Работает, когда IMOEX недоступен.
+def _proxy_market(share_closes):
+    rets = {}
+    for closes in share_closes.values():
+        dts = sorted(closes)
+        for i in range(1, len(dts)):
+            p0, p1 = closes[dts[i - 1]], closes[dts[i]]
+            if p0 > 0:
+                rets.setdefault(dts[i], []).append(p1 / p0 - 1)
+    lvl, idx = 100.0, {}
+    for d in sorted(rets):
+        r = sum(rets[d]) / len(rets[d])
+        lvl *= (1 + r)
+        idx[d] = lvl
+    return idx
 
 
 # бета акции к индексу по дневным доходностям: cov(r_s, r_m)/var(r_m)
@@ -109,50 +129,66 @@ def _beta(stock_closes, idx_closes):
     return round(cov / var, 3)
 
 
-# figi индекса МосБиржи (IMOEX) — для расчёта беты. Ищем по справочнику.
-def _index_figi(client):
-    for q in ("IMOEX", "Индекс МосБиржи", "MOEX Russia Index"):
+# id (uid/figi) индекса МосБиржи (IMOEX). Индексы не торгуемые, поэтому
+# find_instrument по умолчанию их не отдаёт — просим с api_trade_available_flag=False.
+def _index_id(client):
+    variants = [
+        {"query": "IMOEX", "api_trade_available_flag": False},
+        {"query": "Индекс МосБиржи", "api_trade_available_flag": False},
+        {"query": "IMOEX"},
+    ]
+    for kw in variants:
         try:
-            res = client.instruments.find_instrument(query=q)
-            for it in res.instruments:
-                itype = (getattr(it, "instrument_type", "") or "").lower()
-                if getattr(it, "ticker", "") == "IMOEX" or itype == "index":
-                    return it.figi
+            res = client.instruments.find_instrument(**kw)
+        except TypeError:
+            try:
+                res = client.instruments.find_instrument(query=kw["query"])
+            except Exception:
+                continue
         except Exception:
             continue
+        for it in getattr(res, "instruments", []) or []:
+            itype = (getattr(it, "instrument_type", "") or "").lower()
+            if getattr(it, "ticker", "") == "IMOEX" or itype == "index":
+                return getattr(it, "uid", None) or getattr(it, "figi", None)
     return None
 
 
 def dump_shares(client):
     shares = client.instruments.shares(
         instrument_status=InstrumentStatus.INSTRUMENT_STATUS_BASE).instruments
-    figis = [s.figi for s in shares if (s.currency or "").lower() == "rub"]
-    prices = _last_prices(client, figis)
+    rub = [s for s in shares if (s.currency or "").lower() == "rub"]
+    prices = _last_prices(client, [s.figi for s in rub])
     now = datetime.now(timezone.utc)
+    kept = [s for s in rub if prices.get(s.figi)]
 
-    # индекс для беты — тянем свечи один раз
-    idx_figi = _index_figi(client)
-    idx_closes = _daily_closes(client, idx_figi) if idx_figi else {}
-    if idx_closes:
-        print(f"[eq] индекс IMOEX: {len(idx_closes)} дн. свечей → считаю бету", file=sys.stderr)
-    else:
-        print("[eq] индекс IMOEX не найден — бета не будет посчитана", file=sys.stderr)
+    # индекс IMOEX для беты
+    idx_id = _index_id(client)
+    idx_closes = _daily_closes(client, instrument_id=idx_id) if idx_id else {}
+    print(f"[eq] индекс IMOEX: {'найден, ' + str(len(idx_closes)) + ' дн.' if idx_closes else 'НЕ найден → строю прокси-рынок из акций'}", file=sys.stderr)
+
+    # дневные свечи по каждой оставшейся акции — нужны и для беты, и для прокси
+    print(f"[eq] тяну свечи по {len(kept)} акциям для беты…", file=sys.stderr)
+    share_closes = {}
+    for i, s in enumerate(kept):
+        share_closes[s.figi] = _daily_closes(client, figi=s.figi)
+        if i and i % 50 == 0:
+            print(f"[eq]   свечи {i}/{len(kept)}", file=sys.stderr)
+        time.sleep(0.03)
+
+    # если индекса нет — синтетический рынок из самих акций
+    if not idx_closes:
+        idx_closes = _proxy_market(share_closes)
+        print(f"[eq] прокси-рынок: {len(idx_closes)} дн. из {len(share_closes)} акций", file=sys.stderr)
 
     out = []
-    for s in shares:
-        if (s.currency or "").lower() != "rub":
-            continue
-        price = prices.get(s.figi)
-        if not price:
-            continue
+    nbeta = 0
+    for s in kept:
         div12m = _div12m(client, s.figi, now)
-        # бета: дневные свечи акции vs индекса
-        beta = None
-        if idx_closes:
-            sc = _daily_closes(client, s.figi)
-            beta = _beta(sc, idx_closes)
-            time.sleep(0.05)
-        time.sleep(0.05)
+        beta = _beta(share_closes.get(s.figi, {}), idx_closes) if idx_closes else None
+        if beta is not None:
+            nbeta += 1
+        time.sleep(0.03)
         out.append({
             "ticker": s.ticker,
             "name": s.name,
@@ -160,13 +196,13 @@ def dump_shares(client):
             "sector": s.sector or None,
             "currency": s.currency,
             "shares": int(getattr(s, "issue_size", 0) or 0) or None,
-            "price": round(price, 4),
+            "price": round(prices.get(s.figi), 4),
             "div12m": div12m,
             "beta": beta,
         })
     path = os.path.join(PUB, "stocks-cache.json")
     json.dump(out, open(path, "w", encoding="utf-8"), ensure_ascii=False)
-    print(f"[eq] акций: {len(out)} → {path}", file=sys.stderr)
+    print(f"[eq] акций: {len(out)} (с бетой: {nbeta}) → {path}", file=sys.stderr)
 
 
 def dump_futures(client):
