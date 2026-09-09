@@ -5,6 +5,7 @@
 
 import { useMemo, useState } from 'react';
 import { buildRadarData } from '../../lib/comparisonSet.js';
+import { shortIssuerName } from '../../lib/issuerMatch.js';
 import { colorFor } from './colorPalette.js';
 
 const KIND_LABEL = { stock: 'акции', bond: 'облиг.', future: 'фьюч.' };
@@ -81,8 +82,8 @@ export default function ComparisonBar({ selectedView, hoveredKey, onHover }){
               className="flex items-center gap-2 cursor-default"
               style={{ opacity: isOther ? 0.4 : 1 }}
             >
-              <div className="w-[180px] shrink-0 truncate text-[11px] font-mono text-right">
-                <span className="text-text">{x.iss.name}</span>
+              <div className="w-[180px] shrink-0 truncate text-[11px] font-mono text-right" title={x.iss.name}>
+                <span className="text-text">{shortIssuerName(x.iss.name)}</span>
                 {x.iss.ticker && <span className="text-text3 ml-1 text-[10px]">{x.iss.ticker}</span>}
               </div>
               <div className="flex-1 h-5 bg-s2/40 rounded-sm relative overflow-hidden">

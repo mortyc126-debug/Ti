@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { buildRadarData } from '../../lib/comparisonSet.js';
+import { shortIssuerName } from '../../lib/issuerMatch.js';
 import { colorFor, fillOpacity, strokeOpacity } from './colorPalette.js';
 
 const KIND_LABEL = { stock: 'акции', bond: 'облиг.', future: 'фьюч.' };
@@ -170,8 +171,8 @@ function NameCard({ item, color }){
         className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
         style={{ background: color }}
       />
-      <span className="font-mono text-text text-sm truncate max-w-[260px]">
-        {iss.name}
+      <span className="font-mono text-text text-sm truncate max-w-[260px]" title={iss.name}>
+        {shortIssuerName(iss.name)}
         {iss.ticker && <span className="text-text3 ml-1.5 text-[11px]">{iss.ticker}</span>}
       </span>
       <span className="text-[10px] uppercase tracking-wider text-text3 font-mono">

@@ -5,6 +5,7 @@
 import { X, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useComparison } from '../../store/comparison.js';
+import { shortIssuerName } from '../../lib/issuerMatch.js';
 
 export default function CandidatePicker({ candidates, onClose }){
   const selected = useComparison(s => s.selected);
@@ -69,8 +70,8 @@ export default function CandidatePicker({ candidates, onClose }){
                       'w-3 h-3 rounded-full border',
                       on ? 'bg-acc border-acc' : 'border-border2',
                     ].join(' ')} />
-                    <span className="font-mono text-sm text-text flex-1 truncate">
-                      {c.iss.name}
+                    <span className="font-mono text-sm text-text flex-1 truncate" title={c.iss.name}>
+                      {shortIssuerName(c.iss.name)}
                       {c.iss.ticker && <span className="text-text3 ml-1.5 text-[11px]">{c.iss.ticker}</span>}
                     </span>
                     <span className="text-text3 text-[10px] uppercase tracking-wider">{kindLabel(c.kind)}</span>

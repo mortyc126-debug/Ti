@@ -6,6 +6,7 @@
 
 import { useMemo } from 'react';
 import { buildRadarData } from '../../lib/comparisonSet.js';
+import { shortIssuerName } from '../../lib/issuerMatch.js';
 
 const KIND_LABEL = { stock: 'акции', bond: 'облиг.', future: 'фьюч.' };
 
@@ -65,8 +66,8 @@ export default function ComparisonHeatmap({ selectedView, hoveredKey, onHover })
                 style={{ opacity: isOther ? 0.4 : 1 }}
                 className={isHovered ? 'ring-1 ring-acc' : ''}
               >
-                <td className="sticky left-0 z-10 bg-bg2 px-2 py-1 border-b border-border/40 whitespace-nowrap max-w-[220px] truncate">
-                  <span className="text-text">{x.iss.name}</span>
+                <td className="sticky left-0 z-10 bg-bg2 px-2 py-1 border-b border-border/40 whitespace-nowrap max-w-[220px] truncate" title={x.iss.name}>
+                  <span className="text-text">{shortIssuerName(x.iss.name)}</span>
                   {x.iss.ticker && <span className="text-text3 ml-1.5">{x.iss.ticker}</span>}
                   <span className="text-text3 ml-1.5 text-[9px] uppercase">{KIND_LABEL[x.kind] || x.kind}</span>
                 </td>

@@ -14,6 +14,7 @@ import { useWindows } from '../../store/windows.js';
 import { metricSpec } from '../../data/comparisonMetrics.js';
 import { colorFor } from './colorPalette.js';
 import { resolveNorm, classifyValue } from '../../lib/norms.js';
+import { shortIssuerName } from '../../lib/issuerMatch.js';
 import { useIssuers } from '../../store/issuers.js';
 
 const KIND_GROUPS = [
@@ -148,10 +149,11 @@ function CompanyRow({ item, color, layerOn, onToggleVis, onRemove, hovered, onHo
           <button
             type="button"
             onClick={openIssuer}
-            title="Открыть карточку эмитента"
-            className="font-mono text-text text-sm truncate text-left hover:text-acc transition-colors w-full"
+            title={iss.name + ' — открыть карточку'}
+            className="font-mono text-text text-sm text-left hover:text-acc transition-colors w-full leading-tight"
+            style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
           >
-            {iss.name}
+            {shortIssuerName(iss.name)}
             {iss.ticker && <span className="text-text3 ml-1.5 text-[11px]">{iss.ticker}</span>}
             {iss.reportYear && (
               <span className="text-text3 ml-1.5 text-[10px] font-normal"
