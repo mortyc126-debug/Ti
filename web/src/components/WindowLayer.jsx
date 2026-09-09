@@ -13,6 +13,7 @@ import { driversFor } from '../lib/industryDrivers.js';
 import { computeMScore, MSCORE_FIELDS, extraGet, extraSetField } from '../lib/mscore.js';
 import { buildWatch, annualTrends } from '../lib/autoWatch.js';
 import { computeScenario } from '../lib/scenario.js';
+import { useNewsStore, newsForTicker } from '../store/news.js';
 
 // Слой плавающих окон. Рендерится один раз в App.jsx поверх Outlet.
 // Каркас окна + живой контент в MediumBody (вкладки Финансы/Бумаги/
@@ -453,6 +454,7 @@ function TabFinances({ card, reports, industry, inn, issuerName }){
   return (
     <div className="space-y-3">
       <AutoWatch inn={inn} issuerName={issuerName} industry={industry} reports={reports} />
+      <NewsPanel ticker={issuer?.ticker} name={issuerName} />
       {issuer && (
         <div className="text-text3 text-xs">
           <span className="text-text">{issuer.short_name || issuer.name}</span>
@@ -1146,6 +1148,42 @@ function fmtX(v){
 function fmtDays(v){
   if(v == null || !isFinite(v)) return '—';
   return Math.round(v) + ' дн';
+}
+
+// Новости по эмитенту — из снимка news-cache.json, привязка по тикеру.
+function NewsPanel({ ticker, name }){
+  const items = useNewsStore(s => s.items);
+  const load = useNewsStore(s => s.load);
+  useEffect(() => { load(); }, [load]);
+  const list = useMemo(() => newsForTicker(items, ticker).slice(0, 8), [items, ticker]);
+  if(items == null) return null;          // ещё грузится
+  if(!ticker || !list.length) return null; // нет новостей по этой бумаге
+  const fmtDate = s => { try { return new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' }); } catch { return ''; } };
+  const sentCol = v => /pos|позитив|good|↑/i.test(String(v)) ? 'text-green' : /neg|негатив|bad|↓/i.test(String(v)) ? 'text-danger' : 'text-text3';
+  return (
+    <div className="border border-border rounded-lg bg-bg2/40">
+      <div className="px-3 py-1.5 text-text3 text-[10px] uppercase tracking-wider border-b border-border/50">
+        Новости · {ticker} ({list.length})
+      </div>
+      <ul className="divide-y divide-border/30 max-h-[180px] overflow-y-auto">
+        {list.map((n, i) => (
+          <li key={i} className="px-3 py-1.5">
+            <a href={n.url || '#'} target="_blank" rel="noreferrer"
+               data-no-drag
+               className="text-text text-xs leading-snug hover:text-acc transition-colors block">
+              {n.title}
+            </a>
+            <div className="flex items-center gap-2 text-[10px] text-text3 mt-0.5">
+              <span>{fmtDate(n.published)}</span>
+              <span>· {n.source}</span>
+              {n.sentiment && <span className={sentCol(n.sentiment)}>· {n.sentiment}</span>}
+              {n.impact && <span className="text-text3">· {n.impact}</span>}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 // What-if: шок по ставке/выручке → EBITDA / ND-EBITDA / ICR / FCF.
