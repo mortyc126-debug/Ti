@@ -12,6 +12,7 @@ import { computeLinkages } from '../lib/finLinkages.js';
 import { driversFor } from '../lib/industryDrivers.js';
 import { computeMScore, MSCORE_FIELDS, extraGet, extraSetField } from '../lib/mscore.js';
 import { buildWatch, annualTrends } from '../lib/autoWatch.js';
+import { computeScenario } from '../lib/scenario.js';
 
 // Слой плавающих окон. Рендерится один раз в App.jsx поверх Outlet.
 // Каркас окна + живой контент в MediumBody (вкладки Финансы/Бумаги/
@@ -513,6 +514,7 @@ function TabFinances({ card, reports, industry, inn, issuerName }){
       </div>
 
       <GrowthSummary series={series} />
+      <WhatIfPanel inn={inn} />
       <ValuationPanel inn={inn} issuerName={issuerName} />
       <MetricLinkages inn={inn} issuerName={issuerName} />
       <MScorePanel reports={reports} inn={inn} />
@@ -1144,6 +1146,69 @@ function fmtX(v){
 function fmtDays(v){
   if(v == null || !isFinite(v)) return '—';
   return Math.round(v) + ' дн';
+}
+
+// What-if: шок по ставке/выручке → EBITDA / ND-EBITDA / ICR / FCF.
+function WhatIfPanel({ inn }){
+  const allIssuers = useIssuers();
+  const m = useMemo(() => issuerMults(inn), [inn, allIssuers]);
+  const defDrop = (m?.ebitdaMarg != null && m.ebitdaMarg > 0) ? Math.min(100, Math.round(m.ebitdaMarg)) : 60;
+  const [rateShock, setRate] = useState(0);
+  const [floatShare, setFloat] = useState(50);
+  const [revShock, setRev] = useState(0);
+  const [dropthrough, setDrop] = useState(defDrop);
+  const sc = useMemo(() => computeScenario(m, { rateShock, floatShare, revShock, dropthrough }),
+    [m, rateShock, floatShare, revShock, dropthrough]);
+  if(!sc) return null;
+
+  const bn = v => v == null ? '—' : (Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + ' млрд' : v.toFixed(0) + ' млн');
+  const x = v => v == null ? '—' : v.toFixed(2) + 'x';
+  // цвет по направлению «лучше»: EBITDA/ICR/FCF выше — лучше; ND/EBITDA ниже — лучше
+  const delta = (a, b, higherBetter) => {
+    if(a == null || b == null) return 'text-text3';
+    if(Math.abs(b - a) < 1e-9) return 'text-text2';
+    return (higherBetter ? b > a : b < a) ? 'text-green' : 'text-danger';
+  };
+  const Num = ({ label, v, set, min, max, step, suf }) => (
+    <label className="flex items-center gap-1.5 text-[11px] text-text3">
+      {label}
+      <input type="number" value={v} min={min} max={max} step={step}
+        onChange={e => set(e.target.value === '' ? 0 : Number(e.target.value))}
+        data-no-drag
+        className="w-14 bg-bg2 border border-border rounded px-1.5 py-0.5 text-text text-xs" />{suf}
+    </label>
+  );
+  const Row = ({ label, v0, v1, fmt, higherBetter }) => (
+    <div className="flex items-center justify-between gap-2 py-0.5 text-xs">
+      <span className="text-text3">{label}</span>
+      <span className="font-mono">
+        <span className="text-text2">{fmt(v0)}</span>
+        <span className="text-text3 mx-1">→</span>
+        <span className={`font-semibold ${delta(v0, v1, higherBetter)}`}>{fmt(v1)}</span>
+      </span>
+    </div>
+  );
+  return (
+    <div className="mt-3 border-t border-border/60 pt-3">
+      <div className="text-text3 text-[10px] uppercase tracking-wider mb-1.5">What-if · сценарий</div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-2">
+        <Num label="Δ ставки" v={rateShock} set={setRate} min={-10} max={20} step={1} suf="пп" />
+        <Num label="плав. долг" v={floatShare} set={setFloat} min={0} max={100} step={5} suf="%" />
+        <Num label="Δ выручки" v={revShock} set={setRev} min={-50} max={50} step={1} suf="%" />
+        <Num label="дроп-тру" v={dropthrough} set={setDrop} min={0} max={100} step={5} suf="%" />
+      </div>
+      <div className="bg-bg2 border border-border rounded px-3 py-2">
+        <Row label="EBITDA"     v0={sc.ebitda0} v1={sc.ebitda1} fmt={bn} higherBetter />
+        {sc.hasDebt && <Row label="ND/EBITDA"  v0={sc.nde0} v1={sc.nde1} fmt={x} higherBetter={false} />}
+        {sc.hasInt  && <Row label="ICR"        v0={sc.icr0} v1={sc.icr1} fmt={x} higherBetter />}
+        {sc.hasFcf  && <Row label="FCF"        v0={sc.fcf0} v1={sc.fcf1} fmt={bn} higherBetter />}
+        {sc.extraInt > 0 && <div className="text-text3 text-[10px] mt-1">+{bn(sc.extraInt)} процентных расходов от роста ставки на плавающем долге</div>}
+      </div>
+      <div className="text-text3 text-[10px] italic mt-1">
+        Грубая прикидка: ставка бьёт по плавающей части долга, выручка доходит до EBITDA через «дроп-тру» (цена ≈100%, объём ≈по марже). Проценты выведены из ICR. Не прогноз — оценка чувствительности.
+      </div>
+    </div>
+  );
 }
 
 // Динамика: CAGR за доступный период + последний год-к-году по ключевым
