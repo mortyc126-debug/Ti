@@ -7,7 +7,8 @@
 // - кнопка [✕] = удалить из списка.
 
 import { useEffect, useRef } from 'react';
-import { X, Plus, Eye, EyeOff } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, Plus, Eye, EyeOff, Scale } from 'lucide-react';
 import { useComparison } from '../../store/comparison.js';
 import { useIndustryNorms } from '../../store/industryNorms.js';
 import { useWindows } from '../../store/windows.js';
@@ -103,6 +104,7 @@ function CompanyRow({ item, color, layerOn, onToggleVis, onRemove, hovered, onHo
   const iss = item.iss;
   const visible = item.visible && layerOn;
   const openWin = useWindows(s => s.open);
+  const navigate = useNavigate();
   const ref = useRef(null);
 
   // Когда строка становится подсвеченной (например, через hover на
@@ -164,6 +166,14 @@ function CompanyRow({ item, color, layerOn, onToggleVis, onRemove, hovered, onHo
           </button>
           <MiniMetrics mults={iss.mults} industry={iss.industry} />
         </div>
+        <button
+          type="button"
+          onClick={() => navigate('/debt?q=' + encodeURIComponent(iss.ticker || iss.name || ''))}
+          title="Долговая нагрузка (перейти в «Долг»)"
+          className="text-text3 hover:text-acc transition-colors p-1 shrink-0"
+        >
+          <Scale size={12} />
+        </button>
         <button
           type="button"
           onClick={onRemove}

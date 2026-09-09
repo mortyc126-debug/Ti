@@ -521,8 +521,13 @@ tr.row-redeemed td{opacity:.5;}
     </div>
     <div id="cbr-hist-list" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto"></div>
   </div>
-  <!-- T-Invest token row -->
-  <div class="irow" style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.05)">
+  <!-- T-Invest token row — свёрнуто, чтобы не занимало место -->
+  <details id="tok-details" style="margin-top:8px">
+  <summary style="cursor:pointer;font-size:11px;color:var(--t3);display:flex;align-items:center;gap:6px;user-select:none">
+    <span style="color:var(--acc)">🔑</span>T-Invest токен <span style="color:var(--t4)">— для графиков цен (необязательно)</span>
+    <span id="token-badge" style="margin-left:6px;color:var(--pos);font-weight:600"></span>
+  </summary>
+  <div class="irow" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.05)">
     <div class="ig" style="flex:1;min-width:0">
       <label class="il" style="display:flex;align-items:center;gap:5px">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--acc)"><circle cx="8" cy="8" r="3"/><path d="M13 11l8 8-3 3-8-8"/><path d="M17 17l2 2"/></svg>
@@ -536,6 +541,7 @@ tr.row-redeemed td{opacity:.5;}
     </div>
     <div id="token-status" style="font-size:11px;color:var(--t3);align-self:flex-end;padding-bottom:6px;white-space:nowrap"></div>
   </div>
+  </details>
   <div style="margin-top:8px;font-size:11px;color:var(--t3)">
     <span id="hintText">Введите название или тикер · Поиск по облигациям и фьючерсам одновременно · Данные: MOEX ISS API</span>
   </div>
@@ -2837,6 +2843,25 @@ async function cbrPullLive(){
   });
   renderCbrHist();
   applyCbrToKeyrate(false);   // на старте подставляем последнюю — не вводить заново
+})();
+
+// бейдж «✓ сохранён» в свёрнутой шапке токена
+(function tokenBadge(){ try{ if(tToken){ const b=$('token-badge'); if(b)b.textContent='✓ сохранён'; } }catch(e){} })();
+
+// deep-link из приложения: ?q= / ?ticker= / ?isin= → подставить в поиск и
+// сразу запустить анализ. Позволяет «перейти в Долг» по клику на компанию.
+(function initDeepLink(){
+  try{
+    const p=new URLSearchParams(location.search);
+    const q=(p.get('q')||p.get('ticker')||p.get('isin')||'').trim();
+    if(!q) return;
+    const qi=$('qinput');
+    if(qi){
+      qi.value=q; selectedQuery=q; selectedOrigQ=q;
+      const btn=$('btngo'); if(btn) btn.disabled=false;
+      setTimeout(()=>{ try{ go(); }catch(e){} }, 300);
+    }
+  }catch(e){}
 })();
 
 // ===================== INIT =====================

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Rnd } from 'react-rnd';
 import { useWindows } from '../store/windows.js';
 import { api } from '../api.js';
@@ -41,8 +42,11 @@ export default function WindowLayer(){
 
 function FloatingWindow({ win }){
   const { close, duplicate, focus, setMode, setTab, patch } = useWindows.getState();
+  const navigate = useNavigate();
   const isMicro = win.mode === 'micro';
   const isFull  = win.mode === 'full';
+  // «перейти в Долг» по этой бумаге/эмитенту (тикер → имя → ISIN/id)
+  const goDebt = () => navigate('/debt?q=' + encodeURIComponent(win.ticker || win.title || win.id || ''));
 
   // react-rnd двигает окно через CSS transform (translate). iframe модуля
   // отчётности внутри transform-слоя браузер растрирует в текстуру и на
@@ -101,6 +105,7 @@ function FloatingWindow({ win }){
           <span className="font-mono text-text text-sm font-semibold truncate">{win.title}</span>
           {win.ticker && <span className="font-mono text-text3 text-xs">{win.ticker}</span>}
           <div className="ml-auto flex items-center gap-1">
+            <HeaderBtn title="Долговая нагрузка (перейти в «Долг»)" onClick={goDebt}>⚖</HeaderBtn>
             <HeaderBtn title="Дублировать"  onClick={() => duplicate(win.wid)}>⧉</HeaderBtn>
             {isMicro
               ? <HeaderBtn title="Развернуть" onClick={() => setMode(win.wid, 'medium')}>↕</HeaderBtn>
