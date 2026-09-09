@@ -446,6 +446,8 @@ function TabFinances({ card, reports, industry, inn, issuerName }){
     .sort((a, b) => (b.fy_year || 0) - (a.fy_year || 0))
     .slice(0, 5)
     .map(withDerived);
+  // строки денежного потока показываем только если в данных есть ОДДС
+  const hasCF = series.some(s => s.cfo != null || s.fcf != null);
   return (
     <div className="space-y-3">
       <AutoWatch inn={inn} issuerName={issuerName} industry={industry} reports={reports} />
@@ -489,6 +491,13 @@ function TabFinances({ card, reports, industry, inn, issuerName }){
             <MetricRow label="ROS, %"         series={series} field="ros_pct"  fmt={fmtPct} colorize />
             <MetricRow label="EBITDA-марж, %" series={series} field="ebitda_marg" fmt={fmtPct} />
             <MetricRow label="ND/Eq"          series={series} field="net_debt_eq" fmt={fmtX} />
+            {hasCF && <>
+              <MetricRow label="CFO (операц.)"  series={series} field="cfo"     fmt={fmtBn} colorize />
+              <MetricRow label="CAPEX"          series={series} field="capex"   fmt={fmtBn} />
+              <MetricRow label="FCF"            series={series} field="fcf"     fmt={fmtBn} colorize />
+              <MetricRow label="CFO/EBITDA, %"  series={series} field="cfoConv" fmt={fmtPct} colorize />
+              <MetricRow label="Дивид./FCF, %"  series={series} field="divFcf"  fmt={fmtPct} />
+            </>}
           </tbody>
         </table>
       </div>
@@ -1084,12 +1093,18 @@ function withDerived(r){
       roic_pct = ebit * (1 - t) / ic * 100;
     }
   }
+  // денежный поток (короткие ключи reportsDB / возможные ключи снимка)
+  const cfo = num(r.cfo) ?? num(r.cfo_ops), capex = num(r.capex), divp = num(r.divp) ?? num(r.div_paid);
+  const fcf = (cfo != null && capex != null) ? cfo - capex : null;
+  const cfoConv = (cfo != null && ebitda) ? cfo / ebitda * 100 : null;
+  const divFcf  = (divp != null && fcf != null && fcf > 0) ? divp / fcf * 100 : null;
   const bn = v => v == null ? null : v / 1000;   // млн → млрд
   return {
     ...r,
     rev: bn(rev), ebit: bn(num(r.ebit)), np: bn(np), ebitda: bn(ebitda),
     assets: bn(assets), eq: bn(eq), debt: bn(debt), cash: bn(cash),
     roa_pct, ros_pct, roic_pct, roe_pct, ebitda_marg, net_debt_eq,
+    cfo: bn(cfo), capex: bn(capex), fcf: bn(fcf), cfoConv, divFcf,
   };
 }
 
