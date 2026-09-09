@@ -587,6 +587,12 @@ tr.row-redeemed td{opacity:.5;}
   <div id="tipbox"></div>
 </div>
 
+<div class="panel" id="wallPanel" style="display:none">
+  <div class="sl" style="margin-bottom:4px">Стена погашений — сколько гасить/оферт по годам</div>
+  <div id="wallHint" style="font-size:11px;color:var(--t3);margin-bottom:11px"></div>
+  <div id="wallBody"></div>
+</div>
+
 <div class="panel" id="tpanel" style="display:none">
   <div class="sl" style="margin-bottom:11px">Выпуски эмитента</div>
   <div class="tbl-w"><table>
@@ -1208,8 +1214,8 @@ async function go(){
 
     bonds=res; cf=buildCF(res); cfDay=buildCFDay(res); sp(100); log('');
     $('hcount').textContent=res.length+' выпусков'; $('hs2').style.display='';
-    renderStats(); renderChart(); renderTable();
-    $('sgrid').style.display='grid'; $('cpanel').style.display='block'; $('tpanel').style.display='block';
+    renderStats(); renderChart(); renderWall(); renderTable();
+    $('sgrid').style.display='grid'; $('cpanel').style.display='block'; $('wallPanel').style.display='block'; $('tpanel').style.display='block';
     // Notify shell of selected ticker
     if(typeof shellNotify==='function'&&selectedQuery)
       shellNotify('SET_TICKER',{ticker:selectedQuery.split(/\s+/)[0].toUpperCase()});
@@ -1486,6 +1492,78 @@ function renderTableHighlight(dayKey){
       row.classList.remove('row-highlight');
     }
   });
+}
+
+// Стена погашений: суммируем номиналы к погашению/амортизации по годам.
+// Используем график амортизации (если есть) — иначе весь остаток тела на
+// дату погашения (или ближайшей оферты). Возвращает суммы в рублях по годам.
+function buildMaturityWall(res){
+  const today=new Date().toISOString().slice(0,10);
+  const byYear={};                 // год → сумма к погашению, ₽
+  const offerYear={};              // год → сумма к ближайшей оферте, ₽
+  let nearestOffer=null;
+  for(const it of res){
+    const b=it.bond, amort=it.amortizations||[];
+    const issue=(b.ISSUESIZE>0?b.ISSUESIZE:1);
+    if(b.OFFERDATE&&b.OFFERDATE>=today){
+      if(!nearestOffer||b.OFFERDATE<nearestOffer.date) nearestOffer={date:b.OFFERDATE,name:b.SHORTNAME||b.SECID};
+    }
+    const fut=amort.filter(a=>{const d=a.AMORTDATE||a.amortdate;const v=parseFloat(a.VALUE_RUB||a.value_rub||a.VALUE||a.value||0);return d&&d>=today&&v>0;});
+    if(fut.length){
+      for(const a of fut){
+        const d=a.AMORTDATE||a.amortdate;
+        const vr=parseFloat(a.VALUE_RUB||a.value_rub||a.VALUE||a.value||0);
+        const y=d.slice(0,4); byYear[y]=(byYear[y]||0)+vr*issue;
+      }
+    } else {
+      const cf=(b.CURRENTFACEVALUE!=null?b.CURRENTFACEVALUE:(b.FACEVALUE||0));
+      let d=b.MATDATE;
+      if(b.OFFERDATE&&b.OFFERDATE>=today&&(!d||b.OFFERDATE<d)) d=b.OFFERDATE;
+      if(d){ const y=d.slice(0,4); byYear[y]=(byYear[y]||0)+cf*issue; }
+    }
+    // оферта отдельно (это дата решения, не погашение)
+    if(b.OFFERDATE&&b.OFFERDATE>=today){
+      const cf=(b.CURRENTFACEVALUE!=null?b.CURRENTFACEVALUE:(b.FACEVALUE||0));
+      const y=b.OFFERDATE.slice(0,4); offerYear[y]=(offerYear[y]||0)+cf*issue;
+    }
+  }
+  return {byYear,offerYear,nearestOffer};
+}
+
+function renderWall(){
+  const wrap=$('wallBody'); if(!wrap) return;
+  const {byYear,offerYear,nearestOffer}=buildMaturityWall(bonds);
+  const years=Object.keys(byYear).sort();
+  if(!years.length){ wrap.innerHTML='<div style="color:var(--t3);font-size:11px">Нет дат погашения в данных.</div>'; $('wallHint').textContent=''; return; }
+  const bn=v=>v>=1e9?(v/1e9).toFixed(1)+' млрд':v>=1e6?(v/1e6).toFixed(0)+' млн':(v/1e3).toFixed(0)+' тыс';
+  const max=Math.max(...years.map(y=>byYear[y]));
+  const eb=parseFloat($('ebitda').value)||0;   // годовая EBITDA, млрд ₽ (из формы)
+  const curYear=new Date().getFullYear();
+  // ставка: высокая, если текущая КС высокая — риск рефинанса дороже
+  const kr=parseFloat($('keyrate').value)||null;
+  const rows=years.map(y=>{
+    const v=byYear[y]; const w=Math.round(v/max*100);
+    const off=offerYear[y]||0;
+    const heavy=eb>0 && v/1e9 > eb;              // стена больше годовой EBITDA
+    const soon=(+y-curYear)<=1;
+    const col=heavy?'var(--neg)':soon?'var(--warn)':'var(--acc)';
+    const ebNote=eb>0?` · ${(v/1e9/eb).toFixed(1)}× EBITDA`:'';
+    const offNote=off>0?` <span style="color:var(--pur)">оферты ${bn(off)}</span>`:'';
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <span style="width:42px;font-family:var(--mono);font-size:12px;color:${soon?'var(--t1)':'var(--t2)'}">${y}</span>
+      <div style="flex:1;height:18px;background:rgba(255,255,255,.04);border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${w}%;background:${col};opacity:.8;border-radius:4px"></div>
+      </div>
+      <span style="width:230px;font-family:var(--mono);font-size:11px;color:var(--t2);text-align:right">${bn(v)}<span style="color:var(--t3)">${ebNote}</span>${offNote}</span>
+    </div>`;
+  }).join('');
+  wrap.innerHTML=rows;
+  const heavyYears=years.filter(y=>eb>0 && byYear[y]/1e9>eb);
+  let hint='Столбик — сумма к погашению/амортизации в году. ';
+  if(nearestOffer) hint+=`Ближайшая оферта: ${nearestOffer.date} (${nearestOffer.name}). `;
+  if(heavyYears.length) hint+=`🔴 Пиковые годы больше годовой EBITDA: ${heavyYears.join(', ')} — риск рефинанса${kr!=null&&kr>=15?` (ставка ${kr}% — дорого перезанимать)`:''}. `;
+  hint+='Оферта — дата решения (для флоатеров/ВДО), не всегда погашение.';
+  $('wallHint').innerHTML=hint;
 }
 
 function renderTable(){
