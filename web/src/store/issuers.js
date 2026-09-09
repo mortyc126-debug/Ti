@@ -12,7 +12,7 @@ import { loadIssuersReal } from '../data/issuersReal.js';
 import { getAllIssuers } from '../data/issuersMock.js';
 
 const MOCK = getAllIssuers();
-const CACHE_KEY = 'ba_issuers_raw_v9';   // v9: + денежный поток (fcf/cfoConv/…); v8: assetsRaw
+const CACHE_KEY = 'ba_issuers_raw_v10';  // v10: + оборотный капитал (dso/dio/dpo/ccc); v9: денежный поток
 const TTL = 6 * 3600e3;
 
 // выбрать отчёт эмитента под (год, тип); reps уже отсортированы по убыванию

@@ -798,6 +798,15 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
         <div class="field"><label>Дивиденды выплаченные</label><input type="number" id="rep-np-divp" placeholder="300" step="0.1"></div>
         <div class="field"><label></label><div style="font-size:.55rem;color:var(--text3);padding-top:8px">FCF = CFO − CAPEX считается сам</div></div>
       </div>
+      <div style="font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin:6px 0 4px">Оборотный капитал (для цикла денег, если есть)</div>
+      <div class="g2">
+        <div class="field"><label>Дебиторка</label><input type="number" id="rep-np-recv" placeholder="620" step="0.1"></div>
+        <div class="field"><label>Запасы</label><input type="number" id="rep-np-inv" placeholder="410" step="0.1"></div>
+      </div>
+      <div class="g2">
+        <div class="field"><label>Кредиторка</label><input type="number" id="rep-np-pay" placeholder="530" step="0.1"></div>
+        <div class="field"><label></label><div style="font-size:.55rem;color:var(--text3);padding-top:8px">Цикл денег CCC = DSO + DIO − DPO</div></div>
+      </div>
       <div class="field"><label>Заметка к периоду</label><textarea id="rep-np-note" placeholder="Комментарий к результатам..."></textarea></div>
       <!-- Блок сверки с ГИР БО: тянется по ИНН эмитента, сравнивает
            каждое поле формы с официальной строкой РСБУ из ФНС.
@@ -3963,7 +3972,8 @@ const _REPORTS_FIELD_MAP = {
   assets: 'rep-np-assets', eq: 'rep-np-eq', debt: 'rep-np-debt',
   cash: 'rep-np-cash', ca: 'rep-np-ca', cl: 'rep-np-cl',
   ret: 'rep-np-ret',
-  cfo: 'rep-np-cfo', capex: 'rep-np-capex', divp: 'rep-np-divp'
+  cfo: 'rep-np-cfo', capex: 'rep-np-capex', divp: 'rep-np-divp',
+  recv: 'rep-np-recv', inv: 'rep-np-inv', pay: 'rep-np-pay'
 };
 
 // Нормализованный ярлык периода: «FY 2024», «H1 2025», «9M 2024».
@@ -9290,6 +9300,9 @@ const REP_FIELDS = [
   {id:'cfo',   label:'Операц. поток CFO', icon:'💧', unit:'млрд ₽', good:'up'},
   {id:'capex', label:'CAPEX',             icon:'🏗', unit:'млрд ₽', good:'down'},
   {id:'divp',  label:'Дивиденды выпл.',   icon:'🎁', unit:'млрд ₽', good:'down'},
+  {id:'recv',  label:'Дебиторка',         icon:'📨', unit:'млрд ₽', good:'down'},
+  {id:'inv',   label:'Запасы',            icon:'📦', unit:'млрд ₽', good:'down'},
+  {id:'pay',   label:'Кредиторка',        icon:'📩', unit:'млрд ₽', good:'up'},
 ];
 
 // Derived ratios
@@ -9323,6 +9336,14 @@ function repCalcRatios(d){
     if(fcf > 0) r.divFcf = (d.divp/fcf*100).toFixed(0);
     else if(d.divp > 0) r.divFcf = '∞';   // платят при отрицательном FCF
   }
+  // ── Оборотный капитал / цикл денег (база — выручка; COGS в форме нет) ──
+  // DSO — дни сбора дебиторки, DIO — дни в запасах, DPO — дни оплаты кредиторам.
+  if(d.recv != null && d.rev) r.dso = (d.recv/d.rev*365).toFixed(0);
+  if(d.inv  != null && d.rev) r.dio = (d.inv/d.rev*365).toFixed(0);
+  if(d.pay  != null && d.rev) r.dpo = (d.pay/d.rev*365).toFixed(0);
+  // CCC = DSO + DIO − DPO: сколько дней деньги «заморожены» в цикле.
+  if(r.dso != null && r.dio != null && r.dpo != null)
+    r.ccc = (+r.dso + +r.dio - +r.dpo).toFixed(0);
   return r;
 }
 
@@ -11357,6 +11378,10 @@ function repRenderCards(p){
     ratios.cfoNp!=null ? repRatioCard('CFO / Прибыль', ratios.cfoNp+'x', parseFloat(ratios.cfoNp)>1?'var(--green)':parseFloat(ratios.cfoNp)>0.6?'var(--warn)':'var(--danger)', 'Качество прибыли (>1 — денежная)') : '',
     ratios.capexRev!=null ? repRatioCard('CAPEX / Выручка', ratios.capexRev+'%', 'var(--text2)', 'Капиталоёмкость') : '',
     ratios.divFcf!=null ? repRatioCard('Дивиденды / FCF', (ratios.divFcf==='∞'?'∞':ratios.divFcf+'%'), (ratios.divFcf==='∞'||parseFloat(ratios.divFcf)>=100)?'var(--danger)':parseFloat(ratios.divFcf)<70?'var(--green)':'var(--warn)', 'Покрытие дивидендов FCF (>100% — не из FCF)') : '',
+    ratios.dso!=null ? repRatioCard('DSO', ratios.dso+' дн', 'var(--text2)', 'Дни сбора дебиторки') : '',
+    ratios.dio!=null ? repRatioCard('DIO', ratios.dio+' дн', 'var(--text2)', 'Дни в запасах') : '',
+    ratios.dpo!=null ? repRatioCard('DPO', ratios.dpo+' дн', 'var(--text2)', 'Дни оплаты кредиторам') : '',
+    ratios.ccc!=null ? repRatioCard('Цикл денег CCC', ratios.ccc+' дн', parseFloat(ratios.ccc)<0?'var(--green)':parseFloat(ratios.ccc)<90?'var(--warn)':'var(--danger)', 'DSO+DIO−DPO (меньше — лучше)') : '',
   ].filter(Boolean).join('');
 
   // Мостик EBITDA → CFO → FCF → после дивидендов: где деньги «утекают».
@@ -12711,6 +12736,9 @@ const REP_PICKER_FIELDS = [
   {id:'rep-np-cfo',    label:'Операц. поток (CFO)',  hint:'денежные средства от операционной|чистые денежные (средства|потоки),? (полученные|использованные)? ?от операционн|сальдо денежных потоков от (текущих|операционн)|net cash (from|generated).{0,20}operating|cash flow from operations|operating cash flow|поток от текущих операц|чистый денежный поток от операц'},
   {id:'rep-np-capex',  label:'CAPEX (капзатраты)',   hint:'приобретение основных средств|покупка основных средств|капитальные (вложения|затраты)|capital expenditures?|\\bcapex\\b|purchase of (property|fixed assets)|приобретение (объектов )?основных средств и нематериальн|платежи в связи с приобретением.{0,20}внеоборотн'},
   {id:'rep-np-divp',   label:'Дивиденды выплаченные',hint:'дивиденды выплаченн|выплата дивидендов|уплаченные дивиденды|dividends paid|направлено на выплату дивидендов|на выплату дивидендов'},
+  {id:'rep-np-recv',   label:'Дебиторка',            hint:'дебиторская задолженность|торговая дебиторская|trade receivables|accounts receivable|\\breceivables\\b|дебиторы'},
+  {id:'rep-np-inv',    label:'Запасы',               hint:'\\bзапасы\\b|товарно-материальн|inventories|inventory|материально-производственн|готовая продукция и товары'},
+  {id:'rep-np-pay',    label:'Кредиторка',           hint:'кредиторская задолженность|торговая кредиторская|trade payables|accounts payable|\\bpayables\\b|кредиторы'},
 ];
 
 // Общая таблица контекста — используется и для REP_PICKER_FIELDS
@@ -14267,6 +14295,7 @@ function repSavePeriod(){
     assets:gn('rep-np-assets'), eq:gn('rep-np-eq'), debt:gn('rep-np-debt'), cash:gn('rep-np-cash'),
     ca:gn('rep-np-ca'), cl:gn('rep-np-cl'), int:gn('rep-np-int'), ret:gn('rep-np-ret'),
     cfo:gn('rep-np-cfo'), capex:gn('rep-np-capex'), divp:gn('rep-np-divp'),
+    recv:gn('rep-np-recv'), inv:gn('rep-np-inv'), pay:gn('rep-np-pay'),
   };
   // Режим редактирования: если ключ изменился (поменяли год/период/тип) —
   // удаляем старую запись, чтобы не плодить дубликаты. Если такой ключ
@@ -14315,6 +14344,9 @@ function repEditPeriod(){
   setVal('rep-np-cfo',   p.cfo);
   setVal('rep-np-capex', p.capex);
   setVal('rep-np-divp',  p.divp);
+  setVal('rep-np-recv',  p.recv);
+  setVal('rep-np-inv',   p.inv);
+  setVal('rep-np-pay',   p.pay);
   // Подменяем заголовок модала, чтобы было ясно — это правка.
   const hdr = document.querySelector('#modal-rep-period .modal-hdr');
   if(hdr) hdr.firstChild.nodeValue = `Редактирование периода ${p.year} ${p.period || 'FY'} ${p.type || ''} `;

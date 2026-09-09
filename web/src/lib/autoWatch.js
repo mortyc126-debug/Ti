@@ -99,6 +99,9 @@ export function buildWatch({ industry, mults, payout, opexScaleTrap, dyn } = {})
   } else if(mults?.fcf != null && mults.fcf < 0){
     out.push({ level: 'warn', text: 'Отрицательный FCF (CFO < CAPEX): бизнес сжигает деньги — либо фаза стройки/роста, либо проблема. Проверь, за счёт чего живёт (долг/эмиссия) и когда FCF выйдет в плюс.' });
   }
+  if(mults?.ccc != null && mults.ccc > 120 && g !== 'finance'){
+    out.push({ level: 'info', text: `Длинный цикл денег (CCC ${Math.round(mults.ccc)} дн): деньги надолго заморожены в дебиторке/запасах. Рост CCC съедает CFO даже при прибыли — смотри динамику дебиторки и запасов.` });
+  }
 
   // — по данным (структурные) —
   if(opexScaleTrap){

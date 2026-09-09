@@ -42,6 +42,12 @@ export function reportToMults(r){
         capex = _n(r.capex) ?? _n(r.capex_val),
         divp = _n(r.divp) ?? _n(r.div_paid);
   const fcf = (cfo != null && capex != null) ? cfo - capex : null;
+  // оборотный капитал (база — выручка, COGS в данных нет)
+  const recv = _n(r.recv), inv = _n(r.inv), pay = _n(r.pay);
+  const dso = (recv != null && rev && rev > 0) ? recv / rev * 365 : null;
+  const dio = (inv != null && rev && rev > 0) ? inv / rev * 365 : null;
+  const dpo = (pay != null && rev && rev > 0) ? pay / rev * 365 : null;
+  const ccc = (dso != null && dio != null && dpo != null) ? dso + dio - dpo : null;
   const m = {
     ebitdaMarg: _n(r.ebitda_marg) ?? ((rev && rev > 0 && ebitda != null) ? ebitda / rev * 100 : null),
     roa: _n(r.roa_pct) ?? ((assets && assets > 0 && np != null) ? np / assets * 100 : null),
@@ -65,6 +71,7 @@ export function reportToMults(r){
     // обычно млн); приведение делаем при расчёте
     npRaw: np, revRaw: rev, eqRaw: eq, debtRaw: debt, cashRaw: cash, ebitdaRaw: ebitda, assetsRaw: assets,
     cfoRaw: cfo, capexRaw: capex, divpRaw: divp, fcfRaw: fcf,
+    dso, dio, dpo, ccc,
   };
   m.bqi = bqiScore({ mults: m });
   m.safety = safetyScore({ mults: m });

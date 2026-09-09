@@ -448,6 +448,7 @@ function TabFinances({ card, reports, industry, inn, issuerName }){
     .map(withDerived);
   // строки денежного потока показываем только если в данных есть ОДДС
   const hasCF = series.some(s => s.cfo != null || s.fcf != null);
+  const hasWC = series.some(s => s.ccc != null || s.dso != null);
   return (
     <div className="space-y-3">
       <AutoWatch inn={inn} issuerName={issuerName} industry={industry} reports={reports} />
@@ -497,6 +498,12 @@ function TabFinances({ card, reports, industry, inn, issuerName }){
               <MetricRow label="FCF"            series={series} field="fcf"     fmt={fmtBn} colorize />
               <MetricRow label="CFO/EBITDA, %"  series={series} field="cfoConv" fmt={fmtPct} colorize />
               <MetricRow label="Дивид./FCF, %"  series={series} field="divFcf"  fmt={fmtPct} />
+            </>}
+            {hasWC && <>
+              <MetricRow label="DSO, дн"        series={series} field="dso" fmt={fmtDays} />
+              <MetricRow label="DIO, дн"        series={series} field="dio" fmt={fmtDays} />
+              <MetricRow label="DPO, дн"        series={series} field="dpo" fmt={fmtDays} />
+              <MetricRow label="Цикл CCC, дн"   series={series} field="ccc" fmt={fmtDays} />
             </>}
           </tbody>
         </table>
@@ -1098,6 +1105,12 @@ function withDerived(r){
   const fcf = (cfo != null && capex != null) ? cfo - capex : null;
   const cfoConv = (cfo != null && ebitda) ? cfo / ebitda * 100 : null;
   const divFcf  = (divp != null && fcf != null && fcf > 0) ? divp / fcf * 100 : null;
+  // оборотный капитал (дни, база — выручка)
+  const recv = num(r.recv), inv = num(r.inv), pay = num(r.pay);
+  const dso = (recv != null && rev) ? recv / rev * 365 : null;
+  const dio = (inv != null && rev) ? inv / rev * 365 : null;
+  const dpo = (pay != null && rev) ? pay / rev * 365 : null;
+  const ccc = (dso != null && dio != null && dpo != null) ? dso + dio - dpo : null;
   const bn = v => v == null ? null : v / 1000;   // млн → млрд
   return {
     ...r,
@@ -1105,6 +1118,7 @@ function withDerived(r){
     assets: bn(assets), eq: bn(eq), debt: bn(debt), cash: bn(cash),
     roa_pct, ros_pct, roic_pct, roe_pct, ebitda_marg, net_debt_eq,
     cfo: bn(cfo), capex: bn(capex), fcf: bn(fcf), cfoConv, divFcf,
+    dso, dio, dpo, ccc,
   };
 }
 
@@ -1125,4 +1139,8 @@ function fmtPct(v){
 function fmtX(v){
   if(v == null || !isFinite(v)) return '—';
   return v.toFixed(2) + 'x';
+}
+function fmtDays(v){
+  if(v == null || !isFinite(v)) return '—';
+  return Math.round(v) + ' дн';
 }
