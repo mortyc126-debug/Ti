@@ -789,6 +789,15 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
         <div class="field"><label>Процентные расходы</label><input type="number" id="rep-np-int" placeholder="380" step="0.1"></div>
         <div class="field"><label>Нераспр. прибыль</label><input type="number" id="rep-np-ret" placeholder="1 500" step="0.1"></div>
       </div>
+      <div style="font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin:6px 0 4px">Денежный поток (ОДДС, если есть)</div>
+      <div class="g2">
+        <div class="field"><label>Операц. поток (CFO)</label><input type="number" id="rep-np-cfo" placeholder="1 050" step="0.1"></div>
+        <div class="field"><label>CAPEX (капзатраты)</label><input type="number" id="rep-np-capex" placeholder="470" step="0.1"></div>
+      </div>
+      <div class="g2">
+        <div class="field"><label>Дивиденды выплаченные</label><input type="number" id="rep-np-divp" placeholder="300" step="0.1"></div>
+        <div class="field"><label></label><div style="font-size:.55rem;color:var(--text3);padding-top:8px">FCF = CFO − CAPEX считается сам</div></div>
+      </div>
       <div class="field"><label>Заметка к периоду</label><textarea id="rep-np-note" placeholder="Комментарий к результатам..."></textarea></div>
       <!-- Блок сверки с ГИР БО: тянется по ИНН эмитента, сравнивает
            каждое поле формы с официальной строкой РСБУ из ФНС.
@@ -3953,7 +3962,8 @@ const _REPORTS_FIELD_MAP = {
   ebit: 'rep-np-ebit', int: 'rep-np-int',
   assets: 'rep-np-assets', eq: 'rep-np-eq', debt: 'rep-np-debt',
   cash: 'rep-np-cash', ca: 'rep-np-ca', cl: 'rep-np-cl',
-  ret: 'rep-np-ret'
+  ret: 'rep-np-ret',
+  cfo: 'rep-np-cfo', capex: 'rep-np-capex', divp: 'rep-np-divp'
 };
 
 // Нормализованный ярлык периода: «FY 2024», «H1 2025», «9M 2024».
@@ -9277,6 +9287,9 @@ const REP_FIELDS = [
   {id:'cl',    label:'Краткосрочн. обяз.',icon:'🔴', unit:'млрд ₽', good:'down'},
   {id:'int',   label:'Процентные расх.',  icon:'📉', unit:'млрд ₽', good:'down'},
   {id:'ret',   label:'Нераспр. прибыль',  icon:'🏦', unit:'млрд ₽', good:'up'},
+  {id:'cfo',   label:'Операц. поток CFO', icon:'💧', unit:'млрд ₽', good:'up'},
+  {id:'capex', label:'CAPEX',             icon:'🏗', unit:'млрд ₽', good:'down'},
+  {id:'divp',  label:'Дивиденды выпл.',   icon:'🎁', unit:'млрд ₽', good:'down'},
 ];
 
 // Derived ratios
@@ -9295,6 +9308,21 @@ function repCalcRatios(d){
   if(d.ca != null && d.cl != null) r.wc = (d.ca - d.cl).toFixed(2);
   // Debt Ratio — доля финансового долга в активах
   if(d.debt != null && d.assets) r.debtR = (d.debt/d.assets*100).toFixed(1);
+  // ── Денежный поток ────────────────────────────────────────────────
+  // FCF = операционный поток − капзатраты (свободный денежный поток)
+  if(d.cfo != null && d.capex != null) r.fcf = (d.cfo - d.capex).toFixed(2);
+  // Конверсия EBITDA→CFO: сколько операц. кэша даёт рубль EBITDA (в идеале ~1)
+  if(d.cfo != null && d.ebitda) r.cfoConv = (d.cfo/d.ebitda*100).toFixed(0);
+  // Качество прибыли: CFO / чистая прибыль (>1 — прибыль «денежная»)
+  if(d.cfo != null && d.np && d.np !== 0) r.cfoNp = (d.cfo/d.np).toFixed(2);
+  // Интенсивность капзатрат: CAPEX / выручка
+  if(d.capex != null && d.rev) r.capexRev = (d.capex/d.rev*100).toFixed(1);
+  // Покрытие дивидендов свободным потоком: дивиденды / FCF (>100% — платят не из FCF)
+  if(d.divp != null && d.cfo != null && d.capex != null){
+    const fcf = d.cfo - d.capex;
+    if(fcf > 0) r.divFcf = (d.divp/fcf*100).toFixed(0);
+    else if(d.divp > 0) r.divFcf = '∞';   // платят при отрицательном FCF
+  }
   return r;
 }
 
@@ -11324,14 +11352,52 @@ function repRenderCards(p){
     ratios.npm!=null ? repRatioCard('Чист. маржа', ratios.npm+'%', parseFloat(ratios.npm)>10?'var(--green)':parseFloat(ratios.npm)>0?'var(--warn)':'var(--danger)', 'Чист. прибыль / Выручка') : '',
     ratios.ebitdam!=null ? repRatioCard('EBITDA маржа', ratios.ebitdam+'%', parseFloat(ratios.ebitdam)>20?'var(--green)':parseFloat(ratios.ebitdam)>10?'var(--warn)':'var(--danger)', 'EBITDA / Выручка') : '',
     ratios.eqr!=null ? repRatioCard('Equity Ratio', ratios.eqr+'%', parseFloat(ratios.eqr)>40?'var(--green)':parseFloat(ratios.eqr)>20?'var(--warn)':'var(--danger)', 'Капитал / Активы') : '',
+    ratios.fcf!=null ? repRatioCard('FCF', ratios.fcf+' млрд', parseFloat(ratios.fcf)>0?'var(--green)':'var(--danger)', 'CFO − CAPEX (свободный поток)') : '',
+    ratios.cfoConv!=null ? repRatioCard('CFO / EBITDA', ratios.cfoConv+'%', parseFloat(ratios.cfoConv)>80?'var(--green)':parseFloat(ratios.cfoConv)>50?'var(--warn)':'var(--danger)', 'Конверсия EBITDA в кэш (~100% норма)') : '',
+    ratios.cfoNp!=null ? repRatioCard('CFO / Прибыль', ratios.cfoNp+'x', parseFloat(ratios.cfoNp)>1?'var(--green)':parseFloat(ratios.cfoNp)>0.6?'var(--warn)':'var(--danger)', 'Качество прибыли (>1 — денежная)') : '',
+    ratios.capexRev!=null ? repRatioCard('CAPEX / Выручка', ratios.capexRev+'%', 'var(--text2)', 'Капиталоёмкость') : '',
+    ratios.divFcf!=null ? repRatioCard('Дивиденды / FCF', (ratios.divFcf==='∞'?'∞':ratios.divFcf+'%'), (ratios.divFcf==='∞'||parseFloat(ratios.divFcf)>=100)?'var(--danger)':parseFloat(ratios.divFcf)<70?'var(--green)':'var(--warn)', 'Покрытие дивидендов FCF (>100% — не из FCF)') : '',
   ].filter(Boolean).join('');
+
+  // Мостик EBITDA → CFO → FCF → после дивидендов: где деньги «утекают».
+  const bridge = _repCashBridge(p);
 
   grid.innerHTML = `
     ${_cbrContextFor(p.year, p.period)}
     <div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin-bottom:8px">Исходные показатели</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:16px">${cards||'<div style="color:var(--text3);font-size:.7rem">Нет данных</div>'}</div>
     ${ratioCards?`<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin-bottom:8px">Расчётные коэффициенты</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">${ratioCards}</div>`:''}`;
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">${ratioCards}</div>`:''}
+    ${bridge}`;
+}
+
+// Мостик денежного потока EBITDA → CFO → FCF → FCF после дивидендов.
+// Показывает наглядно, куда «утекают» деньги и остаётся ли что-то акционеру.
+function _repCashBridge(p){
+  if(p.cfo == null && p.capex == null) return '';
+  const bn = v => v == null ? null : (Math.abs(v) >= 1 ? v.toLocaleString('ru-RU',{maximumFractionDigits:1}) : (v*1000).toLocaleString('ru-RU',{maximumFractionDigits:0})+' млн');
+  const unit = v => (v != null && Math.abs(v) >= 1) ? ' млрд' : '';
+  const fcf = (p.cfo != null && p.capex != null) ? p.cfo - p.capex : null;
+  const fcfAfterDiv = (fcf != null && p.divp != null) ? fcf - p.divp : null;
+  const rows = [
+    ['EBITDA', p.ebitda, 'var(--text2)'],
+    ['− Δоборотки, налоги, %', null, 'var(--text3)'],
+    ['CFO — операц. поток', p.cfo, 'var(--text)'],
+    ['− CAPEX', p.capex != null ? -p.capex : null, 'var(--warn)'],
+    ['FCF — свободный поток', fcf, fcf != null && fcf < 0 ? 'var(--danger)' : 'var(--green)'],
+    ['− Дивиденды', p.divp != null ? -p.divp : null, 'var(--warn)'],
+    ['FCF после дивидендов', fcfAfterDiv, fcfAfterDiv != null && fcfAfterDiv < 0 ? 'var(--danger)' : 'var(--pos)'],
+  ].filter(r => r[1] != null || r[0].startsWith('−') || r[0].startsWith('CFO'));
+  const line = (l, v, c) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+    <span style="color:${c};font-size:.62rem">${l}</span>
+    <span style="color:${c};font-size:.66rem;font-weight:700;font-family:var(--mono)">${v == null ? '' : (v < 0 ? '−' : '') + bn(Math.abs(v)) + unit(v)}</span></div>`;
+  return `<div style="margin-top:14px">
+    <div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin-bottom:6px">Мостик денежного потока</div>
+    <div style="background:var(--s1);border:1px solid var(--border);padding:10px 14px;max-width:420px">
+      ${rows.map(r => line(r[0], r[1], r[2])).join('')}
+      <div style="font-size:.54rem;color:var(--text3);margin-top:6px">Прибыль ≠ деньги: смотри, доходит ли EBITDA до CFO, что остаётся после CAPEX и хватает ли FCF на дивиденды.</div>
+    </div>
+  </div>`;
 }
 
 function repRatioCard(label, value, color, sub){
@@ -12642,6 +12708,9 @@ const REP_PICKER_FIELDS = [
   {id:'rep-np-cl',     label:'Краткосрочные обяз.',  hint:'итого краткосрочных обязательств|краткосрочные обязательства|итого текущих обязательств|текущие обязательства|current liabilities|total current liabilities|итого раздела v'},
   {id:'rep-np-int',    label:'Процентные расходы',   hint:'процентные расходы|расходы по процентам|проценты к уплате|проценты уплаченные|проценты начисленные|проценты по (кредитам|займам)|interest expense|finance (cost|expenses)|финансовые расходы'},
   {id:'rep-np-ret',    label:'Нераспр. прибыль',     hint:'нераспределенн|нераспределённ|retained|непокрытый убыток|нераспредел\\w+ прибыль'},
+  {id:'rep-np-cfo',    label:'Операц. поток (CFO)',  hint:'денежные средства от операционной|чистые денежные (средства|потоки),? (полученные|использованные)? ?от операционн|сальдо денежных потоков от (текущих|операционн)|net cash (from|generated).{0,20}operating|cash flow from operations|operating cash flow|поток от текущих операц|чистый денежный поток от операц'},
+  {id:'rep-np-capex',  label:'CAPEX (капзатраты)',   hint:'приобретение основных средств|покупка основных средств|капитальные (вложения|затраты)|capital expenditures?|\\bcapex\\b|purchase of (property|fixed assets)|приобретение (объектов )?основных средств и нематериальн|платежи в связи с приобретением.{0,20}внеоборотн'},
+  {id:'rep-np-divp',   label:'Дивиденды выплаченные',hint:'дивиденды выплаченн|выплата дивидендов|уплаченные дивиденды|dividends paid|направлено на выплату дивидендов|на выплату дивидендов'},
 ];
 
 // Общая таблица контекста — используется и для REP_PICKER_FIELDS
@@ -14197,6 +14266,7 @@ function repSavePeriod(){
     rev:gn('rep-np-rev'), ebitda:gn('rep-np-ebitda'), np:gn('rep-np-np'), ebit:gn('rep-np-ebit'),
     assets:gn('rep-np-assets'), eq:gn('rep-np-eq'), debt:gn('rep-np-debt'), cash:gn('rep-np-cash'),
     ca:gn('rep-np-ca'), cl:gn('rep-np-cl'), int:gn('rep-np-int'), ret:gn('rep-np-ret'),
+    cfo:gn('rep-np-cfo'), capex:gn('rep-np-capex'), divp:gn('rep-np-divp'),
   };
   // Режим редактирования: если ключ изменился (поменяли год/период/тип) —
   // удаляем старую запись, чтобы не плодить дубликаты. Если такой ключ
@@ -14242,6 +14312,9 @@ function repEditPeriod(){
   setVal('rep-np-cl',    p.cl);
   setVal('rep-np-int',   p.int);
   setVal('rep-np-ret',   p.ret);
+  setVal('rep-np-cfo',   p.cfo);
+  setVal('rep-np-capex', p.capex);
+  setVal('rep-np-divp',  p.divp);
   // Подменяем заголовок модала, чтобы было ясно — это правка.
   const hdr = document.querySelector('#modal-rep-period .modal-hdr');
   if(hdr) hdr.firstChild.nodeValue = `Редактирование периода ${p.year} ${p.period || 'FY'} ${p.type || ''} `;
