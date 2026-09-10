@@ -165,6 +165,20 @@ async function _issuerNamesFile(){
   return {};
 }
 
+// Имена из отраслевого справочника (offline, без MOEX): web/public/
+// industry-peers.json (сид) + localStorage['bondan_industry_peers'] (правки
+// пользователя со страницы «Отрасли»). Структура: {industries:{k:{peers:[{inn,name}]}}}.
+async function _peerNames(){
+  const map = {};
+  const collect = obj => {
+    const inds = obj?.industries || {};
+    for(const k in inds){ for(const p of (inds[k]?.peers || [])){ if(p?.inn && p?.name) map[String(p.inn)] = p.name; } }
+  };
+  try { const r = await _timeout(fetch('/industry-peers.json'), 8000); if(r.ok) collect(await r.json()); } catch(_){}
+  try { const raw = localStorage.getItem('bondan_industry_peers'); if(raw) collect(JSON.parse(raw)); } catch(_){}
+  return map;
+}
+
 async function _snapshotInns(){
   try {
     const r = await _timeout(fetch('/reports-cache/_index.json'), 8000);
@@ -226,6 +240,7 @@ export async function loadIssuersReal(){
   const dbNames = _reportsDbNames();
   const bondNames = await _bondNames();
   const fileNames = await _issuerNamesFile();
+  const peerNames = await _peerNames();
 
   // per-issuer отчёты пулом (из снимка либо backend)
   const out = [];
@@ -241,9 +256,10 @@ export async function loadIssuersReal(){
       const mm = meta[inn] || {};
       out.push({
         id: inn, inn,
-        // приоритет: catalog → reports-снимок → reportsDB → словарь имён →
-        // снимок облигаций → ИНН
-        name: mm.name || snap.name || dbNames[String(inn)] || fileNames[String(inn)] || bondNames[String(inn)] || inn,
+        // приоритет: catalog → reports-снимок → reportsDB → отраслевой
+        // справочник (offline) → словарь MOEX → снимок облигаций → ИНН
+        name: mm.name || snap.name || dbNames[String(inn)] || peerNames[String(inn)]
+          || fileNames[String(inn)] || bondNames[String(inn)] || inn,
         ticker: mm.ticker || null,
         industry: _SECTOR_MAP[mm.sector] || mm.sector || 'other',
         kinds: ['bond'],

@@ -71,6 +71,9 @@ def main():
         except Exception:
             continue
         real_inn = str(doc.get("inn") or inn)
+        # имя эмитента из дампа (без сети): пробуем на уровне документа
+        doc_name = (doc.get("name") or doc.get("issuer") or doc.get("org_name")
+                    or doc.get("short_name") or doc.get("shortname") or doc.get("emitent"))
         for b in doc.get("data", []):
             secid = (b.get("secid") or "").upper()
             mat = b.get("mat_date")
@@ -80,7 +83,13 @@ def main():
             if ytm is None:
                 continue
             seen.add(secid)
-            out.append({"secid": secid, "inn": real_inn, "mat_date": mat, "ytm": round(ytm, 3)})
+            # имя: документ → поля выпуска (SECNAME/SHORTNAME/issuer) → нет
+            bname = (doc_name or b.get("issuer") or b.get("secname") or b.get("SECNAME")
+                     or b.get("shortname") or b.get("SHORTNAME") or b.get("name"))
+            row = {"secid": secid, "inn": real_inn, "mat_date": mat, "ytm": round(ytm, 3)}
+            if bname:
+                row["issuer"] = str(bname).strip()
+            out.append(row)
         if k % 50 == 0:
             print(f"[cache] эмитенты {k+1}/{len(files)} (бондов с ценой {len(out)})", file=sys.stderr)
 
