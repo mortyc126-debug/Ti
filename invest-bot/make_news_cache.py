@@ -70,9 +70,9 @@ def main():
                 if analyze:
                     try:
                         a = analyze_news(it["title"], it.get("summary", ""), tk)
-                        # analyze_news возвращает dict; берём тональность/влияние гибко
-                        rec["sentiment"] = a.get("sentiment") or a.get("тональность")
-                        rec["impact"] = a.get("impact") or a.get("влияние")
+                        rec["sentiment"] = a.get("sentiment")           # very_positive…very_negative
+                        dirn, strg = a.get("expected_direction"), a.get("expected_strength")
+                        rec["impact"] = f"{dirn}/{strg}" if (dirn and strg) else dirn
                     except Exception as e:
                         print(f"[news] analyze {tk}: {e}", file=sys.stderr)
                 out.append(rec)
