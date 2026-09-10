@@ -1,0 +1,5 @@
+# данные и результаты — локальные, в репозиторий не кладём
+daily.csv
+events.csv
+releases.csv
+earnings_drift_output/
