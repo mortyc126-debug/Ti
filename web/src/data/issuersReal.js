@@ -135,6 +135,26 @@ function _reportsDbNames(){
   return map;
 }
 
+// Имена эмитентов из снимка облигаций (bonds-cache.json несёт issuer+inn).
+// Основной офлайн-источник имён, когда catalog деградировал, а reports-снимок
+// имени не содержит. { inn -> issuerName }.
+async function _bondNames(){
+  const map = {};
+  try {
+    const r = await _timeout(fetch('/bonds-cache.json'), 8000);
+    if(r.ok){
+      const d = await r.json();
+      const rows = Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : []);
+      for(const row of rows){
+        const inn = row.inn || row.issuer_inn || row.emitent_inn;
+        const nm = row.issuer || row.issuer_name || row.emitent || row.org_name;
+        if(inn && nm && !map[String(inn)]) map[String(inn)] = nm;
+      }
+    }
+  } catch(_){}
+  return map;
+}
+
 async function _snapshotInns(){
   try {
     const r = await _timeout(fetch('/reports-cache/_index.json'), 8000);
@@ -191,8 +211,10 @@ export async function loadIssuersReal(){
     }
   } catch(_){ /* без секторов → industry='other' */ }
 
-  // имена из reportsDB (localStorage) — на случай, если catalog пуст/деградировал
+  // имена из reportsDB (localStorage) и снимка облигаций — на случай, если
+  // catalog пуст/деградировал, а reports-снимок имени не содержит
   const dbNames = _reportsDbNames();
+  const bondNames = await _bondNames();
 
   // per-issuer отчёты пулом (из снимка либо backend)
   const out = [];
@@ -208,8 +230,8 @@ export async function loadIssuersReal(){
       const mm = meta[inn] || {};
       out.push({
         id: inn, inn,
-        // приоритет: catalog → имя из снимка → reportsDB → ИНН (крайний случай)
-        name: mm.name || snap.name || dbNames[String(inn)] || inn,
+        // приоритет: catalog → reports-снимок → reportsDB → снимок облигаций → ИНН
+        name: mm.name || snap.name || dbNames[String(inn)] || bondNames[String(inn)] || inn,
         ticker: mm.ticker || null,
         industry: _SECTOR_MAP[mm.sector] || mm.sector || 'other',
         kinds: ['bond'],
