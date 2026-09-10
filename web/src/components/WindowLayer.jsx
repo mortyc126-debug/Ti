@@ -14,6 +14,7 @@ import { computeMScore, MSCORE_FIELDS, extraGet, extraSetField } from '../lib/ms
 import { buildWatch, annualTrends } from '../lib/autoWatch.js';
 import { computeScenario } from '../lib/scenario.js';
 import { useNewsStore, newsForTicker } from '../store/news.js';
+import { ratingGet, ratingSet } from '../lib/ratings.js';
 
 // Слой плавающих окон. Рендерится один раз в App.jsx поверх Outlet.
 // Каркас окна + живой контент в MediumBody (вкладки Финансы/Бумаги/
@@ -454,6 +455,7 @@ function TabFinances({ card, reports, industry, inn, issuerName }){
   return (
     <div className="space-y-3">
       <AutoWatch inn={inn} issuerName={issuerName} industry={industry} reports={reports} />
+      <RatingChip inn={inn} />
       <NewsPanel ticker={issuer?.ticker} name={issuerName} />
       {issuer && (
         <div className="text-text3 text-xs">
@@ -1148,6 +1150,41 @@ function fmtX(v){
 function fmtDays(v){
   if(v == null || !isFinite(v)) return '—';
   return Math.round(v) + ' дн';
+}
+
+// Ручной кредитный рейтинг эмитента (localStorage). Источник добавим позже.
+function RatingChip({ inn }){
+  const [r, setR] = useState(() => ratingGet(inn));
+  const [edit, setEdit] = useState(false);
+  const [val, setVal] = useState(r?.rating || '');
+  const [out, setOut] = useState(r?.outlook || '');
+  useEffect(() => { const g = ratingGet(inn); setR(g); setVal(g?.rating || ''); setOut(g?.outlook || ''); }, [inn]);
+  if(!inn) return null;
+  const save = () => { ratingSet(inn, val, out); setR(ratingGet(inn)); setEdit(false); };
+  if(edit){
+    return (
+      <div className="flex items-center gap-1.5 text-xs" data-no-drag>
+        <span className="text-text3">Рейтинг</span>
+        <input value={val} onChange={e => setVal(e.target.value)} placeholder="AA(RU)" autoFocus
+          onKeyDown={e => e.key === 'Enter' && save()}
+          className="w-24 bg-bg2 border border-border rounded px-1.5 py-0.5 text-text" />
+        <input value={out} onChange={e => setOut(e.target.value)} placeholder="прогноз"
+          onKeyDown={e => e.key === 'Enter' && save()}
+          className="w-24 bg-bg2 border border-border rounded px-1.5 py-0.5 text-text" />
+        <button type="button" onClick={save} className="px-2 py-0.5 rounded bg-acc-dim text-acc border border-acc/30">ок</button>
+      </div>
+    );
+  }
+  return (
+    <button type="button" onClick={() => setEdit(true)} data-no-drag
+      title="Кредитный рейтинг (вручную)"
+      className="inline-flex items-center gap-1.5 text-xs text-text3 hover:text-acc">
+      <span className="text-text3">Рейтинг:</span>
+      {r ? (
+        <span className="font-mono text-text">{r.rating}{r.outlook ? ` · ${r.outlook}` : ''}<span className="text-text3 ml-1 text-[10px]">{r.date}</span></span>
+      ) : <span className="text-acc">＋ добавить</span>}
+    </button>
+  );
 }
 
 // Новости по эмитенту — из снимка news-cache.json, привязка по тикеру.
