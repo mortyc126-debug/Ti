@@ -117,6 +117,24 @@ const REP_TTL = 7 * 864e5;   // отчёты меняются редко → к�
 // Локальный снимок (web/public/reports-cache/{inn}.json = {data:[rows]},
 // _index.json = [inn,...]) — тот же, что читает модуль отчётности. Живёт
 // офлайн, не зависит от деградировавшей D1. Приоритет над backend.
+// Имена эмитентов из reportsDB (localStorage['ba_v2']) — тот же источник,
+// что показывает модуль отчётности. Работает офлайн, когда catalog деградировал.
+// Возвращает { inn -> name }.
+function _reportsDbNames(){
+  const map = {};
+  try {
+    const raw = localStorage.getItem('ba_v2');
+    if(!raw) return map;
+    const db = JSON.parse(raw)?.reportsDB || {};
+    for(const id in db){
+      const e = db[id];
+      if(!e || !e.name) continue;
+      if(e.inn) map[String(e.inn)] = e.name;
+    }
+  } catch(_){}
+  return map;
+}
+
 async function _snapshotInns(){
   try {
     const r = await _timeout(fetch('/reports-cache/_index.json'), 8000);
@@ -173,6 +191,9 @@ export async function loadIssuersReal(){
     }
   } catch(_){ /* без секторов → industry='other' */ }
 
+  // имена из reportsDB (localStorage) — на случай, если catalog пуст/деградировал
+  const dbNames = _reportsDbNames();
+
   // per-issuer отчёты пулом (из снимка либо backend)
   const out = [];
   let idx = 0;
@@ -187,8 +208,8 @@ export async function loadIssuersReal(){
       const mm = meta[inn] || {};
       out.push({
         id: inn, inn,
-        // приоритет: catalog → имя из снимка → ИНН (последнее — крайний случай)
-        name: mm.name || snap.name || inn,
+        // приоритет: catalog → имя из снимка → reportsDB → ИНН (крайний случай)
+        name: mm.name || snap.name || dbNames[String(inn)] || inn,
         ticker: mm.ticker || null,
         industry: _SECTOR_MAP[mm.sector] || mm.sector || 'other',
         kinds: ['bond'],
