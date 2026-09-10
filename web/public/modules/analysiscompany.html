@@ -589,6 +589,8 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
       <button class="btn btn-sm rep-view-btn" id="rep-vb-chart" onclick="repSetView('chart',this)"> Динамика</button>
       <button class="btn btn-sm rep-view-btn" id="rep-vb-analysis" onclick="repSetView('analysis',this)" style="border-color:var(--acc);color:var(--acc)"> Анализ</button>
       <span style="margin-left:12px;font-size:.59rem;color:var(--text3)" id="rep-period-meta"></span>
+      <button id="rep-copy-inn" onclick="_repCopyInn()" title="Скопировать ИНН эмитента"
+        style="display:none;margin-left:8px;font-size:.55rem;background:rgba(255,0,110,.10);border:1px solid rgba(255,0,110,.22);color:var(--acc);border-radius:4px;padding:1px 7px;cursor:pointer;font-family:inherit;font-weight:600">ИНН ⧉</button>
     </div>
 
     <!-- Cards view -->
@@ -11273,6 +11275,15 @@ function repBuildPeriodTabs(){
   _repSyncPeriodToolbar();
 }
 
+function _repCopyInn(){
+  const btn = document.getElementById('rep-copy-inn');
+  const inn = btn && btn.dataset.inn;
+  if(!inn) return;
+  try { navigator.clipboard.writeText(inn); } catch(e){}
+  btn.textContent = 'скопировано ✓';
+  setTimeout(() => { btn.textContent = 'ИНН ' + inn + ' ⧉'; }, 1200);
+}
+
 function repSelectPeriod(key, btn){
   repActivePeriodKey = key;
   document.querySelectorAll('#rep-period-tabs .ptab').forEach(b=>b.classList.remove('active'));
@@ -11285,6 +11296,12 @@ function repRenderPeriod(){
   const iss = reportsDB[repActiveIssuerId]; if(!iss) return;
   const p = iss.periods[repActivePeriodKey]; if(!p) return;
   document.getElementById('rep-period-meta').textContent = `${iss.name} · ${p.year} ${p.period} ${p.type}${p.note?' · '+p.note:''}`;
+  // кнопка копирования ИНН — показываем, если ИНН у эмитента известен
+  const innBtn = document.getElementById('rep-copy-inn');
+  if(innBtn){
+    if(iss.inn){ innBtn.style.display=''; innBtn.dataset.inn = iss.inn; innBtn.textContent = 'ИНН '+iss.inn+' ⧉'; }
+    else { innBtn.style.display='none'; }
+  }
   if(repViewMode==='cards') repRenderCards(p);
   else if(repViewMode==='text') repRenderText(p, iss);
   else if(repViewMode==='analysis') repRenderAnalysis(p, iss);
