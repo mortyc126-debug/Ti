@@ -17,7 +17,7 @@ import {
   buildPool, applyMultFilters,
   applyTopNSum, applyTopNSequential, buildSelectedView,
 } from '../../lib/comparisonSet.js';
-import { useIssuers, currentIssuers } from '../../store/issuers.js';
+import { useIssuers, currentIssuers, reloadIssuers } from '../../store/issuers.js';
 
 export default function Comparison(){
   const allIssuers = useIssuers();   // реальные эмитенты под выбранный год; смена → пересчёт
@@ -105,13 +105,18 @@ export default function Comparison(){
         </span>
       </div>
 
-      {/* переключатель вида: радар / тепловая карта / бары */}
-      <div className="flex gap-0.5 rounded overflow-hidden border border-border w-fit">
-        {[['radar', 'Радар'], ['heatmap', 'Тепловая'], ['bar', 'Бары']].map(([id, lbl]) => (
-          <button key={id} type="button" onClick={() => setView(id)}
-            className={['px-3 py-1 text-xs transition-colors',
-              view === id ? 'bg-acc-dim text-acc' : 'bg-bg2 text-text3 hover:text-text'].join(' ')}>{lbl}</button>
-        ))}
+      {/* переключатель вида + обновление имён/данных эмитентов */}
+      <div className="flex items-center gap-2">
+        <div className="flex gap-0.5 rounded overflow-hidden border border-border w-fit">
+          {[['radar', 'Радар'], ['heatmap', 'Тепловая'], ['bar', 'Бары']].map(([id, lbl]) => (
+            <button key={id} type="button" onClick={() => setView(id)}
+              className={['px-3 py-1 text-xs transition-colors',
+                view === id ? 'bg-acc-dim text-acc' : 'bg-bg2 text-text3 hover:text-text'].join(' ')}>{lbl}</button>
+          ))}
+        </div>
+        <button type="button" onClick={reloadIssuers}
+          title="Сбросить кэш эмитентов и подтянуть имена заново (после генераторов имён)"
+          className="px-2.5 py-1 text-xs rounded border border-border bg-bg2 text-text3 hover:text-acc">⟳ обновить имена</button>
       </div>
 
       <div className="grid lg:grid-cols-[1fr_360px] gap-4">
