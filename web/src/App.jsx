@@ -10,6 +10,7 @@ import Industries from './pages/Industries.jsx';
 import Market from './pages/Market.jsx';
 import Reports from './pages/Reports.jsx';
 import DebtLoad from './pages/DebtLoad.jsx';
+import Stocks from './pages/Stocks.jsx';
 
 export default function App(){
   return (
@@ -19,6 +20,7 @@ export default function App(){
           <Route index element={<Home />} />
           <Route path="portfolio" element={<Portfolio />} />
           <Route path="bonds" element={<Bonds />} />
+          <Route path="stocks" element={<Stocks />} />
           <Route path="live" element={<Live />} />
           <Route path="favorites" element={<Favorites />} />
           <Route path="reports" element={<Reports />} />
