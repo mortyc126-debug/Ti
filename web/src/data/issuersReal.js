@@ -155,6 +155,16 @@ async function _bondNames(){
   return map;
 }
 
+// Готовый словарь имён {inn:name} из web/public/issuer-names.json
+// (генерится tools/make_issuer_names.py из MOEX). Главный офлайн-источник имён.
+async function _issuerNamesFile(){
+  try {
+    const r = await _timeout(fetch('/issuer-names.json'), 8000);
+    if(r.ok){ const d = await r.json(); if(d && typeof d === 'object') return d; }
+  } catch(_){}
+  return {};
+}
+
 async function _snapshotInns(){
   try {
     const r = await _timeout(fetch('/reports-cache/_index.json'), 8000);
@@ -215,6 +225,7 @@ export async function loadIssuersReal(){
   // catalog пуст/деградировал, а reports-снимок имени не содержит
   const dbNames = _reportsDbNames();
   const bondNames = await _bondNames();
+  const fileNames = await _issuerNamesFile();
 
   // per-issuer отчёты пулом (из снимка либо backend)
   const out = [];
@@ -230,8 +241,9 @@ export async function loadIssuersReal(){
       const mm = meta[inn] || {};
       out.push({
         id: inn, inn,
-        // приоритет: catalog → reports-снимок → reportsDB → снимок облигаций → ИНН
-        name: mm.name || snap.name || dbNames[String(inn)] || bondNames[String(inn)] || inn,
+        // приоритет: catalog → reports-снимок → reportsDB → словарь имён →
+        // снимок облигаций → ИНН
+        name: mm.name || snap.name || dbNames[String(inn)] || fileNames[String(inn)] || bondNames[String(inn)] || inn,
         ticker: mm.ticker || null,
         industry: _SECTOR_MAP[mm.sector] || mm.sector || 'other',
         kinds: ['bond'],

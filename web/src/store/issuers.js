@@ -12,7 +12,7 @@ import { loadIssuersReal } from '../data/issuersReal.js';
 import { getAllIssuers } from '../data/issuersMock.js';
 
 const MOCK = getAllIssuers();
-const CACHE_KEY = 'ba_issuers_raw_v13';  // v13: имя из снимка облигаций (inn→issuer); v12: reportsDB
+const CACHE_KEY = 'ba_issuers_raw_v14';  // v14: словарь issuer-names.json (из MOEX); v13: снимок облигаций
 const TTL = 6 * 3600e3;
 
 // выбрать отчёт эмитента под (год, тип); reps уже отсортированы по убыванию
