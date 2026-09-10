@@ -127,9 +127,17 @@ async function _snapshotInns(){
 async function _fetchReportsSnap(inn){
   try {
     const r = await _timeout(fetch('/reports-cache/' + inn + '.json'), 8000);
-    if(r.ok){ const d = await r.json(); return Array.isArray(d?.data) ? d.data : []; }
+    if(r.ok){
+      const d = await r.json();
+      const data = Array.isArray(d?.data) ? d.data : (Array.isArray(d) ? d : []);
+      // имя эмитента из снимка (catalog деградировал — иначе останутся ИНН-цифры)
+      const row0 = data[0] || {};
+      const name = d?.name || d?.orgName || d?.org || d?.issuer || d?.short_name
+        || row0.name || row0.org || row0.orgName || row0.issuer || row0.short_name || null;
+      return { data, name };
+    }
   } catch(_){}
-  return [];
+  return { data: [], name: null };
 }
 
 async function _fetchReportsBackend(inn){
@@ -172,13 +180,15 @@ export async function loadIssuersReal(){
   async function worker(){
     while(idx < inns.length){
       const inn = inns[idx++];
-      const rows = fromSnap ? await _fetchReportsSnap(inn) : await _fetchReportsBackend(inn);
+      const snap = fromSnap ? await _fetchReportsSnap(inn) : { data: await _fetchReportsBackend(inn), name: null };
+      const rows = snap.data;
       const reps = _annualReports(rows);
       if(!reps.length) continue;
       const mm = meta[inn] || {};
       out.push({
         id: inn, inn,
-        name: mm.name || inn,
+        // приоритет: catalog → имя из снимка → ИНН (последнее — крайний случай)
+        name: mm.name || snap.name || inn,
         ticker: mm.ticker || null,
         industry: _SECTOR_MAP[mm.sector] || mm.sector || 'other',
         kinds: ['bond'],
