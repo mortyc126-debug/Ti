@@ -453,19 +453,38 @@ def main():
         daily, events, fcols, cfg
     )
 
-    predictions = walk_forward(
-        dataset, fcols, cfg
-    )
-
-    metrics = summarize(predictions)
-
     output = Path("earnings_drift_output")
     output.mkdir(exist_ok=True)
-
+    # Сырой набор событий пишем СРАЗУ — он полезен сам по себе (остаточный
+    # дрейф по каждому событию), даже если для walk-forward данных мало.
     dataset.to_csv(output / "events_dataset.csv", index=False)
+
+    # Описательная сводка по дрейфу — работает при любом числе событий.
+    y = dataset["y"]
+    print("\n── Остаточный дрейф за", cfg.horizon, "сессий ──")
+    print(f"событий: {len(dataset)} | средний y: {y.mean():+.4f} | "
+          f"медиана: {y.median():+.4f} | доля y>0: {(y>0).mean():.0%}")
+    lo = dataset.loc[dataset["low_attention"] >= 0.7, "y"]
+    hi = dataset.loc[dataset["low_attention"] <= 0.3, "y"]
+    if len(lo): print(f"низкое внимание (n={len(lo)}): средний y {lo.mean():+.4f}")
+    if len(hi): print(f"высокое внимание (n={len(hi)}): средний y {hi.mean():+.4f}")
+    print("\nпо событиям:")
+    cols = [c for c in ("event_id","ticker","decision_time","y","low_attention") if c in dataset]
+    print(dataset[cols].to_string(index=False))
+
+    try:
+        predictions = walk_forward(dataset, fcols, cfg)
+    except ValueError as e:
+        print(f"\n⚠ Walk-forward пропущен: {e}")
+        print(f"Нужно ~{cfg.min_train_events}+ завершившихся событий для OOS "
+              f"(сейчас {len(dataset)}). Введи даты раскрытия по большему числу "
+              "эмитентов/лет и повтори. Сырой набор — в events_dataset.csv.")
+        return
+
+    metrics = summarize(predictions)
     predictions.to_csv(output / "oos_predictions.csv", index=False)
     metrics.to_csv(output / "metrics.csv", index=False)
-
+    print("\n── OOS-метрики (base vs full) ──")
     print(metrics.to_string(index=False))
 
 
