@@ -681,6 +681,30 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
   </div>
 </div>
 
+<!-- Modal: импорт списка раскрытий (e-disclosure / ГИР БО) -->
+<div class="modal-overlay" id="modal-rep-discl">
+  <div class="modal" style="width:760px;max-width:96vw">
+    <div class="modal-hdr">Импорт списка раскрытий <button class="modal-x" onclick="closeModal('modal-rep-discl')"></button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:.63rem;color:var(--text3);line-height:1.5">
+        Скопируй строки со страницы раскрытия эмитента (e-disclosure / ГИР БО) — целиком, вместе с датами и размером файла.
+        Каждая строка = один документ. Разберу <b>год</b>, <b>период</b>, <b>тип</b> и <b>дату раскрытия</b> (последняя дата перед размером файла).
+        Дальше — «Создать заготовки»: появятся пустые периоды с уже проставленными датами, останется вписать только числа.
+      </div>
+      <textarea id="rep-discl-input" spellcheck="false" style="width:100%;min-height:150px;font-family:var(--mono);font-size:.6rem;line-height:1.45;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:8px;resize:vertical" placeholder="1&#9;Годовой отчет&#9;2025&#9;23.04.2026&#9;24.04.2026&#9;27.04.2026&#9;zip, 2.13 МБ&#9;Данные о подписи"></textarea>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-acc" onclick="repDisclParse()">Разобрать</button>
+        <span id="rep-discl-status" style="font-size:.63rem;color:var(--text3)"></span>
+      </div>
+      <div id="rep-discl-preview" style="max-height:340px;overflow:auto"></div>
+      <div id="rep-discl-actions" style="display:none;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-acc" onclick="repDisclCreate()">Создать заготовки периодов</button>
+        <button class="btn" onclick="repDisclCsv()">Копировать CSV</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: new period -->
 <div class="modal-overlay" id="modal-rep-period">
   <div class="modal" style="width:520px">
@@ -14344,6 +14368,190 @@ function repSavePeriod(){
   window._repEditOldKey = null;
   save(); closeModal('modal-rep-period');
   repBuildPeriodTabs();
+}
+
+// ── Импорт списка раскрытий (e-disclosure / ГИР БО) ──────────────────────
+// Пользовательница копирует таблицу документов эмитента (тип · год/период ·
+// даты · размер файла) — руками вбивать даты по каждому периоду долго.
+// Парсер вытаскивает год, период, тип и дату раскрытия, дальше создаём
+// пустые заготовки периодов, остаётся вписать только числа из ZIP.
+function repDisclOpen(){
+  if(!repActiveIssuerId){ alert('Сначала выберите эмитента.'); return; }
+  document.getElementById('rep-discl-input').value = '';
+  document.getElementById('rep-discl-preview').innerHTML = '';
+  document.getElementById('rep-discl-status').textContent = '';
+  document.getElementById('rep-discl-actions').style.display = 'none';
+  window._repDisclRows = [];
+  document.getElementById('modal-rep-discl').classList.add('open');
+}
+
+// Разбор одной вставки в массив {year, period, type, disclosed(iso), disclosedRu, docType}
+function _repParseDisclList(text){
+  const out = [];
+  const dateRe = /^\d{2}\.\d{2}\.\d{4}$/;
+  const sizeRe = /(?:\bzip\b|\brar\b|\bpdf\b|\bxlsx?\b|\bdocx?\b|\brtf\b|КБ|МБ|ГБ|Кб|Мб|Гб)/i;
+  for(const raw of String(text||'').split(/\r?\n/)){
+    const line = raw.trim();
+    if(!line) continue;
+    // ГИР БО/e-disclosure разделяет колонки табами; при копировании иногда
+    // остаются 2+ пробела — тогда бьём по ним.
+    let cells = line.split('\t').map(s=>s.trim()).filter(Boolean);
+    if(cells.length < 3) cells = line.split(/\s{2,}/).map(s=>s.trim()).filter(Boolean);
+    if(cells.length < 3) continue;
+    // размер файла — якорь: дата раскрытия = последняя дата перед ним
+    const sizeIdx = cells.findIndex(c => sizeRe.test(c) && /\d/.test(c));
+    const dates = [];
+    cells.forEach((c,i)=>{ if(dateRe.test(c)) dates.push({i,v:c}); });
+    if(!dates.length) continue;                       // строка без дат — не документ
+    const before = sizeIdx>=0 ? dates.filter(d=>d.i<sizeIdx) : dates;
+    const pool = before.length ? before : dates;
+    const disclosedRu = pool[pool.length-1].v;
+    // ячейка «год/период»: 4-значный год, но не дата
+    let ycell = null;
+    for(const c of cells){ if(!dateRe.test(c) && /(?:^|\D)(?:19|20)\d{2}(?:\D|$)/.test(c) && !sizeRe.test(c)){ ycell = c; break; } }
+    if(!ycell) continue;
+    const year = (ycell.match(/(?:19|20)\d{2}/)||[])[0];
+    if(!year) continue;
+    // тип документа — самая длинная осмысленная ячейка
+    let docType = '';
+    for(const c of cells){
+      if(dateRe.test(c)) continue;
+      if(sizeRe.test(c) && /\d/.test(c)) continue;
+      if(/^\d+$/.test(c)) continue;
+      if(c === ycell) continue;
+      if(/данные о подписи/i.test(c)) continue;
+      if(c.length > docType.length) docType = c;
+    }
+    const dt = (docType + ' ' + ycell).toLowerCase();
+    // период — по маркеру месяцев/квартала (год/период-ячейка надёжнее описания)
+    let period = 'Год';
+    if(/9\s*мес/.test(dt)) period = '9М';
+    else if(/6\s*мес|полугод/.test(dt)) period = 'Полугодие';
+    else if(/3\s*мес|(?:^|\D)1\s*квартал|i\s*квартал|первый квартал/.test(dt)) period = '1 квартал';
+    // тип отчётности
+    let type = 'РСБУ';
+    if(/мсфо|международ|us\s*gaap|ifrs/.test(dt)) type = 'МСФО';
+    else if(/рсбу|бухгалтерск|российск/.test(dt)) type = 'РСБУ';
+    // ISO даты для хранения
+    let iso = null;
+    const dm = disclosedRu.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+    if(dm) iso = `${dm[3]}-${dm[2]}-${dm[1]}`;
+    out.push({year, period, type, disclosed:iso, disclosedRu, docType});
+  }
+  return out;
+}
+
+function repDisclParse(){
+  const text = document.getElementById('rep-discl-input').value;
+  let rows = _repParseDisclList(text);
+  // дубли по ключу год+период+тип (напр. исправленная версия) — оставляем
+  // с самой поздней датой раскрытия
+  const byKey = {};
+  for(const r of rows){
+    const k = `${r.year}_${r.period}_${r.type}`;
+    if(!byKey[k] || (r.disclosed||'') > (byKey[k].disclosed||'')) byKey[k] = r;
+  }
+  rows = Object.values(byKey).sort((a,b)=> (b.year-a.year) || (a.period<b.period?-1:1));
+  rows.forEach(r=>r.include = true);
+  window._repDisclRows = rows;
+  const st = document.getElementById('rep-discl-status');
+  if(!rows.length){
+    st.style.color = 'var(--danger)';
+    st.textContent = 'Не удалось разобрать ни одной строки. Проверь, что скопированы строки целиком (с датами и размером).';
+    document.getElementById('rep-discl-preview').innerHTML = '';
+    document.getElementById('rep-discl-actions').style.display = 'none';
+    return;
+  }
+  st.style.color = 'var(--text3)';
+  st.textContent = `Разобрано строк: ${rows.length}. Проверь период/тип, лишнее сними галочкой.`;
+  _repDisclRenderPreview();
+  document.getElementById('rep-discl-actions').style.display = 'flex';
+}
+
+function _repDisclRenderPreview(){
+  const rows = window._repDisclRows || [];
+  const iss = reportsDB[repActiveIssuerId];
+  const periods = (iss && iss.periods) || {};
+  const perOpts = ['Год','9М','Полугодие','3 квартал','1 квартал'];
+  const typeOpts = ['МСФО','РСБУ'];
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:.6rem">'
+    + '<thead><tr style="color:var(--text3);text-align:left">'
+    + '<th style="padding:4px 5px"></th><th style="padding:4px 5px">Документ</th>'
+    + '<th style="padding:4px 5px">Год</th><th style="padding:4px 5px">Период</th>'
+    + '<th style="padding:4px 5px">Тип</th><th style="padding:4px 5px">Раскрыт</th>'
+    + '<th style="padding:4px 5px"></th></tr></thead><tbody>';
+  rows.forEach((r,i)=>{
+    const key = `${r.year}_${r.period}_${r.type}`;
+    const ex = periods[key];
+    const hasNums = ex && ['rev','ebitda','np','assets'].some(k=>ex[k]!=null);
+    const badge = hasNums ? '<span style="color:var(--warn)" title="Уже есть с числами — пропустим">есть ✓</span>'
+      : ex ? '<span style="color:var(--text3)" title="Заготовка уже есть — обновим дату">заготовка</span>' : '';
+    const per = perOpts.map(o=>`<option value="${o}"${o===r.period?' selected':''}>${o}</option>`).join('');
+    const typ = typeOpts.map(o=>`<option value="${o}"${o===r.type?' selected':''}>${o}</option>`).join('');
+    const doc = (r.docType||'').length>52 ? _escHtml(r.docType.slice(0,52))+'…' : _escHtml(r.docType||'');
+    html += `<tr style="border-top:1px solid var(--border)">`
+      + `<td style="padding:3px 5px"><input type="checkbox" ${r.include?'checked':''} onchange="window._repDisclRows[${i}].include=this.checked"></td>`
+      + `<td style="padding:3px 5px;color:var(--text2)" title="${_escHtml(r.docType||'')}">${doc}</td>`
+      + `<td style="padding:3px 5px;font-family:var(--mono)">${r.year}</td>`
+      + `<td style="padding:3px 5px"><select onchange="window._repDisclRows[${i}].period=this.value;_repDisclRenderPreview()" style="font-size:.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border)">${per}</select></td>`
+      + `<td style="padding:3px 5px"><select onchange="window._repDisclRows[${i}].type=this.value;_repDisclRenderPreview()" style="font-size:.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border)">${typ}</select></td>`
+      + `<td style="padding:3px 5px;font-family:var(--mono);color:var(--text2)">${_escHtml(r.disclosedRu||'—')}</td>`
+      + `<td style="padding:3px 5px;font-size:.55rem">${badge}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('rep-discl-preview').innerHTML = html;
+}
+
+function repDisclCreate(){
+  if(!repActiveIssuerId){ alert('Сначала выберите эмитента.'); return; }
+  const iss = reportsDB[repActiveIssuerId];
+  if(!iss.periods) iss.periods = {};
+  const rows = (window._repDisclRows || []).filter(r=>r.include);
+  if(!rows.length){ alert('Нечего создавать — все строки сняты.'); return; }
+  const NULL_FIELDS = ['rev','ebitda','np','ebit','assets','eq','debt','cash','ca','cl','int','ret','cfo','capex','divp','recv','inv','pay'];
+  let created=0, updated=0, skipped=0;
+  for(const r of rows){
+    const key = `${r.year}_${r.period}_${r.type}`;
+    const ex = iss.periods[key];
+    const hasNums = ex && ['rev','ebitda','np','assets'].some(k=>ex[k]!=null);
+    const note = r.disclosedRu ? ('раскрыт '+r.disclosedRu) : '';
+    if(hasNums){
+      // не трогаем числа, но проставим дату раскрытия, если её ещё нет
+      if(r.disclosed && !ex.disclosed){ ex.disclosed = r.disclosed; if(!ex.note) ex.note = note; updated++; }
+      else skipped++;
+      continue;
+    }
+    if(ex){
+      ex.disclosed = r.disclosed || ex.disclosed || null;
+      if(!ex.note && note) ex.note = note;
+      ex.year = r.year; ex.period = r.period; ex.type = r.type;
+      updated++;
+      continue;
+    }
+    const stub = {year:r.year, period:r.period, type:r.type, note, disclosed:r.disclosed||null};
+    NULL_FIELDS.forEach(f=>stub[f]=null);
+    iss.periods[key] = stub;
+    created++;
+  }
+  save();
+  repBuildPeriodTabs();
+  closeModal('modal-rep-discl');
+  alert(`Готово. Создано заготовок: ${created}` + (updated?`, обновлено: ${updated}`:'') + (skipped?`, пропущено (уже с числами): ${skipped}`:'') + '.\nОткрывай период и вписывай числа — год/период/тип и дата раскрытия уже проставлены.');
+}
+
+function repDisclCsv(){
+  const iss = reportsDB[repActiveIssuerId] || {};
+  const rows = (window._repDisclRows || []).filter(r=>r.include);
+  if(!rows.length){ alert('Нечего копировать.'); return; }
+  const inn = iss.inn || (repActiveIssuerId && /^\d{10}(\d{2})?$/.test(String(repActiveIssuerId)) ? String(repActiveIssuerId) : '');
+  const esc = v => v==null?'':`"${String(v).replace(/"/g,'""')}"`;
+  const lines = ['inn,name,year,period,type,disclosed'];
+  for(const r of rows) lines.push([inn, iss.name||'', r.year, r.period, r.type, r.disclosed||''].map(esc).join(','));
+  const csv = lines.join('\n');
+  try { navigator.clipboard.writeText(csv); } catch(e){}
+  const st = document.getElementById('rep-discl-status');
+  st.style.color = 'var(--green)';
+  st.textContent = `CSV (${rows.length} строк) скопирован в буфер.`;
 }
 
 // Открыть форму с заполненными значениями активного периода.
@@ -29151,6 +29359,7 @@ function _repBuildIssuerHeader(iss, issId){
   var actHtml = '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'
     + '<button class="btn" onclick="repEditIssuer&&repEditIssuer()">✎ отрасль</button>'
     + '<button class="btn" onclick="repRunAudit&&repRunAudit()">аудит</button>'
+    + '<button class="btn" onclick="repDisclOpen&&repDisclOpen()" title="Вставить список раскрытий с e-disclosure/ГИР БО и создать заготовки периодов с датами">📋 раскрытия</button>'
     + '<button class="btn" id="rep-add-period-btn" onclick="repNewPeriodModal&&repNewPeriodModal()">+ период</button>'
     + '<button class="btn btn-acc" id="rep-compare-btn" onclick="repOpenCrossCompare&&repOpenCrossCompare()">≡ Сравнить</button>'
     + '</div>';
