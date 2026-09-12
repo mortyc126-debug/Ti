@@ -686,6 +686,7 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
   <div class="modal" style="width:760px;max-width:96vw">
     <div class="modal-hdr">Импорт списка раскрытий <button class="modal-x" onclick="closeModal('modal-rep-discl')"></button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
+      <div id="rep-discl-target" style="font-size:.66rem;font-weight:600;color:var(--acc);background:rgba(255,0,110,.07);border:1px solid rgba(255,0,110,.2);border-radius:4px;padding:6px 9px"></div>
       <div style="font-size:.63rem;color:var(--text3);line-height:1.5">
         Скопируй строки со страницы раскрытия эмитента (e-disclosure / ГИР БО) — целиком, вместе с датами и размером файла.
         Каждая строка = один документ. Разберу <b>год</b>, <b>период</b>, <b>тип</b> и <b>дату раскрытия</b> (последняя дата перед размером файла).
@@ -14377,6 +14378,13 @@ function repSavePeriod(){
 // пустые заготовки периодов, остаётся вписать только числа из ZIP.
 function repDisclOpen(){
   if(!repActiveIssuerId){ alert('Сначала выберите эмитента.'); return; }
+  const iss = reportsDB[repActiveIssuerId];
+  if(!iss){ alert('Эмитент не найден.'); return; }
+  // Жёстко фиксируем, В КОГО импортируем, на момент открытия окна — дальше
+  // пишем именно сюда, даже если активный эмитент вдруг сменится.
+  window._repDisclIssId = repActiveIssuerId;
+  const innTxt = iss.inn ? ' · ИНН '+iss.inn : '';
+  document.getElementById('rep-discl-target').textContent = 'Импортирую в: ' + (iss.name || repActiveIssuerId) + innTxt;
   document.getElementById('rep-discl-input').value = '';
   document.getElementById('rep-discl-preview').innerHTML = '';
   document.getElementById('rep-discl-status').textContent = '';
@@ -14470,7 +14478,7 @@ function repDisclParse(){
 
 function _repDisclRenderPreview(){
   const rows = window._repDisclRows || [];
-  const iss = reportsDB[repActiveIssuerId];
+  const iss = reportsDB[window._repDisclIssId];
   const periods = (iss && iss.periods) || {};
   const perOpts = ['Год','9М','Полугодие','3 квартал','1 квартал'];
   const typeOpts = ['МСФО','РСБУ'];
@@ -14484,8 +14492,10 @@ function _repDisclRenderPreview(){
     const key = `${r.year}_${r.period}_${r.type}`;
     const ex = periods[key];
     const hasNums = ex && ['rev','ebitda','np','assets'].some(k=>ex[k]!=null);
-    const badge = hasNums ? '<span style="color:var(--warn)" title="Уже есть с числами — пропустим">есть ✓</span>'
-      : ex ? '<span style="color:var(--text3)" title="Заготовка уже есть — обновим дату">заготовка</span>' : '';
+    // Бейдж про СЛОТ периода (год+период+тип) именно у этого эмитента, не про дату
+    const exD = ex && ex.disclosed ? (' (раскрыт '+ex.disclosed.split('-').reverse().join('.')+')') : '';
+    const badge = hasNums ? '<span style="color:var(--warn)" title="У этого эмитента этот период уже с числами'+exD+' — числа не трону">заполнен ✓</span>'
+      : ex ? '<span style="color:var(--text3)" title="У этого эмитента уже есть пустая заготовка этого периода'+exD+' — обновлю дату">слот занят</span>' : '';
     const per = perOpts.map(o=>`<option value="${o}"${o===r.period?' selected':''}>${o}</option>`).join('');
     const typ = typeOpts.map(o=>`<option value="${o}"${o===r.type?' selected':''}>${o}</option>`).join('');
     const doc = (r.docType||'').length>52 ? _escHtml(r.docType.slice(0,52))+'…' : _escHtml(r.docType||'');
@@ -14503,8 +14513,14 @@ function _repDisclRenderPreview(){
 }
 
 function repDisclCreate(){
-  if(!repActiveIssuerId){ alert('Сначала выберите эмитента.'); return; }
-  const iss = reportsDB[repActiveIssuerId];
+  const issId = window._repDisclIssId;
+  const iss = issId && reportsDB[issId];
+  if(!iss){ alert('Эмитент, для которого открыт импорт, не найден. Закрой окно и открой заново.'); return; }
+  // Защита: если активный эмитент успел смениться — предупреждаем, но пишем
+  // именно туда, куда открывали окно (это показано в шапке окна).
+  if(repActiveIssuerId && repActiveIssuerId !== issId){
+    if(!confirm('Внимание: активным сейчас стал другой эмитент.\nЗаписать периоды в «'+(iss.name||issId)+'» (в кого открывали импорт)?')) return;
+  }
   if(!iss.periods) iss.periods = {};
   const rows = (window._repDisclRows || []).filter(r=>r.include);
   if(!rows.length){ alert('Нечего создавать — все строки сняты.'); return; }
@@ -14540,10 +14556,11 @@ function repDisclCreate(){
 }
 
 function repDisclCsv(){
-  const iss = reportsDB[repActiveIssuerId] || {};
+  const issId = window._repDisclIssId;
+  const iss = (issId && reportsDB[issId]) || {};
   const rows = (window._repDisclRows || []).filter(r=>r.include);
   if(!rows.length){ alert('Нечего копировать.'); return; }
-  const inn = iss.inn || (repActiveIssuerId && /^\d{10}(\d{2})?$/.test(String(repActiveIssuerId)) ? String(repActiveIssuerId) : '');
+  const inn = iss.inn || (issId && /^\d{10}(\d{2})?$/.test(String(issId)) ? String(issId) : '');
   const esc = v => v==null?'':`"${String(v).replace(/"/g,'""')}"`;
   const lines = ['inn,name,year,period,type,disclosed'];
   for(const r of rows) lines.push([inn, iss.name||'', r.year, r.period, r.type, r.disclosed||''].map(esc).join(','));
