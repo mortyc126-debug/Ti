@@ -88,6 +88,27 @@ def _features(cur, prev):
     return f
 
 
+def _ticker_by_inn():
+    """inn -> ticker из снимка акций (releases.csv из приложения может идти
+    без тикера — отчётность в вебе живёт по ИНН). Снимок собирает
+    make_equities_cache.py в web/public/stocks-cache.json."""
+    path = os.path.join(PUB, "stocks-cache.json")
+    if not os.path.exists(path):
+        return {}
+    try:
+        a = json.load(open(path, encoding="utf-8"))
+    except Exception:
+        return {}
+    arr = a if isinstance(a, list) else (a.get("data") or a.get("stocks") or [])
+    m = {}
+    for s in (arr or []):
+        inn = str((s or {}).get("inn") or "").strip()
+        tk = str((s or {}).get("ticker") or "").strip()
+        if inn and tk:
+            m[inn] = tk
+    return m
+
+
 def _news_attention():
     """ticker -> список дат публикаций (для прокси внимания)."""
     path = os.path.join(PUB, "news-cache.json")
@@ -135,6 +156,7 @@ def main():
             "(event_id,ticker,inn,fy_year,available_at[,low_attention])"
         )
     news = _news_attention()
+    tk_map = _ticker_by_inn()
     rel = list(csv.DictReader(open(REL, encoding="utf-8-sig")))
 
     out_rows, skipped = [], []
@@ -142,12 +164,17 @@ def main():
         tk = (r.get("ticker") or "").strip()
         inn = (r.get("inn") or "").strip()
         avail = (r.get("available_at") or "").strip()
+        # тикер в releases.csv из приложения может быть пуст — добираем по ИНН
+        if not tk and inn:
+            tk = tk_map.get(inn, "")
         try:
             fy = int(r.get("fy_year"))
         except (TypeError, ValueError):
             skipped.append((r.get("event_id"), "плохой fy_year")); continue
-        if not (tk and inn and avail):
-            skipped.append((r.get("event_id"), "нет ticker/inn/available_at")); continue
+        if not inn or not avail:
+            skipped.append((r.get("event_id"), "нет inn/available_at")); continue
+        if not tk:
+            skipped.append((r.get("event_id"), f"нет тикера по ИНН {inn} (нет в stocks-cache)")); continue
 
         rows = _annual_rows(inn)
         if fy not in rows or (fy - 1) not in rows:

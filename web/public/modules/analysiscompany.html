@@ -701,6 +701,7 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
       <div id="rep-discl-actions" style="display:none;gap:8px;flex-wrap:wrap">
         <button class="btn btn-acc" onclick="repDisclCreate()">Создать заготовки периодов</button>
         <button class="btn" onclick="repDisclCsv()">Копировать CSV</button>
+        <button class="btn" onclick="repDisclExportReleases()" title="Выгрузить ВСЕ годовые даты раскрытия (по всем эмитентам) в файл releases.csv для research/earnings_drift.py — это available_at для PEAD">⭳ releases.csv (PEAD)</button>
       </div>
     </div>
   </div>
@@ -14600,6 +14601,44 @@ function repDisclCsv(){
   const st = document.getElementById('rep-discl-status');
   st.style.color = 'var(--green)';
   st.textContent = `CSV (${rows.length} строк) скопирован в буфер.`;
+}
+
+// Экспорт ВСЕХ годовых дат раскрытия (по всем эмитентам reportsDB) в файл
+// releases.csv — вход для research/make_events_research.py: это и есть
+// available_at для PEAD. Одно событие на (эмитент, год), приоритет МСФО.
+// Тикер добираем из снимка акций (/stocks-cache.json), если совпал по ИНН;
+// чего не хватило — доразрешит python из того же снимка.
+async function repDisclExportReleases(){
+  let byInn={};
+  try{
+    const r=await fetch('/stocks-cache.json',{cache:'no-store'});
+    if(r.ok){const a=await r.json();const arr=Array.isArray(a)?a:(a.data||a.stocks||[]);
+      for(const s of (arr||[])){ if(s&&s.inn&&s.ticker) byInn[String(s.inn)]=s.ticker; }}
+  }catch(e){}
+  const ev={};
+  for(const id in reportsDB){
+    const iss=reportsDB[id]; if(!iss||!iss.periods) continue;
+    const inn=iss.inn||(/^\d{10}(\d{2})?$/.test(String(id))?String(id):'');
+    for(const k in iss.periods){
+      const p=iss.periods[k];
+      if(!p||!p.disclosed||String(p.period)!=='Год') continue;
+      const key=(inn||id)+'_'+p.year;
+      const pref=(String(p.type||'').indexOf('МСФО')>=0)?1:0;
+      if(!ev[key]||pref>ev[key].pref) ev[key]={inn,id,year:p.year,disclosed:p.disclosed,pref,ticker:byInn[inn]||''};
+    }
+  }
+  const rows=Object.values(ev).sort((a,b)=>String((a.inn||a.id)+a.year).localeCompare(String((b.inn||b.id)+b.year)));
+  if(!rows.length){ alert('Нет годовых периодов с датой раскрытия. Сначала импортируй даты через «📋 раскрытия».'); return; }
+  const esc=v=>v==null?'':'"'+String(v).replace(/"/g,'""')+'"';
+  const lines=['event_id,ticker,inn,fy_year,available_at,low_attention'];
+  for(const r of rows) lines.push([(r.inn||r.id)+'_'+r.year, r.ticker, r.inn, r.year, r.disclosed, ''].map(esc).join(','));
+  const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url; a.download='releases.csv'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  const withT=rows.filter(r=>r.ticker).length;
+  const st=document.getElementById('rep-discl-status');
+  if(st){ st.style.color='var(--green)'; st.textContent=`releases.csv: ${rows.length} годовых событий (тикер найден у ${withT}). Положи в research/ → make_events_research.py.`; }
 }
 
 // Открыть форму с заполненными значениями активного периода.
