@@ -14623,6 +14623,13 @@ async function repDisclExportReleases(){
         if(s.name) byName[norm(s.name)]=s.ticker; }}
   }catch(e){}
   const resolveTk = iss => (iss.isin && byIsin[String(iss.isin).toUpperCase()]) || byName[norm(iss.name)] || '';
+  // период приложения → канонический бакет (совпадает с _period_bucket в python)
+  const bucket = per => { const t=String(per||'').toLowerCase();
+    if(/год|12/.test(t)) return 'FY';
+    if(/9|3\s*квартал/.test(t)) return '9M';
+    if(/полугод|6/.test(t)) return 'H1';
+    if(/1\s*квартал|3\s*мес/.test(t)) return 'Q1';
+    return 'FY'; };
   const ev={};
   for(const id in reportsDB){
     const iss=reportsDB[id]; if(!iss||!iss.periods) continue;
@@ -14630,24 +14637,25 @@ async function repDisclExportReleases(){
     const tk=resolveTk(iss);
     for(const k in iss.periods){
       const p=iss.periods[k];
-      if(!p||!p.disclosed||String(p.period)!=='Год') continue;
-      const key=(inn||id)+'_'+p.year;
+      if(!p||!p.disclosed) continue;      // теперь берём ВСЕ периоды с датой
+      const bk=bucket(p.period);
+      const key=(inn||id)+'_'+p.year+'_'+bk;
       const pref=(String(p.type||'').indexOf('МСФО')>=0)?1:0;
-      if(!ev[key]||pref>ev[key].pref) ev[key]={inn,id,year:p.year,disclosed:p.disclosed,pref,ticker:tk};
+      if(!ev[key]||pref>ev[key].pref) ev[key]={inn,id,year:p.year,disclosed:p.disclosed,pref,ticker:tk,bucket:bk};
     }
   }
-  const rows=Object.values(ev).sort((a,b)=>String((a.inn||a.id)+a.year).localeCompare(String((b.inn||b.id)+b.year)));
-  if(!rows.length){ alert('Нет годовых периодов с датой раскрытия. Сначала импортируй даты через «📋 раскрытия».'); return; }
+  const rows=Object.values(ev).sort((a,b)=>String((a.inn||a.id)+a.year+a.bucket).localeCompare(String((b.inn||b.id)+b.year+b.bucket)));
+  if(!rows.length){ alert('Нет периодов с датой раскрытия. Сначала импортируй даты через «📋 раскрытия».'); return; }
   const esc=v=>v==null?'':'"'+String(v).replace(/"/g,'""')+'"';
-  const lines=['event_id,ticker,inn,fy_year,available_at,low_attention'];
-  for(const r of rows) lines.push([(r.inn||r.id)+'_'+r.year, r.ticker, r.inn, r.year, r.disclosed, ''].map(esc).join(','));
+  const lines=['event_id,ticker,inn,fy_year,period,available_at,low_attention'];
+  for(const r of rows) lines.push([(r.inn||r.id)+'_'+r.year+'_'+r.bucket, r.ticker, r.inn, r.year, r.bucket, r.disclosed, ''].map(esc).join(','));
   const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');
   a.href=url; a.download='releases.csv'; a.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
   const withT=rows.filter(r=>r.ticker).length;
   const st=document.getElementById('rep-discl-status');
-  if(st){ st.style.color='var(--green)'; st.textContent=`releases.csv: ${rows.length} годовых событий (тикер найден у ${withT}). Положи в research/ → make_events_research.py.`; }
+  if(st){ st.style.color='var(--green)'; st.textContent=`releases.csv: ${rows.length} событий (годовые+промежуточные, тикер найден у ${withT}). Положи в research/ → make_events_research.py.`; }
 }
 
 // Открыть форму с заполненными значениями активного периода.

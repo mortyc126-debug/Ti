@@ -79,8 +79,11 @@ def load_inputs(daily_path, events_path, cfg):
     for c in ["log_ret", *cfg.factors]:
         daily[c] = pd.to_numeric(daily[c], errors="raise")
 
-    for c in ["low_attention", *fcols]:
-        events[c] = pd.to_numeric(events[c], errors="raise")
+    events["low_attention"] = pd.to_numeric(events["low_attention"], errors="raise")
+    # Фундаментальные признаки могут отсутствовать (промежуточный отчёт без
+    # финансов в снимке) — пустое → NaN, импутация разберётся на train.
+    for c in fcols:
+        events[c] = pd.to_numeric(events[c], errors="coerce")
 
     # NaN разрешены в фундаментальных данных:
     # импутация будет обучаться только на train.

@@ -43,8 +43,30 @@ def _num(v):
         return None
 
 
-def _annual_rows(inn):
-    """годовые строки эмитента из снимка: {fy_year -> row}, приоритет МСФО."""
+# Классификатор периода в канонический бакет. Работает и на строках снимка
+# (reports-cache: "12 месяцев"/"6 месяцев"/"9 месяцев"/"3 месяца"/…), и на
+# периодах из приложения ("Год"/"Полугодие"/"9М"/"3 квартал"/"1 квартал").
+# Бакеты сопоставимы год-к-году: FY, H1, 9M, Q1.
+def _period_bucket(s):
+    t = str(s or "").strip().upper()
+    if not t:
+        return "FY"
+    if t in {"FY", "Y", "ГОД", "ГОДОВОЙ", "12М", "12M", "12 МЕСЯЦЕВ"} or "ГОД" in t or "12" in t or "ANNUAL" in t:
+        return "FY"
+    if "9" in t:          # 9 месяцев / 9М / 3 квартал (янв–сен, накопительно)
+        return "9M"
+    if "3 КВАРТ" in t:    # на всякий случай, если "3 квартал" без цифры 9
+        return "9M"
+    if "6" in t or "ПОЛУГОД" in t or "H1" in t or "1П" in t:
+        return "H1"
+    if "3" in t or "1 КВАРТ" in t or "1 КВ" in t or "Q1" in t or "1К" in t:
+        return "Q1"
+    return "FY"
+
+
+def _rows_by_bucket(inn):
+    """строки эмитента из снимка: {(bucket, year) -> row}, приоритет МСФО.
+    Годовые и промежуточные — сравнение потом идёт с тем же бакетом год назад."""
     path = os.path.join(PUB, "reports-cache", f"{inn}.json")
     if not os.path.exists(path):
         return {}
@@ -54,18 +76,15 @@ def _annual_rows(inn):
         return {}
     out = {}
     for r in data:
-        period = str(r.get("period") or "").strip().upper()
-        if period not in _ANN and not ("ГОД" in period or period in _ANN):
-            continue
         y = r.get("fy_year")
         if y is None:
             continue
-        y = int(y)
+        key = (_period_bucket(r.get("period")), int(y))
         std = str(r.get("std") or "")
         pref = 1 if ("МСФО" in std or "IFRS" in std.upper()) else 0
-        if y not in out or pref >= out[y][0]:
-            out[y] = (pref, r)
-    return {y: v[1] for y, v in out.items()}
+        if key not in out or pref >= out[key][0]:
+            out[key] = (pref, r)
+    return {k: v[1] for k, v in out.items()}
 
 
 def _features(cur, prev):
@@ -181,16 +200,21 @@ def main():
         if not tk:
             skipped.append((r.get("event_id"), f"нет тикера по ИНН {inn} (нет в stocks-cache)")); continue
 
-        rows = _annual_rows(inn)
-        if fy not in rows or (fy - 1) not in rows:
-            skipped.append((r.get("event_id"), f"нет отчётов {fy}/{fy-1} в снимке")); continue
-
-        feats = _features(rows[fy], rows[fy - 1])
+        bucket = _period_bucket(r.get("period") or "FY")
+        # Фичи год-к-году по ТОМУ ЖЕ периоду (H1 vs H1, 9М vs 9М, FY vs FY).
+        # Нет фундамента в снимке — событие всё равно берём (дрейф считается
+        # по ценам), фичи оставляем пустыми: их импутирует модель.
+        rows = _rows_by_bucket(inn)
+        cur, prev = rows.get((bucket, fy)), rows.get((bucket, fy - 1))
+        feats = _features(cur, prev) if (cur and prev) else {
+            "f_revenue_yoy": "", "f_margin_change": "",
+            "f_cfo_assets": "", "f_leverage_change": "",
+        }
         la = r.get("low_attention")
         la = float(la) if (la not in (None, "")) else _low_attention(tk, avail, news)
 
         out_rows.append({
-            "event_id": (r.get("event_id") or f"{tk}_{fy}").strip(),
+            "event_id": (r.get("event_id") or f"{tk}_{fy}_{bucket}").strip(),
             "ticker": tk,
             "available_at": avail,
             "low_attention": round(float(la), 3) if la != "" else "",
