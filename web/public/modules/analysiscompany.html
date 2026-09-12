@@ -11372,17 +11372,48 @@ function _periodEndDate(year,period){
   else if(/9\s*м|3\s*кварт/i.test(p))md='-09-30';
   return y+md;
 }
-function _cbrContextFor(year,period){
+function _cbrContextFor(year,period,disclosed){
   const end=_periodEndDate(year,period);if(!end)return '';
+  const chips=[];
+  // Блок 1 — ставка ЦБ на конец периода (только если есть история ставки)
   const a=_cbrHistLoad();
-  if(!a.length)return '<div style="font-size:.56rem;color:var(--text3);margin-bottom:12px">Ставка ЦБ: история пуста — заведи её в модуле «Долг», и здесь появится контекст по периодам.</div>';
-  const r=_cbrRateAt(end);if(r==null)return '';
-  const prevEnd=_periodEndDate(parseInt(year)-1,period);const pr=prevEnd?_cbrRateAt(prevEnd):null;
-  let delta='';
-  if(pr!=null){const d=r-pr;const col=d>0?'var(--danger)':d<0?'var(--green)':'var(--text3)';delta=' <span style="color:'+col+'">('+(d>0?'+':'')+d.toFixed(2)+' п.п. г/г)</span>';}
-  return '<div style="display:inline-flex;align-items:center;gap:8px;font-size:.62rem;color:var(--text2);background:var(--s1);border:1px solid var(--border);border-left:3px solid var(--acc);padding:7px 12px;margin-bottom:12px">'
-    +'<span style="color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-size:.54rem">Ставка ЦБ на конец периода</span> '
-    +'<b style="color:var(--text);font-size:.8rem">'+(+r).toFixed(2)+'%</b>'+delta+'</div>';
+  const r=a.length?_cbrRateAt(end):null;
+  if(r!=null){
+    const prevEnd=_periodEndDate(parseInt(year)-1,period);const pr=prevEnd?_cbrRateAt(prevEnd):null;
+    let delta='';
+    if(pr!=null){const d=r-pr;const col=d>0?'var(--danger)':d<0?'var(--green)':'var(--text3)';delta=' <span style="color:'+col+'">('+(d>0?'+':'')+d.toFixed(2)+' п.п. г/г)</span>';}
+    chips.push('<div style="display:inline-flex;align-items:center;gap:8px;font-size:.62rem;color:var(--text2);background:var(--s1);border:1px solid var(--border);border-left:3px solid var(--acc);padding:7px 12px">'
+      +'<span style="color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-size:.54rem">Ставка ЦБ на конец периода</span> '
+      +'<b style="color:var(--text);font-size:.8rem">'+(+r).toFixed(2)+'%</b>'+delta+'</div>');
+  }
+  // Блок 2 — дата раскрытия + лаг публикации (конец периода → раскрытие) +
+  // ставка ЦБ на момент публикации. Лагу история ставки не нужна.
+  if(disclosed){
+    const rd=a.length?_cbrRateAt(disclosed):null;
+    const lag=_repLagDays(end,disclosed);
+    const disRu=disclosed.split('-').reverse().join('.');
+    let inner='<span style="color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-size:.54rem">Раскрыт</span> '
+      +'<b style="color:var(--text)">'+disRu+'</b>';
+    if(lag!=null){
+      const lcol=lag>270?'var(--danger)':lag>150?'var(--warn)':'var(--green)';
+      inner+=' · <span style="color:'+lcol+'" title="Сколько прошло от конца отчётного периода до публикации. Долго = медленный/непрозрачный эмитент.">лаг '+lag+' дн</span>';
+    }
+    if(rd!=null) inner+=' · <span style="color:var(--text3)">ставка тогда</span> <b style="color:var(--text)">'+(+rd).toFixed(2)+'%</b>';
+    chips.push('<div style="display:inline-flex;align-items:center;gap:8px;font-size:.62rem;color:var(--text2);background:var(--s1);border:1px solid var(--border);border-left:3px solid var(--text3);padding:7px 12px">'+inner+'</div>');
+  }
+  if(!chips.length){
+    if(!a.length&&!disclosed) return '<div style="font-size:.56rem;color:var(--text3);margin-bottom:12px">Ставка ЦБ: история пуста — заведи её в модуле «Долг». Дата раскрытия у этого периода тоже не задана (импортируй через «📋 раскрытия»).</div>';
+    return '';
+  }
+  return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px">'+chips.join('')+'</div>';
+}
+
+// Разница в днях между двумя ISO-датами (YYYY-MM-DD). null если что-то битое.
+function _repLagDays(fromIso,toIso){
+  if(!fromIso||!toIso)return null;
+  const a=new Date(fromIso+'T00:00:00'),b=new Date(toIso+'T00:00:00');
+  if(isNaN(a)||isNaN(b))return null;
+  return Math.round((b-a)/86400000);
 }
 
 function repRenderCards(p){
@@ -11444,7 +11475,7 @@ function repRenderCards(p){
   const bridge = _repCashBridge(p);
 
   grid.innerHTML = `
-    ${_cbrContextFor(p.year, p.period)}
+    ${_cbrContextFor(p.year, p.period, p.disclosed)}
     <div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin-bottom:8px">Исходные показатели</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:16px">${cards||'<div style="color:var(--text3);font-size:.7rem">Нет данных</div>'}</div>
     ${ratioCards?`<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin-bottom:8px">Расчётные коэффициенты</div>
@@ -29350,6 +29381,25 @@ var _GOV_NAME_RE = /^(администрация|правительство|ми
 })();
 
 // ── Генератор новой шапки эмитента (.iss-hdr) ─────────────────────────────
+// Свежесть данных эмитента: берём самую позднюю дату раскрытия среди всех
+// периодов и считаем, сколько прошло. Аналитика на устаревших числах —
+// отдельный риск, пусть будет видно сразу в шапке.
+function _repDataFreshness(iss){
+  if(!iss||!iss.periods)return '';
+  let maxD=null;
+  for(const k in iss.periods){const p=iss.periods[k];if(p&&p.disclosed&&(!maxD||p.disclosed>maxD))maxD=p.disclosed;}
+  if(!maxD)return '';
+  const days=_repLagDays(maxD,new Date().toISOString().slice(0,10));
+  if(days==null)return '';
+  const mo=Math.max(0,Math.round(days/30.44));
+  const col=days>365?'var(--danger)':days>210?'var(--warn)':'var(--pos)';
+  const disRu=maxD.split('-').reverse().join('.');
+  const ago=mo<1?'меньше месяца назад':(mo+' мес назад');
+  return '<span style="color:'+col+';border:1px solid '+col+'44;padding:1px 6px;font-size:9px;font-family:var(--mono)" '
+    +'title="Самое свежее раскрытие среди всех периодов эмитента. Чем дольше нет новых отчётов — тем более устаревшие данные в анализе.">'
+    +'данные: '+disRu+' · '+ago+'</span>';
+}
+
 function _repBuildIssuerHeader(iss, issId){
   var indKey = iss.ind||'other';
   var indLabel = (window._industryData&&window._industryData.industries&&
@@ -29445,7 +29495,7 @@ function _repBuildIssuerHeader(iss, issId){
     +'<div class="iss-hdr-top">'
     +'<div class="iss-title-blk">'
     +'<div class="iss-title">'+_escHtml(iss.name||'—')+'</div>'
-    +'<div class="iss-sub">'+innStr+indHtml+'</div>'
+    +'<div class="iss-sub">'+innStr+indHtml+_repDataFreshness(iss)+'</div>'
     +ratingsHtml+'</div>'+actHtml+'</div>'
     +'<div class="score-row" style="margin-top:10px">'
     +scoreTile('Запас прочности',stressScore,stressColor,stressComps)
