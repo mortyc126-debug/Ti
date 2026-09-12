@@ -164,6 +164,11 @@ def main():
         tk = (r.get("ticker") or "").strip()
         inn = (r.get("inn") or "").strip()
         avail = (r.get("available_at") or "").strip()
+        # даты раскрытия без времени → ставим на конец дня, чтобы «первое
+        # закрытие после available_at» пришлось на СЛЕДУЮЩУЮ сессию, а не на
+        # тот же день (иначе риск заглянуть в реакцию дня раскрытия).
+        if len(avail) == 10 and avail.count("-") == 2:
+            avail = avail + "T23:59:59+00:00"
         # тикер в releases.csv из приложения может быть пуст — добираем по ИНН
         if not tk and inn:
             tk = tk_map.get(inn, "")

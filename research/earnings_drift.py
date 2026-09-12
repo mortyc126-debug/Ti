@@ -122,6 +122,7 @@ def build_event_dataset(daily, events, fcols, cfg):
         "insufficient_history_or_future": 0,
         "bad_market_data": 0,
     }
+    missing_tickers = set()
 
     numeric_cols = ["log_ret", *cfg.factors]
 
@@ -130,6 +131,7 @@ def build_event_dataset(daily, events, fcols, cfg):
 
         if panel is None:
             skipped["no_ticker"] += 1
+            missing_tickers.add(str(event["ticker"]))
             continue
 
         # Строго первое закрытие после доступности отчётности.
@@ -228,9 +230,23 @@ def build_event_dataset(daily, events, fcols, cfg):
         rows.append(row)
 
     if not rows:
-        raise ValueError(
-            f"Не удалось построить события. Причины: {skipped}"
-        )
+        msg = f"Не удалось построить события. Причины: {skipped}"
+        if skipped["no_ticker"]:
+            have = sorted(panels.keys())
+            miss = sorted(missing_tickers)
+            msg += (
+                f"\nТикеров в daily.csv: {len(have)} "
+                f"(напр.: {', '.join(have[:12])}…)"
+                f"\nНет в daily.csv у событий: {len(miss)} "
+                f"(напр.: {', '.join(miss[:12])}…)"
+                "\nПричина обычно: events.csv остался синтетический "
+                "(make_smoke_data), либо тикеры событий не входят в "
+                "универс make_daily_research (INVEST_TARGET). "
+                "Сгенерируй events.csv из своего releases.csv "
+                "(make_events_research.py) и убедись, что эти тикеры "
+                "есть в daily.csv."
+            )
+        raise ValueError(msg)
 
     result = pd.DataFrame(rows).sort_values(
         ["decision_time", "event_id"]
