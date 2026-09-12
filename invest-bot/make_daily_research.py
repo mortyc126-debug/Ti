@@ -61,25 +61,55 @@ def _fx_id(client):
     return None
 
 
+# тикеры, которые обязаны попасть в daily.csv — из releases.csv (события
+# PEAD). Их не бросаем при первой ошибке: ретраим агрессивнее и в конце
+# явно сообщаем, если какого-то так и нет.
+def _must_tickers():
+    relp = os.path.join(_ROOT, "research", "releases.csv")
+    out = set()
+    if os.path.exists(relp):
+        import csv as _csv
+        for row in _csv.DictReader(open(relp, encoding="utf-8-sig")):
+            t = (row.get("ticker") or "").strip().upper()
+            if t:
+                out.add(t)
+    return out
+
+
 def main():
     days = int(sys.argv[1]) if len(sys.argv) > 1 else 1100
+    must = _must_tickers()
     with Client(_config.tinkoff_token, app_name=_config.tinkoff_app_name, target=INVEST_TARGET) as client:
         shares = client.instruments.shares(
             instrument_status=InstrumentStatus.INSTRUMENT_STATUS_BASE).instruments
         rub = [s for s in shares if (s.currency or "").lower() == "rub"]
 
-        # факторы
+        # ретрай на пустой/короткий ответ: обычная причина «выпал тикер» —
+        # разрыв или лимит Tinkoff, а не отсутствие истории. attempts побольше
+        # для must-тикеров.
+        def _closes(**kw):
+            attempts = 5 if kw.pop("_must", False) else 3
+            c = {}
+            for a in range(attempts):
+                c = _daily_closes(client, days=days, **kw)
+                if len(c) >= 60:
+                    return c
+                time.sleep(0.6 * (a + 1))
+            return c
+
+        # факторы (тоже с ретраем — без них весь daily бесполезен)
         idx = _index_id(client)
-        mkt = _log_rets(_daily_closes(client, instrument_id=idx, days=days)) if idx else {}
+        mkt = _log_rets(_closes(instrument_id=idx)) if idx else {}
         fx_id = _fx_id(client)
-        fx = _log_rets(_daily_closes(client, instrument_id=fx_id, days=days)) if fx_id else {}
+        fx = _log_rets(_closes(instrument_id=fx_id)) if fx_id else {}
         print(f"[daily] IMOEX дней: {len(mkt)}, USDRUB дней: {len(fx)}", file=sys.stderr)
 
         # доходности по акциям + сектор
         rets = {}       # ticker -> {date -> ret}
         sec = {}        # ticker -> sector
         for i, s in enumerate(rub):
-            r = _log_rets(_daily_closes(client, figi=s.figi, days=days))
+            tk = (s.ticker or "").upper()
+            r = _log_rets(_closes(figi=s.figi, _must=(tk in must)))
             if len(r) < 60:
                 continue
             rets[s.ticker] = r
@@ -87,6 +117,14 @@ def main():
             if i and i % 50 == 0:
                 print(f"[daily] свечи {i}/{len(rub)}", file=sys.stderr)
             time.sleep(0.03)
+
+        # явно сообщаем про must-тикеры, которых так и нет
+        if must:
+            got = {t.upper() for t in rets}
+            miss = sorted(must - got)
+            print(f"[daily] must-тикеров из releases: {len(must)}, "
+                  f"добыто: {len(must)-len(miss)}"
+                  + (f", НЕ добыто: {miss}" if miss else ""), file=sys.stderr)
 
         # отраслевой фактор без самой компании: по каждой дате среднее по
         # сектору, потом для тикера пересчитываем как (сумма−его)/(n−1)

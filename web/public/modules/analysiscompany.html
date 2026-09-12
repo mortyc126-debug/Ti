@@ -14609,22 +14609,31 @@ function repDisclCsv(){
 // Тикер добираем из снимка акций (/stocks-cache.json), если совпал по ИНН;
 // чего не хватило — доразрешит python из того же снимка.
 async function repDisclExportReleases(){
-  let byInn={};
+  // мост эмитент→тикер: T-Invest по акции ИНН не отдаёт, поэтому матчим по
+  // ISIN, а если нет — по нормализованному имени (снимок акций stocks-cache).
+  const norm = s => String(s||'').toLowerCase()
+    .replace(/[«»"'`.,]/g,'').replace(/\b(па?о|оа?о|зао|пjsc|ojsc|group|груп+а?)\b/g,'')
+    .replace(/\s+/g,' ').trim();
+  let byIsin={}, byName={};
   try{
     const r=await fetch('/stocks-cache.json',{cache:'no-store'});
     if(r.ok){const a=await r.json();const arr=Array.isArray(a)?a:(a.data||a.stocks||[]);
-      for(const s of (arr||[])){ if(s&&s.inn&&s.ticker) byInn[String(s.inn)]=s.ticker; }}
+      for(const s of (arr||[])){ if(!s||!s.ticker) continue;
+        if(s.isin) byIsin[String(s.isin).toUpperCase()]=s.ticker;
+        if(s.name) byName[norm(s.name)]=s.ticker; }}
   }catch(e){}
+  const resolveTk = iss => (iss.isin && byIsin[String(iss.isin).toUpperCase()]) || byName[norm(iss.name)] || '';
   const ev={};
   for(const id in reportsDB){
     const iss=reportsDB[id]; if(!iss||!iss.periods) continue;
     const inn=iss.inn||(/^\d{10}(\d{2})?$/.test(String(id))?String(id):'');
+    const tk=resolveTk(iss);
     for(const k in iss.periods){
       const p=iss.periods[k];
       if(!p||!p.disclosed||String(p.period)!=='Год') continue;
       const key=(inn||id)+'_'+p.year;
       const pref=(String(p.type||'').indexOf('МСФО')>=0)?1:0;
-      if(!ev[key]||pref>ev[key].pref) ev[key]={inn,id,year:p.year,disclosed:p.disclosed,pref,ticker:byInn[inn]||''};
+      if(!ev[key]||pref>ev[key].pref) ev[key]={inn,id,year:p.year,disclosed:p.disclosed,pref,ticker:tk};
     }
   }
   const rows=Object.values(ev).sort((a,b)=>String((a.inn||a.id)+a.year).localeCompare(String((b.inn||b.id)+b.year)));
