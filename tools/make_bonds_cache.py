@@ -98,6 +98,24 @@ def main():
         json.dump(out, f, ensure_ascii=False)
     print(f"[cache] ГОТОВО: {len(out)} выпусков → {OUT}", file=sys.stderr)
 
+    # Попутно зеркалим годовые отчёты из дампа в web/public/reports-cache:
+    # отдельного генератора у reports-cache нет, это копия data/bond_dump/reports,
+    # её читают и веб-приложение, и research (make_events_research). Без этого
+    # шага отчётность незаметно устаревает относительно свежего дампа.
+    import shutil
+    rep_src = os.path.join(DUMP, "reports")
+    rep_dst = os.path.join(ROOT, "web", "public", "reports-cache")
+    if os.path.isdir(rep_src):
+        os.makedirs(rep_dst, exist_ok=True)
+        n = 0
+        for fn in os.listdir(rep_src):
+            if fn.endswith(".json"):
+                shutil.copyfile(os.path.join(rep_src, fn), os.path.join(rep_dst, fn))
+                n += 1
+        print(f"[cache] reports-cache: скопировано {n} отчётов → {rep_dst}", file=sys.stderr)
+    else:
+        print(f"[cache] нет {rep_src} — reports-cache не обновлён (прогони bond_dump.py)", file=sys.stderr)
+
 
 if __name__ == "__main__":
     main()
