@@ -9398,6 +9398,17 @@ function repCalcRatios(d){
   // CCC = DSO + DIO − DPO: сколько дней деньги «заморожены» в цикле.
   if(r.dso != null && r.dio != null && r.dpo != null)
     r.ccc = (+r.dso + +r.dio - +r.dpo).toFixed(0);
+  // ── Кредитный разрез (важно для ВДО) ──────────────────────────────
+  // Эффективная ставка по долгу = проценты / долг на конец периода.
+  // Сколько компания реально платит — сравнивай со ставкой ЦБ.
+  if(d.int != null && d.debt) r.rate = (d.int/d.debt*100).toFixed(1);
+  // Процентная нагрузка: проценты / EBITDA (выше — тяжелее обслуживать).
+  if(d.int != null && d.ebitda) r.intE = (d.int/d.ebitda*100).toFixed(1);
+  // Покрытие процентов после капзатрат: (EBITDA − CAPEX) / проценты.
+  if(d.ebitda != null && d.capex != null && d.int) r.ecr = ((d.ebitda - d.capex)/d.int).toFixed(2);
+  // CFO / Долг и FCF / Долг — какую долю долга гасит годовой поток.
+  if(d.cfo != null && d.debt) r.cfoD = (d.cfo/d.debt*100).toFixed(0);
+  if(d.cfo != null && d.capex != null && d.debt) r.fcfD = ((d.cfo - d.capex)/d.debt*100).toFixed(0);
   return r;
 }
 
@@ -11509,6 +11520,11 @@ function repRenderCards(p){
     ratios.dio!=null ? repRatioCard('DIO', ratios.dio+' дн', 'var(--text2)', 'Дни в запасах') : '',
     ratios.dpo!=null ? repRatioCard('DPO', ratios.dpo+' дн', 'var(--text2)', 'Дни оплаты кредиторам') : '',
     ratios.ccc!=null ? repRatioCard('Цикл денег CCC', ratios.ccc+' дн', parseFloat(ratios.ccc)<0?'var(--green)':parseFloat(ratios.ccc)<90?'var(--warn)':'var(--danger)', 'DSO+DIO−DPO (меньше — лучше)') : '',
+    ratios.rate!=null ? repRatioCard('Эфф. ставка долга', ratios.rate+'%', 'var(--text2)', 'Проценты / Долг на конец периода — сколько эмитент реально платит за долг. Сравни со ставкой ЦБ: ниже ставки — дешёвый старый долг, выше — дорогое фондирование/рефинанс.') : '',
+    ratios.intE!=null ? repRatioCard('Проценты / EBITDA', ratios.intE+'%', parseFloat(ratios.intE)<35?'var(--green)':parseFloat(ratios.intE)<50?'var(--warn)':'var(--danger)', 'Процентная нагрузка: доля EBITDA, уходящая на обслуживание долга. >50% — тяжело.') : '',
+    ratios.ecr!=null ? repRatioCard('(EBITDA−CAPEX)/%', ratios.ecr+'x', parseFloat(ratios.ecr)>1.5?'var(--green)':parseFloat(ratios.ecr)>1?'var(--warn)':'var(--danger)', 'Покрытие процентов после капзатрат. <1 — на проценты не хватает даже до инвестиций.') : '',
+    ratios.cfoD!=null ? repRatioCard('CFO / Долг', ratios.cfoD+'%', parseFloat(ratios.cfoD)>25?'var(--green)':parseFloat(ratios.cfoD)>10?'var(--warn)':'var(--danger)', 'Операционный поток к долгу: грубо — какую долю долга гасит годовой CFO.') : '',
+    ratios.fcfD!=null ? repRatioCard('FCF / Долг', ratios.fcfD+'%', parseFloat(ratios.fcfD)>15?'var(--green)':parseFloat(ratios.fcfD)>0?'var(--warn)':'var(--danger)', 'Свободный поток к долгу. Отрицательный — долг сам себя не обслуживает.') : '',
   ].filter(Boolean).join('');
 
   // Мостик EBITDA → CFO → FCF → после дивидендов: где деньги «утекают».
