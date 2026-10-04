@@ -11411,6 +11411,17 @@ function repSetView(mode, btn){
 // История ключевой ставки ЦБ — общий ключ с модулем «Долг» (debtload).
 // Даёт контекст «при какой ставке жил этот период».
 function _cbrHistLoad(){
+  // Единый источник ставки ЦБ — история из модуля «Долг» (debt_kc_hist_v1,
+  // текст «ГГГГ-ММ-ДД ставка»): её там ведут и обновляют. Старый ключ
+  // bondan_cbr_history (JSON) оставлен фолбэком.
+  try{
+    const dk=localStorage.getItem('debt_kc_hist_v1');
+    if(dk){
+      const a=String(dk).split('\n').map(l=>l.trim().match(/^(\d{4}-\d{2}-\d{2})\s+([\d.,]+)/)).filter(Boolean)
+        .map(m=>({d:m[1], r:parseFloat(m[2].replace(',','.'))})).filter(x=>isFinite(x.r));
+      if(a.length) return a.sort((p,q)=>p.d<q.d?-1:1);
+    }
+  }catch(e){}
   try{const raw=localStorage.getItem('bondan_cbr_history');const a=raw?JSON.parse(raw):[];
     return Array.isArray(a)?a.filter(x=>x&&x.d&&x.r!=null).sort((p,q)=>p.d<q.d?-1:1):[];}catch(e){return[];}
 }

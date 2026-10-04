@@ -1958,6 +1958,9 @@ function parseKC(txt){
 function loadKC(){
   let t=null;
   try{t=localStorage.getItem(KC_KEY);}catch(e){}
+  // Сид по умолчанию сохраняем в канонический ключ, чтобы ставку сразу
+  // видели и отчётность, и шапка веба (единый источник debt_kc_hist_v1).
+  if(!t){ try{localStorage.setItem(KC_KEY, KC_DEFAULT);}catch(e){} t=KC_DEFAULT; }
   KC=parseKC(t||KC_DEFAULT);
   if(!KC.length)KC=parseKC(KC_DEFAULT);
   const ta=$('kcHist'); if(ta)ta.value=t||KC_DEFAULT;

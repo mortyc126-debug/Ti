@@ -29,11 +29,9 @@ function _parseRep(raw){
   } catch(_) { return []; }
 }
 function _collect(){
-  const a = _parseDebt(_ls(KEY_DEBT));
-  const b = _parseRep(_ls(KEY_REP));
-  const last = arr => arr.length ? arr.map(x => x.d).sort().slice(-1)[0] : '';
-  let hist = (last(a) >= last(b)) ? a : b;        // чей ряд свежее — тот и берём
-  if(!hist.length) hist = a.length ? a : b;
+  const a = _parseDebt(_ls(KEY_DEBT));   // канонический источник — модуль «Долг»
+  const b = _parseRep(_ls(KEY_REP));     // старый ключ отчётности — фолбэк
+  const hist = a.length ? a : b;
   return hist.slice().sort((x, y) => x.d < y.d ? -1 : 1);
 }
 
