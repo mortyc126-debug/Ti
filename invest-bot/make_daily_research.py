@@ -97,12 +97,19 @@ def main():
                 time.sleep(0.6 * (a + 1))
             return c
 
-        # факторы (тоже с ретраем — без них весь daily бесполезен)
+        # факторы (качаем упорно, как must — без них каждая строка отсеется)
         idx = _index_id(client)
-        mkt = _log_rets(_closes(instrument_id=idx)) if idx else {}
+        mkt = _log_rets(_closes(instrument_id=idx, _must=True)) if idx else {}
         fx_id = _fx_id(client)
-        fx = _log_rets(_closes(instrument_id=fx_id)) if fx_id else {}
+        fx = _log_rets(_closes(instrument_id=fx_id, _must=True)) if fx_id else {}
         print(f"[daily] IMOEX дней: {len(mkt)}, USDRUB дней: {len(fx)}", file=sys.stderr)
+        # Пустые факторы → каждая строка отсеется и daily.csv выйдет нулевым.
+        # Лучше упасть явно, чем молча затереть рабочий файл пустышкой.
+        if len(mkt) < 60 or len(fx) < 60:
+            sys.exit("[daily] ОШИБКА: факторы пустые (IMOEX или USD/RUB не добылись). "
+                     "Обычно это лимит T-Invest после нескольких скриптов подряд — "
+                     "подожди 1-2 минуты и перезапусти make_daily_research.py отдельно. "
+                     "Старый daily.csv не тронут.")
 
         # доходности по акциям + сектор
         rets = {}       # ticker -> {date -> ret}
