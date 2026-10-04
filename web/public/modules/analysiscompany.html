@@ -33,11 +33,11 @@
   --neg:#FF4D7A;
   --text:#F2F0FF;
   --text1:#F2F0FF;
-  --text2:#A79BC9;
-  --text3:#6F648F;
+  --text2:#CBC2EA;
+  --text3:#9C90C4;
   --t:#F2F0FF;
-  --t2:#A79BC9;
-  --t3:#6F648F;
+  --t2:#CBC2EA;
+  --t3:#9C90C4;
   --t4:#7E74A8;
   --glow:0 0 0 1px rgba(255,0,140,0.05),0 0 18px rgba(255,0,140,0.06),inset 0 0 20px rgba(255,255,255,0.01);
   --mono:'JetBrains Mono',ui-monospace,monospace;
@@ -14786,7 +14786,18 @@ function _slParse(text){
     }
   }
   if(!header) return null;
-  const periods=header.cols.map(c=>({label:c.label, annual:/^\d{4}$/.test(c.label)}));
+  // период-колонка → назначение в reportsDB. Годовой → «Год». Квартальный
+  // smart-lab (YYYYQn) трактуем как накопительный к концу квартала (как и
+  // период-коды отчётности): Q1→1 квартал, Q2→Полугодие, Q3→9М, Q4→Год.
+  // Пользователь может поменять назначение у каждой квартальной колонки.
+  const _QMAP={1:'1 квартал',2:'Полугодие',3:'9М',4:'Год'};
+  const periods=header.cols.map(c=>{
+    const am=/^\d{4}$/.test(c.label);
+    const qm=c.label.match(/^(\d{4})Q([1-4])$/i);
+    if(am) return {label:c.label, year:c.label, kind:'annual', target:'Год', include:true};
+    if(qm) return {label:c.label, year:qm[1], kind:'quarter', target:_QMAP[+qm[2]], include:true};
+    return {label:c.label, year:null, kind:'other', target:null, include:false};  // LTM и пр.
+  });
   // стандарт: есть EBITDA/амортизация → МСФО, иначе РСБУ
   const hasEbitda=rows.some(r=>/ebitda|амортизац/i.test(r.label));
   const std=hasEbitda?'МСФО':'РСБУ';
@@ -14816,25 +14827,35 @@ function repSlParse(){
   const st=document.getElementById('rep-sl-status');
   if(!d){ st.style.color='var(--danger)'; st.textContent='Не нашла шапку с годами. Скопируй таблицу целиком, вместе со строкой заголовка (годы).'; document.getElementById('rep-sl-preview').innerHTML=''; document.getElementById('rep-sl-actions').style.display='none'; return; }
   window._slData=d;
-  const annual=d.periods.filter(p=>p.annual);
+  const imp=d.periods.filter(p=>p.include);
+  const other=d.periods.length-imp.length;
   st.style.color='var(--text3)';
-  st.textContent=`${d.company||'без имени'} · ${d.std} · строк: ${d.rows.length} · годовых периодов: ${annual.length}`+(d.periods.length>annual.length?` (квартальные/LTM пока пропускаются)`:'');
+  st.textContent=`${d.company||'без имени'} · ${d.std} · строк: ${d.rows.length} · периодов к импорту: ${imp.length}`+(other?` (LTM/прочее пропущено: ${other})`:'');
   _slRenderPreview();
-  document.getElementById('rep-sl-actions').style.display=annual.length?'flex':'none';
+  document.getElementById('rep-sl-actions').style.display=imp.length?'flex':'none';
 }
 
 function _slRenderPreview(){
   const d=window._slData; if(!d) return;
-  const annual=d.periods.filter(p=>p.annual);
-  // чекбоксы периодов
-  let html='<div style="margin-bottom:8px;font-size:.6rem">Периоды (годовые) для импорта: '
-    + annual.map(p=>`<label style="margin-right:10px;cursor:pointer"><input type="checkbox" class="sl-per" value="${p.label}" checked> ${p.label}</label>`).join('')
-    + (annual.length?'':'<span style="color:var(--danger)">нет годовых колонок</span>') + '</div>';
+  const imp=d.periods.map((p,i)=>({p,i})).filter(x=>x.p.include);
+  const perOpts=['1 квартал','Полугодие','9М','3 квартал','Год'];
+  // выбор периодов + назначение квартальным колонкам
+  let html='<div style="margin-bottom:8px;font-size:.6rem"><div style="color:var(--text3);margin-bottom:4px">Периоды для импорта (тип '+d.std+'):</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:10px">'
+    + imp.map(({p,i})=>{
+        const sel = p.kind==='quarter'
+          ? ` <select onchange="window._slData.periods[${i}].target=this.value" style="font-size:.56rem;background:var(--bg);color:var(--text);border:1px solid var(--border)">`
+            + perOpts.map(o=>`<option value="${o}"${o===p.target?' selected':''}>${o}</option>`).join('') + `</select>`
+          : ` <span style="color:var(--text3)">→ Год</span>`;
+        return `<label style="display:inline-flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" class="sl-per" data-i="${i}" checked> <b>${p.label}</b></label>${sel}`;
+      }).join('')
+    + '</div></div>';
   const opts=_SL_TARGETS.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
   html+='<table style="width:100%;border-collapse:collapse;font-size:.58rem"><thead><tr style="color:var(--text3);text-align:left">'
     +'<th style="padding:3px 5px">Строка из smart-lab</th><th style="padding:3px 5px">Назначить</th><th style="padding:3px 5px;text-align:right">посл. знач.</th></tr></thead><tbody>';
   d.rows.forEach((r,i)=>{
-    const last=annual.length?r.vals[annual[annual.length-1].label]:undefined;
+    const lastP = imp.length ? imp[imp.length-1].p.label : null;
+    const last = lastP ? r.vals[lastP] : undefined;
     const sel=_SL_TARGETS.map(([v,l])=>`<option value="${v}"${v===r.target?' selected':''}>${l}</option>`).join('');
     const isExtra=r.target==='__extra__';
     html+=`<tr style="border-top:1px solid var(--border)">`
@@ -14854,14 +14875,15 @@ function repSlImport(){
   if(repActiveIssuerId && repActiveIssuerId!==issId && !confirm('Активен другой эмитент. Импортировать в «'+(iss.name||issId)+'» (куда открывали)?')) return;
   if(!iss.periods) iss.periods={};
   const type=d.std;   // МСФО/РСБУ
-  const chosen=Array.from(document.querySelectorAll('.sl-per:checked')).map(x=>x.value);
+  const chosen=Array.from(document.querySelectorAll('.sl-per:checked'))
+    .map(x=>d.periods[+x.dataset.i]).filter(Boolean);
   if(!chosen.length){ alert('Отметь хотя бы один период.'); return; }
   let created=0, updated=0;
-  for(const plabel of chosen){
-    const year=plabel.slice(0,4);
-    const key=`${year}_Год_${type}`;
+  for(const pc of chosen){
+    const year=pc.year, periodLabel=pc.target||'Год', plabel=pc.label;
+    const key=`${year}_${periodLabel}_${type}`;
     const ex=iss.periods[key];
-    const per = ex || (()=>{ const s={year, period:'Год', type, note:'smart-lab'}; _SL_NULL.forEach(f=>s[f]=null); return s; })();
+    const per = ex || (()=>{ const s={year, period:periodLabel, type, note:'smart-lab'}; _SL_NULL.forEach(f=>s[f]=null); return s; })();
     const extra = per.extra || {};
     for(const r of d.rows){
       const v=r.vals[plabel]; if(v==null) continue;
