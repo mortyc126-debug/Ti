@@ -681,6 +681,28 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
   </div>
 </div>
 
+<!-- Modal: импорт таблицы smartlab -->
+<div class="modal-overlay" id="modal-rep-sl">
+  <div class="modal" style="width:880px;max-width:97vw">
+    <div class="modal-hdr">Импорт таблицы smart-lab <button class="modal-x" onclick="closeModal('modal-rep-sl')"></button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
+      <div id="rep-sl-target" style="font-size:.66rem;font-weight:600;color:var(--acc);background:rgba(255,0,110,.07);border:1px solid rgba(255,0,110,.2);border-radius:4px;padding:6px 9px"></div>
+      <div style="font-size:.63rem;color:var(--text3);line-height:1.5">
+        Скопируй таблицу показателей со smart-lab.ru целиком (с шапкой лет) и вставь. Распознанные строки лягут в стандартные поля периода,
+        а <b>уникальные для эмитента</b> (цена сырья, объёмы добычи и т.п.) не выкидываем — назначь им «★ своя метрика», и они сохранятся в периоде.
+        smart-lab пишет в млрд ₽ — совпадает с внутренней единицей, пересчёт не нужен.
+      </div>
+      <textarea id="rep-sl-input" spellcheck="false" style="width:100%;min-height:120px;font-family:var(--mono);font-size:.58rem;line-height:1.4;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:8px;resize:vertical" placeholder="Компания&#9;2021&#9;2022&#9;2023&#10;Выручка, млрд руб&#9;…&#9;…&#9;…"></textarea>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-acc" onclick="repSlParse()">Разобрать</button>
+        <span id="rep-sl-status" style="font-size:.63rem;color:var(--text3)"></span>
+      </div>
+      <div id="rep-sl-preview" style="max-height:380px;overflow:auto"></div>
+      <div id="rep-sl-actions" style="display:none;gap:8px"><button class="btn btn-acc" onclick="repSlImport()">Импортировать отмеченные периоды</button></div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: импорт списка раскрытий (e-disclosure / ГИР БО) -->
 <div class="modal-overlay" id="modal-rep-discl">
   <div class="modal" style="width:760px;max-width:96vw">
@@ -11498,7 +11520,8 @@ function repRenderCards(p){
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:16px">${cards||'<div style="color:var(--text3);font-size:.7rem">Нет данных</div>'}</div>
     ${ratioCards?`<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin-bottom:8px">Расчётные коэффициенты</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">${ratioCards}</div>`:''}
-    ${bridge}`;
+    ${bridge}
+    ${_repExtraBlock(p)}`;
 }
 
 // Мостик денежного потока EBITDA → CFO → FCF → FCF после дивидендов.
@@ -14673,6 +14696,172 @@ async function repDisclExportReleases(){
   const withT=rows.filter(r=>r.ticker).length;
   const st=document.getElementById('rep-discl-status');
   if(st){ st.style.color='var(--green)'; st.textContent=`releases.csv: ${rows.length} событий (годовые+промежуточные, тикер найден у ${withT}). Положи в research/ → make_events_research.py.`; }
+}
+
+// ================= Импорт таблиц smart-lab в reportsDB =================
+// Парсер таб-таблиц smart-lab + ручное назначение строк (как выбор отрасли).
+// Распознанные строки → короткие ключи периода; уникальные строки эмитента
+// (цена сырья, объёмы добычи) не выкидываем — «★ своя метрика» → p.extra.
+// smart-lab в млрд ₽ = внутренняя единица reportsDB, пересчёт не нужен.
+const _SL_AUTO = {
+  'выручка':'rev','ebitda':'ebitda','операционная прибыль':'ebit','опер.прибыль':'ebit','опер. прибыль':'ebit',
+  'чистая прибыль':'np','опер.денежный поток':'cfo','операционный денежный поток':'cfo','опер. денежный поток':'cfo',
+  'capex':'capex','активы':'assets','чистые активы':'eq','долг':'debt','наличность':'cash',
+  'процентные расходы':'int','проценты к уплате':'int','див.выплата':'divp','дивиденды':'divp',
+  'оборотные активы':'ca','краткосрочные обязательства':'cl','налог на прибыль':'tax','запасы':'inv',
+  'дебиторская задолженность':'recv','кредиторская задолженность':'pay'
+};
+const _SL_TARGETS = [
+  ['','— пропустить'],['__extra__','★ своя метрика (сохранить)'],
+  ['rev','Выручка'],['ebitda','EBITDA'],['ebit','Опер. прибыль (EBIT)'],['np','Чистая прибыль'],
+  ['cfo','CFO (опер. поток)'],['capex','CAPEX'],['debt','Долг'],['cash','Наличность'],
+  ['int','Проценты'],['assets','Активы'],['eq','Чистые активы (капитал)'],['divp','Дивиденды'],
+  ['ca','Оборотные активы'],['cl','Краткосроч. обязательства'],['tax','Налог'],
+  ['ret','Нераспред. прибыль'],['recv','Дебиторка'],['inv','Запасы'],['pay','Кредиторка']
+];
+const _SL_NULL = ['rev','ebitda','np','ebit','assets','eq','debt','cash','ca','cl','int','ret','cfo','capex','divp','recv','inv','pay','tax'];
+
+function _slClean(v){ return v==null?'':String(v).replace(/﻿/g,'').replace(/ /g,' ').trim(); }
+function _slNum(v){
+  let s=_slClean(v).replace(/[−–]/g,'-');
+  if(!s || ['—','-','n/a','na','?'].includes(s.toLowerCase())) return null;
+  const pct=s.endsWith('%'); if(pct) s=s.slice(0,-1);
+  s=s.replace(/\s/g,''); if(s.includes(',')&&!s.includes('.')) s=s.replace(',','.');
+  if(!/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(s)) return null;
+  const x=parseFloat(s); return pct?x/100:x;
+}
+const _SL_PERIOD_RE=/^(\d{4}(Q[1-4])?|LTM\??)$/i;
+function _slIsHeader(cols){ const t=cols.slice(1).map(_slClean).filter(Boolean); if(!t.length) return false; const n=t.filter(x=>_SL_PERIOD_RE.test(x)).length; return n>=2 && n===t.length; }
+
+// Разбор вставки → первый блок {company, std, periods:[{label,idx,annual}], rows:[{label,target,vals}]}
+function _slParse(text){
+  const lines=String(text||'').split(/\r?\n/);
+  let header=null, rows=[];
+  for(const line of lines){
+    const cols=line.split('\t');
+    if(!header){
+      // ищем ТОЛЬКО первую строку-шапку с годами; до неё всё игнорируем
+      if(_slIsHeader(cols)){
+        header={company:_slClean(cols[0]).replace(/smart-?lab\.ru/i,'').trim(), cols:[]};
+        cols.forEach((c,j)=>{ if(j>=1 && _slClean(c)) header.cols.push({label:_slClean(c), idx:j}); });
+      }
+      continue;
+    }
+    // после шапки — всё данные (строку из одних 4-значных чисел, напр. цена
+    // сырья 1790 или объём 2716, НЕ принимаем за новую шапку: иначе обрыв)
+    if(cols.some(c=>_slClean(c))){
+      const label=_slClean(cols[0]); if(!label) continue;
+      if(['Финансовый отчет','Годовой отчет','Презентация','Дата отчета','Валюта отчета'].includes(label)) continue;
+      const vals={};
+      for(const p of header.cols){ const v=_slNum(cols[p.idx]); if(v!=null) vals[p.label]=v; }
+      if(Object.keys(vals).length) rows.push({label, vals});
+    }
+  }
+  if(!header) return null;
+  const periods=header.cols.map(c=>({label:c.label, annual:/^\d{4}$/.test(c.label)}));
+  // стандарт: есть EBITDA/амортизация → МСФО, иначе РСБУ
+  const hasEbitda=rows.some(r=>/ebitda|амортизац/i.test(r.label));
+  const std=hasEbitda?'МСФО':'РСБУ';
+  // автоназначение строк
+  rows.forEach(r=>{
+    const base=r.label.toLowerCase().replace(/,.*$/,'').trim();   // отрезаем «, млрд руб»
+    r.target = _SL_AUTO[base] || '';
+    if(!r.target) r.target='__extra__';   // неизвестное — по умолчанию сохраняем как свою
+  });
+  return {company:header.company, std, periods, rows};
+}
+
+function repSlOpen(){
+  if(!repActiveIssuerId){ alert('Сначала выберите эмитента.'); return; }
+  const iss=reportsDB[repActiveIssuerId]; if(!iss){ alert('Эмитент не найден.'); return; }
+  window._slIssId=repActiveIssuerId; window._slData=null;
+  document.getElementById('rep-sl-target').textContent='Импортирую в: '+(iss.name||repActiveIssuerId)+(iss.inn?' · ИНН '+iss.inn:'');
+  document.getElementById('rep-sl-input').value='';
+  document.getElementById('rep-sl-preview').innerHTML='';
+  document.getElementById('rep-sl-status').textContent='';
+  document.getElementById('rep-sl-actions').style.display='none';
+  document.getElementById('modal-rep-sl').classList.add('open');
+}
+
+function repSlParse(){
+  const d=_slParse(document.getElementById('rep-sl-input').value);
+  const st=document.getElementById('rep-sl-status');
+  if(!d){ st.style.color='var(--danger)'; st.textContent='Не нашла шапку с годами. Скопируй таблицу целиком, вместе со строкой заголовка (годы).'; document.getElementById('rep-sl-preview').innerHTML=''; document.getElementById('rep-sl-actions').style.display='none'; return; }
+  window._slData=d;
+  const annual=d.periods.filter(p=>p.annual);
+  st.style.color='var(--text3)';
+  st.textContent=`${d.company||'без имени'} · ${d.std} · строк: ${d.rows.length} · годовых периодов: ${annual.length}`+(d.periods.length>annual.length?` (квартальные/LTM пока пропускаются)`:'');
+  _slRenderPreview();
+  document.getElementById('rep-sl-actions').style.display=annual.length?'flex':'none';
+}
+
+function _slRenderPreview(){
+  const d=window._slData; if(!d) return;
+  const annual=d.periods.filter(p=>p.annual);
+  // чекбоксы периодов
+  let html='<div style="margin-bottom:8px;font-size:.6rem">Периоды (годовые) для импорта: '
+    + annual.map(p=>`<label style="margin-right:10px;cursor:pointer"><input type="checkbox" class="sl-per" value="${p.label}" checked> ${p.label}</label>`).join('')
+    + (annual.length?'':'<span style="color:var(--danger)">нет годовых колонок</span>') + '</div>';
+  const opts=_SL_TARGETS.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+  html+='<table style="width:100%;border-collapse:collapse;font-size:.58rem"><thead><tr style="color:var(--text3);text-align:left">'
+    +'<th style="padding:3px 5px">Строка из smart-lab</th><th style="padding:3px 5px">Назначить</th><th style="padding:3px 5px;text-align:right">посл. знач.</th></tr></thead><tbody>';
+  d.rows.forEach((r,i)=>{
+    const last=annual.length?r.vals[annual[annual.length-1].label]:undefined;
+    const sel=_SL_TARGETS.map(([v,l])=>`<option value="${v}"${v===r.target?' selected':''}>${l}</option>`).join('');
+    const isExtra=r.target==='__extra__';
+    html+=`<tr style="border-top:1px solid var(--border)">`
+      +`<td style="padding:3px 5px;color:${isExtra?'var(--warn)':'var(--text2)'}" title="${_escHtml(r.label)}">${_escHtml(r.label.length>46?r.label.slice(0,46)+'…':r.label)}</td>`
+      +`<td style="padding:3px 5px"><select onchange="window._slData.rows[${i}].target=this.value" style="font-size:.58rem;background:var(--bg);color:var(--text);border:1px solid var(--border)">${sel}</select></td>`
+      +`<td style="padding:3px 5px;text-align:right;font-family:var(--mono)">${last==null?'—':last}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  document.getElementById('rep-sl-preview').innerHTML=html;
+  // восстановить selected (innerHTML пересоздал select'ы — target уже в данных)
+}
+
+function repSlImport(){
+  const issId=window._slIssId, d=window._slData;
+  const iss=issId&&reportsDB[issId];
+  if(!iss||!d){ alert('Нет данных для импорта.'); return; }
+  if(repActiveIssuerId && repActiveIssuerId!==issId && !confirm('Активен другой эмитент. Импортировать в «'+(iss.name||issId)+'» (куда открывали)?')) return;
+  if(!iss.periods) iss.periods={};
+  const type=d.std;   // МСФО/РСБУ
+  const chosen=Array.from(document.querySelectorAll('.sl-per:checked')).map(x=>x.value);
+  if(!chosen.length){ alert('Отметь хотя бы один период.'); return; }
+  let created=0, updated=0;
+  for(const plabel of chosen){
+    const year=plabel.slice(0,4);
+    const key=`${year}_Год_${type}`;
+    const ex=iss.periods[key];
+    const per = ex || (()=>{ const s={year, period:'Год', type, note:'smart-lab'}; _SL_NULL.forEach(f=>s[f]=null); return s; })();
+    const extra = per.extra || {};
+    for(const r of d.rows){
+      const v=r.vals[plabel]; if(v==null) continue;
+      if(r.target==='__extra__'){ extra[r.label]=v; }
+      else if(r.target && _SL_NULL.includes(r.target)){
+        // не затираем уже введённое число пустым; smart-lab обновляет значение
+        per[r.target]=v;
+      }
+    }
+    if(Object.keys(extra).length) per.extra=extra;
+    if(ex) updated++; else { iss.periods[key]=per; created++; }
+  }
+  save();
+  if(typeof repBuildPeriodTabs==='function') repBuildPeriodTabs();
+  closeModal('modal-rep-sl');
+  alert(`smart-lab: создано периодов ${created}`+(updated?`, обновлено ${updated}`:'')+'.\nУникальные строки сохранены как «свои метрики» (видны в карточках периода).');
+}
+
+// Блок «свои метрики» (p.extra) для вида карточек
+function _repExtraBlock(p){
+  if(!p || !p.extra || !Object.keys(p.extra).length) return '';
+  const rows=Object.entries(p.extra).map(([k,v])=>
+    `<div style="background:var(--s1);border:1px solid var(--border);padding:8px 10px">
+      <div style="font-size:.55rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:3px">${_escHtml(k)}</div>
+      <div style="font-size:.9rem;font-weight:600;color:var(--text)">${typeof v==='number'?v.toLocaleString('ru-RU',{maximumFractionDigits:2}):_escHtml(String(v))}</div>
+    </div>`).join('');
+  return `<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:16px 0 8px">★ Свои метрики эмитента (smart-lab)</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">${rows}</div>`;
 }
 
 // Открыть форму с заполненными значениями активного периода.
@@ -29476,6 +29665,7 @@ function _repBuildIssuerHeader(iss, issId){
     + '<button class="btn" onclick="repEditIssuer&&repEditIssuer()">✎ отрасль</button>'
     + '<button class="btn" onclick="repRunAudit&&repRunAudit()">аудит</button>'
     + '<button class="btn" onclick="repDisclOpen&&repDisclOpen()" title="Вставить список раскрытий с e-disclosure/ГИР БО и создать заготовки периодов с датами">📋 раскрытия</button>'
+    + '<button class="btn" onclick="repSlOpen&&repSlOpen()" title="Импорт таблицы показателей со smart-lab.ru: вставить → назначить строки → создать периоды (уникальные метрики сохраняются)">📥 smart-lab</button>'
     + '<button class="btn" id="rep-add-period-btn" onclick="repNewPeriodModal&&repNewPeriodModal()">+ период</button>'
     + '<button class="btn btn-acc" id="rep-compare-btn" onclick="repOpenCrossCompare&&repOpenCrossCompare()">≡ Сравнить</button>'
     + '</div>';
