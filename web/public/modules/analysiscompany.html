@@ -10637,6 +10637,16 @@ function repRenderIssuerList(){
       ? iss.related.map(r => _normForSearch(r?.name) + ' ' + _normForSearch(r?.inn)).join(' ')
       : '';
     if(search && !name.includes(search) && !inn.includes(search) && !okved.includes(search) && !relatedStr.includes(search)) continue;
+    // Ликвидность/MOEX — дёшево, ДО расчёта мультипликаторов: отсечь тут
+    // значит не считать m и не строить карточку для 2/3 базы.
+    if(status === 'has_moex' || status === 'liquid' || status === 'corp_moex'){
+      if(!(iss.bondsCount > 0)) continue;
+      if(status === 'corp_moex'){
+        const _nm = String(iss.name || '');
+        if(_NON_CORP_KINDS[iss.kind] || iss.kind === 'bank'
+           || _NON_CORP_SECTORS[iss.ind] || _GOV_NAME_RE.test(_nm)) continue;
+      }
+    }
     const m = _repCalcMultipliers(iss);
     // Фильтр по выбранным годам: последний период эмитента должен быть
     // в одном из отмеченных годов. Ничего не отмечено — любой год ок.
@@ -10699,7 +10709,12 @@ function repRenderIssuerList(){
   }
 
   const activeId = typeof repActiveIssuerId !== 'undefined' ? repActiveIssuerId : null;
-  const html = rows.map(({id, iss, m}) => {
+  // Лимит рендера: 325 богатых карточек тормозят и скролл, и каждый ре-рендер.
+  // Показываем первые LIMIT, остальное — по кнопке «показать ещё» (окно растёт).
+  const LIMIT = window._repListLimit || 120;
+  const totalRows = rows.length;
+  const capped = rows.slice(0, LIMIT);
+  const html = capped.map(({id, iss, m}) => {
     const active = id === activeId;
     const periods = Object.keys(iss.periods || {}).length;
     // Мультипликаторы с всплывающими подсказками-формулами.
@@ -10742,7 +10757,9 @@ function repRenderIssuerList(){
       </div>
     `;
   }).join('');
-  listEl.innerHTML = html;
+  listEl.innerHTML = html + (totalRows > capped.length
+    ? `<div style="padding:8px;text-align:center"><button onclick="window._repListLimit=(window._repListLimit||120)+200;repRenderIssuerList()" style="font-size:.58rem;padding:4px 10px;background:var(--s2);border:1px solid var(--border2);color:var(--acc);cursor:pointer;border-radius:4px">показать ещё (${totalRows - capped.length})</button><div style="font-size:.5rem;color:var(--text3);margin-top:4px">показано ${capped.length} из ${totalRows} · уточни поиск/фильтр</div></div>`
+    : '');
 }
 
 function _escHtml(s){
@@ -29292,37 +29309,13 @@ var _NON_CORP_SECTORS = { state: 1 };
 var _GOV_NAME_RE = /^(администрация|правительство|министерство|департамент|комитет|служба|агентство|инспекция|управление)/i;
 (function(){
   var _origRIL = repRenderIssuerList;
+  // corp_moex/has_moex теперь фильтруются в самом repRenderIssuerList (до
+  // расчёта мультипликаторов и с лимитом), поэтому обёртка больше не
+  // рендерит всё и не прячет лишнее — только применяет продвинутый
+  // DOM-фильтр (рейтинг/отрасль/мультипликаторы).
   window.repRenderIssuerList = function(){
-    var st = document.getElementById('rep-sidebar-status');
-    var origVal = st ? st.value : '';
-    var needCustom = origVal === 'has_moex' || origVal === 'corp_moex';
-    if(st && needCustom) st.value = 'all';
     _origRIL();
-    _repFilterApplyDOM();
-    if(st && needCustom){
-      st.value = origVal;
-      var listEl = document.getElementById('rep-sidebar-list');
-      if(listEl){
-        var shown = 0;
-        listEl.querySelectorAll('[onclick]').forEach(function(el){
-          if(el.style.display === 'none') return;
-          var oc = el.getAttribute('onclick') || '';
-          var m = oc.match(/repSelectIssuerById('([^']+)')/);
-          if(!m){ shown++; return; }
-          var iss = reportsDB[m[1]];
-          var hasB = iss && (iss.bondsCount > 0);
-          // corp_moex: исключаем субфедеральные/мун./ОФЗ/банки/гос.органы
-          var isCorpOk = origVal !== 'corp_moex' || (iss &&
-            !_NON_CORP_KINDS[iss.kind] && iss.kind !== 'bank' &&
-            !_NON_CORP_SECTORS[iss.ind] &&
-            !_GOV_NAME_RE.test(iss.name || ''));
-          if(!hasB || !isCorpOk) el.style.display = 'none';
-          else shown++;
-        });
-        var cnt = document.getElementById('rep-sidebar-count');
-        if(cnt) cnt.textContent = String(shown);
-      }
-    }
+    try { _repFilterApplyDOM(); } catch(_){}
   };
 })();
 
