@@ -11532,6 +11532,7 @@ function repRenderCards(p){
 
   grid.innerHTML = `
     ${_cbrContextFor(p.year, p.period, p.disclosed)}
+    ${_repCreditSummary(p, reportsDB[repActiveIssuerId])}
     <div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin-bottom:8px">Исходные показатели</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:16px">${cards||'<div style="color:var(--text3);font-size:.7rem">Нет данных</div>'}</div>
     ${ratioCards?`<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin-bottom:8px">Расчётные коэффициенты</div>
@@ -14866,6 +14867,55 @@ function repSlImport(){
   if(typeof repBuildPeriodTabs==='function') repBuildPeriodTabs();
   closeModal('modal-rep-sl');
   alert(`smart-lab: создано периодов ${created}`+(updated?`, обновлено ${updated}`:'')+'.\nУникальные строки сохранены как «свои метрики» (видны в карточках периода).');
+}
+
+// Предыдущий сопоставимый период (год назад, тот же период и тип).
+function _repPriorPeriod(iss, p){
+  if(!iss || !iss.periods || !p || !p.year) return null;
+  const y = parseInt(p.year, 10); if(!y) return null;
+  return iss.periods[`${y-1}_${p.period}_${p.type}`] || null;
+}
+
+// Кредитное резюме: каждая строка с РЕАЛЬНЫМ значением + г/г-динамика
+// (стрелка/цвет) + короткий человеческий вывод, а где не посчитать —
+// честно «нет данных (нужно: …)». Без дублей-воды, без советов «посмотри
+// метрику», которой нет.
+function _repCreditSummary(p, iss){
+  if(!p) return '';
+  const prev = _repPriorPeriod(iss, p);
+  const R = repCalcRatios(p), Rp = prev ? repCalcRatios(prev) : {};
+  const F = {ebitda:'EBITDA',debt:'Долг',cash:'Наличность',int:'Проценты',capex:'CAPEX',cfo:'CFO',np:'Чист.прибыль',rev:'Выручка'};
+  const items = [
+    {l:'Долг/EBITDA', k:'ndE', u:'×', low:true,  need:['ebitda','debt','cash'], read:v=>v<2.5?'низкая нагрузка':v<4?'умеренная нагрузка':'высокая нагрузка'},
+    {l:'ICR',         k:'icr', u:'×', low:false, need:['ebitda','int'],         read:v=>v>=3?'проценты покрыты с запасом':v>=1.5?'покрытие впритык':'на проценты не хватает'},
+    {l:'Эфф. ставка долга', k:'rate', u:'%', low:true, need:['int','debt'],     read:()=>null},
+    {l:'Проценты/EBITDA', k:'intE', u:'%', low:true, need:['int','ebitda'],     read:v=>v<35?'нагрузка комфортная':v<50?'заметная':'тяжёлая'},
+    {l:'(EBITDA−CAPEX)/%', k:'ecr', u:'×', low:false, need:['ebitda','capex','int'], read:v=>v>1?'хватает и после капзатрат':'после капзатрат на проценты не хватает'},
+    {l:'FCF', k:'fcf', u:' млрд', low:false, need:['cfo','capex'],              read:v=>v>=0?'поток положительный':'жжёт кэш'},
+    {l:'Чистая маржа', k:'npm', u:'%', low:false, need:['np','rev'],            read:()=>null},
+  ];
+  const rows = items.map(it=>{
+    const cv = R[it.k];
+    if(cv == null){
+      const miss = it.need.filter(f=>p[f]==null).map(f=>F[f]||f);
+      return `<div style="padding:3px 0;border-top:1px solid var(--border);color:var(--text3)">${it.l}: нет данных${miss.length?' <span style="font-size:.9em">(нужно: '+miss.join(', ')+')</span>':''}</div>`;
+    }
+    const cur = parseFloat(cv);
+    let trend = '';
+    const pvRaw = Rp[it.k];
+    if(pvRaw != null){
+      const pv = parseFloat(pvRaw), d = cur - pv, eps = Math.abs(pv)*0.03 || 1e-9;
+      const arrow = Math.abs(d)<=eps ? '→' : (d>0?'↑':'↓');
+      const worse = it.low ? d>eps : d<-eps;
+      const better = it.low ? d<-eps : d>eps;
+      const col = worse?'var(--danger)':better?'var(--green)':'var(--text3)';
+      trend = ` <span style="color:${col}">${arrow} с ${pvRaw}${it.u}</span>`;
+    }
+    const rd = it.read ? it.read(cur) : null;
+    return `<div style="padding:3px 0;border-top:1px solid var(--border)"><span style="color:var(--text2)">${it.l}:</span> <b style="color:var(--text)">${cv}${it.u}</b>${trend}${rd?' <span style="color:var(--text3)">— '+rd+'</span>':''}</div>`;
+  }).join('');
+  return `<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin-bottom:6px">Кредитное резюме${prev?` · г/г к ${prev.year}`:' · нет прошлого года для сравнения'}</div>`
+    + `<div style="font-size:.66rem;line-height:1.5;margin-bottom:16px">${rows}</div>`;
 }
 
 // Блок «свои метрики» (p.extra) для вида карточек
