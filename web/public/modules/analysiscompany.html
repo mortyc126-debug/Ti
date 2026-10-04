@@ -54,7 +54,7 @@ html,body{overflow:auto!important;background:linear-gradient(180deg,#0A0615 0%,#
 #page-reports{display:block!important;padding:6px 10px}
 /* Правая панель скроллится независимо, не выезжает за экран */
 #page-reports>div[style*="display:flex"]{align-items:stretch!important;margin-top:2px!important}
-#page-reports>div[style*="display:flex"]>div[style*="flex:1"]{overflow-y:auto;max-height:calc(100vh - 70px);min-width:0}
+#page-reports>div[style*="display:flex"]>div[style*="flex:1"]{overflow-y:auto;max-height:calc(100vh - 16px);min-width:0}
 
 /* Скроллбар */
 ::-webkit-scrollbar{width:8px;height:8px}
@@ -431,7 +431,7 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
   <div style="display:flex;gap:14px;align-items:flex-start;margin-top:10px">
   <!-- Sidebar со списком эмитентов: постоянно виден, с поиском, сортировкой
        по мультипликаторам и фильтром по году последнего отчёта. -->
-  <div id="rep-sidebar" style="width:400px;flex-shrink:0;position:sticky;top:8px;max-height:calc(100vh - 80px);display:flex;flex-direction:column;background:var(--s1);border:1px solid var(--brdm);overflow:hidden">
+  <div id="rep-sidebar" style="width:400px;flex-shrink:0;position:sticky;top:8px;max-height:calc(100vh - 16px);display:flex;flex-direction:column;background:var(--s1);border:1px solid var(--brdm);overflow:hidden">
 
   <!-- Поиск -->
   <div style="padding:9px 10px 8px;border-bottom:1px solid var(--brd);flex-shrink:0">
