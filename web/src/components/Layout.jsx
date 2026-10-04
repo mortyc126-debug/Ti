@@ -4,6 +4,7 @@ import { Menu, X } from 'lucide-react';
 import SearchBar from './SearchBar.jsx';
 import Brand from './Brand.jsx';
 import NavLinks from './NavLinks.jsx';
+import RateChip from './RateChip.jsx';
 import Footer from './Footer.jsx';
 import AppSidebar from './AppSidebar.jsx';
 
@@ -21,6 +22,7 @@ export default function Layout(){
       <header className="bg-bg2/80 backdrop-blur border-b border-border px-4 sm:px-5 py-2.5 flex items-center gap-3 sm:gap-4 sticky top-0 z-40">
         <Brand />
         <SearchBar />
+        <RateChip />
         <div className="hidden md:block">
           <NavLinks orient="row" />
         </div>

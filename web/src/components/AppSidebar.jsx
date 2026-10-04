@@ -4,6 +4,7 @@ import {
   Star, ChevronsLeft, ChevronsRight,
 } from 'lucide-react';
 import { useSidebar } from '../store/sidebar.js';
+import { useKeyRate } from '../store/rates.js';
 
 // Глобальный sidebar — список разделов справа на каждой странице.
 // Свёрнут: только иконки (узкая колонка ~52px). Развёрнут: иконки +
@@ -13,7 +14,7 @@ const ITEMS = [
   { id: 'issuers', icon: Building2,  label: 'Эмитенты',  to: '#' },
   { id: 'reports', icon: FileText,   label: 'Отчёты',    to: '/reports' },
   { id: 'sectors', icon: Factory,    label: 'Отрасли',   to: '/industries' },
-  { id: 'cbr',     icon: Percent,    label: 'КС',        to: '#' },
+  { id: 'cbr',     icon: Percent,    label: 'КС',        to: '/debt' },
   { id: 'ytm',     icon: TrendingUp, label: 'YTM/P&L',   to: '#' },
   { id: 'favs',    icon: Star,       label: 'Избранное', to: '/favorites' },
   { id: 'arch',    icon: Archive,    label: 'Архив',     to: '#' },
@@ -23,6 +24,7 @@ export default function AppSidebar(){
   const expanded = useSidebar(s => s.expanded);
   const toggle   = useSidebar(s => s.toggle);
   const loc      = useLocation();
+  const { current: keyRate } = useKeyRate();
 
   return (
     <aside
@@ -44,12 +46,12 @@ export default function AppSidebar(){
         {ITEMS.map(it => {
           const Icon = it.icon;
           const active = it.to !== '#' && loc.pathname.startsWith(it.to) && it.to !== '/';
+          const label = (it.id === 'cbr' && keyRate != null) ? `КС ${keyRate}%` : it.label;
           return (
             <Link
               key={it.id}
               to={it.to}
-              title={!expanded ? it.label : undefined}
-              className={[
+              title={!expanded ? it.label : undefined}              className={[
                 'flex items-center gap-3 rounded h-9 px-2 transition-colors',
                 active
                   ? 'bg-acc-dim text-acc'
@@ -59,7 +61,7 @@ export default function AppSidebar(){
             >
               <Icon size={16} className="shrink-0" />
               {expanded && (
-                <span className="text-sm font-mono truncate">{it.label}</span>
+                <span className="text-sm font-mono truncate">{label}</span>
               )}
             </Link>
           );
