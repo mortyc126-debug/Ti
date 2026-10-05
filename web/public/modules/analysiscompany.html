@@ -1144,6 +1144,8 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
         <label style="font-size:.55rem">Фильтр по имени (через запятую)</label>
         <input type="text" id="cross-filter" oninput="crossRender()" placeholder="сбер, втб, лукойл" style="font-size:.7rem;padding:3px 6px;width:200px">
       </div>
+      <label style="font-size:.6rem;color:var(--text2);display:flex;align-items:center;gap:4px;cursor:pointer" title="Только банки + банковские метрики (ROE/NIM/CoR/NPL/достаточность…) и банковский радар">
+        <input type="checkbox" id="cross-bank-mode" onchange="crossRender()" style="margin:0"> 🏦 режим банков</label>
       <label style="font-size:.6rem;color:var(--text2);display:flex;align-items:center;gap:4px;cursor:pointer">
         <input type="checkbox" id="cross-same-scope" onchange="crossRender()" style="margin:0"> только той же scope
       </label>
@@ -9580,8 +9582,22 @@ const _CROSS_METRICS = [
   {k:'np',      l:'Чистая прибыль, млрд ₽',    unit:'млрд', higher:true,  calc:d => (typeof d.np === 'number') ? d.np : null},
   {k:'assets',  l:'Активы, млрд ₽',            unit:'млрд', higher:true,  calc:d => (typeof d.assets === 'number') ? d.assets : null},
   {k:'eq',      l:'Капитал, млрд ₽',           unit:'млрд', higher:true,  calc:d => (typeof d.eq === 'number') ? d.eq : null},
-  {k:'debt',    l:'Долг, млрд ₽',              unit:'млрд', higher:false, calc:d => (typeof d.debt === 'number') ? d.debt : null}
+  {k:'debt',    l:'Долг, млрд ₽',              unit:'млрд', higher:false, calc:d => (typeof d.debt === 'number') ? d.debt : null},
+  // ── Банковские метрики (из extra; % хранятся долей → ×100) ──
+  {k:'b_roe', l:'🏦 ROE, %',               unit:'%',    higher:true,  calc:d=>{const v=_cx(d,/\broe\b/i);return v!=null?v*100:null;}},
+  {k:'b_roa', l:'🏦 ROA, %',               unit:'%',    higher:true,  calc:d=>{const v=_cx(d,/\broa\b/i);return v!=null?v*100:null;}},
+  {k:'b_nim', l:'🏦 NIM, %',               unit:'%',    higher:true,  calc:d=>{const v=_cx(d,/чистая процентн/i);return v!=null?v*100:null;}},
+  {k:'b_cor', l:'🏦 CoR, %',               unit:'%',    higher:false, calc:d=>{const v=_cx(d,/стоимость риска|cor/i);return v!=null?v*100:null;}},
+  {k:'b_npl', l:'🏦 NPL, %',               unit:'%',    higher:false, calc:d=>{const v=_cx(d,/просроченные кредиты|npl/i);return v!=null?v*100:null;}},
+  {k:'b_cov', l:'🏦 Покрытие резервами, %',unit:'%',    higher:true,  calc:d=>{const r=_cx(d,/резервы под обесцен/i),n=_cx(d,/неработающие кредиты/i);return (r!=null&&n)?r/n*100:null;}},
+  {k:'b_car', l:'🏦 Дост. капитала, %',    unit:'%',    higher:true,  calc:d=>{const v=_cx(d,/дост\.?\s*общ/i);return v!=null?v*100:null;}},
+  {k:'b_cir', l:'🏦 CIR, %',               unit:'%',    higher:false, calc:d=>{const v=_cx(d,/расходы\/доходы|cir/i);return v!=null?v*100:null;}},
+  {k:'b_ltd', l:'🏦 L/D, %',               unit:'%',    higher:true,  calc:d=>{const v=_cx(d,/loan-to-deposit|^l\/d/i);return v!=null?v*100:null;}},
+  {k:'b_loans', l:'🏦 Кредитный портфель, млрд', unit:'млрд', higher:true, calc:d=>_cx(d,/кредитный портфель/i)},
+  {k:'b_dep',   l:'🏦 Депозиты, млрд',           unit:'млрд', higher:true, calc:d=>_cx(d,/^депозиты,/i)}
 ];
+// Чтение банковской метрики из extra периода по регэкспу ключа.
+const _cx=(d,re)=>{ if(!d||!d.extra)return null; for(const k in d.extra){ if(re.test(k)){ const v=d.extra[k]; return (typeof v==='number'&&isFinite(v))?v:null; } } return null; };
 
 // Сортировочный вес периода: FY > 9M > H1 > Q1 в пределах одного года.
 function _crossPeriodWeight(period){
@@ -9617,6 +9633,11 @@ function _crossEnumeratePeriods(){
 // размера компании (все коэффициенты). Порядок = порядок осей вокруг
 // круга, начиная с 12 часов по часовой.
 const _CROSS_RADAR_AXES = ['ebitdam','npm','roa','roe','icr','ndE','cur','eqr'];
+// Банковские оси радара (в режиме банков).
+const _CROSS_RADAR_AXES_BANK = ['b_roe','b_roa','b_nim','b_cov','b_car','b_cir','b_npl','b_ltd'];
+function _crossBankMode(){ return !!(document.getElementById('cross-bank-mode')&&document.getElementById('cross-bank-mode').checked); }
+// Набор метрик под режим: банковские (b_*) в режиме банков, иначе корпоративные.
+function _crossMetricsFor(){ const bank=_crossBankMode(); return _CROSS_METRICS.filter(m=> bank ? m.k.indexOf('b_')===0 : m.k.indexOf('b_')!==0); }
 
 // Палитра для полигонов компаний в радаре. 30 цветов в HSL с шагом
 // hue ≈ 12° и чередованием насыщенности/яркости — соседи по индексу
@@ -9658,11 +9679,13 @@ function crossBuildPeriodSelector(){
 
 function crossBuildMetricSelector(){
   const sel = document.getElementById('cross-metric');
-  if(!sel || sel.options.length) return;
-  sel.innerHTML = _CROSS_METRICS.map(m =>
+  if(!sel) return;
+  const cur = sel.value;
+  const metrics = _crossMetricsFor();
+  sel.innerHTML = metrics.map(m =>
     `<option value="${m.k}">${m.l}${m.higher === false ? ' (меньше = лучше)' : ''}</option>`
   ).join('');
-  sel.value = 'ebitdam';
+  if(cur && metrics.some(m=>m.k===cur)) sel.value=cur; else sel.value=(metrics[0]&&metrics[0].k)||'';
 }
 
 function crossSetView(mode, btn){
@@ -9728,10 +9751,12 @@ function _crossCollectAll(periodKey, opts){
   const [yearStr, period] = periodKey.split('_');
   const year = +yearStr;
   const out = [];
+  const banksOnly = !!opts.banksOnly;
   for(const [issId, iss] of Object.entries(reportsDB || {})){
     const name = _normForSearch(iss?.name || '');
     if(tokens.length && !tokens.some(t => name.includes(t))) continue;
     if(industry && (iss?.ind || 'other') !== industry) continue;
+    if(banksOnly && !_repBankDetect(iss)) continue;   // режим банков — только банки
     const row = _crossPickRow(iss, issId, year, period, scopeFilter);
     if(!row) continue;
     row.values = {};
@@ -9883,7 +9908,7 @@ function crossRender(){
     }
     scopeFilter = Object.entries(freq).sort((a,b) => b[1] - a[1])[0]?.[0] || null;
   }
-  const rows = _crossCollectAll(periodKey, {filter, industry, scopeFilter});
+  const rows = _crossCollectAll(periodKey, {filter, industry, scopeFilter, banksOnly:_crossBankMode()});
   const ranks = _crossRanks(rows);
   window._crossLast = {rows, ranks, periodKey, scopeFilter};
   _crossRenderCompanies(rows);
@@ -9908,7 +9933,8 @@ function crossRender(){
 // исходным значением метрики.
 function _crossRenderRadar(rows, ranks){
   const chart = document.getElementById('cross-chart');
-  const axes = _CROSS_RADAR_AXES.map(k => _CROSS_METRICS.find(m => m.k === k)).filter(Boolean);
+  const axisKeys = _crossBankMode() ? _CROSS_RADAR_AXES_BANK : _CROSS_RADAR_AXES;
+  const axes = axisKeys.map(k => _CROSS_METRICS.find(m => m.k === k)).filter(Boolean);
   const N = axes.length;
   const W = 640, H = 560;
   const cx = W / 2, cy = H / 2 - 8;
@@ -9990,7 +10016,7 @@ function _percentileColor(p){
 
 function _crossRenderHeatmap(rows, ranks){
   const chart = document.getElementById('cross-chart');
-  const metrics = _CROSS_METRICS;
+  const metrics = _crossMetricsFor();
   // Сортировка строк: сначала считаем средний перцентиль по всем метрикам у каждой компании.
   const withAvg = rows.map(r => {
     const vals = metrics.map(m => ranks[m.k]?.[r.id]).filter(v => v != null);
