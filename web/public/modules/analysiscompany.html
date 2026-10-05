@@ -10113,13 +10113,6 @@ function repInit(){
   } else {
     repRenderIssuerList();
   }
-  // Авто-подхват базы одним запросом, если она пустая (первый вход / квота
-  // localStorage сбросила). Один файл, не сотни запросов. Больше не трогаем.
-  if(!window._repBundleTried){
-    window._repBundleTried = true;
-    var _withPer = Object.keys(reportsDB).filter(function(k){ return reportsDB[k] && Object.keys(reportsDB[k].periods||{}).length>0; }).length;
-    if(_withPer < 5 && typeof repLoadBundle === 'function'){ setTimeout(function(){ repLoadBundle(); }, 50); }
-  }
 }
 
 function repRebuildSelect(){
