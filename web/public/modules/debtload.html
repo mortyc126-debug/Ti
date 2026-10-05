@@ -599,6 +599,7 @@ tr.row-redeemed td{opacity:.72;}
     <div class="card"><div class="sl">Размещено 12 / 24 мес</div><div class="sv" id="sv11">—</div><div class="ss" id="ss11"></div></div>
     <div class="card"><div class="sl">Признаки пирамиды</div><div class="sv" id="sv12">—</div><div class="ss" id="ss12"></div></div>
   </div>
+  <div id="rcost" style="margin:2px 0 16px"></div>
   <div class="leg" style="margin-bottom:8px">
     <span><span class="lsq" style="background:#2EC4B6"></span>Размещено</span>
     <span><span class="lsq" style="background:#D97850"></span>Погашения</span>
@@ -2071,6 +2072,72 @@ function refreshAnalytics(){
   chain=analyzeChain();
   renderWalls();
   renderQuality();
+  renderDebtCost();
+}
+
+// Стоимость биржевого долга СЕЙЧАС — взвешенная по непогашенному номиналу.
+// Отвечает на вопрос «по какой брались фиксы, с каким спредом флоатеры и что
+// это значит при текущей КС»: фикс берёт свой текущий купон, флоатер —
+// КС_сейчас + спред. Это рыночно-контрактная стоимость долга, в отличие от
+// бухгалтерской «проценты / долг» в модуле отчётности.
+function renderDebtCost(){
+  const host=$('rcost'); if(!host) return;
+  const act=bonds.filter(e=>!isRedeemed(e)&&outstanding(e)>0);
+  if(!act.length){ host.innerHTML=''; return; }
+  let wAll=0,cAll=0, wFix=0,cFix=0, wFl=0,cFl=0,spFl=0, wFixPl=0,cFixPl=0, uncov=0;
+  act.forEach(e=>{
+    const w=outstanding(e), b=e.bond, isFl=!!b._isFloater;
+    let rate=null;
+    if(isFl){
+      if(kr!=null && b._spread!=null) rate=kr+b._spread;
+      else if(b.COUPONPERCENT>0) rate=b.COUPONPERCENT;      // спреда нет — берём текущий купон
+    } else if(b.COUPONPERCENT>0){ rate=b.COUPONPERCENT; }
+    if(rate==null){ uncov+=w; return; }
+    wAll+=w; cAll+=w*rate;
+    if(isFl){ wFl+=w; cFl+=w*rate; if(b._spread!=null) spFl+=w*b._spread; }
+    else { wFix+=w; cFix+=w*rate; if(b._cp0!=null){ wFixPl+=w; cFixPl+=w*b._cp0; } }
+  });
+  if(!wAll){ host.innerHTML='<div class="sl">Стоимость долга</div><div style="font-size:12px;color:var(--t3);margin-top:4px">нет купонов/спредов в загруженных выпусках — стоимость не посчитать.</div>'; return; }
+  const avgAll=cAll/wAll;
+  const avgFix=wFix?cFix/wFix:null, avgFl=wFl?cFl/wFl:null;
+  const avgSpFl=wFl?spFl/wFl:null, avgFixPl=wFixPl?cFixPl/wFixPl:null;
+  const shFix=wFix/wAll*100, shFl=wFl/wAll*100;
+  const p1=v=>v==null?'—':v.toFixed(1)+'%';
+
+  const rows=[];
+  if(wFix) rows.push('<div style="display:flex;gap:8px;margin:3px 0;font-size:12px;color:var(--t2)">'
+    +'<span style="min-width:12px;color:var(--pos);font-weight:700">●</span>'
+    +'<span><b style="color:var(--t1)">Фиксы '+Math.round(shFix)+'% долга</b> под средне <b>'+p1(avgFix)+'</b>'
+    +(avgFixPl!=null?' · размещались в среднем под '+p1(avgFixPl):'')+'.</span></div>');
+  if(wFl) rows.push('<div style="display:flex;gap:8px;margin:3px 0;font-size:12px;color:var(--t2)">'
+    +'<span style="min-width:12px;color:var(--warn);font-weight:700">●</span>'
+    +'<span><b style="color:var(--t1)">Флоатеры '+Math.round(shFl)+'% долга</b>'
+    +(avgSpFl!=null?' = КС '+sgn(avgSpFl)+' п.п.'+(kr!=null?' = <b>'+p1(avgFl)+'</b> сейчас':''):(avgFl!=null?' под средне '+p1(avgFl):''))
+    +(kr!=null?' · КС +1 п.п. ≈ '+fmt(wFl*0.01)+'/год к купонам':'')+'.</span></div>');
+
+  // «что это значит сейчас» — трактовка относительно текущей КС
+  let note='';
+  if(kr!=null){
+    const bits=[];
+    if(avgFix!=null){
+      const d=avgFix-kr;
+      bits.push(d<-0.3?('фиксы в среднем на '+Math.abs(d).toFixed(1)+' п.п. дешевле текущей КС '+kr+'% — это старый дешёвый долг, рефинанс сейчас обойдётся дороже')
+        :d>0.3?('фиксы в среднем на '+d.toFixed(1)+' п.п. дороже текущей КС '+kr+'% — брались при более высокой ставке/премии за риск')
+        :('фиксы близки к текущей КС '+kr+'%'));
+    }
+    bits.push(shFl>=50?('долг сильно завязан на КС ('+Math.round(shFl)+'% флоатеры) — рост ставки сразу бьёт по обслуживанию, снижение удешевляет')
+      :shFl>0?('к текущей КС чувствительны флоатеры ('+Math.round(shFl)+'%) и будущий рефинанс')
+      :'флоатеров нет — к КС чувствителен только рефинанс при погашениях');
+    note='<div style="font-size:12px;color:var(--t3);margin-top:7px;line-height:1.5">'+bits.join('; ')+'.</div>';
+  } else {
+    note='<div style="font-size:12px;color:var(--t3);margin-top:7px">Введите ключевую ставку, чтобы оценить флоатеры и сравнить с текущей КС.</div>';
+  }
+  const cov=uncov>0?'<span style="color:var(--t3);font-weight:400;font-size:11px"> · без купона '+fmt(uncov)+'</span>':'';
+
+  host.innerHTML='<div class="sl" style="margin-bottom:6px">Стоимость долга сейчас</div>'
+    +'<div style="font-size:26px;font-weight:700;color:var(--acc);line-height:1.1">'+p1(avgAll)+'</div>'
+    +'<div class="ss" style="margin-bottom:9px">годовых, взвешенно по непогашенному номиналу '+fR(wAll)+cov+'</div>'
+    +rows.join('')+note;
 }
 
 function renderQuality(){
