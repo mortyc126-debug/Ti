@@ -15647,6 +15647,54 @@ function _repDependencyFindings(iss, p){
   return F;
 }
 
+// Единый вердикт сверху: сильные стороны / риски / на что смотреть — синтез
+// из тех же сигналов, что и подробные выводы. Коротко и по делу.
+function _repVerdict(iss, p){
+  if(!iss || !p) return '';
+  const n=v=>(typeof v==='number'&&isFinite(v))?v:null;
+  const ebitda=n(p.ebitda)!=null?n(p.ebitda):n(p.ebit), ebit=n(p.ebit), rev=n(p.rev),
+        debt=n(p.debt), cash=n(p.cash), ca=n(p.ca), cl=n(p.cl), eq=n(p.eq), assets=n(p.assets),
+        intx=n(p.int), cfo=n(p.cfo), capex=n(p.capex);
+  const nd=(debt!=null&&cash!=null)?debt-cash:null;
+  const strong=[], risk=[], watch=[];
+  const push=(b,t)=>{ (b==='s'?strong:b==='r'?risk:watch).push(t); };
+  const norms=_IND_NORMS[_repIndGroup(iss)];
+  // долговая нагрузка
+  if(nd!=null&&ebitda&&ebitda>0){ const v=nd/ebitda, st=norms?_repNormStatus(v,norms.nde):(v<2.5?'good':v<4?'warn':'bad');
+    if(st==='good')push('s',`низкая долговая нагрузка (ND/EBITDA ${v.toFixed(1)}×)`); else if(st==='bad')push('r',`высокая нагрузка (ND/EBITDA ${v.toFixed(1)}×)`); else push('w',`нагрузка повышенная (ND/EBITDA ${v.toFixed(1)}×)`); }
+  // покрытие процентов
+  if(ebit!=null&&intx){ const v=ebit/intx; if(v>=3)push('s',`проценты покрыты с запасом (ICR ${v.toFixed(1)}×)`); else if(v<1.5)push('r',`на проценты едва хватает (ICR ${v.toFixed(1)}×)`); else push('w',`покрытие процентов впритык (ICR ${v.toFixed(1)}×)`); }
+  // качество прибыли
+  if(ebitda&&ebitda>0&&cfo!=null){ const conv=cfo/ebitda*100; if(conv<0)push('r','прибыль не превращается в деньги (CFO<0 при EBITDA>0)'); else if(conv<50)push('w',`в кэш доходит мало EBITDA (${conv.toFixed(0)}%)`); else push('s',`прибыль переходит в кэш (CFO/EBITDA ${conv.toFixed(0)}%)`); }
+  // свободный поток
+  if(cfo!=null&&capex!=null){ const fcf=cfo-capex; if(fcf<0)push('w',`отрицательный FCF (${fcf.toFixed(1)}) — финансируется долгом/кэшем`); else push('s',`положительный FCF (${fcf.toFixed(1)})`); }
+  // маржа vs отрасль
+  if(ebitda!=null&&rev&&norms){ const m=ebitda/rev*100, st=_repNormStatus(m,norms.ebitdaMarg); if(st==='good')push('s',`маржа выше нормы сектора (${m.toFixed(0)}%)`); else if(st==='bad')push('r',`низкая маржа (${m.toFixed(0)}%)`); }
+  // ликвидность
+  if(ca!=null&&cl&&norms){ const c=ca/cl, st=_repNormStatus(c,norms.currentR); if(st==='bad')push('r',`тонкая ликвидность (тек. ${c.toFixed(2)}×)`); }
+  // рефинанс: короткий конец облигаций
+  const ds=_repDebtStructure(iss,p); if(ds&&ds.bondsOut){ const sh=ds.bondsShort/ds.bondsOut*100; if(sh>40)push('w',`крупный короткий конец облигаций (${sh.toFixed(0)}% ≤1г) — рефинанс`); }
+  // тренд: долг обгоняет EBITDA + разовое в прибыли
+  const prA=_repPriorAnnualPeriod(iss,{year:+p.year,period:p.period,type:p.type},1);
+  if(prA){ const pr=prA.period; const gD=(debt!=null&&n(pr.debt))?(debt-n(pr.debt))/Math.abs(n(pr.debt))*100:null;
+    const ebP=n(pr.ebitda)!=null?n(pr.ebitda):n(pr.ebit); const gE=(ebitda!=null&&ebP)?(ebitda-ebP)/Math.abs(ebP)*100:null;
+    if(gD!=null&&gE!=null&&gD>gE+15)push('w','долг растёт быстрее EBITDA');
+    const dNP=(n(p.np)!=null&&n(pr.np)!=null)?n(p.np)-n(pr.np):null;
+    if(dNP!=null){ const dEb=(ebitda!=null&&ebP)?ebitda-ebP:0; const dInt=(intx!=null&&n(pr.int)!=null)?-(intx-n(pr.int)):0; const resid=dNP-dEb-dInt; if(Math.abs(resid)>0.3*Math.max(Math.abs(dNP),1))push('w','прибыль искажена разовым — сверь переоценки/списания'); }
+  }
+  if(!strong.length&&!risk.length&&!watch.length) return '';
+  const headColor = risk.length?'var(--danger)':watch.length?'var(--warn)':'var(--green)';
+  const headText = risk.length?'есть существенные риски':watch.length?'в целом рабочее, есть что проверить':'профиль устойчивый';
+  const line=(icon,color,label,arr)=> arr.length?`<div style="font-size:.66rem;line-height:1.5;margin-top:3px"><span style="color:${color}">${icon} ${label}:</span> <span style="color:var(--text2)">${arr.slice(0,4).join('; ')}</span></div>`:'';
+  return `<div style="border:1px solid var(--border);border-left:3px solid ${headColor};background:var(--s1);padding:9px 12px;margin-bottom:14px">
+    <div style="font-size:.55rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${headColor}">Вердикт · ${headText}</div>
+    ${line('✅','var(--green)','сильные стороны',strong)}
+    ${line('⚠️','var(--danger)','риски',risk)}
+    ${line('👁','var(--warn)','следить',watch)}
+    <div style="font-size:.5rem;color:var(--text3);margin-top:5px">Авто-синтез из показателей периода; не инвест-рекомендация.</div>
+  </div>`;
+}
+
 // Diff «что изменилось г/г»: таблица ключевых метрик было→стало + Δ% и
 // разложение изменения прибыли (EBITDA / проценты / налог / разовое).
 function _repYoYBlock(iss, p){
@@ -15816,7 +15864,7 @@ function _repAnalysisBlock(iss, p){
     }
   }
 
-  return trend + _repYoYBlock(iss, p) + deps + _repMaturityWallBlock(iss) + indCmp + anom + oper;
+  return _repVerdict(iss, p) + trend + _repYoYBlock(iss, p) + deps + _repMaturityWallBlock(iss) + indCmp + anom + oper;
 }
 // helpers для юнит-экономики
 function pctSafe(c,p){ return (typeof c==='number'&&typeof p==='number'&&p!==0)?(c-p)/Math.abs(p)*100:null; }
