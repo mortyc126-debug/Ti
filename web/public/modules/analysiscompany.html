@@ -556,6 +556,7 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
     
     <input type="file" id="rep-issuer-import" accept=".json" style="display:none" onchange="repImportIssuerJson(this)">
     <button class="btn btn-sm" onclick="document.getElementById('rep-issuer-import').click()" title="Импорт одного эмитента с периодами из JSON-файла (bondan/issuer/v1). Не затирает остальных эмитентов."> Импорт эмитента</button>
+    <button class="btn btn-sm" onclick="document.getElementById('import-all-file').click()" title="Восстановить всю базу из файла бэкапа (reportsDB + портфель + списки). Спросит объединить или заменить — выбирай «объединить», ничего не потеряешь."> Восстановить базу</button>
     <div style="margin-left:auto;display:flex;gap:6px">
       <button class="btn btn-sm" id="rep-compare-btn" style="display:none" onclick="repShowCompare()">⇄ Сравнить периоды</button>
       <button class="btn btn-sm" id="rep-dossier-btn" style="display:none" onclick="dossierOpen()" title="Досье эмитента: финансовый профиль (авто), бизнес-профиль, модификаторы, параметры выпусков. Шаблон анализа в духе рейтинговых агентств."> Досье</button>
@@ -2093,10 +2094,14 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
     <div class="modal-hdr"> Вставить JSON бэкапа <button class="modal-x" onclick="closeModal('modal-import-paste')"></button></div>
     <div class="modal-body">
       <div style="font-size:.62rem;color:var(--text2);margin-bottom:6px;line-height:1.6">
-        Вставьте содержимое JSON-файла целиком — если файл не удаётся открыть через выбор с диска. Начинается с <code>{</code> и заканчивается <code>}</code>.
+        Выберите файл бэкапа с диска (быстрее для больших файлов) — или вставьте JSON целиком ниже. Начинается с <code>{</code> и заканчивается <code>}</code>.
+      </div>
+      <div style="margin-bottom:8px">
+        <input type="file" id="import-all-file" accept=".json,application/json" style="display:none" onchange="importAllData(this)">
+        <button class="btn btn-p" onclick="document.getElementById('import-all-file').click()">📂 Восстановить из файла…</button>
       </div>
       <textarea id="import-paste-area" placeholder='{"reportsDB": {...}, "portfolio": [...]}'
-        style="width:100%;min-height:240px;font-family:var(--mono);font-size:.62rem;background:var(--bg);color:var(--text);border:1px solid var(--border2);padding:8px"></textarea>
+        style="width:100%;min-height:200px;font-family:var(--mono);font-size:.62rem;background:var(--bg);color:var(--text);border:1px solid var(--border2);padding:8px"></textarea>
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-import-paste')">Отмена</button>
