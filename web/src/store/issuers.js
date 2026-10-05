@@ -12,7 +12,7 @@ import { loadIssuersReal } from '../data/issuersReal.js';
 import { getAllIssuers } from '../data/issuersMock.js';
 
 const MOCK = getAllIssuers();
-const CACHE_KEY = 'ba_issuers_raw_v15';  // v15: имена из industry-peers (offline) + правки; v14: словарь MOEX
+const CACHE_KEY = 'ba_issuers_raw_v16';  // v16: эмитенты из reportsDB (IndexedDB) влиты в список; v15: имена из industry-peers; v14: словарь MOEX
 const TTL = 6 * 3600e3;
 
 // выбрать отчёт эмитента под (год, тип); reps уже отсортированы по убыванию

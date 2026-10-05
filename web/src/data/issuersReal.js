@@ -117,22 +117,108 @@ const REP_TTL = 7 * 864e5;   // отчёты меняются редко → к�
 // Локальный снимок (web/public/reports-cache/{inn}.json = {data:[rows]},
 // _index.json = [inn,...]) — тот же, что читает модуль отчётности. Живёт
 // офлайн, не зависит от деградировавшей D1. Приоритет над backend.
-// Имена эмитентов из reportsDB (localStorage['ba_v2']) — тот же источник,
-// что показывает модуль отчётности. Работает офлайн, когда catalog деградировал.
-// Возвращает { inn -> name }.
-function _reportsDbNames(){
-  const map = {};
+
+// reportsDB из модуля «Отчётность». База ПЕРЕЕХАЛА в IndexedDB
+// (bondan_store/kv/reportsDB) — localStorage ~5 МБ её уже не вмещает, и
+// ba_v2 при переполнении пишется БЕЗ reportsDB. Поэтому читаем сначала
+// IndexedDB (источник истины), и только как запас — ba_v2. Без этого
+// «Отрасли»/«Карта рынка» не видели ручные/импортированные эмитенты.
+function _idbReadReportsDB(){
+  return new Promise(resolve => {
+    let done = false;
+    const fin = v => { if(!done){ done = true; resolve(v); } };
+    try {
+      if(typeof indexedDB === 'undefined'){ fin(null); return; }
+      const rq = indexedDB.open('bondan_store', 1);
+      rq.onupgradeneeded = () => { try { rq.result.createObjectStore('kv'); } catch(_){} };
+      rq.onerror = () => fin(null);
+      rq.onsuccess = () => {
+        try {
+          const db = rq.result;
+          if(!db.objectStoreNames.contains('kv')){ fin(null); return; }
+          const g = db.transaction('kv', 'readonly').objectStore('kv').get('reportsDB');
+          g.onsuccess = () => fin(g.result && typeof g.result === 'object' ? g.result : null);
+          g.onerror = () => fin(null);
+        } catch(_){ fin(null); }
+      };
+      setTimeout(() => fin(null), 6000);   // не вешаем загрузку, если IDB молчит
+    } catch(_){ fin(null); }
+  });
+}
+
+// Единая точка чтения reportsDB: IndexedDB → ba_v2 (обратная совместимость).
+async function _readReportsDB(){
+  const idb = await _idbReadReportsDB();
+  if(idb && Object.keys(idb).length) return idb;
   try {
     const raw = localStorage.getItem('ba_v2');
-    if(!raw) return map;
-    const db = JSON.parse(raw)?.reportsDB || {};
-    for(const id in db){
+    if(raw){ const db = JSON.parse(raw)?.reportsDB; if(db && Object.keys(db).length) return db; }
+  } catch(_){}
+  return idb || {};
+}
+
+// Имена эмитентов из reportsDB — тот же источник, что показывает модуль
+// отчётности. db передаётся уже прочитанным (см. _readReportsDB).
+// Возвращает { inn -> name }.
+function _reportsDbNames(db){
+  const map = {};
+  try {
+    for(const id in (db || {})){
       const e = db[id];
-      if(!e || !e.name) continue;
-      if(e.inn) map[String(e.inn)] = e.name;
+      if(!e || !e.name || !e.inn) continue;
+      map[String(e.inn)] = e.name;
     }
   } catch(_){}
   return map;
+}
+
+// Годовые периоды reportsDB («Год»/FY/12М) с type РСБУ/МСФО. Квартальные
+// и полугодовые пропускаем — метрики по ним не сопоставимы с годовыми.
+const _REPDB_ANNUAL = new Set(['ГОД', 'FY', '12М', '12M', 'Y']);
+
+// Короткие ключи периода reportsDB → поля, которые ждёт reportToMults.
+// reportsDB хранит int/tax, а reportToMults читает int_exp/tax_exp. Единицы
+// (всё в млрд ₽) не важны — метрики это отношения.
+function _repPeriodToRow(p){
+  return {
+    rev: p.rev, ebitda: p.ebitda, ebit: p.ebit, np: p.np,
+    int_exp: p.int, tax_exp: p.tax, assets: p.assets, ca: p.ca, cl: p.cl,
+    debt: p.debt, cash: p.cash, eq: p.eq, cfo: p.cfo, capex: p.capex,
+    divp: p.divp, recv: p.recv, inv: p.inv, pay: p.pay,
+  };
+}
+
+// Карточки эмитентов прямо из reportsDB — авторитетный источник (ручной
+// ввод/импорт пользователя). Форма как у backend-карточек: {id,inn,name,
+// industry,kinds,reports:[{year,std,mults}]}. Благодаря этому «Отрасли» и
+// «Карта рынка» показывают отчётность из модуля даже при мёртвом backend.
+function _reportsDbIssuers(db){
+  const out = [];
+  for(const id in (db || {})){
+    const iss = db[id];
+    if(!iss || !iss.periods) continue;
+    const anns = [];
+    for(const key in iss.periods){
+      const p = iss.periods[key];
+      if(!p || p.year == null) continue;
+      if(!_REPDB_ANNUAL.has(String(p.period || '').trim().toUpperCase())) continue;
+      anns.push({ year: Number(p.year), std: _normStd(p.type), mults: reportToMults(_repPeriodToRow(p)) });
+    }
+    if(!anns.length) continue;
+    anns.sort((a, b) => b.year - a.year);
+    const seen = new Set(), reps = [];
+    for(const r of anns){ const k = r.year + '|' + r.std; if(seen.has(k)) continue; seen.add(k); reps.push(r); }
+    const inn = iss.inn ? String(iss.inn) : null;
+    out.push({
+      id: inn || String(id), inn,
+      name: iss.name || inn || String(id),
+      ticker: null,
+      industry: iss.ind || 'other',
+      kinds: ['bond'],
+      reports: reps,
+    });
+  }
+  return out;
 }
 
 // Имена эмитентов из снимка облигаций (bonds-cache.json несёт issuer+inn).
@@ -216,6 +302,20 @@ async function _fetchReportsBackend(inn){
 }
 
 export async function loadIssuersReal(){
+  // reportsDB модуля «Отчётность» — читаем первым: это ручные/импортированные
+  // данные пользователя, их показываем даже когда backend/снимок пусты.
+  const repDb = await _readReportsDB();
+  const repIssuers = _reportsDbIssuers(repDb);
+
+  // Слить reportsDB-эмитентов в список: перекрывают backend по inn/id и
+  // добавляют отсутствующих (банки, ручной импорт и т.п.).
+  const _mergeRep = (list) => {
+    if(!repIssuers.length) return list;
+    const byKey = new Map(list.map(o => [String(o.inn || o.id), o]));
+    for(const ri of repIssuers) byKey.set(String(ri.inn || ri.id), ri);
+    return [...byKey.values()];
+  };
+
   // Кто имеет отчёты: снимок → иначе backend report_years
   const snapInns = await _snapshotInns();
   let inns = snapInns;
@@ -223,7 +323,7 @@ export async function loadIssuersReal(){
     try { const ry = await _timeout(api.issuerReportYears(), 12000); inns = Object.keys(ry?.map || {}); }
     catch(_){ inns = []; }
   }
-  if(!inns || !inns.length) return [];
+  if(!inns || !inns.length) return _mergeRep([]);   // backend мёртв — отдаём хотя бы reportsDB
   const fromSnap = !!snapInns;
 
   // имена/сектора — best-effort (тяжёлый /catalog кэширован на edge, с таймаутом)
@@ -235,9 +335,9 @@ export async function loadIssuersReal(){
     }
   } catch(_){ /* без секторов → industry='other' */ }
 
-  // имена из reportsDB (localStorage) и снимка облигаций — на случай, если
-  // catalog пуст/деградировал, а reports-снимок имени не содержит
-  const dbNames = _reportsDbNames();
+  // имена из reportsDB и снимка облигаций — на случай, если catalog
+  // пуст/деградировал, а reports-снимок имени не содержит
+  const dbNames = _reportsDbNames(repDb);
   const bondNames = await _bondNames();
   const fileNames = await _issuerNamesFile();
   const peerNames = await _peerNames();
@@ -268,5 +368,5 @@ export async function loadIssuersReal(){
     }
   }
   await Promise.all(Array.from({ length: CONC }, worker));
-  return out;
+  return _mergeRep(out);
 }
