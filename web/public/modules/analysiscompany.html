@@ -833,7 +833,7 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
         <div class="field"><label>Собственный капитал</label><input type="number" id="rep-np-eq" placeholder="8 200" step="0.1"></div>
       </div>
       <div class="g2">
-        <div class="field"><label>Долг (кредиты+займы)</label><input type="number" id="rep-np-debt" placeholder="4 100" step="0.1"></div>
+        <div class="field"><label>Долг (кредиты+займы) <button type="button" onclick="_repFillDebtFromBonds()" title="Подставить сумму непогашенных облигаций эмитента из каталога MOEX (только биржевой долг — банковские кредиты не входят)" style="font-size:9px;font-weight:600;padding:1px 5px;border:1px solid var(--acc);background:var(--acc-dim);color:var(--acc);cursor:pointer;vertical-align:middle">↓ облигации</button></label><input type="number" id="rep-np-debt" placeholder="4 100" step="0.1"></div>
         <div class="field"><label>Денежные средства</label><input type="number" id="rep-np-cash" placeholder="890" step="0.1"></div>
       </div>
       <div class="g2">
@@ -14478,6 +14478,43 @@ const _REP_UNIT_TO_BN = {'млн': 1/1000, 'млрд': 1, 'трлн': 1000};
 // Текущая единица ввода в форме. Меняется радио-кнопками; при сохранении
 // используется для пересчёта всех числовых полей в млрд.
 window._repNpCurrentUnit = 'млрд';
+
+// Автозаполнение поля «Долг» суммой непогашенных облигаций эмитента из
+// MOEX-каталога (по ИНН). ВАЖНО: это только БИРЖЕВОЙ долг — банковские
+// кредиты и небиржевые займы сюда не входят, поэтому значение подставляется
+// с подтверждением и пометкой, что реальный долг обычно больше.
+function _repFillDebtFromBonds(){
+  var iss = repActiveIssuerId ? reportsDB[repActiveIssuerId] : null;
+  var inn = iss && iss.inn;
+  if(!inn){ alert('У эмитента не указан ИНН — не могу сопоставить облигации.'); return; }
+  var cat = window._moexCatalog;
+  if((!cat || !Array.isArray(cat.items)) && typeof _moexLoadCache==='function'){
+    _moexLoadCache();
+    alert('Каталог облигаций подгружается — повтори через пару секунд.');
+    return;
+  }
+  if(!cat || !Array.isArray(cat.items)){ alert('Каталог облигаций недоступен.'); return; }
+  var now = Date.now(), sumBn = 0, cnt = 0;
+  for(var i=0;i<cat.items.length;i++){
+    var b = cat.items[i];
+    if(!b || String(b.inn)!==String(inn)) continue;
+    if(b.matDate){ var mt=new Date(b.matDate).getTime(); if(!isNaN(mt) && mt<=now) continue; } // только непогашенные
+    if(b.issueSize && b.faceValue){ sumBn += b.issueSize*b.faceValue/1e9; cnt++; }
+  }
+  if(!cnt){ alert('В каталоге нет непогашенных облигаций по ИНН '+inn+'.\nВозможно, у эмитента только банковские кредиты — тогда долг вводится вручную из отчёта.'); return; }
+  var unit = window._repNpCurrentUnit || 'млрд';
+  var val = sumBn / (_REP_UNIT_TO_BN[unit] || 1);
+  var el = document.getElementById('rep-np-debt'); if(!el) return;
+  var dec = unit==='млрд' ? 2 : unit==='млн' ? 0 : 3;
+  var cur = parseFloat(el.value);
+  var msg = 'Облигационный долг (непогашенные выпуски — '+cnt+' шт): '+sumBn.toFixed(2)+' млрд ₽.\n\n'
+    +'⚠️ Это ТОЛЬКО биржевой долг. Банковские кредиты и небиржевые займы сюда не входят — реальный «Долг» в отчёте обычно больше. Сверься с отчётностью.\n\n'
+    +((isFinite(cur)&&cur>0) ? ('Сейчас в поле: '+cur+' '+unit+'. Заменить на '+val.toFixed(dec)+' '+unit+'?')
+                             : ('Вписать '+val.toFixed(dec)+' '+unit+' в поле «Долг»?'));
+  if(!confirm(msg)) return;
+  el.value = Math.round(val*1000)/1000;
+  try{ el.dispatchEvent(new Event('input',{bubbles:true})); }catch(e){}
+}
 
 // Переключение единицы: пересчитывает все числовые поля формы, чтобы
 // отображать то же значение в новой шкале. При сохранении данные
@@ -29954,6 +29991,63 @@ function _repDataFreshness(iss){
     +'данные: '+disRu+' · '+ago+'</span>';
 }
 
+// ── Чувствительность отрасли к макро-факторам ─────────────────────────────
+// Зеркало web/src/lib/factorSensitivity.js + industryNorms.js: качественная
+// матрица «фактор × группа отраслей → эффект». Инлайн, т.к. модуль
+// самодостаточный (без сборки, работает офлайн). Раньше жило только в React-
+// странице «Отрасли» — а по факту ставка/нефть/FX бьют по конкретному
+// эмитенту, поэтому показываем прямо в его карточке по его отрасли.
+var _FACTORS=[
+  {id:'rate_up',    label:'Рост ключевой ставки'},
+  {id:'fx_up',      label:'Девальвация рубля (₽/$ ↑)'},
+  {id:'oil_up',     label:'Рост цены нефти'},
+  {id:'metals_up',  label:'Рост цен на металлы'},
+  {id:'demand_up',  label:'Рост доходов / спроса'},
+  {id:'inflation_up',label:'Ускорение инфляции'}
+];
+var _FACTOR_GROUPS={raw:'Ресурсы и сырьё',manuf:'Обрабат. промышленность',energy:'Энергетика и ЖКХ',build:'Стройка и недвижимость',trade:'Торговля',transport:'Транспорт','it-media':'IT, связь и медиа',finance:'Финансы',services:'Услуги',other:'Прочее'};
+var _FACTOR_EFFECT={'+':{l:'помогает',c:'var(--pos)'},'±':{l:'неоднозначно',c:'var(--warn)'},'~':{l:'нейтрально',c:'var(--t3)'},'-':{l:'давит',c:'var(--neg)'}};
+// ИНН-peer ключ (industry-peers.json) → группа норм (10 групп).
+var _FACTOR_IND2GROUP={
+  oil_gas:'raw',metals_mining:'raw',agro_food:'raw',
+  metal_products:'manuf',machinery:'manuf',auto:'manuf',electronics:'manuf',chemistry:'manuf',pharma:'manuf',plastic_rubber:'manuf',stroy_materials:'manuf',wood_paper:'manuf',textile_clothing:'manuf',furniture_other_mfg:'manuf',
+  utilities:'energy',
+  construction:'build',real_estate:'build',
+  retail:'trade',
+  transport:'transport',
+  media:'it-media',telecom:'it-media',it_software:'it-media',
+  banks:'finance',insurance:'finance',leasing:'finance',mfi:'finance',holdings_spv:'finance',
+  hotels_catering:'services',consulting:'services',science_rnd:'services',admin_services:'services',education:'services',healthcare:'services',arts_sport:'services',other_services:'services'
+};
+var _FACTOR_M={
+  fx_up:{raw:{e:'+',m:'выручка, EBITDA',n:'Экспортная выручка в рублях растёт при тех же долларовых ценах.'},manuf:{e:'±',m:'маржа',n:'Экспортёры выигрывают; у кого импортные компоненты — растёт себестоимость.'},energy:{e:'~',m:'—',n:'Тарифы в рублях, экспорта мало.'},build:{e:'-',m:'себестоимость',n:'Импортные материалы/техника дорожают.'},trade:{e:'-',m:'валовая маржа',n:'Импортные товары дорожают быстрее, чем можно поднять цены.'},transport:{e:'±',m:'ставки/затраты',n:'Экспортная логистика — плюс; импорт техники и валютный лизинг — минус.'},'it-media':{e:'~',m:'—',n:'Выручка в рублях; влияние через импортное оборудование.'},finance:{e:'±',m:'переоценка',n:'Зависит от валютной позиции.'},services:{e:'~',m:'—',n:'В основном внутренний рынок.'},other:{e:'~',m:'—',n:'Зависит от бизнеса.'}},
+  oil_up:{raw:{e:'+',m:'выручка, EBITDA',n:'Нефтегаз — прямо; агро/металлы — косвенно через издержки.'},manuf:{e:'-',m:'себестоимость',n:'Дорожают топливо и нефтехимическое сырьё.'},energy:{e:'~',m:'—',n:'Регулируемые тарифы.'},build:{e:'-',m:'себестоимость',n:'Дорожают ГСМ и логистика.'},trade:{e:'-',m:'маржа',n:'Рост логистики; давление на доходы покупателей.'},transport:{e:'-',m:'себестоимость',n:'Топливо — крупная статья.'},'it-media':{e:'~',m:'—',n:'Почти не зависит.'},finance:{e:'~',m:'—',n:'Прямой связи нет.'},services:{e:'~',m:'—',n:'Слабо.'},other:{e:'~',m:'—',n:'Зависит от бизнеса.'}},
+  rate_up:{raw:{e:'±',m:'процентные расходы',n:'Крупные экспортёры часто с низким долгом — терпят; закредитованные — минус.'},manuf:{e:'-',m:'ICR, % расходы',n:'Оборотный капитал дорожает в обслуживании.'},energy:{e:'-',m:'% расходы',n:'Высокий CAPEX-долг → дороже обслуживать.'},build:{e:'-',m:'спрос, ICR',n:'Ипотека дорожает → спрос падает; проектное финансирование дороже. Один из самых чувствительных секторов.'},trade:{e:'-',m:'спрос, обор. капитал',n:'Падает потребкредит; дорожает финансирование запасов.'},transport:{e:'-',m:'лизинг',n:'Лизинговые платежи привязаны к ставке.'},'it-media':{e:'~',m:'—',n:'Обычно мало долга — устойчивы.'},finance:{e:'±',m:'NIM, спрос',n:'Банки: маржа может вырасти, но спрос и стоимость риска ухудшаются. Лизинг/МФО — скорее минус.'},services:{e:'-',m:'спрос',n:'Снижается дискреционное потребление.'},other:{e:'-',m:'% расходы',n:'Всё, что с долгом, дорожает в обслуживании.'}},
+  metals_up:{raw:{e:'+',m:'выручка, EBITDA',n:'Металлурги/добыча — прямой плюс.'},manuf:{e:'-',m:'себестоимость',n:'Металл — сырьё для машиностроения/металлоизделий.'},energy:{e:'~',m:'—',n:'Слабо.'},build:{e:'-',m:'себестоимость',n:'Арматура/металлоконструкции дорожают.'},trade:{e:'~',m:'—',n:'Косвенно.'},transport:{e:'~',m:'—',n:'Слабо.'},'it-media':{e:'~',m:'—',n:'Не зависит.'},finance:{e:'~',m:'—',n:'Не зависит.'},services:{e:'~',m:'—',n:'Не зависит.'},other:{e:'~',m:'—',n:'Зависит от бизнеса.'}},
+  demand_up:{raw:{e:'~',m:'—',n:'Спрос на сырьё определяется мировым рынком.'},manuf:{e:'+',m:'выручка',n:'Товары длительного пользования — плюс.'},energy:{e:'~',m:'—',n:'Потребление стабильно.'},build:{e:'+',m:'продажи',n:'Растёт спрос на жильё (если ставки позволяют).'},trade:{e:'+',m:'LFL, выручка',n:'Прямой бенефициар роста доходов.'},transport:{e:'+',m:'объёмы',n:'Больше перевозок.'},'it-media':{e:'+',m:'выручка',n:'Растут подписки и реклама.'},finance:{e:'+',m:'портфель',n:'Растёт кредитование и комиссии.'},services:{e:'+',m:'выручка',n:'Дискреционные услуги растут.'},other:{e:'+',m:'выручка',n:'Обычно положительно.'}},
+  inflation_up:{raw:{e:'+',m:'выручка',n:'Товарные цены растут вместе с инфляцией, часто опережают издержки.'},manuf:{e:'±',m:'маржа',n:'Номинальная выручка растёт, но издержки и ставка — тоже.'},energy:{e:'-',m:'маржа',n:'Тарифы индексируются с лагом, издержки растут сразу.'},build:{e:'±',m:'цены/спрос',n:'Цены на жильё растут, но ставка бьёт по спросу.'},trade:{e:'±',m:'маржа',n:'Можно поднимать цены, но закупка дорожает; спрос в дискаунтеры.'},transport:{e:'±',m:'ставки/затраты',n:'Ставки индексируются, топливо и лизинг дорожают.'},'it-media':{e:'+',m:'выручка',n:'Легко индексируют тарифы, издержки — ФОТ.'},finance:{e:'±',m:'NIM',n:'Рост ставок помогает марже, но растёт стоимость риска.'},services:{e:'±',m:'маржа',n:'Индексация цен vs рост ФОТ.'},other:{e:'±',m:'—',n:'Заёмщики с фикс-долгом выигрывают.'}}
+};
+// Блок «чувствительность отрасли к макро-факторам» для карточки эмитента.
+function _repFactorBlock(iss){
+  var grp = _FACTOR_IND2GROUP[iss.ind] || 'other';
+  var grpLabel = _FACTOR_GROUPS[grp] || grp;
+  var rows = _FACTORS.map(function(f){
+    var cell = (_FACTOR_M[f.id] && _FACTOR_M[f.id][grp]) || {e:'~',m:'—',n:''};
+    var meta = _FACTOR_EFFECT[cell.e] || _FACTOR_EFFECT['~'];
+    var hot = f.id==='rate_up';   // ставку выделяем — она в фокусе
+    return '<div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-top:1px solid var(--brd)'+(hot?';background:var(--acc-dim)':'')+'">'
+      +'<span style="min-width:104px;flex-shrink:0;font-size:10px;font-weight:700;color:'+meta.c+';border:1px solid '+meta.c+'55;padding:1px 5px;text-align:center">'+cell.e+' '+meta.l+'</span>'
+      +'<div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--t)">'+_escHtml(f.label)
+      +(cell.m&&cell.m!=='—'?'<span style="color:var(--t3);font-family:var(--mono);font-size:10px;margin-left:6px">→ '+_escHtml(cell.m)+'</span>':'')+'</div>'
+      +(cell.n?'<div style="font-size:11px;color:var(--t3);line-height:1.4;margin-top:1px">'+_escHtml(cell.n)+'</div>':'')+'</div></div>';
+  }).join('');
+  return '<details style="padding:9px 16px;border-top:1px solid var(--brd)">'
+    +'<summary style="cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t3);list-style:none">⚡ Чувствительность отрасли к макро-факторам · '+_escHtml(grpLabel)+'</summary>'
+    +'<div style="margin-top:4px">'+rows+'</div>'
+    +'<div style="font-size:10px;color:var(--t3);font-style:italic;margin-top:6px">Типовая реакция сектора, не прогноз по компании — у эмитента может быть хедж, экспорт или структура долга, меняющие знак. Полная матрица — на странице «Отрасли».</div>'
+    +'</details>';
+}
+
 function _repBuildIssuerHeader(iss, issId){
   var indKey = iss.ind||'other';
   var indLabel = (window._industryData&&window._industryData.industries&&
@@ -30071,7 +30165,7 @@ function _repBuildIssuerHeader(iss, issId){
     +'<div class="score-row" style="margin-top:10px">'
     +scoreTile('Запас прочности',stressScore,stressColor,stressComps,'stress')
     +scoreTile('Качество баланса',qualScore,qualColor,qualComps,'quality')
-    +'</div></div>'+pillsHtml+factorsHtml;
+    +'</div></div>'+pillsHtml+_repFactorBlock(iss)+factorsHtml;
 }
 
 // Добавить/удалить заметку-фактор по активному эмитенту.
