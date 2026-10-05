@@ -15312,6 +15312,7 @@ function _repAnnualSeries(iss, type){
     fcf:    g(x=>(x.cfo!=null&&x.capex!=null)?x.cfo-x.capex:null),
     margin: g(x=>{const e=eb(x); return (e!=null&&x.rev)?e/x.rev*100:null;}),
     icr:    g(x=>(x.ebit!=null&&x.int)?x.ebit/x.int:null),
+    ccc:    g(x=>{const dso=(x.recv!=null&&x.rev)?x.recv/x.rev*365:null, dio=(x.inv!=null&&x.rev)?x.inv/x.rev*365:null, dpo=(x.pay!=null&&x.rev)?x.pay/x.rev*365:null; return (dso!=null&&dio!=null&&dpo!=null)?dso+dio-dpo:null;}),
   }};
 }
 
@@ -15884,7 +15885,7 @@ function _repAnalysisBlock(iss, p){
     const defs = [
       ['rev','Выручка','млрд',false],['ebitda','EBITDA','млрд',false],['np','Чист. прибыль','млрд',false],
       ['debt','Долг','млрд',true],['nde','ND/EBITDA','×',true],['fcf','FCF','млрд',false],
-      ['margin','Рентаб. EBITDA','%',false],['icr','ICR','×',false],
+      ['margin','Рентаб. EBITDA','%',false],['icr','ICR','×',false],['ccc','Ден. цикл CCC','дн',true],
     ];
     const cards = defs.map(([k,label,unit,lowGood])=>{
       const arr = S.rows[k]; if(!arr || arr.filter(v=>v!=null).length<2) return '';
