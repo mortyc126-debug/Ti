@@ -2880,6 +2880,11 @@ let ytmRate=10, ytmBonds=[], portfolio=[], watchlists={}, activeWL=null, calEven
 // данные). IndexedDB — сотни МБ, хранит объект напрямую. reportsDB живёт
 // здесь; localStorage остаётся запасным (и для обратной совместимости).
 var _IDB_NAME='bondan_store', _IDB_STORE='kv';
+// Флаг: завершилось ли первичное чтение reportsDB из IndexedDB. Пока нет —
+// save() не имеет права записать ПУСТОЙ reportsDB в IDB, иначе гонка на
+// старте (loadState читает IDB асинхронно, а какой-то save срабатывает
+// раньше с ещё пустым reportsDB) затирает восстановленную базу.
+var _idbLoadDone=false;
 function _idbOpen(){
   return new Promise(function(res,rej){
     try{
@@ -2922,10 +2927,11 @@ function loadState(){
       } else if(reportsDB && Object.keys(reportsDB).length){
         _idbSet('reportsDB', reportsDB).catch(function(){});
       }
+      _idbLoadDone=true;   // первичное чтение завершено — save() снова свободен
       try{ if(typeof repRebuildSelect==='function') repRebuildSelect(); }catch(e){}
       try{ if(typeof repRenderIssuerList==='function') repRenderIssuerList(); }catch(e){}
       try{ var sb=document.getElementById('sb-rep'); if(sb) sb.textContent=Object.keys(reportsDB).length; }catch(e){}
-    }).catch(function(){});
+    }).catch(function(){ _idbLoadDone=true; });
   }catch(e){}
 }
 // Одноразовая миграция: тип периода ГИРБО/GIRBO → РСБУ (ГИР БО — источник,
@@ -2946,8 +2952,12 @@ function _migrateGirboType(){
   }catch(e){}
 }
 function save(){
-  // reportsDB — в IndexedDB (надёжно, большой лимит).
-  try{ _idbSet('reportsDB', reportsDB).catch(function(){}); }catch(e){}
+  // reportsDB — в IndexedDB (надёжно, большой лимит). НО не пишем пустышку
+  // до завершения первичной загрузки из IDB (иначе гонка на старте стирает
+  // восстановленную базу). Непустой reportsDB пишем всегда.
+  if(_idbLoadDone || Object.keys(reportsDB).length){
+    try{ _idbSet('reportsDB', reportsDB).catch(function(){}); }catch(e){}
+  }
   // ba_v2 в localStorage: пробуем с reportsDB (обратная совместимость), при
   // переполнении — без него (источник истины всё равно IndexedDB).
   try{ localStorage.setItem('ba_v2',JSON.stringify({ytmBonds,portfolio,watchlists,calEvents,reportsDB,compareSets})); }
@@ -16831,11 +16841,33 @@ function applyImportedJsonText(raw){
   } else {
     mergeImportedData(d);
   }
+  _idbLoadDone = true;   // восстановление — осознанная запись, гонки тут нет
   save();
   renderYtm(); renderPort(); renderSbLists();
   document.getElementById('sb-pc').textContent = portfolio.length;
   document.getElementById('sb-rep').textContent = Object.keys(reportsDB).length;
-  alert(choice==='2' ? '✅ Данные заменены на содержимое файла.' : '✅ Данные объединены с текущими.');
+  // Проверяем, что база РЕАЛЬНО легла в IndexedDB, а не потерялась молча
+  // (квота/приватный режим/партиционирование хранилища в iframe). Пишем и
+  // читаем обратно — показываем фактически сохранённое число, чтобы «0 после
+  // перезагрузки» не стало сюрпризом.
+  var _expect = Object.keys(reportsDB).length;
+  _idbSet('reportsDB', reportsDB)
+    .then(function(){ return _idbGet('reportsDB'); })
+    .then(function(back){
+      var n = (back && typeof back==='object') ? Object.keys(back).length : 0;
+      if(n>0 && n>=_expect){
+        alert((choice==='2'?'✅ Данные заменены':'✅ Данные объединены')
+          +'.\n\nВ браузере сохранено эмитентов: '+n+'. После перезагрузки база останется на этом адресе.');
+      } else {
+        alert('⚠️ База загружена в ПАМЯТЬ ('+_expect+' эмитентов), но в хранилище браузера записалось только '+n+'.\n\n'
+          +'Скорее всего приватное окно, переполненное хранилище сайта или ограничение в iframe. '
+          +'При перезагрузке база пропадёт.\n\nНапиши мне — запеку твою базу в репозиторий, будет грузиться одним файлом на любом устройстве.');
+      }
+    })
+    .catch(function(err){
+      alert('⚠️ База в памяти ('+_expect+' эмитентов), но запись в браузер не удалась:\n'+(err&&err.message||err)
+        +'\n\nПри перезагрузке пропадёт. Напиши мне — сделаю загрузку базы из репозитория.');
+    });
   return true;
 }
 
