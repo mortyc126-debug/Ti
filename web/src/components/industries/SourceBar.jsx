@@ -2,8 +2,9 @@
 // добавления в радар. Чек-боксы комбинируются. industry — отдельным
 // dropdown'ом, активна когда чек-бокс «отрасль» включён.
 
-import { Eye } from 'lucide-react';
+import { Eye, RefreshCw } from 'lucide-react';
 import { useComparison } from '../../store/comparison.js';
+import { usePortfolioStore } from '../../store/portfolio.js';
 import { INDUSTRY_GROUPS } from '../../data/industries.js';
 
 const SOURCES = [
@@ -23,6 +24,7 @@ export default function SourceBar(){
   return (
     <div className="flex items-center flex-wrap gap-2">
       <span className="text-text3 text-[10px] uppercase tracking-wider font-mono mr-1">источник</span>
+      {sources.portfolio && <PortfolioStatus />}
       {SOURCES.map(src => {
         const on = !!sources[src.id];
         return (
@@ -75,6 +77,35 @@ const LAYER_ON = {
   bond:   'border-acc/40 text-acc bg-acc-dim/40',
   future: 'border-purple/40 text-purple bg-purple/10',
 };
+
+// Статус реального портфеля из T-API: сколько позиций, с каких счетов,
+// либо причина отката на мок + кнопка перезагрузки.
+function PortfolioStatus(){
+  const real    = usePortfolioStore(s => s.real);
+  const loading = usePortfolioStore(s => s.loading);
+  const error   = usePortfolioStore(s => s.error);
+  const accounts = usePortfolioStore(s => s.accounts);
+  const load    = usePortfolioStore(s => s.load);
+
+  let txt, tone;
+  if(loading){ txt = 'Т-API: загрузка…'; tone = 'text-text3'; }
+  else if(real && real.length){
+    txt = `Т-портфель: ${real.length} бумаг${accounts.length ? ' · ' + accounts.join(', ') : ''}`;
+    tone = 'text-acc';
+  } else if(error){ txt = `Т-API: ${error} · мок`; tone = 'text-warn'; }
+  else { txt = 'Т-портфель'; tone = 'text-text3'; }
+
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] font-mono ${tone}`}
+          title="Реальные позиции со всех счетов T-Invest (токен из раздела «Долг»). Сопоставляются с эмитентами по ISIN.">
+      {txt}
+      <button type="button" onClick={() => load(true)} disabled={loading}
+        className="inline-flex items-center hover:text-acc disabled:opacity-40" title="Обновить позиции из T-API">
+        <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
+      </button>
+    </span>
+  );
+}
 
 function LayerToggle({ kind, label }){
   const on = useComparison(s => s.showLayer[kind]);

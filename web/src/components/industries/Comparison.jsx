@@ -18,6 +18,8 @@ import {
   applyTopNSum, applyTopNSequential, buildSelectedView,
 } from '../../lib/comparisonSet.js';
 import { useIssuers, currentIssuers, reloadIssuers } from '../../store/issuers.js';
+import { usePortfolioStore } from '../../store/portfolio.js';
+import { useBondUniverse } from '../../store/marketData.js';
 
 export default function Comparison(){
   const allIssuers = useIssuers();   // реальные эмитенты под выбранный год; смена → пересчёт
@@ -32,6 +34,16 @@ export default function Comparison(){
 
   const recentItems = useRecent(s => s.items);
   const favSlots    = useFavorites(s => s.slots);
+
+  // Реальный портфель из T-API: грузим, когда источник «Портфель» включён.
+  // bondUniverse нужен, чтобы сопоставить позиции (ISIN) с эмитентами (inn).
+  const loadPortfolio  = usePortfolioStore(s => s.load);
+  const portfolioReal  = usePortfolioStore(s => s.real);
+  const portfolioLoaded = usePortfolioStore(s => s.loaded);
+  const bondUniverse   = useBondUniverse();
+  useEffect(() => {
+    if(sources.portfolio) loadPortfolio();
+  }, [sources.portfolio, loadPortfolio]);
 
   const autocal   = useIndustryNorms(s => s.autocalibrate);
   const overrides = useIndustryNorms(s => s.overrides);
@@ -64,7 +76,7 @@ export default function Comparison(){
       favItems: favSlots,
     });
     return applyMultFilters(pool, filters);
-  }, [sources, industryFilter, filters, recentItems, favSlots, allIssuers]);
+  }, [sources, industryFilter, filters, recentItems, favSlots, allIssuers, portfolioReal, portfolioLoaded, bondUniverse]);
 
   // Текущий selected → view с iss-данными (пересчёт при смене года/данных).
   const selectedView = useMemo(() => buildSelectedView(selected, false), [selected, allIssuers]);

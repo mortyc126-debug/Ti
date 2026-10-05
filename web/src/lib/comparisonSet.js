@@ -2,7 +2,8 @@
 // Используется в Comparison.jsx — здесь чистая логика, без UI.
 
 import { currentIssuers } from '../store/issuers.js';
-import { positions as portfolioPositions } from '../data/mockPortfolio.js';
+import { currentPortfolioPositions } from '../store/portfolio.js';
+import { useBondStore } from '../store/marketData.js';
 import { metricSpec, RADAR_AXES, COMP_METRICS } from '../data/comparisonMetrics.js';
 import { resolveNorm, classifyValue } from './norms.js';
 import { percentileRanks } from './percentile.js';
@@ -34,10 +35,24 @@ export function buildPool({ sources, industryFilter, recentItems, favItems }){
     }
   }
   if(sources.portfolio){
-    for(const p of portfolioPositions){
-      // Mock-портфель — только облигации; будущие акции/фьючерсы
-      // подхватятся теми же kind'ами, когда появятся в данных.
-      add(p.issuer, 'bond');
+    // ISIN → inn через вселенную облигаций (secid=ISIN несёт inn эмитента),
+    // чтобы реальные позиции из T-API легли на карточки эмитентов.
+    const isinToId = new Map();
+    try {
+      for(const b of (useBondStore.getState().bonds || [])){
+        if(b.secid && b.inn) isinToId.set(String(b.secid).toUpperCase(), String(b.inn));
+      }
+    } catch(_){}
+    for(const p of currentPortfolioPositions()){
+      const byIsin = p.isin ? isinToId.get(String(p.isin).toUpperCase()) : null;
+      const iss = byIsin ? byId.get(byIsin) : null;
+      if(iss){
+        // реальная позиция сопоставлена с эмитентом — во все его kind'ы
+        for(const k of iss.kinds) add(iss.id, k);
+      } else if(p.issuer){
+        // мок-фолбэк: у мок-позиции есть имя эмитента как id
+        add(p.issuer, 'bond');
+      }
     }
   }
   if(sources.favorites && Array.isArray(favItems)){
