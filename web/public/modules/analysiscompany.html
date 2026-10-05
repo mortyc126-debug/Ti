@@ -15441,6 +15441,41 @@ function _repDebtStructure(iss, p){
   return { bondsOut, bondsShort, cnt, debt, bank: (debt!=null)? Math.max(0, debt-bondsOut) : null };
 }
 
+// Стена погашений облигаций: объём к погашению по годам (из каталога MOEX).
+function _repMaturityWall(iss){
+  const inn = iss && iss.inn; const cat = window._moexCatalog;
+  if(!inn || !cat || !Array.isArray(cat.items)) return null;
+  const now = Date.now(); const byYear={};
+  for(const b of cat.items){
+    if(!b || String(b.inn)!==String(inn) || !b.issueSize || !b.faceValue || !b.matDate) continue;
+    const t = new Date(b.matDate).getTime(); if(isNaN(t) || t<=now) continue;
+    const y = new Date(b.matDate).getUTCFullYear();
+    byYear[y] = (byYear[y]||0) + b.issueSize*b.faceValue/1e9;
+  }
+  const years=Object.keys(byYear).map(Number); if(!years.length) return null;
+  return { byYear, total: Object.values(byYear).reduce((a,b)=>a+b,0) };
+}
+function _repMaturityWallBlock(iss){
+  const w = _repMaturityWall(iss); if(!w) return '';
+  const curY = new Date().getUTCFullYear();
+  const endY = Math.max(...Object.keys(w.byYear).map(Number));
+  const years=[]; for(let y=curY; y<=Math.min(endY, curY+9); y++) years.push(y);
+  const vals = years.map(y=>w.byYear[y]||0);
+  const max = Math.max(...vals, 0.01);
+  const gap=38, pad=24, H=124, W=Math.max(260, pad*2+years.length*gap), bw=gap*0.64;
+  const bars = years.map((y,i)=>{
+    const v=vals[i], bh=(v/max)*(H-pad*2), x=pad+i*gap+(gap-bw)/2, yy=H-pad-bh;
+    const col = v<=0?'transparent':i<=1?'var(--danger)':i<=3?'var(--warn)':'var(--green)';
+    return `<rect x="${x.toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,bh).toFixed(1)}" fill="${col}"/>`
+      + (v>0?`<text x="${(x+bw/2).toFixed(1)}" y="${(yy-2).toFixed(1)}" text-anchor="middle" font-size="7.5" fill="var(--text2)" font-family="var(--mono)">${v>=1?v.toFixed(0):v.toFixed(1)}</text>`:'')
+      + `<text x="${(x+bw/2).toFixed(1)}" y="${(H-pad+10).toFixed(1)}" text-anchor="middle" font-size="7.5" fill="var(--text3)" font-family="var(--mono)">${String(y).slice(2)}</text>`;
+  }).join('');
+  const near2=(w.byYear[curY]||0)+(w.byYear[curY+1]||0);
+  return `<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:18px 0 6px">📅 Стена погашений облигаций</div>
+    <div style="font-size:.52rem;color:var(--text3);margin-bottom:4px">Объём облигаций к погашению по годам (каталог MOEX, млрд ₽). Ближайшие 2 года — ${near2.toFixed(1)} из ${w.total.toFixed(1)}. Красным — то, что скоро рефинансировать.</div>
+    <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="xMinYMid meet" style="max-width:${W}px">${bars}</svg>`;
+}
+
 // Цепочка зависимости как «A → B → C» с подсветкой узлов.
 function _repChain(nodes){
   return '<div style="font-family:var(--mono);font-size:.62rem;color:var(--text2);line-height:1.7;margin:3px 0">'
@@ -15715,7 +15750,7 @@ function _repAnalysisBlock(iss, p){
     }
   }
 
-  return trend + deps + indCmp + anom + oper;
+  return trend + deps + _repMaturityWallBlock(iss) + indCmp + anom + oper;
 }
 // helpers для юнит-экономики
 function pctSafe(c,p){ return (typeof c==='number'&&typeof p==='number'&&p!==0)?(c-p)/Math.abs(p)*100:null; }
