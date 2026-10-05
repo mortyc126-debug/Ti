@@ -15397,7 +15397,8 @@ function _repDependencyFindings(iss, p){
   const prA = _repPriorAnnualPeriod(iss, {year:+p.year, period:p.period, type:p.type}, 1);
   const pr = prA ? prA.period : null;
   const rev=n(p.rev), np=n(p.np), debt=n(p.debt), cash=n(p.cash), eq=n(p.eq), assets=n(p.assets),
-        cfo=n(p.cfo), capex=n(p.capex), intx=n(p.int);
+        cfo=n(p.cfo), capex=n(p.capex), intx=n(p.int), tax=n(p.tax),
+        ca=n(p.ca), cl=n(p.cl), recv=n(p.recv), inv=n(p.inv), pay=n(p.pay);
   const ebitda = n(p.ebitda)!=null ? n(p.ebitda) : n(p.ebit);
   const ebit = n(p.ebit)!=null ? n(p.ebit) : ebitda;
   const nd = (debt!=null&&cash!=null)? debt-cash : null;
@@ -15512,6 +15513,40 @@ function _repDependencyFindings(iss, p){
           + ((fcf!=null && fcf<0 && dDebt!=null && dDebt>0) ? 'Дефицит после CAPEX закрыт новым долгом — инвестиции идут в долг.'
             : (fcf!=null && div>0 && (fcf-div)<0) ? 'Дивиденды платятся сверх свободного потока — за счёт долга/кэша, не из FCF.'
             : 'Поток распределён между инвестициями, долгом и кэшем без явного перекоса.') });
+    }
+  }
+
+  // 8) Оборотный капитал: мост EBITDA → CFO (куда девается прибыль)
+  if(ebitda!=null && cfo!=null){
+    const wc  = (ca!=null&&cl!=null)? ca-cl : null;
+    const caP = pr?n(pr.ca):null, clP = pr?n(pr.cl):null;
+    const wcP = (caP!=null&&clP!=null)? caP-clP : null;
+    const dWC = (wc!=null&&wcP!=null)? wc-wcP : null;   // рост ЧОК = отток кэша
+    const gap = ebitda - cfo;                            // сколько EBITDA не стало кэшем
+    // Денежный цикл (если есть дебиторка/запасы/кредиторка). DIO в отчётности
+    // считается к выручке (себестоимости обычно нет) — это упрощение.
+    const dso=(recv!=null&&rev)?recv/rev*365:null;
+    const dio=(inv!=null&&rev)?inv/rev*365:null;
+    const dpo=(pay!=null&&rev)?pay/rev*365:null;
+    const ccc=(dso!=null&&dio!=null&&dpo!=null)?dso+dio-dpo:null;
+    if(dWC!=null || ccc!=null){
+      const chain=[`EBITDA ${f1(ebitda)}`];
+      if(dWC!=null) chain.push(dWC>=0?`−ΔОборотн.кап. ${f1(dWC)}`:`+высвобожд. ${f1(-dWC)}`);
+      if(intx) chain.push(`−проценты ${f1(intx)}`);
+      if(tax) chain.push(`−налог ${f1(tax)}`);
+      chain.push(`CFO ${f1(cfo)}`);
+      const wcBig = dWC!=null && gap!=0 && Math.abs(dWC) >= 0.4*Math.abs(gap);
+      const level = (dWC!=null && dWC>0 && gap>0 && wcBig) ? 'yellow' : 'green';
+      let concl='';
+      if(dWC!=null && dWC>0 && gap>0){
+        concl = `Из EBITDA ${f1(ebitda)} в операционный кэш дошло ${f1(cfo)} (разрыв ${f1(gap)}). ${wcBig?'Главная причина':'Частично'} — рост оборотного капитала на ${f1(dWC)}: деньги заморозились в запасах/дебиторке. Вопрос — это разовое пополнение под рост или структурно удлиняющийся цикл.`;
+      } else if(dWC!=null && dWC<0){
+        concl = `Оборотный капитал высвободил ${f1(-dWC)} в кэш (распродажа запасов/сбор дебиторки) — поддержало CFO; разовый эффект, в следующем периоде может не повториться.`;
+      } else {
+        concl = `Разрыв EBITDA→CFO ${f1(gap)} объясняется процентами/налогами и оборотным капиталом.`;
+      }
+      if(ccc!=null) concl += ` Денежный цикл ≈ ${f1(ccc)} дн (дебиторка ${f1(dso)} + запасы ${f1(dio)} − кредиторка ${f1(dpo)}): столько бизнес ждёт возврата денег.`;
+      F.push({ level, title:'Оборотный капитал: куда уходит прибыль по дороге к деньгам', chain, concl });
     }
   }
   return F;
