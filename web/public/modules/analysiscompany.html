@@ -29093,7 +29093,16 @@ async function repLoadBundle(){
     try{ save(); }catch(e){ try{ localStorage.setItem('ba_rep_d1_cache', JSON.stringify({reportsDB:reportsDB})); }catch(_){} }
     repRenderIssuerList(); try{ repRebuildSelect(); }catch(_){}
     var tot=Object.keys(rdb).length;
-    setBtn('✓ база '+filled); setLog('Готово одним запросом: с отчётами '+filled+' | всего '+tot);
+    if(filled===0){
+      // Онлайн-бандл пуст (деградировавший бэкенд D1 отдаёт заглушки).
+      // Это НЕ значит, что база стёрлась: отчёты живут в этом браузере
+      // (IndexedDB) и в бэкап-файле. Явно говорим об этом, чтобы «0» не
+      // читалось как «всё пропало».
+      setBtn('база онлайн пуста');
+      setLog('Онлайн-база пуста (бэкенд недоступен) — цифр в repo нет. Твои отчёты в этом браузере'+(tot?' ('+tot+' эмитентов)':'')+' никуда не делись. Для переноса на другое устройство: «Восстановить базу» из бэкап-файла.', true);
+    } else {
+      setBtn('✓ база '+filled); setLog('Готово одним запросом: с отчётами '+filled+' | всего '+tot);
+    }
     if(btn) btn.disabled=false;
     _d1Loading=false;
   }catch(err){
