@@ -58,15 +58,18 @@ def main():
         if b.get("issuer") and inn not in bname:
             bname[inn] = b["issuer"]
 
-    bundle, n = {}, 0
+    bundle, n, withdata = {}, 0, 0
     for fn in os.listdir(RC):
         if not fn.endswith(".json") or fn.startswith("_"):
             continue
         inn = fn[:-5]
         doc = _load(os.path.join(RC, fn))
-        rows = (doc or {}).get("data") or []
-        if not rows:
+        if doc is None:
             continue
+        rows = (doc or {}).get("data") or []
+        # Включаем ВСЕХ эмитентов (даже без цифр — backend часто отдаёт пустую
+        # заглушку count:0): список грузится одним запросом, периоды подтянутся
+        # там, где данные есть, остальное наполняется smart-lab/вручную.
         bundle[inn] = {
             "name": names.get(inn) or bname.get(inn) or inn,
             "ind": inn_ind.get(inn) or "other",
@@ -74,11 +77,13 @@ def main():
             "rows": rows,
         }
         n += 1
+        if rows:
+            withdata += 1
 
-    with open(OUT, "w", encoding="utf-8") as f:
+    with open(OUT, "w", newline="", encoding="utf-8") as f:
         json.dump(bundle, f, ensure_ascii=False)
     size_mb = os.path.getsize(OUT) / 1e6
-    print(f"reports-bundle.json: {n} эмитентов, {size_mb:.1f} МБ → {OUT}")
+    print(f"reports-bundle.json: {n} эмитентов (с цифрами: {withdata}), {size_mb:.1f} МБ → {OUT}")
 
 
 if __name__ == "__main__":
