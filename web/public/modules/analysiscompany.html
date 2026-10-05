@@ -15315,6 +15315,66 @@ function _repAnnualSeries(iss, type){
   }};
 }
 
+// Нормы по группам отраслей (зеркало web/src/data/industryNorms.js). Для
+// higher=false (nde) green=«не выше», red=«выше — критично»; для остальных
+// наоборот. Группа берётся из _FACTOR_IND2GROUP по ключу отрасли эмитента.
+var _IND_NORMS = {
+  raw:      {nde:{g:2.0,r:4.0,low:true}, icr:{g:3.5,r:1.5}, ebitdaMarg:{g:18,r:8}, currentR:{g:1.2,r:0.8}, equityR:{g:40,r:20}},
+  manuf:    {nde:{g:2.5,r:4.5,low:true}, icr:{g:3.0,r:1.5}, ebitdaMarg:{g:12,r:5},  currentR:{g:1.2,r:0.8}, equityR:{g:35,r:18}},
+  energy:   {nde:{g:2.5,r:5.0,low:true}, icr:{g:3.0,r:1.5}, ebitdaMarg:{g:20,r:10}, currentR:{g:1.0,r:0.7}, equityR:{g:35,r:18}},
+  build:    {nde:{g:4.0,r:7.0,low:true}, icr:{g:2.0,r:1.2}, ebitdaMarg:{g:18,r:8},  currentR:{g:1.1,r:0.8}, equityR:{g:25,r:12}},
+  trade:    {nde:{g:3.0,r:5.5,low:true}, icr:{g:2.5,r:1.4}, ebitdaMarg:{g:6,r:2},   currentR:{g:1.1,r:0.8}, equityR:{g:28,r:12}},
+  transport:{nde:{g:3.0,r:5.5,low:true}, icr:{g:2.5,r:1.3}, ebitdaMarg:{g:14,r:6},  currentR:{g:1.0,r:0.7}, equityR:{g:25,r:10}},
+  'it-media':{nde:{g:1.5,r:3.5,low:true},icr:{g:5.0,r:2.0}, ebitdaMarg:{g:25,r:10}, currentR:{g:1.5,r:1.0}, equityR:{g:50,r:25}},
+  finance:  {nde:{g:5.0,r:8.0,low:true}, icr:{g:1.5,r:1.0}, ebitdaMarg:{g:30,r:10}, currentR:{g:1.0,r:0.7}, equityR:{g:12,r:6}},
+  services: {nde:{g:2.5,r:4.5,low:true}, icr:{g:3.0,r:1.5}, ebitdaMarg:{g:14,r:6},  currentR:{g:1.2,r:0.8}, equityR:{g:35,r:15}},
+  other:    {nde:{g:3.0,r:5.0,low:true}, icr:{g:2.5,r:1.5}, ebitdaMarg:{g:10,r:4},  currentR:{g:1.2,r:0.8}, equityR:{g:30,r:15}}
+};
+function _repIndGroup(iss){ return (iss && _FACTOR_IND2GROUP[iss.ind]) || 'other'; }
+// Статус значения против нормы: 'good'|'warn'|'bad' (+ направление).
+function _repNormStatus(val, norm){
+  if(val==null || !norm) return null;
+  if(norm.low) return val<=norm.g?'good':val<=norm.r?'warn':'bad';     // меньше — лучше
+  return val>=norm.g?'good':val>=norm.r?'warn':'bad';                   // больше — лучше
+}
+
+// Блок «Сравнение с нормами отрасли»: ключевые коэффициенты эмитента против
+// зелёной/красной границы его сектора.
+function _repIndCompareBlock(iss, p){
+  if(!iss || !p) return '';
+  const grp = _repIndGroup(iss); const norms = _IND_NORMS[grp]; if(!norms) return '';
+  const n=v=>(typeof v==='number'&&isFinite(v))?v:null;
+  const ebitda=n(p.ebitda)!=null?n(p.ebitda):n(p.ebit), ebit=n(p.ebit), rev=n(p.rev),
+        debt=n(p.debt), cash=n(p.cash), ca=n(p.ca), cl=n(p.cl), eq=n(p.eq), assets=n(p.assets), intx=n(p.int);
+  const nd=(debt!=null&&cash!=null)?debt-cash:null;
+  const metrics=[
+    {k:'nde', label:'ND/EBITDA', unit:'×', val:(nd!=null&&ebitda&&ebitda>0)?nd/ebitda:null},
+    {k:'icr', label:'ICR', unit:'×', val:(ebit!=null&&intx)?ebit/intx:null},
+    {k:'ebitdaMarg', label:'Рентаб. EBITDA', unit:'%', val:(ebitda!=null&&rev)?ebitda/rev*100:null},
+    {k:'currentR', label:'Тек. ликвидность', unit:'×', val:(ca!=null&&cl)?ca/cl:null},
+    {k:'equityR', label:'Доля капитала', unit:'%', val:(eq!=null&&assets)?eq/assets*100:null},
+  ];
+  const col={good:'var(--green)',warn:'var(--warn)',bad:'var(--danger)'};
+  const fv=(v,u)=>u==='%'?v.toFixed(1)+'%':v.toFixed(2)+'×';
+  const cards=metrics.map(m=>{
+    if(m.val==null) return '';
+    const nm=norms[m.k]; const st=_repNormStatus(m.val,nm)||'warn';
+    const band = nm.low ? `норма ≤${nm.g}${m.unit}, критич. >${nm.r}${m.unit}` : `норма ≥${nm.g}${m.unit}, критич. <${nm.r}${m.unit}`;
+    const verdict = st==='good'?'лучше нормы сектора':st==='warn'?'в серой зоне':'хуже нормы сектора';
+    return `<div style="background:var(--s1);border:1px solid var(--border);border-left:2px solid ${col[st]};padding:7px 9px">
+      <div style="font-size:.52rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)">${m.label}</div>
+      <div style="font-size:.9rem;font-weight:600;color:${col[st]}">${fv(m.val,m.unit)}</div>
+      <div style="font-size:.5rem;color:var(--text3);margin-top:2px">${band}</div>
+      <div style="font-size:.52rem;color:${col[st]};margin-top:1px">${verdict}</div>
+    </div>`;
+  }).filter(Boolean).join('');
+  if(!cards) return '';
+  const label=(_FACTOR_GROUPS[grp]||grp);
+  return `<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:18px 0 4px">🏢 Сравнение с нормами отрасли · ${label}</div>
+    <div style="font-size:.52rem;color:var(--text3);margin-bottom:6px">Пороги типовые для сектора (АКРА/Эксперт РА-практика), не медианы конкретных peer'ов. Зелёная = комфорт, красная = критично.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">${cards}</div>`;
+}
+
 // Ряд значений одной extra-метрики по годам (точное совпадение ключа).
 function _repExtraSeriesByKey(iss, type, key){
   const arr = Object.values(iss.periods||{})
@@ -15597,6 +15657,9 @@ function _repAnalysisBlock(iss, p){
       <div style="font-size:.52rem;color:var(--text3);margin-bottom:4px">Авто-разбор зависимостей: каждая цепочка показывает, как показатели влияют друг на друга и что это значит на практике.</div>${deps}`;
   }
 
+  // ── Сравнение с нормами отрасли ───────────────────────────────────────
+  const indCmp = _repIndCompareBlock(iss, p);
+
   // ── Выбросы vs фундаментальный сдвиг ──────────────────────────────────
   let anom='';
   if(S.years.length>=4){
@@ -15652,7 +15715,7 @@ function _repAnalysisBlock(iss, p){
     }
   }
 
-  return trend + deps + anom + oper;
+  return trend + deps + indCmp + anom + oper;
 }
 // helpers для юнит-экономики
 function pctSafe(c,p){ return (typeof c==='number'&&typeof p==='number'&&p!==0)?(c-p)/Math.abs(p)*100:null; }
