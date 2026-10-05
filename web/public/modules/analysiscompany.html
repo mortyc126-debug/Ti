@@ -30010,20 +30010,19 @@ function _repBuildIssuerHeader(iss, issId){
   }
   // Quality score
   var qualScore=null, qualColor='var(--warn)', qualComps='—';
-  var qs2=[];
-  if(mult.cur!=null&&isFinite(mult.cur)){ var cr2=Math.max(0,mult.cur); qs2.push(cr2>=2?100:cr2>=1?(cr2-1)*100:cr2>=0.5?(cr2-0.5)*100:0); }
-  if(p&&p.assets>0&&p.eq!=null){ var er2=p.eq/p.assets; qs2.push(er2>=0.5?100:er2>=0.2?er2/0.5*100:er2>=0?er2/0.2*40:0); }
-  if(qs2.length) qualScore=Math.round(qs2.reduce(function(a,b){return a+b;},0)/qs2.length);
+  var _qobj=_repQualityScore(iss); qualScore=_qobj.score;   // та же формула, что в модалке «как посчитано»
   qualColor=qualScore!=null?(qualScore>=70?'var(--pos)':qualScore>=40?'var(--warn)':'var(--neg)'):'var(--t3)';
   if(p){
     var cashPct=p.assets>0&&p.cash!=null?(p.cash/p.assets*100).toFixed(1)+'%':null;
     var eqPct=p.assets>0&&p.eq!=null?(p.eq/p.assets*100).toFixed(1)+'%':null;
     qualComps=[cashPct?'Cash/A '+cashPct:null,eqPct?'Eq/A '+eqPct:null,mult.cur!=null&&isFinite(mult.cur)?'CR '+mult.cur.toFixed(2)+'×':null].filter(Boolean).join(' · ')||'—';
   }
-  function scoreTile(lbl, score, color, comps){
+  function scoreTile(lbl, score, color, comps, kind){
     var sw=score!=null?score:0;
-    return '<div class="score-tile"><div class="score-info">'
-      +'<div class="score-lbl">'+lbl+yr+'</div>'
+    var clk=kind?' style="cursor:pointer" title="Нажми — формула и из чего посчитано" onclick="_repExplainScore(\''+kind+'\')"':'';
+    var info='ⓘ';
+    return '<div class="score-tile"'+clk+'><div class="score-info">'
+      +'<div class="score-lbl">'+lbl+yr+(kind?' <span style="opacity:.55;font-weight:400">'+info+'</span>':'')+'</div>'
       +'<div class="score-bw"><div class="score-b" style="width:'+sw+'%;background:'+color+'"></div></div>'
       +'<div class="score-comps">'+comps+'</div>'
       +'</div><div class="score-val" style="color:'+color+'">'+(score!=null?score:'—')
@@ -30070,8 +30069,8 @@ function _repBuildIssuerHeader(iss, issId){
     +'<div class="iss-sub">'+innStr+indHtml+_repDataFreshness(iss)+'</div>'
     +ratingsHtml+'</div>'+actHtml+'</div>'
     +'<div class="score-row" style="margin-top:10px">'
-    +scoreTile('Запас прочности',stressScore,stressColor,stressComps)
-    +scoreTile('Качество баланса',qualScore,qualColor,qualComps)
+    +scoreTile('Запас прочности',stressScore,stressColor,stressComps,'stress')
+    +scoreTile('Качество баланса',qualScore,qualColor,qualComps,'quality')
     +'</div></div>'+pillsHtml+factorsHtml;
 }
 
@@ -30100,6 +30099,112 @@ function repDelFactor(i){
   iss.factors.splice(i,1);
   save();
   if(typeof _repRenderActiveIssuerHeader==='function') _repRenderActiveIssuerHeader();
+}
+
+// ── «Как посчитано»: формула и компоненты двух score ──────────────────────
+// Качество баланса — та же формула, что в шапке (сырые баллы, чтобы модалка
+// не разошлась с плиткой: итог = округление среднего сырых).
+function _repQualityScore(iss){
+  var lp=(typeof _repLatestPeriod==='function')?_repLatestPeriod(iss):null;
+  var p=lp?lp.period:null;
+  var mult=_repCalcMultipliers(iss);
+  var comps=[];
+  if(mult.cur!=null&&isFinite(mult.cur)){
+    var cr=Math.max(0,mult.cur);
+    var s=cr>=2?100:cr>=1?(cr-1)*100:cr>=0.5?(cr-0.5)*100:0;
+    comps.push({label:'Current Ratio (Оборотные / Краткоср. обязательства)',val:mult.cur.toFixed(2)+'×',raw:s,
+      formula:'CR ≥ 2 → 100;  1–2 → (CR−1)×100;  0.5–1 → (CR−0.5)×100;  < 0.5 → 0'});
+  }
+  if(p&&p.assets>0&&p.eq!=null){
+    var er=p.eq/p.assets;
+    var s2=er>=0.5?100:er>=0.2?er/0.5*100:er>=0?er/0.2*40:0;
+    comps.push({label:'Equity Ratio (Капитал / Активы)',val:(er*100).toFixed(1)+'%',raw:s2,
+      formula:'ER ≥ 0.5 → 100;  0.2–0.5 → ER/0.5×100;  0–0.2 → ER/0.2×40;  < 0 → 0'});
+  }
+  var score=comps.length?Math.round(comps.reduce(function(a,c){return a+c.raw;},0)/comps.length):null;
+  return {score:score, comps:comps, year:mult.year};
+}
+
+function _repScoreModal(title, bodyHtml){
+  var old=document.getElementById('rep-score-modal'); if(old&&old.remove) old.remove();
+  var wrap=document.createElement('div');
+  wrap.id='rep-score-modal';
+  wrap.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:3000;display:flex;align-items:flex-start;justify-content:center;padding:28px 16px;overflow:auto';
+  wrap.onclick=function(e){ if(e.target===wrap && wrap.remove) wrap.remove(); };
+  wrap.innerHTML='<div style="background:var(--panel);border:1px solid var(--brd);max-width:580px;width:100%;padding:18px 20px;box-shadow:var(--glow)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+    +'<h3 style="margin:0;font-size:15px;color:var(--t)">'+title+'</h3>'
+    +'<button type="button" onclick="var m=document.getElementById(\'rep-score-modal\');m&&m.remove&&m.remove()" style="background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;line-height:1">×</button>'
+    +'</div>'+bodyHtml+'</div>';
+  document.body.appendChild(wrap);
+}
+
+function _repExplainScore(kind){
+  if(!repActiveIssuerId) return;
+  var iss=reportsDB[repActiveIssuerId]; if(!iss) return;
+  var n=function(v,d){ return (v==null||!isFinite(v))?'—':(+v).toFixed(d==null?2:d); };
+  var bar=function(s){ s=Math.max(0,Math.min(100,s||0)); return '<div style="height:5px;background:var(--brd);margin-top:3px"><div style="height:100%;width:'+s+'%;background:var(--acc)"></div></div>'; };
+
+  if(kind==='quality'){
+    var q=_repQualityScore(iss);
+    var rows=q.comps.map(function(c){
+      return '<div style="padding:9px 0;border-top:1px solid var(--brd)">'
+        +'<div style="display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--t)"><b>'+c.label+'</b><span style="white-space:nowrap">'+c.val+' → <b>'+Math.round(c.raw)+'</b>/100</span></div>'
+        +bar(c.raw)
+        +'<div style="font-size:11px;color:var(--t3);margin-top:4px;font-family:var(--mono);line-height:1.5">'+c.formula+'</div></div>';
+    }).join('');
+    var body='<div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:4px">'
+      +'Среднее баллов доступных компонентов (каждый 0–100). '+(q.year?'Период: '+q.year+'. ':'')
+      +'Нет данных по компоненту — он не учитывается.</div>'
+      +(rows||'<div style="color:var(--t3);font-size:12px;padding:8px 0">Недостаточно данных (нужны Оборотные/Краткосрочные обязательства либо Капитал/Активы).</div>')
+      +'<div style="margin-top:12px;padding-top:10px;border-top:2px solid var(--brd);display:flex;justify-content:space-between;font-size:14px;color:var(--t)"><b>Итог = среднее</b><b style="color:var(--acc)">'+(q.score!=null?q.score:'—')+'/100</b></div>';
+    _repScoreModal('Качество баланса — как посчитано', body);
+    return;
+  }
+
+  // Запас прочности
+  var S=_repStressScore(iss);
+  var defs=[
+    {on:S.debtWallScore!=null, label:'Долговая стена (вес 25)', raw:S.debtWallScore,
+     val:(S.debtWallRatio!=null?'погашения 24 мес / (кэш + EBITDA×2 года) = '+n(S.debtWallRatio,2):'бондов в каталоге нет или нет EBITDA — не учтено'),
+     formula:'балл = 100 − ratio×50 (меньше погашений к ликвидности → выше)'},
+    {on:S.stressIcrScore!=null, label:'Stressed ICR (вес 40)', raw:S.stressIcrScore,
+     val:(S.stressIcrVal!=null?'(EBITDA×0.8) / (Проценты×1.2) = '+n(S.stressIcrVal,2)+'×':'нет EBITDA или процентов'),
+     formula:'≤0.5× → 0;  ≥3.0× → 100;  между — линейно. Стресс: −20% EBITDA, +20% ставка'},
+    {on:S.altmanScore!=null, label:"Altman Z' (вес 35)", raw:S.altmanScore,
+     val:(S.altmanZ!=null?'Z = '+n(S.altmanZ,2):'нет баланса'),
+     formula:'0.717·X1+0.847·X2+3.107·X3+0.420·X4+0.998·X5; Z≤1.23 → 0; ≥2.9 → 100'}
+  ];
+  var compRows=defs.map(function(c){
+    if(!c.on) return '<div style="padding:9px 0;border-top:1px solid var(--brd);opacity:.5"><div style="font-size:12px;color:var(--t2)"><b>'+c.label+'</b> — '+c.val+'</div></div>';
+    return '<div style="padding:9px 0;border-top:1px solid var(--brd)">'
+      +'<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--t)"><b>'+c.label+'</b><span><b>'+Math.round(c.raw)+'</b>/100</span></div>'
+      +'<div style="font-size:11px;color:var(--t2);margin-top:2px">'+c.val+'</div>'+bar(c.raw)
+      +'<div style="font-size:11px;color:var(--t3);margin-top:4px;font-family:var(--mono);line-height:1.5">'+c.formula+'</div></div>';
+  }).join('');
+
+  var adj='';
+  if(S.scoreAdjust){
+    var kTxt=S.debtOutpacingEbitda!=null?('k = рост долга / рост EBITDA = '+n(S.debtRatio,2)+' / '+n(S.ebitdaRatio,2)+' = '+n(S.debtOutpacingEbitda,2)
+      +(S.indMedianK!=null?' · медиана отрасли '+n(S.indMedianK,2)+' → k отн. '+n(S.kRelative,2):'')):'';
+    adj+='<div style="padding:9px 0;border-top:1px solid var(--brd)"><div style="display:flex;justify-content:space-between;font-size:13px;color:var(--t)"><b>Долг vs EBITDA (тренд 3 г)</b><span style="color:'+(S.scoreAdjust<0?'var(--neg)':'var(--pos)')+'"><b>'+(S.scoreAdjust>0?'+':'')+S.scoreAdjust+'</b></span></div>'
+      +(kTxt?'<div style="font-size:11px;color:var(--t2);margin-top:2px">'+kTxt+'</div>':'')
+      +'<div style="font-size:11px;color:var(--t3);margin-top:4px;font-family:var(--mono);line-height:1.5">k≤0.8 → +10;  0.8–1.0 → +5;  1.0–1.3 → 0;  1.3–2.5 → до −30;  &gt;2.5 → −30</div></div>';
+  }
+  if(S.ratingAdjust){
+    adj+='<div style="padding:9px 0;border-top:1px solid var(--brd)"><div style="display:flex;justify-content:space-between;font-size:13px;color:var(--t)"><b>Действия рейтинг. агентств (6 мес)</b><span style="color:'+(S.ratingAdjust<0?'var(--neg)':'var(--pos)')+'"><b>'+(S.ratingAdjust>0?'+':'')+S.ratingAdjust+'</b></span></div>'
+      +((S.ratingReasons&&S.ratingReasons.length)?'<div style="font-size:11px;color:var(--t2);margin-top:2px">'+S.ratingReasons.map(_escHtml).join(' · ')+'</div>':'')+'</div>';
+  }
+
+  var body='<div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:4px">'
+    +'Базовый балл — взвешенное среднее доступных компонентов (веса 25/40/35, пере-нормируются по тем, где есть данные), затем корректировки. Итог обрезается в 0–100.'
+    +(S.year?' Период: '+S.year+'.':'')+(S.usedParent?' <span style="color:var(--warn)">Данные материнской компании.</span>':'')+'</div>'
+    +compRows
+    +'<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--brd);display:flex;justify-content:space-between;font-size:13px;color:var(--t)"><b>Базовый балл</b><b>'+(S.baseScore!=null?S.baseScore:'—')+'/100</b></div>'
+    +adj
+    +'<div style="margin-top:12px;padding-top:10px;border-top:2px solid var(--brd);display:flex;justify-content:space-between;font-size:14px;color:var(--t)"><b>Итог (0–100)</b><b style="color:var(--acc)">'+(S.score!=null?S.score:'—')+'/100</b></div>'
+    +(S.priorScore!=null?'<div style="font-size:11px;color:var(--t3);margin-top:6px">Для сравнения '+(S.priorYear||'')+': '+S.priorScore+'/100 (тренд).</div>':'');
+  _repScoreModal('Запас прочности — как посчитано', body);
 }
 
 // ── Override header: REPLACE innerHTML entirely ────────────────────────────
