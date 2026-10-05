@@ -98,21 +98,35 @@ def main():
         json.dump(out, f, ensure_ascii=False)
     print(f"[cache] ГОТОВО: {len(out)} выпусков → {OUT}", file=sys.stderr)
 
-    # Попутно зеркалим годовые отчёты из дампа в web/public/reports-cache:
-    # отдельного генератора у reports-cache нет, это копия data/bond_dump/reports,
-    # её читают и веб-приложение, и research (make_events_research). Без этого
-    # шага отчётность незаметно устаревает относительно свежего дампа.
+    # Попутно зеркалим годовые отчёты из дампа в web/public/reports-cache.
+    # ВАЖНО: НЕ затираем хороший файл пустой заглушкой. backend часто отдаёт
+    # count:0/data:[] (деградировавшая D1) — такой стаб НЕ должен перезаписывать
+    # уже имеющиеся реальные цифры. Копируем, только если у источника есть
+    # данные ИЛИ в приёмнике файла ещё нет.
     import shutil
     rep_src = os.path.join(DUMP, "reports")
     rep_dst = os.path.join(ROOT, "web", "public", "reports-cache")
     if os.path.isdir(rep_src):
         os.makedirs(rep_dst, exist_ok=True)
-        n = 0
+        copied = skipped = 0
         for fn in os.listdir(rep_src):
-            if fn.endswith(".json"):
-                shutil.copyfile(os.path.join(rep_src, fn), os.path.join(rep_dst, fn))
-                n += 1
-        print(f"[cache] reports-cache: скопировано {n} отчётов → {rep_dst}", file=sys.stderr)
+            if not fn.endswith(".json"):
+                continue
+            src = os.path.join(rep_src, fn); dst = os.path.join(rep_dst, fn)
+            try:
+                src_data = json.load(open(src, encoding="utf-8")).get("data") or []
+            except Exception:
+                src_data = []
+            if not src_data and os.path.exists(dst):
+                try:
+                    dst_data = json.load(open(dst, encoding="utf-8")).get("data") or []
+                except Exception:
+                    dst_data = []
+                if dst_data:
+                    skipped += 1   # у источника пусто, в приёмнике есть — НЕ трогаем
+                    continue
+            shutil.copyfile(src, dst); copied += 1
+        print(f"[cache] reports-cache: скопировано {copied}" + (f", сохранено от затирания пустышкой {skipped}" if skipped else "") + f" → {rep_dst}", file=sys.stderr)
     else:
         print(f"[cache] нет {rep_src} — reports-cache не обновлён (прогони bond_dump.py)", file=sys.stderr)
 
