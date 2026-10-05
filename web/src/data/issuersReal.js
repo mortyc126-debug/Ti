@@ -172,9 +172,27 @@ function _reportsDbNames(db){
   return map;
 }
 
-// Годовые периоды reportsDB («Год»/FY/12М) с type РСБУ/МСФО. Квартальные
-// и полугодовые пропускаем — метрики по ним не сопоставимы с годовыми.
+// Годовые периоды reportsDB («Год»/FY/12М) с type РСБУ/МСФО.
 const _REPDB_ANNUAL = new Set(['ГОД', 'FY', '12М', '12M', 'Y']);
+
+// Приоритет периода, когда за год нет годового отчёта: берём самый
+// «полный» по охвату (9М > Полугодие > 3 кв > 1 кв). Так компании,
+// импортированные только поквартально/9М (credit-analyzer, smart-lab TTM),
+// всё равно попадают в «Отрасли»/«Карту рынка», а не выпадают целиком.
+function _periodRank(period){
+  const p = String(period || '').trim().toUpperCase();
+  if(_REPDB_ANNUAL.has(p)) return 5;
+  if(/9\s*М|9M/.test(p)) return 4;
+  if(/ПОЛУГОД|6\s*М|1П|H1/.test(p)) return 3;
+  if(/3\s*КВ|Q3/.test(p)) return 2;
+  if(/КВ|Q/.test(p)) return 1;
+  return 0;
+}
+function _filledCount(p){
+  let n = 0;
+  for(const k in p){ const v = p[k]; if(typeof v === 'number' && isFinite(v)) n++; }
+  return n;
+}
 
 // Короткие ключи периода reportsDB → поля, которые ждёт reportToMults.
 // reportsDB хранит int/tax, а reportToMults читает int_exp/tax_exp. Единицы
@@ -197,17 +215,27 @@ function _reportsDbIssuers(db){
   for(const id in (db || {})){
     const iss = db[id];
     if(!iss || !iss.periods) continue;
-    const anns = [];
+    // Один отчёт на (год+тип): предпочитаем годовой, иначе самый полный
+    // не-годовой период за этот год (9М/полугодие/квартал). Без этого
+    // компании без годовой отчётности выпадали из списка целиком.
+    const best = new Map();   // `${year}|${std}` → {period, p}
     for(const key in iss.periods){
       const p = iss.periods[key];
       if(!p || p.year == null) continue;
-      if(!_REPDB_ANNUAL.has(String(p.period || '').trim().toUpperCase())) continue;
-      anns.push({ year: Number(p.year), std: _normStd(p.type), mults: reportToMults(_repPeriodToRow(p)) });
+      const std = _normStd(p.type);
+      const k = Number(p.year) + '|' + std;
+      const cur = best.get(k);
+      if(!cur){ best.set(k, p); continue; }
+      const rNew = _periodRank(p.period), rCur = _periodRank(cur.period);
+      // выше ранг периода, при равенстве — больше заполненных полей
+      if(rNew > rCur || (rNew === rCur && _filledCount(p) > _filledCount(cur))) best.set(k, p);
     }
-    if(!anns.length) continue;
-    anns.sort((a, b) => b.year - a.year);
-    const seen = new Set(), reps = [];
-    for(const r of anns){ const k = r.year + '|' + r.std; if(seen.has(k)) continue; seen.add(k); reps.push(r); }
+    if(!best.size) continue;
+    const reps = [];
+    for(const [k, p] of best){
+      reps.push({ year: Number(k.split('|')[0]), std: k.split('|')[1], mults: reportToMults(_repPeriodToRow(p)) });
+    }
+    reps.sort((a, b) => b.year - a.year);
     const inn = iss.inn ? String(iss.inn) : null;
     out.push({
       id: inn || String(id), inn,
