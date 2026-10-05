@@ -448,7 +448,7 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
 
   <!-- Загрузка D1 -->
   <div style="display:flex;align-items:center;gap:4px;padding:5px 8px;border-bottom:1px solid var(--brd);flex-shrink:0">
-    <button id="rep-d1-load-btn" type="button" onclick="_repD1Load()" style="flex:1;font-size:10px;font-family:var(--sans);font-weight:600;padding:4px 10px;border:1px solid var(--acc);background:var(--acc-dim);color:var(--acc);cursor:pointer;letter-spacing:.04em;text-transform:uppercase">↓ Загрузить базу</button>
+    <button id="rep-d1-load-btn" type="button" onclick="repLoadBundle()" style="flex:1;font-size:10px;font-family:var(--sans);font-weight:600;padding:4px 10px;border:1px solid var(--acc);background:var(--acc-dim);color:var(--acc);cursor:pointer;letter-spacing:.04em;text-transform:uppercase" title="Загрузить базу отчётности одним файлом (reports-bundle.json). Долго? Собери свежий: tools/make_reports_bundle.py">↓ Загрузить базу</button>
     <span id="rep-sidebar-count" style="font-size:10px;color:var(--t3);min-width:24px;text-align:center;font-family:var(--mono)">0</span>
     <button type="button" onclick="_repSourcesModal()" title="Источники" style="width:26px;height:26px;border:1px solid var(--brd);background:var(--s2);color:var(--t3);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center">⚙</button>
   </div>
@@ -10107,6 +10107,13 @@ function repInit(){
     _indLoad().then(() => { repRenderIndustryFilter(); repRenderIssuerList(); }).catch(() => repRenderIssuerList());
   } else {
     repRenderIssuerList();
+  }
+  // Авто-подхват базы одним запросом, если она пустая (первый вход / квота
+  // localStorage сбросила). Один файл, не сотни запросов. Больше не трогаем.
+  if(!window._repBundleTried){
+    window._repBundleTried = true;
+    var _withPer = Object.keys(reportsDB).filter(function(k){ return reportsDB[k] && Object.keys(reportsDB[k].periods||{}).length>0; }).length;
+    if(_withPer < 5 && typeof repLoadBundle === 'function'){ setTimeout(function(){ repLoadBundle(); }, 50); }
   }
 }
 
@@ -28986,6 +28993,55 @@ var _d1Catalog = null; // {issuers, bonds, stocks}
 
 // ── D1 Загрузка ────────────────────────────────────────────────────
 var _d1Loading = false;
+
+// Быстрая загрузка базы ОДНИМ запросом из web/public/reports-bundle.json
+// (собирается tools/make_reports_bundle.py). Вместо сотен запросов по файлу
+// на эмитента. Периоды конвертируются тем же _d1MergeReports (млн→млрд),
+// пользовательские периоды (_src:'user') не затираются. Нет бандла —
+// фолбэк на полный _repD1Load (каталог + backend).
+async function repLoadBundle(){
+  if(_d1Loading) return;
+  _d1Loading = true;
+  var btn=document.getElementById('rep-d1-load-btn'), log=document.getElementById('rep-d1-log');
+  var setBtn=function(t){ if(btn) btn.textContent=t; };
+  var setLog=function(t,e){ if(log){ log.style.display=t?'':'none'; log.style.color=e?'var(--danger)':'var(--text3)'; log.textContent=t; } };
+  if(btn) btn.disabled=true; setBtn('↻ база…'); setLog('Загрузка базы одним файлом…');
+  try{
+    var r=await fetch('/reports-bundle.json',{cache:'no-store'});
+    if(!r.ok) throw new Error('нет reports-bundle.json');
+    var bundle=await r.json();
+    if(!reportsDB) reportsDB={};
+    var rdb=reportsDB, added=0, filled=0;
+    for(var inn in bundle){
+      var b=bundle[inn];
+      var id=null;
+      for(var k in rdb){ if(rdb[k] && rdb[k].inn===inn){ id=k; break; } }
+      if(!id){
+        id='i_'+inn;
+        if(!rdb[id]){ rdb[id]={ name:b.name||inn, inn:inn, ind:b.ind||'other', bondsCount:b.bondsCount||0, periods:{} }; added++; }
+      } else {
+        var e=rdb[id];
+        if(b.bondsCount!=null) e.bondsCount=b.bondsCount;
+        if((!e.ind||e.ind==='other') && b.ind) e.ind=b.ind;
+        if(!e.name && b.name) e.name=b.name;
+        if(!e.periods) e.periods={};
+      }
+      if(Array.isArray(b.rows) && b.rows.length){ _d1MergeReports(id, inn, b.rows); filled++; }
+    }
+    try{ save(); }catch(e){ try{ localStorage.setItem('ba_rep_d1_cache', JSON.stringify({reportsDB:reportsDB})); }catch(_){} }
+    repRenderIssuerList(); try{ repRebuildSelect(); }catch(_){}
+    var tot=Object.keys(rdb).length;
+    setBtn('✓ база '+filled); setLog('Готово одним запросом: с отчётами '+filled+' | всего '+tot);
+    if(btn) btn.disabled=false;
+    _d1Loading=false;
+  }catch(err){
+    _d1Loading=false;
+    setLog('Бандл не найден ('+(err.message||err)+') — тяну по старинке…', true);
+    if(btn) btn.disabled=false;
+    return _repD1Load();   // фолбэк: полный путь (каталог + backend)
+  }
+}
+
 async function _repD1Load(){
   if(_d1Loading) return;
   _d1Loading = true;
