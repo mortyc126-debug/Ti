@@ -15614,6 +15614,12 @@ function repImportIssuerJson(input){
   reader.onload = e => {
     try {
       const d = JSON.parse(e.target.result);
+      // Файл smart-lab credit-analyzer (company + sources) — другой формат:
+      // раскладываем его таблицы в периоды тем же конвертером.
+      if(d && (d.format==='credit-analyzer-company' || (d.company && Array.isArray(d.company.sources) && d.company.sources.some(s=>s&&s.text)))){
+        _repImportCreditAnalyzer(d);
+        return;
+      }
       if(!d || !d.name) throw new Error('В файле нет поля name');
       if(!d.periods || typeof d.periods !== 'object') throw new Error('В файле нет поля periods');
       let issId = Object.keys(reportsDB).find(k => reportsDB[k].name === d.name);
