@@ -829,6 +829,10 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
         <div class="field"><label>EBIT</label><input type="number" id="rep-np-ebit" placeholder="1 240" step="0.1"></div>
       </div>
       <div class="g2">
+        <div class="field"><label>Амортизация (D&A) <span style="font-size:.5rem;color:var(--text3)">EBITDA = EBIT + D&A</span></label><input type="number" id="rep-np-da" placeholder="580" step="0.1"></div>
+        <div class="field"><label>Налог на прибыль</label><input type="number" id="rep-np-tax" placeholder="210" step="0.1"></div>
+      </div>
+      <div class="g2">
         <div class="field"><label>Совокупные активы</label><input type="number" id="rep-np-assets" placeholder="25 400" step="0.1"></div>
         <div class="field"><label>Собственный капитал</label><input type="number" id="rep-np-eq" placeholder="8 200" step="0.1"></div>
       </div>
@@ -4135,7 +4139,7 @@ const _REPORTS_FIELD_MAP = {
   ebit: 'rep-np-ebit', int: 'rep-np-int',
   assets: 'rep-np-assets', eq: 'rep-np-eq', debt: 'rep-np-debt',
   cash: 'rep-np-cash', ca: 'rep-np-ca', cl: 'rep-np-cl',
-  ret: 'rep-np-ret',
+  ret: 'rep-np-ret', da: 'rep-np-da', tax: 'rep-np-tax',
   cfo: 'rep-np-cfo', capex: 'rep-np-capex', divp: 'rep-np-divp',
   recv: 'rep-np-recv', inv: 'rep-np-inv', pay: 'rep-np-pay'
 };
@@ -14576,9 +14580,9 @@ function _repNpSetUnit(newUnit){
   // Поле содержит число в единицах prev; чтобы остаться в тех же млрд,
   // новое число = старое × (prev→млрд) / (new→млрд).
   const factor = _REP_UNIT_TO_BN[prev] / _REP_UNIT_TO_BN[newUnit];
-  ['rep-np-rev','rep-np-ebitda','rep-np-np','rep-np-ebit',
-   'rep-np-assets','rep-np-eq','rep-np-debt','rep-np-cash',
-   'rep-np-ca','rep-np-cl','rep-np-int','rep-np-ret'].forEach(id => {
+  // Пересчитываем ВСЕ денежные поля формы (берём из карты — включая da, tax,
+  // cfo, capex, divp, recv, inv, pay, которых в старом списке не было).
+  Object.values(_REPORTS_FIELD_MAP).forEach(id => {
     const el = document.getElementById(id);
     if(!el || !el.value) return;
     const v = parseFloat(el.value);
@@ -14635,9 +14639,13 @@ function repSavePeriod(){
     rev:gn('rep-np-rev'), ebitda:gn('rep-np-ebitda'), np:gn('rep-np-np'), ebit:gn('rep-np-ebit'),
     assets:gn('rep-np-assets'), eq:gn('rep-np-eq'), debt:gn('rep-np-debt'), cash:gn('rep-np-cash'),
     ca:gn('rep-np-ca'), cl:gn('rep-np-cl'), int:gn('rep-np-int'), ret:gn('rep-np-ret'),
+    da:gn('rep-np-da'), tax:gn('rep-np-tax'),
     cfo:gn('rep-np-cfo'), capex:gn('rep-np-capex'), divp:gn('rep-np-divp'),
     recv:gn('rep-np-recv'), inv:gn('rep-np-inv'), pay:gn('rep-np-pay'),
   };
+  // Сохраняем extra (свои метрики smart-lab) при ручном редактировании —
+  // иначе форма затирала их пустым набором.
+  try{ const _old=reportsDB[repActiveIssuerId].periods[window._repEditOldKey||key]; if(_old&&_old.extra) data.extra=_old.extra; }catch(e){}
   // Режим редактирования: если ключ изменился (поменяли год/период/тип) —
   // удаляем старую запись, чтобы не плодить дубликаты. Если такой ключ
   // уже есть и не наш — спросим подтверждение.
@@ -14938,7 +14946,8 @@ function _slAutoTarget(label){
   if(/\/|%|руб\.?\/акц|на акцию|\bp\/|\broe\b|\broa\b|\bev\b|\beps\b|\bbv\b|рентаб|доходност|мультипл|капитализац|free\s*float|цена\s+акц|число\s+акц|баланс[а-яё]*\s+стоимост/.test(l)) return '__extra__';
   if(/чист[а-яё]*\s+долг|net\s*debt/.test(l)) return '__extra__';
   if(/\bfcf\b|свободн[а-яё]*\s+денежн/.test(l)) return '__extra__';
-  if(/себестоимост|амортизац|опер[а-яё]*\.?\s*расход|operating\s+expens|персонал|отгрузк|произв[а-яё]*\.?\s*труда/.test(l)) return '__extra__';
+  if(/амортизац|depreciat|\bd&a\b/.test(l)) return 'da';
+  if(/себестоимост|опер[а-яё]*\.?\s*расход|operating\s+expens|персонал|отгрузк|произв[а-яё]*\.?\s*труда/.test(l)) return '__extra__';
   const H = [
     [/выручка|revenue|\bsales\b|чистый\s+процентн[а-яё]*\s+доход/, 'rev'],
     [/ebitda/, 'ebitda'],
@@ -14969,9 +14978,10 @@ const _SL_TARGETS = [
   ['cfo','CFO (опер. поток)'],['capex','CAPEX'],['debt','Долг'],['cash','Наличность'],
   ['int','Проценты'],['assets','Активы'],['eq','Чистые активы (капитал)'],['divp','Дивиденды'],
   ['ca','Оборотные активы'],['cl','Краткосроч. обязательства'],['tax','Налог'],
+  ['da','Амортизация (D&A)'],
   ['ret','Нераспред. прибыль'],['recv','Дебиторка'],['inv','Запасы'],['pay','Кредиторка']
 ];
-const _SL_NULL = ['rev','ebitda','np','ebit','assets','eq','debt','cash','ca','cl','int','ret','cfo','capex','divp','recv','inv','pay','tax'];
+const _SL_NULL = ['rev','ebitda','np','ebit','assets','eq','debt','cash','ca','cl','int','ret','cfo','capex','divp','recv','inv','pay','tax','da'];
 
 function _slClean(v){ return v==null?'':String(v).replace(/﻿/g,'').replace(/ /g,' ').trim(); }
 function _slNum(v){
@@ -15366,7 +15376,7 @@ function _repIndCompareBlock(iss, p){
   if(!iss || !p) return '';
   const grp = _repIndGroup(iss); const norms = _IND_NORMS[grp]; if(!norms) return '';
   const n=v=>(typeof v==='number'&&isFinite(v))?v:null;
-  const ebitda=n(p.ebitda)!=null?n(p.ebitda):n(p.ebit), ebit=n(p.ebit), rev=n(p.rev),
+  const ebitda=n(p.ebitda)!=null?n(p.ebitda):(n(p.ebit)!=null&&n(p.da)!=null?n(p.ebit)+n(p.da):n(p.ebit)), ebit=n(p.ebit), rev=n(p.rev),
         debt=n(p.debt), cash=n(p.cash), ca=n(p.ca), cl=n(p.cl), eq=n(p.eq), assets=n(p.assets), intx=n(p.int);
   const nd=(debt!=null&&cash!=null)?debt-cash:null;
   const metrics=[
@@ -15516,7 +15526,7 @@ function _repDependencyFindings(iss, p){
   const rev=n(p.rev), np=n(p.np), debt=n(p.debt), cash=n(p.cash), eq=n(p.eq), assets=n(p.assets),
         cfo=n(p.cfo), capex=n(p.capex), intx=n(p.int), tax=n(p.tax),
         ca=n(p.ca), cl=n(p.cl), recv=n(p.recv), inv=n(p.inv), pay=n(p.pay);
-  const ebitda = n(p.ebitda)!=null ? n(p.ebitda) : n(p.ebit);
+  const ebitda = n(p.ebitda)!=null ? n(p.ebitda) : (n(p.ebit)!=null&&n(p.da)!=null?n(p.ebit)+n(p.da):n(p.ebit));
   const ebit = n(p.ebit)!=null ? n(p.ebit) : ebitda;
   const nd = (debt!=null&&cash!=null)? debt-cash : null;
   const isAnnual = /год|fy|year/i.test(String(p.period||''));
@@ -15707,7 +15717,7 @@ function _repLatestAnnual(iss){
 function _repKeyRatios(p){
   const n=v=>(typeof v==='number'&&isFinite(v))?v:null;
   if(!p) return {};
-  const eb=n(p.ebitda)!=null?n(p.ebitda):n(p.ebit), ebit=n(p.ebit), rev=n(p.rev), np=n(p.np),
+  const eb=n(p.ebitda)!=null?n(p.ebitda):(n(p.ebit)!=null&&n(p.da)!=null?n(p.ebit)+n(p.da):n(p.ebit)), ebit=n(p.ebit), rev=n(p.rev), np=n(p.np),
         debt=n(p.debt),cash=n(p.cash),eq=n(p.eq),assets=n(p.assets),intx=n(p.int),cfo=n(p.cfo),capex=n(p.capex);
   const nd=(debt!=null&&cash!=null)?debt-cash:null;
   return { year:p.year,
@@ -15788,7 +15798,7 @@ function repCompareTwo(){
 function _repVerdict(iss, p){
   if(!iss || !p) return '';
   const n=v=>(typeof v==='number'&&isFinite(v))?v:null;
-  const ebitda=n(p.ebitda)!=null?n(p.ebitda):n(p.ebit), ebit=n(p.ebit), rev=n(p.rev),
+  const ebitda=n(p.ebitda)!=null?n(p.ebitda):(n(p.ebit)!=null&&n(p.da)!=null?n(p.ebit)+n(p.da):n(p.ebit)), ebit=n(p.ebit), rev=n(p.rev),
         debt=n(p.debt), cash=n(p.cash), ca=n(p.ca), cl=n(p.cl), eq=n(p.eq), assets=n(p.assets),
         intx=n(p.int), cfo=n(p.cfo), capex=n(p.capex);
   const nd=(debt!=null&&cash!=null)?debt-cash:null;
@@ -15839,7 +15849,7 @@ function _repYoYBlock(iss, p){
   if(!prA) return '';
   const pr = prA.period;
   const n=v=>(typeof v==='number'&&isFinite(v))?v:null;
-  const eb=x=>n(x.ebitda)!=null?n(x.ebitda):n(x.ebit);
+  const eb=x=>n(x.ebitda)!=null?n(x.ebitda):(n(x.ebit)!=null&&n(x.da)!=null?n(x.ebit)+n(x.da):n(x.ebit));
   const pct=(c,p0)=>(c!=null&&p0!=null&&p0!==0)?(c-p0)/Math.abs(p0)*100:null;
   const ndv=x=>{const e=eb(x);return (x.debt!=null&&x.cash!=null&&e&&e>0)?(x.debt-x.cash)/e:null;};
   const marg=x=>{const e=eb(x);return (e!=null&&x.rev)?e/x.rev*100:null;};
@@ -16171,7 +16181,7 @@ function _repComputedExtras(p){
   const exGetK = re => { for(const k in ex){ if(re.test(k)){ const v=parseFloat(ex[k]); if(isFinite(v)) return {v,k}; } } return null; };
   const rev=num(p.rev), np=num(p.np), debt=num(p.debt), cash=num(p.cash),
         eq=num(p.eq), assets=num(p.assets), cfo=num(p.cfo), capex=num(p.capex);
-  const ebitda = num(p.ebitda)!=null ? num(p.ebitda) : num(p.ebit);
+  const ebitda = num(p.ebitda)!=null ? num(p.ebitda) : (num(p.ebit)!=null&&num(p.da)!=null?num(p.ebit)+num(p.da):num(p.ebit));
   const shares = (exGetK(/число\s+акц/i)||{}).v;   // млн штук
   const price  = (exGetK(/цена\s+акц/i)||{}).v;    // руб за акцию (на дату отчёта)
   // Потоковые мультипликаторы (P/E, P/S, EV/EBITDA, Долг/EBITDA, ROE, ROA, EPS)
@@ -16297,6 +16307,8 @@ function repEditPeriod(){
   setVal('rep-np-cl',    p.cl);
   setVal('rep-np-int',   p.int);
   setVal('rep-np-ret',   p.ret);
+  setVal('rep-np-da',    p.da);
+  setVal('rep-np-tax',   p.tax);
   setVal('rep-np-cfo',   p.cfo);
   setVal('rep-np-capex', p.capex);
   setVal('rep-np-divp',  p.divp);
