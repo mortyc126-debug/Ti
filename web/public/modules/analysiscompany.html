@@ -2875,12 +2875,57 @@ const BT_TAG={ОФЗ:'tag-ofz',Корп:'tag-corp',Муни:'tag-muni'};
 // ══ STATE ══
 let ytmRate=10, ytmBonds=[], portfolio=[], watchlists={}, activeWL=null, calEvents=[], reportsDB={}, compareSets={};
 
+// ── Хранилище reportsDB в IndexedDB ──────────────────────────────────
+// localStorage ~5 МБ не вмещает большую базу (при переполнении молча терял
+// данные). IndexedDB — сотни МБ, хранит объект напрямую. reportsDB живёт
+// здесь; localStorage остаётся запасным (и для обратной совместимости).
+var _IDB_NAME='bondan_store', _IDB_STORE='kv';
+function _idbOpen(){
+  return new Promise(function(res,rej){
+    try{
+      var r=indexedDB.open(_IDB_NAME,1);
+      r.onupgradeneeded=function(){ try{ r.result.createObjectStore(_IDB_STORE); }catch(e){} };
+      r.onsuccess=function(){ res(r.result); };
+      r.onerror=function(){ rej(r.error); };
+    }catch(e){ rej(e); }
+  });
+}
+function _idbGet(key){
+  return _idbOpen().then(function(db){ return new Promise(function(res,rej){
+    try{ var rq=db.transaction(_IDB_STORE,'readonly').objectStore(_IDB_STORE).get(key);
+      rq.onsuccess=function(){ res(rq.result); }; rq.onerror=function(){ rej(rq.error); };
+    }catch(e){ rej(e); } }); });
+}
+function _idbSet(key,val){
+  return _idbOpen().then(function(db){ return new Promise(function(res,rej){
+    try{ var tx=db.transaction(_IDB_STORE,'readwrite'); tx.objectStore(_IDB_STORE).put(val,key);
+      tx.oncomplete=function(){ res(true); }; tx.onerror=function(){ rej(tx.error); };
+    }catch(e){ rej(e); } }); });
+}
+
 function loadState(){
   try{const d=JSON.parse(localStorage.getItem('ba_v2')||'{}');
     ytmBonds=d.ytmBonds||[]; portfolio=d.portfolio||[]; watchlists=d.watchlists||{};
     calEvents=d.calEvents||[]; reportsDB=d.reportsDB||{};
     compareSets=d.compareSets||{};
     _migrateGirboType();   // ГИР БО — источник, не тип: старые периоды → РСБУ
+  }catch(e){}
+  // Авторитетная загрузка reportsDB из IndexedDB (вместимей localStorage).
+  // Асинхронно: если в IDB есть база — она главная; если нет, а в ba_v2 что-то
+  // есть — одноразово мигрируем туда. Потом пере-рендерим отчётность.
+  try{
+    _idbGet('reportsDB').then(function(idb){
+      if(idb && typeof idb==='object' && Object.keys(idb).length){
+        for(var k in reportsDB){ delete reportsDB[k]; }
+        Object.assign(reportsDB, idb);
+        try{ _migrateGirboType(); }catch(e){}
+      } else if(reportsDB && Object.keys(reportsDB).length){
+        _idbSet('reportsDB', reportsDB).catch(function(){});
+      }
+      try{ if(typeof repRebuildSelect==='function') repRebuildSelect(); }catch(e){}
+      try{ if(typeof repRenderIssuerList==='function') repRenderIssuerList(); }catch(e){}
+      try{ var sb=document.getElementById('sb-rep'); if(sb) sb.textContent=Object.keys(reportsDB).length; }catch(e){}
+    }).catch(function(){});
   }catch(e){}
 }
 // Одноразовая миграция: тип периода ГИРБО/GIRBO → РСБУ (ГИР БО — источник,
@@ -2901,7 +2946,12 @@ function _migrateGirboType(){
   }catch(e){}
 }
 function save(){
-  try{localStorage.setItem('ba_v2',JSON.stringify({ytmBonds,portfolio,watchlists,calEvents,reportsDB,compareSets}))}catch(e){}
+  // reportsDB — в IndexedDB (надёжно, большой лимит).
+  try{ _idbSet('reportsDB', reportsDB).catch(function(){}); }catch(e){}
+  // ba_v2 в localStorage: пробуем с reportsDB (обратная совместимость), при
+  // переполнении — без него (источник истины всё равно IndexedDB).
+  try{ localStorage.setItem('ba_v2',JSON.stringify({ytmBonds,portfolio,watchlists,calEvents,reportsDB,compareSets})); }
+  catch(e){ try{ localStorage.setItem('ba_v2',JSON.stringify({ytmBonds,portfolio,watchlists,calEvents,compareSets})); }catch(e2){} }
 }
 
 // ══ NAV ══
