@@ -30035,6 +30035,23 @@ function _repBuildIssuerHeader(iss, issId){
     if(val!=null&&isFinite(val)&&tGood!=null){var ok=lowGood?val<=tGood:val>=tGood,med=lowGood?val<=tWarn:val>=tWarn;cls=ok?'rhp-g':med?'rhp-w':'rhp-r';}
     return '<span class="rhp '+cls+'"><span class="rhp-label">'+lbl+'</span><span class="rhp-val">'+txt+'</span></span>';
   }
+  // Заметки / факторы по эмитенту: датированные пометки (оферта, суд, смена
+  // аудитора, допэмиссия, контракт, новость) — то, что важно помнить между
+  // сессиями. Храним в iss.factors; уезжают в экспорт/sync/IDB вместе с iss.
+  var factors = Array.isArray(iss.factors)?iss.factors:[];
+  var facRows = factors.map(function(f,i){
+    return '<div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-top:1px solid var(--brd)">'
+      +'<span style="font-family:var(--mono);font-size:10px;color:var(--t3);white-space:nowrap;min-width:70px">'+_escHtml(f.d||'')+'</span>'
+      +'<span style="flex:1;font-size:12px;color:var(--t2);line-height:1.45;white-space:pre-wrap;word-break:break-word">'+_escHtml(f.t||'')+'</span>'
+      +'<button type="button" onclick="repDelFactor('+i+')" title="Удалить заметку" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:15px;line-height:1;padding:0 2px">×</button>'
+      +'</div>';
+  }).join('');
+  var factorsHtml = '<div style="padding:9px 16px;border-top:1px solid var(--brd)">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">'
+    +'<span style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t3)">📌 Заметки / факторы'+(factors.length?' · '+factors.length:'')+'</span>'
+    +'<button type="button" class="btn" onclick="repAddFactor()" title="Добавить датированную заметку по эмитенту">+ заметка</button></div>'
+    +(facRows||'<div style="font-size:11px;color:var(--t3);padding:3px 0">Пусто. Запиши, что важного у эмитента: оферта, суд, смена аудитора, допэмиссия, крупный контракт, смена собственника…</div>')
+    +'</div>';
   var ebitdaM=(p&&p.ebitda!=null&&p.rev>0)?p.ebitda/p.rev:null;
   var roa=(p&&p.np!=null&&p.assets>0)?p.np/p.assets:null;
   var pillsHtml='<div style="display:flex;flex-wrap:wrap;gap:5px;padding:10px 16px;border-bottom:1px solid var(--brd)">'
@@ -30055,7 +30072,34 @@ function _repBuildIssuerHeader(iss, issId){
     +'<div class="score-row" style="margin-top:10px">'
     +scoreTile('Запас прочности',stressScore,stressColor,stressComps)
     +scoreTile('Качество баланса',qualScore,qualColor,qualComps)
-    +'</div></div>'+pillsHtml;
+    +'</div></div>'+pillsHtml+factorsHtml;
+}
+
+// Добавить/удалить заметку-фактор по активному эмитенту.
+function repAddFactor(){
+  if(!repActiveIssuerId){ alert('Сначала выберите эмитента.'); return; }
+  var iss=reportsDB[repActiveIssuerId]; if(!iss) return;
+  var txt=prompt('Заметка / фактор по «'+(iss.name||'эмитенту')+'»:\n(оферта, суд, смена аудитора, допэмиссия, контракт, новость…)');
+  if(txt==null) return;
+  txt=String(txt).trim(); if(!txt) return;
+  var today=new Date().toISOString().slice(0,10);
+  var d=prompt('Дата заметки (ГГГГ-ММ-ДД):', today) || today;
+  d=String(d).trim(); if(!/^\d{4}-\d{2}-\d{2}$/.test(d)) d=today;
+  if(!Array.isArray(iss.factors)) iss.factors=[];
+  iss.factors.push({d:d, t:txt, ts:Date.now()});
+  iss.factors.sort(function(a,b){ return (b.d||'').localeCompare(a.d||''); }); // свежие сверху
+  save();
+  if(typeof _repRenderActiveIssuerHeader==='function') _repRenderActiveIssuerHeader();
+}
+function repDelFactor(i){
+  if(!repActiveIssuerId) return;
+  var iss=reportsDB[repActiveIssuerId]; if(!iss||!Array.isArray(iss.factors)) return;
+  if(i<0||i>=iss.factors.length) return;
+  var f=iss.factors[i];
+  if(!confirm('Удалить заметку?\n\n'+(f.d||'')+'  '+(f.t||''))) return;
+  iss.factors.splice(i,1);
+  save();
+  if(typeof _repRenderActiveIssuerHeader==='function') _repRenderActiveIssuerHeader();
 }
 
 // ── Override header: REPLACE innerHTML entirely ────────────────────────────
