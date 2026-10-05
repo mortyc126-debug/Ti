@@ -12083,10 +12083,31 @@ function repRenderCompare(){
 }
 
 // ── CRUD ──
+// Заполнить select отрасли полным списком (36 отраслей по группам, из
+// industry-peers) вместо 9 хардкод-опций. Ключи совпадают с iss.ind, которым
+// пользуются факторный блок, нормы и определение сектора.
+function _repFillIndustrySelect(selId, current){
+  const sel=document.getElementById(selId); if(!sel) return;
+  const data=window._industryData && window._industryData.industries;
+  const GROUPS=[['raw','Ресурсы и сырьё'],['manuf','Обработка'],['energy','Энергетика и ЖКХ'],['build','Стройка и недвижимость'],['trade','Торговля'],['transport','Транспорт'],['it-media','IT, связь, медиа'],['finance','Финансы и банки'],['services','Услуги'],['other','Прочее']];
+  let html='';
+  if(data && Object.keys(data).length){
+    const byG={}; Object.keys(data).forEach(k=>{ const g=data[k].group||'other'; (byG[g]=byG[g]||[]).push(k); });
+    GROUPS.forEach(([g,glabel])=>{ const ks=(byG[g]||[]).sort((a,b)=>String(data[a].label||a).localeCompare(String(data[b].label||b),'ru')); if(!ks.length)return;
+      html+='<optgroup label="'+_escHtml(glabel)+'">'+ks.map(k=>`<option value="${_escHtml(k)}">${_escHtml(data[k].label||k)}</option>`).join('')+'</optgroup>'; });
+    if(!/>other</.test(html)) html+='<option value="other">Прочее</option>';
+  } else {
+    // фолбэк, если справочник ещё не загрузился
+    html='<option value="banks">Банки</option><option value="leasing">Лизинг</option><option value="mfi">МФО</option><option value="insurance">Страхование</option><option value="oil_gas">Нефть и газ</option><option value="metals_mining">Металлы и добыча</option><option value="retail">Ритейл</option><option value="telecom">Телеком</option><option value="construction">Строительство</option><option value="other">Прочее</option>';
+  }
+  sel.innerHTML=html;
+  if(current){ if(![...sel.options].some(o=>o.value===current)){ const o=document.createElement('option'); o.value=current; o.textContent=current+' (текущее)'; sel.insertBefore(o,sel.firstChild); } sel.value=current; }
+  else sel.value='other';
+}
 function repNiClearForm(){
   document.getElementById('rep-ni-id').value = '';
   document.getElementById('rep-ni-name').value = '';
-  document.getElementById('rep-ni-ind').value = 'other';
+  (window._indLoad ? _indLoad() : Promise.resolve()).then(()=>_repFillIndustrySelect('rep-ni-ind','other')).catch(()=>_repFillIndustrySelect('rep-ni-ind','other'));
   document.getElementById('rep-ni-isin').value = '';
   document.getElementById('rep-ni-inn').value = '';
   document.getElementById('rep-ni-ogrn').value = '';
@@ -12107,7 +12128,7 @@ function repEditIssuerModal(){
   repNiClearForm();
   document.getElementById('rep-ni-id').value = repActiveIssuerId;
   document.getElementById('rep-ni-name').value = iss.name || '';
-  document.getElementById('rep-ni-ind').value = iss.ind || 'other';
+  (window._indLoad ? _indLoad() : Promise.resolve()).then(()=>_repFillIndustrySelect('rep-ni-ind', iss.ind||'other')).catch(()=>_repFillIndustrySelect('rep-ni-ind', iss.ind||'other'));
   document.getElementById('rep-ni-isin').value = iss.isin || '';
   document.getElementById('rep-ni-inn').value = iss.inn || '';
   document.getElementById('rep-ni-ogrn').value = iss.ogrn || '';
