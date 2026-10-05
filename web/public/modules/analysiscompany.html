@@ -15738,33 +15738,60 @@ const _REP_CMP_ROWS=[
   {k:'conv',label:'CFO/EBITDA',unit:'%',low:false},
   {k:'fcf',label:'FCF',unit:'млрд',low:false},
 ];
+// Банковские коэффициенты периода (из extra, приведены к процентам).
+function _repBankKeyRatios(p){
+  const V=re=>_repBankVal(p,re); const pct=re=>{const v=V(re);return v!=null?v*100:null;};
+  const res=V(/резервы под обесцен/i), nplA=V(/неработающие кредиты/i);
+  return { year:p.year,
+    roe:pct(/\broe\b/i), roa:pct(/\broa\b/i), nim:pct(/чистая процентн/i),
+    cor:pct(/стоимость риска|cor/i), npl:pct(/просроченные кредиты|npl/i),
+    cov:(res!=null&&nplA!=null&&nplA>0)?res/nplA*100:null,
+    car:pct(/дост\.?\s*общ/i), cir:pct(/расходы\/доходы|cir/i),
+    ltd:pct(/loan-to-deposit|^l\/d/i), pb:V(/^p\/b|p\/b/i) };
+}
+const _REP_BANK_CMP_ROWS=[
+  {k:'roe',label:'ROE',unit:'%',low:false},
+  {k:'roa',label:'ROA',unit:'%',low:false},
+  {k:'nim',label:'NIM',unit:'%',low:false},
+  {k:'cor',label:'CoR',unit:'%',low:true},
+  {k:'npl',label:'NPL',unit:'%',low:true},
+  {k:'cov',label:'Покрытие резервами',unit:'%',low:false},
+  {k:'car',label:'Дост. капитала',unit:'%',low:false},
+  {k:'cir',label:'CIR',unit:'%',low:true},
+  {k:'ltd',label:'L/D',unit:'%',low:null},
+  {k:'pb',label:'P/B',unit:'×',low:true},
+];
 function _repTwoRender(){
   const aId=document.getElementById('cmp-a')?.value, bId=document.getElementById('cmp-b')?.value;
   const host=document.getElementById('cmp-body'); if(!host||!aId||!bId) return;
   const A=reportsDB[aId], B=reportsDB[bId];
   const pa=_repLatestAnnual(A), pb=_repLatestAnnual(B);
-  const ra=_repKeyRatios(pa), rb=_repKeyRatios(pb);
+  // Обе — банки → банковский набор метрик; иначе корпоративный.
+  const bothBanks=_repBankDetect(A)&&_repBankDetect(B);
+  const ROWS=bothBanks?_REP_BANK_CMP_ROWS:_REP_CMP_ROWS;
+  const ratioFn=bothBanks?_repBankKeyRatios:_repKeyRatios;
+  const ra=ratioFn(pa), rb=ratioFn(pb);
   const fv=(v,u)=> v==null?'—': u==='%'?v.toFixed(1)+'%': u==='×'?v.toFixed(2)+'×': v.toFixed(1);
-  const rows=_REP_CMP_ROWS.map(r=>{
+  const rows=ROWS.map(r=>{
     const va=ra[r.k], vb=rb[r.k];
     let aw='',bw='';
-    if(va!=null&&vb!=null&&va!==vb){ const aBetter=r.low?va<vb:va>vb; if(aBetter)aw='color:var(--green);font-weight:700'; else bw='color:var(--green);font-weight:700'; }
+    if(r.low!==null && va!=null&&vb!=null&&va!==vb){ const aBetter=r.low?va<vb:va>vb; if(aBetter)aw='color:var(--green);font-weight:700'; else bw='color:var(--green);font-weight:700'; }
     return `<tr style="border-top:1px solid var(--border)">
       <td style="padding:3px 8px;color:var(--text2)">${r.label}</td>
       <td style="padding:3px 8px;text-align:right;font-family:var(--mono);${aw}">${fv(va,r.unit)}</td>
       <td style="padding:3px 8px;text-align:right;font-family:var(--mono);${bw}">${fv(vb,r.unit)}</td></tr>`;
   }).join('');
-  // краткий итог: кто по каким блокам сильнее
-  const score=(r,s)=>{ let n=0; _REP_CMP_ROWS.forEach(d=>{ const x=r[d.k],y=s[d.k]; if(x!=null&&y!=null&&x!==y){ const better=d.low?x<y:x>y; if(better)n++; } }); return n; };
+  const score=(r,s)=>{ let n=0; ROWS.forEach(d=>{ if(d.low===null)return; const x=r[d.k],y=s[d.k]; if(x!=null&&y!=null&&x!==y){ const better=d.low?x<y:x>y; if(better)n++; } }); return n; };
   const sa=score(ra,rb), sb=score(rb,ra);
+  const mixedNote=(!bothBanks&&(_repBankDetect(A)||_repBankDetect(B)))?' <span style="color:var(--warn)">Один из эмитентов — банк, сравнение по корп-метрикам неинформативно; сравнивай банк с банком.</span>':'';
   host.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:.66rem">
       <thead><tr style="color:var(--text3);font-size:.55rem;text-transform:uppercase">
-        <th style="padding:3px 8px;text-align:left">Метрика</th>
+        <th style="padding:3px 8px;text-align:left">${bothBanks?'🏦 Метрика (банк)':'Метрика'}</th>
         <th style="padding:3px 8px;text-align:right">${_escHtml((A.name||'A').slice(0,22))}${pa?' · '+pa.year:''}</th>
         <th style="padding:3px 8px;text-align:right">${_escHtml((B.name||'B').slice(0,22))}${pb?' · '+pb.year:''}</th></tr></thead>
       <tbody>${rows}</tbody></table>
       <div style="font-size:.62rem;color:var(--text2);margin-top:8px">Счёт по метрикам (зелёным — лучше): <b>${_escHtml((A.name||'A').slice(0,18))}</b> ${sa} : ${sb} <b>${_escHtml((B.name||'B').slice(0,18))}</b>. ${sa===sb?'Паритет.':(sa>sb?'Первый сильнее по большинству.':'Второй сильнее по большинству.')}</div>
-      <div style="font-size:.5rem;color:var(--text3);margin-top:4px">Последние годовые периоды. «Лучше» по направлению метрики (для долга — меньше). Разные отрасли сравнивать осторожно.</div>`;
+      <div style="font-size:.5rem;color:var(--text3);margin-top:4px">Последние годовые периоды. «Лучше» по направлению метрики (для долга/CoR/NPL — меньше). Разные отрасли сравнивать осторожно.${mixedNote}</div>`;
 }
 function repCompareTwo(){
   const opts=Object.keys(reportsDB).filter(id=>reportsDB[id]&&_repLatestAnnual(reportsDB[id]))
@@ -16004,6 +16031,61 @@ function _repBankFindings(iss,p){
   }
   return F;
 }
+// Лаг: опережает ли ускорение кредитования рост стоимости риска на ~1 год
+// (классический кредитный цикл). Короткий ряд — наблюдение, не доказательство.
+function _repBankLag(iss){
+  const S=_repBankAnnualSeries(iss); const loans=S.rows.loans, cor=S.rows.cor;
+  if(!loans||loans.length<4) return null;
+  const gL=[]; for(let i=1;i<loans.length;i++) gL.push((loans[i]!=null&&loans[i-1])?(loans[i]-loans[i-1])/Math.abs(loans[i-1])*100:null);
+  const dC=[]; for(let i=1;i<cor.length;i++) dC.push((cor[i]!=null&&cor[i-1]!=null)?cor[i]-cor[i-1]:null);
+  const valid=gL.filter(v=>v!=null); if(valid.length<3) return null;
+  const med=valid.slice().sort((a,b)=>a-b)[Math.floor(valid.length/2)];
+  let hi=0,hiUp=0;
+  for(let j=0;j<gL.length-1;j++){ if(gL[j]==null||dC[j+1]==null)continue; if(gL[j]>=med){ hi++; if(dC[j+1]>0)hiUp++; } }
+  if(hi<2) return null;
+  const lead=hiUp>=Math.ceil(hi*0.6);
+  return { level:'na', title:'Лаг: кредиты сегодня → риск завтра',
+    chain:['Ускорение кредитов (год t)','→ через ~1 год','CoR '+(lead?'растёт':'без явной связи')],
+    concl:(lead?`На ряду: из ${hi} лет с ускоренным кредитованием в ${hiUp} следующий год дал рост стоимости риска — похоже на опережение (кредитный цикл). После всплесков выдач жди роста CoR/NPL.`
+      :`Явного опережения «кредиты → CoR через год» на этом ряду не видно.`)+' Короткий ряд — наблюдение, не доказательство причинности.' };
+}
+// Нормы банковского сектора (ориентир практики ЦБ/рейтинговых агентств).
+// Значения — долями (как в extra). low=true → меньше лучше.
+var _BANK_NORMS={
+  car:{g:0.12,r:0.09}, cet:{g:0.09,r:0.06}, npl:{g:0.04,r:0.08,low:true}, cor:{g:0.015,r:0.035,low:true},
+  cov:{g:1.0,r:0.6}, roe:{g:0.15,r:0.08}, roa:{g:0.02,r:0.01}, nim:{g:0.045,r:0.02}, cir:{g:0.45,r:0.60,low:true}
+};
+function _repBankNormStatus(v,norm){ if(v==null||!norm)return null; return norm.low?(v<=norm.g?'good':v<=norm.r?'warn':'bad'):(v>=norm.g?'good':v>=norm.r?'warn':'bad'); }
+function _repBankNormsBlock(iss,p){
+  const V=re=>_repBankVal(p,re);
+  const res=V(/резервы под обесцен/i), nplA=V(/неработающие кредиты/i);
+  const metrics=[
+    {k:'car',label:'Дост. капитала',v:V(/дост\.?\s*общ/i)},
+    {k:'cet',label:'CET1',v:V(/базового капитала|cet/i)},
+    {k:'npl',label:'NPL',v:V(/просроченные кредиты|npl/i)},
+    {k:'cor',label:'CoR',v:V(/стоимость риска|cor/i)},
+    {k:'cov',label:'Покрытие резервами',v:(res!=null&&nplA!=null&&nplA>0)?res/nplA:null},
+    {k:'roe',label:'ROE',v:V(/\broe\b/i)},
+    {k:'roa',label:'ROA',v:V(/\broa\b/i)},
+    {k:'nim',label:'NIM',v:V(/чистая процентн/i)},
+    {k:'cir',label:'CIR',v:V(/расходы\/доходы|cir/i)},
+  ];
+  const col={good:'var(--green)',warn:'var(--warn)',bad:'var(--danger)'};
+  const cards=metrics.map(m=>{
+    if(m.v==null)return ''; const nm=_BANK_NORMS[m.k]; const st=_repBankNormStatus(m.v,nm)||'warn';
+    const band=nm.low?`норма ≤${(nm.g*100).toFixed(nm.g<0.1?1:0)}%, критич. >${(nm.r*100).toFixed(nm.r<0.1?1:0)}%`:`норма ≥${(nm.g*100).toFixed(nm.g<0.1?1:0)}%, критич. <${(nm.r*100).toFixed(nm.r<0.1?1:0)}%`;
+    const verdict=st==='good'?'лучше нормы':st==='warn'?'серая зона':'хуже нормы';
+    return `<div style="background:var(--s1);border:1px solid var(--border);border-left:2px solid ${col[st]};padding:7px 9px">
+      <div style="font-size:.52rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)">${m.label}</div>
+      <div style="font-size:.9rem;font-weight:600;color:${col[st]}">${(m.v*100).toFixed(1)}%</div>
+      <div style="font-size:.5rem;color:var(--text3);margin-top:2px">${band}</div>
+      <div style="font-size:.52rem;color:${col[st]};margin-top:1px">${verdict}</div></div>`;
+  }).filter(Boolean).join('');
+  if(!cards) return '';
+  return `<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:18px 0 4px">🏦 Нормы банковского сектора</div>
+    <div style="font-size:.52rem;color:var(--text3);margin-bottom:6px">Ориентир практики ЦБ/рейтинговых агентств. L/D не нормируем жёстко (у ипотечных банков структурно >1).</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">${cards}</div>`;
+}
 function _repBankBlock(iss,p){
   const V=re=>_repBankVal(p,re);
   const pc=v=>v==null?'—':(v*100).toFixed(1)+'%', f0=v=>v==null?'—':Math.round(v).toLocaleString('ru-RU'), f1=v=>v==null?'—':(Math.round(v*10)/10);
@@ -16037,7 +16119,8 @@ function _repBankBlock(iss,p){
   if(nii!=null&&opinc){ const core=(nii||0)+(fee||0); scards.push(cell('Core income',f1(core/opinc*100)+'%','проценты+комиссии / опер.доход')); }
   const structure=scards.length?`<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:14px 0 8px">🏗 Структура бизнеса</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">${scards.join('')}</div>`:'';
   // Связи
-  const F=_repBankFindings(iss,p); const col={red:'var(--danger)',yellow:'var(--warn)',green:'var(--green)'};
+  const F=_repBankFindings(iss,p); const lag=_repBankLag(iss); if(lag)F.push(lag);
+  const col={red:'var(--danger)',yellow:'var(--warn)',green:'var(--green)'};
   const deps=F.length?`<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:18px 0 4px">🔗 Связи и выводы (банк)</div>`
     +F.map(f=>`<div style="border-left:2px solid ${col[f.level]||'var(--text3)'};padding:6px 0 6px 10px;margin:9px 0"><div style="font-size:.72rem;font-weight:600;color:var(--text)">${f.title}</div>${_repChain(f.chain)}<div style="font-size:.66rem;color:var(--text2);line-height:1.5;margin-top:3px">${f.concl}</div></div>`).join(''):'';
   // Тренды
@@ -16049,7 +16132,7 @@ function _repBankBlock(iss,p){
     }).join('');
     if(cards)trend=`<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:16px 0 8px">📈 Динамика банка (${S.years[0]}–${S.years[S.years.length-1]})</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">${cards}</div>`;
   }
-  return verdict+trend+structure+deps+_repMaturityWallBlock(iss);
+  return verdict+trend+structure+_repBankNormsBlock(iss,p)+deps+_repMaturityWallBlock(iss);
 }
 
 // Блок аналитики: тренды (спарклайны) + выводы о зависимостях.
