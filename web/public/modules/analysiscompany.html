@@ -9415,7 +9415,7 @@ const REP_FIELDS = [
 ];
 
 // Derived ratios
-function repCalcRatios(d){
+function repCalcRatios(d, prev){
   const r={};
   if(d.ebitda&&d.debt!=null&&d.cash!=null) r.ndE = ((d.debt-d.cash)/d.ebitda).toFixed(2);
   if(d.ebitda&&d.int) r.icr = (d.ebitda/d.int).toFixed(2);
@@ -9457,6 +9457,12 @@ function repCalcRatios(d){
   // Эффективная ставка по долгу = проценты / долг на конец периода.
   // Сколько компания реально платит — сравнивай со ставкой ЦБ.
   if(d.int != null && d.debt) r.rate = (d.int/d.debt*100).toFixed(1);
+  // Устойчивее: проценты / СРЕДНИЙ долг (начало+конец)/2 — не искажается
+  // скачком долга внутри периода (нужен долг прошлого сопоставимого периода).
+  if(d.int != null && prev && prev.debt != null && d.debt != null){
+    const avg = (d.debt + prev.debt) / 2;
+    if(avg > 0) r.rateAvg = (d.int/avg*100).toFixed(1);
+  }
   // Процентная нагрузка: проценты / EBITDA (выше — тяжелее обслуживать).
   if(d.int != null && d.ebitda) r.intE = (d.int/d.ebitda*100).toFixed(1);
   // Покрытие процентов после капзатрат: (EBITDA − CAPEX) / проценты.
@@ -11537,7 +11543,8 @@ function _repLagDays(fromIso,toIso){
 }
 
 function repRenderCards(p){
-  const ratios = repCalcRatios(p);
+  const _issForRate = repActiveIssuerId ? reportsDB[repActiveIssuerId] : null;
+  const ratios = repCalcRatios(p, _issForRate ? _repPriorPeriod(_issForRate, p) : null);
   const grid = document.getElementById('rep-cards-grid');
 
   // Значение хранится в млрд ₽. Для малых значений переключаем единицу,
@@ -11590,6 +11597,7 @@ function repRenderCards(p){
     ratios.dpo!=null ? repRatioCard('DPO', ratios.dpo+' дн', 'var(--text2)', 'Дни оплаты кредиторам') : '',
     ratios.ccc!=null ? repRatioCard('Цикл денег CCC', ratios.ccc+' дн', parseFloat(ratios.ccc)<0?'var(--green)':parseFloat(ratios.ccc)<90?'var(--warn)':'var(--danger)', 'DSO+DIO−DPO (меньше — лучше)') : '',
     ratios.rate!=null ? repRatioCard('Эфф. ставка долга', ratios.rate+'%', 'var(--text2)', 'Проценты / Долг на конец периода — сколько эмитент реально платит за долг. Сравни со ставкой ЦБ: ниже ставки — дешёвый старый долг, выше — дорогое фондирование/рефинанс.') : '',
+    ratios.rateAvg!=null ? repRatioCard('Эфф. ставка (ср. долг)', ratios.rateAvg+'%', 'var(--text2)', 'Проценты / средний долг (начало+конец)/2. Устойчивее к скачку долга внутри периода (новый выпуск под конец года завышает ставку «на конец»). Сопоставимый период берётся автоматически.') : '',
     ratios.intE!=null ? repRatioCard('Проценты / EBITDA', ratios.intE+'%', parseFloat(ratios.intE)<35?'var(--green)':parseFloat(ratios.intE)<50?'var(--warn)':'var(--danger)', 'Процентная нагрузка: доля EBITDA, уходящая на обслуживание долга. >50% — тяжело.') : '',
     ratios.ecr!=null ? repRatioCard('(EBITDA−CAPEX)/%', ratios.ecr+'x', parseFloat(ratios.ecr)>1.5?'var(--green)':parseFloat(ratios.ecr)>1?'var(--warn)':'var(--danger)', 'Покрытие процентов после капзатрат. <1 — на проценты не хватает даже до инвестиций.') : '',
     ratios.cfoD!=null ? repRatioCard('CFO / Долг', ratios.cfoD+'%', parseFloat(ratios.cfoD)>25?'var(--green)':parseFloat(ratios.cfoD)>10?'var(--warn)':'var(--danger)', 'Операционный поток к долгу: грубо — какую долю долга гасит годовой CFO.') : '',
@@ -14974,12 +14982,12 @@ function _repPriorPeriod(iss, p){
 function _repCreditSummary(p, iss){
   if(!p) return '';
   const prev = _repPriorPeriod(iss, p);
-  const R = repCalcRatios(p), Rp = prev ? repCalcRatios(prev) : {};
+  const R = repCalcRatios(p, prev), Rp = prev ? repCalcRatios(prev) : {};
   const F = {ebitda:'EBITDA',debt:'Долг',cash:'Наличность',int:'Проценты',capex:'CAPEX',cfo:'CFO',np:'Чист.прибыль',rev:'Выручка'};
   const items = [
     {l:'Долг/EBITDA', k:'ndE', u:'×', low:true,  need:['ebitda','debt','cash'], read:v=>v<2.5?'низкая нагрузка':v<4?'умеренная нагрузка':'высокая нагрузка'},
     {l:'ICR',         k:'icr', u:'×', low:false, need:['ebitda','int'],         read:v=>v>=3?'проценты покрыты с запасом':v>=1.5?'покрытие впритык':'на проценты не хватает'},
-    {l:'Эфф. ставка долга', k:'rate', u:'%', low:true, need:['int','debt'],     read:()=>null},
+    {l:'Эфф. ставка долга', k:'rate', u:'%', low:true, need:['int','debt'],     read:()=>R.rateAvg!=null?('по среднему долгу '+R.rateAvg+'%'):null},
     {l:'Проценты/EBITDA', k:'intE', u:'%', low:true, need:['int','ebitda'],     read:v=>v<35?'нагрузка комфортная':v<50?'заметная':'тяжёлая'},
     {l:'(EBITDA−CAPEX)/%', k:'ecr', u:'×', low:false, need:['ebitda','capex','int'], read:v=>v>1?'хватает и после капзатрат':'после капзатрат на проценты не хватает'},
     {l:'FCF', k:'fcf', u:' млрд', low:false, need:['cfo','capex'],              read:v=>v>=0?'поток положительный':'жжёт кэш'},
