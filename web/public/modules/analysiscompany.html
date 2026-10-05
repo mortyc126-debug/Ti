@@ -15315,6 +15315,72 @@ function _repAnnualSeries(iss, type){
   }};
 }
 
+// Ряд значений одной extra-метрики по годам (точное совпадение ключа).
+function _repExtraSeriesByKey(iss, type, key){
+  const arr = Object.values(iss.periods||{})
+    .filter(x => x && /год|fy|year/i.test(String(x.period||'')) && (!type||x.type===type))
+    .sort((a,b)=>(+a.year||0)-(+b.year||0));
+  return { years: arr.map(x=>+x.year), vals: arr.map(x => (x.extra && typeof x.extra[key]==='number') ? x.extra[key] : null) };
+}
+
+// Категория extra-метрики: коэффициент / на-акцию / рыночное / операционное.
+function _repExtraCategory(key){
+  const l = String(key||'').toLowerCase();
+  if(/\bp\/e\b|\bp\/s\b|\bp\/bv\b|\bp\/fcf\b|ev\s*\/\s*ebitda|долг\s*\/\s*ebitda|\broe\b|\broa\b|рентаб|доходност|дивиденд\w*\s*\/|fcf\s*<=|\/\s*capex|capex\s*\//.test(l)) return 'ratio';
+  if(/на акцию|руб\.?\/акц|\beps\b|bv\/акц|fcf\/акц|цена\s+акц|дивиденд,\s*руб/.test(l)) return 'share';
+  if(/капитализац|^ev\b|^ev,|число\s+акц|free\s*float|инсайдер/.test(l)) return 'market';
+  return 'oper';
+}
+
+// Детектор выбросов в ряду: разовый всплеск (spike, соседи в норме) vs сдвиг
+// уровня (shift). MAD-z: устойчив к выбросам, не требует нормальности.
+function _repSeriesAnomalies(years, vals){
+  const pts = vals.map((v,i)=>({v,i})).filter(o=>typeof o.v==='number'&&isFinite(o.v));
+  if(pts.length < 4) return [];
+  const median = a => { const s=a.slice().sort((x,y)=>x-y); return s[Math.floor(s.length/2)]; };
+  const medAll = median(pts.map(o=>o.v));
+  const out=[];
+  // Разовый всплеск («тент»): внутренняя точка — локальный экстремум и сильно
+  // отклонена от средней соседей (развернулась обратно).
+  for(let k=1;k<pts.length-1;k++){
+    const a=pts[k-1].v, b=pts[k].v, c=pts[k+1].v;
+    const localBase=(a+c)/2;
+    const mag=Math.max(Math.abs(a),Math.abs(c),Math.abs(medAll),1e-9);
+    const peak=b>a&&b>c, trough=b<a&&b<c;
+    if((peak||trough) && Math.abs(b-localBase)/mag>=0.5)
+      out.push({ year: years[pts[k].i], val:b, kind:'spike', med:localBase });
+  }
+  // Сдвиг уровня: последняя точка далеко от медианы предыдущих И прыжок
+  // заметно больше прежнего разброса (ступень, а не плавный тренд).
+  const prev = pts.slice(0,-1), last = pts[pts.length-1];
+  const pMed = median(prev.map(o=>o.v));
+  const pSpread = median(prev.map(o=>Math.abs(o.v-pMed)));
+  const jump = Math.abs(last.v - pMed);
+  if(jump >= 0.8*Math.max(Math.abs(pMed),1e-9) && jump >= 3*pSpread && !out.some(o=>o.year===years[last.i]))
+    out.push({ year: years[last.i], val:last.v, kind:'shift', med:pMed });
+  return out;
+}
+
+// Структура биржевого долга по каталогу MOEX (по ИНН): объём облигаций,
+// короткие (≤1г), остаток = банки/прочее. Балансовый долг — из периода.
+function _repDebtStructure(iss, p){
+  const inn = iss && iss.inn; const cat = window._moexCatalog;
+  if(!inn || !cat || !Array.isArray(cat.items)) return null;
+  const now = Date.now(), yr = now + 365*86400000;
+  let bondsOut=0, bondsShort=0, cnt=0;
+  for(const b of cat.items){
+    if(!b || String(b.inn)!==String(inn) || !b.issueSize || !b.faceValue) continue;
+    const mat = b.matDate ? new Date(b.matDate).getTime() : null;
+    if(mat && mat<=now) continue;                 // погашен
+    const val = b.issueSize*b.faceValue/1e9;
+    bondsOut += val; cnt++;
+    if(mat && mat<=yr) bondsShort += val;          // к погашению ≤1 года
+  }
+  if(!cnt) return null;
+  const debt = (typeof p.debt==='number') ? p.debt : null;
+  return { bondsOut, bondsShort, cnt, debt, bank: (debt!=null)? Math.max(0, debt-bondsOut) : null };
+}
+
 // Цепочка зависимости как «A → B → C» с подсветкой узлов.
 function _repChain(nodes){
   return '<div style="font-family:var(--mono);font-size:.62rem;color:var(--text2);line-height:1.7;margin:3px 0">'
@@ -15410,6 +15476,44 @@ function _repDependencyFindings(iss, p){
           : 'Долг и EBITDA растут согласованно — нагрузка под контролем.' });
     }
   }
+
+  // 6) Структура долга: облигации vs банки, короткий конец (из каталога MOEX)
+  const ds = _repDebtStructure(iss, p);
+  if(ds && ds.debt){
+    const bShare = ds.bondsOut/ds.debt*100;
+    const shortShare = ds.bondsOut ? ds.bondsShort/ds.bondsOut*100 : 0;
+    const chain = [`Долг ${f1(ds.debt)}`, `облигации ${f1(ds.bondsOut)} (${f1(bShare)}%)`];
+    if(ds.bank!=null && ds.bank>0.05) chain.push(`банки/прочее ${f1(ds.bank)}`);
+    if(ds.bondsShort>0) chain.push(`≤1г ${f1(ds.bondsShort)} (${f1(shortShare)}% обл.)`);
+    F.push({ level: shortShare>40?'yellow':'green', title:'Структура долга: облигации, банки, короткий конец',
+      chain,
+      concl: (bShare>115 ? 'Облигаций в каталоге больше балансового долга — вероятно долг на балансе занижен/устарел или часть внутригрупповая. ' : '')
+        + (shortShare>40 ? `${f1(shortShare)}% облигаций гасится в пределах года — высокая потребность в рефинансе; при дорогой ставке новый долг дороже старого.`
+          : `Короткий конец умеренный (${f1(shortShare)}% облигаций ≤1г).`)
+        + (ds.bank>0.05 ? ` Небиржевой долг (банки) ≈ ${f1(ds.bank)} — его условия только в отчёте.` : '')
+        + ' Облигации — на сегодня из каталога, долг — на дату отчёта.' });
+  }
+
+  // 7) Куда ушли деньги за период (аллокация операционного потока)
+  if(cfo!=null && pr){
+    const dDebt = (debt!=null && n(pr.debt)!=null)? debt-n(pr.debt) : null;
+    const dCash = (cash!=null && n(pr.cash)!=null)? cash-n(pr.cash) : null;
+    const div = n(p.divp);
+    const parts=[];
+    if(capex!=null) parts.push(`CAPEX ${f1(capex)}`);
+    if(div!=null && div>0) parts.push(`дивиденды ${f1(div)}`);
+    if(dDebt!=null) parts.push(dDebt>=0?`+долг ${f1(dDebt)}`:`гашение ${f1(-dDebt)}`);
+    if(dCash!=null) parts.push(dCash>=0?`кэш +${f1(dCash)}`:`кэш ${f1(dCash)}`);
+    if(parts.length>=2){
+      const fcf = capex!=null? cfo-capex : null;
+      F.push({ level:(cfo<0||(fcf!=null&&fcf<0))?'yellow':'green', title:'Куда ушли деньги за период',
+        chain:[`CFO ${f1(cfo)}`, ...parts],
+        concl: (cfo<0 ? 'Операционный поток отрицательный — период профинансирован долгом/запасом кэша, а не бизнесом. ' : '')
+          + ((fcf!=null && fcf<0 && dDebt!=null && dDebt>0) ? 'Дефицит после CAPEX закрыт новым долгом — инвестиции идут в долг.'
+            : (fcf!=null && div>0 && (fcf-div)<0) ? 'Дивиденды платятся сверх свободного потока — за счёт долга/кэша, не из FCF.'
+            : 'Поток распределён между инвестициями, долгом и кэшем без явного перекоса.') });
+    }
+  }
   return F;
 }
 
@@ -15457,7 +15561,72 @@ function _repAnalysisBlock(iss, p){
     deps = `<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:18px 0 4px">🔗 Связи и выводы</div>
       <div style="font-size:.52rem;color:var(--text3);margin-bottom:4px">Авто-разбор зависимостей: каждая цепочка показывает, как показатели влияют друг на друга и что это значит на практике.</div>${deps}`;
   }
-  return trend + deps;
+
+  // ── Выбросы vs фундаментальный сдвиг ──────────────────────────────────
+  let anom='';
+  if(S.years.length>=4){
+    const defs=[['rev','Выручка','млрд'],['ebitda','EBITDA','млрд'],['np','Чист. прибыль','млрд'],['margin','Рентаб. EBITDA','%'],['debt','Долг','млрд'],['fcf','FCF','млрд'],['nde','ND/EBITDA','×']];
+    const found=[];
+    defs.forEach(([k,label,unit])=>{ _repSeriesAnomalies(S.years, S.rows[k]||[]).forEach(a=>found.push({label,unit,...a})); });
+    if(found.length){
+      const fv=(v,u)=>u==='%'?v.toFixed(1)+'%':u==='×'?v.toFixed(1)+'×':v.toLocaleString('ru-RU',{maximumFractionDigits:1});
+      anom = `<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:18px 0 4px">⚡ Выбросы и сдвиги</div>`
+        + `<div style="font-size:.52rem;color:var(--text3);margin-bottom:6px">Точки, резко выбивающиеся из ряда (MAD-критерий). Отличаем разовый всплеск от смены уровня — чтобы не принять единоразовый эффект за тренд.</div>`
+        + found.map(a=>`<div style="font-size:.66rem;color:var(--text2);line-height:1.5;padding:3px 0;border-top:1px solid var(--border)"><b style="color:var(--text)">${a.year} · ${a.label} ${fv(a.val,a.unit)}</b> ${a.kind==='spike'?'<span style="color:var(--warn)">— разовый всплеск</span>: вероятно единоразовый эффект (переоценка, продажа актива, субсидия, разовая статья), не тренд — в сравнениях лучше исключить.':'<span style="color:var(--acc)">— сдвиг уровня</span>: похоже на новую норму (смена масштаба/модели), а не выброс.'} <span style="color:var(--text3)">(медиана ряда ${fv(a.med,a.unit)})</span></div>`).join('');
+    }
+  }
+
+  // ── Динамика операционных метрик (добыча, отгрузки…) + юнит-экономика ──
+  let oper='';
+  const operKeys=new Set();
+  Object.values(iss.periods||{}).forEach(x=>{ if(x && x.type===p.type && /год|fy|year/i.test(String(x.period||'')) && x.extra){ Object.keys(x.extra).forEach(k=>{ if(_repExtraCategory(k)==='oper') operKeys.add(k); }); } });
+  const operCards=[...operKeys].map(k=>{
+    const s=_repExtraSeriesByKey(iss,p.type,k);
+    const valid=s.vals.filter(v=>v!=null);
+    if(valid.length<2) return '';
+    const last=valid[valid.length-1], prev=valid[valid.length-2], d=last-prev;
+    const dcol=d>=0?'var(--green)':'var(--danger)';
+    const fv=v=>Math.abs(v)>=100?v.toLocaleString('ru-RU',{maximumFractionDigits:0}):v.toLocaleString('ru-RU',{maximumFractionDigits:2});
+    return `<div style="background:var(--s1);border:1px solid var(--border);padding:7px 9px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+        <span style="font-size:.5rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${_escHtml(k)}">${_escHtml(k)}</span>
+        ${_sparkline(s.vals,{w:50,h:15})}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:3px">
+        <span style="font-size:.82rem;font-weight:600;color:var(--text)">${fv(last)}</span>
+        <span style="font-size:.52rem;color:${dcol}">${d>=0?'▲':'▼'} ${fv(Math.abs(d))}</span>
+      </div></div>`;
+  }).filter(Boolean).join('');
+  if(operCards){
+    oper = `<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:18px 0 8px">🏭 Операционные метрики по годам</div>`
+      + `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">${operCards}</div>`;
+    // Юнит-экономика: выручка на единицу объёма (цена реализации-прокси)
+    const volKey=[...operKeys].find(k=>/добыч|отгрузк|производ|объ[её]м|продаж\w*\s*(шт|ед|тонн|карат|млн)/i.test(k));
+    if(volKey){
+      const vs=_repExtraSeriesByKey(iss,p.type,volKey), rs=_repAnnualSeries(iss,p.type).rows.rev;
+      const unit=vs.years.map((y,i)=>{ const v=vs.vals[i], r=(rs&&rs[i]); return (v&&r!=null)? r/v : null; });
+      if(unit.filter(v=>v!=null).length>=2){
+        const uv=unit.filter(v=>v!=null); const ul=uv[uv.length-1], up=uv[uv.length-2];
+        const gv=pctSafe(vs.vals.filter(v=>v!=null).slice(-1)[0], vs.vals.filter(v=>v!=null).slice(-2,-1)[0]);
+        const gp=pctSafe(ul,up);
+        oper += `<div style="margin-top:10px;border-left:2px solid var(--acc);padding:6px 0 6px 10px">
+          <div style="font-size:.72rem;font-weight:600;color:var(--text)">Юнит-экономика: выручка / объём («${_escHtml(volKey)}»)</div>
+          ${_repChain([`Объём ${gv!=null?(gv>=0?'+':'')+gv.toFixed(0)+'%':'—'}`, `Цена-прокси ${gp!=null?(gp>=0?'+':'')+gp.toFixed(0)+'%':'—'}`, `Выручка`])}
+          <div style="font-size:.66rem;color:var(--text2);line-height:1.5;margin-top:3px">${_repUnitEconConcl(gv,gp)}</div></div>`;
+      }
+    }
+  }
+
+  return trend + deps + anom + oper;
+}
+// helpers для юнит-экономики
+function pctSafe(c,p){ return (typeof c==='number'&&typeof p==='number'&&p!==0)?(c-p)/Math.abs(p)*100:null; }
+function _repUnitEconConcl(gVol,gPrice){
+  if(gVol==null&&gPrice==null) return 'Недостаточно данных для разложения выручки на объём и цену.';
+  const v=gVol||0, pr=gPrice||0;
+  if(Math.abs(pr)>Math.abs(v)*1.5) return 'Выручку двигает в основном ЦЕНА реализации, а не объём — рост качественный, но чувствителен к развороту цен на рынке.';
+  if(Math.abs(v)>Math.abs(pr)*1.5) return 'Выручку двигает ОБЪЁМ при стабильной цене — рост устойчивее (не зависит от ценовой конъюнктуры), но упирается в мощности.';
+  return 'Выручка растёт сбалансированно — и объёмом, и ценой.';
 }
 
 // Блок «свои метрики» (p.extra) для вида карточек
@@ -15506,6 +15675,9 @@ function _repComputedExtras(p){
   add('P/S', (cap!=null&&rev)?cap/rev:null, '×', /\bp\/s\b/i, true);
   add('P/BV', (cap!=null&&eq)?cap/eq:null, '×', /\bp\/bv\b/i, false);
   add('EPS', (np!=null&&shares)?np/shares*1000:null, '₽', /\beps\b/i, true);  // млрд₽ / млн шт ×1000 = ₽/акц
+  add('CAPEX/Выручка', (capex!=null&&rev)?capex/rev*100:null, '%', /capex\s*\/\s*выручк/i, false);
+  add('Дивиденды/прибыль', (p.divp!=null&&np&&np>0)?p.divp/np*100:null, '%', /дивиденд\w*\s*\/\s*прибыл/i, true);
+  add('Доходность FCF', (cfo!=null&&capex!=null&&cap)?(cfo-capex)/cap*100:null, '%', /доходност\w*\s*fcf/i, true);
   return out;
 }
 
@@ -15545,14 +15717,29 @@ function _repExtraBlock(p, covered){
   covered = covered || new Set();
   const entries = Object.entries(p.extra).filter(([k])=>!covered.has(k));
   if(!entries.length) return '';
-  const rows=entries.map(([k,v])=>
-    `<div style="background:var(--s1);border:1px solid var(--border);padding:8px 10px">
+  // %-метрики smart-lab хранятся долей (_slNum ÷100) — показываем как %.
+  const fmtVal = (k,v)=>{
+    if(typeof v!=='number') return _escHtml(String(v));
+    if(/%/.test(k)) return (v*100).toLocaleString('ru-RU',{maximumFractionDigits:1})+'%';
+    return v.toLocaleString('ru-RU',{maximumFractionDigits:2});
+  };
+  const GROUPS=[
+    ['ratio','Коэффициенты и мультипликаторы'],
+    ['share','На акцию'],
+    ['market','Рыночное'],
+    ['oper','Операционные и прочие'],
+  ];
+  const buckets={ratio:[],share:[],market:[],oper:[]};
+  entries.forEach(([k,v])=>buckets[_repExtraCategory(k)].push([k,v]));
+  const card=([k,v])=>`<div style="background:var(--s1);border:1px solid var(--border);padding:8px 10px">
       <div style="font-size:.55rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:3px">${_escHtml(k)}</div>
-      <div style="font-size:.9rem;font-weight:600;color:var(--text)">${typeof v==='number'?v.toLocaleString('ru-RU',{maximumFractionDigits:2}):_escHtml(String(v))}</div>
-    </div>`).join('');
-  return `<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:16px 0 8px">★ Свои метрики эмитента (smart-lab)</div>
-    <div style="font-size:.52rem;color:var(--text3);margin-bottom:8px">Уникальное, чего нет в расчётных (операционка, цены сырья, на-акцию). Посчитанное выше здесь скрыто, чтобы не дублировать.</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">${rows}</div>`;
+      <div style="font-size:.9rem;font-weight:600;color:var(--text)">${fmtVal(k,v)}</div>
+    </div>`;
+  const sections=GROUPS.filter(([g])=>buckets[g].length).map(([g,label])=>
+    `<div style="font-size:.52rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin:10px 0 5px">${label}</div>
+     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">${buckets[g].map(card).join('')}</div>`).join('');
+  return `<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:16px 0 4px">★ Остальные метрики (smart-lab)</div>
+    <div style="font-size:.52rem;color:var(--text3);margin-bottom:4px">Сгруппировано. Посчитанное в «Расчётных» здесь скрыто; проценты приведены к %.</div>${sections}`;
 }
 
 // Открыть форму с заполненными значениями активного периода.
