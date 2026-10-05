@@ -492,10 +492,10 @@ input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!impo
         <div class="f-row2" style="margin-top:4px">
           <span class="f-lbl">Стат.</span>
           <select id="rep-sidebar-status" onchange="repRenderIssuerList()" class="f-select">
-            <option value="corp_moex" selected>MOEX корп.</option>
+            <option value="has_periods" selected>есть периоды</option>
+            <option value="corp_moex">MOEX корп.</option>
             <option value="has_moex">все с MOEX</option>
             <option value="all">все</option>
-            <option value="has_periods">есть периоды</option>
             <option value="no_periods">нет периодов</option>
             <option value="stale">нет свежего (&gt;2л)</option>
             <option value="no_moex">нет бумаг MOEX</option>
@@ -10676,10 +10676,13 @@ function repRenderIssuerList(){
       : '';
     if(search && !name.includes(search) && !inn.includes(search) && !okved.includes(search) && !relatedStr.includes(search)) continue;
     // Ликвидность/MOEX — дёшево, ДО расчёта мультипликаторов: отсечь тут
-    // значит не считать m и не строить карточку для 2/3 базы.
+    // значит не считать m и не строить карточку для 2/3 базы. НО эмитента с
+    // введёнными периодами не прячем (реальные данные важнее bondsCount,
+    // которого у восстановленных из бэкапа может не быть).
     if(status === 'has_moex' || status === 'liquid' || status === 'corp_moex'){
-      if(!(iss.bondsCount > 0)) continue;
-      if(status === 'corp_moex'){
+      var _hasPer = Object.keys(iss.periods || {}).length > 0;
+      if(!(iss.bondsCount > 0) && !_hasPer) continue;
+      if(status === 'corp_moex' && !_hasPer){
         const _nm = String(iss.name || '');
         if(_NON_CORP_KINDS[iss.kind] || iss.kind === 'bank'
            || _NON_CORP_SECTORS[iss.ind] || _GOV_NAME_RE.test(_nm)) continue;
@@ -29012,9 +29015,12 @@ async function repLoadBundle(){
     var rdb=reportsDB, added=0, filled=0;
     for(var inn in bundle){
       var b=bundle[inn];
+      var hasRows=Array.isArray(b.rows) && b.rows.length>0;
       var id=null;
       for(var k in rdb){ if(rdb[k] && rdb[k].inn===inn){ id=k; break; } }
       if(!id){
+        // не плодим пустые имена: создаём запись только если есть цифры
+        if(!hasRows) continue;
         id='i_'+inn;
         if(!rdb[id]){ rdb[id]={ name:b.name||inn, inn:inn, ind:b.ind||'other', bondsCount:b.bondsCount||0, periods:{} }; added++; }
       } else {
@@ -29024,7 +29030,7 @@ async function repLoadBundle(){
         if(!e.name && b.name) e.name=b.name;
         if(!e.periods) e.periods={};
       }
-      if(Array.isArray(b.rows) && b.rows.length){ _d1MergeReports(id, inn, b.rows); filled++; }
+      if(hasRows){ _d1MergeReports(id, inn, b.rows); filled++; }
     }
     try{ save(); }catch(e){ try{ localStorage.setItem('ba_rep_d1_cache', JSON.stringify({reportsDB:reportsDB})); }catch(_){} }
     repRenderIssuerList(); try{ repRebuildSelect(); }catch(_){}
