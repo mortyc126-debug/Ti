@@ -11670,12 +11670,12 @@ function repRenderCards(p){
 
   grid.innerHTML = `
     ${_cbrContextFor(p.year, p.period, p.disclosed)}
-    ${_repCreditSummary(p, reportsDB[repActiveIssuerId])}
     <div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin-bottom:8px">Исходные показатели</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:16px">${cards||'<div style="color:var(--text3);font-size:.7rem">Нет данных</div>'}</div>
     ${ratioCards?`<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin-bottom:8px">Расчётные коэффициенты</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">${ratioCards}</div>`:''}
     ${bridge}
+    ${_repAnalysisBlock(reportsDB[repActiveIssuerId], p)}
     ${(() => { const _ci=_repComputedExtras(p); return _repComputedBlock(_ci, p) + _repExtraBlock(p, new Set(_ci.map(x=>x.slKey).filter(Boolean))); })()}`;
 }
 
@@ -15286,6 +15286,178 @@ function _repCreditSummary(p, iss){
   }).join('');
   return `<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin-bottom:6px">Кредитное резюме${prev?` · г/г к ${prev.year}`:' · нет прошлого года для сравнения'}</div>`
     + `<div style="font-size:.66rem;line-height:1.5;margin-bottom:16px">${rows}</div>`;
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// АНАЛИТИКА: тренды по годам + авто-выводы о ЗАВИСИМОСТЯХ метрик.
+// Не «проверь», а «проверено»: цепочки вида A → B → C → вывод, с числами.
+// ═════════════════════════════════════════════════════════════════════
+
+// Годовая серия по ключам (тот же стандарт, что у текущего периода) — для
+// спарклайнов и трендов. Возвращает {years:[...], rows:{key:[...]}}.
+function _repAnnualSeries(iss, type){
+  if(!iss || !iss.periods) return {years:[], rows:{}};
+  const arr = Object.values(iss.periods)
+    .filter(x => x && /год|fy|year/i.test(String(x.period||'')) && (!type || x.type===type))
+    .sort((a,b)=>(+a.year||0)-(+b.year||0));
+  const n = v => (typeof v==='number' && isFinite(v)) ? v : null;
+  const eb = x => n(x.ebitda)!=null ? n(x.ebitda) : n(x.ebit);
+  const g = f => arr.map(f);
+  return { years: arr.map(x=>+x.year), rows: {
+    rev:    g(x=>n(x.rev)),
+    ebitda: g(eb),
+    np:     g(x=>n(x.np)),
+    debt:   g(x=>n(x.debt)),
+    nde:    g(x=>{const e=eb(x); return (x.debt!=null&&x.cash!=null&&e&&e>0)?(x.debt-x.cash)/e:null;}),
+    fcf:    g(x=>(x.cfo!=null&&x.capex!=null)?x.cfo-x.capex:null),
+    margin: g(x=>{const e=eb(x); return (e!=null&&x.rev)?e/x.rev*100:null;}),
+    icr:    g(x=>(x.ebit!=null&&x.int)?x.ebit/x.int:null),
+  }};
+}
+
+// Цепочка зависимости как «A → B → C» с подсветкой узлов.
+function _repChain(nodes){
+  return '<div style="font-family:var(--mono);font-size:.62rem;color:var(--text2);line-height:1.7;margin:3px 0">'
+    + nodes.map(s=>'<span style="background:var(--s2);border:1px solid var(--border);padding:1px 5px;white-space:nowrap">'+s+'</span>').join('<span style="color:var(--acc);margin:0 4px">→</span>')
+    + '</div>';
+}
+
+// Авто-выводы о зависимостях. Возвращает [{level, title, chain:[...], concl}].
+function _repDependencyFindings(iss, p){
+  const F = [];
+  const n = v => (typeof v==='number' && isFinite(v)) ? v : null;
+  const pct = (c,pr)=> (c!=null&&pr!=null&&pr!==0)? (c-pr)/Math.abs(pr)*100 : null;
+  const f1 = v => v==null?'—':(Math.round(v*10)/10).toString();
+  const prA = _repPriorAnnualPeriod(iss, {year:+p.year, period:p.period, type:p.type}, 1);
+  const pr = prA ? prA.period : null;
+  const rev=n(p.rev), np=n(p.np), debt=n(p.debt), cash=n(p.cash), eq=n(p.eq), assets=n(p.assets),
+        cfo=n(p.cfo), capex=n(p.capex), intx=n(p.int);
+  const ebitda = n(p.ebitda)!=null ? n(p.ebitda) : n(p.ebit);
+  const ebit = n(p.ebit)!=null ? n(p.ebit) : ebitda;
+  const nd = (debt!=null&&cash!=null)? debt-cash : null;
+  const isAnnual = /год|fy|year/i.test(String(p.period||''));
+
+  // 1) DuPont: ROE = маржа × оборачиваемость × фин.рычаг
+  if(np!=null && rev && assets && eq && eq>0 && isAnnual){
+    const marg = np/rev, turn = rev/assets, lev = assets/eq, roe = np/eq*100;
+    const levHigh = lev>=3, margLow = marg<0.05;
+    const level = roe<0 ? 'red' : (levHigh && !margLow ? 'yellow' : 'green');
+    F.push({ level, title:'ROE раскладывается на 3 драйвера (DuPont)',
+      chain:[`Чист. маржа ${f1(marg*100)}%`, `× Оборач. активов ${f1(turn)}×`, `× Фин. рычаг ${f1(lev)}×`, `= ROE ${f1(roe)}%`],
+      concl: roe<0 ? 'ROE отрицательный — тянет убыток, не структура.'
+        : levHigh ? `ROE держится в основном на плече (активы/капитал ${f1(lev)}×): прибыль на капитал высокая не от эффективности, а от долга — при росте ставки это бьёт сильнее.`
+        : margLow ? 'ROE идёт от оборачиваемости при тонкой марже (модель «оборот важнее маржи») — следи за оборачиваемостью и ликвидностью.'
+        : 'ROE сбалансирован: маржа и оборачиваемость, без перекоса в долг.' });
+  }
+
+  // 2) Долговой каскад: нагрузка → проценты → покрытие → поток
+  if(ebitda && ebitda>0 && debt!=null){
+    const ndE = nd!=null? nd/ebitda : null;
+    const intE = intx!=null? intx/ebitda*100 : null;
+    const icr = (ebit!=null&&intx)? ebit/intx : null;
+    const ecr = (capex!=null&&intx)? (ebitda-capex)/intx : null;
+    const fcfD = (cfo!=null&&capex!=null&&debt)? (cfo-capex)/debt*100 : null;
+    const chain=[]; if(ndE!=null)chain.push(`ND/EBITDA ${f1(ndE)}×`); if(intE!=null)chain.push(`%/EBITDA ${f1(intE)}%`); if(icr!=null)chain.push(`ICR ${f1(icr)}×`); if(ecr!=null)chain.push(`(EBITDA−CAPEX)/% ${f1(ecr)}×`); if(fcfD!=null)chain.push(`FCF/Долг ${f1(fcfD)}%`);
+    if(chain.length>=3){
+      const bad = (icr!=null&&icr<1.5)||(ecr!=null&&ecr<1)||(fcfD!=null&&fcfD<0);
+      const warn = (ndE!=null&&ndE>4)||(intE!=null&&intE>40);
+      F.push({ level: bad?'red':warn?'yellow':'green', title:'Как долг доходит до денежного потока',
+        chain,
+        concl: bad ? 'Цепочка рвётся: потока не хватает на проценты после капзатрат — долг обслуживается за счёт рефинанса, а не бизнеса. Рост ставки или падение EBITDA — прямой риск.'
+          : warn ? 'Нагрузка повышенная, но поток пока покрывает проценты. Узкое место — ставка: при её росте проценты/EBITDA растут, ICR падает.'
+          : 'Долг обслуживается операционным потоком с запасом даже после капзатрат.' });
+    }
+  }
+
+  // 3) Прибыль → деньги: EBITDA → CFO → FCF
+  if(ebitda && ebitda>0 && cfo!=null){
+    const conv = cfo/ebitda*100;
+    const fcf = capex!=null? cfo-capex : null;
+    const chain=[`EBITDA ${f1(ebitda)}`, `CFO ${f1(cfo)} (конв. ${f1(conv)}%)`];
+    if(fcf!=null) chain.push(`FCF ${f1(fcf)} (−CAPEX ${f1(capex)})`);
+    const level = (fcf!=null&&fcf<0) ? 'yellow' : conv<50 ? 'yellow' : 'green';
+    F.push({ level, title:'Доходит ли прибыль до денег',
+      chain,
+      concl: conv<0 ? 'EBITDA положительна, а операционный поток отрицателен — прибыль «на бумаге»: деньги застряли в оборотном капитале или ушли на проценты/налоги. Главный предупреждающий сигнал.'
+        : conv<50 ? `Из EBITDA в живой кэш доходит лишь ${f1(conv)}% — много съедает оборотный капитал/проценты. Долг обслуживать труднее, чем кажется по EBITDA.`
+        : (fcf!=null&&fcf<0) ? `Операционный поток здоровый (${f1(conv)}% от EBITDA), но CAPEX ${f1(capex)} уводит FCF в минус — фаза инвестиций: смотри, растёт ли от них будущая EBITDA.`
+        : `Конверсия EBITDA в кэш ${f1(conv)}% и FCF положительный — качество прибыли высокое.` });
+  }
+
+  // 4) Рычаги роста: выручка → EBITDA → прибыль (г/г)
+  if(pr){
+    const gR=pct(rev, n(pr.rev));
+    const gE=pct(ebitda, n(pr.ebitda)!=null?n(pr.ebitda):n(pr.ebit));
+    const gN=pct(np, n(pr.np));
+    if(gR!=null && gE!=null){
+      const opLev = (gR!==0)? gE/gR : null;   // операционный рычаг
+      const chain=[`Выручка ${gR>=0?'+':''}${f1(gR)}%`, `EBITDA ${gE>=0?'+':''}${f1(gE)}%`];
+      if(gN!=null) chain.push(`Прибыль ${gN>=0?'+':''}${f1(gN)}%`);
+      const level = (gE<gR-5)||(gN!=null&&gN<gE-10) ? 'yellow' : 'green';
+      F.push({ level, title:'Рычаги: как рост выручки превращается в прибыль',
+        chain,
+        concl: (gE<gR-5) ? `EBITDA растёт медленнее выручки (рычаг ${opLev!=null?f1(opLev):'—'}): издержки обгоняют — маржа сжимается, масштаб не даёт экономии.`
+          : (gN!=null&&gN<gE-10) ? 'До EBITDA рост доходит, а до чистой прибыли — нет: съедают проценты/налоги/разовые. Финансовый рычаг работает против прибыли.'
+          : `Операционный рычаг положительный (EBITDA ×${opLev!=null?f1(opLev):'—'} к выручке): рост масштабируется в прибыль.` });
+    }
+    // 5) Долг vs EBITDA: самоускорение нагрузки
+    const gD=pct(debt, n(pr.debt));
+    const gE2=pct(ebitda, n(pr.ebitda)!=null?n(pr.ebitda):n(pr.ebit));
+    if(gD!=null && gE2!=null && (gD>=15 || gD>gE2+15)){
+      F.push({ level: gD>gE2+15?'yellow':'green', title:'Долг vs EBITDA: куда идёт нагрузка',
+        chain:[`Долг ${gD>=0?'+':''}${f1(gD)}%`, `EBITDA ${gE2>=0?'+':''}${f1(gE2)}%`, `ND/EBITDA ${gD>gE2?'растёт':'снижается'}`],
+        concl: gD>gE2+15 ? 'Долг растёт быстрее EBITDA — нагрузка само-ускоряется: каждый новый рубль долга приносит меньше прибыли. Если это не финансирование окупаемого роста — спираль.'
+          : 'Долг и EBITDA растут согласованно — нагрузка под контролем.' });
+    }
+  }
+  return F;
+}
+
+// Блок аналитики: тренды (спарклайны) + выводы о зависимостях.
+function _repAnalysisBlock(iss, p){
+  if(!iss || !p) return '';
+  const S = _repAnnualSeries(iss, p.type);
+  let trend = '';
+  if(S.years.length >= 2){
+    const defs = [
+      ['rev','Выручка','млрд',false],['ebitda','EBITDA','млрд',false],['np','Чист. прибыль','млрд',false],
+      ['debt','Долг','млрд',true],['nde','ND/EBITDA','×',true],['fcf','FCF','млрд',false],
+      ['margin','Рентаб. EBITDA','%',false],['icr','ICR','×',false],
+    ];
+    const cards = defs.map(([k,label,unit,lowGood])=>{
+      const arr = S.rows[k]; if(!arr || arr.filter(v=>v!=null).length<2) return '';
+      const vals = arr.filter(v=>v!=null); const last=vals[vals.length-1], prev=vals[vals.length-2];
+      const d = (last!=null&&prev!=null)? last-prev : null;
+      const good = d==null?null:(lowGood ? d<0 : d>0);
+      const dcol = good==null?'var(--text3)':good?'var(--green)':'var(--danger)';
+      const fv = v => unit==='%'?v.toFixed(1)+'%':unit==='×'?v.toFixed(1)+'×':v.toLocaleString('ru-RU',{maximumFractionDigits:1});
+      return `<div style="background:var(--s1);border:1px solid var(--border);padding:7px 9px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+          <span style="font-size:.52rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text3)">${label}</span>
+          ${_sparkline(arr,{w:54,h:16})}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:3px">
+          <span style="font-size:.85rem;font-weight:600;color:var(--text)">${fv(last)}</span>
+          ${d!=null?`<span style="font-size:.55rem;color:${dcol}">${d>=0?'▲':'▼'} ${fv(Math.abs(d))}</span>`:''}
+        </div></div>`;
+    }).join('');
+    if(cards) trend = `<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:16px 0 8px">📈 Динамика по годам (${S.years[0]}–${S.years[S.years.length-1]})</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">${cards}</div>`;
+  }
+
+  const F = _repDependencyFindings(iss, p);
+  let deps = '';
+  if(F.length){
+    const col = {red:'var(--danger)', yellow:'var(--warn)', green:'var(--green)'};
+    deps = F.map(f=>`<div style="border-left:2px solid ${col[f.level]||'var(--text3)'};padding:6px 0 6px 10px;margin:9px 0">
+      <div style="font-size:.72rem;font-weight:600;color:var(--text)">${f.title}</div>
+      ${_repChain(f.chain)}
+      <div style="font-size:.66rem;color:var(--text2);line-height:1.5;margin-top:3px">${f.concl}</div>
+    </div>`).join('');
+    deps = `<div style="font-size:.57rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:18px 0 4px">🔗 Связи и выводы</div>
+      <div style="font-size:.52rem;color:var(--text3);margin-bottom:4px">Авто-разбор зависимостей: каждая цепочка показывает, как показатели влияют друг на друга и что это значит на практике.</div>${deps}`;
+  }
+  return trend + deps;
 }
 
 // Блок «свои метрики» (p.extra) для вида карточек
