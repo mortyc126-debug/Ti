@@ -15647,6 +15647,35 @@ function _repDependencyFindings(iss, p){
   return F;
 }
 
+// Текстовый разбор активного периода — для копирования в заметку.
+function _repAnalysisText(iss, p){
+  const n=v=>(typeof v==='number'&&isFinite(v))?v:null;
+  const L=[];
+  L.push(`${iss.name||'Эмитент'} — ${p.year} ${p.period} (${p.type})`);
+  if(iss.inn) L.push(`ИНН ${iss.inn}`);
+  L.push('');
+  const base=[['Выручка','rev'],['EBITDA','ebitda'],['EBIT','ebit'],['Чистая прибыль','np'],['Долг','debt'],['Наличность','cash'],['Активы','assets'],['Капитал','eq'],['CFO','cfo'],['CAPEX','capex'],['Проценты','int']];
+  const bl=base.filter(([,k])=>n(p[k])!=null).map(([lab,k])=>`${lab} ${n(p[k])}`);
+  if(bl.length){ L.push('Показатели (млрд ₽): '+bl.join(' · ')); L.push(''); }
+  const comp=_repComputedExtras(p);
+  if(comp.length){ L.push('Расчётные:'); comp.forEach(it=>{ const v=it.unit==='%'?it.val.toFixed(1)+'%':it.unit==='×'?it.val.toFixed(2)+'×':it.val.toFixed(2)+(it.unit?' '+it.unit:''); L.push(`  - ${it.label}: ${v}`); }); L.push(''); }
+  const F=_repDependencyFindings(iss,p);
+  if(F.length){ L.push('Связи и выводы:'); F.forEach(f=>{ L.push(`• ${f.title}`); L.push(`    ${f.chain.join(' -> ')}`); L.push(`    ${f.concl}`); }); L.push(''); }
+  const S=_repAnnualSeries(iss,p.type);
+  if(S.years.length>=4){ const defs=[['rev','Выручка'],['ebitda','EBITDA'],['np','Чист.прибыль'],['debt','Долг'],['fcf','FCF'],['margin','Рентаб.EBITDA']]; const an=[]; defs.forEach(([k,lab])=>_repSeriesAnomalies(S.years,S.rows[k]||[]).forEach(a=>an.push(`${a.year} ${lab} — ${a.kind==='spike'?'разовый всплеск':'сдвиг уровня'}`))); if(an.length){ L.push('Выбросы/сдвиги: '+an.join('; ')); L.push(''); } }
+  L.push(`— БондАналитик, ${new Date().toISOString().slice(0,10)}`);
+  return L.join('\n');
+}
+function repCopyAnalysis(){
+  const iss=repActiveIssuerId?reportsDB[repActiveIssuerId]:null;
+  const p=(iss&&repActivePeriodKey)?iss.periods[repActivePeriodKey]:null;
+  if(!p){ alert('Сначала откройте период эмитента.'); return; }
+  const txt=_repAnalysisText(iss,p);
+  const done=()=>alert('✅ Разбор скопирован в буфер — вставь в заметку.');
+  const fallback=()=>{ const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select(); let ok=false; try{ ok=document.execCommand('copy'); }catch(e){} ta.remove(); ok?done():(function(){ console.log(txt); alert('Не удалось в буфер — разбор выведен в консоль (F12).'); })(); };
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(fallback); else fallback(); }catch(e){ fallback(); }
+}
+
 // Единый вердикт сверху: сильные стороны / риски / на что смотреть — синтез
 // из тех же сигналов, что и подробные выводы. Коротко и по делу.
 function _repVerdict(iss, p){
@@ -30971,6 +31000,7 @@ function _repBuildIssuerHeader(iss, issId){
     + '<button class="btn" onclick="repDisclOpen&&repDisclOpen()" title="Вставить список раскрытий с e-disclosure/ГИР БО и создать заготовки периодов с датами">📋 раскрытия</button>'
     + '<button class="btn" onclick="repSlOpen&&repSlOpen()" title="Импорт таблицы показателей со smart-lab.ru: вставить → назначить строки → создать периоды (уникальные метрики сохраняются)">📥 smart-lab</button>'
     + '<button class="btn" id="rep-add-period-btn" onclick="repNewPeriodModal&&repNewPeriodModal()">+ период</button>'
+    + '<button class="btn" onclick="repCopyAnalysis&&repCopyAnalysis()" title="Скопировать текстовый разбор активного периода (вердикт, расчётные, связи, выбросы) в буфер — для заметки">📋 Разбор</button>'
     + '<button class="btn btn-acc" id="rep-compare-btn" onclick="repOpenCrossCompare&&repOpenCrossCompare()">≡ Сравнить</button>'
     + '</div>';
   var mult = _repCalcMultipliers(iss);
