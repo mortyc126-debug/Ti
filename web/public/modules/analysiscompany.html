@@ -9661,6 +9661,8 @@ const _CROSS_PALETTE = (() => {
 
 let _crossViewMode = 'radar'; // radar | heatmap | bar
 let _crossHiddenIds = new Set(); // чекбокс-скрытые эмитенты
+let _crossListQ = '';            // поиск внутри списка компаний (не трогает данные)
+let _crossListSec = '';          // фильтр списка по сектору (не трогает данные)
 
 function crossBuildPeriodSelector(){
   const sel = document.getElementById('cross-period');
@@ -9733,6 +9735,7 @@ function _crossPickRow(iss, issId, year, period, scopeFilter){
     id: issId,
     name: iss.name || issId,
     type: p.type || '?',
+    ind: iss.ind || 'other',
     year: p.year,
     period: p.period || 'FY',
     data: p
@@ -9828,25 +9831,66 @@ function _crossFmt(v, unit){
 
 function _crossColor(i){ return _CROSS_PALETTE[i % _CROSS_PALETTE.length]; }
 
+// Отфильтрованное подмножество списка по строке поиска + сектору. Это
+// фильтр ОТОБРАЖЕНИЯ списка, он не трогает данные графика: невидимые
+// в списке компании всё равно учитываются на радаре/тепло/баре, если их
+// чекбокс включён. Удобно искать нужную компанию в длинном списке.
+function _crossListFiltered(rows){
+  const q = _normForSearch(_crossListQ || '');
+  const sec = _crossListSec || '';
+  return rows.filter(r => {
+    if(sec && (r.ind || 'other') !== sec) return false;
+    if(q && !_normForSearch(r.name || '').includes(q)) return false;
+    return true;
+  });
+}
+
 // Сайдбар со списком компаний (чекбоксы + цветовой маркер = легенда
-// радара). В режиме heatmap/bar маркер не нужен, но список остаётся —
-// позволяет фильтровать «вручную».
+// радара). Сверху — поиск по имени и фильтр по сектору: сужают сам
+// список, не убирая компании из сравнения. В режиме heatmap/bar маркер
+// не нужен, но список остаётся — позволяет включать/выключать вручную.
 function _crossRenderCompanies(rows){
   const box = document.getElementById('cross-companies');
   if(!box) return;
   if(!rows.length){
+    _crossListQ = ''; _crossListSec = '';
     box.innerHTML = '<div style="padding:10px;color:var(--text3)">—</div>';
     return;
   }
   const showLegend = _crossViewMode === 'radar';
-  const visible = rows.filter(r => !_crossHiddenIds.has(r.id));
-  const head = `<div style="padding:6px 8px;border-bottom:1px solid var(--border);background:var(--bg);display:flex;gap:6px;align-items:center">
-      <strong style="font-size:.62rem;color:var(--text2)">${rows.length} эмит.</strong>
-      <span style="color:var(--text3);font-size:.55rem">(${visible.length} видимых)</span>
-      <button class="btn btn-sm" onclick="crossToggleAll(true)" style="padding:1px 6px;margin-left:auto;font-size:.52rem">все</button>
-      <button class="btn btn-sm" onclick="crossToggleAll(false)" style="padding:1px 6px;font-size:.52rem">ничего</button>
+  const industries = window._industryData?.industries || {};
+  // Секторы, реально присутствующие в списке — чтобы не плодить пустые опции.
+  const secSet = new Set(rows.map(r => r.ind || 'other'));
+  const secOpts = [...secSet].map(k => [k, industries[k]?.label || k])
+    .sort((a, b) => a[0] === 'other' ? 1 : b[0] === 'other' ? -1 : a[1].localeCompare(b[1], 'ru'));
+  const shown = _crossListFiltered(rows);
+  const visible = shown.filter(r => !_crossHiddenIds.has(r.id));
+  const secSel = secOpts.length > 1
+    ? `<select onchange="crossListSetSec(this.value)" style="width:100%;font-size:.55rem;padding:2px 4px;margin-top:4px">
+        <option value="">Все секторы (${rows.length})</option>
+        ${secOpts.map(([k, l]) => `<option value="${k}"${k === _crossListSec ? ' selected' : ''}>${l}</option>`).join('')}
+      </select>`
+    : '';
+  const filterNote = (shown.length !== rows.length)
+    ? ` <span style="color:var(--acc);font-size:.55rem">· найдено ${shown.length}</span>` : '';
+  const head = `<div style="padding:6px 8px;border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:2">
+      <div style="display:flex;gap:6px;align-items:center">
+        <strong style="font-size:.62rem;color:var(--text2)">${rows.length} эмит.</strong>
+        <span style="color:var(--text3);font-size:.55rem">(${visible.length} видимых)${filterNote}</span>
+        <button class="btn btn-sm" onclick="crossToggleAll(true)" style="padding:1px 6px;margin-left:auto;font-size:.52rem" title="Включить все показанные в списке">все</button>
+        <button class="btn btn-sm" onclick="crossToggleAll(false)" style="padding:1px 6px;font-size:.52rem" title="Выключить все показанные в списке">ничего</button>
+      </div>
+      <input type="text" value="${(_crossListQ || '').replace(/"/g, '&quot;')}" oninput="crossListSetQ(this.value)" placeholder="🔍 поиск по имени…" style="width:100%;font-size:.55rem;padding:2px 6px;margin-top:4px">
+      ${secSel}
     </div>`;
-  const list = rows.map((r, i) => {
+  if(!shown.length){
+    box.innerHTML = head + '<div style="padding:10px;color:var(--text3);font-size:.58rem">Ничего не найдено. Сбросьте поиск/сектор.</div>';
+    return;
+  }
+  const list = shown.map((r) => {
+    // Индекс для цвета/легенды берём из полного списка rows — цвет
+    // компании на радаре не должен скакать при фильтрации списка.
+    const i = rows.indexOf(r);
     const checked = !_crossHiddenIds.has(r.id);
     const dot = showLegend
       ? `<span style="width:10px;height:10px;display:inline-block;background:${checked ? _crossColor(i) : 'transparent'};border:1px solid ${_crossColor(i)};flex:0 0 auto"></span>`
@@ -9860,18 +9904,31 @@ function _crossRenderCompanies(rows){
   box.innerHTML = head + list;
 }
 
+// Поиск/сектор в списке — только перерисовка списка, график не пересчитываем.
+function crossListSetQ(v){
+  _crossListQ = v;
+  const rows = window._crossLast?.rows || [];
+  _crossRenderCompanies(rows);
+  // Фокус обратно в поле (innerHTML его сбросил), курсор в конец.
+  const inp = document.querySelector('#cross-companies input[type="text"]');
+  if(inp){ inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+}
+function crossListSetSec(v){
+  _crossListSec = v;
+  _crossRenderCompanies(window._crossLast?.rows || []);
+}
+
 function crossToggleId(id, checked){
   if(checked) _crossHiddenIds.delete(id); else _crossHiddenIds.add(id);
   crossRender();
 }
 
 function crossToggleAll(on){
-  if(on){
-    _crossHiddenIds.clear();
-  } else {
-    const rows = window._crossLast?.rows || [];
-    rows.forEach(r => _crossHiddenIds.add(r.id));
-  }
+  // «все/ничего» действуют на то, что сейчас ПОКАЗАНО в списке (с учётом
+  // поиска/сектора) — иначе фильтр терял бы смысл при длинном списке.
+  const rows = window._crossLast?.rows || [];
+  const shown = _crossListFiltered(rows);
+  shown.forEach(r => { if(on) _crossHiddenIds.delete(r.id); else _crossHiddenIds.add(r.id); });
   crossRender();
 }
 
