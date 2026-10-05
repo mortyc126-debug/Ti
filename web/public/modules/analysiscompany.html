@@ -14986,7 +14986,8 @@ function repSlImport(){
   const chosen=Array.from(document.querySelectorAll('.sl-per:checked'))
     .map(x=>d.periods[+x.dataset.i]).filter(Boolean);
   if(!chosen.length){ alert('Отметь хотя бы один период.'); return; }
-  let created=0, updated=0;
+  const _RULABEL={rev:'Выручка',ebitda:'EBITDA',ebit:'EBIT',np:'Чист.прибыль',int:'Проценты',tax:'Налог',assets:'Активы',ca:'Оборотные',cl:'Кратк.обяз.',debt:'Долг',cash:'Наличность',ret:'Нераспр.приб.',eq:'Капитал',cfo:'CFO',capex:'CAPEX',divp:'Дивиденды',recv:'Дебиторка',inv:'Запасы',pay:'Кредиторка'};
+  let created=0, updated=0, overwritten=0; const changed=[];
   for(const pc of chosen){
     const year=pc.year, periodLabel=pc.target||'Год', plabel=pc.label;
     const key=`${year}_${periodLabel}_${type}`;
@@ -14997,7 +14998,14 @@ function repSlImport(){
       const v=r.vals[plabel]; if(v==null) continue;
       if(r.target==='__extra__'){ extra[r.label]=v; }
       else if(r.target && _SL_NULL.includes(r.target)){
-        // не затираем уже введённое число пустым; smart-lab обновляет значение
+        // политика «новое перезаписывает»: smart-lab обновляет значение.
+        // Но считаем РЕАЛЬНЫЕ затирания (было непустое и ОТЛИЧАЛОСЬ) и
+        // показываем их потом — чтобы перезапись не была молчаливой.
+        const old=per[r.target];
+        if(old!=null && old!==v){
+          overwritten++;
+          if(changed.length<10) changed.push(`${year} ${periodLabel}: ${_RULABEL[r.target]||r.target} ${old}→${v}`);
+        }
         per[r.target]=v;
       }
     }
@@ -15007,7 +15015,13 @@ function repSlImport(){
   save();
   if(typeof repBuildPeriodTabs==='function') repBuildPeriodTabs();
   closeModal('modal-rep-sl');
-  alert(`smart-lab: создано периодов ${created}`+(updated?`, обновлено ${updated}`:'')+'.\nУникальные строки сохранены как «свои метрики» (видны в карточках периода).');
+  let msg=`smart-lab: создано периодов ${created}`+(updated?`, обновлено ${updated}`:'')+'.';
+  if(overwritten){
+    msg += `\n\n⚠️ Перезаписано ранее введённых значений: ${overwritten} (новое поверх старого).\n`
+      + changed.join('\n') + (overwritten>changed.length?`\n… и ещё ${overwritten-changed.length}`:'');
+  }
+  msg += '\n\nУникальные строки сохранены как «свои метрики» (видны в карточках периода).';
+  alert(msg);
 }
 
 // Предыдущий сопоставимый период (год назад, тот же период и тип).
