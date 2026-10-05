@@ -44,8 +44,9 @@ async function tFetch(method, body, tok){
   return json;
 }
 
-// Quotation {units,nano} → число.
+// Quotation/MoneyValue {units,nano} → число (nano всегда 1e-9).
 const _q = q => q == null ? 0 : (parseInt(q.units) || 0) + (parseInt(q.nano) || 0) / 1e9;
+const _money = _q;   // MoneyValue имеет ту же форму + currency
 
 // figi → {isin,ticker,name}. Пара стабильна, кэшируем в localStorage, чтобы
 // не дёргать InstrumentsService на каждый рендер.
@@ -79,7 +80,7 @@ export async function loadTinvestPositions(){
   } catch(e){ return { ok: false, reason: String(e.message || e), positions: [], accounts: [] }; }
   if(!accounts.length) return { ok: true, positions: [], accounts: [] };
 
-  // позиции со всех счетов
+  // позиции со всех счетов, с ценами/НКД для расчёта стоимости и P&L
   const raw = [];
   for(const acc of accounts){
     try {
@@ -89,7 +90,17 @@ export async function loadTinvestPositions(){
         if(!(qty > 0)) continue;   // нули/шорты пропускаем
         const it = String(pos.instrumentType || '').toLowerCase();
         if(it && !/bond|share|etf/.test(it)) continue;   // без валюты/фьючей
-        raw.push({ figi: pos.figi, type: it, qty, name: null, account: acc.name || acc.id });
+        const cur = String((pos.currentPrice && pos.currentPrice.currency) || 'rub').toLowerCase();
+        if(cur !== 'rub') continue;   // приложение рублёвое — валютное пропускаем
+        const avg = _money(pos.averagePositionPrice);   // ср. цена за 1 бумагу, ₽
+        const last = _money(pos.currentPrice);           // текущая цена за 1 бумагу, ₽
+        const nkd = _money(pos.currentNkd);              // НКД за 1 бумагу, ₽ (облигации)
+        raw.push({
+          figi: pos.figi, type: it, qty, name: null, account: acc.name || acc.id,
+          avg, last, nkd,
+          costRub: qty * avg,
+          valRub: qty * (last + nkd),
+        });
       }
     } catch(_){ /* один счёт упал — не валим остальные */ }
   }
@@ -108,14 +119,28 @@ export async function loadTinvestPositions(){
   await Promise.all(Array.from({ length: CONC }, worker));
   _figiCacheSet(cache);
 
-  // схлопнуть одну бумагу с разных счетов в одну позицию (суммируем qty)
+  // схлопнуть одну бумагу с разных счетов в одну позицию (суммируем
+  // qty/стоимость/затраты; ср. цена пересчитывается как costRub/qty)
   const byIsin = new Map();
   for(const r of raw){
     const k = r.isin || r.figi;
     const cur = byIsin.get(k);
-    if(cur){ cur.qty += r.qty; cur.accounts.add(r.account); }
-    else byIsin.set(k, { isin: r.isin, ticker: r.ticker, name: r.name, type: r.type, qty: r.qty, accounts: new Set([r.account]) });
+    if(cur){
+      cur.qty += r.qty; cur.costRub += r.costRub; cur.valRub += r.valRub;
+      cur.accounts.add(r.account);
+    } else {
+      byIsin.set(k, {
+        isin: r.isin, ticker: r.ticker, name: r.name, type: r.type,
+        qty: r.qty, last: r.last, nkd: r.nkd,
+        costRub: r.costRub, valRub: r.valRub, accounts: new Set([r.account]),
+      });
+    }
   }
-  const positions = [...byIsin.values()].map(p => ({ ...p, accounts: [...p.accounts] }));
+  const positions = [...byIsin.values()].map(p => ({
+    ...p,
+    avg: p.qty ? p.costRub / p.qty : 0,
+    pnlRub: p.valRub - p.costRub,
+    accounts: [...p.accounts],
+  }));
   return { ok: true, positions, accounts: accounts.map(a => a.name || a.id) };
 }
