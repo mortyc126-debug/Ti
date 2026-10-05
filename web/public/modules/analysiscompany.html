@@ -15676,6 +15676,91 @@ function repCopyAnalysis(){
   try{ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(fallback); else fallback(); }catch(e){ fallback(); }
 }
 
+// Последний годовой период эмитента.
+function _repLatestAnnual(iss){
+  const arr=Object.values(iss && iss.periods || {}).filter(x=>x&&/год|fy|year/i.test(String(x.period||''))).sort((a,b)=>(+b.year||0)-(+a.year||0));
+  return arr[0]||null;
+}
+// Ключевые коэффициенты периода — для сравнения двух эмитентов.
+function _repKeyRatios(p){
+  const n=v=>(typeof v==='number'&&isFinite(v))?v:null;
+  if(!p) return {};
+  const eb=n(p.ebitda)!=null?n(p.ebitda):n(p.ebit), ebit=n(p.ebit), rev=n(p.rev), np=n(p.np),
+        debt=n(p.debt),cash=n(p.cash),eq=n(p.eq),assets=n(p.assets),intx=n(p.int),cfo=n(p.cfo),capex=n(p.capex);
+  const nd=(debt!=null&&cash!=null)?debt-cash:null;
+  return { year:p.year,
+    ndE:(nd!=null&&eb&&eb>0)?nd/eb:null, de:(debt!=null&&eb&&eb>0)?debt/eb:null,
+    icr:(ebit!=null&&intx)?ebit/intx:null, ebitdaMarg:(eb!=null&&rev)?eb/rev*100:null,
+    npm:(np!=null&&rev)?np/rev*100:null, roe:(np!=null&&eq)?np/eq*100:null,
+    roa:(np!=null&&assets)?np/assets*100:null, fcf:(cfo!=null&&capex!=null)?cfo-capex:null,
+    conv:(cfo!=null&&eb&&eb>0)?cfo/eb*100:null };
+}
+const _REP_CMP_ROWS=[
+  {k:'ndE',label:'ND/EBITDA',unit:'×',low:true},
+  {k:'de',label:'Долг/EBITDA',unit:'×',low:true},
+  {k:'icr',label:'ICR',unit:'×',low:false},
+  {k:'ebitdaMarg',label:'Рентаб. EBITDA',unit:'%',low:false},
+  {k:'npm',label:'Чистая маржа',unit:'%',low:false},
+  {k:'roe',label:'ROE',unit:'%',low:false},
+  {k:'roa',label:'ROA',unit:'%',low:false},
+  {k:'conv',label:'CFO/EBITDA',unit:'%',low:false},
+  {k:'fcf',label:'FCF',unit:'млрд',low:false},
+];
+function _repTwoRender(){
+  const aId=document.getElementById('cmp-a')?.value, bId=document.getElementById('cmp-b')?.value;
+  const host=document.getElementById('cmp-body'); if(!host||!aId||!bId) return;
+  const A=reportsDB[aId], B=reportsDB[bId];
+  const pa=_repLatestAnnual(A), pb=_repLatestAnnual(B);
+  const ra=_repKeyRatios(pa), rb=_repKeyRatios(pb);
+  const fv=(v,u)=> v==null?'—': u==='%'?v.toFixed(1)+'%': u==='×'?v.toFixed(2)+'×': v.toFixed(1);
+  const rows=_REP_CMP_ROWS.map(r=>{
+    const va=ra[r.k], vb=rb[r.k];
+    let aw='',bw='';
+    if(va!=null&&vb!=null&&va!==vb){ const aBetter=r.low?va<vb:va>vb; if(aBetter)aw='color:var(--green);font-weight:700'; else bw='color:var(--green);font-weight:700'; }
+    return `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:3px 8px;color:var(--text2)">${r.label}</td>
+      <td style="padding:3px 8px;text-align:right;font-family:var(--mono);${aw}">${fv(va,r.unit)}</td>
+      <td style="padding:3px 8px;text-align:right;font-family:var(--mono);${bw}">${fv(vb,r.unit)}</td></tr>`;
+  }).join('');
+  // краткий итог: кто по каким блокам сильнее
+  const score=(r,s)=>{ let n=0; _REP_CMP_ROWS.forEach(d=>{ const x=r[d.k],y=s[d.k]; if(x!=null&&y!=null&&x!==y){ const better=d.low?x<y:x>y; if(better)n++; } }); return n; };
+  const sa=score(ra,rb), sb=score(rb,ra);
+  host.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:.66rem">
+      <thead><tr style="color:var(--text3);font-size:.55rem;text-transform:uppercase">
+        <th style="padding:3px 8px;text-align:left">Метрика</th>
+        <th style="padding:3px 8px;text-align:right">${_escHtml((A.name||'A').slice(0,22))}${pa?' · '+pa.year:''}</th>
+        <th style="padding:3px 8px;text-align:right">${_escHtml((B.name||'B').slice(0,22))}${pb?' · '+pb.year:''}</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      <div style="font-size:.62rem;color:var(--text2);margin-top:8px">Счёт по метрикам (зелёным — лучше): <b>${_escHtml((A.name||'A').slice(0,18))}</b> ${sa} : ${sb} <b>${_escHtml((B.name||'B').slice(0,18))}</b>. ${sa===sb?'Паритет.':(sa>sb?'Первый сильнее по большинству.':'Второй сильнее по большинству.')}</div>
+      <div style="font-size:.5rem;color:var(--text3);margin-top:4px">Последние годовые периоды. «Лучше» по направлению метрики (для долга — меньше). Разные отрасли сравнивать осторожно.</div>`;
+}
+function repCompareTwo(){
+  const opts=Object.keys(reportsDB).filter(id=>reportsDB[id]&&_repLatestAnnual(reportsDB[id]))
+    .sort((a,b)=>(reportsDB[a].name||'').localeCompare(reportsDB[b].name||'','ru'));
+  if(opts.length<2){ alert('Нужно минимум два эмитента с годовыми периодами.'); return; }
+  const a0=(repActiveIssuerId&&reportsDB[repActiveIssuerId]&&_repLatestAnnual(reportsDB[repActiveIssuerId]))?repActiveIssuerId:opts[0];
+  const indA=reportsDB[a0]&&reportsDB[a0].ind;
+  const b0=opts.find(id=>id!==a0&&reportsDB[id].ind===indA)||opts.find(id=>id!==a0);
+  const opt=(sel)=>opts.map(o=>`<option value="${o}"${o===sel?' selected':''}>${_escHtml(reportsDB[o].name||o)}</option>`).join('');
+  const old=document.getElementById('rep-cmp2-modal'); if(old&&old.remove)old.remove();
+  const wrap=document.createElement('div');
+  wrap.id='rep-cmp2-modal';
+  wrap.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:3000;display:flex;align-items:flex-start;justify-content:center;padding:28px 16px;overflow:auto';
+  wrap.onclick=e=>{ if(e.target===wrap&&wrap.remove)wrap.remove(); };
+  const ss='background:var(--bg);color:var(--text);border:1px solid var(--brdp);font-size:11px;padding:4px 6px;max-width:48%';
+  wrap.innerHTML=`<div style="background:var(--panel);border:1px solid var(--brd);max-width:620px;width:100%;padding:18px 20px;box-shadow:var(--glow)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0;font-size:15px;color:var(--t)">Сравнение двух эмитентов</h3>
+      <button type="button" onclick="var m=document.getElementById('rep-cmp2-modal');m&&m.remove&&m.remove()" style="background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;line-height:1">×</button></div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <select id="cmp-a" style="${ss}" onchange="_repTwoRender()">${opt(a0)}</select>
+      <span style="color:var(--t3);align-self:center">vs</span>
+      <select id="cmp-b" style="${ss}" onchange="_repTwoRender()">${opt(b0)}</select></div>
+    <div id="cmp-body"></div></div>`;
+  document.body.appendChild(wrap);
+  _repTwoRender();
+}
+
 // Единый вердикт сверху: сильные стороны / риски / на что смотреть — синтез
 // из тех же сигналов, что и подробные выводы. Коротко и по делу.
 function _repVerdict(iss, p){
@@ -31001,6 +31086,7 @@ function _repBuildIssuerHeader(iss, issId){
     + '<button class="btn" onclick="repSlOpen&&repSlOpen()" title="Импорт таблицы показателей со smart-lab.ru: вставить → назначить строки → создать периоды (уникальные метрики сохраняются)">📥 smart-lab</button>'
     + '<button class="btn" id="rep-add-period-btn" onclick="repNewPeriodModal&&repNewPeriodModal()">+ период</button>'
     + '<button class="btn" onclick="repCopyAnalysis&&repCopyAnalysis()" title="Скопировать текстовый разбор активного периода (вердикт, расчётные, связи, выбросы) в буфер — для заметки">📋 Разбор</button>'
+    + '<button class="btn" onclick="repCompareTwo&&repCompareTwo()" title="Сравнить двух эмитентов бок о бок по ключевым коэффициентам (последние годовые периоды)">⟷ vs</button>'
     + '<button class="btn btn-acc" id="rep-compare-btn" onclick="repOpenCrossCompare&&repOpenCrossCompare()">≡ Сравнить</button>'
     + '</div>';
   var mult = _repCalcMultipliers(iss);
