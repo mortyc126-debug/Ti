@@ -3119,6 +3119,23 @@ function _normForSearch(s){
   out = out.replace(/\s+/g, ' ').trim();
   return out;
 }
+// Транслит кириллица→латиница: чтобы «софтлайн» находил «Softline» и наоборот
+// (имена часто в одном алфавите, а ищут в другом).
+var _TRANSLIT_RU = {а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'c',ч:'ch',ш:'sh',щ:'sch',ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya'};
+function _translitRu(s){ return String(s||'').replace(/[а-яё]/g, c => _TRANSLIT_RU[c]!=null?_TRANSLIT_RU[c]:c); }
+// Расширенный «извращённый» матч: все токены запроса должны найтись в сене
+// (имя+ИНН+ОКВЭД+связанные) — в прямом ИЛИ транслитерированном виде, в любом
+// порядке. Пустой запрос — совпадение.
+function _repFuzzyHit(hayNorm, qNorm){
+  if(!qNorm) return true;
+  var hay = hayNorm + ' ' + _translitRu(hayNorm);
+  var toks = qNorm.split(' ').filter(Boolean);
+  for(var i=0;i<toks.length;i++){
+    var t = toks[i], tl = _translitRu(t);
+    if(hay.indexOf(t) < 0 && hay.indexOf(tl) < 0) return false;
+  }
+  return true;
+}
 function ytmCls(v){return v>=14?'val-pos':v>=10?'val-neu':'val-neg'}
 function rub(v,sign=false){return (sign&&v>0?'+':'')+v.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₽'}
 // Срок до погашения/оферты: для <1 года показываем в месяцах
@@ -10768,12 +10785,16 @@ function repRenderIssuerList(){
     const relatedStr = Array.isArray(iss.related)
       ? iss.related.map(r => _normForSearch(r?.name) + ' ' + _normForSearch(r?.inn)).join(' ')
       : '';
-    if(search && !name.includes(search) && !inn.includes(search) && !okved.includes(search) && !relatedStr.includes(search)) continue;
+    if(search && !_repFuzzyHit(name + ' ' + inn + ' ' + okved + ' ' + relatedStr, search)) continue;
+    // Когда идёт АКТИВНЫЙ поиск по имени/ИНН — фасетные фильтры (статус,
+    // отрасль, годы, ликвидность) игнорируем: раз человек ищет конкретного
+    // эмитента, он должен найтись, даже если лежит «в другом блоке» фильтра.
+    const applyFacets = !search;
     // Ликвидность/MOEX — дёшево, ДО расчёта мультипликаторов: отсечь тут
     // значит не считать m и не строить карточку для 2/3 базы. НО эмитента с
     // введёнными периодами не прячем (реальные данные важнее bondsCount,
     // которого у восстановленных из бэкапа может не быть).
-    if(status === 'has_moex' || status === 'liquid' || status === 'corp_moex'){
+    if(applyFacets && (status === 'has_moex' || status === 'liquid' || status === 'corp_moex')){
       var _hasPer = Object.keys(iss.periods || {}).length > 0;
       if(!(iss.bondsCount > 0) && !_hasPer) continue;
       if(status === 'corp_moex' && !_hasPer){
@@ -10783,31 +10804,33 @@ function repRenderIssuerList(){
       }
     }
     const m = _repCalcMultipliers(iss);
-    // Фильтр по выбранным годам: последний период эмитента должен быть
-    // в одном из отмеченных годов. Ничего не отмечено — любой год ок.
-    if(yearsSel && (!m.year || !yearsSel.has(m.year))) continue;
-    // Фильтр по статусу.
-    const periodCount = Object.keys(iss.periods || {}).length;
-    const hasInn = !!iss.inn;
-    if(status === 'has_periods' && periodCount === 0) continue;
-    if(status === 'no_periods' && periodCount > 0) continue;
-    if(status === 'only_inn' && (periodCount > 0 || !hasInn)) continue;
-    if(status === 'no_inn' && hasInn) continue;
-    if(status === 'stale' && (!m.year || m.year >= thisYear - 2)) continue;
-    if(status === 'no_moex' && _repHasMoexBonds(id, iss)) continue;
-    if(status === 'spv_no_parent'){
-      // Признак SPV: iss.ind='holdings_spv' ИЛИ имя содержит Финанс/
-      // Капитал/СПВ/Финансы ИЛИ совсем нет периодов но есть ИНН (эмитент
-      // бондов без самостоятельной отчётности).
-      const nm = String(iss.name || '');
-      const spvName = /(Финанс|Капитал|Инвест|Холдинг|СПВ|SPV|Финансы)\b/i.test(nm);
-      const isSpvInd = iss.ind === 'holdings_spv';
-      const emptyButHasInn = periodCount === 0 && hasInn;
-      const isSpv = spvName || isSpvInd || emptyButHasInn;
-      const hasParent = Array.isArray(iss.related) && iss.related.some(r => r && r.role === 'parent');
-      if(!isSpv || hasParent) continue;
+    if(applyFacets){
+      // Фильтр по выбранным годам: последний период эмитента должен быть
+      // в одном из отмеченных годов. Ничего не отмечено — любой год ок.
+      if(yearsSel && (!m.year || !yearsSel.has(m.year))) continue;
+      // Фильтр по статусу.
+      const periodCount = Object.keys(iss.periods || {}).length;
+      const hasInn = !!iss.inn;
+      if(status === 'has_periods' && periodCount === 0) continue;
+      if(status === 'no_periods' && periodCount > 0) continue;
+      if(status === 'only_inn' && (periodCount > 0 || !hasInn)) continue;
+      if(status === 'no_inn' && hasInn) continue;
+      if(status === 'stale' && (!m.year || m.year >= thisYear - 2)) continue;
+      if(status === 'no_moex' && _repHasMoexBonds(id, iss)) continue;
+      if(status === 'spv_no_parent'){
+        // Признак SPV: iss.ind='holdings_spv' ИЛИ имя содержит Финанс/
+        // Капитал/СПВ/Финансы ИЛИ совсем нет периодов но есть ИНН (эмитент
+        // бондов без самостоятельной отчётности).
+        const nm = String(iss.name || '');
+        const spvName = /(Финанс|Капитал|Инвест|Холдинг|СПВ|SPV|Финансы)\b/i.test(nm);
+        const isSpvInd = iss.ind === 'holdings_spv';
+        const emptyButHasInn = periodCount === 0 && hasInn;
+        const isSpv = spvName || isSpvInd || emptyButHasInn;
+        const hasParent = Array.isArray(iss.related) && iss.related.some(r => r && r.role === 'parent');
+        if(!isSpv || hasParent) continue;
+      }
+      if(indFilter !== 'all' && (iss.ind || 'other') !== indFilter) continue;
     }
-    if(indFilter !== 'all' && (iss.ind || 'other') !== indFilter) continue;
     rows.push({ id, iss, m });
   }
 
@@ -14905,7 +14928,7 @@ function _slIsHeader(cols){ const t=cols.slice(1).map(_slClean).filter(Boolean);
 // Разбор вставки → первый блок {company, std, periods:[{label,idx,annual}], rows:[{label,target,vals}]}
 function _slParse(text){
   const lines=String(text||'').split(/\r?\n/);
-  let header=null, rows=[];
+  let header=null, rows=[]; const rawRows=[];
   for(const line of lines){
     const cols=line.split('\t');
     if(!header){
@@ -14921,12 +14944,32 @@ function _slParse(text){
     if(cols.some(c=>_slClean(c))){
       const label=_slClean(cols[0]); if(!label) continue;
       if(['Финансовый отчет','Годовой отчет','Презентация','Дата отчета','Валюта отчета'].includes(label)) continue;
-      const vals={};
-      for(const p of header.cols){ const v=_slNum(cols[p.idx]); if(v!=null) vals[p.label]=v; }
-      if(Object.keys(vals).length) rows.push({label, vals});
+      rawRows.push({label, cols});   // строим vals ниже, после определения сдвига столбцов
     }
   }
   if(!header) return null;
+  // Выравнивание столбцов: в выгрузке smart-lab у строк данных бывает лишний
+  // маркер-столбец («?»), из-за которого числа сдвинуты на 1 вправо
+  // относительно шапки с годами — и годам доставались ЧУЖИЕ значения (2025←2024).
+  // Определяем постоянный сдвиг по самой «плотной» строке (чисел ровно столько,
+  // сколько колонок в шапке, и сдвиг одинаков для всех) и применяем ко всем.
+  let _off=0;
+  {
+    const hIdx=header.cols.map(c=>c.idx);
+    for(const rr of rawRows){
+      const nums=[];
+      for(let j=0;j<rr.cols.length;j++){ if(_slNum(rr.cols[j])!=null) nums.push(j); }
+      if(nums.length===hIdx.length && hIdx.length){
+        const diffs=hIdx.map((hi,k)=>nums[k]-hi);
+        if(diffs.every(x=>x===diffs[0])){ _off=diffs[0]; break; }
+      }
+    }
+  }
+  for(const rr of rawRows){
+    const vals={};
+    for(const p of header.cols){ const j=p.idx+_off; const v=(j>=0&&j<rr.cols.length)?_slNum(rr.cols[j]):null; if(v!=null) vals[p.label]=v; }
+    if(Object.keys(vals).length) rows.push({label:rr.label, vals});
+  }
   // период-колонка → назначение в reportsDB. Годовой → «Год». Квартальный
   // smart-lab (YYYYQn) трактуем как накопительный к концу квартала (как и
   // период-коды отчётности): Q1→1 квартал, Q2→Полугодие, Q3→9М, Q4→Год.
@@ -15007,6 +15050,106 @@ function _slRenderPreview(){
   html+='</tbody></table>';
   document.getElementById('rep-sl-preview').innerHTML=html;
   // восстановить selected (innerHTML пересоздал select'ы — target уже в данных)
+}
+
+// Многоблочный разбор вставки smart-lab: один текст может содержать несколько
+// таблиц (МСФО/РСБУ, годовые/квартальные) — режем по строкам-шапкам и парсим
+// каждый блок отдельным _slParse. Нужен для импорта файлов credit-analyzer,
+// где все таблицы склеены в одном company.sources[].text.
+function _slParseBlocks(text){
+  const lines = String(text||'').split(/\r?\n/);
+  const blocks = []; let cur = null;
+  for(const line of lines){
+    const cols = line.split('\t');
+    if(_slIsHeader(cols)){ if(cur) blocks.push(cur); cur = [line]; }
+    else if(cur) cur.push(line);
+  }
+  if(cur) blocks.push(cur);
+  const out = [];
+  for(const b of blocks){ const parsed = _slParse(b.join('\n')); if(parsed) out.push(parsed); }
+  return out;
+}
+
+// Отрасль из человеческого ярлыка (credit-analyzer хранит "IT и разработка ПО")
+// → ключ отрасли peer'ов. Не нашли — 'other'.
+function _repGuessIndFromLabel(label){
+  if(!label) return 'other';
+  const ln = _normForSearch(label);
+  const data = window._industryData && window._industryData.industries;
+  if(data){ for(const k in data){ const lab=_normForSearch(data[k] && data[k].label); if(lab && (lab===ln || lab.indexOf(ln)>=0 || ln.indexOf(lab)>=0)) return k; } }
+  return 'other';
+}
+
+// Импорт файла credit-analyzer (формат credit-analyzer-company): берём сырые
+// таблицы из company.sources[].text, парсим все блоки, создаём/дополняем
+// эмитента периодами с автозаполнением полей (как 📥 smart-lab, но из файла и
+// сразу по всем блокам). Политика конфликта — «новое перезаписывает», с отчётом.
+function _repImportCreditAnalyzer(d){
+  const comp = d.company || {};
+  const name = (comp.name || 'Импорт smart-lab').trim();
+  let blocks = [];
+  (comp.sources || []).forEach(s => { if(s && s.text) blocks = blocks.concat(_slParseBlocks(s.text)); });
+  if(!blocks.length){ alert('В файле не нашлось таблиц smart-lab (company.sources[].text пуст).'); return false; }
+  // Стандарт (МСФО/РСБУ) и разрез (годовой/квартальный) — из result.kpi, где
+  // анализатор их уже определил по блокам: «блок N МСФО · годовой …». Это
+  // надёжнее эвристики по наличию EBITDA (в РСБУ её нет, но склейка таблиц
+  // путала детектор). Индекс блока result.kpi совпадает с порядком в sources.
+  const kpiMeta = {};
+  try{
+    Object.keys((d.result && d.result.kpi) || {}).forEach(k => {
+      const mm = k.match(/блок\s*(\d+)\s+(МСФО|РСБУ)\s*·\s*(годов|квартальн)/i);
+      if(mm) kpiMeta[+mm[1]-1] = { std: mm[2].toUpperCase(), kind: /кварт/i.test(mm[3])?'quarter':'annual' };
+    });
+  }catch(e){}
+  blocks.forEach((blk, i) => {
+    const meta = kpiMeta[i];
+    if(meta){ blk.std = meta.std; blk.kind = meta.kind; }
+    else { blk.kind = blk.periods.some(p => p.kind==='quarter') ? 'quarter' : 'annual'; }
+  });
+  // Годовые блоки импортируем ПОСЛЕ квартальных: за годовой слот (…_Год_…)
+  // квартальный Q4 (кумулятивный) не должен затирать выделенную годовую
+  // таблицу — пусть годовая перезапишет его последней и победит.
+  blocks.sort((a,b) => (a.kind==='annual'?1:0) - (b.kind==='annual'?1:0));
+  // найти эмитента по имени (нормализованно) или создать
+  let targetId = null; const nmN = _normForSearch(name);
+  for(const id in reportsDB){ if(reportsDB[id] && _normForSearch(reportsDB[id].name) === nmN){ targetId = id; break; } }
+  if(!targetId){
+    targetId = 'i_sl_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,6);
+    reportsDB[targetId] = { name, ind: _repGuessIndFromLabel(comp.industry), periods: {}, note: 'smart-lab (credit-analyzer)' };
+  }
+  const iss = reportsDB[targetId]; if(!iss.periods) iss.periods = {};
+  let created=0, updated=0, overwritten=0; const changed=[];
+  for(const blk of blocks){
+    const std = blk.std;
+    for(const pc of blk.periods){
+      if(!pc.include || !pc.target) continue;
+      const key = `${pc.year}_${pc.target}_${std}`;
+      const ex = iss.periods[key];
+      const per = ex || (()=>{ const s={year:pc.year, period:pc.target, type:std, note:'smart-lab'}; _SL_NULL.forEach(f=>s[f]=null); return s; })();
+      const extra = per.extra || {};
+      for(const r of blk.rows){
+        const v = r.vals[pc.label]; if(v==null) continue;
+        if(r.target==='__extra__'){ extra[r.label]=v; }
+        else if(r.target && _SL_NULL.includes(r.target)){
+          const old = per[r.target];
+          if(old!=null && old!==v){ overwritten++; if(changed.length<10) changed.push(`${pc.year} ${pc.target} ${std}: ${r.target} ${old}→${v}`); }
+          per[r.target]=v;
+        }
+      }
+      if(Object.keys(extra).length) per.extra=extra;
+      if(ex) updated++; else { iss.periods[key]=per; created++; }
+    }
+  }
+  _idbLoadDone = true;
+  save();
+  if(typeof repRebuildSelect==='function') repRebuildSelect();
+  if(typeof repRenderIssuerList==='function') repRenderIssuerList();
+  if(typeof repSelectIssuerById==='function') repSelectIssuerById(targetId);
+  let msg = `✅ Импорт «${name}»: блоков ${blocks.length}, периодов создано ${created}`+(updated?`, обновлено ${updated}`:'')+'.';
+  if(overwritten) msg += `\n\n⚠️ Перезаписано ранее введённых значений: ${overwritten}\n`+changed.join('\n')+(overwritten>changed.length?`\n… и ещё ${overwritten-changed.length}`:'');
+  msg += '\n\nСтандарт (МСФО/РСБУ) и годовой/квартальный разрез определены автоматически. Уникальные строки — в «свои метрики».';
+  alert(msg);
+  return true;
 }
 
 function repSlImport(){
@@ -16869,6 +17012,12 @@ function applyImportedJsonText(raw){
   if(!d || typeof d !== 'object' || Array.isArray(d)){
     alert('Это не объект бэкапа. Ожидается JSON вида { "reportsDB": {...}, "portfolio": [...] }.');
     return false;
+  }
+
+  // Файл smart-lab credit-analyzer: company + result + сырые таблицы в
+  // company.sources[].text. Отдельная ветка — парсим таблицы в периоды.
+  if(d.format === 'credit-analyzer-company' || (d.company && Array.isArray(d.company.sources) && d.company.sources.some(s=>s&&s.text))){
+    return _repImportCreditAnalyzer(d);
   }
 
   // Single-issuer schema (bondan/issuer/v1 или просто объект с name+periods)
@@ -29532,21 +29681,35 @@ function _repSearchInput(val){
 function _repSearchDropRender(q){
   var drop = document.getElementById('rep-search-drop');
   if(!drop) return;
-  var ql = q.toLowerCase();
+  var qn = _normForSearch(q);
 
-  // Эмитенты из reportsDB
+  // Эмитенты из reportsDB — «извращённый» матч: нормализация (ё→е, латиница-
+  // двойники), транслит (софтлайн↔Softline), токены в любом порядке, имя+ИНН+
+  // ОКВЭД+связанные. Архивные тоже показываем (помечаем). Ранжируем.
   var rdb = reportsDB || {};
-  var issuers = [];
+  var scored = [];
   for(var id in rdb){
     var iss = rdb[id];
     if(!iss || !iss.name) continue;
-    var nm = (iss.name || '').toLowerCase();
-    var inn = (iss.inn || '').toLowerCase();
-    if(nm.includes(ql) || inn.includes(ql)){
-      issuers.push({ id: id, iss: iss });
-      if(issuers.length >= 6) break;
-    }
+    var nmN = _normForSearch(iss.name);
+    var innN = _normForSearch(iss.inn);
+    var okvedN = _normForSearch(iss.okved) + ' ' + _normForSearch(iss.okvedName);
+    var relN = Array.isArray(iss.related) ? iss.related.map(function(r){ return _normForSearch(r&&r.name)+' '+_normForSearch(r&&r.inn); }).join(' ') : '';
+    var hay = nmN + ' ' + innN + ' ' + okvedN + ' ' + relN;
+    if(!_repFuzzyHit(hay, qn)) continue;
+    // Скоринг: точное имя > префикс имени > вхождение в имя > прочее.
+    var sc = 0;
+    if(nmN === qn) sc = 100;
+    else if(nmN.indexOf(qn) === 0) sc = 80;
+    else if(nmN.indexOf(qn) > 0) sc = 60;
+    else if(innN.indexOf(qn) === 0) sc = 55;
+    else if(_translitRu(nmN).indexOf(_translitRu(qn)) >= 0) sc = 45;
+    else sc = 20;
+    if(iss.hidden) sc -= 15;   // архивные ниже, но показываем
+    scored.push({ id: id, iss: iss, sc: sc });
   }
+  scored.sort(function(a,b){ return b.sc - a.sc || (a.iss.name||'').localeCompare(b.iss.name||'','ru'); });
+  var issuers = scored.slice(0, 20);
 
   // Облигации из каталога D1
   var bonds = [];
@@ -29554,8 +29717,8 @@ function _repSearchDropRender(q){
     var bl = _d1Catalog.bonds;
     for(var bi = 0; bi < bl.length && bonds.length < 5; bi++){
       var b = bl[bi];
-      var bn = ((b.name || b.shortname || '') + ' ' + (b.isin || '')).toLowerCase();
-      if(bn.includes(ql)) bonds.push(b);
+      var bn = _normForSearch((b.name || b.shortname || '') + ' ' + (b.isin || ''));
+      if(_repFuzzyHit(bn, qn)) bonds.push(b);
     }
   }
 
@@ -29565,9 +29728,10 @@ function _repSearchDropRender(q){
     html += issuers.map(function(x){
       var m = _repCalcMultipliers(x.iss);
       var yr = m.year ? ' · ' + m.year : '';
+      var arch = x.iss.hidden ? ' <span style="color:var(--warn);font-size:.5rem">архив</span>' : '';
       return '<div class="sd-item" onclick="_repSearchSelectIssuer(\'' + x.id + '\')">' +
         '<span style="color:var(--text3)">🏢</span>' +
-        '<span class="sd-name">' + _escHtml(x.iss.name) + '</span>' +
+        '<span class="sd-name">' + _escHtml(x.iss.name) + arch + '</span>' +
         '<span class="sd-sub">' + (x.iss.inn ? x.iss.inn : '') + yr + '</span>' +
         '</div>';
     }).join('');
