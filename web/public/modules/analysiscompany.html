@@ -2920,36 +2920,64 @@ function loadState(){
   // есть — одноразово мигрируем туда. Потом пере-рендерим отчётность.
   try{
     _idbGet('reportsDB').then(function(idb){
+      var _migrated=false;
       if(idb && typeof idb==='object' && Object.keys(idb).length){
         for(var k in reportsDB){ delete reportsDB[k]; }
         Object.assign(reportsDB, idb);
-        try{ _migrateGirboType(); }catch(e){}
+        try{ _migrated=_migrateGirboType(); }catch(e){}
       } else if(reportsDB && Object.keys(reportsDB).length){
         _idbSet('reportsDB', reportsDB).catch(function(){});
       }
       _idbLoadDone=true;   // первичное чтение завершено — save() снова свободен
+      // Миграция ГИР БО/FY что-то поменяла — закрепляем в хранилище, чтобы
+      // приведение к РСБУ/Год было разовым, а не повторялось каждый запуск.
+      if(_migrated){ try{ save(); }catch(e){} }
       try{ if(typeof repRebuildSelect==='function') repRebuildSelect(); }catch(e){}
       try{ if(typeof repRenderIssuerList==='function') repRenderIssuerList(); }catch(e){}
       try{ var sb=document.getElementById('sb-rep'); if(sb) sb.textContent=Object.keys(reportsDB).length; }catch(e){}
     }).catch(function(){ _idbLoadDone=true; });
   }catch(e){}
 }
-// Одноразовая миграция: тип периода ГИРБО/GIRBO → РСБУ (ГИР БО — источник,
-// стандарт бывает только РСБУ/МСФО). Переименовываем и ключ периода.
+// Миграция: ГИР БО — источник, а не стандарт. Приводим его периоды к
+// нормальному виду: type ГИРБО/GIRBO → РСБУ, нестандартный ярлык period
+// 'FY' → 'Год'. Иначе ключ периода (год_период_тип) не совпадает с ручным/
+// smart-lab годовым РСБУ ('YYYY_Год_РСБУ') и возникают дубли за один год.
+// Провенанс ГИР БО сохраняем в note. Возвращает true, если что-то меняли —
+// чтобы вызвавший мог persist'нуть результат (раньше миграция жила только в
+// памяти и каждый импорт снова упирался в ГИРБО/FY).
 function _migrateGirboType(){
+  var changed=false;
   try{
     for(var id in reportsDB){
       var iss = reportsDB[id]; if(!iss || !iss.periods) continue;
       var per = iss.periods, keys = Object.keys(per);
       for(var i=0;i<keys.length;i++){
         var k = keys[i], p = per[k];
-        if(!p || !/ГИРБО|GIRBO/i.test(String(p.type||''))) continue;
-        p.type = 'РСБУ';
-        var nk = (p.year)+'_'+(p.period||'Год')+'_РСБУ';
-        if(nk !== k){ if(!per[nk]) per[nk] = p; delete per[k]; }
+        if(!p) continue;
+        var isGir = /ГИРБО|GIRBO/i.test(String(p.type||''));
+        var isFY  = String(p.period||'')==='FY';
+        if(!isGir && !isFY) continue;
+        if(isGir){ p.type='РСБУ'; if(!p.note) p.note='ГИР БО'; }
+        if(isFY) p.period='Год';
+        var nk = (p.year)+'_'+(p.period||'Год')+'_'+(p.type||'РСБУ');
+        if(nk !== k){
+          if(!per[nk]){ per[nk]=p; }
+          else {
+            // ключ уже занят (есть ручной/МСФО-… за тот же год) — доливаем
+            // недостающие поля из ГИР БО, НЕ затирая уже введённые числа.
+            var tgt=per[nk];
+            for(var f in p){
+              if(f==='year'||f==='period'||f==='type') continue;
+              if((tgt[f]==null||tgt[f]==='') && p[f]!=null && p[f]!=='') tgt[f]=p[f];
+            }
+          }
+          delete per[k];
+        }
+        changed=true;
       }
     }
   }catch(e){}
+  return changed;
 }
 function save(){
   // reportsDB — в IndexedDB (надёжно, большой лимит). НО не пишем пустышку
@@ -14950,6 +14978,10 @@ function repSlImport(){
   if(!iss||!d){ alert('Нет данных для импорта.'); return; }
   if(repActiveIssuerId && repActiveIssuerId!==issId && !confirm('Активен другой эмитент. Импортировать в «'+(iss.name||issId)+'» (куда открывали)?')) return;
   if(!iss.periods) iss.periods={};
+  // Нормализуем ГИР БО/FY периоды ПЕРЕД слиянием: иначе smart-lab РСБУ-годовой
+  // ('YYYY_Год_РСБУ') не попадёт в существующий ГИР БО-период ('YYYY_FY_ГИРБО')
+  // и создаст дубль за тот же год. После миграции ключи совпадают — мёрдж.
+  try{ _migrateGirboType(); }catch(e){}
   const type=d.std;   // МСФО/РСБУ
   const chosen=Array.from(document.querySelectorAll('.sl-per:checked'))
     .map(x=>d.periods[+x.dataset.i]).filter(Boolean);
@@ -16842,6 +16874,7 @@ function applyImportedJsonText(raw){
     mergeImportedData(d);
   }
   _idbLoadDone = true;   // восстановление — осознанная запись, гонки тут нет
+  try{ _migrateGirboType(); }catch(e){}   // бэкап мог хранить ГИР БО/FY — нормализуем сразу
   save();
   renderYtm(); renderPort(); renderSbLists();
   document.getElementById('sb-pc').textContent = portfolio.length;
