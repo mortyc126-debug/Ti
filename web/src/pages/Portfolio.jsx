@@ -21,6 +21,17 @@ const fmtRub = n => {
 };
 const _PIE = ['#4ea1ff', '#ffb02e', '#49d17e', '#b07cff', '#ff6b6b', '#2dd4bf', '#f472b6', '#a3e635', '#fb923c', '#60a5fa', '#c084fc', '#34d399'];
 
+// Человекочитаемое «когда»: только что / N мин / N ч назад / дата.
+function fmtWhen(ts){
+  if(!ts) return '';
+  const d = Date.now() - ts, m = Math.round(d / 60000);
+  if(m < 1) return 'только что';
+  if(m < 60) return m + ' мин назад';
+  const h = Math.round(m / 60);
+  if(h < 24) return h + ' ч назад';
+  return new Date(ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
 // Единая строка таблицы для реального и мок-портфеля.
 // value — стоимость позиции, ₽; pnl — нереализованный P&L, ₽.
 function realRow(p, bondByIsin, issuerByInn, bondz){
@@ -106,6 +117,8 @@ export default function Portfolio(){
   const loading  = usePortfolioStore(s => s.loading);
   const error    = usePortfolioStore(s => s.error);
   const accounts = usePortfolioStore(s => s.accounts);
+  const cachedAt = usePortfolioStore(s => s.cachedAt);
+  const fresh    = usePortfolioStore(s => s.fresh);
   const load     = usePortfolioStore(s => s.load);
   const bonds    = useBondUniverse();
   const issuers  = useIssuers();
@@ -181,8 +194,10 @@ export default function Portfolio(){
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Портфель</h1>
           <p className="text-text2 text-sm mt-1">
-            {loading ? 'Загрузка позиций из T-Invest…'
-              : isReal ? <>Реальные позиции из T-Invest{accounts.length ? <> · счета: <span className="text-text">{accounts.join(', ')}</span></> : null}</>
+            {loading ? 'Обновление позиций из T-Invest…'
+              : isReal ? <>Реальные позиции из T-Invest{accounts.length ? <> · счета: <span className="text-text">{accounts.join(', ')}</span></> : null}
+                  {cachedAt ? <> · <span className={fresh ? 'text-text3' : 'text-warn'}>{fresh ? 'обновлено' : 'последнее сохранённое'} {fmtWhen(cachedAt)}</span></> : null}
+                  {error ? <> · <span className="text-warn">{error}</span></> : null}</>
               : <>Показаны мок-данные{error ? <> · <span className="text-warn">{error}</span></> : <>. Токен T-API вводится в разделе «Долг».</>}</>}
           </p>
         </div>
