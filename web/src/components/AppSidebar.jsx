@@ -14,7 +14,7 @@ const ITEMS = [
   { id: 'issuers', icon: Building2,  label: 'Эмитенты',  to: '#' },
   { id: 'reports', icon: FileText,   label: 'Отчёты',    to: '/reports' },
   { id: 'sectors', icon: Factory,    label: 'Отрасли',   to: '/industries' },
-  { id: 'cbr',     icon: Percent,    label: 'КС',        to: '/debt' },
+  { id: 'cbr',     icon: Percent,    label: 'КС / спреды', to: '/spreads' },
   { id: 'ytm',     icon: TrendingUp, label: 'YTM/P&L',   to: '#' },
   { id: 'favs',    icon: Star,       label: 'Избранное', to: '/favorites' },
   { id: 'arch',    icon: Archive,    label: 'Архив',     to: '#' },
@@ -59,7 +59,9 @@ export default function AppSidebar(){
                 expanded ? '' : 'justify-center',
               ].join(' ')}
             >
-              <Icon size={16} className="shrink-0" />
+              {(!expanded && it.id === 'cbr' && keyRate != null)
+                ? <span className="text-[10px] font-mono leading-none text-acc">{keyRate}%</span>
+                : <Icon size={16} className="shrink-0" />}
               {expanded && (
                 <span className="text-sm font-mono truncate">{label}</span>
               )}

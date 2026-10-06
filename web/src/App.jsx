@@ -11,6 +11,7 @@ import Market from './pages/Market.jsx';
 import Reports from './pages/Reports.jsx';
 import DebtLoad from './pages/DebtLoad.jsx';
 import Stocks from './pages/Stocks.jsx';
+import Spreads from './pages/Spreads.jsx';
 
 export default function App(){
   return (
@@ -25,6 +26,7 @@ export default function App(){
           <Route path="favorites" element={<Favorites />} />
           <Route path="reports" element={<Reports />} />
           <Route path="debt" element={<DebtLoad />} />
+          <Route path="spreads" element={<Spreads />} />
           <Route path="industries" element={<Industries />} />
           <Route path="market" element={<Market />} />
           <Route path="*" element={<Navigate to="/" replace />} />

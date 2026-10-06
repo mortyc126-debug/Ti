@@ -13,11 +13,11 @@ export default function RateChip(){
   const title = `Ключевая ставка ЦБ: ${current}%`
     + (d ? ` · на ${d}` : '')
     + (source === 'macro-avg' ? ' · среднегодовая (историю заведи в «Долге»)' : '')
-    + '. Клик — модуль «Долг».';
+    + '. Клик — «КС / спреды».';
   return (
     <button
       type="button"
-      onClick={() => navigate('/debt')}
+      onClick={() => navigate('/spreads')}
       title={title}
       className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono text-acc bg-acc-dim hover:brightness-110 transition whitespace-nowrap shrink-0"
     >
