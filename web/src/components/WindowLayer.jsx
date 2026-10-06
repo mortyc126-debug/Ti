@@ -63,8 +63,15 @@ function FloatingWindow({ win }){
   const navigate = useNavigate();
   const isMicro = win.mode === 'micro';
   const isFull  = win.mode === 'full';
-  // «перейти в Долг» по этой бумаге/эмитенту (тикер → имя → ISIN/id)
-  const goDebt = () => navigate('/debt?q=' + encodeURIComponent(win.ticker || win.title || win.id || ''));
+  // «перейти в Долг». Для эмитента ищем по ИМЕНИ (MOEX вернёт все его
+  // выпуски и параметры), а не по тикеру одной бумаги/ISIN — иначе
+  // находится лишь один выпуск. Для акции/облигации тикер уместнее.
+  const goDebt = () => {
+    const q = win.kind === 'issuer'
+      ? (win.title || win.ticker || '')
+      : (win.ticker || win.title || '');
+    navigate('/debt?q=' + encodeURIComponent(q || ''));
+  };
 
   // react-rnd двигает окно через CSS transform (translate). iframe модуля
   // отчётности внутри transform-слоя браузер растрирует в текстуру и на

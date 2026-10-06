@@ -86,7 +86,9 @@ export default function Portfolio(){
     if(r.inn){
       openWin({ kind: 'issuer', id: String(r.inn), inn: String(r.inn), title: r.issuer || r.name, ticker: r.ticker || null, mode: 'medium' });
     } else {
-      navigate('/debt?q=' + encodeURIComponent(r.ticker || r.isin || r.name || ''));
+      // Запасной путь в «Долг»: по ИМЕНИ эмитента (все его выпуски),
+      // а не по ISIN одной бумаги — иначе найдётся лишь один выпуск.
+      navigate('/debt?q=' + encodeURIComponent(r.issuer || r.name || r.ticker || r.isin || ''));
     }
   };
 
