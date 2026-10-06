@@ -172,6 +172,22 @@ function _reportsDbNames(db){
   return map;
 }
 
+// Ключи таксономии модуля отчётности (industry-peers.json) → ключи
+// каталога React (industries.js), чтобы эмитенты из reportsDB правильно
+// группировались в «Отраслях»/«Сравнении»/нормах (единая таксономия).
+const _PEERS_IND_TO_REACT = {
+  oil_gas: 'oil-gas', metals_mining: 'metals', metal_products: 'metalware', machinery: 'machinery',
+  auto: 'auto', electronics: 'electronics', chemistry: 'chemistry', pharma: 'pharma',
+  plastic_rubber: 'plastics', stroy_materials: 'building-mat', wood_paper: 'wood',
+  textile_clothing: 'textile', furniture_other_mfg: 'furniture', agro_food: 'agro',
+  utilities: 'utilities', construction: 'construction', real_estate: 'realestate', retail: 'retail',
+  transport: 'logistics', hotels_catering: 'hospitality', media: 'media', telecom: 'telecom',
+  it_software: 'it', banks: 'banks', insurance: 'insurance', leasing: 'leasing', mfi: 'mfo',
+  holdings_spv: 'holdings', consulting: 'consulting', science_rnd: 'science', admin_services: 'rental',
+  education: 'education', healthcare: 'healthcare', arts_sport: 'entertainment',
+  other_services: 'services-etc', other: 'other',
+};
+
 // Годовые периоды reportsDB («Год»/FY/12М) с type РСБУ/МСФО.
 const _REPDB_ANNUAL = new Set(['ГОД', 'FY', '12М', '12M', 'Y']);
 
@@ -241,7 +257,7 @@ function _reportsDbIssuers(db){
       id: inn || String(id), inn,
       name: iss.name || inn || String(id),
       ticker: null,
-      industry: iss.ind || 'other',
+      industry: _PEERS_IND_TO_REACT[iss.ind] || iss.ind || 'other',
       kinds: ['bond'],
       reports: reps,
     });
