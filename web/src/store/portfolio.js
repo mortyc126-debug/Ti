@@ -34,7 +34,13 @@ export const usePortfolioStore = create((set, get) => ({
       return;
     }
     set({ loading: true, error: null });
-    const r = await loadTinvestPositions();
+    let r;
+    try {
+      r = await loadTinvestPositions();
+    } catch(e){
+      set({ real: null, accounts: [], loading: false, loaded: true, error: _friendlyError(String(e && e.message || e)) });
+      return;
+    }
     if(r.ok){
       set({
         real: r.positions, accounts: r.accounts || [], loading: false, loaded: true,

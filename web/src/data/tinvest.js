@@ -23,10 +23,12 @@ async function tFetch(method, body, tok){
   try {
     res = await fetch(TBASE + '/' + V1 + method, {
       method: 'POST',
+      // Только Content-Type + Authorization: любой доп. заголовок (напр.
+      // x-app-name) добавляет его в CORS-preflight, а T-API его в
+      // Access-Control-Allow-Headers не отдаёт → браузер рубит запрос.
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + tok,
-        'x-app-name': 'bondanalytic-web',
       },
       body: JSON.stringify(body || {}),
       signal: ctrl.signal,
