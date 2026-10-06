@@ -11395,7 +11395,7 @@ function repSameIndustryOpen(){
   const indLabel = (inds[indKey] && inds[indKey].label) || indKey;
   const same = _repIssuersByIndustry(indKey, repActiveIssuerId);
   const listHtml = same.length
-    ? same.map(e => `<div style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:.62rem;display:flex;gap:6px;align-items:center;cursor:pointer" onclick="repSelectIssuerById('${e.id}');var m=document.getElementById('same-ind-modal');if(m)m.remove();" title="Открыть эмитента">
+    ? same.map(e => `<div style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:.62rem;display:flex;gap:6px;align-items:center;cursor:pointer" onclick="repSelectIssuerById('${e.id}');var m=document.getElementById('same-ind-modal');if(m&&m.remove)m.remove();" title="Открыть эмитента">
         <span style="flex:1">${_escHtml(e.name)}</span>
         ${e.inn ? `<span style="color:var(--text3);font-family:var(--mono);font-size:.55rem">${_escHtml(String(e.inn))}</span>` : ''}
         <span style="color:var(--acc);font-size:.55rem">открыть →</span></div>`).join('')
@@ -11416,7 +11416,7 @@ function repSameIndustryOpen(){
        </select>
        <button class="btn btn-sm btn-p" onclick="repAddToThisIndustry()" title="Переназначить отрасль выбранного эмитента на «${_escHtml(indLabel)}»">+ в эту отрасль</button>`
     : '<span style="color:var(--text3);font-size:.6rem">Других эмитентов в базе нет.</span>';
-  const existing = document.getElementById('same-ind-modal'); if(existing) existing.remove();
+  const existing = document.getElementById('same-ind-modal'); if(existing && typeof existing.remove === 'function') existing.remove();
   const modal = document.createElement('div');
   modal.id = 'same-ind-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
