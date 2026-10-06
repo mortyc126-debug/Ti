@@ -12010,7 +12010,11 @@ function repRenderCards(p){
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">${ratioCards}</div>`:''}
     ${bridge}
     ${_repAnalysisBlock(reportsDB[repActiveIssuerId], p)}
-    ${(() => { const _ci=_repComputedExtras(p); return _repComputedBlock(_ci, p) + _repExtraBlock(p, new Set(_ci.map(x=>x.slKey).filter(Boolean))); })()}`;
+    ${(() => { const _ci=_repComputedExtras(p); const _cov=new Set(_ci.map(x=>x.slKey).filter(Boolean));
+      // У банка профильные ключи уже показаны банковской моделью — прячем их
+      // из «★ Остальные метрики», чтобы не дублировать сырыми.
+      if(_repBankDetect(reportsDB[repActiveIssuerId])) _repBankCoveredKeys(p).forEach(k=>_cov.add(k));
+      return _repComputedBlock(_ci, p) + _repExtraBlock(p, _cov); })()}`;
 }
 
 // Мостик денежного потока EBITDA → CFO → FCF → FCF после дивидендов.
@@ -16273,9 +16277,17 @@ function _repBankVal(p, re){ if(!p||!p.extra) return null; for(const k in p.extr
 // (или отрасль — финансы/банки).
 function _repBankDetect(iss){
   if(!iss) return false;
-  if(/bank|банк|mfi|мфо|лизинг|leasing|finance/i.test(String(iss.ind||''))) { /* не достаточно — проверим данные */ }
+  // Явно банковская отрасль — сразу банк (после унификации ключей — 'banks').
+  if(/^banks$/i.test(String(iss.ind||''))) return true;
+  // Иначе — по данным. НЕ требуем полную тройку (кредиты+депозиты+проц.доход):
+  // частично заполненный банк (напр. есть ROE/NIM/CoR/NPL/капитал, но нет
+  // разбивки депозитов) иначе не распознаётся и его метрики уходят в «прочие»
+  // вместо банковской модели. Достаточно двух профильных признаков в extra —
+  // корп-эмитенты этих ключей не хранят, ложных срабатываний нет.
+  const SIG=[/кредитный портфель/i,/^депозиты,/i,/чист\.?\s*проц/i,/стоимость риска|cor/i,
+    /просроченные кредиты|npl/i,/дост\.?\s*общ/i,/loan-to-deposit|^l\/d/i,/\bnim\b/i,/резервы под обесцен/i];
   for(const k in (iss.periods||{})){ const p=iss.periods[k]; if(!p||!p.extra) continue;
-    if(_repBankVal(p,/кредитный портфель/i)!=null && _repBankVal(p,/^депозиты,/i)!=null && _repBankVal(p,/чист\.?\s*проц/i)!=null) return true; }
+    let n=0; for(const re of SIG){ if(_repBankVal(p,re)!=null && ++n>=2) return true; } }
   return false;
 }
 function _repBankAnnualSeries(iss){
@@ -16437,6 +16449,14 @@ function _repBankSectorBlock(iss,p){
     <div style="font-size:.52rem;color:var(--text3);margin-bottom:6px">Медиана по ${med._n} банкам в твоей базе (последний годовой период каждого). Зелёным — где банк лучше медианы сектора.</div>
     <table style="width:100%;border-collapse:collapse;font-size:.64rem"><thead><tr style="color:var(--text3);font-size:.55rem;text-transform:uppercase"><th style="padding:2px 8px;text-align:left">Метрика</th><th style="padding:2px 8px;text-align:right">Банк</th><th style="padding:2px 8px;text-align:right">Сектор (мед.)</th><th style="padding:2px 8px;text-align:right">Δ</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
+// Ключи extra, которые «съедает» банковская модель (_repBankBlock) — чтобы
+// не дублировать их сырыми в блоке «★ Остальные метрики» у банков.
+const _REP_BANK_KEY_RES=[/кредитный портфель/i,/кредиты физ/i,/кредиты юр/i,/^депозиты/i,/депозиты физ/i,/депозиты юр/i,
+  /чист\.?\s*проц/i,/чистая процентн/i,/чист\.?\s*комисс/i,/чистый операц доход/i,/опер\.?\s*расход/i,/доходы по цб/i,
+  /создание резервов/i,/резервы под обесцен/i,/неработающие кредиты/i,/просроченные кредиты|npl/i,
+  /стоимость риска|cor/i,/дост\.?\s*общ/i,/базового капитала|cet/i,/\broe\b/i,/\broa\b/i,
+  /расходы\/доходы|cir/i,/loan-to-deposit|^l\/d/i,/\bnim\b/i];
+function _repBankCoveredKeys(p){ const s=new Set(); if(p&&p.extra) for(const k in p.extra){ if(_REP_BANK_KEY_RES.some(re=>re.test(k))) s.add(k); } return s; }
 function _repBankBlock(iss,p){
   const V=re=>_repBankVal(p,re);
   const pc=v=>v==null?'—':(v*100).toFixed(1)+'%', f0=v=>v==null?'—':Math.round(v).toLocaleString('ru-RU'), f1=v=>v==null?'—':(Math.round(v*10)/10);

@@ -116,9 +116,15 @@ function CompanyRow({ item, color, layerOn, onToggleVis, onRemove, hovered, onHo
     }
   }, [hovered]);
 
-  const openIssuer = () => openWin({
-    kind: 'issuer', id: iss.id, title: iss.name, ticker: iss.ticker || null, mode: 'medium',
-  });
+  // Эмитент без ИНН живёт только в reportsDB (модуль «Отчётность») —
+  // бэкенд-окно по ИНН для него пустое. Ведём в «Отчётность» по имени.
+  const openIssuer = () => {
+    if(iss.inn){
+      openWin({ kind: 'issuer', id: iss.id, inn: String(iss.inn), title: iss.name, ticker: iss.ticker || null, mode: 'medium' });
+    } else {
+      navigate('/reports?issuer=' + encodeURIComponent(iss.name || ''));
+    }
+  };
   return (
     <li
       ref={ref}
