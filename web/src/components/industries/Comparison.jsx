@@ -91,11 +91,17 @@ export default function Comparison(){
   // показываем их (с учётом фильтра, напр. «Банки»); фолбэк на всех.
   useEffect(() => {
     if(selectedView && selectedView.length) return;
-    const src = (candidates && candidates.length)
-      ? candidates.map(c => ({ id: c.id, kind: c.kind }))
-      : (allIssuers || []).map(i => ({ id: i.id, kind: (i.kinds && i.kinds[0]) || 'bond' }));
+    let src = [];
+    if(candidates && candidates.length){
+      src = candidates.map(c => ({ id: c.id, kind: c.kind }));
+    } else if(!sources.industry){
+      // Фолбэк на всех эмитентов — ТОЛЬКО когда фильтр по отрасли выключен.
+      // Иначе пустой результат фильтра (нет компаний отрасли за этот год)
+      // не должен подменяться случайными — иначе «фильтр перестаёт работать».
+      src = (allIssuers || []).map(i => ({ id: i.id, kind: (i.kinds && i.kinds[0]) || 'bond' }));
+    }
     if(src.length) replaceSelected(src.slice(0, 8));
-  }, [candidates, allIssuers, selectedView, replaceSelected]);
+  }, [candidates, allIssuers, selectedView, sources.industry, replaceSelected]);
 
   // Применить top-N. Метрики по умолчанию — 'safety', если ничего не выбрано.
   const applyTopN = () => {
