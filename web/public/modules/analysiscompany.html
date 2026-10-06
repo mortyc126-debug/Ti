@@ -11363,30 +11363,42 @@ async function repChangeIndustry(){
   const iss = reportsDB[repActiveIssuerId];
   if(!iss) return;
   if(typeof _indLoad === 'function') await _indLoad();
-  const industries = window._industryData?.industries || {};
-  const entries = Object.entries(industries).map(([k, v]) => [k, v?.label || k]);
-  entries.sort((a, b) => {
-    if(a[0] === 'other') return 1;
-    if(b[0] === 'other') return -1;
-    return a[1].localeCompare(b[1], 'ru');
-  });
   const current = iss.ind || 'other';
-  const list = entries.map(([k, label]) => `${k === current ? '● ' : '○ '}${label} (${k})`).join('\n');
-  const input = prompt(`Отрасль эмитента «${iss.name}»\nТекущая: ${current}\n\nДоступные отрасли:\n${list}\n\nВведи ключ (oil-gas, banks, holdings, utilities, it, ...) или «other» для сброса:`, current);
-  if(input === null) return;
-  const newKey = String(input).trim();
-  if(!industries[newKey] && newKey !== 'other'){
-    alert('Нет такого ключа. Используй один из: ' + Object.keys(industries).join(', '));
-    return;
-  }
+  const ex = document.getElementById('ci-ind-modal'); if(ex && typeof ex.remove === 'function') ex.remove();
+  const modal = document.createElement('div');
+  modal.id = 'ci-ind-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = `
+    <div style="background:var(--s1);border:1px solid var(--border2);width:420px;max-width:96vw;display:flex;flex-direction:column">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);background:var(--s2);display:flex;align-items:center;gap:8px">
+        <strong style="font-size:.72rem">Отрасль: ${_escHtml(iss.name || '')}</strong>
+        <button onclick="document.getElementById('ci-ind-modal').remove()" style="margin-left:auto;background:none;border:none;color:var(--text);font-size:1.1rem;cursor:pointer">✕</button>
+      </div>
+      <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
+        <select id="ci-ind-sel" style="font-size:.72rem;padding:6px 8px;background:var(--s2);border:1px solid var(--border);color:var(--text)"></select>
+        <div style="display:flex;gap:6px;justify-content:flex-end">
+          <button class="btn btn-sm" onclick="document.getElementById('ci-ind-modal').remove()">Отмена</button>
+          <button class="btn btn-sm btn-p" onclick="repChangeIndustrySave()">Сохранить</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target === modal) modal.remove(); });
+  // Грузим полный сгруппированный список в селект (как в форме эмитента).
+  _repFillIndustrySelect('ci-ind-sel', current);
+}
+
+function repChangeIndustrySave(){
+  const iss = reportsDB[repActiveIssuerId]; if(!iss) return;
+  const sel = document.getElementById('ci-ind-sel'); if(!sel) return;
+  const newKey = sel.value || 'other';
   iss.ind = newKey;
-  // Помечаем ручной выбор, чтобы массовый пересчёт по ОКВЭД его не затёр.
-  // При явном возврате в 'other' снимаем отметку — это откат, не ручной выбор.
-  if(newKey === 'other'){ delete iss.indManual; }
-  else { iss.indManual = true; }
+  // Ручной выбор помечаем, чтобы массовый ОКВЭД-пересчёт не затёр.
+  if(newKey === 'other'){ delete iss.indManual; } else { iss.indManual = true; }
   save();
+  const m = document.getElementById('ci-ind-modal'); if(m && m.remove) m.remove();
   _repRenderActiveIssuerHeader();
-  repRenderIssuerList();
+  try { repRenderIssuerList(); } catch(e){}
 }
 
 // Эмитенты reportsDB той же отрасли (кроме excludeId). [{id,name,inn}].
