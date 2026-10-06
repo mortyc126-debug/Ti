@@ -1,9 +1,54 @@
 {
   "schema": "bondan/industry-peers/v2",
   "version": 2,
-  "note": "Стартовая база компаний по отраслям + маппинг ОКВЭД2. Поле `group` — для группировки узких отраслей в укрупнённые блоки. Редактируется через страницу «🏭 Отрасли» в приложении; изменения пользователя ложатся в localStorage['bondan_industry_peers'] и мёрджатся с этим файлом при загрузке. Чем длиннее префикс okved2 (например '64.20'), тем приоритетнее он в классификаторе — поэтому holdings_spv (64.20) побеждает banks (64).",
+  "note": "Единая таксономия: ключи/ярлыки/группы = web/src/data/industries.js (36 отраслей, 10 групп).",
   "industries": {
-    "oil_gas": {
+    "agro": {
+      "label": "Агро и пищевая промышленность",
+      "group": "raw",
+      "okved2": [
+        "01",
+        "02",
+        "03",
+        "10",
+        "11",
+        "12"
+      ],
+      "peers": []
+    },
+    "metals": {
+      "label": "Металлы и добыча руд",
+      "group": "raw",
+      "okved2": [
+        "07",
+        "08",
+        "09.9",
+        "24"
+      ],
+      "peers": [
+        {
+          "inn": "8401005730",
+          "name": "ПАО «ГМК Норильский никель»"
+        },
+        {
+          "inn": "3528000597",
+          "name": "ПАО «Северсталь»"
+        },
+        {
+          "inn": "4823006703",
+          "name": "ПАО «НЛМК»"
+        },
+        {
+          "inn": "7702630464",
+          "name": "ПАО «Полюс»"
+        },
+        {
+          "inn": "1433000147",
+          "name": "АК «АЛРОСА» (ПАО)"
+        }
+      ]
+    },
+    "oil-gas": {
       "label": "Нефть и газ",
       "group": "raw",
       "okved2": [
@@ -38,43 +83,22 @@
         }
       ]
     },
-    "metals_mining": {
-      "label": "Металлы и добыча руд",
-      "group": "raw",
-      "okved2": [
-        "07",
-        "08",
-        "09.9",
-        "24"
-      ],
-      "peers": [
-        {
-          "inn": "8401005730",
-          "name": "ПАО «ГМК Норильский никель»"
-        },
-        {
-          "inn": "3528000597",
-          "name": "ПАО «Северсталь»"
-        },
-        {
-          "inn": "4823006703",
-          "name": "ПАО «НЛМК»"
-        },
-        {
-          "inn": "7702630464",
-          "name": "ПАО «Полюс»"
-        },
-        {
-          "inn": "1433000147",
-          "name": "АК «АЛРОСА» (ПАО)"
-        }
-      ]
-    },
-    "metal_products": {
-      "label": "Металлоизделия",
+    "auto": {
+      "label": "Автомобили, транспортная техника",
       "group": "manuf",
       "okved2": [
-        "25"
+        "29",
+        "30"
+      ],
+      "peers": []
+    },
+    "wood": {
+      "label": "Дерево, бумага, печать",
+      "group": "manuf",
+      "okved2": [
+        "16",
+        "17",
+        "18"
       ],
       "peers": []
     },
@@ -87,29 +111,46 @@
       ],
       "peers": []
     },
-    "auto": {
-      "label": "Автомобили, транспортная техника",
+    "furniture": {
+      "label": "Мебель и прочее производство",
       "group": "manuf",
       "okved2": [
-        "29",
-        "30"
+        "31",
+        "32"
       ],
       "peers": []
     },
-    "electronics": {
-      "label": "Электроника и электрооборудование",
+    "metalware": {
+      "label": "Металлоизделия",
       "group": "manuf",
       "okved2": [
-        "26",
-        "27"
+        "25"
       ],
       "peers": []
     },
-    "chemistry": {
-      "label": "Химия и удобрения",
+    "plastics": {
+      "label": "Пластмассы и резина",
       "group": "manuf",
       "okved2": [
-        "20"
+        "22"
+      ],
+      "peers": []
+    },
+    "building-mat": {
+      "label": "Стройматериалы",
+      "group": "manuf",
+      "okved2": [
+        "23"
+      ],
+      "peers": []
+    },
+    "textile": {
+      "label": "Текстиль и одежда",
+      "group": "manuf",
+      "okved2": [
+        "13",
+        "14",
+        "15"
       ],
       "peers": []
     },
@@ -121,61 +162,20 @@
       ],
       "peers": []
     },
-    "plastic_rubber": {
-      "label": "Пластмассы и резина",
+    "chemistry": {
+      "label": "Химия и удобрения",
       "group": "manuf",
       "okved2": [
-        "22"
+        "20"
       ],
       "peers": []
     },
-    "stroy_materials": {
-      "label": "Стройматериалы",
+    "electronics": {
+      "label": "Электроника и электрооборудование",
       "group": "manuf",
       "okved2": [
-        "23"
-      ],
-      "peers": []
-    },
-    "wood_paper": {
-      "label": "Дерево, бумага, печать",
-      "group": "manuf",
-      "okved2": [
-        "16",
-        "17",
-        "18"
-      ],
-      "peers": []
-    },
-    "textile_clothing": {
-      "label": "Текстиль и одежда",
-      "group": "manuf",
-      "okved2": [
-        "13",
-        "14",
-        "15"
-      ],
-      "peers": []
-    },
-    "furniture_other_mfg": {
-      "label": "Мебель и прочее производство",
-      "group": "manuf",
-      "okved2": [
-        "31",
-        "32"
-      ],
-      "peers": []
-    },
-    "agro_food": {
-      "label": "Агро и пищевая промышленность",
-      "group": "raw",
-      "okved2": [
-        "01",
-        "02",
-        "03",
-        "10",
-        "11",
-        "12"
+        "26",
+        "27"
       ],
       "peers": []
     },
@@ -191,6 +191,14 @@
       ],
       "peers": []
     },
+    "realestate": {
+      "label": "Недвижимость (аренда, управление)",
+      "group": "build",
+      "okved2": [
+        "68"
+      ],
+      "peers": []
+    },
     "construction": {
       "label": "Строительство и девелопмент",
       "group": "build",
@@ -198,14 +206,6 @@
         "41",
         "42",
         "43"
-      ],
-      "peers": []
-    },
-    "real_estate": {
-      "label": "Недвижимость (аренда, управление)",
-      "group": "build",
-      "okved2": [
-        "68"
       ],
       "peers": []
     },
@@ -224,7 +224,7 @@
         }
       ]
     },
-    "transport": {
+    "logistics": {
       "label": "Транспорт и логистика",
       "group": "transport",
       "okved2": [
@@ -244,15 +244,6 @@
           "name": "ПАО «Аэрофлот»"
         }
       ]
-    },
-    "hotels_catering": {
-      "label": "Гостиницы и общепит",
-      "group": "services",
-      "okved2": [
-        "55",
-        "56"
-      ],
-      "peers": []
     },
     "media": {
       "label": "Медиа и связь",
@@ -285,7 +276,7 @@
         }
       ]
     },
-    "it_software": {
+    "it": {
       "label": "IT и разработка ПО",
       "group": "it-media",
       "okved2": [
@@ -312,6 +303,23 @@
         }
       ]
     },
+    "leasing": {
+      "label": "Лизинг",
+      "group": "finance",
+      "okved2": [
+        "77"
+      ],
+      "peers": []
+    },
+    "mfo": {
+      "label": "МФО и потребительское кредитование",
+      "group": "finance",
+      "okved2": [
+        "64.92",
+        "64.99"
+      ],
+      "peers": []
+    },
     "insurance": {
       "label": "Страхование",
       "group": "finance",
@@ -321,24 +329,7 @@
       ],
       "peers": []
     },
-    "leasing": {
-      "label": "Лизинг",
-      "group": "finance",
-      "okved2": [
-        "77"
-      ],
-      "peers": []
-    },
-    "mfi": {
-      "label": "МФО и потребительское кредитование",
-      "group": "finance",
-      "okved2": [
-        "64.92",
-        "64.99"
-      ],
-      "peers": []
-    },
-    "holdings_spv": {
+    "holdings": {
       "label": "Холдинги / SPV",
       "group": "finance",
       "okved2": [
@@ -349,6 +340,64 @@
         "66.19",
         "66.11",
         "66.12"
+      ],
+      "peers": []
+    },
+    "rental": {
+      "label": "Аренда, услуги, персонал",
+      "group": "services",
+      "okved2": [
+        "78",
+        "79",
+        "80",
+        "81",
+        "82"
+      ],
+      "peers": []
+    },
+    "hospitality": {
+      "label": "Гостиницы и общепит",
+      "group": "services",
+      "okved2": [
+        "55",
+        "56"
+      ],
+      "peers": []
+    },
+    "healthcare": {
+      "label": "Здравоохранение",
+      "group": "services",
+      "okved2": [
+        "86",
+        "87",
+        "88"
+      ],
+      "peers": []
+    },
+    "entertainment": {
+      "label": "Искусство, спорт, развлечения",
+      "group": "services",
+      "okved2": [
+        "90",
+        "91",
+        "92",
+        "93"
+      ],
+      "peers": []
+    },
+    "science": {
+      "label": "Наука и R&D",
+      "group": "services",
+      "okved2": [
+        "72"
+      ],
+      "peers": []
+    },
+    "education": {
+      "label": "Образование",
+      "group": "services",
+      "okved2": [
+        "85"
       ],
       "peers": []
     },
@@ -364,56 +413,7 @@
       ],
       "peers": []
     },
-    "science_rnd": {
-      "label": "Наука и R&D",
-      "group": "services",
-      "okved2": [
-        "72"
-      ],
-      "peers": []
-    },
-    "admin_services": {
-      "label": "Аренда, услуги, персонал",
-      "group": "services",
-      "okved2": [
-        "78",
-        "79",
-        "80",
-        "81",
-        "82"
-      ],
-      "peers": []
-    },
-    "education": {
-      "label": "Образование",
-      "group": "services",
-      "okved2": [
-        "85"
-      ],
-      "peers": []
-    },
-    "healthcare": {
-      "label": "Здравоохранение",
-      "group": "services",
-      "okved2": [
-        "86",
-        "87",
-        "88"
-      ],
-      "peers": []
-    },
-    "arts_sport": {
-      "label": "Искусство, спорт, развлечения",
-      "group": "services",
-      "okved2": [
-        "90",
-        "91",
-        "92",
-        "93"
-      ],
-      "peers": []
-    },
-    "other_services": {
+    "services-etc": {
       "label": "Прочие услуги",
       "group": "services",
       "okved2": [

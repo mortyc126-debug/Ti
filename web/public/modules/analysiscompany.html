@@ -2935,9 +2935,11 @@ function loadState(){
         _idbSet('reportsDB', reportsDB).catch(function(){});
       }
       _idbLoadDone=true;   // первичное чтение завершено — save() снова свободен
+      // Миграция ключей отраслей на единую таксономию (старые → React).
+      var _indMig=false; try{ _indMig=_migrateIndustryKeys(); }catch(e){}
       // Миграция ГИР БО/FY что-то поменяла — закрепляем в хранилище, чтобы
       // приведение к РСБУ/Год было разовым, а не повторялось каждый запуск.
-      if(_migrated){ try{ save(); }catch(e){} }
+      if(_migrated || _indMig){ try{ save(); }catch(e){} }
       try{ if(typeof repRebuildSelect==='function') repRebuildSelect(); }catch(e){}
       try{ if(typeof repRenderIssuerList==='function') repRenderIssuerList(); }catch(e){}
       try{ var sb=document.getElementById('sb-rep'); if(sb) sb.textContent=Object.keys(reportsDB).length; }catch(e){}
@@ -5038,6 +5040,37 @@ window._industryData = null;       // {industries: {key: {label, okved2, peers:[
 window._industryMedians = null;    // {industryKey: {year: {fid: {p25,p50,p75,n}}}}
 window._indActiveKey = null;
 
+// Единая таксономия: исторически модуль хранил свои ключи отраслей
+// (it_software, metals_mining…), а React-разделы — свои (it, metals…).
+// Теперь ключ один — React-каталога. Карта миграции старых ключей.
+const _IND_OLD2NEW = {
+  oil_gas:'oil-gas', metals_mining:'metals', metal_products:'metalware', machinery:'machinery',
+  auto:'auto', electronics:'electronics', chemistry:'chemistry', pharma:'pharma',
+  plastic_rubber:'plastics', stroy_materials:'building-mat', wood_paper:'wood',
+  textile_clothing:'textile', furniture_other_mfg:'furniture', agro_food:'agro',
+  utilities:'utilities', construction:'construction', real_estate:'realestate', retail:'retail',
+  transport:'logistics', hotels_catering:'hospitality', media:'media', telecom:'telecom',
+  it_software:'it', banks:'banks', insurance:'insurance', leasing:'leasing', mfi:'mfo',
+  holdings_spv:'holdings', consulting:'consulting', science_rnd:'science', admin_services:'rental',
+  education:'education', healthcare:'healthcare', arts_sport:'entertainment',
+  other_services:'services-etc', other:'other', development:'construction'
+};
+function _canonInd(k){ return _IND_OLD2NEW[k] || k || 'other'; }
+
+// Разовая миграция iss.ind в reportsDB на новые ключи. Возвращает true,
+// если что-то поменяли (чтобы persist'нуть).
+function _migrateIndustryKeys(){
+  let changed = false;
+  try {
+    for(const id in reportsDB){
+      const iss = reportsDB[id]; if(!iss || !iss.ind) continue;
+      const nk = _IND_OLD2NEW[iss.ind];
+      if(nk && nk !== iss.ind){ iss.ind = nk; changed = true; }
+    }
+  } catch(e){}
+  return changed;
+}
+
 // Классификатор ОКВЭД → ключ отрасли из industry-peers.json.
 // Принимает код вроде "35.11.1" или "64.99" или "35" — возвращает ключ
 // ("utilities") или null если не нашлось. Работает по принципу «самый
@@ -5099,6 +5132,12 @@ async function _indLoad(){
   try {
     const raw = localStorage.getItem('bondan_industry_peers');
     if(raw) user = JSON.parse(raw);
+    // Ремап пользовательских ключей на новую таксономию (идемпотентно).
+    if(user && user.industries){
+      const ri = {};
+      for(const k in user.industries){ const nk = _canonInd(k); ri[nk] = user.industries[k]; }
+      user.industries = ri;
+    }
   } catch(e){}
   // 3) мёрдж: отрасль из user полностью побеждает seed; если в user
   // отрасли нет — берём seed-версию.
@@ -6119,20 +6158,21 @@ function rosstatStoreParsed(parsed){
 // строку, которая есть в данных конкретного года. При желании можно
 // переопределить через localStorage['bondan_rosstat_map'] в будущем.
 const _ROSSTAT_INDUSTRY_MAP = {
-  oil_gas:       ['добыча сырой нефти и природного газа', 'производство кокса и нефтепродуктов', 'добыча полезных ископаемых'],
-  metals_mining: ['производство металлургическое', 'добыча металлических руд', 'добыча полезных ископаемых'],
+  'oil-gas':     ['добыча сырой нефти и природного газа', 'производство кокса и нефтепродуктов', 'добыча полезных ископаемых'],
+  metals:        ['производство металлургическое', 'добыча металлических руд', 'добыча полезных ископаемых'],
   telecom:       ['деятельность в области информации и связи'],
   banks:         ['деятельность финансовая и страховая'],
   retail:        ['торговля оптовая и розничная; ремонт автотранспортных средств и мотоциклов', 'торговля розничная, кроме торговли автотранспортными средствами и мотоциклами'],
-  transport:     ['транспортировка и хранение'],
-  it_software:   ['деятельность в области информации и связи'],
+  logistics:     ['транспортировка и хранение'],
+  it:            ['деятельность в области информации и связи'],
   utilities:     ['обеспечение электрической энергией, газом и паром; кондиционирование воздуха', 'водоснабжение; водоотведение, организация сбора и утилизации отходов, деятельно'],
   pharma:        ['производство лекарственных средств и материалов, применяемых в медицинских целях', 'деятельность в области здравоохранения и социальных услуг'],
   chemistry:     ['производство химических веществ и химических продуктов'],
-  development:   ['строительство', 'деятельность по операциям с недвижимым имуществом'],
+  construction:  ['строительство', 'деятельность по операциям с недвижимым имуществом'],
+  realestate:    ['деятельность по операциям с недвижимым имуществом', 'строительство'],
   leasing:       ['деятельность финансовая и страховая'],
-  mfi:           ['деятельность финансовая и страховая'],
-  agro_food:     ['сельское, лесное хозяйство, охота, рыболовство и рыбоводство', 'производство пищевых продуктов', 'растениеводство и животноводство, охота и предоставление соответствующих услуг в этих областях'],
+  mfo:           ['деятельность финансовая и страховая'],
+  agro:          ['сельское, лесное хозяйство, охота, рыболовство и рыбоводство', 'производство пищевых продуктов', 'растениеводство и животноводство, охота и предоставление соответствующих услуг в этих областях'],
   other:         ['всего']
 };
 
@@ -10932,12 +10972,12 @@ function repRenderIssuerList(){
       if(status === 'stale' && (!m.year || m.year >= thisYear - 2)) continue;
       if(status === 'no_moex' && _repHasMoexBonds(id, iss)) continue;
       if(status === 'spv_no_parent'){
-        // Признак SPV: iss.ind='holdings_spv' ИЛИ имя содержит Финанс/
+        // Признак SPV: iss.ind='holdings' ИЛИ имя содержит Финанс/
         // Капитал/СПВ/Финансы ИЛИ совсем нет периодов но есть ИНН (эмитент
         // бондов без самостоятельной отчётности).
         const nm = String(iss.name || '');
         const spvName = /(Финанс|Капитал|Инвест|Холдинг|СПВ|SPV|Финансы)\b/i.test(nm);
-        const isSpvInd = iss.ind === 'holdings_spv';
+        const isSpvInd = iss.ind === 'holdings';
         const emptyButHasInn = periodCount === 0 && hasInn;
         const isSpv = spvName || isSpvInd || emptyButHasInn;
         const hasParent = Array.isArray(iss.related) && iss.related.some(r => r && r.role === 'parent');
@@ -10997,7 +11037,7 @@ function repRenderIssuerList(){
     // Отрасль (label из industry-peers.json) + подсветка SPV.
     const indKey = iss.ind || 'other';
     const indLabel = window._industryData?.industries?.[indKey]?.label || (indKey === 'other' ? 'отрасль?' : indKey);
-    const isSpv = indKey === 'holdings_spv';
+    const isSpv = indKey === 'holdings';
     const indBadgeColor = isSpv ? 'var(--warn)' : (indKey === 'other' ? 'var(--text3)' : 'var(--acc)');
     const okvedTip = iss.okved ? `ОКВЭД ${iss.okved}${iss.okvedName ? ' — ' + iss.okvedName.slice(0, 80) : ''}` : 'ОКВЭД не известен — запусти «📡 ГИР БО (дописать)»';
     // Рейтинговый мини-бейдж: берём максимальный из iss.ratings (если
@@ -11095,7 +11135,7 @@ function _repRenderActiveIssuerHeader(){
   box.style.display = '';
   const indKey = iss.ind || 'other';
   const indLabel = window._industryData?.industries?.[indKey]?.label || (indKey === 'other' ? 'не определена' : indKey);
-  const isSpv = indKey === 'holdings_spv';
+  const isSpv = indKey === 'holdings';
   const indColor = isSpv ? 'var(--warn)' : (indKey === 'other' ? 'var(--text3)' : 'var(--acc)');
   const okvedStr = iss.okved ? `<span style="color:var(--text2);font-family:var(--mono)">${_escHtml(iss.okved)}</span>${iss.okvedName ? ' — <span style="color:var(--text3)">' + _escHtml(iss.okvedName.slice(0, 100)) + '</span>' : ''}` : '<span style="color:var(--text3)">не определён (запусти «📡 ГИР БО (дописать)»)</span>';
   // Плитка «Запас прочности»: композит debt-wall/stressed-ICR/Altman-Z'.
@@ -11316,7 +11356,7 @@ async function repChangeIndustry(){
   });
   const current = iss.ind || 'other';
   const list = entries.map(([k, label]) => `${k === current ? '● ' : '○ '}${label} (${k})`).join('\n');
-  const input = prompt(`Отрасль эмитента «${iss.name}»\nТекущая: ${current}\n\nДоступные отрасли:\n${list}\n\nВведи ключ (oil_gas, banks, holdings_spv, utilities, ...) или «other» для сброса:`, current);
+  const input = prompt(`Отрасль эмитента «${iss.name}»\nТекущая: ${current}\n\nДоступные отрасли:\n${list}\n\nВведи ключ (oil-gas, banks, holdings, utilities, it, ...) или «other» для сброса:`, current);
   if(input === null) return;
   const newKey = String(input).trim();
   if(!industries[newKey] && newKey !== 'other'){
@@ -11331,6 +11371,83 @@ async function repChangeIndustry(){
   save();
   _repRenderActiveIssuerHeader();
   repRenderIssuerList();
+}
+
+// Эмитенты reportsDB той же отрасли (кроме excludeId). [{id,name,inn}].
+function _repIssuersByIndustry(indKey, excludeId){
+  const out = [];
+  for(const id in reportsDB){
+    const iss = reportsDB[id]; if(!iss) continue;
+    if(id === excludeId) continue;
+    if((iss.ind || 'other') === indKey) out.push({ id, name: iss.name || id, inn: iss.inn || '' });
+  }
+  out.sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru'));
+  return out;
+}
+
+// Панель «та же отрасль»: список эмитентов этой отрасли (клик → открыть) +
+// добавить в неё другого эмитента из базы (переназначить его iss.ind).
+function repSameIndustryOpen(){
+  if(!repActiveIssuerId){ alert('Сначала выберите эмитента'); return; }
+  const iss = reportsDB[repActiveIssuerId]; if(!iss) return;
+  const indKey = iss.ind || 'other';
+  const inds = (window._industryData && window._industryData.industries) || {};
+  const indLabel = (inds[indKey] && inds[indKey].label) || indKey;
+  const same = _repIssuersByIndustry(indKey, repActiveIssuerId);
+  const listHtml = same.length
+    ? same.map(e => `<div style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:.62rem;display:flex;gap:6px;align-items:center;cursor:pointer" onclick="repSelectIssuerById('${e.id}');var m=document.getElementById('same-ind-modal');if(m)m.remove();" title="Открыть эмитента">
+        <span style="flex:1">${_escHtml(e.name)}</span>
+        ${e.inn ? `<span style="color:var(--text3);font-family:var(--mono);font-size:.55rem">${_escHtml(String(e.inn))}</span>` : ''}
+        <span style="color:var(--acc);font-size:.55rem">открыть →</span></div>`).join('')
+    : '<div style="padding:10px;color:var(--text3);font-size:.6rem">В этой отрасли больше нет эмитентов в базе.</div>';
+  // peers из сид-каталога (ИНН), которых ещё нет в reportsDB — для справки
+  const inBase = new Set(Object.values(reportsDB || {}).map(x => String(x && x.inn || '')));
+  const peers = ((inds[indKey] && inds[indKey].peers) || []).filter(p => p && p.inn && !inBase.has(String(p.inn)));
+  const peersHtml = peers.length
+    ? `<div style="padding:6px 8px;border-top:1px solid var(--border);font-size:.55rem;color:var(--text3)">Из справочника отрасли (нет в базе): ${peers.slice(0,20).map(p => _escHtml(p.name || p.inn)).join(', ')}${peers.length>20?' …':''}</div>`
+    : '';
+  // кандидаты на добавление — прочие эмитенты базы
+  const others = [];
+  for(const id in reportsDB){ const x = reportsDB[id]; if(!x || id === repActiveIssuerId) continue; if((x.ind || 'other') !== indKey) others.push({ id, name: x.name || id, ind: x.ind || 'other' }); }
+  others.sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru'));
+  const addHtml = others.length
+    ? `<select id="si-add-sel" style="flex:1;min-width:0;font-size:.6rem;padding:3px 6px;background:var(--s2);border:1px solid var(--border);color:var(--text)">
+         ${others.map(o => `<option value="${o.id}">${_escHtml(o.name)} — ${_escHtml((inds[o.ind] && inds[o.ind].label) || o.ind)}</option>`).join('')}
+       </select>
+       <button class="btn btn-sm btn-p" onclick="repAddToThisIndustry()" title="Переназначить отрасль выбранного эмитента на «${_escHtml(indLabel)}»">+ в эту отрасль</button>`
+    : '<span style="color:var(--text3);font-size:.6rem">Других эмитентов в базе нет.</span>';
+  const existing = document.getElementById('same-ind-modal'); if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'same-ind-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = `
+    <div style="background:var(--s1);border:1px solid var(--border2);width:560px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column">
+      <div style="padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);background:var(--s2)">
+        <strong style="font-size:.72rem">🏭 Отрасль: ${_escHtml(indLabel)}</strong>
+        <span style="color:var(--text3);font-size:.55rem">${same.length} эмитент(ов) в базе</span>
+        <button onclick="document.getElementById('same-ind-modal').remove()" style="margin-left:auto;background:none;border:none;color:var(--text);font-size:1.1rem;cursor:pointer">✕</button>
+      </div>
+      <div style="overflow-y:auto;flex:1">${listHtml}${peersHtml}</div>
+      <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:.55rem;color:var(--text3);width:100%">Добавить эмитента в эту отрасль (переназначить его сектор):</span>
+        ${addHtml}
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target === modal) modal.remove(); });
+}
+
+// Переназначить отрасль выбранного в селекте эмитента на отрасль активного.
+function repAddToThisIndustry(){
+  const iss = reportsDB[repActiveIssuerId]; if(!iss) return;
+  const indKey = iss.ind || 'other';
+  const sel = document.getElementById('si-add-sel'); if(!sel || !sel.value) return;
+  const target = reportsDB[sel.value]; if(!target) return;
+  target.ind = indKey;
+  target.indManual = true;   // ручной выбор — массовый ОКВЭД-пересчёт не затрёт
+  save();
+  try { repRenderIssuerList(); } catch(e){}
+  repSameIndustryOpen();     // перерисовать панель с обновлённым списком
 }
 
 // Редактор связанных компаний для активного эмитента. Хранится в
@@ -12212,7 +12329,7 @@ function _repFillIndustrySelect(selId, current){
     if(!/>other</.test(html)) html+='<option value="other">Прочее</option>';
   } else {
     // фолбэк, если справочник ещё не загрузился
-    html='<option value="banks">Банки</option><option value="leasing">Лизинг</option><option value="mfi">МФО</option><option value="insurance">Страхование</option><option value="oil_gas">Нефть и газ</option><option value="metals_mining">Металлы и добыча</option><option value="retail">Ритейл</option><option value="telecom">Телеком</option><option value="construction">Строительство</option><option value="other">Прочее</option>';
+    html='<option value="banks">Банки</option><option value="leasing">Лизинг</option><option value="mfo">МФО</option><option value="insurance">Страхование</option><option value="oil-gas">Нефть и газ</option><option value="metals">Металлы и добыча руд</option><option value="retail">Ритейл и опт</option><option value="telecom">Телеком</option><option value="construction">Строительство и девелопмент</option><option value="other">Прочее</option>';
   }
   sel.innerHTML=html;
   if(current){ if(![...sel.options].some(o=>o.value===current)){ const o=document.createElement('option'); o.value=current; o.textContent=current+' (текущее)'; sel.insertBefore(o,sel.firstChild); } sel.value=current; }
@@ -31411,15 +31528,15 @@ var _FACTOR_GROUPS={raw:'Ресурсы и сырьё',manuf:'Обрабат. п
 var _FACTOR_EFFECT={'+':{l:'помогает',c:'var(--pos)'},'±':{l:'неоднозначно',c:'var(--warn)'},'~':{l:'нейтрально',c:'var(--t3)'},'-':{l:'давит',c:'var(--neg)'}};
 // ИНН-peer ключ (industry-peers.json) → группа норм (10 групп).
 var _FACTOR_IND2GROUP={
-  oil_gas:'raw',metals_mining:'raw',agro_food:'raw',
-  metal_products:'manuf',machinery:'manuf',auto:'manuf',electronics:'manuf',chemistry:'manuf',pharma:'manuf',plastic_rubber:'manuf',stroy_materials:'manuf',wood_paper:'manuf',textile_clothing:'manuf',furniture_other_mfg:'manuf',
+  'oil-gas':'raw',metals:'raw',agro:'raw',
+  metalware:'manuf',machinery:'manuf',auto:'manuf',electronics:'manuf',chemistry:'manuf',pharma:'manuf',plastics:'manuf','building-mat':'manuf',wood:'manuf',textile:'manuf',furniture:'manuf',
   utilities:'energy',
-  construction:'build',real_estate:'build',
+  construction:'build',realestate:'build',
   retail:'trade',
-  transport:'transport',
-  media:'it-media',telecom:'it-media',it_software:'it-media',
-  banks:'finance',insurance:'finance',leasing:'finance',mfi:'finance',holdings_spv:'finance',
-  hotels_catering:'services',consulting:'services',science_rnd:'services',admin_services:'services',education:'services',healthcare:'services',arts_sport:'services',other_services:'services'
+  logistics:'transport',
+  media:'it-media',telecom:'it-media',it:'it-media',
+  banks:'finance',insurance:'finance',leasing:'finance',mfo:'finance',holdings:'finance',
+  hospitality:'services',consulting:'services',science:'services',rental:'services',education:'services',healthcare:'services',entertainment:'services','services-etc':'services'
 };
 var _FACTOR_M={
   fx_up:{raw:{e:'+',m:'выручка, EBITDA',n:'Экспортная выручка в рублях растёт при тех же долларовых ценах.'},manuf:{e:'±',m:'маржа',n:'Экспортёры выигрывают; у кого импортные компоненты — растёт себестоимость.'},energy:{e:'~',m:'—',n:'Тарифы в рублях, экспорта мало.'},build:{e:'-',m:'себестоимость',n:'Импортные материалы/техника дорожают.'},trade:{e:'-',m:'валовая маржа',n:'Импортные товары дорожают быстрее, чем можно поднять цены.'},transport:{e:'±',m:'ставки/затраты',n:'Экспортная логистика — плюс; импорт техники и валютный лизинг — минус.'},'it-media':{e:'~',m:'—',n:'Выручка в рублях; влияние через импортное оборудование.'},finance:{e:'±',m:'переоценка',n:'Зависит от валютной позиции.'},services:{e:'~',m:'—',n:'В основном внутренний рынок.'},other:{e:'~',m:'—',n:'Зависит от бизнеса.'}},
@@ -31472,9 +31589,10 @@ function _repBuildIssuerHeader(iss, issId){
           +(r.agency?_escHtml(r.agency)+' ':'')+_escHtml(r.rating)+outlook+'</span>';
       }).join('')+'</div>';
   }
-  var indHtml = '<span style="color:var(--pur);border:1px solid rgba(170,90,255,0.22);padding:1px 5px;font-size:9px">'+_escHtml(indLabel)+'</span>';
+  var indHtml = '<button type="button" onclick="repSameIndustryOpen&&repSameIndustryOpen()" title="Показать эмитентов этой же отрасли / добавить сюда" style="color:var(--pur);border:1px solid rgba(170,90,255,0.22);background:none;padding:1px 6px;font-size:9px;cursor:pointer">'+_escHtml(indLabel)+' 👥</button>';
   var actHtml = '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'
     + '<button class="btn" onclick="repEditIssuer&&repEditIssuer()">✎ отрасль</button>'
+    + '<button class="btn" onclick="repSameIndustryOpen&&repSameIndustryOpen()" title="Эмитенты той же отрасли + добавить туда">🏭 отрасль</button>'
     + '<button class="btn" onclick="repRunAudit&&repRunAudit()">аудит</button>'
     + '<button class="btn" onclick="repDisclOpen&&repDisclOpen()" title="Вставить список раскрытий с e-disclosure/ГИР БО и создать заготовки периодов с датами">📋 раскрытия</button>'
     + '<button class="btn" onclick="repSlOpen&&repSlOpen()" title="Импорт таблицы показателей со smart-lab.ru: вставить → назначить строки → создать периоды (уникальные метрики сохраняются)">📥 smart-lab</button>'
