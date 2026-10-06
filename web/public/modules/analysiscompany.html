@@ -2948,11 +2948,11 @@ function loadState(){
       // Разовая авто-переклассификация (лизинги из банков, банки по модели).
       // После _indLoad (нужен справочник для ОКВЭД), один раз по флагу.
       try{
-        if(!localStorage.getItem('bondan_ind_reclass_v3') && typeof _indLoad==='function'){
+        if(!localStorage.getItem('bondan_ind_reclass_v4') && typeof _indLoad==='function'){
           _indLoad().then(function(){
             try{
               var rc=_reclassifyIndustriesOnce();
-              localStorage.setItem('bondan_ind_reclass_v3','1');
+              localStorage.setItem('bondan_ind_reclass_v4','1');
               if(rc){ try{save();}catch(e){} try{repRenderIssuerList();}catch(e){} try{if(typeof repRebuildSelect==='function')repRebuildSelect();}catch(e){} }
             }catch(e){}
           }).catch(function(){});
@@ -5090,6 +5090,25 @@ function _migrateIndustryKeys(){
 //   2) иначе, если есть ОКВЭД — пересчитываем по справочнику (чиним
 //      кучу лизингов/МФО, ранее улетевших в «банки» из-за жадного 64.9).
 // Требует загруженного window._industryData (вызывать после _indLoad).
+// Отрасль по НАЗВАНИЮ для финансовых сущностей — надёжно, когда нет ОКВЭД.
+// Порядок важен: «...ЛИЗИНГ» → лизинг (даже «ВТБ Лизинг»), затем страхование,
+// факторинг/МФО, СФО/ипотечные агенты → SPV/holdings, и только потом «банк».
+function _indByName(name){
+  const s = String(name || '').toLowerCase();
+  if(!s) return null;
+  // JS \b/\w не работают с кириллицей — аббревиатуры (МФО/МФК/МКК/СФО)
+  // ищем по токенам, а длинные корни (лизинг/страхов/…) — подстрокой.
+  const toks = s.split(/[^а-яёa-z0-9]+/).filter(Boolean);
+  const tok = w => toks.indexOf(w) >= 0;
+  if(/лизинг|leasing/.test(s)) return 'leasing';
+  if(/страхов|insurance|перестрах/.test(s)) return 'insurance';
+  if(/факторинг|factoring/.test(s)) return 'mfo';
+  if(tok('мфо') || tok('мфк') || tok('мкк') || /микрофинанс|микрокредит|микрозайм/.test(s)) return 'mfo';
+  if(tok('сфо') || /ипотечн[а-яё]* агент|секьюритиз|сопф/.test(s)) return 'holdings';
+  if(/банк|bank/.test(s)) return 'banks';
+  return null;
+}
+
 function _reclassifyIndustriesOnce(){
   let changed = false;
   try {
@@ -5097,7 +5116,11 @@ function _reclassifyIndustriesOnce(){
       const iss = reportsDB[id]; if(!iss) continue;
       if(iss.indManual) continue;
       let nk = null;
-      try { if(typeof _repBankDetect==='function' && _repBankDetect(iss)) nk = 'banks'; } catch(e){}
+      // 1) явные финансовые по названию (лизинг/страх/МФО/СФО/банк)
+      try { nk = _indByName(iss.name); } catch(e){}
+      // 2) банк по модели отчётности (ловит банки без слова «банк» в имени)
+      if(!nk){ try { if(typeof _repBankDetect==='function' && _repBankDetect(iss)) nk = 'banks'; } catch(e){} }
+      // 3) по ОКВЭД из справочника
       if(!nk && iss.okved && typeof _okvedToIndustry==='function'){
         try { nk = _okvedToIndustry(String(iss.okved)); } catch(e){}
       }
