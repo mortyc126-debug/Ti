@@ -10,6 +10,8 @@ import { INDUSTRIES } from '../data/industries.js';
 import { usePortfolioStore } from '../store/portfolio.js';
 import { useBondUniverse } from '../store/marketData.js';
 import { useIssuers } from '../store/issuers.js';
+import { loadBondization, futureEvents, scheduleByMonth, computeYtm, duration } from '../lib/bondization.js';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const fmtRub = n => {
   if(n == null) return '—';
@@ -17,15 +19,23 @@ const fmtRub = n => {
   if(Math.abs(n) >= 1e3) return (n / 1e3).toFixed(1) + ' тыс ₽';
   return Math.round(n).toLocaleString('ru-RU') + ' ₽';
 };
+const _PIE = ['#4ea1ff', '#ffb02e', '#49d17e', '#b07cff', '#ff6b6b', '#2dd4bf', '#f472b6', '#a3e635', '#fb923c', '#60a5fa', '#c084fc', '#34d399'];
 
 // Единая строка таблицы для реального и мок-портфеля.
 // value — стоимость позиции, ₽; pnl — нереализованный P&L, ₽.
-function realRow(p, bondByIsin, issuerByInn){
+function realRow(p, bondByIsin, issuerByInn, bondz){
   const b = p.isin ? bondByIsin.get(String(p.isin).toUpperCase()) : null;
   // Эмитент — по ИНН (резолв через MOEX) из списка эмитентов; отрасль
   // оттуда же, иначе из облигации. Название — эмитента, иначе бумаги.
   const iss = p.inn ? issuerByInn.get(String(p.inn)) : null;
   const pnlPct = p.costRub ? p.pnlRub / p.costRub * 100 : null;
+  // YTM/дюрация — точный расчёт по расписанию MOEX (bondization) против
+  // грязной цены (цена+НКД за 1 бумагу). Фолбэк — из вселенной облигаций.
+  const bz = bondz ? bondz[String(p.moexSecid || p.isin || '').toUpperCase()] : null;
+  const dirty = (p.last || 0) + (p.nkd || 0);
+  let ytm = bz ? computeYtm(bz, dirty) : null;
+  if(ytm == null) ytm = b?.ytm ?? null;
+  const dur = bz && ytm != null ? duration(bz, ytm / 100) : (b?.duration_years ?? null);
   return {
     key: p.isin || p.ticker || p.name,
     name: p.name || p.ticker || p.isin,
@@ -33,7 +43,7 @@ function realRow(p, bondByIsin, issuerByInn){
     issuer: iss?.name || p.issuerTitle || b?.issuer || p.ticker || null,
     ind: iss?.industry || b?.industry || null,
     qty: p.qty, avg: p.avg, last: p.last,
-    ytm: b?.ytm ?? null, dur: b?.duration_years ?? null,
+    ytm, dur,
     value: p.valRub, pnl: p.pnlRub, pnlPct,
     inn: p.inn || iss?.inn || null, ticker: p.ticker || null, isin: p.isin || null,
   };
@@ -113,10 +123,27 @@ export default function Portfolio(){
   }, [issuers]);
 
   const isReal = !!(realPos && realPos.length);
+
+  // Расписание выплат (MOEX bondization) по каждому выпуску портфеля.
+  const [bondz, setBondz] = useState({});
+  useEffect(() => {
+    if(!isReal) return;
+    let alive = true;
+    (async () => {
+      const keys = [...new Set((realPos || []).map(p => String(p.moexSecid || p.isin || '').toUpperCase()).filter(Boolean))];
+      const out = {};
+      let i = 0; const CONC = 6;
+      async function w(){ while(i < keys.length){ const k = keys[i++]; out[k] = await loadBondization(k); } }
+      await Promise.all(Array.from({ length: CONC }, w));
+      if(alive) setBondz(out);
+    })();
+    return () => { alive = false; };
+  }, [isReal, realPos]);
+
   const allRows = useMemo(() => isReal
-    ? realPos.map(p => realRow(p, bondByIsin, issuerByInn))
+    ? realPos.map(p => realRow(p, bondByIsin, issuerByInn, bondz))
     : mockPositions.map(mockRow),
-    [isReal, realPos, bondByIsin, issuerByInn]);
+    [isReal, realPos, bondByIsin, issuerByInn, bondz]);
 
   const rows = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -126,6 +153,27 @@ export default function Portfolio(){
 
   const t = useMemo(() => computeTotals(allRows), [allRows]);
   const sectors = useMemo(() => computeSectors(allRows), [allRows]);
+
+  // График выплат 12 мес + ближайшие события (из bondization × количество).
+  const schedule = useMemo(() => {
+    if(!isReal) return { months: [], upcoming: [], sum12: 0 };
+    const posForEvents = (realPos || []).map(p => ({
+      secid: p.moexSecid, isin: p.isin, qty: p.qty, name: p.name,
+      issuer: (p.inn && issuerByInn.get(String(p.inn))?.name) || p.issuerTitle || p.name,
+    }));
+    const events = futureEvents(bondz, posForEvents);
+    const months = scheduleByMonth(events, 12);
+    const sum12 = months.reduce((s, m) => s + m.total, 0);
+    return { months, upcoming: events.slice(0, 12), sum12 };
+  }, [isReal, realPos, bondz, issuerByInn]);
+
+  // Концентрация по эмитентам (доли от стоимости).
+  const concentration = useMemo(() => {
+    const m = new Map();
+    for(const r of allRows){ const k = r.issuer || r.name || '—'; m.set(k, (m.get(k) || 0) + (r.value || 0)); }
+    const arr = [...m.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+    return arr.slice(0, 12);
+  }, [allRows]);
 
   return (
     <div className="space-y-6">
@@ -221,6 +269,73 @@ export default function Portfolio(){
             <span className="text-text3 text-[11px] font-mono">всего</span>
             <Badge tone="acc">{allRows.length} позиций</Badge>
           </div>
+        </Card>
+      </div>
+
+      {/* График выплат (12 мес) + ближайшие + концентрация — из MOEX
+          bondization по каждому выпуску × количество. */}
+      <div className="grid lg:grid-cols-3 gap-5">
+        <div className="lg:col-span-2">
+          <Card title={`Выплаты, 12 мес${schedule.sum12 ? ' · ' + fmtRub(schedule.sum12) : ''}`}>
+            {schedule.sum12 > 0 ? (
+              <>
+                <div style={{ width: '100%', height: 230 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={schedule.months} margin={{ top: 5, right: 8, left: 0, bottom: 0 }}>
+                      <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text3)' }} />
+                      <YAxis tick={{ fontSize: 10, fill: 'var(--text3)' }} tickFormatter={v => v >= 1e6 ? (v / 1e6).toFixed(1) + 'м' : v >= 1e3 ? (v / 1e3).toFixed(0) + 'к' : v} />
+                      <Tooltip formatter={(v, n) => [fmtRub(v), n === 'coupon' ? 'Купоны' : 'Амортизация/погашение']} contentStyle={{ fontSize: 11 }} />
+                      <Bar dataKey="coupon" stackId="a" fill="#4ea1ff" name="coupon" />
+                      <Bar dataKey="amort" stackId="a" fill="#ffb02e" name="amort" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-3 border-t border-border/60 pt-2">
+                  <div className="text-text3 text-[10px] uppercase font-mono mb-1 tracking-wider">Ближайшие выплаты</div>
+                  <div className="space-y-1">
+                    {schedule.upcoming.map((e, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs">
+                        <span className="text-text3 font-mono w-[84px] shrink-0">{e.date}</span>
+                        <span className={e.type === 'coupon' ? 'text-acc' : 'text-warn'}>{e.type === 'coupon' ? 'купон' : 'аморт.'}</span>
+                        <span className="flex-1 truncate text-text2">{e.issuer || e.name}</span>
+                        <span className="font-mono text-text">{fmtRub(e.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-text3 text-xs py-8 text-center">
+                {isReal ? 'Расписание выплат подгружается из MOEX… (или нет облигаций с расписанием)' : 'Подключи реальный портфель (токен в «Долге»), чтобы увидеть график выплат.'}
+              </div>
+            )}
+          </Card>
+        </div>
+
+        <Card title="Концентрация по эмитентам">
+          {concentration.length ? (
+            <>
+              <div style={{ width: '100%', height: 200 }}>
+                <ResponsiveContainer>
+                  <PieChart>
+                    <Pie data={concentration} dataKey="value" nameKey="name" innerRadius={42} outerRadius={82} paddingAngle={1}>
+                      {concentration.map((e, i) => <Cell key={i} fill={_PIE[i % _PIE.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={(v, n) => [fmtRub(v), n]} contentStyle={{ fontSize: 11 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-2 space-y-1 max-h-44 overflow-y-auto">
+                {concentration.map((e, i) => (
+                  <div key={i} className="flex items-center gap-2 text-[11px]">
+                    <span style={{ width: 8, height: 8, background: _PIE[i % _PIE.length], display: 'inline-block', borderRadius: 2 }} />
+                    <span className="flex-1 truncate text-text2">{e.name}</span>
+                    <span className="font-mono text-text3">{t.navRub ? (e.value / t.navRub * 100).toFixed(1) + '%' : ''}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : <div className="text-text3 text-xs py-8 text-center">Нет позиций.</div>}
         </Card>
       </div>
     </div>
