@@ -1,7 +1,7 @@
 // Главный layout вкладки «Сравнение»: source-bar сверху → фильтры →
 // два колонки (радар слева, панель компаний справа).
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import SourceBar from './SourceBar.jsx';
 import CompFilters from './CompFilters.jsx';
 import ComparisonRadar from './ComparisonRadar.jsx';
@@ -80,6 +80,19 @@ export default function Comparison(){
 
   // Текущий selected → view с iss-данными (пересчёт при смене года/данных).
   const selectedView = useMemo(() => buildSelectedView(selected, false), [selected, allIssuers]);
+
+  // Чтобы «Сравнение» не открывалось пустым: если ничего не выбрано, но
+  // эмитенты есть — один раз подставляем первые несколько на радар. Дальше
+  // пользователь меняет набор сам (пикер/топ-N/чекбоксы).
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if(seededRef.current) return;
+    if(selected && selected.length){ seededRef.current = true; return; }
+    if(allIssuers && allIssuers.length){
+      seededRef.current = true;
+      replaceSelected(allIssuers.slice(0, 6).map(i => ({ id: i.id, kind: (i.kinds && i.kinds[0]) || 'bond' })));
+    }
+  }, [allIssuers, selected, replaceSelected]);
 
   // Применить top-N.
   const applyTopN = () => {
