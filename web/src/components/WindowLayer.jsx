@@ -43,6 +43,21 @@ export default function WindowLayer(){
   );
 }
 
+// Зажим позиции окна при перетаскивании/ресайзе: шапка не должна уходить
+// под верхнюю панель (sticky, выше слоя окон) — иначе её не схватить. Тот
+// же порог TOP=52, что в windows.clampToViewport. По бокам/снизу оставляем
+// захватываемую полосу.
+function _clampWinPos(x, y){
+  const TOP = 52;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const maxX = Math.max(0, vw - 160);
+  const maxY = Math.max(TOP, vh - 44);
+  return {
+    x: Math.min(Math.max(0, x || 0), maxX),
+    y: Math.min(Math.max(TOP, y || 0), maxY),
+  };
+}
+
 function FloatingWindow({ win }){
   const { close, duplicate, focus, setMode, setTab, patch } = useWindows.getState();
   const navigate = useNavigate();
@@ -87,11 +102,12 @@ function FloatingWindow({ win }){
         // сбрасываем флаг и коммитим позицию: useLayoutEffect после ре-рендера
         // вернёт top/left уже со свежими координатами (crisp).
         onDragStart: () => { busyRef.current = true; toTransformMode(); },
-        onDragStop: (_, d) => { busyRef.current = false; patch(win.wid, { x: d.x, y: d.y }); },
+        onDragStop: (_, d) => { busyRef.current = false; const p = _clampWinPos(d.x, d.y); patch(win.wid, p); },
         onResizeStart: () => { busyRef.current = true; toTransformMode(); },
         onResizeStop: (_, __, ref, ___, pos) => {
           busyRef.current = false;
-          patch(win.wid, { w: parseInt(ref.style.width, 10), h: parseInt(ref.style.height, 10), x: pos.x, y: pos.y }); } };
+          const p = _clampWinPos(pos.x, pos.y);
+          patch(win.wid, { w: parseInt(ref.style.width, 10), h: parseInt(ref.style.height, 10), x: p.x, y: p.y }); } };
 
   return (
     <Rnd
