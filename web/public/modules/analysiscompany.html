@@ -5141,10 +5141,26 @@ async function _indLoad(){
   } catch(e){}
   // 3) мёрдж: отрасль из user полностью побеждает seed; если в user
   // отрасли нет — берём seed-версию.
+  // Метаданные (label/group/okved2) — ВСЕГДА из сида (канон), иначе
+  // стухший localStorage-кэш со старыми группами/ключами перекрывал бы
+  // правильный сид. От пользователя берём только добавленные peers
+  // (объединяем с сидовыми по ИНН) — так сидовые банки не пропадают.
   const merged = {industries: {}};
-  const allKeys = new Set([...Object.keys(seed.industries || {}), ...Object.keys(user.industries || {})]);
+  const sInd = seed.industries || {}, uInd = user.industries || {};
+  const allKeys = new Set([...Object.keys(sInd), ...Object.keys(uInd)]);
   for(const k of allKeys){
-    merged.industries[k] = (user.industries && user.industries[k]) || seed.industries[k];
+    const s = sInd[k], u = uInd[k];
+    if(s){
+      const peers = Array.isArray(s.peers) ? s.peers.slice() : [];
+      const seen = new Set(peers.map(p => String(p && p.inn || '')));
+      for(const p of (u && Array.isArray(u.peers) ? u.peers : [])){
+        if(p && p.inn && !seen.has(String(p.inn))){ peers.push(p); seen.add(String(p.inn)); }
+      }
+      merged.industries[k] = { label: s.label, group: s.group, okved2: s.okved2 || [], peers };
+    } else {
+      // отрасль, которой нет в сиде (создана пользователем) — как есть
+      merged.industries[k] = u;
+    }
   }
   window._industryData = merged;
   // Медианы — из localStorage (будут пересчитаны по кнопке).
@@ -5181,15 +5197,15 @@ async function indRender(){
     (myByInd[k] = myByInd[k] || []).push({ id: iid, name: iss.name || '', inn: iss.inn || '' });
   }
   // Группировка: отрасли → по group → сортировка внутри по label.
-  const GROUP_ORDER = ['resources', 'industry', 'utilities', 'construction', 'trade', 'transport', 'it', 'finance', 'services', 'other'];
+  const GROUP_ORDER = ['raw', 'manuf', 'energy', 'build', 'trade', 'transport', 'it-media', 'finance', 'services', 'other'];
   const GROUP_LABELS = {
-    resources: '⛏ Ресурсы и сырьё',
-    industry: '🏭 Обрабатывающая промышленность',
-    utilities: '⚡ Энергетика и ЖКХ',
-    construction: '🏗 Стройка и недвижимость',
+    raw: '⛏ Ресурсы и сырьё',
+    manuf: '🏭 Обрабатывающая промышленность',
+    energy: '⚡ Энергетика и ЖКХ',
+    build: '🏗 Стройка и недвижимость',
     trade: '🛒 Торговля',
     transport: '🚛 Транспорт',
-    it: '💻 IT, связь и медиа',
+    'it-media': '💻 IT, связь и медиа',
     finance: '💰 Финансы',
     services: '🛎 Услуги и разное',
     other: '📦 Прочее'
