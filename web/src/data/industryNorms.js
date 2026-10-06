@@ -41,11 +41,35 @@ export const NORMS_FINANCE_OVERRIDE = {
   safety: { green: 60, red: 35 },
 };
 
+// Банковские нормы (своя модель, %). Применяются к сектору «Банки»
+// (группа finance). green = «хорошо»/«не хуже», red = «плохо»/«хуже».
+// Для higher=false (CoR/NPL/CIR) зелёное = меньше. Значения — ориентир
+// по российским банкам (Эксперт РА/АКРА-практика), автокалибровка их
+// уточнит по реальным данным базы (как у других секторов).
+export const NORMS_BANK = {
+  b_roe: { green: 18, red: 8 },    // ROE, higher
+  b_roa: { green: 2.5, red: 1.0 }, // ROA, higher
+  b_nim: { green: 5,  red: 3 },    // NIM, higher
+  b_cor: { green: 1.5, red: 3.5 }, // Cost of Risk, lower
+  b_npl: { green: 4,  red: 9 },    // NPL, lower
+  b_cov: { green: 100, red: 60 },  // покрытие резервами, higher
+  b_car: { green: 12, red: 9 },    // достаточность капитала, higher
+  b_cir: { green: 45, red: 65 },   // CIR, lower
+  b_ltd: { green: 90, red: 60 },   // Loan/Deposit, higher
+};
+
+// Метрики банковской таблицы норм (в порядке показа).
+export const BANK_NORM_METRICS = ['b_roe', 'b_roa', 'b_nim', 'b_cor', 'b_npl', 'b_cov', 'b_car', 'b_cir', 'b_ltd'];
+
 // Резолвинг нормы для пары (industryId, metricId). Возвращает
-// { green, red, source: 'group'|'universal'|null } или null если нормы
-// не определены для этой метрики (например percentileBased).
+// { green, red, source: 'group'|'universal'|'bank'|null } или null если
+// нормы не определены для этой метрики (например percentileBased).
 export function defaultNormFor(industryId, metricId){
   const groupId = INDUSTRIES[industryId]?.groupId ?? 'other';
+  // Банковские метрики — только для сектора «Банки» (группа finance).
+  if(NORMS_BANK[metricId]){
+    return groupId === 'finance' ? { ...NORMS_BANK[metricId], source: 'bank' } : null;
+  }
   // Тир 2: универсальные 0-100 (с finance-override).
   if(NORMS_UNIVERSAL[metricId]){
     if(groupId === 'finance' && NORMS_FINANCE_OVERRIDE[metricId]){

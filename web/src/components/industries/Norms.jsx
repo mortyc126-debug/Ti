@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { RotateCcw, Info } from 'lucide-react';
 import { useIndustryNorms } from '../../store/industryNorms.js';
 import { COMP_METRICS } from '../../data/comparisonMetrics.js';
-import { NORM_GROUPS, NORM_METRICS } from '../../data/industryNorms.js';
+import { NORM_GROUPS, NORM_METRICS, BANK_NORM_METRICS } from '../../data/industryNorms.js';
 import { normSourceLabel } from '../../lib/norms.js';
 
 // Для редактора группы используем «представителя группы» как
@@ -104,6 +104,36 @@ export default function Norms(){
         </table>
       </div>
 
+      {/* Банковские нормы — своя модель (ROE/NIM/CoR/NPL/достаточность/
+          CIR/L-D). Правятся и автокалибруются так же, как у других
+          секторов; применяются к сектору «Банки» (группа finance). */}
+      <div className="text-text2 text-sm mt-2">🏦 Банковские нормы (сектор «Банки»)</div>
+      <div className="bg-bg2 border border-border rounded-lg overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-s2/60 text-text3 uppercase text-[10px]">
+            <tr>
+              <th className="text-left p-2 pl-4 sticky left-0 bg-s2/95">Сектор</th>
+              {BANK_NORM_METRICS.map(m => (
+                <th key={m} className="text-center p-2">
+                  <div className="flex items-center justify-center gap-1">
+                    {COMP_METRICS[m]?.short || m}
+                    <span title={COMP_METRICS[m]?.tip} className="text-text3/70"><Info size={10} /></span>
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <NormRow
+              group={{ id: 'finance', label: 'Банки' }}
+              metrics={BANK_NORM_METRICS}
+              overrides={overrides}
+              onSetOverride={setOverride}
+            />
+          </tbody>
+        </table>
+      </div>
+
       <div className="text-text3 text-[11px] font-mono leading-relaxed">
         <span className="text-acc">●</span> вручную задано — переопределяет автокалибровку и дефолт ·{' '}
         <span className="text-green">●</span> авто (по реальным данным базы) ·{' '}
@@ -113,13 +143,13 @@ export default function Norms(){
   );
 }
 
-function NormRow({ group, overrides, onSetOverride }){
+function NormRow({ group, overrides, onSetOverride, metrics = NORM_METRICS }){
   return (
     <tr className="border-t border-border/40">
       <td className="p-2 pl-4 sticky left-0 bg-bg2/95 font-mono text-text">
         {group.label}
       </td>
-      {NORM_METRICS.map(m => (
+      {metrics.map(m => (
         <NormCell
           key={m}
           groupId={group.id}
@@ -229,8 +259,11 @@ function fmt(v){
 }
 
 // Прямой доступ к таблице дефолтов, минуя резолвер по industryId.
-import { NORMS_BY_GROUP, NORMS_UNIVERSAL, NORMS_FINANCE_OVERRIDE } from '../../data/industryNorms.js';
+import { NORMS_BY_GROUP, NORMS_UNIVERSAL, NORMS_FINANCE_OVERRIDE, NORMS_BANK } from '../../data/industryNorms.js';
 function readGroupDefault(groupId, metricId){
+  if(NORMS_BANK[metricId]){
+    return groupId === 'finance' ? { ...NORMS_BANK[metricId], source: 'bank' } : null;
+  }
   if(NORMS_UNIVERSAL[metricId]){
     if(groupId === 'finance' && NORMS_FINANCE_OVERRIDE[metricId]){
       return { ...NORMS_FINANCE_OVERRIDE[metricId], source: 'universal-finance' };
