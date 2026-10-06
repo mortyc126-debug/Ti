@@ -31607,7 +31607,7 @@ function _repBuildIssuerHeader(iss, issId){
   }
   var indHtml = '<button type="button" onclick="repSameIndustryOpen&&repSameIndustryOpen()" title="Показать эмитентов этой же отрасли / добавить сюда" style="color:var(--pur);border:1px solid rgba(170,90,255,0.22);background:none;padding:1px 6px;font-size:9px;cursor:pointer">'+_escHtml(indLabel)+' 👥</button>';
   var actHtml = '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'
-    + '<button class="btn" onclick="repEditIssuer&&repEditIssuer()">✎ отрасль</button>'
+    + '<button class="btn" onclick="repChangeIndustry&&repChangeIndustry()" title="Сменить отрасль эмитента">✎ отрасль</button>'
     + '<button class="btn" onclick="repSameIndustryOpen&&repSameIndustryOpen()" title="Эмитенты той же отрасли + добавить туда">🏭 отрасль</button>'
     + '<button class="btn" onclick="repRunAudit&&repRunAudit()">аудит</button>'
     + '<button class="btn" onclick="repDisclOpen&&repDisclOpen()" title="Вставить список раскрытий с e-disclosure/ГИР БО и создать заготовки периодов с датами">📋 раскрытия</button>'
