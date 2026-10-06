@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Wallet, TrendingUp, Clock, Coins, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Wallet, TrendingUp, Clock, Coins, RefreshCw, Scale, FileText } from 'lucide-react';
 import Card from '../components/ui/Card.jsx';
 import Stat from '../components/ui/Stat.jsx';
 import Badge from '../components/ui/Badge.jsx';
@@ -33,6 +34,7 @@ function realRow(p, bondByIsin, issuerByInn){
     qty: p.qty, avg: p.avg, last: p.last,
     ytm: b?.ytm ?? null, dur: b?.duration_years ?? null,
     value: p.valRub, pnl: p.pnlRub, pnlPct,
+    inn: p.inn || iss?.inn || null, ticker: p.ticker || null, isin: p.isin || null,
   };
 }
 function mockRow(p){
@@ -44,6 +46,7 @@ function mockRow(p){
     qty: p.qty, avg: p.avg, last: p.last,
     ytm: p.ytm ?? null, dur: p.dur ?? null,
     value, pnl: value - cost, pnlPct: cost ? (value - cost) / cost * 100 : null,
+    inn: null, ticker: null, isin: p.isin || null,
   };
 }
 
@@ -73,6 +76,16 @@ function computeSectors(rows){
 
 export default function Portfolio(){
   const [filter, setFilter] = useState('');
+  const navigate = useNavigate();
+  // Переходы по позиции: «Долг» (debtload по тикеру/ISIN) и «Отчётность»
+  // (модуль открывается на эмитенте по ИНН/имени).
+  const goDebt = (r) => navigate('/debt?q=' + encodeURIComponent(r.ticker || r.isin || r.issuer || r.name || ''));
+  const goReports = (r) => {
+    const qs = new URLSearchParams();
+    if(r.inn) qs.set('inn', r.inn);
+    if(r.issuer) qs.set('issuer', r.issuer);
+    navigate('/reports' + (qs.toString() ? '?' + qs.toString() : ''));
+  };
 
   const realPos  = usePortfolioStore(s => s.real);
   const loading  = usePortfolioStore(s => s.loading);
@@ -160,7 +173,8 @@ export default function Portfolio(){
                     <th className="text-right p-2">Тек. цена</th>
                     <th className="text-right p-2">YTM</th>
                     <th className="text-right p-2">Стоим.</th>
-                    <th className="text-right p-2 pr-5">P&L</th>
+                    <th className="text-right p-2">P&L</th>
+                    <th className="text-right p-2 pr-5"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -177,15 +191,25 @@ export default function Portfolio(){
                         <td className="p-2 text-right font-mono text-text">{r.last != null ? r.last.toFixed(2) : '—'}</td>
                         <td className="p-2 text-right font-mono text-acc">{r.ytm != null ? r.ytm.toFixed(1) + '%' : '—'}</td>
                         <td className="p-2 text-right font-mono text-text2">{fmtRub(r.value)}</td>
-                        <td className={`p-2 pr-5 text-right font-mono ${pos ? 'text-green' : 'text-danger'}`}>
+                        <td className={`p-2 text-right font-mono ${pos ? 'text-green' : 'text-danger'}`}>
                           {pos ? '+' : ''}{fmtRub(r.pnl)}
                           {r.pnlPct != null && <span className="text-text3 ml-1 text-[10px]">{pos ? '+' : ''}{r.pnlPct.toFixed(1)}%</span>}
+                        </td>
+                        <td className="p-2 pr-5 text-right whitespace-nowrap">
+                          <button type="button" onClick={() => goDebt(r)} title="Долговая нагрузка эмитента"
+                            className="inline-flex items-center justify-center w-6 h-6 rounded border border-border text-text3 hover:text-acc hover:border-acc/40 transition-colors">
+                            <Scale size={13} />
+                          </button>
+                          <button type="button" onClick={() => goReports(r)} title="Отчётность эмитента"
+                            className="inline-flex items-center justify-center w-6 h-6 rounded border border-border text-text3 hover:text-acc hover:border-acc/40 transition-colors ml-1">
+                            <FileText size={13} />
+                          </button>
                         </td>
                       </tr>
                     );
                   })}
                   {!rows.length && (
-                    <tr><td colSpan={7} className="p-8 text-center text-text3 text-sm">{loading ? 'Загрузка…' : 'Ничего не нашлось'}</td></tr>
+                    <tr><td colSpan={8} className="p-8 text-center text-text3 text-sm">{loading ? 'Загрузка…' : 'Ничего не нашлось'}</td></tr>
                   )}
                 </tbody>
               </table>

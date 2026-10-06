@@ -2941,6 +2941,8 @@ function loadState(){
       try{ if(typeof repRebuildSelect==='function') repRebuildSelect(); }catch(e){}
       try{ if(typeof repRenderIssuerList==='function') repRenderIssuerList(); }catch(e){}
       try{ var sb=document.getElementById('sb-rep'); if(sb) sb.textContent=Object.keys(reportsDB).length; }catch(e){}
+      // Deep-link из оболочки: ?inn=/?issuer= → сразу открыть эмитента.
+      try{ if(typeof _openIssuerFromUrl==='function') _openIssuerFromUrl(); }catch(e){}
     }).catch(function(){ _idbLoadDone=true; });
   }catch(e){}
 }
@@ -10185,6 +10187,25 @@ function crossOpenIssuer(issId){
     sel.value = issId;
     if(typeof repSelectIssuer === 'function') repSelectIssuer();
   }
+}
+
+// Deep-link из оболочки: ?inn=<ИНН> и/или ?issuer=<имя> → находим эмитента
+// в reportsDB и открываем его анализ (как клик по имени в «Сравнении»).
+// Матч: сначала по ИНН, затем точное имя, затем частичное.
+function _openIssuerFromUrl(){
+  try{
+    var p = new URLSearchParams(location.search || '');
+    var inn = (p.get('inn') || '').trim();
+    var q = (p.get('issuer') || p.get('q') || '').trim();
+    if(!inn && !q) return;
+    var id = null, k;
+    if(inn){ for(k in reportsDB){ if(reportsDB[k] && String(reportsDB[k].inn||'')===inn){ id=k; break; } } }
+    if(!id && q){ var ql=q.toLowerCase();
+      for(k in reportsDB){ if(reportsDB[k] && String(reportsDB[k].name||'').toLowerCase()===ql){ id=k; break; } }
+      if(!id){ for(k in reportsDB){ if(reportsDB[k] && String(reportsDB[k].name||'').toLowerCase().indexOf(ql)>=0){ id=k; break; } } }
+    }
+    if(id && typeof crossOpenIssuer==='function') crossOpenIssuer(id);
+  }catch(e){}
 }
 
 function crossExportCsv(){
