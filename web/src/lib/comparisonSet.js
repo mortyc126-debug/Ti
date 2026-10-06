@@ -4,7 +4,7 @@
 import { currentIssuers } from '../store/issuers.js';
 import { currentPortfolioPositions } from '../store/portfolio.js';
 import { useBondStore } from '../store/marketData.js';
-import { metricSpec, RADAR_AXES, COMP_METRICS } from '../data/comparisonMetrics.js';
+import { metricSpec, RADAR_AXES, BANK_RADAR_AXES, COMP_METRICS } from '../data/comparisonMetrics.js';
 import { resolveNorm, classifyValue } from './norms.js';
 import { percentileRanks } from './percentile.js';
 
@@ -157,13 +157,18 @@ export function buildSelectedView(selected, visibleOnly){
 export function buildRadarData(selectedView){
   const visible = selectedView.filter(x => x.visible);
   if(!visible.length) return [];
-  // Адаптивные оси: каждая метрика, по которой есть хоть одно значение в
-  // выборке (порядок — как в COMP_METRICS). Пустые (P/E, YTM без данных)
-  // сами отпадают. Радар рисует всё, что реально есть в данных.
-  const axes = Object.values(COMP_METRICS)
-    .map(m => m.id)
-    .filter(id => visible.some(x => x.iss?.mults?.[id] != null));
-  const useAxes = axes.length ? axes : RADAR_AXES;
+  // Банки — отдельная модель: если выборка преимущественно банковская
+  // (есть банковские метрики ≥ половины), рисуем банковские оси
+  // (ROE/NIM/CoR/NPL/достаточность/CIR/L-D), иначе — обычные. Так банки
+  // получают «свою» красивую отрисовку, а не пустой общий радар.
+  const bankish = visible.filter(x => BANK_RADAR_AXES.some(id => x.iss?.mults?.[id] != null));
+  const bankMode = bankish.length > 0 && bankish.length >= Math.ceil(visible.length / 2);
+  const candidateIds = bankMode
+    ? BANK_RADAR_AXES
+    : Object.values(COMP_METRICS).filter(m => !m.bank).map(m => m.id);
+  // Адаптивно оставляем только оси, по которым есть хоть одно значение.
+  const axes = candidateIds.filter(id => visible.some(x => x.iss?.mults?.[id] != null));
+  const useAxes = axes.length ? axes : (bankMode ? BANK_RADAR_AXES : RADAR_AXES);
   const data = useAxes.map(axisId => {
     const spec = metricSpec(axisId);
     const vals = visible.map(x => x.iss.mults?.[axisId] ?? null);

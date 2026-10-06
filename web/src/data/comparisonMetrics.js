@@ -80,9 +80,28 @@ export const COMP_METRICS = {
     higher: true, fmt: '%', radar: false,
     tip: 'Доходность облигации к погашению (для бондов).',
   },
+
+  // ── Банковские метрики (своя модель: считаются из extra периода, %) ──
+  // radar:false — на обычный радар не лезут; для банков используется
+  // отдельный набор BANK_RADAR_AXES (см. buildRadarData).
+  b_roe: { id: 'b_roe', label: 'ROE банка', short: 'ROE', higher: true,  fmt: '%', radar: false, bank: true, tip: 'Рентабельность капитала банка.' },
+  b_roa: { id: 'b_roa', label: 'ROA банка', short: 'ROA', higher: true,  fmt: '%', radar: false, bank: true, tip: 'Рентабельность активов банка.' },
+  b_nim: { id: 'b_nim', label: 'NIM',       short: 'NIM', higher: true,  fmt: '%', radar: false, bank: true, tip: 'Чистая процентная маржа.' },
+  b_cor: { id: 'b_cor', label: 'Cost of Risk', short: 'CoR', higher: false, fmt: '%', radar: false, bank: true, tip: 'Стоимость риска: отчисления в резервы к портфелю. Меньше — лучше.' },
+  b_npl: { id: 'b_npl', label: 'NPL',       short: 'NPL', higher: false, fmt: '%', radar: false, bank: true, tip: 'Доля проблемных кредитов. Меньше — лучше.' },
+  b_cov: { id: 'b_cov', label: 'Покрытие резервами', short: 'Покр.', higher: true, fmt: '%', radar: false, bank: true, tip: 'Резервы к неработающим кредитам.' },
+  b_car: { id: 'b_car', label: 'Достаточность капитала', short: 'CAR', higher: true, fmt: '%', radar: false, bank: true, tip: 'Норматив достаточности капитала.' },
+  b_cir: { id: 'b_cir', label: 'CIR',       short: 'CIR', higher: false, fmt: '%', radar: false, bank: true, tip: 'Cost-to-income: расходы/доходы. Меньше — эффективнее.' },
+  b_ltd: { id: 'b_ltd', label: 'Кредиты/депозиты', short: 'L/D', higher: true, fmt: '%', radar: false, bank: true, tip: 'Loan-to-deposit: насколько кредиты фондируются депозитами.' },
+  b_loans: { id: 'b_loans', label: 'Кредитный портфель', short: 'Кредиты', higher: true, fmt: 'bn', radar: false, bank: true, tip: 'Кредитный портфель, млрд ₽.' },
+  b_dep:   { id: 'b_dep',   label: 'Депозиты', short: 'Депозиты', higher: true, fmt: 'bn', radar: false, bank: true, tip: 'Депозиты клиентов, млрд ₽.' },
 };
 
 export const RADAR_AXES = Object.values(COMP_METRICS).filter(m => m.radar).map(m => m.id);
+
+// Оси радара для банков (своя модель). Используются, когда выборка —
+// преимущественно банки (см. buildRadarData).
+export const BANK_RADAR_AXES = ['b_roe', 'b_roa', 'b_nim', 'b_cov', 'b_car', 'b_cir', 'b_npl', 'b_ltd'];
 
 // Оси для последовательной воронки (без перцентильных).
 export const SEQUENTIAL_AXES = Object.values(COMP_METRICS)

@@ -207,6 +207,39 @@ function _indByNameReact(name){
   return null;
 }
 
+// Банковские метрики из extra периода (своя модель). Проценты хранятся
+// долей → ×100. Та же логика, что в модуле (_cx). Нужны, чтобы банки
+// рисовались по своим осям (ROE/NIM/CoR/NPL/достаточность/CIR/L-D).
+function _cxReact(extra, re){
+  if(!extra) return null;
+  for(const k in extra){ if(re.test(k)){ const v = extra[k]; return (typeof v === 'number' && isFinite(v)) ? v : null; } }
+  return null;
+}
+function _bankMults(p){
+  const e = p && p.extra;
+  if(!e) return null;
+  const pc = v => v != null ? v * 100 : null;
+  const roe = _cxReact(e, /\broe\b/i), roa = _cxReact(e, /\broa\b/i), nim = _cxReact(e, /чистая процентн/i),
+        cor = _cxReact(e, /стоимость риска|cor/i), npl = _cxReact(e, /просроченные кредиты|npl/i),
+        car = _cxReact(e, /дост\.?\s*общ/i), cir = _cxReact(e, /расходы\/доходы|cir/i),
+        ltd = _cxReact(e, /loan-to-deposit|^l\/d/i),
+        rez = _cxReact(e, /резервы под обесцен/i), nwl = _cxReact(e, /неработающие кредиты/i),
+        loans = _cxReact(e, /кредитный портфель/i), dep = _cxReact(e, /^депозиты,/i);
+  const m = {};
+  if(roe != null) m.b_roe = pc(roe);
+  if(roa != null) m.b_roa = pc(roa);
+  if(nim != null) m.b_nim = pc(nim);
+  if(cor != null) m.b_cor = pc(cor);
+  if(npl != null) m.b_npl = pc(npl);
+  if(car != null) m.b_car = pc(car);
+  if(cir != null) m.b_cir = pc(cir);
+  if(ltd != null) m.b_ltd = pc(ltd);
+  if(rez != null && nwl) m.b_cov = rez / nwl * 100;
+  if(loans != null) m.b_loans = loans;
+  if(dep != null) m.b_dep = dep;
+  return Object.keys(m).length ? m : null;
+}
+
 // Годовые периоды reportsDB («Год»/FY/12М) с type РСБУ/МСФО.
 const _REPDB_ANNUAL = new Set(['ГОД', 'FY', '12М', '12M', 'Y']);
 
@@ -268,7 +301,10 @@ function _reportsDbIssuers(db){
     if(!best.size) continue;
     const reps = [];
     for(const [k, p] of best){
-      reps.push({ year: Number(k.split('|')[0]), std: k.split('|')[1], mults: reportToMults(_repPeriodToRow(p)) });
+      const mults = reportToMults(_repPeriodToRow(p));
+      const bm = _bankMults(p);           // банковские метрики из extra, если есть
+      if(bm) Object.assign(mults, bm);
+      reps.push({ year: Number(k.split('|')[0]), std: k.split('|')[1], mults });
     }
     reps.sort((a, b) => b.year - a.year);
     const inn = iss.inn ? String(iss.inn) : null;
