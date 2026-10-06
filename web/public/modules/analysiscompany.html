@@ -2945,6 +2945,19 @@ function loadState(){
       try{ var sb=document.getElementById('sb-rep'); if(sb) sb.textContent=Object.keys(reportsDB).length; }catch(e){}
       // Deep-link из оболочки: ?inn=/?issuer= → сразу открыть эмитента.
       try{ if(typeof _openIssuerFromUrl==='function') _openIssuerFromUrl(); }catch(e){}
+      // Разовая авто-переклассификация (лизинги из банков, банки по модели).
+      // После _indLoad (нужен справочник для ОКВЭД), один раз по флагу.
+      try{
+        if(!localStorage.getItem('bondan_ind_reclass_v3') && typeof _indLoad==='function'){
+          _indLoad().then(function(){
+            try{
+              var rc=_reclassifyIndustriesOnce();
+              localStorage.setItem('bondan_ind_reclass_v3','1');
+              if(rc){ try{save();}catch(e){} try{repRenderIssuerList();}catch(e){} try{if(typeof repRebuildSelect==='function')repRebuildSelect();}catch(e){} }
+            }catch(e){}
+          }).catch(function(){});
+        }
+      }catch(e){}
     }).catch(function(){ _idbLoadDone=true; });
   }catch(e){}
 }
@@ -5065,6 +5078,29 @@ function _migrateIndustryKeys(){
     for(const id in reportsDB){
       const iss = reportsDB[id]; if(!iss || !iss.ind) continue;
       const nk = _IND_OLD2NEW[iss.ind];
+      if(nk && nk !== iss.ind){ iss.ind = nk; changed = true; }
+    }
+  } catch(e){}
+  return changed;
+}
+
+// Разовая авто-переклассификация отраслей (не трогает ручной выбор):
+//   1) если это банк по модели (_repBankDetect) → ind='banks' (сильный
+//      сигнал для импортированных банков без ОКВЭД);
+//   2) иначе, если есть ОКВЭД — пересчитываем по справочнику (чиним
+//      кучу лизингов/МФО, ранее улетевших в «банки» из-за жадного 64.9).
+// Требует загруженного window._industryData (вызывать после _indLoad).
+function _reclassifyIndustriesOnce(){
+  let changed = false;
+  try {
+    for(const id in reportsDB){
+      const iss = reportsDB[id]; if(!iss) continue;
+      if(iss.indManual) continue;
+      let nk = null;
+      try { if(typeof _repBankDetect==='function' && _repBankDetect(iss)) nk = 'banks'; } catch(e){}
+      if(!nk && iss.okved && typeof _okvedToIndustry==='function'){
+        try { nk = _okvedToIndustry(String(iss.okved)); } catch(e){}
+      }
       if(nk && nk !== iss.ind){ iss.ind = nk; changed = true; }
     }
   } catch(e){}
