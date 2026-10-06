@@ -85,23 +85,29 @@ export default function Comparison(){
   // есть кандидаты (с учётом источника/фильтра, напр. «Банки») — сразу
   // показываем их на радаре. Пересеваем при опустошении (сменила фильтр
   // → увидела новый сектор). Фолбэк на всех эмитентов, если пул пуст.
+  // Важно: смотрим на РЕЗОЛВНУТЫЙ вид, а не на selected — в persist-сторе
+  // могли застрять старые id, которые не резолвятся (радар пуст, но
+  // selected «непустой»). Если на радаре реально пусто, а кандидаты есть —
+  // показываем их (с учётом фильтра, напр. «Банки»); фолбэк на всех.
   useEffect(() => {
-    if(selected && selected.length) return;
+    if(selectedView && selectedView.length) return;
     const src = (candidates && candidates.length)
       ? candidates.map(c => ({ id: c.id, kind: c.kind }))
       : (allIssuers || []).map(i => ({ id: i.id, kind: (i.kinds && i.kinds[0]) || 'bond' }));
     if(src.length) replaceSelected(src.slice(0, 8));
-  }, [candidates, allIssuers, selected, replaceSelected]);
+  }, [candidates, allIssuers, selectedView, replaceSelected]);
 
-  // Применить top-N.
+  // Применить top-N. Метрики по умолчанию — 'safety', если ничего не выбрано.
   const applyTopN = () => {
+    if(!candidates.length) return;
+    const metrics = (topN.metrics && topN.metrics.length) ? topN.metrics : ['safety'];
     const issuers = currentIssuers();
     const ctx = { issuers, autocalibrate: autocal, overrides };
     let out;
     if(topN.mode === 'sum'){
-      out = applyTopNSum(candidates, topN.metrics, topN.n);
+      out = applyTopNSum(candidates, metrics, topN.n);
     } else {
-      out = applyTopNSequential(candidates, topN.metrics, ctx);
+      out = applyTopNSequential(candidates, metrics, ctx);
     }
     replaceSelected(out.map(c => ({ id: c.id, kind: c.kind })));
   };
@@ -114,10 +120,11 @@ export default function Comparison(){
         <button
           type="button"
           onClick={applyTopN}
-          disabled={!topN.metrics.length}
+          disabled={!candidates.length}
+          title={candidates.length ? 'Показать на радаре топ-N кандидатов по выбранным метрикам (по умолчанию «запас прочности»)' : 'Нет кандидатов — включите источник (напр. «Все» или «Отрасль»)'}
           className={[
             'px-3 py-1.5 rounded text-xs font-mono uppercase tracking-wider transition-colors border',
-            topN.metrics.length
+            candidates.length
               ? 'bg-acc text-bg border-acc hover:bg-acc/80'
               : 'bg-s2 text-text3 border-border cursor-not-allowed',
           ].join(' ')}
