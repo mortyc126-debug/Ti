@@ -105,7 +105,7 @@ export default function Portfolio(){
           <p className="text-text2 text-sm mt-1">
             {loading ? 'Загрузка позиций из T-Invest…'
               : isReal ? <>Реальные позиции из T-Invest{accounts.length ? <> · счета: <span className="text-text">{accounts.join(', ')}</span></> : null}</>
-              : <>Мок-данные{error ? <> · T-API: <span className="text-warn">{error}</span></> : null}. Токен вводится в разделе «Долг».</>}
+              : <>Показаны мок-данные{error ? <> · <span className="text-warn">{error}</span></> : <>. Токен T-API вводится в разделе «Долг».</>}</>}
           </p>
         </div>
         <div className="flex gap-2">

@@ -7,6 +7,18 @@ import { create } from 'zustand';
 import { loadTinvestPositions, tinvestToken } from '../data/tinvest.js';
 import { positions as mockPositions } from '../data/mockPortfolio.js';
 
+// Сетевой сбой из браузера к invest-public-api.tinkoff.ru почти всегда =
+// браузер не доверяет сертификату Т-Банка (российский УЦ Минцифры не
+// установлен). Подсказываем это прямо, а не «Failed to fetch».
+function _friendlyError(reason){
+  const r = String(reason || '');
+  if(r === 'no-token') return 'нет токена (введите в разделе «Долг»)';
+  if(/Failed to fetch|таймаут|NetworkError|cert|CERT/i.test(r)){
+    return 'нет связи с T-API — вероятно, не установлен корневой сертификат Минцифры (см. чат)';
+  }
+  return r;
+}
+
 export const usePortfolioStore = create((set, get) => ({
   real: null,          // [{isin,ticker,name,type,qty,accounts}] | null (null → мок)
   loading: false,
@@ -29,7 +41,7 @@ export const usePortfolioStore = create((set, get) => ({
         error: r.positions.length ? null : 'портфель пуст',
       });
     } else {
-      set({ real: null, accounts: [], loading: false, loaded: true, error: r.reason });
+      set({ real: null, accounts: [], loading: false, loaded: true, error: _friendlyError(r.reason) });
     }
   },
 }));
