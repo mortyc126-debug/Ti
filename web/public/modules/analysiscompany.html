@@ -3002,6 +3002,20 @@ function _migrateGirboType(){
   }catch(e){}
   return changed;
 }
+// Общий канал синхронизации с соседними разделами (React-оболочка и др.).
+// Один origin → BroadcastChannel ходит между iframe и родителем. Модуль
+// шлёт сигнал «данные поменялись», оболочка сбрасывает кэш и перечитывает.
+var _bondanBC = (function(){ try{ return new BroadcastChannel('bondan-sync'); }catch(e){ return null; } })();
+var _bondanBCTimer = null;
+function _broadcastChange(kind){
+  if(!_bondanBC) return;
+  clearTimeout(_bondanBCTimer);
+  // debounce — при пакетных правках шлём один сигнал.
+  _bondanBCTimer = setTimeout(function(){
+    try{ _bondanBC.postMessage({ type:'changed', kind: kind || 'reportsDB', at: Date.now() }); }catch(e){}
+  }, 400);
+}
+
 function save(){
   // reportsDB — в IndexedDB (надёжно, большой лимит). НО не пишем пустышку
   // до завершения первичной загрузки из IDB (иначе гонка на старте стирает
@@ -3013,6 +3027,8 @@ function save(){
   // переполнении — без него (источник истины всё равно IndexedDB).
   try{ localStorage.setItem('ba_v2',JSON.stringify({ytmBonds,portfolio,watchlists,calEvents,reportsDB,compareSets})); }
   catch(e){ try{ localStorage.setItem('ba_v2',JSON.stringify({ytmBonds,portfolio,watchlists,calEvents,compareSets})); }catch(e2){} }
+  // сообщаем соседним разделам, что reportsDB изменился
+  try{ _broadcastChange('reportsDB'); }catch(e){}
 }
 
 // ══ NAV ══

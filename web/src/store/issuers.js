@@ -129,3 +129,19 @@ export function reloadIssuers(){
   useIssuersStore.setState({ raw: null, issuers: null, years: [], loading: false, error: null, source: 'mock' });
   useIssuersStore.getState().load();
 }
+
+// Живой обмен изменениями с модулем «Отчётность» (и др. разделами):
+// один origin → BroadcastChannel ходит между iframe и оболочкой. Когда
+// модуль правит reportsDB (ввод/импорт/переклассификация) и зовёт save(),
+// он шлёт сигнал — здесь сбрасываем кэш списка и перечитываем, чтобы
+// «Отрасли»/«Сравнение»/«Портфель» обновились без ручной перезагрузки.
+try {
+  const _bc = new BroadcastChannel('bondan-sync');
+  let _t = null;
+  _bc.onmessage = (e) => {
+    const d = e && e.data;
+    if(!d || d.type !== 'changed') return;
+    clearTimeout(_t);
+    _t = setTimeout(() => { try { reloadIssuers(); } catch(_){} }, 500);
+  };
+} catch(_){ /* старый браузер без BroadcastChannel — работает как раньше */ }
