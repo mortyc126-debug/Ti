@@ -5029,7 +5029,11 @@ async function fetchGirboByInn(inn, maxYears = 5){
 // собираем series по всем peer'ам, потом по каждому (год, показатель)
 // считаем p25 / p50 / p75.
 
-const _IND_SEED_URL = 'references/industry-peers.json';
+// Кандидаты расположения сид-каталога отраслей. Модуль лежит в /modules/,
+// поэтому относительный 'references/…' резолвится в /modules/references/…
+// (его нет → 404 → список отраслей падал на короткий фолбэк). В сборке
+// Vite файл отдаётся из web/public как /industry-peers.json. Перебираем.
+const _IND_SEED_URLS = ['/industry-peers.json', '../industry-peers.json', 'references/industry-peers.json', '../references/industry-peers.json'];
 window._industryData = null;       // {industries: {key: {label, okved2, peers:[{inn,name}]}}}
 window._industryMedians = null;    // {industryKey: {year: {fid: {p25,p50,p75,n}}}}
 window._indActiveKey = null;
@@ -5082,12 +5086,14 @@ function _extractOkvedFromGirbo(orgOrBfo){
 
 async function _indLoad(){
   if(window._industryData) return window._industryData;
-  // 1) seed
+  // 1) seed — перебираем кандидатов, берём первый валидный с отраслями
   let seed = {industries:{}};
-  try {
-    const r = await fetch(_IND_SEED_URL, {cache:'no-store'});
-    if(r.ok) seed = await r.json();
-  } catch(e){}
+  for(const url of _IND_SEED_URLS){
+    try {
+      const r = await fetch(url, {cache:'no-store'});
+      if(r.ok){ const j = await r.json(); if(j && j.industries && Object.keys(j.industries).length){ seed = j; break; } }
+    } catch(e){}
+  }
   // 2) пользовательские правки
   let user = {industries:{}};
   try {
