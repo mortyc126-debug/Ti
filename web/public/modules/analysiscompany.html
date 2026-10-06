@@ -31703,6 +31703,7 @@ function _repBuildIssuerHeader(iss, issId){
     + '<button class="btn" onclick="repCopyAnalysis&&repCopyAnalysis()" title="Скопировать текстовый разбор активного периода (вердикт, расчётные, связи, выбросы) в буфер — для заметки">📋 Разбор</button>'
     + '<button class="btn" onclick="repCompareTwo&&repCompareTwo()" title="Сравнить двух эмитентов бок о бок по ключевым коэффициентам (последние годовые периоды)">⟷ vs</button>'
     + '<button class="btn btn-acc" id="rep-compare-btn" onclick="repOpenCrossCompare&&repOpenCrossCompare()">≡ Сравнить</button>'
+    + '<button class="btn" onclick="exportAllData&&exportAllData()" title="Скачать резервную копию ВСЕЙ базы (отчётность, портфель, облигации, календарь) одним JSON. Делай периодически — данные живут локально в браузере.">💾 Бэкап</button>'
     + '</div>';
   var mult = _repCalcMultipliers(iss);
   var lp = (typeof _repLatestPeriod==='function') ? _repLatestPeriod(iss) : null;
