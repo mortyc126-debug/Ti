@@ -12,7 +12,7 @@ import { loadIssuersReal } from '../data/issuersReal.js';
 import { getAllIssuers } from '../data/issuersMock.js';
 
 const MOCK = getAllIssuers();
-const CACHE_KEY = 'ba_issuers_raw_v19';  // v19: переклассификация по названию (лизинг/банк/СФО); v18: по ОКВЭД/модели; v17: лучший период за год
+const CACHE_KEY = 'ba_issuers_raw_v20';  // v20: классификация по названию в самом React-слое (не зависит от модуля); v19/18: в модуле
 const TTL = 6 * 3600e3;
 
 // выбрать отчёт эмитента под (год, тип); reps уже отсортированы по убыванию

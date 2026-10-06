@@ -188,6 +188,25 @@ const _PEERS_IND_TO_REACT = {
   other_services: 'services-etc', other: 'other',
 };
 
+// Отрасль по НАЗВАНИЮ для финансовых сущностей (надёжнее, чем ОКВЭД/тег,
+// которых у ручных записей часто нет). Та же логика, что в модуле. Нужна,
+// чтобы «…ЛИЗИНГ» не висели в банках, а «…БАНК» попадали в банки, даже
+// если в reportsDB у них iss.ind='other'. \b/\w с кириллицей не работают —
+// аббревиатуры (МФО/МФК/МКК/СФО) ищем по токенам.
+function _indByNameReact(name){
+  const s = String(name || '').toLowerCase();
+  if(!s) return null;
+  const toks = s.split(/[^а-яёa-z0-9]+/).filter(Boolean);
+  const tok = w => toks.indexOf(w) >= 0;
+  if(/лизинг|leasing/.test(s)) return 'leasing';
+  if(/страхов|insurance|перестрах/.test(s)) return 'insurance';
+  if(/факторинг|factoring/.test(s)) return 'mfo';
+  if(tok('мфо') || tok('мфк') || tok('мкк') || /микрофинанс|микрокредит|микрозайм/.test(s)) return 'mfo';
+  if(tok('сфо') || /ипотечн[а-яё]* агент|секьюритиз|сопф/.test(s)) return 'holdings';
+  if(/банк|bank/.test(s)) return 'banks';
+  return null;
+}
+
 // Годовые периоды reportsDB («Год»/FY/12М) с type РСБУ/МСФО.
 const _REPDB_ANNUAL = new Set(['ГОД', 'FY', '12М', '12M', 'Y']);
 
@@ -257,7 +276,7 @@ function _reportsDbIssuers(db){
       id: inn || String(id), inn,
       name: iss.name || inn || String(id),
       ticker: null,
-      industry: _PEERS_IND_TO_REACT[iss.ind] || iss.ind || 'other',
+      industry: _indByNameReact(iss.name) || _PEERS_IND_TO_REACT[iss.ind] || iss.ind || 'other',
       kinds: ['bond'],
       reports: reps,
     });
