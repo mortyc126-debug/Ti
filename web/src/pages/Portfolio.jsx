@@ -7,6 +7,7 @@ import { positions as mockPositions } from '../data/mockPortfolio.js';
 import { INDUSTRIES } from '../data/industries.js';
 import { usePortfolioStore } from '../store/portfolio.js';
 import { useBondUniverse } from '../store/marketData.js';
+import { useIssuers } from '../store/issuers.js';
 
 const fmtRub = n => {
   if(n == null) return '—';
@@ -17,13 +18,18 @@ const fmtRub = n => {
 
 // Единая строка таблицы для реального и мок-портфеля.
 // value — стоимость позиции, ₽; pnl — нереализованный P&L, ₽.
-function realRow(p, bondByIsin){
+function realRow(p, bondByIsin, issuerByInn){
   const b = p.isin ? bondByIsin.get(String(p.isin).toUpperCase()) : null;
+  // Эмитент — по ИНН (резолв через MOEX) из списка эмитентов; отрасль
+  // оттуда же, иначе из облигации. Название — эмитента, иначе бумаги.
+  const iss = p.inn ? issuerByInn.get(String(p.inn)) : null;
   const pnlPct = p.costRub ? p.pnlRub / p.costRub * 100 : null;
   return {
     key: p.isin || p.ticker || p.name,
-    name: p.name || p.ticker || p.isin, sub: [p.isin, (p.accounts || []).join('/')].filter(Boolean).join(' · '),
-    issuer: b?.issuer || p.ticker || null, ind: b?.industry || null,
+    name: p.name || p.ticker || p.isin,
+    sub: [p.issuerTitle || iss?.name, p.isin, (p.accounts || []).join('/')].filter(Boolean).join(' · '),
+    issuer: iss?.name || p.issuerTitle || b?.issuer || p.ticker || null,
+    ind: iss?.industry || b?.industry || null,
     qty: p.qty, avg: p.avg, last: p.last,
     ytm: b?.ytm ?? null, dur: b?.duration_years ?? null,
     value: p.valRub, pnl: p.pnlRub, pnlPct,
@@ -74,6 +80,7 @@ export default function Portfolio(){
   const accounts = usePortfolioStore(s => s.accounts);
   const load     = usePortfolioStore(s => s.load);
   const bonds    = useBondUniverse();
+  const issuers  = useIssuers();
   useEffect(() => { load(); }, [load]);
 
   const bondByIsin = useMemo(() => {
@@ -81,12 +88,17 @@ export default function Portfolio(){
     for(const b of (bonds || [])){ if(b.secid) m.set(String(b.secid).toUpperCase(), b); }
     return m;
   }, [bonds]);
+  const issuerByInn = useMemo(() => {
+    const m = new Map();
+    for(const it of (issuers || [])){ if(it.inn) m.set(String(it.inn), it); }
+    return m;
+  }, [issuers]);
 
   const isReal = !!(realPos && realPos.length);
   const allRows = useMemo(() => isReal
-    ? realPos.map(p => realRow(p, bondByIsin))
+    ? realPos.map(p => realRow(p, bondByIsin, issuerByInn))
     : mockPositions.map(mockRow),
-    [isReal, realPos, bondByIsin]);
+    [isReal, realPos, bondByIsin, issuerByInn]);
 
   const rows = useMemo(() => {
     const q = filter.trim().toLowerCase();

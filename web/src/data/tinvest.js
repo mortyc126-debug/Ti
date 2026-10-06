@@ -68,6 +68,47 @@ async function _resolveFigi(figi, tok, cache){
   } catch(_){ return { isin: null, ticker: null, name: null }; }
 }
 
+// ISIN → {inn, title, secid} эмитента через открытый MOEX ISS. Локального
+// bonds-cache.json в сборке может не быть (fetch 404 → вселенная облигаций
+// деградирует до мока), поэтому связь «бумага → эмитент» строим здесь по
+// ISIN напрямую с биржи. emitent_inn → матчится с карточками эмитентов.
+// Пара ISIN→ИНН стабильна, кэшируем в localStorage.
+const _INN_CACHE = 'ba_isin_inn_v1';
+function _innCacheGet(){ try { return JSON.parse(localStorage.getItem(_INN_CACHE) || '{}'); } catch(_){ return {}; } }
+function _innCacheSet(m){ try { localStorage.setItem(_INN_CACHE, JSON.stringify(m)); } catch(_){} }
+
+async function _moexByIsin(isin){
+  try {
+    const r = await fetch('https://iss.moex.com/iss/securities.json?iss.meta=off&iss.only=securities&limit=10&q=' + encodeURIComponent(isin));
+    if(!r.ok) return {};
+    const d = await r.json();
+    const sec = d && d.securities;
+    if(!sec || !sec.columns || !sec.data) return {};
+    const ci = {}; sec.columns.forEach((c, i) => { ci[c] = i; });
+    const up = isin.toUpperCase();
+    const row = sec.data.find(x => String(x[ci.isin] || '').toUpperCase() === up) || sec.data[0];
+    if(!row) return {};
+    return {
+      inn: row[ci.emitent_inn] != null ? String(row[ci.emitent_inn]) : null,
+      title: row[ci.emitent_title] || null,
+      secid: row[ci.secid] || null,
+    };
+  } catch(_){ return {}; }
+}
+
+// Дорезолвить ИНН для списка ISIN (с кэшем, пулом). Возвращает карту
+// {ISIN(upper): {inn,title,secid}}.
+export async function resolveInnsByIsin(isins){
+  const cache = _innCacheGet();
+  const todo = [...new Set(isins.filter(Boolean).map(s => s.toUpperCase()))].filter(k => !(k in cache));
+  let idx = 0;
+  const CONC = 5;
+  async function w(){ while(idx < todo.length){ const k = todo[idx++]; cache[k] = await _moexByIsin(k); } }
+  await Promise.all(Array.from({ length: CONC }, w));
+  if(todo.length) _innCacheSet(cache);
+  return cache;
+}
+
 // Все позиции со ВСЕХ счетов, дополненные isin/ticker/name. Берём только
 // акции/облигации/ETF (валюта/фьючерсы к фундаменту эмитента не клеятся).
 // Возвращает { ok, positions:[{isin,ticker,name,type,qty,accounts[]}], accounts, reason }.
@@ -144,5 +185,13 @@ export async function loadTinvestPositions(){
     pnlRub: p.valRub - p.costRub,
     accounts: [...p.accounts],
   }));
+  // Привязка к эмитентам: ISIN → ИНН/название через MOEX (best-effort).
+  try {
+    const innMap = await resolveInnsByIsin(positions.map(p => p.isin));
+    for(const p of positions){
+      const m = p.isin ? innMap[p.isin.toUpperCase()] : null;
+      if(m){ p.inn = m.inn || null; p.issuerTitle = m.title || null; p.moexSecid = m.secid || null; }
+    }
+  } catch(_){ /* нет связи с MOEX — позиции останутся без привязки */ }
   return { ok: true, positions, accounts: accounts.map(a => a.name || a.id) };
 }

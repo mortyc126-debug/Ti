@@ -44,13 +44,15 @@ export function buildPool({ sources, industryFilter, recentItems, favItems }){
       }
     } catch(_){}
     for(const p of currentPortfolioPositions()){
-      const byIsin = p.isin ? isinToId.get(String(p.isin).toUpperCase()) : null;
-      const iss = byIsin ? byId.get(byIsin) : null;
+      // 1) ИНН напрямую (реальные позиции резолвятся через MOEX) —
+      // самый надёжный ключ; 2) ISIN → inn через вселенную облигаций;
+      // 3) мок-фолбэк по имени эмитента.
+      const idByInn = p.inn && byId.has(String(p.inn)) ? String(p.inn) : null;
+      const idByIsin = !idByInn && p.isin ? isinToId.get(String(p.isin).toUpperCase()) : null;
+      const iss = (idByInn && byId.get(idByInn)) || (idByIsin && byId.get(idByIsin)) || null;
       if(iss){
-        // реальная позиция сопоставлена с эмитентом — во все его kind'ы
         for(const k of iss.kinds) add(iss.id, k);
       } else if(p.issuer){
-        // мок-фолбэк: у мок-позиции есть имя эмитента как id
         add(p.issuer, 'bond');
       }
     }
