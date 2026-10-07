@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Percent, CalendarDays, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine, ScatterChart, Scatter, Legend } from 'recharts';
 import Card from '../components/ui/Card.jsx';
 import { useKeyRate } from '../store/rates.js';
 import { usePortfolioStore } from '../store/portfolio.js';
@@ -22,7 +22,15 @@ const bp = v => v == null ? '—' : (v >= 0 ? '+' : '') + Math.round(v) + ' б.�
 const short = s => { s = String(s || ''); return s.length > 22 ? s.slice(0, 21) + '…' : s; };
 
 export default function Spreads(){
-  const { current: keyRate, asOf, source } = useKeyRate();
+  const { current: keyRate, asOf, source, setCurrent } = useKeyRate();
+  const [editKr, setEditKr] = useState(false);
+  const [krInput, setKrInput] = useState('');
+  // Ставка «устарела», если последняя запись старше ~50 дней (заседания ЦБ
+  // чаще) — подсказываем обновить, а не молча показываем старое значение.
+  const krStale = useMemo(() => {
+    if(!asOf || asOf.length !== 10) return false;
+    return (Date.now() - new Date(asOf).getTime()) > 50 * 864e5;
+  }, [asOf]);
   const real   = usePortfolioStore(s => s.real);
   const loadPf = usePortfolioStore(s => s.load);
   const bonds  = useBondUniverse();
@@ -31,9 +39,11 @@ export default function Spreads(){
   // Набор бумаг: сначала облигации портфеля (ОФЗ исключаем — они бенчмарк),
   // иначе — корпоративы из каталога (ограниченно, чтобы не грузить сеть).
   const scope = useMemo(() => {
-    const isOfz = s => /^SU\d/i.test(String(s || ''));
+    // Исключаем только ОФЗ-ПД (SU26*) — они бенчмарк. ОФЗ-ПК (SU29*, флоатеры)
+    // и корпораты оставляем, чтобы флоатеры были видны.
+    const isBench = s => /^SU26/i.test(String(s || ''));
     const fromPf = (real || [])
-      .filter(p => /bond/.test(String(p.type || '')) && (p.moexSecid || p.isin) && !isOfz(p.moexSecid || p.isin))
+      .filter(p => /bond/.test(String(p.type || '')) && (p.moexSecid || p.isin) && !isBench(p.moexSecid || p.isin))
       .map(p => ({ secid: String(p.moexSecid || p.isin).toUpperCase(), name: p.name || p.issuerTitle, issuer: p.issuerTitle || p.name }));
     if(fromPf.length) return { src: 'портфель', list: dedupe(fromPf) };
     const corp = (bonds || [])
@@ -83,6 +93,10 @@ export default function Spreads(){
     if(_seen[nm] != null){ nm = nm + ' ·' + String(r.secid).slice(-4); } else { _seen[nm] = 1; }
     return { name: nm, delta: r.delta, fl: r.isFloater };
   });
+  // Данные кривой доходности: линия ОФЗ (начало/конец) + точки корп-бумаг.
+  const curveEnd   = (res?.ofzCurveEnd   || []).map(p => ({ durY: p.durY, y: p.y, kind: 'ofz' }));
+  const curveStart = (res?.ofzCurveStart || []).map(p => ({ durY: p.durY, y: p.y, kind: 'ofzStart' }));
+  const corpPts    = rows.filter(r => r.durY > 0 && r.yEnd != null).map(r => ({ ...r, kind: 'corp' }));
 
   return (
     <div className="space-y-6">
@@ -94,19 +108,39 @@ export default function Spreads(){
             G-спред = доходность бумаги − доходность ОФЗ той же дюрации. Смотрим, сузился он или расширился за период.
           </p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-acc-dim border border-acc/30">
-          <Percent size={18} className="text-acc" />
+        <div className={['flex items-center gap-2 px-4 py-2 rounded-lg border', krStale ? 'bg-warn/10 border-warn/40' : 'bg-acc-dim border-acc/30'].join(' ')}>
+          <Percent size={18} className={krStale ? 'text-warn' : 'text-acc'} />
           <div className="leading-tight">
             <div className="text-[10px] uppercase tracking-wider text-text3 font-mono">Ключевая ставка ЦБ</div>
-            <div className="text-xl font-semibold font-mono text-acc">
-              {keyRate != null ? keyRate + '%' : '—'}
-              {asOf ? <span className="text-text3 text-[11px] font-normal ml-2">на {(asOf.length === 10 ? asOf.split('-').reverse().join('.') : asOf)}</span> : null}
-            </div>
+            {editKr ? (
+              <div className="flex items-center gap-1 mt-0.5">
+                <input type="number" step="0.25" autoFocus value={krInput} onChange={e => setKrInput(e.target.value)}
+                  placeholder={keyRate != null ? String(keyRate) : '16'}
+                  className="bg-s2 border border-border rounded px-2 h-7 w-20 text-sm font-mono text-text" />
+                <button type="button" onClick={() => { setCurrent(krInput); setEditKr(false); setKrInput(''); }}
+                  className="px-2 h-7 rounded text-xs font-mono bg-acc text-bg">ok</button>
+                <button type="button" onClick={() => { setEditKr(false); setKrInput(''); }}
+                  className="px-2 h-7 rounded text-xs font-mono text-text3 hover:text-text">×</button>
+              </div>
+            ) : (
+              <div className="text-xl font-semibold font-mono text-acc flex items-center gap-2">
+                {keyRate != null ? keyRate + '%' : '—'}
+                {asOf ? <span className="text-text3 text-[11px] font-normal">на {(asOf.length === 10 ? asOf.split('-').reverse().join('.') : asOf)}</span> : null}
+                <button type="button" onClick={() => { setKrInput(keyRate != null ? String(keyRate) : ''); setEditKr(true); }}
+                  title="Обновить ставку (запишется на сегодня)"
+                  className="text-text3 hover:text-acc text-[11px] font-normal underline decoration-dotted">изм.</button>
+              </div>
+            )}
           </div>
         </div>
       </div>
+      {krStale && !editKr && (
+        <div className="text-[11px] text-warn font-mono -mt-3">
+          Ставка от {asOf && asOf.length === 10 ? asOf.split('-').reverse().join('.') : asOf} — похоже, устарела. Нажми «изм.» и впиши актуальную (запишется на сегодня, подхватят все разделы).
+        </div>
+      )}
       {source === 'macro-avg' && (
-        <div className="text-[11px] text-warn font-mono -mt-3">КС показана среднегодовой — заведи историю ставки в модуле «Долг» для точности.</div>
+        <div className="text-[11px] text-warn font-mono -mt-3">КС показана среднегодовой — впиши актуальную через «изм.».</div>
       )}
 
       {/* Управление периодом */}
@@ -152,6 +186,35 @@ export default function Spreads(){
           <SummaryTile label="Фиксы" delta={avgFix} n={fixRows.length} color={C_FIX} />
           <SummaryTile label="Флоатеры" delta={avgFlt} n={fltRows.length} color={C_FLT} approx />
         </div>
+      )}
+
+      {/* Интерактивная кривая доходности: ОФЗ (линия) + корп-бумаги (точки) */}
+      {res?.ok && corpPts.length > 0 && curveEnd.length >= 2 && (
+        <Card title={`Кривая доходности · ${res.label} (${fmtD(res.from)} → ${fmtD(res.till)})`}
+          subtitle="Линия — ОФЗ по дюрации (пунктир — на начало периода). Точки — бумаги; наведи, чтобы увидеть даты, доходность, спред и его изменение.">
+          <div style={{ width: '100%', height: 420 }}>
+            <ResponsiveContainer>
+              <ScatterChart margin={{ left: 4, right: 16, top: 8, bottom: 16 }}>
+                <XAxis type="number" dataKey="durY" name="дюрация" unit=" г" domain={['dataMin', 'dataMax']}
+                  tick={{ fill: '#9C90C4', fontSize: 10 }} tickFormatter={v => v.toFixed(1)}
+                  label={{ value: 'дюрация, лет', position: 'insideBottom', offset: -8, fill: '#9C90C4', fontSize: 10 }} />
+                <YAxis type="number" dataKey="y" name="доходность" unit="%" domain={['auto', 'auto']}
+                  tick={{ fill: '#CBC2EA', fontSize: 10 }} tickFormatter={v => v.toFixed(0)}
+                  label={{ value: 'доходность, %', angle: -90, position: 'insideLeft', fill: '#9C90C4', fontSize: 10 }} />
+                <Tooltip content={<CurveTip />} cursor={{ strokeDasharray: '3 3', stroke: '#3A1F44' }} />
+                <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'monospace' }} />
+                <Scatter name="ОФЗ (начало)" data={curveStart} line={{ stroke: '#52F2C9', strokeOpacity: 0.4, strokeDasharray: '5 4' }}
+                  fill="#52F2C9" fillOpacity={0.4} isAnimationActive={false} />
+                <Scatter name="ОФЗ (конец)" data={curveEnd} line={{ stroke: '#52F2C9' }} fill="#52F2C9" isAnimationActive={false} />
+                <Scatter name="Фиксы" data={corpPts.filter(p => !p.isFloater)} fill={C_FIX} isAnimationActive={false} />
+                <Scatter name="Флоатеры" data={corpPts.filter(p => p.isFloater)} fill={C_FLT} isAnimationActive={false} />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="text-[11px] text-text3 font-mono mt-2">
+            Чем выше точка над линией ОФЗ — тем больше премия за риск (спред). Сдвиг линии вниз/вверх — изменение базовых ставок за период.
+          </div>
+        </Card>
       )}
 
       {/* График Δспреда по бумагам */}
@@ -247,6 +310,28 @@ function SummaryTile({ label, delta, n, color, approx }){
       </div>
       <div className={'text-2xl font-semibold font-mono mt-1 ' + col}>{bp(delta)}</div>
       <div className={'text-xs ' + col}>{word}{approx && delta != null ? ' · ориентировочно' : ''}</div>
+    </div>
+  );
+}
+
+function CurveTip({ active, payload }){
+  if(!active || !payload || !payload.length) return null;
+  const p = payload[0].payload;
+  if(!p) return null;
+  const box = 'bg-bg2 border border-border rounded px-2 py-1.5 text-[11px] font-mono';
+  if(p.kind === 'ofz' || p.kind === 'ofzStart'){
+    return <div className={box + ' text-text2'}>ОФЗ ~{p.durY.toFixed(1)} г · {p.y.toFixed(2)}% · {p.kind === 'ofzStart' ? 'начало' : 'конец'}</div>;
+  }
+  const dy = (p.yEnd != null && p.yStart != null) ? (p.yEnd - p.yStart) * 100 : null;
+  const dc = p.delta < 0 ? 'text-green' : p.delta > 0 ? 'text-warn' : 'text-text2';
+  return (
+    <div className={box + ' space-y-0.5 max-w-[250px]'}>
+      <div className="text-text font-semibold truncate">{p.issuer || p.name}</div>
+      <div className="text-text3">{p.secid} · {p.isFloater ? 'флоатер' : 'фикс'}</div>
+      <div className="text-text2">дюрация {p.durY.toFixed(1)} г · дох. {p.yEnd.toFixed(2)}%</div>
+      <div className="text-text2">ОФЗ {p.ofzEnd != null ? p.ofzEnd.toFixed(2) + '%' : '—'} · спред {bp(p.spreadEnd * 100)}</div>
+      <div className={dc}>Δспред {bp(p.delta)}{dy != null ? ` · дох. ${dy >= 0 ? '+' : ''}${Math.round(dy)} б.п.` : ''}</div>
+      <div className="text-text3">{fmtD(p.dStart)} → {fmtD(p.dEnd)}</div>
     </div>
   );
 }

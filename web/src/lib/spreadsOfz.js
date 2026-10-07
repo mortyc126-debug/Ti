@@ -120,17 +120,20 @@ function _ofzCurveAt(ofzSeriesList, date){
   return pts;
 }
 
-// Классификатор фикс/флоатер через bondization: у флоатера будущие купоны
-// ещё не определены (rate=null). Используем общий кэш loadBondization.
+// Классификатор фикс/флоатер через bondization: у фикса ВСЕ будущие купоны
+// известны заранее (есть ставка), у флоатера будущие ещё не определены
+// (rate=null). ОФЗ-ПК (SU29*) — тоже флоатеры. Используем кэш loadBondization.
 async function classifyFloater(secid){
+  if(/^SU29/i.test(String(secid || ''))) return true;   // ОФЗ-ПК
   try {
     const b = await loadBondization(secid);
     if(!b || !b.events) return false;
     const today = new Date().toISOString().slice(0, 10);
     const future = b.events.filter(e => e.type === 'coupon' && e.date > today);
-    if(future.length < 2) return false;
+    if(!future.length) return false;
     const unknown = future.filter(e => e.rate == null).length;
-    return unknown >= 2;   // ≥2 неизвестных будущих купона → плавающий
+    // Хотя бы половина будущих купонов без ставки → плавающий (у фикса их 0).
+    return unknown >= 1 && unknown / future.length >= 0.5;
   } catch(_){ return false; }
 }
 
@@ -155,6 +158,11 @@ export async function computeSpreadChange(bonds, from, till, onProgress){
   const ptsStart = _ofzCurveAt(ofzSeries, from);
   const ptsEnd = _ofzCurveAtLatest(ofzSeries, from, till);
   out.ofzPointsStart = ptsStart.length; out.ofzPointsEnd = ptsEnd.length;
+  // Кривые ОФЗ для графика: {durY (дюрация в годах), y (доходность %)}.
+  const _curve = pts => pts.map(p => ({ durY: p.dur / 365, y: p.y }))
+    .filter(p => p.durY > 0 && p.y != null).sort((a, b) => a.durY - b.durY);
+  out.ofzCurveStart = _curve(ptsStart);
+  out.ofzCurveEnd = _curve(ptsEnd);
 
   // Корпоративные бумаги.
   let done = 0;
@@ -174,7 +182,7 @@ export async function computeSpreadChange(bonds, from, till, onProgress){
           rows.push({
             secid, name: b.name || secid, issuer: b.issuer || '',
             isFloater,
-            durY: fl.end.dur / 365,
+            durY: fl.end.dur / 365, durYStart: fl.start.dur / 365,
             yStart: fl.start.y, yEnd: fl.end.y,
             ofzStart, ofzEnd,
             spreadStart, spreadEnd,

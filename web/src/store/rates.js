@@ -37,6 +37,21 @@ function _collect(){
 
 export const useRatesStore = create((set) => ({
   history: [], current: null, asOf: null, source: null,
+  // Задать актуальную КС на дату (по умолчанию сегодня) — дописываем запись в
+  // канонический ключ «Долга», её тут же подхватывают все разделы. Так ставку
+  // можно поправить, не заходя в «Долг».
+  setCurrent: (rate, date) => {
+    const r = parseFloat(String(rate).replace(',', '.'));
+    if(!isFinite(r)) return;
+    const d = date || new Date().toISOString().slice(0, 10);
+    const prev = _ls(KEY_DEBT) || '';
+    const line = d + ' ' + r;
+    const next = prev && !/\n$/.test(prev) ? prev + '\n' + line : prev + line;
+    try { localStorage.setItem(KEY_DEBT, next); } catch(_){}
+    const hist = _collect();
+    const cur = hist[hist.length - 1] || { rate: r, d };
+    set({ history: hist, current: cur.rate, asOf: cur.d, source: 'cbr' });
+  },
   load: () => {
     const hist = _collect();
     if(hist.length){
@@ -72,5 +87,6 @@ export function useKeyRate(){
     asOf:    useRatesStore(s => s.asOf),
     source:  useRatesStore(s => s.source),
     history: useRatesStore(s => s.history),
+    setCurrent: useRatesStore(s => s.setCurrent),
   };
 }
