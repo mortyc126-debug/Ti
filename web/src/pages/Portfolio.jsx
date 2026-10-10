@@ -11,6 +11,7 @@ import { usePortfolioStore } from '../store/portfolio.js';
 import { useBondUniverse } from '../store/marketData.js';
 import { useIssuers } from '../store/issuers.js';
 import { loadBondization, futureEvents, scheduleByMonth, computeYtm, duration } from '../lib/bondization.js';
+import PortfolioRisk from '../components/PortfolioRisk.jsx';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const fmtRub = n => {
@@ -353,6 +354,8 @@ export default function Portfolio(){
           ) : <div className="text-text3 text-xs py-8 text-center">Нет позиций.</div>}
         </Card>
       </div>
+
+      {isReal && <PortfolioRisk positions={realPos} />}
     </div>
   );
 }
