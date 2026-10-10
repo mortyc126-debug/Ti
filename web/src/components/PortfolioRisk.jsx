@@ -57,7 +57,7 @@ export default function PortfolioRisk({ positions }){
       if(series.length < 30){ setErr('мало истории цен за период (нужно ≥30 торговых дней)'); setRunning(false); return; }
       const rfDaily = annualToDaily(keyRate || 0);
       const m = portfolioMetrics(series, rfDaily);
-      const mc = monteCarlo(m.returns, { horizon: 252, paths: 1000, block: 10, rfDaily });
+      const mc = monteCarlo(m.returns, { stepsPerYear: m.ppy, paths: 1000, block: 10, rfDaily });
       // нормируем кривую к 100 в начале
       const base = series[0].val || 1;
       const curve = series.map(s => ({ date: s.date, v: s.val / base * 100 }));
