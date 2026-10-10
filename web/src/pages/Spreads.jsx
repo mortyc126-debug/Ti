@@ -5,7 +5,7 @@
 // Данные тянутся прямо из MOEX ISS в браузере (spreadsOfz.js), бэкенд не нужен.
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Percent, CalendarDays, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
+import { Percent, CalendarDays, RefreshCw, TrendingDown, TrendingUp, History } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine, ScatterChart, Scatter, Legend } from 'recharts';
 import Card from '../components/ui/Card.jsx';
 import { useKeyRate } from '../store/rates.js';
@@ -22,9 +22,12 @@ const bp = v => v == null ? '—' : (v >= 0 ? '+' : '') + Math.round(v) + ' б.�
 const short = s => { s = String(s || ''); return s.length > 22 ? s.slice(0, 21) + '…' : s; };
 
 export default function Spreads(){
-  const { current: keyRate, asOf, source, setCurrent } = useKeyRate();
+  const { current: keyRate, asOf, source, setCurrent, history: krHist, addEntry, removeEntry, mergeCanon } = useKeyRate();
   const [editKr, setEditKr] = useState(false);
   const [krInput, setKrInput] = useState('');
+  const [showHist, setShowHist] = useState(false);
+  const [newDate, setNewDate] = useState('');
+  const [newRate, setNewRate] = useState('');
   // Ставка «устарела», если последняя запись старше ~50 дней (заседания ЦБ
   // чаще) — подсказываем обновить, а не молча показываем старое значение.
   const krStale = useMemo(() => {
@@ -140,8 +143,67 @@ export default function Spreads(){
         </div>
       )}
       {source === 'macro-avg' && (
-        <div className="text-[11px] text-warn font-mono -mt-3">КС показана среднегодовой — впиши актуальную через «изм.».</div>
+        <div className="text-[11px] text-warn font-mono -mt-3">КС показана среднегодовой — впиши актуальную через «изм.» или догрузи ряд ЦБ ниже.</div>
       )}
+
+      {/* История ставки — ступенчатая: с даты и до следующей записи */}
+      <div>
+        <button type="button" onClick={() => setShowHist(v => !v)}
+          className="inline-flex items-center gap-1.5 text-xs font-mono text-text2 hover:text-acc">
+          <History size={13} /> История ключевой ставки {krHist?.length ? `(${krHist.length})` : ''} {showHist ? '▲' : '▼'}
+        </button>
+        {showHist && (
+          <Card className="mt-2" padded>
+            <div className="text-[11px] text-text3 font-mono mb-3">
+              Каждая запись — «с этой даты действует такая ставка», держится до следующей. Добавляй даты заседаний ЦБ (ставка меняется с рабочего дня после решения).
+            </div>
+            <div className="flex flex-wrap items-end gap-2 mb-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-text3 font-mono mb-1">Дата</div>
+                <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)}
+                  className="bg-s2 border border-border rounded px-2 h-8 text-xs font-mono text-text" />
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-text3 font-mono mb-1">Ставка, %</div>
+                <input type="number" step="0.25" value={newRate} onChange={e => setNewRate(e.target.value)} placeholder="14"
+                  className="bg-s2 border border-border rounded px-2 h-8 w-24 text-xs font-mono text-text" />
+              </div>
+              <button type="button" disabled={!newDate || newRate === ''}
+                onClick={() => { addEntry(newDate, newRate); setNewDate(''); setNewRate(''); }}
+                className="px-3 h-8 rounded text-xs font-mono border border-border text-text2 hover:text-acc hover:border-acc/40 disabled:opacity-40">
+                добавить
+              </button>
+              <button type="button" onClick={mergeCanon}
+                title="Добавить отсутствующие даты из официального ряда ЦБ (2021–2026), свои значения не трогая"
+                className="px-3 h-8 rounded text-xs font-mono border border-acc/40 text-acc hover:bg-acc-dim ml-auto">
+                ⭳ догрузить ряд ЦБ
+              </button>
+            </div>
+            <div className="max-h-64 overflow-y-auto border border-border/60 rounded">
+              <table className="w-full text-xs">
+                <thead className="bg-s2/60 text-text3 uppercase text-[10px] sticky top-0">
+                  <tr><th className="text-left p-2 pl-3">Действует с</th><th className="text-right p-2">Ставка</th><th className="w-8" /></tr>
+                </thead>
+                <tbody>
+                  {(krHist || []).slice().reverse().map(h => (
+                    <tr key={h.d} className="border-t border-border/40 hover:bg-s2/30">
+                      <td className="p-2 pl-3 font-mono text-text2">{h.d.split('-').reverse().join('.')}</td>
+                      <td className="p-2 text-right font-mono text-text">{h.rate}%</td>
+                      <td className="p-2 text-center">
+                        <button type="button" onClick={() => removeEntry(h.d)} title="Удалить запись"
+                          className="text-text3 hover:text-danger">✕</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {!(krHist || []).length && (
+                    <tr><td colSpan={3} className="p-3 text-text3 font-mono text-[11px]">История пуста — нажми «догрузить ряд ЦБ».</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+      </div>
 
       {/* Управление периодом */}
       <Card title="Период" padded>
