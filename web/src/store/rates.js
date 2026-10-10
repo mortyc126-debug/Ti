@@ -92,8 +92,18 @@ export const useRatesStore = create((set) => ({
     const m = _asMap(); m[d] = r; _writeMap(m, set);
   },
   load: () => {
-    const hist = _collect();
+    let hist = _collect();
     if(hist.length){
+      // Автодогрузка официального ряда ЦБ: если последняя сохранённая запись
+      // старше последнего известного решения — добавляем недостающие даты
+      // (свои значения не трогаем). Так КС не «залипает» на старой дате и не
+      // требует ручного нажатия. Пишем только когда реально чего-то не хватает.
+      const canonLast = CBR_CANON[CBR_CANON.length - 1][0];
+      if(hist[hist.length - 1].d < canonLast){
+        const m = _asMap(); let changed = false;
+        for(const [d, r] of CBR_CANON) if(!(d in m)){ m[d] = r; changed = true; }
+        if(changed){ _writeMap(m, set); return; }
+      }
       const cur = hist[hist.length - 1];
       set({ history: hist, current: cur.rate, asOf: cur.d, source: 'cbr' });
       return;
