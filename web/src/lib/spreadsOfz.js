@@ -132,8 +132,9 @@ async function classifyFloater(secid){
     const future = b.events.filter(e => e.type === 'coupon' && e.date > today);
     if(!future.length) return false;
     const unknown = future.filter(e => e.rate == null).length;
-    // Хотя бы половина будущих купонов без ставки → плавающий (у фикса их 0).
-    return unknown >= 1 && unknown / future.length >= 0.5;
+    // У фикса ВСЕ будущие купоны известны заранее (ставка есть). Хотя бы один
+    // будущий купон без ставки → плавающий.
+    return unknown >= 1;
   } catch(_){ return false; }
 }
 

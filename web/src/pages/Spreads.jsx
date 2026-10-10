@@ -19,7 +19,18 @@ const PRESETS = [
 ];
 const C_FIX = '#4ea1ff', C_FLT = '#ffb02e';
 const bp = v => v == null ? '—' : (v >= 0 ? '+' : '') + Math.round(v) + ' б.п.';
-const short = s => { s = String(s || ''); return s.length > 22 ? s.slice(0, 21) + '…' : s; };
+const short = s => { s = String(s || ''); return s.length > 24 ? s.slice(0, 23) + '…' : s; };
+// Отрезаем юр-форму в начале названия («Акционерное общество …», ПАО/ООО/…),
+// чтобы в подписях оставалось имя компании, а не «Акционерное общество».
+const LEGAL = /^(публичное\s+|непубличное\s+)?(акционерное\s+общество|общество\s+с\s+ограниченной\s+ответственностью|коммерческий\s+банк|банк|ао|пао|оао|зао|ооо|пкб?)\s+/i;
+const clean = s => String(s || '').replace(/["«»“”]/g, '').replace(LEGAL, '').trim();
+// Лучшее читаемое имя выпуска: очищенный эмитент → короткое имя бумаги → SECID.
+function displayName(r){
+  const iss = clean(r.issuer), nm = clean(r.name);
+  if(iss && iss.length >= 3 && !/^общество/i.test(iss)) return iss;
+  if(nm && nm.length >= 2) return nm;
+  return r.issuer || r.name || r.secid;
+}
 
 export default function Spreads(){
   const { current: keyRate, asOf, source, setCurrent, history: krHist, addEntry, removeEntry, mergeCanon } = useKeyRate();
@@ -92,14 +103,17 @@ export default function Spreads(){
   // при коллизии дописываем хвост SECID.
   const _seen = {};
   const chartData = rows.map(r => {
-    let nm = short(r.issuer || r.name);
+    let nm = short(displayName(r));
     if(_seen[nm] != null){ nm = nm + ' ·' + String(r.secid).slice(-4); } else { _seen[nm] = 1; }
     return { name: nm, delta: r.delta, fl: r.isFloater };
   });
   // Данные кривой доходности: линия ОФЗ (начало/конец) + точки корп-бумаг.
+  // ВАЖНО: ось Y графика читает поле `y`, поэтому у корп-точек кладём y = yEnd
+  // (иначе точки не рисуются). label — очищенное имя для подсказки.
   const curveEnd   = (res?.ofzCurveEnd   || []).map(p => ({ durY: p.durY, y: p.y, kind: 'ofz' }));
   const curveStart = (res?.ofzCurveStart || []).map(p => ({ durY: p.durY, y: p.y, kind: 'ofzStart' }));
-  const corpPts    = rows.filter(r => r.durY > 0 && r.yEnd != null).map(r => ({ ...r, kind: 'corp' }));
+  const corpPts    = rows.filter(r => r.durY > 0 && r.yEnd != null)
+    .map(r => ({ ...r, y: r.yEnd, label: displayName(r), kind: 'corp' }));
 
   return (
     <div className="space-y-6">
@@ -287,7 +301,7 @@ export default function Spreads(){
             <ResponsiveContainer>
               <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
                 <XAxis type="number" tick={{ fill: '#9C90C4', fontSize: 10 }} tickFormatter={v => Math.round(v)} />
-                <YAxis type="category" dataKey="name" width={150} tick={{ fill: '#CBC2EA', fontSize: 10 }} />
+                <YAxis type="category" dataKey="name" width={170} tick={{ fill: '#CBC2EA', fontSize: 10 }} />
                 <Tooltip
                   contentStyle={{ background: '#140A24', border: '1px solid #241638', borderRadius: 8, fontSize: 12 }}
                   formatter={v => [bp(v), 'Δспред']} labelStyle={{ color: '#CBC2EA' }} />
@@ -326,7 +340,7 @@ export default function Spreads(){
                   return (
                     <tr key={r.secid} className="border-t border-border/40 hover:bg-s2/30">
                       <td className="p-2 pl-4">
-                        <div className="text-text truncate max-w-[280px]" title={r.issuer || r.name}>{r.issuer || r.name}</div>
+                        <div className="text-text truncate max-w-[280px]" title={r.issuer || r.name}>{displayName(r)}</div>
                         <div className="text-text3 font-mono text-[10px]">{r.secid}</div>
                       </td>
                       <td className="p-2 text-center">
@@ -388,7 +402,7 @@ function CurveTip({ active, payload }){
   const dc = p.delta < 0 ? 'text-green' : p.delta > 0 ? 'text-warn' : 'text-text2';
   return (
     <div className={box + ' space-y-0.5 max-w-[250px]'}>
-      <div className="text-text font-semibold truncate">{p.issuer || p.name}</div>
+      <div className="text-text font-semibold truncate">{p.label || p.issuer || p.name}</div>
       <div className="text-text3">{p.secid} · {p.isFloater ? 'флоатер' : 'фикс'}</div>
       <div className="text-text2">дюрация {p.durY.toFixed(1)} г · дох. {p.yEnd.toFixed(2)}%</div>
       <div className="text-text2">ОФЗ {p.ofzEnd != null ? p.ofzEnd.toFixed(2) + '%' : '—'} · спред {bp(p.spreadEnd * 100)}</div>
