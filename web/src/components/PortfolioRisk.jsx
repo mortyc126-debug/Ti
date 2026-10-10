@@ -10,6 +10,7 @@ import Card from './ui/Card.jsx';
 import { useKeyRate } from '../store/rates.js';
 import { fetchPriceHistory, buildPortfolioSeries } from '../lib/moexPriceHistory.js';
 import { portfolioMetrics, monteCarlo, annualToDaily } from '../lib/portfolioRisk.js';
+import { optimizeAll } from '../lib/portfolioOptimize.js';
 
 const PRESETS = [{ k: 1, l: '1Г' }, { k: 2, l: '2Г' }, { k: 3, l: '3Г' }];
 const pct = (x, d = 1) => x == null ? '—' : (x * 100).toFixed(d) + '%';
@@ -37,7 +38,10 @@ export default function PortfolioRisk({ positions }){
 
   const scope = (positions || [])
     .filter(p => (p.moexSecid || p.isin) && (p.qty > 0))
-    .map(p => ({ secid: String(p.moexSecid || p.isin).toUpperCase(), qty: p.qty }));
+    .map(p => ({
+      secid: String(p.moexSecid || p.isin).toUpperCase(), qty: p.qty,
+      name: p.issuerTitle || p.name || null, val: p.valRub || ((p.last || 0) * p.qty) || 0,
+    }));
 
   const run = useCallback(async (yrs) => {
     if(!scope.length){ setErr('нет бумаг с привязкой к MOEX — подключи реальный портфель'); return; }
@@ -57,7 +61,12 @@ export default function PortfolioRisk({ positions }){
       // нормируем кривую к 100 в начале
       const base = series[0].val || 1;
       const curve = series.map(s => ({ date: s.date, v: s.val / base * 100 }));
-      setRes({ m, mc, curve, covered: withHist.length, total: scope.length, from, till, yrs });
+      // оптимизация весов на тех же историях + текущие веса по стоимости
+      const opt = optimizeAll(withHist, rfDaily);
+      const nameBy = {}; for(const p of scope) nameBy[p.secid] = p.name || p.secid;
+      const totVal = withHist.reduce((a, p) => a + (p.val || 0), 0) || 1;
+      const curW = {}; for(const p of withHist) curW[p.secid] = (p.val || 0) / totVal;
+      setRes({ m, mc, curve, covered: withHist.length, total: scope.length, from, till, yrs, opt, nameBy, curW });
     } catch(e){ setErr(String(e && e.message || e)); }
     setRunning(false);
   }, [scope, keyRate]);
@@ -141,12 +150,88 @@ export default function PortfolioRisk({ positions }){
             </div>
           )}
 
+          {/* Оптимизация весов */}
+          {res.opt && res.opt.models.length > 0 && (
+            <WeightsBlock opt={res.opt} curW={res.curW} nameBy={res.nameBy} />
+          )}
+
           <div className="text-[11px] text-text3 font-mono leading-relaxed">
-            Метрики порт из multi-model-portfolio-backtester (polytest.py). «Подводная» просадка меряет провал ниже стартового капитала (прибыль сверх старта не учитывается). Монте-Карло пересобирает реальные дневные доходности блоками (сохраняя автокорреляцию) — это «что могло бы быть», не прогноз.
+            Метрики порт из multi-model-portfolio-backtester (polytest.py / benchmarks.py). «Подводная» просадка меряет провал ниже стартового капитала. Монте-Карло пересобирает реальные дневные доходности блоками — это «что могло бы быть», не прогноз. Веса моделей long-only (∑=1), посчитаны на той же истории; это ориентир, не инвест-рекомендация.
           </div>
         </div>
       )}
     </Card>
+  );
+}
+
+function WeightsBlock({ opt, curW, nameBy }){
+  const [sel, setSel] = useState('minvar');
+  const model = opt.models.find(m => m.key === sel) || opt.models[0];
+  // объединённый список бумаг, сортировка по весу выбранной модели
+  const rows = opt.assets.map(secid => ({
+    secid, name: nameBy[secid] || secid,
+    cur: curW[secid] || 0,
+    w: (model.weights.find(x => x.secid === secid) || {}).w || 0,
+  })).sort((a, b) => b.w - a.w);
+  const pc = x => (x * 100).toFixed(1) + '%';
+  const barW = x => Math.max(0, Math.min(100, x * 100)).toFixed(1) + '%';
+  return (
+    <div>
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+        <div className="text-[11px] font-mono uppercase tracking-wider text-text2">Оптимизация весов · {opt.dates} дней</div>
+        <div className="flex flex-wrap gap-1">
+          {opt.models.map(m => (
+            <button key={m.key} type="button" onClick={() => setSel(m.key)}
+              className={['px-2 py-1 rounded text-[10px] font-mono border',
+                sel === m.key ? 'border-acc text-acc bg-acc-dim' : 'border-border text-text2 hover:text-text'].join(' ')}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* сравнение характеристик моделей */}
+      <div className="overflow-x-auto mb-3">
+        <table className="w-full text-[11px]">
+          <thead className="text-text3 uppercase text-[9px]">
+            <tr><th className="text-left p-1.5">Модель</th><th className="text-right p-1.5">Дох. год</th><th className="text-right p-1.5">Волат.</th><th className="text-right p-1.5">Sortino</th><th className="text-right p-1.5">CVaR 95%</th></tr>
+          </thead>
+          <tbody>
+            {opt.models.map(m => (
+              <tr key={m.key} className={'border-t border-border/40 ' + (m.key === sel ? 'bg-acc-dim/40' : '')}>
+                <td className="p-1.5 font-mono text-text">{m.label}</td>
+                <td className={'p-1.5 text-right font-mono ' + (m.stats.retAnnual >= 0 ? 'text-green' : 'text-danger')}>{pc(m.stats.retAnnual)}</td>
+                <td className="p-1.5 text-right font-mono text-text2">{pc(m.stats.vol)}</td>
+                <td className="p-1.5 text-right font-mono text-text2">{isFinite(m.stats.sortino) ? m.stats.sortino.toFixed(2) : '—'}</td>
+                <td className="p-1.5 text-right font-mono text-warn">{pc(m.stats.cvar)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* текущие vs предложенные веса */}
+      <div className="max-h-72 overflow-y-auto border border-border/60 rounded">
+        <table className="w-full text-[11px]">
+          <thead className="bg-s2/60 text-text3 uppercase text-[9px] sticky top-0">
+            <tr><th className="text-left p-1.5 pl-3">Бумага</th><th className="text-right p-1.5">Сейчас</th><th className="text-right p-1.5 pr-3">{model.label}</th><th className="w-[40%]" /></tr>
+          </thead>
+          <tbody>
+            {rows.map(r => {
+              const d = r.w - r.cur;
+              return (
+                <tr key={r.secid} className="border-t border-border/40">
+                  <td className="p-1.5 pl-3"><div className="truncate max-w-[180px] text-text" title={r.name}>{r.name}</div><div className="text-text3 font-mono text-[9px]">{r.secid}</div></td>
+                  <td className="p-1.5 text-right font-mono text-text3">{pc(r.cur)}</td>
+                  <td className={'p-1.5 pr-3 text-right font-mono ' + (d > 0.005 ? 'text-green' : d < -0.005 ? 'text-warn' : 'text-text')}>{pc(r.w)}</td>
+                  <td className="p-1.5"><div className="h-2 rounded bg-s2 overflow-hidden"><div className="h-full" style={{ width: barW(r.w), background: '#FF006E' }} /></div></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
