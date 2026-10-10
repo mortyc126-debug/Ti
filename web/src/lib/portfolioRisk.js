@@ -7,13 +7,19 @@
 // Все функции чистые (тестируются без UI). Доходности — дневные доли.
 
 const TRADING_DAYS = 252;
+// Кап дневной доходности: у неликвидных облигаций редкие сделки дают
+// «дневной» скачок в десятки % (месячный ход, схлопнутый в один бар), а
+// компаундинг в Монте-Карло раздувает его в сотни иксов. Клампим к ±25%/день —
+// это гасит артефакты, сохраняя реальный стресс (даже дефолтный гэп редко >25%).
+export const RET_CAP = 0.25;
+export const clipRet = x => x > RET_CAP ? RET_CAP : x < -RET_CAP ? -RET_CAP : x;
 
-// Дневные доходности из ряда стоимости [{date, val}] или [val].
+// Дневные доходности из ряда стоимости [{date, val}] или [val] (винзоризованы).
 export function dailyReturns(series){
   const v = series.map(x => (typeof x === 'number' ? x : x.val)).filter(x => x != null && isFinite(x));
   const r = [];
   for(let i = 1; i < v.length; i++){
-    if(v[i - 1] > 0) r.push(v[i] / v[i - 1] - 1);
+    if(v[i - 1] > 0) r.push(clipRet(v[i] / v[i - 1] - 1));
   }
   return r;
 }

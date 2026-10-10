@@ -8,6 +8,10 @@
 // Все веса long-only, сумма = 1. Чистые функции.
 
 const TD = 252;
+// Тот же кап дневной доходности, что в portfolioRisk — иначе выбросы
+// неликвидных бумаг ломают ковариацию/CVaR и дают абсурдные веса.
+const RET_CAP = 0.25;
+const clip = x => x > RET_CAP ? RET_CAP : x < -RET_CAP ? -RET_CAP : x;
 
 // Матрица дневных доходностей по общим датам.
 // positions: [{secid, hist:[{date,close}]}] → {assets, dates, R:[день][актив]}.
@@ -30,7 +34,7 @@ export function alignedReturns(positions){
   }
   const R = [];
   for(let t = 1; t < prices.length; t++){
-    R.push(prices[t].map((p, i) => prices[t - 1][i] > 0 ? p / prices[t - 1][i] - 1 : 0));
+    R.push(prices[t].map((p, i) => prices[t - 1][i] > 0 ? clip(p / prices[t - 1][i] - 1) : 0));
   }
   return { assets, dates, R };
 }
