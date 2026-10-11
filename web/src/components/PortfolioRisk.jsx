@@ -10,7 +10,7 @@ import Card from './ui/Card.jsx';
 import { useKeyRate } from '../store/rates.js';
 import { fetchPriceHistory, buildPortfolioSeries } from '../lib/moexPriceHistory.js';
 import { portfolioMetrics, monteCarlo, annualToDaily } from '../lib/portfolioRisk.js';
-import { optimizeAll } from '../lib/portfolioOptimize.js';
+import { optimizeAll, weightedReturns } from '../lib/portfolioOptimize.js';
 import { INDICATOR_COLORS as IC, seriesColor } from '../lib/indicatorColors.js';
 
 const PRESETS = [{ k: 1, l: '1Г' }, { k: 2, l: '2Г' }, { k: 3, l: '3Г' }];
@@ -37,6 +37,7 @@ export default function PortfolioRisk({ positions }){
   const [res, setRes] = useState(null);
   const [err, setErr] = useState('');
   const [howOpen, setHowOpen] = useState(false);
+  const [note, setNote] = useState(null);   // активная подсказка по метрике
 
   const scope = (positions || [])
     .filter(p => (p.moexSecid || p.isin) && (p.qty > 0))
@@ -68,7 +69,20 @@ export default function PortfolioRisk({ positions }){
       const nameBy = {}; for(const p of scope) nameBy[p.secid] = p.name || p.secid;
       const totVal = withHist.reduce((a, p) => a + (p.val || 0), 0) || 1;
       const curW = {}; for(const p of withHist) curW[p.secid] = (p.val || 0) / totVal;
-      setRes({ m, mc, curve, covered: withHist.length, total: scope.length, from, till, yrs, opt, nameBy, curW });
+      // прогон весов через Монте-Карло: текущие + каждая модель на той же истории
+      let resil = null;
+      if(opt.R && opt.R.length >= 20){
+        const curVec = opt.assets.map(s => curW[s] || 0);
+        const sVec = curVec.reduce((a, b) => a + b, 0) || 1;
+        const curNorm = curVec.map(x => x / sVec);
+        const mkRes = (key, label, w) => {
+          const rr = weightedReturns(opt.R, w);
+          const q = monteCarlo(rr, { stepsPerYear: m.ppy, paths: 500, block: 10, rfDaily });
+          return q ? { key, label, cagr: q.cagr.p50, dd: q.maxDrawdown.p50, prob20: q.probDrawdown20 } : null;
+        };
+        resil = [mkRes('current', 'Сейчас', curNorm), ...opt.models.map(mm => mkRes(mm.key, mm.label, mm.w))].filter(Boolean);
+      }
+      setRes({ m, mc, curve, covered: withHist.length, total: scope.length, from, till, yrs, opt, nameBy, curW, resil });
     } catch(e){ setErr(String(e && e.message || e)); }
     setRunning(false);
   }, [scope, keyRate]);
@@ -122,16 +136,27 @@ export default function PortfolioRisk({ positions }){
             </ResponsiveContainer>
           </div>
 
-          {/* Метрики */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <Tile label="CAGR" val={pct(m.cagr)} col={m.cagr >= 0 ? 'text-green' : 'text-danger'} />
-            <Tile label="Волатильность" val={pct(m.vol)} />
-            <Tile label="Sortino (к КС)" val={num(m.sortino)} col={m.sortino >= 0 ? 'text-green' : 'text-danger'} sub="доходность/вниз-риск" />
-            <Tile label="Худший день" val={num(m.maxDailyDrop, 1) + '%'} col="text-danger" />
-            <Tile label="Просадка (подводная)" val={pct(m.maxDrawdown)} col={ddCol(m.maxDrawdown)} sub="ниже старта капитала" />
-            <Tile label="Просадка (от пика)" val={pct(m.classicMaxDD)} col={ddCol(m.classicMaxDD)} />
-            <Tile label="Ulcer index" val={num(m.ulcer, 1)} sub="глубина×длительность боли" />
-            <Tile label="CVaR 95% (день)" val={pct(m.cvar95)} col="text-warn" sub={`VaR ${pct(m.var95)}`} />
+          {/* Метрики — вся плитка кликабельна, снизу раскрывается пояснение */}
+          <div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <Tile nkey="cagr" note={note} setNote={setNote} label="CAGR" val={pct(m.cagr)} col={m.cagr >= 0 ? 'text-green' : 'text-danger'} />
+              <Tile nkey="vol" note={note} setNote={setNote} label="Волатильность" val={pct(m.vol)} />
+              <Tile nkey="sortino" note={note} setNote={setNote} label="Sortino (к КС)" val={num(m.sortino)} col={m.sortino >= 0 ? 'text-green' : 'text-danger'} sub="доходность/вниз-риск" />
+              <Tile nkey="maxDailyDrop" note={note} setNote={setNote} label="Худший день" val={num(m.maxDailyDrop, 1) + '%'} col="text-danger" />
+              <Tile nkey="maxDrawdown" note={note} setNote={setNote} label="Просадка (подводная)" val={pct(m.maxDrawdown)} col={ddCol(m.maxDrawdown)} sub="ниже старта капитала" />
+              <Tile nkey="classicMaxDD" note={note} setNote={setNote} label="Просадка (от пика)" val={pct(m.classicMaxDD)} col={ddCol(m.classicMaxDD)} />
+              <Tile nkey="ulcer" note={note} setNote={setNote} label="Ulcer index" val={num(m.ulcer, 1)} sub="глубина×длительность боли" />
+              <Tile nkey="cvar95" note={note} setNote={setNote} label="CVaR 95% (день)" val={pct(m.cvar95)} col="text-warn" sub={`VaR ${pct(m.var95)}`} />
+            </div>
+            {note && NOTES[note] && (
+              <div className="mt-2 flex items-start gap-2 rounded border bg-s2/40 px-3 py-2 text-[12px] text-text2 leading-relaxed"
+                style={{ borderColor: IC.violet + '66' }}>
+                <span className="font-mono font-semibold shrink-0" style={{ color: IC.violet }}>{NOTES[note].t}</span>
+                <span>{NOTES[note].d}</span>
+                <button type="button" onClick={() => setNote(null)} className="ml-auto text-text3 hover:text-text shrink-0">×</button>
+              </div>
+            )}
+            <div className="text-[10px] text-text3 font-mono mt-1">нажми на любую плитку — покажу, что это и как считается</div>
           </div>
 
           {/* Монте-Карло */}
@@ -154,7 +179,7 @@ export default function PortfolioRisk({ positions }){
 
           {/* Оптимизация весов */}
           {res.opt && res.opt.models.length > 0 && (
-            <WeightsBlock opt={res.opt} curW={res.curW} nameBy={res.nameBy} />
+            <WeightsBlock opt={res.opt} curW={res.curW} nameBy={res.nameBy} resil={res.resil} />
           )}
 
           <div>
@@ -184,7 +209,7 @@ function HowBlock(){
   );
 }
 
-function WeightsBlock({ opt, curW, nameBy }){
+function WeightsBlock({ opt, curW, nameBy, resil }){
   const [sel, setSel] = useState('minvar');
   const model = opt.models.find(m => m.key === sel) || opt.models[0];
   // объединённый список бумаг, сортировка по весу выбранной модели
@@ -212,7 +237,29 @@ function WeightsBlock({ opt, curW, nameBy }){
         </div>
       </div>
 
-      {/* сравнение характеристик моделей */}
+      {/* Прогон весов через Монте-Карло: устойчивость текущих vs модельных */}
+      {resil && resil.length > 0 && (
+        <div className="overflow-x-auto mb-3">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-text3 mb-1">Монте-Карло по наборам весов (медиана за год)</div>
+          <table className="w-full text-[11px]">
+            <thead className="text-text3 uppercase text-[9px]">
+              <tr><th className="text-left p-1.5">Набор весов</th><th className="text-right p-1.5">CAGR</th><th className="text-right p-1.5">Макс. просадка</th><th className="text-right p-1.5">P(просадка&gt;−20%)</th></tr>
+            </thead>
+            <tbody>
+              {resil.map(x => (
+                <tr key={x.key} className={'border-t border-border/40 ' + (x.key === 'current' ? 'bg-s2/60' : x.key === sel ? 'bg-acc-dim/40' : '')}>
+                  <td className="p-1.5 font-mono text-text">{x.key === 'current' ? '▸ Сейчас' : x.label}</td>
+                  <td className={'p-1.5 text-right font-mono ' + (x.cagr >= 0 ? 'text-green' : 'text-danger')}>{(x.cagr * 100).toFixed(1)}%</td>
+                  <td className={'p-1.5 text-right font-mono ' + (x.dd <= -0.2 ? 'text-danger' : x.dd <= -0.1 ? 'text-warn' : 'text-text2')}>{(x.dd * 100).toFixed(1)}%</td>
+                  <td className={'p-1.5 text-right font-mono ' + (x.prob20 > 0.3 ? 'text-danger' : x.prob20 > 0.1 ? 'text-warn' : 'text-green')}>{(x.prob20 * 100).toFixed(0)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* сравнение характеристик моделей (историч.) */}
       <div className="overflow-x-auto mb-3">
         <table className="w-full text-[11px]">
           <thead className="text-text3 uppercase text-[9px]">
@@ -263,13 +310,28 @@ function WeightsBlock({ opt, curW, nameBy }){
   );
 }
 
-function Tile({ label, val, col = 'text-text', sub }){
+// Подсказки по метрикам — простым языком, с формулой словами (не LaTeX).
+const NOTES = {
+  cagr: { t: 'CAGR', d: 'Среднегодовой рост портфеля за календарный срок. Формула: (итог/старт) в степени 1/лет, минус 1. Пример: вырос в 1.3 раза за 2 года → ≈14%/год.' },
+  vol: { t: 'Волатильность', d: 'Насколько сильно колеблется стоимость. Стандартное отклонение дневных доходностей, приведённое к году (×√числа наблюдений). Больше — тряска сильнее.' },
+  sortino: { t: 'Sortino', d: 'Во сколько раз доходность сверх ключевой ставки перекрывает риск ПАДЕНИЯ. В знаменателе — колебания только вниз (рост не штрафуется). >1 хорошо, 2+ отлично.' },
+  maxDailyDrop: { t: 'Худший день', d: 'Самое большое падение стоимости за один торговый день за период. Быстрый индикатор «насколько больно бывает за раз».' },
+  maxDrawdown: { t: 'Просадка (подводная)', d: 'Максимальный провал НИЖЕ стартового капитала (прибыль сверх старта не засчитывается). Отвечает на вопрос «на сколько я уходила в минус от вложенного».' },
+  classicMaxDD: { t: 'Просадка (от пика)', d: 'Максимальное падение от достигнутого максимума до последующего дна. Классическая просадка: «сколько потеряла бы, войдя на пике».' },
+  ulcer: { t: 'Ulcer index', d: 'Индекс «язвы»: среднеквадратичная глубина просадок с учётом их ДЛИТЕЛЬНОСТИ. Долгие глубокие минусы наказываются сильнее коротких. Чем ближе к 0 — тем спокойнее.' },
+  cvar95: { t: 'VaR / CVaR 95%', d: 'VaR 95% — порог: хуже него только 5% худших дней. CVaR (Expected Shortfall) — СРЕДНИЙ убыток внутри этих 5%. CVaR честнее: показывает, насколько плохо в хвосте, а не только его край.' },
+};
+
+function Tile({ label, val, col = 'text-text', sub, nkey, note, setNote }){
+  const active = nkey && note === nkey;
   return (
-    <div className="bg-s2/40 border border-border rounded p-2.5">
+    <button type="button" onClick={() => nkey && setNote(active ? null : nkey)}
+      className={['text-left w-full bg-s2/40 border rounded p-2.5 transition-colors',
+        active ? 'border-acc' : 'border-border hover:border-border2'].join(' ')}>
       <div className="text-[10px] uppercase tracking-wider text-text3 font-mono truncate">{label}</div>
       <div className={'text-lg font-semibold font-mono ' + col}>{val}</div>
       {sub && <div className="text-[10px] text-text3">{sub}</div>}
-    </div>
+    </button>
   );
 }
 

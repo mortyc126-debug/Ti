@@ -159,11 +159,17 @@ export function statsForWeights(R, w, rfDaily = 0){
   return { retAnnual, vol, sortino, cvar };
 }
 
-// Собрать все модели сразу. → [{key, label, weights:[{secid,w}], stats}]
+// Доходности портфеля с весами w (в порядке assets) по дням — для прогона
+// конкретного набора весов через Монте-Карло.
+export function weightedReturns(R, w){
+  return R.map(row => row.reduce((s, x, j) => s + x * (w[j] || 0), 0));
+}
+
+// Собрать все модели сразу. → {assets, dates, R, models:[{key,label,weights,stats,w}]}
 export function optimizeAll(positions, rfDaily = 0){
   const { assets, R } = alignedReturns(positions);
-  if(!assets.length || R.length < 20) return { assets: [], dates: 0, models: [] };
-  const mk = (key, label, w) => ({ key, label, weights: assets.map((s, i) => ({ secid: s, w: w[i] })), stats: statsForWeights(R, w, rfDaily) });
+  if(!assets.length || R.length < 20) return { assets: [], dates: 0, R: [], models: [] };
+  const mk = (key, label, w) => ({ key, label, w, weights: assets.map((s, i) => ({ secid: s, w: w[i] })), stats: statsForWeights(R, w, rfDaily) });
   const models = [
     mk('uniform', '1/N (равные)', wUniform(assets.length)),
     mk('invvol', 'Обратная волатильность', wInverseVol(R)),
@@ -171,5 +177,5 @@ export function optimizeAll(positions, rfDaily = 0){
     mk('sortino', 'Max-Sortino (tangency)', wMaxSortino(R, rfDaily)),
     mk('cvar', 'Min-CVaR 95%', wMinCVaR(R)),
   ];
-  return { assets, dates: R.length, models };
+  return { assets, dates: R.length, R, models };
 }
