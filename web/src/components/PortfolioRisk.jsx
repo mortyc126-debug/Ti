@@ -4,13 +4,14 @@
 // порт открытых формул из multi-model-portfolio-backtester (polytest.py).
 
 import { useCallback, useState } from 'react';
-import { ShieldAlert, RefreshCw } from 'lucide-react';
+import { ShieldAlert, RefreshCw, Info } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import Card from './ui/Card.jsx';
 import { useKeyRate } from '../store/rates.js';
 import { fetchPriceHistory, buildPortfolioSeries } from '../lib/moexPriceHistory.js';
 import { portfolioMetrics, monteCarlo, annualToDaily } from '../lib/portfolioRisk.js';
 import { optimizeAll } from '../lib/portfolioOptimize.js';
+import { INDICATOR_COLORS as IC, seriesColor } from '../lib/indicatorColors.js';
 
 const PRESETS = [{ k: 1, l: '1Г' }, { k: 2, l: '2Г' }, { k: 3, l: '3Г' }];
 const pct = (x, d = 1) => x == null ? '—' : (x * 100).toFixed(d) + '%';
@@ -35,6 +36,7 @@ export default function PortfolioRisk({ positions }){
   const [running, setRunning] = useState(false);
   const [res, setRes] = useState(null);
   const [err, setErr] = useState('');
+  const [howOpen, setHowOpen] = useState(false);
 
   const scope = (positions || [])
     .filter(p => (p.moexSecid || p.isin) && (p.qty > 0))
@@ -115,7 +117,7 @@ export default function PortfolioRisk({ positions }){
                 <Tooltip contentStyle={{ background: '#140A24', border: '1px solid #241638', borderRadius: 8, fontSize: 11 }}
                   formatter={v => [v.toFixed(1), 'индекс (старт=100)']} labelStyle={{ color: '#CBC2EA' }} />
                 <ReferenceLine y={100} stroke="#3A1F44" strokeDasharray="3 3" />
-                <Line type="monotone" dataKey="v" stroke="#FF006E" dot={false} strokeWidth={1.5} isAnimationActive={false} />
+                <Line type="monotone" dataKey="v" stroke={IC.accent} dot={false} strokeWidth={1.5} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -155,8 +157,12 @@ export default function PortfolioRisk({ positions }){
             <WeightsBlock opt={res.opt} curW={res.curW} nameBy={res.nameBy} />
           )}
 
-          <div className="text-[11px] text-text3 font-mono leading-relaxed">
-            Метрики порт из multi-model-portfolio-backtester (polytest.py / benchmarks.py). «Подводная» просадка меряет провал ниже стартового капитала. Монте-Карло пересобирает реальные дневные доходности блоками — это «что могло бы быть», не прогноз. Веса моделей long-only (∑=1), посчитаны на той же истории; это ориентир, не инвест-рекомендация.
+          <div>
+            <button type="button" onClick={() => setHowOpen(v => !v)}
+              className="inline-flex items-center gap-1.5 text-[11px] font-mono text-text2 hover:text-acc">
+              <Info size={12} /> Как это считается {howOpen ? '▲' : '▼'}
+            </button>
+            {howOpen && <HowBlock />}
           </div>
         </div>
       )}
@@ -164,10 +170,26 @@ export default function PortfolioRisk({ positions }){
   );
 }
 
+function HowBlock(){
+  const H = ({ c, children }) => <span style={{ color: c }}>{children}</span>;
+  return (
+    <div className="mt-2 text-[11px] text-text2 leading-relaxed space-y-2 border-l-2 pl-3" style={{ borderColor: IC.violet }}>
+      <div><H c={IC.accent}>Ряд стоимости (мульти-актив).</H> Для каждой бумаги берётся дневная история цен MOEX; цены выравниваются по общим датам (пропуски — предыдущим значением). Стоимость портфеля в день t: <span className="font-mono">V(t) = Σ qtyᵢ·pxᵢ(t)</span> по всем бумагам. Дневная доходность <span className="font-mono">r(t) = V(t)/V(t−1) − 1</span>, винзоризуется к ±25% (глушит скачки неликвида).</div>
+      <div><H c={IC.bullish}>CAGR</H> = (Π(1+r))^(1/лет) − 1 — среднегодовой рост за <b>календарный</b> срок. <H c={IC.blue}>Волатильность</H> = σ(r)·√(набл/год). <H c={IC.violet}>Sortino</H> = (CAGR − КС) / σ только <i>отрицательных</i> отклонений (падения штрафуются, рост — нет).</div>
+      <div><H c={IC.bearish}>Просадка «подводная»</H> — max провал ниже стартового капитала (прибыль сверх старта не в счёт). <H c={IC.orange}>Ulcer</H> = RMS глубины×длительности просадок. <H c={IC.gray}>VaR/CVaR 95%</H>: VaR — порог 5% худших дней, CVaR — средний убыток в этом хвосте.</div>
+      <div><H c={IC.accent}>Монте-Карло.</H> Реальные дневные доходности пересобираются блоками по ~10 (сохраняя автокорреляцию) в 1000 траекторий длиной «1 год» (= фактическое число наблюдений в год). По каждой считаются те же метрики → перцентили p5/p50/p95 и доля траекторий с просадкой глубже −20%.</div>
+      <div><H c={IC.teal}>Веса (мульти-актив).</H> На матрице доходностей активов строится ковариация Σ (со шринкажем к диагонали). <b>1/N</b> — поровну. <b>Обр. волатильность</b> — wᵢ∝1/σᵢ. <b>Min-variance</b> — w∝Σ⁻¹·1. <b>Max-Sortino</b> — w∝Σ⁻¹·(μ−КС). <b>Min-CVaR</b> — минимизирует средний убыток 5%-хвоста (Рокафеллар–Урясев). Все long-only, ∑=1 (проекция на симплекс).</div>
+      <div className="text-text3">Источник формул: multi-model-portfolio-backtester (polytest.py / benchmarks.py). Это ориентир, не инвест-рекомендация; облигационные нюансы (дюрация, оферты) модели не видят.</div>
+    </div>
+  );
+}
+
 function WeightsBlock({ opt, curW, nameBy }){
   const [sel, setSel] = useState('minvar');
   const model = opt.models.find(m => m.key === sel) || opt.models[0];
   // объединённый список бумаг, сортировка по весу выбранной модели
+  // цвет закреплён за бумагой (стабилен между моделями) — как линии индикаторов
+  const colorBy = {}; opt.assets.forEach((s, i) => { colorBy[s] = seriesColor(i); });
   const rows = opt.assets.map(secid => ({
     secid, name: nameBy[secid] || secid,
     cur: curW[secid] || 0,
@@ -221,10 +243,16 @@ function WeightsBlock({ opt, curW, nameBy }){
               const d = r.w - r.cur;
               return (
                 <tr key={r.secid} className="border-t border-border/40">
-                  <td className="p-1.5 pl-3"><div className="truncate max-w-[180px] text-text" title={r.name}>{r.name}</div><div className="text-text3 font-mono text-[9px]">{r.secid}</div></td>
+                  <td className="p-1.5 pl-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: colorBy[r.secid] }} />
+                      <div className="truncate max-w-[170px] text-text" title={r.name}>{r.name}</div>
+                    </div>
+                    <div className="text-text3 font-mono text-[9px] pl-3.5">{r.secid}</div>
+                  </td>
                   <td className="p-1.5 text-right font-mono text-text3">{pc(r.cur)}</td>
                   <td className={'p-1.5 pr-3 text-right font-mono ' + (d > 0.005 ? 'text-green' : d < -0.005 ? 'text-warn' : 'text-text')}>{pc(r.w)}</td>
-                  <td className="p-1.5"><div className="h-2 rounded bg-s2 overflow-hidden"><div className="h-full" style={{ width: barW(r.w), background: '#FF006E' }} /></div></td>
+                  <td className="p-1.5"><div className="h-2 rounded bg-s2 overflow-hidden"><div className="h-full" style={{ width: barW(r.w), background: colorBy[r.secid] }} /></div></td>
                 </tr>
               );
             })}
