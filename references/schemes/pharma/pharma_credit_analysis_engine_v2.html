@@ -1,0 +1,330 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pharma Credit Analysis Engine V2 Engine</title>
+<style>
+:root{--bg:#0E1122;--p:#14182c;--p2:#191d34;--l:#2b3150;--w:#C71B52;--pu:#8c62b8;--t:#60A4A1;--b:#17506E;--tx:#F0F3FF;--m:#B8C4E0;--d:#7f8aa9;--r:#e35b78}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.55 Inter,Segoe UI,Arial,sans-serif}.wrap{max-width:1420px;margin:auto;padding:26px}header{padding:28px 0 18px;border-bottom:1px solid var(--l)}h1{font-size:34px;letter-spacing:-.03em;margin:0 0 8px}h2{font-size:24px;margin:0 0 15px}h3{font-size:17px;margin:0 0 10px}p{margin:7px 0;color:var(--m)}.lead{font-size:17px;max-width:1000px}
+nav{position:sticky;top:0;z-index:5;background:rgba(14,17,34,.95);border-bottom:1px solid var(--l);padding:10px 0;margin:0 -26px 28px}nav .inner{max-width:1420px;margin:auto;padding:0 26px;display:flex;gap:8px;overflow:auto}nav a{white-space:nowrap;padding:7px 10px;border:1px solid transparent;border-radius:7px;font-size:13px;color:var(--m);text-decoration:none}nav a:hover{border-color:var(--l);background:var(--p)}
+section{margin:34px 0;scroll-margin-top:72px}.grid{display:grid;gap:12px}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card{background:linear-gradient(145deg,var(--p),#11152a);border:1px solid var(--l);border-radius:12px;padding:16px}.wine{border-left:3px solid var(--w)}.teal{border-left:3px solid var(--t)}.purple{border-left:3px solid var(--pu)}.blue{border-left:3px solid var(--b)}
+.tag{display:inline-block;border:1px solid var(--l);border-radius:999px;padding:3px 8px;color:var(--m);font-size:12px;margin:2px 3px}.formula{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:#0b0e1b;border:1px solid var(--l);padding:12px;border-radius:8px;color:var(--tx);overflow:auto}.chain{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:12px 0}.node{background:#11152a;border:1px solid var(--l);padding:8px 11px;border-radius:7px}.arrow{color:var(--w);font-weight:700}.callout{padding:16px;border:1px solid var(--w);background:linear-gradient(90deg,rgba(199,27,82,.10),rgba(199,27,82,.02));border-radius:10px}table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px}th,td{padding:9px 10px;border-bottom:1px solid var(--l);vertical-align:top;text-align:left}th{background:#12162a}td{color:var(--m)}.metric{font-size:26px;font-weight:700}.small{font-size:12px;color:var(--d)}
+.timeline{display:grid;grid-template-columns:140px repeat(6,1fr);border:1px solid var(--l)}.timeline>div{padding:8px;border-bottom:1px solid var(--l);border-right:1px solid var(--l);min-height:42px}.bar{height:25px;background:rgba(96,164,161,.28);border:1px solid var(--t);border-radius:5px}.cliff{height:25px;background:rgba(199,27,82,.24);border:1px solid var(--w);border-radius:5px}.footer{border-top:1px solid var(--l);padding:25px 0 50px;color:var(--d)}
+@media(max-width:900px){.g2,.g3,.g4{grid-template-columns:1fr}.timeline{font-size:11px;grid-template-columns:95px repeat(6,1fr)}h1{font-size:27px}}
+</style></head><body><div class="wrap">
+<header><h1>Pharma Credit Analysis Engine</h1>
+<p class="lead">Карта показателей, зависимостей и выводов для кредитного анализа фармацевтической компании.</p>
+<div class="chain"><span class="node">Product Portfolio</span><span class="arrow">→</span><span class="node">Lifecycle</span><span class="arrow">→</span><span class="node">Patent / Exclusivity</span><span class="arrow">→</span><span class="node">Revenue</span><span class="arrow">→</span><span class="node">EBITDA</span><span class="arrow">→</span><span class="node">FCF</span><span class="arrow">→</span><span class="node">Debt Service</span></div>
+<div class="callout"><b>Главный вопрос:</b> какая часть текущей прибыли защищена, сколько времени она проживёт и чем будет заменена после исчезновения текущего cash flow?</div></header>
+<nav><div class="inner">
+<a href="#architecture">Архитектура</a><a href="#raw">Raw data</a><a href="#products">Products</a><a href="#lifecycle">Lifecycle</a><a href="#patent">Patent Wall</a><a href="#pipeline">Pipeline</a><a href="#rd">R&D</a><a href="#reg">Regulatory</a><a href="#ops">Operations</a><a href="#pricing">Pricing</a><a href="#cash">Cash Flow</a><a href="#debt">Debt</a><a href="#stress">Stress</a><a href="#recovery">Recovery</a><a href="#signals">Signals</a><a href="#passport">Passport</a>
+</div></nav>
+
+<section id="architecture"><h2>01 · Архитектура модели</h2><div class="grid g4">
+<div class="card wine"><h3>L0 · Raw Data</h3><p>Финансы, препараты, рынки, патенты, pipeline, производство, долги.</p></div>
+<div class="card purple"><h3>L1 · Product Economics</h3><p>Volume, net price, market share, gross margin, EBITDA contribution.</p></div>
+<div class="card teal"><h3>L2 · Portfolio</h3><p>Концентрация, lifecycle, protected EBITDA, patent wall, replacement.</p></div>
+<div class="card blue"><h3>L3–L6 · Credit</h3><p>R&D, regulatory, CFO, FCF, leverage, liquidity, stress, recovery.</p></div></div>
+<div class="card" style="margin-top:12px"><h3>Центральная цепочка</h3><div class="chain"><span class="node">Patent / Exclusivity</span><span class="arrow">→</span><span class="node">Competition</span><span class="arrow">→</span><span class="node">Price / Volume</span><span class="arrow">→</span><span class="node">Revenue</span><span class="arrow">→</span><span class="node">EBITDA</span><span class="arrow">→</span><span class="node">CFO</span><span class="arrow">→</span><span class="node">FCF</span><span class="arrow">→</span><span class="node">Debt Service</span></div><p>Обратная ветка: <b>Pipeline → Probability of Success → Approval → Launch → Future Revenue → Replacement FCF.</b></p></div></section>
+
+<section id="raw"><h2>02 · Raw Data</h2><div class="grid g3"><div class="card"><h3>Financial</h3><p>Revenue · EBITDA · EBIT · CFO · Capex · FCF · Cash · Gross Debt · Net Debt · Interest · Tax.</p></div><div class="card"><h3>Portfolio</h3><p>Препараты · Revenue · Volume · Net Price · Margin · Market Share · Geography · Indication.</p></div><div class="card"><h3>Forward-looking</h3><p>Patent · Exclusivity · Competitors · Pipeline phase · PoS · Expected launch · Peak sales.</p></div></div></section>
+
+<section id="products"><h2>03 · Product Master / Экономика препарата</h2><table><tr><th>Блок</th><th>Показатель</th><th>Зачем кредитору</th></tr><tr><td>Продажи</td><td>Revenue / Volume / Net Price</td><td>Разделить рост количества, цены и mix.</td></tr><tr><td>Рынок</td><td>Market share / Patient population</td><td>Понять ceiling и конкурентную позицию.</td></tr><tr><td>Маржа</td><td>Gross margin / EBITDA contribution</td><td>Определить экономически значимые препараты.</td></tr><tr><td>Защита</td><td>Patent / Exclusivity / LOE</td><td>Оценить duration текущего cash flow.</td></tr><tr><td>Конкуренция</td><td>Generic / Biosimilar / Branded competitors</td><td>Оценить erosion после LOE.</td></tr><tr><td>Операции</td><td>API / Site / Supplier</td><td>Найти single points of failure.</td></tr></table>
+<div class="grid g3"><div class="card wine"><div class="metric">Revenue share</div><div class="formula">RCᵢ = Revenueᵢ / Revenueₜₒₜₐₗ</div></div><div class="card purple"><div class="metric">EBITDA share</div><div class="formula">ECᵢ = EBITDAᵢ / EBITDAₜₒₜₐₗ</div></div><div class="card teal"><div class="metric">Concentration</div><div class="formula">HHI = Σ sᵢ²</div></div></div><p class="small">Для кредита EBITDA concentration обычно информативнее простой revenue concentration.</p></section>
+
+<section id="lifecycle"><h2>04 · Product Lifecycle</h2><div class="grid g3"><div class="card"><h3>Launch / Growth</h3><p>Volume ↑ · Share ↑ · Commercial investment ↑.</p></div><div class="card teal"><h3>Mature</h3><p>Наиболее предсказуемый FCF, но растёт значение будущего LOE.</p></div><div class="card wine"><h3>Pre-LOE / Erosion</h3><p>Revenue ещё может быть сильной, но economic duration сокращается.</p></div></div><div class="formula">Product lifecycle → Revenue duration → EBITDA duration → FCF duration → Debt capacity</div></section>
+
+<section id="patent"><h2>05 · Patent Wall / Economic Protection</h2><p>Патентная дата сама по себе недостаточна: анализировать нужно effective economic protection — patent, regulatory exclusivity, breadth, litigation и вероятность/скорость конкурентного входа.</p>
+<div class="timeline"><div><b>Препарат</b></div><div>2027</div><div>2028</div><div>2029</div><div>2030</div><div>2031</div><div>2032</div><div>Drug A</div><div></div><div class="bar"></div><div class="bar"></div><div class="cliff"></div><div></div><div></div><div>Drug B</div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="cliff"></div><div>Drug C</div><div></div><div class="bar"></div><div class="cliff"></div><div></div><div></div><div></div></div>
+<div class="grid g3" style="margin-top:12px"><div class="card wine"><h3>EBITDA at Risk</h3><div class="formula">Σ EBITDAᵢ × Expected erosionᵢ</div></div><div class="card purple"><h3>Protected EBITDA</h3><div class="formula">EBITDA − At-Risk EBITDA</div></div><div class="card teal"><h3>Economic runway</h3><div class="formula">Weighted time to material cash-flow erosion</div></div></div></section>
+
+<section id="pipeline"><h2>06 · Pipeline / Replacement Engine</h2><table><tr><th>Stage</th><th>Вопрос</th><th>Credit interpretation</th></tr><tr><td>Discovery / Preclinical</td><td>Есть ли технологический актив?</td><td>Далёкий и высоконеопределённый cash flow.</td></tr><tr><td>Phase I</td><td>Safety / early signal?</td><td>Низкая текущая replacement value.</td></tr><tr><td>Phase II</td><td>Efficacy?</td><td>Формируется экономическая опция.</td></tr><tr><td>Phase III</td><td>Регистрация?</td><td>Наиболее значимый late-stage pipeline.</td></tr><tr><td>Filing / Approval</td><td>Когда launch?</td><td>Близкий replacement cash flow.</td></tr></table>
+<div class="grid g3"><div class="card"><h3>Risk-adjusted value</h3><div class="formula">rNPVᵢ = NPVᵢ × PoSᵢ</div></div><div class="card wine"><h3>Pipeline Replacement Ratio</h3><div class="formula">PRR = Risk-adjusted Pipeline EBITDA / EBITDA at Risk</div></div><div class="card teal"><h3>Replacement Gap</h3><div class="formula">Gapₜ = EBITDA at Riskₜ − Pipeline EBITDAₜ</div></div></div><p class="small">Pipeline трактуется как способность заменить будущий cash flow, а не как гарантированный актив.</p></section>
+
+<section id="rd"><h2>07 · R&D / Future Cash Flow</h2><div class="grid g2"><div class="card"><h3>R&D composition</h3><p><span class="tag">Maintenance</span><span class="tag">Replacement</span><span class="tag">Growth</span><span class="tag">Platform</span></p><p>Сокращение R&D улучшает FCF сегодня, но может ухудшить replacement capacity завтра.</p></div><div class="card wine"><h3>R&D productivity</h3><div class="formula">Risk-adjusted commercial value / Cumulative R&D</div><p>Смотреть R&D, Phase III success, approvals, launches и peak sales.</p></div></div><div class="callout" style="margin-top:12px"><b>False FCF improvement:</b> R&D ↓ → FCF ↑ → leverage ↓, но Pipeline ↓ → future EBITDA ↓.</div></section>
+
+<section id="reg"><h2>08 · Regulatory / Reimbursement</h2><div class="grid g3"><div class="card"><h3>Clinical</h3><p>Safety · Efficacy · Trial failure · Delay.</p></div><div class="card"><h3>Approval</h3><p>Filing · Label · Manufacturing requirements · Post-market commitments.</p></div><div class="card"><h3>Commercial access</h3><p>Reimbursement · Payer restrictions · Procurement · Pricing policy.</p></div></div><div class="formula">Clinical success → Approval → Label → Reimbursement → Access → Commercial revenue</div></section>
+
+<section id="ops"><h2>09 · Manufacturing / Supply Chain</h2><div class="grid g4"><div class="card"><h3>API</h3><p>Собственное / supplier · single-source · geography · price risk.</p></div><div class="card"><h3>Sites</h3><p>Capacity · utilization · redundancy · regulatory status.</p></div><div class="card"><h3>Inventory</h3><p>Days of supply · ageing · expiry · obsolescence · write-offs.</p></div><div class="card"><h3>Concentration</h3><p>Product × site × API supplier × country.</p></div></div><div class="chain"><span class="node">API</span><span class="arrow">→</span><span class="node">Manufacturing</span><span class="arrow">→</span><span class="node">Quality / Release</span><span class="arrow">→</span><span class="node">Distribution</span><span class="arrow">→</span><span class="node">Revenue</span></div><div class="callout"><b>Single Point of Failure:</b> значимая доля revenue + один API supplier или один производственный сайт может превратить операционный сбой в cash-flow shock.</div></section>
+
+<section id="pricing"><h2>10 · Pricing / Gross-to-Net / Mix</h2><div class="formula">Gross Sales − Rebates − Discounts − Returns − Chargebacks − Government concessions = Net Sales</div><div class="grid g3" style="margin-top:12px"><div class="card"><h3>Gross-to-Net</h3><div class="formula">GTN = (Gross Sales − Net Sales) / Gross Sales</div></div><div class="card"><h3>Price effect</h3><p>Изменение net price после concessions.</p></div><div class="card"><h3>Mix effect</h3><p>Сдвиг продаж между препаратами с разной маржой.</p></div></div><p>Revenue growth раскладывать на Volume / Price / FX / Mix / GTN.</p></section>
+
+<section id="cash"><h2>11 · Working Capital → CFO → FCF</h2><div class="formula">CCC = DIO + DSO − DPO</div><div class="grid g3"><div class="card"><h3>Inventory</h3><p>Expiry, slow-moving stock, channel inventory.</p></div><div class="card"><h3>Receivables</h3><p>Distributors, hospitals, government, insurers; DSO и overdue.</p></div><div class="card"><h3>Channel</h3><p>Рост продаж при росте запасов дистрибьютора может быть pull-forward.</p></div></div><div class="chain"><span class="node">EBITDA</span><span class="arrow">→</span><span class="node">Interest</span><span class="arrow">→</span><span class="node">Tax</span><span class="arrow">→</span><span class="node">WC</span><span class="arrow">→</span><span class="node">Capex</span><span class="arrow">→</span><span class="node">FCF</span></div><div class="grid g2"><div class="card teal"><h3>Cash conversion</h3><div class="formula">CFO / EBITDA</div></div><div class="card"><h3>FCF conversion</h3><div class="formula">FCF / EBITDA</div></div></div></section>
+
+<section id="debt"><h2>12 · Debt / Liquidity</h2><div class="grid g4"><div class="card"><h3>Reported leverage</h3><div class="formula">Net Debt / EBITDA</div></div><div class="card purple"><h3>Protected leverage</h3><div class="formula">Net Debt / Protected EBITDA</div></div><div class="card wine"><h3>Stress leverage</h3><div class="formula">Net Debt / Stress EBITDA</div></div><div class="card"><h3>Interest coverage</h3><div class="formula">EBIT / Interest</div></div></div><div class="callout" style="margin-top:12px"><b>Три EBITDA лучше одной:</b> Reported показывает настоящее, Protected — duration, Stress — способность пережить product/patent shock.</div><table><tr><th>Показатель</th><th>Что проверять</th></tr><tr><td>Cash / ST Debt</td><td>Ближайшая liquidity coverage.</td></tr><tr><td>FCF / Debt Maturity</td><td>Способность погашать долг собственным cash flow.</td></tr><tr><td>Floating-rate debt</td><td>Чувствительность к ставкам.</td></tr><tr><td>Covenants</td><td>Headroom после EBITDA shock.</td></tr><tr><td>Maturity × LOE</td><td>Совпадает ли refinancing wall с patent cliff.</td></tr></table></section>
+
+<section id="stress"><h2>13 · Stress Engine</h2><div class="grid g3"><div class="card"><h3>Product shock</h3><p>LOE раньше ожиданий · generic entry · market-share loss.</p></div><div class="card"><h3>Commercial shock</h3><p>Price −15% · GTN ↑ · reimbursement pressure · volume −10%.</p></div><div class="card"><h3>Pipeline shock</h3><p>Phase III failure · regulatory delay · launch delay.</p></div></div><table><tr><th>Сценарий</th><th>EBITDA</th><th>Leverage</th><th>Главный вопрос</th></tr><tr><td>Base</td><td>100%</td><td>Текущий</td><td>Нормальная траектория?</td></tr><tr><td>Patent stress</td><td>−20–40%</td><td>↑</td><td>Что происходит после LOE?</td></tr><tr><td>Severe portfolio stress</td><td>−40%+</td><td>↑↑</td><td>Есть ли liquidity / refinancing capacity?</td></tr><tr><td>Compound stress</td><td>LOE + pipeline delay + maturity</td><td>максимум</td><td>Выживает ли капиталовая структура?</td></tr></table></section>
+
+<section id="recovery"><h2>14 · Recovery / Strategic Value</h2><div class="grid g4"><div class="card"><h3>Going concern</h3><p>Компания продолжает генерировать FCF.</p></div><div class="card teal"><h3>Strategic sale</h3><p>Портфель приобретается стратегическим покупателем.</p></div><div class="card purple"><h3>Asset sale</h3><p>Отдельно продаются препараты, IP, manufacturing.</p></div><div class="card wine"><h3>Liquidation</h3><p>IP и физические активы реализуются с дисконтом.</p></div></div><div class="formula">Recovery ≠ Book Value. Для фармы важны IP, approved products, regulatory rights, manufacturing capabilities и buyer universe.</div><p>Отдельно оценивать <b>survival probability</b> и <b>recovery probability</b>.</p></section>
+
+<section id="signals"><h2>15 · Contradiction Detector / Сигналы</h2><table><tr><th>Наблюдение</th><th>Возможная интерпретация</th></tr><tr><td>Revenue ↑↑ + Volume → + Price ↑↑</td><td>Price-led growth.</td></tr><tr><td>Revenue ↑ + Channel inventory ↑↑</td><td>Potential pull-forward.</td></tr><tr><td>Revenue ↑ + DSO ↑↑</td><td>Cash conversion deterioration.</td></tr><tr><td>Revenue ↑ + EBITDA ↓</td><td>Mix / pricing / competition pressure.</td></tr><tr><td>EBITDA ↑ + CFO ↓</td><td>Working-capital stress.</td></tr><tr><td>EBITDA ↑ + R&D ↓↓</td><td>Possible underinvestment.</td></tr><tr><td>Net Debt ↓ + R&D ↓↓</td><td>Artificial deleveraging risk.</td></tr><tr><td>Patent runway ↓ + M&A ↑</td><td>Pipeline replacement stress.</td></tr><tr><td>Pipeline count ↑ + rNPV ↓</td><td>Quantity without economic quality.</td></tr><tr><td>Current EBITDA ↑ + EBITDA at Risk ↑↑</td><td>False strength.</td></tr><tr><td>Gross sales ↑ + Net sales →</td><td>Gross-to-net pressure.</td></tr><tr><td>LOE + Debt maturity одновременно</td><td>Refinancing risk amplified by patent cliff.</td></tr></table></section>
+
+<section id="passport"><h2>16 · Final Pharma Borrower Passport</h2><table><tr><th>Блок</th><th>Level</th><th>Momentum</th><th>vs Sector</th><th>Главный вопрос</th></tr>
+<tr><td>Revenue quality</td><td></td><td></td><td></td><td>Рост объёмный, ценовой или mix-driven?</td></tr><tr><td>Product concentration</td><td></td><td></td><td></td><td>Сколько экономического риска в Top-1 / Top-3?</td></tr><tr><td>EBITDA quality</td><td></td><td></td><td></td><td>Какая доля protected?</td></tr><tr><td>Patent runway</td><td></td><td></td><td></td><td>Когда economic cliff?</td></tr><tr><td>EBITDA at Risk</td><td></td><td></td><td></td><td>Что исчезнет при LOE?</td></tr><tr><td>Pipeline quality</td><td></td><td></td><td></td><td>Есть ли replacement?</td></tr><tr><td>Pipeline timing</td><td></td><td></td><td></td><td>Успеет ли replacement до падения FCF?</td></tr><tr><td>R&D productivity</td><td></td><td></td><td></td><td>Покупает ли R&D будущую EBITDA?</td></tr><tr><td>Regulatory risk</td><td></td><td></td><td></td><td>Какая выручка зависит от regulatory events?</td></tr><tr><td>Pricing / GTN</td><td></td><td></td><td></td><td>Сохраняется ли net pricing power?</td></tr><tr><td>Manufacturing</td><td></td><td></td><td></td><td>Есть ли single point of failure?</td></tr><tr><td>Inventory quality</td><td></td><td></td><td></td><td>Сколько запасов реально монетизируемо?</td></tr><tr><td>Cash conversion</td><td></td><td></td><td></td><td>EBITDA превращается в cash?</td></tr><tr><td>Leverage</td><td></td><td></td><td></td><td>Что показывают protected/stress ratios?</td></tr><tr><td>Liquidity</td><td></td><td></td><td></td><td>Переживает ли maturity wall?</td></tr><tr><td>Recovery</td><td></td><td></td><td></td><td>Что получит кредитор при distress?</td></tr></table>
+<div class="callout" style="margin-top:16px"><b>Финальный вопрос:</b> какая часть прибыли защищена, сколько времени она существует, чем будет заменена после LOE и превратится ли она в cash раньше, чем наступит долг?</div></section>
+
+<section><h2>17 · Analytical Engine</h2><div class="chain"><span class="node">RAW DATA</span><span class="arrow">→</span><span class="node">PRODUCT ECONOMICS</span><span class="arrow">→</span><span class="node">LIFECYCLE</span><span class="arrow">→</span><span class="node">PATENT WALL</span><span class="arrow">→</span><span class="node">PIPELINE</span><span class="arrow">→</span><span class="node">R&D / REGULATORY</span><span class="arrow">→</span><span class="node">REVENUE / EBITDA</span><span class="arrow">→</span><span class="node">CFO / FCF</span><span class="arrow">→</span><span class="node">DEBT / LIQUIDITY</span><span class="arrow">→</span><span class="node">STRESS</span><span class="arrow">→</span><span class="node">RECOVERY</span></div><p><b>Core metrics:</b> Protected EBITDA · EBITDA at Risk · Patent runway · Pipeline Replacement Ratio · Replacement Gap · Net Debt / Protected EBITDA · Net Debt / Stress EBITDA · Cash Conversion · Debt Maturity × LOE.</p></section>
+<div class="footer">Pharma Credit Analysis Engine · thresholds для scoring калибруются отдельно под innovative pharma / generic / biosimilar / CDMO / OTC.</div>
+</div>
+<style>
+.v2mark{display:inline-block;font-size:11px;letter-spacing:.14em;color:#60A4A1;border:1px solid #60A4A1;padding:4px 8px;margin-left:8px}
+.engine-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.engine-card{background:#11152a;border:1px solid #2d3150;padding:18px;border-radius:10px}
+.engine-card h3{color:#f0f3ff;margin-top:0}
+.engine-card p,.engine-card li{color:#b8c4e0;line-height:1.55}
+.eq{background:#0b0e1c;border-left:3px solid #c71b52;padding:12px 15px;margin:12px 0;color:#f0f3ff;font-family:ui-monospace,monospace}
+.warn{border-left:3px solid #c71b52;background:#181123;padding:14px;color:#f0f3ff}
+.teal{border-left:3px solid #60A4A1;background:#101b25;padding:14px;color:#f0f3ff}
+.small{font-size:12px;color:#8f9bb8}
+</style>
+
+<section id="v2-model-types">
+<div class="section">
+<h2>18. Business Model Selector <span class="v2mark">V2 ENGINE</span></h2>
+<p>До расчёта leverage нельзя применять одну и ту же логику к любой фарме. Сначала определяется, откуда возникает и чем защищается cash flow.</p>
+<div class="engine-grid">
+<div class="engine-card"><h3>INNOVATIVE</h3><p><b>Главная ось:</b> patent → clinical pipeline → launch → peak sales → LOE.</p><p><b>Кредитный риск:</b> концентрация EBITDA на зрелых препаратах + провал замещения.</p></div>
+<div class="engine-card"><h3>GENERIC</h3><p><b>Главная ось:</b> manufacturing → tender → cost → price erosion → volume.</p><p><b>Кредитный риск:</b> ценовая конкуренция, концентрация тендеров, GMP/supply disruption.</p></div>
+<div class="engine-card"><h3>BIOSIMILAR</h3><p><b>Главная ось:</b> approval → manufacturing scale → payer adoption → interchangeability → erosion.</p><p><b>Кредитный риск:</b> capex, qualification, adoption speed, price compression.</p></div>
+<div class="engine-card"><h3>CDMO</h3><p><b>Главная ось:</b> backlog → qualification → utilization → customer concentration → capex.</p><p><b>Кредитный риск:</b> потеря клиента, недозагрузка, execution/capex risk.</p></div>
+<div class="engine-card"><h3>OTC / CONSUMER</h3><p><b>Главная ось:</b> brand → distribution → shelf space → marketing → price/mix.</p><p><b>Кредитный риск:</b> demand elasticity, retailer power, inventory, brand erosion.</p></div>
+</div>
+<div class="eq">Model Fit = f(Business Model, Revenue Mix, EBITDA Mix, Geography, Regulation)</div>
+<div class="warn"><b>Ошибка:</b> сравнивать generic-компанию и innovative pharma по одинаковому набору «pipeline / patent / R&D» и считать, что их credit profile устроен одинаково.</div>
+</div>
+</section>
+
+<section id="v2-loe">
+<div class="section">
+<h2>19. LOE Erosion Engine <span class="v2mark">V2 ENGINE</span></h2>
+<p>Patent expiry — событие. Для кредита важна траектория cash-flow после него.</p>
+<div class="eq">Revenue(t) = Volume(t) × Net Price(t)</div>
+<div class="eq">EBITDA(t) = Revenue(t) × Margin(t) − Fixed Costs(t)</div>
+<div class="eq">EBITDA at Risk = Σ [EBITDAᵢ × Expected Erosionᵢ × Timing Weightᵢ]</div>
+<table>
+<tr><th>Фаза</th><th>Что смотреть</th><th>Кредитный смысл</th></tr>
+<tr><td>Pre-LOE</td><td>Market share, price, GTN, channel inventory</td><td>Проверка качества текущей базы</td></tr>
+<tr><td>Entry</td><td>Число конкурентов, price cuts, substitution</td><td>Скорость разрушения moat</td></tr>
+<tr><td>Ramp</td><td>Volume erosion + price erosion</td><td>Фактический cash-flow cliff</td></tr>
+<tr><td>Post-LOE</td><td>Residual share, margin floor</td><td>Остаточная EBITDA</td></tr>
+</table>
+<div class="teal"><b>Главная метрика:</b> не «лет до патента», а <b>Protected EBITDA Years</b> — сколько EBITDA остаётся экономически защищённой до существенного cash-flow erosion.</div>
+</div>
+</section>
+
+<section id="v2-pipeline">
+<div class="section">
+<h2>20. Replacement Engine</h2>
+<p>Pipeline должен сопоставляться не с R&amp;D budget, а с будущей дырой в EBITDA.</p>
+<div class="eq">rNPVᵢ = NPVᵢ × PoSᵢ</div>
+<div class="eq">Expected EBITDAᵢ = Peak Salesᵢ × Expected Marginᵢ × PoSᵢ × Launch Rampᵢ</div>
+<div class="eq">Replacement Gap(t) = EBITDA at Risk(t) − Expected Pipeline EBITDA(t)</div>
+<div class="eq">Pipeline Coverage = Expected Pipeline EBITDA / EBITDA at Risk</div>
+<table>
+<tr><th>Сигнал</th><th>Интерпретация</th></tr>
+<tr><td>Coverage &gt; 1</td><td>Pipeline потенциально перекрывает erosion, но нужно проверить timing.</td></tr>
+<tr><td>Coverage ≈ 1</td><td>Формально replacement есть; задержки launch становятся критичными.</td></tr>
+<tr><td>Coverage &lt; 1</td><td>Есть structural earnings gap.</td></tr>
+<tr><td>Coverage &lt; 1 + LOE близко</td><td>Высокий риск refinancing / deleveraging mismatch.</td></tr>
+</table>
+<div class="warn"><b>Нельзя считать pipeline replacement только по количеству активов.</b> Один препарат с большим rNPV и 20 ранних проектов могут иметь одинаковый headline pipeline, но совершенно разную кредитную ценность.</div>
+</div>
+</section>
+
+<section id="v2-clinical">
+<div class="section">
+<h2>21. Clinical &amp; Regulatory Risk → Cash Flow</h2>
+<p>Клинический pipeline превращается в кредитный риск через вероятность, время и величину будущего cash flow.</p>
+<div class="engine-grid">
+<div class="engine-card"><h3>Probability</h3><p>Фаза, indication, historical success, trial design, endpoint risk.</p></div>
+<div class="engine-card"><h3>Timing</h3><p>Оставшееся время до approval, launch, reimbursement и peak sales.</p></div>
+<div class="engine-card"><h3>Economics</h3><p>Peak sales, margin, market size, payer access, competitive intensity.</p></div>
+<div class="engine-card"><h3>Execution</h3><p>Manufacturing readiness, regulatory dependencies, launch capability.</p></div>
+</div>
+<div class="eq">Risk-adjusted Future FCF = Σ(FCFᵢ,t × PoSᵢ,t)</div>
+<div class="eq">Pipeline Duration = Weighted Average Time to Material Cash Contribution</div>
+</div>
+</section>
+
+<section id="v2-gtn">
+<div class="section">
+<h2>22. Gross-to-Net &amp; Payer Engine</h2>
+<p>Gross sales могут расти одновременно с ухудшением экономической цены препарата.</p>
+<div class="eq">GTN = (Gross Sales − Net Sales) / Gross Sales</div>
+<div class="eq">Net Price = List Price × (1 − GTN)</div>
+<div class="eq">Realized Price Change = List Price Change − GTN Change</div>
+<table>
+<tr><th>Наблюдение</th><th>Что может происходить</th></tr>
+<tr><td>Gross sales ↑ / Net sales →</td><td>Discount/rebate pressure</td></tr>
+<tr><td>Volume ↑ / Net price ↓</td><td>Рост за счёт price concession</td></tr>
+<tr><td>List price ↑ / Revenue →</td><td>GTN deterioration может съедать headline pricing</td></tr>
+<tr><td>Gross-to-net ↑ + payer concentration ↑</td><td>Усиление bargaining power плательщика</td></tr>
+</table>
+<div class="teal"><b>Добавить в мониторинг:</b> GTN по продукту, payer/channel mix, rebates, returns, chargebacks, distributor deductions и изменение realized net price.</div>
+</div>
+</section>
+
+<section id="v2-channel">
+<div class="section">
+<h2>23. Channel Inventory &amp; Demand Quality</h2>
+<div class="eq">End Demand ≠ Shipments to Distributor</div>
+<div class="eq">Inventory Correction Risk ∝ Channel Inventory Growth − End-Demand Growth</div>
+<table>
+<tr><th>Комбинация</th><th>Сигнал</th></tr>
+<tr><td>Revenue ↑ + Channel Inventory ↑↑</td><td>Pull-forward / channel loading risk</td></tr>
+<tr><td>Revenue ↑ + End Demand ↑</td><td>Более качественный рост</td></tr>
+<tr><td>Inventory ↑ + Expiry window ↓</td><td>Potential write-off</td></tr>
+<tr><td>Returns ↑ + Revenue ↑</td><td>Качество продаж ухудшается</td></tr>
+</table>
+</div>
+</section>
+
+<section id="v2-manufacturing">
+<div class="section">
+<h2>24. Manufacturing Resilience</h2>
+<p>Для кредита производственный актив — не просто источник COGS. Это потенциальный single point of failure.</p>
+<div class="eq">Supply-at-Risk = Revenue dependent on Single Site × Probability of Disruption</div>
+<div class="engine-grid">
+<div class="engine-card"><h3>Site</h3><p>Доля выпуска, который зависит от одного завода / линии.</p></div>
+<div class="engine-card"><h3>API</h3><p>Single-source API, geographic concentration, qualification lead time.</p></div>
+<div class="engine-card"><h3>GMP</h3><p>Inspection history, remediation, quality deviations.</p></div>
+<div class="engine-card"><h3>Recovery</h3><p>Время переноса производства и повторной квалификации.</p></div>
+</div>
+<div class="warn"><b>Ключевой вопрос:</b> если завтра этот завод остановится, сколько EBITDA исчезнет за 1 месяц, 6 месяцев и 12 месяцев — и насколько реально вернуть объём конкурентам после stock-out?</div>
+</div>
+</section>
+
+<section id="v2-ma">
+<div class="section">
+<h2>25. M&amp;A / Licensing Replacement Engine</h2>
+<p>M&amp;A может быть growth strategy, а может быть способом закрыть дыру, которую компания не смогла закрыть собственным pipeline.</p>
+<div class="eq">Acquisition Replacement Ratio = Expected EBITDA from Acquired Assets / EBITDA at Risk</div>
+<div class="eq">Debt-funded Replacement = Incremental Debt / Expected Risk-adjusted EBITDA</div>
+<table>
+<tr><th>Сигнал</th><th>Возможная интерпретация</th></tr>
+<tr><td>M&amp;A ↑ + R&amp;D ↓</td><td>Externalization of pipeline</td></tr>
+<tr><td>M&amp;A ↑ + Net Debt ↑↑</td><td>Deleveraging capacity may deteriorate</td></tr>
+<tr><td>Upfront ↑ + milestones ↑</td><td>Future cash obligations understated by headline debt</td></tr>
+<tr><td>Acquired EBITDA ↑ + rNPV uncertain</td><td>Integration / valuation risk</td></tr>
+</table>
+<div class="eq">Adjusted Future Obligations = Debt + Leases + Milestones + Earn-outs + Material Commitments</div>
+</div>
+</section>
+
+<section id="v2-litigation">
+<div class="section">
+<h2>26. Litigation / Recall / Pharmacovigilance Stress</h2>
+<div class="eq">Expected Litigation Loss = Probability × Loss Severity × Timing Factor</div>
+<div class="eq">Recall Shock = Inventory Write-off + Lost Gross Profit + Claims + Remediation + Lost Future Sales</div>
+<div class="engine-grid">
+<div class="engine-card"><h3>Patent Litigation</h3><p>Может ускорить LOE или открыть рынок конкурентам раньше базового сценария.</p></div>
+<div class="engine-card"><h3>Product Liability</h3><p>Cash claims + insurance limitations + reputation / demand effect.</p></div>
+<div class="engine-card"><h3>Recall</h3><p>Одновременно бьёт по inventory, revenue и future demand.</p></div>
+<div class="engine-card"><h3>Regulatory Action</h3><p>Может превращать операционный сбой в многолетнюю erosion.</p></div>
+</div>
+</div>
+</section>
+
+<section id="v2-fx">
+<div class="section">
+<h2>27. FX / Geography / Payer Concentration</h2>
+<div class="eq">FX Stress = Revenue FX Exposure − Cost FX Exposure − Debt FX Exposure</div>
+<div class="eq">Concentration Risk = Σ Exposureᵢ²</div>
+<p>Считать нужно не только страны, но и <b>экономические центры принятия решения</b>: payer, regulator, distributor, manufacturing site, API supplier.</p>
+<table>
+<tr><th>Концентрация</th><th>Что ломается при shock</th></tr>
+<tr><td>Revenue geography</td><td>FX / demand / reimbursement</td></tr>
+<tr><td>Payer</td><td>Pricing / GTN</td></tr>
+<tr><td>Manufacturing</td><td>Supply</td></tr>
+<tr><td>API supplier</td><td>COGS / availability</td></tr>
+<tr><td>Product</td><td>EBITDA / LOE</td></tr>
+</table>
+</div>
+</section>
+
+<section id="v2-leverage">
+<div class="section">
+<h2>28. Four Leverage Views</h2>
+<p>Обычный Net Debt/EBITDA недостаточен, если текущая EBITDA находится накануне structural erosion.</p>
+<div class="eq">L₁ = Net Debt / EBITDA</div>
+<div class="eq">L₂ = Net Debt / Protected EBITDA</div>
+<div class="eq">L₃ = Net Debt / Stress EBITDA</div>
+<div class="eq">L₄ = Net Debt / Replacement EBITDA</div>
+<table>
+<tr><th>Metric</th><th>Вопрос</th></tr>
+<tr><td>Net Debt / EBITDA</td><td>Каков leverage сегодня?</td></tr>
+<tr><td>Net Debt / Protected EBITDA</td><td>Каков leverage без слабозащищённой EBITDA?</td></tr>
+<tr><td>Net Debt / Stress EBITDA</td><td>Что будет после adverse operating shock?</td></tr>
+<tr><td>Net Debt / Replacement EBITDA</td><td>Сколько долга приходится на будущую EBITDA, которая должна заменить исчезающую?</td></tr>
+</table>
+<div class="warn"><b>Credit trap:</b> текущий leverage может улучшаться одновременно с ухудшением качества EBITDA, если компания сокращает R&amp;D, продаёт активы или временно вытягивает cash из working capital.</div>
+</div>
+</section>
+
+<section id="v2-debtwall">
+<div class="section">
+<h2>29. Patent Cliff × Debt Maturity Wall</h2>
+<p>Один из главных compound risks фармы — совпадение erosion EBITDA и refinancing.</p>
+<div class="eq">Refinancing Gap(t) = Debt Maturities(t) − Available Liquidity(t) − FCF(t)</div>
+<div class="eq">Cliff Coverage = Years to Material EBITDA Erosion − Years to Major Debt Maturity</div>
+<table>
+<tr><th>Сценарий</th><th>Кредитный смысл</th></tr>
+<tr><td>Debt maturity далеко, LOE далеко</td><td>Есть время перестроить баланс.</td></tr>
+<tr><td>LOE близко, debt maturity далеко</td><td>Главный риск — future deleveraging.</td></tr>
+<tr><td>LOE далеко, maturity близко</td><td>Текущий cash flow может помочь refinance.</td></tr>
+<tr><td>LOE близко + maturity близко</td><td><b>Compound refinancing risk.</b></td></tr>
+</table>
+</div>
+</section>
+
+<section id="v2-recovery">
+<div class="section">
+<h2>30. Recovery: Going Concern vs IP Break-up</h2>
+<div class="engine-grid">
+<div class="engine-card"><h3>Going Concern</h3><p>Компания продолжает продавать продукты, обслуживать клиентов и превращать pipeline в cash flow.</p></div>
+<div class="engine-card"><h3>Strategic Buyer</h3><p>IP, approved products, manufacturing и distribution могут иметь ценность для другого игрока.</p></div>
+<div class="engine-card"><h3>Asset Sale</h3><p>Заводы, inventory, licenses и отдельные продукты продаются независимо.</p></div>
+<div class="engine-card"><h3>Failure Case</h3><p>Patent disputes, regulatory issues и product concentration могут резко снизить recovery.</p></div>
+</div>
+<div class="eq">Recovery Value = Σ Product/IP Value + Manufacturing Value + Working Capital Recovery − Claims − Debt-like Obligations</div>
+<div class="warn"><b>Важно:</b> approved product может иметь высокую стратегическую стоимость для покупателя, но низкую ликвидационную стоимость для кредитора. Эти две вещи нельзя смешивать.</div>
+</div>
+</section>
+
+<section id="v2-score">
+<div class="section">
+<h2>31. Pharma Credit Scorecard</h2>
+<table>
+<tr><th>Block</th><th>Core variables</th><th>Что пытаемся узнать</th></tr>
+<tr><td>Current Earnings</td><td>EBITDA, margin, mix, GTN</td><td>Насколько качественна текущая прибыль?</td></tr>
+<tr><td>Protection</td><td>Patent, exclusivity, moat</td><td>Как долго она защищена?</td></tr>
+<tr><td>Erosion</td><td>LOE, generic entry, price/volume</td><td>Как быстро она исчезает?</td></tr>
+<tr><td>Replacement</td><td>rNPV, PoS, launch timing</td><td>Чем её заменить?</td></tr>
+<tr><td>Cash Conversion</td><td>CFO, WC, GTN, inventory</td><td>Доходит ли EBITDA до cash?</td></tr>
+<tr><td>Resilience</td><td>Sites, API, suppliers, payers</td><td>Что может физически сломать cash flow?</td></tr>
+<tr><td>Capital Allocation</td><td>R&amp;D, M&amp;A, buybacks, capex</td><td>Компания строит будущее или маскирует erosion?</td></tr>
+<tr><td>Liquidity</td><td>FCF, cash, maturities</td><td>Переживёт ли cliff?</td></tr>
+<tr><td>Recovery</td><td>IP, products, plants, claims</td><td>Что останется кредитору?</td></tr>
+</table>
+</div>
+</section>
+
+<section id="v2-final">
+<div class="section">
+<h2>32. Final Pharma Borrower Passport — V2</h2>
+<div class="eq">Credit Quality = f(Current Cash Flow, Protection, Erosion, Replacement, Cash Conversion, Resilience, Liquidity, Recovery)</div>
+<ol>
+<li><b>Кто именно зарабатывает деньги?</b> Product / geography / payer / business model.</li>
+<li><b>Что защищает EBITDA?</b> Patent, exclusivity, clinical moat, brand, manufacturing advantage.</li>
+<li><b>Когда начинается erosion?</b> LOE, competition, reimbursement pressure.</li>
+<li><b>Какова форма erosion?</b> Price, volume, market share, margin.</li>
+<li><b>Чем заменяется EBITDA?</b> Internal pipeline, licensing, M&amp;A.</li>
+<li><b>Хватает ли replacement по времени?</b> Replacement Gap по годам.</li>
+<li><b>Превращается ли EBITDA в cash?</b> CFO, GTN, inventory, receivables.</li>
+<li><b>Что может внезапно остановить cash flow?</b> Site, API, recall, litigation, regulator.</li>
+<li><b>Что происходит с debt wall?</b> Maturity vs LOE vs FCF.</li>
+<li><b>Что получит кредитор в failure case?</b> Going concern vs strategic/IP recovery.</li>
+</ol>
+<div class="teal"><b>Итоговая идея:</b> фарма — это не просто компания с высоким EBITDA и большим R&amp;D. Это портфель будущих cash-flow, у каждого из которых есть срок защиты, вероятность реализации, скорость erosion и стоимость замещения.</div>
+</div>
+</section>
+</body></html>
