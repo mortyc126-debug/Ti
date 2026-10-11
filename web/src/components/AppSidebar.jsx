@@ -11,7 +11,7 @@ import { useKeyRate } from '../store/rates.js';
 // подписи (~220px). Состояние persist в localStorage.
 
 const ITEMS = [
-  { id: 'issuers', icon: Building2,  label: 'Эмитенты',  to: '#' },
+  { id: 'schemes', icon: Building2,  label: 'Схемы отраслей', to: '/schemes' },
   { id: 'reports', icon: FileText,   label: 'Отчёты',    to: '/reports' },
   { id: 'sectors', icon: Factory,    label: 'Отрасли',   to: '/industries' },
   { id: 'cbr',     icon: Percent,    label: 'КС / спреды', to: '/spreads' },
