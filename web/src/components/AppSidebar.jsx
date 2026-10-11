@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
   Building2, FileText, Factory, Percent, TrendingUp, Archive,
-  Star, ChevronsLeft, ChevronsRight,
+  Star, ChevronsLeft, ChevronsRight, Code2,
 } from 'lucide-react';
 import { useSidebar } from '../store/sidebar.js';
 import { useKeyRate } from '../store/rates.js';
@@ -12,6 +12,7 @@ import { useKeyRate } from '../store/rates.js';
 
 const ITEMS = [
   { id: 'schemes', icon: Building2,  label: 'Схемы отраслей', to: '/schemes' },
+  { id: 'templates', icon: Code2,    label: 'Шаблоны кода', to: '/templates' },
   { id: 'reports', icon: FileText,   label: 'Отчёты',    to: '/reports' },
   { id: 'sectors', icon: Factory,    label: 'Отрасли',   to: '/industries' },
   { id: 'cbr',     icon: Percent,    label: 'КС / спреды', to: '/spreads' },
