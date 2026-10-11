@@ -8,7 +8,7 @@ import { useState, useRef, useEffect } from 'react';
 import { ChevronRight, ChevronDown, FileCode2, Trash2, Download, Plus, Settings, KeyRound, ExternalLink } from 'lucide-react';
 import Card from '../components/ui/Card.jsx';
 import { INDUSTRY_GROUPS } from '../data/industries.js';
-import { listSchemes, getSchemeContent, putScheme, deleteScheme, getRepo, setRepo, getToken, setToken } from '../lib/schemesRepo.js';
+import { listSchemes, getSchemeContent, putScheme, deleteScheme, getRepo, setRepo, getToken, setToken, listIndustriesWithSchemes } from '../lib/schemesRepo.js';
 
 export default function Schemes(){
   const [open, setOpen] = useState(null);          // раскрытая отрасль (key)
@@ -18,6 +18,8 @@ export default function Schemes(){
   const [viewer, setViewer] = useState(null);      // {name, url}
   const cache = useRef(new Map());                 // path → html (чтобы не тянуть повторно)
   const blobUrl = useRef(null);
+  const [have, setHave] = useState(null);          // Set ключей отраслей, где есть схемы (лёгкий индекс)
+  const [indexErr, setIndexErr] = useState('');
   const [cfgOpen, setCfgOpen] = useState(false);
   const [repo, setRepoS] = useState(getRepo());
   const [tok, setTokS] = useState(getToken());
@@ -31,6 +33,13 @@ export default function Schemes(){
     catch(e){ setErr(String(e.message || e)); }
     setBusy(b => ({ ...b, [key]: false }));
   };
+  // Лёгкий индекс отраслей со схемами — при открытии раздела и после правок.
+  const loadIndex = async () => {
+    setIndexErr('');
+    try { setHave(new Set(await listIndustriesWithSchemes())); }
+    catch(e){ setHave(new Set()); setIndexErr(String(e.message || e)); }
+  };
+  useEffect(() => { loadIndex(); }, []);   // один дешёвый запрос на старте раздела
   const toggle = (key) => {
     if(open === key){ setOpen(null); return; }
     setOpen(key);
@@ -72,7 +81,7 @@ export default function Schemes(){
     if(!getToken()){ setErr('нужен токен для удаления (⚙ настройки ниже)'); return; }
     if(!confirm(`Удалить ${fileObj.name}? Это коммит в репозиторий.`)) return;
     setBusy(b => ({ ...b, [key]: true })); setErr('');
-    try { await deleteScheme(fileObj.path, fileObj.sha); await loadDir(key); }
+    try { await deleteScheme(fileObj.path, fileObj.sha); await loadDir(key); loadIndex(); }
     catch(e){ setErr(String(e.message || e)); setBusy(b => ({ ...b, [key]: false })); }
   };
   const pickFile = (key) => {
@@ -84,7 +93,7 @@ export default function Schemes(){
     const f = e.target.files && e.target.files[0]; const key = pendingKey.current;
     if(!f || !key) return;
     setBusy(b => ({ ...b, [key]: true })); setErr('');
-    try { const text = await f.text(); await putScheme(key, f.name, text); await loadDir(key); }
+    try { const text = await f.text(); await putScheme(key, f.name, text); await loadDir(key); loadIndex(); }
     catch(er){ setErr(String(er.message || er)); setBusy(b => ({ ...b, [key]: false })); }
   };
   const saveCfg = () => { setRepo(repo); setToken(tok); setCfgOpen(false); setErr(''); };
@@ -127,6 +136,10 @@ export default function Schemes(){
       )}
 
       {err && <div className="text-warn text-xs font-mono">{err}</div>}
+      {have === null && !indexErr && <div className="text-text3 text-[11px] font-mono">проверяю, где есть схемы…</div>}
+      {indexErr && <div className="text-warn text-[11px] font-mono">не удалось прочитать индекс схем: {indexErr}{!getToken() ? ' — если репозиторий приватный, впиши токен (⚙).' : ''}</div>}
+      {have && have.size > 0 && <div className="text-text3 text-[11px] font-mono">Отрасли со схемами подсвечены (бейдж «есть»/число). Содержимое грузится при раскрытии.</div>}
+      {have && have.size === 0 && !indexErr && <div className="text-text3 text-[11px] font-mono">Пока ни одной схемы. Раскрой отрасль и прикрепи .html.</div>}
 
       <div className="space-y-4">
         {INDUSTRY_GROUPS.map(g => (
@@ -135,14 +148,17 @@ export default function Schemes(){
               {g.items.map(it => {
                 const expanded = open === it.id;
                 const list = files[it.id];
-                const n = list ? list.length : null;
+                const n = list ? list.length : null;        // точное число (после раскрытия)
+                const hasIdx = have && have.has(it.id);      // есть ли схемы по лёгкому индексу
                 return (
                   <div key={it.id} className="border-t border-border/40 first:border-t-0">
                     <button type="button" onClick={() => toggle(it.id)}
-                      className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-s2/40">
-                      {expanded ? <ChevronDown size={14} className="text-acc" /> : <ChevronRight size={14} className="text-text3" />}
+                      className={['w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-s2/40', hasIdx ? '' : 'opacity-70'].join(' ')}>
+                      {expanded ? <ChevronDown size={14} className="text-acc" /> : <ChevronRight size={14} className={hasIdx ? 'text-acc' : 'text-text3'} />}
                       <span className="text-text flex-1">{it.label}</span>
-                      {n != null && n > 0 && <span className="text-[10px] font-mono text-acc bg-acc-dim rounded px-1.5 py-0.5">{n}</span>}
+                      {n != null
+                        ? (n > 0 && <span className="text-[10px] font-mono text-acc bg-acc-dim rounded px-1.5 py-0.5">{n}</span>)
+                        : (hasIdx && <span className="text-[10px] font-mono text-acc bg-acc-dim rounded px-1.5 py-0.5">есть</span>)}
                       <span className="text-text3 font-mono text-[10px]">{it.id}</span>
                     </button>
                     {expanded && (

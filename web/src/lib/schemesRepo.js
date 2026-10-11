@@ -42,6 +42,17 @@ async function gh(path, { method = 'GET', body } = {}){
   return j;
 }
 
+// Лёгкий индекс: какие отрасли вообще содержат папку со схемами. ОДИН запрос
+// (только имена подпапок, без файлов/содержимого) — чтобы при открытии раздела
+// сразу видеть, где есть схемы, не раскрывая каждую отрасль. Содержимое папок
+// по-прежнему тянется лениво (listSchemes при раскрытии).
+export async function listIndustriesWithSchemes(){
+  const repo = getRepo();
+  const res = await gh(`/repos/${repo}/contents/${BASE}?ref=${BRANCH}`);
+  if(res._notFound || !Array.isArray(res)) return [];
+  return res.filter(x => x.type === 'dir').map(x => x.name);
+}
+
 // Список HTML-файлов отрасли. 404 (папки ещё нет) → пустой список.
 export async function listSchemes(industryKey){
   const repo = getRepo();
