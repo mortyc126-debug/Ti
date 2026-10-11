@@ -16,8 +16,18 @@ export function setRepo(v){ try { localStorage.setItem('ba_repo', String(v || ''
 export function getToken(){ try { return localStorage.getItem('ba_repo_token') || localStorage.getItem('ba_gist_token') || ''; } catch(_){ return ''; } }
 export function setToken(v){ try { if(v) localStorage.setItem('ba_repo_token', v.trim()); else localStorage.removeItem('ba_repo_token'); } catch(_){} }
 
-// UTF-8 ⇄ base64 (btoa работает только с latin1).
-function utf8ToB64(s){ return btoa(String.fromCharCode(...new TextEncoder().encode(s))); }
+// UTF-8 ⇄ base64 (btoa работает только с latin1). Кодируем ПОБЛОЧНО: спред
+// большого массива в String.fromCharCode(...bytes) переполняет стек вызовов
+// ("Maximum call stack size exceeded") на файлах в десятки КБ.
+function utf8ToB64(s){
+  const bytes = new TextEncoder().encode(s);
+  let bin = '';
+  const CH = 0x8000;   // 32768 аргументов за раз — безопасно для apply
+  for(let i = 0; i < bytes.length; i += CH){
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  }
+  return btoa(bin);
+}
 function b64ToUtf8(b){ const bin = atob(b.replace(/\s/g, '')); const bytes = Uint8Array.from(bin, c => c.charCodeAt(0)); return new TextDecoder().decode(bytes); }
 
 async function gh(path, { method = 'GET', body } = {}){
