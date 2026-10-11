@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Конструктор кода</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>Конструктор кода</h1>
+    <div class="sub">Собирай код из блоков. Контейнеры (if / for / функция / клик) показывают начало <b style="color:var(--kw)">{</b> и конец <b style="color:var(--kw)">}</b> и вложенность отступом. Справа — живой код и запуск с превью.</div>
+    <div class="tabs"><a href="/">Шаблоны</a><a href="/constructor.html" class="on">Конструктор</a></div>
+  </header>
+  <div style="padding:16px">
+    <div class="ctor">
+      <section class="panel">
+        <div class="toolbar">
+          <button class="btn" id="clear">× очистить</button>
+          <button class="btn" id="example">пример</button>
+        </div>
+        <div class="hintline">Нажимай «+ блок», чтобы добавлять. В контейнер блоки кладутся внутрь (по его «+ блок»).</div>
+        <div class="ws ws-root" id="ws"></div>
+      </section>
+      <section class="panel">
+        <div class="toolbar">
+          <button class="btn" id="copy">⧉ копировать</button>
+          <button class="btn ok" id="run">▶ запустить</button>
+        </div>
+        <pre class="code mono" id="code"></pre>
+        <div class="preview"><iframe id="preview" sandbox="allow-scripts"></iframe></div>
+      </section>
+    </div>
+  </div>
+  <script src="/constructor.js"></script>
+</body>
+</html>
