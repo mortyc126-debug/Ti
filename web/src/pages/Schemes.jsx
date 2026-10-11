@@ -4,8 +4,8 @@
 // репозиторий через GitHub Contents API (по токену). При старте ничего не
 // грузится.
 
-import { useState, useRef } from 'react';
-import { ChevronRight, ChevronDown, FileCode2, Trash2, Download, Plus, Settings, KeyRound } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { ChevronRight, ChevronDown, FileCode2, Trash2, Download, Plus, Settings, KeyRound, ExternalLink } from 'lucide-react';
 import Card from '../components/ui/Card.jsx';
 import { INDUSTRY_GROUPS } from '../data/industries.js';
 import { listSchemes, getSchemeContent, putScheme, deleteScheme, getRepo, setRepo, getToken, setToken } from '../lib/schemesRepo.js';
@@ -15,7 +15,9 @@ export default function Schemes(){
   const [files, setFiles] = useState({});          // key → [{name,path,sha,size}]
   const [busy, setBusy] = useState({});            // key → bool (загрузка списка)
   const [err, setErr] = useState('');
-  const [viewer, setViewer] = useState(null);      // {name, html}
+  const [viewer, setViewer] = useState(null);      // {name, url}
+  const cache = useRef(new Map());                 // path → html (чтобы не тянуть повторно)
+  const blobUrl = useRef(null);
   const [cfgOpen, setCfgOpen] = useState(false);
   const [repo, setRepoS] = useState(getRepo());
   const [tok, setTokS] = useState(getToken());
@@ -34,19 +36,38 @@ export default function Schemes(){
     setOpen(key);
     if(!files[key]) loadDir(key);
   };
+  // Контент берём из кэша или тянем один раз. Для просмотра — blob-URL (грузится
+  // как настоящая страница, быстрее большого srcDoc), чистим при закрытии.
+  const fetchHtml = async (fileObj) => {
+    if(cache.current.has(fileObj.path)) return cache.current.get(fileObj.path);
+    const html = await getSchemeContent(fileObj.path);
+    cache.current.set(fileObj.path, html);
+    return html;
+  };
+  const makeBlob = html => URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+  const closeViewer = () => { if(blobUrl.current){ URL.revokeObjectURL(blobUrl.current); blobUrl.current = null; } setViewer(null); };
   const view = async (fileObj) => {
+    setErr(''); setViewer({ name: fileObj.name, url: null });   // показать окно сразу (со спиннером)
+    try {
+      const html = await fetchHtml(fileObj);
+      if(blobUrl.current) URL.revokeObjectURL(blobUrl.current);
+      blobUrl.current = makeBlob(html);
+      setViewer({ name: fileObj.name, url: blobUrl.current });
+    } catch(e){ setErr(String(e.message || e)); closeViewer(); }
+  };
+  const openTab = async (fileObj) => {
     setErr('');
-    try { const html = await getSchemeContent(fileObj.path); setViewer({ name: fileObj.name, html }); }
+    try { window.open(makeBlob(await fetchHtml(fileObj)), '_blank', 'noopener'); }
     catch(e){ setErr(String(e.message || e)); }
   };
   const download = async (fileObj) => {
     try {
-      const html = await getSchemeContent(fileObj.path);
-      const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+      const url = makeBlob(await fetchHtml(fileObj));
       const a = document.createElement('a'); a.href = url; a.download = fileObj.name; a.click();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
     } catch(e){ setErr(String(e.message || e)); }
   };
+  useEffect(() => () => { if(blobUrl.current) URL.revokeObjectURL(blobUrl.current); }, []);
   const del = async (key, fileObj) => {
     if(!getToken()){ setErr('нужен токен для удаления (⚙ настройки ниже)'); return; }
     if(!confirm(`Удалить ${fileObj.name}? Это коммит в репозиторий.`)) return;
@@ -76,7 +97,7 @@ export default function Schemes(){
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Схемы отраслей</h1>
           <p className="text-text2 text-sm mt-1">
-            Библиотека HTML-схем анализа по отраслям. Файлы лежат в репозитории; открываются лениво — только при выборе отрасли/файла.
+            Библиотека HTML-схем анализа по отраслям. Файлы лежат в репозитории; открываются лениво — только при выборе отрасли/файла. Храни здесь только свои (доверенные) схемы — их JS выполняется.
           </p>
         </div>
         <button type="button" onClick={() => setCfgOpen(v => !v)}
@@ -135,6 +156,7 @@ export default function Schemes(){
                             <FileCode2 size={13} className="text-blue shrink-0" style={{ color: '#3DD9FF' }} />
                             <button type="button" onClick={() => view(fo)} className="flex-1 text-left text-text2 hover:text-acc truncate text-[13px]" title={fo.name}>{fo.name}</button>
                             <span className="text-text3 font-mono text-[10px]">{Math.round((fo.size || 0) / 1024)} КБ</span>
+                            <button type="button" onClick={() => openTab(fo)} title="Открыть в новой вкладке" className="text-text3 hover:text-acc"><ExternalLink size={13} /></button>
                             <button type="button" onClick={() => download(fo)} title="Скачать" className="text-text3 hover:text-text"><Download size={13} /></button>
                             <button type="button" onClick={() => del(it.id, fo)} title="Удалить (коммит)" className="text-text3 hover:text-danger"><Trash2 size={13} /></button>
                           </div>
@@ -154,15 +176,23 @@ export default function Schemes(){
       </div>
 
       {viewer && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex flex-col p-4 sm:p-8" onClick={() => setViewer(null)}>
-          <div className="bg-bg2 border border-border rounded-lg flex flex-col flex-1 min-h-0 max-w-5xl w-full mx-auto overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center gap-2 px-4 py-2 border-b border-border">
+        <div className="fixed inset-0 z-50 bg-black/70 flex flex-col p-2 sm:p-6" onClick={closeViewer}>
+          <div className="bg-bg2 border border-border rounded-lg flex flex-col flex-1 min-h-0 w-full max-w-6xl mx-auto overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 px-4 py-2 border-b border-border select-none">
               <FileCode2 size={14} className="text-acc" />
               <span className="text-text text-sm font-mono truncate flex-1">{viewer.name}</span>
-              <button type="button" onClick={() => setViewer(null)} className="text-text3 hover:text-text text-lg leading-none px-1">×</button>
+              {viewer.url && (
+                <a href={viewer.url} target="_blank" rel="noopener noreferrer" title="Открыть в новой вкладке"
+                  className="text-text3 hover:text-acc"><ExternalLink size={14} /></a>
+              )}
+              <button type="button" onClick={closeViewer} className="text-text3 hover:text-text text-lg leading-none px-1">×</button>
             </div>
-            <iframe title={viewer.name} srcDoc={viewer.html} sandbox="allow-scripts allow-popups"
-              className="flex-1 w-full bg-white" style={{ border: 'none' }} />
+            {viewer.url ? (
+              <iframe title={viewer.name} src={viewer.url} sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-downloads"
+                className="flex-1 w-full bg-white" style={{ border: 'none' }} />
+            ) : (
+              <div className="flex-1 grid place-items-center text-text3 text-sm font-mono">загрузка схемы…</div>
+            )}
           </div>
         </div>
       )}
