@@ -61,7 +61,10 @@ function render(tpl){
   const copy = mkBtn('⧉ копировать код');
   const reset = mkBtn('↺ сброс имён');
   const del = mkBtn('🗑 удалить'); del.classList.add('danger');
-  bar.append(copy, reset, del); work.appendChild(bar);
+  const runnable = tpl.lang === 'js';
+  const run = runnable ? mkBtn('▶ запустить') : null;
+  if(run) run.classList.add('ok');
+  bar.append(copy, reset); if(run) bar.append(run); bar.append(del); work.appendChild(bar);
 
   const pre = document.createElement('pre'); pre.className = 'code mono';
   (tpl.lines || []).forEach((line, li) => {
@@ -83,6 +86,13 @@ function render(tpl){
     + '<b style="color:var(--fn)">функции</b> · <b style="color:var(--str)">строки</b> · <b style="color:var(--num)">числа</b> · <b style="color:var(--com)">комментарии</b>. '
     + 'Клик по слову → впиши, что оно значит (сохранится).';
   work.appendChild(lg);
+
+  if(run){
+    const box = document.createElement('div'); box.className = 'preview';
+    const frame = document.createElement('iframe'); frame.sandbox = 'allow-scripts';
+    box.appendChild(frame); work.appendChild(box);
+    run.onclick = () => runCode(frame, [...pre.querySelectorAll('.line')].map(l => l.textContent.replace(/​/g, '')).join('\n'));
+  }
 
   copy.onclick = () => {
     const text = [...pre.querySelectorAll('.line')].map(l => l.textContent.replace(/\u200b/g, '')).join('\n');
@@ -195,6 +205,22 @@ function showAddForm(){
   };
 }
 
+// запуск JS-шаблона в песочнице-iframe: есть canvas #c и #out для рисунков,
+// console.log печатается в превью.
+function runCode(frame, code){
+  frame.srcdoc = `<!doctype html><meta charset="utf-8"><body style="margin:8px;font:12px ui-monospace,monospace;color:#F6F4FF;background:#0E0720">
+<canvas id="c" width="280" height="140" style="background:#140A24;border:1px solid #241638;border-radius:6px"></canvas>
+<div id="out" style="margin-top:8px"></div>
+<pre id="log" style="color:#52F2C9;white-space:pre-wrap;margin-top:8px"></pre>
+<script>
+var log=document.getElementById('log');
+var _p=function(){ log.textContent += Array.prototype.join.call(arguments,' ')+'\\n'; };
+var console={log:_p,error:_p,warn:_p,info:_p};
+try{
+${code}
+}catch(e){ log.textContent += '\\u26d4 '+e.message; }
+<\/script></body>`;
+}
 function mkBtn(t){ const b = document.createElement('button'); b.className = 'btn'; b.textContent = t; return b; }
 function flash(btn, t){ const old = btn.textContent; btn.classList.add('ok'); btn.textContent = t; setTimeout(() => { btn.classList.remove('ok'); btn.textContent = old; }, 1200); }
 function resetInfo(){ selected = null; info.innerHTML = '<div class="info-empty muted">Нажми на слово в коде — здесь появится, что оно значит, и можно вписать своё пояснение.</div>'; }
