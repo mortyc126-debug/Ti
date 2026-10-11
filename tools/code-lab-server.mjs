@@ -160,7 +160,8 @@ const server = http.createServer(async (req, res) => {
     if(!abs) return json(res, 400, { error: 'bad path' });
     const data = await fs.readFile(abs).catch(() => null);
     if(data == null) return json(res, 404, { error: 'not found' });
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(abs)] || 'application/octet-stream' });
+    // no-store: иначе браузер показывает старый app.js/style.css после правок
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(abs)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
     res.end(data);
   } catch(e){ json(res, 500, { error: String(e && e.message || e) }); }
 });
