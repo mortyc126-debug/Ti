@@ -19,6 +19,8 @@ main{display:grid;grid-template-columns:260px 1fr 320px;min-height:calc(100vh - 
 
 /* навигация */
 nav{border-right:1px solid var(--border);padding:10px;overflow:auto}
+.addbtn{padding:9px 10px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--str);border:1px dashed rgba(82,242,201,.4);text-align:center;margin-bottom:6px}
+.addbtn:hover{background:rgba(82,242,201,.08)}
 .grp{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin:12px 6px 4px}
 .grp:first-child{margin-top:2px}
 .tpl{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;cursor:pointer;color:var(--text2);font-size:13px}
@@ -36,6 +38,21 @@ section#work{padding:20px;overflow:auto;min-width:0}
 .btn{font:12px/1 ui-monospace,monospace;color:var(--text2);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:7px 11px;cursor:pointer}
 .btn:hover{color:var(--acc);border-color:rgba(255,0,110,.4)}
 .btn.ok{color:var(--str);border-color:rgba(82,242,201,.4)}
+.btn.danger:hover{color:var(--acc);border-color:rgba(255,0,110,.5)}
+.btn.full{width:100%;margin-top:8px}
+
+/* форма нового шаблона */
+.form{max-width:760px}
+.form label{display:block;font-size:12px;color:var(--text3);margin-bottom:12px}
+.form .row{display:flex;gap:12px}
+.form .row label{flex:1}
+.form input,.form select,.form textarea{display:block;width:100%;margin-top:4px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px}
+.form textarea{font-family:ui-monospace,Menlo,Consolas,monospace;resize:vertical}
+.form input[type=file]{padding:6px;color:var(--text2)}
+
+/* редактор пояснения в панели */
+textarea.ann{width:100%;margin-top:6px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:9px 11px;color:var(--text);font-size:13px;line-height:1.5;resize:vertical;min-height:90px}
+textarea.ann:focus{outline:none;border-color:var(--name)}
 
 pre.code{background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:14px 16px;margin:0;overflow:auto;font-size:13.5px;line-height:1.7}
 .line{white-space:pre}
