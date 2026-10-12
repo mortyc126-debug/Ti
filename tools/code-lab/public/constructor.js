@@ -57,8 +57,26 @@ function classify(text){
 }
 const CATS = [...new Set(Object.values(BLOCKS).map(b => b.cat))];
 
-// ── состояние: дерево узлов ──────────────────────────────────────────────────
-let root = { children: [] };
+// ── состояние: «файлы»-вкладки, у каждой своё дерево узлов ────────────────────
+// root всегда указывает на дерево активной вкладки. Всё сохраняется в
+// localStorage, чтобы большая программа не терялась при перезагрузке.
+let files = [{ name: 'файл 1', root: { children: [] } }];
+let active = 0;
+let root = files[active].root;
+const LS = 'codelab_ctor_files';
+function setRoot(r){ root = r; files[active].root = r; }
+function persist(){ try { localStorage.setItem(LS, JSON.stringify({ files, active })); } catch(_){} }
+function restore(){
+  try {
+    const s = JSON.parse(localStorage.getItem(LS) || 'null');
+    if(s && Array.isArray(s.files) && s.files.length){
+      files = s.files.map(f => ({ name: String(f.name || 'файл'), root: (f.root && f.root.children) ? f.root : { children: [] } }));
+      active = Math.min(Math.max(0, s.active | 0), files.length - 1);
+      root = files[active].root;
+    }
+  } catch(_){}
+}
+function switchTab(i){ if(i < 0 || i >= files.length) return; active = i; root = files[active].root; renderTree(); }
 const uid = () => Math.random().toString(36).slice(2, 8);
 function makeNode(id){
   const b = BLOCKS[id]; const fields = {}; (b.fields || []).forEach(f => fields[f.k] = f.def);
@@ -70,11 +88,40 @@ function makeNode(id){
 const $ = s => document.querySelector(s);
 const ws = $('#ws'), codeEl = $('#code'), preview = $('#preview');
 
+// ── вкладки-«файлы» ───────────────────────────────────────────────────────────
+function renderTabs(){
+  const bar = $('#tabs'); if(!bar) return;
+  bar.innerHTML = '';
+  files.forEach((f, i) => {
+    const t = document.createElement('div'); t.className = 'ftab' + (i === active ? ' on' : '');
+    const nm = document.createElement('span'); nm.textContent = f.name;
+    nm.onclick = () => switchTab(i);
+    nm.ondblclick = () => { const v = prompt('Имя файла:', f.name); if(v){ f.name = v.slice(0, 40); renderTree(); } };
+    t.appendChild(nm);
+    if(files.length > 1){
+      const x = document.createElement('span'); x.className = 'fx'; x.textContent = '×'; x.title = 'удалить вкладку';
+      x.onclick = e => {
+        e.stopPropagation();
+        if(!confirm('Удалить вкладку «' + f.name + '» со всем её содержимым?')) return;
+        files.splice(i, 1); if(active >= files.length) active = files.length - 1;
+        root = files[active].root; renderTree();
+      };
+      t.appendChild(x);
+    }
+    bar.appendChild(t);
+  });
+  const add = document.createElement('button'); add.className = 'faddf'; add.textContent = '+ файл'; add.title = 'новая вкладка (двойной клик по имени — переименовать)';
+  add.onclick = () => { files.push({ name: 'файл ' + (files.length + 1), root: { children: [] } }); active = files.length - 1; root = files[active].root; renderTree(); };
+  bar.appendChild(add);
+}
+
 // ── рендер дерева ─────────────────────────────────────────────────────────────
 function renderTree(){
+  renderTabs();
   ws.innerHTML = '';
   ws.appendChild(renderChildren(root.children, root));
   renderCode();
+  persist();
 }
 function renderChildren(arr, parent){
   const frag = document.createDocumentFragment();
@@ -92,8 +139,9 @@ function renderNode(nd, siblings, idx){
     const inp = document.createElement(f.multi ? 'textarea' : 'input'); inp.value = nd.fields[f.k];
     if(f.multi){ inp.rows = Math.min(14, (String(nd.fields[f.k]).split('\n').length + 1)); inp.className = 'blk-code'; inp.spellcheck = false; }
     else inp.style.width = (f.k === 'body' || f.k === 'points' || f.k === 'values' || f.k === 'items') ? '220px' : '';
-    inp.addEventListener('input', () => { nd.fields[f.k] = inp.value; renderCode(); });
-    lab.appendChild(inp); head.appendChild(lab);
+    inp.addEventListener('input', () => { nd.fields[f.k] = inp.value; renderCode(); persist(); });
+    if(f.multi){ lab.appendChild(attachHighlight(inp)); } else lab.appendChild(inp);
+    head.appendChild(lab);
   });
   const ctrls = document.createElement('div'); ctrls.className = 'blk-ctrls';
   ctrls.appendChild(ctrlBtn('↑', () => move(siblings, idx, -1)));
@@ -173,10 +221,10 @@ function currentCode(){ return genLines(root.children).join('\n'); }
 // лёгкая подсветка кода (для панели)
 const KW = new Set(['const','let','function','return','if','else','for','of','while','new','=>']);
 const BI = new Set(['console','log','document','querySelector','getContext','addEventListener','map','reduce','forEach','fillRect','innerHTML']);
-function renderCode(){
-  const code = currentCode();
-  codeEl.innerHTML = '';
-  code.split('\n').forEach(line => {
+// код → массив <div class="line"> с раскрашенными спанами (общий для панели и блоков)
+function buildHighlight(code){
+  const lines = [];
+  String(code).split('\n').forEach(line => {
     const div = document.createElement('div'); div.className = 'line';
     let i = 0; const n = line.length;
     const push = (cls, v) => { const s = document.createElement('span'); if(cls) s.style.color = cls; s.textContent = v; div.appendChild(s); };
@@ -192,8 +240,21 @@ function renderCode(){
       push('#9C90C4', c); i++;
     }
     if(!line) div.appendChild(document.createTextNode('​'));
-    codeEl.appendChild(div);
+    lines.push(div);
   });
+  return lines;
+}
+function renderCode(){ codeEl.innerHTML = ''; buildHighlight(currentCode()).forEach(l => codeEl.appendChild(l)); }
+
+// обернуть textarea блока раскрашенным <pre> под ним (прозрачный текст поверх)
+function attachHighlight(ta){
+  const wrap = document.createElement('div'); wrap.className = 'blk-code-wrap';
+  const pre = document.createElement('pre'); pre.className = 'blk-hl'; pre.setAttribute('aria-hidden', 'true');
+  const sync = () => { pre.innerHTML = ''; buildHighlight(ta.value).forEach(l => pre.appendChild(l)); };
+  ta.addEventListener('input', sync);
+  ta.addEventListener('scroll', () => { pre.scrollTop = ta.scrollTop; pre.scrollLeft = ta.scrollLeft; });
+  wrap.appendChild(pre); wrap.appendChild(ta); sync();
+  return wrap;
 }
 
 // ── запуск в песочнице ────────────────────────────────────────────────────────
@@ -238,9 +299,10 @@ function wrapHtml(code){
 $('#dl').onclick = () => {
   const code = currentCode();
   const fmt = $('#fmt').value;
-  if(fmt === 'html') download('моя-страница.html', wrapHtml(code), 'text/html');
-  else if(fmt === 'txt') download('код.txt', code, 'text/plain');
-  else download('код.js', code, 'text/javascript');
+  const base = ((files[active] && files[active].name) || 'код').replace(/[^\wа-яё.\- ]/gi, '').trim() || 'код';
+  if(fmt === 'html') download(base + '.html', wrapHtml(code), 'text/html');
+  else if(fmt === 'txt') download(base + '.txt', code, 'text/plain');
+  else download(base + '.js', code, 'text/javascript');
   flashBtn($('#dl'), '✓ скачано', '⬇ скачать');
 };
 function flashBtn(b, on, off){ b.textContent = on; setTimeout(() => b.textContent = off, 1200); }
@@ -338,9 +400,9 @@ $('#fromtpl').onclick = async (e) => {
   m.style.top = (r.bottom + window.scrollY + 4) + 'px';
   setTimeout(() => document.addEventListener('mousedown', outside), 0);
 };
-$('#clear').onclick = () => { root = { children: [] }; renderTree(); };
+$('#clear').onclick = () => { setRoot({ children: [] }); renderTree(); };
 $('#example').onclick = () => {
-  root = { children: [
+  setRoot({ children: [
     { uid: uid(), blockId:'array', fields:{ name:'числа', items:'40, 70, 30, 90, 55' } },
     { uid: uid(), blockId:'func', fields:{ name:'среднее', args:'список' }, children:[
       { uid: uid(), blockId:'reduce', fields:{ name:'с', list:'список', expr:'acc + x' } },
@@ -348,8 +410,9 @@ $('#example').onclick = () => {
     ]},
     { uid: uid(), blockId:'call', fields:{ name:'среднее', args:'числа' } },
     { uid: uid(), blockId:'bars', fields:{ values:'40, 70, 30, 90, 55' } },
-  ]};
+  ]});
   renderTree();
 };
 
+restore();
 renderTree();

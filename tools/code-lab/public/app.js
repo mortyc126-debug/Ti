@@ -96,12 +96,23 @@ function render(tpl){
   const copy = mkBtn('⧉ копировать код');
   const reset = mkBtn('↺ сброс имён');
   const edit = mkBtn('✎ править');
+  const dsc = mkBtn('✨ описание');
   const del = mkBtn('🗑 удалить'); del.classList.add('danger');
   const runnable = tpl.lang === 'js';
   const run = runnable ? mkBtn('▶ запустить') : null;
   if(run) run.classList.add('ok');
-  bar.append(copy, reset, edit); if(run) bar.append(run); bar.append(del); work.appendChild(bar);
+  bar.append(copy, reset, edit, dsc); if(run) bar.append(run); bar.append(del); work.appendChild(bar);
   edit.onclick = () => showEditForm(tpl);
+  // быстро добавить/поправить описание: подсказываем по коду, пользователь правит
+  dsc.onclick = async () => {
+    const code = (tpl.lines || []).map(line => (line || []).map(t => t.v != null ? t.v : '').join('')).join('\n');
+    const suggest = describe(code);
+    const cur = (tpl.desc && !/^из файла /.test(tpl.desc)) ? tpl.desc : suggest;
+    const v = prompt('Описание куска (что он делает). Подсказка по коду уже вписана — поправь под себя:', cur);
+    if(v === null) return;
+    const r = await fetch('/api/edit', { method: 'POST', body: JSON.stringify({ id: curId, desc: v }) }).then(r => r.json()).catch(() => ({}));
+    if(r.ok){ tpl.desc = v; select(curId, nav.querySelector('.tpl.on')); } else flash(dsc, 'ошибка');
+  };
 
   const pre = document.createElement('pre'); pre.className = 'code mono';
   (tpl.lines || []).forEach((line, li) => {
@@ -317,6 +328,24 @@ try{
 ${code}
 }catch(e){ log.textContent += '\\u26d4 '+e.message; }
 <\/script></body>`;
+}
+// грубая авто-подсказка описания по коду (без ИИ) — что в куске происходит
+function describe(code){
+  const t = String(code || ''); const bits = [];
+  let m = t.match(/\bfunction\s+([A-Za-zА-Яа-я_$][\wА-Яа-я$]*)/) || t.match(/\b(?:const|let|var)\s+([A-Za-zА-Яа-я_$][\wА-Яа-я$]*)\s*=\s*(?:async\s*)?\(?[^=\n]*=>/);
+  if(m) bits.push('функция «' + m[1] + '»');
+  m = t.match(/\bclass\s+([A-Za-zА-Яа-я_$][\wА-Яа-я$]*)/); if(m) bits.push('класс «' + m[1] + '»');
+  const loops = (t.match(/\b(for|while)\b/g) || []).length; if(loops) bits.push(loops > 1 ? ('циклы ×' + loops) : 'цикл');
+  const ifs = (t.match(/\bif\b/g) || []).length; if(ifs) bits.push(ifs > 1 ? ('ветвления ×' + ifs) : 'ветвление if');
+  if(/\.(map|reduce|filter|forEach)\(/.test(t)) bits.push('обработка массива (map/reduce/…)');
+  if(/\bfetch\(|XMLHttpRequest/.test(t)) bits.push('сетевой запрос');
+  if(/addEventListener|onclick/.test(t)) bits.push('обработчик события');
+  if(/getContext\(|<svg|createElement|innerHTML/.test(t)) bits.push('рисование/DOM');
+  if(/console\.(log|error|warn|info)|\bprint\(/.test(t)) bits.push('вывод');
+  let s = bits.length ? bits.join(', ') : 'фрагмент кода';
+  const ret = t.match(/\breturn\s+([^;\n]{1,48})/); if(ret) s += '; возвращает ' + ret[1].trim();
+  const n = t.split('\n').filter(x => x.trim()).length;
+  return s.charAt(0).toUpperCase() + s.slice(1) + '. ~' + n + ' строк.';
 }
 function mkBtn(t){ const b = document.createElement('button'); b.className = 'btn'; b.textContent = t; return b; }
 function flash(btn, t){ const old = btn.textContent; btn.classList.add('ok'); btn.textContent = t; setTimeout(() => { btn.classList.remove('ok'); btn.textContent = old; }, 1200); }
