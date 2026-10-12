@@ -22,8 +22,39 @@ const BLOCKS = {
   svg:    { cat:'Отрисовка', label:'SVG-линия', type:'draw', hint:'Нарисовать линию по точкам «x,y x,y…» в области #out. Больше точек — длиннее кривая.', fields:[{k:'points',def:'0,90 20,70 40,80 60,40 80,55 100,20'}], code:f=>`document.querySelector("#out").innerHTML =\n  '<svg width="200" height="100"><polyline points="${f.points}" fill="none" stroke="#52F2C9" stroke-width="2"/></svg>';` },
   bars:   { cat:'Отрисовка', label:'столбики (canvas)', type:'draw', hint:'Нарисовать столбики по числам (values) на холсте #c. Каждое число — высота столбика.', fields:[{k:'values',def:'40, 70, 30, 90, 55'}], code:f=>`const ctx = document.querySelector("#c").getContext("2d");\n[${f.values}].forEach((v, i) => { ctx.fillStyle = "#3DD9FF"; ctx.fillRect(i * 32, 140 - v, 22, v); });` },
   click:  { cat:'Интерактив', label:'по клику', type:'container', hint:'Выполнять вложенное при КЛИКЕ по элементу. sel — что кликаем (#c — холст). Клади блоки ВНУТРЬ.', fields:[{k:'sel',def:'#c'}], code:f=>({ open:`document.querySelector("${f.sel}").addEventListener("click", () => {`, close:'});' }) },
-  raw:    { cat:'Своё', label:'свой код', type:'leaf', hint:'Любой свой/вставленный JS-код как есть. Так можно втянуть в конструктор код из шаблона или откуда угодно и комбинировать с блоками.', fields:[{k:'code',multi:true,def:'// вставь сюда свой код\nconsole.log("привет");'}], code:f=>f.code },
+  raw:    { cat:'Своё', label:'свой код', type:'leaf', labelFn:f=>classify(f.code||''), hint:'Любой свой/вставленный JS-код как есть. Так можно втянуть в конструктор код из шаблона или откуда угодно и комбинировать с блоками.', fields:[{k:'code',multi:true,def:'// вставь сюда свой код\nconsole.log("привет");'}], code:f=>f.code },
+  block:  { cat:'Своё', type:'container', label:'блок { }',
+            labelFn:f=>classify(f.header||''),
+            hintFn:f=>'заголовок: ' + ((f.header||'').trim() || '(пусто)') + ' — дальше вложенные блоки. Меняй заголовок/вложенное, добавляй и удаляй.',
+            fields:[{k:'header',def:'if (x > 0)'},{k:'tail',def:''}],
+            code:f=>({ open:(f.header && f.header.trim() ? f.header.trim() + ' {' : '{'), close:'}' + (f.tail ? f.tail : '') }) },
 };
+
+// грубая классификация строки кода → подпись «что это» (для импортированного)
+function classify(text){
+  const l = (text || '').trim().split('\n')[0] || '';
+  if(/^(export\s+)?(async\s+)?function\b/.test(l)) return 'функция';
+  if(/\b(const|let|var)\b.*=>\s*\(?$|\b(const|let|var)\b.*=>\s*$/.test(l)) return 'функция (стрелка)';
+  if(/^(export\s+)?class\b/.test(l)) return 'класс';
+  if(/^else\s+if\b/.test(l)) return 'иначе если';
+  if(/^}?\s*else\b/.test(l)) return 'иначе';
+  if(/^if\b/.test(l)) return 'условие if';
+  if(/^for\b/.test(l)) return 'цикл for';
+  if(/^while\b/.test(l)) return 'цикл while';
+  if(/^switch\b/.test(l)) return 'switch';
+  if(/^try\b/.test(l)) return 'try';
+  if(/^}?\s*catch\b/.test(l)) return 'catch';
+  if(/addEventListener/.test(l)) return 'обработчик события';
+  if(/^return\b/.test(l)) return 'возврат';
+  if(/console\.(log|error|warn|info)/.test(l)) return 'вывод';
+  if(/^(import|export)\b/.test(l)) return 'импорт/экспорт';
+  if(/^(export\s+)?(const|let|var)\b/.test(l)) return 'переменная';
+  if(/^[\w.$\[\]]+\s*[-+*/]?=/.test(l)) return 'присваивание';
+  if(/^[\w.$]+\s*\(|\.\w+\(/.test(l)) return 'вызов';
+  if(/^\/\//.test(l)) return 'комментарий';
+  if(/^[\w"']+\s*:/.test(l) && !/[;{}]/.test(l)) return 'поле объекта';
+  return 'код';
+}
 const CATS = [...new Set(Object.values(BLOCKS).map(b => b.cat))];
 
 // ── состояние: дерево узлов ──────────────────────────────────────────────────
@@ -55,7 +86,7 @@ function renderNode(nd, siblings, idx){
   const b = BLOCKS[nd.blockId];
   const wrap = document.createElement('div'); wrap.className = 'blk';
   const head = document.createElement('div'); head.className = 'blk-head ' + (b.type === 'container' ? 'container' : b.type === 'draw' ? 'draw' : 'leaf');
-  const tag = document.createElement('span'); tag.className = 'blk-tag'; tag.textContent = b.label; head.appendChild(tag);
+  const tag = document.createElement('span'); tag.className = 'blk-tag'; tag.textContent = b.labelFn ? b.labelFn(nd.fields) : b.label; head.appendChild(tag);
   (b.fields || []).forEach(f => {
     const lab = document.createElement('label'); lab.className = 'blk-field'; lab.textContent = f.k;
     const inp = document.createElement(f.multi ? 'textarea' : 'input'); inp.value = nd.fields[f.k];
@@ -70,7 +101,8 @@ function renderNode(nd, siblings, idx){
   ctrls.appendChild(ctrlBtn('🗑', () => { siblings.splice(idx, 1); renderTree(); }));
   head.appendChild(ctrls);
   wrap.appendChild(head);
-  if(b.hint){ const h = document.createElement('div'); h.className = 'blk-hint'; h.textContent = b.hint; wrap.appendChild(h); }
+  const hintTxt = b.hintFn ? b.hintFn(nd.fields) : b.hint;
+  if(hintTxt){ const h = document.createElement('div'); h.className = 'blk-hint'; h.textContent = hintTxt; wrap.appendChild(h); }
   if(b.type === 'container'){
     const body = document.createElement('div'); body.className = 'blk-body';
     body.appendChild(renderChildren(nd.children, nd));
@@ -202,6 +234,56 @@ $('#dl').onclick = () => {
   flashBtn($('#dl'), '✓ скачано', '⬇ скачать');
 };
 function flashBtn(b, on, off){ b.textContent = on; setTimeout(() => b.textContent = off, 1200); }
+
+// ── импорт файла: разбить рабочий JS на вложенные блоки ──────────────────────
+// Грубый разбор по фигурным скобкам (с учётом строк/комментариев/скобок).
+// Контейнеры { } → блок-контейнер, остальное → строки кода. Код сохраняется
+// рабочим (при сборке просто склеивается обратно), сложные конструкции
+// (else, цепочки) могут разбиться на части — но запускаются.
+function parseLevel(code){
+  const nodes = []; const n = code.length; let i = 0, seg = '', paren = 0, brack = 0;
+  const pushStmt = txt => { const t = txt.trim(); if(t){ const nd = makeNode('raw'); nd.fields.code = t; nodes.push(nd); } };
+  const skipStr = (j, qt) => { j++; while(j < n){ if(code[j] === '\\'){ j += 2; continue; } if(code[j] === qt){ j++; break; } j++; } return j; };
+  while(i < n){
+    const c = code[i];
+    if(c === '"' || c === "'" || c === '`'){ const j = skipStr(i, c); seg += code.slice(i, j); i = j; continue; }
+    if(c === '/' && code[i + 1] === '/'){ let j = code.indexOf('\n', i); if(j < 0) j = n; seg += code.slice(i, j); i = j; continue; }
+    if(c === '/' && code[i + 1] === '*'){ let j = code.indexOf('*/', i + 2); j = j < 0 ? n : j + 2; seg += code.slice(i, j); i = j; continue; }
+    if(c === '('){ paren++; seg += c; i++; continue; }
+    if(c === ')'){ paren = Math.max(0, paren - 1); seg += c; i++; continue; }
+    if(c === '['){ brack++; seg += c; i++; continue; }
+    if(c === ']'){ brack = Math.max(0, brack - 1); seg += c; i++; continue; }
+    if(c === '{'){
+      const header = seg.trim(); seg = '';
+      let depth = 1, j = i + 1, inner = '';
+      while(j < n && depth > 0){
+        const d = code[j];
+        if(d === '"' || d === "'" || d === '`'){ const k = skipStr(j, d); inner += code.slice(j, k); j = k; continue; }
+        if(d === '/' && code[j + 1] === '/'){ let k = code.indexOf('\n', j); if(k < 0) k = n; inner += code.slice(j, k); j = k; continue; }
+        if(d === '/' && code[j + 1] === '*'){ let k = code.indexOf('*/', j + 2); k = k < 0 ? n : k + 2; inner += code.slice(j, k); j = k; continue; }
+        if(d === '{') depth++;
+        if(d === '}'){ depth--; if(depth === 0){ j++; break; } }
+        inner += d; j++;
+      }
+      let tail = ''; while(j < n && code[j] !== '\n'){ const done = code[j] === ';'; if(code[j] === '{') break; tail += code[j]; j++; if(done) break; }
+      const nd = makeNode('block'); nd.fields.header = header; nd.fields.tail = tail.trim(); nd.children = parseLevel(inner);
+      nodes.push(nd); i = j; continue;
+    }
+    if(c === ';'){ seg += c; pushStmt(seg); seg = ''; i++; continue; }
+    if(c === '\n'){ if(paren === 0 && brack === 0){ pushStmt(seg); seg = ''; } else seg += c; i++; continue; }
+    seg += c; i++;
+  }
+  pushStmt(seg);
+  return nodes;
+}
+$('#imp').onclick = () => $('#impfile').click();
+$('#impfile').onchange = async e => {
+  const f = e.target.files && e.target.files[0]; if(!f) return;
+  const text = await f.text();
+  if(text.length > 80000){ alert('Файл большой (' + Math.round(text.length / 1024) + ' КБ). Возьми кусок поменьше — иначе разметка будет огромной и медленной.'); return; }
+  try { root = { children: parseLevel(text) }; renderTree(); }
+  catch(err){ alert('не удалось разобрать: ' + err.message); }
+};
 
 // сохранить сборку как шаблон (появится в разделе «Шаблоны», группа «Из конструктора»)
 $('#save').onclick = async () => {
