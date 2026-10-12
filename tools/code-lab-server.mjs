@@ -168,7 +168,7 @@ const server = http.createServer(async (req, res) => {
     if(u.pathname === '/api/data/save' && req.method === 'POST'){
       const b = await readBody(req);
       const id = slug(b.name || 'data');
-      const obj = { id, name: String(b.name || 'без имени').slice(0, 120), desc: String(b.desc || '').slice(0, 400), savedAt: new Date().toISOString(), data: b.data };
+      const obj = { id, name: String(b.name || 'без имени').slice(0, 120), desc: String(b.desc || '').slice(0, 400), category: String(b.category || '').slice(0, 80), savedAt: new Date().toISOString(), data: b.data };
       await fs.mkdir(DATA, { recursive: true });
       await fs.writeFile(path.join(DATA, id + '.json'), JSON.stringify(obj), 'utf8');
       return json(res, 200, { id });
@@ -179,7 +179,7 @@ const server = http.createServer(async (req, res) => {
       const out = [];
       for(const n of names.sort().reverse()){
         try { const st = await fs.stat(path.join(DATA, n)); const j = JSON.parse(await fs.readFile(path.join(DATA, n), 'utf8'));
-          out.push({ id: j.id || n.replace(/\.json$/, ''), name: j.name || n, desc: j.desc || '', savedAt: j.savedAt || '', size: st.size }); } catch(_){}
+          out.push({ id: j.id || n.replace(/\.json$/, ''), name: j.name || n, desc: j.desc || '', category: j.category || '', savedAt: j.savedAt || '', size: st.size }); } catch(_){}
       }
       return json(res, 200, out);
     }
@@ -189,6 +189,18 @@ const server = http.createServer(async (req, res) => {
       const txt = await fs.readFile(abs, 'utf8').catch(() => null);
       if(txt == null) return json(res, 404, { error: 'нет такого' });
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(txt); return;
+    }
+    if(u.pathname === '/api/data/update' && req.method === 'POST'){
+      const b = await readBody(req); const abs = within(DATA, (b.id || '') + '.json');
+      if(!abs) return json(res, 400, { error: 'bad id' });
+      const txt = await fs.readFile(abs, 'utf8').catch(() => null);
+      if(txt == null) return json(res, 404, { error: 'нет такого' });
+      const j = JSON.parse(txt);
+      if(b.name != null) j.name = String(b.name).slice(0, 120);
+      if(b.desc != null) j.desc = String(b.desc).slice(0, 400);
+      if(b.category != null) j.category = String(b.category).slice(0, 80);
+      await fs.writeFile(abs, JSON.stringify(j), 'utf8');
+      return json(res, 200, { ok: true });
     }
     if(u.pathname === '/api/data/delete' && req.method === 'POST'){
       const b = await readBody(req); const abs = within(DATA, (b.id || '') + '.json');

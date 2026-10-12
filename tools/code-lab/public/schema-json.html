@@ -29,6 +29,8 @@
   .res .v{color:var(--text2)}
   .err{color:var(--warn,#E8895A);font-size:12.5px;font-family:ui-monospace,monospace;white-space:pre-wrap}
   .saved{margin:10px 0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .catline{width:100%;font-size:11px;color:var(--acc);text-transform:uppercase;letter-spacing:.05em;margin:8px 0 2px}
+  .catrow{width:100%;display:flex;flex-wrap:wrap;gap:6px}
   .savedh{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-right:4px}
   .chip{font-size:12px;background:var(--s2);border:1px solid var(--border);border-radius:14px;padding:4px 10px;cursor:pointer;color:var(--text2)}
   .chip:hover{border-color:var(--acc);color:var(--text)}
@@ -93,28 +95,72 @@ async function handle(fileList){
 pick.onchange = () => { show(+pick.value); $('#sname').value = files[+pick.value].name; };
 
 // ── сохранение на диск локального сервера + список сохранённого ──────────────
+// авто-разбор содержимого → {category, desc} (узнаёт формы БондАналитика)
+function classifyData(d){
+  const keys = (d && typeof d === 'object' && !Array.isArray(d)) ? Object.keys(d) : [];
+  const has = k => keys.includes(k);
+  if(has('ytmBonds') || has('portfolio') || has('watchlists') || has('calEvents') || (has('reportsDB') && keys.length > 1)){
+    const p = [];
+    if(d.portfolio) p.push('портфель (' + (Array.isArray(d.portfolio) ? d.portfolio.length : '?') + ')');
+    if(d.ytmBonds) p.push('облигации (' + (Array.isArray(d.ytmBonds) ? d.ytmBonds.length : '?') + ')');
+    if(d.reportsDB) p.push('отчётность (' + Object.keys(d.reportsDB).length + ' эмит.)');
+    if(d.watchlists) p.push('списки'); if(d.calEvents) p.push('календарь');
+    return { category: 'БондАналитик', desc: 'снапшот приложения: ' + p.join(', ') };
+  }
+  if(has('reportsDB')) return { category: 'Отчётность', desc: 'reportsDB: ' + Object.keys(d.reportsDB).length + ' эмитентов' };
+  if(has('rosstatRatios')) return { category: 'ФНС / Росстат', desc: 'ROS/ROA по годам и отраслям' };
+  if(has('industryPeers') || has('industryMedians')) return { category: 'Отрасли', desc: 'peer-ИНН / медианы по отраслям' };
+  if(has('refs')) return { category: 'Эталоны', desc: 'эталоны РСБУ для сверки' };
+  if(Array.isArray(d)){
+    const f = d[0]; const flds = f && typeof f === 'object' ? Object.keys(f).slice(0, 6).join(', ') : '';
+    return { category: 'Таблицы', desc: 'массив, записей: ' + d.length + (flds ? ' (поля: ' + flds + ')' : '') };
+  }
+  if(d && typeof d === 'object') return { category: 'Прочее', desc: 'объект, ключей ' + keys.length + ': ' + keys.slice(0, 8).join(', ') + (keys.length > 8 ? '…' : '') };
+  return { category: 'Прочее', desc: 'значение: ' + String(d).slice(0, 60) };
+}
+
 async function loadSaved(){
   let list; try { list = await fetch('/api/data/list').then(r => r.json()); } catch(_){ return; }
-  const box = $('#saved');
-  if(!list.length){ box.innerHTML = ''; return; }
-  box.innerHTML = '<span class="savedh">сохранено:</span>' + list.map(x =>
-    '<span class="chip" data-id="'+esc(x.id)+'" title="'+esc(x.desc || x.savedAt)+'">'+esc(x.name)+' <b class="del" data-id="'+esc(x.id)+'">×</b></span>').join('');
-  box.querySelectorAll('.chip').forEach(ch => {
-    ch.onclick = async e => {
-      if(e.target.classList.contains('del')){ await fetch('/api/data/delete', { method:'POST', body: JSON.stringify({ id: ch.dataset.id }) }); loadSaved(); return; }
-      const j = await fetch('/api/data/get?id=' + encodeURIComponent(ch.dataset.id)).then(r => r.json());
-      files = [{ name: j.name, data: j.data }];
-      pick.innerHTML = '<option value="0">'+esc(j.name)+'</option>';
-      bar.style.display = 'flex'; tree.style.display = 'block'; $('#savebar').style.display = 'flex';
-      $('#sname').value = j.name; $('#sdesc').value = j.desc || '';
-      show(0);
-    };
-  });
+  const box = $('#saved'); box.innerHTML = '';
+  if(!list.length) return;
+  const tools = el('div', 'savedh'); tools.textContent = 'сохранено (' + list.length + '):';
+  const rel = document.createElement('button'); rel.className = 'btn'; rel.textContent = '🏷 авто-подписать всё'; rel.style.marginLeft = '6px';
+  rel.onclick = async () => {
+    rel.textContent = 'подписываю…';
+    for(const it of list){
+      try { const j = await fetch('/api/data/get?id=' + encodeURIComponent(it.id)).then(r => r.json());
+        const a = classifyData(j.data);
+        await fetch('/api/data/update', { method:'POST', body: JSON.stringify({ id: it.id, desc: it.desc || a.desc, category: it.category || a.category }) }); } catch(_){}
+    }
+    loadSaved();
+  };
+  box.append(tools, rel);
+  const by = {}; list.forEach(x => { const c = x.category || 'Без категории'; (by[c] = by[c] || []).push(x); });
+  for(const cat of Object.keys(by).sort()){
+    const h = el('div', 'catline'); h.textContent = cat; box.appendChild(h);
+    const row = el('div', 'catrow');
+    by[cat].forEach(x => {
+      const chip = document.createElement('span'); chip.className = 'chip'; chip.title = x.desc || x.savedAt;
+      chip.innerHTML = esc(x.name) + ' <b class="del">×</b>';
+      chip.onclick = async e => {
+        if(e.target.classList.contains('del')){ await fetch('/api/data/delete', { method:'POST', body: JSON.stringify({ id: x.id }) }); loadSaved(); return; }
+        const j = await fetch('/api/data/get?id=' + encodeURIComponent(x.id)).then(r => r.json());
+        files = [{ name: j.name, data: j.data }];
+        pick.innerHTML = '<option value="0">' + esc(j.name) + '</option>';
+        bar.style.display = 'flex'; tree.style.display = 'block'; $('#savebar').style.display = 'flex';
+        $('#sname').value = j.name; $('#sdesc').value = j.desc || '';
+        show(0);
+      };
+      row.appendChild(chip);
+    });
+    box.appendChild(row);
+  }
 }
 $('#savebtn').onclick = async () => {
   if(!files.length) return;
   const f = files[+pick.value || 0];
-  const body = { name: $('#sname').value || f.name, desc: $('#sdesc').value, data: f.data };
+  const a = classifyData(f.data);
+  const body = { name: $('#sname').value || f.name, desc: $('#sdesc').value || a.desc, category: a.category, data: f.data };
   const btn = $('#savebtn'); btn.textContent = 'сохраняю…';
   const r = await fetch('/api/data/save', { method: 'POST', body: JSON.stringify(body) }).then(r => r.json()).catch(() => ({}));
   btn.textContent = r.id ? '✓ сохранено' : 'ошибка'; setTimeout(() => btn.textContent = '💾 сохранить этот', 1300);
@@ -124,7 +170,8 @@ $('#saveall').onclick = async () => {
   if(!files.length) return;
   const btn = $('#saveall'); btn.textContent = 'сохраняю…'; let ok = 0;
   for(const f of files){
-    const r = await fetch('/api/data/save', { method: 'POST', body: JSON.stringify({ name: f.name, desc: $('#sdesc').value, data: f.data }) }).then(r => r.json()).catch(() => ({}));
+    const a = classifyData(f.data);
+    const r = await fetch('/api/data/save', { method: 'POST', body: JSON.stringify({ name: f.name, desc: $('#sdesc').value || a.desc, category: a.category, data: f.data }) }).then(r => r.json()).catch(() => ({}));
     if(r.id) ok++;
   }
   btn.textContent = '✓ сохранено ' + ok + '/' + files.length; setTimeout(() => btn.textContent = '💾 сохранить всё', 1600);
