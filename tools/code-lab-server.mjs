@@ -146,6 +146,23 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
+    // правка шаблона целиком: новый код → заново токенизируем, перезаписываем файл
+    if(u.pathname === '/api/edit' && req.method === 'POST'){
+      const b = await readBody(req);
+      const file = await fileForId(b.id);
+      if(!file) return json(res, 404, { error: 'нет такого шаблона' });
+      const full = path.join(TEMPLATES, file);
+      const j = JSON.parse(await fs.readFile(full, 'utf8'));
+      if(b.lang != null) j.lang = String(b.lang).toLowerCase();
+      if(b.title != null) j.title = String(b.title).slice(0, 80) || j.title;
+      if(b.group != null) j.group = String(b.group).slice(0, 60) || j.group;
+      if(b.desc != null) j.desc = String(b.desc).slice(0, 400);
+      if(b.output != null) j.output = String(b.output);
+      if(b.code != null) j.lines = tokenize(b.code, j.lang);   // код заново раскрашивается
+      await fs.writeFile(full, JSON.stringify(j, null, 2), 'utf8');
+      return json(res, 200, { ok: true, id: j.id });
+    }
+
     // удалить шаблон
     if(u.pathname === '/api/delete' && req.method === 'POST'){
       const b = await readBody(req);

@@ -73,11 +73,13 @@ function render(tpl){
   const bar = document.createElement('div'); bar.className = 'toolbar';
   const copy = mkBtn('⧉ копировать код');
   const reset = mkBtn('↺ сброс имён');
+  const edit = mkBtn('✎ править');
   const del = mkBtn('🗑 удалить'); del.classList.add('danger');
   const runnable = tpl.lang === 'js';
   const run = runnable ? mkBtn('▶ запустить') : null;
   if(run) run.classList.add('ok');
-  bar.append(copy, reset); if(run) bar.append(run); bar.append(del); work.appendChild(bar);
+  bar.append(copy, reset, edit); if(run) bar.append(run); bar.append(del); work.appendChild(bar);
+  edit.onclick = () => showEditForm(tpl);
 
   const pre = document.createElement('pre'); pre.className = 'code mono';
   (tpl.lines || []).forEach((line, li) => {
@@ -241,6 +243,40 @@ function showAddForm(){
     const body = { title: $('#f-title').value || 'Без названия', lang: $('#f-lang').value, group: $('#f-group').value, desc: $('#f-desc').value, code, output: $('#f-out').value };
     const r = await fetch('/api/add', { method: 'POST', body: JSON.stringify(body) }).then(r => r.json()).catch(() => ({}));
     if(r.id) loadList(r.id); else $('#f-err').textContent = 'ошибка: ' + (r.error || 'не сохранилось');
+  };
+}
+
+// Правка шаблона: открыть весь код текстом, сохранить → сервер заново
+// токенизирует и перезаписывает файл (пояснения к словам при этом сбросятся,
+// т.к. код изменился — впишешь заново кликом по слову).
+function showEditForm(tpl){
+  const code = (tpl.lines || []).map(line => (line || []).map(t => t.v != null ? t.v : '').join('')).join('\n');
+  work.innerHTML = '';
+  const h = document.createElement('div'); h.className = 't-title'; h.textContent = 'Правка: ' + (tpl.title || '');
+  const p = document.createElement('div'); p.className = 't-desc';
+  p.textContent = 'Меняй код как хочешь — структуру, слова, строки. После сохранения он заново раскрасится. Пояснения к словам сбросятся (код же поменялся).';
+  work.append(h, p);
+  const f = document.createElement('div'); f.className = 'form';
+  const opt = l => `<option value="${l}"${(tpl.lang||'js')===l?' selected':''}>${l}</option>`;
+  f.innerHTML = `
+    <label>Название<input id="e-title"></label>
+    <div class="row">
+      <label>Язык<select id="e-lang">${opt('js')}${opt('python')}${opt('sql')}${opt('other')}</select></label>
+      <label>Группа<input id="e-group"></label>
+    </div>
+    <label>Описание<input id="e-desc"></label>
+    <label>Код<textarea id="e-code" rows="16" spellcheck="false"></textarea></label>
+    <label>Что на выходе<textarea id="e-out" rows="2"></textarea></label>
+    <div class="toolbar"><button class="btn ok" id="e-save">сохранить</button><button class="btn" id="e-cancel">отмена</button></div>
+    <div class="muted" id="e-err"></div>`;
+  work.appendChild(f);
+  $('#e-title').value = tpl.title || ''; $('#e-group').value = tpl.group || '';
+  $('#e-desc').value = tpl.desc || ''; $('#e-code').value = code; $('#e-out').value = tpl.output || '';
+  $('#e-cancel').onclick = () => select(curId, nav.querySelector('.tpl.on'));
+  $('#e-save').onclick = async () => {
+    const body = { id: curId, title: $('#e-title').value, lang: $('#e-lang').value, group: $('#e-group').value, desc: $('#e-desc').value, code: $('#e-code').value, output: $('#e-out').value };
+    const r = await fetch('/api/edit', { method: 'POST', body: JSON.stringify(body) }).then(r => r.json()).catch(() => ({}));
+    if(r.ok){ loadList(curId); } else $('#e-err').textContent = 'ошибка: ' + (r.error || 'не сохранилось');
   };
 }
 
