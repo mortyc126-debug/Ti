@@ -28,6 +28,17 @@
   .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   @media(max-width:720px){.two{grid-template-columns:1fr}}
   .kw{color:#B45CFF}.str{color:#52F2C9}.num{color:#FF8800}.com{color:#9090BB}.fn{color:#3DD9FF}.err{color:#FF4D7A}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--text3);font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+  td:first-child{color:var(--text);white-space:nowrap}
+  td code{display:inline-block;margin:1px 0}
+  .lyr{background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:12px 14px;margin:8px 0 14px;color:var(--text2);font-size:12.5px;line-height:1.7;font-style:italic;white-space:pre-line}
+  .term{border-left:3px solid var(--border);padding-left:12px;margin:12px 0}
+  .term h4{margin:0 0 3px;font-size:13px;color:var(--text)}
+  .term .o{font-size:11.5px;color:var(--text3)}
+  .term p{margin:4px 0 0;font-size:12.5px;color:var(--text2);line-height:1.55}
+  .term .alt{color:var(--teal,#6CC9C5)}
 </style>
 </head>
 <body>
@@ -122,6 +133,44 @@ const b = 3;
           <p>Выйдет <code>"53"</code>, а не <code>8</code>. <b>Баг типов:</b> <code>"5" + 3</code> — JS видит строку слева и <b>склеивает</b>, а не складывает. Лечится приведением: <code>Number(a) + b</code>. Это та самая ловушка данных из полей/сети — всегда приводи к числу.</p></details>
       </div>
     </div>
+
+    <h2><span class="n">6</span>Способы — в виде команд</h2>
+    <p class="lead">«Проверить» или «логировать» — это не абстракция, а конкретные команды. Вот чем именно это делают, слева Python, справа JS/браузер.</p>
+    <table>
+      <tr><th>приём</th><th>Python</th><th>JS / браузер</th></tr>
+      <tr><td>печать значения</td><td><code>print("x:", x)</code></td><td><code>console.log("x:", x)</code></td></tr>
+      <tr><td>красивый дамп объекта</td><td><code>import json; print(json.dumps(obj, indent=2, ensure_ascii=False))</code></td><td><code>console.log(JSON.stringify(obj,null,2))</code> · <code>console.table(arr)</code></td></tr>
+      <tr><td>точка останова</td><td><code>breakpoint()</code> (запуск как обычно)</td><td><code>debugger;</code> при открытом F12 · или клик по № строки в Sources</td></tr>
+      <tr><td>пошаговый дебаггер</td><td><code>python -m pdb файл.py</code> → <code>n</code> дальше, <code>s</code> внутрь, <code>c</code> продолжить, <code>p x</code> напечатать, <code>q</code> выйти</td><td>DevTools → Sources → F10 шаг · F11 внутрь · F8 дальше</td></tr>
+      <tr><td>страховка (инвариант)</td><td><code>assert 0 &lt;= p &lt;= 1, f"p={p}"</code></td><td><code>console.assert(cond, "msg")</code></td></tr>
+      <tr><td>логи с уровнями</td><td><code>import logging; logging.basicConfig(level=logging.DEBUG); logging.info("…")</code></td><td><code>console.debug/info/warn/error(...)</code></td></tr>
+      <tr><td>поймать трассировку</td><td><code>import traceback; traceback.print_exc()</code> · <code>logging.exception("…")</code></td><td><code>catch(e){ console.error(e) }</code> — стек в <code>e.stack</code></td></tr>
+      <tr><td>запустить тесты</td><td><code>pytest</code> · <code>pytest -k имя</code> · <code>pytest -x</code> (стоп на 1-й)</td><td><code>npm test</code> (vitest / jest)</td></tr>
+      <tr><td>покрытие тестами</td><td><code>pytest --cov</code> · <code>coverage report</code></td><td><code>vitest --coverage</code></td></tr>
+      <tr><td>найти ломающий коммит</td><td colspan="2"><code>git bisect start</code> → <code>git bisect bad</code> → <code>git bisect good &lt;hash&gt;</code> → git сам половинит историю</td></tr>
+      <tr><td>измерить время</td><td><code>import time; t=time.perf_counter(); … ; print(time.perf_counter()-t)</code></td><td><code>console.time("x"); … ; console.timeEnd("x")</code></td></tr>
+      <tr><td>глянуть, кто вызвал</td><td><code>traceback.print_stack()</code></td><td><code>console.trace()</code></td></tr>
+    </table>
+    <div class="note">Порядок по частоте: сначала <b>print/log</b> (быстро сузить) → если мало, <b>breakpoint/pdb</b> (замереть и осмотреться) → <b>assert</b> (зафиксировать, что не должно случаться) → <b>тест</b> (чтобы баг не вернулся). «Что делать» всегда разворачивается в одну из этих команд.</div>
+
+    <h2><span class="n">7</span>Словарь (разбор твоих строк)</h2>
+    <div class="lyr">Двести девяносто три раза — pass. / Я ставлю print в центральный класс. / Проверка? Нет данных и трассировки стэка. / Где-то проглочен exception…
+Все фикстуры зелёные, coverage — в потолок, / А в проде опять отвалился поток. / Mock возвращает идеальный ответ. / Реальный источник — None и привет.
+Кэш протух, но считается свежим, / У объекта потерян контекст. / Я ставлю логгер — баг стал вежливым, / И ушёл в асинхронный процесс.</div>
+    <p class="lead">По каждому слову: что это, откуда берётся и какие есть альтернативы.</p>
+
+    <div class="term"><h4><code>pass</code> (в except)</h4><div class="o">откуда: Python требует непустое тело у блока; <code>pass</code> — «ничего не делать»</div><p>Заглушка, превращающая «поймал ошибку» в «молча проглотил». <span class="alt">Альтернатива:</span> ловить <i>конкретный</i> тип (<code>except ValueError</code>) и <b>логировать</b> (<code>logging.exception</code>), либо не ловить вовсе — пусть падает там, где сломалось.</p></div>
+    <div class="term"><h4>print в центральный класс</h4><div class="o">откуда: встроенная функция вывода</div><p>Быстрая разовая охота: воткнул — посмотрел — убрал. <span class="alt">Альтернатива:</span> <b>logging</b> (включается/выключается, пишет время и уровень, в файл), <b>breakpoint/pdb</b> (видишь все переменные сразу, а не по одной).</p></div>
+    <div class="term"><h4>трассировка стэка (stacktrace)</h4><div class="o">откуда: интерпретатор строит её в момент исключения</div><p>Цепочка вызовов до места падения — «кто кого звал». Главная улика. <span class="alt">Если её нет</span> (проглотили) — верни: не глотай, или <code>traceback.print_exc()</code> / <code>e.stack</code>. Нет стека = работаешь вслепую (ровно твоя строка).</p></div>
+    <div class="term"><h4>exception (исключение)</h4><div class="o">откуда: <code>raise</code> или ошибка рантайма (деление на ноль, None.foo…)</div><p>Объект-сигнал «что-то не так», прерывает поток и летит вверх, пока кто-то не поймает. <span class="alt">Альтернатива перехвату:</span> <code>try/except</code> конкретного типа; в других стилях — коды возврата / Result-объекты вместо исключений.</p></div>
+    <div class="term"><h4>фикстуры (fixtures)</h4><div class="o">откуда: тест-фреймворк, напр. <code>@pytest.fixture</code></div><p>Готовый «стенд» для теста: подготовленные данные/окружение (фейковый портфель, временная база). <span class="alt">Ловушка:</span> фикстура — это <b>твоё</b> представление о данных, а не реальность. Зелёные фикстуры ≠ рабочий прод (см. Mock/None ниже).</p></div>
+    <div class="term"><h4>coverage (покрытие)</h4><div class="o">откуда: <code>coverage.py</code> / <code>pytest --cov</code></div><p>Процент строк кода, которые прогнали тесты. <span class="alt">Обман метрики:</span> 100% ≠ 0 багов — строку <i>выполнили</i>, но не проверили на <i>правильном</i> входе. «Coverage в потолок» и падающий прод — классика. Лечение: тесты на <b>краевые случаи</b>, не на количество строк.</p></div>
+    <div class="term"><h4>Mock (мок)</h4><div class="o">откуда: <code>unittest.mock</code> — поддельный объект вместо настоящего</div><p>Подменяет реальную биржу/сеть заготовленным ответом, чтобы тест был быстрым и без интернета. <span class="alt">Ровно твоя строка:</span> mock отдаёт идеал, а живой источник — <code>None</code> → тест зелёный, прод падает. Лечение: <b>интеграционные/контрактные</b> тесты + тест именно на <code>None</code>/пустой ответ.</p></div>
+    <div class="term"><h4><code>None</code> (null / undefined в JS)</h4><div class="o">откуда: функция ничего не вернула, ключа нет, данные не пришли</div><p>«Пусто». Беда: <code>None.foo</code> → падение, или тихо течёт дальше как «ничего». <span class="alt">Защита:</span> ранняя проверка <code>if x is None</code>, значения по умолчанию, Optional-типы, «ранний возврат» при пустом входе.</p></div>
+    <div class="term"><h4>протухший кэш (stale cache)</h4><div class="o">откуда: кэшируем ради скорости (у тебя — heavy-cache раз в 5 баров)</div><p>Сохранённый старый результат, который код считает свежим. Показывает вчерашнее как сегодняшнее. <span class="alt">Лечение:</span> <b>TTL</b> (срок годности), инвалидация по ключу/версии, cache-busting <code>?_t=timestamp</code> (это уже есть в твоём прокси ГИР БО).</p></div>
+    <div class="term"><h4>потерян контекст</h4><div class="o">откуда: колбэки, async, передача метода «без привязки»</div><p>Код выполняется не в той обстановке: потерян <code>this</code>/<code>self</code>, замыкание поймало не ту переменную, объект уже изменился. <span class="alt">Лечение:</span> стрелочные функции (сохраняют <code>this</code>), <code>bind</code>, <code>functools.partial</code>, явно передавать состояние, а не надеяться на окружение.</p></div>
+    <div class="term"><h4>логгер</h4><div class="o">откуда: <code>logging</code> (py) / <code>console</code>+библиотеки (js)</div><p>Запись событий с уровнями (debug/info/warning/error), временем, назначением (экран/файл). Управляемый, в отличие от print. <span class="alt">Твоя ирония точна:</span> логгер <b>показал</b> ошибку, но не починил — «баг стал вежливым»: теперь он сообщает о себе и спокойно едет дальше.</p></div>
+    <div class="term"><h4>асинхронный процесс</h4><div class="o">откуда: сеть, таймеры, параллелизм (<code>await</code>, колбэки, очереди, отдельный поток)</div><p>Код выполняется «не сразу», а по готовности/параллельно. <span class="alt">Почему баги там злее:</span> порядок недетерминирован, <b>стектрейс рвётся на <code>await</code></b> (не видно, кто звал), воспроизвести трудно. Способы: async-debug режим, логи с <b>таймстемпом и id задачи</b>, <code>console.trace()</code>, делать тесты детерминированными.</p></div>
 
     <p style="margin:28px 0 10px;font-size:11.5px;color:var(--text3)">Отладка — навык, а не талант. Метод один и тот же: сузить место → проверить предположение → починить причину → закрыть тестом.</p>
   </div>

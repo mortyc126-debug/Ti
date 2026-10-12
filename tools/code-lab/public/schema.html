@@ -19,9 +19,10 @@
   .card p{margin:6px 0 0;font-size:12.5px;color:var(--text2);line-height:1.55}
   .card .ex{margin-top:8px;font-size:11.5px;color:var(--teal, #6CC9C5)}
   .tag{display:inline-block;font-size:10px;font-family:ui-monospace,monospace;padding:2px 7px;border-radius:5px;background:var(--bg);margin:2px 4px 0 0}
-  .pyr{display:flex;flex-direction:column;gap:4px;max-width:720px}
-  .lvl{display:flex;align-items:center;gap:10px;border-radius:7px;padding:9px 12px;color:#0E0720;font-size:12.5px;font-weight:600}
-  .lvl .sub{font-weight:400;color:rgba(14,7,32,.7);font-size:11px}
+  .pyr{display:flex;flex-direction:column;gap:5px;max-width:720px}
+  .lvl{display:flex;align-items:center;gap:10px;border-radius:7px;padding:9px 12px;background:var(--bg2);border:1px solid var(--border);border-left-width:3px;color:var(--text2);font-size:12.5px;font-weight:600}
+  .lvl b{color:var(--text)}
+  .lvl .sub{font-weight:400;color:var(--text3);font-size:11px}
   .flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0}
   .step{flex:1;min-width:150px;background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:11px;position:relative}
   .step .num{font-family:ui-monospace,monospace;color:var(--acc);font-size:11px}
@@ -126,20 +127,20 @@
 
 <script>
 // ── пирамида знаний ──
+// приглушённые тона (низкая насыщенность) — только тонкая левая грань
 const PYR = [
-  ["7","Предметка (финансы, ML)","#7B61FF","доходности, риск, индикаторы, обучение весов — ЧТО считать"],
-  ["6","Отладка и тесты","#FF2FAE","найти баг, воспроизвести, проверить unit-тестом"],
-  ["5","Данные и сеть","#FF8800","fetch, API, JSON, парсеры, прокси/CORS, хранение"],
-  ["4","Архитектура","#3DD9FF","модули, связи, кто кого зовёт, как не стать монстром"],
-  ["3","Поток данных / функции","#6CC9C5","вход→выход, связывание шагов, состояние"],
-  ["2","Структуры данных","#52F2C9","массив, словарь, очередь — чем хранить"],
-  ["1","Основы языка","#B45CFF","переменные, условия, циклы, типы"],
+  ["7","Предметка (финансы, ML)","#6a5a9c","доходности, риск, индикаторы, обучение весов — ЧТО считать"],
+  ["6","Отладка и тесты","#9c5a84","найти баг, воспроизвести, проверить unit-тестом"],
+  ["5","Данные и сеть","#9c7a4a","fetch, API, JSON, парсеры, прокси/CORS, хранение"],
+  ["4","Архитектура","#4a7a9c","модули, связи, кто кого зовёт, как не стать монстром"],
+  ["3","Поток данных / функции","#4a8c86","вход→выход, связывание шагов, состояние"],
+  ["2","Структуры данных","#4a9c80","массив, словарь, очередь — чем хранить"],
+  ["1","Основы языка","#7a5a9c","переменные, условия, циклы, типы"],
 ];
 const pyr = document.getElementById('pyr');
 PYR.forEach((l,idx)=>{
-  const w = 55 + idx*(45/6); // шире кверху визуально? нет — фундамент шире
   const d = document.createElement('div'); d.className='lvl';
-  d.style.background = l[2]; d.style.width = (100 - idx*6) + '%'; d.style.marginLeft='0';
+  d.style.borderLeftColor = l[2]; d.style.width = (100 - idx*6) + '%';
   d.innerHTML = '<b>'+l[0]+'. '+l[1]+'</b><span class="sub">— '+l[3]+'</span>';
   pyr.appendChild(d);
 });
