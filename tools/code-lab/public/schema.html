@@ -41,7 +41,7 @@
   <header>
     <h1>Как устроена такая система</h1>
     <div class="sub">Наглядная карта: что нужно знать, какие бывают структуры данных, как ловят баги и как устроена архитектура. На примере твоего бота.</div>
-    <div class="tabs"><a href="/">Шаблоны</a><a href="/constructor.html">Конструктор</a><a href="/schema.html" class="on">Схемы</a></div>
+    <div class="tabs"><a href="/">Шаблоны</a><a href="/constructor.html">Конструктор</a><a href="/schema.html" class="on">Схемы</a><a href="/schema-debug.html">Отладка</a></div>
   </header>
 
   <div class="wrap">
@@ -60,7 +60,7 @@
     <h2><span class="n">3</span>Как ловят баги</h2>
     <p class="lead">Отладка — это не «тупить в код», а метод. Пять шагов, всегда одни и те же.</p>
     <div class="flow" id="debug"></div>
-    <div class="note bad"><b>Антипаттерн №1 (твой случай):</b> <code>except: pass</code> ×293 — ошибка случилась, её молча проглотили. Баг становится невидимым: данных нет, а почему — неизвестно. Лечится так: лови <i>конкретную</i> ошибку и <b>логируй</b> её, а не глотай.</div>
+    <div class="note bad"><b>Антипаттерн №1 (твой случай):</b> <code>except: pass</code> ×293 — ошибка случилась, её молча проглотили. Баг становится невидимым: данных нет, а почему — неизвестно. Лечится так: лови <i>конкретную</i> ошибку и <b>логируй</b> её, а не глотай. <a href="/schema-debug.html" style="color:var(--acc)">→ подробная схема отладки с живыми примерами</a></div>
     <h3 style="margin:16px 0 6px;font-size:13.5px;color:var(--text)">Виды багов (чтобы узнавать в лицо)</h3>
     <div class="grid g2" id="bugs"></div>
 
