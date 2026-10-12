@@ -63,7 +63,7 @@ mean([])</pre></div>
       <div class="row"><div class="lab">команда — напечатать тип и значение ПЕРЕД использованием</div>
         <div class="demo"><pre>const data = undefined;
 console.log("тип:", typeof data, "| значение:", data);</pre>
-        <button class="btn" onclick="run('r1','const data=undefined;console.log(\"тип:\", typeof data, \"| значение:\", data);')">▶ запустить</button><iframe id="r1" sandbox="allow-scripts"></iframe></div>
+        <button class="btn" onclick="run('r1', D1)">▶ запустить</button><iframe id="r1" sandbox="allow-scripts"></iframe></div>
       </div>
       <div class="interp"><span class="how">как толковать:</span> выведет <code>тип: undefined | значение: undefined</code> → данных нет вообще (ключа не было). Если бы было <code>тип: object | значение: null</code> — пусто намеренно. А <code>тип: string</code> на том, что ждал массив — баг типов. <b>Тип подсказывает причину.</b></div>
       <div class="row"><div class="lab alt">альтернатива — ранняя проверка / assert</div><pre><span class="kw">if</span>(data == <span class="kw">null</span>) <span class="kw">throw new</span> <span class="fn">Error</span>(<span class="str">"нет данных по bonds"</span>);
@@ -83,7 +83,7 @@ logging.info(<span class="str">"score: %s"</span>, 0.14)
       <div class="interp"><span class="how">как толковать вывод лога</span> <code>INFO:root:score: 0.14</code> — три части: <b>INFO</b> уровень важности · <b>root</b> какой логгер (обычно имя модуля) · дальше сообщение. Уровни по росту: <code>DEBUG &lt; INFO &lt; WARNING &lt; ERROR</code>. Поставил <code>level=WARNING</code> — <b>DEBUG и INFO молчат</b>, видно только проблемы. Так глушат шум, не стирая строки.</div>
       <div class="row"><div class="lab alt">массив/таблицу — console.table</div>
         <div class="demo"><pre>console.table([{имя:"ОФЗ",ytm:16.1},{имя:"ВДО",ytm:24.3}]);</pre>
-        <button class="btn" onclick="run('r3','console.table([{имя:\"ОФЗ\",ytm:16.1},{имя:\"ВДО\",ytm:24.3}]);console.log(\"(в реальном F12 это рисуется таблицей)\")')">▶ запустить</button><iframe id="r3" sandbox="allow-scripts"></iframe></div>
+        <button class="btn" onclick="run('r3', D3)">▶ запустить</button><iframe id="r3" sandbox="allow-scripts"></iframe></div>
       </div>
       <div class="interp"><span class="how">как толковать:</span> в настоящем DevTools <code>console.table</code> рисует данные <b>сеткой</b> — сразу видно кривую строку среди сотни. (В нашей мини-песочнице таблицы нет, но в F12 попробуй.)</div>
     </div>
@@ -97,7 +97,7 @@ logging.info(<span class="str">"score: %s"</span>, 0.14)
   return p;
 }
 проверь(1.7);   // вероятность не может быть 1.7</pre>
-        <button class="btn" onclick="run('r4','function pr(p){ console.assert(p>=0&&p<=1, \"вероятность вне [0,1]: \"+p); return p; } pr(1.7); console.log(\"код поехал дальше со значением\", 1.7);')">▶ запустить</button><iframe id="r4" sandbox="allow-scripts"></iframe></div>
+        <button class="btn" onclick="run('r4', D4)">▶ запустить</button><iframe id="r4" sandbox="allow-scripts"></iframe></div>
       </div>
       <div class="interp"><span class="how">как толковать:</span> увидишь <code>Assertion failed: вероятность вне [0,1]: 1.7</code>. Это <b>сигнал «сюда дошло то, чего быть не должно»</b>. В JS <code>console.assert</code> только пишет и <b>не останавливает</b>. В Python <code>assert p&lt;=1</code> — <b>падает</b> с <code>AssertionError</code>. Ставь на входах функций и инвариантах («сумма весов = 1»), чтобы ловить гниль у истока.</div>
     </div>
@@ -111,7 +111,7 @@ logging.info(<span class="str">"score: %s"</span>, 0.14)
   плюс(){ this.n++; console.log("n =", this.n); }
 };
 setTimeout(счётчик.плюс, 0);   // this уже НЕ счётчик</pre>
-        <button class="btn" onclick="run('r5','const c={n:0, плюс(){ console.log(\"this есть?\", this && this.n!==undefined); }}; setTimeout(c.плюс,0);')">▶ запустить</button><iframe id="r5" sandbox="allow-scripts"></iframe></div>
+        <button class="btn" onclick="run('r5', D5)">▶ запустить</button><iframe id="r5" sandbox="allow-scripts"></iframe></div>
       </div>
       <div class="interp"><span class="how">как толковать:</span> выведет <code>this есть? false</code> — внутри <code>this</code> уже не объект (потерян при передаче). Симптом: «метод работает при прямом вызове и ломается в колбэке/таймере».</div>
       <div class="row"><div class="lab alt">лечение — стрелка (сохраняет this) или bind</div><pre>setTimeout(() => счётчик.плюс(), 0);   <span class="com">// стрелка держит контекст</span>
@@ -175,6 +175,11 @@ git bisect reset               <span class="com"># выйти</span></pre></div>
   </div>
 
 <script>
+// код демо — в переменных (inline-onclick с кавычками внутри ломает атрибут)
+const D1 = 'const data = undefined; console.log("тип:", typeof data, "| значение:", data);';
+const D3 = 'console.table([{имя:"ОФЗ",ytm:16.1},{имя:"ВДО",ytm:24.3}]); console.log("(в реальном F12 это рисуется таблицей-сеткой)");';
+const D4 = 'function pr(p){ console.assert(p>=0 && p<=1, "вероятность вне [0,1]: "+p); return p; } pr(1.7); console.log("а код поехал дальше со значением 1.7");';
+const D5 = 'const c = { n:0, плюс(){ console.log("this есть?", this && this.n!==undefined); } }; setTimeout(c.плюс, 0);';
 function run(id, code){
   document.getElementById(id).srcdoc =
     '<!doctype html><meta charset=utf-8><body style="margin:8px;font:12px ui-monospace,monospace;color:#F6F4FF;background:#0E0720">'
