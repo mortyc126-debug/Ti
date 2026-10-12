@@ -170,8 +170,36 @@ ${code}
 }
 
 // ── кнопки ────────────────────────────────────────────────────────────────────
-$('#copy').onclick = () => { navigator.clipboard.writeText(currentCode()); };
+$('#copy').onclick = () => { navigator.clipboard.writeText(currentCode()); flashBtn($('#copy'), '✓ скопировано', '⧉ копировать'); };
 $('#run').onclick = run;
+
+// скачать файл: Blob + ссылка с атрибутом download. Формат = расширение имени
+// + MIME-тип Blob (type). Браузер по ним и решает, что это за файл.
+function download(name, text, mime){
+  const blob = new Blob([text], { type: mime + ';charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+function wrapHtml(code){
+  return '<!doctype html>\n<html lang="ru">\n<head>\n<meta charset="utf-8">\n<title>моя страница</title>\n'
+    + '<style>body{margin:12px;font:13px ui-monospace,monospace;color:#F6F4FF;background:#0E0720}'
+    + '#log{color:#52F2C9;white-space:pre-wrap}</style>\n</head>\n<body>\n'
+    + '<canvas id="c" width="300" height="160" style="background:#140A24;border:1px solid #241638;border-radius:6px"></canvas>\n'
+    + '<div id="out"></div>\n<pre id="log"></pre>\n<script>\n'
+    + 'var log=document.getElementById("log");var _p=function(){log.textContent+=Array.prototype.join.call(arguments," ")+"\\n";};\n'
+    + 'var console={log:_p,error:_p,warn:_p,info:_p};\ntry{\n' + code + '\n}catch(e){log.textContent+="\\u26d4 "+e.message;}\n'
+    + '<\/script>\n</body>\n</html>\n';
+}
+$('#dl').onclick = () => {
+  const code = currentCode();
+  const fmt = $('#fmt').value;
+  if(fmt === 'html') download('моя-страница.html', wrapHtml(code), 'text/html');
+  else if(fmt === 'txt') download('код.txt', code, 'text/plain');
+  else download('код.js', code, 'text/javascript');
+  flashBtn($('#dl'), '✓ скачано', '⬇ скачать');
+};
+function flashBtn(b, on, off){ b.textContent = on; setTimeout(() => b.textContent = off, 1200); }
 $('#clear').onclick = () => { root = { children: [] }; renderTree(); };
 $('#example').onclick = () => {
   root = { children: [

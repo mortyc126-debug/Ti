@@ -43,6 +43,7 @@ section#work{padding:20px;overflow:auto;min-width:0}
 .btn{font:12px/1 ui-monospace,monospace;color:var(--text2);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:7px 11px;cursor:pointer}
 .btn:hover{color:var(--acc);border-color:rgba(255,0,110,.4)}
 .btn.ok{color:var(--str);border-color:rgba(82,242,201,.4)}
+select.btn{appearance:auto;color:var(--text2);background:var(--s2)}
 .btn.danger:hover{color:var(--acc);border-color:rgba(255,0,110,.5)}
 .btn.full{width:100%;margin-top:8px}
 
