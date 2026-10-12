@@ -22,6 +22,7 @@ const BLOCKS = {
   svg:    { cat:'Отрисовка', label:'SVG-линия', type:'draw', hint:'Нарисовать линию по точкам «x,y x,y…» в области #out. Больше точек — длиннее кривая.', fields:[{k:'points',def:'0,90 20,70 40,80 60,40 80,55 100,20'}], code:f=>`document.querySelector("#out").innerHTML =\n  '<svg width="200" height="100"><polyline points="${f.points}" fill="none" stroke="#52F2C9" stroke-width="2"/></svg>';` },
   bars:   { cat:'Отрисовка', label:'столбики (canvas)', type:'draw', hint:'Нарисовать столбики по числам (values) на холсте #c. Каждое число — высота столбика.', fields:[{k:'values',def:'40, 70, 30, 90, 55'}], code:f=>`const ctx = document.querySelector("#c").getContext("2d");\n[${f.values}].forEach((v, i) => { ctx.fillStyle = "#3DD9FF"; ctx.fillRect(i * 32, 140 - v, 22, v); });` },
   click:  { cat:'Интерактив', label:'по клику', type:'container', hint:'Выполнять вложенное при КЛИКЕ по элементу. sel — что кликаем (#c — холст). Клади блоки ВНУТРЬ.', fields:[{k:'sel',def:'#c'}], code:f=>({ open:`document.querySelector("${f.sel}").addEventListener("click", () => {`, close:'});' }) },
+  raw:    { cat:'Своё', label:'свой код', type:'leaf', hint:'Любой свой/вставленный JS-код как есть. Так можно втянуть в конструктор код из шаблона или откуда угодно и комбинировать с блоками.', fields:[{k:'code',multi:true,def:'// вставь сюда свой код\nconsole.log("привет");'}], code:f=>f.code },
 };
 const CATS = [...new Set(Object.values(BLOCKS).map(b => b.cat))];
 
@@ -57,8 +58,9 @@ function renderNode(nd, siblings, idx){
   const tag = document.createElement('span'); tag.className = 'blk-tag'; tag.textContent = b.label; head.appendChild(tag);
   (b.fields || []).forEach(f => {
     const lab = document.createElement('label'); lab.className = 'blk-field'; lab.textContent = f.k;
-    const inp = document.createElement('input'); inp.value = nd.fields[f.k];
-    inp.style.width = (f.k === 'body' || f.k === 'points' || f.k === 'values' || f.k === 'items') ? '220px' : '';
+    const inp = document.createElement(f.multi ? 'textarea' : 'input'); inp.value = nd.fields[f.k];
+    if(f.multi){ inp.rows = Math.min(14, (String(nd.fields[f.k]).split('\n').length + 1)); inp.className = 'blk-code'; inp.spellcheck = false; }
+    else inp.style.width = (f.k === 'body' || f.k === 'points' || f.k === 'values' || f.k === 'items') ? '220px' : '';
     inp.addEventListener('input', () => { nd.fields[f.k] = inp.value; renderCode(); });
     lab.appendChild(inp); head.appendChild(lab);
   });
@@ -200,6 +202,39 @@ $('#dl').onclick = () => {
   flashBtn($('#dl'), '✓ скачано', '⬇ скачать');
 };
 function flashBtn(b, on, off){ b.textContent = on; setTimeout(() => b.textContent = off, 1200); }
+
+// «+ из шаблона»: втянуть код шаблона в конструктор как блок «свой код».
+// Так шаблоны (в т.ч. загруженные) оказываются в конструкторе.
+$('#fromtpl').onclick = async (e) => {
+  e.stopPropagation(); closeMenu();
+  let list; try { list = await fetch('/api/list').then(r => r.json()); } catch(_){ return; }
+  const jsOnly = list.filter(t => (t.lang || 'js') === 'js');   // в конструкторе бежит только JS
+  const m = document.createElement('div'); m.className = 'menu'; m.id = '_menu';
+  if(!jsOnly.length){ m.innerHTML = '<div class="mcat">нет JS-шаблонов</div>'; }
+  const byGroup = {};
+  jsOnly.forEach(t => { (byGroup[t.group] = byGroup[t.group] || []).push(t); });
+  for(const g of Object.keys(byGroup)){
+    const h = document.createElement('div'); h.className = 'mcat'; h.textContent = g; m.appendChild(h);
+    byGroup[g].forEach(t => {
+      const it = document.createElement('div'); it.className = 'mitem';
+      it.innerHTML = '<span class="mi-label">' + t.title + '</span>';
+      it.onclick = async () => {
+        closeMenu();
+        try {
+          const tpl = await fetch('/api/template?id=' + encodeURIComponent(t.id)).then(r => r.json());
+          const code = (tpl.lines || []).map(line => (line || []).map(tok => tok.v != null ? tok.v : '').join('')).join('\n');
+          const nd = makeNode('raw'); nd.fields.code = code; root.children.push(nd); renderTree();
+        } catch(_){}
+      };
+      m.appendChild(it);
+    });
+  }
+  document.body.appendChild(m);
+  const r = $('#fromtpl').getBoundingClientRect();
+  m.style.left = Math.min(r.left, window.innerWidth - 320) + 'px';
+  m.style.top = (r.bottom + window.scrollY + 4) + 'px';
+  setTimeout(() => document.addEventListener('mousedown', outside), 0);
+};
 $('#clear').onclick = () => { root = { children: [] }; renderTree(); };
 $('#example').onclick = () => {
   root = { children: [
