@@ -116,6 +116,9 @@ pre.code{background:var(--bg2);border:1px solid var(--border);border-radius:9px;
 .blk-field{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text3)}
 .blk-field input{background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:3px 7px;color:var(--name);font-family:ui-monospace,monospace;font-size:12px;width:90px}
 .blk-hint{font-size:11px;color:var(--text3);line-height:1.5;padding:0 10px 8px 12px}
+.blk-caret{cursor:pointer;color:var(--text3);font-size:10px;padding:0 4px;user-select:none}
+.blk-caret:hover{color:var(--acc)}
+.blk-collapsed{font-size:11px;color:var(--text3);padding:2px 0 6px 18px;font-style:italic}
 textarea.blk-code{width:100%;min-width:260px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 9px;color:#CBC2EA;font-family:ui-monospace,monospace;font-size:12px;line-height:1.5;resize:vertical;margin-top:3px}
 .blk-field:has(textarea.blk-code){display:block;width:100%}
 .blk-body{margin:0 0 6px 18px;padding-left:10px;border-left:1px dashed var(--border)}

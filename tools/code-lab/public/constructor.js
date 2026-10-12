@@ -98,21 +98,31 @@ function renderNode(nd, siblings, idx){
   const ctrls = document.createElement('div'); ctrls.className = 'blk-ctrls';
   ctrls.appendChild(ctrlBtn('↑', () => move(siblings, idx, -1)));
   ctrls.appendChild(ctrlBtn('↓', () => move(siblings, idx, +1)));
+  ctrls.appendChild(ctrlBtn('⎘', () => { const copy = reUid(JSON.parse(JSON.stringify(nd))); siblings.splice(idx + 1, 0, copy); renderTree(); }));
   ctrls.appendChild(ctrlBtn('🗑', () => { siblings.splice(idx, 1); renderTree(); }));
   head.appendChild(ctrls);
   wrap.appendChild(head);
   const hintTxt = b.hintFn ? b.hintFn(nd.fields) : b.hint;
   if(hintTxt){ const h = document.createElement('div'); h.className = 'blk-hint'; h.textContent = hintTxt; wrap.appendChild(h); }
   if(b.type === 'container'){
-    const body = document.createElement('div'); body.className = 'blk-body';
-    body.appendChild(renderChildren(nd.children, nd));
-    wrap.appendChild(body);
+    const caret = document.createElement('span'); caret.className = 'blk-caret'; caret.textContent = nd.collapsed ? '▸' : '▾';
+    caret.onclick = () => { nd.collapsed = !nd.collapsed; renderTree(); };
+    head.insertBefore(caret, head.firstChild);
+    if(!nd.collapsed){
+      const body = document.createElement('div'); body.className = 'blk-body';
+      body.appendChild(renderChildren(nd.children, nd));
+      wrap.appendChild(body);
+    } else {
+      const c = document.createElement('div'); c.className = 'blk-collapsed'; c.textContent = '… ' + (nd.children ? nd.children.length : 0) + ' внутри';
+      wrap.appendChild(c);
+    }
     const close = document.createElement('div'); close.className = 'blk-close'; close.textContent = b.code(nd.fields).close;
     wrap.appendChild(close);
   }
   return wrap;
 }
 function ctrlBtn(t, fn){ const b = document.createElement('button'); b.textContent = t; b.onclick = fn; return b; }
+function reUid(nd){ nd.uid = uid(); if(nd.children) nd.children.forEach(reUid); return nd; }
 function move(arr, i, d){ const j = i + d; if(j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; renderTree(); }
 
 function addButton(targetArr){
@@ -281,8 +291,9 @@ $('#impfile').onchange = async e => {
   const f = e.target.files && e.target.files[0]; if(!f) return;
   const text = await f.text();
   if(text.length > 80000){ alert('Файл большой (' + Math.round(text.length / 1024) + ' КБ). Возьми кусок поменьше — иначе разметка будет огромной и медленной.'); return; }
-  try { root = { children: parseLevel(text) }; renderTree(); }
+  try { const imported = parseLevel(text); root.children.push(...imported); renderTree(); }   // добавляем, не стираем
   catch(err){ alert('не удалось разобрать: ' + err.message); }
+  e.target.value = '';   // чтобы можно было загрузить тот же файл повторно
 };
 
 // сохранить сборку как шаблон (появится в разделе «Шаблоны», группа «Из конструктора»)
