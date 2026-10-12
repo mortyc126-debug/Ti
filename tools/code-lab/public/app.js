@@ -23,6 +23,28 @@ async function loadList(openId){
   nav.innerHTML = '';
   const add = document.createElement('div'); add.className = 'addbtn'; add.textContent = '+ новый шаблон (вставить код)';
   add.onclick = showAddForm; nav.appendChild(add);
+  const imp = document.createElement('div'); imp.className = 'addbtn'; imp.textContent = '⬆ загрузить файлы кода (.js/.py/.sql)';
+  imp.onclick = () => {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true;
+    inp.accept = '.js,.mjs,.jsx,.ts,.py,.sql,.txt';
+    inp.onchange = async e => {
+      const fs = [...(e.target.files || [])]; if(!fs.length) return;
+      imp.textContent = 'загружаю ' + fs.length + '…'; let ok = 0, last = null;
+      for(const f of fs){
+        try {
+          const text = await f.text();
+          const ext = (f.name.split('.').pop() || '').toLowerCase();
+          const lang = ({ py: 'python', sql: 'sql' })[ext] || 'js';
+          const r = await fetch('/api/add', { method: 'POST', body: JSON.stringify({ title: f.name.replace(/\.[^.]+$/, ''), lang, group: 'Мои куски', code: text, desc: 'из файла ' + f.name }) }).then(r => r.json()).catch(() => ({}));
+          if(r.id){ ok++; last = r.id; }
+        } catch(_){}
+      }
+      imp.textContent = '✓ загружено ' + ok + '/' + fs.length;
+      setTimeout(() => loadList(last), 700);
+    };
+    inp.click();
+  };
+  nav.appendChild(imp);
   if(!list.length){ const m = document.createElement('div'); m.className = 'muted pad'; m.textContent = 'Пока пусто. Нажми «+ новый шаблон».'; nav.appendChild(m); return; }
   const groups = [];
   for(const t of list){ let g = groups.find(x => x.name === t.group); if(!g){ g = { name: t.group, items: [] }; groups.push(g); } g.items.push(t); }
