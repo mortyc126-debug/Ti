@@ -21,8 +21,13 @@ main{display:grid;grid-template-columns:260px 1fr 320px;min-height:calc(100vh - 
 nav{border-right:1px solid var(--border);padding:10px;overflow:auto}
 .addbtn{padding:9px 10px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--str);border:1px dashed rgba(82,242,201,.4);text-align:center;margin-bottom:6px}
 .addbtn:hover{background:rgba(82,242,201,.08)}
-.grp{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin:12px 6px 4px}
-.grp:first-child{margin-top:2px}
+.grp{display:flex;align-items:center;gap:7px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin:3px 0 2px;padding:6px 8px;border-radius:7px;cursor:pointer}
+.grp:hover{background:var(--s2);color:var(--text2)}
+.grp.open{color:var(--text2)}
+.grp-caret{font-size:9px;width:10px}
+.grp-name{flex:1}
+.grp-n{font-size:9px;font-family:ui-monospace,monospace;background:var(--bg);padding:1px 6px;border-radius:5px}
+.grp-items{margin-bottom:4px}
 .tpl{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;cursor:pointer;color:var(--text2);font-size:13px}
 .tpl:hover{background:var(--s2)}
 .tpl.on{background:rgba(255,0,110,.14);color:var(--acc)}

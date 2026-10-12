@@ -26,16 +26,29 @@ async function loadList(openId){
   if(!list.length){ const m = document.createElement('div'); m.className = 'muted pad'; m.textContent = 'Пока пусто. Нажми «+ новый шаблон».'; nav.appendChild(m); return; }
   const groups = [];
   for(const t of list){ let g = groups.find(x => x.name === t.group); if(!g){ g = { name: t.group, items: [] }; groups.push(g); } g.items.push(t); }
+  const want = openId || curId;
+  // какую группу раскрыть: с нужным шаблоном, иначе первую
+  let openGroup = (want && (groups.find(g => g.items.some(t => t.id === want)) || {}).name) || (groups[0] && groups[0].name);
   for(const g of groups){
-    const h = document.createElement('div'); h.className = 'grp'; h.textContent = g.name; nav.appendChild(h);
+    const open = g.name === openGroup;
+    const h = document.createElement('div'); h.className = 'grp' + (open ? ' open' : '');
+    h.innerHTML = `<span class="grp-caret">${open ? '▾' : '▸'}</span><span class="grp-name">${esc(g.name)}</span><span class="grp-n">${g.items.length}</span>`;
+    const box = document.createElement('div'); box.className = 'grp-items'; box.style.display = open ? 'block' : 'none';
+    h.onclick = () => {
+      const now = box.style.display === 'none';
+      box.style.display = now ? 'block' : 'none';
+      h.querySelector('.grp-caret').textContent = now ? '▾' : '▸';
+      h.classList.toggle('open', now);
+    };
+    nav.appendChild(h);
     for(const t of g.items){
       const d = document.createElement('div'); d.className = 'tpl'; d.dataset.id = t.id;
       d.innerHTML = `<span>${esc(t.title)}</span><span class="lang">${esc((t.lang||'').toUpperCase())}</span>`;
       d.onclick = () => select(t.id, d);
-      nav.appendChild(d);
+      box.appendChild(d);
     }
+    nav.appendChild(box);
   }
-  const want = openId || curId;
   const target = want && nav.querySelector(`.tpl[data-id="${cssEsc(want)}"]`);
   const first = target || nav.querySelector('.tpl');
   if(first) select(first.dataset.id, first);
