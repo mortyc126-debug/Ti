@@ -19,6 +19,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, 'code-lab');
 const PUBLIC = path.join(ROOT, 'public');
 const TEMPLATES = path.join(ROOT, 'templates');
+const DATA = path.join(ROOT, 'data');     // сохранённые JSON-данные пользователя
 const PORT = Number(process.argv[2]) || 8788;
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8' };
@@ -31,7 +32,7 @@ function within(base, rel){
 }
 function readBody(req){
   return new Promise((resolve, reject) => {
-    let d = ''; req.on('data', c => { d += c; if(d.length > 5e6) req.destroy(); });
+    let d = ''; req.on('data', c => { d += c; if(d.length > 80e6) req.destroy(); });
     req.on('end', () => { try { resolve(d ? JSON.parse(d) : {}); } catch(e){ reject(e); } });
     req.on('error', reject);
   });
@@ -161,6 +162,39 @@ const server = http.createServer(async (req, res) => {
       if(b.code != null) j.lines = tokenize(b.code, j.lang);   // код заново раскрашивается
       await fs.writeFile(full, JSON.stringify(j, null, 2), 'utf8');
       return json(res, 200, { ok: true, id: j.id });
+    }
+
+    // ── сохранённые данные (JSON из архивов) ──────────────────────────────
+    if(u.pathname === '/api/data/save' && req.method === 'POST'){
+      const b = await readBody(req);
+      const id = slug(b.name || 'data');
+      const obj = { id, name: String(b.name || 'без имени').slice(0, 120), desc: String(b.desc || '').slice(0, 400), savedAt: new Date().toISOString(), data: b.data };
+      await fs.mkdir(DATA, { recursive: true });
+      await fs.writeFile(path.join(DATA, id + '.json'), JSON.stringify(obj), 'utf8');
+      return json(res, 200, { id });
+    }
+    if(u.pathname === '/api/data/list'){
+      let names = [];
+      try { names = (await fs.readdir(DATA)).filter(n => n.endsWith('.json')); } catch(_){ return json(res, 200, []); }
+      const out = [];
+      for(const n of names.sort().reverse()){
+        try { const st = await fs.stat(path.join(DATA, n)); const j = JSON.parse(await fs.readFile(path.join(DATA, n), 'utf8'));
+          out.push({ id: j.id || n.replace(/\.json$/, ''), name: j.name || n, desc: j.desc || '', savedAt: j.savedAt || '', size: st.size }); } catch(_){}
+      }
+      return json(res, 200, out);
+    }
+    if(u.pathname === '/api/data/get'){
+      const id = u.searchParams.get('id'); const abs = within(DATA, (id || '') + '.json');
+      if(!abs) return json(res, 400, { error: 'bad id' });
+      const txt = await fs.readFile(abs, 'utf8').catch(() => null);
+      if(txt == null) return json(res, 404, { error: 'нет такого' });
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(txt); return;
+    }
+    if(u.pathname === '/api/data/delete' && req.method === 'POST'){
+      const b = await readBody(req); const abs = within(DATA, (b.id || '') + '.json');
+      if(!abs) return json(res, 400, { error: 'bad id' });
+      await fs.unlink(abs).catch(() => {});
+      return json(res, 200, { ok: true });
     }
 
     // удалить шаблон

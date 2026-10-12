@@ -27,7 +27,15 @@
   .res{font-size:12px;line-height:1.7}
   .res .p{color:#3DD9FF;cursor:pointer}.res .p:hover{text-decoration:underline}
   .res .v{color:var(--text2)}
-  .err{color:var(--warn,#E8895A);font-size:12.5px;font-family:ui-monospace,monospace}
+  .err{color:var(--warn,#E8895A);font-size:12.5px;font-family:ui-monospace,monospace;white-space:pre-wrap}
+  .saved{margin:10px 0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .savedh{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-right:4px}
+  .chip{font-size:12px;background:var(--s2);border:1px solid var(--border);border-radius:14px;padding:4px 10px;cursor:pointer;color:var(--text2)}
+  .chip:hover{border-color:var(--acc);color:var(--text)}
+  .chip .del{color:var(--text3);margin-left:6px;cursor:pointer}
+  .chip .del:hover{color:var(--danger,#FF4D7A)}
+  .btn{font:12px/1 ui-monospace,monospace;color:var(--text2);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;cursor:pointer}
+  .btn:hover{color:var(--acc);border-color:rgba(255,0,110,.4)}
 </style>
 </head>
 <body>
@@ -38,10 +46,16 @@
   </header>
   <div class="wrap">
     <div class="drop" id="drop">перетащи файл сюда или нажми, чтобы выбрать<input type="file" id="file" accept=".json,.gz,.zip,application/json,application/gzip,application/zip" multiple style="display:none"></div>
+    <div class="saved" id="saved"></div>
     <div class="err" id="err"></div>
     <div class="bar" id="bar" style="display:none">
       <select id="pick" title="файл из архива"></select>
       <input type="search" id="q" placeholder="поиск по ключам и значениям…">
+    </div>
+    <div class="bar" id="savebar" style="display:none">
+      <input id="sname" placeholder="название для сохранения" style="min-width:180px">
+      <input id="sdesc" placeholder="описание (необязательно)" style="flex:1;min-width:180px">
+      <button class="btn" id="savebtn">💾 сохранить</button>
     </div>
     <div class="summary" id="sum"></div>
     <div class="tree" id="tree" style="display:none"></div>
@@ -70,11 +84,42 @@ async function handle(fileList){
     } catch(e){ err.textContent += '«' + f.name + '»: ' + e.message + '\n'; }
   }
   if(!files.length){ bar.style.display = 'none'; tree.style.display = 'none'; sum.textContent = ''; return; }
-  pick.innerHTML = files.map((f,i) => '<option value="'+i+'">'+f.name+'</option>').join('');
+  pick.innerHTML = files.map((f,i) => '<option value="'+i+'">'+esc(f.name)+'</option>').join('');
   bar.style.display = 'flex'; tree.style.display = 'block';
+  $('#savebar').style.display = 'flex'; $('#sname').value = files[0].name; $('#sdesc').value = '';
   show(0);
 }
-pick.onchange = () => show(+pick.value);
+pick.onchange = () => { show(+pick.value); $('#sname').value = files[+pick.value].name; };
+
+// ── сохранение на диск локального сервера + список сохранённого ──────────────
+async function loadSaved(){
+  let list; try { list = await fetch('/api/data/list').then(r => r.json()); } catch(_){ return; }
+  const box = $('#saved');
+  if(!list.length){ box.innerHTML = ''; return; }
+  box.innerHTML = '<span class="savedh">сохранено:</span>' + list.map(x =>
+    '<span class="chip" data-id="'+esc(x.id)+'" title="'+esc(x.desc || x.savedAt)+'">'+esc(x.name)+' <b class="del" data-id="'+esc(x.id)+'">×</b></span>').join('');
+  box.querySelectorAll('.chip').forEach(ch => {
+    ch.onclick = async e => {
+      if(e.target.classList.contains('del')){ await fetch('/api/data/delete', { method:'POST', body: JSON.stringify({ id: ch.dataset.id }) }); loadSaved(); return; }
+      const j = await fetch('/api/data/get?id=' + encodeURIComponent(ch.dataset.id)).then(r => r.json());
+      files = [{ name: j.name, data: j.data }];
+      pick.innerHTML = '<option value="0">'+esc(j.name)+'</option>';
+      bar.style.display = 'flex'; tree.style.display = 'block'; $('#savebar').style.display = 'flex';
+      $('#sname').value = j.name; $('#sdesc').value = j.desc || '';
+      show(0);
+    };
+  });
+}
+$('#savebtn').onclick = async () => {
+  if(!files.length) return;
+  const f = files[+pick.value || 0];
+  const body = { name: $('#sname').value || f.name, desc: $('#sdesc').value, data: f.data };
+  const btn = $('#savebtn'); btn.textContent = 'сохраняю…';
+  const r = await fetch('/api/data/save', { method: 'POST', body: JSON.stringify(body) }).then(r => r.json()).catch(() => ({}));
+  btn.textContent = r.id ? '✓ сохранено' : 'ошибка'; setTimeout(() => btn.textContent = '💾 сохранить', 1300);
+  loadSaved();
+};
+loadSaved();
 q.oninput = () => render();
 
 // ── извлечение: json / gz / zip ──────────────────────────────────────────────
