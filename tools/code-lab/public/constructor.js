@@ -203,6 +203,16 @@ $('#dl').onclick = () => {
 };
 function flashBtn(b, on, off){ b.textContent = on; setTimeout(() => b.textContent = off, 1200); }
 
+// сохранить сборку как шаблон (появится в разделе «Шаблоны», группа «Из конструктора»)
+$('#save').onclick = async () => {
+  const code = currentCode();
+  if(!code.trim()){ flashBtn($('#save'), 'пусто', '💾 в шаблоны'); return; }
+  const title = prompt('Название шаблона:', 'Моя сборка');
+  if(title === null) return;
+  const r = await fetch('/api/add', { method: 'POST', body: JSON.stringify({ title: title || 'Моя сборка', lang: 'js', group: 'Из конструктора', code, desc: 'собрано в конструкторе' }) }).then(r => r.json()).catch(() => ({}));
+  flashBtn($('#save'), r.id ? '✓ в шаблонах' : 'ошибка', '💾 в шаблоны');
+};
+
 // «+ из шаблона»: втянуть код шаблона в конструктор как блок «свой код».
 // Так шаблоны (в т.ч. загруженные) оказываются в конструкторе.
 $('#fromtpl').onclick = async (e) => {
