@@ -45,7 +45,7 @@
   <header>
     <h1>Отладка — как ловить баги</h1>
     <div class="sub">Подробная схема одного слоя: инструменты, приёмы и живые примеры «найди баг». Нажимай «запустить» — увидишь, как баг себя проявляет.</div>
-    <div class="tabs"><a href="/">Шаблоны</a><a href="/schema.html">Схемы</a><a href="/schema-debug.html" class="on">Отладка</a><a href="/schema-debug-code.html">Практикум</a></div>
+    <div class="tabs"><a href="/">Шаблоны</a><a href="/schema.html">Схемы</a><a href="/schema-data.html">Структуры</a><a href="/schema-debug.html" class="on">Отладка</a><a href="/schema-debug-code.html">Практикум</a></div>
   </header>
 
   <div class="wrap">
@@ -76,6 +76,62 @@
       <div class="card"><h3>Деление пополам</h3><p>Баг где-то в 500 строках? Проверь значение в середине. Верно — баг во второй половине, нет — в первой. 500 → 250 → 125… 9 шагов на тысячу строк.</p></div>
       <div class="card"><h3>Проверь вход и выход функции</h3><p>Функция врёт? Напечатай, что в неё ВОШЛО и что ВЫШЛО. Часто вход уже битый — тогда беда у того, кто вызвал, а не здесь.</p></div>
       <div class="card"><h3>Резиновая уточка</h3><p>Объясни код вслух (хоть утке). На фразе «а здесь он берёт…» часто сам слышишь, где соврал. Серьёзный приём, не шутка.</p></div>
+    </div>
+
+    <h2><span class="n">3.5</span>Виды багов — пощупай каждый</h2>
+    <p class="lead">Узнавать баг в лицо — половина дела. Нажми «запустить» у каждого: увидишь, КАК он проявляется. Симптом подсказывает категорию, категория — где искать.</p>
+    <div class="grid g2">
+      <div class="card">
+        <h3>Логическая ошибка</h3>
+        <p>Код работает, не падает — но считает НЕ ТО. Самая коварная. Тут цикл по границам съехал.</p>
+        <pre>const n = [10, 20, 30];
+let s = 0;
+<span class="kw">for</span>(let i = 1; i &lt;= n.length; i++) s += n[i]; <span class="com">// i: 1,2,3 — мимо!</span>
+<span class="fn">console</span>.log("среднее:", s / n.length);</pre>
+        <button class="btn" onclick="run('gl', G_LOGIC)">▶ запустить</button><iframe id="gl" sandbox="allow-scripts"></iframe>
+        <p>Выйдет <code>NaN</code>: пропустили <code>n[0]</code>, залезли в <code>n[3]</code>=undefined. <b>Симптом «NaN/не то число» → ищи логику и границы.</b></p>
+      </div>
+      <div class="card">
+        <h3>Краевой случай</h3>
+        <p>Работает на обычных данных, ломается на пустом/нуле/одном элементе.</p>
+        <pre>const пусто = [];
+<span class="fn">console</span>.log("сумма:", пусто.<span class="fn">reduce</span>((a,b)=>a+b)); <span class="com">// reduce без старта на []</span></pre>
+        <button class="btn" onclick="run('ge', G_EDGE)">▶ запустить</button><iframe id="ge" sandbox="allow-scripts"></iframe>
+        <p>Упадёт: <code>Reduce of empty array with no initial value</code>. <b>Симптом «падает только иногда» → проверь пустые/крайние входы</b> (дай <code>reduce((a,b)=>a+b, 0)</code>).</p>
+      </div>
+      <div class="card">
+        <h3>Баг типов</h3>
+        <p>Ждал число — пришла строка (из поля/сети). JS молча склеивает.</p>
+        <pre>const a = "5";   <span class="com">// строка</span>
+<span class="fn">console</span>.log("склеил:", a + 3, " сложил:", Number(a) + 3);</pre>
+        <button class="btn" onclick="run('gt', G_TYPE)">▶ запустить</button><iframe id="gt" sandbox="allow-scripts"></iframe>
+        <p><code>склеил: "53"  сложил: 8</code>. <b>Симптом «числа слипаются / NaN при математике» → приводи типы</b> (<code>Number(x)</code>).</p>
+      </div>
+      <div class="card">
+        <h3>Состояние / общая ссылка</h3>
+        <p>Думал, скопировал — а это та же коробка. Меняешь одну — «само» меняется в другой.</p>
+        <pre>const a = [1, 2];
+const b = a;        <span class="com">// НЕ копия — та же ссылка</span>
+b.push(3);
+<span class="fn">console</span>.log("a:", a.join(","), " b:", b.join(","));</pre>
+        <button class="btn" onclick="run('gs', G_STATE)">▶ запустить</button><iframe id="gs" sandbox="allow-scripts"></iframe>
+        <p><code>a: 1,2,3  b: 1,2,3</code> — изменились оба! <b>Симптом «данные меняются сами» → ищи общие ссылки</b> (копируй: <code>[...a]</code>).</p>
+      </div>
+      <div class="card">
+        <h3>Проглоченная ошибка</h3>
+        <p>Ошибка была — но её поймали и выкинули. Код едет дальше как ни в чём.</p>
+        <pre><span class="kw">try</span> { <span class="kw">null</span>.foo; } <span class="kw">catch</span>(e) { <span class="com">/* тишина */</span> }
+<span class="fn">console</span>.log("дошли сюда — а ошибку не видели");</pre>
+        <button class="btn" onclick="run('gg', G_SWALLOW)">▶ запустить</button><iframe id="gg" sandbox="allow-scripts"></iframe>
+        <p>Видишь только последнюю строку. Ошибка <code>null.foo</code> была, но исчезла. <b>Симптом «ничего не падает, но результат пустой» → ищи except/catch без лога.</b></p>
+      </div>
+      <div class="card">
+        <h3>Синтаксис</h3>
+        <p>Самый лёгкий: код вообще не запускается, движок ругается сразу и показывает строку.</p>
+        <pre><span class="fn">console</span>.log("забыл скобку"<span class="com">     // ← нет )</span></pre>
+        <button class="btn" onclick="run('gy', G_SYNTAX)">▶ запустить</button><iframe id="gy" sandbox="allow-scripts"></iframe>
+        <p>Увидишь <code>SyntaxError</code> с местом. <b>Хорошая новость: такой баг виден сразу</b>, в отличие от логического.</p>
+      </div>
     </div>
 
     <h2><span class="n">4</span>Твоя боль: проглоченная ошибка</h2>
@@ -180,6 +236,12 @@ const C1 = 'function sr(n){try{return n.reduce((a,b)=>a+b)/n.length;}catch(e){}}
 const C2 = 'function sr(n){ if(!Array.isArray(n)||!n.length) throw new Error("нужен непустой массив, пришло: "+n); return n.reduce((a,b)=>a+b)/n.length; }\ntry{ console.log(sr(null)); }catch(e){ console.log("\\u26d4", e.message); }';
 const B1 = 'const nums=[10,20,30];let s=0;for(let i=1;i<=nums.length;i++)s+=nums[i];console.log("сумма:",s," среднее:",s/nums.length);';
 const B2 = 'const a="5",b=3;console.log("сумма:", a+b);';
+const G_LOGIC  = 'const n=[10,20,30];let s=0;for(let i=1;i<=n.length;i++)s+=n[i];console.log("среднее:", s/n.length);';
+const G_EDGE   = 'const пусто=[];console.log("сумма:", пусто.reduce((a,b)=>a+b));';
+const G_TYPE   = 'const a="5";console.log("склеил:", a+3, " сложил:", Number(a)+3);';
+const G_STATE  = 'const a=[1,2];const b=a;b.push(3);console.log("a:",a.join(",")," b:",b.join(","));';
+const G_SWALLOW= 'try{ null.foo; }catch(e){} console.log("дошли сюда — а ошибку не видели");';
+const G_SYNTAX = 'eval(\'console.log("забыл скобку"\');';
 function run(id, code){
   document.getElementById(id).srcdoc =
     '<!doctype html><meta charset=utf-8><body style="margin:8px;font:12px ui-monospace,monospace;color:#F6F4FF;background:#0E0720">'
