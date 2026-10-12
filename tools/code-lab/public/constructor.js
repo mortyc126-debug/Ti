@@ -6,22 +6,22 @@
 // leaf.code(f) → строка (может быть многострочной)
 // container.code(f) → { open, close }  (между ними кладётся вложенный код)
 const BLOCKS = {
-  let:    { cat:'Основы', label:'переменная', type:'leaf', fields:[{k:'name',def:'цена'},{k:'value',def:'100'}], code:f=>`let ${f.name} = ${f.value};` },
-  log:    { cat:'Основы', label:'вывод в консоль', type:'leaf', fields:[{k:'value',def:'цена'}], code:f=>`console.log(${f.value});` },
-  comment:{ cat:'Основы', label:'комментарий', type:'leaf', fields:[{k:'text',def:'пояснение'}], code:f=>`// ${f.text}` },
-  array:  { cat:'Данные', label:'массив', type:'leaf', fields:[{k:'name',def:'числа'},{k:'items',def:'1, 2, 3, 4'}], code:f=>`const ${f.name} = [${f.items}];` },
-  object: { cat:'Данные', label:'объект', type:'leaf', fields:[{k:'name',def:'бумага'},{k:'body',def:'имя: "ОФЗ", купон: 7.1'}], code:f=>`const ${f.name} = { ${f.body} };` },
-  map:    { cat:'Данные', label:'map (преобразовать)', type:'leaf', fields:[{k:'name',def:'удвоенные'},{k:'list',def:'числа'},{k:'expr',def:'x * 2'}], code:f=>`const ${f.name} = ${f.list}.map(x => ${f.expr});` },
-  reduce: { cat:'Данные', label:'reduce (свернуть)', type:'leaf', fields:[{k:'name',def:'сумма'},{k:'list',def:'числа'},{k:'expr',def:'acc + x'}], code:f=>`const ${f.name} = ${f.list}.reduce((acc, x) => ${f.expr}, 0);` },
-  iff:    { cat:'Управление', label:'если (if)', type:'container', fields:[{k:'cond',def:'цена > 50'}], code:f=>({ open:`if (${f.cond}) {`, close:'}' }) },
-  forN:   { cat:'Управление', label:'цикл N раз', type:'container', fields:[{k:'count',def:'3'}], code:f=>({ open:`for (let i = 0; i < ${f.count}; i++) {`, close:'}' }) },
-  forOf:  { cat:'Управление', label:'перебор массива', type:'container', fields:[{k:'item',def:'x'},{k:'list',def:'числа'}], code:f=>({ open:`for (const ${f.item} of ${f.list}) {`, close:'}' }) },
-  func:   { cat:'Функции', label:'функция', type:'container', fields:[{k:'name',def:'посчитать'},{k:'args',def:'a, b'}], code:f=>({ open:`function ${f.name}(${f.args}) {`, close:'}' }) },
-  ret:    { cat:'Функции', label:'вернуть (return)', type:'leaf', fields:[{k:'value',def:'a + b'}], code:f=>`return ${f.value};` },
-  call:   { cat:'Функции', label:'вызвать функцию', type:'leaf', fields:[{k:'name',def:'посчитать'},{k:'args',def:'4, 5'}], code:f=>`console.log(${f.name}(${f.args}));` },
-  svg:    { cat:'Отрисовка', label:'SVG-линия', type:'draw', fields:[{k:'points',def:'0,90 20,70 40,80 60,40 80,55 100,20'}], code:f=>`document.querySelector("#out").innerHTML =\n  '<svg width="200" height="100"><polyline points="${f.points}" fill="none" stroke="#52F2C9" stroke-width="2"/></svg>';` },
-  bars:   { cat:'Отрисовка', label:'столбики (canvas)', type:'draw', fields:[{k:'values',def:'40, 70, 30, 90, 55'}], code:f=>`const ctx = document.querySelector("#c").getContext("2d");\n[${f.values}].forEach((v, i) => { ctx.fillStyle = "#3DD9FF"; ctx.fillRect(i * 32, 140 - v, 22, v); });` },
-  click:  { cat:'Интерактив', label:'по клику', type:'container', fields:[{k:'sel',def:'#c'}], code:f=>({ open:`document.querySelector("${f.sel}").addEventListener("click", () => {`, close:'});' }) },
+  let:    { cat:'Основы', label:'переменная', type:'leaf', hint:'Коробка со значением. name — как назовёшь, value — что положишь. Потом к значению обращаешься по имени.', fields:[{k:'name',def:'цена'},{k:'value',def:'100'}], code:f=>`let ${f.name} = ${f.value};` },
+  log:    { cat:'Основы', label:'вывод в консоль', type:'leaf', hint:'Показать значение в превью (при запуске). В value — что напечатать: имя переменной или текст в кавычках.', fields:[{k:'value',def:'цена'}], code:f=>`console.log(${f.value});` },
+  comment:{ cat:'Основы', label:'комментарий', type:'leaf', hint:'Заметка для человека. Код её не выполняет — просто пояснение рядом.', fields:[{k:'text',def:'пояснение'}], code:f=>`// ${f.text}` },
+  array:  { cat:'Данные', label:'массив', type:'leaf', hint:'Список значений через запятую. name — имя списка, items — что внутри. Доступ по номеру (с 0).', fields:[{k:'name',def:'числа'},{k:'items',def:'1, 2, 3, 4'}], code:f=>`const ${f.name} = [${f.items}];` },
+  object: { cat:'Данные', label:'объект', type:'leaf', hint:'Карточка «ключ: значение». В body — поля через запятую (имя: "ОФЗ", купон: 7.1).', fields:[{k:'name',def:'бумага'},{k:'body',def:'имя: "ОФЗ", купон: 7.1'}], code:f=>`const ${f.name} = { ${f.body} };` },
+  map:    { cat:'Данные', label:'map (преобразовать)', type:'leaf', hint:'Сделать НОВЫЙ список: к каждому элементу x применить выражение. Нужен готовый список (блок «массив») в list.', fields:[{k:'name',def:'удвоенные'},{k:'list',def:'числа'},{k:'expr',def:'x * 2'}], code:f=>`const ${f.name} = ${f.list}.map(x => ${f.expr});` },
+  reduce: { cat:'Данные', label:'reduce (свернуть)', type:'leaf', hint:'Свернуть список в ОДНО число. acc копит результат, x — текущий элемент. Нужен список в list.', fields:[{k:'name',def:'сумма'},{k:'list',def:'числа'},{k:'expr',def:'acc + x'}], code:f=>`const ${f.name} = ${f.list}.reduce((acc, x) => ${f.expr}, 0);` },
+  iff:    { cat:'Управление', label:'если (if)', type:'container', hint:'Выполнить вложенное ТОЛЬКО если условие истинно. Клади блоки ВНУТРЬ (по его «+ блок»).', fields:[{k:'cond',def:'цена > 50'}], code:f=>({ open:`if (${f.cond}) {`, close:'}' }) },
+  forN:   { cat:'Управление', label:'цикл N раз', type:'container', hint:'Повторить вложенное count раз. Внутри доступен счётчик i (0,1,2…). Клади блоки ВНУТРЬ.', fields:[{k:'count',def:'3'}], code:f=>({ open:`for (let i = 0; i < ${f.count}; i++) {`, close:'}' }) },
+  forOf:  { cat:'Управление', label:'перебор массива', type:'container', hint:'Пройти по каждому элементу списка; item — текущий. Нужен список в list. Клади блоки ВНУТРЬ.', fields:[{k:'item',def:'x'},{k:'list',def:'числа'}], code:f=>({ open:`for (const ${f.item} of ${f.list}) {`, close:'}' }) },
+  func:   { cat:'Функции', label:'функция', type:'container', hint:'Рецепт. Приними входы (args), ВНУТРЬ положи шаги и блок «вернуть». Сама не запускается — её надо ВЫЗВАТЬ (блок «вызвать функцию» ниже).', fields:[{k:'name',def:'посчитать'},{k:'args',def:'a, b'}], code:f=>({ open:`function ${f.name}(${f.args}) {`, close:'}' }) },
+  ret:    { cat:'Функции', label:'вернуть (return)', type:'leaf', hint:'Отдать результат из функции наружу. Ставь ВНУТРИ блока «функция». В value — что вернуть.', fields:[{k:'value',def:'a + b'}], code:f=>`return ${f.value};` },
+  call:   { cat:'Функции', label:'вызвать функцию', type:'leaf', hint:'Запустить функцию по имени с конкретными значениями (args) и показать результат. name должен совпадать с именем функции.', fields:[{k:'name',def:'посчитать'},{k:'args',def:'4, 5'}], code:f=>`console.log(${f.name}(${f.args}));` },
+  svg:    { cat:'Отрисовка', label:'SVG-линия', type:'draw', hint:'Нарисовать линию по точкам «x,y x,y…» в области #out. Больше точек — длиннее кривая.', fields:[{k:'points',def:'0,90 20,70 40,80 60,40 80,55 100,20'}], code:f=>`document.querySelector("#out").innerHTML =\n  '<svg width="200" height="100"><polyline points="${f.points}" fill="none" stroke="#52F2C9" stroke-width="2"/></svg>';` },
+  bars:   { cat:'Отрисовка', label:'столбики (canvas)', type:'draw', hint:'Нарисовать столбики по числам (values) на холсте #c. Каждое число — высота столбика.', fields:[{k:'values',def:'40, 70, 30, 90, 55'}], code:f=>`const ctx = document.querySelector("#c").getContext("2d");\n[${f.values}].forEach((v, i) => { ctx.fillStyle = "#3DD9FF"; ctx.fillRect(i * 32, 140 - v, 22, v); });` },
+  click:  { cat:'Интерактив', label:'по клику', type:'container', hint:'Выполнять вложенное при КЛИКЕ по элементу. sel — что кликаем (#c — холст). Клади блоки ВНУТРЬ.', fields:[{k:'sel',def:'#c'}], code:f=>({ open:`document.querySelector("${f.sel}").addEventListener("click", () => {`, close:'});' }) },
 };
 const CATS = [...new Set(Object.values(BLOCKS).map(b => b.cat))];
 
@@ -68,6 +68,7 @@ function renderNode(nd, siblings, idx){
   ctrls.appendChild(ctrlBtn('🗑', () => { siblings.splice(idx, 1); renderTree(); }));
   head.appendChild(ctrls);
   wrap.appendChild(head);
+  if(b.hint){ const h = document.createElement('div'); h.className = 'blk-hint'; h.textContent = b.hint; wrap.appendChild(h); }
   if(b.type === 'container'){
     const body = document.createElement('div'); body.className = 'blk-body';
     body.appendChild(renderChildren(nd.children, nd));
@@ -92,7 +93,8 @@ function openMenu(anchor, targetArr){
     const h = document.createElement('div'); h.className = 'mcat'; h.textContent = cat; m.appendChild(h);
     for(const [id, b] of Object.entries(BLOCKS)){
       if(b.cat !== cat) continue;
-      const it = document.createElement('div'); it.className = 'mitem'; it.textContent = b.label;
+      const it = document.createElement('div'); it.className = 'mitem';
+      it.innerHTML = '<span class="mi-label">'+b.label+'</span>' + (b.hint ? '<span class="mi-hint">'+b.hint+'</span>' : '');
       it.onclick = () => { targetArr.push(makeNode(id)); closeMenu(); renderTree(); };
       m.appendChild(it);
     }

@@ -109,7 +109,12 @@ pre.code{background:var(--bg2);border:1px solid var(--border);border-radius:9px;
 .blk-ctrls button:hover{color:var(--acc);background:var(--s2)}
 .blk-field{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text3)}
 .blk-field input{background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:3px 7px;color:var(--name);font-family:ui-monospace,monospace;font-size:12px;width:90px}
+.blk-hint{font-size:11px;color:var(--text3);line-height:1.5;padding:0 10px 8px 12px}
 .blk-body{margin:0 0 6px 18px;padding-left:10px;border-left:1px dashed var(--border)}
+.menu .mitem .mi-label{display:block}
+.menu .mitem .mi-hint{display:block;font-size:10.5px;color:var(--text3);line-height:1.45;margin-top:2px;white-space:normal}
+.menu .mitem:hover .mi-hint{color:var(--text2)}
+.menu{min-width:300px;max-width:340px}
 .blk-close{padding:5px 10px;color:var(--kw);font-family:ui-monospace,monospace;font-size:12px}
 .addblk{display:inline-flex;align-items:center;gap:5px;margin:6px 0 2px;padding:5px 10px;border-radius:7px;border:1px dashed rgba(82,242,201,.4);color:var(--str);font-size:12px;cursor:pointer;background:none}
 .addblk:hover{background:rgba(82,242,201,.08)}
@@ -121,6 +126,12 @@ pre.code{background:var(--bg2);border:1px solid var(--border);border-radius:9px;
 .preview{margin-top:12px}
 .preview iframe{width:100%;height:220px;border:1px solid var(--border);border-radius:9px;background:#0E0720}
 .hintline{font-size:11px;color:var(--text3);margin:4px 0 10px}
+
+/* всплывашка пояснения у слова */
+.tok-pop{position:absolute;z-index:60;background:var(--bg2);border:1px solid var(--acc);border-radius:9px;padding:9px 11px;box-shadow:0 10px 32px rgba(0,0,0,.55);pointer-events:none;max-width:320px}
+.tok-pop .tp-kind{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--acc);margin-bottom:4px}
+.tok-pop .tp-body{font-size:12.5px;line-height:1.5;color:var(--text)}
+.tok-pop .tp-empty{color:var(--text3);font-style:italic}
 
 /* панель пояснения */
 aside#info{border-left:1px solid var(--border);padding:16px;overflow:auto;position:sticky;top:0;align-self:start;max-height:100vh}

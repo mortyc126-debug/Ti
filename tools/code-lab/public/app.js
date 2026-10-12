@@ -159,7 +159,33 @@ function showInfo(span){
       : 'Это значение можно заменить своим прямо в коде.';
     info.append(hint);
   }
+  showPop(span, k);   // всплывашка прямо у слова — чтобы не скроллить к панели
 }
+
+// Всплывающее пояснение у самого слова. Один элемент на страницу.
+let _pop = null;
+function showPop(span, k){
+  if(!_pop){ _pop = document.createElement('div'); _pop.className = 'tok-pop'; document.body.appendChild(_pop); }
+  const e = span.dataset.e;
+  _pop.innerHTML = '';
+  const kd = document.createElement('div'); kd.className = 'tp-kind'; kd.textContent = KIND_LABEL[k] || k;
+  const bd = document.createElement('div'); bd.className = 'tp-body';
+  bd.textContent = e || 'пояснение пока не задано — впиши в панели справа';
+  if(!e) bd.classList.add('tp-empty');
+  _pop.append(kd, bd);
+  _pop.style.display = 'block';
+  // позиция: под словом, в пределах экрана
+  const r = span.getBoundingClientRect();
+  const w = Math.min(320, window.innerWidth - 24);
+  _pop.style.width = w + 'px';
+  let left = r.left + window.scrollX;
+  if(left + w > window.scrollX + window.innerWidth - 12) left = window.scrollX + window.innerWidth - w - 12;
+  _pop.style.left = Math.max(window.scrollX + 12, left) + 'px';
+  _pop.style.top = (r.bottom + window.scrollY + 6) + 'px';
+}
+function hidePop(){ if(_pop) _pop.style.display = 'none'; }
+document.addEventListener('scroll', hidePop, true);
+document.addEventListener('mousedown', ev => { if(_pop && !_pop.contains(ev.target) && !(ev.target.classList && ev.target.classList.contains('tok'))) hidePop(); });
 
 function showAddForm(){
   nav.querySelectorAll('.tpl').forEach(x => x.classList.remove('on'));
