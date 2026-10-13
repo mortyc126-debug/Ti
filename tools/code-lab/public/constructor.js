@@ -237,6 +237,13 @@ function drawEdges(){
   });
 }
 canvas.addEventListener('pointerdown', e => { if(e.target === canvas || e.target === edgesSvg){ selectedId = null; markSel(); renderInspector(); } });
+// Delete/Backspace — удалить выделенный узел (если не печатаем в поле)
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Delete' && e.key !== 'Backspace') return;
+  if(!selectedId) return;
+  const ae = document.activeElement; if(ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName)) return;
+  e.preventDefault(); removeNode(selectedId);
+});
 
 // ── инспектор ─────────────────────────────────────────────────────────────────
 function select(nd){ selectedId = nd.id; markSel(); renderInspector(nd); persist(); }

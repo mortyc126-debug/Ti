@@ -99,7 +99,7 @@ function subOf(t, purpose){
 const TYPE_RU = { fragment:'фрагмент', component:'компонент', recipe:'рецепт', module:'модуль' };
 const TYPE_RANK = { recipe:0, module:1, component:2, fragment:3 };
 
-let ALL = [], active = PURPOSE[0].key, fPlace = '', fTech = '', query = '';
+let ALL = [], active = PURPOSE[0].key, fPlace = '', fTech = '', query = '', selCardId = null;
 
 async function loadAll(){
   try { ALL = await fetch('/api/list').then(r=>r.json()); } catch(_){ document.getElementById('sections').innerHTML='<div class="empty">сервер недоступен</div>'; return; }
@@ -166,7 +166,7 @@ function render(){
 }
 
 function card(t){
-  const a = document.createElement('a'); a.className='card'; a.href='/component.html?id='+encodeURIComponent(t.id);
+  const a = document.createElement('a'); a.className='card'+(t.id===selCardId?' sel':''); a.href='/component.html?id='+encodeURIComponent(t.id); a.dataset.id=t.id;
   const warn = t.comp && t.comp.safety && t.comp.safety.level && t.comp.safety.level!=='ok';
   const top = '<div class="card-top"><span class="ctype '+t._type+'">'+ (TYPE_RU[t._type]||t._type) +'</span><span class="ctitle"></span></div>';
   const io = (t.comp && (t.comp.input||t.comp.output)) ? '<div class="cio"><span class="i"></span><span class="a">→</span><span class="o"></span></div>' : '';
@@ -182,7 +182,10 @@ function card(t){
   a.querySelector('.cdesc').textContent = t.desc || '';
   if(io){ a.querySelector('.cio .i').textContent = t.comp.input||'—'; a.querySelector('.cio .o').textContent = t.comp.output||'—'; }
   a.querySelector('[data-x="ctor"]').onclick = e => { e.preventDefault(); e.stopPropagation(); toConstructor(t); };
-  a.querySelector('[data-x="use"]').onclick = e => { e.preventDefault(); location.href = a.href; };
+  a.querySelector('[data-x="use"]').onclick = e => { e.preventDefault(); e.stopPropagation(); location.href = a.href; };
+  // клик по карточке — выделить (для удаления по Delete); двойной — открыть
+  a.addEventListener('click', e => { if(e.target.closest('.cbtn')) return; e.preventDefault(); selCardId = t.id; markCardSel(); });
+  a.addEventListener('dblclick', e => { if(e.target.closest('.cbtn')) return; location.href = a.href; });
   a.querySelector('[data-x="ren"]').onclick = async e => {
     e.preventDefault(); e.stopPropagation();
     const v = prompt('Новое понятное название (без англ. жаргона, если можно):', t.title || '');
@@ -190,14 +193,24 @@ function card(t){
     const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: t.id, title: v.trim() }) }).then(r=>r.json()).catch(()=>({}));
     if(r.ok){ t.title = v.trim(); render(); }
   };
-  a.querySelector('[data-x="del"]').onclick = async e => {
-    e.preventDefault(); e.stopPropagation();
-    if(!confirm('Удалить компонент «' + (t.title||t.id) + '» навсегда?')) return;
-    const r = await fetch('/api/delete', { method:'POST', body: JSON.stringify({ id: t.id }) }).then(r=>r.json()).catch(()=>({}));
-    if(r.ok){ ALL = ALL.filter(x=>x.id!==t.id); renderCats(); render(); }
-  };
+  a.querySelector('[data-x="del"]').onclick = e => { e.preventDefault(); e.stopPropagation(); deleteById(t.id, t.title); };
   return a;
 }
+function markCardSel(){ document.querySelectorAll('.card').forEach(el => el.classList.toggle('sel', el.dataset.id === selCardId)); }
+async function deleteById(id, label){
+  if(!confirm('Удалить компонент «' + (label || id) + '» навсегда?')) return;
+  const r = await fetch('/api/delete', { method:'POST', body: JSON.stringify({ id }) }).then(r=>r.json()).catch(()=>({}));
+  if(r.ok){ ALL = ALL.filter(x => x.id !== id); if(selCardId === id) selCardId = null; renderCats(); render(); }
+}
+// клик по карточке выделяет её; Delete/Backspace удаляет выделенную
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Delete' && e.key !== 'Backspace') return;
+  if(!selCardId) return;
+  const ae = document.activeElement; if(ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName)) return;
+  if(document.querySelector('.modal-bg')) return;
+  const t = ALL.find(x => x.id === selCardId); if(!t) return;
+  e.preventDefault(); deleteById(selCardId, t.title);
+});
 
 async function toConstructor(t){
   let code = '';
