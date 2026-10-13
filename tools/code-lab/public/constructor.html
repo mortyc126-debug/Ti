@@ -5,90 +5,117 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Конструктор кода</title>
 <link rel="stylesheet" href="/style.css">
+<style>
+  .gwrap{display:grid;grid-template-columns:230px 1fr 300px;gap:12px;padding:12px 14px;height:calc(100vh - 2px)}
+  @media(max-width:1000px){.gwrap{grid-template-columns:200px 1fr}.g-insp{display:none}}
+
+  /* палитра слева — компоненты по категориям */
+  .palette{background:var(--bg2);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;min-height:0}
+  .pal-top{padding:10px;border-bottom:1px solid var(--border)}
+  .pal-search{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:7px 9px}
+  .pal-search:focus{outline:none;border-color:var(--name)}
+  .pal-list{overflow:auto;padding:8px;flex:1}
+  .pal-cat{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin:10px 6px 4px}
+  .pal-item{padding:7px 9px;border-radius:7px;cursor:pointer;font-size:12.5px;color:var(--text2);border:1px solid transparent}
+  .pal-item:hover{background:var(--s2);color:var(--text);border-color:var(--border)}
+  .pal-item .pi-h{font-size:10.5px;color:var(--text3);margin-top:1px;line-height:1.35}
+  .pal-btn{display:block;width:100%;text-align:left;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--str);font-size:12.5px;padding:8px 10px;cursor:pointer;margin-top:6px}
+  .pal-btn:hover{border-color:rgba(82,242,201,.5)}
+
+  /* центр — холст */
+  .center{display:flex;flex-direction:column;min-width:0;min-height:0;gap:10px}
+  .c-toolbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+  .canvas-scroll{flex:1;min-height:0;overflow:auto;border:1px solid var(--border);border-radius:12px;background:
+      radial-gradient(circle, rgba(124,108,160,.10) 1px, transparent 1px) 0 0/22px 22px, var(--bg)}
+  .canvas{position:relative;width:2400px;height:1600px}
+  .edges{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+  .edges path{fill:none;stroke:#6a5a8a;stroke-width:2}
+  .edges path.tmp{stroke:var(--acc);stroke-dasharray:5 4}
+  .gnode{position:absolute;width:190px;background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--name);border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.35);user-select:none}
+  .gnode.container{border-left-color:var(--kw)} .gnode.draw{border-left-color:var(--str)}
+  .gnode.sel{border-color:var(--acc);box-shadow:0 0 0 2px rgba(255,0,110,.4),0 4px 14px rgba(0,0,0,.4)}
+  .gnode-head{display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:grab;border-bottom:1px solid var(--border)}
+  .gnode-head:active{cursor:grabbing}
+  .gnode-title{flex:1;font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .gnode-del{background:none;border:0;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px}
+  .gnode-del:hover{color:#FF6B6B}
+  .gnode-prev{font-family:ui-monospace,monospace;font-size:11px;color:var(--text3);padding:7px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .port{position:absolute;width:13px;height:13px;border-radius:50%;background:var(--s2);border:2px solid #6a5a8a;left:50%;transform:translateX(-50%);cursor:crosshair;z-index:2}
+  .port:hover{border-color:var(--acc);background:var(--acc)}
+  .port.in{top:-7px} .port.out{bottom:-7px}
+  .port.out:hover,.port.in.hot{border-color:var(--str);background:var(--str)}
+  .canvas-empty{position:absolute;left:24px;top:20px;color:var(--text3);font-size:13px;max-width:360px;line-height:1.6}
+
+  /* результат снизу */
+  .result{display:grid;grid-template-columns:1fr 300px;gap:10px;height:210px}
+  @media(max-width:1000px){.result{grid-template-columns:1fr}}
+  pre.code{background:#0E0720;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:0;overflow:auto;font-size:12px;line-height:1.55}
+  .result .preview{margin:0}
+  .result iframe{width:100%;height:100%;border:1px solid var(--border);border-radius:10px;background:#0E0720}
+
+  /* правый инспектор */
+  .g-insp{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:auto;min-height:0}
+  .insp-head{display:flex;gap:2px;border-bottom:1px solid var(--border);padding:6px 8px;position:sticky;top:0;background:var(--bg2)}
+  .insp-head button{font-size:12.5px;color:var(--text2);background:none;border:0;border-radius:7px;padding:6px 10px;cursor:pointer}
+  .insp-head button:hover{color:var(--text)} .insp-head button.on{background:var(--s2);color:var(--acc)}
+  .insp-body{padding:13px 14px}
+  .insp-empty{color:var(--text3);font-size:12.5px;line-height:1.7}
+  .insp-title{font-size:14px;font-weight:600;margin:0 0 2px}
+  .insp-kind{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:10px}
+  .insp-field{margin-bottom:11px}
+  .insp-field label{display:block;font-size:11px;color:var(--text3);margin-bottom:4px}
+  .insp-field input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--name);font-family:ui-monospace,monospace;font-size:13px}
+  .insp-field input:focus{outline:none;border-color:var(--name)}
+  .insp-text{font-size:13px;color:var(--text2);line-height:1.65}
+  .insp-code{margin-top:10px}
+  .blk-code-wrap{position:relative;width:100%;margin-top:3px}
+  textarea.blk-code,pre.blk-hl{width:100%;box-sizing:border-box;margin:0;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word;tab-size:2}
+  pre.blk-hl{position:absolute;inset:0;pointer-events:none;overflow:hidden;color:#CBC2EA;background:var(--bg);border-color:transparent}
+  textarea.blk-code{position:relative;z-index:1;background:transparent;color:transparent;caret-color:#F6F4FF;-webkit-text-fill-color:transparent;resize:vertical}
+  .btn{font:12px/1 ui-monospace,monospace;color:var(--text2);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:7px 11px;cursor:pointer}
+  .btn:hover{color:var(--acc);border-color:rgba(255,0,110,.4)} .btn.ok{color:var(--str);border-color:rgba(82,242,201,.4)}
+  select.btn{appearance:auto}
+</style>
 </head>
 <body data-page="constructor">
-  <header>
-    <h1>Конструктор кода <span style="font-size:11px;color:var(--str);border:1px solid rgba(82,242,201,.5);border-radius:6px;padding:2px 7px;vertical-align:middle">граф v2</span></h1>
-    <div class="sub">Собирай код из блоков. Контейнеры (if / for / функция / клик) показывают начало <b style="color:var(--kw)">{</b> и конец <b style="color:var(--kw)">}</b> и вложенность отступом. Справа — живой код и запуск с превью.</div>
-    <div class="tabs"><a href="/">Шаблоны</a><a href="/constructor.html" class="on">Конструктор</a><a href="/schema.html">Схемы</a></div>
-    <details class="glossary">
-      <summary>словарик терминов</summary>
-      <div class="gloss-grid">
-        <p><b>переменная</b> — коробка со значением: <code>let x = 5</code>.</p>
-        <p><b>функция</b> — рецепт: вход → выход. Запускается при вызове.</p>
-        <p><b>параметр / аргумент</b> — имя входа в описании / значение при вызове.</p>
-        <p><b>return</b> — что функция отдаёт наружу.</p>
-        <p><b>массив</b> — список <code>[10, 20]</code>; <b>объект</b> — <code>{ ключ: значение }</code>.</p>
-        <p><b>цикл</b> — повтор; <b>условие (if)</b> — ветвление.</p>
-        <p><b>событие</b> — клик и т.п.; <b>состояние</b> — переменная между событиями.</p>
+  <div class="gwrap">
+    <aside class="palette">
+      <div class="pal-top">
+        <input class="pal-search" id="palSearch" placeholder="поиск компонента…">
+        <button class="pal-btn" id="fromtpl">+ компонент из каталога</button>
       </div>
-    </details>
-  </header>
-  <div style="padding:16px">
-    <div class="ctor">
-      <section class="panel">
-        <div class="toolbar">
-          <button class="btn" id="clear">× очистить</button>
-          <button class="btn" id="example">пример</button>
-          <button class="btn" id="fromtpl">+ из шаблона</button>
-          <button class="btn" id="imp">⬆ разобрать файл</button>
-          <input type="file" id="impfile" accept=".js,.txt,.mjs,.jsx" style="display:none">
+      <div class="pal-list" id="palList"></div>
+    </aside>
+
+    <section class="center">
+      <div class="c-toolbar">
+        <span style="font-size:12.5px;color:var(--text2);font-weight:600">Холст</span>
+        <span style="font-size:11px;color:var(--str);border:1px solid rgba(82,242,201,.5);border-radius:6px;padding:2px 7px">граф v3</span>
+        <span style="flex:1"></span>
+        <button class="btn" id="example">пример</button>
+        <button class="btn" id="clear">× очистить</button>
+        <button class="btn" id="imp">⬆ разобрать файл</button>
+        <input type="file" id="impfile" accept=".js,.txt,.mjs,.jsx" style="display:none">
+        <button class="btn" id="copy">⧉ код</button>
+        <button class="btn ok" id="run">▶ запустить</button>
+        <select id="fmt" class="btn" title="формат файла"><option value="html">.html</option><option value="js">.js</option><option value="txt">.txt</option></select>
+        <button class="btn" id="dl">⬇ скачать</button>
+        <button class="btn" id="save">💾 в шаблоны</button>
+      </div>
+      <div class="canvas-scroll">
+        <div class="canvas" id="canvas">
+          <svg class="edges" id="edges"></svg>
+          <div class="canvas-empty" id="emptyHint">Пусто. Слева выбери компонент — он появится на холсте. Тащи узлы за шапку. Соедини: потяни от нижнего кружка одного узла к верхнему кружку другого — выход пойдёт на вход. Внизу — собранный код и запуск.</div>
         </div>
-        <div class="hintline">Жми «+ блок», чтобы добавить узел. Узлы соединяются сверху вниз — выход одного идёт в следующий. Кликни узел → справа «Настроить / Разобраться / Объяснить». «Файлы»-вкладки — части большой программы.</div>
-        <div class="tabs-files" id="tabs"></div>
-        <div class="ws ws-root" id="ws"></div>
-      </section>
-      <section class="panel">
-        <div class="inspector" id="inspector"></div>
-        <div class="toolbar">
-          <button class="btn" id="copy">⧉ копировать</button>
-          <button class="btn ok" id="run">▶ запустить</button>
-          <select id="fmt" class="btn" title="формат файла"><option value="html">.html (страница)</option><option value="js">.js</option><option value="txt">.txt</option></select>
-          <button class="btn" id="dl">⬇ скачать</button>
-          <button class="btn" id="save">💾 в шаблоны</button>
-        </div>
+      </div>
+      <div class="result">
         <pre class="code mono" id="code"></pre>
         <div class="preview"><iframe id="preview" sandbox="allow-scripts"></iframe></div>
-      </section>
-    </div>
+      </div>
+    </section>
+
+    <aside class="g-insp" id="inspector"></aside>
   </div>
-  <style>
-    /* узлы-карточки со связями */
-    .ws-root{display:flex;flex-direction:column;gap:0;background:none;border:1px dashed var(--border);border-radius:12px;padding:12px}
-    .node{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--name);border-radius:10px;padding:9px 11px;cursor:pointer;transition:border-color .12s,box-shadow .12s}
-    .node:hover{border-color:rgba(255,0,110,.4)}
-    .node.sel{border-color:var(--acc);box-shadow:0 0 0 1px rgba(255,0,110,.35)}
-    .node.container{border-left-color:var(--kw)}
-    .node.draw{border-left-color:var(--str)}
-    .node-head{display:flex;align-items:center;gap:8px}
-    .node-caret{color:var(--text3);font-size:10px;width:11px;cursor:pointer;user-select:none}
-    .node-label{font-weight:600;font-size:13px;color:var(--text);flex:1}
-    .node-ctrls{display:flex;gap:1px}
-    .node-ctrls button{background:none;border:0;color:var(--text3);cursor:pointer;font-size:12px;padding:2px 4px;border-radius:4px}
-    .node-ctrls button:hover{color:var(--acc);background:var(--s2)}
-    .node-prev{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--text3);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .node-body{margin:8px 0 2px 16px;padding-left:12px;border-left:1px dashed var(--border);display:flex;flex-direction:column;gap:0}
-    .node-close{font-family:ui-monospace,monospace;color:var(--kw);font-size:11px;margin:4px 0 0 2px}
-    .node-collapsed{font-size:11px;color:var(--text3);font-style:italic;margin-top:6px}
-    .conn{height:16px;display:flex;align-items:center;justify-content:center;color:var(--text3)}
-    .conn svg{display:block}
-    /* правая панель-инспектор */
-    .inspector{background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden}
-    .insp-head{display:flex;gap:2px;border-bottom:1px solid var(--border);padding:6px 8px}
-    .insp-head button{font-size:12.5px;color:var(--text2);background:none;border:0;border-radius:7px;padding:6px 11px;cursor:pointer}
-    .insp-head button:hover{color:var(--text)}
-    .insp-head button.on{background:var(--s2);color:var(--acc)}
-    .insp-body{padding:13px 14px;min-height:80px}
-    .insp-empty{color:var(--text3);font-size:12.5px;line-height:1.6}
-    .insp-title{font-size:14px;font-weight:600;margin:0 0 2px}
-    .insp-kind{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:10px}
-    .insp-field{margin-bottom:11px}
-    .insp-field label{display:block;font-size:11px;color:var(--text3);margin-bottom:4px}
-    .insp-field input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--name);font-family:ui-monospace,monospace;font-size:13px}
-    .insp-field input:focus{outline:none;border-color:var(--name)}
-    .insp-text{font-size:13px;color:var(--text2);line-height:1.65}
-    .insp-code{margin-top:10px}
-  </style>
   <script src="/shell.js"></script>
   <script src="/constructor.js"></script>
 </body>
