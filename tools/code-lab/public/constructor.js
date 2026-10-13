@@ -87,6 +87,8 @@ function makeNode(id){
 
 const $ = s => document.querySelector(s);
 const ws = $('#ws'), codeEl = $('#code'), preview = $('#preview');
+let selectedUid = null;   // какой узел выбран (его правит инспектор справа)
+let inspTab = 'set';      // вкладка инспектора: set | learn | why
 
 // ── вкладки-«файлы» ───────────────────────────────────────────────────────────
 function renderTabs(){
@@ -115,61 +117,126 @@ function renderTabs(){
   bar.appendChild(add);
 }
 
-// ── рендер дерева ─────────────────────────────────────────────────────────────
-function renderTree(){
-  renderTabs();
-  ws.innerHTML = '';
-  ws.appendChild(renderChildren(root.children, root));
-  renderCode();
-  persist();
-}
+// ── рендер графа узлов ────────────────────────────────────────────────────────
+function renderGraph(){ ws.innerHTML = ''; ws.appendChild(renderChildren(root.children, root)); }
+function renderTree(){ renderTabs(); renderGraph(); renderCode(); renderInspector(); persist(); }
+
 function renderChildren(arr, parent){
   const frag = document.createDocumentFragment();
-  arr.forEach((nd, i) => frag.appendChild(renderNode(nd, arr, i)));
+  arr.forEach((nd, i) => { if(i > 0) frag.appendChild(connector()); frag.appendChild(renderNode(nd, arr, i)); });
+  if(arr.length) frag.appendChild(connector(true));
   frag.appendChild(addButton(parent === root ? root.children : parent.children));
   return frag;
 }
+function connector(faint){
+  const c = document.createElement('div'); c.className = 'conn';
+  const col = faint ? '#2e2046' : '#6a5a8a';
+  c.innerHTML = '<svg width="12" height="16"><line x1="6" y1="0" x2="6" y2="13" stroke="' + col + '" stroke-width="2"/><path d="M2 9 L6 14 L10 9" fill="none" stroke="' + col + '" stroke-width="2"/></svg>';
+  return c;
+}
+function kindClass(b){ return b.type === 'container' ? 'container' : b.type === 'draw' ? 'draw' : 'leaf'; }
+function nodeLabel(nd, b){ return b.labelFn ? b.labelFn(nd.fields) : b.label; }
+function nodePreview(nd, b){
+  const c = b.code(nd.fields);
+  const line = (b.type === 'container' ? c.open : String(c).split('\n')[0]) || '';
+  return line.length > 80 ? line.slice(0, 80) + '…' : line;
+}
 function renderNode(nd, siblings, idx){
   const b = BLOCKS[nd.blockId];
-  const wrap = document.createElement('div'); wrap.className = 'blk';
-  const head = document.createElement('div'); head.className = 'blk-head ' + (b.type === 'container' ? 'container' : b.type === 'draw' ? 'draw' : 'leaf');
-  const tag = document.createElement('span'); tag.className = 'blk-tag'; tag.textContent = b.labelFn ? b.labelFn(nd.fields) : b.label; head.appendChild(tag);
-  (b.fields || []).forEach(f => {
-    const lab = document.createElement('label'); lab.className = 'blk-field'; lab.textContent = f.k;
-    const inp = document.createElement(f.multi ? 'textarea' : 'input'); inp.value = nd.fields[f.k];
-    if(f.multi){ inp.rows = Math.min(14, (String(nd.fields[f.k]).split('\n').length + 1)); inp.className = 'blk-code'; inp.spellcheck = false; }
-    else inp.style.width = (f.k === 'body' || f.k === 'points' || f.k === 'values' || f.k === 'items') ? '220px' : '';
-    inp.addEventListener('input', () => { nd.fields[f.k] = inp.value; renderCode(); persist(); });
-    if(f.multi){ lab.appendChild(attachHighlight(inp)); } else lab.appendChild(inp);
-    head.appendChild(lab);
-  });
-  const ctrls = document.createElement('div'); ctrls.className = 'blk-ctrls';
-  ctrls.appendChild(ctrlBtn('↑', () => move(siblings, idx, -1)));
-  ctrls.appendChild(ctrlBtn('↓', () => move(siblings, idx, +1)));
-  ctrls.appendChild(ctrlBtn('⎘', () => { const copy = reUid(JSON.parse(JSON.stringify(nd))); siblings.splice(idx + 1, 0, copy); renderTree(); }));
-  ctrls.appendChild(ctrlBtn('🗑', () => { siblings.splice(idx, 1); renderTree(); }));
-  head.appendChild(ctrls);
-  wrap.appendChild(head);
-  const hintTxt = b.hintFn ? b.hintFn(nd.fields) : b.hint;
-  if(hintTxt){ const h = document.createElement('div'); h.className = 'blk-hint'; h.textContent = hintTxt; wrap.appendChild(h); }
+  const card = document.createElement('div');
+  card.className = 'node ' + kindClass(b) + (nd.uid === selectedUid ? ' sel' : '');
+  card.dataset.uid = nd.uid;
+  const head = document.createElement('div'); head.className = 'node-head';
   if(b.type === 'container'){
-    const caret = document.createElement('span'); caret.className = 'blk-caret'; caret.textContent = nd.collapsed ? '▸' : '▾';
-    caret.onclick = () => { nd.collapsed = !nd.collapsed; renderTree(); };
-    head.insertBefore(caret, head.firstChild);
-    if(!nd.collapsed){
-      const body = document.createElement('div'); body.className = 'blk-body';
-      body.appendChild(renderChildren(nd.children, nd));
-      wrap.appendChild(body);
-    } else {
-      const c = document.createElement('div'); c.className = 'blk-collapsed'; c.textContent = '… ' + (nd.children ? nd.children.length : 0) + ' внутри';
-      wrap.appendChild(c);
-    }
-    const close = document.createElement('div'); close.className = 'blk-close'; close.textContent = b.code(nd.fields).close;
-    wrap.appendChild(close);
+    const caret = document.createElement('span'); caret.className = 'node-caret'; caret.textContent = nd.collapsed ? '▸' : '▾';
+    caret.onclick = e => { e.stopPropagation(); nd.collapsed = !nd.collapsed; renderTree(); };
+    head.appendChild(caret);
   }
-  return wrap;
+  const label = document.createElement('span'); label.className = 'node-label'; label.textContent = nodeLabel(nd, b); head.appendChild(label);
+  const ctrls = document.createElement('div'); ctrls.className = 'node-ctrls';
+  ctrls.appendChild(ctrlBtn('↑', e => { e.stopPropagation(); move(siblings, idx, -1); }));
+  ctrls.appendChild(ctrlBtn('↓', e => { e.stopPropagation(); move(siblings, idx, +1); }));
+  ctrls.appendChild(ctrlBtn('⎘', e => { e.stopPropagation(); const copy = reUid(JSON.parse(JSON.stringify(nd))); siblings.splice(idx + 1, 0, copy); renderTree(); }));
+  ctrls.appendChild(ctrlBtn('🗑', e => { e.stopPropagation(); siblings.splice(idx, 1); if(nd.uid === selectedUid) selectedUid = null; renderTree(); }));
+  head.appendChild(ctrls);
+  card.appendChild(head);
+  const prev = document.createElement('div'); prev.className = 'node-prev'; prev.textContent = nodePreview(nd, b); card.appendChild(prev);
+  card.onclick = e => { if(e.target.closest('.node-ctrls') || e.target.classList.contains('node-caret')) return; select(nd); };
+  if(b.type === 'container'){
+    if(!nd.collapsed){
+      const body = document.createElement('div'); body.className = 'node-body';
+      body.appendChild(renderChildren(nd.children, nd));
+      card.appendChild(body);
+      const close = document.createElement('div'); close.className = 'node-close'; close.textContent = b.code(nd.fields).close; card.appendChild(close);
+    } else {
+      const c = document.createElement('div'); c.className = 'node-collapsed'; c.textContent = '… ' + (nd.children ? nd.children.length : 0) + ' внутри'; card.appendChild(c);
+    }
+  }
+  return card;
 }
 function ctrlBtn(t, fn){ const b = document.createElement('button'); b.textContent = t; b.onclick = fn; return b; }
+
+// ── выбор узла + инспектор (Настроить / Разобраться / Объяснить) ──────────────
+function findNode(uid, arr){ arr = arr || root.children; for(const nd of arr){ if(nd.uid === uid) return nd; if(nd.children){ const r = findNode(uid, nd.children); if(r) return r; } } return null; }
+function select(nd){ selectedUid = nd.uid; ws.querySelectorAll('.node').forEach(el => el.classList.toggle('sel', el.dataset.uid === selectedUid)); renderInspector(nd); persist(); }
+function onFieldChange(){ renderGraph(); renderCode(); persist(); }   // граф обновляем, инспектор не трогаем (фокус)
+
+function renderInspector(nd){
+  const host = $('#inspector'); if(!host) return;
+  nd = nd || (selectedUid ? findNode(selectedUid) : null);
+  if(!nd){ selectedUid = null; host.innerHTML = '<div class="insp-body"><div class="insp-empty">Выбери узел слева — здесь настроишь его поля, разберёшься, что он делает, и получишь объяснение.<br><br>Нет узлов? Жми «+ блок» или «пример».</div></div>'; return; }
+  const b = BLOCKS[nd.blockId];
+  host.innerHTML = '';
+  const head = document.createElement('div'); head.className = 'insp-head';
+  [['set','Настроить'],['learn','Разобраться'],['why','Объяснить']].forEach(([k, lbl]) => {
+    const btn = document.createElement('button'); btn.textContent = lbl; if(k === inspTab) btn.classList.add('on');
+    btn.onclick = () => { inspTab = k; renderInspector(nd); };
+    head.appendChild(btn);
+  });
+  host.appendChild(head);
+  const body = document.createElement('div'); body.className = 'insp-body';
+  const title = document.createElement('div'); title.className = 'insp-title'; title.textContent = nodeLabel(nd, b); body.appendChild(title);
+  const kind = document.createElement('div'); kind.className = 'insp-kind'; kind.textContent = b.type === 'container' ? 'контейнер · { }' : b.type === 'draw' ? 'рисование' : 'блок'; body.appendChild(kind);
+  if(inspTab === 'set') body.appendChild(inspFields(nd, b));
+  else if(inspTab === 'learn'){ const p = document.createElement('div'); p.className = 'insp-text'; p.textContent = (b.hintFn ? b.hintFn(nd.fields) : b.hint) || 'подсказки нет'; body.appendChild(p); }
+  else body.appendChild(inspWhy(nd, b));
+  host.appendChild(body);
+}
+function inspFields(nd, b){
+  if(!(b.fields || []).length){ const e = document.createElement('div'); e.className = 'insp-text'; e.textContent = 'у этого узла нет настроек.'; return e; }
+  const box = document.createElement('div');
+  (b.fields || []).forEach(f => {
+    const row = document.createElement('div'); row.className = 'insp-field';
+    const lab = document.createElement('label'); lab.textContent = f.k; row.appendChild(lab);
+    if(f.multi){
+      const ta = document.createElement('textarea'); ta.className = 'blk-code'; ta.spellcheck = false; ta.value = nd.fields[f.k];
+      ta.rows = Math.min(16, String(nd.fields[f.k]).split('\n').length + 1);
+      ta.addEventListener('input', () => { nd.fields[f.k] = ta.value; onFieldChange(); });
+      row.appendChild(attachHighlight(ta));
+    } else {
+      const inp = document.createElement('input'); inp.value = nd.fields[f.k]; inp.spellcheck = false;
+      inp.addEventListener('input', () => { nd.fields[f.k] = inp.value; onFieldChange(); });
+      row.appendChild(inp);
+    }
+    box.appendChild(row);
+  });
+  return box;
+}
+function inspWhy(nd, b){
+  const box = document.createElement('div');
+  const p = document.createElement('div'); p.className = 'insp-text';
+  const hint = (b.hintFn ? b.hintFn(nd.fields) : b.hint) || '';
+  const first = hint.split('.')[0];
+  p.textContent = 'Это «' + nodeLabel(nd, b) + '». ' + (first ? first + '. ' : '') + (b.type === 'container' ? ('Внутри ' + (nd.children ? nd.children.length : 0) + ' шаг(ов).') : '');
+  box.appendChild(p);
+  const c = b.code(nd.fields);
+  const codeStr = b.type === 'container' ? (c.open + '\n  …\n' + c.close) : String(c);
+  const cw = document.createElement('div'); cw.className = 'insp-code';
+  const pre = document.createElement('pre'); pre.className = 'code mono'; pre.style.maxHeight = '220px';
+  buildHighlight(codeStr).forEach(l => pre.appendChild(l));
+  cw.appendChild(pre); box.appendChild(cw);
+  return box;
+}
 function reUid(nd){ nd.uid = uid(); if(nd.children) nd.children.forEach(reUid); return nd; }
 function move(arr, i, d){ const j = i + d; if(j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; renderTree(); }
 
@@ -187,7 +254,7 @@ function openMenu(anchor, targetArr){
       if(b.cat !== cat) continue;
       const it = document.createElement('div'); it.className = 'mitem';
       it.innerHTML = '<span class="mi-label">'+b.label+'</span>' + (b.hint ? '<span class="mi-hint">'+b.hint+'</span>' : '');
-      it.onclick = () => { targetArr.push(makeNode(id)); closeMenu(); renderTree(); };
+      it.onclick = () => { const nd = makeNode(id); targetArr.push(nd); closeMenu(); renderTree(); select(nd); };
       m.appendChild(it);
     }
   }
@@ -388,7 +455,7 @@ $('#fromtpl').onclick = async (e) => {
         try {
           const tpl = await fetch('/api/template?id=' + encodeURIComponent(t.id)).then(r => r.json());
           const code = (tpl.lines || []).map(line => (line || []).map(tok => tok.v != null ? tok.v : '').join('')).join('\n');
-          const nd = makeNode('raw'); nd.fields.code = code; root.children.push(nd); renderTree();
+          const nd = makeNode('raw'); nd.fields.code = code; root.children.push(nd); renderTree(); select(nd);
         } catch(_){}
       };
       m.appendChild(it);
@@ -400,8 +467,9 @@ $('#fromtpl').onclick = async (e) => {
   m.style.top = (r.bottom + window.scrollY + 4) + 'px';
   setTimeout(() => document.addEventListener('mousedown', outside), 0);
 };
-$('#clear').onclick = () => { setRoot({ children: [] }); renderTree(); };
+$('#clear').onclick = () => { selectedUid = null; setRoot({ children: [] }); renderTree(); };
 $('#example').onclick = () => {
+  selectedUid = null;
   setRoot({ children: [
     { uid: uid(), blockId:'array', fields:{ name:'числа', items:'40, 70, 30, 90, 55' } },
     { uid: uid(), blockId:'func', fields:{ name:'среднее', args:'список' }, children:[

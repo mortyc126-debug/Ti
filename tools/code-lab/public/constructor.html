@@ -34,11 +34,12 @@
           <button class="btn" id="imp">⬆ разобрать файл</button>
           <input type="file" id="impfile" accept=".js,.txt,.mjs,.jsx" style="display:none">
         </div>
-        <div class="hintline">Совсем новичку: жми «+ блок» → под каждым блоком серым написано, что он делает и что ему нужно. Собери что-нибудь, нажми «пример», потом «▶ запустить» справа — и смотри, что вышло. Не понимаешь блок — наведи/прочитай подсказку под ним. «Файлы»-вкладки сверху — отдельные куски большой программы; переключайся и собирай по частям.</div>
+        <div class="hintline">Жми «+ блок», чтобы добавить узел. Узлы соединяются сверху вниз — выход одного идёт в следующий. Кликни узел → справа «Настроить / Разобраться / Объяснить». «Файлы»-вкладки — части большой программы.</div>
         <div class="tabs-files" id="tabs"></div>
         <div class="ws ws-root" id="ws"></div>
       </section>
       <section class="panel">
+        <div class="inspector" id="inspector"></div>
         <div class="toolbar">
           <button class="btn" id="copy">⧉ копировать</button>
           <button class="btn ok" id="run">▶ запустить</button>
@@ -51,6 +52,43 @@
       </section>
     </div>
   </div>
+  <style>
+    /* узлы-карточки со связями */
+    .ws-root{display:flex;flex-direction:column;gap:0;background:none;border:1px dashed var(--border);border-radius:12px;padding:12px}
+    .node{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--name);border-radius:10px;padding:9px 11px;cursor:pointer;transition:border-color .12s,box-shadow .12s}
+    .node:hover{border-color:rgba(255,0,110,.4)}
+    .node.sel{border-color:var(--acc);box-shadow:0 0 0 1px rgba(255,0,110,.35)}
+    .node.container{border-left-color:var(--kw)}
+    .node.draw{border-left-color:var(--str)}
+    .node-head{display:flex;align-items:center;gap:8px}
+    .node-caret{color:var(--text3);font-size:10px;width:11px;cursor:pointer;user-select:none}
+    .node-label{font-weight:600;font-size:13px;color:var(--text);flex:1}
+    .node-ctrls{display:flex;gap:1px}
+    .node-ctrls button{background:none;border:0;color:var(--text3);cursor:pointer;font-size:12px;padding:2px 4px;border-radius:4px}
+    .node-ctrls button:hover{color:var(--acc);background:var(--s2)}
+    .node-prev{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--text3);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .node-body{margin:8px 0 2px 16px;padding-left:12px;border-left:1px dashed var(--border);display:flex;flex-direction:column;gap:0}
+    .node-close{font-family:ui-monospace,monospace;color:var(--kw);font-size:11px;margin:4px 0 0 2px}
+    .node-collapsed{font-size:11px;color:var(--text3);font-style:italic;margin-top:6px}
+    .conn{height:16px;display:flex;align-items:center;justify-content:center;color:var(--text3)}
+    .conn svg{display:block}
+    /* правая панель-инспектор */
+    .inspector{background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden}
+    .insp-head{display:flex;gap:2px;border-bottom:1px solid var(--border);padding:6px 8px}
+    .insp-head button{font-size:12.5px;color:var(--text2);background:none;border:0;border-radius:7px;padding:6px 11px;cursor:pointer}
+    .insp-head button:hover{color:var(--text)}
+    .insp-head button.on{background:var(--s2);color:var(--acc)}
+    .insp-body{padding:13px 14px;min-height:80px}
+    .insp-empty{color:var(--text3);font-size:12.5px;line-height:1.6}
+    .insp-title{font-size:14px;font-weight:600;margin:0 0 2px}
+    .insp-kind{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:10px}
+    .insp-field{margin-bottom:11px}
+    .insp-field label{display:block;font-size:11px;color:var(--text3);margin-bottom:4px}
+    .insp-field input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--name);font-family:ui-monospace,monospace;font-size:13px}
+    .insp-field input:focus{outline:none;border-color:var(--name)}
+    .insp-text{font-size:13px;color:var(--text2);line-height:1.65}
+    .insp-code{margin-top:10px}
+  </style>
   <script src="/shell.js"></script>
   <script src="/constructor.js"></script>
 </body>
