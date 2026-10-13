@@ -1,0 +1,135 @@
+{
+  "id": "localstorage-removeitem-удалить-mv6cusm4",
+  "lang": "js",
+  "group": "Хранилище",
+  "title": "localStorage.removeItem — удалить",
+  "desc": "removeItem удаляет одну запись по ключу. clear() удаляет все записи этого сайта, поэтому используйте его осторожно.",
+  "lines": [
+    [
+      {
+        "k": "name",
+        "v": "localStorage",
+        "r": "localStorage"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "setItem"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "str",
+        "v": "\"temporaryColor\""
+      },
+      {
+        "k": "op",
+        "v": ","
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "str",
+        "v": "\"#52F2C9\""
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [
+      {
+        "k": "name",
+        "v": "localStorage",
+        "r": "localStorage"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "removeItem"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "str",
+        "v": "\"temporaryColor\""
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [
+      {
+        "k": "fn",
+        "v": "console"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "log"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "name",
+        "v": "localStorage",
+        "r": "localStorage"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "getItem"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "str",
+        "v": "\"temporaryColor\""
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ]
+  ],
+  "output": "null"
+}

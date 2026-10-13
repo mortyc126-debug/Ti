@@ -1,0 +1,112 @@
+{
+  "id": "linear-gradient-линейный-градиент-mv6cut84",
+  "lang": "js",
+  "group": "Цвета",
+  "title": "linear-gradient — линейный градиент",
+  "desc": "linear-gradient создаёт переход цветов вдоль направления. Его можно назначить через CSS background или backgroundImage.",
+  "lines": [
+    [
+      {
+        "k": "kw",
+        "v": "const"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "name",
+        "v": "panel",
+        "r": "panel"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "op",
+        "v": "="
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "fn",
+        "v": "document"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "querySelector"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "str",
+        "v": "\"#panel\""
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [
+      {
+        "k": "name",
+        "v": "panel",
+        "r": "panel"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "name",
+        "v": "style",
+        "r": "style"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "name",
+        "v": "backgroundImage",
+        "r": "backgroundImage"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "op",
+        "v": "="
+      }
+    ],
+    [
+      {
+        "k": "sp",
+        "v": "  "
+      },
+      {
+        "k": "str",
+        "v": "\"linear-gradient(90deg, #FF006E, #3DD9FF)\""
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ]
+  ],
+  "output": "Фон панели плавно переходит от розового к голубому"
+}
