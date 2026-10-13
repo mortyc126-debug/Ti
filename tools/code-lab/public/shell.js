@@ -6,6 +6,7 @@
   const PAGES = [
     { key:'home',        label:'Главная',     href:'/' },
     { key:'library',     label:'Библиотека',  href:'/library.html' },
+    { key:'map',         label:'Карта',       href:'/map.html' },
     { key:'constructor', label:'Конструктор', href:'/constructor.html' },
     { key:'data',        label:'Данные',      href:'/schema-json.html' },
     { key:'learn',       label:'Обучение',    href:'/schema.html' },

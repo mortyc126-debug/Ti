@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Карта — уровни архитектуры</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .mapwrap{padding:22px 26px;max-width:1120px}
+  .maphead h1{font-size:24px;margin:0 0 6px}
+  .maphead p{color:var(--text2);font-size:13.5px;margin:0 0 20px;max-width:720px}
+
+  /* схема уровней (обзор-лесенка) */
+  .ladder{display:flex;flex-direction:column;gap:6px;margin-bottom:30px}
+  .lband{display:flex;align-items:center;gap:14px;background:var(--bg2);border:1px solid var(--border);border-left-width:4px;border-radius:10px;padding:11px 14px;cursor:pointer;transition:border-color .15s,transform .1s}
+  .lband:hover{transform:translateX(3px)}
+  .lband .lnum{width:30px;height:30px;flex:none;display:grid;place-items:center;border-radius:8px;font-weight:700;font-size:14px;color:#0E0720}
+  .lband .lmain{flex:1;min-width:0}
+  .lband .lname{font-size:14.5px;font-weight:600;color:var(--text)}
+  .lband .lwhat{font-size:12px;color:var(--text3);margin-top:1px}
+  .lband .lcount{font-size:11px;font-family:ui-monospace,monospace;color:var(--text3);background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:3px 10px;flex:none}
+  .laddernote{font-size:12px;color:var(--text3);margin:-20px 0 26px}
+
+  /* детальные секции уровней */
+  .lsec{margin-bottom:30px;scroll-margin-top:12px}
+  .lsec-h{display:flex;align-items:baseline;gap:10px;margin-bottom:4px}
+  .lsec-dot{width:12px;height:12px;border-radius:50%;flex:none;align-self:center}
+  .lsec-n{font-size:12px;font-family:ui-monospace,monospace;color:var(--text3)}
+  .lsec-name{font-size:17px;font-weight:600}
+  .lsec-what{font-size:12.5px;color:var(--text3);margin:0 0 12px 22px}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:980px){.cards{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:620px){.cards{grid-template-columns:1fr}}
+  .tcard{display:flex;flex-direction:column;gap:7px;text-decoration:none;background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:13px 14px;transition:border-color .15s,transform .1s}
+  .tcard:hover{transform:translateY(-2px)}
+  .tcard-h{display:flex;align-items:flex-start;gap:8px}
+  .tcard-t{font-size:13.5px;font-weight:600;color:var(--text);line-height:1.3;flex:1}
+  .tcard-l{font-size:9px;font-family:ui-monospace,monospace;padding:2px 6px;border-radius:5px;background:var(--bg);color:var(--text3);flex:none;margin-top:1px}
+  .tcard-d{font-size:12px;color:var(--text3);line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .tcard-g{font-size:10.5px;color:var(--text3);opacity:.8;margin-top:auto}
+  .lsec-link{display:inline-block;margin-left:22px;font-size:12.5px;color:var(--name);text-decoration:none}
+  .lsec-link:hover{color:var(--acc)}
+</style>
+</head>
+<body data-page="map">
+  <div class="mapwrap">
+    <div class="maphead">
+      <h1>Карта: уровни архитектуры</h1>
+      <p>Все шаблоны разложены по слоям — снизу вверх. Каждый следующий слой опирается на предыдущий: нельзя строить систему, перепрыгнув фундамент. Клик по карточке — открыть шаблон в Библиотеке.</p>
+    </div>
+    <div class="ladder" id="ladder"></div>
+    <div id="sections"></div>
+  </div>
+  <script src="/shell.js"></script>
+  <script src="/map.js"></script>
+</body>
+</html>
