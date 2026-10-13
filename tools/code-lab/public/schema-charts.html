@@ -28,11 +28,11 @@
   .kw{color:#9f7fce}.str{color:#6fc9a8}.num{color:#c9924f}.com{color:#8a84a8}.fn{color:#5fb4d4}
 </style>
 </head>
-<body>
+<body data-page="learn">
   <header>
     <h1>Диаграммы и формулы</h1>
     <div class="sub">Виды диаграмм, как показать классическую математику на странице и как превратить формулу в код. Нажимай «показать».</div>
-    <div class="tabs"><a href="/">Шаблоны</a><a href="/schema.html">Схемы</a><a href="/schema-draw.html">Отрисовка</a><a href="/schema-charts.html" class="on">Диаграммы</a></div>
+    <div class="tabs"><a href="/schema.html">Схемы</a><a href="/schema-draw.html">Отрисовка</a><a href="/schema-charts.html" class="on">Диаграммы</a></div>
   </header>
   <div class="wrap">
 
@@ -128,7 +128,8 @@ const σ = Math.<span class="fn">sqrt</span>(сумма / x.length);</pre>
 
 <script>
 const HEAD='<!doctype html><meta charset=utf-8><body style="margin:0;background:#0E0720"><canvas id=c width=280 height=150></canvas><scr'+'ipt>var x=document.getElementById("c").getContext("2d"),H=150,pad=14;';
-const END='<\/scr'+'ipt></body>';
+const END='<\/scr'+'ipt>  <script src="/shell.js"></script>
+</body>';
 const BAR=HEAD+'var d=[40,70,30,90,55,80],w=38;d.forEach(function(v,i){x.fillStyle="#3DD9FF";x.fillRect(16+i*w,H-pad-v,26,v);});'+END;
 const LINE=HEAD+'var d=[30,55,40,80,60,95],W=46;x.strokeStyle="#52F2C9";x.lineWidth=2;x.beginPath();d.forEach(function(v,i){var X=18+i*W,Y=H-pad-v;if(i)x.lineTo(X,Y);else x.moveTo(X,Y);});x.stroke();'+END;
 const AREA=HEAD+'var d=[30,55,40,80,60,95],W=46,x0=18;x.beginPath();x.moveTo(x0,H-pad);d.forEach(function(v,i){x.lineTo(x0+i*W,H-pad-v);});x.lineTo(x0+(d.length-1)*W,H-pad);x.closePath();x.fillStyle="rgba(180,92,255,.3)";x.fill();x.strokeStyle="#B45CFF";x.lineWidth=2;x.beginPath();d.forEach(function(v,i){var X=x0+i*W,Y=H-pad-v;if(i)x.lineTo(X,Y);else x.moveTo(X,Y);});x.stroke();'+END;

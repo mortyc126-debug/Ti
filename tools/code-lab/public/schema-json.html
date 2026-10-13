@@ -40,11 +40,11 @@
   .btn:hover{color:var(--acc);border-color:rgba(255,0,110,.4)}
 </style>
 </head>
-<body>
+<body data-page="learn">
   <header>
     <h1>JSON — инспектор</h1>
     <div class="sub">Кинь сюда <b>.json</b>, <b>.gz</b> или <b>.zip</b> (с JSON внутри) — разберётся прямо в браузере, офлайн. Смотри дерево, ищи по ключам/значениям.</div>
-    <div class="tabs"><a href="/">Шаблоны</a><a href="/schema.html">Схемы</a><a href="/schema-data.html">Структуры</a><a href="/schema-json.html" class="on">JSON</a></div>
+    <div class="tabs"><a href="/schema.html">Схемы</a><a href="/schema-data.html">Структуры</a><a href="/schema-json.html" class="on">JSON</a></div>
   </header>
   <div class="wrap">
     <div class="drop" id="drop">перетащи файл сюда или нажми, чтобы выбрать<input type="file" id="file" accept=".json,.gz,.zip,application/json,application/gzip,application/zip" multiple style="display:none"></div>
@@ -303,5 +303,6 @@ function preview(v){
 function el(tag, cls, text){ const e = document.createElement(tag); e.className = cls; if(text != null) e.textContent = text; return e; }
 function esc(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 </script>
+  <script src="/shell.js"></script>
 </body>
 </html>

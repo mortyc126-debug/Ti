@@ -48,7 +48,8 @@ async function loadList(openId){
   if(!list.length){ const m = document.createElement('div'); m.className = 'muted pad'; m.textContent = 'Пока пусто. Нажми «+ новый шаблон».'; nav.appendChild(m); return; }
   const groups = [];
   for(const t of list){ let g = groups.find(x => x.name === t.group); if(!g){ g = { name: t.group, items: [] }; groups.push(g); } g.items.push(t); }
-  const want = openId || curId;
+  const hashId = decodeURIComponent((location.hash || '').replace(/^#/, ''));
+  const want = openId || curId || hashId || null;
   // какую группу раскрыть: с нужным шаблоном, иначе первую
   let openGroup = (want && (groups.find(g => g.items.some(t => t.id === want)) || {}).name) || (groups[0] && groups[0].name);
   for(const g of groups){

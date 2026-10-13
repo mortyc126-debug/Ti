@@ -38,11 +38,11 @@
   svg{max-width:100%;height:auto}
 </style>
 </head>
-<body>
+<body data-page="learn">
   <header>
     <h1>Как устроена такая система</h1>
     <div class="sub">Наглядная карта: что нужно знать, какие бывают структуры данных, как ловят баги и как устроена архитектура. На примере твоего бота.</div>
-    <div class="tabs"><a href="/">Шаблоны</a><a href="/constructor.html">Конструктор</a><a href="/schema.html" class="on">Схемы</a><a href="/schema-data.html">Структуры</a><a href="/schema-json.html">JSON</a><a href="/schema-draw.html">Отрисовка</a><a href="/schema-charts.html">Диаграммы</a><a href="/schema-debug.html">Отладка</a></div>
+    <div class="tabs"><a href="/constructor.html">Конструктор</a><a href="/schema.html" class="on">Схемы</a><a href="/schema-data.html">Структуры</a><a href="/schema-json.html">JSON</a><a href="/schema-draw.html">Отрисовка</a><a href="/schema-charts.html">Диаграммы</a><a href="/schema-debug.html">Отладка</a></div>
   </header>
 
   <div class="wrap">
@@ -209,5 +209,6 @@ PIPE.forEach((s,i)=>{
   if(i<PIPE.length-1){ const a=document.createElement('div'); a.className='arrow'; a.textContent='→'; pipe.appendChild(a); }
 });
 </script>
+  <script src="/shell.js"></script>
 </body>
 </html>

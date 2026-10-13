@@ -25,11 +25,11 @@
   .kw{color:#9f7fce}.str{color:#6fc9a8}.num{color:#c9924f}.com{color:#8a84a8}.fn{color:#5fb4d4}.err{color:#c96f86}
 </style>
 </head>
-<body>
+<body data-page="learn">
   <header>
     <h1>Отладка: код и команды</h1>
     <div class="sub">Практикум: по каждому случаю — код, команда, команды альтернатив и главное — <b>как толковать</b> то, что вывелось. Где можно — нажми «запустить».</div>
-    <div class="tabs"><a href="/">Шаблоны</a><a href="/schema.html">Схемы</a><a href="/schema-debug.html">Отладка</a><a href="/schema-debug-code.html" class="on">Практикум</a></div>
+    <div class="tabs"><a href="/schema.html">Схемы</a><a href="/schema-debug.html">Отладка</a><a href="/schema-debug-code.html" class="on">Практикум</a></div>
   </header>
   <div class="wrap">
 
@@ -187,7 +187,8 @@ function run(id, code){
     +'var log=document.getElementById("log");var _p=function(){log.textContent+=Array.prototype.join.call(arguments," ")+"\\n";};'
     +'var console={log:_p,error:_p,warn:_p,info:_p,assert:function(c){if(!c)_p("Assertion failed:",Array.prototype.slice.call(arguments,1).join(" "));},table:_p,trace:_p};'
     +'try{'+code+'}catch(e){log.textContent+="\\u26d4 "+e.message;}'
-    +'<\/scr'+'ipt></body>';
+    +'<\/scr'+'ipt>  <script src="/shell.js"></script>
+</body>';
 }
 </script>
 </body>

@@ -22,11 +22,11 @@
   .kw{color:#9f7fce}.str{color:#6fc9a8}.num{color:#c9924f}.com{color:#8a84a8}.fn{color:#5fb4d4}
 </style>
 </head>
-<body>
+<body data-page="learn">
   <header>
     <h1>Структуры данных</h1>
     <div class="sub">Чем хранить данные — и как это ведёт себя вживую. Нажимай «запустить»: увидишь операции и результат. Главное правило — <b>форма под задачу</b>.</div>
-    <div class="tabs"><a href="/">Шаблоны</a><a href="/schema.html">Схемы</a><a href="/schema-debug.html">Отладка</a><a href="/schema-data.html" class="on">Структуры</a><a href="/schema-json.html">JSON</a><a href="/schema-draw.html">Отрисовка</a><a href="/schema-charts.html">Диаграммы</a></div>
+    <div class="tabs"><a href="/schema.html">Схемы</a><a href="/schema-debug.html">Отладка</a><a href="/schema-data.html" class="on">Структуры</a><a href="/schema-json.html">JSON</a><a href="/schema-draw.html">Отрисовка</a><a href="/schema-charts.html">Диаграммы</a></div>
   </header>
   <div class="wrap">
 
@@ -155,7 +155,8 @@ function run(id, code){
     +'<pre id="log" style="color:#6fc9a8;white-space:pre-wrap;margin:0"></pre><script>'
     +'var log=document.getElementById("log");var _p=function(){log.textContent+=Array.prototype.join.call(arguments," ")+"\\n";};'
     +'var console={log:_p,error:_p,warn:_p,info:_p};try{'+code+'}catch(e){log.textContent+="\\u26d4 "+e.message;}'
-    +'<\/scr'+'ipt></body>';
+    +'<\/scr'+'ipt>  <script src="/shell.js"></script>
+</body>';
 }
 </script>
 </body>
