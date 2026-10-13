@@ -165,13 +165,13 @@ function runDemo(box, c, codeText){
 // ── «в конструктор» ──
 function toConstructor(t, codeText){
   const name = (t.title || 'компонент').slice(0, 40);
-  const LS = 'codelab_ctor_files';
-  let store = { files: [], active: 0 };
-  try { const s = JSON.parse(localStorage.getItem(LS) || 'null'); if(s && Array.isArray(s.files)) store = s; } catch(_){}
+  const LS = 'codelab_graph';
+  let g = { nodes: [], edges: [] };
+  try { const s = JSON.parse(localStorage.getItem(LS) || 'null'); if(s && Array.isArray(s.nodes)) g = s; } catch(_){}
   const uid = () => Math.random().toString(36).slice(2, 8);
-  store.files.push({ name, root: { children: [{ uid: uid(), blockId: 'raw', fields: { code: codeText } }] } });
-  store.active = store.files.length - 1;
-  try { localStorage.setItem(LS, JSON.stringify(store)); } catch(_){}
+  const n = g.nodes.length;
+  g.nodes.push({ id: uid(), blockId: 'raw', fields: { code: codeText }, x: 60 + (n % 6) * 30, y: 60 + (n % 6) * 30, title: name });
+  try { localStorage.setItem(LS, JSON.stringify(g)); } catch(_){}
   location.href = '/constructor.html';
 }
 

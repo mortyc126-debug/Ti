@@ -76,8 +76,8 @@ const SUBCATS = {
   'Запуск и инфраструктура':[['Серверы',['сервер','node','flask','порт']],['Маршруты',['маршрут','роут']],['Модули и импорты',['модул','импорт','export','файл']],['Конфигурация',['конфиг','env','сборк','зависимост']]],
 };
 function thay(t){ return ((t.group||'')+' '+(t.title||'')+' '+(t.desc||'')).toLowerCase(); }
-function purposeOf(t){ const h = thay(t); for(const key of PORDER){ const P = PURPOSE.find(x=>x[0]===key); if(P[1].some(w=>h.includes(w))) return key; } return 'Работа с данными'; }
-function subOf(t, pk){ const defs = SUBCATS[pk]||[]; const h = thay(t); for(const [name,kws] of defs){ if(kws.some(w=>h.includes(w))) return name; } return 'Разное'; }
+function purposeOf(t){ if(t.comp && t.comp.tags && t.comp.tags.purpose && t.comp.tags.purpose.length) return t.comp.tags.purpose[0]; const h = thay(t); for(const key of PORDER){ const P = PURPOSE.find(x=>x[0]===key); if(P[1].some(w=>h.includes(w))) return key; } return 'Работа с данными'; }
+function subOf(t, pk){ if(t.comp && t.comp.subcat) return t.comp.subcat; const defs = SUBCATS[pk]||[]; const h = thay(t); for(const [name,kws] of defs){ if(kws.some(w=>h.includes(w))) return name; } return 'Разное'; }
 
 // ── палитра: Базовые блоки + компоненты каталога по иерархии назначений ───────
 let CATALOG = [];

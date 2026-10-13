@@ -113,7 +113,7 @@ async function listTemplates(){
       // краткая сводка компонента — чтобы каталог показывал тип/контракт/теги без лишних запросов
       if(j.component){
         const c = j.component;
-        row.comp = { type: c.type || '', tags: c.tags || {}, input: (c.summary && c.summary.input) || '', output: (c.summary && c.summary.output) || '' };
+        row.comp = { type: c.type || '', tags: c.tags || {}, subcat: c.subcat || '', input: (c.summary && c.summary.input) || '', output: (c.summary && c.summary.output) || '' };
       }
       out.push(row);
     } catch(_){}
@@ -146,6 +146,7 @@ const server = http.createServer(async (req, res) => {
         lines: tokenize(b.code || '', lang),
         output: b.output != null ? String(b.output) : '',
       };
+      if(b.component && typeof b.component === 'object') obj.component = b.component;   // метаданные компонента (теги осей, подкатегория, контракт)
       await fs.mkdir(TEMPLATES, { recursive: true });
       await fs.writeFile(path.join(TEMPLATES, obj.id + '.json'), JSON.stringify(obj, null, 2), 'utf8');
       return json(res, 200, { id: obj.id });

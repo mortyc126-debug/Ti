@@ -91,6 +91,7 @@ function typeOf(t){
   return (t.nlines||0) >= 14 ? 'component' : 'fragment';
 }
 function subOf(t, purpose){
+  if(t.comp && t.comp.subcat) return t.comp.subcat;   // явная подкатегория из метаданных
   const defs = SUBCATS[purpose] || []; const h = hay(t);
   for(const [name, kws] of defs){ if(kws.some(w=>h.includes(w))) return name.trim(); }
   return 'Разное';
@@ -100,11 +101,12 @@ const TYPE_RANK = { recipe:0, module:1, component:2, fragment:3 };
 
 let ALL = [], active = PURPOSE[0].key, fPlace = '', fTech = '', query = '';
 
-(async function(){
+async function loadAll(){
   try { ALL = await fetch('/api/list').then(r=>r.json()); } catch(_){ document.getElementById('sections').innerHTML='<div class="empty">сервер недоступен</div>'; return; }
   ALL.forEach(t => { t._purpose = purposeOf(t); t._places = placesOf(t); t._techs = techsOf(t); t._type = typeOf(t); });
   renderCats(); renderFilters(); render();
-})();
+}
+loadAll();
 
 function renderCats(){
   const box = document.getElementById('pcats'); box.innerHTML='';
@@ -174,12 +176,26 @@ function card(t){
     + (warn?'<span class="tg warnflag">⚠ риск</span>':'')
     + '</div>';
   a.innerHTML = top + '<div class="cdesc"></div>' + io + tags
-    + '<div class="cact"><span class="cbtn" data-x="use">Открыть</span><span class="cbtn" data-x="ctor">→ в конструктор</span></div>';
+    + '<div class="cact"><span class="cbtn" data-x="use">Открыть</span><span class="cbtn" data-x="ctor">→ в конструктор</span>'
+    + '<span class="cbtn" data-x="ren" title="переименовать">✎</span><span class="cbtn del" data-x="del" title="удалить">🗑</span></div>';
   a.querySelector('.ctitle').textContent = t.title || t.id;
   a.querySelector('.cdesc').textContent = t.desc || '';
   if(io){ a.querySelector('.cio .i').textContent = t.comp.input||'—'; a.querySelector('.cio .o').textContent = t.comp.output||'—'; }
   a.querySelector('[data-x="ctor"]').onclick = e => { e.preventDefault(); e.stopPropagation(); toConstructor(t); };
   a.querySelector('[data-x="use"]').onclick = e => { e.preventDefault(); location.href = a.href; };
+  a.querySelector('[data-x="ren"]').onclick = async e => {
+    e.preventDefault(); e.stopPropagation();
+    const v = prompt('Новое понятное название (без англ. жаргона, если можно):', t.title || '');
+    if(v == null || v.trim() === '' || v === t.title) return;
+    const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: t.id, title: v.trim() }) }).then(r=>r.json()).catch(()=>({}));
+    if(r.ok){ t.title = v.trim(); render(); }
+  };
+  a.querySelector('[data-x="del"]').onclick = async e => {
+    e.preventDefault(); e.stopPropagation();
+    if(!confirm('Удалить компонент «' + (t.title||t.id) + '» навсегда?')) return;
+    const r = await fetch('/api/delete', { method:'POST', body: JSON.stringify({ id: t.id }) }).then(r=>r.json()).catch(()=>({}));
+    if(r.ok){ ALL = ALL.filter(x=>x.id!==t.id); renderCats(); render(); }
+  };
   return a;
 }
 
@@ -190,12 +206,56 @@ async function toConstructor(t){
       ? full.component.views.use.code.content
       : (full.lines||[]).map(l=>(l||[]).map(k=>k.v!=null?k.v:'').join('')).join('\n');
   } catch(_){ return; }
-  const LS='codelab_ctor_files'; let store={files:[],active:0};
-  try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(s&&Array.isArray(s.files)) store=s; }catch(_){}
+  const LS='codelab_graph'; let g={nodes:[],edges:[]};
+  try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(s&&Array.isArray(s.nodes)) g=s; }catch(_){}
   const uid=()=>Math.random().toString(36).slice(2,8);
-  store.files.push({ name:(t.title||'компонент').slice(0,40), root:{children:[{uid:uid(),blockId:'raw',fields:{code}}]} });
-  store.active=store.files.length-1;
-  try{ localStorage.setItem(LS, JSON.stringify(store)); }catch(_){}
+  const n=g.nodes.length;
+  g.nodes.push({ id:uid(), blockId:'raw', fields:{code}, x:60+(n%6)*30, y:60+(n%6)*30, title:(t.title||'компонент').slice(0,40) });
+  try{ localStorage.setItem(LS, JSON.stringify(g)); }catch(_){}
   location.href='/constructor.html';
 }
+// ── добавить компонент в любой раздел (в установленном формате) ──────────────
+const TECH2LANG = { JavaScript:'js', Python:'python', 'HTML/CSS':'css', SQL:'sql' };
+function openAddForm(){
+  const bg = document.createElement('div'); bg.className = 'modal-bg';
+  const purposeOpts = PURPOSE.map(p => '<option>' + esc(p.key) + '</option>').join('');
+  const techOpts = TECHS.map(t => '<option>' + t + '</option>').join('');
+  bg.innerHTML = '<div class="modal">'
+    + '<h3>Новый компонент</h3><p class="mh">Заполни в общем формате — он ляжет в выбранный раздел каталога и будет доступен в конструкторе.</p>'
+    + '<div class="mrow"><div class="mfield"><label>Назначение (раздел)</label><select id="m-purpose">' + purposeOpts + '</select></div>'
+    + '<div class="mfield"><label>Подкатегория</label><select id="m-sub"></select></div></div>'
+    + '<div class="mrow"><div class="mfield"><label>Название (по-русски)</label><input id="m-title" placeholder="например: Объект ⇄ текст (сохранить/прочитать)"></div>'
+    + '<div class="mfield"><label>Технология</label><select id="m-tech">' + techOpts + '</select></div></div>'
+    + '<div class="mfield"><label>Что делает (одна строка)</label><input id="m-desc" placeholder="коротко: зачем этот кусок"></div>'
+    + '<div class="mrow"><div class="mfield"><label>Вход (необязательно)</label><input id="m-in" placeholder="что принимает"></div>'
+    + '<div class="mfield"><label>Выход (необязательно)</label><input id="m-out" placeholder="что отдаёт"></div></div>'
+    + '<div class="mfield"><label>Код</label><textarea id="m-code" spellcheck="false" placeholder="вставь код сюда"></textarea></div>'
+    + '<div class="mbtns"><button class="btn ok" id="m-save">Сохранить в каталог</button><button class="btn" id="m-cancel">Отмена</button></div>'
+    + '<div class="merr" id="m-err"></div></div>';
+  document.body.appendChild(bg);
+  const $$ = s => bg.querySelector(s);
+  const fillSubs = () => {
+    const pk = $$('#m-purpose').value;
+    const subs = (SUBCATS[pk] || []).map(x => x[0]).concat(['Разное']);
+    $$('#m-sub').innerHTML = subs.map(s => '<option>' + esc(s) + '</option>').join('');
+  };
+  fillSubs(); $$('#m-purpose').onchange = fillSubs;
+  bg.onclick = e => { if(e.target === bg) bg.remove(); };
+  $$('#m-cancel').onclick = () => bg.remove();
+  $$('#m-save').onclick = async () => {
+    const title = $$('#m-title').value.trim(), code = $$('#m-code').value;
+    if(!title){ $$('#m-err').textContent = 'впиши название'; return; }
+    if(!code.trim()){ $$('#m-err').textContent = 'впиши код'; return; }
+    const tech = $$('#m-tech').value, purpose = $$('#m-purpose').value, subcat = $$('#m-sub').value;
+    const component = { type:'component', tags:{ purpose:[purpose], technology:[tech], runtime:[] }, subcat,
+      summary:{ input: $$('#m-in').value.trim(), output: $$('#m-out').value.trim(), dependencies:[], requirements:[] } };
+    const body = { title, lang: TECH2LANG[tech] || 'js', group: subcat, desc: $$('#m-desc').value.trim(), code, component };
+    $$('#m-save').textContent = 'сохраняю…';
+    const r = await fetch('/api/add', { method:'POST', body: JSON.stringify(body) }).then(r=>r.json()).catch(()=>({}));
+    if(r.id){ bg.remove(); active = purpose; loadAll(); }
+    else { $$('#m-err').textContent = 'не сохранилось: ' + (r.error || 'ошибка'); $$('#m-save').textContent = 'Сохранить в каталог'; }
+  };
+}
+document.getElementById('addComp').onclick = openAddForm;
+
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
