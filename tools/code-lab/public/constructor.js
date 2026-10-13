@@ -86,7 +86,7 @@ function palDetails(title, count, open){
   const d = document.createElement('details'); d.className = 'pal-d'; if(open) d.open = true;
   const s = document.createElement('summary'); s.innerHTML = '<span>' + esc(title) + '</span><span class="pal-n">' + count + '</span>'; d.appendChild(s); return d;
 }
-function palItem(title, hint){ const it = el('div', 'pal-item2', title); if(hint) it.title = hint; return it; }
+function palItem(title, hint){ const it = el('div', 'pal-item2'); it.appendChild(el('span', 'pi-t', title)); if(hint) it.title = hint; return it; }
 function renderPalette(){
   const host = $('#palList'); host.innerHTML = '';
   const q = ($('#palSearch').value || '').toLowerCase();
