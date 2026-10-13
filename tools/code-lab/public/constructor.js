@@ -55,21 +55,69 @@ function nodeCode(nd){ const b = BLOCKS[nd.blockId]; const c = b.code(nd.fields)
 function nodePreview(nd){ const l = nodeCode(nd).split('\n')[0] || ''; return l.length > 36 ? l.slice(0, 36) + '…' : l; }
 function kindClass(nd){ const b = BLOCKS[nd.blockId]; return b.type === 'draw' ? 'draw' : b.type === 'container' ? 'container' : 'leaf'; }
 
-// ── палитра ───────────────────────────────────────────────────────────────────
+// ── таксономия как в каталоге: назначение → подкатегория ─────────────────────
+const PURPOSE = [
+  ['Интерфейс', ['dom','форм','ввод','кнопк','таблиц','карточк','модал','меню','уведомл','поиск','canvas','цвет','анимац','стил','css','верстк','grid','flex','клик','наведен','ползун','slider','рисов','отрисов','svg','экран','курсор','градиент','частиц']],
+  ['Работа с данными', ['массив','объект','словар','строк','crud','база','sql','хранилищ','localstorage','кэш','миграц','импорт','экспорт','модел','схем','сохран','reduce','.map','filter','сортиров','фильтр','очеред','стек','дек','множеств']],
+  ['Интеграции', ['fetch','api','http','rest','запрос','вебхук','webhook','почт','платеж','сторонн','таймаут','прокси','cors','moex','гир бо']],
+  ['Файлы и документы', ['csv','xlsx','excel','pdf','docx','sheetjs','mammoth','разбор файл','чтение файл']],
+  ['Автоматизация', ['расписан','планировщ','фонов','периодическ','cron','setinterval','пакет','батч','batch']],
+  ['Диагностика и тестирование', ['тест','логир','ошибк','трассиров','монитор','debug','отладк','исключ','assert']],
+  ['Запуск и инфраструктура', ['сервер','запуск','конфиг','зависимост','сборк','контейнер','env','порт','node','flask','маршрут','роут','модул','импорт','export']],
+];
+const PORDER = ['Интеграции','Файлы и документы','Автоматизация','Диагностика и тестирование','Запуск и инфраструктура','Интерфейс','Работа с данными'];
+const SUBCATS = {
+  'Интерфейс':[['Формы и ввод',['форм','input','ввод','checkbox','select','ползун','range','поле','type=']],['Таблицы и списки',['таблиц','tbody','список строк']],['Рисование (Canvas/SVG)',['canvas','svg','рисов','градиент','fillrect','filltext','arc','lineto','moveto','drawimage','кадр','частиц','clearrect','столбик']],['Цвета',['цвет','hsl','rgba','gradient','палитр']],['Анимация и время',['анимац','requestanimationframe','время']],['События',['событ','клик','keydown','keyup','клавиш','мыш','наведен','курсор']],['DOM-элементы',['dom','queryselector','createelement','classlist','setattribute','textcontent','innerhtml','style','append','надпис']]],
+  'Работа с данными':[['Массивы и объекты',['массив','объект','map','reduce','filter','foreach']],['Строки',['строк','split','replace','join']],['Хранилище',['localstorage','хранилищ','кэш','setitem','сохран']],['База и CRUD',['crud','база','добав','найд','удал']],['Сортировка и фильтры',['сортиров','фильтр','sort']],['Структуры',['стек','очеред','дек','множеств','set']],['Основы',['переменн','услови','цикл','функц','тип','ветвлен','switch','break','continue','return']]],
+  'Интеграции':[['HTTP-запросы',['fetch','http','запрос','анатом']],['Разбор ответа',['парсер','columns','разбор','ответ api']],['Прокси и CORS',['прокси','cors']],['Цепочки и параллельно',['цепочк','promise','await','параллель']]],
+  'Файлы и документы':[['CSV',['csv']],['Excel',['xlsx','excel','sheetjs']],['Разбор',['парсер','разбор','parse']]],
+  'Автоматизация':[['Таймеры',['таймер','интервал','setinterval']],['Планировщик',['расписан','планировщ','cron']],['Пакетная обработка',['пакет','батч','batch']]],
+  'Диагностика и тестирование':[['Ошибки',['ошибк','try','catch','исключ']],['Логи',['лог','console']],['Тесты',['тест']],['Отладка',['отладк','debug','трассиров']]],
+  'Запуск и инфраструктура':[['Серверы',['сервер','node','flask','порт']],['Маршруты',['маршрут','роут']],['Модули и импорты',['модул','импорт','export','файл']],['Конфигурация',['конфиг','env','сборк','зависимост']]],
+};
+function thay(t){ return ((t.group||'')+' '+(t.title||'')+' '+(t.desc||'')).toLowerCase(); }
+function purposeOf(t){ const h = thay(t); for(const key of PORDER){ const P = PURPOSE.find(x=>x[0]===key); if(P[1].some(w=>h.includes(w))) return key; } return 'Работа с данными'; }
+function subOf(t, pk){ const defs = SUBCATS[pk]||[]; const h = thay(t); for(const [name,kws] of defs){ if(kws.some(w=>h.includes(w))) return name; } return 'Разное'; }
+
+// ── палитра: Базовые блоки + компоненты каталога по иерархии назначений ───────
+let CATALOG = [];
+async function loadCatalog(){ try { CATALOG = await fetch('/api/list').then(r => r.json()); } catch(_){ CATALOG = []; } renderPalette(); }
+function palDetails(title, count, open){
+  const d = document.createElement('details'); d.className = 'pal-d'; if(open) d.open = true;
+  const s = document.createElement('summary'); s.innerHTML = '<span>' + esc(title) + '</span><span class="pal-n">' + count + '</span>'; d.appendChild(s); return d;
+}
+function palItem(title, hint){ const it = el('div', 'pal-item2', title); if(hint) it.title = hint; return it; }
 function renderPalette(){
   const host = $('#palList'); host.innerHTML = '';
   const q = ($('#palSearch').value || '').toLowerCase();
-  CATS.forEach(cat => {
-    const items = Object.entries(BLOCKS).filter(([id, b]) => b.cat === cat && (!q || (b.label + ' ' + (b.hint || '')).toLowerCase().includes(q)));
-    if(!items.length) return;
-    const h = document.createElement('div'); h.className = 'pal-cat'; h.textContent = cat; host.appendChild(h);
-    items.forEach(([id, b]) => {
-      const it = document.createElement('div'); it.className = 'pal-item';
-      it.innerHTML = '<div>' + esc(b.label) + '</div>' + (b.hint ? '<div class="pi-h">' + esc(b.hint) + '</div>' : '');
-      it.onclick = () => addNode(id);
-      host.appendChild(it);
+  // базовые блоки (со структурными полями)
+  const base = Object.entries(BLOCKS).filter(([id, b]) => !q || (b.label + ' ' + (b.hint || '')).toLowerCase().includes(q));
+  if(base.length){
+    const d = palDetails('Базовые блоки', base.length, !!q || !CATALOG.length);
+    base.forEach(([id, b]) => { const it = palItem(b.label, b.hint); it.onclick = () => addNode(id); d.appendChild(it); });
+    host.appendChild(d);
+  }
+  // каталог по назначению → подкатегория
+  const js = CATALOG.filter(t => (t.lang || 'js') === 'js').filter(t => !q || (t.title + ' ' + (t.desc || '')).toLowerCase().includes(q));
+  const byP = {}; js.forEach(t => { const p = purposeOf(t); (byP[p] = byP[p] || []).push(t); });
+  PURPOSE.map(x => x[0]).forEach(pk => {
+    const items = byP[pk]; if(!items || !items.length) return;
+    const d = palDetails(pk, items.length, !!q);
+    const bySub = {}; items.forEach(t => { const s = subOf(t, pk); (bySub[s] = bySub[s] || []).push(t); });
+    const order = (SUBCATS[pk] || []).map(x => x[0]).concat(['Разное']);
+    Object.keys(bySub).sort((a, b) => { const ia = order.indexOf(a), ib = order.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); }).forEach(sub => {
+      d.appendChild(el('div', 'pal-sub', sub + ' · ' + bySub[sub].length));
+      bySub[sub].forEach(t => { const it = palItem(t.title, t.desc); it.onclick = () => addFromCatalog(t); d.appendChild(it); });
     });
+    host.appendChild(d);
   });
+}
+async function addFromCatalog(t){
+  try {
+    const tpl = await fetch('/api/template?id=' + encodeURIComponent(t.id)).then(r => r.json());
+    const code = (tpl.lines || []).map(line => (line || []).map(k => k.v != null ? k.v : '').join('')).join('\n');
+    addNode('raw', { fields: { code }, title: t.title });
+  } catch(_){}
 }
 $('#palSearch').oninput = renderPalette;
 
@@ -386,7 +434,7 @@ function esc(s){ return String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&l
 function cssEsc(s){ return String(s).replace(/["\\]/g, '\\$&'); }
 
 restore();
-renderPalette();
+loadCatalog();
 renderCanvas();
 renderInspector();
 renderCode();
