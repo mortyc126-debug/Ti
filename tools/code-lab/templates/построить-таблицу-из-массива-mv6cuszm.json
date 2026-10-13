@@ -712,5 +712,137 @@
       }
     ]
   ],
-  "output": "В tbody таблицы #colors добавляются две строки с цветами"
+  "output": "В tbody таблицы #colors добавляются две строки с цветами",
+  "component": {
+    "type": "component",
+    "tags": {
+      "purpose": [
+        "Интерфейс",
+        "Работа с данными"
+      ],
+      "runtime": [
+        "Браузер",
+        "DOM"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Массив объектов [{name, hex}]",
+      "output": "Строки в <tbody>",
+      "dependencies": [],
+      "requirements": [
+        "HTML-таблица с элементом <tbody>"
+      ]
+    },
+    "safety": {
+      "level": "ok",
+      "notes": []
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project",
+      "view_connections"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "html": "<table id=\"colors\">\n  <thead><tr><th>Название</th><th>Код</th></tr></thead>\n  <tbody></tbody>\n</table>",
+        "code": {
+          "language": "javascript",
+          "content": "function renderColors(colors) {\n  const tbody = document.querySelector('#colors tbody');\n  if (!tbody) throw new Error('Не найден #colors tbody');\n  tbody.replaceChildren();\n  colors.forEach(({ name, hex }) => {\n    const tr = document.createElement('tr');\n    const nameCell = document.createElement('td');\n    const hexCell = document.createElement('td');\n    nameCell.textContent = name;\n    hexCell.textContent = hex;\n    tr.append(nameCell, hexCell);\n    tbody.append(tr);\n  });\n}"
+        },
+        "steps": [
+          "Добавь таблицу с id=colors и элементом <tbody>",
+          "Вставь функцию renderColors в JavaScript",
+          "Передай массив в renderColors(colors)"
+        ],
+        "example_input": [
+          {
+            "name": "Красный",
+            "hex": "#ff0000"
+          },
+          {
+            "name": "Синий",
+            "hex": "#0000ff"
+          }
+        ],
+        "demo": "renderColors(colors);"
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "В таблице появляются две строки: Красный #ff0000 и Синий #0000ff",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Пустой массив",
+            "Два объекта",
+            "Отсутствует <tbody>",
+            "Повторный вызов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Строк нет",
+            "cause": "Неверный id или <tbody> ещё не создан",
+            "solution": "Проверь id=\"colors\" и наличие <tbody>, вызывай после отрисовки таблицы"
+          },
+          {
+            "symptom": "Cannot read properties…",
+            "cause": "Неверная структура входных данных",
+            "solution": "Проверь, что у объектов есть поля name и hex"
+          },
+          {
+            "symptom": "Данные не обновляются",
+            "cause": "Старые строки не очищены / массив устарел",
+            "solution": "replaceChildren() уже чистит; убедись, что передаёшь актуальный массив"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [
+          {
+            "name": "querySelector",
+            "role": "находит <tbody>"
+          },
+          {
+            "name": "replaceChildren",
+            "role": "очищает старые строки"
+          },
+          {
+            "name": "createElement",
+            "role": "создаёт строки и ячейки"
+          },
+          {
+            "name": "textContent",
+            "role": "устанавливает текст ячеек (безопасно)"
+          },
+          {
+            "name": "append",
+            "role": "добавляет элементы в DOM"
+          }
+        ],
+        "effects": [
+          "Изменяет DOM",
+          "Удаляет прежнее содержимое <tbody>"
+        ],
+        "network": false,
+        "connections": [
+          {
+            "name": "Простая база в памяти (CRUD)",
+            "role": "источник массива"
+          }
+        ]
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "version": "1.0.0"
+  }
 }

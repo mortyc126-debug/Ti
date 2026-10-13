@@ -86,7 +86,7 @@ function levelFor(t){
 })();
 
 function card(t){
-  const a = document.createElement('a'); a.className = 'tcard'; a.href = '/library.html#' + encodeURIComponent(t.id);
+  const a = document.createElement('a'); a.className = 'tcard'; a.href = '/component.html?id=' + encodeURIComponent(t.id);
   a.innerHTML = '<div class="tcard-h"><span class="tcard-t"></span><span class="tcard-l">' + esc(LANG_LABEL[(t.lang||'other').toLowerCase()] || (t.lang||'').toUpperCase()) + '</span></div>'
     + '<div class="tcard-d"></div><div class="tcard-g"></div>';
   a.querySelector('.tcard-t').textContent = t.title || 'без названия';
