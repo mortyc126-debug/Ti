@@ -45,6 +45,25 @@ async function loadList(openId){
     inp.click();
   };
   nav.appendChild(imp);
+
+  // отправить шаблоны на GitHub (чтобы не жили только локально)
+  const gh = document.createElement('div'); gh.className = 'addbtn'; gh.style.borderColor = 'rgba(61,217,255,.4)'; gh.style.color = 'var(--name)';
+  gh.textContent = 'Сохранить шаблоны на GitHub';
+  async function refreshGh(){
+    try {
+      const i = await fetch('/api/git/info').then(r => r.json());
+      if(!i.repo){ gh.textContent = 'GitHub: нет git-репозитория (локально)'; return; }
+      gh.textContent = i.dirty ? ('Сохранить на GitHub (не сохранено: ' + i.dirty + ')') : ('На GitHub всё сохранено · ' + i.branch);
+    } catch(_){ gh.textContent = 'Сохранить шаблоны на GitHub'; }
+  }
+  gh.onclick = async () => {
+    gh.textContent = 'отправляю на GitHub…';
+    const r = await fetch('/api/git/sync', { method: 'POST' }).then(r => r.json()).catch(() => ({ ok: false, message: 'сервер недоступен' }));
+    gh.textContent = (r.ok ? '✓ ' : '⚠ ') + (r.message || (r.ok ? 'готово' : 'не удалось'));
+    setTimeout(refreshGh, 3500);
+  };
+  nav.appendChild(gh); refreshGh();
+
   if(!list.length){ const m = document.createElement('div'); m.className = 'muted pad'; m.textContent = 'Пока пусто. Нажми «+ новый шаблон».'; nav.appendChild(m); return; }
   const groups = [];
   for(const t of list){ let g = groups.find(x => x.name === t.group); if(!g){ g = { name: t.group, items: [] }; groups.push(g); } g.items.push(t); }

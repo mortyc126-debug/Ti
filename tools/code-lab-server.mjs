@@ -14,6 +14,7 @@ import http from 'node:http';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, 'code-lab');
@@ -37,6 +38,16 @@ function readBody(req){
     req.on('error', reject);
   });
 }
+
+// ── git: чтобы шаблоны уходили на GitHub, а не висели локально ────────────────
+function git(args, cwd){
+  return new Promise(resolve => {
+    execFile('git', args, { cwd: cwd || HERE, timeout: 30000, maxBuffer: 10e6 }, (e, so, se) => {
+      resolve({ code: e ? (typeof e.code === 'number' ? e.code : 1) : 0, out: String(so || '').trim(), err: String(se || '').trim() });
+    });
+  });
+}
+async function gitRoot(){ const r = await git(['rev-parse', '--show-toplevel']); return r.code === 0 ? r.out : null; }
 
 // ── токенайзер: сырой код → строки токенов {k, v, r?} ───────────────────────
 const KW = {
@@ -208,6 +219,38 @@ const server = http.createServer(async (req, res) => {
       if(!abs) return json(res, 400, { error: 'bad id' });
       await fs.unlink(abs).catch(() => {});
       return json(res, 200, { ok: true });
+    }
+
+    // ── синхронизация шаблонов с GitHub ───────────────────────────────────
+    if(u.pathname === '/api/git/info'){
+      let templates = 0;
+      try { templates = (await fs.readdir(TEMPLATES)).filter(n => n.endsWith('.json')).length; } catch(_){}
+      const root = await gitRoot();
+      let branch = '', dirty = 0;
+      if(root){
+        branch = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], root)).out;
+        const st = await git(['status', '--porcelain', '--', TEMPLATES], root);
+        dirty = st.out ? st.out.split('\n').filter(Boolean).length : 0;
+      }
+      return json(res, 200, { repo: !!root, branch, dirty, templates });
+    }
+    if(u.pathname === '/api/git/sync' && req.method === 'POST'){
+      const root = await gitRoot();
+      if(!root) return json(res, 200, { ok: false, stage: 'repo', message: 'Папка лаборатории не внутри git-репозитория — шаблоны сохранены только локально.' });
+      const add = await git(['add', '--', TEMPLATES], root);
+      if(add.code !== 0) return json(res, 200, { ok: false, stage: 'add', message: add.err || 'git add не удался' });
+      const staged = (await git(['diff', '--cached', '--name-only', '--', TEMPLATES], root)).out.split('\n').filter(Boolean).length;
+      if(staged > 0){
+        const c = await git(['commit', '-m', 'Лаборатория: мои шаблоны кода', '--', TEMPLATES], root);
+        if(c.code !== 0) return json(res, 200, { ok: false, stage: 'commit', message: c.err || c.out });
+      }
+      let push = await git(['push'], root);
+      if(push.code !== 0){
+        const br = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], root)).out;
+        push = await git(['push', '-u', 'origin', br], root);
+        if(push.code !== 0) return json(res, 200, { ok: false, stage: 'push', committed: staged, message: push.err || push.out || 'push отклонён' });
+      }
+      return json(res, 200, { ok: true, committed: staged, message: staged ? ('Отправлено на GitHub: ' + staged + ' файл(ов).') : 'На GitHub уже всё актуально.' });
     }
 
     // удалить шаблон

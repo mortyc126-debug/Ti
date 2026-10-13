@@ -78,6 +78,7 @@
   </header>
   <div class="wrap">
     <div class="drop" id="drop">перетащи сюда архивы (можно пачкой) или нажми — распакуются и сохранятся<input type="file" id="file" accept=".json,.gz,.zip,application/json,application/gzip,application/zip" multiple style="display:none"></div>
+    <div style="margin:8px 0"><button class="btn" id="rescue">Перенести шаблоны кода из Данных в Библиотеку</button></div>
     <div class="saved" id="saved"></div>
     <div class="err" id="err"></div>
 
@@ -132,9 +133,43 @@ async function handle(fileList){
     } catch(e){ err.textContent += '«' + f.name + '»: ' + e.message + '\n'; }
   }
   if(!files.length) return;
-  await autostore();            // распаковали → сразу складываем (дубли по имени пропускаем)
-  openFiles(files, 0, null);    // и показываем первый
+  const st = await autostore();   // данные складываем; шаблоны кода уводим в Библиотеку
+  const dataFiles = files.filter(f => !isTemplate(f.data));
+  const note = [];
+  if(st.saved) note.push('в данные легло: ' + st.saved);
+  if(st.skipped) note.push('уже было: ' + st.skipped);
+  if(st.toLib) note.push('шаблонов кода → в Библиотеку: ' + st.toLib + ' (открой «Библиотека»)');
+  err.textContent = note.join(' · ');
+  if(dataFiles.length) openFiles(dataFiles, 0, null);
+  else $('#comp').style.display = 'none';
 }
+
+// json — это на самом деле шаблон кода? (как файлы из templates/: есть lines + lang)
+function isTemplate(d){ return d && typeof d === 'object' && !Array.isArray(d) && Array.isArray(d.lines) && typeof d.lang === 'string'; }
+function linesToCode(lines){ return (lines || []).map(line => (line || []).map(t => t && t.v != null ? t.v : '').join('')).join('\n'); }
+async function addTemplate(d, fallbackName){
+  const code = linesToCode(d.lines);
+  return fetch('/api/add', { method: 'POST', body: JSON.stringify({ title: d.title || fallbackName, lang: d.lang || 'js', group: d.group || 'Мои куски', code, desc: d.desc || '', output: d.output || '' }) }).then(r => r.json()).catch(() => ({}));
+}
+
+// перенести уже сохранённые в «Данные» шаблоны кода → в Библиотеку
+$('#rescue').onclick = async () => {
+  const btn = $('#rescue'); btn.textContent = 'проверяю…';
+  let list = []; try { list = await fetch('/api/data/list').then(r => r.json()); } catch(_){}
+  let moved = 0;
+  for(const it of list){
+    try {
+      const j = await fetch('/api/data/get?id=' + encodeURIComponent(it.id)).then(r => r.json());
+      if(isTemplate(j.data)){
+        const r = await addTemplate(j.data, j.name);
+        if(r.id){ await fetch('/api/data/delete', { method: 'POST', body: JSON.stringify({ id: it.id }) }); moved++; }
+      }
+    } catch(_){}
+  }
+  btn.textContent = moved ? ('✓ перенесено в Библиотеку: ' + moved + ' — не забудь «Сохранить на GitHub» там') : 'шаблонов кода в Данных не нашлось';
+  loadSaved();
+  setTimeout(() => btn.textContent = 'Перенести шаблоны кода из Данных в Библиотеку', 4000);
+};
 
 // открыть набор распарсенных файлов в компоненте
 function openFiles(fs, i, sid){
@@ -309,15 +344,20 @@ function classifyData(d){
 async function autostore(){
   let existing = []; try { existing = await fetch('/api/data/list').then(r => r.json()); } catch(_){}
   const have = new Set(existing.map(x => x.name));
-  let saved = 0, skipped = 0;
+  let saved = 0, skipped = 0, toLib = 0;
   for(const f of files){
+    if(isTemplate(f.data)){                       // это шаблон кода — ему место в Библиотеке
+      const r = await addTemplate(f.data, f.name);
+      if(r.id) toLib++;
+      continue;
+    }
     if(have.has(f.name)){ skipped++; continue; }
     const a = classifyData(f.data);
     const r = await fetch('/api/data/save', { method: 'POST', body: JSON.stringify({ name: f.name, desc: a.desc, category: a.category, data: f.data }) }).then(r => r.json()).catch(() => ({}));
     if(r.id){ saved++; have.add(f.name); }
   }
-  err.textContent = (saved ? ('легло: ' + saved) : '') + (skipped ? (saved ? ', ' : '') + 'уже было: ' + skipped : '');
   loadSaved();
+  return { saved, skipped, toLib };
 }
 
 // список сохранённого (чипы по категориям), клик → открыть в компоненте
