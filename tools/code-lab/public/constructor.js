@@ -276,6 +276,7 @@ function renderInspector(nd){
   host.appendChild(body);
 }
 function inspFields(nd, b){
+  if(nd.blockId === 'raw') return rawInspFields(nd);   // у «своего кода» — поля по переменным + весь код
   if(!(b.fields || []).length) return el('div', 'insp-text', 'нет настроек.');
   const box = document.createElement('div');
   (b.fields || []).forEach(f => {
@@ -294,6 +295,40 @@ function inspFields(nd, b){
   });
   return box;
 }
+// «Настроить» для своего кода: понятные поля по строкам `имя = значение;`
+// (значения правятся прямо отсюда) + весь код в раскрывашке.
+const VAR_RE = /^(\s*(?:const|let|var)\s+([A-Za-zА-Яа-яЁё_$][\wА-Яа-яЁё$]*)\s*=\s*)(.+);\s*$/;
+function rawVars(code){ const out = []; String(code).split('\n').forEach((ln, i) => { const m = ln.match(VAR_RE); if(m) out.push({ i, name: m[2], value: m[3] }); }); return out; }
+function setVar(nd, name, val){
+  const lines = String(nd.fields.code || '').split('\n');
+  for(let i = 0; i < lines.length; i++){ const m = lines[i].match(VAR_RE); if(m && m[2] === name){ lines[i] = m[1] + val + ';'; break; } }
+  nd.fields.code = lines.join('\n');
+}
+function rawInspFields(nd){
+  const box = document.createElement('div');
+  const vars = rawVars(nd.fields.code);
+  if(vars.length){
+    const note = el('div', 'insp-kind', 'что можно поменять'); note.style.marginBottom = '6px'; box.appendChild(note);
+    vars.forEach(v => {
+      const row = el('div', 'insp-field'); row.appendChild(el('label', '', v.name));
+      const inp = document.createElement('input'); inp.value = v.value; inp.spellcheck = false;
+      inp.addEventListener('input', () => { setVar(nd, v.name, inp.value); updateCard(nd); renderCode(); persist(); });
+      row.appendChild(inp); box.appendChild(row);
+    });
+  } else {
+    box.appendChild(el('div', 'insp-text', 'Готовых полей тут нет — весь код ниже можно править целиком.'));
+  }
+  // весь код — в раскрывашке (или сразу, если полей нет)
+  const det = document.createElement('details'); det.style.marginTop = '8px'; if(!vars.length) det.open = true;
+  const sum = document.createElement('summary'); sum.textContent = 'весь код'; sum.style.cssText = 'cursor:pointer;color:var(--text3);font-size:12px;margin-bottom:6px'; det.appendChild(sum);
+  const ta = document.createElement('textarea'); ta.className = 'blk-code'; ta.spellcheck = false; ta.value = nd.fields.code;
+  ta.rows = Math.min(18, String(nd.fields.code).split('\n').length + 1);
+  ta.addEventListener('input', () => { nd.fields.code = ta.value; updateCard(nd); renderCode(); persist(); });
+  det.appendChild(attachHighlight(ta));
+  box.appendChild(det);
+  return box;
+}
+
 function inspWhy(nd, b){
   const box = document.createElement('div');
   const first = (b.hint || '').split('.')[0];
