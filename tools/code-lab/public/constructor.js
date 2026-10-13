@@ -451,11 +451,62 @@ $('#fromtpl').onclick = async e => {
 function outside(e){ const m = $('#_menu'); if(m && !m.contains(e.target)) closeMenu(); }
 function closeMenu(){ const m = $('#_menu'); if(m) m.remove(); document.removeEventListener('mousedown', outside); }
 
+// разобрать HTML на части: разметка / стили / скрипт(ы)
+function breakdownHTML(text){
+  const parts = [];
+  const scripts = [...text.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1].trim()).filter(Boolean);
+  const styles  = [...text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1].trim()).filter(Boolean);
+  const markup  = text.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/\n{3,}/g, '\n\n').trim();
+  if(markup) parts.push({ title: 'разметка (HTML)', code: markup });
+  styles.forEach((s, i) => parts.push({ title: 'стили (CSS)' + (styles.length > 1 ? ' ' + (i + 1) : ''), code: s }));
+  scripts.forEach((s, i) => parts.push({ title: 'скрипт (JS)' + (scripts.length > 1 ? ' ' + (i + 1) : ''), code: s }));
+  return parts.length ? parts : [{ title: 'HTML', code: text }];
+}
+// разбить JS на верхнеуровневые шаги (функции/объявления/вызовы)
+function splitTopLevel(code){
+  const out = []; let brace = 0, paren = 0, seg = '', i = 0; const n = code.length;
+  const push = () => { const t = seg.trim(); if(t) out.push(t); seg = ''; };
+  const skipStr = (j, q) => { j++; while(j < n){ if(code[j] === '\\'){ j += 2; continue; } if(code[j] === q){ j++; break; } j++; } return j; };
+  while(i < n){
+    const c = code[i];
+    if(c === '"' || c === "'" || c === '`'){ const j = skipStr(i, c); seg += code.slice(i, j); i = j; continue; }
+    if(c === '/' && code[i + 1] === '/'){ let j = code.indexOf('\n', i); if(j < 0) j = n; seg += code.slice(i, j); i = j; continue; }
+    if(c === '/' && code[i + 1] === '*'){ let j = code.indexOf('*/', i + 2); j = j < 0 ? n : j + 2; seg += code.slice(i, j); i = j; continue; }
+    if(c === '(' || c === '['){ paren++; seg += c; i++; continue; }
+    if(c === ')' || c === ']'){ paren = Math.max(0, paren - 1); seg += c; i++; continue; }
+    if(c === '{'){ brace++; seg += c; i++; continue; }
+    if(c === '}'){ brace = Math.max(0, brace - 1); seg += c; i++;
+      if(brace === 0 && paren === 0){ let j = i; while(j < n && /\s/.test(code[j])) j++; if(code[j] === ';'){ seg += code.slice(i, j + 1); i = j + 1; } push(); }
+      continue; }
+    if(c === ';' && brace === 0 && paren === 0){ seg += c; push(); i++; continue; }
+    seg += c; i++;
+  }
+  push();
+  return out.filter(Boolean);
+}
+// положить части колонкой и соединить стрелками (выход → вход)
+function addPieces(parts){
+  const startX = graph.nodes.length ? Math.max(...graph.nodes.map(n => n.x)) + 240 : 60;
+  let prev = null;
+  parts.forEach((pc, i) => {
+    const nd = makeNode('raw', { fields: { code: pc.code }, title: pc.title, x: startX, y: 50 + i * 150 });
+    graph.nodes.push(nd);
+    if(prev) graph.edges.push({ from: prev.id, to: nd.id });
+    prev = nd;
+  });
+  renderCanvas(); renderCode(); persist();
+  if(parts.length) select(graph.nodes[graph.nodes.length - 1]);
+}
 $('#imp').onclick = () => $('#impfile').click();
 $('#impfile').onchange = async e => {
   const f = e.target.files && e.target.files[0]; if(!f) return;
-  const text = await f.text(); if(text.length > 80000){ alert('Файл большой — возьми кусок поменьше.'); return; }
-  addNode('raw', { fields: { code: text }, title: f.name.replace(/\.[^.]+$/, '') });
+  const text = await f.text(); if(text.length > 120000){ alert('Файл большой — возьми кусок поменьше.'); return; }
+  const ext = (f.name.split('.').pop() || '').toLowerCase();
+  let parts;
+  if(ext === 'html' || ext === 'htm') parts = breakdownHTML(text);
+  else if(['js','mjs','jsx','ts'].includes(ext)) parts = splitTopLevel(text).map(c => ({ title: classify(c), code: c }));
+  else parts = [{ title: f.name.replace(/\.[^.]+$/, ''), code: text }];
+  addPieces(parts);
   e.target.value = '';
 };
 
