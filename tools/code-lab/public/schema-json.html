@@ -40,14 +40,13 @@
   .btn:hover{color:var(--acc);border-color:rgba(255,0,110,.4)}
 </style>
 </head>
-<body data-page="learn">
+<body data-page="data">
   <header>
-    <h1>JSON — инспектор</h1>
-    <div class="sub">Кинь сюда <b>.json</b>, <b>.gz</b> или <b>.zip</b> (с JSON внутри) — разберётся прямо в браузере, офлайн. Смотри дерево, ищи по ключам/значениям.</div>
-    <div class="tabs"><a href="/schema.html">Схемы</a><a href="/schema-data.html">Структуры</a><a href="/schema-json.html" class="on">JSON</a></div>
+    <h1>Данные — архивы</h1>
+    <div class="sub">Кинь сюда пачку <b>.zip</b> / <b>.gz</b> / <b>.json</b> — распакуются прямо в браузере (офлайн) и сразу <b>лягут</b> в список ниже. Клик по сохранённому — смотреть дерево, искать по ключам/значениям.</div>
   </header>
   <div class="wrap">
-    <div class="drop" id="drop">перетащи файл сюда или нажми, чтобы выбрать<input type="file" id="file" accept=".json,.gz,.zip,application/json,application/gzip,application/zip" multiple style="display:none"></div>
+    <div class="drop" id="drop">перетащи сюда архивы (можно пачкой) или нажми, чтобы выбрать — они распакуются и сохранятся<input type="file" id="file" accept=".json,.gz,.zip,application/json,application/gzip,application/zip" multiple style="display:none"></div>
     <div class="saved" id="saved"></div>
     <div class="err" id="err"></div>
     <div class="bar" id="bar" style="display:none">
@@ -91,6 +90,24 @@ async function handle(fileList){
   bar.style.display = 'flex'; tree.style.display = 'block';
   $('#savebar').style.display = 'flex'; $('#sname').value = files[0].name; $('#sdesc').value = '';
   show(0);
+  autostore();   // распаковали → сразу складываем в список (дубли по имени пропускаем)
+}
+
+// авто-сохранение всех распарсенных JSON на локальный сервер; что уже сохранено
+// под тем же именем — не дублируем
+async function autostore(){
+  let existing = [];
+  try { existing = await fetch('/api/data/list').then(r => r.json()); } catch(_){}
+  const have = new Set(existing.map(x => x.name));
+  let saved = 0, skipped = 0;
+  for(const f of files){
+    if(have.has(f.name)){ skipped++; continue; }
+    const a = classifyData(f.data);
+    const r = await fetch('/api/data/save', { method: 'POST', body: JSON.stringify({ name: f.name, desc: a.desc, category: a.category, data: f.data }) }).then(r => r.json()).catch(() => ({}));
+    if(r.id){ saved++; have.add(f.name); }
+  }
+  sum.innerHTML += ' · <b>легло: ' + saved + '</b>' + (skipped ? (' (уже было: ' + skipped + ')') : '');
+  loadSaved();
 }
 pick.onchange = () => { show(+pick.value); $('#sname').value = files[+pick.value].name; };
 
