@@ -1,42 +1,50 @@
 // Карта: раскладывает шаблоны (/api/list) по 7 уровням архитектуры.
 // Уровни — те же «слои», что в схеме знаний: фундамент снизу, предметка сверху.
-// Группа шаблона → уровень по таблице ниже; что не попало — в «Прочее».
+// Уровень определяется по ключевым словам в группе/названии — так ложатся и
+// готовые шаблоны, и свои загруженные (с любыми группами).
 const LEVELS = [
   { n:1, key:'basics', color:'#B45CFF', name:'Основы языка',
     what:'переменные, условия, циклы, функции, типы — алфавит, без него никуда',
-    groups:['JavaScript — основы','Python — основы','Справочник','Одна задача на 3 языках'] },
+    kw:['основ','управлен','переменн','услови','цикл','синтаксис','справочник','одна задача','ветвлен'] },
   { n:2, key:'data', color:'#3DD9FF', name:'Структуры данных',
-    what:'массив, объект/словарь, простая база — ЧЕМ и как хранить',
-    groups:['JavaScript — данные','База данных (просто)'] },
-  { n:3, key:'flow', color:'#52F2C9', name:'Поток данных и функции',
-    what:'вход→выход, связывание шагов, события, состояние, отрисовка результата',
-    groups:['Как связывать (поток данных)','JavaScript — расчёты','JavaScript — интерактив','Как строятся системы','Рецепты (от задачи к коду)','Отрисовка'] },
+    what:'массив, объект/словарь, строки, простая база — ЧЕМ и как хранить',
+    kw:['массив','объект','строк','словар','список','структур','данные','база','коллекц'] },
+  { n:3, key:'flow', color:'#52F2C9', name:'Поток данных, логика и вывод',
+    what:'связывание шагов, события, состояние, расчёты, игры, отрисовка на экран',
+    kw:[] },   // сюда попадает всё, что не опознано как другой слой
   { n:4, key:'arch', color:'#FF8800', name:'Архитектура',
-    what:'модули и импорты, библиотеки, серверы, интерфейс — кто кого зовёт',
-    groups:['Как файлы образуют систему','Библиотеки','Серверы','Стили страниц'] },
+    what:'модули и импорты, библиотеки, серверы, стили/вёрстка — кто кого зовёт',
+    kw:['библиотек','сервер','файл','модул','импорт','export','стил','css','верстк','роут','маршрут'] },
   { n:5, key:'net', color:'#FF2FAE', name:'Данные и сеть',
-    what:'fetch, API, JSON, парсеры, обход CORS через прокси',
-    groups:['Сеть и запросы','Парсеры'] },
+    what:'fetch, API, JSON, парсеры, хранилище/localStorage, обход CORS',
+    kw:['сеть','запрос','fetch','api','парсер','прокси','cors','хранилищ','storage','localstorage','кэш','gist'] },
   { n:6, key:'debug', color:'#E8895A', name:'Отладка и тесты',
-    what:'найти баг, воспроизвести, проверить — пока без шаблонов, но есть практикум',
-    groups:[], link:{ href:'/schema-debug.html', text:'→ практикум по отладке' } },
+    what:'найти баг, воспроизвести, проверить',
+    kw:['отладк','debug','юнит','тест'], link:{ href:'/schema-debug.html', text:'→ практикум по отладке' } },
   { n:7, key:'domain', color:'#9C90C4', name:'Предметка: финансы и математика',
     what:'доходности, риск, корреляции, индикаторы — ЧТО именно считать',
-    groups:['Сложная математика','Риск на нескольких активах'] },
+    kw:['риск','портфел','облигац','доходн','ковариац','корреляц','ssa','финанс','индикатор','дисперс','волатил','эмитент'] },
 ];
 const LANG_LABEL = { js:'JS', python:'PY', sql:'SQL', css:'CSS', other:'—' };
+// порядок проверки: специфичные слои раньше; «поток» (flow) — как запасной
+const ORDER = ['domain','net','arch','debug','data','basics','flow'];
+function levelFor(t){
+  const hay = ((t.group || '') + ' ' + (t.title || '')).toLowerCase();
+  for(const key of ORDER){
+    const L = LEVELS.find(x => x.key === key);
+    if(L.kw.some(w => hay.includes(w))) return key;
+  }
+  return 'flow';
+}
 
 (async function(){
   let list = [];
   try { list = await fetch('/api/list').then(r => r.json()); } catch(_){
     document.getElementById('sections').innerHTML = '<div class="muted pad">сервер недоступен</div>'; return;
   }
-  // группа → уровень
-  const g2l = {};
-  LEVELS.forEach(L => L.groups.forEach(g => g2l[g] = L.key));
+  // разложить по уровням
   const byLevel = {}; LEVELS.forEach(L => byLevel[L.key] = []);
-  const other = [];
-  list.forEach(t => { const k = g2l[t.group]; if(k) byLevel[k].push(t); else other.push(t); });
+  list.forEach(t => byLevel[levelFor(t)].push(t));
 
   // обзор-лесенка
   const ladder = document.getElementById('ladder');
@@ -61,22 +69,20 @@ const LANG_LABEL = { js:'JS', python:'PY', sql:'SQL', css:'CSS', other:'—' };
     const what = document.createElement('div'); what.className = 'lsec-what'; what.textContent = L.what; sec.appendChild(what);
     const items = byLevel[L.key];
     if(items.length){
-      const grid = document.createElement('div'); grid.className = 'cards';
-      items.forEach(t => grid.appendChild(card(t)));
-      sec.appendChild(grid);
+      // внутри уровня — по исходным группам (твои темы: Canvas, DOM, Игры…)
+      const bg = {}; items.forEach(t => { (bg[t.group || '—'] = bg[t.group || '—'] || []).push(t); });
+      const groups = Object.keys(bg).sort((a, b) => bg[b].length - bg[a].length);
+      groups.forEach(g => {
+        if(groups.length > 1){ const gl = document.createElement('div'); gl.className = 'lsub'; gl.textContent = g + ' · ' + bg[g].length; sec.appendChild(gl); }
+        const grid = document.createElement('div'); grid.className = 'cards';
+        bg[g].forEach(t => grid.appendChild(card(t)));
+        sec.appendChild(grid);
+      });
     } else if(L.link){
       const a = document.createElement('a'); a.className = 'lsec-link'; a.href = L.link.href; a.textContent = L.link.text; sec.appendChild(a);
     }
     host.appendChild(sec);
   });
-
-  if(other.length){
-    const sec = document.createElement('section'); sec.className = 'lsec';
-    sec.innerHTML = '<div class="lsec-h"><span class="lsec-dot" style="background:var(--text3)"></span><span class="lsec-name">Прочее</span></div>';
-    const grid = document.createElement('div'); grid.className = 'cards';
-    other.forEach(t => grid.appendChild(card(t)));
-    sec.appendChild(grid); host.appendChild(sec);
-  }
 })();
 
 function card(t){
