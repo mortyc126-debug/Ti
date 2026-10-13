@@ -138,7 +138,7 @@ async function handle(fileList){
   const note = [];
   if(st.saved) note.push('в данные легло: ' + st.saved);
   if(st.skipped) note.push('уже было: ' + st.skipped);
-  if(st.toLib) note.push('шаблонов кода → в Библиотеку: ' + st.toLib + ' (открой «Библиотека»)');
+  if(st.toLib){ note.push('шаблонов кода → в Библиотеку: ' + st.toLib); const g = await syncGh(); if(g) note.push('GitHub: ' + g); }
   err.textContent = note.join(' · ');
   if(dataFiles.length) openFiles(dataFiles, 0, null);
   else $('#comp').style.display = 'none';
@@ -166,10 +166,18 @@ $('#rescue').onclick = async () => {
       }
     } catch(_){}
   }
-  btn.textContent = moved ? ('✓ перенесено в Библиотеку: ' + moved + ' — не забудь «Сохранить на GitHub» там') : 'шаблонов кода в Данных не нашлось';
+  let msg = moved ? ('перенесено в Библиотеку: ' + moved) : 'шаблонов кода в Данных не нашлось';
+  if(moved){ const g = await syncGh(); msg += ' · GitHub: ' + g; }
+  btn.textContent = (moved ? '✓ ' : '') + msg;
   loadSaved();
-  setTimeout(() => btn.textContent = 'Перенести шаблоны кода из Данных в Библиотеку', 4000);
+  setTimeout(() => btn.textContent = 'Перенести шаблоны кода из Данных в Библиотеку', 5000);
 };
+
+// отправить шаблоны на GitHub (прямо отсюда, чтобы никуда не ходить)
+async function syncGh(){
+  try { const r = await fetch('/api/git/sync', { method: 'POST' }).then(r => r.json()); return r.message || (r.ok ? 'отправлено' : 'не удалось'); }
+  catch(_){ return 'сервер недоступен'; }
+}
 
 // открыть набор распарсенных файлов в компоненте
 function openFiles(fs, i, sid){
