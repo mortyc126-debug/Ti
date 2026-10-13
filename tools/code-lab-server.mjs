@@ -199,6 +199,7 @@ const server = http.createServer(async (req, res) => {
       if(b.name != null) j.name = String(b.name).slice(0, 120);
       if(b.desc != null) j.desc = String(b.desc).slice(0, 400);
       if(b.category != null) j.category = String(b.category).slice(0, 80);
+      if(b.data !== undefined) j.data = b.data;   // правки понятных полей сохраняются в сами данные
       await fs.writeFile(abs, JSON.stringify(j), 'utf8');
       return json(res, 200, { ok: true });
     }
