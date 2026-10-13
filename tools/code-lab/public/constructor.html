@@ -84,6 +84,24 @@
   .insp-field input:focus{outline:none;border-color:var(--name)}
   .insp-text{font-size:13px;color:var(--text2);line-height:1.65}
   .insp-code{margin-top:10px}
+  .insp-desc{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-size:13px;line-height:1.5;min-height:58px;resize:vertical}
+  .insp-desc:focus{outline:none;border-color:var(--name)}
+  .insp-save{font:12px/1 ui-monospace,monospace;color:var(--str);background:var(--s2);border:1px dashed rgba(82,242,201,.45);border-radius:7px;padding:8px 11px;cursor:pointer;margin:2px 0 12px}
+  .insp-save:hover{border-color:var(--str)}
+  /* модалка «сохранить в каталог» */
+  .modal-bg{position:fixed;inset:0;background:rgba(5,2,14,.72);display:flex;align-items:flex-start;justify-content:center;z-index:60;overflow:auto;padding:28px 16px}
+  .modal{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;max-width:600px;padding:20px 22px}
+  .modal h3{margin:0 0 4px;font-size:17px}
+  .modal .mh{color:var(--text3);font-size:12.5px;margin:0 0 16px}
+  .mfield{margin-bottom:13px}
+  .mfield label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:5px}
+  .mfield input,.mfield select,.mfield textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:9px 11px}
+  .mfield textarea{font-family:ui-monospace,monospace;resize:vertical;min-height:120px}
+  .mfield input:focus,.mfield select:focus,.mfield textarea:focus{outline:none;border-color:var(--name)}
+  .mrow{display:flex;gap:12px}.mrow .mfield{flex:1}
+  .mbtns{display:flex;gap:8px;margin-top:6px}
+  .mbtns .btn{font:13px/1 ui-sans-serif,system-ui;padding:9px 14px}
+  .merr{color:#FF6B6B;font-size:12.5px;margin-top:8px}
   .blk-code-wrap{position:relative;width:100%;margin-top:3px}
   textarea.blk-code,pre.blk-hl{width:100%;box-sizing:border-box;margin:0;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word;tab-size:2}
   pre.blk-hl{position:absolute;inset:0;pointer-events:none;overflow:hidden;color:#CBC2EA;background:var(--bg);border-color:transparent}

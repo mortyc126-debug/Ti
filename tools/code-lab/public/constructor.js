@@ -268,10 +268,11 @@ function renderInspector(nd){
   });
   host.appendChild(head);
   const body = document.createElement('div'); body.className = 'insp-body';
-  body.appendChild(el('div', 'insp-title', nodeLabel(nd)));
+  const titleEl = el('div', 'insp-title', nodeLabel(nd)); body.appendChild(titleEl);
   body.appendChild(el('div', 'insp-kind', b.type === 'draw' ? 'рисование' : 'компонент'));
-  if(inspTab === 'set') body.appendChild(inspFields(nd, b));
-  else if(inspTab === 'learn') body.appendChild(el('div', 'insp-text', b.hint || 'подсказки нет'));
+  const save = el('button', 'insp-save', '💾 сохранить в каталог'); save.title = 'добавить этот кусок в каталог как компонент'; save.onclick = () => saveToCatalog(nd); body.appendChild(save);
+  if(inspTab === 'set'){ body.appendChild(nodeMetaEditor(nd, titleEl)); body.appendChild(inspFields(nd, b)); }
+  else if(inspTab === 'learn') body.appendChild(el('div', 'insp-text', nd.desc || b.hint || 'описания нет. Открой «Настроить» → поле «описание», впиши своими словами.'));
   else body.appendChild(inspWhy(nd, b));
   host.appendChild(body);
 }
@@ -327,6 +328,50 @@ function rawInspFields(nd){
   det.appendChild(attachHighlight(ta));
   box.appendChild(det);
   return box;
+}
+
+// редактор заголовка и описания узла (в «Настроить»)
+function nodeMetaEditor(nd, titleEl){
+  const box = document.createElement('div');
+  const r1 = el('div', 'insp-field'); r1.appendChild(el('label', '', 'заголовок'));
+  const ti = document.createElement('input'); ti.value = nodeLabel(nd); ti.spellcheck = false;
+  ti.addEventListener('input', () => { nd.title = ti.value; updateCard(nd); if(titleEl) titleEl.textContent = ti.value; persist(); });
+  r1.appendChild(ti); box.appendChild(r1);
+  const r2 = el('div', 'insp-field'); r2.appendChild(el('label', '', 'описание (своими словами)'));
+  const ta = document.createElement('textarea'); ta.className = 'insp-desc'; ta.spellcheck = false; ta.value = nd.desc || ''; ta.placeholder = 'что это и зачем — чтобы не забыть';
+  ta.addEventListener('input', () => { nd.desc = ta.value; persist(); });
+  r2.appendChild(ta); box.appendChild(r2);
+  return box;
+}
+// сохранить узел как компонент в каталог (появится в каталоге и палитре)
+function saveToCatalog(nd){
+  const bg = el('div', 'modal-bg');
+  const purposeOpts = PURPOSE.map(p => '<option>' + esc(p[0]) + '</option>').join('');
+  bg.innerHTML = '<div class="modal"><h3>Сохранить в каталог</h3>'
+    + '<p class="mh">Этот кусок станет компонентом в выбранном разделе — появится в каталоге и в палитре слева.</p>'
+    + '<div class="mrow"><div class="mfield"><label>Назначение</label><select id="s-purpose">' + purposeOpts + '</select></div>'
+    + '<div class="mfield"><label>Подкатегория</label><select id="s-sub"></select></div></div>'
+    + '<div class="mfield"><label>Название</label><input id="s-title"></div>'
+    + '<div class="mfield"><label>Описание</label><textarea id="s-desc" style="min-height:70px"></textarea></div>'
+    + '<div class="mfield"><label>Код</label><textarea id="s-code" spellcheck="false"></textarea></div>'
+    + '<div class="mbtns"><button class="btn ok" id="s-save">Сохранить</button><button class="btn" id="s-cancel">Отмена</button></div><div class="merr" id="s-err"></div></div>';
+  document.body.appendChild(bg);
+  const q = s => bg.querySelector(s);
+  q('#s-title').value = nodeLabel(nd); q('#s-desc').value = nd.desc || ''; q('#s-code').value = nodeCode(nd);
+  const fillSubs = () => { const pk = q('#s-purpose').value; const subs = (SUBCATS[pk] || []).map(x => x[0]).concat(['Разное']); q('#s-sub').innerHTML = subs.map(s => '<option>' + esc(s) + '</option>').join(''); };
+  fillSubs(); q('#s-purpose').onchange = fillSubs;
+  bg.onclick = e => { if(e.target === bg) bg.remove(); };
+  q('#s-cancel').onclick = () => bg.remove();
+  q('#s-save').onclick = async () => {
+    const title = q('#s-title').value.trim(), code = q('#s-code').value;
+    if(!title || !code.trim()){ q('#s-err').textContent = 'нужны название и код'; return; }
+    const purpose = q('#s-purpose').value, subcat = q('#s-sub').value;
+    const component = { type:'component', tags:{ purpose:[purpose], technology:['JavaScript'], runtime:[] }, subcat, summary:{ input:'', output:'', dependencies:[], requirements:[] } };
+    const payload = { title, lang:'js', group: subcat, desc: q('#s-desc').value.trim(), code, component };
+    q('#s-save').textContent = 'сохраняю…';
+    const r = await fetch('/api/add', { method:'POST', body: JSON.stringify(payload) }).then(r => r.json()).catch(() => ({}));
+    if(r.id){ bg.remove(); loadCatalog(); } else { q('#s-err').textContent = 'не сохранилось'; q('#s-save').textContent = 'Сохранить'; }
+  };
 }
 
 function inspWhy(nd, b){
