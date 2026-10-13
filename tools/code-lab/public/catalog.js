@@ -177,7 +177,7 @@ function card(t){
     + '</div>';
   a.innerHTML = top + '<div class="cdesc"></div>' + io + tags
     + '<div class="cact"><span class="cbtn" data-x="use">Открыть</span><span class="cbtn" data-x="ctor">→ в конструктор</span>'
-    + '<span class="cbtn" data-x="ren" title="переименовать">✎</span><span class="cbtn del" data-x="del" title="удалить">🗑</span></div>';
+    + '<span class="cbtn" data-x="desc" title="описание">📝</span><span class="cbtn" data-x="ren" title="переименовать">✎</span><span class="cbtn del" data-x="del" title="удалить">🗑</span></div>';
   a.querySelector('.ctitle').textContent = t.title || t.id;
   a.querySelector('.cdesc').textContent = t.desc || '';
   if(io){ a.querySelector('.cio .i').textContent = t.comp.input||'—'; a.querySelector('.cio .o').textContent = t.comp.output||'—'; }
@@ -193,8 +193,29 @@ function card(t){
     const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: t.id, title: v.trim() }) }).then(r=>r.json()).catch(()=>({}));
     if(r.ok){ t.title = v.trim(); render(); }
   };
+  a.querySelector('[data-x="desc"]').onclick = e => { e.preventDefault(); e.stopPropagation(); editDescModal(t); };
   a.querySelector('[data-x="del"]').onclick = e => { e.preventDefault(); e.stopPropagation(); deleteById(t.id, t.title); };
   return a;
+}
+// дописать/изменить описание карточки (чтобы не забывать, что это)
+function editDescModal(t){
+  const bg = document.createElement('div'); bg.className = 'modal-bg';
+  bg.innerHTML = '<div class="modal" style="max-width:520px"><h3>Описание</h3>'
+    + '<p class="mh">Своими словами: что это и когда брать. Сохранится на карточке и в подсказке палитры.</p>'
+    + '<div class="mfield"><label>' + esc(t.title || '') + '</label><textarea id="d-desc" style="min-height:130px" spellcheck="false"></textarea></div>'
+    + '<div class="mbtns"><button class="btn ok" id="d-save">Сохранить</button><button class="btn" id="d-cancel">Отмена</button></div><div class="merr" id="d-err"></div></div>';
+  document.body.appendChild(bg);
+  const $$ = s => bg.querySelector(s);
+  $$('#d-desc').value = t.desc || '';
+  $$('#d-desc').focus();
+  bg.onclick = e => { if(e.target === bg) bg.remove(); };
+  $$('#d-cancel').onclick = () => bg.remove();
+  $$('#d-save').onclick = async () => {
+    const v = $$('#d-desc').value;
+    $$('#d-save').textContent = 'сохраняю…';
+    const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: t.id, desc: v }) }).then(r=>r.json()).catch(()=>({}));
+    if(r.ok){ t.desc = v; bg.remove(); render(); } else { $$('#d-err').textContent = 'не сохранилось'; $$('#d-save').textContent = 'Сохранить'; }
+  };
 }
 function markCardSel(){ document.querySelectorAll('.card').forEach(el => el.classList.toggle('sel', el.dataset.id === selCardId)); }
 async function deleteById(id, label){
