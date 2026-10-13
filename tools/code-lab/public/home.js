@@ -1,6 +1,5 @@
 // Главный экран: подтягивает список шаблонов и показывает несколько карточек.
 // Клик по карточке открывает её в Библиотеке (id — в hash).
-const LANG_IC = { js: '🟨', python: '🐍', sql: '🗄️', other: '📄' };
 
 (async function(){
   const box = document.getElementById('pop');
@@ -14,9 +13,7 @@ const LANG_IC = { js: '🟨', python: '🐍', sql: '🗄️', other: '📄' };
   box.innerHTML = '';
   pick.forEach(t => {
     const a = document.createElement('a'); a.className = 'pop'; a.href = '/library.html#' + encodeURIComponent(t.id);
-    const ic = LANG_IC[(t.lang || 'other').toLowerCase()] || '📄';
-    a.innerHTML = '<div class="pop-ic">' + ic + '</div>'
-      + '<div class="pop-t"></div><div class="pop-g"></div>'
+    a.innerHTML = '<div class="pop-t"></div><div class="pop-g"></div>'
       + '<div class="pop-l">' + esc((t.lang || '').toUpperCase() || '—') + '</div>';
     a.querySelector('.pop-t').textContent = t.title || 'без названия';
     a.querySelector('.pop-g').textContent = t.group || '';

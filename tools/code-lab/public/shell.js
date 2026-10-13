@@ -4,10 +4,10 @@
 // data-page у <body>. Подключать ПЕРЕД основным скриптом страницы.
 (function(){
   const PAGES = [
-    { key:'home',        label:'Главная',     ic:'🏠', href:'/' },
-    { key:'library',     label:'Библиотека',  ic:'📚', href:'/library.html' },
-    { key:'constructor', label:'Конструктор', ic:'🧩', href:'/constructor.html' },
-    { key:'learn',       label:'Обучение',    ic:'🎓', href:'/schema.html' },
+    { key:'home',        label:'Главная',     href:'/' },
+    { key:'library',     label:'Библиотека',  href:'/library.html' },
+    { key:'constructor', label:'Конструктор', href:'/constructor.html' },
+    { key:'learn',       label:'Обучение',    href:'/schema.html' },
   ];
   const cur = document.body.dataset.page || '';
 
@@ -23,10 +23,10 @@
   if(cur !== 'learn'){ const t = main.querySelector('header .tabs'); if(t) t.remove(); }
 
   const side = document.createElement('aside'); side.className = 'side';
-  side.innerHTML = '<div class="brand"><span class="logo">⚡</span><span>Лаборатория</span></div>';
+  side.innerHTML = '<div class="brand"><span class="logo"></span><span>Лаборатория</span></div>';
   PAGES.forEach(p => {
     const a = document.createElement('a'); a.className = 'nav-i' + (p.key === cur ? ' on' : ''); a.href = p.href;
-    a.innerHTML = '<span class="ic">' + p.ic + '</span><span>' + p.label + '</span>';
+    a.textContent = p.label;
     side.appendChild(a);
   });
   const sp = document.createElement('div'); sp.className = 'spacer'; side.appendChild(sp);
