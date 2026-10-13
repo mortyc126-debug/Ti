@@ -108,7 +108,14 @@ async function listTemplates(){
   for(const n of names.sort()){
     try {
       const j = JSON.parse(await fs.readFile(path.join(TEMPLATES, n), 'utf8'));
-      out.push({ id: j.id || n.replace(/\.json$/, ''), lang: j.lang || '', group: j.group || 'Разное', title: j.title || n, desc: j.desc || '', file: n });
+      const nlines = Array.isArray(j.lines) ? j.lines.filter(l => (l || []).some(k => (k.v || '').trim())).length : 0;
+      const row = { id: j.id || n.replace(/\.json$/, ''), lang: j.lang || '', group: j.group || 'Разное', title: j.title || n, desc: j.desc || '', file: n, nlines };
+      // краткая сводка компонента — чтобы каталог показывал тип/контракт/теги без лишних запросов
+      if(j.component){
+        const c = j.component;
+        row.comp = { type: c.type || '', tags: c.tags || {}, input: (c.summary && c.summary.input) || '', output: (c.summary && c.summary.output) || '' };
+      }
+      out.push(row);
     } catch(_){}
   }
   return out;
