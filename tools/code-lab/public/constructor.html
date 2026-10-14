@@ -88,6 +88,21 @@
   .insp-desc:focus{outline:none;border-color:var(--name)}
   .insp-save{font:12px/1 ui-monospace,monospace;color:var(--str);background:var(--s2);border:1px dashed rgba(82,242,201,.45);border-radius:7px;padding:8px 11px;cursor:pointer;margin:2px 0 12px}
   .insp-save:hover{border-color:var(--str)}
+  /* где живут правки узла: только в схеме или в шаблоне */
+  .insp-scope{margin-top:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:9px}
+  .scope-h{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px}
+  .scope-src{font-size:12px;color:var(--text2)}
+  .scope-st{font-size:10.5px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--text3)}
+  .scope-st.dirty{color:var(--acc);border-color:rgba(255,0,110,.4)}
+  .scope-st.clean{color:var(--str);border-color:rgba(82,242,201,.4)}
+  .scope-note{font-size:11.5px;color:var(--text3);line-height:1.5}
+  .scope-btns{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}
+  .scope-save,.scope-revert{font:12px/1 ui-sans-serif,system-ui;border-radius:7px;padding:8px 11px;cursor:pointer;border:1px solid var(--border);background:var(--s2)}
+  .scope-save{color:var(--str);border-color:rgba(82,242,201,.5)}
+  .scope-save:hover{border-color:var(--str)}
+  .scope-save:disabled{opacity:.6;cursor:default}
+  .scope-revert{color:var(--text2)}
+  .scope-revert:hover{color:var(--acc);border-color:rgba(255,0,110,.4)}
   /* модалка «сохранить в каталог» */
   .modal-bg{position:fixed;inset:0;background:rgba(5,2,14,.72);display:flex;align-items:flex-start;justify-content:center;z-index:60;overflow:auto;padding:28px 16px}
   .modal{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;max-width:600px;padding:20px 22px}

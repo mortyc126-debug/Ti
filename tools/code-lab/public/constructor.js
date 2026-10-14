@@ -116,7 +116,8 @@ async function addFromCatalog(t){
   try {
     const tpl = await fetch('/api/template?id=' + encodeURIComponent(t.id)).then(r => r.json());
     const code = (tpl.lines || []).map(line => (line || []).map(k => k.v != null ? k.v : '').join('')).join('\n');
-    addNode('raw', { fields: { code }, title: t.title });
+    // запоминаем, из какого шаблона узел — чтобы правки можно было вернуть в сам шаблон
+    addNode('raw', { fields: { code }, title: t.title, desc: tpl.desc || '', src: { id: t.id, title: t.title, desc: tpl.desc || '', code } });
   } catch(_){}
 }
 $('#palSearch').oninput = renderPalette;
@@ -330,18 +331,63 @@ function rawInspFields(nd){
   return box;
 }
 
+// узел отличается от своего шаблона?
+function nodeDirty(nd){
+  if(!nd.src) return false;
+  return nodeLabel(nd) !== nd.src.title || (nd.desc || '') !== (nd.src.desc || '') || String(nd.fields && nd.fields.code || '') !== String(nd.src.code || '');
+}
 // редактор заголовка и описания узла (в «Настроить»)
 function nodeMetaEditor(nd, titleEl){
   const box = document.createElement('div');
   const r1 = el('div', 'insp-field'); r1.appendChild(el('label', '', 'заголовок'));
   const ti = document.createElement('input'); ti.value = nodeLabel(nd); ti.spellcheck = false;
-  ti.addEventListener('input', () => { nd.title = ti.value; updateCard(nd); if(titleEl) titleEl.textContent = ti.value; persist(); });
+  ti.addEventListener('input', () => { nd.title = ti.value; updateCard(nd); if(titleEl) titleEl.textContent = ti.value; persist(); renderScope(); });
   r1.appendChild(ti); box.appendChild(r1);
   const r2 = el('div', 'insp-field'); r2.appendChild(el('label', '', 'описание (своими словами)'));
   const ta = document.createElement('textarea'); ta.className = 'insp-desc'; ta.spellcheck = false; ta.value = nd.desc || ''; ta.placeholder = 'что это и зачем — чтобы не забыть';
-  ta.addEventListener('input', () => { nd.desc = ta.value; persist(); });
+  ta.addEventListener('input', () => { nd.desc = ta.value; persist(); renderScope(); });
   r2.appendChild(ta); box.appendChild(r2);
+
+  // где живут правки + сохранение в сам шаблон
+  const scope = el('div', 'insp-scope'); box.appendChild(scope);
+  function renderScope(){
+    scope.innerHTML = '';
+    if(!nd.src){
+      scope.appendChild(el('div', 'scope-note', 'Этот узел не связан с шаблоном. Правки живут только в этой схеме. Чтобы сохранить насовсем — «💾 сохранить в каталог» выше.'));
+      return;
+    }
+    const dirty = nodeDirty(nd);
+    const h = el('div', 'scope-h');
+    h.appendChild(el('span', 'scope-src', 'из шаблона: «' + nd.src.title + '»'));
+    h.appendChild(el('span', 'scope-st ' + (dirty ? 'dirty' : 'clean'), dirty ? '● изменено только в схеме' : '✓ как в шаблоне'));
+    scope.appendChild(h);
+    scope.appendChild(el('div', 'scope-note', dirty
+      ? 'Правки заголовка, описания и кода пока только в этой схеме. Можно оставить так — или записать их в сам шаблон (изменится везде, где он используется).'
+      : 'Совпадает с шаблоном. Поменяй что-нибудь выше — появится выбор: оставить в схеме или записать в шаблон.'));
+    if(dirty){
+      const btns = el('div', 'scope-btns');
+      const sv = el('button', 'scope-save', '✎ записать в шаблон'); sv.onclick = () => saveNodeToTemplate(nd, sv, renderScope);
+      const rv = el('button', 'scope-revert', '↩ вернуть как в шаблоне'); rv.onclick = () => {
+        nd.title = nd.src.title; nd.desc = nd.src.desc; if(nd.fields) nd.fields.code = nd.src.code;
+        updateCard(nd); if(titleEl) titleEl.textContent = nodeLabel(nd); persist(); renderInspector(nd);
+      };
+      btns.append(sv, rv); scope.appendChild(btns);
+    }
+  }
+  renderScope();
   return box;
+}
+// записать правки узла обратно в его шаблон (меняет сам .json через /api/edit)
+async function saveNodeToTemplate(nd, btn, done){
+  if(!nd.src || !nd.src.id) return;
+  const payload = { id: nd.src.id, title: nodeLabel(nd), desc: nd.desc || '', code: (nd.fields && nd.fields.code) || nodeCode(nd) };
+  if(btn){ btn.textContent = 'сохраняю…'; btn.disabled = true; }
+  const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify(payload) }).then(r => r.json()).catch(() => ({}));
+  if(r && r.ok){
+    nd.src = { id: nd.src.id, title: payload.title, desc: payload.desc, code: payload.code };  // теперь шаблон = текущее
+    persist(); loadCatalog();   // палитра/каталог подтянут новое название
+    if(btn){ btn.textContent = '✓ записано в шаблон'; setTimeout(() => done && done(), 900); }
+  } else if(btn){ btn.textContent = 'не вышло, ещё раз'; btn.disabled = false; }
 }
 // сохранить узел как компонент в каталог (появится в каталоге и палитре)
 function saveToCatalog(nd){
