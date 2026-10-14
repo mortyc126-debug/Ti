@@ -588,7 +588,32 @@ function addPieces(parts){
   renderCanvas(); renderCode(); persist();
   if(parts.length) select(graph.nodes[graph.nodes.length - 1]);
 }
+// разобрать произвольный текст: auto определяет HTML/JS по виду
+function breakdownText(text, kind){
+  const looksHTML = /<\s*(!doctype|html|head|body|div|section|span|p|a|script|style|canvas|svg|ul|li|table|h[1-6])\b/i.test(text);
+  const mode = kind === 'auto' ? (looksHTML ? 'html' : 'js') : kind;
+  if(mode === 'html') return { parts: breakdownHTML(text), mode };
+  return { parts: splitTopLevel(text).map(c => ({ title: classify(c), code: c })), mode };
+}
 $('#imp').onclick = () => $('#impfile').click();
+// «вставить код» — панель с textarea, разбор на блоки прямо из вставленного
+$('#paste').onclick = () => {
+  const pp = $('#pastePanel'); const show = pp.style.display === 'none';
+  pp.style.display = show ? 'block' : 'none';
+  if(show){ $('#pasteNote').textContent = ''; $('#pasteCode').focus(); }
+};
+$('#pasteCancel').onclick = () => { $('#pastePanel').style.display = 'none'; $('#pasteCode').value = ''; $('#pasteNote').textContent = ''; };
+$('#pasteGo').onclick = () => {
+  const text = $('#pasteCode').value; const note = $('#pasteNote');
+  if(!text.trim()){ note.textContent = 'поле пустое'; return; }
+  if(text.length > 120000){ note.textContent = 'многовато — вставь кусок поменьше'; return; }
+  const { parts, mode } = breakdownText(text, $('#pasteKind').value);
+  if(!parts.length){ note.textContent = 'не нашлось, что разбить'; return; }
+  addPieces(parts);
+  note.textContent = 'готово: ' + parts.length + ' блок(ов), ' + (mode === 'html' ? 'как HTML' : 'как JS');
+  $('#pasteCode').value = '';
+  setTimeout(() => { $('#pastePanel').style.display = 'none'; note.textContent = ''; }, 1200);
+};
 $('#impfile').onchange = async e => {
   const f = e.target.files && e.target.files[0]; if(!f) return;
   const text = await f.text(); if(text.length > 120000){ alert('Файл большой — возьми кусок поменьше.'); return; }
