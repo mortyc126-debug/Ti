@@ -2,6 +2,7 @@
 // Данные — из template.component (если есть), иначе мягкий fallback на код/описание.
 const ID = decodeURIComponent((location.search.match(/[?&]id=([^&]+)/) || [])[1] || (location.hash || '').replace(/^#/, ''));
 const root = document.getElementById('root');
+let NOTES = {};   // пояснения к словам, хранятся на компоненте (component.notes)
 
 (async function(){
   if(!ID){ root.innerHTML = '<div class="muted pad">не указан компонент</div>'; return; }
@@ -13,6 +14,7 @@ const root = document.getElementById('root');
 
 function render(t){
   const c = t.component || null;
+  NOTES = (c && c.notes && typeof c.notes === 'object') ? c.notes : {};
   const codeText = c && c.views && c.views.use && c.views.use.code ? c.views.use.code.content
                  : (t.lines || []).map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n');
   root.innerHTML = '';
@@ -84,7 +86,10 @@ function viewUse(c, codeText, runnable, t){
   const use = c && c.views && c.views.use;
   let n = 1;
   if(use && use.html){ wrap.appendChild(step(n++, 'Подготовь HTML', codeBlock(use.html, 'html'))); }
-  wrap.appendChild(step(n++, use ? 'Добавь JavaScript' : 'Код', codeBlock(codeText, 'js')));
+  const mainCode = document.createElement('div');
+  mainCode.appendChild(el('div', 'note-hint', 'Клик по слову в коде — вписать пояснение (сохранится на компоненте).'));
+  mainCode.appendChild(noteCode(codeText));
+  wrap.appendChild(step(n++, use ? 'Добавь JavaScript' : 'Код', mainCode));
   if(use && use.example_input){
     const ex = document.createElement('div');
     ex.appendChild(codeBlock('const colors = ' + JSON.stringify(use.example_input, null, 2) + ';' + (use.demo ? '\n' + use.demo : ''), 'js'));
@@ -204,6 +209,54 @@ function hl(code, lang){
   });
   return lines.join('\n');
 }
+// код с кликабельными словами — пояснения к словам (сохраняются на компоненте)
+function noteCode(text){
+  const wrap = el('div', 'codewrap');
+  const pre = document.createElement('pre'); pre.className = 'code';
+  String(text).split('\n').forEach(line => {
+    const div = document.createElement('div'); let i = 0; const n = line.length;
+    const add = (cls, v, word) => {
+      const s = document.createElement('span'); if(cls) s.className = cls; s.textContent = v;
+      if(word){ s.classList.add('w'); if(NOTES[word]){ s.classList.add('has-note'); s.title = NOTES[word]; }
+        s.addEventListener('click', e => { e.stopPropagation(); openNote(word, s); }); }
+      div.appendChild(s);
+    };
+    while(i < n){
+      const rest = line.slice(i), c = line[i];
+      if(rest.startsWith('//')){ add('u', line.slice(i)); break; }
+      if(c === '"' || c === "'" || c === '`'){ let j = i + 1; while(j < n && line[j] !== c) j++; j++; add('s', line.slice(i, j)); i = j; continue; }
+      if(/[0-9]/.test(c)){ const m = /^\d[\d.]*/.exec(rest); add('n', m[0]); i += m[0].length; continue; }
+      const m = /^[A-Za-zА-Яа-яЁё_$][\wА-Яа-яЁё$]*/.exec(rest);
+      if(m){ const w = m[0]; let k = i + w.length; while(line[k] === ' ') k++; add(KW.has(w) ? 'k' : (line[k] === '(' ? 'f' : ''), w, w); i += w.length; continue; }
+      add('', line[i]); i++;
+    }
+    if(!line.length) div.appendChild(document.createTextNode('​'));
+    pre.appendChild(div);
+  });
+  const cp = el('button', 'copy', '⧉'); cp.onclick = () => { navigator.clipboard.writeText(text); cp.textContent = '✓'; setTimeout(() => cp.textContent = '⧉', 1000); };
+  wrap.append(pre, cp); return wrap;
+}
+function openNote(word, span){
+  closeNotePop();
+  const pop = el('div', 'note-pop'); pop.id = '_notepop';
+  pop.appendChild(el('div', 'np-h', 'пояснение к «' + word + '»'));
+  const ta = document.createElement('textarea'); ta.value = NOTES[word] || ''; ta.placeholder = 'что это значит, своими словами';
+  const btns = el('div', 'np-btns');
+  const sv = el('button', 'np-ok', 'сохранить'); const del = el('button', '', 'убрать');
+  sv.onclick = async () => { const v = ta.value.trim(); if(v) NOTES[word] = v; else delete NOTES[word]; await saveNotes(); applyNote(word); closeNotePop(); };
+  del.onclick = async () => { delete NOTES[word]; await saveNotes(); applyNote(word); closeNotePop(); };
+  btns.append(sv, del); pop.append(ta, btns); document.body.appendChild(pop);
+  const r = span.getBoundingClientRect();
+  pop.style.left = Math.min(r.left + window.scrollX, window.scrollX + window.innerWidth - 290) + 'px';
+  pop.style.top = (r.bottom + window.scrollY + 5) + 'px';
+  ta.focus();
+  setTimeout(() => document.addEventListener('mousedown', noteOutside), 0);
+}
+function applyNote(word){ document.querySelectorAll('.w').forEach(s => { if(s.textContent === word){ if(NOTES[word]){ s.classList.add('has-note'); s.title = NOTES[word]; } else { s.classList.remove('has-note'); s.removeAttribute('title'); } } }); }
+function noteOutside(e){ const p = document.getElementById('_notepop'); if(p && !p.contains(e.target)) closeNotePop(); }
+function closeNotePop(){ const p = document.getElementById('_notepop'); if(p) p.remove(); document.removeEventListener('mousedown', noteOutside); }
+async function saveNotes(){ await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: ID, notes: NOTES }) }).catch(() => {}); }
+
 function badge(cls, text){ return el('span', 'b ' + cls, text); }
 function btn(text, extra){ const b = document.createElement('button'); b.className = 'btn' + (extra ? ' ' + extra : ''); b.textContent = text; return b; }
 function flash(b, t){ const o = b.textContent; b.textContent = t; setTimeout(() => b.textContent = o, 1100); }
