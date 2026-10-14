@@ -3,6 +3,7 @@
 const ID = decodeURIComponent((location.search.match(/[?&]id=([^&]+)/) || [])[1] || (location.hash || '').replace(/^#/, ''));
 const root = document.getElementById('root');
 let NOTES = {};   // пояснения к словам, хранятся на компоненте (component.notes)
+let LNOTES = {};  // пояснения к строкам, ключ — текст строки без пробелов по краям (component.lineNotes)
 
 (async function(){
   if(!ID){ root.innerHTML = '<div class="muted pad">не указан компонент</div>'; return; }
@@ -15,6 +16,7 @@ let NOTES = {};   // пояснения к словам, хранятся на �
 function render(t){
   const c = t.component || null;
   NOTES = (c && c.notes && typeof c.notes === 'object') ? c.notes : {};
+  LNOTES = (c && c.lineNotes && typeof c.lineNotes === 'object') ? c.lineNotes : {};
   const codeText = c && c.views && c.views.use && c.views.use.code ? c.views.use.code.content
                  : (t.lines || []).map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n');
   root.innerHTML = '';
@@ -87,7 +89,7 @@ function viewUse(c, codeText, runnable, t){
   let n = 1;
   if(use && use.html){ wrap.appendChild(step(n++, 'Подготовь HTML', codeBlock(use.html, 'html'))); }
   const mainCode = document.createElement('div');
-  mainCode.appendChild(el('div', 'note-hint', 'Клик по слову в коде — вписать пояснение (сохранится на компоненте).'));
+  mainCode.appendChild(el('div', 'note-hint', 'Клик по слову — пояснение к слову · клик по точке слева от строки — пояснение ко всей строке. Всё сохраняется на компоненте.'));
   mainCode.appendChild(noteCode(codeText));
   wrap.appendChild(step(n++, use ? 'Добавь JavaScript' : 'Код', mainCode));
   if(use && use.example_input){
@@ -209,12 +211,19 @@ function hl(code, lang){
   });
   return lines.join('\n');
 }
-// код с кликабельными словами — пояснения к словам (сохраняются на компоненте)
+// код с кликабельными словами и строками — пояснения хранятся на компоненте
 function noteCode(text){
   const wrap = el('div', 'codewrap');
-  const pre = document.createElement('pre'); pre.className = 'code';
+  const pre = document.createElement('pre'); pre.className = 'code noted';
   String(text).split('\n').forEach(line => {
-    const div = document.createElement('div'); let i = 0; const n = line.length;
+    const row = el('div', 'crow');
+    const lkey = line.trim();
+    // клик по номеру строки слева — пояснение ко всей строке
+    const g = el('span', 'lng', '•'); g.title = 'пояснение к строке';
+    if(lkey && LNOTES[lkey]){ g.classList.add('has-lnote'); row.classList.add('has-lnote'); g.title = LNOTES[lkey]; }
+    g.addEventListener('click', e => { e.stopPropagation(); if(lkey) openLineNote(lkey, g, row); });
+    row.appendChild(g);
+    const div = el('span', 'cln'); let i = 0; const n = line.length;
     const add = (cls, v, word) => {
       const s = document.createElement('span'); if(cls) s.className = cls; s.textContent = v;
       if(word){ s.classList.add('w'); if(NOTES[word]){ s.classList.add('has-note'); s.title = NOTES[word]; }
@@ -231,7 +240,7 @@ function noteCode(text){
       add('', line[i]); i++;
     }
     if(!line.length) div.appendChild(document.createTextNode('​'));
-    pre.appendChild(div);
+    row.appendChild(div); pre.appendChild(row);
   });
   const cp = el('button', 'copy', '⧉'); cp.onclick = () => { navigator.clipboard.writeText(text); cp.textContent = '✓'; setTimeout(() => cp.textContent = '⧉', 1000); };
   wrap.append(pre, cp); return wrap;
@@ -253,9 +262,26 @@ function openNote(word, span){
   setTimeout(() => document.addEventListener('mousedown', noteOutside), 0);
 }
 function applyNote(word){ document.querySelectorAll('.w').forEach(s => { if(s.textContent === word){ if(NOTES[word]){ s.classList.add('has-note'); s.title = NOTES[word]; } else { s.classList.remove('has-note'); s.removeAttribute('title'); } } }); }
+function openLineNote(key, gutter, row){
+  closeNotePop();
+  const pop = el('div', 'note-pop'); pop.id = '_notepop';
+  pop.appendChild(el('div', 'np-h', 'пояснение к строке'));
+  const ta = document.createElement('textarea'); ta.value = LNOTES[key] || ''; ta.placeholder = 'что делает эта строка';
+  const btns = el('div', 'np-btns');
+  const sv = el('button', 'np-ok', 'сохранить'); const del = el('button', '', 'убрать');
+  sv.onclick = async () => { const v = ta.value.trim(); if(v) LNOTES[key] = v; else delete LNOTES[key]; await saveNotes(); applyLineNote(); closeNotePop(); };
+  del.onclick = async () => { delete LNOTES[key]; await saveNotes(); applyLineNote(); closeNotePop(); };
+  btns.append(sv, del); pop.append(ta, btns); document.body.appendChild(pop);
+  const r = gutter.getBoundingClientRect();
+  pop.style.left = Math.min(r.left + window.scrollX, window.scrollX + window.innerWidth - 290) + 'px';
+  pop.style.top = (r.bottom + window.scrollY + 5) + 'px';
+  ta.focus();
+  setTimeout(() => document.addEventListener('mousedown', noteOutside), 0);
+}
+function applyLineNote(){ document.querySelectorAll('.crow').forEach(row => { const g = row.querySelector('.lng'); const cln = row.querySelector('.cln'); if(!g || !cln) return; const key = cln.textContent.trim(); if(LNOTES[key]){ g.classList.add('has-lnote'); row.classList.add('has-lnote'); g.title = LNOTES[key]; } else { g.classList.remove('has-lnote'); row.classList.remove('has-lnote'); g.title = 'пояснение к строке'; } }); }
 function noteOutside(e){ const p = document.getElementById('_notepop'); if(p && !p.contains(e.target)) closeNotePop(); }
 function closeNotePop(){ const p = document.getElementById('_notepop'); if(p) p.remove(); document.removeEventListener('mousedown', noteOutside); }
-async function saveNotes(){ await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: ID, notes: NOTES }) }).catch(() => {}); }
+async function saveNotes(){ await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: ID, notes: NOTES, lineNotes: LNOTES }) }).catch(() => {}); }
 
 function badge(cls, text){ return el('span', 'b ' + cls, text); }
 function btn(text, extra){ const b = document.createElement('button'); b.className = 'btn' + (extra ? ' ' + extra : ''); b.textContent = text; return b; }

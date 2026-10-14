@@ -182,6 +182,7 @@ const server = http.createServer(async (req, res) => {
       // свои разделы (классификация пользователя) и заметки к словам — хранятся на компоненте
       if(Array.isArray(b.collections)){ j.component = j.component || {}; j.component.collections = b.collections.map(x => String(x).slice(0, 60)).slice(0, 30); }
       if(b.notes && typeof b.notes === 'object'){ j.component = j.component || {}; j.component.notes = b.notes; }
+      if(b.lineNotes && typeof b.lineNotes === 'object'){ j.component = j.component || {}; j.component.lineNotes = b.lineNotes; }
       if(b.component && typeof b.component === 'object'){ j.component = Object.assign({}, j.component || {}, b.component); }
       await fs.writeFile(full, JSON.stringify(j, null, 2), 'utf8');
       return json(res, 200, { ok: true, id: j.id });

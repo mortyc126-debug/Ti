@@ -52,6 +52,13 @@
   pre.code .w{cursor:pointer;border-radius:3px;padding:0 1px}
   pre.code .w:hover{background:rgba(255,255,255,.1)}
   pre.code .has-note{border-bottom:2px dotted var(--acc)}
+  pre.code.noted{padding-left:4px}
+  pre.code .crow{display:flex;align-items:flex-start}
+  pre.code .crow .lng{flex:0 0 auto;width:16px;text-align:center;color:var(--border);cursor:pointer;user-select:none;margin-right:6px;font-size:11px;line-height:1.6}
+  pre.code .crow:hover .lng{color:var(--text3)}
+  pre.code .crow .lng.has-lnote{color:var(--acc)}
+  pre.code .crow.has-lnote{background:rgba(255,0,110,.06);border-left:2px solid var(--acc);margin-left:-2px}
+  pre.code .crow .cln{flex:1;white-space:pre;min-width:0}
   .note-hint{font-size:11.5px;color:var(--text3);margin-bottom:6px}
   .note-pop{position:absolute;z-index:70;background:var(--bg2);border:1px solid var(--acc);border-radius:10px;padding:10px;width:280px;box-shadow:0 12px 34px rgba(0,0,0,.55)}
   .note-pop .np-h{font-size:12px;color:var(--text3);margin-bottom:6px}
