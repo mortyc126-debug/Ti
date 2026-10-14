@@ -99,7 +99,14 @@ function subOf(t, purpose){
 const TYPE_RU = { fragment:'фрагмент', component:'компонент', recipe:'рецепт', module:'модуль' };
 const TYPE_RANK = { recipe:0, module:1, component:2, fragment:3 };
 
-let ALL = [], active = PURPOSE[0].key, fPlace = '', fTech = '', query = '', selCardId = null;
+let ALL = [], active = PURPOSE[0].key, fPlace = '', fTech = '', query = '', selCardId = null, axis = 'purpose', activeCol = null;
+function collectionsOf(t){ return (t.comp && Array.isArray(t.comp.collections)) ? t.comp.collections : []; }
+function allCollections(){ const s = new Set(); ALL.forEach(t => collectionsOf(t).forEach(c => s.add(c))); return [...s].sort((a, b) => a.localeCompare(b, 'ru')); }
+function countCol(name){ return name === 'Без раздела' ? ALL.filter(t => !collectionsOf(t).length).length : ALL.filter(t => collectionsOf(t).includes(name)).length; }
+async function setCollections(t, cols){
+  t.comp = t.comp || {}; t.comp.collections = cols;
+  await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: t.id, collections: cols }) }).catch(() => {});
+}
 
 async function loadAll(){
   try { ALL = await fetch('/api/list').then(r=>r.json()); } catch(_){ document.getElementById('sections').innerHTML='<div class="empty">сервер недоступен</div>'; return; }
@@ -110,6 +117,7 @@ loadAll();
 
 function renderCats(){
   const box = document.getElementById('pcats'); box.innerHTML='';
+  if(axis === 'custom'){ renderColCats(box); return; }
   PURPOSE.forEach(P => {
     const n = ALL.filter(t=>t._purpose===P.key).length;
     const d = document.createElement('div'); d.className='pcat'+(P.key===active?' on':'');
@@ -132,6 +140,7 @@ function chip(text, on){ const s=document.createElement('span'); s.className='fc
 document.getElementById('q').oninput = e => { query = e.target.value.trim().toLowerCase(); render(); };
 
 function render(){
+  if(axis === 'custom') return renderCustom();
   const P = PURPOSE.find(x=>x.key===active);
   document.getElementById('cName').textContent = active;
   document.getElementById('cLead').textContent = P.lead;
@@ -175,11 +184,13 @@ function card(t){
     + '<span class="tg">'+esc((t._techs[0]||''))+'</span>'
     + (warn?'<span class="tg warnflag">⚠ риск</span>':'')
     + '</div>';
-  a.innerHTML = top + '<div class="cdesc"></div>' + io + tags
+  a.innerHTML = top + '<div class="cdesc"></div>' + io + tags + '<div class="ccols"></div>'
     + '<div class="cact"><span class="cbtn" data-x="use">Открыть</span><span class="cbtn" data-x="ctor">→ в конструктор</span>'
-    + '<span class="cbtn" data-x="desc" title="описание">📝</span><span class="cbtn" data-x="ren" title="переименовать">✎</span><span class="cbtn del" data-x="del" title="удалить">🗑</span></div>';
+    + '<span class="cbtn" data-x="col" title="в мой раздел">🏷</span><span class="cbtn" data-x="desc" title="описание">📝</span><span class="cbtn" data-x="ren" title="переименовать">✎</span><span class="cbtn del" data-x="del" title="удалить">🗑</span></div>';
   a.querySelector('.ctitle').textContent = t.title || t.id;
   a.querySelector('.cdesc').textContent = t.desc || '';
+  fillCols(a, t);
+  a.querySelector('[data-x="col"]').onclick = e => { e.preventDefault(); e.stopPropagation(); collectionMenu(t, e.target); };
   if(io){ a.querySelector('.cio .i').textContent = t.comp.input||'—'; a.querySelector('.cio .o').textContent = t.comp.output||'—'; }
   a.querySelector('[data-x="ctor"]').onclick = e => { e.preventDefault(); e.stopPropagation(); toConstructor(t); };
   a.querySelector('[data-x="use"]').onclick = e => { e.preventDefault(); e.stopPropagation(); location.href = a.href; };
@@ -292,4 +303,69 @@ function openAddForm(){
 }
 document.getElementById('addComp').onclick = openAddForm;
 
+// ── своя классификация: переключатель оси + разделы ──────────────────────────
+document.getElementById('axisToggle').querySelectorAll('button').forEach(b => {
+  b.onclick = () => {
+    axis = b.dataset.axis;
+    document.getElementById('axisToggle').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    selCardId = null; renderCats(); renderFilters(); render();
+  };
+});
+function renderColCats(box){
+  const names = allCollections().concat(['Без раздела']);
+  if(!activeCol || !names.includes(activeCol)) activeCol = names[0];
+  names.forEach(name => {
+    const d = document.createElement('div'); d.className = 'pcat' + (name === activeCol ? ' on' : '');
+    d.innerHTML = '<span class="pn">' + esc(name) + '</span><span class="pc">' + countCol(name) + '</span>';
+    d.onclick = () => { activeCol = name; fPlace = ''; fTech = ''; query = ''; const q = document.getElementById('q'); if(q) q.value = ''; renderCats(); renderFilters(); render(); };
+    box.appendChild(d);
+  });
+  if(!allCollections().length){ const h = document.createElement('div'); h.className = 'cat-hint'; h.style.padding = '8px 6px'; h.textContent = 'Пока нет своих разделов. На карточке жми 🏷 → «новый раздел».'; box.appendChild(h); }
+}
+function renderCustom(){
+  document.getElementById('cName').textContent = 'Моя классификация · ' + (activeCol || '');
+  document.getElementById('cLead').textContent = 'Твои разделы. Назначай карточки через 🏷. «Без раздела» — ещё не разложенное. Delete — удалить выделенную.';
+  let items = activeCol === 'Без раздела' ? ALL.filter(t => !collectionsOf(t).length) : ALL.filter(t => collectionsOf(t).includes(activeCol));
+  if(fPlace) items = items.filter(t => t._places.includes(fPlace));
+  if(fTech) items = items.filter(t => t._techs.includes(fTech));
+  if(query) items = items.filter(t => ((t.title || '') + ' ' + (t.desc || '')).toLowerCase().includes(query));
+  const host = document.getElementById('sections'); host.innerHTML = '';
+  if(!items.length){ host.innerHTML = '<div class="empty">здесь пусто — разложи карточки сюда через 🏷</div>'; return; }
+  items.sort((a, b) => TYPE_RANK[a._type] - TYPE_RANK[b._type]);
+  const grid = document.createElement('div'); grid.className = 'cards'; items.forEach(t => grid.appendChild(card(t))); host.appendChild(grid);
+}
+function fillCols(cardEl, t){
+  const box = cardEl.querySelector('.ccols'); if(!box) return; box.innerHTML = '';
+  collectionsOf(t).forEach(c => box.appendChild(el('span', 'ccol', c)));
+}
+function collectionMenu(t, anchor){
+  closeColMenu(false);
+  const m = document.createElement('div'); m.className = 'colmenu'; m.id = '_colmenu';
+  m.innerHTML = '<div class="cm-h">в мой раздел</div>';
+  const cur = new Set(collectionsOf(t));
+  allCollections().forEach(name => {
+    const it = document.createElement('div'); it.className = 'cm-i';
+    it.innerHTML = '<span class="ck">' + (cur.has(name) ? '✓' : '') + '</span><span>' + esc(name) + '</span>';
+    it.onclick = async () => {
+      if(cur.has(name)) cur.delete(name); else cur.add(name);
+      it.querySelector('.ck').textContent = cur.has(name) ? '✓' : '';
+      await setCollections(t, [...cur]); const cardEl = anchor.closest('.card'); if(cardEl) fillCols(cardEl, t);
+    };
+    m.appendChild(it);
+  });
+  const nw = document.createElement('div'); nw.className = 'cm-new';
+  nw.innerHTML = '<input placeholder="новый раздел…"><button>+</button>';
+  const add = async () => { const v = nw.querySelector('input').value.trim(); if(!v) return; cur.add(v); await setCollections(t, [...cur]); closeColMenu(true); };
+  nw.querySelector('button').onclick = add;
+  nw.querySelector('input').addEventListener('keydown', e => { if(e.key === 'Enter') add(); });
+  m.appendChild(nw);
+  document.body.appendChild(m);
+  const r = anchor.getBoundingClientRect();
+  m.style.left = Math.min(r.left, window.innerWidth - 230) + 'px'; m.style.top = (r.bottom + window.scrollY + 4) + 'px';
+  setTimeout(() => document.addEventListener('mousedown', colOutside), 0);
+}
+function colOutside(e){ const m = document.getElementById('_colmenu'); if(m && !m.contains(e.target)) closeColMenu(true); }
+function closeColMenu(refresh){ const m = document.getElementById('_colmenu'); if(m) m.remove(); document.removeEventListener('mousedown', colOutside); if(refresh){ renderCats(); render(); } }
+
+function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
