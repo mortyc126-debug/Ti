@@ -107,10 +107,22 @@ function renderPalette(){
     const order = (SUBCATS[pk] || []).map(x => x[0]).concat(['Разное']);
     Object.keys(bySub).sort((a, b) => { const ia = order.indexOf(a), ib = order.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); }).forEach(sub => {
       d.appendChild(el('div', 'pal-sub', sub + ' · ' + bySub[sub].length));
-      bySub[sub].forEach(t => { const it = palItem(t.title, t.desc); it.onclick = () => addFromCatalog(t); d.appendChild(it); });
+      bySub[sub].forEach(t => {
+        const it = palItem(t.title, t.desc); it.onclick = () => addFromCatalog(t);
+        // удалить шаблон прямо из палитры (на случай дублей/переименований)
+        const del = el('span', 'pi-del', '🗑'); del.title = 'удалить шаблон насовсем';
+        del.onclick = e => { e.stopPropagation(); delTemplate(t); };
+        it.appendChild(del);
+        d.appendChild(it);
+      });
     });
     host.appendChild(d);
   });
+}
+async function delTemplate(t){
+  if(!confirm('Удалить шаблон «' + (t.title || t.id) + '» насовсем? Файл будет удалён.')) return;
+  const r = await fetch('/api/delete', { method:'POST', body: JSON.stringify({ id: t.id }) }).then(r => r.json()).catch(() => ({}));
+  if(r && r.ok) loadCatalog(); else alert('не вышло удалить');
 }
 async function addFromCatalog(t){
   try {
