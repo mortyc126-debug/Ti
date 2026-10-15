@@ -24,7 +24,8 @@ const DATA = path.join(ROOT, 'data');     // сохранённые JSON-дан�
 const PORT = Number(process.argv[2]) || 8788;
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8' };
-const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' }); res.end(JSON.stringify(obj)); };
+// no-store обязателен: иначе браузер кэширует GET /api/list и /api/template и показывает старые описания после правок
+const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
 
 function within(base, rel){
   const p = path.resolve(base, '.' + path.sep + (rel || '').replace(/^\/+/, ''));
@@ -212,7 +213,7 @@ const server = http.createServer(async (req, res) => {
       if(!abs) return json(res, 400, { error: 'bad id' });
       const txt = await fs.readFile(abs, 'utf8').catch(() => null);
       if(txt == null) return json(res, 404, { error: 'нет такого' });
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(txt); return;
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(txt); return;
     }
     if(u.pathname === '/api/data/update' && req.method === 'POST'){
       const b = await readBody(req); const abs = within(DATA, (b.id || '') + '.json');
