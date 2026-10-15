@@ -110,7 +110,7 @@ function render(tpl){
   const title = document.createElement('div'); title.className = 't-title';
   title.innerHTML = `${esc(tpl.title || '')} <span class="t-lang">${esc((tpl.lang||'').toUpperCase())}</span>`;
   work.appendChild(title);
-  if(tpl.desc){ const d = document.createElement('div'); d.className = 't-desc'; d.textContent = tpl.desc; work.appendChild(d); }
+  if(tpl.desc){ const d = document.createElement('div'); d.className = 't-desc'; d.innerHTML = descFmt(tpl.desc); work.appendChild(d); }
 
   const bar = document.createElement('div'); bar.className = 'toolbar';
   const copy = mkBtn('⧉ копировать код');
@@ -371,6 +371,14 @@ function mkBtn(t){ const b = document.createElement('button'); b.className = 'bt
 function flash(btn, t){ const old = btn.textContent; btn.classList.add('ok'); btn.textContent = t; setTimeout(() => { btn.classList.remove('ok'); btn.textContent = old; }, 1200); }
 function resetInfo(){ selected = null; info.innerHTML = '<div class="info-empty muted">Нажми на слово в коде — здесь появится, что оно значит, и можно вписать своё пояснение.</div>'; }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+// описание с кодом: `код` → цветная плашка, ```блок``` → цветной блок
+function descFmt(s){
+  s = String(s == null ? '' : s);
+  const blocks = [];
+  s = s.replace(/```([\s\S]*?)```/g, (m, c) => { blocks.push(c.replace(/^\n+|\n+$/g, '')); return '\u0001' + (blocks.length - 1) + '\u0001'; });
+  let html = esc(s).replace(/`([^`\n]+)`/g, (m, c) => '<code class="desc-chip">' + c + '</code>').replace(/\n/g, '<br>');
+  return html.replace(/\u0001(\d+)\u0001/g, (m, i) => '<pre class="desc-code">' + esc(blocks[+i]) + '</pre>');
+}
 const cssEsc = s => String(s).replace(/["\\]/g, '\\$&');
 
 loadList();

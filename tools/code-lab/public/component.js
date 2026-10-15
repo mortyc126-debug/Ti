@@ -35,7 +35,7 @@ function render(t){
   const safety = c && c.safety;
   if(safety && safety.level && safety.level !== 'ok') badges.appendChild(badge('warn', '⚠ ' + (safety.notes && safety.notes[0] ? safety.notes[0] : safety.level)));
   head.appendChild(badges);
-  const desc = el('div', 'cdesc'); desc.textContent = (c && c.description) || t.desc || ''; head.appendChild(desc);
+  const desc = el('div', 'cdesc'); desc.innerHTML = descFmt(t.desc || (c && c.description) || ''); head.appendChild(desc);
   root.appendChild(head);
 
   // ── L2: контракт + необходимое ──
@@ -288,3 +288,11 @@ function btn(text, extra){ const b = document.createElement('button'); b.classNa
 function flash(b, t){ const o = b.textContent; b.textContent = t; setTimeout(() => b.textContent = o, 1100); }
 function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
 function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])); }
+// описание с кодом: `код` → цветная плашка, ```блок``` → цветной блок
+function descFmt(s){
+  s = String(s == null ? '' : s);
+  const blocks = [];
+  s = s.replace(/```([\s\S]*?)```/g, (m, c) => { blocks.push(c.replace(/^\n+|\n+$/g, '')); return '\u0001' + (blocks.length - 1) + '\u0001'; });
+  let html = esc(s).replace(/`([^`\n]+)`/g, (m, c) => '<code class="desc-chip">' + c + '</code>').replace(/\n/g, '<br>');
+  return html.replace(/\u0001(\d+)\u0001/g, (m, i) => '<pre class="desc-code">' + esc(blocks[+i]) + '</pre>');
+}

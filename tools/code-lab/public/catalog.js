@@ -188,7 +188,7 @@ function card(t){
     + '<div class="cact"><span class="cbtn" data-x="use">Открыть</span><span class="cbtn" data-x="ctor">→ в конструктор</span>'
     + '<span class="cbtn" data-x="col" title="в мой раздел">🏷</span><span class="cbtn" data-x="desc" title="описание">📝</span><span class="cbtn" data-x="ren" title="переименовать">✎</span><span class="cbtn del" data-x="del" title="удалить">🗑</span></div>';
   a.querySelector('.ctitle').textContent = t.title || t.id;
-  a.querySelector('.cdesc').textContent = t.desc || '';
+  a.querySelector('.cdesc').innerHTML = descFmt(t.desc || '');
   fillCols(a, t);
   a.querySelector('[data-x="col"]').onclick = e => { e.preventDefault(); e.stopPropagation(); collectionMenu(t, e.target); };
   if(io){ a.querySelector('.cio .i').textContent = t.comp.input||'—'; a.querySelector('.cio .o').textContent = t.comp.output||'—'; }
@@ -211,14 +211,20 @@ function card(t){
 // дописать/изменить описание карточки (чтобы не забывать, что это)
 function editDescModal(t){
   const bg = document.createElement('div'); bg.className = 'modal-bg';
-  bg.innerHTML = '<div class="modal" style="max-width:520px"><h3>Описание</h3>'
+  bg.innerHTML = '<div class="modal" style="max-width:560px"><h3>Описание</h3>'
     + '<p class="mh">Своими словами: что это и когда брать. Сохранится на карточке и в подсказке палитры.</p>'
     + '<div class="mfield"><label>' + esc(t.title || '') + '</label><textarea id="d-desc" style="min-height:130px" spellcheck="false"></textarea></div>'
+    + '<div class="desc-tools"><button type="button" class="btn" id="d-chip">⟨⟩ код в плашку</button>'
+    + '<span class="desc-hint">`код` в обратных кавычках — цветная плашка, блок — в тройных ```</span></div>'
+    + '<div class="desc-prev-wrap"><div class="desc-prev-h">как будет выглядеть</div><div class="desc-prev" id="d-prev"></div></div>'
     + '<div class="mbtns"><button class="btn ok" id="d-save">Сохранить</button><button class="btn" id="d-cancel">Отмена</button></div><div class="merr" id="d-err"></div></div>';
   document.body.appendChild(bg);
   const $$ = s => bg.querySelector(s);
   $$('#d-desc').value = t.desc || '';
   $$('#d-desc').focus();
+  const prev = () => { $$('#d-prev').innerHTML = descFmt($$('#d-desc').value) || '<span class="muted">пусто</span>'; };
+  prev(); $$('#d-desc').addEventListener('input', prev);
+  $$('#d-chip').onclick = () => { wrapBackticks($$('#d-desc')); prev(); };
   bg.onclick = e => { if(e.target === bg) bg.remove(); };
   $$('#d-cancel').onclick = () => bg.remove();
   $$('#d-save').onclick = async () => {
@@ -271,7 +277,7 @@ function openAddForm(){
     + '<div class="mfield"><label>Подкатегория</label><select id="m-sub"></select></div></div>'
     + '<div class="mrow"><div class="mfield"><label>Название (по-русски)</label><input id="m-title" placeholder="например: Объект ⇄ текст (сохранить/прочитать)"></div>'
     + '<div class="mfield"><label>Технология</label><select id="m-tech">' + techOpts + '</select></div></div>'
-    + '<div class="mfield"><label>Что делает (одна строка)</label><input id="m-desc" placeholder="коротко: зачем этот кусок"></div>'
+    + '<div class="mfield"><label>Что делает</label><input id="m-desc" placeholder="коротко: зачем этот кусок"><span class="desc-hint">`код` в обратных кавычках — цветная плашка</span></div>'
     + '<div class="mrow"><div class="mfield"><label>Вход (необязательно)</label><input id="m-in" placeholder="что принимает"></div>'
     + '<div class="mfield"><label>Выход (необязательно)</label><input id="m-out" placeholder="что отдаёт"></div></div>'
     + '<div class="mfield"><label>Код</label><textarea id="m-code" spellcheck="false" placeholder="вставь код сюда"></textarea></div>'
@@ -383,3 +389,18 @@ function closeColMenu(refresh){ const m = document.getElementById('_colmenu'); i
 
 function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+// обернуть выделение в textarea обратными кавычками (плашка кода)
+function wrapBackticks(ta){
+  const a = ta.selectionStart, b = ta.selectionEnd, v = ta.value, sel = v.slice(a, b) || 'код';
+  ta.value = v.slice(0, a) + '`' + sel + '`' + v.slice(b);
+  ta.focus(); ta.selectionStart = a + 1; ta.selectionEnd = a + 1 + sel.length;
+  ta.dispatchEvent(new Event('input'));
+}
+// описание с кодом: `код` → цветная плашка, ```блок``` → цветной блок
+function descFmt(s){
+  s = String(s == null ? '' : s);
+  const blocks = [];
+  s = s.replace(/```([\s\S]*?)```/g, (m, c) => { blocks.push(c.replace(/^\n+|\n+$/g, '')); return '\u0001' + (blocks.length - 1) + '\u0001'; });
+  let html = esc(s).replace(/`([^`\n]+)`/g, (m, c) => '<code class="desc-chip">' + c + '</code>').replace(/\n/g, '<br>');
+  return html.replace(/\u0001(\d+)\u0001/g, (m, i) => '<pre class="desc-code">' + esc(blocks[+i]) + '</pre>');
+}

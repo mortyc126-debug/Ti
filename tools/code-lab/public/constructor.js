@@ -285,7 +285,7 @@ function renderInspector(nd){
   body.appendChild(el('div', 'insp-kind', b.type === 'draw' ? 'рисование' : 'компонент'));
   const save = el('button', 'insp-save', '💾 сохранить в каталог'); save.title = 'добавить этот кусок в каталог как компонент'; save.onclick = () => saveToCatalog(nd); body.appendChild(save);
   if(inspTab === 'set'){ body.appendChild(nodeMetaEditor(nd, titleEl)); body.appendChild(inspFields(nd, b)); }
-  else if(inspTab === 'learn') body.appendChild(el('div', 'insp-text', nd.desc || b.hint || 'описания нет. Открой «Настроить» → поле «описание», впиши своими словами.'));
+  else if(inspTab === 'learn'){ const lt = el('div', 'insp-text'); lt.innerHTML = descFmt(nd.desc || b.hint || 'описания нет. Открой «Настроить» → поле «описание», впиши своими словами.'); body.appendChild(lt); }
   else body.appendChild(inspWhy(nd, b));
   host.appendChild(body);
 }
@@ -358,7 +358,12 @@ function nodeMetaEditor(nd, titleEl){
   const r2 = el('div', 'insp-field'); r2.appendChild(el('label', '', 'описание (своими словами)'));
   const ta = document.createElement('textarea'); ta.className = 'insp-desc'; ta.spellcheck = false; ta.value = nd.desc || ''; ta.placeholder = 'что это и зачем — чтобы не забыть';
   ta.addEventListener('input', () => { nd.desc = ta.value; persist(); renderScope(); });
-  r2.appendChild(ta); box.appendChild(r2);
+  r2.appendChild(ta);
+  const tools = el('div', 'desc-tools');
+  const chip = el('button', 'btn', '⟨⟩ код в плашку'); chip.type = 'button'; chip.onclick = () => { wrapBackticks(ta); nd.desc = ta.value; persist(); renderScope(); };
+  tools.appendChild(chip); tools.appendChild(el('span', 'desc-hint', '`код` — плашка, блок — в тройных ```'));
+  r2.appendChild(tools);
+  box.appendChild(r2);
 
   // где живут правки + сохранение в сам шаблон
   const scope = el('div', 'insp-scope'); box.appendChild(scope);
@@ -665,6 +670,21 @@ $('#example').onclick = () => {
 
 function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])); }
+// описание с кодом: `код` → цветная плашка, ```блок``` → цветной блок
+function descFmt(s){
+  s = String(s == null ? '' : s);
+  const blocks = [];
+  s = s.replace(/```([\s\S]*?)```/g, (m, c) => { blocks.push(c.replace(/^\n+|\n+$/g, '')); return '\u0001' + (blocks.length - 1) + '\u0001'; });
+  let html = esc(s).replace(/`([^`\n]+)`/g, (m, c) => '<code class="desc-chip">' + c + '</code>').replace(/\n/g, '<br>');
+  return html.replace(/\u0001(\d+)\u0001/g, (m, i) => '<pre class="desc-code">' + esc(blocks[+i]) + '</pre>');
+}
+// обернуть выделение в textarea обратными кавычками
+function wrapBackticks(ta){
+  const a = ta.selectionStart, b = ta.selectionEnd, v = ta.value, sel = v.slice(a, b) || 'код';
+  ta.value = v.slice(0, a) + '`' + sel + '`' + v.slice(b);
+  ta.focus(); ta.selectionStart = a + 1; ta.selectionEnd = a + 1 + sel.length;
+  ta.dispatchEvent(new Event('input'));
+}
 function cssEsc(s){ return String(s).replace(/["\\]/g, '\\$&'); }
 
 restore();
