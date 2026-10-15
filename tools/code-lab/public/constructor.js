@@ -285,7 +285,7 @@ function renderInspector(nd){
   body.appendChild(el('div', 'insp-kind', b.type === 'draw' ? 'рисование' : 'компонент'));
   const save = el('button', 'insp-save', '💾 сохранить в каталог'); save.title = 'добавить этот кусок в каталог как компонент'; save.onclick = () => saveToCatalog(nd); body.appendChild(save);
   if(inspTab === 'set'){ body.appendChild(nodeMetaEditor(nd, titleEl)); body.appendChild(inspFields(nd, b)); }
-  else if(inspTab === 'learn'){ const lt = el('div', 'insp-text'); lt.innerHTML = descFmt(nd.desc || b.hint || 'описания нет. Открой «Настроить» → поле «описание», впиши своими словами.'); body.appendChild(lt); }
+  else if(inspTab === 'learn') body.appendChild(descEditor(nd, b));
   else body.appendChild(inspWhy(nd, b));
   host.appendChild(body);
 }
@@ -348,22 +348,32 @@ function nodeDirty(nd){
   if(!nd.src) return false;
   return nodeLabel(nd) !== nd.src.title || (nd.desc || '') !== (nd.src.desc || '') || String(nd.fields && nd.fields.code || '') !== String(nd.src.code || '');
 }
-// редактор заголовка и описания узла (в «Настроить»)
+// описание узла: пишется и сразу видно здесь же, во вкладке «Разобраться»
+function descEditor(nd, b){
+  const box = document.createElement('div');
+  box.appendChild(el('div', 'insp-kind', 'описание — своими словами, сохраняется сразу'));
+  const ta = document.createElement('textarea'); ta.className = 'insp-desc'; ta.spellcheck = false; ta.value = nd.desc || '';
+  ta.placeholder = 'что это и зачем — чтобы не забыть. `код` в кавычках — цветная плашка';
+  const prev = el('div', 'desc-prev');
+  const draw = () => { const v = ta.value.trim() ? descFmt(ta.value) : (b && b.hint ? descFmt(b.hint) + '<div class="desc-hint" style="margin-top:6px">↑ пока показана встроенная подсказка. Впиши своё описание — заменит её.</div>' : '<span class="muted">пока пусто</span>'); prev.innerHTML = v; };
+  ta.addEventListener('input', () => { nd.desc = ta.value; persist(); draw(); });
+  box.appendChild(ta);
+  const tools = el('div', 'desc-tools');
+  const chip = el('button', 'btn', '⟨⟩ код в плашку'); chip.type = 'button'; chip.onclick = () => { wrapBackticks(ta); nd.desc = ta.value; persist(); draw(); };
+  tools.appendChild(chip); tools.appendChild(el('span', 'desc-hint', '`код` — плашка, блок — в тройных ```'));
+  box.appendChild(tools);
+  box.appendChild(el('div', 'desc-prev-h', 'как выглядит'));
+  box.appendChild(prev); draw();
+  return box;
+}
+// редактор заголовка узла (в «Настроить»); описание — во вкладке «Разобраться»
 function nodeMetaEditor(nd, titleEl){
   const box = document.createElement('div');
   const r1 = el('div', 'insp-field'); r1.appendChild(el('label', '', 'заголовок'));
   const ti = document.createElement('input'); ti.value = nodeLabel(nd); ti.spellcheck = false;
   ti.addEventListener('input', () => { nd.title = ti.value; updateCard(nd); if(titleEl) titleEl.textContent = ti.value; persist(); renderScope(); });
   r1.appendChild(ti); box.appendChild(r1);
-  const r2 = el('div', 'insp-field'); r2.appendChild(el('label', '', 'описание (своими словами)'));
-  const ta = document.createElement('textarea'); ta.className = 'insp-desc'; ta.spellcheck = false; ta.value = nd.desc || ''; ta.placeholder = 'что это и зачем — чтобы не забыть';
-  ta.addEventListener('input', () => { nd.desc = ta.value; persist(); renderScope(); });
-  r2.appendChild(ta);
-  const tools = el('div', 'desc-tools');
-  const chip = el('button', 'btn', '⟨⟩ код в плашку'); chip.type = 'button'; chip.onclick = () => { wrapBackticks(ta); nd.desc = ta.value; persist(); renderScope(); };
-  tools.appendChild(chip); tools.appendChild(el('span', 'desc-hint', '`код` — плашка, блок — в тройных ```'));
-  r2.appendChild(tools);
-  box.appendChild(r2);
+  const hr = el('div', 'desc-hint', 'описание узла — во вкладке «Разобраться»'); hr.style.margin = '2px 0 10px'; box.appendChild(hr);
 
   // где живут правки + сохранение в сам шаблон
   const scope = el('div', 'insp-scope'); box.appendChild(scope);
