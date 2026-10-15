@@ -275,6 +275,7 @@ function openAddForm(){
     + '<div class="mrow"><div class="mfield"><label>Вход (необязательно)</label><input id="m-in" placeholder="что принимает"></div>'
     + '<div class="mfield"><label>Выход (необязательно)</label><input id="m-out" placeholder="что отдаёт"></div></div>'
     + '<div class="mfield"><label>Код</label><textarea id="m-code" spellcheck="false" placeholder="вставь код сюда"></textarea></div>'
+    + '<div class="m-dup" id="m-dup" style="display:none"></div>'
     + '<div class="mbtns"><button class="btn ok" id="m-save">Сохранить в каталог</button><button class="btn" id="m-cancel">Отмена</button></div>'
     + '<div class="merr" id="m-err"></div></div>';
   document.body.appendChild(bg);
@@ -287,6 +288,16 @@ function openAddForm(){
   fillSubs(); $$('#m-purpose').onchange = fillSubs;
   bg.onclick = e => { if(e.target === bg) bg.remove(); };
   $$('#m-cancel').onclick = () => bg.remove();
+  // если название совпадает с существующим — предложим обновить, а не плодить дубль
+  const findDup = () => { const t = $$('#m-title').value.trim().toLowerCase(), lang = TECH2LANG[$$('#m-tech').value] || 'js'; return t && ALL.find(x => (x.title||'').trim().toLowerCase() === t && (x.lang||'js') === lang); };
+  const refreshDup = () => {
+    const d = findDup(), box = $$('#m-dup');
+    if(d){ box.style.display = 'block'; box.innerHTML = 'Компонент «' + esc(d.title) + '» уже есть. <label class="m-dup-lbl"><input type="checkbox" id="m-asnew"> создать новый, а не обновлять</label>';
+      $$('#m-save').textContent = 'Обновить существующий'; }
+    else { box.style.display = 'none'; box.innerHTML = ''; $$('#m-save').textContent = 'Сохранить в каталог'; }
+  };
+  $$('#m-title').addEventListener('input', refreshDup);
+  $$('#m-tech').addEventListener('change', refreshDup);
   $$('#m-save').onclick = async () => {
     const title = $$('#m-title').value.trim(), code = $$('#m-code').value;
     if(!title){ $$('#m-err').textContent = 'впиши название'; return; }
@@ -295,10 +306,13 @@ function openAddForm(){
     const component = { type:'component', tags:{ purpose:[purpose], technology:[tech], runtime:[] }, subcat,
       summary:{ input: $$('#m-in').value.trim(), output: $$('#m-out').value.trim(), dependencies:[], requirements:[] } };
     const body = { title, lang: TECH2LANG[tech] || 'js', group: subcat, desc: $$('#m-desc').value.trim(), code, component };
+    const dup = findDup(), asNew = $$('#m-asnew') && $$('#m-asnew').checked;
     $$('#m-save').textContent = 'сохраняю…';
-    const r = await fetch('/api/add', { method:'POST', body: JSON.stringify(body) }).then(r=>r.json()).catch(()=>({}));
-    if(r.id){ bg.remove(); active = purpose; loadAll(); }
-    else { $$('#m-err').textContent = 'не сохранилось: ' + (r.error || 'ошибка'); $$('#m-save').textContent = 'Сохранить в каталог'; }
+    let r;
+    if(dup && !asNew) r = await fetch('/api/edit', { method:'POST', body: JSON.stringify(Object.assign({ id: dup.id }, body)) }).then(x=>x.json()).catch(()=>({}));
+    else r = await fetch('/api/add', { method:'POST', body: JSON.stringify(body) }).then(x=>x.json()).catch(()=>({}));
+    if(r.id || r.ok){ bg.remove(); active = purpose; loadAll(); }
+    else { $$('#m-err').textContent = 'не сохранилось: ' + (r.error || 'ошибка'); refreshDup(); }
   };
 }
 document.getElementById('addComp').onclick = openAddForm;

@@ -400,6 +400,7 @@ function saveToCatalog(nd){
     + '<div class="mfield"><label>Название</label><input id="s-title"></div>'
     + '<div class="mfield"><label>Описание</label><textarea id="s-desc" style="min-height:70px"></textarea></div>'
     + '<div class="mfield"><label>Код</label><textarea id="s-code" spellcheck="false"></textarea></div>'
+    + '<div class="m-dup" id="s-dup" style="display:none"></div>'
     + '<div class="mbtns"><button class="btn ok" id="s-save">Сохранить</button><button class="btn" id="s-cancel">Отмена</button></div><div class="merr" id="s-err"></div></div>';
   document.body.appendChild(bg);
   const q = s => bg.querySelector(s);
@@ -408,15 +409,27 @@ function saveToCatalog(nd){
   fillSubs(); q('#s-purpose').onchange = fillSubs;
   bg.onclick = e => { if(e.target === bg) bg.remove(); };
   q('#s-cancel').onclick = () => bg.remove();
+  // совпадение по названию → предложить обновить вместо дубля (приоритет — родной шаблон узла)
+  const findDup = () => { const t = q('#s-title').value.trim().toLowerCase(); if(!t) return null;
+    if(nd.src && (nd.src.title||'').trim().toLowerCase() === t) return { id: nd.src.id, title: nd.src.title };
+    return CATALOG.find(x => (x.title||'').trim().toLowerCase() === t && (x.lang||'js') === 'js'); };
+  const refreshDup = () => { const d = findDup(), box = q('#s-dup');
+    if(d){ box.style.display = 'block'; box.innerHTML = 'Компонент «' + esc(d.title) + '» уже есть. <label class="m-dup-lbl"><input type="checkbox" id="s-asnew"> создать новый, а не обновлять</label>'; q('#s-save').textContent = 'Обновить существующий'; }
+    else { box.style.display = 'none'; box.innerHTML = ''; q('#s-save').textContent = 'Сохранить'; } };
+  q('#s-title').addEventListener('input', refreshDup); refreshDup();
   q('#s-save').onclick = async () => {
     const title = q('#s-title').value.trim(), code = q('#s-code').value;
     if(!title || !code.trim()){ q('#s-err').textContent = 'нужны название и код'; return; }
     const purpose = q('#s-purpose').value, subcat = q('#s-sub').value;
     const component = { type:'component', tags:{ purpose:[purpose], technology:['JavaScript'], runtime:[] }, subcat, summary:{ input:'', output:'', dependencies:[], requirements:[] } };
     const payload = { title, lang:'js', group: subcat, desc: q('#s-desc').value.trim(), code, component };
+    const dup = findDup(), asNew = q('#s-asnew') && q('#s-asnew').checked;
     q('#s-save').textContent = 'сохраняю…';
-    const r = await fetch('/api/add', { method:'POST', body: JSON.stringify(payload) }).then(r => r.json()).catch(() => ({}));
-    if(r.id){ bg.remove(); loadCatalog(); } else { q('#s-err').textContent = 'не сохранилось'; q('#s-save').textContent = 'Сохранить'; }
+    let r;
+    if(dup && !asNew) r = await fetch('/api/edit', { method:'POST', body: JSON.stringify(Object.assign({ id: dup.id }, payload)) }).then(x => x.json()).catch(() => ({}));
+    else r = await fetch('/api/add', { method:'POST', body: JSON.stringify(payload) }).then(x => x.json()).catch(() => ({}));
+    if(r.id || r.ok){ if(dup && !asNew){ nd.src = { id: dup.id, title, desc: payload.desc, code }; persist(); } bg.remove(); loadCatalog(); }
+    else { q('#s-err').textContent = 'не сохранилось'; refreshDup(); }
   };
 }
 
