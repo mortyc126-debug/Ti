@@ -134,3 +134,122 @@ async function copy(text, btn){
 }
 document.getElementById('pcopy').onclick = e => copy(piecesAsText(), e.target);
 document.getElementById('fcopy').onclick = e => copy(flowsAsText(), e.target);
+
+// ── импорт связей/контрактов из текста ────────────────────────────────────────
+const el2 = (tag, cls, html) => { const e = document.createElement(tag); if(cls) e.className = cls; if(html != null) e.innerHTML = html; return e; };
+function split2(s, sep){ const i = s.indexOf(sep); return [s.slice(0, i), s.slice(i + sep.length)]; }
+function resolveName(nm){ const q = String(nm || '').trim().toLowerCase(); return PIECES.find(t => (t.title || '').trim().toLowerCase() === q) || PIECES.find(t => t.id === String(nm || '').trim()) || null; }
+function parseLinks(text){
+  const edges = [], contracts = [], errors = []; let flowName = '';
+  String(text).split('\n').forEach((raw, i) => {
+    const line = raw.trim(); const ln = i + 1;
+    if(!line) return;
+    if(line.startsWith('#') || line.startsWith('//')){ const m = line.match(/схема[:\s]+(.+)/i); if(m) flowName = m[1].trim(); return; }
+    let m;
+    if((m = line.match(/^схема[:\s]+(.+)/i))){ flowName = m[1].trim(); return; }
+    if(line.includes('::')){
+      const [name, rest] = split2(line, '::'); const fields = {};
+      rest.split(';').forEach(part => {
+        const kv = part.split('='); if(kv.length < 2) return;
+        const key = kv[0].trim().toLowerCase(), val = kv.slice(1).join('=').trim();
+        const list = () => val.split(/[,،]/).map(s => s.trim()).filter(Boolean);
+        if(/нужн|requir/.test(key)) fields.requires = list();
+        else if(/да[её]т|provid|выда/.test(key)) fields.provides = list();
+        else if(/сред|env|runtime/.test(key)) fields.runtime = list();
+        else if(/предуслов|requirement/.test(key)) fields.requirements = list();
+        else if(/ошиб|error|огранич/.test(key)) fields.errors = val;
+        else if(/провер|check/.test(key)) fields.check = val;
+        else if(/^\s*вход|input/.test(key)) fields.input = val;
+        else if(/^\s*выход|output/.test(key)) fields.output = val;
+      });
+      contracts.push({ name: name.trim(), fields, ln }); return;
+    }
+    if((m = line.match(/^(.+?)\s*(?:->|→|=>)\s*(.+)$/))){ edges.push({ a: m[1].trim(), b: m[2].trim(), ln }); return; }
+    if((m = line.match(/^(.+?)\s+зависит\s+от\s+(.+)$/i))){ edges.push({ a: m[2].trim(), b: m[1].trim(), ln }); return; }
+    errors.push('строка ' + ln + ': не понял — «' + line + '»');
+  });
+  return { edges, contracts, errors, flowName };
+}
+async function applyLinks(P){
+  for(const c of P.contracts){
+    const t = resolveName(c.name); if(!t) continue;
+    const f = c.fields, body = { id: t.id };
+    if(f.provides) body.provides = f.provides;
+    if(f.requires) body.requires = f.requires;
+    if(f.runtime || f.input || f.output || f.requirements || f.errors || f.check){
+      const full = await fetch('/api/template?id=' + encodeURIComponent(t.id)).then(r => r.json()).catch(() => null);
+      const comp = (full && full.component) || {};
+      if(f.runtime){ comp.tags = Object.assign({}, comp.tags, { runtime: f.runtime }); }
+      if(f.input || f.output || f.requirements){ comp.summary = Object.assign({}, comp.summary); if(f.input) comp.summary.input = f.input; if(f.output) comp.summary.output = f.output; if(f.requirements) comp.summary.requirements = f.requirements; }
+      if(f.errors || f.check){ comp.views = Object.assign({}, comp.views); comp.views.check = Object.assign({}, comp.views.check); if(f.errors) comp.views.check.errors = f.errors; if(f.check) comp.views.check.expected_result = f.check; }
+      body.component = comp;
+    }
+    await fetch('/api/edit', { method:'POST', body: JSON.stringify(body) }).catch(() => {});
+  }
+  const used = new Map(), nodes = [], edges = []; let col = 0;
+  const ensureNode = async t => {
+    if(used.has(t.id)) return used.get(t.id);
+    const full = await fetch('/api/template?id=' + encodeURIComponent(t.id)).then(r => r.json()).catch(() => null);
+    const code = ((full && full.lines) || []).map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n');
+    const nid = Math.random().toString(36).slice(2, 8);
+    nodes.push({ id: nid, blockId: 'raw', fields: { code }, title: t.title, desc: (full && full.desc) || '', src: { id: t.id, title: t.title, desc: (full && full.desc) || '', code }, x: 60 + (col % 4) * 240, y: 60 + Math.floor(col / 4) * 170 });
+    col++; used.set(t.id, nid); return nid;
+  };
+  for(const e of P.edges){ const ta = resolveName(e.a), tb = resolveName(e.b); if(!ta || !tb) continue; const na = await ensureNode(ta), nb = await ensureNode(tb); if(!edges.some(x => x.from === na && x.to === nb)) edges.push({ from: na, to: nb }); }
+  let flowId = null;
+  if(nodes.length){
+    const name = P.flowName || ('Импорт связей ' + new Date().toLocaleDateString('ru'));
+    const r = await fetch('/api/flows/save', { method:'POST', body: JSON.stringify({ name, graph: { nodes, edges } }) }).then(r => r.json()).catch(() => ({}));
+    flowId = r.id;
+  }
+  return { contracts: P.contracts.length, edges: edges.length, nodes: nodes.length, flowId };
+}
+const LINKS_SAMPLE = [
+  '# Правила связей. Строки:',
+  '#   A -> B           — связь: A передаёт в B',
+  '#   A зависит от B    — то же, что B -> A',
+  '#   Имя:: нужно=x,y; даёт=z; среда=браузер; ошибка=...; проверка=...; вход=...; выход=...',
+  '# схема: Моя сборка   — как назвать итоговую схему',
+  '',
+  'схема: Среднее по списку',
+  'Массив чисел -> Сумма (reduce)',
+  'Сумма (reduce) -> Среднее',
+  'Среднее:: нужно=сумма, количество; даёт=среднее; среда=браузер; проверка=сравни с ручным счётом'
+].join('\n');
+function openLinksModal(){
+  const bg = el2('div', 'modal-bg');
+  const box = el2('div', 'modal');
+  box.innerHTML = '<h3>Связи из текста</h3>'
+    + '<p class="mh">Вставь правила — приложение разберёт связи и контракты кусков. Куски ищутся по названию. Связи соберутся в схему, контракты («нужно/даёт/среда/ошибка/проверка/вход/выход») запишутся на куски.</p>'
+    + '<div class="fmt">A -> B&#10;A зависит от B&#10;Имя:: нужно=x,y; даёт=z; среда=браузер; ошибка=...; проверка=...&#10;схема: Название</div>'
+    + '<textarea id="lk-text" placeholder="вставь текст или нажми «пример»"></textarea>'
+    + '<div class="mbtns"><button class="btn" id="lk-sample">пример</button><button class="btn ok" id="lk-parse">разобрать</button><button class="btn" id="lk-apply" style="display:none">применить</button><button class="btn" id="lk-close">закрыть</button></div>'
+    + '<div class="lp-prev" id="lk-prev"></div>';
+  bg.appendChild(box); document.body.appendChild(bg);
+  const q = s => bg.querySelector(s);
+  bg.onclick = e => { if(e.target === bg) bg.remove(); };
+  q('#lk-close').onclick = () => bg.remove();
+  q('#lk-sample').onclick = () => { q('#lk-text').value = LINKS_SAMPLE; };
+  let parsed = null;
+  q('#lk-parse').onclick = () => {
+    parsed = parseLinks(q('#lk-text').value);
+    const prev = q('#lk-prev'); prev.innerHTML = '';
+    const line = (txt, cls) => { const d = el2('div', 'lp-row ' + (cls || '')); d.textContent = txt; return d; };
+    prev.appendChild(el2('div', 'lp-sec', 'связи (' + parsed.edges.length + ')'));
+    parsed.edges.forEach(e => { const a = resolveName(e.a), b = resolveName(e.b); const ok = a && b; prev.appendChild(line((ok ? '✓ ' : '✕ ') + e.a + ' → ' + e.b + (ok ? '' : '  (не найдено: ' + [!a ? e.a : '', !b ? e.b : ''].filter(Boolean).join(', ') + ')'), ok ? 'lp-ok' : 'lp-bad')); });
+    prev.appendChild(el2('div', 'lp-sec', 'контракты (' + parsed.contracts.length + ')'));
+    parsed.contracts.forEach(c => { const t = resolveName(c.name); prev.appendChild(line((t ? '✓ ' : '✕ ') + c.name + ': ' + Object.keys(c.fields).join(', ') + (t ? '' : '  (кусок не найден)'), t ? 'lp-ok' : 'lp-bad')); });
+    if(parsed.errors.length){ prev.appendChild(el2('div', 'lp-sec', 'не разобрано')); parsed.errors.forEach(x => prev.appendChild(line(x, 'lp-bad'))); }
+    q('#lk-apply').style.display = (parsed.edges.length || parsed.contracts.length) ? '' : 'none';
+  };
+  q('#lk-apply').onclick = async () => {
+    if(!parsed) return;
+    q('#lk-apply').textContent = 'применяю…'; q('#lk-apply').disabled = true;
+    const r = await applyLinks(parsed);
+    try { PIECES = await fetch('/api/list').then(x => x.json()); FLOWS = await fetch('/api/flows/list').then(x => x.json()); } catch(_){}
+    renderPieces(); renderFlows();
+    q('#lk-prev').innerHTML = '<div class="lp-row lp-ok">Готово: контрактов обновлено ' + r.contracts + ', связей ' + r.edges + (r.flowId ? ', схема сохранена' : '') + '.</div>';
+    q('#lk-apply').style.display = 'none';
+  };
+}
+document.getElementById('plinks').onclick = openLinksModal;
