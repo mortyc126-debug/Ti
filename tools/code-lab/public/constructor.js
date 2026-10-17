@@ -625,6 +625,8 @@ function drawEdges(){
     if(!byId(e.from) || !byId(e.to)) return;
     const a = portXY(e.from, 'out'), b = portXY(e.to, 'in'); const d = bez(a.x, a.y, b.x, b.y);
     const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', d);
+    // цвет ребра по виду связи (kind), если словарь загружен
+    if(e.kind && window.relationColor){ const col = window.relationColor(e.kind); if(e.kind !== 'data') p.style.stroke = col; }
     if(sameEdge(selectedEdge, e)) p.setAttribute('class', 'sel');
     // широкая прозрачная дорожка сверху — чтобы по тонкой стрелке было легко попасть
     const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path'); hit.setAttribute('d', d); hit.setAttribute('class', 'edge-hit');

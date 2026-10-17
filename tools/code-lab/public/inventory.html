@@ -51,6 +51,14 @@
   .lp-ok{color:var(--str)}.lp-bad{color:#FF6B6B}
   .lp-row{font-family:ui-monospace,monospace;font-size:12px;padding:1px 0}
   .merr{color:#FF6B6B;font-size:12.5px;margin-top:8px}
+  details.rr{margin:4px 0 10px}
+  details.rr summary{cursor:pointer;font-size:12px;color:var(--name)}
+  .rr-box{margin-top:8px;max-height:230px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+  .rr-g{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin:8px 0 3px}
+  .rr-row{font-size:12px;color:var(--text2);line-height:1.5;display:flex;align-items:baseline;gap:7px}
+  .rr-row b{color:var(--text)}
+  .rr-dot{flex:0 0 auto;width:9px;height:9px;border-radius:50%;align-self:center}
+  .rr-kw{color:var(--text3);font-family:ui-monospace,monospace;font-size:11px}
   .muted{color:var(--text3)}
   .tbl-wrap{max-height:62vh;overflow:auto;border:1px solid var(--border);border-radius:10px}
   .flow{background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:10px}
@@ -90,6 +98,7 @@
     <div id="flows"></div>
   </div>
   <script src="/shell.js"></script>
+  <script src="/relations.js"></script>
   <script src="/inventory.js"></script>
 </body>
 </html>

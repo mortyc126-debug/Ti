@@ -98,7 +98,7 @@ async function loadFlowEdges(f){
   const full = await fetch('/api/flows/get?id=' + encodeURIComponent(f.id)).then(r => r.json()).catch(() => null);
   if(!full || !full.graph) return { nodes: [], edges: [] };
   const byId = {}; (full.graph.nodes || []).forEach(n => byId[n.id] = n);
-  const edges = (full.graph.edges || []).map(e => ({ from: flowNodeLabel(byId[e.from]), to: flowNodeLabel(byId[e.to]) }));
+  const edges = (full.graph.edges || []).map(e => ({ from: flowNodeLabel(byId[e.from]), to: flowNodeLabel(byId[e.to]), kind: e.kind || 'data' }));
   return { nodes: full.graph.nodes || [], edges };
 }
 async function renderFlows(){
@@ -110,7 +110,7 @@ async function renderFlows(){
     const { edges } = await loadFlowEdges(f);
     const box = document.createElement('div'); box.className = 'flow';
     box.innerHTML = '<h3>' + esc(f.name) + '</h3><div class="fmeta">' + f.nodes + ' узлов · ' + f.edges + ' связей</div>'
-      + (edges.length ? edges.map(e => '<div class="edge">' + esc(e.from) + ' <span class="arr">→</span> ' + esc(e.to) + '</div>').join('')
+      + (edges.length ? edges.map(e => { const r = (window.relationById && window.relationById(e.kind)) || { label: '', color: '#888' }; return '<div class="edge">' + esc(e.from) + ' <span class="arr" style="color:' + r.color + '">—[' + esc(r.label) + ']→</span> ' + esc(e.to) + '</div>'; }).join('')
                       : '<div class="muted" style="font-size:12px">связей нет</div>');
     host.appendChild(box);
     f._edges = edges;
@@ -120,7 +120,7 @@ function flowsAsText(){
   const lines = ['# Схемы и связи (' + FLOWS.length + ')', ''];
   FLOWS.forEach(f => {
     lines.push('## ' + f.name + '  (' + f.nodes + ' узлов, ' + f.edges + ' связей)');
-    (f._edges || []).forEach(e => lines.push('  ' + e.from + ' -> ' + e.to));
+    (f._edges || []).forEach(e => { const r = (window.relationById && window.relationById(e.kind)) || { label: '' }; lines.push('  ' + e.from + ' —[' + r.label + ']-> ' + e.to); });
     lines.push('');
   });
   return lines.join('\n');
@@ -164,8 +164,16 @@ function parseLinks(text){
       });
       contracts.push({ name: name.trim(), fields, ln }); return;
     }
-    if((m = line.match(/^(.+?)\s*(?:->|→|=>)\s*(.+)$/))){ edges.push({ a: m[1].trim(), b: m[2].trim(), ln }); return; }
-    if((m = line.match(/^(.+?)\s+зависит\s+от\s+(.+)$/i))){ edges.push({ a: m[2].trim(), b: m[1].trim(), ln }); return; }
+    // стрелки = поток данных
+    if((m = line.match(/^(.+?)\s*(?:->|→|=>)\s*(.+)$/))){ edges.push({ a: m[1].trim(), b: m[2].trim(), kind: 'data', ln }); return; }
+    // любой вид связи по ключевому слову из словаря (window.relationKwIndex)
+    const kws = (window.relationKwIndex || []).filter(x => !/^(->|→|=>)$/.test(x.k));
+    let hit = null;
+    for(const x of kws){
+      const re = new RegExp('^(.+?)\\s+' + x.k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s+(.+)$', 'i');
+      const mm = line.match(re); if(mm){ hit = { a: mm[1].trim(), b: mm[2].trim().replace(/^(с|со|от|на|для|в|к|в\s)\s+/i, ''), r: x.r }; break; }
+    }
+    if(hit){ edges.push({ a: hit.a, b: hit.b, kind: hit.r.id, ln }); return; }
     errors.push('строка ' + ln + ': не понял — «' + line + '»');
   });
   return { edges, contracts, errors, flowName };
@@ -195,7 +203,7 @@ async function applyLinks(P){
     nodes.push({ id: nid, blockId: 'raw', fields: { code }, title: t.title, desc: (full && full.desc) || '', src: { id: t.id, title: t.title, desc: (full && full.desc) || '', code }, x: 60 + (col % 4) * 240, y: 60 + Math.floor(col / 4) * 170 });
     col++; used.set(t.id, nid); return nid;
   };
-  for(const e of P.edges){ const ta = resolveName(e.a), tb = resolveName(e.b); if(!ta || !tb) continue; const na = await ensureNode(ta), nb = await ensureNode(tb); if(!edges.some(x => x.from === na && x.to === nb)) edges.push({ from: na, to: nb }); }
+  for(const e of P.edges){ const ta = resolveName(e.a), tb = resolveName(e.b); if(!ta || !tb) continue; const na = await ensureNode(ta), nb = await ensureNode(tb); const kind = e.kind || 'data'; if(!edges.some(x => x.from === na && x.to === nb && x.kind === kind)) edges.push({ from: na, to: nb, kind }); }
   let flowId = null;
   if(nodes.length){
     const name = P.flowName || ('Импорт связей ' + new Date().toLocaleDateString('ru'));
@@ -205,23 +213,37 @@ async function applyLinks(P){
   return { contracts: P.contracts.length, edges: edges.length, nodes: nodes.length, flowId };
 }
 const LINKS_SAMPLE = [
-  '# Правила связей. Строки:',
-  '#   A -> B           — связь: A передаёт в B',
-  '#   A зависит от B    — то же, что B -> A',
-  '#   Имя:: нужно=x,y; даёт=z; среда=браузер; ошибка=...; проверка=...; вход=...; выход=...',
-  '# схема: Моя сборка   — как назвать итоговую схему',
+  '# Связи пишутся: Кусок A <вид> Кусок B. Виды — в справочнике ниже.',
+  '# Стрелка -> (или →) = передаёт данные. Контракт: Имя:: ключ=значение; ...',
   '',
   'схема: Среднее по списку',
   'Массив чисел -> Сумма (reduce)',
   'Сумма (reduce) -> Среднее',
+  'Среднее зависит от Сумма (reduce)',
+  'Валидатор проверяет Среднее',
+  'Тест среднего тестирует Среднее',
+  'Старое среднее заменяет Среднее',
+  '',
   'Среднее:: нужно=сумма, количество; даёт=среднее; среда=браузер; проверка=сравни с ручным счётом'
 ].join('\n');
+function relationsRef(){
+  const R = window.CODE_RELATIONS || [];
+  const groups = {};
+  R.forEach(r => { (groups[r.group] = groups[r.group] || []).push(r); });
+  return Object.keys(groups).map(g =>
+    '<div class="rr-g">' + esc(g) + '</div>' + groups[g].map(r =>
+      '<div class="rr-row"><span class="rr-dot" style="background:' + r.color + '"></span>'
+      + '<b>' + esc(r.label) + '</b> <span class="rr-kw">(' + esc(r.kw.slice(0, 3).join(', ')) + ')</span> — ' + esc(r.note) + '</div>'
+    ).join('')
+  ).join('');
+}
 function openLinksModal(){
   const bg = el2('div', 'modal-bg');
   const box = el2('div', 'modal');
   box.innerHTML = '<h3>Связи из текста</h3>'
     + '<p class="mh">Вставь правила — приложение разберёт связи и контракты кусков. Куски ищутся по названию. Связи соберутся в схему, контракты («нужно/даёт/среда/ошибка/проверка/вход/выход») запишутся на куски.</p>'
-    + '<div class="fmt">A -> B&#10;A зависит от B&#10;Имя:: нужно=x,y; даёт=z; среда=браузер; ошибка=...; проверка=...&#10;схема: Название</div>'
+    + '<div class="fmt">A -> B&#10;A зависит от B · A оборачивает B · A конфликтует с B …&#10;Имя:: нужно=x,y; даёт=z; среда=браузер; ошибка=...; проверка=...&#10;схема: Название</div>'
+    + '<details class="rr"><summary>виды связей, которые понимает парсер (' + (window.CODE_RELATIONS || []).length + ')</summary><div class="rr-box">' + relationsRef() + '</div></details>'
     + '<textarea id="lk-text" placeholder="вставь текст или нажми «пример»"></textarea>'
     + '<div class="mbtns"><button class="btn" id="lk-sample">пример</button><button class="btn ok" id="lk-parse">разобрать</button><button class="btn" id="lk-apply" style="display:none">применить</button><button class="btn" id="lk-close">закрыть</button></div>'
     + '<div class="lp-prev" id="lk-prev"></div>';
@@ -236,7 +258,7 @@ function openLinksModal(){
     const prev = q('#lk-prev'); prev.innerHTML = '';
     const line = (txt, cls) => { const d = el2('div', 'lp-row ' + (cls || '')); d.textContent = txt; return d; };
     prev.appendChild(el2('div', 'lp-sec', 'связи (' + parsed.edges.length + ')'));
-    parsed.edges.forEach(e => { const a = resolveName(e.a), b = resolveName(e.b); const ok = a && b; prev.appendChild(line((ok ? '✓ ' : '✕ ') + e.a + ' → ' + e.b + (ok ? '' : '  (не найдено: ' + [!a ? e.a : '', !b ? e.b : ''].filter(Boolean).join(', ') + ')'), ok ? 'lp-ok' : 'lp-bad')); });
+    parsed.edges.forEach(e => { const a = resolveName(e.a), b = resolveName(e.b); const ok = a && b; const rel = (window.relationById && window.relationById(e.kind)) || { label: 'связь' }; prev.appendChild(line((ok ? '✓ ' : '✕ ') + e.a + '  —[' + rel.label + ']→  ' + e.b + (ok ? '' : '  (не найдено: ' + [!a ? e.a : '', !b ? e.b : ''].filter(Boolean).join(', ') + ')'), ok ? 'lp-ok' : 'lp-bad')); });
     prev.appendChild(el2('div', 'lp-sec', 'контракты (' + parsed.contracts.length + ')'));
     parsed.contracts.forEach(c => { const t = resolveName(c.name); prev.appendChild(line((t ? '✓ ' : '✕ ') + c.name + ': ' + Object.keys(c.fields).join(', ') + (t ? '' : '  (кусок не найден)'), t ? 'lp-ok' : 'lp-bad')); });
     if(parsed.errors.length){ prev.appendChild(el2('div', 'lp-sec', 'не разобрано')); parsed.errors.forEach(x => prev.appendChild(line(x, 'lp-bad'))); }
