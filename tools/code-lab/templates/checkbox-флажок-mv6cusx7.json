@@ -256,5 +256,80 @@
       }
     ]
   ],
-  "output": "Класс show-grid включается или выключается по флажку"
+  "output": "Класс show-grid включается или выключается по флажку",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "Класс show-grid включается или выключается по флажку",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: previewCanvas, showGrid.",
+        "Для рисования нужен canvas с подходящим id и доступным 2D-контекстом."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const checkbox = document.querySelector(\"#showGrid\");\nconst canvas = document.querySelector(\"#previewCanvas\");\n\ncheckbox.addEventListener(\"change\", () => {\n  canvas.classList.toggle(\"show-grid\", checkbox.checked);\n});"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Класс show-grid включается или выключается по флажку",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  }
 }

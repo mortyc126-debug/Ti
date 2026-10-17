@@ -245,5 +245,78 @@
       }
     ]
   ],
-  "output": "0.4\nfalse"
+  "output": "0.4\nfalse",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Работа с данными"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "0.4\nfalse",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const weights = new Map();\nweights.set(\"red\", 0.4);\nweights.set(\"blue\", 0.6);\nconsole.log(weights.get(\"red\"));\nconsole.log(weights.has(\"green\"));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "0.4\nfalse",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  }
 }

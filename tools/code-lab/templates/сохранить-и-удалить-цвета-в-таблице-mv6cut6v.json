@@ -1099,5 +1099,81 @@
       }
     ]
   ],
-  "output": "Таблица отражает сохранённые цвета; кнопка удаляет строку и обновляет хранилище"
+  "output": "Таблица отражает сохранённые цвета; кнопка удаляет строку и обновляет хранилище",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс",
+        "Работа с данными"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "Таблица отражает сохранённые цвета; кнопка удаляет строку и обновляет хранилище",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: colors.",
+        "Нужен браузерный контекст с доступным localStorage; значения хранилища — строки."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const storageKey = \"palette\";\nlet colors = JSON.parse(localStorage.getItem(storageKey) || \"[]\");\n\nfunction saveColors() {\n  localStorage.setItem(storageKey, JSON.stringify(colors));\n}\n\nfunction renderColors() {\n  const body = document.querySelector(\"#colors tbody\");\n  body.replaceChildren();\n\n  colors.forEach((color, index) => {\n    const row = document.createElement(\"tr\");\n    const cell = document.createElement(\"td\");\n    const remove = document.createElement(\"button\");\n\n    cell.textContent = color;\n    remove.textContent = \"Удалить\";\n    remove.addEventListener(\"click\", () => {\n      colors.splice(index, 1);\n      saveColors();\n      renderColors();\n    });\n\n    row.append(cell, remove);\n    body.append(row);\n  });\n}\n\nfunction addColor(color) {\n  colors.push(color);\n  saveColors();\n  renderColors();\n}"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Таблица отражает сохранённые цвета; кнопка удаляет строку и обновляет хранилище",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  }
 }

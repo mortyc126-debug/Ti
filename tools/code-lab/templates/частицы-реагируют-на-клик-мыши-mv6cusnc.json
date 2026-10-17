@@ -861,5 +861,79 @@
       }
     ]
   ],
-  "output": "12"
+  "output": "12",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс",
+        "Работа с данными"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Массив, объявленный в коде",
+      "output": "12",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const particles = [];\n\nfunction burst(x, y) {\n  for (let i = 0; i < 12; i += 1) {\n    particles.push({\n      x,\n      y,\n      vx: Math.random() * 4 - 2,\n      vy: Math.random() * 4 - 2,\n      life: 1\n    });\n  }\n}\n\nfunction updateParticles() {\n  particles.forEach(particle => {\n    particle.x += particle.vx;\n    particle.y += particle.vy;\n    particle.life -= 0.02;\n  });\n}\n\nparticles.length = 0;\nburst(100, 80);\nupdateParticles();\nconsole.log(particles.length);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "12",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  }
 }

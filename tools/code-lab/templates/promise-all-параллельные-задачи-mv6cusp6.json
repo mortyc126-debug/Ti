@@ -248,5 +248,80 @@
       }
     ]
   ],
-  "output": "[цвета, настройки]"
+  "output": "[цвета, настройки]",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс",
+        "Работа с данными",
+        "Интеграции"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "[цвета, настройки]",
+      "dependencies": [],
+      "requirements": [
+        "Код с await должен выполняться внутри async-функции или другого допустимого async-контекста."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "async function loadBoth() {\n  const results = await Promise.all([\n    Promise.resolve(\"цвета\"),\n    Promise.resolve(\"настройки\")\n  ]);\n  console.log(results);\n}\n\nloadBoth();"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "[цвета, настройки]",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  }
 }

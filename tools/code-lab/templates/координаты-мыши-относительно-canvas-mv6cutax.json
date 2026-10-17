@@ -546,5 +546,80 @@
       }
     ]
   ],
-  "output": "Координаты указателя в системе координат canvas"
+  "output": "Координаты указателя в системе координат canvas",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "Координаты указателя в системе координат canvas",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: scene.",
+        "Для рисования нужен canvas с подходящим id и доступным 2D-контекстом."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const canvas = document.querySelector(\"#scene\");\n\ncanvas.addEventListener(\"mousemove\", event => {\n  const rect = canvas.getBoundingClientRect();\n  const x = (event.clientX - rect.left) * canvas.width / rect.width;\n  const y = (event.clientY - rect.top) * canvas.height / rect.height;\n  console.log(x.toFixed(0), y.toFixed(0));\n});"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Координаты указателя в системе координат canvas",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  }
 }

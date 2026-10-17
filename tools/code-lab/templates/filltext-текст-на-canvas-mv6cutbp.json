@@ -245,5 +245,80 @@
       }
     ]
   ],
-  "output": "Надпись «Привет, canvas!» на холсте"
+  "output": "Надпись «Привет, canvas!» на холсте",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "Надпись «Привет, canvas!» на холсте",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: scene.",
+        "Для рисования нужен canvas с подходящим id и доступным 2D-контекстом."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\n\nctx.font = \"20px sans-serif\";\nctx.fillStyle = \"#F6F4FF\";\nctx.fillText(\"Привет, canvas!\", 20, 50);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Надпись «Привет, canvas!» на холсте",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  }
 }

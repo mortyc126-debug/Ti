@@ -174,5 +174,79 @@
       }
     ]
   ],
-  "output": "rgba(255, 0, 110, 0.35)"
+  "output": "rgba(255, 0, 110, 0.35)",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "rgba(255, 0, 110, 0.35)",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: panel."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const overlay = \"rgba(255, 0, 110, 0.35)\";\nconst panel = document.querySelector(\"#panel\");\n\npanel.style.backgroundColor = overlay;\nconsole.log(overlay);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "rgba(255, 0, 110, 0.35)",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  }
 }
