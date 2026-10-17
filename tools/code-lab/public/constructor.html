@@ -74,7 +74,7 @@
   @media(max-width:1000px){.result{grid-template-columns:1fr}}
   pre.code{background:#0E0720;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:0;overflow:auto;font-size:12px;line-height:1.55}
   .result .preview{margin:0}
-  .result iframe{width:100%;height:100%;border:1px solid var(--border);border-radius:10px;background:#0E0720}
+  .result iframe{width:100%;height:100%;border:1px solid var(--border);border-radius:10px;background:#0E0720}.preview{position:relative}.runtime-status{position:absolute;right:7px;top:7px;z-index:2;padding:4px 7px;border-radius:7px;background:rgba(14,7,32,.9);border:1px solid var(--border);font:10px ui-monospace,monospace;color:var(--text3);pointer-events:none}.runtime-status.ok{color:var(--str);border-color:rgba(82,242,201,.45)}.runtime-status.error{color:#ffb3c1;border-color:rgba(255,107,107,.45)}.runtime-status.checking{color:var(--num);border-color:rgba(255,136,0,.45)}
 
   /* правый инспектор */
   .g-insp{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:auto;min-height:0}
@@ -83,6 +83,26 @@
   .insp-head button:hover{color:var(--text)} .insp-head button.on{background:var(--s2);color:var(--acc)}
   .insp-body{padding:13px 14px}
   .insp-empty{color:var(--text3);font-size:12.5px;line-height:1.7}
+
+  /* Явный контракт блока: вход, результат, требования и ограничения */
+  .block-contract{border:1px solid var(--border);background:rgba(124,108,160,.06);border-radius:10px;padding:10px;margin:8px 0 12px}
+  .bc-io{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:5px;align-items:center}
+  .bc-side{min-width:0}
+  .bc-label{display:block;font-size:9px;letter-spacing:.08em;color:var(--text3);margin-bottom:4px}
+  .bc-value{display:block;font-size:11px;line-height:1.45;color:var(--text2);overflow-wrap:anywhere}
+  .bc-arrow{text-align:center;color:var(--acc)}
+  .bc-status{font-size:10.5px;line-height:1.45;padding:6px 8px;border-radius:6px;margin-top:9px}
+  .bc-status.needs-work{color:#FFB18A;background:rgba(232,137,90,.09);border:1px solid rgba(232,137,90,.28)}
+  .bc-status.ready{color:var(--str);background:rgba(82,242,201,.07);border:1px solid rgba(82,242,201,.2)}
+  .bc-section{margin-top:10px}
+  .bc-heading{font-size:11px;font-weight:600;color:var(--text);margin-bottom:4px}
+  .block-contract ul{padding-left:17px;margin:5px 0 0;color:var(--text2);font-size:11px;line-height:1.5}
+  .block-contract li{margin:0 0 5px}
+  .block-contract .bc-alert{color:#FFB18A}
+  .bc-details{margin-top:9px;border-top:1px solid var(--border);padding-top:8px}
+  .bc-details summary{cursor:pointer;font-size:11px;color:var(--text3)}
+  .bc-details[open] summary{margin-bottom:5px;color:var(--text2)}
+
   .insp-title{font-size:14px;font-weight:600;margin:0 0 2px}
   .insp-kind{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:10px}
   .insp-field{margin-bottom:11px}
@@ -143,6 +163,11 @@
   .btn{font:12px/1 ui-monospace,monospace;color:var(--text2);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:7px 11px;cursor:pointer}
   .btn:hover{color:var(--acc);border-color:rgba(255,0,110,.4)} .btn.ok{color:var(--str);border-color:rgba(82,242,201,.4)}
   select.btn{appearance:auto}
+
+.edge-message{position:fixed;right:18px;bottom:18px;z-index:1000;max-width:420px;padding:10px 13px;border:1px solid var(--line,#3a2d55);border-radius:10px;background:#170d29;color:var(--text,#f6f4ff);box-shadow:0 8px 30px rgba(0,0,0,.35);font-size:12px;line-height:1.45}
+.edge-message.error{border-color:#a94b62}.edge-message.warn{border-color:#a7833e}.edge-message.ok{border-color:#3d9a83}
+.bc-status.needs-work{border-color:#a7833e}.bc-status.ready{border-color:#3d9a83}
+.bc-alert{color:#ffb3c1}.edge-message{display:none}
 </style>
 </head>
 <body data-page="constructor">
@@ -190,7 +215,7 @@
       </div>
       <div class="result">
         <pre class="code mono" id="code"></pre>
-        <div class="preview"><iframe id="preview" sandbox="allow-scripts"></iframe></div>
+        <div class="preview"><div id="runtimeStatus" class="runtime-status" aria-live="polite">Preview не запускался</div><iframe id="preview" sandbox="allow-scripts"></iframe></div>
       </div>
     </section>
 

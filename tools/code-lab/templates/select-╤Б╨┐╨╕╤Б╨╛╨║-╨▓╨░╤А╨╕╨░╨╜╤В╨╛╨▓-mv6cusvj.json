@@ -1,0 +1,327 @@
+{
+  "id": "select-список-вариантов-mv6cusvj",
+  "lang": "js",
+  "group": "Формы и ввод",
+  "title": "select — список вариантов",
+  "desc": "У select свойство value содержит значение выбранного option. Событие change срабатывает при смене выбора.",
+  "lines": [
+    [
+      {
+        "k": "kw",
+        "v": "const"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "name",
+        "v": "select",
+        "r": "select"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "op",
+        "v": "="
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "fn",
+        "v": "document"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "querySelector"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "str",
+        "v": "\"#theme\""
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [
+      {
+        "k": "kw",
+        "v": "const"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "name",
+        "v": "page",
+        "r": "page"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "op",
+        "v": "="
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "fn",
+        "v": "document"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "querySelector"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "str",
+        "v": "\"body\""
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [],
+    [
+      {
+        "k": "name",
+        "v": "select",
+        "r": "select"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "addEventListener"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "str",
+        "v": "\"change\""
+      },
+      {
+        "k": "op",
+        "v": ","
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "op",
+        "v": "="
+      },
+      {
+        "k": "op",
+        "v": ">"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "op",
+        "v": "{"
+      }
+    ],
+    [
+      {
+        "k": "sp",
+        "v": "  "
+      },
+      {
+        "k": "name",
+        "v": "page",
+        "r": "page"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "name",
+        "v": "dataset",
+        "r": "dataset"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "name",
+        "v": "theme",
+        "r": "theme"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "op",
+        "v": "="
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "name",
+        "v": "select",
+        "r": "select"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "name",
+        "v": "value",
+        "r": "value"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [
+      {
+        "k": "op",
+        "v": "}"
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ]
+  ],
+  "output": "data-theme у body соответствует выбранному варианту",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "data-theme у body соответствует выбранному варианту",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: theme."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const select = document.querySelector(\"#theme\");\nconst page = document.querySelector(\"body\");\n\nselect.addEventListener(\"change\", () => {\n  page.dataset.theme = select.value;\n});"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "data-theme у body соответствует выбранному варианту",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  }
+}

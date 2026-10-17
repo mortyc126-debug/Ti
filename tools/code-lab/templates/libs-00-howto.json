@@ -136,5 +136,80 @@
       }
     ]
   ],
-  "output": "2026-10-11"
+  "output": "2026-10-11",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс",
+        "Работа с данными",
+        "Интеграции"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "2026-10-11",
+      "dependencies": [],
+      "requirements": [
+        "Запускай как ES-модуль и проверь наличие импортируемых файлов/пакетов."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "// 1) В проекте (есть package.json): сначала в терминале\n//    npm install dayjs\n//    затем в коде:\nimport dayjs from \"dayjs\";\nconsole.log(dayjs().format(\"YYYY-MM-DD\"));\n\n// 2) В обычном HTML без сборки — через CDN:\n// <script src=\"https://cdn.jsdelivr.net/npm/dayjs/dayjs.min.js\"></script>"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "2026-10-11",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  }
 }

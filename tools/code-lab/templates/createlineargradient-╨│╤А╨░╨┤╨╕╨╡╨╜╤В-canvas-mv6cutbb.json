@@ -1,0 +1,479 @@
+{
+  "id": "createlineargradient-градиент-canvas-mv6cutbb",
+  "lang": "js",
+  "group": "Canvas",
+  "title": "createLinearGradient — градиент Canvas",
+  "desc": "createLinearGradient создаёт градиент, addColorStop задаёт цветовые точки от 0 до 1. Назначьте градиент в fillStyle или strokeStyle.",
+  "lines": [
+    [
+      {
+        "k": "kw",
+        "v": "const"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "name",
+        "v": "canvas",
+        "r": "canvas"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "op",
+        "v": "="
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "fn",
+        "v": "document"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "querySelector"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "str",
+        "v": "\"#scene\""
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [
+      {
+        "k": "kw",
+        "v": "const"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "name",
+        "v": "ctx",
+        "r": "ctx"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "op",
+        "v": "="
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "name",
+        "v": "canvas",
+        "r": "canvas"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "getContext"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "str",
+        "v": "\"2d\""
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [
+      {
+        "k": "kw",
+        "v": "const"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "name",
+        "v": "gradient",
+        "r": "gradient"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "op",
+        "v": "="
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "name",
+        "v": "ctx",
+        "r": "ctx"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "createLinearGradient"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "num",
+        "v": "0"
+      },
+      {
+        "k": "op",
+        "v": ","
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "num",
+        "v": "0"
+      },
+      {
+        "k": "op",
+        "v": ","
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "num",
+        "v": "180"
+      },
+      {
+        "k": "op",
+        "v": ","
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "num",
+        "v": "0"
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [],
+    [
+      {
+        "k": "name",
+        "v": "gradient",
+        "r": "gradient"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "addColorStop"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "num",
+        "v": "0"
+      },
+      {
+        "k": "op",
+        "v": ","
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "str",
+        "v": "\"#FF006E\""
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [
+      {
+        "k": "name",
+        "v": "gradient",
+        "r": "gradient"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "addColorStop"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "num",
+        "v": "1"
+      },
+      {
+        "k": "op",
+        "v": ","
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "str",
+        "v": "\"#3DD9FF\""
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [
+      {
+        "k": "name",
+        "v": "ctx",
+        "r": "ctx"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "name",
+        "v": "fillStyle",
+        "r": "fillStyle"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "op",
+        "v": "="
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "name",
+        "v": "gradient",
+        "r": "gradient"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [
+      {
+        "k": "name",
+        "v": "ctx",
+        "r": "ctx"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "fillRect"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "num",
+        "v": "10"
+      },
+      {
+        "k": "op",
+        "v": ","
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "num",
+        "v": "10"
+      },
+      {
+        "k": "op",
+        "v": ","
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "num",
+        "v": "180"
+      },
+      {
+        "k": "op",
+        "v": ","
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "num",
+        "v": "70"
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ]
+  ],
+  "output": "Прямоугольник с переходом от розового к голубому",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "Прямоугольник с переходом от розового к голубому",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: scene.",
+        "Для рисования нужен canvas с подходящим id и доступным 2D-контекстом."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\nconst gradient = ctx.createLinearGradient(0, 0, 180, 0);\n\ngradient.addColorStop(0, \"#FF006E\");\ngradient.addColorStop(1, \"#3DD9FF\");\nctx.fillStyle = gradient;\nctx.fillRect(10, 10, 180, 70);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Прямоугольник с переходом от розового к голубому",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  }
+}

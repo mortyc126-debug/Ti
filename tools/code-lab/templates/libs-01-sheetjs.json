@@ -494,5 +494,83 @@
       }
     ]
   ],
-  "output": "[[\"Год\",\"Выручка\"],[\"2024\",120], …]"
+  "output": "[[\"Год\",\"Выручка\"],[\"2024\",120], …]",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Работа с данными"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "[[\"Год\",\"Выручка\"],[\"2024\",120], …]",
+      "dependencies": [],
+      "requirements": [
+        "Запускай как ES-модуль и проверь наличие импортируемых файлов/пакетов."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import * as XLSX from \"xlsx\";\n\nconst книга = XLSX.read(данныеФайла, { type: \"array\" });\nconst лист  = книга.Sheets[книга.SheetNames[0]]; // первый лист\nconst строки = XLSX.utils.sheet_to_json(лист, { header: 1 });\n// строки → [[ячейка, ячейка, …], …]"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "[[\"Год\",\"Выручка\"],[\"2024\",120], …]",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  },
+  "summary": {
+    "dependencies": [
+      "SheetJS (xlsx) — источник/блок: libs-sheetjs"
+    ]
+  }
 }

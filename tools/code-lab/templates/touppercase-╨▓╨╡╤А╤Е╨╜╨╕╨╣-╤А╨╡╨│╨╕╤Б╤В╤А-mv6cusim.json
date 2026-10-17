@@ -1,0 +1,165 @@
+{
+  "id": "touppercase-верхний-регистр-mv6cusim",
+  "lang": "js",
+  "group": "Строки",
+  "title": "toUpperCase — верхний регистр",
+  "desc": "toUpperCase возвращает строку, в которой буквы преобразованы в верхний регистр.",
+  "lines": [
+    [
+      {
+        "k": "kw",
+        "v": "const"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "name",
+        "v": "label",
+        "r": "label"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "op",
+        "v": "="
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "str",
+        "v": "\"hello, world!\""
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [
+      {
+        "k": "fn",
+        "v": "console"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "log"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "name",
+        "v": "label",
+        "r": "label"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "toUpperCase"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ]
+  ],
+  "output": "HELLO, WORLD!",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Логика и вычисления"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "HELLO, WORLD!",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const label = \"hello, world!\";\nconsole.log(label.toUpperCase());"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "HELLO, WORLD!",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  }
+}

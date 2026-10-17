@@ -712,5 +712,80 @@
       }
     ]
   ],
-  "output": "по цепочке, secid: SBER…\nпараллельно пришли оба ответа"
+  "output": "по цепочке, secid: SBER…\nпараллельно пришли оба ответа",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Работа с данными",
+        "Интеграции"
+      ],
+      "runtime": [
+        "Браузер или Node.js с поддержкой fetch"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "URL запроса и ответ внешнего API",
+      "output": "по цепочке, secid: SBER…\nпараллельно пришли оба ответа",
+      "dependencies": [],
+      "requirements": [
+        "Нужен доступ к сети; сервер должен разрешать запросы через CORS. Проверь HTTP-статус и обработку ошибок.",
+        "Код с await должен выполняться внутри async-функции или другого допустимого async-контекста."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const q = u => fetch(u).then(r => r.json());\n\nasync function main(){\n  // — ЦЕПОЧКА: шаг 2 зависит от шага 1 —\n  const поиск = await q(\"https://iss.moex.com/iss/securities.json?q=Сбербанк&iss.meta=off\");\n  const secid = поиск.securities.data[0][1];          // берём код из 1-го ответа\n  const инфо  = await q(\"https://iss.moex.com/iss/securities/\" + secid + \".json?iss.meta=off\");\n  console.log(\"по цепочке, secid:\", secid);\n\n  // — ПАРАЛЛЕЛЬНО: запросы НЕ зависят друг от друга —\n  const [a, b] = await Promise.all([\n    q(\"https://iss.moex.com/iss/engines.json?iss.meta=off\"),\n    q(\"https://iss.moex.com/iss/index.json?iss.meta=off\"),\n  ]);\n  console.log(\"параллельно пришли оба ответа\");\n}\nmain();"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "по цепочке, secid: SBER…\nпараллельно пришли оба ответа",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  }
 }

@@ -2322,5 +2322,80 @@
       }
     ]
   ],
-  "output": "ИНН эмитента: 7707083893\norgId: … годы: [2024, 2023, 2022, …]"
+  "output": "ИНН эмитента: 7707083893\norgId: … годы: [2024, 2023, 2022, …]",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Работа с данными",
+        "Интеграции"
+      ],
+      "runtime": [
+        "Браузер или Node.js с поддержкой fetch"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "URL запроса и ответ внешнего API",
+      "output": "ИНН эмитента: 7707083893\norgId: … годы: [2024, 2023, 2022, …]",
+      "dependencies": [],
+      "requirements": [
+        "Нужен доступ к сети; сервер должен разрешать запросы через CORS. Проверь HTTP-статус и обработку ошибок.",
+        "Код с await должен выполняться внутри async-функции или другого допустимого async-контекста."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "// Прокси обходит CORS к bo.nalog.gov.ru. По умолчанию — публичный corsproxy.io.\nconst ПРОКСИ = \"https://corsproxy.io/?\";   // свой CF Worker: \"https://…workers.dev/?u=\"\n\n// собрать адрес через прокси по соглашению проекта\nfunction черезПрокси(target){\n  if(ПРОКСИ.endsWith(\"=\")) return ПРОКСИ + encodeURIComponent(target); // …/?u= → кодируем\n  return ПРОКСИ + target;                                             // …/?   → как есть\n}\nconst гирбо = путь => черезПрокси(\"https://bo.nalog.gov.ru\" + путь);\nconst q = u => fetch(u, { headers: { Accept: \"application/json\" } }).then(r => r.json());\n\n// Шаг 1–2: имя → MOEX → ИНН эмитента\nasync function поИмениИНН(имя){\n  const j = await q(\"https://iss.moex.com/iss/securities.json?iss.meta=off&q=\" + encodeURIComponent(имя));\n  const кол = j.securities.columns;\n  const стр = j.securities.data[0];\n  if(!стр) throw new Error(\"на бирже нет: \" + имя);\n  return String(стр[кол.indexOf(\"emitent_inn\")] || \"\");\n}\n\n// Шаг 3–4: ИНН → ГИР БО → годы отчётов в массив\nasync function отчётность(ИНН){\n  const найдено = await q(гирбо(\"/advanced-search/organizations/search?inn=\" + ИНН));\n  const orgs = найдено.content || найдено;      // список организаций\n  const org = orgs[0];\n  if(!org) throw new Error(\"в ГИР БО нет ИНН \" + ИНН);\n  const bfo = await q(гирбо(\"/nbo/organizations/\" + org.id + \"/bfo/\")); // список отчётов\n  const список = bfo.content || bfo;\n  const годы = список\n    .filter(b => String(b.period).length === 4)   // только годовые\n    .map(b => Number(b.period))\n    .sort((a, b) => b - a);\n  return { orgId: org.id, годы };                 // ответ → массив лет\n}\n\nasync function main(){\n  const ИНН = await поИмениИНН(\"Сбербанк\");       // ← имя из Т-Инвестиций\n  console.log(\"ИНН эмитента:\", ИНН);\n  const r = await отчётность(ИНН);\n  console.log(\"orgId:\", r.orgId, \"годы:\", r.годы);\n  // дальше по каждому году: /nbo/details/balance?id= и /nbo/details/financial_result?id=\n  // → оттуда выручка (код 2110), активы (1600) и т.д. в массивы по годам.\n}\nmain();"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "ИНН эмитента: 7707083893\norgId: … годы: [2024, 2023, 2022, …]",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  }
 }

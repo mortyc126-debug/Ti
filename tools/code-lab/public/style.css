@@ -235,3 +235,11 @@ aside#info{border-left:1px solid var(--border);padding:16px;overflow:auto;positi
 .pop .pop-t{font-size:13.5px;font-weight:600;color:var(--text);margin-bottom:4px;word-break:break-word}
 .pop .pop-g{font-size:11px;color:var(--text3)}
 .pop .pop-l{display:inline-block;margin-top:8px;font-size:9px;font-family:ui-monospace,monospace;padding:2px 6px;border-radius:5px;background:var(--bg);color:var(--text3)}
+
+/* Самопроверка перед сохранением компонента */
+.preflight{margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);font-size:12px;line-height:1.45}
+.preflight-title{font-weight:700;margin-bottom:6px}
+.preflight ul{margin:6px 0 0;padding-left:18px}
+.preflight-error{color:#ff6b6b;margin:3px 0}
+.preflight-warning{color:#e7b84b;margin:3px 0}
+#s-save:disabled{opacity:.45;cursor:not-allowed}

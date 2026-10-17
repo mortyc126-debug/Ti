@@ -1,0 +1,216 @@
+{
+  "id": "textcontent-и-innerhtml-mv6cusz6",
+  "lang": "js",
+  "group": "DOM",
+  "title": "textContent и innerHTML",
+  "desc": "textContent вставляет текст безопасно, не интерпретируя его как HTML. innerHTML разбирает строку как HTML-разметку; не вставляйте туда недоверенные данные.",
+  "lines": [
+    [
+      {
+        "k": "kw",
+        "v": "const"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "name",
+        "v": "box",
+        "r": "box"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "op",
+        "v": "="
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "fn",
+        "v": "document"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "querySelector"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "str",
+        "v": "\"#message\""
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [
+      {
+        "k": "name",
+        "v": "box",
+        "r": "box"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "name",
+        "v": "textContent",
+        "r": "textContent"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "op",
+        "v": "="
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "str",
+        "v": "\"<b>Привет</b>\""
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [
+      {
+        "k": "fn",
+        "v": "console"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "log"
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "name",
+        "v": "box",
+        "r": "box"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "name",
+        "v": "textContent",
+        "r": "textContent"
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ]
+  ],
+  "output": "<b>Привет</b> (отображается именно как текст)",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс",
+        "Работа с данными"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "<b>Привет</b> (отображается именно как текст)",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: message."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const box = document.querySelector(\"#message\");\nbox.textContent = \"<b>Привет</b>\";\nconsole.log(box.textContent);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "<b>Привет</b> (отображается именно как текст)",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  }
+}

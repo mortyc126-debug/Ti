@@ -1281,5 +1281,83 @@
       }
     ]
   ],
-  "output": "таблица облигаций с доходностью > 20%, по убыванию"
+  "output": "таблица облигаций с доходностью > 20%, по убыванию",
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс",
+        "Работа с данными",
+        "Интеграции"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "URL запроса и ответ внешнего API",
+      "output": "таблица облигаций с доходностью > 20%, по убыванию",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: out.",
+        "Нужен доступ к сети; сервер должен разрешать запросы через CORS. Проверь HTTP-статус и обработку ошибок.",
+        "Код с await должен выполняться внутри async-функции или другого допустимого async-контекста."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "async function main(){\n  const url = \"https://iss.moex.com/iss/engines/stock/markets/bonds/boards/TQCB/securities.json\"\n    + \"?iss.meta=off&securities.columns=SECID,SECNAME&marketdata.columns=SECID,YIELD\";\n  const ответ = await fetch(url);\n  const данные = await ответ.json();\n\n  // имена: {SECID: название}\n  const имена = {};\n  данные.securities.data.forEach(r => имена[r[0]] = r[1]);\n\n  // доходности → объекты → отбор > 20% → сортировка\n  const список = данные.marketdata.data\n    .map(r => ({ secid: r[0], доходность: r[1], имя: имена[r[0]] }))\n    .filter(x => x.доходность > 20)\n    .sort((a, b) => b.доходность - a.доходность);\n\n  таблица(список);\n}\n\nfunction таблица(список){\n  const строки = список.map(x =>\n    \"<tr><td>\" + (x.имя || x.secid) + \"</td><td>\" + x.доходность + \"%</td></tr>\").join(\"\");\n  document.querySelector(\"#out\").innerHTML =\n    \"<table cellpadding='4' style='color:#F6F4FF'>\" + строки + \"</table>\";\n}\nmain();"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "таблица облигаций с доходностью > 20%, по убыванию",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  }
 }

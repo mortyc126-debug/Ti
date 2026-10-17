@@ -48,8 +48,8 @@ function render(t){
     const p2 = el('div', 'panel'); p2.innerHTML = '<h3>Необходимое</h3>';
     const req = el('div', 'req');
     const reqs = (c.summary.requirements || []); const deps = (c.summary.dependencies || []);
-    req.innerHTML = (reqs.length ? reqs.map(esc).join('<br>') : 'ничего особенного')
-      + '<div class="dep">' + (deps.length ? ('зависимости: ' + deps.map(esc).join(', ')) : 'библиотеки и сеть не нужны') + '</div>';
+    req.innerHTML = (reqs.length ? reqs.map(esc).join('<br>') : '<span class="req-missing">не описано — проверь код перед использованием</span>')
+      + '<div class="dep">' + (deps.length ? ('зависимости: ' + deps.map(esc).join(', ')) : 'зависимости не указаны (это не означает, что их нет)') + '</div>';
     p2.appendChild(req); brief.appendChild(p2);
     root.appendChild(brief);
   }

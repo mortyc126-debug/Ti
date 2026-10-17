@@ -13,9 +13,9 @@ const BLOCKS = {
   reduce: { cat:'Обработка', label:'reduce (свернуть)', type:'leaf', hint:'Свернуть список в одно значение. acc копит, x — текущий.', fields:[{k:'name',def:'сумма'},{k:'list',def:'числа'},{k:'expr',def:'acc + x'}], code:f=>`const ${f.name} = ${f.list}.reduce((acc, x) => ${f.expr}, 0);` },
   calc:   { cat:'Обработка', label:'расчёт (формула)', type:'leaf', hint:'Посчитать выражение и положить в имя.', fields:[{k:'name',def:'результат'},{k:'expr',def:'сумма / числа.length'}], code:f=>`const ${f.name} = ${f.expr};` },
   log:    { cat:'Вывод', label:'вывод в консоль', type:'leaf', hint:'Показать значение в превью при запуске.', fields:[{k:'value',def:'результат'}], code:f=>`console.log(${f.value});` },
-  bars:   { cat:'Вывод', label:'столбики (canvas)', type:'draw', hint:'Нарисовать столбики по числам на холсте #c.', fields:[{k:'values',def:'40, 70, 30, 90, 55'}], code:f=>`const ctx = document.querySelector("#c").getContext("2d");\n[${f.values}].forEach((v, i) => { ctx.fillStyle = "#3DD9FF"; ctx.fillRect(i * 32, 140 - v, 22, v); });` },
-  svg:    { cat:'Вывод', label:'SVG-линия', type:'draw', hint:'Линия по точкам «x,y x,y…» в области #out.', fields:[{k:'points',def:'0,90 20,70 40,80 60,40 80,55 100,20'}], code:f=>`document.querySelector("#out").innerHTML =\n  '<svg width="200" height="100"><polyline points="${f.points}" fill="none" stroke="#52F2C9" stroke-width="2"/></svg>';` },
-  fetchj: { cat:'Сеть', label:'запрос (fetch)', type:'leaf', hint:'Сходить в сеть за JSON. Нужен await — ставь внутри async.', fields:[{k:'name',def:'данные'},{k:'url',def:'https://api.example.com/data'}], code:f=>`const ${f.name} = await fetch("${f.url}").then(r => r.json());` },
+  bars:   { cat:'Вывод', label:'столбики (canvas)', type:'draw', hint:'Нарисовать столбики по числам на холсте #c. Поле values принимает массив или список чисел.', fields:[{k:'values',def:'40, 70, 30, 90, 55'}], code:f=>`const ctx = document.querySelector("#c").getContext("2d");\nconst barValues = Array.isArray(${f.values}) ? ${f.values} : [${f.values}];\nbarValues.forEach((v, i) => { ctx.fillStyle = "#3DD9FF"; ctx.fillRect(i * 32, 140 - v, 22, v); });` },
+  svg:    { cat:'Вывод', label:'SVG-линия', type:'draw', hint:'Линия по точкам «x,y x,y…» в области #out. Координаты проверяются как числа, SVG-узлы создаются через DOM.', fields:[{k:'points',def:'0,90 20,70 40,80 60,40 80,55 100,20'}], code:f=>{ const raw=JSON.stringify(String(f.points||'')); return `const svgHost = document.querySelector("#out");\nif (!svgHost) throw new Error('Не найден элемент #out для SVG');\nconst svgPointsRaw = ${raw};\nconst svgPairs = svgPointsRaw.trim().split(/\\s+/).filter(Boolean).map((pair) => pair.split(',').map(Number));\nif (!svgPairs.length || svgPairs.some((p) => p.length !== 2 || p.some((v) => !Number.isFinite(v)))) throw new Error('SVG: точки должны быть парами чисел x,y через пробел');\nconst svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');\nsvg.setAttribute('width', '200'); svg.setAttribute('height', '100');\nconst polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');\npolyline.setAttribute('points', svgPairs.map((p) => p.join(',')).join(' '));\npolyline.setAttribute('fill', 'none'); polyline.setAttribute('stroke', '#52F2C9'); polyline.setAttribute('stroke-width', '2');\nsvg.appendChild(polyline); svgHost.replaceChildren(svg);`; } },
+  fetchj: { cat:'Сеть', label:'запрос (fetch)', type:'leaf', hint:'Сходить в сеть за JSON. Нужен await — ставь внутри async.', fields:[{k:'name',def:'данные'},{k:'url',def:'https://api.example.com/data'}], code:f=>`const ${f.name} = await fetch("${f.url}").then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });` },
   iff:    { cat:'Логика', label:'если (if)', type:'leaf', hint:'Выполнить строку только если условие истинно.', fields:[{k:'cond',def:'цена > 50'},{k:'then',def:'console.log("дорого")'}], code:f=>`if (${f.cond}) { ${f.then}; }` },
   forN:   { cat:'Логика', label:'повторить N раз', type:'leaf', hint:'Повторить строку count раз (счётчик i).', fields:[{k:'count',def:'3'},{k:'body',def:'console.log(i)'}], code:f=>`for (let i = 0; i < ${f.count}; i++) { ${f.body}; }` },
   func:   { cat:'Логика', label:'функция', type:'leaf', hint:'Рецепт: вход args → тело. Многострочное тело пиши в body.', fields:[{k:'name',def:'посчитать'},{k:'args',def:'a, b'},{k:'body',def:'return a + b;'}], code:f=>`function ${f.name}(${f.args}) {\n  ${f.body}\n}` },
@@ -33,6 +33,180 @@ function classify(text){
   if(/\.(map|filter|reduce|forEach)\(/.test(l)) return 'обработка списка';
   return 'код';
 }
+
+// Контракт блока: показываем требования и результат до того, как пользователь запускает код.
+// Это подсказки по типовым блокам, а не доказательство автоматической совместимости.
+const BLOCK_GUIDES = {
+  let:    { input:'Значение, которое можно записать в переменную', output:'Переменная с указанным именем', needs:['Имя переменной без пробелов','Корректное JavaScript-выражение в поле «value»'], risks:['Если имя уже объявлено через const/let в той же области, возникнет ошибка повторного объявления.'] },
+  array:  { input:'Элементы, перечисленные через запятую', output:'Массив с указанным именем', needs:['Имя массива','Элементы должны быть корректными выражениями: строки — в кавычках, объекты — в фигурных скобках'], risks:['Не заключай весь список в дополнительные квадратные скобки: блок добавляет их сам.'] },
+  object: { input:'Пары ключ: значение', output:'Объект с указанным именем', needs:['Ключи и значения в синтаксисе JavaScript','Строковые значения нужно заключать в кавычки'], risks:['Неверная запятая или двоеточие сломают синтаксис.'] },
+  map:    { input:'Массив из поля «list»', output:'Новый массив в переменной из поля «name»', needs:['Сначала создай массив или добавь блок, который объявляет переменную из поля «list»','В выражении используй x как текущий элемент'], risks:['Если переменной из «list» нет, будет ReferenceError.','map не меняет исходный массив, а возвращает новый.'] },
+  filter: { input:'Массив из поля «list»', output:'Новый массив только с элементами, прошедшими условие', needs:['Переменная массива должна быть объявлена выше по порядку выполнения','Условие должно возвращать true/false; x — текущий элемент'], risks:['Если условие всегда истинно/ложно, результат будет содержать все/ни одного элемента.'] },
+  reduce: { input:'Массив из поля «list»', output:'Одно итоговое значение', needs:['Объявленная переменная массива','Выражение использует acc (накопитель) и x (текущий элемент)'], risks:['Начальное значение здесь фиксировано как 0; для объектов/строк нужно изменить код вручную.'] },
+  calc:   { input:'Переменные и выражения, указанные в формуле', output:'Переменная с результатом вычисления', needs:['Все имена в формуле должны быть объявлены раньше','Проверь деление на ноль и типы значений'], risks:['Необъявленная переменная приведёт к ReferenceError.'] },
+  log:    { input:'Переменная или выражение из поля «value»', output:'Значение в журнале предпросмотра', needs:['Указанное имя должно существовать к моменту вывода'], risks:['Если имя не объявлено, запуск остановится с ошибкой.'] },
+  bars:   { input:'Список чисел из поля «values»', output:'Столбчатая диаграмма на canvas #c', needs:['Среда предпросмотра содержит canvas с id="c"','Значения должны быть числами; высота столбца зависит от значения'], risks:['Если canvas отсутствует, getContext вызовет ошибку.'] },
+  svg:    { input:'Координаты точек из поля «points»', output:'SVG-линия внутри элемента #out', needs:['Среда должна содержать элемент с id="out"','Точки задаются парами x,y через пробел и должны быть конечными числами'], risks:['Неверная точка остановит этот блок с понятной ошибкой; SVG больше не собирается через innerHTML.'] },
+  fetchj: { input:'URL API из поля «url»', output:'Данные JSON в переменной из поля «name»', needs:['Доступ к сети и разрешение CORS со стороны сервера','Запрос должен выполняться в async-контексте — конструктор оборачивает код с await','API должен возвращать корректный JSON'], risks:['Домен-заглушка api.example.com не является готовым источником данных.','HTTP-ошибки и недоступная сеть могут сорвать запрос; нужна обработка ошибок.'] },
+  iff:    { input:'Условие из поля «cond»', output:'Выполняет тело только если условие истинно', needs:['Все переменные в условии должны существовать','В поле then указывается JavaScript-код'], risks:['Условие сравнения обычно использует ===, >, < и другие операторы.'] },
+  forN:   { input:'Количество повторений', output:'Выполняет тело цикла N раз', needs:['Количество — неотрицательное число','В теле доступна переменная-счётчик i'], risks:['Бесконечный цикл возможен, если вручную изменить условие/шаг.'] },
+  func:   { input:'Аргументы, перечисленные в поле «args»', output:'Объявляет функцию; сама по себе не запускает её', needs:['Имя функции и параметры должны быть корректными идентификаторами','Чтобы получить результат, отдельно вызови функцию'], risks:['Функция с return ничего не посчитает до вызова.'] },
+  raw:    { input:'Зависит от вставленного кода', output:'Зависит от вставленного кода', needs:['Проверь, что все переменные, функции и DOM-элементы доступны','Код выполняется в изолированном предпросмотре; серверные API и пакеты не подключены автоматически'], risks:['Свободный код может иметь побочные эффекты; проверь его перед запуском.'] }
+};
+
+
+// Runtime-проверка: отделяем «по описанию должно быть» от того, что реально есть
+// в текущем preview. Состояние используется инспектором и запуском.
+const runtimeState = { status:'idle', errors:[], warnings:[], checkedAt:0 };
+const COMMON_GLOBALS = new Set([
+  'Array','Boolean','Date','Error','JSON','Map','Math','Number','Object','Promise','RegExp','Set','String','Symbol','URL','console','document','window','fetch','localStorage','sessionStorage','indexedDB','requestAnimationFrame','cancelAnimationFrame','setTimeout','clearTimeout','setInterval','clearInterval','parseInt','parseFloat','isNaN','isFinite','Intl','TextEncoder','TextDecoder','FormData','Blob','File','FileReader','URLSearchParams'
+]);
+const LIBRARY_GLOBALS = {
+  XLSX:'XLSX', Chart:'Chart', React:'React', Vue:'Vue', VueRouter:'VueRouter', axios:'axios', dayjs:'dayjs', moment:'moment', _:'_', echarts:'echarts', THREE:'THREE'
+};
+const DEPENDENCY_REGISTRY = {
+  XLSX:{id:'sheetjs',name:'SheetJS (xlsx)',global:'XLSX',mode:'script',url:'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',provide:'подключение SheetJS browser bundle',provider:'libs-sheetjs'},
+  Chart:{id:'chartjs',name:'Chart.js',global:'Chart',mode:'script',url:'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js',provide:'подключение Chart.js browser bundle'},
+  React:{id:'react',name:'React',global:'React',mode:'script',url:'https://unpkg.com/react@18/umd/react.development.js',provide:'подключение React UMD или сборщик'},
+  Vue:{id:'vue',name:'Vue',global:'Vue',mode:'script',url:'https://unpkg.com/vue@3/dist/vue.global.js',provide:'подключение Vue Global или сборщик'},
+  axios:{id:'axios',name:'Axios',global:'axios',mode:'script',url:'https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js',provide:'подключение Axios browser bundle'},
+  dayjs:{id:'dayjs',name:'Day.js',global:'dayjs',mode:'script',url:'https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js',provide:'подключение Day.js browser bundle'},
+  moment:{id:'moment',name:'Moment.js',global:'moment',mode:'script',url:'https://cdn.jsdelivr.net/npm/moment@2.30.1/min/moment.min.js',provide:'подключение Moment.js browser bundle'},
+  _:{id:'lodash',name:'Lodash',global:'_',mode:'script',url:'https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js',provide:'подключение Lodash browser bundle'},
+  echarts:{id:'echarts',name:'Apache ECharts',global:'echarts',mode:'script',url:'https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js',provide:'подключение ECharts browser bundle'},
+  THREE:{id:'three',name:'Three.js',global:'THREE',mode:'script',url:'https://cdn.jsdelivr.net/npm/three@0.172.0/build/three.min.js',provide:'подключение Three.js browser bundle'},
+  zustand:{id:'zustand',name:'Zustand',mode:'module',provide:'npm/ESM-среда; обычный script-preview не поддерживает автоматическое подключение',provider:'libs-zustand'}
+};
+const DEPENDENCY_ALIASES={xlsx:'XLSX','chart.js':'Chart',react:'React',vue:'Vue',axios:'axios',dayjs:'dayjs',moment:'moment',lodash:'_',echarts:'echarts',three:'THREE',zustand:'zustand'};
+function runtimeSelectors(code){
+  const out=[]; const seen=new Set(); const text=String(code||'');
+  const push=(v)=>{ if(v && !seen.has(v)){seen.add(v);out.push(v);} };
+  for(const re of [/querySelector\(\s*["']([^"']+)["']\s*\)/g,/querySelectorAll\(\s*["']([^"']+)["']\s*\)/g,/getElementById\(\s*["']([^"']+)["']\s*\)/g]){
+    let m; while((m=re.exec(text))) push(m[1]);
+  }
+  return out;
+}
+function runtimeLibraryNeeds(code){
+  const text=String(code||''); const out=[]; const seen=new Set();
+  const add=(key,evidence)=>{const dep=DEPENDENCY_REGISTRY[key]; if(!dep||seen.has(dep.id)) return; seen.add(dep.id); out.push({...dep,evidence:evidence||'global'});};
+  Object.keys(LIBRARY_GLOBALS).forEach(name=>{const re=new RegExp('\\b'+name.replace(/[$]/g,'\\$&')+'\\b'); if(re.test(text)&&!COMMON_GLOBALS.has(name)) add(name,'global '+name);});
+  for(const m of text.matchAll(/(?:import|export)\s+(?:[^'\"]+?\s+from\s+)?['\"]([^'\"]+)['\"]/g)){const raw=m[1],key=DEPENDENCY_ALIASES[raw]||raw;if(DEPENDENCY_REGISTRY[key]) add(key,'import '+raw);}
+  return out;
+}
+function dependencyStatus(doc,code){
+  const deps=runtimeLibraryNeeds(code),result={ready:[],missing:[],manual:[]};
+  deps.forEach(dep=>{if(dep.mode==='module'){result.manual.push(dep);return;} try{if(doc.defaultView&&dep.global in doc.defaultView) result.ready.push(dep);else result.missing.push(dep);}catch(_){result.missing.push(dep);}});
+  return result;
+}
+function dependencyAdvice(dep){const source=dep.provider?` Источник/блок: ${dep.provider}.`:''; return dep.mode==='module'?`Зависимость «${dep.name}» требует ESM/npm-среду: ${dep.provide}.${source}`:`Зависимость «${dep.name}» не найдена: ${dep.provide}.${source}`; }
+
+function runtimeFreeIdentifierNeeds(code){
+  const declared=new Set(['console','document','window','globalThis']);
+  const scrubbed=String(code||'').replace(/\/\*[\s\S]*?\*\//g,' ').replace(/(^|[^:])\/\/.*$/gm,' ').replace(/(['\"`])(?:\\.|(?!\1)[^\\])*\1/g,' ');
+  for(const m of scrubbed.matchAll(/(?:const|let|var|function|class)\s+([\p{ID_Start}_$][\p{ID_Continue}_$]*)/gu)) declared.add(m[1]);
+  const used=[]; const seen=new Set();
+  for(const m of scrubbed.matchAll(/\b([A-Za-z_$][A-Za-z0-9_$]*)\b/g)){
+    const w=m[1]; if(seen.has(w)||declared.has(w)||COMMON_GLOBALS.has(w)||LIBRARY_GLOBALS[w]) continue;
+    // Ключевые слова и свойства после точки не считаем внешними зависимостями.
+    const i=m.index||0; if(i>0 && String(code)[i-1]==='.') continue;
+    if(/^(if|else|for|while|return|const|let|var|function|class|new|throw|try|catch|finally|async|await|true|false|null|undefined|typeof|instanceof|in|of|this|switch|case|break|continue|do|delete|void|yield)$/.test(w)) continue;
+    seen.add(w); used.push(w);
+  }
+  return used;
+}
+function runtimeAnalyze(code){
+  const selectors=runtimeSelectors(code), libraries=runtimeLibraryNeeds(code), external=runtimeFreeIdentifierNeeds(code);
+  return { selectors, libraries, external };
+}
+function runtimeCheckDocument(doc, code){
+  const a=runtimeAnalyze(code), errors=[], warnings=[];
+  a.selectors.forEach(sel=>{try{if(!doc.querySelector(sel))errors.push(`Не найден DOM-элемент «${sel}».`);}catch(e){errors.push(`Некорректный CSS-селектор «${sel}».`);}});
+  const dependencies=dependencyStatus(doc,code);
+  dependencies.missing.forEach(d=>errors.push(`Не подключена библиотека «${d.name}» (${d.global||d.id}). ${dependencyAdvice(d)}`));
+  dependencies.manual.forEach(d=>warnings.push(`Библиотека «${d.name}» требует ESM/npm-настройку. ${dependencyAdvice(d)}`));
+  if(a.external.length)warnings.push(`Возможные внешние переменные/библиотеки: ${a.external.join(', ')}.`);
+  return {errors,warnings,analysis:a,dependencies};
+}
+function setRuntimeState(status, errors=[], warnings=[]){ runtimeState.status=status; runtimeState.errors=[...new Set(errors)]; runtimeState.warnings=[...new Set(warnings)]; runtimeState.checkedAt=Date.now(); const el=document.getElementById('runtimeStatus'); if(el){ el.className='runtime-status '+status; el.textContent=status==='ready'?'✓ окружение готово':status==='error'?'⛔ есть ошибки':status==='checking'?'… проверка':'Preview не запускался'; } }
+
+// Формальный контракт соединений. Это уже не только текстовая подсказка:
+// addEdge() использует эти данные и не создаёт заведомо несовместимую связь.
+const BLOCK_CONTRACTS = {
+  let:    { output:'any', outputField:'name', outputKind:'value' },
+  array:  { output:'array', outputField:'name', outputKind:'value' },
+  object: { output:'object', outputField:'name', outputKind:'value' },
+  map:    { input:'array', inputField:'list', output:'array', outputField:'name' },
+  filter: { input:'array', inputField:'list', output:'array', outputField:'name' },
+  reduce: { input:'array', inputField:'list', output:'any', outputField:'name' },
+  calc:   { input:'any', inputField:'expr', output:'any', outputField:'name', inputMode:'expression' },
+  log:    { input:'any', inputField:'value', output:'void', inputMode:'expression' },
+  bars:   { input:'array', inputField:'values', output:'void', inputMode:'expression', dom:['c'] },
+  svg:    { input:'points', inputField:'points', output:'void', inputMode:'expression', dom:['out'] },
+  fetchj: { output:'any', outputField:'name', async:true },
+  iff:    { input:'any', inputField:'cond', output:'void', inputMode:'expression' },
+  forN:   { output:'void' },
+  func:   { output:'function', outputField:'name' },
+  raw:    { input:'any', output:'any', inputMode:'free', unknown:true }
+};
+const TYPE_RU = { any:'значение', array:'массив', object:'объект', points:'точки', string:'строка', number:'число', boolean:'логическое значение', function:'функция', void:'ничего' };
+const IDENTIFIER_RE = /^[\p{ID_Start}_$][\p{ID_Continue}_$]*$/u;
+const DECLARATION_RE = /(?:const|let|var)\s+([\p{ID_Start}_$][\p{ID_Continue}_$]*)\s*=\s*([^;\n]+)/gu;
+
+function blockContract(nd){ return BLOCK_CONTRACTS[nd && nd.blockId] || BLOCK_CONTRACTS.raw; }
+function outputName(nd){ const c=blockContract(nd), f=nd.fields||{}; return c.outputField ? String(f[c.outputField]||'').trim() : ''; }
+function inferExprType(expr, defined){
+  const x=String(expr||'').trim();
+  if(!x) return 'any';
+  if(/^\[/.test(x) || /\.(?:map|filter)\s*\(/.test(x)) return 'array';
+  if(/^\{/.test(x)) return 'object';
+  if(/^(?:true|false)$/.test(x)) return 'boolean';
+  if(/^["'`]/.test(x)) return 'string';
+  if(/^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(x)) return 'number';
+  if(/^function\b|^\(?[^=]*\)?\s*=>/.test(x)) return 'function';
+  if(/^document\./.test(x) || /^document\.querySelector/.test(x)) return 'object';
+  if(defined && defined.has(x)) return defined.get(x) || 'any';
+  return 'any';
+}
+function buildSymbols(code){
+  const symbols=new Map();
+  for(const m of String(code||'').matchAll(DECLARATION_RE)) symbols.set(m[1], inferExprType(m[2], symbols));
+  return symbols;
+}
+function typeCompatible(actual, expected){ return expected==='any' ? true : actual===expected; }
+function connectedIncoming(nd){ return graph.edges.filter(e=>e.to===nd.id).map(e=>byId(e.from)).filter(Boolean); }
+function connectedOutgoing(nd){ return graph.edges.filter(e=>e.from===nd.id).map(e=>byId(e.to)).filter(Boolean); }
+function edgeCheck(from,to){
+  const a=blockContract(from), b=blockContract(to);
+  if(a.unknown || b.unknown) return {ok:true,level:'info',reason:'Связь со «своим кодом» требует ручной проверки.'};
+  if(b.input==null) return {ok:false,reason:`«${nodeLabel(to)}» не принимает вход от другого блока.`};
+  if(a.output==='void') return {ok:false,reason:`«${nodeLabel(from)}» ничего не выдаёт для передачи дальше.`};
+  const sourceType=outputType(from);
+  if(!typeCompatible(sourceType,b.input)) return {ok:false,reason:`Несовместимые типы: «${nodeLabel(from)}» выдаёт ${TYPE_RU[sourceType]||sourceType}, а «${nodeLabel(to)}» ожидает ${TYPE_RU[b.input]||b.input}.`};
+  const sourceName=outputName(from);
+  if(b.inputMode!=='free' && b.inputField && !sourceName) return {ok:false,reason:`«${nodeLabel(from)}» не имеет имени результата, которое можно передать в поле «${b.inputField}».`};
+  if(b.dom && b.dom.length) return {ok:true,level:'info',reason:`Данные совместимы. Кроме них нужен DOM-элемент: ${b.dom.map(x=>'#'+x).join(', ')}.`};
+  return {ok:true};
+}
+function outputType(nd){
+  const c=blockContract(nd), f=nd.fields||{};
+  if(c.outputField && f[c.outputField]){
+    if(nd.blockId==='let') return inferExprType(f.value, new Map());
+    if(nd.blockId==='calc') return inferExprType(f.expr, buildSymbols(''));
+    return c.output || 'any';
+  }
+  return c.output || 'any';
+}
+function bindEdge(from,to){
+  const c=blockContract(to); if(!c.inputField || c.inputMode==='free') return;
+  const name=outputName(from); if(!name) return;
+  to.fields=to.fields||{}; to.fields[c.inputField]=name;
+}
+function edgeExplanation(from,to){ const check=edgeCheck(from,to); if(!check.ok) return {...check,text:'Связь запрещена: '+check.reason}; bindEdge(from,to); return {...check,text:check.reason||`Совместимо: ${nodeLabel(from)} → ${nodeLabel(to)}.`}; }
+function compatibleTargets(nd){
+  return graph.nodes.filter(n=>n.id!==nd.id).filter(n=>edgeCheck(nd,n).ok).map(n=>nodeLabel(n));
+}
+
+
 const CATS = [...new Set(Object.values(BLOCKS).map(b => b.cat))];
 
 // ── состояние: граф {nodes:[{id,blockId,fields,x,y,title?}], edges:[{from,to}]} ─
@@ -229,9 +403,31 @@ function portConnect(pout, nd){
     document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
   });
 }
+let edgeMessageTimer = null;
+function showEdgeMessage(text, level){
+  let box = $('#edgeMessage');
+  if(!box){
+    box = el('div','edge-message'); box.id='edgeMessage';
+    document.body.appendChild(box);
+  }
+  box.className = 'edge-message ' + (level || 'ok');
+  box.textContent = text;
+  box.style.display = 'block';
+  clearTimeout(edgeMessageTimer);
+  edgeMessageTimer = setTimeout(() => { box.style.display = 'none'; }, 4200);
+}
 function addEdge(from, to){
   if(graph.edges.some(e => e.from === from && e.to === to)) return;
-  graph.edges.push({ from, to }); drawEdges(); persist(); renderCode();
+  const a = byId(from), b = byId(to);
+  if(!a || !b) return;
+  const result = edgeExplanation(a, b);
+  if(!result.ok){ select(b); showEdgeMessage(result.text, 'error'); return; }
+  // Один входной порт = один фактический источник. Старую связь заменяем,
+  // только если новая действительно совместима.
+  graph.edges = graph.edges.filter(e => e.to !== to);
+  graph.edges.push({ from, to });
+  drawEdges(); persist(); renderCode(); renderInspector(b);
+  showEdgeMessage(result.text, result.level === 'info' ? 'warn' : 'ok');
 }
 function removeNode(id){
   graph.nodes = graph.nodes.filter(n => n.id !== id);
@@ -290,12 +486,102 @@ function renderInspector(nd){
   const body = document.createElement('div'); body.className = 'insp-body';
   const titleEl = el('div', 'insp-title', nodeLabel(nd)); body.appendChild(titleEl);
   body.appendChild(el('div', 'insp-kind', b.type === 'draw' ? 'рисование' : 'компонент'));
+  body.appendChild(renderBlockContract(nd, b));
   const save = el('button', 'insp-save', '💾 сохранить в каталог'); save.title = 'добавить этот кусок в каталог как компонент'; save.onclick = () => saveToCatalog(nd); body.appendChild(save);
   if(inspTab === 'set'){ body.appendChild(nodeMetaEditor(nd, titleEl)); body.appendChild(inspFields(nd, b)); }
   else if(inspTab === 'learn') body.appendChild(descEditor(nd, b));
   else body.appendChild(inspWhy(nd, b));
   host.appendChild(body);
 }
+
+function renderBlockContract(nd, b){
+  const guide = BLOCK_GUIDES[nd.blockId] || {
+    input:'Определяется кодом блока',
+    output:'Определяется кодом блока',
+    needs:['Открой «Объяснить» и проверь код, переменные и окружение перед запуском.'],
+    risks:['Для этого блока пока нет подробной автоматической проверки требований.']
+  };
+  const box = el('section', 'block-contract');
+  const top = el('div', 'bc-io');
+  const input = el('div', 'bc-side');
+  input.append(el('span','bc-label','ПОЛУЧАЕТ'), el('span','bc-value',guide.input));
+  const arrow = el('div','bc-arrow','→');
+  const output = el('div','bc-side');
+  output.append(el('span','bc-label','ДАЁТ'), el('span','bc-value',guide.output));
+  top.append(input,arrow,output); box.appendChild(top);
+  const checks = validateBlockSetup(nd, guide);
+  const status = el('div', 'bc-status ' + (checks.length ? 'needs-work' : 'ready'));
+  status.textContent = checks.length ? `Перед запуском проверь: ${checks.length} пункт(а)` : 'Базовые требования по шаблону отмечены';
+  box.appendChild(status);
+  const needs = el('div','bc-section');
+  needs.appendChild(el('div','bc-heading','Что нужно'));
+  const ul = document.createElement('ul');
+  guide.needs.forEach(x => ul.appendChild(el('li','',x)));
+  checks.forEach(x => { const li=el('li','bc-alert',x); ul.appendChild(li); });
+  needs.appendChild(ul); box.appendChild(needs);
+  const depStatus=dependencyStatus(document,currentCode());
+  if(depStatus.ready.length||depStatus.missing.length||depStatus.manual.length){
+    const depBox=el('div','bc-section'); depBox.appendChild(el('div','bc-heading','Зависимости'));
+    const ul=document.createElement('ul');
+    depStatus.ready.forEach(d=>ul.appendChild(el('li','',`✓ ${d.name} — доступна.`)));
+    depStatus.missing.forEach(d=>ul.appendChild(el('li','bc-alert',`⛔ ${d.name} — не подключена. ${dependencyAdvice(d)}`)));
+    depStatus.manual.forEach(d=>ul.appendChild(el('li','bc-alert',`⚠ ${d.name} — требуется ESM/npm. ${dependencyAdvice(d)}`)));
+    depBox.appendChild(ul); box.appendChild(depBox);
+  }
+  if(guide.risks && guide.risks.length){
+    const det = document.createElement('details'); det.className='bc-details';
+    const sum = document.createElement('summary'); sum.textContent='Возможные ошибки и ограничения'; det.appendChild(sum);
+    const riskList = document.createElement('ul');
+    guide.risks.forEach(x => riskList.appendChild(el('li','',x)));
+    det.appendChild(riskList); box.appendChild(det);
+  }
+  return box;
+}
+function compatibleBlockTypes(nd){
+  const labels=[];
+  Object.keys(BLOCK_CONTRACTS).forEach(id=>{
+    if(id===nd.blockId) return;
+    const candidate={blockId:id,fields:{}};
+    const c=BLOCK_CONTRACTS[id];
+    if(!c || c.input==null) return;
+    if(edgeCheck(nd,candidate).ok) labels.push(BLOCKS[id] ? BLOCKS[id].label : id);
+  });
+  return labels;
+}
+function validateBlockSetup(nd, guide){
+  const out=[]; const f=nd.fields||{}; const ordered=orderedNodes();
+  const idx=ordered.findIndex(n=>n.id===nd.id); const prior=ordered.slice(0,idx<0?ordered.length:idx);
+  const priorCode=prior.map(nodeCode).join('\n'); const defined=buildSymbols(priorCode); const c=blockContract(nd);
+
+  connectedIncoming(nd).forEach(src=>{ const result=edgeCheck(src,nd); if(!result.ok || result.level==='info') out.push(result.reason); });
+
+  const checkIdentifierField=(field,label=field)=>{
+    const value=String(f[field]||'').trim();
+    if(value && IDENTIFIER_RE.test(value) && !defined.has(value)) out.push(`Не найдено объявление переменной «${value}» — добавь совместимый блок выше или исправь поле «${label}».`);
+  };
+  if(c.inputField && c.inputMode!=='expression' && c.inputMode!=='free') checkIdentifierField(c.inputField);
+  if(['map','filter','reduce'].includes(nd.blockId) && f.list) checkIdentifierField('list');
+  if(nd.blockId==='log'){
+    const value=String(f.value||'').trim();
+    if(IDENTIFIER_RE.test(value) && !defined.has(value)) out.push(`Переменная «${value}» не найдена среди объявлений в текущей сборке.`);
+  }
+  if(nd.blockId==='calc'){
+    const expr=String(f.expr||'');
+    for(const m of expr.matchAll(/[\p{ID_Start}_$][\p{ID_Continue}_$]*/gu)){
+      const word=m[0];
+      if(['Math','true','false','null','undefined','NaN','Infinity'].includes(word) || defined.has(word)) continue;
+      if(word==='length') continue;
+      if(!out.some(x=>x.includes(`«${word}»`))) out.push(`Переменная «${word}» в формуле может быть не объявлена.`);
+    }
+  }
+  if(c.dom) c.dom.forEach(id=>{ const selector='#'+id; if(!runtimeState.checkedAt) out.push(`Среда запуска должна содержать DOM-элемент ${selector}.`); else if(runtimeState.errors.some(x=>x.includes(`«${selector}»`))) out.push(`Среда запуска не содержит ${selector}.`); });
+  if(c.async && !prior.concat([nd]).some(n=>/\bawait\b/.test(nodeCode(n)))) out.push('Блок использует async/await: при запуске он должен находиться в async-контексте.');
+  const targets=compatibleBlockTypes(nd);
+  if(c.output && c.output!=='void' && !c.unknown) out.push(targets.length ? `Подходящие типы блоков для соединения: ${targets.join(', ')}.` : 'Для этого результата пока нет блока с подтверждённо совместимым входом.');
+  return [...new Set(out)];
+}
+
+
 function inspFields(nd, b){
   if(nd.blockId === 'raw') return rawInspFields(nd);   // у «своего кода» — поля по переменным + весь код
   if(!(b.fields || []).length) return el('div', 'insp-text', 'нет настроек.');
@@ -475,6 +761,94 @@ async function saveNodeToTemplate(nd, btn, done){
   } else if(btn){ btn.textContent = 'не вышло, ещё раз'; btn.disabled = false; }
 }
 // сохранить узел как компонент в каталог (появится в каталоге и палитре)
+function componentPreflight(nd, code){
+  const errors = [], warnings = [];
+  const text = String(code || '');
+  if(!text.trim()) errors.push('Код пустой — компонент нечего запускать.');
+
+  // Проверяем синтаксис в том же режиме, в котором preview сможет выполнить код.
+  if(text.trim()){
+    try {
+      const hasAwait = /\bawait\b/.test(text);
+      if(hasAwait) new Function(`return (async()=>{\n${text}\n})()`);
+      else new Function(text);
+    } catch(e) {
+      errors.push(`Синтаксическая ошибка: ${e && e.message ? e.message : 'код не разбирается JavaScript'}.`);
+    }
+  }
+
+  // Контракт выбранного блока: обязательные поля, входы и тип результата.
+  const guide = BLOCK_GUIDES[nd.blockId] || null;
+  const c = blockContract(nd);
+  const f = nd.fields || {};
+  if(guide && Array.isArray(guide.needs)){
+    const requiredFields = (BLOCKS[nd.blockId] && BLOCKS[nd.blockId].fields || []).filter(x => x && x.required).map(x => x.k);
+    requiredFields.forEach(k => { if(!String(f[k] == null ? '' : f[k]).trim()) errors.push(`Не заполнено обязательное поле «${k}».`); });
+  }
+
+  // Если блок требует именованный вход, он должен быть либо связан, либо реально объявлен в коде.
+  if(c.inputField && c.inputMode !== 'expression' && c.inputMode !== 'free'){
+    const value = String(f[c.inputField] || '').trim();
+    if(!value) errors.push(`Не указан вход «${c.inputField}».`);
+    else if(IDENTIFIER_RE.test(value)){
+      const symbols = buildSymbols(text);
+      if(!symbols.has(value)) errors.push(`Переменная «${value}» не объявлена в компоненте. Добавь источник данных или измени вход.`);
+    }
+  }
+
+  // Все связи выбранного блока должны быть подтверждены контрактом.
+  connectedIncoming(nd).forEach(src => {
+    const r = edgeCheck(src, nd);
+    if(!r.ok) errors.push(`Входящая связь «${nodeLabel(src)} → ${nodeLabel(nd)}»: ${r.reason}`);
+    else if(r.level === 'info') warnings.push(`Входящая связь «${nodeLabel(src)} → ${nodeLabel(nd)}» требует ручной проверки.`);
+  });
+  connectedOutgoing(nd).forEach(dst => {
+    const r = edgeCheck(nd, dst);
+    if(!r.ok) errors.push(`Исходящая связь «${nodeLabel(nd)} → ${nodeLabel(dst)}»: ${r.reason}`);
+    else if(r.level === 'info') warnings.push(`Исходящая связь «${nodeLabel(nd)} → ${nodeLabel(dst)}» требует ручной проверки.`);
+  });
+
+  // Runtime-зависимости: missing блокирует сохранение, ESM/manual остаётся предупреждением.
+  const deps = dependencyStatus(document, text);
+  // Script-зависимости зарегистрированы и preview умеет их автоматически подключать.
+  // Поэтому отсутствие глобала в самом конструкторе — предупреждение, а не ложная ошибка сохранения.
+  deps.missing.forEach(d => warnings.push(`Библиотека «${d.name}» пока не загружена в конструкторе; Preview попытается подключить её автоматически. ${dependencyAdvice(d)}`));
+  deps.manual.forEach(d => errors.push(`Зависимость «${d.name}» требует ESM/npm-среду, которой нет в обычном script-preview. ${dependencyAdvice(d)}`));
+
+  // Эти элементы гарантированно создаются wrapHtml() перед запуском preview.
+  const PREVIEW_DOM_IDS = new Set(['c','out','log']);
+  if(c.dom && c.dom.length){
+    c.dom.forEach(id => {
+      const selector = '#' + id;
+      if(!PREVIEW_DOM_IDS.has(id)) warnings.push(`Обязательный DOM-элемент ${selector} не входит в стандартный preview: добавь его в окружение компонента.`);
+    });
+  }
+
+  // Для встроенных выражений проверяем именно имена, а не только свободные идентификаторы runtime-анализатора.
+  const symbols = buildSymbols(text);
+  if(nd.blockId === 'calc'){
+    for(const m of String(f.expr || '').matchAll(/[\p{ID_Start}_$][\p{ID_Continue}_$]*/gu)){
+      const word=m[0];
+      if(['Math','true','false','null','undefined','NaN','Infinity'].includes(word) || symbols.has(word) || word==='length') continue;
+      errors.push(`Переменная «${word}» в формуле не объявлена в компоненте.`);
+    }
+  }
+
+  // Внешние идентификаторы не всегда ошибка: это может быть вход, который компонент получает от среды.
+  // Поэтому они явно показываются как неподтверждённые предупреждения, а не маскируются.
+  const runtime = runtimeAnalyze(text);
+  if(runtime.external.length) warnings.push(`Неподтверждённые внешние идентификаторы: ${runtime.external.join(', ')}.`);
+  if(c.async && !/\bawait\b/.test(text)) warnings.push('Контракт помечен как async, но await в коде не найден — проверь намерение блока.');
+
+  return { errors:[...new Set(errors)], warnings:[...new Set(warnings)] };
+}
+function renderPreflight(host, result){
+  host.innerHTML = '';
+  const title = el('div','preflight-title', result.errors.length ? '⛔ Сохранение заблокировано' : result.warnings.length ? '⚠ Можно сохранить, но есть предупреждения' : '✓ Компонент прошёл самопроверку');
+  host.appendChild(title);
+  if(result.errors.length){ const ul=document.createElement('ul'); result.errors.forEach(x=>ul.appendChild(el('li','preflight-error',x))); host.appendChild(ul); }
+  if(result.warnings.length){ const ul=document.createElement('ul'); result.warnings.forEach(x=>ul.appendChild(el('li','preflight-warning',x))); host.appendChild(ul); }
+}
 function saveToCatalog(nd){
   const bg = el('div', 'modal-bg');
   const purposeOpts = PURPOSE.map(p => '<option>' + esc(p[0]) + '</option>').join('');
@@ -485,11 +859,21 @@ function saveToCatalog(nd){
     + '<div class="mfield"><label>Название</label><input id="s-title"></div>'
     + '<div class="mfield"><label>Описание</label><textarea id="s-desc" style="min-height:70px"></textarea></div>'
     + '<div class="mfield"><label>Код</label><textarea id="s-code" spellcheck="false"></textarea></div>'
+    + '<div class="preflight" id="s-preflight"></div>'
     + '<div class="m-dup" id="s-dup" style="display:none"></div>'
     + '<div class="mbtns"><button class="btn ok" id="s-save">Сохранить</button><button class="btn" id="s-cancel">Отмена</button></div><div class="merr" id="s-err"></div></div>';
   document.body.appendChild(bg);
   const q = s => bg.querySelector(s);
   q('#s-title').value = nodeLabel(nd); q('#s-desc').value = nd.desc || ''; q('#s-code').value = nodeCode(nd);
+  const preflightBox = q('#s-preflight');
+  const refreshPreflight = () => {
+    const result = componentPreflight(nd, q('#s-code').value);
+    renderPreflight(preflightBox, result);
+    q('#s-save').disabled = result.errors.length > 0;
+    q('#s-save').title = result.errors.length ? 'Исправь ошибки самопроверки перед сохранением' : '';
+    return result;
+  };
+  q('#s-code').addEventListener('input', refreshPreflight);
   const fillSubs = () => { const pk = q('#s-purpose').value; const subs = (SUBCATS[pk] || []).map(x => x[0]).concat(['Разное']); q('#s-sub').innerHTML = subs.map(s => '<option>' + esc(s) + '</option>').join(''); };
   fillSubs(); q('#s-purpose').onchange = fillSubs;
   bg.onclick = e => { if(e.target === bg) bg.remove(); };
@@ -501,12 +885,14 @@ function saveToCatalog(nd){
   const refreshDup = () => { const d = findDup(), box = q('#s-dup');
     if(d){ box.style.display = 'block'; box.innerHTML = 'Компонент «' + esc(d.title) + '» уже есть. <label class="m-dup-lbl"><input type="checkbox" id="s-asnew"> создать новый, а не обновлять</label>'; q('#s-save').textContent = 'Обновить существующий'; }
     else { box.style.display = 'none'; box.innerHTML = ''; q('#s-save').textContent = 'Сохранить'; } };
-  q('#s-title').addEventListener('input', refreshDup); refreshDup();
+  q('#s-title').addEventListener('input', refreshDup); refreshDup(); refreshPreflight();
   q('#s-save').onclick = async () => {
     const title = q('#s-title').value.trim(), code = q('#s-code').value;
     if(!title || !code.trim()){ q('#s-err').textContent = 'нужны название и код'; return; }
+    const preflight = refreshPreflight();
+    if(preflight.errors.length){ q('#s-err').textContent = 'Сохранение заблокировано: сначала исправь ошибки самопроверки.'; return; }
     const purpose = q('#s-purpose').value, subcat = q('#s-sub').value;
-    const component = { type:'component', tags:{ purpose:[purpose], technology:['JavaScript'], runtime:[] }, subcat, summary:{ input:'', output:'', dependencies:[], requirements:[] } };
+    const detectedDeps=runtimeLibraryNeeds(code).map(d=>d.provider?`${d.name} — источник/блок: ${d.provider}`:d.name); const component = { type:'component', tags:{ purpose:[purpose], technology:['JavaScript'], runtime:[] }, subcat, summary:{ input:'', output:'', dependencies:detectedDeps, requirements:[] } };
     const payload = { title, lang:'js', group: subcat, desc: q('#s-desc').value.trim(), code, component };
     const dup = findDup(), asNew = q('#s-asnew') && q('#s-asnew').checked;
     q('#s-save').textContent = 'сохраняю…';
@@ -543,7 +929,7 @@ function orderedNodes(){
 }
 function currentCode(){
   const nodes = orderedNodes();
-  const needAsync = nodes.some(n => /await /.test(nodeCode(n)));
+  const needAsync = nodes.some(n => /\bawait\b/.test(nodeCode(n)));
   const body = nodes.map(nodeCode).join('\n');
   return needAsync ? '(async () => {\n' + body.split('\n').map(l => '  ' + l).join('\n') + '\n})();' : body;
 }
@@ -582,9 +968,10 @@ function attachHighlight(ta){
 }
 
 // ── запуск / файлы ────────────────────────────────────────────────────────────
-function run(){
-  const code = currentCode();
-  preview.srcdoc = `<!doctype html><meta charset="utf-8"><body style="margin:8px;font:12px ui-monospace,monospace;color:#F6F4FF;background:#0E0720">
+function buildPreviewHtml(code, analysis, runId){
+  const deps = analysis.libraries.filter(x => x.mode === 'script').map(x => ({name:x.name,global:x.global,url:x.url}));
+  const safeRunId = String(runId).replace(/[^a-zA-Z0-9_-]/g, '');
+  return `<!doctype html><meta charset="utf-8"><body style="margin:8px;font:12px ui-monospace,monospace;color:#F6F4FF;background:#0E0720">
 <canvas id="c" width="280" height="140" style="background:#140A24;border:1px solid #241638;border-radius:6px"></canvas>
 <div id="out" style="margin-top:8px"></div>
 <pre id="log" style="color:#52F2C9;white-space:pre-wrap;margin-top:8px"></pre>
@@ -592,11 +979,47 @@ function run(){
 var log=document.getElementById('log');
 var _p=function(){ log.textContent += Array.prototype.join.call(arguments,' ')+'\\n'; };
 var console={log:_p,error:_p,warn:_p,info:_p};
-try{
-${code}
-}catch(e){ log.textContent += '\\u26d4 '+e.message; }
-<\/script></body>`;
+var _report=function(prefix,e){ var msg=e && e.stack ? e.stack : (e && e.message ? e.message : String(e)); _p(prefix + msg); try{ parent.postMessage({type:'codeforge-preview-error',runId:'${safeRunId}',message:String(msg)}, '*'); }catch(_){} };
+window.addEventListener('error',function(e){ _report('⛔ ', e.error || e.message); });
+window.addEventListener('unhandledrejection',function(e){ _report('⛔ Promise: ', e.reason); e.preventDefault(); });
+(async function(){
+  try{
+    const deps=${JSON.stringify(deps)};
+    for(const dep of deps){
+      if(dep.global && window[dep.global]) continue;
+      await new Promise((resolve,reject)=>{const sc=document.createElement('script');sc.src=dep.url;sc.onload=resolve;sc.onerror=()=>reject(new Error('Не удалось загрузить '+dep.name+' из '+dep.url));document.head.appendChild(sc);});
+    }
+${String(code).split('\\n').map(l => '    '+l).join('\\n')}
+  }catch(e){ _report('⛔ ', e); }
+})().then(function(){ try{ parent.postMessage({type:'codeforge-preview-ready',runId:'${safeRunId}'}, '*'); }catch(_){} }).catch(function(e){ _report('⛔ async: ', e); });
+<\\/script></body>`;
 }
+
+function run(){
+  const code = currentCode();
+  const analysis = runtimeAnalyze(code);
+  const preWarnings=[]; if(analysis.external.length) preWarnings.push(`Возможные внешние переменные/библиотеки: ${analysis.external.join(', ')}.`); analysis.libraries.filter(x=>x.mode==='module').forEach(x=>preWarnings.push(`Библиотека ${x.name} требует ESM/npm-среду.`));
+  setRuntimeState('checking', [], preWarnings);
+  renderInspector();
+  const runId = Date.now().toString(36);
+  preview.srcdoc = buildPreviewHtml(code, analysis, runId);
+  // Явно ждём сообщение об ошибке из iframe: ошибки Promise/fetch больше
+  // не теряются после завершения синхронного try/catch.
+  preview.dataset.runId = runId;
+}
+window.addEventListener('message', e => {
+  const d=e.data||{}; if(!d || !d.type || d.runId !== preview.dataset.runId) return;
+  if(d.type==='codeforge-preview-error'){
+    setRuntimeState('error', [...runtimeState.errors, 'Preview: '+d.message], runtimeState.warnings);
+    showEdgeMessage('⛔ Preview: '+d.message, 'error'); renderInspector();
+  } else if(d.type==='codeforge-preview-ready'){
+    const doc=preview.contentDocument; const check=doc ? runtimeCheckDocument(doc, currentCode()) : {errors:['Не удалось получить документ preview.'],warnings:[]};
+    setRuntimeState(check.errors.length ? 'error' : 'ready', check.errors, [...runtimeState.warnings, ...check.warnings]);
+    renderInspector();
+    if(check.errors.length) showEdgeMessage('⛔ Окружение preview не готово: '+check.errors[0], 'error');
+    else showEdgeMessage('✓ Preview: окружение проверено', 'ok');
+  }
+});
 $('#copy').onclick = () => { navigator.clipboard.writeText(currentCode()); flash($('#copy'), '✓'); };
 $('#run').onclick = run;
 function download(name, text, mime){ const b = new Blob([text], { type: mime + ';charset=utf-8' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 2000); }
