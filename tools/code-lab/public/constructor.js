@@ -357,25 +357,28 @@ function descEditor(nd, b){
   const prev = el('div', 'desc-prev');
   const draw = () => { const v = ta.value.trim() ? descFmt(ta.value) : (b && b.hint ? descFmt(b.hint) + '<div class="desc-hint" style="margin-top:6px">↑ пока показана встроенная подсказка. Впиши своё описание — заменит её.</div>' : '<span class="muted">пока пусто</span>'); prev.innerHTML = v; };
 
-  // блок синхронизации с шаблоном (чтобы каталог и конструктор не расходились)
+  // блок сведения описаний: узел в схеме ⇄ шаблон в каталоге
   const sync = el('div', 'desc-sync');
+  // актуальное описание шаблона берём из свежего списка каталога (а не из снимка при добавлении)
+  const tplDesc = () => { if(!nd.src) return ''; const t = (CATALOG || []).find(x => x.id === nd.src.id); return t ? (t.desc || '') : (nd.src.desc || ''); };
   const drawSync = () => {
     sync.innerHTML = ''; if(!nd.src){ sync.style.display = 'none'; return; }
     sync.style.display = '';
-    const diff = (nd.desc || '') !== (nd.src.desc || '');
-    sync.appendChild(el('div', 'desc-hint', diff
-      ? 'Это описание — у узла в схеме, в шаблоне (и в каталоге) пока другое.'
-      : 'Совпадает с описанием шаблона в каталоге.'));
-    if(diff){
-      const btn = el('button', 'btn', '↑ записать описание в шаблон'); btn.type = 'button';
-      btn.onclick = async () => {
-        btn.textContent = 'сохраняю…'; btn.disabled = true;
-        const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: nd.src.id, desc: nd.desc || '' }) }).then(r => r.json()).catch(() => ({}));
-        if(r && r.ok){ nd.src.desc = nd.desc || ''; persist(); loadCatalog(); btn.textContent = '✓ в каталоге обновилось'; setTimeout(drawSync, 900); }
-        else { btn.textContent = 'не вышло, ещё раз'; btn.disabled = false; }
-      };
-      sync.appendChild(btn);
-    }
+    const here = nd.desc || '', there = tplDesc();
+    sync.appendChild(el('div', 'desc-sync-h', 'Сведение с каталогом · шаблон «' + nd.src.title + '»'));
+    if(here === there){ sync.appendChild(el('div', 'desc-hint', '✓ Описание узла и шаблона в каталоге совпадают.')); return; }
+    sync.appendChild(el('div', 'desc-hint', 'Сейчас расходятся. В каталоге:'));
+    const box2 = el('div', 'desc-prev'); box2.style.margin = '2px 0 4px'; box2.innerHTML = there.trim() ? descFmt(there) : '<span class="muted">пусто</span>'; sync.appendChild(box2);
+    const row = el('div', 'desc-sync-btns');
+    const up = el('button', 'btn', '↑ записать моё в шаблон'); up.type = 'button';
+    up.onclick = async () => {
+      up.textContent = 'сохраняю…'; up.disabled = true;
+      const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: nd.src.id, desc: here }) }).then(r => r.json()).catch(() => ({}));
+      if(r && r.ok){ nd.src.desc = here; persist(); await loadCatalog(); drawSync(); } else { up.textContent = 'не вышло, ещё раз'; up.disabled = false; }
+    };
+    const down = el('button', 'btn', '↓ взять из каталога'); down.type = 'button';
+    down.onclick = () => { ta.value = there; nd.desc = there; nd.src.desc = there; persist(); draw(); drawSync(); };
+    row.append(up, down); sync.appendChild(row);
   };
   ta.addEventListener('input', () => { nd.desc = ta.value; persist(); draw(); drawSync(); });
   box.appendChild(ta);
