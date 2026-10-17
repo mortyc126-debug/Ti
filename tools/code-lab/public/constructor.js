@@ -275,6 +275,9 @@ function restore(){
     if(s && Array.isArray(s.nodes)) graph = { nodes: s.nodes, edges: Array.isArray(s.edges) ? s.edges : [] };
   } catch(_){}
 }
+// авто-разводка связей по совпадению имён (объявляем рано — addNode её использует)
+let autoWire = true;
+try { autoWire = localStorage.getItem('codelab_autowire') !== 'off'; } catch(_){}
 // масштаб холста (только уменьшение — чтобы увидеть больше узлов; скролл полотна остаётся рабочим)
 let zoom = 1;
 function setZoom(z){
@@ -369,6 +372,12 @@ async function addFromCatalog(t){
 $('#palSearch').oninput = renderPalette;
 // «🗂 схемы» — сохранить текущий граф со связями в файл / открыть сохранённый
 (function(){ const btn = $('#flows'); if(!btn) return; btn.onclick = openFlowModal; })();
+// «🔗 авто-связи» — переключатель авто-разводки
+(function(){ const btn = $('#autowire'); if(!btn) return;
+  const upd = () => { btn.textContent = autoWire ? '🔗 авто-связи' : '🔗 авто-связи off'; btn.style.opacity = autoWire ? '1' : '.5'; };
+  upd();
+  btn.onclick = () => { autoWire = !autoWire; try { localStorage.setItem('codelab_autowire', autoWire ? 'on' : 'off'); } catch(_){} upd(); showEdgeMessage(autoWire ? 'Авто-связи включены.' : 'Авто-связи выключены.', 'warn'); };
+})();
 async function openFlowModal(){
   const bg = el('div', 'modal-bg'); bg.innerHTML =
     '<div class="modal" style="max-width:620px"><h3>Схемы (сборки со связями)</h3>'
@@ -432,8 +441,56 @@ function spawnPos(){
 function addNode(blockId, extra){
   const p = spawnPos();
   const nd = makeNode(blockId, Object.assign({ x: p.x, y: p.y }, extra || {}));
-  graph.nodes.push(nd); renderCanvas(); select(nd); persist(); renderCode();
+  graph.nodes.push(nd);
+  const made = autoWire ? autoConnect(nd) : 0;
+  renderCanvas(); select(nd); persist(); renderCode();
+  if(made) showEdgeMessage('Авто-связи: ' + made + ' (по совпадению имён). Отключить — кнопка 🔗.', 'ok');
   return nd;
+}
+// контракт узла по его коду: какие имена даёт (provides) и какие берёт (requires)
+const _NC_GLOB = new Set(['console','document','window','globalThis','Math','JSON','Array','Object','Number','String','Boolean','Date','Map','Set','Promise','RegExp','Error','Symbol','fetch','setTimeout','setInterval','clearTimeout','clearInterval','requestAnimationFrame','parseInt','parseFloat','isNaN','isFinite','localStorage','sessionStorage','URL','URLSearchParams','true','false','null','undefined','NaN','Infinity']);
+const _NC_KW = new Set(['const','let','var','function','return','if','else','for','while','of','in','new','await','async','class','extends','super','try','catch','finally','throw','typeof','instanceof','this','break','continue','switch','case','do','yield','delete','void','import','export','from','default','static','get','set']);
+function nodeContract(nd){
+  const txt = String(nodeCode(nd)).replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1 ').replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, ' ');
+  const ID = '[A-Za-zА-Яа-яЁё_$][\\wА-Яа-яЁё$]*';
+  const provides = new Set();
+  for(const m of txt.matchAll(new RegExp('(?:const|let|var|function|class)\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
+  const local = new Set(provides);
+  const addP = s => String(s || '').split(',').forEach(x => { const m = x.trim().match(new RegExp('^(' + ID + ')')); if(m) local.add(m[1]); });
+  for(const m of txt.matchAll(new RegExp('function\\s*' + ID + '?\\s*\\(([^)]*)\\)', 'g'))) addP(m[1]);
+  for(const m of txt.matchAll(/\(([^)]*)\)\s*=>/g)) addP(m[1]);
+  for(const m of txt.matchAll(new RegExp('(' + ID + ')\\s*=>', 'g'))) local.add(m[1]);
+  for(const m of txt.matchAll(new RegExp('catch\\s*\\(\\s*(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of txt.matchAll(new RegExp('for\\s*\\(\\s*(?:const|let|var)?\\s*(' + ID + ')', 'g'))) local.add(m[1]);
+  const requires = [];
+  const seen = new Set();
+  for(const m of txt.matchAll(new RegExp('(' + ID + ')', 'g'))){
+    const w = m[1], i = m.index || 0;
+    if(i > 0 && txt[i - 1] === '.') continue;
+    if(_NC_KW.has(w) || _NC_GLOB.has(w) || local.has(w) || seen.has(w)) continue;
+    seen.add(w); requires.push(w);
+  }
+  return { provides, requires };
+}
+// авто-соединение нового узла с существующими по совпадению имён (provides→requires)
+function autoConnect(nd){
+  let made = 0;
+  const others = graph.nodes.filter(n => n !== nd);
+  const myC = nodeContract(nd);
+  // 1) что нужно мне — ищем источник среди существующих (беру первый подходящий, т.к. вход один)
+  if(!graph.edges.some(e => e.to === nd.id)){
+    for(const r of myC.requires){
+      const src = others.find(o => nodeContract(o).provides.has(r));
+      if(src){ graph.edges.push({ from: src.id, to: nd.id }); made++; break; }
+    }
+  }
+  // 2) что даю я — цепляю к тем, кому это нужно и у кого ещё нет входа
+  for(const o of others){
+    if(graph.edges.some(e => e.to === o.id)) continue;
+    const oc = nodeContract(o);
+    if(oc.requires.some(r => myC.provides.has(r))){ graph.edges.push({ from: nd.id, to: o.id }); made++; }
+  }
+  return made;
 }
 
 // ── холст ─────────────────────────────────────────────────────────────────────
