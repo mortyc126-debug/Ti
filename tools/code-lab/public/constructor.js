@@ -485,20 +485,35 @@ function portXY(id, which){
   return { x, y };
 }
 function bez(x1, y1, x2, y2){ const dy = Math.max(30, Math.abs(y2 - y1) / 2); return 'M ' + x1 + ' ' + y1 + ' C ' + x1 + ' ' + (y1 + dy) + ' ' + x2 + ' ' + (y2 - dy) + ' ' + x2 + ' ' + y2; }
+let selectedEdge = null;   // {from,to} выбранной связи для удаления
+function sameEdge(a, b){ return a && b && a.from === b.from && a.to === b.to; }
+function removeEdge(ed){
+  graph.edges = graph.edges.filter(e => !(e.from === ed.from && e.to === ed.to));
+  if(sameEdge(selectedEdge, ed)) selectedEdge = null;
+  drawEdges(); persist(); renderCode(); markNeeds();
+  showEdgeMessage('Связь удалена.', 'ok');
+}
 function drawEdges(){
-  edgesSvg.querySelectorAll('path:not(.tmp)').forEach(p => p.remove());
+  edgesSvg.querySelectorAll('path:not(.tmp), .edge-hit').forEach(p => p.remove());
   graph.edges.forEach(e => {
     if(!byId(e.from) || !byId(e.to)) return;
-    const a = portXY(e.from, 'out'), b = portXY(e.to, 'in');
-    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', bez(a.x, a.y, b.x, b.y)); edgesSvg.appendChild(p);
+    const a = portXY(e.from, 'out'), b = portXY(e.to, 'in'); const d = bez(a.x, a.y, b.x, b.y);
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', d);
+    if(sameEdge(selectedEdge, e)) p.setAttribute('class', 'sel');
+    // широкая прозрачная дорожка сверху — чтобы по тонкой стрелке было легко попасть
+    const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path'); hit.setAttribute('d', d); hit.setAttribute('class', 'edge-hit');
+    hit.addEventListener('pointerdown', ev => { ev.stopPropagation(); selectedEdge = { from: e.from, to: e.to }; selectedId = null; markSel(); renderInspector(); drawEdges(); showEdgeMessage('Связь выбрана. Delete или двойной клик — удалить.', 'warn'); });
+    hit.addEventListener('dblclick', ev => { ev.stopPropagation(); removeEdge({ from: e.from, to: e.to }); });
+    edgesSvg.appendChild(p); edgesSvg.appendChild(hit);
   });
 }
-canvas.addEventListener('pointerdown', e => { if(e.target === canvas || e.target === edgesSvg){ selectedId = null; markSel(); renderInspector(); } });
-// Delete/Backspace — удалить выделенный узел (если не печатаем в поле)
+canvas.addEventListener('pointerdown', e => { if(e.target === canvas || e.target === edgesSvg){ selectedId = null; selectedEdge = null; markSel(); renderInspector(); drawEdges(); } });
+// Delete/Backspace — удалить выбранную связь, иначе выбранный узел (если не печатаем в поле)
 document.addEventListener('keydown', e => {
   if(e.key !== 'Delete' && e.key !== 'Backspace') return;
-  if(!selectedId) return;
   const ae = document.activeElement; if(ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName)) return;
+  if(selectedEdge){ e.preventDefault(); removeEdge(selectedEdge); return; }
+  if(!selectedId) return;
   e.preventDefault(); removeNode(selectedId);
 });
 
