@@ -141,6 +141,8 @@ document.getElementById('q').oninput = e => { query = e.target.value.trim().toLo
 
 function render(){
   if(axis === 'custom') return renderCustom();
+  // поиск ищет по ВСЕМ разделам сразу (не только в активном)
+  if(query){ return renderSearch(); }
   const P = PURPOSE.find(x=>x.key===active);
   document.getElementById('cName').textContent = active;
   document.getElementById('cLead').textContent = P.lead;
@@ -171,6 +173,28 @@ function render(){
       sec.append(tog, fg);
     }
     host.appendChild(sec);
+  });
+}
+
+// результаты поиска по всем разделам, сгруппированные по назначению
+function renderSearch(){
+  let items = ALL.slice();
+  if(fPlace) items = items.filter(t=>t._places.includes(fPlace));
+  if(fTech) items = items.filter(t=>t._techs.includes(fTech));
+  items = items.filter(t=>((t.title||'')+' '+(t.desc||'')).toLowerCase().includes(query));
+  document.getElementById('cName').textContent = 'Поиск';
+  document.getElementById('cLead').textContent = items.length ? ('«'+query+'» — найдено '+items.length+' по всем разделам') : ('«'+query+'» — ничего не найдено');
+  const host = document.getElementById('sections'); host.innerHTML='';
+  if(!items.length){ host.innerHTML='<div class="empty">Ничего не нашлось. Попробуй другое слово или очисти поиск.</div>'; return; }
+  const byP = {}; items.forEach(t=>{ const k=t._purpose||'Разное'; (byP[k]=byP[k]||[]).push(t); });
+  PURPOSE.map(x=>x.key).concat(Object.keys(byP).filter(k=>!PURPOSE.some(x=>x.key===k))).forEach(pk=>{
+    const list = byP[pk]; if(!list||!list.length) return;
+    list.sort((a,b)=>(TYPE_RANK[a._type]-TYPE_RANK[b._type]));
+    const sec = document.createElement('div'); sec.className='subsec';
+    sec.innerHTML = '<div class="subh">'+esc(pk)+' <span class="sc">'+list.length+'</span></div>';
+    const grid = document.createElement('div'); grid.className='grid';
+    list.forEach(t=>grid.appendChild(card(t)));
+    sec.appendChild(grid); host.appendChild(sec);
   });
 }
 
