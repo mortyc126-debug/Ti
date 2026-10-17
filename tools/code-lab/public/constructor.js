@@ -367,6 +367,50 @@ async function addFromCatalog(t){
   } catch(_){}
 }
 $('#palSearch').oninput = renderPalette;
+// «🗂 схемы» — сохранить текущий граф со связями в файл / открыть сохранённый
+(function(){ const btn = $('#flows'); if(!btn) return; btn.onclick = openFlowModal; })();
+async function openFlowModal(){
+  const bg = el('div', 'modal-bg'); bg.innerHTML =
+    '<div class="modal" style="max-width:620px"><h3>Схемы (сборки со связями)</h3>'
+    + '<p class="mh">Сохрани текущий холст как схему — узлы и связи лягут в файл, их можно открыть позже и отправить на GitHub.</p>'
+    + '<div class="mrow"><div class="mfield" style="flex:2"><label>Название схемы</label><input id="fl-name" placeholder="например: расчёт среднего по списку"></div>'
+    + '<div class="mfield" style="flex:0 0 auto;display:flex;align-items:flex-end"><button class="btn ok" id="fl-save">💾 сохранить текущую</button></div></div>'
+    + '<div class="fl-err merr" id="fl-err"></div>'
+    + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin:10px 0 6px">сохранённые схемы</div>'
+    + '<div id="fl-list" class="fl-list"><div class="muted">загрузка…</div></div>'
+    + '<div class="mbtns" style="margin-top:14px"><button class="btn" id="fl-close">Закрыть</button></div></div>';
+  document.body.appendChild(bg);
+  const q = s => bg.querySelector(s);
+  bg.onclick = e => { if(e.target === bg) bg.remove(); };
+  q('#fl-close').onclick = () => bg.remove();
+  const reload = async () => {
+    const list = await fetch('/api/flows/list').then(r => r.json()).catch(() => []);
+    const box = q('#fl-list'); box.innerHTML = '';
+    if(!list.length){ box.innerHTML = '<div class="muted">пока нет сохранённых схем</div>'; return; }
+    list.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0)).forEach(f => {
+      const row = el('div', 'fl-row');
+      row.innerHTML = '<span class="fl-n"></span><span class="fl-meta">' + f.nodes + ' узлов · ' + f.edges + ' связей</span>';
+      row.querySelector('.fl-n').textContent = f.name;
+      const open = el('button', 'btn', 'открыть'); open.onclick = async () => {
+        const full = await fetch('/api/flows/get?id=' + encodeURIComponent(f.id)).then(r => r.json()).catch(() => null);
+        if(full && full.graph){ histFlush(); graph = { nodes: full.graph.nodes || [], edges: full.graph.edges || [] }; selectedId = null; multi.clear(); renderCanvas(); renderInspector(); renderCode(); persist(); bg.remove(); showEdgeMessage('Схема «' + f.name + '» открыта.', 'ok'); }
+      };
+      const del = el('button', 'btn', '🗑'); del.title = 'удалить схему'; del.onclick = async () => { if(!confirm('Удалить схему «' + f.name + '»?')) return; await fetch('/api/flows/delete', { method:'POST', body: JSON.stringify({ id: f.id }) }); reload(); };
+      const acts = el('div', 'fl-acts'); acts.append(open, del); row.appendChild(acts);
+      box.appendChild(row);
+    });
+  };
+  q('#fl-save').onclick = async () => {
+    const name = q('#fl-name').value.trim();
+    if(!name){ q('#fl-err').textContent = 'впиши название'; return; }
+    if(!graph.nodes.length){ q('#fl-err').textContent = 'холст пустой — нечего сохранять'; return; }
+    q('#fl-save').textContent = 'сохраняю…';
+    const r = await fetch('/api/flows/save', { method:'POST', body: JSON.stringify({ name, graph }) }).then(r => r.json()).catch(() => ({}));
+    q('#fl-save').textContent = '💾 сохранить текущую';
+    if(r.ok){ q('#fl-err').textContent = ''; q('#fl-name').value = ''; reload(); } else q('#fl-err').textContent = 'не сохранилось';
+  };
+  reload();
+}
 // «свести описания» — авто-сведение по дате, массово по всем узлам из каталога
 (function(){ const btn = $('#reconcile'); if(!btn) return; btn.onclick = async () => {
   btn.disabled = true; const o = btn.textContent; btn.textContent = 'свожу…';

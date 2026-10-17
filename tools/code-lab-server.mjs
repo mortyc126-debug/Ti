@@ -20,6 +20,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, 'code-lab');
 const PUBLIC = path.join(ROOT, 'public');
 const TEMPLATES = path.join(ROOT, 'templates');
+const FLOWS = path.join(ROOT, 'flows');   // сохранённые схемы-сборки (граф со связями)
 const DATA = path.join(ROOT, 'data');     // сохранённые JSON-данные пользователя
 const PORT = Number(process.argv[2]) || 8788;
 
@@ -244,7 +245,7 @@ const server = http.createServer(async (req, res) => {
       let branch = '', dirty = 0;
       if(root){
         branch = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], root)).out;
-        const st = await git(['status', '--porcelain', '--', TEMPLATES], root);
+        const st = await git(['status', '--porcelain', '--', TEMPLATES, FLOWS], root);
         dirty = st.out ? st.out.split('\n').filter(Boolean).length : 0;
       }
       return json(res, 200, { repo: !!root, branch, dirty, templates });
@@ -252,11 +253,11 @@ const server = http.createServer(async (req, res) => {
     if(u.pathname === '/api/git/sync' && req.method === 'POST'){
       const root = await gitRoot();
       if(!root) return json(res, 200, { ok: false, stage: 'repo', message: 'Папка лаборатории не внутри git-репозитория — шаблоны сохранены только локально.' });
-      const add = await git(['add', '--', TEMPLATES], root);
+      const add = await git(['add', '--', TEMPLATES, FLOWS], root);
       if(add.code !== 0) return json(res, 200, { ok: false, stage: 'add', message: add.err || 'git add не удался' });
-      const staged = (await git(['diff', '--cached', '--name-only', '--', TEMPLATES], root)).out.split('\n').filter(Boolean).length;
+      const staged = (await git(['diff', '--cached', '--name-only', '--', TEMPLATES, FLOWS], root)).out.split('\n').filter(Boolean).length;
       if(staged > 0){
-        const c = await git(['commit', '-m', 'Лаборатория: мои шаблоны кода', '--', TEMPLATES], root);
+        const c = await git(['commit', '-m', 'Лаборатория: мои шаблоны и схемы', '--', TEMPLATES, FLOWS], root);
         if(c.code !== 0) return json(res, 200, { ok: false, stage: 'commit', message: c.err || c.out });
       }
       let push = await git(['push'], root);
@@ -274,6 +275,46 @@ const server = http.createServer(async (req, res) => {
       const file = await fileForId(b.id);
       if(!file) return json(res, 404, { error: 'нет такого шаблона' });
       await fs.unlink(path.join(TEMPLATES, file));
+      return json(res, 200, { ok: true });
+    }
+
+    // ── схемы-сборки (граф со связями) ────────────────────────────────────────
+    if(u.pathname === '/api/flows/list'){
+      let names = [];
+      try { names = (await fs.readdir(FLOWS)).filter(n => n.endsWith('.json')); } catch(_){ return json(res, 200, []); }
+      const out = [];
+      for(const n of names.sort()){
+        try { const j = JSON.parse(await fs.readFile(path.join(FLOWS, n), 'utf8'));
+          out.push({ id: j.id || n.replace(/\.json$/, ''), name: j.name || j.id || n, savedAt: j.savedAt || 0,
+            nodes: Array.isArray(j.graph && j.graph.nodes) ? j.graph.nodes.length : 0,
+            edges: Array.isArray(j.graph && j.graph.edges) ? j.graph.edges.length : 0 });
+        } catch(_){}
+      }
+      return json(res, 200, out);
+    }
+    if(u.pathname === '/api/flows/get'){
+      const id = String(u.searchParams.get('id') || '');
+      const abs = within(FLOWS, id + '.json');
+      if(!abs) return json(res, 400, { error: 'bad id' });
+      const txt = await fs.readFile(abs, 'utf8').catch(() => null);
+      if(txt == null) return json(res, 404, { error: 'нет такой схемы' });
+      return json(res, 200, JSON.parse(txt));
+    }
+    if(u.pathname === '/api/flows/save' && req.method === 'POST'){
+      const b = await readBody(req);
+      const graph = (b.graph && typeof b.graph === 'object') ? b.graph : { nodes: [], edges: [] };
+      const id = b.id && /^[\w.-]+$/.test(b.id) ? b.id : slug(b.name || 'схема');
+      const obj = { id, name: String(b.name || 'Моя схема').slice(0, 80), savedAt: Date.now(),
+        graph: { nodes: Array.isArray(graph.nodes) ? graph.nodes : [], edges: Array.isArray(graph.edges) ? graph.edges : [] } };
+      await fs.mkdir(FLOWS, { recursive: true });
+      await fs.writeFile(path.join(FLOWS, id + '.json'), JSON.stringify(obj, null, 2), 'utf8');
+      return json(res, 200, { ok: true, id });
+    }
+    if(u.pathname === '/api/flows/delete' && req.method === 'POST'){
+      const b = await readBody(req);
+      const abs = within(FLOWS, String(b.id || '') + '.json');
+      if(!abs) return json(res, 400, { error: 'bad id' });
+      await fs.unlink(abs).catch(() => {});
       return json(res, 200, { ok: true });
     }
 
