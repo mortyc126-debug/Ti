@@ -422,16 +422,21 @@ function headDrag(head, el, nd){
   head.addEventListener('pointerdown', e => {
     if(e.target.classList.contains('gnode-del')) return;
     e.preventDefault(); head.setPointerCapture(e.pointerId);
-    const sx = e.clientX, sy = e.clientY, ox = nd.x, oy = nd.y; let moved = false;
+    // если тащим узел из группы — двигаем всю группу
+    const groupIds = (multi.has(nd.id) && multi.size > 1) ? [...multi] : [nd.id];
+    const starts = groupIds.map(id => { const n = byId(id); return n ? { n, x: n.x, y: n.y } : null; }).filter(Boolean);
+    const sx = e.clientX, sy = e.clientY; let moved = false;
     const mv = ev => {
-      const dx = ev.clientX - sx, dy = ev.clientY - sy;
-      if(!moved && Math.abs(dx) + Math.abs(dy) > 3) moved = true;
-      if(moved){ nd.x = Math.max(0, ox + dx / zoom); nd.y = Math.max(0, oy + dy / zoom); el.style.left = nd.x + 'px'; el.style.top = nd.y + 'px'; drawEdges(); }
+      const dx = (ev.clientX - sx) / zoom, dy = (ev.clientY - sy) / zoom;
+      if(!moved && Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 3) moved = true;
+      if(moved){ starts.forEach(s => { s.n.x = Math.max(0, s.x + dx); s.n.y = Math.max(0, s.y + dy); const elm = canvas.querySelector('.gnode[data-id="' + cssEsc(s.n.id) + '"]'); if(elm){ elm.style.left = s.n.x + 'px'; elm.style.top = s.n.y + 'px'; } }); drawEdges(); }
     };
     const up = ev => {
       head.releasePointerCapture(e.pointerId);
       head.removeEventListener('pointermove', mv); head.removeEventListener('pointerup', up);
-      if(moved) persist(); else select(nd);
+      if(moved){ persist(); }
+      else if(ev.shiftKey){ if(multi.has(nd.id)) multi.delete(nd.id); else multi.add(nd.id); selectedId = nd.id; markSel(); renderInspector(nd); persist(); }
+      else { multi.clear(); select(nd); }
     };
     head.addEventListener('pointermove', mv); head.addEventListener('pointerup', up);
   });
@@ -527,19 +532,48 @@ function drawEdges(){
     edgesSvg.appendChild(p); edgesSvg.appendChild(hit);
   });
 }
-canvas.addEventListener('pointerdown', e => { if(e.target === canvas || e.target === edgesSvg){ selectedId = null; selectedEdge = null; markSel(); renderInspector(); drawEdges(); } });
+// по пустому месту левой кнопкой — рамка выделения; с пробелом — это панорама
+canvas.addEventListener('pointerdown', e => {
+  if(e.button !== 0 || spaceHeld) return;
+  if(!(e.target === canvas || e.target === edgesSvg)) return;
+  selectedId = null; selectedEdge = null; multi.clear(); markSel(); renderInspector(); drawEdges();
+  const rect = canvas.getBoundingClientRect();
+  const sx = (e.clientX - rect.left) / zoom, sy = (e.clientY - rect.top) / zoom;
+  const box = el('div', 'sel-box'); canvas.appendChild(box);
+  const mv = ev => {
+    const x = (ev.clientX - rect.left) / zoom, y = (ev.clientY - rect.top) / zoom;
+    const l = Math.min(sx, x), t = Math.min(sy, y), w = Math.abs(x - sx), h = Math.abs(y - sy);
+    box.style.left = l + 'px'; box.style.top = t + 'px'; box.style.width = w + 'px'; box.style.height = h + 'px';
+    multi.clear();
+    graph.nodes.forEach(n => {
+      const elm = canvas.querySelector('.gnode[data-id="' + cssEsc(n.id) + '"]');
+      const nw = elm ? elm.offsetWidth : 190, nh = elm ? elm.offsetHeight : 70;
+      if(n.x < l + w && n.x + nw > l && n.y < t + h && n.y + nh > t) multi.add(n.id);
+    });
+    markSel();
+  };
+  const up = () => {
+    document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); box.remove();
+    if(multi.size === 1){ selectedId = [...multi][0]; multi.clear(); renderInspector(byId(selectedId)); }
+    markSel();
+  };
+  document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
+});
 // Delete/Backspace — удалить выбранную связь, иначе выбранный узел (если не печатаем в поле)
 document.addEventListener('keydown', e => {
   if(e.key !== 'Delete' && e.key !== 'Backspace') return;
   const ae = document.activeElement; if(ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName)) return;
+  if(multi.size){ e.preventDefault(); const ids = [...multi]; graph.nodes = graph.nodes.filter(n => !multi.has(n.id)); graph.edges = graph.edges.filter(ed => !multi.has(ed.from) && !multi.has(ed.to)); multi.clear(); selectedId = null; renderCanvas(); renderInspector(); renderCode(); persist(); return; }
   if(selectedEdge){ e.preventDefault(); removeEdge(selectedEdge); return; }
   if(!selectedId) return;
   e.preventDefault(); removeNode(selectedId);
 });
 
 // ── инспектор ─────────────────────────────────────────────────────────────────
+let spaceHeld = false;
+const multi = new Set();   // множественное выделение узлов
 function select(nd){ selectedId = nd.id; markSel(); renderInspector(nd); persist(); }
-function markSel(){ canvas.querySelectorAll('.gnode').forEach(el => el.classList.toggle('sel', el.dataset.id === selectedId)); }
+function markSel(){ canvas.querySelectorAll('.gnode').forEach(el => el.classList.toggle('sel', el.dataset.id === selectedId || multi.has(el.dataset.id))); }
 function updateCard(nd){
   const el = canvas.querySelector('.gnode[data-id="' + cssEsc(nd.id) + '"]'); if(!el) return;
   el.querySelector('.gnode-title').textContent = nodeLabel(nd);
@@ -1270,12 +1304,12 @@ const scroll = $('.canvas-scroll');
 if(scroll){
   scroll.addEventListener('wheel', e => { if(!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); setZoom(zoom - Math.sign(e.deltaY) * 0.1); }, { passive: false });
   // панорама: средняя кнопка, либо пробел+тащить по пустому месту
-  let panning = null, space = false;
-  document.addEventListener('keydown', e => { if(e.code === 'Space' && !/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||'')) space = true; });
-  document.addEventListener('keyup', e => { if(e.code === 'Space') space = false; });
-  scroll.addEventListener('pointerdown', e => {
-    const onNode = e.target.closest && e.target.closest('.gnode');
-    if(e.button === 1 || (space && !onNode)){
+  let panning = null;
+  document.addEventListener("keydown", e => { if(e.code === "Space" && !/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||"")) spaceHeld = true; });
+  document.addEventListener("keyup", e => { if(e.code === "Space") spaceHeld = false; });
+  scroll.addEventListener("pointerdown", e => {
+    const onNode = e.target.closest && e.target.closest(".gnode");
+    if(e.button === 1 || (spaceHeld && !onNode)){
       e.preventDefault(); panning = { x: e.clientX, y: e.clientY, l: scroll.scrollLeft, t: scroll.scrollTop };
       scroll.setPointerCapture(e.pointerId); scroll.style.cursor = 'grabbing';
     }
