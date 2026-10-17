@@ -55,4 +55,20 @@
   const toggle = v => { off = v; try { localStorage.setItem('codelab_shell_side', off ? 'off' : 'on'); } catch(_){} apply(); };
   collapse.onclick = e => { e.preventDefault(); toggle(true); };
   reopen.onclick = e => { e.preventDefault(); toggle(false); };
+
+  // авто-рост полей ввода: textarea подстраивает высоту под текст (до max-height, дальше — скролл)
+  const grow = ta => {
+    if(!ta || ta.tagName !== 'TEXTAREA' || ta.dataset.noGrow) return;
+    const max = parseInt(getComputedStyle(ta).maxHeight) || 600;
+    ta.style.height = 'auto';
+    const h = Math.min(ta.scrollHeight + 2, max);
+    ta.style.height = h + 'px';
+    ta.style.overflowY = ta.scrollHeight > max ? 'auto' : 'hidden';
+  };
+  document.addEventListener('input', e => grow(e.target));
+  document.addEventListener('focusin', e => grow(e.target));
+  // первичный проход для полей, появившихся динамически (инспектор, модалки, вставка)
+  const scan = root => { if(!root || root.nodeType !== 1) return; if(root.tagName === 'TEXTAREA') grow(root); root.querySelectorAll && root.querySelectorAll('textarea').forEach(grow); };
+  new MutationObserver(ms => ms.forEach(m => m.addedNodes && m.addedNodes.forEach(scan))).observe(document.body, { childList:true, subtree:true });
+  scan(document.body);
 })();

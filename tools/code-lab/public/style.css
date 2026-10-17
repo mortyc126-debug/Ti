@@ -47,6 +47,9 @@ select.btn{appearance:auto;color:var(--text2);background:var(--s2)}
 .btn.danger:hover{color:var(--acc);border-color:rgba(255,0,110,.5)}
 .btn.full{width:100%;margin-top:8px}
 
+/* поля ввода текста растут под содержимое (shell.js), но не выше экрана */
+textarea{max-height:62vh}
+
 /* код в описаниях: `плашка` и ```блок``` (общий стиль для всех страниц) */
 .desc-chip{font-family:ui-monospace,monospace;font-size:.92em;color:var(--kw,#B45CFF);background:rgba(180,92,255,.14);border:1px solid rgba(180,92,255,.4);border-radius:6px;padding:1px 6px;white-space:nowrap}
 .desc-code{font-family:ui-monospace,monospace;font-size:12px;line-height:1.55;color:var(--str,#52F2C9);background:#0E0720;border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin:6px 0;overflow:auto;white-space:pre}
