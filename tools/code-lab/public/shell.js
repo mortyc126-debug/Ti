@@ -8,6 +8,7 @@
     { key:'library',     label:'Библиотека',  href:'/library.html' },
     { key:'catalog',     label:'Каталог',     href:'/catalog.html' },
     { key:'constructor', label:'Конструктор', href:'/constructor.html' },
+    { key:'inventory',   label:'Опись',       href:'/inventory.html' },
     { key:'data',        label:'Данные',      href:'/schema-json.html' },
     { key:'learn',       label:'Обучение',    href:'/schema.html' },
   ];
