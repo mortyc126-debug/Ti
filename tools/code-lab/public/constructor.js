@@ -187,6 +187,31 @@ function edgeCheck(from,to){
   if(b.dom && b.dom.length) return {ok:true,level:'info',reason:`Данные совместимы. Кроме них нужен DOM-элемент: ${b.dom.map(x=>'#'+x).join(', ')}.`};
   return {ok:true};
 }
+// нужен ли узлу вход, которого пока нет (для пометки «нужен вход»)
+function nodeNeedsInput(nd){
+  const c = blockContract(nd);
+  if(c.unknown || c.input == null || !c.inputField || c.inputMode === 'free') return false;
+  if(graph.edges.some(e => e.to === nd.id)) return false;      // есть входящая связь
+  const val = String((nd.fields || {})[c.inputField] || '').trim();
+  if(!val) return true;                                        // поле пустое — вход точно нужен
+  if(inferExprType(val, new Map()) !== 'any') return false;    // литерал (число/массив/строка) — вход уже есть
+  // ссылка на имя: считаем входом, если это имя выдаёт какой-то другой узел
+  // (границы слова — через ID_Continue, т.к. \b не работает с кириллицей)
+  const names = graph.nodes.filter(n => n !== nd).map(outputName).filter(Boolean);
+  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return !names.some(nm => new RegExp('(^|[^\\p{ID_Continue}$])' + esc(nm) + '($|[^\\p{ID_Continue}$])', 'u').test(val));
+}
+// проставить/снять пометку «нужен вход» на всех узлах
+function markNeeds(){
+  canvas.querySelectorAll('.gnode').forEach(elm => {
+    const nd = byId(elm.dataset.id); if(!nd) return;
+    const need = nodeNeedsInput(nd);
+    elm.classList.toggle('needs-input', need);
+    let badge = elm.querySelector('.need-badge');
+    if(need && !badge){ badge = el('div', 'need-badge', 'нужен вход'); elm.appendChild(badge); }
+    else if(!need && badge){ badge.remove(); }
+  });
+}
 function outputType(nd){
   const c=blockContract(nd), f=nd.fields||{};
   if(c.outputField && f[c.outputField]){
@@ -337,7 +362,7 @@ function renderCanvas(){
   canvas.querySelectorAll('.gnode').forEach(el => el.remove());
   graph.nodes.forEach(nd => canvas.appendChild(nodeEl(nd)));
   $('#emptyHint').style.display = graph.nodes.length ? 'none' : 'block';
-  drawEdges();
+  drawEdges(); markNeeds();
 }
 function nodeEl(nd){
   const el = document.createElement('div');
@@ -421,13 +446,14 @@ function addEdge(from, to){
   const a = byId(from), b = byId(to);
   if(!a || !b) return;
   const result = edgeExplanation(a, b);
-  if(!result.ok){ select(b); showEdgeMessage(result.text, 'error'); return; }
-  // Один входной порт = один фактический источник. Старую связь заменяем,
-  // только если новая действительно совместима.
+  // Связь не запрещаем — собирать схему можно в любом порядке. Если типы не
+  // сходятся, связь всё равно создаётся, но с предупреждением; узел-получатель
+  // остаётся помеченным «нужен вход», пока вход реально не подойдёт.
   graph.edges = graph.edges.filter(e => e.to !== to);
   graph.edges.push({ from, to });
-  drawEdges(); persist(); renderCode(); renderInspector(b);
-  showEdgeMessage(result.text, result.level === 'info' ? 'warn' : 'ok');
+  if(!result.ok){ try { bindEdge(a, b); } catch(_){} }   // всё равно пробуем подставить имя
+  drawEdges(); persist(); renderCode(); renderInspector(b); markNeeds();
+  showEdgeMessage(result.ok ? result.text : ('⚠ ' + result.reason + ' Связь создана — проверь вход.'), result.ok ? (result.level === 'info' ? 'warn' : 'ok') : 'warn');
 }
 function removeNode(id){
   graph.nodes = graph.nodes.filter(n => n.id !== id);
@@ -468,7 +494,7 @@ function updateCard(nd){
   const el = canvas.querySelector('.gnode[data-id="' + cssEsc(nd.id) + '"]'); if(!el) return;
   el.querySelector('.gnode-title').textContent = nodeLabel(nd);
   el.querySelector('.gnode-prev').textContent = nodePreview(nd);
-  drawEdges();
+  drawEdges(); markNeeds();
 }
 function renderInspector(nd){
   const host = $('#inspector'); if(!host) return;
