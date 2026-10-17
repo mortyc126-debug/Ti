@@ -287,6 +287,16 @@ const server = http.createServer(async (req, res) => {
         const c = await git(['commit', '-m', 'Лаборатория: мои шаблоны и схемы', '--', TEMPLATES, FLOWS], root);
         if(c.code !== 0) return json(res, 200, { ok: false, stage: 'commit', message: c.err || c.out });
       }
+      // подтянуть серверные изменения ПЕРЕД push, чтобы не упираться в отклонение.
+      // --autostash бережёт другие несохранённые правки; при конфликте — откат, ничего не ломаем.
+      const up = await git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'], root);
+      if(up.code === 0 && up.out){
+        const pull = await git(['pull', '--rebase', '--autostash'], root);
+        if(pull.code !== 0){
+          await git(['rebase', '--abort'], root);
+          return json(res, 200, { ok: false, stage: 'pull', committed: staged, message: 'С сервера пришли изменения, которые конфликтуют с твоими — автослияние не вышло. Я откатила, ничего не испорчено. Нужно слить вручную (git pull) и повторить. ' + (pull.err || pull.out || '').slice(0, 240) });
+        }
+      }
       let push = await git(['push'], root);
       if(push.code !== 0){
         const br = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], root)).out;
