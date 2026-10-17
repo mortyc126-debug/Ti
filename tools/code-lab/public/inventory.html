@@ -30,6 +30,13 @@
   .edit-cell:hover{background:var(--bg2);outline:1px dashed var(--border)}
   .inv-cell-in{width:100%;background:var(--bg);border:1px solid var(--name);border-radius:6px;color:var(--text);font-family:ui-monospace,monospace;font-size:12px;padding:4px 6px}
   .inv-cell-in:focus{outline:none}
+  .inv-chk{font-size:12px;color:var(--text2);display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+  .cov{display:inline-flex;gap:3px;flex-wrap:nowrap}
+  .cov-d{font-size:9.5px;line-height:1;padding:3px 4px;border-radius:5px;border:1px solid var(--border);min-width:20px;text-align:center;cursor:help}
+  .cov-d.on{color:var(--str);background:rgba(82,242,201,.14);border-color:rgba(82,242,201,.4)}
+  .cov-d.off{color:var(--text3);background:transparent;opacity:.5}
+  .cov-legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--text3);margin:0 0 8px}
+  .cov-legend b{color:var(--str)}
   .muted{color:var(--text3)}
   .tbl-wrap{max-height:62vh;overflow:auto;border:1px solid var(--border);border-radius:10px}
   .flow{background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:10px}
@@ -48,12 +55,14 @@
     <div class="inv-head">
       <h2>Кусочки кода</h2><span class="cnt" id="pcnt"></span>
       <span class="sp"></span>
+      <label class="inv-chk"><input type="checkbox" id="pincomplete"> только с пробелами</label>
       <input class="inv-search" id="pq" placeholder="фильтр по названию/коду…">
       <button class="btn" id="pcopy">⧉ скопировать список</button>
     </div>
+    <div class="cov-legend" id="covLegend"></div>
     <div class="tbl-wrap">
       <table class="inv-t">
-        <thead><tr><th>Название</th><th>Язык</th><th>Раздел</th><th>Даёт</th><th>Нужно</th></tr></thead>
+        <thead><tr><th>Название</th><th>Язык</th><th>Раздел</th><th>Даёт</th><th>Нужно</th><th title="что описано: 8 граней">Описано</th></tr></thead>
         <tbody id="prows"></tbody>
       </table>
     </div>

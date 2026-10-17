@@ -4,12 +4,33 @@ let PIECES = [], FLOWS = [];
 (async function(){
   try { PIECES = await fetch('/api/list').then(r => r.json()); } catch(_){ PIECES = []; }
   try { FLOWS = await fetch('/api/flows/list').then(r => r.json()); } catch(_){ FLOWS = []; }
+  const leg = document.getElementById('covLegend');
+  if(leg) leg.innerHTML = 'Описано: ' + [['inputs','Вх','Входы'],['outputs','Вых','Выходы'],['env','Ср','Среда'],['pre','Пр','Предусловия'],['effects','Эф','Побочные эффекты'],['errors','Ош','Ошибки'],['links','Св','Связи'],['check','Пв','Проверка']].map(f => '<span><b>' + f[1] + '</b> — ' + f[2] + '</span>').join('');
   renderPieces(); renderFlows();
 })();
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 const give = t => (t.comp && t.comp.provides) || [];
 const need = t => (t.comp && t.comp.requires) || [];
+// 8 граней «что описано» — ключ, буква, название, пояснение
+const FACETS = [
+  ['inputs',  'Вх',  'Входы',            'какие данные требуются'],
+  ['outputs', 'Вых', 'Выходы',           'что возвращается и какого типа'],
+  ['env',     'Ср',  'Среда',            'браузер / Node / библиотека'],
+  ['pre',     'Пр',  'Предусловия',      'что должно быть создано до запуска'],
+  ['effects', 'Эф',  'Побочные эффекты', 'меняет ли DOM, хранилище, сеть, время'],
+  ['errors',  'Ош',  'Ошибки/ограничения','что может пойти не так'],
+  ['links',   'Св',  'Связи',            'какие имена берёт извне (другие рецепты)'],
+  ['check',   'Пв',  'Проверка',         'как понять, что фрагмент работает']
+];
+const cov = t => t.cov || {};
+const covCount = t => FACETS.reduce((n, f) => n + (cov(t)[f[0]] ? 1 : 0), 0);
+function covCell(t){
+  return '<div class="cov">' + FACETS.map(f => {
+    const on = !!cov(t)[f[0]];
+    return '<span class="cov-d ' + (on ? 'on' : 'off') + '" title="' + esc(f[2] + ' — ' + f[3] + (on ? ' · есть' : ' · нет')) + '">' + esc(f[1]) + '</span>';
+  }).join('') + '</div>';
+}
 
 function pieceRows(list){
   return list.map(t => {
@@ -20,6 +41,7 @@ function pieceRows(list){
       + '<td>' + esc(t.group || '') + '</td>'
       + '<td class="give edit-cell" data-field="provides" title="клик — изменить">' + (g.length ? esc(g.join(', ')) : '<span class="muted">+ отметить</span>') + '</td>'
       + '<td class="need edit-cell" data-field="requires" title="клик — изменить">' + (n.length ? esc(n.join(', ')) : '<span class="muted">+ отметить</span>') + '</td>'
+      + '<td>' + covCell(t) + '</td>'
       + '</tr>';
   }).join('');
 }
@@ -43,8 +65,11 @@ document.getElementById('prows').addEventListener('click', e => {
 });
 function filteredPieces(){
   const q = (document.getElementById('pq').value || '').toLowerCase().trim();
-  if(!q) return PIECES;
-  return PIECES.filter(t => ((t.title || '') + ' ' + (t.id || '') + ' ' + (t.group || '') + ' ' + give(t).join(' ') + ' ' + need(t).join(' ')).toLowerCase().includes(q));
+  const incompleteOnly = document.getElementById('pincomplete') && document.getElementById('pincomplete').checked;
+  let list = PIECES;
+  if(q) list = list.filter(t => ((t.title || '') + ' ' + (t.id || '') + ' ' + (t.group || '') + ' ' + give(t).join(' ') + ' ' + need(t).join(' ')).toLowerCase().includes(q));
+  if(incompleteOnly) list = list.filter(t => covCount(t) < FACETS.length);
+  return list;
 }
 function renderPieces(){
   const list = filteredPieces();
@@ -52,15 +77,18 @@ function renderPieces(){
   document.getElementById('pcnt').textContent = list.length + (list.length === PIECES.length ? '' : ' из ' + PIECES.length);
 }
 document.getElementById('pq').oninput = renderPieces;
+(function(){ const c = document.getElementById('pincomplete'); if(c) c.onchange = renderPieces; })();
 
 function piecesAsText(){
   const list = filteredPieces();
   const lines = ['# Кусочки кода (' + list.length + ')', ''];
   list.forEach(t => {
     const g = give(t), n = need(t);
-    lines.push('- ' + (t.title || t.id) + '  [' + (t.lang || '') + '] · ' + (t.group || ''));
+    lines.push('- ' + (t.title || t.id) + '  [' + (t.lang || '') + '] · ' + (t.group || '') + '  (описано ' + covCount(t) + '/' + FACETS.length + ')');
     if(g.length) lines.push('    даёт: ' + g.join(', '));
     if(n.length) lines.push('    нужно: ' + n.join(', '));
+    const miss = FACETS.filter(f => !cov(t)[f[0]]).map(f => f[2]);
+    if(miss.length) lines.push('    пробелы: ' + miss.join(', '));
   });
   return lines.join('\n');
 }

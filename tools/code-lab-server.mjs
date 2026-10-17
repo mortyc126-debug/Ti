@@ -129,6 +129,24 @@ function slug(s){
   return base + '-' + Date.now().toString(36);
 }
 
+// что из 8 граней описано/видно у куска — для колонки «описано» в Описи
+function coverage(j){
+  const c = j.component || {}, s = c.summary || {}, v = c.views || {};
+  const code = Array.isArray(j.lines) ? j.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : '';
+  const effects = { dom: /\bdocument\.|innerHTML|\.style\b|createElement|appendChild|querySelector/.test(code), storage: /localStorage|sessionStorage|indexedDB/.test(code), net: /\bfetch\(|XMLHttpRequest|\.ajax\(/.test(code), timers: /setInterval|setTimeout|requestAnimationFrame/.test(code) };
+  const envBrowser = /\bdocument\b|\bwindow\b|localStorage|querySelector/.test(code);
+  const envNode = /\brequire\(|\bprocess\.|module\.exports|__dirname/.test(code);
+  return {
+    inputs:  !!(s.input) || (Array.isArray(c.requires) && c.requires.length > 0),
+    outputs: !!(s.output) || (Array.isArray(c.provides) && c.provides.length > 0),
+    env:     !!(c.tags && Array.isArray(c.tags.runtime) && c.tags.runtime.length) || envBrowser || envNode,
+    pre:     Array.isArray(s.requirements) && s.requirements.length > 0,
+    effects: effects.dom || effects.storage || effects.net || effects.timers,
+    errors:  !!(c.safety && c.safety.level) || !!(v.check && (v.check.pitfalls || v.check.errors)) || (Array.isArray(c.verification) && c.verification.length > 0),
+    links:   Array.isArray(c.requires) && c.requires.length > 0,
+    check:   !!(v.check && (v.check.expected_result || v.check.how)) || (Array.isArray(c.verification) && c.verification.length > 0)
+  };
+}
 async function listTemplates(){
   let names = [];
   try { names = (await fs.readdir(TEMPLATES)).filter(n => n.endsWith('.json')); } catch(_){ return []; }
@@ -137,7 +155,7 @@ async function listTemplates(){
     try {
       const j = JSON.parse(await fs.readFile(path.join(TEMPLATES, n), 'utf8'));
       const nlines = Array.isArray(j.lines) ? j.lines.filter(l => (l || []).some(k => (k.v || '').trim())).length : 0;
-      const row = { id: j.id || n.replace(/\.json$/, ''), lang: j.lang || '', group: j.group || 'Разное', title: j.title || n, desc: j.desc || '', descAt: j.descAt || 0, file: n, nlines };
+      const row = { id: j.id || n.replace(/\.json$/, ''), lang: j.lang || '', group: j.group || 'Разное', title: j.title || n, desc: j.desc || '', descAt: j.descAt || 0, file: n, nlines, cov: coverage(j) };
       // краткая сводка компонента — чтобы каталог показывал тип/контракт/теги без лишних запросов
       if(j.component){
         const c = j.component;
