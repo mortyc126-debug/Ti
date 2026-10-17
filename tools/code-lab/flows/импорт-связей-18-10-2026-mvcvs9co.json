@@ -1,0 +1,353 @@
+{
+  "id": "импорт-связей-18-10-2026-mvcvs9co",
+  "name": "Импорт связей 18.10.2026",
+  "savedAt": 1792270843224,
+  "graph": {
+    "nodes": [
+      {
+        "id": "ovcubk",
+        "blockId": "raw",
+        "fields": {
+          "code": "// 1) В проекте (есть package.json): сначала в терминале\n//    npm install dayjs\n//    затем в коде:\nimport dayjs from \"dayjs\";\nconsole.log(dayjs().format(\"YYYY-MM-DD\"));\n\n// 2) В обычном HTML без сборки — через CDN:\n// <script src=\"https://cdn.jsdelivr.net/npm/dayjs/dayjs.min.js\"></script>"
+        },
+        "title": "Как подключать библиотеки",
+        "desc": "Библиотека — чужой готовый код, который подключаешь к себе. Два пути: через npm (в проекте со сборкой) или через CDN (прямо в HTML).",
+        "src": {
+          "id": "libs-howto",
+          "title": "Как подключать библиотеки",
+          "desc": "Библиотека — чужой готовый код, который подключаешь к себе. Два пути: через npm (в проекте со сборкой) или через CDN (прямо в HTML).",
+          "code": "// 1) В проекте (есть package.json): сначала в терминале\n//    npm install dayjs\n//    затем в коде:\nimport dayjs from \"dayjs\";\nconsole.log(dayjs().format(\"YYYY-MM-DD\"));\n\n// 2) В обычном HTML без сборки — через CDN:\n// <script src=\"https://cdn.jsdelivr.net/npm/dayjs/dayjs.min.js\"></script>"
+        },
+        "x": 60,
+        "y": 60
+      },
+      {
+        "id": "dvlmwf",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "dayjs",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 60
+      },
+      {
+        "id": "gh2jn6",
+        "blockId": "raw",
+        "fields": {
+          "code": "import * as XLSX from \"xlsx\";\n\nconst книга = XLSX.read(данныеФайла, { type: \"array\" });\nconst лист  = книга.Sheets[книга.SheetNames[0]]; // первый лист\nconst строки = XLSX.utils.sheet_to_json(лист, { header: 1 });\n// строки → [[ячейка, ячейка, …], …]"
+        },
+        "title": "SheetJS (xlsx) — читать Excel",
+        "desc": "Библиотека xlsx (SheetJS) — чтение .xlsx прямо в браузере. Используется в проекте для импорта отчётов ФНС. Лист → массив строк.",
+        "src": {
+          "id": "libs-sheetjs",
+          "title": "SheetJS (xlsx) — читать Excel",
+          "desc": "Библиотека xlsx (SheetJS) — чтение .xlsx прямо в браузере. Используется в проекте для импорта отчётов ФНС. Лист → массив строк.",
+          "code": "import * as XLSX from \"xlsx\";\n\nconst книга = XLSX.read(данныеФайла, { type: \"array\" });\nconst лист  = книга.Sheets[книга.SheetNames[0]]; // первый лист\nconst строки = XLSX.utils.sheet_to_json(лист, { header: 1 });\n// строки → [[ячейка, ячейка, …], …]"
+        },
+        "x": 540,
+        "y": 60
+      },
+      {
+        "id": "5awzv5",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "XLSX",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 60
+      },
+      {
+        "id": "8vdvgv",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "данныеФайла",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 230
+      },
+      {
+        "id": "42zisu",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "книга",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 230
+      },
+      {
+        "id": "jocmp4",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "лист",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 230
+      },
+      {
+        "id": "o4h425",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "строки",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 230
+      },
+      {
+        "id": "j5a9xh",
+        "blockId": "raw",
+        "fields": {
+          "code": "// ── файл  math.js  —  отдаёт функции наружу ──\nexport function среднее(список){\n  return список.reduce((a, b) => a + b, 0) / список.length;\n}\nexport const ВЕРСИЯ = \"1.0\";\n\n// ── файл  main.js  —  берёт их у соседа ──\nimport { среднее, ВЕРСИЯ } from \"./math.js\";   // путь к файлу-соседу\n\nconsole.log(среднее([10, 20, 30]));   // 20\nconsole.log(\"версия:\", ВЕРСИЯ);"
+        },
+        "title": "Файлы общаются: export / import",
+        "desc": "Как «куча файликов» одного языка образует систему. Один файл ОТДАЁТ (export) функции, другой их БЕРЁТ (import) по пути к соседу. Копируй в два файла рядом — заработает (в проекте со сборкой или type=module).",
+        "src": {
+          "id": "sys-modules",
+          "title": "Файлы общаются: export / import",
+          "desc": "Как «куча файликов» одного языка образует систему. Один файл ОТДАЁТ (export) функции, другой их БЕРЁТ (import) по пути к соседу. Копируй в два файла рядом — заработает (в проекте со сборкой или type=module).",
+          "code": "// ── файл  math.js  —  отдаёт функции наружу ──\nexport function среднее(список){\n  return список.reduce((a, b) => a + b, 0) / список.length;\n}\nexport const ВЕРСИЯ = \"1.0\";\n\n// ── файл  main.js  —  берёт их у соседа ──\nimport { среднее, ВЕРСИЯ } from \"./math.js\";   // путь к файлу-соседу\n\nconsole.log(среднее([10, 20, 30]));   // 20\nconsole.log(\"версия:\", ВЕРСИЯ);"
+        },
+        "x": 60,
+        "y": 400
+      },
+      {
+        "id": "2atmno",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "экспортируемые значения другого модуля",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 400
+      },
+      {
+        "id": "qvmpr1",
+        "blockId": "raw",
+        "fields": {
+          "code": "// ДВА СПОСОБА СОБРАТЬ СИСТЕМУ ИЗ ФАЙЛОВ\n\n// 1) ВНУТРИ ОДНОГО ДВИЖКА — файлы одного мира соединяются импортами.\n//    Браузер понимает HTML+CSS+JS сразу, поэтому один .html МОЖЕТ держать\n//    и <style> (стиль), и <script> (логику) — это реальное «вложение».\n//    JS-файлы между собой: export / import. Python-файлы: import.\n//    НО Python внутри JS внутри HTML «в одном запуске» — НЕЛЬЗЯ:\n//    браузер не умеет Python.\n//    (Исключение: PyScript / Pyodide — Python компилируют в WebAssembly,\n//     и он бежит в браузере. Экзотика, медленно, редко нужно.)\n\n// 2) РАЗНЫЕ ЯЗЫКИ / МАШИНЫ — отдельные программы, которые ОБЩАЮТСЯ.\n//    Никто не вложен в другого. Способы общения:\n//    • HTTP + JSON — один шлёт запрос, другой отвечает данными (fetch).\n//    • общий файл — один пишет .json/.csv, другой читает.\n//    • база данных — один кладёт строки, другой забирает.\n//    Главное — ДОГОВОР (формат сообщения), а не общий код.\n\n// ТВОЙ ПРОЕКТ ИМЕННО ТАК И УСТРОЕН:\n//   [браузер: HTML+JS сайт] --HTTP/JSON--> [Cloudflare Worker (JS)] --> ГИР БО\n//   [браузер]               --HTTP------->  [MOEX API]\n//   [Python-бот]            --файлы/JSON-->  общие данные --> [сайт читает]\n//   каждый кусок на своём языке, связаны СООБЩЕНИЯМИ, не общим кодом."
+        },
+        "title": "Как файлы собираются в систему",
+        "desc": "Два способа объединять код. 1) Внутри одного движка — вложение/импорты. 2) Разные языки/машины — отдельные программы, общаются сообщениями. Твой проект — второй способ.",
+        "src": {
+          "id": "sys-architecture",
+          "title": "Как файлы собираются в систему",
+          "desc": "Два способа объединять код. 1) Внутри одного движка — вложение/импорты. 2) Разные языки/машины — отдельные программы, общаются сообщениями. Твой проект — второй способ.",
+          "code": "// ДВА СПОСОБА СОБРАТЬ СИСТЕМУ ИЗ ФАЙЛОВ\n\n// 1) ВНУТРИ ОДНОГО ДВИЖКА — файлы одного мира соединяются импортами.\n//    Браузер понимает HTML+CSS+JS сразу, поэтому один .html МОЖЕТ держать\n//    и <style> (стиль), и <script> (логику) — это реальное «вложение».\n//    JS-файлы между собой: export / import. Python-файлы: import.\n//    НО Python внутри JS внутри HTML «в одном запуске» — НЕЛЬЗЯ:\n//    браузер не умеет Python.\n//    (Исключение: PyScript / Pyodide — Python компилируют в WebAssembly,\n//     и он бежит в браузере. Экзотика, медленно, редко нужно.)\n\n// 2) РАЗНЫЕ ЯЗЫКИ / МАШИНЫ — отдельные программы, которые ОБЩАЮТСЯ.\n//    Никто не вложен в другого. Способы общения:\n//    • HTTP + JSON — один шлёт запрос, другой отвечает данными (fetch).\n//    • общий файл — один пишет .json/.csv, другой читает.\n//    • база данных — один кладёт строки, другой забирает.\n//    Главное — ДОГОВОР (формат сообщения), а не общий код.\n\n// ТВОЙ ПРОЕКТ ИМЕННО ТАК И УСТРОЕН:\n//   [браузер: HTML+JS сайт] --HTTP/JSON--> [Cloudflare Worker (JS)] --> ГИР БО\n//   [браузер]               --HTTP------->  [MOEX API]\n//   [Python-бот]            --файлы/JSON-->  общие данные --> [сайт читает]\n//   каждый кусок на своём языке, связаны СООБЩЕНИЯМИ, не общим кодом."
+        },
+        "x": 540,
+        "y": 400
+      },
+      {
+        "id": "nedalo",
+        "blockId": "raw",
+        "fields": {
+          "code": "import http from \"node:http\";\n\nconst сервер = http.createServer((req, res) => {\n  res.writeHead(200, { \"Content-Type\": \"text/plain; charset=utf-8\" });\n  res.end(\"Привет!\");\n});\n\nсервер.listen(8788, () => console.log(\"http://localhost:8788/\"));"
+        },
+        "title": "Как запустить сервер (Node)",
+        "desc": "Минимальный веб-сервер: слушает порт и на каждый запрос отвечает. Запуск: node файл.mjs. Так устроена и Лаборатория кода.",
+        "src": {
+          "id": "server-node",
+          "title": "Как запустить сервер (Node)",
+          "desc": "Минимальный веб-сервер: слушает порт и на каждый запрос отвечает. Запуск: node файл.mjs. Так устроена и Лаборатория кода.",
+          "code": "import http from \"node:http\";\n\nconst сервер = http.createServer((req, res) => {\n  res.writeHead(200, { \"Content-Type\": \"text/plain; charset=utf-8\" });\n  res.end(\"Привет!\");\n});\n\nсервер.listen(8788, () => console.log(\"http://localhost:8788/\"));"
+        },
+        "x": 780,
+        "y": 400
+      },
+      {
+        "id": "ppdb2p",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "http",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 570
+      },
+      {
+        "id": "mlofx9",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "req",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 570
+      },
+      {
+        "id": "ll5p65",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "сервер",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 570
+      },
+      {
+        "id": "7b56ny",
+        "blockId": "raw",
+        "fields": {
+          "code": "const сервер = http.createServer((req, res) => {\n  const url = new URL(req.url, \"http://localhost\");\n  if(url.pathname === \"/api/time\"){\n    res.writeHead(200, { \"Content-Type\": \"application/json\" });\n    return res.end(JSON.stringify({ time: Date.now() }));\n  }\n  res.writeHead(404);\n  res.end(\"not found\");\n});"
+        },
+        "title": "Сервер с маршрутами и JSON",
+        "desc": "Чуть сложнее: разные ответы на разные адреса (роуты) и отдача JSON. По этому принципу сделаны /api/list и /api/add в Лаборатории.",
+        "src": {
+          "id": "server-routes",
+          "title": "Сервер с маршрутами и JSON",
+          "desc": "Чуть сложнее: разные ответы на разные адреса (роуты) и отдача JSON. По этому принципу сделаны /api/list и /api/add в Лаборатории.",
+          "code": "const сервер = http.createServer((req, res) => {\n  const url = new URL(req.url, \"http://localhost\");\n  if(url.pathname === \"/api/time\"){\n    res.writeHead(200, { \"Content-Type\": \"application/json\" });\n    return res.end(JSON.stringify({ time: Date.now() }));\n  }\n  res.writeHead(404);\n  res.end(\"not found\");\n});"
+        },
+        "x": 780,
+        "y": 570
+      },
+      {
+        "id": "pxm4ts",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "url",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 740
+      },
+      {
+        "id": "utzjbh",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "JSON-ответ",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 740
+      }
+    ],
+    "edges": [
+      {
+        "from": "ovcubk",
+        "to": "dvlmwf",
+        "kind": "imports",
+        "src": "— импортирует → «dayjs»"
+      },
+      {
+        "from": "gh2jn6",
+        "to": "5awzv5",
+        "kind": "uses",
+        "src": "— использует → «XLSX»"
+      },
+      {
+        "from": "gh2jn6",
+        "to": "8vdvgv",
+        "kind": "reads",
+        "src": "— читает → «данныеФайла»"
+      },
+      {
+        "from": "gh2jn6",
+        "to": "42zisu",
+        "kind": "returns",
+        "src": "— возвращает → «книга»"
+      },
+      {
+        "from": "gh2jn6",
+        "to": "jocmp4",
+        "kind": "returns",
+        "src": "— возвращает → «лист»"
+      },
+      {
+        "from": "gh2jn6",
+        "to": "o4h425",
+        "kind": "returns",
+        "src": "— возвращает → «строки»"
+      },
+      {
+        "from": "j5a9xh",
+        "to": "2atmno",
+        "kind": "imports",
+        "src": "— импортирует → экспортируемые значения другого модуля"
+      },
+      {
+        "from": "qvmpr1",
+        "to": "j5a9xh",
+        "kind": "uses",
+        "src": "— использует → «Файлы общаются: export / import»"
+      },
+      {
+        "from": "nedalo",
+        "to": "ppdb2p",
+        "kind": "uses",
+        "src": "— использует → «http»"
+      },
+      {
+        "from": "nedalo",
+        "to": "mlofx9",
+        "kind": "uses",
+        "src": "— использует → «req»"
+      },
+      {
+        "from": "nedalo",
+        "to": "ll5p65",
+        "kind": "creates",
+        "src": "— создаёт → «сервер»"
+      },
+      {
+        "from": "7b56ny",
+        "to": "ppdb2p",
+        "kind": "uses",
+        "src": "— использует → «http»"
+      },
+      {
+        "from": "7b56ny",
+        "to": "mlofx9",
+        "kind": "uses",
+        "src": "— использует → «req»"
+      },
+      {
+        "from": "7b56ny",
+        "to": "ll5p65",
+        "kind": "creates",
+        "src": "— создаёт → «сервер»"
+      },
+      {
+        "from": "7b56ny",
+        "to": "pxm4ts",
+        "kind": "data",
+        "src": "— передаёт данные → «url»"
+      },
+      {
+        "from": "7b56ny",
+        "to": "utzjbh",
+        "kind": "returns",
+        "src": "— возвращает → JSON-ответ [для маршрутов, которые формируют JSON]"
+      },
+      {
+        "from": "7b56ny",
+        "to": "nedalo",
+        "kind": "extends",
+        "src": "— расширяет → «Как запустить сервер (Node)» [если использует тот же базовый механизм создания HTTP-сервера и добавляет маршруты]"
+      },
+      {
+        "from": "nedalo",
+        "to": "7b56ny",
+        "kind": "alt",
+        "src": "— альтернатива → «Сервер с маршрутами и JSON» [только для простого сервера без дополнительных маршрутов; не полная взаимозаменяемость]"
+      }
+    ]
+  }
+}

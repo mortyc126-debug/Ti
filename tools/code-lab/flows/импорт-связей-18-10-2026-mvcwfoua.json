@@ -1,0 +1,542 @@
+{
+  "id": "импорт-связей-18-10-2026-mvcwfoua",
+  "name": "Импорт связей 18.10.2026",
+  "savedAt": 1792271936386,
+  "graph": {
+    "nodes": [
+      {
+        "id": "yxso97",
+        "blockId": "raw",
+        "fields": {
+          "code": "localStorage.setItem(\"record\", \"120\");\nconst record = localStorage.getItem(\"record\");\nconsole.log(record);"
+        },
+        "title": "localStorage.getItem — загрузить",
+        "desc": "getItem читает строковое значение по ключу. Если ключа нет, вернётся null.",
+        "src": {
+          "id": "localstorage-getitem-загрузить-mv6cusmx",
+          "title": "localStorage.getItem — загрузить",
+          "desc": "getItem читает строковое значение по ключу. Если ключа нет, вернётся null.",
+          "code": "localStorage.setItem(\"record\", \"120\");\nconst record = localStorage.getItem(\"record\");\nconsole.log(record);"
+        },
+        "x": 60,
+        "y": 60
+      },
+      {
+        "id": "t3cdt7",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "localStorage",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 60
+      },
+      {
+        "id": "cmw4wf",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "record",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 60
+      },
+      {
+        "id": "xjn1le",
+        "blockId": "raw",
+        "fields": {
+          "code": "localStorage.setItem(\"favoriteColor\", \"#FF006E\");\nconsole.log(\"Цвет сохранён\");"
+        },
+        "title": "localStorage.setItem — сохранить",
+        "desc": "localStorage хранит значения между перезагрузками страницы. Значения записываются как строки, поэтому объекты обычно сначала преобразуют через JSON.stringify.",
+        "src": {
+          "id": "localstorage-setitem-сохранить-mv6cusla",
+          "title": "localStorage.setItem — сохранить",
+          "desc": "localStorage хранит значения между перезагрузками страницы. Значения записываются как строки, поэтому объекты обычно сначала преобразуют через JSON.stringify.",
+          "code": "localStorage.setItem(\"favoriteColor\", \"#FF006E\");\nconsole.log(\"Цвет сохранён\");"
+        },
+        "x": 780,
+        "y": 60
+      },
+      {
+        "id": "pjpng4",
+        "blockId": "raw",
+        "fields": {
+          "code": "localStorage.setItem(\"temporaryColor\", \"#52F2C9\");\nlocalStorage.removeItem(\"temporaryColor\");\nconsole.log(localStorage.getItem(\"temporaryColor\"));"
+        },
+        "title": "localStorage.removeItem — удалить",
+        "desc": "removeItem удаляет одну запись по ключу. clear() удаляет все записи этого сайта, поэтому используйте его осторожно.",
+        "src": {
+          "id": "localstorage-removeitem-удалить-mv6cusm4",
+          "title": "localStorage.removeItem — удалить",
+          "desc": "removeItem удаляет одну запись по ключу. clear() удаляет все записи этого сайта, поэтому используйте его осторожно.",
+          "code": "localStorage.setItem(\"temporaryColor\", \"#52F2C9\");\nlocalStorage.removeItem(\"temporaryColor\");\nconsole.log(localStorage.getItem(\"temporaryColor\"));"
+        },
+        "x": 60,
+        "y": 230
+      },
+      {
+        "id": "tjxwyb",
+        "blockId": "raw",
+        "fields": {
+          "code": "const key = \"savedColors\";\nconst colors = JSON.parse(localStorage.getItem(key) || \"[]\");\n\ncolors.push(\"#FF006E\");\nlocalStorage.setItem(key, JSON.stringify(colors));\n\nconsole.log(colors.length);"
+        },
+        "title": "Сохранить и загрузить список",
+        "desc": "Типичный шаблон: безопасно прочитать JSON-массив из localStorage, добавить элемент и сохранить обновлённый массив.",
+        "src": {
+          "id": "сохранить-и-загрузить-список-mv6cuslp",
+          "title": "Сохранить и загрузить список",
+          "desc": "Типичный шаблон: безопасно прочитать JSON-массив из localStorage, добавить элемент и сохранить обновлённый массив.",
+          "code": "const key = \"savedColors\";\nconst colors = JSON.parse(localStorage.getItem(key) || \"[]\");\n\ncolors.push(\"#FF006E\");\nlocalStorage.setItem(key, JSON.stringify(colors));\n\nconsole.log(colors.length);"
+        },
+        "x": 300,
+        "y": 230
+      },
+      {
+        "id": "kc2lw3",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "key",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 230
+      },
+      {
+        "id": "2iset2",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "colors",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 230
+      },
+      {
+        "id": "hijw5b",
+        "blockId": "raw",
+        "fields": {
+          "code": "const storageKey = \"palette\";\nlet colors = JSON.parse(localStorage.getItem(storageKey) || \"[]\");\n\nfunction saveColors() {\n  localStorage.setItem(storageKey, JSON.stringify(colors));\n}\n\nfunction renderColors() {\n  const body = document.querySelector(\"#colors tbody\");\n  body.replaceChildren();\n\n  colors.forEach((color, index) => {\n    const row = document.createElement(\"tr\");\n    const cell = document.createElement(\"td\");\n    const remove = document.createElement(\"button\");\n\n    cell.textContent = color;\n    remove.textContent = \"Удалить\";\n    remove.addEventListener(\"click\", () => {\n      colors.splice(index, 1);\n      saveColors();\n      renderColors();\n    });\n\n    row.append(cell, remove);\n    body.append(row);\n  });\n}\n\nfunction addColor(color) {\n  colors.push(color);\n  saveColors();\n  renderColors();\n}"
+        },
+        "title": "Сохранить и удалить цвета в таблице",
+        "desc": "Храните цвета как массив объектов в localStorage. После добавления или удаления перерисуйте таблицу; пользовательский текст вставляйте через textContent.",
+        "src": {
+          "id": "сохранить-и-удалить-цвета-в-таблице-mv6cut6v",
+          "title": "Сохранить и удалить цвета в таблице",
+          "desc": "Храните цвета как массив объектов в localStorage. После добавления или удаления перерисуйте таблицу; пользовательский текст вставляйте через textContent.",
+          "code": "const storageKey = \"palette\";\nlet colors = JSON.parse(localStorage.getItem(storageKey) || \"[]\");\n\nfunction saveColors() {\n  localStorage.setItem(storageKey, JSON.stringify(colors));\n}\n\nfunction renderColors() {\n  const body = document.querySelector(\"#colors tbody\");\n  body.replaceChildren();\n\n  colors.forEach((color, index) => {\n    const row = document.createElement(\"tr\");\n    const cell = document.createElement(\"td\");\n    const remove = document.createElement(\"button\");\n\n    cell.textContent = color;\n    remove.textContent = \"Удалить\";\n    remove.addEventListener(\"click\", () => {\n      colors.splice(index, 1);\n      saveColors();\n      renderColors();\n    });\n\n    row.append(cell, remove);\n    body.append(row);\n  });\n}\n\nfunction addColor(color) {\n  colors.push(color);\n  saveColors();\n  renderColors();\n}"
+        },
+        "x": 60,
+        "y": 400
+      },
+      {
+        "id": "x9r5c2",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "saveColors",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 400
+      },
+      {
+        "id": "6lwqhr",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "renderColors",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 400
+      },
+      {
+        "id": "x63czk",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "addColor",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 400
+      },
+      {
+        "id": "uhcqcg",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "remove",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 570
+      },
+      {
+        "id": "92zjyv",
+        "blockId": "raw",
+        "fields": {
+          "code": "const key = \"bestScore\";\nconst best = Number(localStorage.getItem(key) || 0);\nconst score = 125;\n\nif (score > best) {\n  localStorage.setItem(key, String(score));\n}\n\nconsole.log(Math.max(best, score));"
+        },
+        "title": "Рекорд в localStorage",
+        "desc": "Загружайте сохранённый рекорд, сравнивайте с текущим счётом и сохраняйте только новый максимум.",
+        "src": {
+          "id": "рекорд-в-localstorage-mv6custk",
+          "title": "Рекорд в localStorage",
+          "desc": "Загружайте сохранённый рекорд, сравнивайте с текущим счётом и сохраняйте только новый максимум.",
+          "code": "const key = \"bestScore\";\nconst best = Number(localStorage.getItem(key) || 0);\nconst score = 125;\n\nif (score > best) {\n  localStorage.setItem(key, String(score));\n}\n\nconsole.log(Math.max(best, score));"
+        },
+        "x": 300,
+        "y": 570
+      },
+      {
+        "id": "uaxa98",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "score",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 570
+      },
+      {
+        "id": "kuzyp3",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "best",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 570
+      },
+      {
+        "id": "ucve3k",
+        "blockId": "raw",
+        "fields": {
+          "code": "const state = {\n  score: 0,\n  lives: 3,\n  running: true\n};\n\nstate.score += 10;\nconsole.log(state.score);\nconsole.log(state.lives);"
+        },
+        "title": "Состояние игры и счёт",
+        "desc": "Объект state собирает связанные данные игры в одном месте. Изменяйте его свойства по событиям и обновляйте отображение.",
+        "src": {
+          "id": "состояние-игры-и-счёт-mv6cust5",
+          "title": "Состояние игры и счёт",
+          "desc": "Объект state собирает связанные данные игры в одном месте. Изменяйте его свойства по событиям и обновляйте отображение.",
+          "code": "const state = {\n  score: 0,\n  lives: 3,\n  running: true\n};\n\nstate.score += 10;\nconsole.log(state.score);\nconsole.log(state.lives);"
+        },
+        "x": 60,
+        "y": 740
+      },
+      {
+        "id": "or9kzx",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "lives",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 740
+      },
+      {
+        "id": "vt4je8",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "running",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 740
+      },
+      {
+        "id": "8pypgf",
+        "blockId": "raw",
+        "fields": {
+          "code": "import { create } from \"zustand\";\n\nexport const useСчёт = create((set) => ({\n  значение: 0,\n  плюс: () => set((s) => ({ значение: s.значение + 1 })),\n}));\n\n// в компоненте:  const n = useСчёт(s => s.значение);"
+        },
+        "title": "zustand — общее состояние (в сайте)",
+        "desc": "Маленькая библиотека состояния для React. В проекте так хранятся ключевая ставка, настройки. create даёт хук, set меняет и перерисовывает.",
+        "src": {
+          "id": "libs-zustand",
+          "title": "zustand — общее состояние (в сайте)",
+          "desc": "Маленькая библиотека состояния для React. В проекте так хранятся ключевая ставка, настройки. create даёт хук, set меняет и перерисовывает.",
+          "code": "import { create } from \"zustand\";\n\nexport const useСчёт = create((set) => ({\n  значение: 0,\n  плюс: () => set((s) => ({ значение: s.значение + 1 })),\n}));\n\n// в компоненте:  const n = useСчёт(s => s.значение);"
+        },
+        "x": 780,
+        "y": 740
+      },
+      {
+        "id": "p5enel",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "useСчёт",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 910
+      },
+      {
+        "id": "u1uvxu",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "create",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 910
+      },
+      {
+        "id": "f30s33",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "общее состояние приложения через store",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 910
+      },
+      {
+        "id": "rjsnwv",
+        "blockId": "raw",
+        "fields": {
+          "code": "const score = 120;\nconst achievements = [\n  { title: \"Первый шаг\", unlocked: score >= 10 },\n  { title: \"Сотня очков\", unlocked: score >= 100 },\n  { title: \"Мастер\", unlocked: score >= 500 }\n];\n\nconst unlocked = achievements.filter(item => item.unlocked);\nconsole.log(unlocked.map(item => item.title));"
+        },
+        "title": "Достижения по условиям",
+        "desc": "Каждое достижение — объект с условием. Фильтрация выбирает те достижения, которые уже открыты при текущем состоянии.",
+        "src": {
+          "id": "достижения-по-условиям-mv6cusur",
+          "title": "Достижения по условиям",
+          "desc": "Каждое достижение — объект с условием. Фильтрация выбирает те достижения, которые уже открыты при текущем состоянии.",
+          "code": "const score = 120;\nconst achievements = [\n  { title: \"Первый шаг\", unlocked: score >= 10 },\n  { title: \"Сотня очков\", unlocked: score >= 100 },\n  { title: \"Мастер\", unlocked: score >= 500 }\n];\n\nconst unlocked = achievements.filter(item => item.unlocked);\nconsole.log(unlocked.map(item => item.title));"
+        },
+        "x": 780,
+        "y": 910
+      },
+      {
+        "id": "nyv7gj",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "условия достижения",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 1080
+      },
+      {
+        "id": "kbkvhf",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "achievements",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 1080
+      },
+      {
+        "id": "v4yhzf",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "unlocked",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 1080
+      }
+    ],
+    "edges": [
+      {
+        "from": "yxso97",
+        "to": "t3cdt7",
+        "kind": "reads",
+        "src": "— читает → localStorage"
+      },
+      {
+        "from": "yxso97",
+        "to": "cmw4wf",
+        "kind": "returns",
+        "src": "— возвращает → «record»"
+      },
+      {
+        "from": "xjn1le",
+        "to": "t3cdt7",
+        "kind": "mutates",
+        "src": "— меняет → localStorage"
+      },
+      {
+        "from": "pjpng4",
+        "to": "t3cdt7",
+        "kind": "mutates",
+        "src": "— меняет → localStorage"
+      },
+      {
+        "from": "tjxwyb",
+        "to": "yxso97",
+        "kind": "uses",
+        "src": "— использует → «localStorage.getItem — загрузить»"
+      },
+      {
+        "from": "tjxwyb",
+        "to": "xjn1le",
+        "kind": "uses",
+        "src": "— использует → «localStorage.setItem — сохранить»"
+      },
+      {
+        "from": "tjxwyb",
+        "to": "kc2lw3",
+        "kind": "reads",
+        "src": "— читает → «key»"
+      },
+      {
+        "from": "tjxwyb",
+        "to": "2iset2",
+        "kind": "mutates",
+        "src": "— меняет → «colors»"
+      },
+      {
+        "from": "hijw5b",
+        "to": "xjn1le",
+        "kind": "uses",
+        "src": "— использует → «localStorage.setItem — сохранить»"
+      },
+      {
+        "from": "hijw5b",
+        "to": "yxso97",
+        "kind": "uses",
+        "src": "— использует → «localStorage.getItem — загрузить»"
+      },
+      {
+        "from": "hijw5b",
+        "to": "pjpng4",
+        "kind": "uses",
+        "src": "— использует → «localStorage.removeItem — удалить»"
+      },
+      {
+        "from": "hijw5b",
+        "to": "2iset2",
+        "kind": "mutates",
+        "src": "— меняет → «colors»"
+      },
+      {
+        "from": "hijw5b",
+        "to": "x9r5c2",
+        "kind": "calls",
+        "src": "— вызывает → «saveColors»"
+      },
+      {
+        "from": "hijw5b",
+        "to": "6lwqhr",
+        "kind": "calls",
+        "src": "— вызывает → «renderColors»"
+      },
+      {
+        "from": "hijw5b",
+        "to": "x63czk",
+        "kind": "calls",
+        "src": "— вызывает → «addColor»"
+      },
+      {
+        "from": "hijw5b",
+        "to": "uhcqcg",
+        "kind": "calls",
+        "src": "— вызывает → «remove»"
+      },
+      {
+        "from": "92zjyv",
+        "to": "yxso97",
+        "kind": "uses",
+        "src": "— использует → «localStorage.getItem — загрузить»"
+      },
+      {
+        "from": "92zjyv",
+        "to": "xjn1le",
+        "kind": "uses",
+        "src": "— использует → «localStorage.setItem — сохранить»"
+      },
+      {
+        "from": "92zjyv",
+        "to": "uaxa98",
+        "kind": "reads",
+        "src": "— читает → «score»"
+      },
+      {
+        "from": "92zjyv",
+        "to": "kuzyp3",
+        "kind": "mutates",
+        "src": "— меняет → «best»"
+      },
+      {
+        "from": "ucve3k",
+        "to": "uaxa98",
+        "kind": "contains",
+        "src": "— содержит → «score»"
+      },
+      {
+        "from": "ucve3k",
+        "to": "or9kzx",
+        "kind": "contains",
+        "src": "— содержит → «lives»"
+      },
+      {
+        "from": "ucve3k",
+        "to": "vt4je8",
+        "kind": "contains",
+        "src": "— содержит → «running»"
+      },
+      {
+        "from": "8pypgf",
+        "to": "p5enel",
+        "kind": "creates",
+        "src": "— создаёт → «useСчёт»"
+      },
+      {
+        "from": "8pypgf",
+        "to": "u1uvxu",
+        "kind": "uses",
+        "src": "— использует → «create»"
+      },
+      {
+        "from": "8pypgf",
+        "to": "f30s33",
+        "kind": "mutates",
+        "src": "— меняет → общее состояние приложения через store"
+      },
+      {
+        "from": "rjsnwv",
+        "to": "uaxa98",
+        "kind": "reads",
+        "src": "— читает → «score»"
+      },
+      {
+        "from": "rjsnwv",
+        "to": "nyv7gj",
+        "kind": "validates",
+        "src": "— проверяет → условия достижения"
+      },
+      {
+        "from": "rjsnwv",
+        "to": "kbkvhf",
+        "kind": "mutates",
+        "src": "— меняет → «achievements»"
+      },
+      {
+        "from": "rjsnwv",
+        "to": "v4yhzf",
+        "kind": "mutates",
+        "src": "— меняет → «unlocked»"
+      }
+    ]
+  }
+}

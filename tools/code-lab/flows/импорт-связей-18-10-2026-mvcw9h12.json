@@ -1,0 +1,1027 @@
+{
+  "id": "импорт-связей-18-10-2026-mvcw9h12",
+  "name": "Импорт связей 18.10.2026",
+  "savedAt": 1792271646326,
+  "graph": {
+    "nodes": [
+      {
+        "id": "csz4yq",
+        "blockId": "raw",
+        "fields": {
+          "code": "const title = document.querySelector(\".page-title\");\n\nif (title) {\n  console.log(title.textContent);\n} else {\n  console.log(\"Заголовок не найден\");\n}"
+        },
+        "title": "querySelector — найти элемент",
+        "desc": "querySelector возвращает первый элемент, подходящий под CSS-селектор, или null, если совпадения нет.",
+        "src": {
+          "id": "queryselector-найти-элемент-mv6cut0y",
+          "title": "querySelector — найти элемент",
+          "desc": "querySelector возвращает первый элемент, подходящий под CSS-селектор, или null, если совпадения нет.",
+          "code": "const title = document.querySelector(\".page-title\");\n\nif (title) {\n  console.log(title.textContent);\n} else {\n  console.log(\"Заголовок не найден\");\n}"
+        },
+        "x": 60,
+        "y": 60
+      },
+      {
+        "id": "6tn1ef",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "найденный DOM-элемент",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 60
+      },
+      {
+        "id": "qqtlyp",
+        "blockId": "raw",
+        "fields": {
+          "code": "const card = document.querySelector(\".card\");\ncard.classList.add(\"selected\");\ncard.classList.toggle(\"highlight\");\nconsole.log(card.classList.contains(\"selected\"));"
+        },
+        "title": "classList — управлять классами",
+        "desc": "classList.add добавляет класс, remove удаляет, toggle переключает, contains проверяет наличие класса.",
+        "src": {
+          "id": "classlist-управлять-классами-mv6cut28",
+          "title": "classList — управлять классами",
+          "desc": "classList.add добавляет класс, remove удаляет, toggle переключает, contains проверяет наличие класса.",
+          "code": "const card = document.querySelector(\".card\");\ncard.classList.add(\"selected\");\ncard.classList.toggle(\"highlight\");\nconsole.log(card.classList.contains(\"selected\"));"
+        },
+        "x": 540,
+        "y": 60
+      },
+      {
+        "id": "cuol7r",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "классы DOM-элемента card",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 60
+      },
+      {
+        "id": "i4t3aq",
+        "blockId": "raw",
+        "fields": {
+          "code": "const list = document.querySelector(\"#list\");\nconst item = document.createElement(\"li\");\nitem.textContent = \"Новый пункт\";\nlist.append(item);"
+        },
+        "title": "createElement и append",
+        "desc": "createElement создаёт новый DOM-элемент, а append добавляет его внутрь выбранного контейнера. Контейнер должен существовать в HTML.",
+        "src": {
+          "id": "createelement-и-append-mv6cut1r",
+          "title": "createElement и append",
+          "desc": "createElement создаёт новый DOM-элемент, а append добавляет его внутрь выбранного контейнера. Контейнер должен существовать в HTML.",
+          "code": "const list = document.querySelector(\"#list\");\nconst item = document.createElement(\"li\");\nitem.textContent = \"Новый пункт\";\nlist.append(item);"
+        },
+        "x": 60,
+        "y": 230
+      },
+      {
+        "id": "nh1wbl",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "DOM-элемент item",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 230
+      },
+      {
+        "id": "hsflv7",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "DOM-структуру list",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 230
+      },
+      {
+        "id": "f3v6a0",
+        "blockId": "raw",
+        "fields": {
+          "code": "const colors = [\n  { name: \"Розовый\", hex: \"#FF006E\" },\n  { name: \"Мятный\", hex: \"#52F2C9\" }\n];\nconst table = document.querySelector(\"#colors\");\nconst body = table.querySelector(\"tbody\");\n\ncolors.forEach(color => {\n  const row = document.createElement(\"tr\");\n  const nameCell = document.createElement(\"td\");\n  const hexCell = document.createElement(\"td\");\n\n  nameCell.textContent = color.name;\n  hexCell.textContent = color.hex;\n  row.append(nameCell, hexCell);\n  body.append(row);\n});"
+        },
+        "title": "Построить таблицу из массива",
+        "desc": "Создавайте строки и ячейки через createElement, а текст задавайте через textContent. Это безопаснее, чем собирать HTML из пользовательских строк.",
+        "src": {
+          "id": "построить-таблицу-из-массива-mv6cuszm",
+          "title": "Построить таблицу из массива",
+          "desc": "Создавайте строки и ячейки через createElement, а текст задавайте через textContent. Это безопаснее, чем собирать HTML из пользовательских строк.",
+          "code": "const colors = [\n  { name: \"Розовый\", hex: \"#FF006E\" },\n  { name: \"Мятный\", hex: \"#52F2C9\" }\n];\nconst table = document.querySelector(\"#colors\");\nconst body = table.querySelector(\"tbody\");\n\ncolors.forEach(color => {\n  const row = document.createElement(\"tr\");\n  const nameCell = document.createElement(\"td\");\n  const hexCell = document.createElement(\"td\");\n\n  nameCell.textContent = color.name;\n  hexCell.textContent = color.hex;\n  row.append(nameCell, hexCell);\n  body.append(row);\n});"
+        },
+        "x": 780,
+        "y": 230
+      },
+      {
+        "id": "kglacg",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "table",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 400
+      },
+      {
+        "id": "s6yhdo",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "body",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 400
+      },
+      {
+        "id": "gjwzt9",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "row",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 400
+      },
+      {
+        "id": "qphbbm",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "nameCell",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 400
+      },
+      {
+        "id": "1ha42j",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "hexCell",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 570
+      },
+      {
+        "id": "sixyyn",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "name",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 570
+      },
+      {
+        "id": "xr3gew",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "hex",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 570
+      },
+      {
+        "id": "e9qk8n",
+        "blockId": "raw",
+        "fields": {
+          "code": "const box = document.querySelector(\"#message\");\nbox.textContent = \"<b>Привет</b>\";\nconsole.log(box.textContent);"
+        },
+        "title": "textContent и innerHTML",
+        "desc": "textContent вставляет текст безопасно, не интерпретируя его как HTML. innerHTML разбирает строку как HTML-разметку; не вставляйте туда недоверенные данные.",
+        "src": {
+          "id": "textcontent-и-innerhtml-mv6cusz6",
+          "title": "textContent и innerHTML",
+          "desc": "textContent вставляет текст безопасно, не интерпретируя его как HTML. innerHTML разбирает строку как HTML-разметку; не вставляйте туда недоверенные данные.",
+          "code": "const box = document.querySelector(\"#message\");\nbox.textContent = \"<b>Привет</b>\";\nconsole.log(box.textContent);"
+        },
+        "x": 780,
+        "y": 570
+      },
+      {
+        "id": "tsscx8",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "содержимое DOM-элемента box",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 740
+      },
+      {
+        "id": "v1kvdl",
+        "blockId": "raw",
+        "fields": {
+          "code": "const button = document.querySelector(\"#save\");\nbutton.setAttribute(\"aria-label\", \"Сохранить цвет\");\nbutton.setAttribute(\"data-state\", \"ready\");\nconsole.log(button.getAttribute(\"data-state\"));"
+        },
+        "title": "setAttribute — задать атрибут",
+        "desc": "setAttribute задаёт атрибут HTML-элемента, например title, aria-label или data-id.",
+        "src": {
+          "id": "setattribute-задать-атрибут-mv6cut0k",
+          "title": "setAttribute — задать атрибут",
+          "desc": "setAttribute задаёт атрибут HTML-элемента, например title, aria-label или data-id.",
+          "code": "const button = document.querySelector(\"#save\");\nbutton.setAttribute(\"aria-label\", \"Сохранить цвет\");\nbutton.setAttribute(\"data-state\", \"ready\");\nconsole.log(button.getAttribute(\"data-state\"));"
+        },
+        "x": 300,
+        "y": 740
+      },
+      {
+        "id": "1ds15g",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "атрибуты DOM-элемента button",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 740
+      },
+      {
+        "id": "37kvfk",
+        "blockId": "raw",
+        "fields": {
+          "code": "const field = document.querySelector(\"#nickname\");\nconst preview = document.querySelector(\"#preview\");\n\nfield.addEventListener(\"input\", () => {\n  preview.textContent = field.value;\n});"
+        },
+        "title": "input type=text — текстовое поле",
+        "desc": "Событие input позволяет реагировать на каждый ввод. Значение поля читается через value.",
+        "src": {
+          "id": "input-type-text-текстовое-поле-mv6cusv5",
+          "title": "input type=text — текстовое поле",
+          "desc": "Событие input позволяет реагировать на каждый ввод. Значение поля читается через value.",
+          "code": "const field = document.querySelector(\"#nickname\");\nconst preview = document.querySelector(\"#preview\");\n\nfield.addEventListener(\"input\", () => {\n  preview.textContent = field.value;\n});"
+        },
+        "x": 780,
+        "y": 740
+      },
+      {
+        "id": "4j6exc",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "field",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 910
+      },
+      {
+        "id": "lt5878",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "preview",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 910
+      },
+      {
+        "id": "90fz8s",
+        "blockId": "raw",
+        "fields": {
+          "code": "const field = document.querySelector(\"#amount\");\nconst output = document.querySelector(\"#amountOutput\");\n\nfield.addEventListener(\"input\", () => {\n  const amount = Number(field.value);\n  output.textContent = Number.isFinite(amount) ? amount * 2 : \"Введите число\";\n});"
+        },
+        "title": "input type=number — число",
+        "desc": "value у input всегда строка. Используйте Number(...) для преобразования и проверяйте, что результат конечный.",
+        "src": {
+          "id": "input-type-number-число-mv6cuswe",
+          "title": "input type=number — число",
+          "desc": "value у input всегда строка. Используйте Number(...) для преобразования и проверяйте, что результат конечный.",
+          "code": "const field = document.querySelector(\"#amount\");\nconst output = document.querySelector(\"#amountOutput\");\n\nfield.addEventListener(\"input\", () => {\n  const amount = Number(field.value);\n  output.textContent = Number.isFinite(amount) ? amount * 2 : \"Введите число\";\n});"
+        },
+        "x": 540,
+        "y": 910
+      },
+      {
+        "id": "hcx46u",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "amount",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 910
+      },
+      {
+        "id": "aebcaj",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "output",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 1080
+      },
+      {
+        "id": "5lypb0",
+        "blockId": "raw",
+        "fields": {
+          "code": "const slider = document.querySelector(\"#intensity\");\nconst valueLabel = document.querySelector(\"#intensityValue\");\n\nslider.addEventListener(\"input\", () => {\n  valueLabel.textContent = `${slider.value}%`;\n});"
+        },
+        "title": "input type=range — ползунок",
+        "desc": "Ползунок обычно отправляет input при перемещении. Его value — строка, которую можно преобразовать в число.",
+        "src": {
+          "id": "input-type-range-ползунок-mv6cusvy",
+          "title": "input type=range — ползунок",
+          "desc": "Ползунок обычно отправляет input при перемещении. Его value — строка, которую можно преобразовать в число.",
+          "code": "const slider = document.querySelector(\"#intensity\");\nconst valueLabel = document.querySelector(\"#intensityValue\");\n\nslider.addEventListener(\"input\", () => {\n  valueLabel.textContent = `${slider.value}%`;\n});"
+        },
+        "x": 300,
+        "y": 1080
+      },
+      {
+        "id": "p43seh",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "slider",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 1080
+      },
+      {
+        "id": "zqy5i3",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "valueLabel",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 1080
+      },
+      {
+        "id": "2a7e0v",
+        "blockId": "raw",
+        "fields": {
+          "code": "const picker = document.querySelector(\"#colorPicker\");\nconst swatch = document.querySelector(\"#swatch\");\n\npicker.addEventListener(\"input\", () => {\n  swatch.style.backgroundColor = picker.value;\n});"
+        },
+        "title": "input type=color — выбор цвета",
+        "desc": "Поле color отдаёт выбранный цвет в формате hex, например #ff006e. Значение можно применять к фону или хранить в массиве.",
+        "src": {
+          "id": "input-type-color-выбор-цвета-mv6cusws",
+          "title": "input type=color — выбор цвета",
+          "desc": "Поле color отдаёт выбранный цвет в формате hex, например #ff006e. Значение можно применять к фону или хранить в массиве.",
+          "code": "const picker = document.querySelector(\"#colorPicker\");\nconst swatch = document.querySelector(\"#swatch\");\n\npicker.addEventListener(\"input\", () => {\n  swatch.style.backgroundColor = picker.value;\n});"
+        },
+        "x": 60,
+        "y": 1250
+      },
+      {
+        "id": "a6bqml",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "picker",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 1250
+      },
+      {
+        "id": "emd3zq",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "swatch",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 1250
+      },
+      {
+        "id": "e5epiy",
+        "blockId": "raw",
+        "fields": {
+          "code": "const field = document.querySelector(\"#colorName\");\n\nfield.addEventListener(\"input\", event => {\n  console.log(\"Сейчас:\", event.target.value);\n});\n\nfield.addEventListener(\"change\", event => {\n  console.log(\"Подтверждено:\", event.target.value);\n});"
+        },
+        "title": "input и change — изменения поля",
+        "desc": "input срабатывает при каждом изменении значения, change — когда изменение подтверждено (например, после выбора или потери фокуса, в зависимости от типа поля).",
+        "src": {
+          "id": "input-и-change-изменения-поля-mv6cusyq",
+          "title": "input и change — изменения поля",
+          "desc": "input срабатывает при каждом изменении значения, change — когда изменение подтверждено (например, после выбора или потери фокуса, в зависимости от типа поля).",
+          "code": "const field = document.querySelector(\"#colorName\");\n\nfield.addEventListener(\"input\", event => {\n  console.log(\"Сейчас:\", event.target.value);\n});\n\nfield.addEventListener(\"change\", event => {\n  console.log(\"Подтверждено:\", event.target.value);\n});"
+        },
+        "x": 780,
+        "y": 1250
+      },
+      {
+        "id": "1yh9xt",
+        "blockId": "raw",
+        "fields": {
+          "code": "const кнопка = document.querySelector(\".btn\");\nкнопка.addEventListener(\"click\", () => {\n  кнопка.textContent = \"нажато!\";   // меняем элемент в ответ\n});\n\n// делегирование: один слушатель на список ловит клики по пунктам\nсписок.addEventListener(\"click\", (e) => {\n  if(e.target.matches(\"li\")) console.log(e.target.textContent);\n});"
+        },
+        "title": "Реакция на клики",
+        "desc": "Чтобы элемент отвечал на клик — вешают «слушатель» события. Функция внутри срабатывает при каждом клике. Делегирование — один слушатель на контейнер вместо многих.",
+        "src": {
+          "id": "js-click",
+          "title": "Реакция на клики",
+          "desc": "Чтобы элемент отвечал на клик — вешают «слушатель» события. Функция внутри срабатывает при каждом клике. Делегирование — один слушатель на контейнер вместо многих.",
+          "code": "const кнопка = document.querySelector(\".btn\");\nкнопка.addEventListener(\"click\", () => {\n  кнопка.textContent = \"нажато!\";   // меняем элемент в ответ\n});\n\n// делегирование: один слушатель на список ловит клики по пунктам\nсписок.addEventListener(\"click\", (e) => {\n  if(e.target.matches(\"li\")) console.log(e.target.textContent);\n});"
+        },
+        "x": 60,
+        "y": 1420
+      },
+      {
+        "id": "zmd79n",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "событие click кнопки",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 1420
+      },
+      {
+        "id": "cyke3i",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "обработчик клика",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 1420
+      },
+      {
+        "id": "e5uzb3",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "список",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 1420
+      },
+      {
+        "id": "jc5ub8",
+        "blockId": "raw",
+        "fields": {
+          "code": "// рисуем поле, кнопку и место для ответа\ndocument.querySelector(\"#out\").innerHTML =\n  '<input id=\"n\" value=\"10\" style=\"width:60px\"> ' +\n  '<button id=\"go\">+ удвоить</button> <span id=\"res\"></span>';\n\nlet всего = 0;   // состояние: копится между нажатиями\n\ndocument.querySelector(\"#go\").addEventListener(\"click\", () => {\n  const n = Number(document.querySelector(\"#n\").value); // вход: из поля\n  const удвоено = n * 2;                                 // расчёт\n  всего = всего + удвоено;                               // обновляем состояние\n  document.querySelector(\"#res\").textContent = \"итог: \" + всего; // вывод\n});"
+        },
+        "title": "Клик → расчёт → экран (+состояние)",
+        "desc": "Связь через СОБЫТИЕ. Нажал → читаем поле (вход) → считаем → обновляем экран. Переменная «всего» — состояние: живёт между кликами и копит результат.",
+        "src": {
+          "id": "flow-interactive",
+          "title": "Клик → расчёт → экран (+состояние)",
+          "desc": "Связь через СОБЫТИЕ. Нажал → читаем поле (вход) → считаем → обновляем экран. Переменная «всего» — состояние: живёт между кликами и копит результат.",
+          "code": "// рисуем поле, кнопку и место для ответа\ndocument.querySelector(\"#out\").innerHTML =\n  '<input id=\"n\" value=\"10\" style=\"width:60px\"> ' +\n  '<button id=\"go\">+ удвоить</button> <span id=\"res\"></span>';\n\nlet всего = 0;   // состояние: копится между нажатиями\n\ndocument.querySelector(\"#go\").addEventListener(\"click\", () => {\n  const n = Number(document.querySelector(\"#n\").value); // вход: из поля\n  const удвоено = n * 2;                                 // расчёт\n  всего = всего + удвоено;                               // обновляем состояние\n  document.querySelector(\"#res\").textContent = \"итог: \" + всего; // вывод\n});"
+        },
+        "x": 60,
+        "y": 1590
+      },
+      {
+        "id": "zhqebh",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "событие клика",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 1590
+      },
+      {
+        "id": "vxv6j0",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "состояние",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 1590
+      },
+      {
+        "id": "1ofcll",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "исходное значение в результат расчёта",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 1590
+      },
+      {
+        "id": "g22n8z",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "экран",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 1760
+      },
+      {
+        "id": "2rlwu6",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "всего",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 1760
+      },
+      {
+        "id": "xs5mvl",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "n",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 1760
+      },
+      {
+        "id": "jrda1a",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "удвоено",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 1760
+      },
+      {
+        "id": "jy4d95",
+        "blockId": "raw",
+        "fields": {
+          "code": "function containsPoint(x, y, rect) {\n  return x >= rect.x &&\n    x <= rect.x + rect.width &&\n    y >= rect.y &&\n    y <= rect.y + rect.height;\n}\n\nconst button = { x: 20, y: 30, width: 100, height: 40 };\nconsole.log(containsPoint(50, 45, button));"
+        },
+        "title": "Попадание точки в прямоугольник",
+        "desc": "Точка попадает в прямоугольник, если её координаты находятся между левой/правой и верхней/нижней границами.",
+        "src": {
+          "id": "попадание-точки-в-прямоугольник-mv6cussc",
+          "title": "Попадание точки в прямоугольник",
+          "desc": "Точка попадает в прямоугольник, если её координаты находятся между левой/правой и верхней/нижней границами.",
+          "code": "function containsPoint(x, y, rect) {\n  return x >= rect.x &&\n    x <= rect.x + rect.width &&\n    y >= rect.y &&\n    y <= rect.y + rect.height;\n}\n\nconst button = { x: 20, y: 30, width: 100, height: 40 };\nconsole.log(containsPoint(50, 45, button));"
+        },
+        "x": 60,
+        "y": 1930
+      },
+      {
+        "id": "1kr6xs",
+        "blockId": "raw",
+        "fields": {
+          "code": "const canvas = document.querySelector(\"#scene\");\n\ncanvas.addEventListener(\"mousemove\", event => {\n  const rect = canvas.getBoundingClientRect();\n  const x = (event.clientX - rect.left) * canvas.width / rect.width;\n  const y = (event.clientY - rect.top) * canvas.height / rect.height;\n  console.log(x.toFixed(0), y.toFixed(0));\n});"
+        },
+        "title": "Координаты мыши относительно Canvas",
+        "desc": "clientX/clientY относятся к окну браузера. Вычтите координаты и учтите масштаб canvas, чтобы получить координаты холста.",
+        "src": {
+          "id": "координаты-мыши-относительно-canvas-mv6cutax",
+          "title": "Координаты мыши относительно Canvas",
+          "desc": "clientX/clientY относятся к окну браузера. Вычтите координаты и учтите масштаб canvas, чтобы получить координаты холста.",
+          "code": "const canvas = document.querySelector(\"#scene\");\n\ncanvas.addEventListener(\"mousemove\", event => {\n  const rect = canvas.getBoundingClientRect();\n  const x = (event.clientX - rect.left) * canvas.width / rect.width;\n  const y = (event.clientY - rect.top) * canvas.height / rect.height;\n  console.log(x.toFixed(0), y.toFixed(0));\n});"
+        },
+        "x": 300,
+        "y": 1930
+      },
+      {
+        "id": "tzy4pr",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "попадание точки в область button",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 1930
+      },
+      {
+        "id": "ndyzfc",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "containsPoint",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 1930
+      },
+      {
+        "id": "fwz5hr",
+        "blockId": "raw",
+        "fields": {
+          "code": "function showLabel(x, y, message) {\n  const label = document.createElement(\"div\");\n  label.textContent = message;\n  label.style.position = \"fixed\";\n  label.style.left = `${x}px`;\n  label.style.top = `${y}px`;\n  label.classList.add(\"screen-label\");\n  document.body.append(label);\n}\n\nshowLabel(120, 80, \"Привет!\");"
+        },
+        "title": "Создать надпись в координатах экрана",
+        "desc": "Создайте элемент, задайте ему fixed-позиционирование и координаты в пикселях. Координаты clientX/clientY относятся к видимой области окна.",
+        "src": {
+          "id": "создать-надпись-в-координатах-экрана-mv6cut1c",
+          "title": "Создать надпись в координатах экрана",
+          "desc": "Создайте элемент, задайте ему fixed-позиционирование и координаты в пикселях. Координаты clientX/clientY относятся к видимой области окна.",
+          "code": "function showLabel(x, y, message) {\n  const label = document.createElement(\"div\");\n  label.textContent = message;\n  label.style.position = \"fixed\";\n  label.style.left = `${x}px`;\n  label.style.top = `${y}px`;\n  label.classList.add(\"screen-label\");\n  document.body.append(label);\n}\n\nshowLabel(120, 80, \"Привет!\");"
+        },
+        "x": 60,
+        "y": 2100
+      },
+      {
+        "id": "bw8vil",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "label",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 2100
+      },
+      {
+        "id": "pyyiax",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "showLabel",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 2100
+      },
+      {
+        "id": "2opsl8",
+        "blockId": "raw",
+        "fields": {
+          "code": "const label = document.querySelector(\"#label\");\nlabel.style.position = \"absolute\";\nlabel.style.left = \"120px\";\nlabel.style.top = \"80px\";\nlabel.textContent = \"Привет в точке (120, 80)\";"
+        },
+        "title": "style.left и style.top — позиция",
+        "desc": "Для абсолютного позиционирования задайте элементу position: absolute или fixed. Значения координат CSS задаются строками с единицами, например px.",
+        "src": {
+          "id": "style-left-и-style-top-позиция-mv6cut07",
+          "title": "style.left и style.top — позиция",
+          "desc": "Для абсолютного позиционирования задайте элементу position: absolute или fixed. Значения координат CSS задаются строками с единицами, например px.",
+          "code": "const label = document.querySelector(\"#label\");\nlabel.style.position = \"absolute\";\nlabel.style.left = \"120px\";\nlabel.style.top = \"80px\";\nlabel.textContent = \"Привет в точке (120, 80)\";"
+        },
+        "x": 780,
+        "y": 2100
+      },
+      {
+        "id": "53y14z",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "координаты позиционирования DOM-элемента label",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 2270
+      },
+      {
+        "id": "rc1ary",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "координаты события мыши",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 2270
+      },
+      {
+        "id": "uvfnks",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "границы canvas",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 2270
+      },
+      {
+        "id": "it0osf",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "x",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 2270
+      },
+      {
+        "id": "utkwkm",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "y",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 2440
+      },
+      {
+        "id": "z3ifdg",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "rect",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 2440
+      }
+    ],
+    "edges": [
+      {
+        "from": "csz4yq",
+        "to": "6tn1ef",
+        "kind": "returns",
+        "src": "— возвращает → найденный DOM-элемент"
+      },
+      {
+        "from": "qqtlyp",
+        "to": "cuol7r",
+        "kind": "mutates",
+        "src": "— меняет → классы DOM-элемента card"
+      },
+      {
+        "from": "i4t3aq",
+        "to": "nh1wbl",
+        "kind": "creates",
+        "src": "— создаёт → DOM-элемент item"
+      },
+      {
+        "from": "i4t3aq",
+        "to": "hsflv7",
+        "kind": "mutates",
+        "src": "— меняет → DOM-структуру list"
+      },
+      {
+        "from": "f3v6a0",
+        "to": "kglacg",
+        "kind": "creates",
+        "src": "— создаёт → «table»"
+      },
+      {
+        "from": "f3v6a0",
+        "to": "s6yhdo",
+        "kind": "creates",
+        "src": "— создаёт → «body»"
+      },
+      {
+        "from": "f3v6a0",
+        "to": "gjwzt9",
+        "kind": "creates",
+        "src": "— создаёт → «row»"
+      },
+      {
+        "from": "f3v6a0",
+        "to": "qphbbm",
+        "kind": "creates",
+        "src": "— создаёт → «nameCell»"
+      },
+      {
+        "from": "f3v6a0",
+        "to": "1ha42j",
+        "kind": "creates",
+        "src": "— создаёт → «hexCell»"
+      },
+      {
+        "from": "f3v6a0",
+        "to": "sixyyn",
+        "kind": "reads",
+        "src": "— читает → «name»"
+      },
+      {
+        "from": "f3v6a0",
+        "to": "xr3gew",
+        "kind": "reads",
+        "src": "— читает → «hex»"
+      },
+      {
+        "from": "f3v6a0",
+        "to": "i4t3aq",
+        "kind": "uses",
+        "src": "— использует → «createElement и append» [если элементы таблицы создаются и добавляются этими операциями]"
+      },
+      {
+        "from": "f3v6a0",
+        "to": "e9qk8n",
+        "kind": "uses",
+        "src": "— использует → «textContent и innerHTML» [если содержимое ячеек устанавливается этими способами]"
+      },
+      {
+        "from": "e9qk8n",
+        "to": "tsscx8",
+        "kind": "mutates",
+        "src": "— меняет → содержимое DOM-элемента box"
+      },
+      {
+        "from": "v1kvdl",
+        "to": "1ds15g",
+        "kind": "mutates",
+        "src": "— меняет → атрибуты DOM-элемента button"
+      },
+      {
+        "from": "37kvfk",
+        "to": "4j6exc",
+        "kind": "creates",
+        "src": "— создаёт → «field»"
+      },
+      {
+        "from": "37kvfk",
+        "to": "lt5878",
+        "kind": "mutates",
+        "src": "— меняет → «preview» [если текст поля отображается в preview]"
+      },
+      {
+        "from": "90fz8s",
+        "to": "4j6exc",
+        "kind": "creates",
+        "src": "— создаёт → «field»"
+      },
+      {
+        "from": "90fz8s",
+        "to": "hcx46u",
+        "kind": "mutates",
+        "src": "— меняет → «amount»"
+      },
+      {
+        "from": "90fz8s",
+        "to": "aebcaj",
+        "kind": "data",
+        "src": "— передаёт данные → «output»"
+      },
+      {
+        "from": "5lypb0",
+        "to": "p43seh",
+        "kind": "creates",
+        "src": "— создаёт → «slider»"
+      },
+      {
+        "from": "5lypb0",
+        "to": "zqy5i3",
+        "kind": "mutates",
+        "src": "— меняет → «valueLabel»"
+      },
+      {
+        "from": "2a7e0v",
+        "to": "a6bqml",
+        "kind": "creates",
+        "src": "— создаёт → «picker»"
+      },
+      {
+        "from": "2a7e0v",
+        "to": "emd3zq",
+        "kind": "mutates",
+        "src": "— меняет → «swatch»"
+      },
+      {
+        "from": "e5epiy",
+        "to": "4j6exc",
+        "kind": "listens",
+        "src": "— слушает → событие change поля «field»"
+      },
+      {
+        "from": "1yh9xt",
+        "to": "zmd79n",
+        "kind": "listens",
+        "src": "— слушает → событие click кнопки"
+      },
+      {
+        "from": "1yh9xt",
+        "to": "cyke3i",
+        "kind": "calls",
+        "src": "— вызывает → обработчик клика"
+      },
+      {
+        "from": "1yh9xt",
+        "to": "e5uzb3",
+        "kind": "reads",
+        "src": "— читает → «список» [если обработчик использует список, указанный в требованиях рецепта]"
+      },
+      {
+        "from": "jc5ub8",
+        "to": "zhqebh",
+        "kind": "listens",
+        "src": "— слушает → событие клика"
+      },
+      {
+        "from": "jc5ub8",
+        "to": "vxv6j0",
+        "kind": "mutates",
+        "src": "— меняет → состояние"
+      },
+      {
+        "from": "jc5ub8",
+        "to": "1ofcll",
+        "kind": "transforms",
+        "src": "— преобразует → исходное значение в результат расчёта"
+      },
+      {
+        "from": "jc5ub8",
+        "to": "g22n8z",
+        "kind": "data",
+        "src": "— передаёт данные → экран"
+      },
+      {
+        "from": "jc5ub8",
+        "to": "2rlwu6",
+        "kind": "returns",
+        "src": "— возвращает → «всего»"
+      },
+      {
+        "from": "jc5ub8",
+        "to": "xs5mvl",
+        "kind": "returns",
+        "src": "— возвращает → «n»"
+      },
+      {
+        "from": "jc5ub8",
+        "to": "jrda1a",
+        "kind": "returns",
+        "src": "— возвращает → «удвоено»"
+      },
+      {
+        "from": "jy4d95",
+        "to": "1kr6xs",
+        "kind": "uses",
+        "src": "— использует → «Координаты мыши относительно Canvas» [если передаются координаты x и y в той же системе координат]"
+      },
+      {
+        "from": "jy4d95",
+        "to": "tzy4pr",
+        "kind": "validates",
+        "src": "— проверяет → попадание точки в область button"
+      },
+      {
+        "from": "jy4d95",
+        "to": "ndyzfc",
+        "kind": "returns",
+        "src": "— возвращает → «containsPoint»"
+      },
+      {
+        "from": "fwz5hr",
+        "to": "bw8vil",
+        "kind": "creates",
+        "src": "— создаёт → «label»"
+      },
+      {
+        "from": "fwz5hr",
+        "to": "pyyiax",
+        "kind": "calls",
+        "src": "— вызывает → «showLabel»"
+      },
+      {
+        "from": "2opsl8",
+        "to": "53y14z",
+        "kind": "mutates",
+        "src": "— меняет → координаты позиционирования DOM-элемента label"
+      },
+      {
+        "from": "1kr6xs",
+        "to": "rc1ary",
+        "kind": "reads",
+        "src": "— читает → координаты события мыши"
+      },
+      {
+        "from": "1kr6xs",
+        "to": "uvfnks",
+        "kind": "reads",
+        "src": "— читает → границы canvas"
+      },
+      {
+        "from": "1kr6xs",
+        "to": "it0osf",
+        "kind": "returns",
+        "src": "— возвращает → «x»"
+      },
+      {
+        "from": "1kr6xs",
+        "to": "utkwkm",
+        "kind": "returns",
+        "src": "— возвращает → «y»"
+      },
+      {
+        "from": "1kr6xs",
+        "to": "z3ifdg",
+        "kind": "returns",
+        "src": "— возвращает → «rect»"
+      }
+    ]
+  }
+}
