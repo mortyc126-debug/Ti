@@ -128,11 +128,18 @@ async function addFromCatalog(t){
   try {
     const tpl = await fetch('/api/template?id=' + encodeURIComponent(t.id)).then(r => r.json());
     const code = (tpl.lines || []).map(line => (line || []).map(k => k.v != null ? k.v : '').join('')).join('\n');
-    // запоминаем, из какого шаблона узел — чтобы правки можно было вернуть в сам шаблон
-    addNode('raw', { fields: { code }, title: t.title, desc: tpl.desc || '', src: { id: t.id, title: t.title, desc: tpl.desc || '', code } });
+    // запоминаем, из какого шаблона узел + когда взято описание (для авто-сведения по дате)
+    addNode('raw', { fields: { code }, title: t.title, desc: tpl.desc || '', descAt: tpl.descAt || 0, src: { id: t.id, title: t.title, desc: tpl.desc || '', code } });
   } catch(_){}
 }
 $('#palSearch').oninput = renderPalette;
+// «свести описания» — авто-сведение по дате, массово по всем узлам из каталога
+(function(){ const btn = $('#reconcile'); if(!btn) return; btn.onclick = async () => {
+  btn.disabled = true; const o = btn.textContent; btn.textContent = 'свожу…';
+  const r = await reconcileByDate();
+  btn.textContent = r.groupsN ? ('✓ узлов ' + r.nodeChanges + ' · шаблонов ' + r.tplChanges) : 'нечего сводить';
+  setTimeout(() => { btn.textContent = o; btn.disabled = false; }, 2000);
+}; })();
 
 function makeNode(blockId, extra){
   const b = BLOCKS[blockId]; const fields = {}; (b.fields || []).forEach(f => fields[f.k] = f.def);
@@ -373,17 +380,17 @@ function descEditor(nd, b){
     const up = el('button', 'btn', '↑ записать моё в шаблон'); up.type = 'button';
     up.onclick = async () => {
       up.textContent = 'сохраняю…'; up.disabled = true;
-      const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: nd.src.id, desc: here }) }).then(r => r.json()).catch(() => ({}));
+      const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: nd.src.id, desc: here, descAt: nd.descAt || Date.now() }) }).then(r => r.json()).catch(() => ({}));
       if(r && r.ok){ nd.src.desc = here; persist(); await loadCatalog(); drawSync(); } else { up.textContent = 'не вышло, ещё раз'; up.disabled = false; }
     };
     const down = el('button', 'btn', '↓ взять из каталога'); down.type = 'button';
-    down.onclick = () => { ta.value = there; nd.desc = there; nd.src.desc = there; persist(); draw(); drawSync(); };
+    down.onclick = () => { const t = (CATALOG || []).find(x => x.id === nd.src.id); ta.value = there; nd.desc = there; nd.descAt = (t && t.descAt) || 0; nd.src.desc = there; persist(); draw(); drawSync(); };
     row.append(up, down); sync.appendChild(row);
   };
-  ta.addEventListener('input', () => { nd.desc = ta.value; persist(); draw(); drawSync(); });
+  ta.addEventListener('input', () => { nd.desc = ta.value; nd.descAt = Date.now(); persist(); draw(); drawSync(); });
   box.appendChild(ta);
   const tools = el('div', 'desc-tools');
-  const chip = el('button', 'btn', '⟨⟩ код в плашку'); chip.type = 'button'; chip.onclick = () => { wrapBackticks(ta); nd.desc = ta.value; persist(); draw(); drawSync(); };
+  const chip = el('button', 'btn', '⟨⟩ код в плашку'); chip.type = 'button'; chip.onclick = () => { wrapBackticks(ta); nd.desc = ta.value; nd.descAt = Date.now(); persist(); draw(); drawSync(); };
   tools.appendChild(chip); tools.appendChild(el('span', 'desc-hint', '`код` — плашка, блок — в тройных ```'));
   box.appendChild(tools);
   box.appendChild(el('div', 'desc-prev-h', 'как выглядит'));
@@ -391,6 +398,31 @@ function descEditor(nd, b){
   box.appendChild(sync);
   draw(); drawSync();
   return box;
+}
+// авто-сведение описаний по дате: для каждого шаблона берём самое свежее описание
+// (среди самого шаблона и всех его узлов на холсте) и раскатываем на всех
+async function reconcileByDate(){
+  const groups = {};
+  graph.nodes.forEach(nd => { if(nd.src && nd.src.id) (groups[nd.src.id] = groups[nd.src.id] || []).push(nd); });
+  let nodeChanges = 0, tplChanges = 0, groupsN = 0;
+  for(const id of Object.keys(groups)){
+    const t = (CATALOG || []).find(x => x.id === id); if(!t) continue;
+    groupsN++;
+    const nodes = groups[id];
+    // кандидаты: шаблон + каждый узел; у каждого — описание и его дата
+    const cand = [{ desc: t.desc || '', at: t.descAt || 0, tpl: true }];
+    nodes.forEach(nd => cand.push({ desc: nd.desc || '', at: nd.descAt || 0 }));
+    let win = cand[0];
+    cand.forEach(c => { if(c.at > win.at) win = c; });   // самое новое; при равенстве остаётся шаблон
+    if(cand.every(c => c.desc === win.desc)) continue;   // уже всё одинаковое
+    nodes.forEach(nd => { if((nd.desc || '') !== win.desc){ nd.desc = win.desc; nodeChanges++; } nd.descAt = win.at; nd.src.desc = win.desc; });
+    if((t.desc || '') !== win.desc){
+      await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id, desc: win.desc, descAt: win.at }) }).then(r => r.json()).catch(() => ({}));
+      tplChanges++;
+    }
+  }
+  persist(); await loadCatalog(); renderInspector();
+  return { groupsN, nodeChanges, tplChanges };
 }
 // редактор заголовка узла (в «Настроить»); описание — во вкладке «Разобраться»
 function nodeMetaEditor(nd, titleEl){

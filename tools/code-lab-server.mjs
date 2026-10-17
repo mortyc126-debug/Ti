@@ -110,7 +110,7 @@ async function listTemplates(){
     try {
       const j = JSON.parse(await fs.readFile(path.join(TEMPLATES, n), 'utf8'));
       const nlines = Array.isArray(j.lines) ? j.lines.filter(l => (l || []).some(k => (k.v || '').trim())).length : 0;
-      const row = { id: j.id || n.replace(/\.json$/, ''), lang: j.lang || '', group: j.group || 'Разное', title: j.title || n, desc: j.desc || '', file: n, nlines };
+      const row = { id: j.id || n.replace(/\.json$/, ''), lang: j.lang || '', group: j.group || 'Разное', title: j.title || n, desc: j.desc || '', descAt: j.descAt || 0, file: n, nlines };
       // краткая сводка компонента — чтобы каталог показывал тип/контракт/теги без лишних запросов
       if(j.component){
         const c = j.component;
@@ -146,6 +146,7 @@ const server = http.createServer(async (req, res) => {
         desc: String(b.desc || '').slice(0, 400),
         lines: tokenize(b.code || '', lang),
         output: b.output != null ? String(b.output) : '',
+        descAt: Date.now(),   // когда описание задано/изменено — для авто-сведения по дате
       };
       if(b.component && typeof b.component === 'object') obj.component = b.component;   // метаданные компонента (теги осей, подкатегория, контракт)
       await fs.mkdir(TEMPLATES, { recursive: true });
@@ -177,7 +178,7 @@ const server = http.createServer(async (req, res) => {
       if(b.lang != null) j.lang = String(b.lang).toLowerCase();
       if(b.title != null) j.title = String(b.title).slice(0, 80) || j.title;
       if(b.group != null) j.group = String(b.group).slice(0, 60) || j.group;
-      if(b.desc != null) j.desc = String(b.desc).slice(0, 400);
+      if(b.desc != null){ const nv = String(b.desc).slice(0, 400); if(nv !== (j.desc || '')) j.descAt = (b.descAt && Number(b.descAt)) || Date.now(); j.desc = nv; }
       if(b.output != null) j.output = String(b.output);
       if(b.code != null) j.lines = tokenize(b.code, j.lang);   // код заново раскрашивается
       // свои разделы (классификация пользователя) и заметки к словам — хранятся на компоненте
