@@ -4,3 +4,37 @@ __pycache__/
 .claude/
 data/
 tools/code-lab/data/
+
+# архивы и бэкапы
+*.rar
+*.zip
+
+# логи
+*.log
+
+# Cloudflare Wrangler (кэш/состояние, не код)
+.wrangler/
+**/.wrangler/
+
+# invest-bot: сгенерированные данные и кэши (не исходники)
+invest-bot/out/
+invest-bot/*.csv
+invest-bot/data/**/*.csv
+invest-bot/futures_cache.json
+invest-bot/oi_tickers.json
+invest-bot/method_params.json
+invest-bot/backtest_*.txt
+invest-bot/scores_stdout.txt
+pead.txt
+dashboard.log
+
+# web/public: кэши и сгенерированные бандлы
+web/public/*cache*.json
+web/public/reports-cache/
+web/public/bonds-cache.json
+web/public/futures-cache.json
+web/public/issuer-names.json
+web/public/macro-cache.json
+web/public/news-cache.json
+web/public/reports-bundle.json
+web/public/stocks-cache.json
