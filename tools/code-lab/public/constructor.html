@@ -50,6 +50,9 @@
   .c-toolbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
   .c-toolbar .btn:disabled{opacity:.35;cursor:default}
   #undo,#redo{font-size:15px;line-height:1;padding:6px 10px}
+  .zoom-grp{display:inline-flex;gap:2px;align-items:center}
+  .zoom-grp .btn{padding:6px 9px}
+  #zoomLbl{font-size:11px;min-width:34px;display:inline-block;text-align:center}
   .canvas-scroll{flex:1;min-height:0;overflow:auto;border:1px solid var(--border);border-radius:12px;background:
       radial-gradient(circle, rgba(124,108,160,.10) 1px, transparent 1px) 0 0/22px 22px, var(--bg)}
   .canvas{position:relative;width:2400px;height:1600px}
@@ -192,6 +195,11 @@
         <span style="font-size:11px;color:var(--str);border:1px solid rgba(82,242,201,.5);border-radius:6px;padding:2px 7px">граф v3</span>
         <button class="btn" id="undo" title="отменить (Ctrl+Z)" disabled>↶</button>
         <button class="btn" id="redo" title="повторить (Ctrl+Y)" disabled>↷</button>
+        <span class="zoom-grp">
+          <button class="btn" id="zoomOut" title="мельче (Ctrl+колесо)">−</button>
+          <button class="btn" id="zoomReset" title="100%"><span id="zoomLbl">100%</span></button>
+          <button class="btn" id="zoomIn" title="крупнее">+</button>
+        </span>
         <span style="flex:1"></span>
         <button class="btn" id="example">пример</button>
         <button class="btn" id="clear">× очистить</button>

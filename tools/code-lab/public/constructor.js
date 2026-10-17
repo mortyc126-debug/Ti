@@ -263,6 +263,14 @@ function restore(){
     if(s && Array.isArray(s.nodes)) graph = { nodes: s.nodes, edges: Array.isArray(s.edges) ? s.edges : [] };
   } catch(_){}
 }
+// масштаб холста (только уменьшение — чтобы увидеть больше узлов; скролл полотна остаётся рабочим)
+let zoom = 1;
+function setZoom(z){
+  zoom = Math.max(0.4, Math.min(1, Math.round(z * 20) / 20));
+  canvas.style.transformOrigin = '0 0';
+  canvas.style.transform = 'scale(' + zoom + ')';
+  const lbl = document.getElementById('zoomLbl'); if(lbl) lbl.textContent = Math.round(zoom * 100) + '%';
+}
 const byId = id => graph.nodes.find(n => n.id === id);
 function nodeLabel(nd){ const b = BLOCKS[nd.blockId]; return nd.title || (b.labelFn ? b.labelFn(nd.fields) : b.label); }
 function nodeCode(nd){ const b = BLOCKS[nd.blockId]; const c = b.code(nd.fields); return b.type === 'container' ? (c.open + '\n' + c.close) : String(c); }
@@ -406,7 +414,7 @@ function headDrag(head, el, nd){
     const mv = ev => {
       const dx = ev.clientX - sx, dy = ev.clientY - sy;
       if(!moved && Math.abs(dx) + Math.abs(dy) > 3) moved = true;
-      if(moved){ nd.x = Math.max(0, ox + dx); nd.y = Math.max(0, oy + dy); el.style.left = nd.x + 'px'; el.style.top = nd.y + 'px'; drawEdges(); }
+      if(moved){ nd.x = Math.max(0, ox + dx / zoom); nd.y = Math.max(0, oy + dy / zoom); el.style.left = nd.x + 'px'; el.style.top = nd.y + 'px'; drawEdges(); }
     };
     const up = ev => {
       head.releasePointerCapture(e.pointerId);
@@ -427,7 +435,7 @@ function portConnect(pout, nd){
     const cr = () => canvas.getBoundingClientRect();
     const start = portXY(nd.id, 'out');
     const mv = ev => {
-      const r = cr(); const x2 = ev.clientX - r.left, y2 = ev.clientY - r.top;
+      const r = cr(); const x2 = (ev.clientX - r.left) / zoom, y2 = (ev.clientY - r.top) / zoom;
       tmp.setAttribute('d', bez(start.x, start.y, x2, y2));
       const hot = document.elementFromPoint(ev.clientX, ev.clientY);
       document.querySelectorAll('.port.in.hot').forEach(p => p.classList.remove('hot'));
@@ -1240,6 +1248,30 @@ renderCanvas();
 renderInspector();
 renderCode();
 histInit();
+
+// Зум: кнопки − / % / + и Ctrl+колесо; панорама — средней кнопкой мыши или с зажатым пробелом
+setZoom(1);
+if($('#zoomOut')) $('#zoomOut').onclick = () => setZoom(zoom - 0.1);
+if($('#zoomIn')) $('#zoomIn').onclick = () => setZoom(zoom + 0.1);
+if($('#zoomReset')) $('#zoomReset').onclick = () => setZoom(1);
+const scroll = $('.canvas-scroll');
+if(scroll){
+  scroll.addEventListener('wheel', e => { if(!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); setZoom(zoom - Math.sign(e.deltaY) * 0.1); }, { passive: false });
+  // панорама: средняя кнопка, либо пробел+тащить по пустому месту
+  let panning = null, space = false;
+  document.addEventListener('keydown', e => { if(e.code === 'Space' && !/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||'')) space = true; });
+  document.addEventListener('keyup', e => { if(e.code === 'Space') space = false; });
+  scroll.addEventListener('pointerdown', e => {
+    const onNode = e.target.closest && e.target.closest('.gnode');
+    if(e.button === 1 || (space && !onNode)){
+      e.preventDefault(); panning = { x: e.clientX, y: e.clientY, l: scroll.scrollLeft, t: scroll.scrollTop };
+      scroll.setPointerCapture(e.pointerId); scroll.style.cursor = 'grabbing';
+    }
+  });
+  scroll.addEventListener('pointermove', e => { if(!panning) return; scroll.scrollLeft = panning.l - (e.clientX - panning.x); scroll.scrollTop = panning.t - (e.clientY - panning.y); });
+  const endPan = () => { panning = null; scroll.style.cursor = ''; };
+  scroll.addEventListener('pointerup', endPan); scroll.addEventListener('pointercancel', endPan);
+}
 
 // Undo/Redo: кнопки на тулбаре + Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z
 if($('#undo')) $('#undo').onclick = undo;
