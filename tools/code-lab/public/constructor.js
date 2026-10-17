@@ -242,7 +242,22 @@ const uid = () => Math.random().toString(36).slice(2, 8);
 const $ = s => document.querySelector(s);
 const canvas = $('#canvas'), edgesSvg = $('#edges'), codeEl = $('#code'), preview = $('#preview');
 
-function persist(){ try { localStorage.setItem(LS, JSON.stringify(graph)); } catch(_){} }
+function persistRaw(){ try { localStorage.setItem(LS, JSON.stringify(graph)); } catch(_){} }
+// История для отмены/повтора. Быстрые правки (печать) схлопываются в один шаг.
+let histPast = [], histFuture = [], histLast = null, histTimer = null;
+function histInit(){ histLast = JSON.stringify(graph); updateUndoButtons(); }
+function histCommit(){
+  const cur = JSON.stringify(graph);
+  if(cur === histLast) return;
+  histPast.push(histLast); if(histPast.length > 120) histPast.shift();
+  histFuture = []; histLast = cur; updateUndoButtons();
+}
+function persist(){ persistRaw(); clearTimeout(histTimer); histTimer = setTimeout(histCommit, 350); }
+function histFlush(){ clearTimeout(histTimer); histCommit(); }
+function applySnap(s){ try { const g = JSON.parse(s); graph = { nodes: g.nodes || [], edges: Array.isArray(g.edges) ? g.edges : [] }; selectedId = null; renderCanvas(); renderInspector(); renderCode(); persistRaw(); } catch(_){} }
+function undo(){ histFlush(); if(!histPast.length) return; histFuture.push(histLast); const s = histPast.pop(); histLast = s; applySnap(s); updateUndoButtons(); }
+function redo(){ histFlush(); if(!histFuture.length) return; histPast.push(histLast); const s = histFuture.pop(); histLast = s; applySnap(s); updateUndoButtons(); }
+function updateUndoButtons(){ const u = $('#undo'), r = $('#redo'); if(u) u.disabled = !histPast.length; if(r) r.disabled = !histFuture.length; }
 function restore(){
   try { const s = JSON.parse(localStorage.getItem(LS) || 'null');
     if(s && Array.isArray(s.nodes)) graph = { nodes: s.nodes, edges: Array.isArray(s.edges) ? s.edges : [] };
@@ -1209,6 +1224,18 @@ loadCatalog();
 renderCanvas();
 renderInspector();
 renderCode();
+histInit();
+
+// Undo/Redo: кнопки на тулбаре + Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z
+if($('#undo')) $('#undo').onclick = undo;
+if($('#redo')) $('#redo').onclick = redo;
+document.addEventListener('keydown', e => {
+  if(!(e.ctrlKey || e.metaKey)) return;
+  const ae = document.activeElement; if(ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName)) return;  // в полях — родная отмена
+  const k = e.key.toLowerCase();
+  if(k === 'z' && !e.shiftKey){ e.preventDefault(); undo(); }
+  else if((k === 'z' && e.shiftKey) || k === 'y'){ e.preventDefault(); redo(); }
+});
 
 // перетягиваемые границы колонок (палитра | холст | инспектор); размеры запоминаются
 (function(){
