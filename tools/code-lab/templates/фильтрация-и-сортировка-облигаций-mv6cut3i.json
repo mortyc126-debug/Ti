@@ -739,6 +739,15 @@
       "code_review": "not_verified",
       "tests": "not_run",
       "compatibility": "not_verified"
-    }
+    },
+    "provides": [
+      "bonds",
+      "shortlist"
+    ],
+    "requires": [
+      "name",
+      "years",
+      "a"
+    ]
   }
 }

@@ -786,6 +786,17 @@
       "code_review": "not_verified",
       "tests": "not_run",
       "compatibility": "not_verified"
-    }
+    },
+    "provides": [
+      "q",
+      "main",
+      "поиск",
+      "secid",
+      "инфо"
+    ],
+    "requires": [
+      "a",
+      "b"
+    ]
   }
 }

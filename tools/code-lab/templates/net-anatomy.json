@@ -690,6 +690,17 @@
       "code_review": "not_verified",
       "tests": "not_run",
       "compatibility": "not_verified"
-    }
+    },
+    "provides": [
+      "база",
+      "путь",
+      "параметры",
+      "url",
+      "запрос",
+      "r"
+    ],
+    "requires": [
+      "q"
+    ]
   }
 }

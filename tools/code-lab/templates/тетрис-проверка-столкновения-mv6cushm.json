@@ -803,6 +803,15 @@
       "code_review": "not_verified",
       "tests": "not_run",
       "compatibility": "not_verified"
-    }
+    },
+    "provides": [
+      "canPlace",
+      "inside",
+      "board"
+    ],
+    "requires": [
+      "x",
+      "length"
+    ]
   }
 }

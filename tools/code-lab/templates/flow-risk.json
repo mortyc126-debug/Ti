@@ -1185,6 +1185,20 @@
       "code_review": "not_verified",
       "tests": "not_run",
       "compatibility": "not_verified"
-    }
+    },
+    "provides": [
+      "цены",
+      "доходности",
+      "out",
+      "i",
+      "волатильность",
+      "среднее",
+      "дисп",
+      "дох",
+      "риск"
+    ],
+    "requires": [
+      "a"
+    ]
   }
 }

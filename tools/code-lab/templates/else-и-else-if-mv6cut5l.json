@@ -362,6 +362,10 @@
       "code_review": "not_verified",
       "tests": "not_run",
       "compatibility": "not_verified"
-    }
+    },
+    "provides": [
+      "temperature"
+    ],
+    "requires": []
   }
 }

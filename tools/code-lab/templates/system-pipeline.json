@@ -634,6 +634,18 @@
       "code_review": "not_verified",
       "tests": "not_run",
       "compatibility": "not_verified"
-    }
+    },
+    "provides": [
+      "система",
+      "сырое",
+      "чистое",
+      "метрики"
+    ],
+    "requires": [
+      "загрузить",
+      "разобрать",
+      "посчитать",
+      "показать"
+    ]
   }
 }

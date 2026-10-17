@@ -208,7 +208,13 @@ function card(t){
     + '<span class="tg">'+esc((t._techs[0]||''))+'</span>'
     + (warn?'<span class="tg warnflag">⚠ риск</span>':'')
     + '</div>';
-  a.innerHTML = top + '<div class="cdesc"></div>' + io + tags + '<div class="ccols"></div>'
+  const prov = (t.comp && t.comp.provides) || [], req = (t.comp && t.comp.requires) || [];
+  const contract = (prov.length || req.length)
+    ? '<div class="ccontract">'
+      + (prov.length ? '<span class="cc-give">даёт: ' + esc(prov.slice(0,4).join(', ')) + (prov.length>4?'…':'') + '</span>' : '')
+      + (req.length ? '<span class="cc-need">нужно: ' + esc(req.slice(0,4).join(', ')) + (req.length>4?'…':'') + '</span>' : '')
+      + '</div>' : '';
+  a.innerHTML = top + '<div class="cdesc"></div>' + io + contract + tags + '<div class="ccols"></div>'
     + '<div class="cact"><span class="cbtn" data-x="use">Открыть</span><span class="cbtn" data-x="ctor">→ в конструктор</span>'
     + '<span class="cbtn" data-x="col" title="в мой раздел">🏷</span><span class="cbtn" data-x="desc" title="описание">📝</span><span class="cbtn" data-x="ren" title="переименовать">✎</span><span class="cbtn del" data-x="del" title="удалить">🗑</span></div>';
   a.querySelector('.ctitle').textContent = t.title || t.id;

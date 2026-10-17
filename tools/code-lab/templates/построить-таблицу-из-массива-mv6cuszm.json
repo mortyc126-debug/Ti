@@ -843,6 +843,18 @@
       "tests": "not_run",
       "compatibility": "not_verified"
     },
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "provides": [
+      "colors",
+      "table",
+      "body",
+      "row",
+      "nameCell",
+      "hexCell"
+    ],
+    "requires": [
+      "name",
+      "hex"
+    ]
   }
 }

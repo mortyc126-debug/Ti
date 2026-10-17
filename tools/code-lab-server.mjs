@@ -98,6 +98,32 @@ function tokenizeLine(line, lang){
 }
 function tokenize(code, lang){ return String(code).replace(/\r\n/g, '\n').split('\n').map(l => tokenizeLine(l, lang)); }
 
+// контракт куска: что он ОБЪЯВЛЯЕТ наружу (provides) и какие имена БЕРЁТ со стороны (requires)
+const _GLOBALS = new Set(['console','document','window','globalThis','Math','JSON','Array','Object','Number','String','Boolean','Date','Map','Set','Promise','RegExp','Error','Symbol','fetch','setTimeout','setInterval','clearTimeout','clearInterval','requestAnimationFrame','parseInt','parseFloat','isNaN','isFinite','localStorage','sessionStorage','URL','URLSearchParams','true','false','null','undefined','NaN','Infinity']);
+const _KWSET = new Set(['const','let','var','function','return','if','else','for','while','of','in','new','await','async','class','extends','super','try','catch','finally','throw','typeof','instanceof','this','break','continue','switch','case','do','yield','delete','void','import','export','from','default','static','get','set']);
+function codeContract(code){
+  const txt = String(code || '').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1 ').replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, ' ');
+  const ID = '[A-Za-zА-Яа-яЁё_$][\\wА-Яа-яЁё$]*';
+  const provides = new Set();          // что кусок объявляет наружу
+  for(const m of txt.matchAll(new RegExp('(?:const|let|var|function|class)\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
+  // локальные имена, которые НЕ являются внешней зависимостью: объявления + параметры + счётчики циклов
+  const local = new Set(provides);
+  const addParams = s => String(s || '').split(',').forEach(p => { const m = p.trim().match(new RegExp('^(' + ID + ')')); if(m) local.add(m[1]); });
+  for(const m of txt.matchAll(new RegExp('function\\s*' + ID + '?\\s*\\(([^)]*)\\)', 'g'))) addParams(m[1]);   // function f(a,b)
+  for(const m of txt.matchAll(/\(([^)]*)\)\s*=>/g)) addParams(m[1]);                                            // (a,b)=>
+  for(const m of txt.matchAll(new RegExp('(' + ID + ')\\s*=>', 'g'))) local.add(m[1]);                          // x =>
+  for(const m of txt.matchAll(new RegExp('catch\\s*\\(\\s*(' + ID + ')', 'g'))) local.add(m[1]);                // catch(e)
+  for(const m of txt.matchAll(new RegExp('for\\s*\\(\\s*(?:const|let|var)?\\s*(' + ID + ')', 'g'))) local.add(m[1]);
+  const requires = new Set();
+  for(const m of txt.matchAll(new RegExp('(' + ID + ')', 'g'))){
+    const w = m[1]; const i = m.index || 0;
+    if(i > 0 && txt[i - 1] === '.') continue;           // свойство после точки — не внешняя зависимость
+    if(_KWSET.has(w) || _GLOBALS.has(w) || local.has(w)) continue;
+    requires.add(w);
+  }
+  return { provides: [...provides].slice(0, 40), requires: [...requires].slice(0, 40) };
+}
+
 function slug(s){
   const base = String(s || 'tpl').toLowerCase().replace(/[^\wа-яё]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'tpl';
   return base + '-' + Date.now().toString(36);
@@ -115,7 +141,7 @@ async function listTemplates(){
       // краткая сводка компонента — чтобы каталог показывал тип/контракт/теги без лишних запросов
       if(j.component){
         const c = j.component;
-        row.comp = { type: c.type || '', tags: c.tags || {}, subcat: c.subcat || '', collections: Array.isArray(c.collections) ? c.collections : [], input: (c.summary && c.summary.input) || '', output: (c.summary && c.summary.output) || '' };
+        row.comp = { type: c.type || '', tags: c.tags || {}, subcat: c.subcat || '', collections: Array.isArray(c.collections) ? c.collections : [], input: (c.summary && c.summary.input) || '', output: (c.summary && c.summary.output) || '', provides: Array.isArray(c.provides) ? c.provides : [], requires: Array.isArray(c.requires) ? c.requires : [] };
       }
       out.push(row);
     } catch(_){}
@@ -150,6 +176,7 @@ const server = http.createServer(async (req, res) => {
         descAt: Date.now(),   // когда описание задано/изменено — для авто-сведения по дате
       };
       if(b.component && typeof b.component === 'object') obj.component = b.component;   // метаданные компонента (теги осей, подкатегория, контракт)
+      if(lang === 'js'){ const c = codeContract(b.code || ''); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
       await fs.mkdir(TEMPLATES, { recursive: true });
       await fs.writeFile(path.join(TEMPLATES, obj.id + '.json'), JSON.stringify(obj, null, 2), 'utf8');
       return json(res, 200, { id: obj.id });
@@ -181,7 +208,7 @@ const server = http.createServer(async (req, res) => {
       if(b.group != null) j.group = String(b.group).slice(0, 60) || j.group;
       if(b.desc != null){ const nv = String(b.desc).slice(0, 400); if(nv !== (j.desc || '')) j.descAt = (b.descAt && Number(b.descAt)) || Date.now(); j.desc = nv; }
       if(b.output != null) j.output = String(b.output);
-      if(b.code != null) j.lines = tokenize(b.code, j.lang);   // код заново раскрашивается
+      if(b.code != null){ j.lines = tokenize(b.code, j.lang); if((j.lang || 'js') === 'js'){ const c = codeContract(b.code); j.component = j.component || {}; j.component.provides = c.provides; j.component.requires = c.requires; } }   // код заново раскрашивается + пересчёт контракта
       // свои разделы (классификация пользователя) и заметки к словам — хранятся на компоненте
       if(Array.isArray(b.collections)){ j.component = j.component || {}; j.component.collections = b.collections.map(x => String(x).slice(0, 60)).slice(0, 30); }
       if(b.notes && typeof b.notes === 'object'){ j.component = j.component || {}; j.component.notes = b.notes; }

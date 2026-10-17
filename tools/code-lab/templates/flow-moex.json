@@ -1358,6 +1358,22 @@
       "code_review": "not_verified",
       "tests": "not_run",
       "compatibility": "not_verified"
-    }
+    },
+    "provides": [
+      "main",
+      "url",
+      "ответ",
+      "данные",
+      "имена",
+      "список",
+      "таблица",
+      "строки"
+    ],
+    "requires": [
+      "secid",
+      "доходность",
+      "имя",
+      "a"
+    ]
   }
 }

@@ -467,6 +467,13 @@
       "code_review": "not_verified",
       "tests": "not_run",
       "compatibility": "not_verified"
-    }
+    },
+    "provides": [
+      "сервер"
+    ],
+    "requires": [
+      "http",
+      "req"
+    ]
   }
 }

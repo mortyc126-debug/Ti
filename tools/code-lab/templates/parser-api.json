@@ -690,6 +690,16 @@
       "code_review": "not_verified",
       "tests": "not_run",
       "compatibility": "not_verified"
-    }
+    },
+    "provides": [
+      "разбор",
+      "col",
+      "iД",
+      "iY"
+    ],
+    "requires": [
+      "дата",
+      "доходность"
+    ]
   }
 }

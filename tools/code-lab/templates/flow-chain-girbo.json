@@ -2396,6 +2396,33 @@
       "code_review": "not_verified",
       "tests": "not_run",
       "compatibility": "not_verified"
-    }
+    },
+    "provides": [
+      "ПРОКСИ",
+      "черезПрокси",
+      "гирбо",
+      "q",
+      "поИмениИНН",
+      "j",
+      "кол",
+      "стр",
+      "отчётность",
+      "найдено",
+      "orgs",
+      "org",
+      "bfo",
+      "список",
+      "годы",
+      "main",
+      "ИНН",
+      "r"
+    ],
+    "requires": [
+      "encodeURIComponent",
+      "headers",
+      "Accept",
+      "a",
+      "orgId"
+    ]
   }
 }
