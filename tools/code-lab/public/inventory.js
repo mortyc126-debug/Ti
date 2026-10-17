@@ -14,15 +14,33 @@ const need = t => (t.comp && t.comp.requires) || [];
 function pieceRows(list){
   return list.map(t => {
     const g = give(t), n = need(t);
-    return '<tr>'
+    return '<tr data-id="' + esc(t.id) + '">'
       + '<td class="t-title"><a href="/component.html?id=' + encodeURIComponent(t.id) + '">' + esc(t.title || t.id) + '</a><div class="t-id">' + esc(t.id) + '</div></td>'
       + '<td>' + esc((t.lang || '').toUpperCase()) + '</td>'
       + '<td>' + esc(t.group || '') + '</td>'
-      + '<td class="give">' + (g.length ? esc(g.join(', ')) : '<span class="muted">—</span>') + '</td>'
-      + '<td class="need">' + (n.length ? esc(n.join(', ')) : '<span class="muted">—</span>') + '</td>'
+      + '<td class="give edit-cell" data-field="provides" title="клик — изменить">' + (g.length ? esc(g.join(', ')) : '<span class="muted">+ отметить</span>') + '</td>'
+      + '<td class="need edit-cell" data-field="requires" title="клик — изменить">' + (n.length ? esc(n.join(', ')) : '<span class="muted">+ отметить</span>') + '</td>'
       + '</tr>';
   }).join('');
 }
+// инлайн-редактирование ячеек «даёт/нужно»
+document.getElementById('prows').addEventListener('click', e => {
+  const cell = e.target.closest && e.target.closest('.edit-cell'); if(!cell) return;
+  if(cell.querySelector('input')) return;
+  const id = cell.parentElement.dataset.id, field = cell.dataset.field;
+  const t = PIECES.find(x => x.id === id); if(!t) return;
+  const cur = (field === 'provides' ? give(t) : need(t)).join(', ');
+  cell.innerHTML = '<input class="inv-cell-in" value="' + esc(cur) + '" placeholder="имена через запятую">';
+  const inp = cell.querySelector('input'); inp.focus(); inp.select();
+  const save = async () => {
+    const vals = inp.value.split(',').map(s => s.trim()).filter(Boolean);
+    const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id, [field]: vals }) }).then(r => r.json()).catch(() => ({}));
+    if(r && r.ok){ t.comp = t.comp || {}; t.comp[field] = vals; }
+    renderPieces();
+  };
+  inp.addEventListener('blur', save, { once: true });
+  inp.addEventListener('keydown', ev => { if(ev.key === 'Enter'){ ev.preventDefault(); inp.blur(); } if(ev.key === 'Escape'){ inp.removeEventListener('blur', save); renderPieces(); } });
+});
 function filteredPieces(){
   const q = (document.getElementById('pq').value || '').toLowerCase().trim();
   if(!q) return PIECES;

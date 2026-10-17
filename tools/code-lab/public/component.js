@@ -38,6 +38,9 @@ function render(t){
   const desc = el('div', 'cdesc'); desc.innerHTML = descFmt(t.desc || (c && c.description) || ''); head.appendChild(desc);
   root.appendChild(head);
 
+  // ── связи: что кусок даёт и что ему нужно (редактируется, влияет на авто-разводку) ──
+  root.appendChild(contractEditor(t));
+
   // ── L2: контракт + необходимое ──
   if(c && c.summary){
     const brief = el('div', 'brief');
@@ -283,6 +286,32 @@ function noteOutside(e){ const p = document.getElementById('_notepop'); if(p && 
 function closeNotePop(){ const p = document.getElementById('_notepop'); if(p) p.remove(); document.removeEventListener('mousedown', noteOutside); }
 async function saveNotes(){ await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: ID, notes: NOTES, lineNotes: LNOTES }) }).catch(() => {}); }
 
+// редактор контракта «даёт/нужно» — имена-связи, сохраняются на компоненте
+function contractEditor(t){
+  const c = t.component || {};
+  const box = el('div', 'contract-ed');
+  box.appendChild(el('div', 'ce-h', 'Связи этого куска'));
+  box.appendChild(el('div', 'ce-hint', 'Имена, которые кусок выдаёт («даёт») и которые берёт со стороны («нужно»). По ним конструктор авто-соединяет куски. Меняется вручную, сохраняется.'));
+  const mkRow = (label, field, cls) => {
+    const row = el('div', 'ce-row');
+    row.appendChild(el('span', 'ce-lbl ' + cls, label));
+    const inp = document.createElement('input'); inp.className = 'ce-in'; inp.value = (c[field] || []).join(', '); inp.placeholder = 'имена через запятую';
+    const save = async () => {
+      const vals = inp.value.split(',').map(s => s.trim()).filter(Boolean);
+      inp.disabled = true;
+      const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: t.id, [field]: vals }) }).then(r => r.json()).catch(() => ({}));
+      inp.disabled = false;
+      c[field] = vals; flashDot(row, r && r.ok);
+    };
+    inp.addEventListener('change', save);
+    inp.addEventListener('keydown', e => { if(e.key === 'Enter') inp.blur(); });
+    row.appendChild(inp); return row;
+  };
+  box.appendChild(mkRow('даёт', 'provides', 'give'));
+  box.appendChild(mkRow('нужно', 'requires', 'need'));
+  return box;
+}
+function flashDot(row, ok){ let d = row.querySelector('.ce-ok'); if(!d){ d = el('span', 'ce-ok'); row.appendChild(d); } d.textContent = ok ? '✓' : '✕'; d.style.color = ok ? 'var(--str)' : '#FF6B6B'; setTimeout(() => { if(d) d.textContent = ''; }, 1200); }
 function badge(cls, text){ return el('span', 'b ' + cls, text); }
 function btn(text, extra){ const b = document.createElement('button'); b.className = 'btn' + (extra ? ' ' + extra : ''); b.textContent = text; return b; }
 function flash(b, t){ const o = b.textContent; b.textContent = t; setTimeout(() => b.textContent = o, 1100); }

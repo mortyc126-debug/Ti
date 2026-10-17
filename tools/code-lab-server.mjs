@@ -208,7 +208,12 @@ const server = http.createServer(async (req, res) => {
       if(b.group != null) j.group = String(b.group).slice(0, 60) || j.group;
       if(b.desc != null){ const nv = String(b.desc).slice(0, 400); if(nv !== (j.desc || '')) j.descAt = (b.descAt && Number(b.descAt)) || Date.now(); j.desc = nv; }
       if(b.output != null) j.output = String(b.output);
-      if(b.code != null){ j.lines = tokenize(b.code, j.lang); if((j.lang || 'js') === 'js'){ const c = codeContract(b.code); j.component = j.component || {}; j.component.provides = c.provides; j.component.requires = c.requires; } }   // код заново раскрашивается + пересчёт контракта
+      const _names = a => (Array.isArray(a) ? a : String(a || '').split(',')).map(x => String(x).trim()).filter(Boolean).slice(0, 40);
+      // ручная правка контракта «нужно/даёт» — фиксируется и больше не перетирается авторазбором кода
+      if(b.provides !== undefined){ j.component = j.component || {}; j.component.provides = _names(b.provides); j.component.contractLocked = true; }
+      if(b.requires !== undefined){ j.component = j.component || {}; j.component.requires = _names(b.requires); j.component.contractLocked = true; }
+      if(b.code != null){ j.lines = tokenize(b.code, j.lang);   // код заново раскрашивается
+        if((j.lang || 'js') === 'js' && !(j.component && j.component.contractLocked)){ const c = codeContract(b.code); j.component = j.component || {}; j.component.provides = c.provides; j.component.requires = c.requires; } }
       // свои разделы (классификация пользователя) и заметки к словам — хранятся на компоненте
       if(Array.isArray(b.collections)){ j.component = j.component || {}; j.component.collections = b.collections.map(x => String(x).slice(0, 60)).slice(0, 30); }
       if(b.notes && typeof b.notes === 'object'){ j.component = j.component || {}; j.component.notes = b.notes; }
