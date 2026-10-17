@@ -702,3 +702,36 @@ loadCatalog();
 renderCanvas();
 renderInspector();
 renderCode();
+
+// перетягиваемые границы колонок (палитра | холст | инспектор); размеры запоминаются
+(function(){
+  const gw = document.querySelector('.gwrap'); if(!gw) return;
+  let PW = 230, IW = 300;
+  try { PW = +localStorage.getItem('codelab_pw') || 230; IW = +localStorage.getItem('codelab_iw') || 300; } catch(_){}
+  const apply = () => { gw.style.setProperty('--pw', PW + 'px'); gw.style.setProperty('--iw', IW + 'px'); };
+  apply();
+  const mkGutter = which => {
+    const g = document.createElement('div'); g.className = 'gutter'; g.title = 'потяни, чтобы изменить ширину';
+    g.addEventListener('pointerdown', e => {
+      e.preventDefault(); g.classList.add('drag');
+      const sx = e.clientX, sPW = PW, sIW = IW;
+      const mv = ev => {
+        const dx = ev.clientX - sx;
+        if(which === 'left') PW = Math.max(150, Math.min(520, sPW + dx));
+        else IW = Math.max(200, Math.min(680, sIW - dx));
+        apply();
+      };
+      const up = () => {
+        g.classList.remove('drag');
+        document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up);
+        try { localStorage.setItem('codelab_pw', PW); localStorage.setItem('codelab_iw', IW); } catch(_){}
+        if(typeof drawEdges === 'function') drawEdges();
+      };
+      document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
+    });
+    return g;
+  };
+  const pal = gw.querySelector('.palette'), insp = gw.querySelector('.g-insp');
+  if(pal) gw.insertBefore(mkGutter('left'), pal.nextSibling);
+  if(insp) gw.insertBefore(mkGutter('right'), insp);
+})();

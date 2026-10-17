@@ -6,8 +6,12 @@
 <title>Конструктор кода</title>
 <link rel="stylesheet" href="/style.css">
 <style>
-  .gwrap{display:grid;grid-template-columns:230px 1fr 300px;gap:12px;padding:12px 14px;height:calc(100vh - 2px)}
-  @media(max-width:1000px){.gwrap{grid-template-columns:200px 1fr}.g-insp{display:none}}
+  .gwrap{display:grid;grid-template-columns:var(--pw,230px) 10px 1fr 10px var(--iw,300px);gap:0;padding:12px 14px;height:calc(100vh - 2px)}
+  @media(max-width:1000px){.gwrap{grid-template-columns:200px 1fr;gap:12px}.gutter,.g-insp{display:none}}
+  /* перетягиваемые границы между колонками */
+  .gutter{align-self:stretch;cursor:col-resize;display:flex;align-items:center;justify-content:center;touch-action:none}
+  .gutter:after{content:'';width:3px;height:36px;border-radius:3px;background:var(--border);transition:background .12s,height .12s}
+  .gutter:hover:after,.gutter.drag:after{background:var(--acc);height:60px}
 
   /* палитра слева — компоненты по категориям */
   .palette{background:var(--bg2);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;min-height:0}
