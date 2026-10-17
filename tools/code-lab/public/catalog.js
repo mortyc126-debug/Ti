@@ -323,6 +323,15 @@ function openAddForm(){
 }
 document.getElementById('addComp').onclick = openAddForm;
 
+// сворачивание левой колонки с разделами (состояние запоминается)
+(function(){
+  const cat = document.getElementById('cat'), btn = document.getElementById('sideToggle');
+  let off = false; try { off = localStorage.getItem('codelab_cat_side') === 'off'; } catch(_){}
+  const apply = () => { cat.classList.toggle('side-off', off); if(btn) btn.title = off ? 'показать разделы' : 'свернуть разделы'; };
+  apply();
+  if(btn) btn.onclick = () => { off = !off; try { localStorage.setItem('codelab_cat_side', off ? 'off' : 'on'); } catch(_){} apply(); };
+})();
+
 // ── своя классификация: переключатель оси + разделы ──────────────────────────
 document.getElementById('axisToggle').querySelectorAll('button').forEach(b => {
   b.onclick = () => {
