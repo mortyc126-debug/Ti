@@ -177,7 +177,7 @@ aside#info{border-left:1px solid var(--border);padding:16px;overflow:auto;positi
 
 /* ─────────────── единая оболочка (боковое меню + контент) ─────────────── */
 .app{display:grid;grid-template-columns:230px 1fr;min-height:100vh;transition:grid-template-columns .15s}
-.app.side-off{grid-template-columns:0 1fr}
+.app.side-off{grid-template-columns:1fr}
 .app.side-off .side{display:none}
 .side-collapse{margin-left:auto;font-size:14px;line-height:1;color:var(--text3);background:var(--s2);border:1px solid var(--border);border-radius:7px;padding:4px 8px;cursor:pointer}
 .side-collapse:hover{color:var(--acc);border-color:rgba(255,0,110,.4)}
