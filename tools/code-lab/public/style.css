@@ -176,7 +176,14 @@ aside#info{border-left:1px solid var(--border);padding:16px;overflow:auto;positi
 .info-hint{margin-top:14px;font-size:11.5px;color:var(--text3);border-top:1px solid var(--border);padding-top:10px}
 
 /* ─────────────── единая оболочка (боковое меню + контент) ─────────────── */
-.app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+.app{display:grid;grid-template-columns:230px 1fr;min-height:100vh;transition:grid-template-columns .15s}
+.app.side-off{grid-template-columns:0 1fr}
+.app.side-off .side{display:none}
+.side-collapse{margin-left:auto;font-size:14px;line-height:1;color:var(--text3);background:var(--s2);border:1px solid var(--border);border-radius:7px;padding:4px 8px;cursor:pointer}
+.side-collapse:hover{color:var(--acc);border-color:rgba(255,0,110,.4)}
+.side-reopen{display:none;position:fixed;top:12px;left:12px;z-index:50;font-size:16px;line-height:1;color:var(--text);background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:8px 11px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+.side-reopen:hover{color:var(--acc);border-color:rgba(255,0,110,.4)}
+.app.side-off .side-reopen{display:block}
 .app-main{min-width:0;display:flex;flex-direction:column}
 .app-main > header{background:transparent;border-bottom:1px solid var(--border)}
 .side{background:var(--bg2);border-right:1px solid var(--border);padding:14px 12px;display:flex;flex-direction:column;gap:3px;position:sticky;top:0;height:100vh;overflow:auto}

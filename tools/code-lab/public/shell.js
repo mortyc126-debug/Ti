@@ -25,7 +25,10 @@
   if(cur !== 'learn'){ const t = main.querySelector('header .tabs'); if(t) t.remove(); }
 
   const side = document.createElement('aside'); side.className = 'side';
-  side.innerHTML = '<div class="brand"><span class="logo"></span><span>Лаборатория</span></div>';
+  const brand = document.createElement('div'); brand.className = 'brand';
+  brand.innerHTML = '<span class="logo"></span><span class="brand-t">Лаборатория</span>';
+  const collapse = document.createElement('button'); collapse.className = 'side-collapse'; collapse.textContent = '⟨'; collapse.title = 'свернуть меню';
+  brand.appendChild(collapse); side.appendChild(brand);
   PAGES.forEach(p => {
     const a = document.createElement('a'); a.className = 'nav-i' + (p.key === cur ? ' on' : ''); a.href = p.href;
     a.textContent = p.label;
@@ -38,5 +41,18 @@
 
   const app = document.createElement('div'); app.className = 'app';
   app.appendChild(side); app.appendChild(main);
+
+  // кнопка-открывашка, видна когда меню свёрнуто
+  const reopen = document.createElement('button'); reopen.className = 'side-reopen'; reopen.textContent = '☰'; reopen.title = 'показать меню';
+  app.appendChild(reopen);
+
   document.body.insertBefore(app, document.body.firstChild);
+
+  // сворачивание меню, состояние запоминается на всех страницах
+  let off = false; try { off = localStorage.getItem('codelab_shell_side') === 'off'; } catch(_){}
+  const apply = () => app.classList.toggle('side-off', off);
+  apply();
+  const toggle = v => { off = v; try { localStorage.setItem('codelab_shell_side', off ? 'off' : 'on'); } catch(_){} apply(); };
+  collapse.onclick = e => { e.preventDefault(); toggle(true); };
+  reopen.onclick = e => { e.preventDefault(); toggle(false); };
 })();
