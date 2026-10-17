@@ -139,14 +139,31 @@ document.getElementById('fcopy').onclick = e => copy(flowsAsText(), e.target);
 const el2 = (tag, cls, html) => { const e = document.createElement(tag); if(cls) e.className = cls; if(html != null) e.innerHTML = html; return e; };
 function split2(s, sep){ const i = s.indexOf(sep); return [s.slice(0, i), s.slice(i + sep.length)]; }
 function resolveName(nm){ const q = String(nm || '').trim().toLowerCase(); return PIECES.find(t => (t.title || '').trim().toLowerCase() === q) || PIECES.find(t => t.id === String(nm || '').trim()) || null; }
+// отрезать условие [если ...] и вернуть {text, cond}
+function splitCond(s){ let cond = ''; const text = String(s || '').replace(/\[([^\]]*)\]/g, (_, c) => { cond = (cond ? cond + '; ' : '') + c.trim(); return ' '; }).trim(); return { text, cond }; }
+// имя куска: берём содержимое первых «ёлочек»/кавычек; иначе строку как есть (условие уже убрано)
+function cleanName(s){ const { text } = splitCond(s); const q = text.match(/[«„"'“]([^»"'”]+)[»"'”]/); return (q ? q[1] : text).trim(); }
+// вид связи по ключевому слову В НАЧАЛЕ строки (для «дерева»: «— создаёт → …»)
+function relFromStart(s){
+  const low = String(s || '').trim().toLowerCase();
+  for(const x of (window.relationKwIndex || [])){
+    if(/^(->|→|=>)$/.test(x.k)) continue;
+    if(low === x.k || low.startsWith(x.k + ' ') || low.startsWith(x.k + '→') || low.startsWith(x.k + ' →')){
+      return { r: x.r, rest: s.trim().slice(x.k.length) };
+    }
+  }
+  return null;
+}
 function parseLinks(text){
-  const edges = [], contracts = [], errors = []; let flowName = '';
+  const edges = [], contracts = [], errors = []; let flowName = '', subject = null;
+  // swap:true — источник = второй кусок (напр. «A следует за B» = B→A); src хранит исходную строку
+  const addEdge = (aName, bName, r, line, ln) => { let a = aName, b = bName; if(r.swap){ const t = a; a = b; b = t; } edges.push({ a, b, kind: r.id, ln, src: line }); };
   String(text).split('\n').forEach((raw, i) => {
     const line = raw.trim(); const ln = i + 1;
     if(!line) return;
-    if(line.startsWith('#') || line.startsWith('//')){ const m = line.match(/схема[:\s]+(.+)/i); if(m) flowName = m[1].trim(); return; }
+    if(line.startsWith('#') || line.startsWith('//')){ const m = line.match(/схема[:\s]+(.+)/i); if(m) flowName = cleanName(m[1]); return; }
     let m;
-    if((m = line.match(/^схема[:\s]+(.+)/i))){ flowName = m[1].trim(); return; }
+    if((m = line.match(/^схема[:\s]+(.+)/i))){ flowName = cleanName(m[1]); return; }
     if(line.includes('::')){
       const [name, rest] = split2(line, '::'); const fields = {};
       rest.split(';').forEach(part => {
@@ -162,26 +179,37 @@ function parseLinks(text){
         else if(/^\s*вход|input/.test(key)) fields.input = val;
         else if(/^\s*выход|output/.test(key)) fields.output = val;
       });
-      contracts.push({ name: name.trim(), fields, ln }); return;
+      contracts.push({ name: cleanName(name), fields, ln }); return;
     }
-    // стрелки = поток данных (явная связь; src — исходное предложение для сверки)
-    if((m = line.match(/^(.+?)\s*(?:->|→|=>)\s*(.+)$/))){ edges.push({ a: m[1].trim(), b: m[2].trim(), kind: 'data', ln, src: line }); return; }
-    // любой вид связи по ключевому слову из словаря (window.relationKwIndex)
+    // «дерево»: строка с маркером — связь от текущего заголовка (subject)
+    const bullet = line.match(/^[—–\-•*·]\s*(.+)$/);
+    if(bullet){
+      if(!subject){ errors.push('строка ' + ln + ': связь без заголовка куска выше — «' + line + '»'); return; }
+      const rel = relFromStart(bullet[1]);
+      if(!rel){ errors.push('строка ' + ln + ': не понял вид связи — «' + line + '»'); return; }
+      const target = cleanName(rel.rest.replace(/^\s*(?:->|→|=>)\s*/, ''));
+      if(!target){ errors.push('строка ' + ln + ': не понял цель связи — «' + line + '»'); return; }
+      addEdge(subject, target, rel.r, line, ln); return;
+    }
+    // плоский формат: стрелки = поток данных
+    if((m = line.match(/^(.+?)\s*(?:->|→|=>)\s*(.+)$/))){ edges.push({ a: cleanName(m[1]), b: cleanName(m[2]), kind: 'data', ln, src: line }); return; }
+    // плоский формат: любой вид связи по ключевому слову из словаря
     const kws = (window.relationKwIndex || []).filter(x => !/^(->|→|=>)$/.test(x.k));
     let hit = null;
     for(const x of kws){
       const re = new RegExp('^(.+?)\\s+' + x.k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s+(.+)$', 'i');
-      const mm = line.match(re); if(mm){ hit = { a: mm[1].trim(), b: mm[2].trim().replace(/^(с|со|от|на|для|в|к|в\s)\s+/i, ''), r: x.r }; break; }
+      const mm = line.match(re); if(mm){ hit = { a: mm[1].trim(), b: cleanName(mm[2].replace(/^(с|со|от|на|для|в|к)\s+/i, '')), r: x.r }; break; }
     }
     if(hit){
       // отрицание перед связью («A не зависит от B») — ребро не создаём
       if(/(^|\s)(не|ни)$/i.test(hit.a)){ errors.push('строка ' + ln + ': отрицание — ребро пропущено («' + line + '»)'); return; }
       // модальность/неуверенность («A может вызывать B», «иногда», «возможно») — лучше не создавать ложное ребро
       if(/(^|\s)(может|могут|могла|могли|мог|можно|возможно|иногда|редко|обычно|наверное|бы)$/i.test(hit.a)){ errors.push('строка ' + ln + ': модальность/неуверенность — ребро пропущено («' + line + '»)'); return; }
-      // swap:true — в тексте источник = второй кусок (напр. «A следует за B» = B→A)
-      const a = hit.r.swap ? hit.b : hit.a, b = hit.r.swap ? hit.a : hit.b;
-      edges.push({ a, b, kind: hit.r.id, ln, src: line }); return;
+      addEdge(cleanName(hit.a), hit.b, hit.r, line, ln); return;
     }
+    // заголовок куска: в «ёлочках»/кавычках или совпал с названием существующего куска
+    const asName = cleanName(line);
+    if(/^[«„"'“]/.test(line) || resolveName(asName)){ subject = asName; return; }
     errors.push('строка ' + ln + ': не понял — «' + line + '»');
   });
   return { edges, contracts, errors, flowName };
@@ -230,18 +258,23 @@ async function applyLinks(P){
   return { contracts: P.contracts.length, edges: edges.length, nodes: nodes.length, flowId };
 }
 const LINKS_SAMPLE = [
-  '# Связи пишутся: Кусок A <вид> Кусок B. Виды — в справочнике ниже.',
-  '# Стрелка -> (или →) = передаёт данные. Контракт: Имя:: ключ=значение; ...',
+  '# Два формата. 1) плоский: Кусок A <вид> Кусок B (по строке на связь).',
+  '# Стрелка -> (или →) = передаёт данные. Виды — в справочнике ниже.',
   '',
   'схема: Среднее по списку',
   'Массив чисел -> Сумма (reduce)',
   'Сумма (reduce) -> Среднее',
   'Среднее зависит от Сумма (reduce)',
-  'Среднее возвращает Число',
   'Среднее следует за Сумма (reduce)',
   'Валидатор проверяет Среднее',
-  'Тест среднего тестирует Среднее',
   'Старое среднее заменяет Среднее',
+  '',
+  '# 2) «дерево»: заголовок куска в «ёлочках», под ним связи с «—».',
+  '# (пояснение) отбрасывается, [условие] сохраняется как основание.',
+  '«Среднее»',
+  '  — зависит от → «Сумма (reduce)»',
+  '  — возвращает → «Число» (результат вычисления)',
+  '  — передаёт данные → «Форматтер» [если нужно показать на экране]',
   '',
   'Среднее:: нужно=сумма, количество; даёт=среднее; среда=браузер; проверка=сравни с ручным счётом'
 ].join('\n');
@@ -261,7 +294,7 @@ function openLinksModal(){
   const box = el2('div', 'modal');
   box.innerHTML = '<h3>Связи из текста</h3>'
     + '<p class="mh">Вставь правила — приложение разберёт связи и контракты кусков. Куски ищутся по названию. Связи соберутся в схему, контракты («нужно/даёт/среда/ошибка/проверка/вход/выход») запишутся на куски. Отрицания («A <b>не</b> зависит от B») и неуверенность («A <b>может</b> вызывать B») пропускаются — лучше без ребра, чем ложное.</p>'
-    + '<div class="fmt">A -> B&#10;A зависит от B · A оборачивает B · A конфликтует с B …&#10;Имя:: нужно=x,y; даёт=z; среда=браузер; ошибка=...; проверка=...&#10;схема: Название</div>'
+    + '<div class="fmt">Плоско: A -> B · A зависит от B · A конфликтует с B …&#10;Дерево:  «Кусок A»&#10;             — создаёт → «Кусок B» (пояснение) [условие]&#10;Контракт: Имя:: нужно=x,y; даёт=z; среда=браузер; ошибка=…; проверка=…&#10;схема: Название</div>'
     + '<details class="rr"><summary>виды связей, которые понимает парсер (' + (window.CODE_RELATIONS || []).length + ')</summary><div class="rr-box">' + relationsRef() + '</div></details>'
     + '<textarea id="lk-text" placeholder="вставь текст или нажми «пример»"></textarea>'
     + '<div class="mbtns"><button class="btn" id="lk-sample">пример</button><button class="btn ok" id="lk-parse">разобрать</button><button class="btn" id="lk-apply" style="display:none">применить</button><button class="btn" id="lk-close">закрыть</button></div>'
