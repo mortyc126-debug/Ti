@@ -173,7 +173,8 @@ function parseLinks(text){
       const re = new RegExp('^(.+?)\\s+' + x.k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s+(.+)$', 'i');
       const mm = line.match(re); if(mm){ hit = { a: mm[1].trim(), b: mm[2].trim().replace(/^(с|со|от|на|для|в|к|в\s)\s+/i, ''), r: x.r }; break; }
     }
-    if(hit){ edges.push({ a: hit.a, b: hit.b, kind: hit.r.id, ln }); return; }
+    // swap:true — в тексте источник = второй кусок (напр. «A следует за B» = B→A)
+    if(hit){ const a = hit.r.swap ? hit.b : hit.a, b = hit.r.swap ? hit.a : hit.b; edges.push({ a, b, kind: hit.r.id, ln }); return; }
     errors.push('строка ' + ln + ': не понял — «' + line + '»');
   });
   return { edges, contracts, errors, flowName };
@@ -203,7 +204,16 @@ async function applyLinks(P){
     nodes.push({ id: nid, blockId: 'raw', fields: { code }, title: t.title, desc: (full && full.desc) || '', src: { id: t.id, title: t.title, desc: (full && full.desc) || '', code }, x: 60 + (col % 4) * 240, y: 60 + Math.floor(col / 4) * 170 });
     col++; used.set(t.id, nid); return nid;
   };
-  for(const e of P.edges){ const ta = resolveName(e.a), tb = resolveName(e.b); if(!ta || !tb) continue; const na = await ensureNode(ta), nb = await ensureNode(tb); const kind = e.kind || 'data'; if(!edges.some(x => x.from === na && x.to === nb && x.kind === kind)) edges.push({ from: na, to: nb, kind }); }
+  for(const e of P.edges){
+    const ta = resolveName(e.a), tb = resolveName(e.b); if(!ta || !tb) continue;
+    const na = await ensureNode(ta), nb = await ensureNode(tb); const kind = e.kind || 'data';
+    // ненаправленные связи (дубликат/конфликтует/альтернатива) — дубль в любом порядке; разные виды между одной парой разрешены
+    const rel = (window.relationById && window.relationById(kind)) || { dir: 'd' };
+    const dup = edges.some(x => x.kind === kind && (rel.dir === 'u'
+      ? ((x.from === na && x.to === nb) || (x.from === nb && x.to === na))
+      : (x.from === na && x.to === nb)));
+    if(!dup) edges.push({ from: na, to: nb, kind });
+  }
   let flowId = null;
   if(nodes.length){
     const name = P.flowName || ('Импорт связей ' + new Date().toLocaleDateString('ru'));
@@ -220,6 +230,8 @@ const LINKS_SAMPLE = [
   'Массив чисел -> Сумма (reduce)',
   'Сумма (reduce) -> Среднее',
   'Среднее зависит от Сумма (reduce)',
+  'Среднее возвращает Число',
+  'Среднее следует за Сумма (reduce)',
   'Валидатор проверяет Среднее',
   'Тест среднего тестирует Среднее',
   'Старое среднее заменяет Среднее',
