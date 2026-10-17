@@ -201,6 +201,18 @@ function nodeNeedsInput(nd){
   const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return !names.some(nm => new RegExp('(^|[^\\p{ID_Continue}$])' + esc(nm) + '($|[^\\p{ID_Continue}$])', 'u').test(val));
 }
+// текст подсказки «что нужно подать на вход» (из гайда блока или контракта)
+function needHint(nd){
+  const g = (typeof BLOCK_GUIDES !== 'undefined') ? BLOCK_GUIDES[nd.blockId] : null;
+  const c = blockContract(nd);
+  let s = 'Нужен вход';
+  if(g && g.input) s += ': ' + g.input;
+  else if(c.inputField) s += ' в поле «' + c.inputField + '»' + (c.input && TYPE_RU[c.input] ? ' (' + TYPE_RU[c.input] + ')' : '');
+  s += '.';
+  if(g && g.needs && g.needs.length) s += ' ' + g.needs.join('; ') + '.';
+  s += ' Соедини с узлом-источником или впиши имя существующей переменной.';
+  return s;
+}
 // проставить/снять пометку «нужен вход» на всех узлах
 function markNeeds(){
   canvas.querySelectorAll('.gnode').forEach(elm => {
@@ -208,8 +220,8 @@ function markNeeds(){
     const need = nodeNeedsInput(nd);
     elm.classList.toggle('needs-input', need);
     let badge = elm.querySelector('.need-badge');
-    if(need && !badge){ badge = el('div', 'need-badge', 'нужен вход'); elm.appendChild(badge); }
-    else if(!need && badge){ badge.remove(); }
+    if(need){ if(!badge){ badge = el('div', 'need-badge', 'нужен вход'); elm.appendChild(badge); } badge.title = needHint(nd); }
+    else if(badge){ badge.remove(); }
   });
 }
 function outputType(nd){
