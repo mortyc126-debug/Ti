@@ -211,9 +211,9 @@ function card(t){
 // дописать/изменить описание карточки (чтобы не забывать, что это)
 function editDescModal(t){
   const bg = document.createElement('div'); bg.className = 'modal-bg';
-  bg.innerHTML = '<div class="modal" style="max-width:560px"><h3>Описание</h3>'
+  bg.innerHTML = '<div class="modal" style="max-width:720px"><h3>Описание</h3>'
     + '<p class="mh">Своими словами: что это и когда брать. Сохранится на карточке и в подсказке палитры.</p>'
-    + '<div class="mfield"><label>' + esc(t.title || '') + '</label><textarea id="d-desc" style="min-height:130px" spellcheck="false"></textarea></div>'
+    + '<div class="mfield"><label>' + esc(t.title || '') + '</label><textarea id="d-desc" style="min-height:220px" spellcheck="false"></textarea></div>'
     + '<div class="desc-tools"><button type="button" class="btn" id="d-chip">⟨⟩ код в плашку</button>'
     + '<span class="desc-hint">`код` в обратных кавычках — цветная плашка, блок — в тройных ```</span></div>'
     + '<div class="desc-prev-wrap"><div class="desc-prev-h">как будет выглядеть</div><div class="desc-prev" id="d-prev"></div></div>'
@@ -277,7 +277,8 @@ function openAddForm(){
     + '<div class="mfield"><label>Подкатегория</label><select id="m-sub"></select></div></div>'
     + '<div class="mrow"><div class="mfield"><label>Название (по-русски)</label><input id="m-title" placeholder="например: Объект ⇄ текст (сохранить/прочитать)"></div>'
     + '<div class="mfield"><label>Технология</label><select id="m-tech">' + techOpts + '</select></div></div>'
-    + '<div class="mfield"><label>Что делает</label><input id="m-desc" placeholder="коротко: зачем этот кусок"><span class="desc-hint">`код` в обратных кавычках — цветная плашка</span></div>'
+    + '<div class="mfield"><label>Что делает</label><textarea id="m-desc" style="min-height:96px" placeholder="своими словами: что это, когда брать, на что обратить внимание. Можно несколько строк. `код` в кавычках — цветная плашка"></textarea>'
+    + '<div class="desc-tools"><button type="button" class="btn" id="m-chip">⟨⟩ код в плашку</button><span class="desc-hint">`код` — плашка, блок — в тройных ```</span></div></div>'
     + '<div class="mrow"><div class="mfield"><label>Вход (необязательно)</label><input id="m-in" placeholder="что принимает"></div>'
     + '<div class="mfield"><label>Выход (необязательно)</label><input id="m-out" placeholder="что отдаёт"></div></div>'
     + '<div class="mfield"><label>Код</label><textarea id="m-code" spellcheck="false" placeholder="вставь код сюда"></textarea></div>'
@@ -292,6 +293,7 @@ function openAddForm(){
     $$('#m-sub').innerHTML = subs.map(s => '<option>' + esc(s) + '</option>').join('');
   };
   fillSubs(); $$('#m-purpose').onchange = fillSubs;
+  const mchip = $$('#m-chip'); if(mchip) mchip.onclick = () => wrapBackticks($$('#m-desc'));
   bg.onclick = e => { if(e.target === bg) bg.remove(); };
   $$('#m-cancel').onclick = () => bg.remove();
   // если название совпадает с существующим — предложим обновить, а не плодить дубль

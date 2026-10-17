@@ -356,14 +356,37 @@ function descEditor(nd, b){
   ta.placeholder = 'что это и зачем — чтобы не забыть. `код` в кавычках — цветная плашка';
   const prev = el('div', 'desc-prev');
   const draw = () => { const v = ta.value.trim() ? descFmt(ta.value) : (b && b.hint ? descFmt(b.hint) + '<div class="desc-hint" style="margin-top:6px">↑ пока показана встроенная подсказка. Впиши своё описание — заменит её.</div>' : '<span class="muted">пока пусто</span>'); prev.innerHTML = v; };
-  ta.addEventListener('input', () => { nd.desc = ta.value; persist(); draw(); });
+
+  // блок синхронизации с шаблоном (чтобы каталог и конструктор не расходились)
+  const sync = el('div', 'desc-sync');
+  const drawSync = () => {
+    sync.innerHTML = ''; if(!nd.src){ sync.style.display = 'none'; return; }
+    sync.style.display = '';
+    const diff = (nd.desc || '') !== (nd.src.desc || '');
+    sync.appendChild(el('div', 'desc-hint', diff
+      ? 'Это описание — у узла в схеме, в шаблоне (и в каталоге) пока другое.'
+      : 'Совпадает с описанием шаблона в каталоге.'));
+    if(diff){
+      const btn = el('button', 'btn', '↑ записать описание в шаблон'); btn.type = 'button';
+      btn.onclick = async () => {
+        btn.textContent = 'сохраняю…'; btn.disabled = true;
+        const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: nd.src.id, desc: nd.desc || '' }) }).then(r => r.json()).catch(() => ({}));
+        if(r && r.ok){ nd.src.desc = nd.desc || ''; persist(); loadCatalog(); btn.textContent = '✓ в каталоге обновилось'; setTimeout(drawSync, 900); }
+        else { btn.textContent = 'не вышло, ещё раз'; btn.disabled = false; }
+      };
+      sync.appendChild(btn);
+    }
+  };
+  ta.addEventListener('input', () => { nd.desc = ta.value; persist(); draw(); drawSync(); });
   box.appendChild(ta);
   const tools = el('div', 'desc-tools');
-  const chip = el('button', 'btn', '⟨⟩ код в плашку'); chip.type = 'button'; chip.onclick = () => { wrapBackticks(ta); nd.desc = ta.value; persist(); draw(); };
+  const chip = el('button', 'btn', '⟨⟩ код в плашку'); chip.type = 'button'; chip.onclick = () => { wrapBackticks(ta); nd.desc = ta.value; persist(); draw(); drawSync(); };
   tools.appendChild(chip); tools.appendChild(el('span', 'desc-hint', '`код` — плашка, блок — в тройных ```'));
   box.appendChild(tools);
   box.appendChild(el('div', 'desc-prev-h', 'как выглядит'));
-  box.appendChild(prev); draw();
+  box.appendChild(prev);
+  box.appendChild(sync);
+  draw(); drawSync();
   return box;
 }
 // редактор заголовка узла (в «Настроить»); описание — во вкладке «Разобраться»
