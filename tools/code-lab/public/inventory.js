@@ -98,7 +98,7 @@ async function loadFlowEdges(f){
   const full = await fetch('/api/flows/get?id=' + encodeURIComponent(f.id)).then(r => r.json()).catch(() => null);
   if(!full || !full.graph) return { nodes: [], edges: [] };
   const byId = {}; (full.graph.nodes || []).forEach(n => byId[n.id] = n);
-  const edges = (full.graph.edges || []).map(e => ({ from: flowNodeLabel(byId[e.from]), to: flowNodeLabel(byId[e.to]), kind: e.kind || 'data' }));
+  const edges = (full.graph.edges || []).map(e => ({ from: flowNodeLabel(byId[e.from]), to: flowNodeLabel(byId[e.to]), kind: e.kind || 'data', src: e.src || '' }));
   return { nodes: full.graph.nodes || [], edges };
 }
 async function renderFlows(){
@@ -110,7 +110,7 @@ async function renderFlows(){
     const { edges } = await loadFlowEdges(f);
     const box = document.createElement('div'); box.className = 'flow';
     box.innerHTML = '<h3>' + esc(f.name) + '</h3><div class="fmeta">' + f.nodes + ' узлов · ' + f.edges + ' связей</div>'
-      + (edges.length ? edges.map(e => { const r = (window.relationById && window.relationById(e.kind)) || { label: '', color: '#888' }; return '<div class="edge">' + esc(e.from) + ' <span class="arr" style="color:' + r.color + '">—[' + esc(r.label) + ']→</span> ' + esc(e.to) + '</div>'; }).join('')
+      + (edges.length ? edges.map(e => { const r = (window.relationById && window.relationById(e.kind)) || { label: '', color: '#888' }; return '<div class="edge"' + (e.src ? ' title="' + esc(e.src) + '"' : '') + '>' + esc(e.from) + ' <span class="arr" style="color:' + r.color + '">—[' + esc(r.label) + ']→</span> ' + esc(e.to) + (e.src ? ' <span class="muted" style="font-size:10.5px">· ' + esc(e.src) + '</span>' : '') + '</div>'; }).join('')
                       : '<div class="muted" style="font-size:12px">связей нет</div>');
     host.appendChild(box);
     f._edges = edges;
@@ -164,8 +164,8 @@ function parseLinks(text){
       });
       contracts.push({ name: name.trim(), fields, ln }); return;
     }
-    // стрелки = поток данных
-    if((m = line.match(/^(.+?)\s*(?:->|→|=>)\s*(.+)$/))){ edges.push({ a: m[1].trim(), b: m[2].trim(), kind: 'data', ln }); return; }
+    // стрелки = поток данных (явная связь; src — исходное предложение для сверки)
+    if((m = line.match(/^(.+?)\s*(?:->|→|=>)\s*(.+)$/))){ edges.push({ a: m[1].trim(), b: m[2].trim(), kind: 'data', ln, src: line }); return; }
     // любой вид связи по ключевому слову из словаря (window.relationKwIndex)
     const kws = (window.relationKwIndex || []).filter(x => !/^(->|→|=>)$/.test(x.k));
     let hit = null;
@@ -173,8 +173,15 @@ function parseLinks(text){
       const re = new RegExp('^(.+?)\\s+' + x.k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s+(.+)$', 'i');
       const mm = line.match(re); if(mm){ hit = { a: mm[1].trim(), b: mm[2].trim().replace(/^(с|со|от|на|для|в|к|в\s)\s+/i, ''), r: x.r }; break; }
     }
-    // swap:true — в тексте источник = второй кусок (напр. «A следует за B» = B→A)
-    if(hit){ const a = hit.r.swap ? hit.b : hit.a, b = hit.r.swap ? hit.a : hit.b; edges.push({ a, b, kind: hit.r.id, ln }); return; }
+    if(hit){
+      // отрицание перед связью («A не зависит от B») — ребро не создаём
+      if(/(^|\s)(не|ни)$/i.test(hit.a)){ errors.push('строка ' + ln + ': отрицание — ребро пропущено («' + line + '»)'); return; }
+      // модальность/неуверенность («A может вызывать B», «иногда», «возможно») — лучше не создавать ложное ребро
+      if(/(^|\s)(может|могут|могла|могли|мог|можно|возможно|иногда|редко|обычно|наверное|бы)$/i.test(hit.a)){ errors.push('строка ' + ln + ': модальность/неуверенность — ребро пропущено («' + line + '»)'); return; }
+      // swap:true — в тексте источник = второй кусок (напр. «A следует за B» = B→A)
+      const a = hit.r.swap ? hit.b : hit.a, b = hit.r.swap ? hit.a : hit.b;
+      edges.push({ a, b, kind: hit.r.id, ln, src: line }); return;
+    }
     errors.push('строка ' + ln + ': не понял — «' + line + '»');
   });
   return { edges, contracts, errors, flowName };
@@ -212,7 +219,7 @@ async function applyLinks(P){
     const dup = edges.some(x => x.kind === kind && (rel.dir === 'u'
       ? ((x.from === na && x.to === nb) || (x.from === nb && x.to === na))
       : (x.from === na && x.to === nb)));
-    if(!dup) edges.push({ from: na, to: nb, kind });
+    if(!dup) edges.push({ from: na, to: nb, kind, src: e.src || '' });
   }
   let flowId = null;
   if(nodes.length){
@@ -253,7 +260,7 @@ function openLinksModal(){
   const bg = el2('div', 'modal-bg');
   const box = el2('div', 'modal');
   box.innerHTML = '<h3>Связи из текста</h3>'
-    + '<p class="mh">Вставь правила — приложение разберёт связи и контракты кусков. Куски ищутся по названию. Связи соберутся в схему, контракты («нужно/даёт/среда/ошибка/проверка/вход/выход») запишутся на куски.</p>'
+    + '<p class="mh">Вставь правила — приложение разберёт связи и контракты кусков. Куски ищутся по названию. Связи соберутся в схему, контракты («нужно/даёт/среда/ошибка/проверка/вход/выход») запишутся на куски. Отрицания («A <b>не</b> зависит от B») и неуверенность («A <b>может</b> вызывать B») пропускаются — лучше без ребра, чем ложное.</p>'
     + '<div class="fmt">A -> B&#10;A зависит от B · A оборачивает B · A конфликтует с B …&#10;Имя:: нужно=x,y; даёт=z; среда=браузер; ошибка=...; проверка=...&#10;схема: Название</div>'
     + '<details class="rr"><summary>виды связей, которые понимает парсер (' + (window.CODE_RELATIONS || []).length + ')</summary><div class="rr-box">' + relationsRef() + '</div></details>'
     + '<textarea id="lk-text" placeholder="вставь текст или нажми «пример»"></textarea>'
@@ -270,7 +277,7 @@ function openLinksModal(){
     const prev = q('#lk-prev'); prev.innerHTML = '';
     const line = (txt, cls) => { const d = el2('div', 'lp-row ' + (cls || '')); d.textContent = txt; return d; };
     prev.appendChild(el2('div', 'lp-sec', 'связи (' + parsed.edges.length + ')'));
-    parsed.edges.forEach(e => { const a = resolveName(e.a), b = resolveName(e.b); const ok = a && b; const rel = (window.relationById && window.relationById(e.kind)) || { label: 'связь' }; prev.appendChild(line((ok ? '✓ ' : '✕ ') + e.a + '  —[' + rel.label + ']→  ' + e.b + (ok ? '' : '  (не найдено: ' + [!a ? e.a : '', !b ? e.b : ''].filter(Boolean).join(', ') + ')'), ok ? 'lp-ok' : 'lp-bad')); });
+    parsed.edges.forEach(e => { const a = resolveName(e.a), b = resolveName(e.b); const ok = a && b; const rel = (window.relationById && window.relationById(e.kind)) || { label: 'связь' }; prev.appendChild(line((ok ? '✓ ' : '✕ ') + e.a + '  —[' + rel.label + ']→  ' + e.b + (ok ? '' : '  (не найдено: ' + [!a ? e.a : '', !b ? e.b : ''].filter(Boolean).join(', ') + ')'), ok ? 'lp-ok' : 'lp-bad')); if(e.src && e.src !== (e.a + ' ' + e.b)) prev.appendChild(line('      ↳ ' + e.src, 'muted')); });
     prev.appendChild(el2('div', 'lp-sec', 'контракты (' + parsed.contracts.length + ')'));
     parsed.contracts.forEach(c => { const t = resolveName(c.name); prev.appendChild(line((t ? '✓ ' : '✕ ') + c.name + ': ' + Object.keys(c.fields).join(', ') + (t ? '' : '  (кусок не найден)'), t ? 'lp-ok' : 'lp-bad')); });
     if(parsed.errors.length){ prev.appendChild(el2('div', 'lp-sec', 'не разобрано')); parsed.errors.forEach(x => prev.appendChild(line(x, 'lp-bad'))); }
