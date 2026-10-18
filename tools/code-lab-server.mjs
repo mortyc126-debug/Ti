@@ -168,6 +168,19 @@ async function listTemplates(){
   return out;
 }
 async function fileForId(id){ const l = await listTemplates(); const m = l.find(x => x.id === id); return m ? m.file : null; }
+// найти уже существующий шаблон с таким же названием и кодом (для дедупа при добавлении)
+const _tplCode = j => (Array.isArray(j.lines) ? j.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : '').trim();
+async function findSameTemplate(title, code){
+  const wantT = String(title || '').trim().toLowerCase(), wantC = String(code || '').trim();
+  let names = [];
+  try { names = (await fs.readdir(TEMPLATES)).filter(n => n.endsWith('.json')); } catch(_){ return null; }
+  for(const n of names){
+    try { const j = JSON.parse(await fs.readFile(path.join(TEMPLATES, n), 'utf8'));
+      if((j.title || '').trim().toLowerCase() === wantT && _tplCode(j) === wantC) return n;
+    } catch(_){}
+  }
+  return null;
+}
 
 // ── запуск кода на установленных у пользователя языках ───────────────────────
 // Карта: язык → чем запускать (bin + аргументы) и расширение файла. Каждая запись
@@ -244,17 +257,31 @@ const server = http.createServer(async (req, res) => {
     if(u.pathname === '/api/add' && req.method === 'POST'){
       const b = await readBody(req);
       const lang = String(b.lang || 'js').toLowerCase();
+      const code = String(b.code || '');
+      const title = String(b.title || 'Без названия').slice(0, 80);
+      // дедуп: если кусок с таким же названием и кодом уже есть — обновляем его, а не плодим новый
+      const dupFile = await findSameTemplate(title, code);
+      if(dupFile){
+        const full = path.join(TEMPLATES, dupFile);
+        const j = JSON.parse(await fs.readFile(full, 'utf8'));
+        j.lang = lang; j.title = title;
+        if(b.group != null) j.group = String(b.group).slice(0, 60) || j.group;
+        if(b.desc) j.desc = String(b.desc).slice(0, 400);
+        if(b.component && typeof b.component === 'object') j.component = Object.assign({}, j.component, b.component);
+        await fs.writeFile(full, JSON.stringify(j, null, 2), 'utf8');
+        return json(res, 200, { id: j.id || dupFile.replace(/\.json$/, ''), dedup: true });
+      }
       const obj = {
-        id: slug(b.title || lang),
+        id: slug(title || lang),
         lang, group: String(b.group || 'Мои шаблоны').slice(0, 60),
-        title: String(b.title || 'Без названия').slice(0, 80),
+        title,
         desc: String(b.desc || '').slice(0, 400),
-        lines: tokenize(b.code || '', lang),
+        lines: tokenize(code, lang),
         output: b.output != null ? String(b.output) : '',
         descAt: Date.now(),   // когда описание задано/изменено — для авто-сведения по дате
       };
       if(b.component && typeof b.component === 'object') obj.component = b.component;   // метаданные компонента (теги осей, подкатегория, контракт)
-      if(lang === 'js'){ const c = codeContract(b.code || ''); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
+      if(lang === 'js'){ const c = codeContract(code); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
       await fs.mkdir(TEMPLATES, { recursive: true });
       await fs.writeFile(path.join(TEMPLATES, obj.id + '.json'), JSON.stringify(obj, null, 2), 'utf8');
       return json(res, 200, { id: obj.id });
