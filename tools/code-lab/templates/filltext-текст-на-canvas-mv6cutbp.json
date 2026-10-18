@@ -1,7 +1,7 @@
 {
   "id": "filltext-текст-на-canvas-mv6cutbp",
   "lang": "js",
-  "group": "Canvas",
+  "group": "Графика и визуализация / Canvas: рисование",
   "title": "fillText — текст на canvas",
   "desc": "fillText(text, x, y) рисует текст. Координата y — базовая линия текста, а не верхняя граница.",
   "lines": [
@@ -250,7 +250,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Интерфейс"
+        "Графика и визуализация"
       ],
       "runtime": [
         "Браузер"
@@ -324,6 +324,7 @@
       "canvas",
       "ctx"
     ],
-    "requires": []
+    "requires": [],
+    "subcat": "Canvas: рисование"
   }
 }

@@ -1,7 +1,7 @@
 {
   "id": "fillrect-и-strokerect-прямоугольники-mv6cutc3",
   "lang": "js",
-  "group": "Canvas",
+  "group": "Графика и визуализация / Canvas: рисование",
   "title": "fillRect и strokeRect — прямоугольники",
   "desc": "fillRect рисует заполненный прямоугольник, strokeRect — только контур. Координаты и размеры задаются в пикселях canvas.",
   "lines": [
@@ -365,7 +365,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Интерфейс"
+        "Графика и визуализация"
       ],
       "runtime": [
         "Браузер"
@@ -439,6 +439,7 @@
       "canvas",
       "ctx"
     ],
-    "requires": []
+    "requires": [],
+    "subcat": "Canvas: рисование"
   }
 }

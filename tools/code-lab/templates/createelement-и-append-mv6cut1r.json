@@ -1,7 +1,7 @@
 {
   "id": "createelement-и-append-mv6cut1r",
   "lang": "js",
-  "group": "DOM",
+  "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
   "title": "createElement и append",
   "desc": "createElement создаёт новый DOM-элемент, а append добавляет его внутрь выбранного контейнера. Контейнер должен существовать в HTML.",
   "lines": [
@@ -189,7 +189,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Интерфейс"
+        "Интерфейс: поля, кнопки и события"
       ],
       "runtime": [
         "Браузер"
@@ -262,6 +262,7 @@
       "list",
       "item"
     ],
-    "requires": []
+    "requires": [],
+    "subcat": "Обновлять страницу и эле"
   }
 }

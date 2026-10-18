@@ -1,7 +1,7 @@
 {
   "id": "then-и-catch-mv6cuson",
   "lang": "js",
-  "group": "Сеть",
+  "group": "Сеть и запросы / Получить данные",
   "title": ".then и .catch",
   "desc": "then обрабатывает успешно завершившийся Promise, catch — ошибку в цепочке. Этот стиль можно использовать вместо async/await.",
   "lines": [
@@ -263,9 +263,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Работа с данными",
-        "Интеграции",
-        "Диагностика и тестирование"
+        "Сеть и запросы"
       ],
       "runtime": [
         "Браузер или Node.js с поддержкой fetch"
@@ -334,6 +332,7 @@
       "compatibility": "not_verified"
     },
     "provides": [],
-    "requires": []
+    "requires": [],
+    "subcat": "Получить данные"
   }
 }

@@ -1,7 +1,7 @@
 {
   "id": "linear-gradient-линейный-градиент-mv6cut84",
   "lang": "js",
-  "group": "Цвета",
+  "group": "Графика и визуализация / Цвета и градиенты",
   "title": "linear-gradient — линейный градиент",
   "desc": "linear-gradient создаёт переход цветов вдоль направления. Его можно назначить через CSS background или backgroundImage.",
   "lines": [
@@ -113,7 +113,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Интерфейс"
+        "Графика и визуализация"
       ],
       "runtime": [
         "Браузер"
@@ -185,6 +185,7 @@
     "provides": [
       "panel"
     ],
-    "requires": []
+    "requires": [],
+    "subcat": "Цвета и градиенты"
   }
 }

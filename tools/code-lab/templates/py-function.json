@@ -1,7 +1,7 @@
 {
   "id": "py-function",
   "lang": "python",
-  "group": "Python — основы",
+  "group": "Начать здесь / Основы программирования",
   "title": "Функция (def)",
   "desc": "Функция в Python начинается с def. Тело — с отступом. return отдаёт результат наружу.",
   "lines": [
@@ -147,7 +147,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Логика и вычисления"
+        "Начать здесь"
       ],
       "runtime": [
         "JavaScript"
@@ -214,6 +214,7 @@
       "code_review": "not_verified",
       "tests": "not_run",
       "compatibility": "not_verified"
-    }
+    },
+    "subcat": "Основы программирования"
   }
 }

@@ -1,7 +1,7 @@
 {
   "id": "object-keys-values-и-entries-mv6cusnr",
   "lang": "js",
-  "group": "Массивы и объекты",
+  "group": "Данные: хранить, находить и преобразовывать / Коллекции и ст",
   "title": "Object.keys, values и entries",
   "desc": "keys возвращает массив ключей, values — значений, entries — пар [ключ, значение] объекта.",
   "lines": [
@@ -267,7 +267,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Работа с данными"
+        "Данные: хранить, находить и преобразовывать"
       ],
       "runtime": [
         "JavaScript"
@@ -341,6 +341,7 @@
     "requires": [
       "Аня",
       "Лев"
-    ]
+    ],
+    "subcat": "Коллекции и ст"
   }
 }

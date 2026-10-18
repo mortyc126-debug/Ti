@@ -1,7 +1,7 @@
 {
   "id": "setattribute-задать-атрибут-mv6cut0k",
   "lang": "js",
-  "group": "DOM",
+  "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
   "title": "setAttribute — задать атрибут",
   "desc": "setAttribute задаёт атрибут HTML-элемента, например title, aria-label или data-id.",
   "lines": [
@@ -203,8 +203,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Интерфейс",
-        "Работа с данными"
+        "Интерфейс: поля, кнопки и события"
       ],
       "runtime": [
         "Браузер"
@@ -276,6 +275,7 @@
     "provides": [
       "button"
     ],
-    "requires": []
+    "requires": [],
+    "subcat": "Обновлять страницу и эле"
   }
 }

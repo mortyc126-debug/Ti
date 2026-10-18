@@ -1,7 +1,7 @@
 {
   "id": "clearrect-очистить-кадр-mv6cutcv",
   "lang": "js",
-  "group": "Canvas",
+  "group": "Графика и визуализация / Canvas: рисование",
   "title": "clearRect — очистить кадр",
   "desc": "clearRect стирает пиксели заданной области. В анимации обычно очищают весь canvas перед рисованием нового кадра.",
   "lines": [
@@ -293,8 +293,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Интерфейс",
-        "Работа с данными"
+        "Графика и визуализация"
       ],
       "runtime": [
         "Браузер"
@@ -368,6 +367,7 @@
       "canvas",
       "ctx"
     ],
-    "requires": []
+    "requires": [],
+    "subcat": "Canvas: рисование"
   }
 }

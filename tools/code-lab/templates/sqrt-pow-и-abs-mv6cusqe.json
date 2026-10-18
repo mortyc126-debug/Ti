@@ -1,7 +1,7 @@
 {
   "id": "sqrt-pow-и-abs-mv6cusqe",
   "lang": "js",
-  "group": "Математика",
+  "group": "Данные: хранить, находить и преобразовывать / Числа и просты",
   "title": "sqrt, pow и abs",
   "desc": "sqrt вычисляет квадратный корень, pow возводит число в степень, abs возвращает абсолютное значение.",
   "lines": [
@@ -177,7 +177,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Логика и вычисления"
+        "Данные: хранить, находить и преобразовывать"
       ],
       "runtime": [
         "JavaScript"
@@ -246,6 +246,7 @@
       "compatibility": "not_verified"
     },
     "provides": [],
-    "requires": []
+    "requires": [],
+    "subcat": "Числа и просты"
   }
 }

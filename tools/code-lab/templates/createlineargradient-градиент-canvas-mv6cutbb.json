@@ -1,7 +1,7 @@
 {
   "id": "createlineargradient-градиент-canvas-mv6cutbb",
   "lang": "js",
-  "group": "Canvas",
+  "group": "Графика и визуализация / Canvas: рисование",
   "title": "createLinearGradient — градиент Canvas",
   "desc": "createLinearGradient создаёт градиент, addColorStop задаёт цветовые точки от 0 до 1. Назначьте градиент в fillStyle или strokeStyle.",
   "lines": [
@@ -405,7 +405,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Интерфейс"
+        "Графика и визуализация"
       ],
       "runtime": [
         "Браузер"
@@ -480,6 +480,7 @@
       "ctx",
       "gradient"
     ],
-    "requires": []
+    "requires": [],
+    "subcat": "Canvas: рисование"
   }
 }

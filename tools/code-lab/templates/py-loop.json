@@ -1,7 +1,7 @@
 {
   "id": "py-loop",
   "lang": "python",
-  "group": "Python — основы",
+  "group": "Данные: хранить, находить и преобразовывать / Перебирать, фи",
   "title": "Цикл (for … in range)",
   "desc": "Главное в Python — отступы. Тело цикла — это строки, сдвинутые вправо. Двоеточие открывает блок.",
   "lines": [
@@ -88,7 +88,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Логика и вычисления"
+        "Данные: хранить, находить и преобразовывать"
       ],
       "runtime": [
         "JavaScript"
@@ -155,6 +155,7 @@
       "code_review": "not_verified",
       "tests": "not_run",
       "compatibility": "not_verified"
-    }
+    },
+    "subcat": "Перебирать, фи"
   }
 }

@@ -1,7 +1,7 @@
 {
   "id": "promise-all-параллельные-задачи-mv6cusp6",
   "lang": "js",
-  "group": "Сеть",
+  "group": "Сеть и запросы / Получить данные",
   "title": "Promise.all — параллельные задачи",
   "desc": "Promise.all ждёт завершения всех переданных Promise. Если один из них отклоняется, общий Promise тоже отклоняется.",
   "lines": [
@@ -253,9 +253,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Интерфейс",
-        "Работа с данными",
-        "Интеграции"
+        "Сеть и запросы"
       ],
       "runtime": [
         "JavaScript"
@@ -327,6 +325,7 @@
       "loadBoth",
       "results"
     ],
-    "requires": []
+    "requires": [],
+    "subcat": "Получить данные"
   }
 }

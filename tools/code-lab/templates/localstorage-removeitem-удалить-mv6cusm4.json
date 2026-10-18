@@ -1,7 +1,7 @@
 {
   "id": "localstorage-removeitem-удалить-mv6cusm4",
   "lang": "js",
-  "group": "Хранилище",
+  "group": "Файлы, хранение и сервер / Хранение в браузере",
   "title": "localStorage.removeItem — удалить",
   "desc": "removeItem удаляет одну запись по ключу. clear() удаляет все записи этого сайта, поэтому используйте его осторожно.",
   "lines": [
@@ -136,7 +136,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Работа с данными"
+        "Файлы, хранение и сервер"
       ],
       "runtime": [
         "Браузер"
@@ -205,6 +205,7 @@
       "compatibility": "not_verified"
     },
     "provides": [],
-    "requires": []
+    "requires": [],
+    "subcat": "Хранение в браузере"
   }
 }

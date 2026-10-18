@@ -1,7 +1,7 @@
 {
   "id": "textcontent-и-innerhtml-mv6cusz6",
   "lang": "js",
-  "group": "DOM",
+  "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
   "title": "textContent и innerHTML",
   "desc": "textContent вставляет текст безопасно, не интерпретируя его как HTML. innerHTML разбирает строку как HTML-разметку; не вставляйте туда недоверенные данные.",
   "lines": [
@@ -142,8 +142,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Интерфейс",
-        "Работа с данными"
+        "Интерфейс: поля, кнопки и события"
       ],
       "runtime": [
         "Браузер"
@@ -215,6 +214,7 @@
     "provides": [
       "box"
     ],
-    "requires": []
+    "requires": [],
+    "subcat": "Обновлять страницу и эле"
   }
 }

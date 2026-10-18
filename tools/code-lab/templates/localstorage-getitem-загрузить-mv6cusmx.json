@@ -1,7 +1,7 @@
 {
   "id": "localstorage-getitem-загрузить-mv6cusmx",
   "lang": "js",
-  "group": "Хранилище",
+  "group": "Файлы, хранение и сервер / Хранение в браузере",
   "title": "localStorage.getItem — загрузить",
   "desc": "getItem читает строковое значение по ключу. Если ключа нет, вернётся null.",
   "lines": [
@@ -141,7 +141,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Работа с данными"
+        "Файлы, хранение и сервер"
       ],
       "runtime": [
         "Браузер"
@@ -212,6 +212,7 @@
     "provides": [
       "record"
     ],
-    "requires": []
+    "requires": [],
+    "subcat": "Хранение в браузере"
   }
 }

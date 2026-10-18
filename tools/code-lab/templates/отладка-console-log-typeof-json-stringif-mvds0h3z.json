@@ -1,7 +1,7 @@
 {
   "id": "отладка-console-log-typeof-json-stringif-mvds0h3z",
   "lang": "js",
-  "group": "JavaScript — основы",
+  "group": "Ошибки и отладка / Найти причину сбоя",
   "title": "Отладка: console.log, typeof, JSON.stringify",
   "desc": "Три самых частых способа посмотреть, что внутри: вывести значение, узнать тип, красиво распечатать объект.",
   "lines": [
@@ -420,6 +420,12 @@
       "цена",
       "данные"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Ошибки и отладка"
+      ]
+    },
+    "subcat": "Найти причину сбоя"
   }
 }
