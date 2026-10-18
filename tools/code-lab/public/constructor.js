@@ -334,32 +334,51 @@ function renderPalette(){
     base.forEach(([id, b]) => { const it = palItem(b.label, b.hint); it.onclick = () => addNode(id); d.appendChild(it); });
     host.appendChild(d);
   }
-  // каталог по назначению → подкатегория (все языки, не только js)
-  const cat = CATALOG.filter(t => !q || (t.title + ' ' + (t.desc || '') + ' ' + (t.lang || '')).toLowerCase().includes(q));
-  const byP = {}; cat.forEach(t => { const p = purposeOf(t); (byP[p] = byP[p] || []).push(t); });
-  // известные разделы (в своём порядке) + любые пользовательские, заданные через «раздел»
-  const allPurposes = [...PURPOSE.map(x => x[0]), ...Object.keys(byP).filter(p => !PURPOSE.some(x => x[0] === p))];
-  allPurposes.forEach(pk => {
-    const items = byP[pk]; if(!items || !items.length) return;
-    const d = palDetails(pk, items.length, !!q);
-    const bySub = {}; items.forEach(t => { const s = subOf(t, pk); (bySub[s] = bySub[s] || []).push(t); });
-    const order = (SUBCATS[pk] || []).map(x => x[0]).concat(['Разное']);
-    Object.keys(bySub).sort((a, b) => { const ia = order.indexOf(a), ib = order.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); }).forEach(sub => {
-      d.appendChild(el('div', 'pal-sub', sub + ' · ' + bySub[sub].length));
-      bySub[sub].forEach(t => {
-        const it = palItem(t.title, t.desc); it.onclick = () => addFromCatalog(t);
-        // подпись языка у куска (теперь в палитре все языки)
-        if(t.lang){ const lg = el('span', 'pi-lang', String(t.lang).toUpperCase()); it.appendChild(lg); }
-        // удалить шаблон прямо из палитры (на случай дублей/переименований)
-        const del = el('span', 'pi-del', '🗑'); del.title = 'удалить шаблон насовсем';
-        del.onclick = e => { e.stopPropagation(); delTemplate(t); };
-        it.appendChild(del);
-        d.appendChild(it);
-      });
-    });
-    host.appendChild(d);
+  // каталог — единое дерево по разделу (поле «раздел», через «/»); все языки
+  const cat = CATALOG.filter(t => !q || (t.title + ' ' + (t.desc || '') + ' ' + (t.lang || '') + ' ' + (t.group || '')).toLowerCase().includes(q));
+  const root = { children: new Map(), items: [] };
+  cat.forEach(t => {
+    const path = String(t.group || '').split('/').map(s => s.trim()).filter(Boolean);
+    let node = root;
+    (path.length ? path : ['Без раздела']).forEach(seg => { if(!node.children.has(seg)) node.children.set(seg, { children: new Map(), items: [] }); node = node.children.get(seg); });
+    node.items.push(t);
   });
+  const count = n => { let c = n.items.length; n.children.forEach(x => c += count(x)); return c; };
+  const mkItem = t => {
+    const it = palItem(t.title, t.desc); it.onclick = () => addFromCatalog(t);
+    if(t.lang){ const lg = el('span', 'pi-lang', String(t.lang).toUpperCase()); it.appendChild(lg); }
+    const del = el('span', 'pi-del', '🗑'); del.title = 'удалить шаблон насовсем';
+    del.onclick = e => { e.stopPropagation(); delTemplate(t); };
+    it.appendChild(del); return it;
+  };
+  const renderBranch = (node, into) => {
+    const names = [...node.children.keys()].sort((a, b) => (a === 'Без раздела') - (b === 'Без раздела') || a.localeCompare(b, 'ru'));
+    names.forEach(nm => { const ch = node.children.get(nm); const d = palDetails(nm, count(ch), !!q); renderBranch(ch, d); ch.items.forEach(t => d.appendChild(mkItem(t))); into.appendChild(d); });
+  };
+  renderBranch(root, host);
 }
+// разово проставить раздел по смыслу там, где он пуст (ключевые слова → «Раздел / Подраздел»)
+async function autoSortCatalog(){
+  const need = CATALOG.filter(t => !String(t.group || '').trim());
+  if(!need.length) return { done: 0 };
+  let done = 0;
+  for(const t of need){
+    const pk = purposeOf(t), sub = subOf(t, pk);
+    const group = sub && sub !== 'Разное' ? (pk + ' / ' + sub) : pk;
+    const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: t.id, group }) }).then(r => r.json()).catch(() => ({}));
+    if(r && r.ok) done++;
+  }
+  await loadCatalog();
+  return { done };
+}
+(function(){ const btn = $('#palsort'); if(!btn) return; btn.onclick = async () => {
+  const empty = CATALOG.filter(t => !String(t.group || '').trim()).length;
+  if(!empty){ const o = btn.textContent; btn.textContent = 'всё уже разложено'; setTimeout(() => btn.textContent = o, 1600); return; }
+  if(!confirm('Проставить раздел по смыслу у ' + empty + ' кусков без раздела? Уже заданные разделы не трогаются; потом можно переименовать/переместить.')) return;
+  btn.disabled = true; const o = btn.textContent; btn.textContent = 'раскладываю…';
+  const r = await autoSortCatalog();
+  btn.textContent = '✓ разложено ' + r.done; setTimeout(() => { btn.textContent = o; btn.disabled = false; }, 2000);
+}; })();
 async function delTemplate(t){
   if(!confirm('Удалить шаблон «' + (t.title || t.id) + '» насовсем? Файл будет удалён.')) return;
   const r = await fetch('/api/delete', { method:'POST', body: JSON.stringify({ id: t.id }) }).then(r => r.json()).catch(() => ({}));
