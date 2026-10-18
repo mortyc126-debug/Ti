@@ -9,6 +9,9 @@ const KIND_LABEL = {
   str: 'строка (текст)', num: 'число', op: 'оператор / символ', com: 'комментарий',
 };
 const EDITABLE = new Set(['name', 'str', 'num']);
+// какие языки установлены у пользователя (спрашиваем сервер один раз)
+let _serverLangs = null;
+function serverLangs(){ return _serverLangs || (_serverLangs = fetch('/api/run/langs').then(r => r.json()).catch(() => ({ langs: [], bins: {} }))); }
 
 const $ = s => document.querySelector(s);
 const nav = $('#nav'), work = $('#work'), info = $('#info');
@@ -118,10 +121,10 @@ function render(tpl){
   const edit = mkBtn('✎ править');
   const dsc = mkBtn('✨ описание');
   const del = mkBtn('🗑 удалить'); del.classList.add('danger');
-  const runnable = tpl.lang === 'js';
-  const run = runnable ? mkBtn('▶ запустить') : null;
-  if(run) run.classList.add('ok');
-  bar.append(copy, reset, edit, dsc); if(run) bar.append(run); bar.append(del); work.appendChild(bar);
+  const webRun = (tpl.lang || '').toLowerCase() === 'js';
+  const run = mkBtn(webRun ? '▶ запустить' : '▶ запустить на ПК');
+  run.classList.add('ok');
+  bar.append(copy, reset, edit, dsc, run, del); work.appendChild(bar);
   edit.onclick = () => showEditForm(tpl);
   // быстро добавить/поправить описание: подсказываем по коду, пользователь правит
   dsc.onclick = async () => {
@@ -155,11 +158,29 @@ function render(tpl){
     + 'Клик по слову → впиши, что оно значит (сохранится).';
   work.appendChild(lg);
 
-  if(run){
+  const codeText = () => [...pre.querySelectorAll('.line')].map(l => l.textContent.replace(/​/g, '')).join('\n');
+  if(webRun){
     const box = document.createElement('div'); box.className = 'preview';
     const frame = document.createElement('iframe'); frame.sandbox = 'allow-scripts';
     box.appendChild(frame); work.appendChild(box);
-    run.onclick = () => runCode(frame, [...pre.querySelectorAll('.line')].map(l => l.textContent.replace(/​/g, '')).join('\n'));
+    run.onclick = () => runCode(frame, codeText());
+  } else {
+    // запуск на установленном у пользователя языке — через локальный сервер
+    const box = document.createElement('div'); box.className = 'out run-out'; box.style.display = 'none';
+    box.innerHTML = '<div class="lbl">вывод запуска (на твоём ПК)</div><pre></pre><div class="run-langs muted"></div>';
+    const outPre = box.querySelector('pre'); work.appendChild(box);
+    serverLangs().then(info => { const note = box.querySelector('.run-langs'); if(note && info && info.langs) note.textContent = 'установлено на этом ПК: ' + (info.langs.length ? info.langs.join(', ') : '— ничего из поддерживаемых не найдено'); });
+    run.onclick = async () => {
+      box.style.display = ''; outPre.textContent = 'запускаю…'; run.disabled = true;
+      const r = await fetch('/api/run', { method: 'POST', body: JSON.stringify({ lang: tpl.lang, code: codeText() }) }).then(x => x.json()).catch(() => ({ ok: false, error: 'сервер недоступен' }));
+      run.disabled = false;
+      if(!r.ok){ outPre.textContent = '⚠ ' + (r.error || 'ошибка'); return; }
+      let t = r.stdout || '';
+      if(r.stderr) t += (t ? '\n' : '') + '⚠ ' + r.stderr;
+      if(r.timedOut) t += '\n⏱ прервано по таймауту (10 секунд)';
+      if(!t.trim()) t = '(код отработал, вывода нет · завершился с кодом ' + r.code + ')';
+      outPre.textContent = t;
+    };
   }
 
   copy.onclick = () => {

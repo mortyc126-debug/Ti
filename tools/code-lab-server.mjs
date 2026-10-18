@@ -13,6 +13,7 @@
 import http from 'node:http';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 
@@ -167,6 +168,65 @@ async function listTemplates(){
   return out;
 }
 async function fileForId(id){ const l = await listTemplates(); const m = l.find(x => x.id === id); return m ? m.file : null; }
+
+// ── запуск кода на установленных у пользователя языках ───────────────────────
+// Карта: язык → чем запускать (bin + аргументы) и расширение файла. Каждая запись
+// выполняет НАСТОЯЩИЙ код на машине пользователя — поэтому только локально.
+const RUNNERS = {
+  javascript:{ bin:'node',    ext:'js'  }, js:{ bin:'node', ext:'js' }, node:{ bin:'node', ext:'js' },
+  python:    { bin:'python3', ext:'py', alt:'python' }, py:{ bin:'python3', ext:'py', alt:'python' },
+  ruby:      { bin:'ruby',    ext:'rb'  }, rb:{ bin:'ruby', ext:'rb' },
+  php:       { bin:'php',     ext:'php' },
+  perl:      { bin:'perl',    ext:'pl'  }, pl:{ bin:'perl', ext:'pl' },
+  lua:       { bin:'lua',     ext:'lua' },
+  bash:      { bin:'bash',    ext:'sh'  }, sh:{ bin:'bash', ext:'sh' }, shell:{ bin:'bash', ext:'sh' },
+  powershell:{ bin:'pwsh',    ext:'ps1' }, ps1:{ bin:'pwsh', ext:'ps1' },
+  r:         { bin:'Rscript', ext:'R'   },
+  go:        { bin:'go', args:['run'],  ext:'go' },
+  tsx:       { bin:'npx', args:['-y','tsx'], ext:'ts' }, typescript:{ bin:'npx', args:['-y','tsx'], ext:'ts' }, ts:{ bin:'npx', args:['-y','tsx'], ext:'ts' }
+};
+function runnerFor(lang){ return RUNNERS[String(lang || '').trim().toLowerCase()] || null; }
+const _runExec = (bin, args, opts) => new Promise(resolve => {
+  const child = execFile(bin, args, opts, (err, stdout, stderr) => {
+    resolve({ err, stdout: String(stdout || ''), stderr: String(stderr || ''), code: err && typeof err.code === 'number' ? err.code : (err ? 1 : 0), signal: err && err.signal, enoent: err && err.code === 'ENOENT', timedOut: err && err.killed });
+  });
+});
+// какие языки реально установлены — пробуем bin с безобидным аргументом версии
+let _langCache = null;
+async function detectLangs(){
+  if(_langCache) return _langCache;
+  const bins = {}; Object.values(RUNNERS).forEach(r => { bins[r.bin] = r; });
+  const avail = {};
+  for(const [bin, r] of Object.entries(bins)){
+    const verArg = bin === 'go' ? 'version' : '--version';
+    const res = await _runExec(bin, [verArg], { timeout: 4000, maxBuffer: 1 << 20 }).catch(() => ({ enoent: true }));
+    avail[bin] = !res.enoent;   // любой ответ (даже с ошибкой флага) значит, что бинарь есть
+  }
+  // понятные названия установленных языков (по одному на интерпретатор)
+  const LABEL = { node:'JavaScript', python3:'Python', ruby:'Ruby', php:'PHP', perl:'Perl', lua:'Lua', bash:'Bash', pwsh:'PowerShell', Rscript:'R', go:'Go', npx:'TypeScript' };
+  const langs = Object.keys(avail).filter(b => avail[b]).map(b => LABEL[b] || b);
+  _langCache = { langs, bins: avail };
+  return _langCache;
+}
+async function runCode(lang, code){
+  const r = runnerFor(lang);
+  if(!r) return { ok:false, error:'Язык «' + lang + '» пока не поддержан для запуска. Поддержаны: ' + [...new Set(Object.values(RUNNERS).map(x=>x.bin))].join(', ') };
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'codelab-run-'));
+  const file = path.join(dir, 'code.' + r.ext);
+  try {
+    await fs.writeFile(file, String(code == null ? '' : code), 'utf8');
+    const tryBins = [r.bin].concat(r.alt ? [r.alt] : []);
+    let res = null;
+    for(const bin of tryBins){
+      res = await _runExec(bin, (r.args || []).concat(file), { timeout: 10000, maxBuffer: 2 << 20, cwd: dir });
+      if(!res.enoent) break;   // бинарь найден — не пробуем запасной
+    }
+    if(res.enoent) return { ok:false, error:'Не найден интерпретатор «' + r.bin + '»' + (r.alt ? ' (и «' + r.alt + '»)' : '') + '. Похоже, язык не установлен.' };
+    return { ok:true, stdout: res.stdout.slice(0, 200000), stderr: res.stderr.slice(0, 200000), code: res.code, timedOut: !!res.timedOut };
+  } finally {
+    fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -378,6 +438,15 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
+    // какие языки установлены у пользователя
+    if(u.pathname === '/api/run/langs'){ return json(res, 200, await detectLangs()); }
+    // запустить код на установленном языке (выполняется ЛОКАЛЬНО на машине пользователя)
+    if(u.pathname === '/api/run' && req.method === 'POST'){
+      const b = await readBody(req);
+      const out = await runCode(b.lang, b.code);
+      return json(res, 200, out);
+    }
+
     const rel = u.pathname === '/' ? 'index.html' : u.pathname;
     const abs = within(PUBLIC, rel);
     if(!abs) return json(res, 400, { error: 'bad path' });
@@ -389,7 +458,7 @@ const server = http.createServer(async (req, res) => {
   } catch(e){ json(res, 500, { error: String(e && e.message || e) }); }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '127.0.0.1', () => {
   console.log(`Лаборатория кода: http://localhost:${PORT}/`);
   console.log(`Шаблоны: ${TEMPLATES}  (можно добавлять со страницы или класть .json руками)`);
 });
