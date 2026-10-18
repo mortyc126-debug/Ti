@@ -388,8 +388,10 @@ async function addFromCatalog(t){
   try {
     const tpl = await fetch('/api/template?id=' + encodeURIComponent(t.id)).then(r => r.json());
     const code = (tpl.lines || []).map(line => (line || []).map(k => k.v != null ? k.v : '').join('')).join('\n');
-    // запоминаем, из какого шаблона узел + когда взято описание (для авто-сведения по дате)
-    addNode('raw', { fields: { code }, title: t.title, desc: tpl.desc || '', descAt: tpl.descAt || 0, src: { id: t.id, title: t.title, desc: tpl.desc || '', code } });
+    // запоминаем, из какого шаблона узел + типизированный контракт (для проверки стыковки)
+    const comp = tpl.component || {};
+    const contract = { provides: Array.isArray(comp.provides) ? comp.provides : [], requires: Array.isArray(comp.requires) ? comp.requires : [] };
+    addNode('raw', { fields: { code }, title: t.title, desc: tpl.desc || '', descAt: tpl.descAt || 0, src: { id: t.id, title: t.title, desc: tpl.desc || '', code, contract } });
   } catch(_){}
 }
 $('#palSearch').oninput = renderPalette;

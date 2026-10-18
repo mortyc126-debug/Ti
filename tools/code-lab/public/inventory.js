@@ -5,7 +5,8 @@ let PIECES = [], FLOWS = [];
   try { PIECES = await fetch('/api/list').then(r => r.json()); } catch(_){ PIECES = []; }
   try { FLOWS = await fetch('/api/flows/list').then(r => r.json()); } catch(_){ FLOWS = []; }
   const leg = document.getElementById('covLegend');
-  if(leg) leg.innerHTML = 'Описано: ' + [['inputs','Вх','Входы'],['outputs','Вых','Выходы'],['env','Ср','Среда'],['pre','Пр','Предусловия'],['effects','Эф','Побочные эффекты'],['errors','Ош','Ошибки'],['links','Св','Связи'],['check','Пв','Проверка']].map(f => '<span><b>' + f[1] + '</b> — ' + f[2] + '</span>').join('');
+  if(leg) leg.innerHTML = 'Описано: ' + [['inputs','Вх','Входы'],['outputs','Вых','Выходы'],['env','Ср','Среда'],['pre','Пр','Предусловия'],['effects','Эф','Побочные эффекты'],['errors','Ош','Ошибки'],['links','Св','Связи'],['check','Пв','Проверка']].map(f => '<span><b>' + f[1] + '</b> — ' + f[2] + '</span>').join('')
+    + ' · <span class="muted">тип входа/выхода пиши через двоеточие: «сумма: число». Типы: ' + (window.CONTRACT_TYPES || []).map(t => '<span class="ct-ty" style="color:' + window.contractTypeColor(t) + ';border-color:' + window.contractTypeColor(t) + '55">' + t + '</span>').join(' ') + '</span>';
   fillFilters(); applyUrlFilters(); renderPieces(); renderFlows();
 })();
 // пресет фильтров из ссылки (навигатор «С чего начать» ведёт сюда: ?group=Интерфейс)
@@ -41,6 +42,15 @@ function covCell(t){
   }).join('') + '</div>';
 }
 
+// чипы контракта с типом: «имя: тип» → имя + цветной тег типа
+function contractChips(arr){
+  if(!arr || !arr.length) return '';
+  return arr.map(s => {
+    const it = window.contractParseItem ? window.contractParseItem(s) : { name: s, type: '' };
+    const ty = it.type ? '<span class="ct-ty" style="color:' + window.contractTypeColor(it.type) + ';border-color:' + window.contractTypeColor(it.type) + '55">' + esc(it.type) + '</span>' : '';
+    return '<span class="ct-item">' + esc(it.name) + ty + '</span>';
+  }).join(' ');
+}
 function pieceRows(list){
   return list.map(t => {
     const g = give(t), n = need(t);
@@ -48,8 +58,8 @@ function pieceRows(list){
       + '<td class="t-title"><a href="/component.html?id=' + encodeURIComponent(t.id) + '">' + esc(t.title || t.id) + '</a><div class="t-id">' + esc(t.id) + '</div></td>'
       + '<td>' + esc((t.lang || '').toUpperCase()) + '</td>'
       + '<td class="edit-cell" data-field="group" title="клик — сменить раздел">' + (t.group ? esc(t.group) : '<span class="muted">+ раздел</span>') + '</td>'
-      + '<td class="give edit-cell" data-field="provides" title="клик — изменить">' + (g.length ? esc(g.join(', ')) : '<span class="muted">+ отметить</span>') + '</td>'
-      + '<td class="need edit-cell" data-field="requires" title="клик — изменить">' + (n.length ? esc(n.join(', ')) : '<span class="muted">+ отметить</span>') + '</td>'
+      + '<td class="give edit-cell" data-field="provides" title="клик — изменить (имя: тип)">' + (g.length ? contractChips(g) : '<span class="muted">+ отметить</span>') + '</td>'
+      + '<td class="need edit-cell" data-field="requires" title="клик — изменить (имя: тип)">' + (n.length ? contractChips(n) : '<span class="muted">+ отметить</span>') + '</td>'
       + '<td>' + covCell(t) + '</td>'
       + '<td class="pc-act"><button class="mini pc-move" data-id="' + esc(t.id) + '" title="переместить в раздел">📁</button><button class="mini pc-del" data-id="' + esc(t.id) + '" title="удалить кусок">🗑</button></td>'
       + '</tr>';
@@ -63,7 +73,7 @@ document.getElementById('prows').addEventListener('click', e => {
   const t = PIECES.find(x => x.id === id); if(!t) return;
   const isGroup = field === 'group';
   const cur = isGroup ? (t.group || '') : (field === 'provides' ? give(t) : need(t)).join(', ');
-  cell.innerHTML = '<input class="inv-cell-in" value="' + esc(cur) + '" placeholder="' + (isGroup ? 'раздел / подраздел' : 'имена через запятую') + '">';
+  cell.innerHTML = '<input class="inv-cell-in" value="' + esc(cur) + '" placeholder="' + (isGroup ? 'раздел / подраздел' : 'имена через запятую (можно «имя: тип»)') + '">';
   const inp = cell.querySelector('input'); inp.focus(); inp.select();
   const save = async () => {
     if(isGroup){
@@ -142,8 +152,8 @@ function gpPieceRow(t){
   return '<div class="gp-piece">'
     + '<a href="/component.html?id=' + encodeURIComponent(t.id) + '">' + esc(t.title || t.id) + '</a>'
     + '<span class="gp-lang">' + esc((t.lang || '').toUpperCase()) + '</span>'
-    + (g.length ? '<span class="gp-cr give">даёт: ' + esc(g.join(', ')) + '</span>' : '')
-    + (n.length ? '<span class="gp-cr need">нужно: ' + esc(n.join(', ')) + '</span>' : '')
+    + (g.length ? '<span class="gp-cr give">даёт: ' + contractChips(g) + '</span>' : '')
+    + (n.length ? '<span class="gp-cr need">нужно: ' + contractChips(n) + '</span>' : '')
     + '<span class="gp-sp"></span>' + covCell(t)
     + '<button class="mini pc-move" data-id="' + esc(t.id) + '" title="переместить в раздел">📁</button>'
     + '<button class="mini pc-del" data-id="' + esc(t.id) + '" title="удалить кусок">🗑</button></div>';
