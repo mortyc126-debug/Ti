@@ -99,7 +99,8 @@ async function loadFlowEdges(f){
   if(!full || !full.graph) return { nodes: [], edges: [] };
   const byId = {}; (full.graph.nodes || []).forEach(n => byId[n.id] = n);
   const edges = (full.graph.edges || []).map(e => ({ from: flowNodeLabel(byId[e.from]), to: flowNodeLabel(byId[e.to]), kind: e.kind || 'data', src: e.src || '' }));
-  return { nodes: full.graph.nodes || [], edges };
+  const nodeLabels = (full.graph.nodes || []).map(flowNodeLabel);
+  return { nodes: full.graph.nodes || [], nodeLabels, edges };
 }
 async function renderFlows(){
   const host = document.getElementById('flows');
@@ -107,19 +108,21 @@ async function renderFlows(){
   if(!FLOWS.length){ host.innerHTML = '<div class="empty">Сохранённых схем пока нет. Собери граф в Конструкторе и нажми «🗂 схемы».</div>'; return; }
   host.innerHTML = '';
   for(const f of FLOWS.slice().sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))){
-    const { edges } = await loadFlowEdges(f);
+    const { edges, nodeLabels } = await loadFlowEdges(f);
     const box = document.createElement('div'); box.className = 'flow';
     box.innerHTML = '<h3>' + esc(f.name) + '</h3><div class="fmeta">' + f.nodes + ' узлов · ' + f.edges + ' связей</div>'
+      + (nodeLabels.length ? '<div class="fnodes muted"><b>узлы:</b> ' + nodeLabels.map(esc).join(' · ') + '</div>' : '')
       + (edges.length ? edges.map(e => { const r = (window.relationById && window.relationById(e.kind)) || { label: '', color: '#888' }; return '<div class="edge"' + (e.src ? ' title="' + esc(e.src) + '"' : '') + '>' + esc(e.from) + ' <span class="arr" style="color:' + r.color + '">—[' + esc(r.label) + ']→</span> ' + esc(e.to) + (e.src ? ' <span class="muted" style="font-size:10.5px">· ' + esc(e.src) + '</span>' : '') + '</div>'; }).join('')
                       : '<div class="muted" style="font-size:12px">связей нет</div>');
     host.appendChild(box);
-    f._edges = edges;
+    f._edges = edges; f._nodeLabels = nodeLabels;
   }
 }
 function flowsAsText(){
   const lines = ['# Схемы и связи (' + FLOWS.length + ')', ''];
   FLOWS.forEach(f => {
     lines.push('## ' + f.name + '  (' + f.nodes + ' узлов, ' + f.edges + ' связей)');
+    if((f._nodeLabels || []).length){ lines.push('  узлы: ' + f._nodeLabels.join(', ')); }
     (f._edges || []).forEach(e => { const r = (window.relationById && window.relationById(e.kind)) || { label: '' }; lines.push('  ' + e.from + ' —[' + r.label + ']-> ' + e.to); });
     lines.push('');
   });
