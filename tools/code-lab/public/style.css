@@ -16,6 +16,18 @@ h1{font-size:17px;margin:0}
 .sub{color:var(--text2);font-size:12.5px;margin-top:4px;max-width:900px}
 main{display:grid;grid-template-columns:260px 1fr 320px;min-height:calc(100vh - 62px)}
 @media(max-width:1100px){main{grid-template-columns:220px 1fr}aside#info{display:none}}
+/* адаптивно: на узких экранах список-карточки сверху, код снизу, всё тянется по ширине */
+@media(max-width:720px){
+  main{grid-template-columns:1fr}
+  #nav{max-height:40vh;overflow:auto;border-bottom:1px solid var(--border);border-right:0}
+  #work{padding:14px 16px}
+  #work .code{font-size:12px}
+  #work .t-title{font-size:clamp(16px,5vw,20px)}
+}
+/* длинные названия в списке-карточках переносятся, а не обрезаются/наезжают */
+.tpl{flex-wrap:wrap}
+.tpl > span:first-child{flex:1;min-width:0;overflow-wrap:anywhere}
+#work .code{white-space:pre-wrap;overflow-wrap:anywhere}
 
 /* навигация */
 nav{border-right:1px solid var(--border);padding:10px;overflow:auto}
