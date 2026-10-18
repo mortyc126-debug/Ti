@@ -57,6 +57,26 @@
   collapse.onclick = e => { e.preventDefault(); toggle(true); };
   reopen.onclick = e => { e.preventDefault(); toggle(false); };
 
+  // перетягиваемая ширина меню — общая для всех страниц, запоминается
+  let SW = 230; try { SW = +localStorage.getItem('codelab_side_w') || 230; } catch(_){}
+  const applyW = () => app.style.setProperty('--side-w', SW + 'px');
+  applyW();
+  const gutter = document.createElement('div'); gutter.className = 'side-gutter'; gutter.title = 'потяни, чтобы изменить ширину меню';
+  app.appendChild(gutter);
+  gutter.addEventListener('pointerdown', e => {
+    e.preventDefault(); gutter.classList.add('drag'); document.body.classList.add('dragging-side');
+    const sx = e.clientX, s0 = SW;
+    const mv = ev => { SW = Math.max(170, Math.min(460, s0 + (ev.clientX - sx))); applyW(); };
+    const up = () => {
+      gutter.classList.remove('drag'); document.body.classList.remove('dragging-side');
+      document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up);
+      try { localStorage.setItem('codelab_side_w', SW); } catch(_){}
+    };
+    document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
+  });
+  // двойной клик по границе — сброс к стандартной ширине
+  gutter.addEventListener('dblclick', () => { SW = 230; applyW(); try { localStorage.setItem('codelab_side_w', SW); } catch(_){} });
+
   // авто-рост полей ввода: textarea подстраивает высоту под текст (до max-height, дальше — скролл)
   const grow = ta => {
     if(!ta || ta.tagName !== 'TEXTAREA' || ta.dataset.noGrow) return;
