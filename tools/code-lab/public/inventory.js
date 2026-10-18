@@ -6,8 +6,17 @@ let PIECES = [], FLOWS = [];
   try { FLOWS = await fetch('/api/flows/list').then(r => r.json()); } catch(_){ FLOWS = []; }
   const leg = document.getElementById('covLegend');
   if(leg) leg.innerHTML = 'Описано: ' + [['inputs','Вх','Входы'],['outputs','Вых','Выходы'],['env','Ср','Среда'],['pre','Пр','Предусловия'],['effects','Эф','Побочные эффекты'],['errors','Ош','Ошибки'],['links','Св','Связи'],['check','Пв','Проверка']].map(f => '<span><b>' + f[1] + '</b> — ' + f[2] + '</span>').join('');
-  fillFilters(); renderPieces(); renderFlows();
+  fillFilters(); applyUrlFilters(); renderPieces(); renderFlows();
 })();
+// пресет фильтров из ссылки (навигатор «С чего начать» ведёт сюда: ?group=Интерфейс)
+function applyUrlFilters(){
+  const p = new URLSearchParams(location.search);
+  const set = (id, v) => { const e = document.getElementById(id); if(e && v != null) e.value = v; };
+  if(p.get('group')) set('pgroup', p.get('group'));
+  if(p.get('lang')) set('plang', p.get('lang'));
+  if(p.get('q')){ set('pq', p.get('q')); }
+  if(p.get('tree') === '1'){ const c = document.getElementById('pgroupview'); if(c){ c.checked = true; } }
+}
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 const give = t => (t.comp && t.comp.provides) || [];
@@ -99,7 +108,7 @@ function filteredPieces(){
   let list = PIECES;
   if(q) list = list.filter(t => ((t.title || '') + ' ' + (t.id || '') + ' ' + (t.group || '') + ' ' + give(t).join(' ') + ' ' + need(t).join(' ')).toLowerCase().includes(q));
   if(lang) list = list.filter(t => (t.lang || '') === lang);
-  if(group) list = list.filter(t => (t.group || '') === group);
+  if(group) list = list.filter(t => String(t.group || '').split('/')[0].trim() === group);   // по верхнему уровню раздела
   if(facet) list = list.filter(t => !cov(t)[facet]);           // показать только те, где этой грани НЕТ
   if(incompleteOnly) list = list.filter(t => covCount(t) < FACETS.length);
   return list;
@@ -107,7 +116,7 @@ function filteredPieces(){
 // наполнить выпадашки языком/разделом (из данных) и гранями (из FACETS)
 function fillFilters(){
   const langs = [...new Set(PIECES.map(t => t.lang).filter(Boolean))].sort();
-  const groups = [...new Set(PIECES.map(t => t.group).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru'));
+  const groups = [...new Set(PIECES.map(t => String(t.group || '').split('/')[0].trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru'));
   const opt = (v, label) => '<option value="' + esc(v) + '">' + esc(label) + '</option>';
   const pl = document.getElementById('plang'); if(pl) pl.innerHTML = opt('', 'язык: все') + langs.map(l => opt(l, l.toUpperCase())).join('');
   const pg = document.getElementById('pgroup'); if(pg) pg.innerHTML = opt('', 'раздел: все') + groups.map(g => opt(g, g)).join('');

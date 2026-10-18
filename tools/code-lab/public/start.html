@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>С чего начать — Лаборатория кода</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .start{padding:22px 26px;max-width:1000px}
+  .start h1{font-size:21px;margin:0 0 2px}
+  .start .lead{color:var(--text3);font-size:12.5px;margin:0 0 18px;line-height:1.55}
+  .goals{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:8px}
+  .goal{text-align:left;display:flex;flex-direction:column;gap:5px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 15px;cursor:pointer;color:var(--text)}
+  .goal:hover{border-color:var(--name)}
+  .goal.on{border-color:var(--acc);background:rgba(255,0,110,.08)}
+  .goal .g-ic{font-size:22px}
+  .goal .g-t{font-weight:700;font-size:14.5px}
+  .goal .g-l{font-size:12px;color:var(--text3);line-height:1.5}
+  #steps{margin-top:18px}
+  .steps-h{font-size:13px;color:var(--text2);margin:0 0 12px;line-height:1.5}
+  .step{display:flex;align-items:flex-start;gap:12px;background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:9px;text-decoration:none;color:var(--text)}
+  .step:hover{border-color:var(--name)}
+  .step .s-n{flex:0 0 auto;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--s2);color:var(--acc);font-size:12px;font-family:ui-monospace,monospace}
+  .step .s-body{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}
+  .step .s-t{font-weight:600;font-size:13.5px}
+  .step .s-g{color:var(--name);font-weight:400;font-size:12px}
+  .step .s-why{font-size:12px;color:var(--text3);line-height:1.5}
+  .step .s-arr{color:var(--text3);align-self:center}
+  .step:hover .s-arr{color:var(--acc)}
+  .steps-tip{margin-top:12px;font-size:12px;color:var(--text3);background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--str);border-radius:9px;padding:10px 13px;line-height:1.55}
+  .muted{color:var(--text3)}
+</style>
+</head>
+<body data-page="start">
+  <div class="start">
+    <h1>С чего начать</h1>
+    <div class="lead">Не знаешь, за что хвататься? Выбери, что хочешь сделать — покажу порядок шагов и куда идти. Каждый шаг ведёт в нужный раздел с готовыми кусками.</div>
+    <div class="goals" id="goals"><div class="muted">загрузка…</div></div>
+    <div id="steps"></div>
+  </div>
+  <script src="/shell.js"></script>
+  <script src="/start.js"></script>
+</body>
+</html>
