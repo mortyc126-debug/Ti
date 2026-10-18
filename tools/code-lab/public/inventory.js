@@ -164,7 +164,7 @@ function relFromStart(s){
   return null;
 }
 function parseLinks(text){
-  const edges = [], contracts = [], errors = []; let flowName = '', subject = null;
+  const edges = [], contracts = [], errors = []; let flowName = '', subject = null, section = '';
   // swap:true — источник = второй кусок (напр. «A следует за B» = B→A); src хранит исходную строку
   const addEdge = (aName, bName, r, line, ln) => { let a = aName, b = bName; if(r.swap){ const t = a; a = b; b = t; } edges.push({ a, b, kind: r.id, ln, src: line }); };
   String(text).split('\n').forEach((raw, i) => {
@@ -173,6 +173,13 @@ function parseLinks(text){
     if(line.startsWith('#') || line.startsWith('//')){ const m = line.match(/схема[:\s]+(.+)/i); if(m) flowName = cleanName(m[1]); return; }
     let m;
     if((m = line.match(/^схема[:\s]+(.+)/i))){ flowName = cleanName(m[1]); return; }
+    // раздел: X — задаёт текущий раздел для последующих «+ имя»
+    if((m = line.match(/^(?:раздел|группа|категория)[:\s]+(.+)/i))){ section = cleanName(m[1]); return; }
+    // + имя — положить кусок в текущий раздел
+    if((m = line.match(/^\+\s*(.+)$/))){
+      if(!section){ errors.push('строка ' + ln + ': «+ имя» без «раздел:» выше — «' + line + '»'); return; }
+      contracts.push({ name: cleanName(m[1]), fields: { group: section }, ln }); return;
+    }
     if(line.includes('::')){
       const [name, rest] = split2(line, '::'); const fields = {};
       rest.split(';').forEach(part => {
@@ -185,6 +192,7 @@ function parseLinks(text){
         else if(/предуслов|requirement/.test(key)) fields.requirements = list();
         else if(/ошиб|error|огранич/.test(key)) fields.errors = val;
         else if(/провер|check/.test(key)) fields.check = val;
+        else if(/раздел|групп|категор|section|group/.test(key)) fields.group = val;
         else if(/^\s*вход|input/.test(key)) fields.input = val;
         else if(/^\s*выход|output/.test(key)) fields.output = val;
       });
@@ -232,6 +240,7 @@ async function applyLinks(P){
   for(const c of P.contracts){
     const t = resolveName(c.name); if(!t) continue;
     const f = c.fields, body = { id: t.id };
+    if(f.group) body.group = f.group;
     if(f.provides) body.provides = f.provides;
     if(f.requires) body.requires = f.requires;
     if(f.runtime || f.input || f.output || f.requirements || f.errors || f.check){
@@ -314,7 +323,12 @@ const LINKS_SAMPLE = [
   '  — возвращает → «Число» (результат вычисления)',
   '  — передаёт данные → «Форматтер» [если нужно показать на экране]',
   '',
-  'Среднее:: нужно=сумма, количество; даёт=среднее; среда=браузер; проверка=сравни с ручным счётом'
+  'Среднее:: нужно=сумма, количество; даёт=среднее; среда=браузер; проверка=сравни с ручным счётом; раздел=Математика',
+  '',
+  '# разложить куски по разделам: «раздел: X», затем список через «+»',
+  'раздел: Сеть и API',
+  '+ fetch + await — получить данные',
+  '+ Парсер ответа API (columns/data)'
 ].join('\n');
 function relationsRef(){
   const R = window.CODE_RELATIONS || [];
@@ -331,8 +345,8 @@ function openLinksModal(){
   const bg = el2('div', 'modal-bg');
   const box = el2('div', 'modal');
   box.innerHTML = '<h3>Связи из текста</h3>'
-    + '<p class="mh">Вставь правила — приложение разберёт связи и контракты кусков. Куски ищутся по названию. Связи соберутся в схему, контракты («нужно/даёт/среда/ошибка/проверка/вход/выход») запишутся на куски. Отрицания («A <b>не</b> зависит от B») и неуверенность («A <b>может</b> вызывать B») пропускаются — лучше без ребра, чем ложное.</p>'
-    + '<div class="fmt">Плоско: A -> B · A зависит от B · A конфликтует с B …&#10;Дерево:  «Кусок A»&#10;             — создаёт → «Кусок B» (пояснение) [условие]&#10;Контракт: Имя:: нужно=x,y; даёт=z; среда=браузер; ошибка=…; проверка=…&#10;схема: Название</div>'
+    + '<p class="mh">Вставь правила — приложение разберёт связи и контракты кусков. Куски ищутся по названию. Связи соберутся в схему, контракты («нужно/даёт/среда/ошибка/проверка/вход/выход/<b>раздел</b>») запишутся на куски. Разложить по разделам можно блоком «<b>раздел: X</b>» и списком «<b>+ Имя куска</b>». Отрицания («A <b>не</b> зависит от B») и неуверенность («A <b>может</b> вызывать B») пропускаются.</p>'
+    + '<div class="fmt">Плоско: A -> B · A зависит от B · A конфликтует с B …&#10;Дерево:  «Кусок A»&#10;             — создаёт → «Кусок B» (пояснение) [условие]&#10;Контракт: Имя:: нужно=x,y; даёт=z; среда=браузер; раздел=Сеть; проверка=…&#10;Разделы: раздел: Сеть и API&#10;             + Имя куска&#10;схема: Название</div>'
     + '<details class="rr"><summary>виды связей, которые понимает парсер (' + (window.CODE_RELATIONS || []).length + ')</summary><div class="rr-box">' + relationsRef() + '</div></details>'
     + '<textarea id="lk-text" placeholder="вставь текст или нажми «пример»"></textarea>'
     + '<div class="mbtns"><button class="btn" id="lk-sample">пример</button><button class="btn ok" id="lk-parse">разобрать</button><button class="btn" id="lk-apply" style="display:none">применить</button><button class="btn" id="lk-close">закрыть</button><label class="inv-chk" style="margin-left:auto"><input type="checkbox" id="lk-missing" checked> создавать узлы для ненайденных (ящики данных)</label></div>'
