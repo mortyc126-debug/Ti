@@ -283,7 +283,12 @@ const server = http.createServer(async (req, res) => {
       const j = JSON.parse(await fs.readFile(full, 'utf8'));
       if(b.lang != null) j.lang = String(b.lang).toLowerCase();
       if(b.title != null) j.title = String(b.title).slice(0, 80) || j.title;
-      if(b.group != null) j.group = String(b.group).slice(0, 60) || j.group;
+      if(b.group != null){
+        const g = String(b.group).slice(0, 60); j.group = g || j.group;
+        // «раздел» — единый источник: из него же задаём раздел/подраздел в Конструкторе (purpose/subcat)
+        const segs = (g || '').split('/').map(s => s.trim()).filter(Boolean);
+        if(segs.length){ j.component = j.component || {}; j.component.tags = Object.assign({}, j.component.tags, { purpose: [segs[0]] }); j.component.subcat = segs.slice(1).join(' / ') || 'Разное'; }
+      }
       if(b.desc != null){ const nv = String(b.desc).slice(0, 400); if(nv !== (j.desc || '')) j.descAt = (b.descAt && Number(b.descAt)) || Date.now(); j.desc = nv; }
       if(b.output != null) j.output = String(b.output);
       const _names = a => (Array.isArray(a) ? a : String(a || '').split(',')).map(x => String(x).trim()).filter(Boolean).slice(0, 40);

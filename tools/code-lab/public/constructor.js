@@ -337,7 +337,9 @@ function renderPalette(){
   // каталог по назначению → подкатегория
   const js = CATALOG.filter(t => (t.lang || 'js') === 'js').filter(t => !q || (t.title + ' ' + (t.desc || '')).toLowerCase().includes(q));
   const byP = {}; js.forEach(t => { const p = purposeOf(t); (byP[p] = byP[p] || []).push(t); });
-  PURPOSE.map(x => x[0]).forEach(pk => {
+  // известные разделы (в своём порядке) + любые пользовательские, заданные через «раздел»
+  const allPurposes = [...PURPOSE.map(x => x[0]), ...Object.keys(byP).filter(p => !PURPOSE.some(x => x[0] === p))];
+  allPurposes.forEach(pk => {
     const items = byP[pk]; if(!items || !items.length) return;
     const d = palDetails(pk, items.length, !!q);
     const bySub = {}; items.forEach(t => { const s = subOf(t, pk); (bySub[s] = bySub[s] || []).push(t); });
