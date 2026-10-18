@@ -334,9 +334,9 @@ function renderPalette(){
     base.forEach(([id, b]) => { const it = palItem(b.label, b.hint); it.onclick = () => addNode(id); d.appendChild(it); });
     host.appendChild(d);
   }
-  // каталог по назначению → подкатегория
-  const js = CATALOG.filter(t => (t.lang || 'js') === 'js').filter(t => !q || (t.title + ' ' + (t.desc || '')).toLowerCase().includes(q));
-  const byP = {}; js.forEach(t => { const p = purposeOf(t); (byP[p] = byP[p] || []).push(t); });
+  // каталог по назначению → подкатегория (все языки, не только js)
+  const cat = CATALOG.filter(t => !q || (t.title + ' ' + (t.desc || '') + ' ' + (t.lang || '')).toLowerCase().includes(q));
+  const byP = {}; cat.forEach(t => { const p = purposeOf(t); (byP[p] = byP[p] || []).push(t); });
   // известные разделы (в своём порядке) + любые пользовательские, заданные через «раздел»
   const allPurposes = [...PURPOSE.map(x => x[0]), ...Object.keys(byP).filter(p => !PURPOSE.some(x => x[0] === p))];
   allPurposes.forEach(pk => {
@@ -348,6 +348,8 @@ function renderPalette(){
       d.appendChild(el('div', 'pal-sub', sub + ' · ' + bySub[sub].length));
       bySub[sub].forEach(t => {
         const it = palItem(t.title, t.desc); it.onclick = () => addFromCatalog(t);
+        // подпись языка у куска (теперь в палитре все языки)
+        if(t.lang){ const lg = el('span', 'pi-lang', String(t.lang).toUpperCase()); it.appendChild(lg); }
         // удалить шаблон прямо из палитры (на случай дублей/переименований)
         const del = el('span', 'pi-del', '🗑'); del.title = 'удалить шаблон насовсем';
         del.onclick = e => { e.stopPropagation(); delTemplate(t); };
