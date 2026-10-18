@@ -38,10 +38,11 @@ function pieceRows(list){
     return '<tr data-id="' + esc(t.id) + '">'
       + '<td class="t-title"><a href="/component.html?id=' + encodeURIComponent(t.id) + '">' + esc(t.title || t.id) + '</a><div class="t-id">' + esc(t.id) + '</div></td>'
       + '<td>' + esc((t.lang || '').toUpperCase()) + '</td>'
-      + '<td>' + esc(t.group || '') + '</td>'
+      + '<td class="edit-cell" data-field="group" title="клик — сменить раздел">' + (t.group ? esc(t.group) : '<span class="muted">+ раздел</span>') + '</td>'
       + '<td class="give edit-cell" data-field="provides" title="клик — изменить">' + (g.length ? esc(g.join(', ')) : '<span class="muted">+ отметить</span>') + '</td>'
       + '<td class="need edit-cell" data-field="requires" title="клик — изменить">' + (n.length ? esc(n.join(', ')) : '<span class="muted">+ отметить</span>') + '</td>'
       + '<td>' + covCell(t) + '</td>'
+      + '<td class="pc-act"><button class="mini pc-move" data-id="' + esc(t.id) + '" title="переместить в раздел">📁</button><button class="mini pc-del" data-id="' + esc(t.id) + '" title="удалить кусок">🗑</button></td>'
       + '</tr>';
   }).join('');
 }
@@ -51,10 +52,17 @@ document.getElementById('prows').addEventListener('click', e => {
   if(cell.querySelector('input')) return;
   const id = cell.parentElement.dataset.id, field = cell.dataset.field;
   const t = PIECES.find(x => x.id === id); if(!t) return;
-  const cur = (field === 'provides' ? give(t) : need(t)).join(', ');
-  cell.innerHTML = '<input class="inv-cell-in" value="' + esc(cur) + '" placeholder="имена через запятую">';
+  const isGroup = field === 'group';
+  const cur = isGroup ? (t.group || '') : (field === 'provides' ? give(t) : need(t)).join(', ');
+  cell.innerHTML = '<input class="inv-cell-in" value="' + esc(cur) + '" placeholder="' + (isGroup ? 'раздел / подраздел' : 'имена через запятую') + '">';
   const inp = cell.querySelector('input'); inp.focus(); inp.select();
   const save = async () => {
+    if(isGroup){
+      const val = inp.value.trim();
+      const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id, group: val }) }).then(r => r.json()).catch(() => ({}));
+      if(r && r.ok) t.group = val;
+      fillFilters(); renderPieces(); return;
+    }
     const vals = inp.value.split(',').map(s => s.trim()).filter(Boolean);
     const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id, [field]: vals }) }).then(r => r.json()).catch(() => ({}));
     if(r && r.ok){ t.comp = t.comp || {}; t.comp[field] = vals; }
@@ -62,6 +70,26 @@ document.getElementById('prows').addEventListener('click', e => {
   };
   inp.addEventListener('blur', save, { once: true });
   inp.addEventListener('keydown', ev => { if(ev.key === 'Enter'){ ev.preventDefault(); inp.blur(); } if(ev.key === 'Escape'){ inp.removeEventListener('blur', save); renderPieces(); } });
+});
+// переместить кусок в другой раздел / удалить — работает и в таблице, и в дереве
+async function movePiece(id){
+  const t = PIECES.find(x => x.id === id); if(!t) return;
+  const v = prompt('Раздел для «' + (t.title || id) + '» (подраздел через «/»). Пусто = без раздела:', t.group || '');
+  if(v === null) return;
+  const val = v.trim();
+  const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id, group: val }) }).then(r => r.json()).catch(() => ({}));
+  if(r && r.ok){ t.group = val; fillFilters(); renderPieces(); }
+}
+async function deletePiece(id){
+  const t = PIECES.find(x => x.id === id); if(!t) return;
+  if(!confirm('Удалить кусок «' + (t.title || id) + '»? Файл удалится без возврата.')) return;
+  await fetch('/api/delete', { method:'POST', body: JSON.stringify({ id }) }).catch(() => {});
+  try { PIECES = await fetch('/api/list').then(r => r.json()); } catch(_){ PIECES = PIECES.filter(x => x.id !== id); }
+  fillFilters(); renderPieces();
+}
+document.addEventListener('click', e => {
+  const mv = e.target.closest && e.target.closest('.pc-move'); if(mv){ e.preventDefault(); movePiece(mv.dataset.id); return; }
+  const dl = e.target.closest && e.target.closest('.pc-del'); if(dl){ e.preventDefault(); deletePiece(dl.dataset.id); return; }
 });
 const _val = id => { const e = document.getElementById(id); return e ? e.value : ''; };
 function filteredPieces(){
@@ -107,7 +135,9 @@ function gpPieceRow(t){
     + '<span class="gp-lang">' + esc((t.lang || '').toUpperCase()) + '</span>'
     + (g.length ? '<span class="gp-cr give">даёт: ' + esc(g.join(', ')) + '</span>' : '')
     + (n.length ? '<span class="gp-cr need">нужно: ' + esc(n.join(', ')) + '</span>' : '')
-    + '<span class="gp-sp"></span>' + covCell(t) + '</div>';
+    + '<span class="gp-sp"></span>' + covCell(t)
+    + '<button class="mini pc-move" data-id="' + esc(t.id) + '" title="переместить в раздел">📁</button>'
+    + '<button class="mini pc-del" data-id="' + esc(t.id) + '" title="удалить кусок">🗑</button></div>';
 }
 function renderNode(node, depth){
   let html = '';
@@ -140,7 +170,7 @@ function renderPieces(){
   else {
     if(tree) tree.style.display = 'none';
     if(table) table.style.display = '';
-    document.getElementById('prows').innerHTML = list.length ? pieceRows(list) : '<tr><td colspan="6" class="empty">ничего не нашлось</td></tr>';
+    document.getElementById('prows').innerHTML = list.length ? pieceRows(list) : '<tr><td colspan="7" class="empty">ничего не нашлось</td></tr>';
   }
   document.getElementById('pcnt').textContent = list.length + (list.length === PIECES.length ? '' : ' из ' + PIECES.length);
 }
