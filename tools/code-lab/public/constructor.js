@@ -1448,7 +1448,7 @@ document.addEventListener('keydown', e => {
       const mv = ev => {
         const dx = ev.clientX - sx;
         if(which === 'left') PW = Math.max(150, Math.min(520, sPW + dx));
-        else IW = Math.max(200, Math.min(680, sIW - dx));
+        else IW = Math.max(200, Math.min(900, sIW - dx));
         apply();
       };
       const up = () => {
