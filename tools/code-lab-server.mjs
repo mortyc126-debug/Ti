@@ -363,7 +363,7 @@ const server = http.createServer(async (req, res) => {
     if(u.pathname === '/api/flows/save' && req.method === 'POST'){
       const b = await readBody(req);
       const graph = (b.graph && typeof b.graph === 'object') ? b.graph : { nodes: [], edges: [] };
-      const id = b.id && /^[\w.-]+$/.test(b.id) ? b.id : slug(b.name || 'схема');
+      const id = b.id && /^[\wа-яё.-]+$/iu.test(b.id) ? b.id : slug(b.name || 'схема');   // id содержит кириллицу — пропускаем её, иначе «дописать в ту же схему» создавало новый файл
       const obj = { id, name: String(b.name || 'Моя схема').slice(0, 80), savedAt: Date.now(),
         graph: { nodes: Array.isArray(graph.nodes) ? graph.nodes : [], edges: Array.isArray(graph.edges) ? graph.edges : [] } };
       await fs.mkdir(FLOWS, { recursive: true });
