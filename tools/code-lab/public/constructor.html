@@ -62,6 +62,7 @@
   .edges path.tmp{stroke:var(--acc);stroke-dasharray:5 4}
   .edges path.sel{stroke:var(--acc);stroke-width:3}
   .edges path.edge-hit{stroke:transparent;stroke-width:14;cursor:pointer;pointer-events:stroke}
+  .edges path.edge-bad{stroke:#FF6B6B;stroke-dasharray:6 4}
   .gnode{position:absolute;width:190px;background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--name);border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.35);user-select:none}
   .gnode.needs-input{border-left-color:var(--num,#FF8800);border-color:rgba(255,136,0,.5)}
   .gnode .need-badge{position:absolute;top:-9px;right:8px;font-size:9.5px;line-height:1;padding:3px 7px;border-radius:9px;background:rgba(255,136,0,.16);border:1px solid rgba(255,136,0,.6);color:var(--num,#FF8800);white-space:nowrap;cursor:help}
@@ -219,6 +220,7 @@
         <button class="btn" id="autowire" title="авто-связи: соединять новые куски с совместимыми по именам">🔗 авто-связи</button>
         <input type="file" id="impfile" accept=".js,.mjs,.jsx,.ts,.html,.htm,.css,.py,.sql,.json,.txt" style="display:none">
         <button class="btn" id="copy">⧉ код</button>
+        <button class="btn" id="buildcheck" title="проверить стыковку по типам и запустить собранное">🔌 собрать и проверить</button>
         <button class="btn ok" id="run">▶ запустить</button>
         <select id="fmt" class="btn" title="формат файла"><option value="html">.html</option><option value="js">.js</option><option value="txt">.txt</option></select>
         <button class="btn" id="dl">⬇ скачать</button>

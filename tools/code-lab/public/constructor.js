@@ -391,7 +391,7 @@ async function addFromCatalog(t){
     // запоминаем, из какого шаблона узел + типизированный контракт (для проверки стыковки)
     const comp = tpl.component || {};
     const contract = { provides: Array.isArray(comp.provides) ? comp.provides : [], requires: Array.isArray(comp.requires) ? comp.requires : [] };
-    addNode('raw', { fields: { code }, title: t.title, desc: tpl.desc || '', descAt: tpl.descAt || 0, src: { id: t.id, title: t.title, desc: tpl.desc || '', code, contract } });
+    addNode('raw', { fields: { code }, title: t.title, desc: tpl.desc || '', descAt: tpl.descAt || 0, src: { id: t.id, title: t.title, desc: tpl.desc || '', code, lang: tpl.lang || t.lang || 'js', contract } });
   } catch(_){}
 }
 $('#palSearch').oninput = renderPalette;
@@ -496,6 +496,30 @@ function nodeContract(nd){
     seen.add(w); requires.push(w);
   }
   return { provides, requires };
+}
+// типизированный контракт узла из шаблона (имя→тип), если он сохранён в src
+function nodeTypes(nd){
+  const prov = new Map(), req = new Map();
+  const c = nd && nd.src && nd.src.contract;
+  const put = (map, arr) => (arr || []).forEach(s => { if(window.contractParseItem){ const it = window.contractParseItem(s); if(it.name) map.set(it.name, it.type || ''); } });
+  if(c){ put(prov, c.provides); put(req, c.requires); }
+  return { prov, req };
+}
+// статус ребра по типам: 'bad' — тип выхода не подходит ко входу; 'ok' — совпало; 'none' — не несёт данных/нет типов
+function edgeTypeStatus(e){
+  const from = byId(e.from), to = byId(e.to); if(!from || !to) return 'none';
+  if(!window.contractTypesCompatible) return 'none';
+  const fc = nodeContract(from), tc = nodeContract(to);         // имена из кода
+  const ft = nodeTypes(from).prov, tt = nodeTypes(to).req;      // типы из контракта
+  const shared = [...tc.requires].filter(r => fc.provides.has(r));
+  if(!shared.length) return 'none';
+  let typed = false;
+  for(const name of shared){
+    const a = ft.get(name) || '', b = tt.get(name) || '';
+    if(a || b) typed = true;
+    if(!window.contractTypesCompatible(a, b)) return 'bad';
+  }
+  return typed ? 'ok' : 'none';
 }
 // авто-соединение нового узла с существующими по совпадению имён (provides→requires)
 function autoConnect(nd){
@@ -652,6 +676,8 @@ function drawEdges(){
     const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', d);
     // цвет ребра по виду связи (kind), если словарь загружен
     if(e.kind && window.relationColor){ const col = window.relationColor(e.kind); if(e.kind !== 'data') p.style.stroke = col; }
+    // типы не стыкуются — красное пунктирное ребро
+    if(edgeTypeStatus(e) === 'bad'){ p.classList.add('edge-bad'); }
     if(sameEdge(selectedEdge, e)) p.setAttribute('class', 'sel');
     // широкая прозрачная дорожка сверху — чтобы по тонкой стрелке было легко попасть
     const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path'); hit.setAttribute('d', d); hit.setAttribute('class', 'edge-hit');
@@ -1260,6 +1286,37 @@ window.addEventListener('message', e => {
 });
 $('#copy').onclick = () => { navigator.clipboard.writeText(currentCode()); flash($('#copy'), '✓'); };
 $('#run').onclick = run;
+// «🔌 собрать и проверить»: стыковка по типам + незакрытые входы + запуск собранного
+function nodeLang(nd){ return (nd && nd.src && nd.src.lang) ? String(nd.src.lang).toLowerCase() : 'js'; }
+async function buildCheck(){
+  const nodes = graph.nodes;
+  if(!nodes.length){ showEdgeMessage('Холст пустой — нечего собирать.', 'warn'); return; }
+  const bad = graph.edges.filter(e => edgeTypeStatus(e) === 'bad');
+  drawEdges();
+  const unmet = nodes.filter(n => nodeNeedsInput(n));
+  const langs = [...new Set(nodes.map(nodeLang))];
+  const msg = [];
+  if(bad.length) msg.push('⛔ связей с несовпадением типов: ' + bad.length + ' (красный пунктир)');
+  if(unmet.length) msg.push('⚠ узлов без входа: ' + unmet.length);
+  if(!bad.length && !unmet.length) msg.push('✓ стыковка в порядке');
+  const lvl = bad.length ? 'error' : (unmet.length ? 'warn' : 'ok');
+  // разные языки нельзя собрать в одну программу (кроме js+html)
+  if(langs.length > 1 && !(langs.length === 2 && langs.includes('js') && langs.includes('html'))){
+    showEdgeMessage(msg.join(' · ') + ' · 🚫 разные языки (' + langs.join(', ') + ') — в одну программу не собрать. Раздели по языку или передай данные через JSON.', 'error');
+    return;
+  }
+  const lang = langs[0] || 'js';
+  if(lang === 'js' || lang === 'html'){ showEdgeMessage(msg.join(' · ') + ' · запускаю в превью…', lvl); run(); return; }
+  // не-JS: собрать по порядку и запустить на сервере
+  const code = orderedNodes().map(nodeCode).join('\n');
+  showEdgeMessage(msg.join(' · ') + ' · запускаю на ПК (' + lang + ')…', lvl);
+  const r = await fetch('/api/run', { method:'POST', body: JSON.stringify({ lang, code }) }).then(x => x.json()).catch(() => ({ ok:false, error:'сервер недоступен' }));
+  if(!r.ok){ showEdgeMessage('⛔ ' + (r.error || 'ошибка запуска'), 'error'); return; }
+  let out = r.stdout || ''; if(r.stderr) out += (out ? '\n' : '') + '⚠ ' + r.stderr; if(r.timedOut) out += '\n⏱ таймаут'; if(!out.trim()) out = '(код отработал, вывода нет · ' + r.code + ')';
+  const esco = s => String(s).replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]));
+  preview.srcdoc = '<!doctype html><meta charset=utf-8><body style="margin:10px;font:12px ui-monospace,monospace;color:#F6F4FF;background:#0E0720;white-space:pre-wrap">' + esco(out) + '</body>';
+}
+if($('#buildcheck')) $('#buildcheck').onclick = buildCheck;
 function download(name, text, mime){ const b = new Blob([text], { type: mime + ';charset=utf-8' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 2000); }
 function wrapHtml(code){ return '<!doctype html>\n<html lang="ru"><head><meta charset="utf-8"><title>моя страница</title>\n<style>body{margin:12px;font:13px ui-monospace,monospace;color:#F6F4FF;background:#0E0720}#log{color:#52F2C9;white-space:pre-wrap}</style></head>\n<body>\n<canvas id="c" width="300" height="160" style="background:#140A24;border:1px solid #241638;border-radius:6px"></canvas>\n<div id="out"></div><pre id="log"></pre>\n<script>\nvar log=document.getElementById("log");var _p=function(){log.textContent+=Array.prototype.join.call(arguments," ")+"\\n";};var console={log:_p,error:_p,warn:_p,info:_p};\ntry{\n' + code + '\n}catch(e){log.textContent+="\\u26d4 "+e.message;}\n<\/script>\n</body></html>\n'; }
 $('#dl').onclick = () => { const code = currentCode(); const fmt = $('#fmt').value; if(fmt === 'html') download('схема.html', wrapHtml(code), 'text/html'); else if(fmt === 'txt') download('код.txt', code, 'text/plain'); else download('код.js', code, 'text/javascript'); flash($('#dl'), '✓'); };
