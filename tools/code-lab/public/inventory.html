@@ -15,6 +15,8 @@
   .inv-head .sp{flex:1}
   .inv-search{background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:7px 10px;font-family:ui-monospace,monospace;min-width:180px}
   .inv-search:focus{outline:none;border-color:var(--name)}
+  .inv-sel{background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text2);font-size:12px;padding:7px 9px;font-family:ui-monospace,monospace;cursor:pointer}
+  .inv-sel:focus{outline:none;border-color:var(--name)}
   .btn{font:12px/1 ui-monospace,monospace;color:var(--text2);background:var(--s2);border:1px solid var(--border);border-radius:7px;padding:8px 11px;cursor:pointer}
   .btn:hover{color:var(--acc);border-color:rgba(255,0,110,.4)}
   table.inv-t{width:100%;border-collapse:collapse;font-size:12.5px}
@@ -79,6 +81,9 @@
     <div class="inv-head">
       <h2>Кусочки кода</h2><span class="cnt" id="pcnt"></span>
       <span class="sp"></span>
+      <select class="inv-sel" id="plang" title="язык"><option value="">язык: все</option></select>
+      <select class="inv-sel" id="pgroup" title="раздел"><option value="">раздел: все</option></select>
+      <select class="inv-sel" id="pfacet" title="не хватает грани"><option value="">не хватает: —</option></select>
       <label class="inv-chk"><input type="checkbox" id="pincomplete"> только с пробелами</label>
       <input class="inv-search" id="pq" placeholder="фильтр по названию/коду…">
       <button class="btn" id="plinks">📥 связи из текста</button>

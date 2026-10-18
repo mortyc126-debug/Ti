@@ -6,7 +6,7 @@ let PIECES = [], FLOWS = [];
   try { FLOWS = await fetch('/api/flows/list').then(r => r.json()); } catch(_){ FLOWS = []; }
   const leg = document.getElementById('covLegend');
   if(leg) leg.innerHTML = 'Описано: ' + [['inputs','Вх','Входы'],['outputs','Вых','Выходы'],['env','Ср','Среда'],['pre','Пр','Предусловия'],['effects','Эф','Побочные эффекты'],['errors','Ош','Ошибки'],['links','Св','Связи'],['check','Пв','Проверка']].map(f => '<span><b>' + f[1] + '</b> — ' + f[2] + '</span>').join('');
-  renderPieces(); renderFlows();
+  fillFilters(); renderPieces(); renderFlows();
 })();
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
@@ -63,13 +63,27 @@ document.getElementById('prows').addEventListener('click', e => {
   inp.addEventListener('blur', save, { once: true });
   inp.addEventListener('keydown', ev => { if(ev.key === 'Enter'){ ev.preventDefault(); inp.blur(); } if(ev.key === 'Escape'){ inp.removeEventListener('blur', save); renderPieces(); } });
 });
+const _val = id => { const e = document.getElementById(id); return e ? e.value : ''; };
 function filteredPieces(){
   const q = (document.getElementById('pq').value || '').toLowerCase().trim();
   const incompleteOnly = document.getElementById('pincomplete') && document.getElementById('pincomplete').checked;
+  const lang = _val('plang'), group = _val('pgroup'), facet = _val('pfacet');
   let list = PIECES;
   if(q) list = list.filter(t => ((t.title || '') + ' ' + (t.id || '') + ' ' + (t.group || '') + ' ' + give(t).join(' ') + ' ' + need(t).join(' ')).toLowerCase().includes(q));
+  if(lang) list = list.filter(t => (t.lang || '') === lang);
+  if(group) list = list.filter(t => (t.group || '') === group);
+  if(facet) list = list.filter(t => !cov(t)[facet]);           // показать только те, где этой грани НЕТ
   if(incompleteOnly) list = list.filter(t => covCount(t) < FACETS.length);
   return list;
+}
+// наполнить выпадашки языком/разделом (из данных) и гранями (из FACETS)
+function fillFilters(){
+  const langs = [...new Set(PIECES.map(t => t.lang).filter(Boolean))].sort();
+  const groups = [...new Set(PIECES.map(t => t.group).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru'));
+  const opt = (v, label) => '<option value="' + esc(v) + '">' + esc(label) + '</option>';
+  const pl = document.getElementById('plang'); if(pl) pl.innerHTML = opt('', 'язык: все') + langs.map(l => opt(l, l.toUpperCase())).join('');
+  const pg = document.getElementById('pgroup'); if(pg) pg.innerHTML = opt('', 'раздел: все') + groups.map(g => opt(g, g)).join('');
+  const pf = document.getElementById('pfacet'); if(pf) pf.innerHTML = opt('', 'не хватает: —') + FACETS.map(f => opt(f[0], 'нет: ' + f[2])).join('');
 }
 function renderPieces(){
   const list = filteredPieces();
@@ -77,7 +91,7 @@ function renderPieces(){
   document.getElementById('pcnt').textContent = list.length + (list.length === PIECES.length ? '' : ' из ' + PIECES.length);
 }
 document.getElementById('pq').oninput = renderPieces;
-(function(){ const c = document.getElementById('pincomplete'); if(c) c.onchange = renderPieces; })();
+['pincomplete', 'plang', 'pgroup', 'pfacet'].forEach(id => { const e = document.getElementById(id); if(e) e.onchange = renderPieces; });
 
 function piecesAsText(){
   const list = filteredPieces();
@@ -375,7 +389,7 @@ function openLinksModal(){
     parsed.createMissing = !q('#lk-missing') || q('#lk-missing').checked;
     const r = await applyLinks(parsed);
     try { PIECES = await fetch('/api/list').then(x => x.json()); FLOWS = await fetch('/api/flows/list').then(x => x.json()); } catch(_){}
-    renderPieces(); renderFlows();
+    fillFilters(); renderPieces(); renderFlows();
     q('#lk-prev').innerHTML = '<div class="lp-row lp-ok">Готово: контрактов обновлено ' + r.contracts + ', ' + (r.merged ? 'дописано связей ' : 'связей ') + r.edges + (r.missing ? ', новых ящиков ' + r.missing : '') + (r.merged ? ' (в схеме всего ' + r.totalEdges + ')' : '') + (r.flowId ? ', схема сохранена' : '') + '.</div>';
     q('#lk-apply').style.display = 'none';
   };
