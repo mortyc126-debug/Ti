@@ -1,7 +1,7 @@
 {
   "id": "break-и-continue-mv6cut6g",
   "lang": "js",
-  "group": "Начать здесь / Основы программирования",
+  "group": "Основы / Синтаксис",
   "title": "break и continue",
   "desc": "break полностью останавливает цикл. continue пропускает оставшуюся часть текущей итерации и переходит к следующей.",
   "lines": [
@@ -339,7 +339,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Начать здесь"
+        "Основы"
       ],
       "runtime": [
         "JavaScript"
@@ -411,6 +411,6 @@
       "number"
     ],
     "requires": [],
-    "subcat": "Основы программирования"
+    "subcat": "Синтаксис"
   }
 }

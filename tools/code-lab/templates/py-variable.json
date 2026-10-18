@@ -1,7 +1,7 @@
 {
   "id": "py-variable",
   "lang": "python",
-  "group": "Начать здесь / Основы программирования",
+  "group": "Основы / Синтаксис",
   "title": "Переменная и вывод",
   "desc": "В Python переменная создаётся простым присваиванием — без let/const. Вывод на экран — функция print.",
   "lines": [
@@ -58,7 +58,7 @@
     "type": "fragment",
     "tags": {
       "purpose": [
-        "Начать здесь"
+        "Основы"
       ],
       "runtime": [
         "JavaScript"
@@ -126,6 +126,6 @@
       "tests": "not_run",
       "compatibility": "not_verified"
     },
-    "subcat": "Основы программирования"
+    "subcat": "Синтаксис"
   }
 }

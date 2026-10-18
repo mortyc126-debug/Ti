@@ -1,7 +1,7 @@
 {
   "id": "pytest-первый-тест-mvdrpus3",
   "lang": "python",
-  "group": "Тестирование на Python / Написать тест",
+  "group": "Тесты (Python) / Написать тест",
   "title": "pytest — первый тест",
   "desc": "Тест — функция с именем test_..., внутри которой assert. Файл тоже должен называться test_*.py. Запуск — командой pytest.",
   "lines": [
@@ -263,7 +263,7 @@
   "component": {
     "tags": {
       "purpose": [
-        "Тестирование на Python"
+        "Тесты (Python)"
       ]
     },
     "subcat": "Написать тест"
