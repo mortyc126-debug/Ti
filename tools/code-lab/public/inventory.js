@@ -85,13 +85,72 @@ function fillFilters(){
   const pg = document.getElementById('pgroup'); if(pg) pg.innerHTML = opt('', 'раздел: все') + groups.map(g => opt(g, g)).join('');
   const pf = document.getElementById('pfacet'); if(pf) pf.innerHTML = opt('', 'не хватает: —') + FACETS.map(f => opt(f[0], 'нет: ' + f[2])).join('');
 }
+// дерево разделов: group «Сеть / Запросы» → вложенность по «/»
+function buildTree(list){
+  const root = { name: '', children: new Map(), items: [] };
+  list.forEach(t => {
+    const path = String(t.group || 'Без раздела').split('/').map(s => s.trim()).filter(Boolean);
+    let node = root;
+    (path.length ? path : ['Без раздела']).forEach(seg => {
+      if(!node.children.has(seg)) node.children.set(seg, { name: seg, children: new Map(), items: [] });
+      node = node.children.get(seg);
+    });
+    node.items.push(t);
+  });
+  return root;
+}
+function treeCount(node){ let n = node.items.length; node.children.forEach(c => n += treeCount(c)); return n; }
+function gpPieceRow(t){
+  const g = give(t), n = need(t);
+  return '<div class="gp-piece">'
+    + '<a href="/component.html?id=' + encodeURIComponent(t.id) + '">' + esc(t.title || t.id) + '</a>'
+    + '<span class="gp-lang">' + esc((t.lang || '').toUpperCase()) + '</span>'
+    + (g.length ? '<span class="gp-cr give">даёт: ' + esc(g.join(', ')) + '</span>' : '')
+    + (n.length ? '<span class="gp-cr need">нужно: ' + esc(n.join(', ')) + '</span>' : '')
+    + '<span class="gp-sp"></span>' + covCell(t) + '</div>';
+}
+function renderNode(node, depth){
+  let html = '';
+  // подразделы (сортировка по алфавиту), потом куски прямо в этом разделе
+  const kids = [...node.children.values()].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  kids.forEach(ch => {
+    html += '<details class="tsec" open><summary><span class="tri">▶</span>'
+      + '<span class="tname">' + esc(ch.name) + '</span><span class="tcnt">' + treeCount(ch) + '</span></summary>'
+      + '<div class="tbody">' + renderNode(ch, depth + 1) + '</div></details>';
+  });
+  node.items.forEach(t => { html += gpPieceRow(t); });
+  return html;
+}
+function renderGrouped(list){
+  const host = document.getElementById('prows');
+  // прячем таблицу, рисуем дерево в контейнере-замене
+  let tree = document.getElementById('ptree');
+  const table = host.closest('table');
+  if(table) table.style.display = list.length ? 'none' : '';
+  if(!tree){ tree = document.createElement('div'); tree.id = 'ptree'; tree.className = 'tree'; table.parentElement.appendChild(tree); }
+  tree.style.display = '';
+  tree.innerHTML = list.length ? renderNode(buildTree(list), 0) : '<div class="empty">ничего не нашлось</div>';
+}
 function renderPieces(){
   const list = filteredPieces();
-  document.getElementById('prows').innerHTML = list.length ? pieceRows(list) : '<tr><td colspan="5" class="empty">ничего не нашлось</td></tr>';
+  const grouped = document.getElementById('pgroupview') && document.getElementById('pgroupview').checked;
+  const table = document.getElementById('prows').closest('table');
+  const tree = document.getElementById('ptree');
+  if(grouped){ renderGrouped(list); }
+  else {
+    if(tree) tree.style.display = 'none';
+    if(table) table.style.display = '';
+    document.getElementById('prows').innerHTML = list.length ? pieceRows(list) : '<tr><td colspan="6" class="empty">ничего не нашлось</td></tr>';
+  }
   document.getElementById('pcnt').textContent = list.length + (list.length === PIECES.length ? '' : ' из ' + PIECES.length);
 }
 document.getElementById('pq').oninput = renderPieces;
-['pincomplete', 'plang', 'pgroup', 'pfacet'].forEach(id => { const e = document.getElementById(id); if(e) e.onchange = renderPieces; });
+['pincomplete', 'plang', 'pgroup', 'pfacet', 'pgroupview'].forEach(id => { const e = document.getElementById(id); if(e) e.onchange = renderPieces; });
+// запоминаем «по разделам» между заходами
+(function(){ const c = document.getElementById('pgroupview'); if(!c) return;
+  try { c.checked = localStorage.getItem('codelab_inv_group') === '1'; } catch(_){}
+  c.addEventListener('change', () => { try { localStorage.setItem('codelab_inv_group', c.checked ? '1' : '0'); } catch(_){} });
+})();
 
 function piecesAsText(){
   const list = filteredPieces();
@@ -339,10 +398,13 @@ const LINKS_SAMPLE = [
   '',
   'Среднее:: нужно=сумма, количество; даёт=среднее; среда=браузер; проверка=сравни с ручным счётом; раздел=Математика',
   '',
-  '# разложить куски по разделам: «раздел: X», затем список через «+»',
-  'раздел: Сеть и API',
+  '# разложить куски по разделам: «раздел: X», затем список через «+».',
+  '# подразделы — через «/»: раздел: Сеть / Запросы',
+  'раздел: Сеть / Запросы',
   '+ fetch + await — получить данные',
-  '+ Парсер ответа API (columns/data)'
+  '+ Парсер ответа API (columns/data)',
+  'раздел: Сеть / Ошибки',
+  '+ Запрос сломался — где и почему'
 ].join('\n');
 function relationsRef(){
   const R = window.CODE_RELATIONS || [];
@@ -360,7 +422,7 @@ function openLinksModal(){
   const box = el2('div', 'modal');
   box.innerHTML = '<h3>Связи из текста</h3>'
     + '<p class="mh">Вставь правила — приложение разберёт связи и контракты кусков. Куски ищутся по названию. Связи соберутся в схему, контракты («нужно/даёт/среда/ошибка/проверка/вход/выход/<b>раздел</b>») запишутся на куски. Разложить по разделам можно блоком «<b>раздел: X</b>» и списком «<b>+ Имя куска</b>». Отрицания («A <b>не</b> зависит от B») и неуверенность («A <b>может</b> вызывать B») пропускаются.</p>'
-    + '<div class="fmt">Плоско: A -> B · A зависит от B · A конфликтует с B …&#10;Дерево:  «Кусок A»&#10;             — создаёт → «Кусок B» (пояснение) [условие]&#10;Контракт: Имя:: нужно=x,y; даёт=z; среда=браузер; раздел=Сеть; проверка=…&#10;Разделы: раздел: Сеть и API&#10;             + Имя куска&#10;схема: Название</div>'
+    + '<div class="fmt">Плоско: A -> B · A зависит от B · A конфликтует с B …&#10;Дерево:  «Кусок A»&#10;             — создаёт → «Кусок B» (пояснение) [условие]&#10;Контракт: Имя:: нужно=x,y; даёт=z; среда=браузер; раздел=Сеть; проверка=…&#10;Разделы: раздел: Сеть / Запросы&#10;             + Имя куска   (подраздел — через «/»)&#10;схема: Название</div>'
     + '<details class="rr"><summary>виды связей, которые понимает парсер (' + (window.CODE_RELATIONS || []).length + ')</summary><div class="rr-box">' + relationsRef() + '</div></details>'
     + '<textarea id="lk-text" placeholder="вставь текст или нажми «пример»"></textarea>'
     + '<div class="mbtns"><button class="btn" id="lk-sample">пример</button><button class="btn ok" id="lk-parse">разобрать</button><button class="btn" id="lk-apply" style="display:none">применить</button><button class="btn" id="lk-close">закрыть</button><label class="inv-chk" style="margin-left:auto"><input type="checkbox" id="lk-missing" checked> создавать узлы для ненайденных (ящики данных)</label></div>'
