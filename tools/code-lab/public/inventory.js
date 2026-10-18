@@ -487,3 +487,79 @@ function openLinksModal(){
   };
 }
 document.getElementById('plinks').onclick = openLinksModal;
+
+// ── отдельное окно: разложить куски по разделам ────────────────────────────────
+const SECTIONS_SAMPLE = [
+  '# Как разложить куски по разделам.',
+  '# «раздел: Название» — начинает раздел. Подраздел — через «/».',
+  '# Ниже — список кусков со значком «+» (имена как в Описи).',
+  '',
+  'раздел: Сеть / Запросы',
+  '+ fetch + await — получить данные',
+  '+ Парсер ответа API (columns/data)',
+  '',
+  'раздел: Сеть / Ошибки',
+  '+ Запрос сломался — где и почему',
+  '',
+  'раздел: Математика / Статистика',
+  '+ Среднее',
+  '+ Сумма (reduce)'
+].join('\n');
+// разобрать только раздельную разметку → [{name, group}]
+function parseSections(text){
+  const items = [], errors = []; let section = '';
+  String(text).split('\n').forEach((raw, i) => {
+    const line = raw.trim(); const ln = i + 1;
+    if(!line || line.startsWith('#') || line.startsWith('//')) return;
+    let m;
+    if((m = line.match(/^(?:раздел|группа|категория)[:\s]+(.+)/i))){ section = cleanName(m[1]); return; }
+    if((m = line.match(/^\+\s*(.+)$/))){
+      if(!section){ errors.push('строка ' + ln + ': «+ имя» без «раздел:» выше — «' + line + '»'); return; }
+      items.push({ name: cleanName(m[1]), group: section, ln }); return;
+    }
+    // просто имя под заголовком раздела — тоже кладём (без «+»)
+    if(section){ items.push({ name: cleanName(line), group: section, ln }); return; }
+    errors.push('строка ' + ln + ': не понял — «' + line + '» (нет «раздел:» выше)');
+  });
+  return { items, errors };
+}
+function openSectionsModal(){
+  const bg = el2('div', 'modal-bg');
+  const box = el2('div', 'modal');
+  box.innerHTML = '<h3>Разделы из текста</h3>'
+    + '<p class="mh">Разложи куски по разделам. Пиши «<b>раздел: Название</b>», ниже — список кусков со значком «<b>+</b>». Подразделы — через «<b>/</b>» (напр. «Сеть / Запросы»). Имена — как в Описи, можно в «ёлочках».</p>'
+    + '<div class="fmt">раздел: Сеть / Запросы&#10;+ fetch + await — получить данные&#10;+ Парсер ответа API (columns/data)&#10;&#10;раздел: Сеть / Ошибки&#10;+ Запрос сломался — где и почему</div>'
+    + '<textarea id="sc-text" placeholder="вставь текст или нажми «пример»"></textarea>'
+    + '<div class="mbtns"><button class="btn" id="sc-sample">пример</button><button class="btn ok" id="sc-parse">разобрать</button><button class="btn" id="sc-apply" style="display:none">применить</button><button class="btn" id="sc-close">закрыть</button></div>'
+    + '<div class="lp-prev" id="sc-prev"></div>';
+  bg.appendChild(box); document.body.appendChild(bg);
+  const q = s => bg.querySelector(s);
+  bg.onclick = e => { if(e.target === bg) bg.remove(); };
+  q('#sc-close').onclick = () => bg.remove();
+  q('#sc-sample').onclick = () => { q('#sc-text').value = SECTIONS_SAMPLE; };
+  let parsed = null;
+  q('#sc-parse').onclick = () => {
+    parsed = parseSections(q('#sc-text').value);
+    const prev = q('#sc-prev'); prev.innerHTML = '';
+    const line = (txt, cls) => { const d = el2('div', 'lp-row ' + (cls || '')); d.textContent = txt; return d; };
+    prev.appendChild(el2('div', 'lp-sec', 'в разделы (' + parsed.items.length + ')'));
+    parsed.items.forEach(it => { const t = resolveName(it.name); prev.appendChild(line((t ? '✓ ' : '✕ ') + it.name + '  →  ' + it.group + (t ? '' : '  (кусок не найден)'), t ? 'lp-ok' : 'lp-bad')); });
+    if(parsed.errors.length){ prev.appendChild(el2('div', 'lp-sec', 'не разобрано')); parsed.errors.forEach(x => prev.appendChild(line(x, 'lp-bad'))); }
+    q('#sc-apply').style.display = parsed.items.some(it => resolveName(it.name)) ? '' : 'none';
+  };
+  q('#sc-apply').onclick = async () => {
+    if(!parsed) return;
+    q('#sc-apply').textContent = 'применяю…'; q('#sc-apply').disabled = true;
+    let done = 0;
+    for(const it of parsed.items){
+      const t = resolveName(it.name); if(!t) continue;
+      const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: t.id, group: it.group }) }).then(r => r.json()).catch(() => ({}));
+      if(r && r.ok){ t.group = it.group; done++; }
+    }
+    try { PIECES = await fetch('/api/list').then(x => x.json()); } catch(_){}
+    fillFilters(); renderPieces();
+    q('#sc-prev').innerHTML = '<div class="lp-row lp-ok">Готово: разложено кусков ' + done + '.</div>';
+    q('#sc-apply').style.display = 'none';
+  };
+}
+document.getElementById('psections').onclick = openSectionsModal;
