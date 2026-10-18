@@ -244,16 +244,29 @@ async function applyLinks(P){
     }
     await fetch('/api/edit', { method:'POST', body: JSON.stringify(body) }).catch(() => {});
   }
-  const used = new Map(), nodes = [], edges = []; let col = 0, missing = 0;
+  const name = P.flowName || ('Импорт связей ' + new Date().toLocaleDateString('ru'));
   const createMissing = P.createMissing !== false;   // по умолчанию создаём ящики для ненайденных
+  // дописываем в схему того же имени, а не затираем её: подхватываем существующий граф
+  let existingId = null, baseNodes = [], baseEdges = [];
+  try {
+    const list = await fetch('/api/flows/list').then(r => r.json());
+    const ex = (list || []).find(x => (x.name || '').trim().toLowerCase() === name.trim().toLowerCase());
+    if(ex){ existingId = ex.id; const full = await fetch('/api/flows/get?id=' + encodeURIComponent(ex.id)).then(r => r.json()).catch(() => null);
+      if(full && full.graph){ baseNodes = Array.isArray(full.graph.nodes) ? full.graph.nodes : []; baseEdges = Array.isArray(full.graph.edges) ? full.graph.edges : []; } }
+  } catch(_){}
+  const used = new Map(), nodes = baseNodes.slice(), edges = baseEdges.slice(); let col = nodes.length, missing = 0, addedN = 0, addedE = 0;
+  // опознаём уже существующие узлы: кусок — по id, ящик — по имени (label:…)
+  const identityOf = n => (n && n.src && n.src.id) ? n.src.id : ('label:' + String((n && n.title) || '').toLowerCase());
+  nodes.forEach(n => used.set(identityOf(n), n.id));
   const place = () => ({ x: 60 + (col % 4) * 240, y: 60 + Math.floor(col / 4) * 170 });
+  const newId = () => Math.random().toString(36).slice(2, 8);
   const ensureNode = async t => {
     if(used.has(t.id)) return used.get(t.id);
     const full = await fetch('/api/template?id=' + encodeURIComponent(t.id)).then(r => r.json()).catch(() => null);
     const code = ((full && full.lines) || []).map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n');
-    const nid = Math.random().toString(36).slice(2, 8); const p = place();
+    const nid = newId(); const p = place();
     nodes.push({ id: nid, blockId: 'raw', fields: { code }, title: t.title, desc: (full && full.desc) || '', src: { id: t.id, title: t.title, desc: (full && full.desc) || '', code }, x: p.x, y: p.y });
-    col++; used.set(t.id, nid); return nid;
+    col++; addedN++; used.set(t.id, nid); return nid;
   };
   // узел по имени: существующий кусок → полный узел; иначе ящик-ярлык (не сохранённый кусок)
   const nodeFor = async name => {
@@ -261,26 +274,26 @@ async function applyLinks(P){
     if(!createMissing) return null;
     const key = 'label:' + String(name).toLowerCase();
     if(used.has(key)) return used.get(key);
-    const nid = Math.random().toString(36).slice(2, 8); const p = place();
+    const nid = newId(); const p = place();
     nodes.push({ id: nid, blockId: 'raw', fields: { code: '' }, title: name, desc: '(ящик данных — не сохранённый кусок)', x: p.x, y: p.y });
-    col++; missing++; used.set(key, nid); return nid;
+    col++; missing++; addedN++; used.set(key, nid); return nid;
   };
   for(const e of P.edges){
     const na = await nodeFor(e.a), nb = await nodeFor(e.b); if(na == null || nb == null) continue; const kind = e.kind || 'data';
     // ненаправленные связи (дубликат/конфликтует/альтернатива) — дубль в любом порядке; разные виды между одной парой разрешены
     const rel = (window.relationById && window.relationById(kind)) || { dir: 'd' };
-    const dup = edges.some(x => x.kind === kind && (rel.dir === 'u'
+    const dup = edges.some(x => (x.kind || 'data') === kind && (rel.dir === 'u'
       ? ((x.from === na && x.to === nb) || (x.from === nb && x.to === na))
       : (x.from === na && x.to === nb)));
-    if(!dup) edges.push({ from: na, to: nb, kind, src: e.src || '' });
+    if(!dup){ edges.push({ from: na, to: nb, kind, src: e.src || '' }); addedE++; }
   }
   let flowId = null;
   if(nodes.length){
-    const name = P.flowName || ('Импорт связей ' + new Date().toLocaleDateString('ru'));
-    const r = await fetch('/api/flows/save', { method:'POST', body: JSON.stringify({ name, graph: { nodes, edges } }) }).then(r => r.json()).catch(() => ({}));
+    const body = { name, graph: { nodes, edges } }; if(existingId) body.id = existingId;
+    const r = await fetch('/api/flows/save', { method:'POST', body: JSON.stringify(body) }).then(r => r.json()).catch(() => ({}));
     flowId = r.id;
   }
-  return { contracts: P.contracts.length, edges: edges.length, nodes: nodes.length, missing, flowId };
+  return { contracts: P.contracts.length, edges: addedE, nodes: addedN, missing, merged: !!existingId, totalEdges: edges.length, flowId };
 }
 const LINKS_SAMPLE = [
   '# Два формата. 1) плоский: Кусок A <вид> Кусок B (по строке на связь).',
@@ -349,7 +362,7 @@ function openLinksModal(){
     const r = await applyLinks(parsed);
     try { PIECES = await fetch('/api/list').then(x => x.json()); FLOWS = await fetch('/api/flows/list').then(x => x.json()); } catch(_){}
     renderPieces(); renderFlows();
-    q('#lk-prev').innerHTML = '<div class="lp-row lp-ok">Готово: контрактов обновлено ' + r.contracts + ', связей ' + r.edges + (r.missing ? ', ящиков-узлов ' + r.missing : '') + (r.flowId ? ', схема сохранена' : '') + '.</div>';
+    q('#lk-prev').innerHTML = '<div class="lp-row lp-ok">Готово: контрактов обновлено ' + r.contracts + ', ' + (r.merged ? 'дописано связей ' : 'связей ') + r.edges + (r.missing ? ', новых ящиков ' + r.missing : '') + (r.merged ? ' (в схеме всего ' + r.totalEdges + ')' : '') + (r.flowId ? ', схема сохранена' : '') + '.</div>';
     q('#lk-apply').style.display = 'none';
   };
 }
