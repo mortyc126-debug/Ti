@@ -1,0 +1,3879 @@
+{
+  "id": "импорт-связей-18-10-2026-mvde3qgh",
+  "name": "Импорт связей 18.10.2026",
+  "savedAt": 1792301611697,
+  "graph": {
+    "nodes": [
+      {
+        "id": "nhvcx1",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Массив (список) —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 60
+      },
+      {
+        "id": "2ndhqe",
+        "blockId": "raw",
+        "fields": {
+          "code": "const числа = [10, 20, 30];\nconst сумма = числа.reduce((a, b) => a + b, 0); // складываем вручную\nconst среднее = сумма / числа.length;\nconsole.log(среднее); // 20"
+        },
+        "title": "Среднее — JavaScript",
+        "desc": "Задача одна: среднее от [10,20,30]. JS: встроенного «среднего» нет — суммируем сами через reduce, делим на длину. Больше ручной работы, зато работает в браузере.",
+        "src": {
+          "id": "same-mean-js",
+          "title": "Среднее — JavaScript",
+          "desc": "Задача одна: среднее от [10,20,30]. JS: встроенного «среднего» нет — суммируем сами через reduce, делим на длину. Больше ручной работы, зато работает в браузере.",
+          "code": "const числа = [10, 20, 30];\nconst сумма = числа.reduce((a, b) => a + b, 0); // складываем вручную\nconst среднее = сумма / числа.length;\nconsole.log(среднее); // 20"
+        },
+        "x": 300,
+        "y": 60
+      },
+      {
+        "id": "wieucd",
+        "blockId": "raw",
+        "fields": {
+          "code": "числа = [10, 20, 30]\nсреднее = sum(числа) / len(числа)  # sum и len — встроенные\nprint(среднее)  # 20.0"
+        },
+        "title": "Среднее — Python",
+        "desc": "То же среднее. Python: есть готовые sum() и len(), код короче и читается почти как фраза. Но это скрипт — в браузере не запустится, нужен Python.",
+        "src": {
+          "id": "same-mean-py",
+          "title": "Среднее — Python",
+          "desc": "То же среднее. Python: есть готовые sum() и len(), код короче и читается почти как фраза. Но это скрипт — в браузере не запустится, нужен Python.",
+          "code": "числа = [10, 20, 30]\nсреднее = sum(числа) / len(числа)  # sum и len — встроенные\nprint(среднее)  # 20.0"
+        },
+        "x": 540,
+        "y": 60
+      },
+      {
+        "id": "zvpt1v",
+        "blockId": "raw",
+        "fields": {
+          "code": "-- таблица nums со столбцом v: 10, 20, 30\nselect avg(v) as среднее\nfrom nums;\n-- результат: 20"
+        },
+        "title": "Среднее — SQL",
+        "desc": "То же среднее, но данные лежат в ТАБЛИЦЕ. SQL: ни цикла, ни суммы вручную — пишешь avg(столбец), а КАК считать решает база. Описываешь ЧТО хочешь, не КАК.",
+        "src": {
+          "id": "same-mean-sql",
+          "title": "Среднее — SQL",
+          "desc": "То же среднее, но данные лежат в ТАБЛИЦЕ. SQL: ни цикла, ни суммы вручную — пишешь avg(столбец), а КАК считать решает база. Описываешь ЧТО хочешь, не КАК.",
+          "code": "-- таблица nums со столбцом v: 10, 20, 30\nselect avg(v) as среднее\nfrom nums;\n-- результат: 20"
+        },
+        "x": 780,
+        "y": 60
+      },
+      {
+        "id": "6oz336",
+        "blockId": "raw",
+        "fields": {
+          "code": "function calculateTotal(price, quantity) {\n  return price * quantity;\n}\n\nconst orders = [\n  { price: 12, quantity: 2 },\n  { price: 5, quantity: 4 },\n  { price: 20, quantity: 1 }\n];\n\nconst totals = orders.map(order =>\n  calculateTotal(order.price, order.quantity)\n);\n\nconsole.log(totals);"
+        },
+        "title": "Применить формулу к массиву",
+        "desc": "map передаёт каждый элемент в функцию-преобразователь и возвращает новый массив результатов. Формулу удобно вынести в отдельную функцию.",
+        "src": {
+          "id": "применить-формулу-к-массиву-mv6cut33",
+          "title": "Применить формулу к массиву",
+          "desc": "map передаёт каждый элемент в функцию-преобразователь и возвращает новый массив результатов. Формулу удобно вынести в отдельную функцию.",
+          "code": "function calculateTotal(price, quantity) {\n  return price * quantity;\n}\n\nconst orders = [\n  { price: 12, quantity: 2 },\n  { price: 5, quantity: 4 },\n  { price: 20, quantity: 1 }\n];\n\nconst totals = orders.map(order =>\n  calculateTotal(order.price, order.quantity)\n);\n\nconsole.log(totals);"
+        },
+        "x": 60,
+        "y": 230
+      },
+      {
+        "id": "vgsi10",
+        "blockId": "raw",
+        "fields": {
+          "code": "const bonds = [\n  { name: \"Альфа\", yield: 12.4, years: 2 },\n  { name: \"Бета\", yield: 9.8, years: 1 },\n  { name: \"Гамма\", yield: 13.1, years: 5 }\n];\n\nconst shortlist = bonds\n  .filter(bond => bond.yield >= 10 && bond.years <= 3)\n  .sort((a, b) => b.yield - a.yield);\n\nconsole.log(shortlist.map(bond => bond.name));"
+        },
+        "title": "Фильтрация и сортировка облигаций",
+        "desc": "filter отбирает записи по нескольким условиям, а sort сортирует подходящие записи. Для числовых полей используйте числовой компаратор.",
+        "src": {
+          "id": "фильтрация-и-сортировка-облигаций-mv6cut3i",
+          "title": "Фильтрация и сортировка облигаций",
+          "desc": "filter отбирает записи по нескольким условиям, а sort сортирует подходящие записи. Для числовых полей используйте числовой компаратор.",
+          "code": "const bonds = [\n  { name: \"Альфа\", yield: 12.4, years: 2 },\n  { name: \"Бета\", yield: 9.8, years: 1 },\n  { name: \"Гамма\", yield: 13.1, years: 5 }\n];\n\nconst shortlist = bonds\n  .filter(bond => bond.yield >= 10 && bond.years <= 3)\n  .sort((a, b) => b.yield - a.yield);\n\nconsole.log(shortlist.map(bond => bond.name));"
+        },
+        "x": 300,
+        "y": 230
+      },
+      {
+        "id": "ftbgfb",
+        "blockId": "raw",
+        "fields": {
+          "code": "const colors = [\n  { name: \"Розовый\", hex: \"#FF006E\" },\n  { name: \"Мятный\", hex: \"#52F2C9\" }\n];\nconst table = document.querySelector(\"#colors\");\nconst body = table.querySelector(\"tbody\");\n\ncolors.forEach(color => {\n  const row = document.createElement(\"tr\");\n  const nameCell = document.createElement(\"td\");\n  const hexCell = document.createElement(\"td\");\n\n  nameCell.textContent = color.name;\n  hexCell.textContent = color.hex;\n  row.append(nameCell, hexCell);\n  body.append(row);\n});"
+        },
+        "title": "Построить таблицу из массива",
+        "desc": "Создавайте строки и ячейки через createElement, а текст задавайте через textContent. Это безопаснее, чем собирать HTML из пользовательских строк.",
+        "src": {
+          "id": "построить-таблицу-из-массива-mv6cuszm",
+          "title": "Построить таблицу из массива",
+          "desc": "Создавайте строки и ячейки через createElement, а текст задавайте через textContent. Это безопаснее, чем собирать HTML из пользовательских строк.",
+          "code": "const colors = [\n  { name: \"Розовый\", hex: \"#FF006E\" },\n  { name: \"Мятный\", hex: \"#52F2C9\" }\n];\nconst table = document.querySelector(\"#colors\");\nconst body = table.querySelector(\"tbody\");\n\ncolors.forEach(color => {\n  const row = document.createElement(\"tr\");\n  const nameCell = document.createElement(\"td\");\n  const hexCell = document.createElement(\"td\");\n\n  nameCell.textContent = color.name;\n  hexCell.textContent = color.hex;\n  row.append(nameCell, hexCell);\n  body.append(row);\n});"
+        },
+        "x": 540,
+        "y": 230
+      },
+      {
+        "id": "phwsx5",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Перебор: map / filter / reduce —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 230
+      },
+      {
+        "id": "2uljv5",
+        "blockId": "raw",
+        "fields": {
+          "code": "const цены = [100, 90, 120];\n\nconsole.log(цены[0]);      // первый элемент\nconsole.log(цены.length);  // сколько элементов\n\nцены.push(80);             // добавить в конец"
+        },
+        "title": "Массив (список)",
+        "desc": "Массив — упорядоченный список значений. Доступ по индексу (с нуля). Длина — сколько элементов.",
+        "src": {
+          "id": "js-array",
+          "title": "Массив (список)",
+          "desc": "Массив — упорядоченный список значений. Доступ по индексу (с нуля). Длина — сколько элементов.",
+          "code": "const цены = [100, 90, 120];\n\nconsole.log(цены[0]);      // первый элемент\nconsole.log(цены.length);  // сколько элементов\n\nцены.push(80);             // добавить в конец"
+        },
+        "x": 60,
+        "y": 400
+      },
+      {
+        "id": "4uvw1l",
+        "blockId": "raw",
+        "fields": {
+          "code": "const items = [\n  { price: 10, quantity: 2 },\n  { price: 7, quantity: 3 },\n  { price: 5, quantity: 1 }\n];\n\nconst totals = items.map(item => item.price * item.quantity);\nconst grandTotal = totals.reduce((sum, value) => sum + value, 0);\n\nconsole.log(totals);\nconsole.log(grandTotal);"
+        },
+        "title": "Цепочка map и reduce",
+        "desc": "map преобразует каждую запись, reduce собирает результаты в одно значение. Удобно применять формулу к данным, а затем вычислять сумму, среднее или итог.",
+        "src": {
+          "id": "цепочка-map-и-reduce-mv6cut2o",
+          "title": "Цепочка map и reduce",
+          "desc": "map преобразует каждую запись, reduce собирает результаты в одно значение. Удобно применять формулу к данным, а затем вычислять сумму, среднее или итог.",
+          "code": "const items = [\n  { price: 10, quantity: 2 },\n  { price: 7, quantity: 3 },\n  { price: 5, quantity: 1 }\n];\n\nconst totals = items.map(item => item.price * item.quantity);\nconst grandTotal = totals.reduce((sum, value) => sum + value, 0);\n\nconsole.log(totals);\nconsole.log(grandTotal);"
+        },
+        "x": 300,
+        "y": 400
+      },
+      {
+        "id": "iw88cn",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "filter — отфильтровать элементы —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 400
+      },
+      {
+        "id": "x7k6jz",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "sort — сортировка чисел —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 400
+      },
+      {
+        "id": "17mf1v",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "slice — скопировать часть массива —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 570
+      },
+      {
+        "id": "weuyea",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Цепочка map и reduce —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 570
+      },
+      {
+        "id": "ay5mxp",
+        "blockId": "raw",
+        "fields": {
+          "code": "const числа = [1, 2, 3, 4];\n\nconst удвоенные = числа.map(x => x * 2);        // [2,4,6,8]\nconst чётные    = числа.filter(x => x % 2 === 0); // [2,4]\nconst сумма     = числа.reduce((acc, x) => acc + x, 0); // 10"
+        },
+        "title": "Перебор: map / filter / reduce",
+        "desc": "Три главных метода массива. map — преобразовать каждый; filter — отобрать; reduce — свернуть в одно число.",
+        "src": {
+          "id": "js-array-methods",
+          "title": "Перебор: map / filter / reduce",
+          "desc": "Три главных метода массива. map — преобразовать каждый; filter — отобрать; reduce — свернуть в одно число.",
+          "code": "const числа = [1, 2, 3, 4];\n\nconst удвоенные = числа.map(x => x * 2);        // [2,4,6,8]\nconst чётные    = числа.filter(x => x % 2 === 0); // [2,4]\nconst сумма     = числа.reduce((acc, x) => acc + x, 0); // 10"
+        },
+        "x": 540,
+        "y": 570
+      },
+      {
+        "id": "7uj8hx",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Применить формулу к массиву —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 570
+      },
+      {
+        "id": "z9smbr",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Расчёт: среднее и округление —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 740
+      },
+      {
+        "id": "91jdus",
+        "blockId": "raw",
+        "fields": {
+          "code": "const low = Math.min(8, 3, 12, -2);\nconst high = Math.max(8, 3, 12, -2);\n\nconsole.log(low);\nconsole.log(high);"
+        },
+        "title": "Math.min и Math.max",
+        "desc": "Находят минимальное и максимальное значение среди переданных чисел.",
+        "src": {
+          "id": "math-min-и-math-max-mv6cusry",
+          "title": "Math.min и Math.max",
+          "desc": "Находят минимальное и максимальное значение среди переданных чисел.",
+          "code": "const low = Math.min(8, 3, 12, -2);\nconst high = Math.max(8, 3, 12, -2);\n\nconsole.log(low);\nconsole.log(high);"
+        },
+        "x": 300,
+        "y": 740
+      },
+      {
+        "id": "44wdna",
+        "blockId": "raw",
+        "fields": {
+          "code": "const value = 4.6;\nconsole.log(Math.round(value));\nconsole.log(Math.floor(value));\nconsole.log(Math.ceil(value));"
+        },
+        "title": "round, floor и ceil",
+        "desc": "round округляет до ближайшего целого, floor округляет вниз, ceil — вверх.",
+        "src": {
+          "id": "round-floor-и-ceil-mv6cusqs",
+          "title": "round, floor и ceil",
+          "desc": "round округляет до ближайшего целого, floor округляет вниз, ceil — вверх.",
+          "code": "const value = 4.6;\nconsole.log(Math.round(value));\nconsole.log(Math.floor(value));\nconsole.log(Math.ceil(value));"
+        },
+        "x": 540,
+        "y": 740
+      },
+      {
+        "id": "w92pzs",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Среднее — JavaScript —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 740
+      },
+      {
+        "id": "t1g1m2",
+        "blockId": "raw",
+        "fields": {
+          "code": "function среднее(значения){\n  const сумма = значения.reduce((a, b) => a + b, 0);\n  return сумма / значения.length;\n}\n\nconst результат = среднее([10, 20, 30]);\nconsole.log(результат.toFixed(2)); // \"20.00\""
+        },
+        "title": "Расчёт: среднее и округление",
+        "desc": "Типичный расчёт: сумма через reduce, делим на количество, округляем. Так же считаются доходности, медианы и пр.",
+        "src": {
+          "id": "js-calc-mean",
+          "title": "Расчёт: среднее и округление",
+          "desc": "Типичный расчёт: сумма через reduce, делим на количество, округляем. Так же считаются доходности, медианы и пр.",
+          "code": "function среднее(значения){\n  const сумма = значения.reduce((a, b) => a + b, 0);\n  return сумма / значения.length;\n}\n\nconst результат = среднее([10, 20, 30]);\nconsole.log(результат.toFixed(2)); // \"20.00\""
+        },
+        "x": 60,
+        "y": 910
+      },
+      {
+        "id": "pui1ix",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Среднее — Python —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 910
+      },
+      {
+        "id": "70pikw",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Объект (ключ",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 910
+      },
+      {
+        "id": "nntcu4",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "значение) —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 910
+      },
+      {
+        "id": "gdcnfp",
+        "blockId": "raw",
+        "fields": {
+          "code": "const бумага = { имя: \"ОФЗ\", купон: 7.1 };"
+        },
+        "title": "объект",
+        "desc": "Объект — набор связанных данных\nТеперь представь, что нужно хранить информацию не просто о цвете, а о его названии, коде и цене.\nМожно использовать объект:\nconst color = {\n  name: \"Красный\",\n  hex: \"#ff0000\",\n  price: 100\n};\n\n\nОбъект обозначается фигурными скобками {}. Внутри хранятся пары ключ: значение.\nРазбираем объект\nname\n\n\"Красный\"\nНазвание цвета\n\n\nhex\n\n\"#ff0000\"\nЦветовой код\n\n\nprice\n\n100\nЦе",
+        "src": {
+          "id": "объект-mv9z7j6w",
+          "title": "объект",
+          "desc": "Объект — набор связанных данных\nТеперь представь, что нужно хранить информацию не просто о цвете, а о его названии, коде и цене.\nМожно использовать объект:\nconst color = {\n  name: \"Красный\",\n  hex: \"#ff0000\",\n  price: 100\n};\n\n\nОбъект обозначается фигурными скобками {}. Внутри хранятся пары ключ: значение.\nРазбираем объект\nname\n\n\"Красный\"\nНазвание цвета\n\n\nhex\n\n\"#ff0000\"\nЦветовой код\n\n\nprice\n\n100\nЦе",
+          "code": "const бумага = { имя: \"ОФЗ\", купон: 7.1 };"
+        },
+        "x": 60,
+        "y": 1080
+      },
+      {
+        "id": "g20e0p",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Доступ по obj",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 1080
+      },
+      {
+        "id": "ww70l3",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Доступ по obj  —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 1080
+      },
+      {
+        "id": "3dk2od",
+        "blockId": "raw",
+        "fields": {
+          "code": "const scores = { Аня: 8, Лев: 10 };\nconsole.log(Object.keys(scores));\nconsole.log(Object.values(scores));\nconsole.log(Object.entries(scores));"
+        },
+        "title": "Object.keys, values и entries",
+        "desc": "keys возвращает массив ключей, values — значений, entries — пар [ключ, значение] объекта.",
+        "src": {
+          "id": "object-keys-values-и-entries-mv6cusnr",
+          "title": "Object.keys, values и entries",
+          "desc": "keys возвращает массив ключей, values — значений, entries — пар [ключ, значение] объекта.",
+          "code": "const scores = { Аня: 8, Лев: 10 };\nconsole.log(Object.keys(scores));\nconsole.log(Object.values(scores));\nconsole.log(Object.entries(scores));"
+        },
+        "x": 780,
+        "y": 1080
+      },
+      {
+        "id": "8edl6w",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Object.keys, values и entries —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 1250
+      },
+      {
+        "id": "6jxtcq",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Map — get, set и has —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 1250
+      },
+      {
+        "id": "xl7gve",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "значение)",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 1250
+      },
+      {
+        "id": "46firt",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Set — уникальные значения —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 1250
+      },
+      {
+        "id": "07lfz6",
+        "blockId": "raw",
+        "fields": {
+          "code": "const allowed = [\"red\", \"blue\", \"green\"];\nconsole.log(allowed.includes(\"blue\"));\nconsole.log(allowed.includes(\"pink\"));"
+        },
+        "title": "includes — проверить элемент",
+        "desc": "includes проверяет, есть ли точное значение в массиве. Возвращает true или false.",
+        "src": {
+          "id": "includes-проверить-элемент-mv6cutfr",
+          "title": "includes — проверить элемент",
+          "desc": "includes проверяет, есть ли точное значение в массиве. Возвращает true или false.",
+          "code": "const allowed = [\"red\", \"blue\", \"green\"];\nconsole.log(allowed.includes(\"blue\"));\nconsole.log(allowed.includes(\"pink\"));"
+        },
+        "x": 60,
+        "y": 1420
+      },
+      {
+        "id": "ht03h7",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "push, pop и shift —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 1420
+      },
+      {
+        "id": "3qd4ih",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "split и join —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 1420
+      },
+      {
+        "id": "9mll89",
+        "blockId": "raw",
+        "fields": {
+          "code": "const message = \"Цвет: синий\";\nconst updated = message.replace(\"синий\", \"розовый\");\nconsole.log(updated);"
+        },
+        "title": "replace — заменить фрагмент",
+        "desc": "replace(search, replacement) возвращает новую строку с заменой первого совпадения; исходная строка не меняется.",
+        "src": {
+          "id": "replace-заменить-фрагмент-mv6cuski",
+          "title": "replace — заменить фрагмент",
+          "desc": "replace(search, replacement) возвращает новую строку с заменой первого совпадения; исходная строка не меняется.",
+          "code": "const message = \"Цвет: синий\";\nconst updated = message.replace(\"синий\", \"розовый\");\nconsole.log(updated);"
+        },
+        "x": 780,
+        "y": 1420
+      },
+      {
+        "id": "gpm5lg",
+        "blockId": "raw",
+        "fields": {
+          "code": "def разбор(текст):\n    куски = текст.split(\";\")        # [\"10\",\"20\",\"30\"]\n    return [int(к) for к in куски]  # [10, 20, 30]\n\nprint(разбор(\"10;20;30\"))"
+        },
+        "title": "Python: парсер строк в числа",
+        "desc": "Разобрать строку \"10;20;30\" в список чисел. split режет, int превращает текст в число, генератор списка собирает.",
+        "src": {
+          "id": "py-parser",
+          "title": "Python: парсер строк в числа",
+          "desc": "Разобрать строку \"10;20;30\" в список чисел. split режет, int превращает текст в число, генератор списка собирает.",
+          "code": "def разбор(текст):\n    куски = текст.split(\";\")        # [\"10\",\"20\",\"30\"]\n    return [int(к) for к in куски]  # [10, 20, 30]\n\nprint(разбор(\"10;20;30\"))"
+        },
+        "x": 60,
+        "y": 1590
+      },
+      {
+        "id": "62kkfm",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "replace — заменить фрагмент —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 1590
+      },
+      {
+        "id": "ovrq9g",
+        "blockId": "raw",
+        "fields": {
+          "code": "const filename = \"palette.json\";\nconsole.log(filename.includes(\".json\"));\nconsole.log(filename.includes(\".html\"));"
+        },
+        "title": "includes — проверить наличие",
+        "desc": "includes(fragment) возвращает true, если строка содержит указанный фрагмент, иначе false.",
+        "src": {
+          "id": "includes-проверить-наличие-mv6cuskw",
+          "title": "includes — проверить наличие",
+          "desc": "includes(fragment) возвращает true, если строка содержит указанный фрагмент, иначе false.",
+          "code": "const filename = \"palette.json\";\nconsole.log(filename.includes(\".json\"));\nconsole.log(filename.includes(\".html\"));"
+        },
+        "x": 540,
+        "y": 1590
+      },
+      {
+        "id": "65n2nh",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "slice — взять часть строки —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 1590
+      },
+      {
+        "id": "xe53sd",
+        "blockId": "raw",
+        "fields": {
+          "code": "const label = \"hello, world!\";\nconsole.log(label.toUpperCase());"
+        },
+        "title": "toUpperCase — верхний регистр",
+        "desc": "toUpperCase возвращает строку, в которой буквы преобразованы в верхний регистр.",
+        "src": {
+          "id": "touppercase-верхний-регистр-mv6cusim",
+          "title": "toUpperCase — верхний регистр",
+          "desc": "toUpperCase возвращает строку, в которой буквы преобразованы в верхний регистр.",
+          "code": "const label = \"hello, world!\";\nconsole.log(label.toUpperCase());"
+        },
+        "x": 60,
+        "y": 1760
+      },
+      {
+        "id": "enubn1",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Шаблонная строка ${x} —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 1760
+      },
+      {
+        "id": "r85vph",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "JSON.stringify и JSON.parse —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 1760
+      },
+      {
+        "id": "ggs88v",
+        "blockId": "raw",
+        "fields": {
+          "code": "const key = \"savedColors\";\nconst colors = JSON.parse(localStorage.getItem(key) || \"[]\");\n\ncolors.push(\"#FF006E\");\nlocalStorage.setItem(key, JSON.stringify(colors));\n\nconsole.log(colors.length);"
+        },
+        "title": "Сохранить и загрузить список",
+        "desc": "Типичный шаблон: безопасно прочитать JSON-массив из localStorage, добавить элемент и сохранить обновлённый массив.",
+        "src": {
+          "id": "сохранить-и-загрузить-список-mv6cuslp",
+          "title": "Сохранить и загрузить список",
+          "desc": "Типичный шаблон: безопасно прочитать JSON-массив из localStorage, добавить элемент и сохранить обновлённый массив.",
+          "code": "const key = \"savedColors\";\nconst colors = JSON.parse(localStorage.getItem(key) || \"[]\");\n\ncolors.push(\"#FF006E\");\nlocalStorage.setItem(key, JSON.stringify(colors));\n\nconsole.log(colors.length);"
+        },
+        "x": 780,
+        "y": 1760
+      },
+      {
+        "id": "tw0paz",
+        "blockId": "raw",
+        "fields": {
+          "code": "const storageKey = \"palette\";\nlet colors = JSON.parse(localStorage.getItem(storageKey) || \"[]\");\n\nfunction saveColors() {\n  localStorage.setItem(storageKey, JSON.stringify(colors));\n}\n\nfunction renderColors() {\n  const body = document.querySelector(\"#colors tbody\");\n  body.replaceChildren();\n\n  colors.forEach((color, index) => {\n    const row = document.createElement(\"tr\");\n    const cell = document.createElement(\"td\");\n    const remove = document.createElement(\"button\");\n\n    cell.textContent = color;\n    remove.textContent = \"Удалить\";\n    remove.addEventListener(\"click\", () => {\n      colors.splice(index, 1);\n      saveColors();\n      renderColors();\n    });\n\n    row.append(cell, remove);\n    body.append(row);\n  });\n}\n\nfunction addColor(color) {\n  colors.push(color);\n  saveColors();\n  renderColors();\n}"
+        },
+        "title": "Сохранить и удалить цвета в таблице",
+        "desc": "Храните цвета как массив объектов в localStorage. После добавления или удаления перерисуйте таблицу; пользовательский текст вставляйте через textContent.",
+        "src": {
+          "id": "сохранить-и-удалить-цвета-в-таблице-mv6cut6v",
+          "title": "Сохранить и удалить цвета в таблице",
+          "desc": "Храните цвета как массив объектов в localStorage. После добавления или удаления перерисуйте таблицу; пользовательский текст вставляйте через textContent.",
+          "code": "const storageKey = \"palette\";\nlet colors = JSON.parse(localStorage.getItem(storageKey) || \"[]\");\n\nfunction saveColors() {\n  localStorage.setItem(storageKey, JSON.stringify(colors));\n}\n\nfunction renderColors() {\n  const body = document.querySelector(\"#colors tbody\");\n  body.replaceChildren();\n\n  colors.forEach((color, index) => {\n    const row = document.createElement(\"tr\");\n    const cell = document.createElement(\"td\");\n    const remove = document.createElement(\"button\");\n\n    cell.textContent = color;\n    remove.textContent = \"Удалить\";\n    remove.addEventListener(\"click\", () => {\n      colors.splice(index, 1);\n      saveColors();\n      renderColors();\n    });\n\n    row.append(cell, remove);\n    body.append(row);\n  });\n}\n\nfunction addColor(color) {\n  colors.push(color);\n  saveColors();\n  renderColors();\n}"
+        },
+        "x": 60,
+        "y": 1930
+      },
+      {
+        "id": "liartn",
+        "blockId": "raw",
+        "fields": {
+          "code": "const key = \"bestScore\";\nconst best = Number(localStorage.getItem(key) || 0);\nconst score = 125;\n\nif (score > best) {\n  localStorage.setItem(key, String(score));\n}\n\nconsole.log(Math.max(best, score));"
+        },
+        "title": "Рекорд в localStorage",
+        "desc": "Загружайте сохранённый рекорд, сравнивайте с текущим счётом и сохраняйте только новый максимум.",
+        "src": {
+          "id": "рекорд-в-localstorage-mv6custk",
+          "title": "Рекорд в localStorage",
+          "desc": "Загружайте сохранённый рекорд, сравнивайте с текущим счётом и сохраняйте только новый максимум.",
+          "code": "const key = \"bestScore\";\nconst best = Number(localStorage.getItem(key) || 0);\nconst score = 125;\n\nif (score > best) {\n  localStorage.setItem(key, String(score));\n}\n\nconsole.log(Math.max(best, score));"
+        },
+        "x": 300,
+        "y": 1930
+      },
+      {
+        "id": "1o33q6",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Сохранить и загрузить список —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 1930
+      },
+      {
+        "id": "fpwh2e",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Сохранить и удалить цвета в таблице —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 1930
+      },
+      {
+        "id": "wjsx6g",
+        "blockId": "raw",
+        "fields": {
+          "code": "const list = document.querySelector(\"#list\");\nconst item = document.createElement(\"li\");\nitem.textContent = \"Новый пункт\";\nlist.append(item);"
+        },
+        "title": "createElement и append",
+        "desc": "createElement создаёт новый DOM-элемент, а append добавляет его внутрь выбранного контейнера. Контейнер должен существовать в HTML.",
+        "src": {
+          "id": "createelement-и-append-mv6cut1r",
+          "title": "createElement и append",
+          "desc": "createElement создаёт новый DOM-элемент, а append добавляет его внутрь выбранного контейнера. Контейнер должен существовать в HTML.",
+          "code": "const list = document.querySelector(\"#list\");\nconst item = document.createElement(\"li\");\nitem.textContent = \"Новый пункт\";\nlist.append(item);"
+        },
+        "x": 60,
+        "y": 2100
+      },
+      {
+        "id": "tppmpx",
+        "blockId": "raw",
+        "fields": {
+          "code": "const box = document.querySelector(\"#message\");\nbox.textContent = \"<b>Привет</b>\";\nconsole.log(box.textContent);"
+        },
+        "title": "textContent и innerHTML",
+        "desc": "textContent вставляет текст безопасно, не интерпретируя его как HTML. innerHTML разбирает строку как HTML-разметку; не вставляйте туда недоверенные данные.",
+        "src": {
+          "id": "textcontent-и-innerhtml-mv6cusz6",
+          "title": "textContent и innerHTML",
+          "desc": "textContent вставляет текст безопасно, не интерпретируя его как HTML. innerHTML разбирает строку как HTML-разметку; не вставляйте туда недоверенные данные.",
+          "code": "const box = document.querySelector(\"#message\");\nbox.textContent = \"<b>Привет</b>\";\nconsole.log(box.textContent);"
+        },
+        "x": 300,
+        "y": 2100
+      },
+      {
+        "id": "k9iutx",
+        "blockId": "raw",
+        "fields": {
+          "code": "const picker = document.querySelector(\"#colorPicker\");\nconst swatch = document.querySelector(\"#swatch\");\n\npicker.addEventListener(\"input\", () => {\n  swatch.style.backgroundColor = picker.value;\n});"
+        },
+        "title": "input type=color — выбор цвета",
+        "desc": "Поле color отдаёт выбранный цвет в формате hex, например #ff006e. Значение можно применять к фону или хранить в массиве.",
+        "src": {
+          "id": "input-type-color-выбор-цвета-mv6cusws",
+          "title": "input type=color — выбор цвета",
+          "desc": "Поле color отдаёт выбранный цвет в формате hex, например #ff006e. Значение можно применять к фону или хранить в массиве.",
+          "code": "const picker = document.querySelector(\"#colorPicker\");\nconst swatch = document.querySelector(\"#swatch\");\n\npicker.addEventListener(\"input\", () => {\n  swatch.style.backgroundColor = picker.value;\n});"
+        },
+        "x": 540,
+        "y": 2100
+      },
+      {
+        "id": "a29jfc",
+        "blockId": "raw",
+        "fields": {
+          "code": "const кнопка = document.querySelector(\".btn\");\nкнопка.addEventListener(\"click\", () => {\n  кнопка.textContent = \"нажато!\";   // меняем элемент в ответ\n});\n\n// делегирование: один слушатель на список ловит клики по пунктам\nсписок.addEventListener(\"click\", (e) => {\n  if(e.target.matches(\"li\")) console.log(e.target.textContent);\n});"
+        },
+        "title": "Реакция на клики",
+        "desc": "Чтобы элемент отвечал на клик — вешают «слушатель» события. Функция внутри срабатывает при каждом клике. Делегирование — один слушатель на контейнер вместо многих.",
+        "src": {
+          "id": "js-click",
+          "title": "Реакция на клики",
+          "desc": "Чтобы элемент отвечал на клик — вешают «слушатель» события. Функция внутри срабатывает при каждом клике. Делегирование — один слушатель на контейнер вместо многих.",
+          "code": "const кнопка = document.querySelector(\".btn\");\nкнопка.addEventListener(\"click\", () => {\n  кнопка.textContent = \"нажато!\";   // меняем элемент в ответ\n});\n\n// делегирование: один слушатель на список ловит клики по пунктам\nсписок.addEventListener(\"click\", (e) => {\n  if(e.target.matches(\"li\")) console.log(e.target.textContent);\n});"
+        },
+        "x": 780,
+        "y": 2100
+      },
+      {
+        "id": "vza8uy",
+        "blockId": "raw",
+        "fields": {
+          "code": "const card = document.querySelector(\".card\");\ncard.classList.add(\"selected\");\ncard.classList.toggle(\"highlight\");\nconsole.log(card.classList.contains(\"selected\"));"
+        },
+        "title": "classList — управлять классами",
+        "desc": "classList.add добавляет класс, remove удаляет, toggle переключает, contains проверяет наличие класса.",
+        "src": {
+          "id": "classlist-управлять-классами-mv6cut28",
+          "title": "classList — управлять классами",
+          "desc": "classList.add добавляет класс, remove удаляет, toggle переключает, contains проверяет наличие класса.",
+          "code": "const card = document.querySelector(\".card\");\ncard.classList.add(\"selected\");\ncard.classList.toggle(\"highlight\");\nconsole.log(card.classList.contains(\"selected\"));"
+        },
+        "x": 60,
+        "y": 2270
+      },
+      {
+        "id": "g58nsn",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "localStorage.getItem — загрузить —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 2270
+      },
+      {
+        "id": "jqvk79",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "localStorage.setItem — сохранить —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 2270
+      },
+      {
+        "id": "2bh05l",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "localStorage.removeItem — удалить —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 2270
+      },
+      {
+        "id": "1iq1rx",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Рекорд в localStorage —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 2440
+      },
+      {
+        "id": "76fq9k",
+        "blockId": "raw",
+        "fields": {
+          "code": "const state = {\n  score: 0,\n  lives: 3,\n  running: true\n};\n\nstate.score += 10;\nconsole.log(state.score);\nconsole.log(state.lives);"
+        },
+        "title": "Состояние игры и счёт",
+        "desc": "Объект state собирает связанные данные игры в одном месте. Изменяйте его свойства по событиям и обновляйте отображение.",
+        "src": {
+          "id": "состояние-игры-и-счёт-mv6cust5",
+          "title": "Состояние игры и счёт",
+          "desc": "Объект state собирает связанные данные игры в одном месте. Изменяйте его свойства по событиям и обновляйте отображение.",
+          "code": "const state = {\n  score: 0,\n  lives: 3,\n  running: true\n};\n\nstate.score += 10;\nconsole.log(state.score);\nconsole.log(state.lives);"
+        },
+        "x": 300,
+        "y": 2440
+      },
+      {
+        "id": "54p2pc",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Достижения по условиям —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 2440
+      },
+      {
+        "id": "frro9i",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Состояние игры и счёт —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 2440
+      },
+      {
+        "id": "nj50yq",
+        "blockId": "raw",
+        "fields": {
+          "code": "import { create } from \"zustand\";\n\nexport const useСчёт = create((set) => ({\n  значение: 0,\n  плюс: () => set((s) => ({ значение: s.значение + 1 })),\n}));\n\n// в компоненте:  const n = useСчёт(s => s.значение);"
+        },
+        "title": "zustand — общее состояние (в сайте)",
+        "desc": "Маленькая библиотека состояния для React. В проекте так хранятся ключевая ставка, настройки. create даёт хук, set меняет и перерисовывает.",
+        "src": {
+          "id": "libs-zustand",
+          "title": "zustand — общее состояние (в сайте)",
+          "desc": "Маленькая библиотека состояния для React. В проекте так хранятся ключевая ставка, настройки. create даёт хук, set меняет и перерисовывает.",
+          "code": "import { create } from \"zustand\";\n\nexport const useСчёт = create((set) => ({\n  значение: 0,\n  плюс: () => set((s) => ({ значение: s.значение + 1 })),\n}));\n\n// в компоненте:  const n = useСчёт(s => s.значение);"
+        },
+        "x": 60,
+        "y": 2610
+      },
+      {
+        "id": "ygw0jq",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Тетрис: игровая матрица —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 2610
+      },
+      {
+        "id": "vytult",
+        "blockId": "raw",
+        "fields": {
+          "code": "const board = [\n  [0, 0, 0, 0],\n  [1, 1, 1, 1],\n  [0, 1, 0, 0],\n  [1, 1, 1, 1]\n];\n\nconst kept = board.filter(row => row.some(cell => cell === 0));\nconst cleared = board.length - kept.length;\n\nwhile (kept.length < board.length) {\n  kept.unshift(Array(4).fill(0));\n}\n\nconsole.log(cleared);\nconsole.log(kept.length);"
+        },
+        "title": "Тетрис: удалить заполненные строки",
+        "desc": "Строка считается заполненной, если все её клетки ненулевые. Отфильтруйте такие строки, добавьте сверху столько пустых строк, сколько было удалено.",
+        "src": {
+          "id": "тетрис-удалить-заполненные-строки-mv6cusi3",
+          "title": "Тетрис: удалить заполненные строки",
+          "desc": "Строка считается заполненной, если все её клетки ненулевые. Отфильтруйте такие строки, добавьте сверху столько пустых строк, сколько было удалено.",
+          "code": "const board = [\n  [0, 0, 0, 0],\n  [1, 1, 1, 1],\n  [0, 1, 0, 0],\n  [1, 1, 1, 1]\n];\n\nconst kept = board.filter(row => row.some(cell => cell === 0));\nconst cleared = board.length - kept.length;\n\nwhile (kept.length < board.length) {\n  kept.unshift(Array(4).fill(0));\n}\n\nconsole.log(cleared);\nconsole.log(kept.length);"
+        },
+        "x": 540,
+        "y": 2610
+      },
+      {
+        "id": "e1d0yb",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Тетрис: проверка столкновения —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 2610
+      },
+      {
+        "id": "j78l0t",
+        "blockId": "raw",
+        "fields": {
+          "code": "const state = { x: 3, y: 0 };\n\nwindow.addEventListener(\"keydown\", event => {\n  if (event.key === \"ArrowLeft\") state.x -= 1;\n  if (event.key === \"ArrowRight\") state.x += 1;\n  if (event.key === \"ArrowDown\") state.y += 1;\n\n  console.log(state.x, state.y);\n});"
+        },
+        "title": "Тетрис: управление клавишами",
+        "desc": "Храните текущую позицию фигуры в состоянии игры. keydown меняет координаты, после чего вызывается функция отрисовки поля.",
+        "src": {
+          "id": "тетрис-управление-клавишами-mv6cush3",
+          "title": "Тетрис: управление клавишами",
+          "desc": "Храните текущую позицию фигуры в состоянии игры. keydown меняет координаты, после чего вызывается функция отрисовки поля.",
+          "code": "const state = { x: 3, y: 0 };\n\nwindow.addEventListener(\"keydown\", event => {\n  if (event.key === \"ArrowLeft\") state.x -= 1;\n  if (event.key === \"ArrowRight\") state.x += 1;\n  if (event.key === \"ArrowDown\") state.y += 1;\n\n  console.log(state.x, state.y);\n});"
+        },
+        "x": 60,
+        "y": 2780
+      },
+      {
+        "id": "wj4zcr",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Тетрис: управление клавишами —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 2780
+      },
+      {
+        "id": "ggxqwk",
+        "blockId": "raw",
+        "fields": {
+          "code": "const rows = 4;\nconst columns = 6;\nconst board = Array.from(\n  { length: rows },\n  () => Array(columns).fill(0)\n);\n\nboard[2][3] = 1;\nboard[2][4] = 1;\nconsole.log(board[2]);"
+        },
+        "title": "Тетрис: игровая матрица",
+        "desc": "Поле можно хранить как двумерный массив. Ноль означает пустую клетку, а положительное число — занятый блок или его цветовой индекс.",
+        "src": {
+          "id": "тетрис-игровая-матрица-mv6cusgl",
+          "title": "Тетрис: игровая матрица",
+          "desc": "Поле можно хранить как двумерный массив. Ноль означает пустую клетку, а положительное число — занятый блок или его цветовой индекс.",
+          "code": "const rows = 4;\nconst columns = 6;\nconst board = Array.from(\n  { length: rows },\n  () => Array(columns).fill(0)\n);\n\nboard[2][3] = 1;\nboard[2][4] = 1;\nconsole.log(board[2]);"
+        },
+        "x": 540,
+        "y": 2780
+      },
+      {
+        "id": "7iz2hy",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Тетрис: удалить заполненные строки —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 2780
+      },
+      {
+        "id": "pfqysn",
+        "blockId": "raw",
+        "fields": {
+          "code": "window.addEventListener(\"keydown\", event => {\n  if (event.key === \"ArrowLeft\") {\n    console.log(\"Движение влево\");\n  }\n});\n\nwindow.addEventListener(\"keyup\", event => {\n  console.log(\"Клавишу отпустили:\", event.key);\n});"
+        },
+        "title": "keydown и keyup — клавиатура",
+        "desc": "keydown срабатывает при нажатии клавиши, keyup — при отпускании. Слушатели нужно устанавливать один раз и удалять, если компонент больше не нужен.",
+        "src": {
+          "id": "keydown-и-keyup-клавиатура-mv6cusyc",
+          "title": "keydown и keyup — клавиатура",
+          "desc": "keydown срабатывает при нажатии клавиши, keyup — при отпускании. Слушатели нужно устанавливать один раз и удалять, если компонент больше не нужен.",
+          "code": "window.addEventListener(\"keydown\", event => {\n  if (event.key === \"ArrowLeft\") {\n    console.log(\"Движение влево\");\n  }\n});\n\nwindow.addEventListener(\"keyup\", event => {\n  console.log(\"Клавишу отпустили:\", event.key);\n});"
+        },
+        "x": 60,
+        "y": 2950
+      },
+      {
+        "id": "gp8xpc",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Массив частиц: позиция и скорость —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 2950
+      },
+      {
+        "id": "q96zx7",
+        "blockId": "raw",
+        "fields": {
+          "code": "const particles = [];\n\nfunction burst(x, y) {\n  for (let i = 0; i < 12; i += 1) {\n    particles.push({\n      x,\n      y,\n      vx: Math.random() * 4 - 2,\n      vy: Math.random() * 4 - 2,\n      life: 1\n    });\n  }\n}\n\nfunction updateParticles() {\n  particles.forEach(particle => {\n    particle.x += particle.vx;\n    particle.y += particle.vy;\n    particle.life -= 0.02;\n  });\n}\n\nparticles.length = 0;\nburst(100, 80);\nupdateParticles();\nconsole.log(particles.length);"
+        },
+        "title": "Частицы реагируют на клик мыши",
+        "desc": "При клике создаётся группа частиц со случайными скоростями. В игровом цикле частицы перемещаются и постепенно исчезают; этот пример показывает создание и обновление данных.",
+        "src": {
+          "id": "частицы-реагируют-на-клик-мыши-mv6cusnc",
+          "title": "Частицы реагируют на клик мыши",
+          "desc": "При клике создаётся группа частиц со случайными скоростями. В игровом цикле частицы перемещаются и постепенно исчезают; этот пример показывает создание и обновление данных.",
+          "code": "const particles = [];\n\nfunction burst(x, y) {\n  for (let i = 0; i < 12; i += 1) {\n    particles.push({\n      x,\n      y,\n      vx: Math.random() * 4 - 2,\n      vy: Math.random() * 4 - 2,\n      life: 1\n    });\n  }\n}\n\nfunction updateParticles() {\n  particles.forEach(particle => {\n    particle.x += particle.vx;\n    particle.y += particle.vy;\n    particle.life -= 0.02;\n  });\n}\n\nparticles.length = 0;\nburst(100, 80);\nupdateParticles();\nconsole.log(particles.length);"
+        },
+        "x": 540,
+        "y": 2950
+      },
+      {
+        "id": "jarmay",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Частицы реагируют на клик мыши —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 2950
+      },
+      {
+        "id": "9ma8v5",
+        "blockId": "raw",
+        "fields": {
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\nconst particles = [\n  { x: 30, y: 40, vx: 1.5, vy: -0.5 },\n  { x: 80, y: 60, vx: -1, vy: 1 }\n];\n\nfunction drawFrame() {\n  ctx.clearRect(0, 0, canvas.width, canvas.height);\n\n  particles.forEach(particle => {\n    particle.x += particle.vx;\n    particle.y += particle.vy;\n    ctx.fillRect(particle.x, particle.y, 4, 4);\n  });\n}\n\ndrawFrame();"
+        },
+        "title": "Частицы: обновление и отрисовка",
+        "desc": "Каждый кадр очищайте canvas, обновляйте координаты и рисуйте каждую частицу. Здесь показан один шаг; его можно вызывать из requestAnimationFrame.",
+        "src": {
+          "id": "частицы-обновление-и-отрисовка-mv6cuta3",
+          "title": "Частицы: обновление и отрисовка",
+          "desc": "Каждый кадр очищайте canvas, обновляйте координаты и рисуйте каждую частицу. Здесь показан один шаг; его можно вызывать из requestAnimationFrame.",
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\nconst particles = [\n  { x: 30, y: 40, vx: 1.5, vy: -0.5 },\n  { x: 80, y: 60, vx: -1, vy: 1 }\n];\n\nfunction drawFrame() {\n  ctx.clearRect(0, 0, canvas.width, canvas.height);\n\n  particles.forEach(particle => {\n    particle.x += particle.vx;\n    particle.y += particle.vy;\n    ctx.fillRect(particle.x, particle.y, 4, 4);\n  });\n}\n\ndrawFrame();"
+        },
+        "x": 60,
+        "y": 3120
+      },
+      {
+        "id": "g21u4p",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Частицы: обновление и отрисовка —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 3120
+      },
+      {
+        "id": "kd7oid",
+        "blockId": "raw",
+        "fields": {
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\nlet x = 10;\nlet vx = 2;\n\nfunction frame() {\n  ctx.clearRect(0, 0, canvas.width, canvas.height);\n  x += vx;\n\n  if (x > canvas.width - 20 || x < 20) {\n    vx *= -1;\n  }\n\n  ctx.beginPath();\n  ctx.arc(x, 40, 20, 0, Math.PI * 2);\n  ctx.fillStyle = \"#FF006E\";\n  ctx.fill();\n  requestAnimationFrame(frame);\n}\n\nrequestAnimationFrame(frame);"
+        },
+        "title": "Canvas: игровой цикл с requestAnimationFrame",
+        "desc": "Очищайте кадр, обновляйте состояние и рисуйте заново. Следующий кадр запрашивается в конце функции, чтобы цикл продолжался.",
+        "src": {
+          "id": "canvas-игровой-цикл-с-requestanimationfr-mv6cutdo",
+          "title": "Canvas: игровой цикл с requestAnimationFrame",
+          "desc": "Очищайте кадр, обновляйте состояние и рисуйте заново. Следующий кадр запрашивается в конце функции, чтобы цикл продолжался.",
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\nlet x = 10;\nlet vx = 2;\n\nfunction frame() {\n  ctx.clearRect(0, 0, canvas.width, canvas.height);\n  x += vx;\n\n  if (x > canvas.width - 20 || x < 20) {\n    vx *= -1;\n  }\n\n  ctx.beginPath();\n  ctx.arc(x, 40, 20, 0, Math.PI * 2);\n  ctx.fillStyle = \"#FF006E\";\n  ctx.fill();\n  requestAnimationFrame(frame);\n}\n\nrequestAnimationFrame(frame);"
+        },
+        "x": 540,
+        "y": 3120
+      },
+      {
+        "id": "zbh1bl",
+        "blockId": "raw",
+        "fields": {
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\n\nctx.fillStyle = \"#FF006E\";\nctx.fillRect(10, 10, 80, 80);\nctx.clearRect(30, 30, 40, 40);"
+        },
+        "title": "clearRect — очистить кадр",
+        "desc": "clearRect стирает пиксели заданной области. В анимации обычно очищают весь canvas перед рисованием нового кадра.",
+        "src": {
+          "id": "clearrect-очистить-кадр-mv6cutcv",
+          "title": "clearRect — очистить кадр",
+          "desc": "clearRect стирает пиксели заданной области. В анимации обычно очищают весь canvas перед рисованием нового кадра.",
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\n\nctx.fillStyle = \"#FF006E\";\nctx.fillRect(10, 10, 80, 80);\nctx.clearRect(30, 30, 40, 40);"
+        },
+        "x": 780,
+        "y": 3120
+      },
+      {
+        "id": "nwdi20",
+        "blockId": "raw",
+        "fields": {
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\n\nctx.beginPath();\nctx.arc(80, 70, 35, 0, Math.PI * 2);\nctx.fillStyle = \"#52F2C9\";\nctx.fill();"
+        },
+        "title": "arc — нарисовать круг",
+        "desc": "arc(x, y, radius, startAngle, endAngle) задаёт дугу. Для полного круга используй угол от 0 до Math.PI * 2, затем fill() или stroke().",
+        "src": {
+          "id": "arc-нарисовать-круг-mv6cutd9",
+          "title": "arc — нарисовать круг",
+          "desc": "arc(x, y, radius, startAngle, endAngle) задаёт дугу. Для полного круга используй угол от 0 до Math.PI * 2, затем fill() или stroke().",
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\n\nctx.beginPath();\nctx.arc(80, 70, 35, 0, Math.PI * 2);\nctx.fillStyle = \"#52F2C9\";\nctx.fill();"
+        },
+        "x": 60,
+        "y": 3290
+      },
+      {
+        "id": "js2i1v",
+        "blockId": "raw",
+        "fields": {
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\n\nctx.fillStyle = \"#FF006E\";\nctx.fillRect(20, 20, 100, 60);\nctx.strokeStyle = \"#3DD9FF\";\nctx.lineWidth = 3;\nctx.strokeRect(140, 20, 100, 60);"
+        },
+        "title": "fillRect и strokeRect — прямоугольники",
+        "desc": "fillRect рисует заполненный прямоугольник, strokeRect — только контур. Координаты и размеры задаются в пикселях canvas.",
+        "src": {
+          "id": "fillrect-и-strokerect-прямоугольники-mv6cutc3",
+          "title": "fillRect и strokeRect — прямоугольники",
+          "desc": "fillRect рисует заполненный прямоугольник, strokeRect — только контур. Координаты и размеры задаются в пикселях canvas.",
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\n\nctx.fillStyle = \"#FF006E\";\nctx.fillRect(20, 20, 100, 60);\nctx.strokeStyle = \"#3DD9FF\";\nctx.lineWidth = 3;\nctx.strokeRect(140, 20, 100, 60);"
+        },
+        "x": 300,
+        "y": 3290
+      },
+      {
+        "id": "s3sctz",
+        "blockId": "raw",
+        "fields": {
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\n\nctx.font = \"20px sans-serif\";\nctx.fillStyle = \"#F6F4FF\";\nctx.fillText(\"Привет, canvas!\", 20, 50);"
+        },
+        "title": "fillText — текст на canvas",
+        "desc": "fillText(text, x, y) рисует текст. Координата y — базовая линия текста, а не верхняя граница.",
+        "src": {
+          "id": "filltext-текст-на-canvas-mv6cutbp",
+          "title": "fillText — текст на canvas",
+          "desc": "fillText(text, x, y) рисует текст. Координата y — базовая линия текста, а не верхняя граница.",
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\n\nctx.font = \"20px sans-serif\";\nctx.fillStyle = \"#F6F4FF\";\nctx.fillText(\"Привет, canvas!\", 20, 50);"
+        },
+        "x": 540,
+        "y": 3290
+      },
+      {
+        "id": "6ljgzs",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Canvas: игровой цикл с requestAnimationFrame —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 3290
+      },
+      {
+        "id": "jx81n0",
+        "blockId": "raw",
+        "fields": {
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\n\nctx.beginPath();\nctx.moveTo(20, 100);\nctx.lineTo(100, 20);\nctx.lineTo(180, 100);\nctx.strokeStyle = \"#B45CFF\";\nctx.lineWidth = 4;\nctx.stroke();"
+        },
+        "title": "moveTo и lineTo — линия",
+        "desc": "moveTo переносит перо без рисования, lineTo добавляет отрезок. stroke() отображает построенный контур.",
+        "src": {
+          "id": "moveto-и-lineto-линия-mv6cutaj",
+          "title": "moveTo и lineTo — линия",
+          "desc": "moveTo переносит перо без рисования, lineTo добавляет отрезок. stroke() отображает построенный контур.",
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\n\nctx.beginPath();\nctx.moveTo(20, 100);\nctx.lineTo(100, 20);\nctx.lineTo(180, 100);\nctx.strokeStyle = \"#B45CFF\";\nctx.lineWidth = 4;\nctx.stroke();"
+        },
+        "x": 60,
+        "y": 3460
+      },
+      {
+        "id": "8q7esb",
+        "blockId": "raw",
+        "fields": {
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\nconst gradient = ctx.createLinearGradient(0, 0, 180, 0);\n\ngradient.addColorStop(0, \"#FF006E\");\ngradient.addColorStop(1, \"#3DD9FF\");\nctx.fillStyle = gradient;\nctx.fillRect(10, 10, 180, 70);"
+        },
+        "title": "createLinearGradient — градиент Canvas",
+        "desc": "createLinearGradient создаёт градиент, addColorStop задаёт цветовые точки от 0 до 1. Назначьте градиент в fillStyle или strokeStyle.",
+        "src": {
+          "id": "createlineargradient-градиент-canvas-mv6cutbb",
+          "title": "createLinearGradient — градиент Canvas",
+          "desc": "createLinearGradient создаёт градиент, addColorStop задаёт цветовые точки от 0 до 1. Назначьте градиент в fillStyle или strokeStyle.",
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\nconst gradient = ctx.createLinearGradient(0, 0, 180, 0);\n\ngradient.addColorStop(0, \"#FF006E\");\ngradient.addColorStop(1, \"#3DD9FF\");\nctx.fillStyle = gradient;\nctx.fillRect(10, 10, 180, 70);"
+        },
+        "x": 300,
+        "y": 3460
+      },
+      {
+        "id": "wmtfql",
+        "blockId": "raw",
+        "fields": {
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\nconst image = document.querySelector(\"#sourceImage\");\n\nimage.addEventListener(\"load\", () => {\n  ctx.drawImage(image, 10, 10, 120, 80);\n});"
+        },
+        "title": "drawImage — нарисовать изображение",
+        "desc": "drawImage помещает загруженное изображение на canvas. Рисовать нужно после события load; для локальной песочницы можно использовать заранее доступный URL или собственный файл.",
+        "src": {
+          "id": "drawimage-нарисовать-изображение-mv6cutch",
+          "title": "drawImage — нарисовать изображение",
+          "desc": "drawImage помещает загруженное изображение на canvas. Рисовать нужно после события load; для локальной песочницы можно использовать заранее доступный URL или собственный файл.",
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\nconst image = document.querySelector(\"#sourceImage\");\n\nimage.addEventListener(\"load\", () => {\n  ctx.drawImage(image, 10, 10, 120, 80);\n});"
+        },
+        "x": 540,
+        "y": 3460
+      },
+      {
+        "id": "5b2vfk",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Canvas — нарисовать столбики —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 3460
+      },
+      {
+        "id": "2m5940",
+        "blockId": "raw",
+        "fields": {
+          "code": "function график(значения){\n  const точки = значения\n    .map((y, x) => (x * 20) + \",\" + (100 - y))\n    .join(\" \");\n  return '<svg width=\"200\" height=\"100\">'\n    + '<polyline points=\"' + точки + '\" fill=\"none\" stroke=\"#52F2C9\"/>'\n    + '</svg>';\n}"
+        },
+        "title": "SVG — линия из точек (мини-график)",
+        "desc": "SVG — это картинка из тегов. Линию задаёт атрибут points: пары x,y. Так рисуются sparkline и кривые в проекте.",
+        "src": {
+          "id": "draw-svg",
+          "title": "SVG — линия из точек (мини-график)",
+          "desc": "SVG — это картинка из тегов. Линию задаёт атрибут points: пары x,y. Так рисуются sparkline и кривые в проекте.",
+          "code": "function график(значения){\n  const точки = значения\n    .map((y, x) => (x * 20) + \",\" + (100 - y))\n    .join(\" \");\n  return '<svg width=\"200\" height=\"100\">'\n    + '<polyline points=\"' + точки + '\" fill=\"none\" stroke=\"#52F2C9\"/>'\n    + '</svg>';\n}"
+        },
+        "x": 60,
+        "y": 3630
+      },
+      {
+        "id": "jx3jdp",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "SVG — линия из точек (мини-график) —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 3630
+      },
+      {
+        "id": "ybgpnc",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Погода",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 3630
+      },
+      {
+        "id": "aifjuj",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "медиана по дням",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 3630
+      },
+      {
+        "id": "ijnkhz",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "кривая с градиентом —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 3800
+      },
+      {
+        "id": "m96mpf",
+        "blockId": "raw",
+        "fields": {
+          "code": "async function loadData() {\n  const response = await fetch(\"/api/colors\");\n  if (!response.ok) {\n    throw new Error(\"Не удалось загрузить данные\");\n  }\n  const data = await response.json();\n  console.log(data);\n}\n\nloadData().catch(error => console.log(error.message));"
+        },
+        "title": "fetch + await — получить данные",
+        "desc": "async-функция может ждать Promise через await. fetch возвращает Response; json() читает тело ответа. В реальном примере обрабатывайте ошибки и проверяйте response.ok.",
+        "src": {
+          "id": "fetch-await-получить-данные-mv6cuspk",
+          "title": "fetch + await — получить данные",
+          "desc": "async-функция может ждать Promise через await. fetch возвращает Response; json() читает тело ответа. В реальном примере обрабатывайте ошибки и проверяйте response.ok.",
+          "code": "async function loadData() {\n  const response = await fetch(\"/api/colors\");\n  if (!response.ok) {\n    throw new Error(\"Не удалось загрузить данные\");\n  }\n  const data = await response.json();\n  console.log(data);\n}\n\nloadData().catch(error => console.log(error.message));"
+        },
+        "x": 300,
+        "y": 3800
+      },
+      {
+        "id": "rf5ofn",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Координаты мыши относительно Canvas —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 3800
+      },
+      {
+        "id": "o4vmfg",
+        "blockId": "raw",
+        "fields": {
+          "code": "function showLabel(x, y, message) {\n  const label = document.createElement(\"div\");\n  label.textContent = message;\n  label.style.position = \"fixed\";\n  label.style.left = `${x}px`;\n  label.style.top = `${y}px`;\n  label.classList.add(\"screen-label\");\n  document.body.append(label);\n}\n\nshowLabel(120, 80, \"Привет!\");"
+        },
+        "title": "Создать надпись в координатах экрана",
+        "desc": "Создайте элемент, задайте ему fixed-позиционирование и координаты в пикселях. Координаты clientX/clientY относятся к видимой области окна.",
+        "src": {
+          "id": "создать-надпись-в-координатах-экрана-mv6cut1c",
+          "title": "Создать надпись в координатах экрана",
+          "desc": "Создайте элемент, задайте ему fixed-позиционирование и координаты в пикселях. Координаты clientX/clientY относятся к видимой области окна.",
+          "code": "function showLabel(x, y, message) {\n  const label = document.createElement(\"div\");\n  label.textContent = message;\n  label.style.position = \"fixed\";\n  label.style.left = `${x}px`;\n  label.style.top = `${y}px`;\n  label.classList.add(\"screen-label\");\n  document.body.append(label);\n}\n\nshowLabel(120, 80, \"Привет!\");"
+        },
+        "x": 780,
+        "y": 3800
+      },
+      {
+        "id": "1sld22",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Попадание точки в прямоугольник —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 3970
+      },
+      {
+        "id": "7le0qj",
+        "blockId": "raw",
+        "fields": {
+          "code": "const dx = 120 - 30;\nconst dy = 90 - 50;\nconst distance = Math.sqrt(dx * dx + dy * dy);\n\nconsole.log(distance.toFixed(2));"
+        },
+        "title": "Расстояние между двумя точками",
+        "desc": "Евклидово расстояние вычисляется по теореме Пифагора: корень из суммы квадратов разностей координат.",
+        "src": {
+          "id": "расстояние-между-двумя-точками-mv6cussr",
+          "title": "Расстояние между двумя точками",
+          "desc": "Евклидово расстояние вычисляется по теореме Пифагора: корень из суммы квадратов разностей координат.",
+          "code": "const dx = 120 - 30;\nconst dy = 90 - 50;\nconst distance = Math.sqrt(dx * dx + dy * dy);\n\nconsole.log(distance.toFixed(2));"
+        },
+        "x": 300,
+        "y": 3970
+      },
+      {
+        "id": "cpgtec",
+        "blockId": "raw",
+        "fields": {
+          "code": "const canvas = document.querySelector(\"#scene\");\n\ncanvas.addEventListener(\"mousemove\", event => {\n  const rect = canvas.getBoundingClientRect();\n  const x = (event.clientX - rect.left) * canvas.width / rect.width;\n  const y = (event.clientY - rect.top) * canvas.height / rect.height;\n  console.log(x.toFixed(0), y.toFixed(0));\n});"
+        },
+        "title": "Координаты мыши относительно Canvas",
+        "desc": "clientX/clientY относятся к окну браузера. Вычтите координаты и учтите масштаб canvas, чтобы получить координаты холста.",
+        "src": {
+          "id": "координаты-мыши-относительно-canvas-mv6cutax",
+          "title": "Координаты мыши относительно Canvas",
+          "desc": "clientX/clientY относятся к окну браузера. Вычтите координаты и учтите масштаб canvas, чтобы получить координаты холста.",
+          "code": "const canvas = document.querySelector(\"#scene\");\n\ncanvas.addEventListener(\"mousemove\", event => {\n  const rect = canvas.getBoundingClientRect();\n  const x = (event.clientX - rect.left) * canvas.width / rect.width;\n  const y = (event.clientY - rect.top) * canvas.height / rect.height;\n  console.log(x.toFixed(0), y.toFixed(0));\n});"
+        },
+        "x": 540,
+        "y": 3970
+      },
+      {
+        "id": "pzxcmh",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Расстояние между двумя точками —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 3970
+      },
+      {
+        "id": "w6ehbz",
+        "blockId": "raw",
+        "fields": {
+          "code": "console.log(Math.sqrt(81));\nconsole.log(Math.pow(3, 2));\nconsole.log(Math.abs(-7));"
+        },
+        "title": "sqrt, pow и abs",
+        "desc": "sqrt вычисляет квадратный корень, pow возводит число в степень, abs возвращает абсолютное значение.",
+        "src": {
+          "id": "sqrt-pow-и-abs-mv6cusqe",
+          "title": "sqrt, pow и abs",
+          "desc": "sqrt вычисляет квадратный корень, pow возводит число в степень, abs возвращает абсолютное значение.",
+          "code": "console.log(Math.sqrt(81));\nconsole.log(Math.pow(3, 2));\nconsole.log(Math.abs(-7));"
+        },
+        "x": 60,
+        "y": 4140
+      },
+      {
+        "id": "g1m79d",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Создать надпись в координатах экрана —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 4140
+      },
+      {
+        "id": "vflzbk",
+        "blockId": "raw",
+        "fields": {
+          "code": "const label = document.querySelector(\"#label\");\nlabel.style.position = \"absolute\";\nlabel.style.left = \"120px\";\nlabel.style.top = \"80px\";\nlabel.textContent = \"Привет в точке (120, 80)\";"
+        },
+        "title": "style.left и style.top — позиция",
+        "desc": "Для абсолютного позиционирования задайте элементу position: absolute или fixed. Значения координат CSS задаются строками с единицами, например px.",
+        "src": {
+          "id": "style-left-и-style-top-позиция-mv6cut07",
+          "title": "style.left и style.top — позиция",
+          "desc": "Для абсолютного позиционирования задайте элементу position: absolute или fixed. Значения координат CSS задаются строками с единицами, например px.",
+          "code": "const label = document.querySelector(\"#label\");\nlabel.style.position = \"absolute\";\nlabel.style.left = \"120px\";\nlabel.style.top = \"80px\";\nlabel.textContent = \"Привет в точке (120, 80)\";"
+        },
+        "x": 540,
+        "y": 4140
+      },
+      {
+        "id": "p3iqps",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "style.left и style.top — позиция —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 4140
+      },
+      {
+        "id": "pn5tqa",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Реакция на клики —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 4310
+      },
+      {
+        "id": "v9n8ud",
+        "blockId": "raw",
+        "fields": {
+          "code": "const title = document.querySelector(\".page-title\");\n\nif (title) {\n  console.log(title.textContent);\n} else {\n  console.log(\"Заголовок не найден\");\n}"
+        },
+        "title": "querySelector — найти элемент",
+        "desc": "querySelector возвращает первый элемент, подходящий под CSS-селектор, или null, если совпадения нет.",
+        "src": {
+          "id": "queryselector-найти-элемент-mv6cut0y",
+          "title": "querySelector — найти элемент",
+          "desc": "querySelector возвращает первый элемент, подходящий под CSS-селектор, или null, если совпадения нет.",
+          "code": "const title = document.querySelector(\".page-title\");\n\nif (title) {\n  console.log(title.textContent);\n} else {\n  console.log(\"Заголовок не найден\");\n}"
+        },
+        "x": 300,
+        "y": 4310
+      },
+      {
+        "id": "svsq1z",
+        "blockId": "raw",
+        "fields": {
+          "code": "const button = document.querySelector(\"#save\");\nbutton.setAttribute(\"aria-label\", \"Сохранить цвет\");\nbutton.setAttribute(\"data-state\", \"ready\");\nconsole.log(button.getAttribute(\"data-state\"));"
+        },
+        "title": "setAttribute — задать атрибут",
+        "desc": "setAttribute задаёт атрибут HTML-элемента, например title, aria-label или data-id.",
+        "src": {
+          "id": "setattribute-задать-атрибут-mv6cut0k",
+          "title": "setAttribute — задать атрибут",
+          "desc": "setAttribute задаёт атрибут HTML-элемента, например title, aria-label или data-id.",
+          "code": "const button = document.querySelector(\"#save\");\nbutton.setAttribute(\"aria-label\", \"Сохранить цвет\");\nbutton.setAttribute(\"data-state\", \"ready\");\nconsole.log(button.getAttribute(\"data-state\"));"
+        },
+        "x": 540,
+        "y": 4310
+      },
+      {
+        "id": "0rzw34",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "input и change — изменения поля —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 4310
+      },
+      {
+        "id": "e3wr1z",
+        "blockId": "raw",
+        "fields": {
+          "code": "const field = document.querySelector(\"#nickname\");\nconst preview = document.querySelector(\"#preview\");\n\nfield.addEventListener(\"input\", () => {\n  preview.textContent = field.value;\n});"
+        },
+        "title": "input type=text — текстовое поле",
+        "desc": "Событие input позволяет реагировать на каждый ввод. Значение поля читается через value.",
+        "src": {
+          "id": "input-type-text-текстовое-поле-mv6cusv5",
+          "title": "input type=text — текстовое поле",
+          "desc": "Событие input позволяет реагировать на каждый ввод. Значение поля читается через value.",
+          "code": "const field = document.querySelector(\"#nickname\");\nconst preview = document.querySelector(\"#preview\");\n\nfield.addEventListener(\"input\", () => {\n  preview.textContent = field.value;\n});"
+        },
+        "x": 60,
+        "y": 4480
+      },
+      {
+        "id": "sysp1g",
+        "blockId": "raw",
+        "fields": {
+          "code": "const field = document.querySelector(\"#amount\");\nconst output = document.querySelector(\"#amountOutput\");\n\nfield.addEventListener(\"input\", () => {\n  const amount = Number(field.value);\n  output.textContent = Number.isFinite(amount) ? amount * 2 : \"Введите число\";\n});"
+        },
+        "title": "input type=number — число",
+        "desc": "value у input всегда строка. Используйте Number(...) для преобразования и проверяйте, что результат конечный.",
+        "src": {
+          "id": "input-type-number-число-mv6cuswe",
+          "title": "input type=number — число",
+          "desc": "value у input всегда строка. Используйте Number(...) для преобразования и проверяйте, что результат конечный.",
+          "code": "const field = document.querySelector(\"#amount\");\nconst output = document.querySelector(\"#amountOutput\");\n\nfield.addEventListener(\"input\", () => {\n  const amount = Number(field.value);\n  output.textContent = Number.isFinite(amount) ? amount * 2 : \"Введите число\";\n});"
+        },
+        "x": 300,
+        "y": 4480
+      },
+      {
+        "id": "b9z8zr",
+        "blockId": "raw",
+        "fields": {
+          "code": "const slider = document.querySelector(\"#intensity\");\nconst valueLabel = document.querySelector(\"#intensityValue\");\n\nslider.addEventListener(\"input\", () => {\n  valueLabel.textContent = `${slider.value}%`;\n});"
+        },
+        "title": "input type=range — ползунок",
+        "desc": "Ползунок обычно отправляет input при перемещении. Его value — строка, которую можно преобразовать в число.",
+        "src": {
+          "id": "input-type-range-ползунок-mv6cusvy",
+          "title": "input type=range — ползунок",
+          "desc": "Ползунок обычно отправляет input при перемещении. Его value — строка, которую можно преобразовать в число.",
+          "code": "const slider = document.querySelector(\"#intensity\");\nconst valueLabel = document.querySelector(\"#intensityValue\");\n\nslider.addEventListener(\"input\", () => {\n  valueLabel.textContent = `${slider.value}%`;\n});"
+        },
+        "x": 540,
+        "y": 4480
+      },
+      {
+        "id": "8es4m4",
+        "blockId": "raw",
+        "fields": {
+          "code": "const select = document.querySelector(\"#theme\");\nconst page = document.querySelector(\"body\");\n\nselect.addEventListener(\"change\", () => {\n  page.dataset.theme = select.value;\n});"
+        },
+        "title": "select — список вариантов",
+        "desc": "У select свойство value содержит значение выбранного option. Событие change срабатывает при смене выбора.",
+        "src": {
+          "id": "select-список-вариантов-mv6cusvj",
+          "title": "select — список вариантов",
+          "desc": "У select свойство value содержит значение выбранного option. Событие change срабатывает при смене выбора.",
+          "code": "const select = document.querySelector(\"#theme\");\nconst page = document.querySelector(\"body\");\n\nselect.addEventListener(\"change\", () => {\n  page.dataset.theme = select.value;\n});"
+        },
+        "x": 780,
+        "y": 4480
+      },
+      {
+        "id": "3xcwcb",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Клик",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 4650
+      },
+      {
+        "id": "q1jre0",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "расчёт",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 4650
+      },
+      {
+        "id": "60gm5b",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "экран (+состояние) —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 4650
+      },
+      {
+        "id": "rvl01h",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Цены",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 4650
+      },
+      {
+        "id": "fttwe5",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "доходности",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 4820
+      },
+      {
+        "id": "j94l0w",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "риск —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 4820
+      },
+      {
+        "id": "vo0mub",
+        "blockId": "raw",
+        "fields": {
+          "code": "const доходности = цены.map((p, i) =>\n  i === 0 ? 0 : p / цены[i - 1] - 1);   // слой 1: из цен\n\nconst cov = ковариация(матрицаДоходностей); // слой 2: из доходностей\nconst риск = Math.sqrt(дисперсияПортфеля(веса, cov)); // слой 3\nconst sharpe = (средняяДоходность - ставка) / риск;   // слой 4"
+        },
+        "title": "Зависимости расчётов (слои)",
+        "desc": "Сложный расчёт — это слои: каждый следующий опирается на предыдущий. Цены → доходности → ковариация → риск портфеля → Sharpe. Меняешь низ — верх пересчитывается сам.",
+        "src": {
+          "id": "risk-dependencies",
+          "title": "Зависимости расчётов (слои)",
+          "desc": "Сложный расчёт — это слои: каждый следующий опирается на предыдущий. Цены → доходности → ковариация → риск портфеля → Sharpe. Меняешь низ — верх пересчитывается сам.",
+          "code": "const доходности = цены.map((p, i) =>\n  i === 0 ? 0 : p / цены[i - 1] - 1);   // слой 1: из цен\n\nconst cov = ковариация(матрицаДоходностей); // слой 2: из доходностей\nconst риск = Math.sqrt(дисперсияПортфеля(веса, cov)); // слой 3\nconst sharpe = (средняяДоходность - ставка) / риск;   // слой 4"
+        },
+        "x": 540,
+        "y": 4820
+      },
+      {
+        "id": "slvkt0",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Зависимости расчётов (слои) —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 4820
+      },
+      {
+        "id": "55557r",
+        "blockId": "raw",
+        "fields": {
+          "code": "import numpy as np\n\n# матрица доходностей: строки — активы, столбцы — дни\nдоходности = np.array([\n    [0.01, -0.02, 0.03],   # актив A\n    [0.02, -0.01, 0.025],  # актив B\n])\n\nкорр = np.corrcoef(доходности)   # матрица 2×2\nprint(корр)"
+        },
+        "title": "Матрица корреляций (связи активов)",
+        "desc": "Корреляция показывает, насколько активы движутся вместе (от −1 до 1). numpy строит всю матрицу одной командой — это основа риск-моделей на нескольких активах.",
+        "src": {
+          "id": "math-correlation",
+          "title": "Матрица корреляций (связи активов)",
+          "desc": "Корреляция показывает, насколько активы движутся вместе (от −1 до 1). numpy строит всю матрицу одной командой — это основа риск-моделей на нескольких активах.",
+          "code": "import numpy as np\n\n# матрица доходностей: строки — активы, столбцы — дни\nдоходности = np.array([\n    [0.01, -0.02, 0.03],   # актив A\n    [0.02, -0.01, 0.025],  # актив B\n])\n\nкорр = np.corrcoef(доходности)   # матрица 2×2\nprint(корр)"
+        },
+        "x": 60,
+        "y": 4990
+      },
+      {
+        "id": "d12p2k",
+        "blockId": "raw",
+        "fields": {
+          "code": "// w — веса бумаг [0.5, 0.5]; cov — матрица ковариаций N×N\nfunction дисперсияПортфеля(w, cov){\n  let сумма = 0;\n  for(let i = 0; i < w.length; i++){\n    for(let j = 0; j < w.length; j++){\n      сумма += w[i] * w[j] * cov[i][j]; // вклад пары (i,j)\n    }\n  }\n  return сумма;                        // дисперсия; корень = волатильность\n}"
+        },
+        "title": "Дисперсия портфеля (ковариация)",
+        "desc": "Риск портфеля — НЕ сумма рисков бумаг. Он зависит от того, как бумаги движутся вместе (ковариация). Формула: wᵀ·Σ·w. w — веса, Σ — матрица ковариаций.",
+        "src": {
+          "id": "risk-portfolio-var",
+          "title": "Дисперсия портфеля (ковариация)",
+          "desc": "Риск портфеля — НЕ сумма рисков бумаг. Он зависит от того, как бумаги движутся вместе (ковариация). Формула: wᵀ·Σ·w. w — веса, Σ — матрица ковариаций.",
+          "code": "// w — веса бумаг [0.5, 0.5]; cov — матрица ковариаций N×N\nfunction дисперсияПортфеля(w, cov){\n  let сумма = 0;\n  for(let i = 0; i < w.length; i++){\n    for(let j = 0; j < w.length; j++){\n      сумма += w[i] * w[j] * cov[i][j]; // вклад пары (i,j)\n    }\n  }\n  return сумма;                        // дисперсия; корень = волатильность\n}"
+        },
+        "x": 300,
+        "y": 4990
+      },
+      {
+        "id": "a6nzv5",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Матрица корреляций (связи активов) —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 4990
+      },
+      {
+        "id": "qnhgki",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Фильтрация и сортировка облигаций —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 4990
+      },
+      {
+        "id": "0btdt8",
+        "blockId": "raw",
+        "fields": {
+          "code": "const values = [40, 5, 100, 12];\nvalues.sort((a, b) => a - b);\nconsole.log(values);"
+        },
+        "title": "sort — сортировка чисел",
+        "desc": "sort сортирует массив на месте. Для чисел передавай сравнивающую функцию: a - b по возрастанию, b - a по убыванию.",
+        "src": {
+          "id": "sort-сортировка-чисел-mv6cute3",
+          "title": "sort — сортировка чисел",
+          "desc": "sort сортирует массив на месте. Для чисел передавай сравнивающую функцию: a - b по возрастанию, b - a по убыванию.",
+          "code": "const values = [40, 5, 100, 12];\nvalues.sort((a, b) => a - b);\nconsole.log(values);"
+        },
+        "x": 60,
+        "y": 5160
+      },
+      {
+        "id": "ycrq1x",
+        "blockId": "raw",
+        "fields": {
+          "code": "const prices = [12, 45, 8, 30];\nconst expensive = prices.filter(price => price >= 20);\nconsole.log(expensive);"
+        },
+        "title": "filter — отфильтровать элементы",
+        "desc": "filter создаёт новый массив только из элементов, для которых callback возвращает true. Исходный массив не изменяется.",
+        "src": {
+          "id": "filter-отфильтровать-элементы-mv6cutgz",
+          "title": "filter — отфильтровать элементы",
+          "desc": "filter создаёт новый массив только из элементов, для которых callback возвращает true. Исходный массив не изменяется.",
+          "code": "const prices = [12, 45, 8, 30];\nconst expensive = prices.filter(price => price >= 20);\nconsole.log(expensive);"
+        },
+        "x": 300,
+        "y": 5160
+      },
+      {
+        "id": "prfw2h",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "MOEX: облигации",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 5160
+      },
+      {
+        "id": "x5ysw2",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "отбор",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 5160
+      },
+      {
+        "id": "77rwvf",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "таблица —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 5330
+      },
+      {
+        "id": "l30oz8",
+        "blockId": "raw",
+        "fields": {
+          "code": "function разбор(ответ){\n  const col = имя => ответ.columns.indexOf(имя); // имя колонки → её номер\n  const iД = col(\"TRADEDATE\");\n  const iY = col(\"YIELDCLOSE\");\n  return ответ.data.map(строка => ({\n    дата: строка[iД],\n    доходность: строка[iY],\n  }));\n}"
+        },
+        "title": "Парсер ответа API (columns/data)",
+        "desc": "Реальный приём из этого проекта: биржа MOEX отдаёт колонки и строки отдельно. Собираем массив объектов по индексам колонок.",
+        "src": {
+          "id": "parser-api",
+          "title": "Парсер ответа API (columns/data)",
+          "desc": "Реальный приём из этого проекта: биржа MOEX отдаёт колонки и строки отдельно. Собираем массив объектов по индексам колонок.",
+          "code": "function разбор(ответ){\n  const col = имя => ответ.columns.indexOf(имя); // имя колонки → её номер\n  const iД = col(\"TRADEDATE\");\n  const iY = col(\"YIELDCLOSE\");\n  return ответ.data.map(строка => ({\n    дата: строка[iД],\n    доходность: строка[iY],\n  }));\n}"
+        },
+        "x": 300,
+        "y": 5330
+      },
+      {
+        "id": "4pzhf8",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Имя",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 5330
+      },
+      {
+        "id": "t0gool",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "биржа",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 5330
+      },
+      {
+        "id": "xba9hj",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "ИНН",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 5500
+      },
+      {
+        "id": "6fzmq2",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "ГИР БО",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 5500
+      },
+      {
+        "id": "g3do5h",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "массивы (с прокси) —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 5500
+      },
+      {
+        "id": "82ubce",
+        "blockId": "raw",
+        "fields": {
+          "code": "const q = u => fetch(u).then(r => r.json());\n\nasync function main(){\n  // — ЦЕПОЧКА: шаг 2 зависит от шага 1 —\n  const поиск = await q(\"https://iss.moex.com/iss/securities.json?q=Сбербанк&iss.meta=off\");\n  const secid = поиск.securities.data[0][1];          // берём код из 1-го ответа\n  const инфо  = await q(\"https://iss.moex.com/iss/securities/\" + secid + \".json?iss.meta=off\");\n  console.log(\"по цепочке, secid:\", secid);\n\n  // — ПАРАЛЛЕЛЬНО: запросы НЕ зависят друг от друга —\n  const [a, b] = await Promise.all([\n    q(\"https://iss.moex.com/iss/engines.json?iss.meta=off\"),\n    q(\"https://iss.moex.com/iss/index.json?iss.meta=off\"),\n  ]);\n  console.log(\"параллельно пришли оба ответа\");\n}\nmain();"
+        },
+        "title": "Цепочка и параллельные запросы",
+        "desc": "Два способа нескольких запросов. ЦЕПОЧКА (await, потом await) — когда второй нуждается в результате первого. ПАРАЛЛЕЛЬНО (Promise.all) — когда запросы независимы: так быстрее, ждём все разом.",
+        "src": {
+          "id": "net-chain",
+          "title": "Цепочка и параллельные запросы",
+          "desc": "Два способа нескольких запросов. ЦЕПОЧКА (await, потом await) — когда второй нуждается в результате первого. ПАРАЛЛЕЛЬНО (Promise.all) — когда запросы независимы: так быстрее, ждём все разом.",
+          "code": "const q = u => fetch(u).then(r => r.json());\n\nasync function main(){\n  // — ЦЕПОЧКА: шаг 2 зависит от шага 1 —\n  const поиск = await q(\"https://iss.moex.com/iss/securities.json?q=Сбербанк&iss.meta=off\");\n  const secid = поиск.securities.data[0][1];          // берём код из 1-го ответа\n  const инфо  = await q(\"https://iss.moex.com/iss/securities/\" + secid + \".json?iss.meta=off\");\n  console.log(\"по цепочке, secid:\", secid);\n\n  // — ПАРАЛЛЕЛЬНО: запросы НЕ зависят друг от друга —\n  const [a, b] = await Promise.all([\n    q(\"https://iss.moex.com/iss/engines.json?iss.meta=off\"),\n    q(\"https://iss.moex.com/iss/index.json?iss.meta=off\"),\n  ]);\n  console.log(\"параллельно пришли оба ответа\");\n}\nmain();"
+        },
+        "x": 780,
+        "y": 5500
+      },
+      {
+        "id": "zv7tdx",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Цепочка и параллельные запросы —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 5670
+      },
+      {
+        "id": "p7y0v3",
+        "blockId": "raw",
+        "fields": {
+          "code": "// адрес по кусочкам — так легче собрать и понять\nconst база   = \"https://iss.moex.com\";              // сервер\nconst путь   = \"/iss/securities.json\";               // что просим\nconst параметры = new URLSearchParams({              // настройки после ?\n  q: \"Сбербанк\",        // поиск по тексту\n  \"iss.meta\": \"off\",    // не слать служебные поля\n});\nconst url = база + путь + \"?\" + параметры;           // склеили\n\n// шаблон любого GET-запроса:\nasync function запрос(url){\n  const r = await fetch(url);     // сходили\n  return await r.json();          // разобрали\n}\nзапрос(url).then(data => console.log(data));"
+        },
+        "title": "Анатомия запроса + если нет шаблона",
+        "desc": "Из чего состоит запрос и как его СОБРАТЬ самому, когда готового примера нет. Запрос = адрес (база + путь) + параметры после ?. Где взять: 1) документация API; 2) открой сайт, F12 → вкладка Network, сделай действие — увидишь реальные запросы; 3) проверь URL, просто вставив его в адресную строку браузера.",
+        "src": {
+          "id": "net-anatomy",
+          "title": "Анатомия запроса + если нет шаблона",
+          "desc": "Из чего состоит запрос и как его СОБРАТЬ самому, когда готового примера нет. Запрос = адрес (база + путь) + параметры после ?. Где взять: 1) документация API; 2) открой сайт, F12 → вкладка Network, сделай действие — увидишь реальные запросы; 3) проверь URL, просто вставив его в адресную строку браузера.",
+          "code": "// адрес по кусочкам — так легче собрать и понять\nconst база   = \"https://iss.moex.com\";              // сервер\nconst путь   = \"/iss/securities.json\";               // что просим\nconst параметры = new URLSearchParams({              // настройки после ?\n  q: \"Сбербанк\",        // поиск по тексту\n  \"iss.meta\": \"off\",    // не слать служебные поля\n});\nconst url = база + путь + \"?\" + параметры;           // склеили\n\n// шаблон любого GET-запроса:\nasync function запрос(url){\n  const r = await fetch(url);     // сходили\n  return await r.json();          // разобрали\n}\nзапрос(url).then(data => console.log(data));"
+        },
+        "x": 300,
+        "y": 5670
+      },
+      {
+        "id": "nbhnf1",
+        "blockId": "raw",
+        "fields": {
+          "code": "async function безопасныйЗапрос(url){\n  console.log(\"→ идём на:\", url);          // 1) видно, КУДА\n  let r;\n  try {\n    r = await fetch(url);                   // нет связи/сбой → в catch\n  } catch(e){\n    console.log(\"⛔ сеть не ответила:\", e.message);\n    return null;\n  }\n  console.log(\"← статус:\", r.status);       // 2) 200 ок · 404 нет · 500 сервер упал\n  if(!r.ok){\n    console.log(\"⛔ сервер вернул ошибку\", r.status);\n    return null;\n  }\n  const текст = await r.text();             // 3) сначала как ТЕКСТ\n  try {\n    return JSON.parse(текст);               // 4) пробуем разобрать\n  } catch(e){\n    console.log(\"⛔ это не JSON. Начало ответа:\", текст.slice(0, 100));\n    return null;\n  }\n}\n\n// проба с заведомо битым адресом:\nбезопасныйЗапрос(\"https://iss.moex.com/iss/НЕТУ.json\")\n  .then(d => console.log(\"итог:\", d));"
+        },
+        "title": "Запрос сломался — где и почему",
+        "desc": "Как понять, ЧТО именно пошло не так. Проверяем по шагам: дошли ли до сети, какой статус вернул сервер (200 ок, 404 нет адреса, 500 упал), это вообще JSON или HTML с ошибкой. Запусти — адрес нарочно битый, увидишь, на каком шаге встало.",
+        "src": {
+          "id": "net-debug",
+          "title": "Запрос сломался — где и почему",
+          "desc": "Как понять, ЧТО именно пошло не так. Проверяем по шагам: дошли ли до сети, какой статус вернул сервер (200 ок, 404 нет адреса, 500 упал), это вообще JSON или HTML с ошибкой. Запусти — адрес нарочно битый, увидишь, на каком шаге встало.",
+          "code": "async function безопасныйЗапрос(url){\n  console.log(\"→ идём на:\", url);          // 1) видно, КУДА\n  let r;\n  try {\n    r = await fetch(url);                   // нет связи/сбой → в catch\n  } catch(e){\n    console.log(\"⛔ сеть не ответила:\", e.message);\n    return null;\n  }\n  console.log(\"← статус:\", r.status);       // 2) 200 ок · 404 нет · 500 сервер упал\n  if(!r.ok){\n    console.log(\"⛔ сервер вернул ошибку\", r.status);\n    return null;\n  }\n  const текст = await r.text();             // 3) сначала как ТЕКСТ\n  try {\n    return JSON.parse(текст);               // 4) пробуем разобрать\n  } catch(e){\n    console.log(\"⛔ это не JSON. Начало ответа:\", текст.slice(0, 100));\n    return null;\n  }\n}\n\n// проба с заведомо битым адресом:\nбезопасныйЗапрос(\"https://iss.moex.com/iss/НЕТУ.json\")\n  .then(d => console.log(\"итог:\", d));"
+        },
+        "x": 540,
+        "y": 5670
+      },
+      {
+        "id": "f5w5rs",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Promise.all — параллельные задачи —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 5670
+      },
+      {
+        "id": "dg78cq",
+        "blockId": "raw",
+        "fields": {
+          "code": "fetch(\"/api/status\")\n  .then(response => response.json())\n  .then(data => console.log(data.status))\n  .catch(error => console.log(\"Ошибка:\", error.message));"
+        },
+        "title": ".then и .catch",
+        "desc": "then обрабатывает успешно завершившийся Promise, catch — ошибку в цепочке. Этот стиль можно использовать вместо async/await.",
+        "src": {
+          "id": "then-и-catch-mv6cuson",
+          "title": ".then и .catch",
+          "desc": "then обрабатывает успешно завершившийся Promise, catch — ошибку в цепочке. Этот стиль можно использовать вместо async/await.",
+          "code": "fetch(\"/api/status\")\n  .then(response => response.json())\n  .then(data => console.log(data.status))\n  .catch(error => console.log(\"Ошибка:\", error.message));"
+        },
+        "x": 60,
+        "y": 5840
+      },
+      {
+        "id": "2p3vp2",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Анатомия запроса + если нет шаблона —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 5840
+      },
+      {
+        "id": "mbw5k4",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "fetch + await — получить данные —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 5840
+      },
+      {
+        "id": "s7xb4d",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Парсер CSV",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 5840
+      },
+      {
+        "id": "j0wfqb",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "массив объектов",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 6010
+      },
+      {
+        "id": "aor9hf",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "массив объектов —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 6010
+      },
+      {
+        "id": "ps9yvf",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Парсер ответа API (columns/data) —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 6010
+      },
+      {
+        "id": "1vi57x",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "таблица",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 6010
+      },
+      {
+        "id": "g0qqar",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Конвейер: данные",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 6180
+      },
+      {
+        "id": "10hcmx",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "обработка",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 6180
+      },
+      {
+        "id": "cq4lty",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "вывод —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 6180
+      },
+      {
+        "id": "0py923",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "риск",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 6180
+      },
+      {
+        "id": "s7ws98",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Как файлы собираются в систему —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 6350
+      },
+      {
+        "id": "542ebs",
+        "blockId": "raw",
+        "fields": {
+          "code": "// 1) В проекте (есть package.json): сначала в терминале\n//    npm install dayjs\n//    затем в коде:\nimport dayjs from \"dayjs\";\nconsole.log(dayjs().format(\"YYYY-MM-DD\"));\n\n// 2) В обычном HTML без сборки — через CDN:\n// <script src=\"https://cdn.jsdelivr.net/npm/dayjs/dayjs.min.js\"></script>"
+        },
+        "title": "Как подключать библиотеки",
+        "desc": "Библиотека — чужой готовый код, который подключаешь к себе. Два пути: через npm (в проекте со сборкой) или через CDN (прямо в HTML).",
+        "src": {
+          "id": "libs-howto",
+          "title": "Как подключать библиотеки",
+          "desc": "Библиотека — чужой готовый код, который подключаешь к себе. Два пути: через npm (в проекте со сборкой) или через CDN (прямо в HTML).",
+          "code": "// 1) В проекте (есть package.json): сначала в терминале\n//    npm install dayjs\n//    затем в коде:\nimport dayjs from \"dayjs\";\nconsole.log(dayjs().format(\"YYYY-MM-DD\"));\n\n// 2) В обычном HTML без сборки — через CDN:\n// <script src=\"https://cdn.jsdelivr.net/npm/dayjs/dayjs.min.js\"></script>"
+        },
+        "x": 300,
+        "y": 6350
+      },
+      {
+        "id": "q0b631",
+        "blockId": "raw",
+        "fields": {
+          "code": "const сервер = http.createServer((req, res) => {\n  const url = new URL(req.url, \"http://localhost\");\n  if(url.pathname === \"/api/time\"){\n    res.writeHead(200, { \"Content-Type\": \"application/json\" });\n    return res.end(JSON.stringify({ time: Date.now() }));\n  }\n  res.writeHead(404);\n  res.end(\"not found\");\n});"
+        },
+        "title": "Сервер с маршрутами и JSON",
+        "desc": "Чуть сложнее: разные ответы на разные адреса (роуты) и отдача JSON. По этому принципу сделаны /api/list и /api/add в Лаборатории.",
+        "src": {
+          "id": "server-routes",
+          "title": "Сервер с маршрутами и JSON",
+          "desc": "Чуть сложнее: разные ответы на разные адреса (роуты) и отдача JSON. По этому принципу сделаны /api/list и /api/add в Лаборатории.",
+          "code": "const сервер = http.createServer((req, res) => {\n  const url = new URL(req.url, \"http://localhost\");\n  if(url.pathname === \"/api/time\"){\n    res.writeHead(200, { \"Content-Type\": \"application/json\" });\n    return res.end(JSON.stringify({ time: Date.now() }));\n  }\n  res.writeHead(404);\n  res.end(\"not found\");\n});"
+        },
+        "x": 540,
+        "y": 6350
+      },
+      {
+        "id": "q5jb1e",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Сервер с маршрутами и JSON —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 6350
+      },
+      {
+        "id": "6cw43b",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Как запустить сервер (Node) —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 6520
+      },
+      {
+        "id": "akmow2",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Как подключать библиотеки —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 6520
+      },
+      {
+        "id": "orfoha",
+        "blockId": "raw",
+        "fields": {
+          "code": "import * as XLSX from \"xlsx\";\n\nconst книга = XLSX.read(данныеФайла, { type: \"array\" });\nconst лист  = книга.Sheets[книга.SheetNames[0]]; // первый лист\nconst строки = XLSX.utils.sheet_to_json(лист, { header: 1 });\n// строки → [[ячейка, ячейка, …], …]"
+        },
+        "title": "SheetJS (xlsx) — читать Excel",
+        "desc": "Библиотека xlsx (SheetJS) — чтение .xlsx прямо в браузере. Используется в проекте для импорта отчётов ФНС. Лист → массив строк.",
+        "src": {
+          "id": "libs-sheetjs",
+          "title": "SheetJS (xlsx) — читать Excel",
+          "desc": "Библиотека xlsx (SheetJS) — чтение .xlsx прямо в браузере. Используется в проекте для импорта отчётов ФНС. Лист → массив строк.",
+          "code": "import * as XLSX from \"xlsx\";\n\nconst книга = XLSX.read(данныеФайла, { type: \"array\" });\nconst лист  = книга.Sheets[книга.SheetNames[0]]; // первый лист\nconst строки = XLSX.utils.sheet_to_json(лист, { header: 1 });\n// строки → [[ячейка, ячейка, …], …]"
+        },
+        "x": 540,
+        "y": 6520
+      },
+      {
+        "id": "ydrkhv",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Файлы общаются: export / import —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 6520
+      },
+      {
+        "id": "hifutx",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "вывод",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 6690
+      },
+      {
+        "id": "fr1g51",
+        "blockId": "raw",
+        "fields": {
+          "code": "const числа = [40, 70, 30, 90, 55];"
+        },
+        "title": "массив",
+        "desc": "Массив — упорядоченный список значений\nДопустим, у тебя есть не один цвет, а сразу пять. Создавать отдельную переменную для каждого неудобно.\nМожно собрать их в массив:\nconst colors = [\"красный\", \"синий\", \"зелёный\"];\nМассив обозначается квадратными скобками [].\nКак устроен массив\nУ каждого элемента есть позиция — индекс. В JavaScript отсчёт начинается с нуля.\nИндекс 0\nкрасный\n\n\nИндекс 1\nсиний\n\n\nИн",
+        "src": {
+          "id": "массив-mv9yln2q",
+          "title": "массив",
+          "desc": "Массив — упорядоченный список значений\nДопустим, у тебя есть не один цвет, а сразу пять. Создавать отдельную переменную для каждого неудобно.\nМожно собрать их в массив:\nconst colors = [\"красный\", \"синий\", \"зелёный\"];\nМассив обозначается квадратными скобками [].\nКак устроен массив\nУ каждого элемента есть позиция — индекс. В JavaScript отсчёт начинается с нуля.\nИндекс 0\nкрасный\n\n\nИндекс 1\nсиний\n\n\nИн",
+          "code": "const числа = [40, 70, 30, 90, 55];"
+        },
+        "x": 300,
+        "y": 6690
+      },
+      {
+        "id": "gh901u",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Функция —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 6690
+      },
+      {
+        "id": "m5850g",
+        "blockId": "raw",
+        "fields": {
+          "code": "defплощадь(ширина,высота):\n    returnширина*высота\n\nprint(площадь(4,5))"
+        },
+        "title": "Функция (def)",
+        "desc": "Функция в Python начинается с def. Тело — с отступом. return отдаёт результат наружу.",
+        "src": {
+          "id": "py-function",
+          "title": "Функция (def)",
+          "desc": "Функция в Python начинается с def. Тело — с отступом. return отдаёт результат наружу.",
+          "code": "defплощадь(ширина,высота):\n    returnширина*высота\n\nprint(площадь(4,5))"
+        },
+        "x": 780,
+        "y": 6690
+      },
+      {
+        "id": "jj1nm6",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Цикл (for) —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 6860
+      },
+      {
+        "id": "cj2cky",
+        "blockId": "raw",
+        "fields": {
+          "code": "foriinrange(3):\n    print(i)"
+        },
+        "title": "Цикл (for … in range)",
+        "desc": "Главное в Python — отступы. Тело цикла — это строки, сдвинутые вправо. Двоеточие открывает блок.",
+        "src": {
+          "id": "py-loop",
+          "title": "Цикл (for … in range)",
+          "desc": "Главное в Python — отступы. Тело цикла — это строки, сдвинутые вправо. Двоеточие открывает блок.",
+          "code": "foriinrange(3):\n    print(i)"
+        },
+        "x": 300,
+        "y": 6860
+      },
+      {
+        "id": "phqh8z",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Условие (if / else) —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 6860
+      },
+      {
+        "id": "lqi3fj",
+        "blockId": "raw",
+        "fields": {
+          "code": "const age = 20;\nconst hasTicket = true;\nconst allowed = age >= 18 && hasTicket;\n\nconsole.log(allowed);"
+        },
+        "title": "Логика и сравнения",
+        "desc": "&& означает «и», || — «или», ! — отрицание. === сравнивает без преобразования типов; > и < сравнивают величины.",
+        "src": {
+          "id": "логика-и-сравнения-mv6cut56",
+          "title": "Логика и сравнения",
+          "desc": "&& означает «и», || — «или», ! — отрицание. === сравнивает без преобразования типов; > и < сравнивают величины.",
+          "code": "const age = 20;\nconst hasTicket = true;\nconst allowed = age >= 18 && hasTicket;\n\nconsole.log(allowed);"
+        },
+        "x": 780,
+        "y": 6860
+      },
+      {
+        "id": "jxbo0k",
+        "blockId": "raw",
+        "fields": {
+          "code": "const temperature = 18;\n\nif (temperature >= 25) {\n  console.log(\"Жарко\");\n} else if (temperature >= 15) {\n  console.log(\"Комфортно\");\n} else {\n  console.log(\"Холодно\");\n}"
+        },
+        "title": "else и else if",
+        "desc": "Выбирает одну из нескольких веток в зависимости от условий. Условия проверяются сверху вниз.",
+        "src": {
+          "id": "else-и-else-if-mv6cut5l",
+          "title": "else и else if",
+          "desc": "Выбирает одну из нескольких веток в зависимости от условий. Условия проверяются сверху вниз.",
+          "code": "const temperature = 18;\n\nif (temperature >= 25) {\n  console.log(\"Жарко\");\n} else if (temperature >= 15) {\n  console.log(\"Комфортно\");\n} else {\n  console.log(\"Холодно\");\n}"
+        },
+        "x": 60,
+        "y": 7030
+      },
+      {
+        "id": "1xkbhb",
+        "blockId": "raw",
+        "fields": {
+          "code": "const score = 72;\nconst result = score >= 60 ? \"Зачёт\" : \"Незачёт\";\n\nconsole.log(result);"
+        },
+        "title": "Тернарный оператор",
+        "desc": "Короткая форма выбора одного из двух значений: условие ? значениеЕслиДа : значениеЕслиНет.",
+        "src": {
+          "id": "тернарный-оператор-mv6cut4a",
+          "title": "Тернарный оператор",
+          "desc": "Короткая форма выбора одного из двух значений: условие ? значениеЕслиДа : значениеЕслиНет.",
+          "code": "const score = 72;\nconst result = score >= 60 ? \"Зачёт\" : \"Незачёт\";\n\nconsole.log(result);"
+        },
+        "x": 300,
+        "y": 7030
+      },
+      {
+        "id": "xzagh4",
+        "blockId": "raw",
+        "fields": {
+          "code": "const color = \"blue\";\nlet meaning;\n\nswitch (color) {\n  case \"red\":\n    meaning = \"Энергия\";\n    break;\n  case \"blue\":\n    meaning = \"Спокойствие\";\n    break;\n  default:\n    meaning = \"Неизвестный цвет\";\n}\n\nconsole.log(meaning);"
+        },
+        "title": "switch",
+        "desc": "Выбирает ветку по точному совпадению значения. break завершает выбранную ветку, default срабатывает, если совпадений нет.",
+        "src": {
+          "id": "switch-mv6cut4q",
+          "title": "switch",
+          "desc": "Выбирает ветку по точному совпадению значения. break завершает выбранную ветку, default срабатывает, если совпадений нет.",
+          "code": "const color = \"blue\";\nlet meaning;\n\nswitch (color) {\n  case \"red\":\n    meaning = \"Энергия\";\n    break;\n  case \"blue\":\n    meaning = \"Спокойствие\";\n    break;\n  default:\n    meaning = \"Неизвестный цвет\";\n}\n\nconsole.log(meaning);"
+        },
+        "x": 540,
+        "y": 7030
+      },
+      {
+        "id": "vi0t2c",
+        "blockId": "raw",
+        "fields": {
+          "code": "function getDiscount(price) {\n  if (price <= 0) {\n    return 0;\n  }\n\n  return price * 0.1;\n}\n\nconsole.log(getDiscount(200));"
+        },
+        "title": "Ранний return",
+        "desc": "В функции можно сразу вернуть результат и выйти, если входные данные не подходят. Это уменьшает вложенность условий.",
+        "src": {
+          "id": "ранний-return-mv6cut62",
+          "title": "Ранний return",
+          "desc": "В функции можно сразу вернуть результат и выйти, если входные данные не подходят. Это уменьшает вложенность условий.",
+          "code": "function getDiscount(price) {\n  if (price <= 0) {\n    return 0;\n  }\n\n  return price * 0.1;\n}\n\nconsole.log(getDiscount(200));"
+        },
+        "x": 780,
+        "y": 7030
+      },
+      {
+        "id": "n5szts",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "switch —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 7200
+      },
+      {
+        "id": "uoo24i",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Логика и сравнения —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 7200
+      },
+      {
+        "id": "dbu9ra",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Ранний return —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 7200
+      },
+      {
+        "id": "ipca01",
+        "blockId": "raw",
+        "fields": {
+          "code": "functionплощадь(ширина,высота){\n  returnширина*высота;\n}\n\nconsole.log(площадь(4,5));"
+        },
+        "title": "Функция",
+        "desc": "Функция — это рецепт: даёшь ей что-то на вход, она возвращает результат. Написал один раз — вызываешь сколько угодно.",
+        "src": {
+          "id": "js-function",
+          "title": "Функция",
+          "desc": "Функция — это рецепт: даёшь ей что-то на вход, она возвращает результат. Написал один раз — вызываешь сколько угодно.",
+          "code": "functionплощадь(ширина,высота){\n  returnширина*высота;\n}\n\nconsole.log(площадь(4,5));"
+        },
+        "x": 780,
+        "y": 7200
+      },
+      {
+        "id": "fs8p46",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Тернарный оператор —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 7370
+      },
+      {
+        "id": "4e14wb",
+        "blockId": "raw",
+        "fields": {
+          "code": "constвозраст=20;\n\nif(возраст>=18){\n  console.log(\"можно\");\n}else{\n  console.log(\"нельзя\");\n}"
+        },
+        "title": "Условие (if / else)",
+        "desc": "«Если … то … иначе …». Код решает, какую ветку выполнить, в зависимости от того, правда условие или нет.",
+        "src": {
+          "id": "js-condition",
+          "title": "Условие (if / else)",
+          "desc": "«Если … то … иначе …». Код решает, какую ветку выполнить, в зависимости от того, правда условие или нет.",
+          "code": "constвозраст=20;\n\nif(возраст>=18){\n  console.log(\"можно\");\n}else{\n  console.log(\"нельзя\");\n}"
+        },
+        "x": 300,
+        "y": 7370
+      },
+      {
+        "id": "6qp3tb",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Случайный цвет из палитры —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 7370
+      },
+      {
+        "id": "kmzwsw",
+        "blockId": "raw",
+        "fields": {
+          "code": "const value = Math.random();\nconsole.log(value);"
+        },
+        "title": "Math.random — случайное число",
+        "desc": "Math.random() возвращает случайное дробное число от 0 включительно до 1, не включая 1.",
+        "src": {
+          "id": "math-random-случайное-число-mv6cusrk",
+          "title": "Math.random — случайное число",
+          "desc": "Math.random() возвращает случайное дробное число от 0 включительно до 1, не включая 1.",
+          "code": "const value = Math.random();\nconsole.log(value);"
+        },
+        "x": 780,
+        "y": 7370
+      },
+      {
+        "id": "3ukr6g",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Случайное целое в диапазоне —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 7540
+      },
+      {
+        "id": "3s066j",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "hsl — тон, насыщенность, яркость —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 7540
+      },
+      {
+        "id": "y08i85",
+        "blockId": "raw",
+        "fields": {
+          "code": "const palette = [\"#FF006E\", \"#52F2C9\", \"#3DD9FF\", \"#B45CFF\"];\nconst index = Math.floor(Math.random() * palette.length);\nconst color = palette[index];\n\nconsole.log(color);"
+        },
+        "title": "Случайный цвет из палитры",
+        "desc": "Можно выбирать случайный элемент из готового массива цветов по индексу, полученному через Math.random и Math.floor.",
+        "src": {
+          "id": "случайный-цвет-из-палитры-mv6custy",
+          "title": "Случайный цвет из палитры",
+          "desc": "Можно выбирать случайный элемент из готового массива цветов по индексу, полученному через Math.random и Math.floor.",
+          "code": "const palette = [\"#FF006E\", \"#52F2C9\", \"#3DD9FF\", \"#B45CFF\"];\nconst index = Math.floor(Math.random() * palette.length);\nconst color = palette[index];\n\nconsole.log(color);"
+        },
+        "x": 540,
+        "y": 7540
+      },
+      {
+        "id": "zikq8m",
+        "blockId": "raw",
+        "fields": {
+          "code": "const overlay = \"rgba(255, 0, 110, 0.35)\";\nconst panel = document.querySelector(\"#panel\");\n\npanel.style.backgroundColor = overlay;\nconsole.log(overlay);"
+        },
+        "title": "rgba — цвет с прозрачностью",
+        "desc": "rgba(r, g, b, a) задаёт красный, зелёный и синий каналы от 0 до 255, а альфа-канал — прозрачность от 0 до 1.",
+        "src": {
+          "id": "rgba-цвет-с-прозрачностью-mv6cut7c",
+          "title": "rgba — цвет с прозрачностью",
+          "desc": "rgba(r, g, b, a) задаёт красный, зелёный и синий каналы от 0 до 255, а альфа-канал — прозрачность от 0 до 1.",
+          "code": "const overlay = \"rgba(255, 0, 110, 0.35)\";\nconst panel = document.querySelector(\"#panel\");\n\npanel.style.backgroundColor = overlay;\nconsole.log(overlay);"
+        },
+        "x": 780,
+        "y": 7540
+      },
+      {
+        "id": "el1vnm",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "linear-gradient — линейный градиент —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 7710
+      },
+      {
+        "id": "vbeuf2",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "radial-gradient — радиальный градиент —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 7710
+      },
+      {
+        "id": "cy9naq",
+        "blockId": "raw",
+        "fields": {
+          "code": "const panel = document.querySelector(\"#panel\");\npanel.style.backgroundImage =\n  \"linear-gradient(90deg, #FF006E, #3DD9FF)\";"
+        },
+        "title": "linear-gradient — линейный градиент",
+        "desc": "linear-gradient создаёт переход цветов вдоль направления. Его можно назначить через CSS background или backgroundImage.",
+        "src": {
+          "id": "linear-gradient-линейный-градиент-mv6cut84",
+          "title": "linear-gradient — линейный градиент",
+          "desc": "linear-gradient создаёт переход цветов вдоль направления. Его можно назначить через CSS background или backgroundImage.",
+          "code": "const panel = document.querySelector(\"#panel\");\npanel.style.backgroundImage =\n  \"linear-gradient(90deg, #FF006E, #3DD9FF)\";"
+        },
+        "x": 540,
+        "y": 7710
+      },
+      {
+        "id": "pv7hic",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "conic-gradient — спектральный круг —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 7710
+      },
+      {
+        "id": "3aoaws",
+        "blockId": "raw",
+        "fields": {
+          "code": "const hue = 330;\nconst saturation = 90;\nconst lightness = 55;\nconst color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;\n\nconsole.log(color);"
+        },
+        "title": "hsl — тон, насыщенность, яркость",
+        "desc": "hsl(h, s%, l%) задаёт цвет через тон от 0 до 360 градусов, насыщенность и светлоту в процентах.",
+        "src": {
+          "id": "hsl-тон-насыщенность-яркость-mv6cut8j",
+          "title": "hsl — тон, насыщенность, яркость",
+          "desc": "hsl(h, s%, l%) задаёт цвет через тон от 0 до 360 градусов, насыщенность и светлоту в процентах.",
+          "code": "const hue = 330;\nconst saturation = 90;\nconst lightness = 55;\nconst color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;\n\nconsole.log(color);"
+        },
+        "x": 60,
+        "y": 7880
+      },
+      {
+        "id": "6tna4g",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Шрифты и цвета через переменные —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 7880
+      },
+      {
+        "id": "9kng17",
+        "blockId": "raw",
+        "fields": {
+          "code": "const glow = document.querySelector(\"#glow\");\nglow.style.backgroundImage =\n  \"radial-gradient(circle, #B45CFF 0%, #140A24 70%)\";"
+        },
+        "title": "radial-gradient — радиальный градиент",
+        "desc": "radial-gradient создаёт цветовой переход из центра наружу. Удобен для свечения и мягких подсветок.",
+        "src": {
+          "id": "radial-gradient-радиальный-градиент-mv6cut7q",
+          "title": "radial-gradient — радиальный градиент",
+          "desc": "radial-gradient создаёт цветовой переход из центра наружу. Удобен для свечения и мягких подсветок.",
+          "code": "const glow = document.querySelector(\"#glow\");\nglow.style.backgroundImage =\n  \"radial-gradient(circle, #B45CFF 0%, #140A24 70%)\";"
+        },
+        "x": 540,
+        "y": 7880
+      },
+      {
+        "id": "bxq4s9",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "rgba — цвет с прозрачностью —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 7880
+      },
+      {
+        "id": "9p8wkj",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "setInterval — повторять действие —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 8050
+      },
+      {
+        "id": "a26me0",
+        "blockId": "raw",
+        "fields": {
+          "code": "console.log(\"Старт\");\n\nsetTimeout(() => {\n  console.log(\"Прошла примерно 1 секунда\");\n}, 1000);"
+        },
+        "title": "setTimeout — выполнить позже",
+        "desc": "setTimeout вызывает функцию один раз после задержки в миллисекундах. Задержка задаёт минимальное ожидание, а не точное время запуска.",
+        "src": {
+          "id": "settimeout-выполнить-позже-mv6cusf0",
+          "title": "setTimeout — выполнить позже",
+          "desc": "setTimeout вызывает функцию один раз после задержки в миллисекундах. Задержка задаёт минимальное ожидание, а не точное время запуска.",
+          "code": "console.log(\"Старт\");\n\nsetTimeout(() => {\n  console.log(\"Прошла примерно 1 секунда\");\n}, 1000);"
+        },
+        "x": 300,
+        "y": 8050
+      },
+      {
+        "id": "8a0hh9",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "requestAnimationFrame — цикл анимации —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 8050
+      },
+      {
+        "id": "kpnl2i",
+        "blockId": "raw",
+        "fields": {
+          "code": "let ticks = 0;\nconst timerId = setInterval(() => {\n  ticks += 1;\n  console.log(ticks);\n\n  if (ticks >= 3) {\n    clearInterval(timerId);\n  }\n}, 500);"
+        },
+        "title": "setInterval — повторять действие",
+        "desc": "setInterval повторяет функцию с заданным интервалом. Сохраняйте идентификатор и вызывайте clearInterval, когда повторения больше не нужны.",
+        "src": {
+          "id": "setinterval-повторять-действие-mv6cusfl",
+          "title": "setInterval — повторять действие",
+          "desc": "setInterval повторяет функцию с заданным интервалом. Сохраняйте идентификатор и вызывайте clearInterval, когда повторения больше не нужны.",
+          "code": "let ticks = 0;\nconst timerId = setInterval(() => {\n  ticks += 1;\n  console.log(ticks);\n\n  if (ticks >= 3) {\n    clearInterval(timerId);\n  }\n}, 500);"
+        },
+        "x": 780,
+        "y": 8050
+      },
+      {
+        "id": "of0mlc",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "resize — изменение размера окна —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 8220
+      },
+      {
+        "id": "gr84fj",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "keydown и keyup — клавиатура —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 8220
+      },
+      {
+        "id": "92o4r7",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "mousemove — движение мыши —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 540,
+        "y": 8220
+      },
+      {
+        "id": "e0uivp",
+        "blockId": "raw",
+        "fields": {
+          "code": "// ДВА СПОСОБА СОБРАТЬ СИСТЕМУ ИЗ ФАЙЛОВ\n\n// 1) ВНУТРИ ОДНОГО ДВИЖКА — файлы одного мира соединяются импортами.\n//    Браузер понимает HTML+CSS+JS сразу, поэтому один .html МОЖЕТ держать\n//    и <style> (стиль), и <script> (логику) — это реальное «вложение».\n//    JS-файлы между собой: export / import. Python-файлы: import.\n//    НО Python внутри JS внутри HTML «в одном запуске» — НЕЛЬЗЯ:\n//    браузер не умеет Python.\n//    (Исключение: PyScript / Pyodide — Python компилируют в WebAssembly,\n//     и он бежит в браузере. Экзотика, медленно, редко нужно.)\n\n// 2) РАЗНЫЕ ЯЗЫКИ / МАШИНЫ — отдельные программы, которые ОБЩАЮТСЯ.\n//    Никто не вложен в другого. Способы общения:\n//    • HTTP + JSON — один шлёт запрос, другой отвечает данными (fetch).\n//    • общий файл — один пишет .json/.csv, другой читает.\n//    • база данных — один кладёт строки, другой забирает.\n//    Главное — ДОГОВОР (формат сообщения), а не общий код.\n\n// ТВОЙ ПРОЕКТ ИМЕННО ТАК И УСТРОЕН:\n//   [браузер: HTML+JS сайт] --HTTP/JSON--> [Cloudflare Worker (JS)] --> ГИР БО\n//   [браузер]               --HTTP------->  [MOEX API]\n//   [Python-бот]            --файлы/JSON-->  общие данные --> [сайт читает]\n//   каждый кусок на своём языке, связаны СООБЩЕНИЯМИ, не общим кодом."
+        },
+        "title": "Как файлы собираются в систему",
+        "desc": "Два способа объединять код. 1) Внутри одного движка — вложение/импорты. 2) Разные языки/машины — отдельные программы, общаются сообщениями. Твой проект — второй способ.",
+        "src": {
+          "id": "sys-architecture",
+          "title": "Как файлы собираются в систему",
+          "desc": "Два способа объединять код. 1) Внутри одного движка — вложение/импорты. 2) Разные языки/машины — отдельные программы, общаются сообщениями. Твой проект — второй способ.",
+          "code": "// ДВА СПОСОБА СОБРАТЬ СИСТЕМУ ИЗ ФАЙЛОВ\n\n// 1) ВНУТРИ ОДНОГО ДВИЖКА — файлы одного мира соединяются импортами.\n//    Браузер понимает HTML+CSS+JS сразу, поэтому один .html МОЖЕТ держать\n//    и <style> (стиль), и <script> (логику) — это реальное «вложение».\n//    JS-файлы между собой: export / import. Python-файлы: import.\n//    НО Python внутри JS внутри HTML «в одном запуске» — НЕЛЬЗЯ:\n//    браузер не умеет Python.\n//    (Исключение: PyScript / Pyodide — Python компилируют в WebAssembly,\n//     и он бежит в браузере. Экзотика, медленно, редко нужно.)\n\n// 2) РАЗНЫЕ ЯЗЫКИ / МАШИНЫ — отдельные программы, которые ОБЩАЮТСЯ.\n//    Никто не вложен в другого. Способы общения:\n//    • HTTP + JSON — один шлёт запрос, другой отвечает данными (fetch).\n//    • общий файл — один пишет .json/.csv, другой читает.\n//    • база данных — один кладёт строки, другой забирает.\n//    Главное — ДОГОВОР (формат сообщения), а не общий код.\n\n// ТВОЙ ПРОЕКТ ИМЕННО ТАК И УСТРОЕН:\n//   [браузер: HTML+JS сайт] --HTTP/JSON--> [Cloudflare Worker (JS)] --> ГИР БО\n//   [браузер]               --HTTP------->  [MOEX API]\n//   [Python-бот]            --файлы/JSON-->  общие данные --> [сайт читает]\n//   каждый кусок на своём языке, связаны СООБЩЕНИЯМИ, не общим кодом."
+        },
+        "x": 780,
+        "y": 8220
+      },
+      {
+        "id": "dbwrlb",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Функция (def) —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 60,
+        "y": 8390
+      },
+      {
+        "id": "ku329i",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Переменная и вывод —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 300,
+        "y": 8390
+      },
+      {
+        "id": "of0nv4",
+        "blockId": "raw",
+        "fields": {
+          "code": "let цена = 100;"
+        },
+        "title": "переменная",
+        "desc": "Переменная — именованное место для значения\nПеременная позволяет сохранить какое-то значение и обращаться к нему по имени.\nlet name = \"Алекс\";\nlet age = 25;\nlet isAdmin = false;\n\n\nЗдесь мы создали три переменные:\n\nname\nХранит текст\n\"Алекс\"\n\n\n\n\nage\nХранит число\n25\n\n\n\n\nisAdmin\nХранит логическое значение\nfalse — нет\n\n\n\nМожно представить переменную как подписанный контейнер. Имя позволяет найти значен",
+        "src": {
+          "id": "js-variable",
+          "title": "переменная",
+          "desc": "Переменная — именованное место для значения\nПеременная позволяет сохранить какое-то значение и обращаться к нему по имени.\nlet name = \"Алекс\";\nlet age = 25;\nlet isAdmin = false;\n\n\nЗдесь мы создали три переменные:\n\nname\nХранит текст\n\"Алекс\"\n\n\n\n\nage\nХранит число\n25\n\n\n\n\nisAdmin\nХранит логическое значение\nfalse — нет\n\n\n\nМожно представить переменную как подписанный контейнер. Имя позволяет найти значен",
+          "code": "let цена = 100;"
+        },
+        "x": 540,
+        "y": 8390
+      },
+      {
+        "id": "a104vj",
+        "blockId": "raw",
+        "fields": {
+          "code": ""
+        },
+        "title": "Python: парсер строк в числа —",
+        "desc": "(ящик данных — не сохранённый кусок)",
+        "x": 780,
+        "y": 8390
+      }
+    ],
+    "edges": [
+      {
+        "from": "nhvcx1",
+        "to": "2ndhqe",
+        "kind": "data",
+        "src": "Массив (список) —[передаёт данные]-> Среднее — JavaScript"
+      },
+      {
+        "from": "nhvcx1",
+        "to": "wieucd",
+        "kind": "data",
+        "src": "Массив (список) —[передаёт данные]-> Среднее — Python"
+      },
+      {
+        "from": "nhvcx1",
+        "to": "zvpt1v",
+        "kind": "data",
+        "src": "Массив (список) —[передаёт данные]-> Среднее — SQL"
+      },
+      {
+        "from": "nhvcx1",
+        "to": "6oz336",
+        "kind": "data",
+        "src": "Массив (список) —[передаёт данные]-> Применить формулу к массиву"
+      },
+      {
+        "from": "nhvcx1",
+        "to": "vgsi10",
+        "kind": "data",
+        "src": "Массив (список) —[передаёт данные]-> Фильтрация и сортировка облигаций"
+      },
+      {
+        "from": "nhvcx1",
+        "to": "ftbgfb",
+        "kind": "data",
+        "src": "Массив (список) —[передаёт данные]-> Построить таблицу из массива"
+      },
+      {
+        "from": "phwsx5",
+        "to": "2uljv5",
+        "kind": "data",
+        "src": "Перебор: map / filter / reduce —[использует]-> Массив (список)"
+      },
+      {
+        "from": "phwsx5",
+        "to": "4uvw1l",
+        "kind": "data",
+        "src": "Перебор: map / filter / reduce —[альтернатива]-> Цепочка map и reduce"
+      },
+      {
+        "from": "phwsx5",
+        "to": "6oz336",
+        "kind": "data",
+        "src": "Перебор: map / filter / reduce —[альтернатива]-> Применить формулу к массиву"
+      },
+      {
+        "from": "iw88cn",
+        "to": "vgsi10",
+        "kind": "data",
+        "src": "filter — отфильтровать элементы —[альтернатива]-> Фильтрация и сортировка облигаций"
+      },
+      {
+        "from": "x7k6jz",
+        "to": "2uljv5",
+        "kind": "data",
+        "src": "sort — сортировка чисел —[использует]-> Массив (список)"
+      },
+      {
+        "from": "17mf1v",
+        "to": "2uljv5",
+        "kind": "data",
+        "src": "slice — скопировать часть массива —[использует]-> Массив (список)"
+      },
+      {
+        "from": "weuyea",
+        "to": "ay5mxp",
+        "kind": "data",
+        "src": "Цепочка map и reduce —[использует]-> Перебор: map / filter / reduce"
+      },
+      {
+        "from": "weuyea",
+        "to": "6oz336",
+        "kind": "data",
+        "src": "Цепочка map и reduce —[альтернатива]-> Применить формулу к массиву"
+      },
+      {
+        "from": "7uj8hx",
+        "to": "4uvw1l",
+        "kind": "data",
+        "src": "Применить формулу к массиву —[использует]-> Цепочка map и reduce"
+      },
+      {
+        "from": "z9smbr",
+        "to": "2ndhqe",
+        "kind": "data",
+        "src": "Расчёт: среднее и округление —[альтернатива]-> Среднее — JavaScript"
+      },
+      {
+        "from": "z9smbr",
+        "to": "91jdus",
+        "kind": "data",
+        "src": "Расчёт: среднее и округление —[использует]-> Math.min и Math.max"
+      },
+      {
+        "from": "z9smbr",
+        "to": "44wdna",
+        "kind": "data",
+        "src": "Расчёт: среднее и округление —[использует]-> round, floor и ceil"
+      },
+      {
+        "from": "w92pzs",
+        "to": "t1g1m2",
+        "kind": "data",
+        "src": "Среднее — JavaScript —[альтернатива]-> Расчёт: среднее и округление"
+      },
+      {
+        "from": "pui1ix",
+        "to": "zvpt1v",
+        "kind": "data",
+        "src": "Среднее — Python —[альтернатива]-> Среднее — SQL"
+      },
+      {
+        "from": "70pikw",
+        "to": "nntcu4",
+        "kind": "data",
+        "src": "Объект (ключ → значение) —[альтернатива]-> объект"
+      },
+      {
+        "from": "nntcu4",
+        "to": "gdcnfp",
+        "kind": "data",
+        "src": "Объект (ключ → значение) —[альтернатива]-> объект"
+      },
+      {
+        "from": "nntcu4",
+        "to": "g20e0p",
+        "kind": "data",
+        "src": "Объект (ключ → значение) —[альтернатива]-> Доступ по obj[key]"
+      },
+      {
+        "from": "ww70l3",
+        "to": "3dk2od",
+        "kind": "data",
+        "src": "Доступ по obj[key] —[использует]-> Object.keys, values и entries"
+      },
+      {
+        "from": "8edl6w",
+        "to": "g20e0p",
+        "kind": "data",
+        "src": "Object.keys, values и entries —[использует]-> Доступ по obj[key]"
+      },
+      {
+        "from": "6jxtcq",
+        "to": "70pikw",
+        "kind": "data",
+        "src": "Map — get, set и has —[альтернатива]-> Объект (ключ → значение)"
+      },
+      {
+        "from": "70pikw",
+        "to": "xl7gve",
+        "kind": "data",
+        "src": "Map — get, set и has —[альтернатива]-> Объект (ключ → значение)"
+      },
+      {
+        "from": "46firt",
+        "to": "07lfz6",
+        "kind": "data",
+        "src": "Set — уникальные значения —[использует]-> includes — проверить элемент"
+      },
+      {
+        "from": "ht03h7",
+        "to": "2uljv5",
+        "kind": "data",
+        "src": "push, pop и shift —[использует]-> Массив (список)"
+      },
+      {
+        "from": "3qd4ih",
+        "to": "9mll89",
+        "kind": "data",
+        "src": "split и join —[использует]-> replace — заменить фрагмент"
+      },
+      {
+        "from": "3qd4ih",
+        "to": "gpm5lg",
+        "kind": "data",
+        "src": "split и join —[альтернатива]-> Python: парсер строк в числа"
+      },
+      {
+        "from": "62kkfm",
+        "to": "ovrq9g",
+        "kind": "data",
+        "src": "replace — заменить фрагмент —[использует]-> includes — проверить наличие"
+      },
+      {
+        "from": "65n2nh",
+        "to": "xe53sd",
+        "kind": "data",
+        "src": "slice — взять часть строки —[использует]-> toUpperCase — верхний регистр"
+      },
+      {
+        "from": "enubn1",
+        "to": "xe53sd",
+        "kind": "data",
+        "src": "Шаблонная строка ${x} —[использует]-> toUpperCase — верхний регистр"
+      },
+      {
+        "from": "enubn1",
+        "to": "9mll89",
+        "kind": "data",
+        "src": "Шаблонная строка ${x} —[использует]-> replace — заменить фрагмент"
+      },
+      {
+        "from": "r85vph",
+        "to": "ggs88v",
+        "kind": "data",
+        "src": "JSON.stringify и JSON.parse —[использует]-> Сохранить и загрузить список"
+      },
+      {
+        "from": "r85vph",
+        "to": "tw0paz",
+        "kind": "data",
+        "src": "JSON.stringify и JSON.parse —[использует]-> Сохранить и удалить цвета в таблице"
+      },
+      {
+        "from": "r85vph",
+        "to": "liartn",
+        "kind": "data",
+        "src": "JSON.stringify и JSON.parse —[использует]-> Рекорд в localStorage"
+      },
+      {
+        "from": "1o33q6",
+        "to": "tw0paz",
+        "kind": "data",
+        "src": "Сохранить и загрузить список —[альтернатива]-> Сохранить и удалить цвета в таблице"
+      },
+      {
+        "from": "fpwh2e",
+        "to": "ftbgfb",
+        "kind": "data",
+        "src": "Сохранить и удалить цвета в таблице —[использует]-> Построить таблицу из массива"
+      },
+      {
+        "from": "fpwh2e",
+        "to": "wjsx6g",
+        "kind": "data",
+        "src": "Сохранить и удалить цвета в таблице —[использует]-> createElement и append"
+      },
+      {
+        "from": "fpwh2e",
+        "to": "tppmpx",
+        "kind": "data",
+        "src": "Сохранить и удалить цвета в таблице —[использует]-> textContent и innerHTML"
+      },
+      {
+        "from": "fpwh2e",
+        "to": "k9iutx",
+        "kind": "data",
+        "src": "Сохранить и удалить цвета в таблице —[использует]-> input type=color — выбор цвета"
+      },
+      {
+        "from": "fpwh2e",
+        "to": "a29jfc",
+        "kind": "data",
+        "src": "Сохранить и удалить цвета в таблице —[использует]-> Реакция на клики"
+      },
+      {
+        "from": "fpwh2e",
+        "to": "vza8uy",
+        "kind": "data",
+        "src": "Сохранить и удалить цвета в таблице —[использует]-> classList — управлять классами"
+      },
+      {
+        "from": "g58nsn",
+        "to": "ggs88v",
+        "kind": "data",
+        "src": "localStorage.getItem — загрузить —[альтернатива]-> Сохранить и загрузить список"
+      },
+      {
+        "from": "jqvk79",
+        "to": "ggs88v",
+        "kind": "data",
+        "src": "localStorage.setItem — сохранить —[альтернатива]-> Сохранить и загрузить список"
+      },
+      {
+        "from": "2bh05l",
+        "to": "tw0paz",
+        "kind": "data",
+        "src": "localStorage.removeItem — удалить —[использует]-> Сохранить и удалить цвета в таблице"
+      },
+      {
+        "from": "1iq1rx",
+        "to": "76fq9k",
+        "kind": "data",
+        "src": "Рекорд в localStorage —[использует]-> Состояние игры и счёт"
+      },
+      {
+        "from": "54p2pc",
+        "to": "76fq9k",
+        "kind": "data",
+        "src": "Достижения по условиям —[использует]-> Состояние игры и счёт"
+      },
+      {
+        "from": "54p2pc",
+        "to": "liartn",
+        "kind": "data",
+        "src": "Достижения по условиям —[использует]-> Рекорд в localStorage"
+      },
+      {
+        "from": "frro9i",
+        "to": "nj50yq",
+        "kind": "data",
+        "src": "Состояние игры и счёт —[использует]-> zustand — общее состояние (в сайте)"
+      },
+      {
+        "from": "ygw0jq",
+        "to": "vytult",
+        "kind": "data",
+        "src": "Тетрис: игровая матрица —[передаёт данные]-> Тетрис: удалить заполненные строки"
+      },
+      {
+        "from": "e1d0yb",
+        "to": "j78l0t",
+        "kind": "data",
+        "src": "Тетрис: проверка столкновения —[передаёт данные]-> Тетрис: управление клавишами"
+      },
+      {
+        "from": "wj4zcr",
+        "to": "ggxqwk",
+        "kind": "data",
+        "src": "Тетрис: управление клавишами —[использует]-> Тетрис: игровая матрица"
+      },
+      {
+        "from": "wj4zcr",
+        "to": "vytult",
+        "kind": "data",
+        "src": "Тетрис: управление клавишами —[использует]-> Тетрис: удалить заполненные строки"
+      },
+      {
+        "from": "7iz2hy",
+        "to": "ggxqwk",
+        "kind": "data",
+        "src": "Тетрис: удалить заполненные строки —[использует]-> Тетрис: игровая матрица"
+      },
+      {
+        "from": "wj4zcr",
+        "to": "pfqysn",
+        "kind": "data",
+        "src": "Тетрис: управление клавишами —[слушает]-> keydown и keyup — клавиатура"
+      },
+      {
+        "from": "frro9i",
+        "to": "j78l0t",
+        "kind": "data",
+        "src": "Состояние игры и счёт —[передаёт данные]-> Тетрис: управление клавишами"
+      },
+      {
+        "from": "gp8xpc",
+        "to": "q96zx7",
+        "kind": "data",
+        "src": "Массив частиц: позиция и скорость —[передаёт данные]-> Частицы реагируют на клик мыши"
+      },
+      {
+        "from": "jarmay",
+        "to": "9ma8v5",
+        "kind": "data",
+        "src": "Частицы реагируют на клик мыши —[вызывает]-> Частицы: обновление и отрисовка"
+      },
+      {
+        "from": "g21u4p",
+        "to": "kd7oid",
+        "kind": "data",
+        "src": "Частицы: обновление и отрисовка —[использует]-> Canvas: игровой цикл с requestAnimationFrame"
+      },
+      {
+        "from": "g21u4p",
+        "to": "zbh1bl",
+        "kind": "data",
+        "src": "Частицы: обновление и отрисовка —[использует]-> clearRect — очистить кадр"
+      },
+      {
+        "from": "g21u4p",
+        "to": "nwdi20",
+        "kind": "data",
+        "src": "Частицы: обновление и отрисовка —[использует]-> arc — нарисовать круг"
+      },
+      {
+        "from": "g21u4p",
+        "to": "js2i1v",
+        "kind": "data",
+        "src": "Частицы: обновление и отрисовка —[использует]-> fillRect и strokeRect — прямоугольники"
+      },
+      {
+        "from": "g21u4p",
+        "to": "s3sctz",
+        "kind": "data",
+        "src": "Частицы: обновление и отрисовка —[использует]-> fillText — текст на canvas"
+      },
+      {
+        "from": "6ljgzs",
+        "to": "nwdi20",
+        "kind": "data",
+        "src": "Canvas: игровой цикл с requestAnimationFrame —[использует]-> arc — нарисовать круг"
+      },
+      {
+        "from": "6ljgzs",
+        "to": "jx81n0",
+        "kind": "data",
+        "src": "Canvas: игровой цикл с requestAnimationFrame —[использует]-> moveTo и lineTo — линия"
+      },
+      {
+        "from": "6ljgzs",
+        "to": "8q7esb",
+        "kind": "data",
+        "src": "Canvas: игровой цикл с requestAnimationFrame —[использует]-> createLinearGradient — градиент Canvas"
+      },
+      {
+        "from": "6ljgzs",
+        "to": "wmtfql",
+        "kind": "data",
+        "src": "Canvas: игровой цикл с requestAnimationFrame —[использует]-> drawImage — нарисовать изображение"
+      },
+      {
+        "from": "5b2vfk",
+        "to": "2m5940",
+        "kind": "data",
+        "src": "Canvas — нарисовать столбики —[альтернатива]-> SVG — линия из точек (мини-график)"
+      },
+      {
+        "from": "5b2vfk",
+        "to": "js2i1v",
+        "kind": "data",
+        "src": "Canvas — нарисовать столбики —[использует]-> fillRect и strokeRect — прямоугольники"
+      },
+      {
+        "from": "jx3jdp",
+        "to": "jx81n0",
+        "kind": "data",
+        "src": "SVG — линия из точек (мини-график) —[использует]-> moveTo и lineTo — линия"
+      },
+      {
+        "from": "ybgpnc",
+        "to": "aifjuj",
+        "kind": "data",
+        "src": "Погода → медиана по дням → кривая с градиентом —[использует]-> createLinearGradient — градиент Canvas"
+      },
+      {
+        "from": "aifjuj",
+        "to": "ijnkhz",
+        "kind": "data",
+        "src": "Погода → медиана по дням → кривая с градиентом —[использует]-> createLinearGradient — градиент Canvas"
+      },
+      {
+        "from": "ijnkhz",
+        "to": "8q7esb",
+        "kind": "data",
+        "src": "Погода → медиана по дням → кривая с градиентом —[использует]-> createLinearGradient — градиент Canvas"
+      },
+      {
+        "from": "ijnkhz",
+        "to": "m96mpf",
+        "kind": "data",
+        "src": "Погода → медиана по дням → кривая с градиентом —[использует]-> fetch + await — получить данные"
+      },
+      {
+        "from": "rf5ofn",
+        "to": "q96zx7",
+        "kind": "data",
+        "src": "Координаты мыши относительно Canvas —[передаёт данные]-> Частицы реагируют на клик мыши"
+      },
+      {
+        "from": "rf5ofn",
+        "to": "o4vmfg",
+        "kind": "data",
+        "src": "Координаты мыши относительно Canvas —[передаёт данные]-> Создать надпись в координатах экрана"
+      },
+      {
+        "from": "1sld22",
+        "to": "7le0qj",
+        "kind": "data",
+        "src": "Попадание точки в прямоугольник —[использует]-> Расстояние между двумя точками"
+      },
+      {
+        "from": "1sld22",
+        "to": "cpgtec",
+        "kind": "data",
+        "src": "Попадание точки в прямоугольник —[использует]-> Координаты мыши относительно Canvas"
+      },
+      {
+        "from": "pzxcmh",
+        "to": "w6ehbz",
+        "kind": "data",
+        "src": "Расстояние между двумя точками —[использует]-> sqrt, pow и abs"
+      },
+      {
+        "from": "g1m79d",
+        "to": "wjsx6g",
+        "kind": "data",
+        "src": "Создать надпись в координатах экрана —[использует]-> createElement и append"
+      },
+      {
+        "from": "g1m79d",
+        "to": "vflzbk",
+        "kind": "data",
+        "src": "Создать надпись в координатах экрана —[использует]-> style.left и style.top — позиция"
+      },
+      {
+        "from": "g1m79d",
+        "to": "tppmpx",
+        "kind": "data",
+        "src": "Создать надпись в координатах экрана —[использует]-> textContent и innerHTML"
+      },
+      {
+        "from": "p3iqps",
+        "to": "cpgtec",
+        "kind": "data",
+        "src": "style.left и style.top — позиция —[использует]-> Координаты мыши относительно Canvas"
+      },
+      {
+        "from": "pn5tqa",
+        "to": "v9n8ud",
+        "kind": "data",
+        "src": "Реакция на клики —[использует]-> querySelector — найти элемент"
+      },
+      {
+        "from": "pn5tqa",
+        "to": "vza8uy",
+        "kind": "data",
+        "src": "Реакция на клики —[использует]-> classList — управлять классами"
+      },
+      {
+        "from": "pn5tqa",
+        "to": "svsq1z",
+        "kind": "data",
+        "src": "Реакция на клики —[использует]-> setAttribute — задать атрибут"
+      },
+      {
+        "from": "0rzw34",
+        "to": "e3wr1z",
+        "kind": "data",
+        "src": "input и change — изменения поля —[использует]-> input type=text — текстовое поле"
+      },
+      {
+        "from": "0rzw34",
+        "to": "sysp1g",
+        "kind": "data",
+        "src": "input и change — изменения поля —[использует]-> input type=number — число"
+      },
+      {
+        "from": "0rzw34",
+        "to": "b9z8zr",
+        "kind": "data",
+        "src": "input и change — изменения поля —[использует]-> input type=range — ползунок"
+      },
+      {
+        "from": "0rzw34",
+        "to": "k9iutx",
+        "kind": "data",
+        "src": "input и change — изменения поля —[использует]-> input type=color — выбор цвета"
+      },
+      {
+        "from": "0rzw34",
+        "to": "8es4m4",
+        "kind": "data",
+        "src": "input и change — изменения поля —[использует]-> select — список вариантов"
+      },
+      {
+        "from": "3xcwcb",
+        "to": "q1jre0",
+        "kind": "data",
+        "src": "Клик → расчёт → экран (+состояние) —[использует]-> Реакция на клики"
+      },
+      {
+        "from": "q1jre0",
+        "to": "60gm5b",
+        "kind": "data",
+        "src": "Клик → расчёт → экран (+состояние) —[использует]-> Реакция на клики"
+      },
+      {
+        "from": "60gm5b",
+        "to": "a29jfc",
+        "kind": "data",
+        "src": "Клик → расчёт → экран (+состояние) —[использует]-> Реакция на клики"
+      },
+      {
+        "from": "60gm5b",
+        "to": "t1g1m2",
+        "kind": "data",
+        "src": "Клик → расчёт → экран (+состояние) —[использует]-> Расчёт: среднее и округление"
+      },
+      {
+        "from": "60gm5b",
+        "to": "tppmpx",
+        "kind": "data",
+        "src": "Клик → расчёт → экран (+состояние) —[использует]-> textContent и innerHTML"
+      },
+      {
+        "from": "rvl01h",
+        "to": "fttwe5",
+        "kind": "data",
+        "src": "Цены → доходности → риск —[использует]-> Расчёт: среднее и округление"
+      },
+      {
+        "from": "fttwe5",
+        "to": "j94l0w",
+        "kind": "data",
+        "src": "Цены → доходности → риск —[использует]-> Расчёт: среднее и округление"
+      },
+      {
+        "from": "j94l0w",
+        "to": "t1g1m2",
+        "kind": "data",
+        "src": "Цены → доходности → риск —[использует]-> Расчёт: среднее и округление"
+      },
+      {
+        "from": "j94l0w",
+        "to": "vo0mub",
+        "kind": "data",
+        "src": "Цены → доходности → риск —[передаёт данные]-> Зависимости расчётов (слои)"
+      },
+      {
+        "from": "slvkt0",
+        "to": "55557r",
+        "kind": "data",
+        "src": "Зависимости расчётов (слои) —[использует]-> Матрица корреляций (связи активов)"
+      },
+      {
+        "from": "slvkt0",
+        "to": "d12p2k",
+        "kind": "data",
+        "src": "Зависимости расчётов (слои) —[использует]-> Дисперсия портфеля (ковариация)"
+      },
+      {
+        "from": "a6nzv5",
+        "to": "d12p2k",
+        "kind": "data",
+        "src": "Матрица корреляций (связи активов) —[использует]-> Дисперсия портфеля (ковариация)"
+      },
+      {
+        "from": "nntcu4",
+        "to": "vgsi10",
+        "kind": "data",
+        "src": "Объект (ключ → значение) —[передаёт данные]-> Фильтрация и сортировка облигаций"
+      },
+      {
+        "from": "qnhgki",
+        "to": "0btdt8",
+        "kind": "data",
+        "src": "Фильтрация и сортировка облигаций —[использует]-> sort — сортировка чисел"
+      },
+      {
+        "from": "qnhgki",
+        "to": "ycrq1x",
+        "kind": "data",
+        "src": "Фильтрация и сортировка облигаций —[использует]-> filter — отфильтровать элементы"
+      },
+      {
+        "from": "qnhgki",
+        "to": "ftbgfb",
+        "kind": "data",
+        "src": "Фильтрация и сортировка облигаций —[использует]-> Построить таблицу из массива"
+      },
+      {
+        "from": "prfw2h",
+        "to": "x5ysw2",
+        "kind": "data",
+        "src": "MOEX: облигации → отбор → таблица —[использует]-> fetch + await — получить данные"
+      },
+      {
+        "from": "x5ysw2",
+        "to": "77rwvf",
+        "kind": "data",
+        "src": "MOEX: облигации → отбор → таблица —[использует]-> fetch + await — получить данные"
+      },
+      {
+        "from": "77rwvf",
+        "to": "m96mpf",
+        "kind": "data",
+        "src": "MOEX: облигации → отбор → таблица —[использует]-> fetch + await — получить данные"
+      },
+      {
+        "from": "77rwvf",
+        "to": "l30oz8",
+        "kind": "data",
+        "src": "MOEX: облигации → отбор → таблица —[использует]-> Парсер ответа API (columns/data)"
+      },
+      {
+        "from": "77rwvf",
+        "to": "ftbgfb",
+        "kind": "data",
+        "src": "MOEX: облигации → отбор → таблица —[использует]-> Построить таблицу из массива"
+      },
+      {
+        "from": "77rwvf",
+        "to": "70pikw",
+        "kind": "data",
+        "src": "MOEX: облигации → отбор → таблица —[использует]-> Объект (ключ → значение)"
+      },
+      {
+        "from": "4pzhf8",
+        "to": "t0gool",
+        "kind": "data",
+        "src": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси) —[использует]-> fetch + await — получить данные"
+      },
+      {
+        "from": "t0gool",
+        "to": "xba9hj",
+        "kind": "data",
+        "src": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси) —[использует]-> fetch + await — получить данные"
+      },
+      {
+        "from": "xba9hj",
+        "to": "6fzmq2",
+        "kind": "data",
+        "src": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси) —[использует]-> fetch + await — получить данные"
+      },
+      {
+        "from": "6fzmq2",
+        "to": "g3do5h",
+        "kind": "data",
+        "src": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси) —[использует]-> fetch + await — получить данные"
+      },
+      {
+        "from": "g3do5h",
+        "to": "m96mpf",
+        "kind": "data",
+        "src": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси) —[использует]-> fetch + await — получить данные"
+      },
+      {
+        "from": "g3do5h",
+        "to": "82ubce",
+        "kind": "data",
+        "src": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси) —[использует]-> Цепочка и параллельные запросы"
+      },
+      {
+        "from": "g3do5h",
+        "to": "l30oz8",
+        "kind": "data",
+        "src": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси) —[использует]-> Парсер ответа API (columns/data)"
+      },
+      {
+        "from": "zv7tdx",
+        "to": "p7y0v3",
+        "kind": "data",
+        "src": "Цепочка и параллельные запросы —[использует]-> Анатомия запроса + если нет шаблона"
+      },
+      {
+        "from": "zv7tdx",
+        "to": "nbhnf1",
+        "kind": "data",
+        "src": "Цепочка и параллельные запросы —[использует]-> Запрос сломался — где и почему"
+      },
+      {
+        "from": "f5w5rs",
+        "to": "82ubce",
+        "kind": "data",
+        "src": "Promise.all — параллельные задачи —[альтернатива]-> Цепочка и параллельные запросы"
+      },
+      {
+        "from": "f5w5rs",
+        "to": "dg78cq",
+        "kind": "data",
+        "src": "Promise.all — параллельные задачи —[использует]-> .then и .catch"
+      },
+      {
+        "from": "2p3vp2",
+        "to": "nbhnf1",
+        "kind": "data",
+        "src": "Анатомия запроса + если нет шаблона —[использует]-> Запрос сломался — где и почему"
+      },
+      {
+        "from": "2p3vp2",
+        "to": "m96mpf",
+        "kind": "data",
+        "src": "Анатомия запроса + если нет шаблона —[использует]-> fetch + await — получить данные"
+      },
+      {
+        "from": "mbw5k4",
+        "to": "dg78cq",
+        "kind": "data",
+        "src": "fetch + await — получить данные —[альтернатива]-> .then и .catch"
+      },
+      {
+        "from": "mbw5k4",
+        "to": "l30oz8",
+        "kind": "data",
+        "src": "fetch + await — получить данные —[использует]-> Парсер ответа API (columns/data)"
+      },
+      {
+        "from": "mbw5k4",
+        "to": "s7xb4d",
+        "kind": "data",
+        "src": "fetch + await — получить данные —[использует]-> Парсер CSV → массив объектов"
+      },
+      {
+        "from": "s7xb4d",
+        "to": "j0wfqb",
+        "kind": "data",
+        "src": "fetch + await — получить данные —[использует]-> Парсер CSV → массив объектов"
+      },
+      {
+        "from": "s7xb4d",
+        "to": "aor9hf",
+        "kind": "data",
+        "src": "Парсер CSV → массив объектов —[передаёт данные]-> Фильтрация и сортировка облигаций"
+      },
+      {
+        "from": "aor9hf",
+        "to": "vgsi10",
+        "kind": "data",
+        "src": "Парсер CSV → массив объектов —[передаёт данные]-> Фильтрация и сортировка облигаций"
+      },
+      {
+        "from": "ps9yvf",
+        "to": "prfw2h",
+        "kind": "data",
+        "src": "Парсер ответа API (columns/data) —[передаёт данные]-> MOEX: облигации → отбор → таблица"
+      },
+      {
+        "from": "x5ysw2",
+        "to": "1vi57x",
+        "kind": "data",
+        "src": "Парсер ответа API (columns/data) —[передаёт данные]-> MOEX: облигации → отбор → таблица"
+      },
+      {
+        "from": "g0qqar",
+        "to": "10hcmx",
+        "kind": "data",
+        "src": "Конвейер: данные → обработка → вывод —[использует]-> fetch + await — получить данные"
+      },
+      {
+        "from": "10hcmx",
+        "to": "cq4lty",
+        "kind": "data",
+        "src": "Конвейер: данные → обработка → вывод —[использует]-> fetch + await — получить данные"
+      },
+      {
+        "from": "cq4lty",
+        "to": "m96mpf",
+        "kind": "data",
+        "src": "Конвейер: данные → обработка → вывод —[использует]-> fetch + await — получить данные"
+      },
+      {
+        "from": "cq4lty",
+        "to": "l30oz8",
+        "kind": "data",
+        "src": "Конвейер: данные → обработка → вывод —[использует]-> Парсер ответа API (columns/data)"
+      },
+      {
+        "from": "cq4lty",
+        "to": "s7xb4d",
+        "kind": "data",
+        "src": "Конвейер: данные → обработка → вывод —[использует]-> Парсер CSV → массив объектов"
+      },
+      {
+        "from": "cq4lty",
+        "to": "rvl01h",
+        "kind": "data",
+        "src": "Конвейер: данные → обработка → вывод —[использует]-> Цены → доходности → риск"
+      },
+      {
+        "from": "fttwe5",
+        "to": "0py923",
+        "kind": "data",
+        "src": "Конвейер: данные → обработка → вывод —[использует]-> Цены → доходности → риск"
+      },
+      {
+        "from": "cq4lty",
+        "to": "ftbgfb",
+        "kind": "data",
+        "src": "Конвейер: данные → обработка → вывод —[использует]-> Построить таблицу из массива"
+      },
+      {
+        "from": "s7ws98",
+        "to": "542ebs",
+        "kind": "data",
+        "src": "Как файлы собираются в систему —[использует]-> Как подключать библиотеки"
+      },
+      {
+        "from": "s7ws98",
+        "to": "q0b631",
+        "kind": "data",
+        "src": "Как файлы собираются в систему —[использует]-> Сервер с маршрутами и JSON"
+      },
+      {
+        "from": "q5jb1e",
+        "to": "p7y0v3",
+        "kind": "data",
+        "src": "Сервер с маршрутами и JSON —[использует]-> Анатомия запроса + если нет шаблона"
+      },
+      {
+        "from": "6cw43b",
+        "to": "q0b631",
+        "kind": "data",
+        "src": "Как запустить сервер (Node) —[альтернатива]-> Сервер с маршрутами и JSON"
+      },
+      {
+        "from": "akmow2",
+        "to": "orfoha",
+        "kind": "data",
+        "src": "Как подключать библиотеки —[использует]-> SheetJS (xlsx) — читать Excel"
+      },
+      {
+        "from": "ydrkhv",
+        "to": "g0qqar",
+        "kind": "data",
+        "src": "Файлы общаются: export / import —[передаёт данные]-> Конвейер: данные → обработка → вывод"
+      },
+      {
+        "from": "10hcmx",
+        "to": "hifutx",
+        "kind": "data",
+        "src": "Файлы общаются: export / import —[передаёт данные]-> Конвейер: данные → обработка → вывод"
+      },
+      {
+        "from": "nhvcx1",
+        "to": "fr1g51",
+        "kind": "data",
+        "src": "Массив (список) —[альтернатива]-> массив"
+      },
+      {
+        "from": "gh901u",
+        "to": "m5850g",
+        "kind": "data",
+        "src": "Функция —[альтернатива]-> Функция (def)"
+      },
+      {
+        "from": "jj1nm6",
+        "to": "cj2cky",
+        "kind": "data",
+        "src": "Цикл (for) —[альтернатива]-> Цикл (for … in range)"
+      },
+      {
+        "from": "w92pzs",
+        "to": "wieucd",
+        "kind": "data",
+        "src": "Среднее — JavaScript —[альтернатива]-> Среднее — Python"
+      },
+      {
+        "from": "w92pzs",
+        "to": "zvpt1v",
+        "kind": "data",
+        "src": "Среднее — JavaScript —[альтернатива]-> Среднее — SQL"
+      },
+      {
+        "from": "phqh8z",
+        "to": "lqi3fj",
+        "kind": "data",
+        "src": "Условие (if / else) —[альтернатива]-> Логика и сравнения"
+      },
+      {
+        "from": "phqh8z",
+        "to": "jxbo0k",
+        "kind": "data",
+        "src": "Условие (if / else) —[альтернатива]-> else и else if"
+      },
+      {
+        "from": "phqh8z",
+        "to": "1xkbhb",
+        "kind": "data",
+        "src": "Условие (if / else) —[использует]-> Тернарный оператор"
+      },
+      {
+        "from": "phqh8z",
+        "to": "xzagh4",
+        "kind": "data",
+        "src": "Условие (if / else) —[использует]-> switch"
+      },
+      {
+        "from": "phqh8z",
+        "to": "vi0t2c",
+        "kind": "data",
+        "src": "Условие (if / else) —[использует]-> Ранний return"
+      },
+      {
+        "from": "n5szts",
+        "to": "07lfz6",
+        "kind": "data",
+        "src": "switch —[использует]-> includes — проверить элемент"
+      },
+      {
+        "from": "uoo24i",
+        "to": "07lfz6",
+        "kind": "data",
+        "src": "Логика и сравнения —[использует]-> includes — проверить элемент"
+      },
+      {
+        "from": "uoo24i",
+        "to": "ovrq9g",
+        "kind": "data",
+        "src": "Логика и сравнения —[использует]-> includes — проверить наличие"
+      },
+      {
+        "from": "dbu9ra",
+        "to": "ipca01",
+        "kind": "data",
+        "src": "Ранний return —[использует]-> Функция"
+      },
+      {
+        "from": "fs8p46",
+        "to": "4e14wb",
+        "kind": "data",
+        "src": "Тернарный оператор —[альтернатива]-> Условие (if / else)"
+      },
+      {
+        "from": "6qp3tb",
+        "to": "kmzwsw",
+        "kind": "data",
+        "src": "Случайный цвет из палитры —[использует]-> Math.random — случайное число"
+      },
+      {
+        "from": "3ukr6g",
+        "to": "kmzwsw",
+        "kind": "data",
+        "src": "Случайное целое в диапазоне —[использует]-> Math.random — случайное число"
+      },
+      {
+        "from": "6qp3tb",
+        "to": "xzagh4",
+        "kind": "data",
+        "src": "Случайный цвет из палитры —[использует]-> switch"
+      },
+      {
+        "from": "3s066j",
+        "to": "y08i85",
+        "kind": "data",
+        "src": "hsl — тон, насыщенность, яркость —[использует]-> Случайный цвет из палитры"
+      },
+      {
+        "from": "3s066j",
+        "to": "zikq8m",
+        "kind": "data",
+        "src": "hsl — тон, насыщенность, яркость —[использует]-> rgba — цвет с прозрачностью"
+      },
+      {
+        "from": "el1vnm",
+        "to": "8q7esb",
+        "kind": "data",
+        "src": "linear-gradient — линейный градиент —[альтернатива]-> createLinearGradient — градиент Canvas"
+      },
+      {
+        "from": "vbeuf2",
+        "to": "cy9naq",
+        "kind": "data",
+        "src": "radial-gradient — радиальный градиент —[альтернатива]-> linear-gradient — линейный градиент"
+      },
+      {
+        "from": "pv7hic",
+        "to": "3aoaws",
+        "kind": "data",
+        "src": "conic-gradient — спектральный круг —[использует]-> hsl — тон, насыщенность, яркость"
+      },
+      {
+        "from": "6tna4g",
+        "to": "cy9naq",
+        "kind": "data",
+        "src": "Шрифты и цвета через переменные —[использует]-> linear-gradient — линейный градиент"
+      },
+      {
+        "from": "6tna4g",
+        "to": "9kng17",
+        "kind": "data",
+        "src": "Шрифты и цвета через переменные —[использует]-> radial-gradient — радиальный градиент"
+      },
+      {
+        "from": "bxq4s9",
+        "to": "cy9naq",
+        "kind": "data",
+        "src": "rgba — цвет с прозрачностью —[использует]-> linear-gradient — линейный градиент"
+      },
+      {
+        "from": "9p8wkj",
+        "to": "a26me0",
+        "kind": "data",
+        "src": "setInterval — повторять действие —[альтернатива]-> setTimeout — выполнить позже"
+      },
+      {
+        "from": "8a0hh9",
+        "to": "kpnl2i",
+        "kind": "data",
+        "src": "requestAnimationFrame — цикл анимации —[альтернатива]-> setInterval — повторять действие"
+      },
+      {
+        "from": "8a0hh9",
+        "to": "kd7oid",
+        "kind": "data",
+        "src": "requestAnimationFrame — цикл анимации —[вызывает]-> Canvas: игровой цикл с requestAnimationFrame"
+      },
+      {
+        "from": "of0mlc",
+        "to": "kd7oid",
+        "kind": "data",
+        "src": "resize — изменение размера окна —[вызывает]-> Canvas: игровой цикл с requestAnimationFrame"
+      },
+      {
+        "from": "gr84fj",
+        "to": "j78l0t",
+        "kind": "data",
+        "src": "keydown и keyup — клавиатура —[передаёт данные]-> Тетрис: управление клавишами"
+      },
+      {
+        "from": "92o4r7",
+        "to": "cpgtec",
+        "kind": "data",
+        "src": "mousemove — движение мыши —[передаёт данные]-> Координаты мыши относительно Canvas"
+      },
+      {
+        "from": "ydrkhv",
+        "to": "e0uivp",
+        "kind": "data",
+        "src": "Файлы общаются: export / import —[использует]-> Как файлы собираются в систему"
+      },
+      {
+        "from": "dbwrlb",
+        "to": "ipca01",
+        "kind": "data",
+        "src": "Функция (def) —[альтернатива]-> Функция"
+      },
+      {
+        "from": "ku329i",
+        "to": "of0nv4",
+        "kind": "data",
+        "src": "Переменная и вывод —[альтернатива]-> переменная"
+      },
+      {
+        "from": "a104vj",
+        "to": "s7xb4d",
+        "kind": "data",
+        "src": "Python: парсер строк в числа —[альтернатива]-> Парсер CSV → массив объектов"
+      },
+      {
+        "from": "a6nzv5",
+        "to": "rvl01h",
+        "kind": "data",
+        "src": "Матрица корреляций (связи активов) —[использует]-> Цены → доходности → риск"
+      }
+    ]
+  }
+}
