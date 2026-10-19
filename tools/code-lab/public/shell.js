@@ -5,6 +5,7 @@
 (function(){
   const PAGES = [
     { key:'start',       label:'С чего начать',href:'/start.html' },
+    { key:'recipes',     label:'Рецепты',     href:'/recipes.html' },
     { key:'home',        label:'Главная',     href:'/' },
     { key:'library',     label:'Библиотека',  href:'/library.html' },
     { key:'catalog',     label:'Каталог',     href:'/catalog.html' },
