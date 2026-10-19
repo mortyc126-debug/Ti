@@ -752,6 +752,17 @@ function renderInspector(nd){
   body.appendChild(el('div', 'insp-kind', b.type === 'draw' ? 'рисование' : 'компонент'));
   body.appendChild(renderBlockContract(nd, b));
   const save = el('button', 'insp-save', '💾 сохранить в каталог'); save.title = 'добавить этот кусок в каталог как компонент'; save.onclick = () => saveToCatalog(nd); body.appendChild(save);
+  // кусок — целый файл? предложить разложить на блоки (разметка/стили/скрипт, JS по шагам)
+  if(nd.blockId === 'raw'){
+    const parts = breakdownText(String((nd.fields || {}).code || ''), 'auto').parts;
+    if(parts.length > 1){
+      const split = el('button', 'insp-save', '🧩 разложить на блоки (' + parts.length + ')');
+      split.style.color = '#3DD9FF'; split.style.borderColor = 'rgba(61,217,255,.45)';
+      split.title = 'разбить этот целый файл на отдельные блоки и соединить их';
+      split.onclick = () => explodeNode(nd);
+      body.appendChild(split);
+    }
+  }
   if(inspTab === 'set'){ body.appendChild(nodeMetaEditor(nd, titleEl)); body.appendChild(inspFields(nd, b)); }
   else if(inspTab === 'learn') body.appendChild(descEditor(nd, b));
   else body.appendChild(inspWhy(nd, b));
@@ -1403,6 +1414,20 @@ function addPieces(parts){
   });
   renderCanvas(); renderCode(); persist();
   if(parts.length) select(graph.nodes[graph.nodes.length - 1]);
+}
+// разложить узел-целый-файл на отдельные блоки (на месте исходного)
+function explodeNode(nd){
+  const code = String((nd.fields || {}).code || '');
+  const parts = breakdownText(code, 'auto').parts;
+  if(parts.length < 2){ showEdgeMessage('Нечего разбивать — получается один блок.', 'warn'); return; }
+  histFlush();
+  const x = nd.x, y = nd.y;
+  graph.edges = graph.edges.filter(e => e.from !== nd.id && e.to !== nd.id);
+  graph.nodes = graph.nodes.filter(n => n.id !== nd.id);
+  let prev = null;
+  parts.forEach((pc, i) => { const node = makeNode('raw', { fields: { code: pc.code }, title: pc.title, x, y: y + i * 150 }); graph.nodes.push(node); if(prev) graph.edges.push({ from: prev.id, to: node.id }); prev = node; });
+  selectedId = null; renderCanvas(); renderInspector(); renderCode(); persist();
+  showEdgeMessage('Разложено на ' + parts.length + ' блок(ов).', 'ok');
 }
 // разобрать произвольный текст: auto определяет HTML/JS по виду
 function breakdownText(text, kind){
