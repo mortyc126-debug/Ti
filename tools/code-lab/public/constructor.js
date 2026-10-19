@@ -1288,11 +1288,14 @@ window.addEventListener('message', e => {
     setRuntimeState('error', [...runtimeState.errors, 'Preview: '+d.message], runtimeState.warnings);
     showEdgeMessage('⛔ Preview: '+d.message, 'error'); renderInspector();
   } else if(d.type==='codeforge-preview-ready'){
-    const doc=preview.contentDocument; const check=doc ? runtimeCheckDocument(doc, currentCode()) : {errors:['Не удалось получить документ preview.'],warnings:[]};
-    setRuntimeState(check.errors.length ? 'error' : 'ready', check.errors, [...runtimeState.warnings, ...check.warnings]);
+    // код отработал без исключения — это успех. Недостающие селекторы/библиотеки
+    // не блокируют, а показываются тихой подсказкой (многие куски создают DOM сами).
+    const doc=preview.contentDocument; const check=doc ? runtimeCheckDocument(doc, currentCode()) : {errors:[],warnings:[]};
+    const hints=[...check.errors, ...check.warnings];
+    setRuntimeState('ready', [], hints);
     renderInspector();
-    if(check.errors.length) showEdgeMessage('⛔ Окружение preview не готово: '+check.errors[0], 'error');
-    else showEdgeMessage('✓ Preview: окружение проверено', 'ok');
+    if(hints.length) showEdgeMessage('✓ Запущено. Подсказка: ' + hints[0], 'warn');
+    else showEdgeMessage('✓ Запущено.', 'ok');
   }
 });
 $('#copy').onclick = () => { navigator.clipboard.writeText(currentCode()); flash($('#copy'), '✓'); };

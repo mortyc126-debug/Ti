@@ -187,8 +187,7 @@ function run(id, code){
     +'var log=document.getElementById("log");var _p=function(){log.textContent+=Array.prototype.join.call(arguments," ")+"\\n";};'
     +'var console={log:_p,error:_p,warn:_p,info:_p,assert:function(c){if(!c)_p("Assertion failed:",Array.prototype.slice.call(arguments,1).join(" "));},table:_p,trace:_p};'
     +'try{'+code+'}catch(e){log.textContent+="\\u26d4 "+e.message;}'
-    +'<\/scr'+'ipt>  <script src="/shell.js"></script>
-</body>';
+    +'<\/scr'+'ipt></body>';
 }
 </script>
 </body>
