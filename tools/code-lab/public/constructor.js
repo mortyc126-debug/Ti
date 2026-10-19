@@ -1297,35 +1297,62 @@ window.addEventListener('message', e => {
 });
 $('#copy').onclick = () => { navigator.clipboard.writeText(currentCode()); flash($('#copy'), '✓'); };
 $('#run').onclick = run;
-// «🔌 собрать и проверить»: стыковка по типам + незакрытые входы + запуск собранного
+// «🔌 собрать и проверить»: что не стыкуется + чего не хватает + запуск
 function nodeLang(nd){ return (nd && nd.src && nd.src.lang) ? String(nd.src.lang).toLowerCase() : 'js'; }
+// каких входов не хватает: имя нужно куску, но никто РАНЬШЕ него (по порядку) его не даёт
+function missingInputs(){
+  const order = orderedNodes(); const provided = new Set(); const out = [];
+  for(const nd of order){
+    const c = nodeContract(nd);
+    for(const r of c.requires){ if(!provided.has(r)) out.push({ node: nodeLabel(nd), name: r }); }
+    c.provides.forEach(p => provided.add(p));
+  }
+  return out;
+}
+const _escH = s => String(s).replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]));
 async function buildCheck(){
   const nodes = graph.nodes;
   if(!nodes.length){ showEdgeMessage('Холст пустой — нечего собирать.', 'warn'); return; }
-  const bad = graph.edges.filter(e => edgeTypeStatus(e) === 'bad');
   drawEdges();
-  const unmet = nodes.filter(n => nodeNeedsInput(n));
+  const bad = graph.edges.filter(e => edgeTypeStatus(e) === 'bad').map(e => ({ from: nodeLabel(byId(e.from)), to: nodeLabel(byId(e.to)) }));
+  const missing = missingInputs();
   const langs = [...new Set(nodes.map(nodeLang))];
-  const msg = [];
-  if(bad.length) msg.push('⛔ связей с несовпадением типов: ' + bad.length + ' (красный пунктир)');
-  if(unmet.length) msg.push('⚠ узлов без входа: ' + unmet.length);
-  if(!bad.length && !unmet.length) msg.push('✓ стыковка в порядке');
-  const lvl = bad.length ? 'error' : (unmet.length ? 'warn' : 'ok');
-  // разные языки нельзя собрать в одну программу (кроме js+html)
-  if(langs.length > 1 && !(langs.length === 2 && langs.includes('js') && langs.includes('html'))){
-    showEdgeMessage(msg.join(' · ') + ' · 🚫 разные языки (' + langs.join(', ') + ') — в одну программу не собрать. Раздели по языку или передай данные через JSON.', 'error');
-    return;
+  const mixed = langs.length > 1 && !(langs.length === 2 && langs.includes('js') && langs.includes('html'));
+
+  // отчёт-окно
+  const bg = el('div', 'modal-bg');
+  let html = '<div class="modal" style="max-width:640px"><h3>Проверка сборки</h3>';
+  if(!bad.length && !missing.length && !mixed){
+    html += '<p class="mh" style="color:var(--str)">✓ Всё стыкуется: входы закрыты, типы совпадают. Можно запускать.</p>';
+  } else {
+    html += '<p class="mh">Вот что помешает запуску — почини это, и «почти готово» станет готово:</p>';
+    if(mixed) html += '<div class="bc-sec">🚫 <b>Разные языки</b> на холсте (' + _escH(langs.join(', ')) + ') — в одну программу не собрать. Раздели по языку или передай данные через JSON (файл/stdout).</div>';
+    if(missing.length){
+      html += '<div class="bc-sec"><b>⚠ Не хватает входов</b> (связь не дотянута или имя не объявлено):<ul>'
+        + missing.map(m => '<li>куску «<b>' + _escH(m.node) + '</b>» нужно <code>' + _escH(m.name) + '</code> — его никто не даёт раньше</li>').join('') + '</ul></div>';
+    }
+    if(bad.length){
+      html += '<div class="bc-sec"><b>⛔ Типы не сходятся</b> (красный пунктир на холсте):<ul>'
+        + bad.map(e => '<li>«' + _escH(e.from) + '» → «' + _escH(e.to) + '»: тип выхода не подходит ко входу</li>').join('') + '</ul></div>';
+    }
   }
-  const lang = langs[0] || 'js';
-  if(lang === 'js' || lang === 'html'){ showEdgeMessage(msg.join(' · ') + ' · запускаю в превью…', lvl); run(); return; }
-  // не-JS: собрать по порядку и запустить на сервере
-  const code = orderedNodes().map(nodeCode).join('\n');
-  showEdgeMessage(msg.join(' · ') + ' · запускаю на ПК (' + lang + ')…', lvl);
-  const r = await fetch('/api/run', { method:'POST', body: JSON.stringify({ lang, code }) }).then(x => x.json()).catch(() => ({ ok:false, error:'сервер недоступен' }));
-  if(!r.ok){ showEdgeMessage('⛔ ' + (r.error || 'ошибка запуска'), 'error'); return; }
-  let out = r.stdout || ''; if(r.stderr) out += (out ? '\n' : '') + '⚠ ' + r.stderr; if(r.timedOut) out += '\n⏱ таймаут'; if(!out.trim()) out = '(код отработал, вывода нет · ' + r.code + ')';
-  const esco = s => String(s).replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]));
-  preview.srcdoc = '<!doctype html><meta charset=utf-8><body style="margin:10px;font:12px ui-monospace,monospace;color:#F6F4FF;background:#0E0720;white-space:pre-wrap">' + esco(out) + '</body>';
+  html += '<div id="bc-out" class="bc-out" style="display:none"></div>';
+  html += '<div class="mbtns" style="margin-top:12px"><button class="btn ok" id="bc-run">▶ всё равно запустить</button><button class="btn" id="bc-close">закрыть</button></div></div>';
+  bg.innerHTML = html; document.body.appendChild(bg);
+  const q = s => bg.querySelector(s);
+  bg.onclick = e => { if(e.target === bg) bg.remove(); };
+  q('#bc-close').onclick = () => bg.remove();
+  q('#bc-run').onclick = async () => {
+    if(mixed){ showEdgeMessage('Разные языки — собери по одному языку.', 'error'); return; }
+    const lang = langs[0] || 'js';
+    if(lang === 'js' || lang === 'html'){ bg.remove(); run(); return; }
+    const outBox = q('#bc-out'); outBox.style.display = ''; outBox.textContent = 'запускаю на ПК…';
+    const code = orderedNodes().map(nodeCode).join('\n');
+    const r = await fetch('/api/run', { method:'POST', body: JSON.stringify({ lang, code }) }).then(x => x.json()).catch(() => ({ ok:false, error:'сервер недоступен' }));
+    if(!r.ok){ outBox.textContent = '⛔ ' + (r.error || 'ошибка'); return; }
+    let out = r.stdout || ''; if(r.stderr) out += (out ? '\n' : '') + '⚠ ' + r.stderr; if(r.timedOut) out += '\n⏱ таймаут'; if(!out.trim()) out = '(код отработал, вывода нет · ' + r.code + ')';
+    outBox.textContent = out;
+  };
 }
 if($('#buildcheck')) $('#buildcheck').onclick = buildCheck;
 function download(name, text, mime){ const b = new Blob([text], { type: mime + ';charset=utf-8' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 2000); }
