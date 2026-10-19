@@ -13,76 +13,90 @@ let LNOTES = {};  // пояснения к строкам, ключ — текс
   render(t);
 })();
 
+// секция с номером и заголовком — страница куска идёт сверху вниз в этом порядке
+function panel(title, node){ const d = el('div', 'cpanel'); d.appendChild(el('h3', 'cpanel-h', title)); if(node) d.appendChild(node); return d; }
+function elHtml(tag, cls, html){ const e = document.createElement(tag); if(cls) e.className = cls; if(html != null) e.innerHTML = html; return e; }
+// чипы имён с типом («имя: тип» → имя + цветной тег)
+function nameChips(arr){
+  if(!arr || !arr.length) return '<span class="muted">— не указано</span>';
+  return arr.map(s => {
+    const it = window.contractParseItem ? window.contractParseItem(s) : { name: s, type: '' };
+    const ty = it.type ? ' <span class="ct-ty" style="color:' + window.contractTypeColor(it.type) + ';border-color:' + window.contractTypeColor(it.type) + '55">' + esc(it.type) + '</span>' : '';
+    return '<span class="ct-item">' + esc(it.name) + ty + '</span>';
+  }).join(' ');
+}
+
 function render(t){
   const c = t.component || null;
   NOTES = (c && c.notes && typeof c.notes === 'object') ? c.notes : {};
   LNOTES = (c && c.lineNotes && typeof c.lineNotes === 'object') ? c.lineNotes : {};
   const codeText = c && c.views && c.views.use && c.views.use.code ? c.views.use.code.content
                  : (t.lines || []).map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n');
+  const provides = (c && c.provides) || [], requires = (c && c.requires) || [];
+  const summary = (c && c.summary) || {}, check = (c && c.views && c.views.check) || {};
   root.innerHTML = '';
 
   // ── шапка ──
   const head = el('div', 'chead');
   const h1 = document.createElement('h1'); h1.textContent = t.title || t.id; head.appendChild(h1);
   const badges = el('div', 'badges');
-  const type = (c && c.type) || 'фрагмент';
-  const typeRu = { fragment:'фрагмент', component:'компонент', recipe:'рецепт', module:'модуль' }[type] || type;
-  badges.appendChild(badge('type', typeRu));
   const tags = (c && c.tags) || {};
-  (tags.purpose || []).forEach(x => badges.appendChild(badge('purpose', x)));
+  if(t.group) badges.appendChild(badge('purpose', t.group));
   (tags.runtime || []).forEach(x => badges.appendChild(badge('runtime', x)));
-  (tags.technology || [ (t.lang || '').toUpperCase() ]).forEach(x => x && badges.appendChild(badge('tech', x)));
-  const safety = c && c.safety;
-  if(safety && safety.level && safety.level !== 'ok') badges.appendChild(badge('warn', '⚠ ' + (safety.notes && safety.notes[0] ? safety.notes[0] : safety.level)));
+  badges.appendChild(badge('tech', (t.lang || 'js').toUpperCase()));
   head.appendChild(badges);
-  const desc = el('div', 'cdesc'); desc.innerHTML = descFmt(t.desc || (c && c.description) || ''); head.appendChild(desc);
   root.appendChild(head);
 
-  // ── связи: что кусок даёт и что ему нужно (редактируется, влияет на авто-разводку) ──
-  root.appendChild(contractEditor(t));
+  const runnable = (t.lang === 'js') || (c && c.tags && (c.tags.technology || []).some(x => /javascript|js/i.test(x)));
 
-  // ── L2: контракт + необходимое ──
-  if(c && c.summary){
-    const brief = el('div', 'brief');
-    const p1 = el('div', 'panel'); p1.innerHTML = '<h3>Контракт</h3>';
-    const io = el('div', 'io');
-    io.innerHTML = '<span class="in">' + esc(c.summary.input || '—') + '</span><span class="arrow">→</span><span class="out">' + esc(c.summary.output || '—') + '</span>';
-    p1.appendChild(io); brief.appendChild(p1);
-    const p2 = el('div', 'panel'); p2.innerHTML = '<h3>Необходимое</h3>';
-    const req = el('div', 'req');
-    const reqs = (c.summary.requirements || []); const deps = (c.summary.dependencies || []);
-    req.innerHTML = (reqs.length ? reqs.map(esc).join('<br>') : '<span class="req-missing">не описано — проверь код перед использованием</span>')
-      + '<div class="dep">' + (deps.length ? ('зависимости: ' + deps.map(esc).join(', ')) : 'зависимости не указаны (это не означает, что их нет)') + '</div>';
-    p2.appendChild(req); brief.appendChild(p2);
-    root.appendChild(brief);
+  // ① Что делает — функция куска одним-двумя предложениями
+  root.appendChild(panel('① Что делает', elHtml('div', 'func', descFmt(t.desc || (c && c.description) || '<span class="muted">не описано — допиши в Описи</span>')
+    + (summary.output ? '<div class="func-out">Отдаёт: ' + esc(summary.output) + '</div>' : ''))));
+
+  // ② Что меняешь (код) + запуск
+  const codeWrap = document.createElement('div');
+  codeWrap.appendChild(el('div', 'note-hint', 'Клик по слову — что это значит; клик по точке слева — пояснение к строке. Меняй значения и имена под себя.'));
+  codeWrap.appendChild(noteCode(codeText));
+  if(runnable){
+    const rb = btn('▶ запустить', 'primary'); rb.style.marginTop = '6px';
+    const box = el('div', 'preview'); rb.onclick = () => runDemo(box, c, codeText);
+    const h = document.createElement('div'); h.append(rb, box); codeWrap.appendChild(h);
+  }
+  root.appendChild(panel('② Что меняешь', codeWrap));
+
+  // ③ Имена и требования — что даёт/берёт (с типами) + требования к значениям
+  const s3 = document.createElement('div');
+  s3.appendChild(elHtml('div', 'nm-row', '<span class="nm-lbl give">имена-выходы (даёт):</span> ' + nameChips(provides)));
+  s3.appendChild(elHtml('div', 'nm-row', '<span class="nm-lbl need">имена-входы (нужно):</span> ' + nameChips(requires)));
+  const reqs = summary.requirements;
+  const reqTxt = Array.isArray(reqs) ? reqs.map(esc).join('<br>') : (reqs ? esc(reqs) : '');
+  s3.appendChild(elHtml('div', 'nm-req', '<b>Требования к значениям:</b> ' + (reqTxt || '<span class="muted">не описаны</span>')
+    + (summary.input ? '<br><b>Что подать на вход:</b> ' + esc(summary.input) : '')));
+  root.appendChild(panel('③ Имена и требования', s3));
+
+  // ④ Можно / нельзя — ограничения, края, что сломается
+  root.appendChild(panel('④ Можно / нельзя', elHtml('div', 'cando', check.errors
+    ? esc(check.errors)
+    : '<span class="muted">ограничения не описаны. Проверь на краях: пустой вход, не те типы, спецсимволы.</span>')));
+
+  // ⑤ Связи — к чему подключается (редактируется; влияет на авто-разводку)
+  const s5 = document.createElement('div');
+  s5.appendChild(elHtml('div', 'link-expl',
+    (requires.length ? 'Подключи сюда кусок, который <b>даёт</b>: ' + nameChips(requires) : 'Входов нет — куску ничего не нужно извне.')
+    + (provides.length ? '<br>Дальше этот кусок <b>отдаёт</b>: ' + nameChips(provides) + ' — их можно подать в следующий.' : '')));
+  s5.appendChild(contractEditor(t));
+  root.appendChild(panel('⑤ Связи', s5));
+
+  // проверка результата (если описана)
+  if(check.expected_result || (check.common_errors && check.common_errors.length) || check.tests){
+    root.appendChild(panel('Проверка результата', viewCheck(c)));
   }
 
   // ── действия ──
   const actions = el('div', 'actions');
-  const runnable = (t.lang === 'js') || (c && c.tags && (c.tags.technology || []).some(x => /javascript|js/i.test(x)));
   const useBtn = btn('→ в конструктор', 'primary'); useBtn.onclick = () => toConstructor(t, codeText); actions.appendChild(useBtn);
   const copyBtn = btn('⧉ копировать код'); copyBtn.onclick = () => { navigator.clipboard.writeText(codeText); flash(copyBtn, '✓ скопировано'); }; actions.appendChild(copyBtn);
-  if(c && c.views && c.views.about){ const linkBtn = btn('связи'); linkBtn.onclick = () => showTab('about'); actions.appendChild(linkBtn); }
   root.appendChild(actions);
-
-  // ── табы ──
-  const haveC = !!(c && c.views);
-  const tabs = el('div', 'tabs2');
-  const defs = haveC ? [['use','Применение'],['check','Проверка'],['about','Устройство']] : [['use','Код']];
-  defs.forEach(([k, label], i) => { const b = document.createElement('button'); b.dataset.k = k; b.textContent = label; if(i===0) b.classList.add('on'); b.onclick = () => showTab(k); tabs.appendChild(b); });
-  root.appendChild(tabs);
-
-  const body = el('div', ''); body.id = 'tabbody'; root.appendChild(body);
-
-  function showTab(k){
-    tabs.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.k === k));
-    body.innerHTML = '';
-    if(k === 'use') body.appendChild(viewUse(c, codeText, runnable, t));
-    else if(k === 'check') body.appendChild(viewCheck(c));
-    else body.appendChild(viewAbout(c));
-  }
-  window.showTab = showTab;
-  showTab('use');
 }
 
 // ── Применение ──
