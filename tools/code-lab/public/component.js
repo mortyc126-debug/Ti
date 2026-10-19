@@ -194,7 +194,12 @@ function toConstructor(t, codeText){
   try { const s = JSON.parse(localStorage.getItem(LS) || 'null'); if(s && Array.isArray(s.nodes)) g = s; } catch(_){}
   const uid = () => Math.random().toString(36).slice(2, 8);
   const n = g.nodes.length;
-  g.nodes.push({ id: uid(), blockId: 'raw', fields: { code: codeText }, x: 60 + (n % 6) * 30, y: 60 + (n % 6) * 30, title: name });
+  const comp = t.component || {};
+  // узел приходит полным: код + связь с источником + типизированный контракт (чтобы в конструкторе ничего не терялось)
+  g.nodes.push({ id: uid(), blockId: 'raw', fields: { code: codeText }, x: 60 + (n % 6) * 30, y: 60 + (n % 6) * 30,
+    title: name, desc: t.desc || '', descAt: t.descAt || 0,
+    src: { id: t.id, title: name, desc: t.desc || '', code: codeText, lang: t.lang || 'js',
+           contract: { provides: Array.isArray(comp.provides) ? comp.provides : [], requires: Array.isArray(comp.requires) ? comp.requires : [] } } });
   try { localStorage.setItem(LS, JSON.stringify(g)); } catch(_){}
   location.href = '/constructor.html';
 }
