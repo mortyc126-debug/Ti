@@ -212,6 +212,9 @@ body.dragging-side{user-select:none;cursor:col-resize}
 .side{background:var(--bg2);border-right:1px solid var(--border);padding:14px 12px;display:flex;flex-direction:column;gap:3px;position:sticky;top:0;height:100vh;overflow:auto}
 .side .brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px;padding:4px 8px 16px;color:var(--text)}
 .side .brand .logo{width:26px;height:26px;display:grid;place-items:center;border-radius:8px;background:linear-gradient(135deg,var(--kw),var(--name));color:#0E0720;font-size:15px}
+.side .nav-hist{display:flex;gap:6px;margin:2px 2px 8px}
+.side .hist-b{flex:1;font:12px/1 ui-monospace,monospace;color:var(--text2);background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:7px 6px;cursor:pointer}
+.side .hist-b:hover{color:var(--acc);border-color:rgba(255,0,110,.4)}
 .side .nav-i{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;color:var(--text2);font-size:13.5px;cursor:pointer;text-decoration:none;border:1px solid transparent}
 .side .nav-i:hover{background:var(--s2);color:var(--text)}
 .side .nav-i.on{background:linear-gradient(90deg,rgba(180,92,255,.20),rgba(61,217,255,.08));color:var(--text);border-color:rgba(180,92,255,.4)}

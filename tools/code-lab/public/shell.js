@@ -33,6 +33,13 @@
   brand.innerHTML = '<span class="logo"></span><span class="brand-t">Лаборатория</span>';
   const collapse = document.createElement('button'); collapse.className = 'side-collapse'; collapse.textContent = '⟨'; collapse.title = 'свернуть меню';
   brand.appendChild(collapse); side.appendChild(brand);
+
+  // назад / вперёд по истории — путешествовать по разделам, не начиная сначала
+  const hist = document.createElement('div'); hist.className = 'nav-hist';
+  const back = document.createElement('button'); back.className = 'hist-b'; back.innerHTML = '← назад'; back.title = 'назад (предыдущий раздел)';
+  const fwd = document.createElement('button'); fwd.className = 'hist-b'; fwd.innerHTML = 'вперёд →'; fwd.title = 'вперёд';
+  back.onclick = () => history.back(); fwd.onclick = () => history.forward();
+  hist.append(back, fwd); side.appendChild(hist);
   let lastSect = null;
   PAGES.forEach(p => {
     if(p.sect && p.sect !== lastSect){ const s = document.createElement('div'); s.className = 'sect'; s.textContent = p.sect; side.appendChild(s); lastSect = p.sect; }
