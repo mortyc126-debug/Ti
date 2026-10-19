@@ -3,16 +3,17 @@
 // кладёт в .app-main и слева приставляет меню. Активный пункт — по
 // data-page у <body>. Подключать ПЕРЕД основным скриптом страницы.
 (function(){
+  // сгруппировано по тому, ЧТО ты делаешь: начать → смотреть куски → собирать → данные
   const PAGES = [
-    { key:'start',       label:'С чего начать',href:'/start.html' },
-    { key:'recipes',     label:'Рецепты',     href:'/recipes.html' },
-    { key:'home',        label:'Главная',     href:'/' },
-    { key:'library',     label:'Библиотека',  href:'/library.html' },
-    { key:'catalog',     label:'Каталог',     href:'/catalog.html' },
-    { key:'constructor', label:'Конструктор', href:'/constructor.html' },
-    { key:'inventory',   label:'Опись',       href:'/inventory.html' },
-    { key:'data',        label:'Данные',      href:'/schema-json.html' },
-    { key:'learn',       label:'Обучение',    href:'/schema.html' },
+    { key:'home',        label:'Главная',      href:'/',                sect:'Старт' },
+    { key:'start',       label:'С чего начать', href:'/start.html',      sect:'Старт' },
+    { key:'learn',       label:'Обучение',     href:'/schema.html',     sect:'Старт' },
+    { key:'inventory',   label:'Опись',        href:'/inventory.html',  sect:'Кусочки кода' },
+    { key:'library',     label:'Библиотека',   href:'/library.html',    sect:'Кусочки кода' },
+    { key:'catalog',     label:'Каталог',      href:'/catalog.html',    sect:'Кусочки кода' },
+    { key:'constructor', label:'Конструктор',  href:'/constructor.html',sect:'Собирать' },
+    { key:'recipes',     label:'Рецепты',      href:'/recipes.html',    sect:'Собирать' },
+    { key:'data',        label:'Данные (загрузка)', href:'/schema-json.html', sect:'Данные' },
   ];
   const cur = document.body.dataset.page || '';
 
@@ -32,7 +33,9 @@
   brand.innerHTML = '<span class="logo"></span><span class="brand-t">Лаборатория</span>';
   const collapse = document.createElement('button'); collapse.className = 'side-collapse'; collapse.textContent = '⟨'; collapse.title = 'свернуть меню';
   brand.appendChild(collapse); side.appendChild(brand);
+  let lastSect = null;
   PAGES.forEach(p => {
+    if(p.sect && p.sect !== lastSect){ const s = document.createElement('div'); s.className = 'sect'; s.textContent = p.sect; side.appendChild(s); lastSect = p.sect; }
     const a = document.createElement('a'); a.className = 'nav-i' + (p.key === cur ? ' on' : ''); a.href = p.href;
     a.textContent = p.label;
     side.appendChild(a);
