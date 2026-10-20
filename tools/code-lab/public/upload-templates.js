@@ -76,14 +76,18 @@
     host.innerHTML =
       '<div class="up-box">' +
         '<div class="up-row">' +
-          '<label class="up-note">положить в раздел:</label>' +
-          '<select class="up-group"><option value="">— как в файле / без раздела —</option></select>' +
-          '<input class="up-newgroup" placeholder="новый раздел (можно «Группа / Подгруппа»)" style="display:none">' +
-        '</div>' +
-        '<div class="up-row">' +
           '<button class="btn ok up-load">📥 загрузить куски</button>' +
           '<input type="file" class="up-file" accept=".json,.js,.mjs,.jsx,.ts,.tsx,.py,.rb,.php,.go,.lua,.sh,.bash,.ps1,.r,.sql,.html,.htm,.css,.txt" multiple style="display:none">' +
           '<span class="up-note muted">код-файлы (.js/.py/.css/.html…), полный кусок JSON или сборник — можно несколько сразу</span>' +
+        '</div>' +
+        '<div class="up-nav">' +
+          '<div class="up-nav-head">📂 разделы сейчас (живая навигация). Клик — выбрать, раздел впишется в образец ниже:</div>' +
+          '<div class="up-nav-tree">загрузка…</div>' +
+          '<div class="up-row">' +
+            '<span class="up-note">файл уедет в раздел:</span> <b class="up-sel">— без раздела —</b>' +
+            '<input class="up-newgroup" placeholder="или впиши новый: «Группа / Подгруппа»">' +
+            '<button class="btn up-newbtn">добавить</button>' +
+          '</div>' +
         '</div>' +
         '<div class="up-tpl">' +
           '<div class="up-tpl-head">Образец формата <select class="up-lang"></select></div>' +
@@ -97,15 +101,37 @@
         '</div>' +
       '</div>';
 
-    // выбор раздела для загружаемых кусков: существующие разделы + «создать новый»
-    const grpSel = host.querySelector('.up-group'), newGrp = host.querySelector('.up-newgroup');
-    fetch('/api/list').then(r => r.json()).then(list => {
-      const groups = [...new Set((list || []).map(t => String(t.group || '').split('/')[0].trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru'));
-      groups.forEach(g => { const o = document.createElement('option'); o.value = g; o.textContent = g; grpSel.appendChild(o); });
-      const nw = document.createElement('option'); nw.value = '__new__'; nw.textContent = '➕ создать новый раздел…'; grpSel.appendChild(nw);
-    }).catch(() => {});
-    grpSel.onchange = () => { newGrp.style.display = grpSel.value === '__new__' ? '' : 'none'; if(grpSel.value === '__new__') newGrp.focus(); };
-    const targetGroup = () => (grpSel.value === '__new__' ? newGrp.value.trim() : grpSel.value);
+    // выбранный раздел (куда уедет файл; впишется в образец)
+    const navTree = host.querySelector('.up-nav-tree'), selEl = host.querySelector('.up-sel'), newGrp = host.querySelector('.up-newgroup');
+    let selGroup = '';
+    const escAttr = s => String(s).replace(/"/g, '&quot;');
+    const setSel = g => {
+      selGroup = g || '';
+      selEl.textContent = selGroup || '— без раздела —';
+      navTree.querySelectorAll('.up-nav-i').forEach(el => el.classList.toggle('on', el.dataset.path === selGroup));
+      show();   // перерисовать образец — раздел уже вписан
+    };
+    // живое дерево всех разделов (с подразделами) + счётчики
+    const buildTreeHtml = (list) => {
+      const root = {};
+      (list || []).forEach(t => {
+        const parts = String(t.group || 'Разное').split('/').map(s => s.trim()).filter(Boolean);
+        let node = root; const acc = [];
+        (parts.length ? parts : ['Разное']).forEach(seg => { acc.push(seg); node[seg] = node[seg] || { c: 0, p: acc.join(' / '), ch: {} }; node[seg].c++; node = node[seg].ch; });
+      });
+      const render = (node, depth) => Object.keys(node).sort((a, b) => a.localeCompare(b, 'ru')).map(k => {
+        const n = node[k];
+        return '<div class="up-nav-i" data-path="' + escAttr(n.p) + '" style="padding-left:' + (depth * 15 + 6) + 'px">' + esc(k) + ' <span class="up-nav-c">' + n.c + '</span></div>' + render(n.ch, depth + 1);
+      }).join('');
+      const inner = render(root, 0);
+      return '<div class="up-nav-i up-nav-none" data-path="">— без раздела —</div>' + (inner || '<div class="up-note muted" style="padding:4px 6px">разделов пока нет</div>');
+    };
+    fetch('/api/list').then(r => r.json()).then(list => { navTree.innerHTML = buildTreeHtml(list); navTree.querySelectorAll('.up-nav-i').forEach(el => el.classList.toggle('on', el.dataset.path === selGroup)); }).catch(() => { navTree.textContent = 'сервер недоступен'; });
+    navTree.addEventListener('click', e => { const i = e.target.closest('.up-nav-i'); if(i){ newGrp.value = ''; setSel(i.dataset.path); } });
+    host.querySelector('.up-newbtn').onclick = () => { const v = newGrp.value.trim(); if(v) setSel(v); };
+    newGrp.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); const v = newGrp.value.trim(); if(v) setSel(v); } });
+
+    const targetGroup = () => selGroup;
     const applyGroup = (payload, g) => {
       if(!g) return payload;
       if(Array.isArray(payload)) payload.forEach(p => { if(p && typeof p === 'object') p.group = g; });
@@ -120,11 +146,14 @@
     let curText = '', curName = '';
     const show = () => {
       const ex = EXAMPLES[sel.value]; const obj = clean(ex);
+      // раздел из навигации вписываем прямо в образец — чтобы он был описан в самом файле
+      if(Array.isArray(obj.pieces)) obj.pieces.forEach(p => { p.group = selGroup; });
+      else obj.group = selGroup;
       curText = JSON.stringify(obj, null, 2);
       curName = (sel.value === 'collection' ? 'сборник' : 'кусок-' + ex.lang) + '.json';
       descEl.textContent = ex._desc;
       codeEl.textContent = curText;
-      whatEl.textContent = sel.value === 'collection' ? 'грузи этот файл — добавит все куски и пополнит словарь' : 'заполни по образцу и загрузи';
+      whatEl.textContent = (selGroup ? 'уедет в раздел «' + selGroup + '»' : 'раздел не выбран — ляжет в «без раздела»');
     };
     sel.onchange = show; show();
 
@@ -151,6 +180,8 @@
       const parts = ['+' + created + ' кусков']; if(updated) parts.push(updated + ' обновл.'); if(learned) parts.push('+' + learned + ' слов'); if(bad) parts.push(bad + ' пропущено');
       loadBtn.textContent = '✓ ' + parts.join(', ');
       setTimeout(() => { loadBtn.textContent = o; }, 3500);
+      // навигация живая: подтянуть разделы заново (появился новый — сразу виден)
+      fetch('/api/list').then(r => r.json()).then(list => { navTree.innerHTML = buildTreeHtml(list); navTree.querySelectorAll('.up-nav-i').forEach(el => el.classList.toggle('on', el.dataset.path === selGroup)); }).catch(() => {});
       if(typeof opts.onDone === 'function') opts.onDone();
     };
   };
