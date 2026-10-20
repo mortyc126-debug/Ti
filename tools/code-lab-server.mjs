@@ -155,7 +155,8 @@ async function importBundle(b){
     const code = hasLines ? '' : String(pc.code || '');
     if(!hasLines && !code.trim()){ skipped++; continue; }
     const codeForDup = hasLines ? pc.lines.map(ln => (ln || []).map(t => (t && t.v) || '').join('')).join('\n') : code;
-    const dup = await findSameTemplate(title, codeForDup);
+    // дубль: сначала точное совпадение (название+код), иначе — тот же КОД под другим названием
+    const dup = (await findSameTemplate(title, codeForDup)) || (await findByCode(codeForDup));
     let obj, full;
     if(dup){ full = path.join(TEMPLATES, dup); obj = JSON.parse(await fs.readFile(full, 'utf8')); obj.lang = lang; obj.title = title; if(pc.group) obj.group = String(pc.group).slice(0, 60); if(pc.desc) obj.desc = String(pc.desc).slice(0, 400); obj.lines = hasLines ? pc.lines : tokenize(code, lang); if(pc.output != null) obj.output = String(pc.output); updated++; }
     else { obj = { id: slug(title || lang), lang, group: (pc.group != null ? String(pc.group) : 'Мои куски').slice(0, 60), title, desc: String(pc.desc || '').slice(0, 400), lines: hasLines ? pc.lines : tokenize(code, lang), output: pc.output != null ? String(pc.output) : '', descAt: Date.now() }; if(pc.component && typeof pc.component === 'object') obj.component = pc.component; full = path.join(TEMPLATES, obj.id + '.json'); created++; }
@@ -253,6 +254,18 @@ async function findSameTemplate(title, code){
   }
   return null;
 }
+// дубль по коду, даже под другим названием: тот же код — тот же кусок (пустой код не считаем)
+async function findByCode(code){
+  const wantC = String(code || '').trim(); if(!wantC) return null;
+  let names = [];
+  try { names = (await fs.readdir(TEMPLATES)).filter(n => n.endsWith('.json')); } catch(_){ return null; }
+  for(const n of names){
+    try { const j = JSON.parse(await fs.readFile(path.join(TEMPLATES, n), 'utf8'));
+      if(_tplCode(j) === wantC) return n;
+    } catch(_){}
+  }
+  return null;
+}
 
 // ── запуск кода на установленных у пользователя языках ───────────────────────
 // Карта: язык → чем запускать (bin + аргументы) и расширение файла. Каждая запись
@@ -331,8 +344,8 @@ const server = http.createServer(async (req, res) => {
       const lang = String(b.lang || 'js').toLowerCase();
       const code = String(b.code || '');
       const title = String(b.title || 'Без названия').slice(0, 80);
-      // дедуп: если кусок с таким же названием и кодом уже есть — обновляем его, а не плодим новый
-      const dupFile = await findSameTemplate(title, code);
+      // дедуп: тот же код (точное совпадение по названию+коду или просто тот же код) — обновляем, не плодим
+      const dupFile = (await findSameTemplate(title, code)) || (await findByCode(code));
       if(dupFile){
         const full = path.join(TEMPLATES, dupFile);
         const j = JSON.parse(await fs.readFile(full, 'utf8'));
