@@ -115,15 +115,14 @@
   .sb-ed-del{background:none;border:0;color:var(--text3);cursor:pointer;font-size:12px;padding:0 3px}
   .sb-ed-del:hover{color:#FF6B6B}
   /* редактор с подсветкой: прозрачная textarea поверх раскрашенного pre */
-  .sb-ed-wrap{position:relative;flex:1;min-height:64px;overflow:hidden;background:#0E0720}
+  .sb-ed-wrap{position:relative;display:flex;flex:1;min-height:64px;overflow:hidden;background:#0E0720}
   .sb-hl,.sb-code{margin:0;padding:9px 11px;font:12px/1.5 ui-monospace,monospace;white-space:pre;tab-size:2;letter-spacing:0;border:0;box-sizing:border-box}
-  .sb-hl{position:absolute;inset:0;overflow:hidden;color:#CBC2EA;pointer-events:none}
+  /* textarea тянется как flex-элемент (абсолютная не растягивается в Chromium), pre — абсолютная подложка под ней */
+  .sb-hl{position:absolute;top:0;right:0;bottom:0;left:0;overflow:hidden;color:#CBC2EA;pointer-events:none;z-index:0}
   .sb-hl .line{min-height:1.5em}
-  .sb-code{position:absolute;inset:0;overflow:auto;background:transparent;color:transparent;caret-color:#fff;resize:none;outline:none}
+  .sb-code{position:relative;z-index:1;flex:1;min-width:0;min-height:0;overflow:auto;background:transparent;color:transparent;caret-color:#fff;resize:none;outline:none}
   .sb-code::selection{background:rgba(124,108,160,.4)}
-  .center.explain-on .sb-code{pointer-events:none}
-  .center.explain-on .sb-hl{pointer-events:auto;cursor:help}
-  .center.explain-on .sb-hl span:hover{background:rgba(124,108,160,.25);border-radius:3px}
+  .center.explain-on .sb-code{cursor:help}
   .sb-pop{position:fixed;z-index:9999;max-width:300px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font:12.5px/1.55 system-ui,sans-serif;color:var(--text);box-shadow:0 8px 28px rgba(0,0,0,.45)}
   .sb-pop-h{margin-bottom:4px} .sb-pop-h b{color:var(--acc);font-family:ui-monospace,monospace}
   .sb-pop-r{font-size:10.5px;color:var(--text3);border:1px solid var(--border);border-radius:5px;padding:1px 5px;margin-left:5px}

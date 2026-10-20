@@ -104,9 +104,16 @@
   if(!files.length) files = DEFAULTS.map(f => ({ ...f }));
   let live = true;
   try { live = localStorage.getItem('codelab_sandbox_live') !== '0'; } catch(_){}
+  let ros = []; // ResizeObserver'ы панелей (чтобы отключать при перерисовке)
 
   const save = () => { try { localStorage.setItem('codelab_sandbox', JSON.stringify(files)); } catch(_){} };
   const uid = () => 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  // копирование в буфер + короткая отметка «✓» на кнопке
+  function copyText(text, btn){
+    const done = () => { if(!btn) return; const o = btn.textContent; btn.textContent = '✓'; setTimeout(() => { btn.textContent = o; }, 900); };
+    const fallback = () => { const t = document.createElement('textarea'); t.value = text; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch(_){} t.remove(); done(); };
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+  }
 
   // ── DOM песочницы ──
   const box = document.createElement('div');
@@ -117,9 +124,10 @@
     '<div class="sb-right">' +
       '<div class="sb-bar">' +
         '<button class="btn ok" id="sbRun">▶ запустить</button>' +
+        '<button class="btn" id="sbCopyAll" title="скопировать весь собранный документ (HTML+CSS+JS вместе) — вставить в файл">⧉ копировать итог</button>' +
         '<label class="sb-live"><input type="checkbox" id="sbLive"> живой предпросмотр</label>' +
         '<button class="btn" id="sbAdd">+ файл</button>' +
-        '<button class="btn" id="sbExplain" title="режим разбора: кликай по цветным словам в коде — объясню, что это">🔍 разбор</button>' +
+        '<label class="sb-live" title="когда включено — клик по слову в коде показывает пояснение. Редактировать код можно всё равно."><input type="checkbox" id="sbExplain"> 🔍 пояснения по клику</label>' +
         '<button class="btn" id="sbLegend" title="что значат цвета в коде">🎨 цвета</button>' +
         '<span style="flex:1"></span>' +
         '<button class="btn" id="sbClr">× консоль</button>' +
@@ -235,14 +243,14 @@
     length:'length — длина: сколько элементов в массиве или символов в строке.',
     settimeout:'setTimeout — выполнить код один раз через заданную задержку.',
     setinterval:'setInterval — повторять код каждые N миллисекунд.',
-    addeventlistener2:'', removeeventlistener:'removeEventListener — снять ранее повешенный обработчик события.',
+    removeeventlistener:'removeEventListener — снять ранее повешенный обработчик события.',
     createelement:'createElement — создаёт новый элемент (например div), который потом можно вставить на страницу.',
     appendchild:'appendChild — вставляет элемент внутрь другого, последним ребёнком.',
     append:'append — добавляет узлы/текст в конец элемента.',
     classlist:'classList — список CSS-классов элемента: add/remove/toggle.',
     style:'style — инлайновые стили элемента: element.style.color = "red".',
     value:'value — текущее значение поля ввода (input).',
-    settimeout2:'', preventdefault:'preventDefault — отменяет стандартное действие события (например отправку формы).',
+    preventdefault:'preventDefault — отменяет стандартное действие события (например отправку формы).',
     target:'target — элемент, на котором произошло событие.',
     'typeof':'typeof — возвращает тип значения строкой: "number", "string"…',
     of:'of — часть цикла for…of: перебрать элементы массива.',
@@ -250,7 +258,7 @@
     'break':'break — выйти из цикла досрочно.', 'continue':'continue — перейти к следующей итерации цикла.',
     switch:'switch — выбрать ветку по значению (замена цепочки if/else).',
     case:'case — одна ветка внутри switch.', 'default':'default — ветка switch, когда ни один case не подошёл.',
-    json2:'', parseint:'parseInt — превратить строку в целое число.', parsefloat:'parseFloat — строку в дробное число.',
+    parseint:'parseInt — превратить строку в целое число.', parsefloat:'parseFloat — строку в дробное число.',
     math:'Math — встроенный объект с математикой: Math.round, Math.random, Math.max…',
     date:'Date — работа с датой и временем.', promise:'Promise — «обещание» результата, который придёт позже.',
     reduce:'reduce — свернуть массив в одно значение (сумма, объект…).',
@@ -367,6 +375,7 @@
 
   // ── рендер панелей-редакторов ──
   function renderEds(){
+    ros.forEach(r => r.disconnect()); ros = [];
     edsEl.innerHTML = '';
     files.forEach(f => {
       const ed = document.createElement('div'); ed.className = 'sb-ed';
@@ -387,6 +396,10 @@
         head.appendChild(run1);
       }
 
+      const cp = document.createElement('button'); cp.className = 'btn sb-run1'; cp.textContent = '⧉'; cp.title = 'скопировать код этого файла';
+      cp.onclick = () => copyText(f.code, cp);
+      head.appendChild(cp);
+
       const del = document.createElement('button'); del.className = 'sb-ed-del'; del.textContent = '🗑'; del.title = 'удалить файл';
       del.onclick = () => { files = files.filter(x => x !== f); if(!files.length) files = [{ id:uid(), name:'index.html', lang:'html', code:'' }]; save(); renderEds(); schedulePreview(); };
       head.appendChild(del);
@@ -401,14 +414,23 @@
       ta.addEventListener('scroll', syncScroll);
       // Tab вставляет отступ, а не прыгает по форме
       ta.onkeydown = ev => { if(ev.key === 'Tab'){ ev.preventDefault(); const s = ta.selectionStart, e2 = ta.selectionEnd; ta.value = ta.value.slice(0, s) + '  ' + ta.value.slice(e2); ta.selectionStart = ta.selectionEnd = s + 2; f.code = ta.value; save(); paint(); schedulePreview(); } };
-      // клик по слову в режиме «разбор» — пояснение
-      pre.addEventListener('click', ev => {
+      // клик по слову в режиме «пояснения»: курсор ставится как обычно (редактирование не ломается),
+      // а под курсором находим раскрашенный span и показываем окошко
+      ta.addEventListener('click', ev => {
         if(!center.classList.contains('explain-on')) return;
-        const sp = ev.target.closest('span'); if(!sp) return;
-        explainToken(sp, ev);
+        const savePE = ta.style.pointerEvents, savePre = pre.style.pointerEvents;
+        ta.style.pointerEvents = 'none'; pre.style.pointerEvents = 'auto';
+        const el = document.elementFromPoint(ev.clientX, ev.clientY);
+        ta.style.pointerEvents = savePE; pre.style.pointerEvents = savePre;
+        const sp = el && el.closest && el.closest('.sb-hl span');
+        if(sp) explainToken(sp, ev); else hidePop();
       });
       paint();
       wrap.append(pre, ta);
+      // textarea (форм-контрол) в Chromium не растягивается ни flex'ом, ни height:100% —
+      // задаём высоту явно по размеру обёртки и держим в синхроне
+      const ro = new ResizeObserver(() => { const h = wrap.clientHeight; if(h) ta.style.height = h + 'px'; });
+      ro.observe(wrap); ros.push(ro);
       ed.appendChild(head); ed.appendChild(wrap); edsEl.appendChild(ed);
     });
   }
@@ -416,6 +438,22 @@
   // ── кнопки ──
   box.querySelector('#sbAdd').onclick = () => { files.push({ id:uid(), name:'файл' + (files.length + 1) + '.js', lang:'js', code:'' }); save(); renderEds(); schedulePreview(); };
   box.querySelector('#sbClr').onclick = () => { conEl.textContent = ''; };
+  // «копировать итог» — чистый собранный документ без служебного перехвата консоли
+  box.querySelector('#sbCopyAll').onclick = ev => {
+    const html = files.filter(f => f.lang === 'html').map(f => f.code).join('\n');
+    const css = files.filter(f => f.lang === 'css').map(f => f.code).join('\n');
+    const js = files.filter(f => f.lang === 'js' || f.lang === 'ts').map(f => f.code).join('\n\n');
+    let out;
+    if(/<html[\s>]/i.test(html)){
+      out = html;
+      if(css) out = out.replace(/<\/head>/i, '  <style>\n' + css + '\n  </style>\n</head>');
+      if(js) out = out.replace(/<\/body>/i, '  <script>\n' + js + '\n  <\/script>\n</body>');
+    } else {
+      out = '<!doctype html>\n<html lang="ru">\n<head>\n  <meta charset="utf-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">' +
+        (css ? '\n  <style>\n' + css + '\n  </style>' : '') + '\n</head>\n<body>\n' + html + (js ? '\n  <script>\n' + js + '\n  <\/script>' : '') + '\n</body>\n</html>';
+    }
+    copyText(out, ev.currentTarget);
+  };
   box.querySelector('#sbRun').onclick = () => {
     renderPreview();
     // плюс запускаем все не-frontend файлы на сервере
@@ -425,13 +463,11 @@
   const exBtn = box.querySelector('#sbExplain');
   const setExplain = on => {
     center.classList.toggle('explain-on', on);
-    exBtn.classList.toggle('ok', on);
-    exBtn.textContent = on ? '🔍 разбор: вкл' : '🔍 разбор';
-    exBtn.title = on ? 'клик по цветному слову в коде → пояснение. Нажми ещё раз, чтобы вернуться к правке.' : 'режим разбора: кликай по цветным словам в коде — объясню, что это';
+    exBtn.checked = on;
     if(!on) hidePop();
     try { localStorage.setItem('codelab_sandbox_explain', on ? '1' : '0'); } catch(_){}
   };
-  exBtn.onclick = () => setExplain(!center.classList.contains('explain-on'));
+  exBtn.onchange = () => setExplain(exBtn.checked);
   let exInit = false; try { exInit = localStorage.getItem('codelab_sandbox_explain') === '1'; } catch(_){}
   setExplain(exInit);
 
