@@ -1,0 +1,115 @@
+{
+  "id": "sessionstorage-mvh8he7d",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Хранение в браузере",
+  "title": "sessionStorage",
+  "desc": "Живёт, пока открыта вкладка.",
+  "lines": [
+    [
+      {
+        "k": "name",
+        "v": "sessionStorage",
+        "r": "sessionStorage",
+        "e": "sessionStorage — хранилище до закрытия вкладки"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "setItem",
+        "e": "setItem — записать значение в localStorage по ключу."
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "str",
+        "v": "'step'"
+      },
+      {
+        "k": "op",
+        "v": ","
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "str",
+        "v": "'2'"
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [
+      {
+        "k": "fn",
+        "v": "console",
+        "e": "console — встроенный объект для вывода в консоль (отладки)."
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "log",
+        "e": "log — печатает значение в консоль. console.log(x) — показать x."
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "name",
+        "v": "sessionStorage",
+        "r": "sessionStorage",
+        "e": "sessionStorage — хранилище до закрытия вкладки"
+      },
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "fn",
+        "v": "getItem",
+        "e": "getItem — прочитать значение из localStorage по ключу."
+      },
+      {
+        "k": "op",
+        "v": "("
+      },
+      {
+        "k": "str",
+        "v": "'step'"
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ")"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ]
+  ],
+  "output": "",
+  "descAt": 1792534036009,
+  "component": {
+    "provides": [],
+    "requires": []
+  }
+}
