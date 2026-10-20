@@ -40,6 +40,32 @@
   const fwd = document.createElement('button'); fwd.className = 'hist-b'; fwd.innerHTML = 'вперёд →'; fwd.title = 'вперёд';
   back.onclick = () => history.back(); fwd.onclick = () => history.forward();
   hist.append(back, fwd); side.appendChild(hist);
+
+  // общий поиск по всем кускам — из любого раздела
+  const sbox = document.createElement('div'); sbox.className = 'side-search';
+  const sin = document.createElement('input'); sin.className = 'ss-in'; sin.placeholder = '🔎 найти кусок…'; sin.spellcheck = false;
+  const sres = document.createElement('div'); sres.className = 'ss-res'; sres.style.display = 'none';
+  sbox.append(sin, sres); side.appendChild(sbox);
+  let ALL = null;
+  const esc2 = s => String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]));
+  const loadAll = () => ALL || (ALL = fetch('/api/list').then(r => r.json()).catch(() => []));
+  const give = t => (t.comp && t.comp.provides) || [], need = t => (t.comp && t.comp.requires) || [];
+  const draw = async () => {
+    const q = sin.value.toLowerCase().trim();
+    if(!q){ sres.style.display = 'none'; sres.innerHTML = ''; return; }
+    const list = await loadAll();
+    const hits = list.filter(t => ((t.title || '') + ' ' + (t.group || '') + ' ' + (t.lang || '') + ' ' + (t.desc || '') + ' ' + give(t).join(' ') + ' ' + need(t).join(' ')).toLowerCase().includes(q)).slice(0, 14);
+    sres.innerHTML = hits.map(t => '<a class="ss-item" href="/component.html?id=' + encodeURIComponent(t.id) + '"><span class="ss-t">' + esc2(t.title || t.id) + '</span><span class="ss-g">' + esc2((t.group || '').split('/')[0].trim()) + ' · ' + esc2((t.lang || '').toUpperCase()) + '</span></a>').join('')
+      + '<a class="ss-item ss-all" href="/inventory.html?q=' + encodeURIComponent(sin.value.trim()) + '">показать все в Описи →</a>';
+    sres.style.display = '';
+  };
+  sin.addEventListener('input', draw);
+  sin.addEventListener('focus', () => { if(sin.value.trim()) draw(); });
+  sin.addEventListener('keydown', e => {
+    if(e.key === 'Escape'){ sin.value = ''; sres.style.display = 'none'; }
+    if(e.key === 'Enter'){ const first = sres.querySelector('.ss-item'); if(first) location.href = first.getAttribute('href'); }
+  });
+  document.addEventListener('click', e => { if(!sbox.contains(e.target)) sres.style.display = 'none'; });
   let lastSect = null;
   PAGES.forEach(p => {
     if(p.sect && p.sect !== lastSect){ const s = document.createElement('div'); s.className = 'sect'; s.textContent = p.sect; side.appendChild(s); lastSect = p.sect; }
