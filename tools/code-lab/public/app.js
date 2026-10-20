@@ -412,4 +412,19 @@ if(_annAll) _annAll.onclick = async () => {
   else { _annAll.textContent = 'ошибка'; setTimeout(() => { _annAll.textContent = o; }, 2000); }
 };
 
+// импорт сборника кусков: добавляет куски и дополняет словарь
+const _impColl = document.getElementById('impColl'), _impCollFile = document.getElementById('impCollFile');
+if(_impColl && _impCollFile){
+  _impColl.onclick = () => _impCollFile.click();
+  _impCollFile.onchange = async () => {
+    const f = _impCollFile.files[0]; if(!f) return;
+    const o = _impColl.textContent; _impColl.disabled = true; _impColl.textContent = '…';
+    let bundle; try { bundle = JSON.parse(await f.text()); } catch(_){ _impColl.disabled = false; _impColl.textContent = 'не JSON'; setTimeout(() => { _impColl.textContent = o; }, 2000); _impCollFile.value = ''; return; }
+    let r; try { r = await fetch('/api/import-collection', { method: 'POST', body: JSON.stringify(bundle) }).then(x => x.json()); } catch(_){ r = { ok: false }; }
+    _impColl.disabled = false; _impCollFile.value = '';
+    if(r && r.ok){ _impColl.textContent = '✓ +' + r.created + ' кусков, +' + r.learned + ' слов'; loadList(); setTimeout(() => { _impColl.textContent = o; }, 3000); }
+    else { _impColl.textContent = 'ошибка'; setTimeout(() => { _impColl.textContent = o; }, 2000); }
+  };
+}
+
 loadList();

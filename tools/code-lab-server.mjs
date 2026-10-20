@@ -346,6 +346,41 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, files, added, total: names.length });
     }
 
+    // импорт сборника: один файл добавляет куски И дополняет словарь (разделом dict и словами из самих кусков)
+    if(u.pathname === '/api/import-collection' && req.method === 'POST'){
+      const b = await readBody(req);
+      const dictPath = path.join(PUBLIC, 'keyword-dict.json');
+      let dict; try { dict = JSON.parse(await fs.readFile(dictPath, 'utf8')); } catch(_){ dict = {}; }
+      for(const s of ['words','htmlTags','htmlAttrs','cssProps','cssVals']) if(!dict[s]) dict[s] = {};
+      let learned = 0;
+      const mergeInto = (obj, section) => { if(!obj || typeof obj !== 'object') return; for(const [k, v] of Object.entries(obj)){ if(typeof v === 'string' && v.trim() && dict[section][k.toLowerCase()] == null){ dict[section][k.toLowerCase()] = v.slice(0, 600); learned++; } } };
+      if(b.dict){ mergeInto(b.dict.words, 'words'); mergeInto(b.dict.htmlTags, 'htmlTags'); mergeInto(b.dict.htmlAttrs, 'htmlAttrs'); mergeInto(b.dict.cssProps, 'cssProps'); mergeInto(b.dict.cssVals, 'cssVals'); }
+      const pieces = Array.isArray(b.pieces) ? b.pieces : [];
+      for(const pc of pieces) mergeInto(pc.words, 'words');   // слова из самих кусков тоже учим
+      await fs.writeFile(dictPath, JSON.stringify(dict, null, 2), 'utf8');
+      _kwDict = dict;   // обновить кэш словаря
+      let created = 0, updated = 0;
+      for(const pc of pieces){
+        const lang = String(pc.lang || 'js').toLowerCase();
+        const code = String(pc.code || '');
+        if(!code.trim()) continue;
+        const title = String(pc.title || 'Без названия').slice(0, 80);
+        const dup = await findSameTemplate(title, code);
+        let obj, full;
+        if(dup){ full = path.join(TEMPLATES, dup); obj = JSON.parse(await fs.readFile(full, 'utf8')); obj.lang = lang; obj.title = title; if(pc.group) obj.group = String(pc.group).slice(0, 60); if(pc.desc) obj.desc = String(pc.desc).slice(0, 400); obj.lines = tokenize(code, lang); updated++; }
+        else { obj = { id: slug(title || lang), lang, group: String(pc.group || 'Мой сборник').slice(0, 60), title, desc: String(pc.desc || '').slice(0, 400), lines: tokenize(code, lang), output: pc.output != null ? String(pc.output) : '', descAt: Date.now() }; full = path.join(TEMPLATES, obj.id + '.json'); created++; }
+        if(lang === 'js'){ const c = codeContract(code); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
+        annotateLines(obj.lines, lang, dict);   // автоподпись из словаря (уже с новыми словами)
+        if(pc.words && typeof pc.words === 'object'){   // ручные пояснения куска — поверх авто
+          const low = {}; for(const [k, v] of Object.entries(pc.words)) low[k.toLowerCase()] = v;
+          for(const line of obj.lines) for(const t of line){ if(t.k === 'sp' || t.k === 'op') continue; const e = low[String(t.v).toLowerCase()]; if(e) t.e = String(e).slice(0, 600); }
+        }
+        await fs.mkdir(TEMPLATES, { recursive: true });
+        await fs.writeFile(full, JSON.stringify(obj, null, 2), 'utf8');
+      }
+      return json(res, 200, { ok: true, learned, created, updated, total: pieces.length });
+    }
+
     // правка шаблона целиком: новый код → заново токенизируем, перезаписываем файл
     if(u.pathname === '/api/edit' && req.method === 'POST'){
       const b = await readBody(req);
