@@ -10,7 +10,9 @@
     { key:'learn',       label:'Обучение',     href:'/schema.html',     sect:'Старт' },
     { key:'inventory',   label:'Опись',        href:'/inventory.html',  sect:'Кусочки кода' },
     { key:'library',     label:'Библиотека',   href:'/library.html',    sect:'Кусочки кода' },
-    { key:'catalog',     label:'Каталог',      href:'/catalog.html',    sect:'Кусочки кода' },
+    // «Каталог» убран из меню: дублировал Опись по старой авто-классификации. Файл catalog.html/js
+    // оставлен — чтобы вернуть, достаточно раскомментировать строку ниже.
+    // { key:'catalog',     label:'Каталог',      href:'/catalog.html',    sect:'Кусочки кода' },
     { key:'constructor', label:'Конструктор',  href:'/constructor.html',sect:'Собирать' },
     { key:'recipes',     label:'Рецепты',      href:'/recipes.html',    sect:'Собирать' },
     { key:'data',        label:'Данные (загрузка)', href:'/schema-json.html', sect:'Данные' },
