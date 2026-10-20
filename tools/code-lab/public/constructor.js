@@ -1498,6 +1498,20 @@ $('#impfile').onchange = async e => {
 };
 
 $('#clear').onclick = () => { graph = { nodes: [], edges: [] }; selectedId = null; renderCanvas(); renderInspector(); renderCode(); persist(); };
+// свернуть/развернуть визуальный холст — чтобы коду и предпросмотру досталась почти вся высота
+(function(){
+  const center = document.querySelector('.center'), btn = $('#collapseCanvas'); if(!center || !btn) return;
+  const set = on => {
+    center.classList.toggle('canvas-collapsed', on);
+    btn.textContent = on ? '🔼 развернуть холст' : '🔽 свернуть холст';
+    btn.title = on ? 'показать визуальный холст со связями' : 'свернуть визуальный холст — больше места коду и предпросмотру';
+    try { localStorage.setItem('codelab_canvas_collapsed', on ? '1' : '0'); } catch(_){}
+    if(!on && typeof drawEdges === 'function') drawEdges();
+  };
+  let init = false; try { init = localStorage.getItem('codelab_canvas_collapsed') === '1'; } catch(_){}
+  set(init);
+  btn.onclick = () => set(!center.classList.contains('canvas-collapsed'));
+})();
 $('#example').onclick = () => {
   const a = uid(), b = uid(), c = uid(), d = uid();
   graph = { nodes: [
