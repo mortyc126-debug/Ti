@@ -12,19 +12,9 @@
     <div class="sub">Шаблоны для копирования. Клик по любому слову — что оно значит. Синие слова (имена) можно править прямо в коде — поменяются во всём шаблоне.</div>
     <div class="tabs"><a href="/" class="on">Шаблоны</a><a href="/constructor.html">Конструктор</a><a href="/schema.html">Схемы</a></div>
     <button id="annAll" class="tab-btn" title="проставить пояснения к ключевым словам во всех шаблонах из словаря (вручную вписанные не трогает)">✍ подписать слова</button>
-    <button id="impColl" class="tab-btn" title="загрузить куски: код-файлы (.js/.py/.css/.html…), полноценный кусок JSON или сборник {dict,pieces}. Можно несколько файлов сразу.">📥 загрузить куски</button>
-    <input type="file" id="impCollFile" accept=".json,.js,.mjs,.jsx,.ts,.tsx,.py,.rb,.php,.go,.lua,.sh,.bash,.ps1,.r,.sql,.html,.htm,.css,.txt" multiple style="display:none">
     <details class="dl-tpl">
-      <summary>📄 образцы форматов (скачать и заполнить)</summary>
-      <div class="dl-tpl-body">
-        <p><b>Что во что грузить — через «📥 загрузить куски»:</b></p>
-        <ul>
-          <li><b>Обычный код-файл</b> (.js, .py, .css, .html…) — просто перетащи/выбери. Станет одним куском: язык по расширению, название по имени файла. Образец не нужен.</li>
-          <li><a href="/piece-template.example.json" download>⬇ полноценный кусок (JSON)</a> <button class="mini dl-copy" data-src="/piece-template.example.json" title="скопировать текст образца в буфер">⧉ копировать</button> — один кусок с готовой разметкой и <b>пояснениями к словам</b> (поле e). Бери, когда хочешь свои формулировки.</li>
-          <li><a href="/collection.example.json" download>⬇ сборник (JSON)</a> <button class="mini dl-copy" data-src="/collection.example.json" title="скопировать текст образца в буфер">⧉ копировать</button> — <b>много кусков сразу + пополнение словаря</b>. Разделы dict и words учат словарь. Главный способ растить систему пачками.</li>
-        </ul>
-        <p class="muted">Внутри каждого файла — раздел <code>_how</code>: пошагово, что и куда писать.</p>
-      </div>
+      <summary>📥 загрузить куски и образцы форматов (видно прямо тут)</summary>
+      <div id="uploader"></div>
     </details>
     <details class="glossary">
       <summary>словарик терминов (нажми, если забыл что к чему)</summary>
@@ -60,6 +50,7 @@
     </aside>
   </main>
   <script src="/shell.js"></script>
+  <script src="/upload-templates.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

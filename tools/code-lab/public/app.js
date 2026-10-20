@@ -412,46 +412,8 @@ if(_annAll) _annAll.onclick = async () => {
   else { _annAll.textContent = 'ошибка'; setTimeout(() => { _annAll.textContent = o; }, 2000); }
 };
 
-// объединённый загрузчик: код-файлы, полноценный кусок JSON или сборник. Можно несколько файлов.
-const _EXT_LANG = { js:'js', mjs:'js', jsx:'js', ts:'ts', tsx:'ts', py:'python', rb:'ruby', php:'php', go:'go', lua:'lua', sh:'bash', bash:'bash', ps1:'powershell', r:'r', sql:'sql', html:'html', htm:'html', css:'css', txt:'txt' };
-const _impColl = document.getElementById('impColl'), _impCollFile = document.getElementById('impCollFile');
-if(_impColl && _impCollFile){
-  _impColl.onclick = () => _impCollFile.click();
-  _impCollFile.onchange = async () => {
-    const files = [..._impCollFile.files]; if(!files.length) return;
-    const o = _impColl.textContent; _impColl.disabled = true; _impColl.textContent = '…';
-    let created = 0, learned = 0, updated = 0, bad = 0, lastId = null;
-    for(const f of files){
-      const ext = (f.name.split('.').pop() || '').toLowerCase();
-      const text = await f.text();
-      let payload;
-      if(ext === 'json'){
-        try { payload = JSON.parse(text); }   // кусок, массив кусков или сборник {dict,pieces}
-        catch(_){ bad++; continue; }
-      } else {
-        // обычный код-файл → один кусок; имя файла (без расширения) = название
-        payload = { lang: _EXT_LANG[ext] || 'txt', title: f.name.replace(/\.[^.]+$/, ''), code: text, group: 'Мои куски' };
-      }
-      let r; try { r = await fetch('/api/import', { method: 'POST', body: JSON.stringify(payload) }).then(x => x.json()); } catch(_){ r = null; }
-      if(r && r.ok){ created += r.created || 0; learned += r.learned || 0; updated += r.updated || 0; }
-      else bad++;
-    }
-    _impColl.disabled = false; _impCollFile.value = '';
-    loadList();
-    const parts = ['+' + created + ' кусков']; if(updated) parts.push(updated + ' обновл.'); if(learned) parts.push('+' + learned + ' слов'); if(bad) parts.push(bad + ' пропущено');
-    _impColl.textContent = '✓ ' + parts.join(', ');
-    setTimeout(() => { _impColl.textContent = o; }, 3500);
-  };
-}
-
-// копировать текст образца формата в буфер (альтернатива скачиванию)
-document.addEventListener('click', async e => {
-  const b = e.target.closest && e.target.closest('.dl-copy'); if(!b) return;
-  e.preventDefault();
-  let text = ''; try { text = await fetch(b.dataset.src).then(r => r.text()); } catch(_){ b.textContent = 'ошибка'; return; }
-  const o = b.textContent; const done = () => { b.textContent = '✓ скопировано'; setTimeout(() => { b.textContent = o; }, 1200); };
-  const fallback = () => { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch(_){} ta.remove(); done(); };
-  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
-});
+// видимый блок загрузки + образцы форматов (upload-templates.js); обновляем список после загрузки
+const _upHost = document.getElementById('uploader');
+if(_upHost && window.renderUploader) window.renderUploader(_upHost, { onDone: () => loadList() });
 
 loadList();

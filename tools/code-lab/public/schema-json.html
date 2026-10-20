@@ -77,6 +77,11 @@
     <div class="sub">Кинь пачку <b>.zip</b> / <b>.gz</b> / <b>.json</b> — распакуются офлайн и лягут ниже. Клик по сохранённому — смотри его тремя способами: <b>Поля</b> (понятные окна для правки), <b>Код</b> и <b>Связи</b> (карточка: что из чего состоит). «→ в конструктор» — отправить как переменную и писать код.</div>
   </header>
   <div class="wrap">
+    <details class="dl-tpl" open>
+      <summary>📥 загрузить куски кода (пачкой) + образцы форматов по языкам</summary>
+      <div id="uploader"></div>
+    </details>
+    <div class="catline">а ниже — загрузка архивов данных (json/gz/zip) для инспектора</div>
     <div class="drop" id="drop">перетащи сюда архивы (можно пачкой) или нажми — распакуются и сохранятся<input type="file" id="file" accept=".json,.gz,.zip,application/json,application/gzip,application/zip" multiple style="display:none"></div>
     <div style="margin:8px 0"><button class="btn" id="rescue">Перенести шаблоны кода из Данных в Библиотеку</button></div>
     <div class="saved" id="saved"></div>
@@ -443,5 +448,9 @@ function el(tag, cls, text){ const e = document.createElement(tag); e.className 
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 </script>
   <script src="/shell.js"></script>
+  <script src="/upload-templates.js"></script>
+  <script>
+    (function(){ const h = document.getElementById('uploader'); if(h && window.renderUploader) window.renderUploader(h); })();
+  </script>
 </body>
 </html>
