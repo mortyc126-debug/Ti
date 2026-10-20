@@ -133,7 +133,11 @@ async function handle(fileList){
       const got = await extract(f);
       for(const g of got){
         try { files.push({ name: g.name, data: JSON.parse(g.text) }); }
-        catch(e){ err.textContent += '«' + g.name + '» не JSON: ' + e.message + '\n'; }
+        catch(e){
+          const L = extLang(g.name);   // не JSON, но код по расширению → завернём в кусок
+          if(L) files.push({ name: g.name, data: { lang: L, title: g.name.replace(/\.[^.]+$/, ''), code: g.text } });
+          else err.textContent += '«' + g.name + '» не JSON и не похоже на код: ' + e.message + '\n';
+        }
       }
     } catch(e){ err.textContent += '«' + f.name + '»: ' + e.message + '\n'; }
   }
@@ -159,6 +163,9 @@ function looksLikePiece(d){
   return (Array.isArray(d.lines) || typeof d.code === 'string') && typeof d.lang === 'string';
 }
 async function importPiece(d){ return fetch('/api/import', { method: 'POST', body: JSON.stringify(d) }).then(r => r.json()).catch(() => ({})); }
+// расширение файла → язык (чтобы голый код из архива стал куском)
+const EXT_LANG = { js:'js', mjs:'js', jsx:'js', ts:'ts', tsx:'ts', py:'python', rb:'ruby', php:'php', go:'go', lua:'lua', sh:'bash', bash:'bash', ps1:'powershell', r:'r', sql:'sql', css:'css', html:'html', htm:'html', txt:'txt' };
+function extLang(name){ return EXT_LANG[(String(name).split('.').pop() || '').toLowerCase()] || null; }
 function linesToCode(lines){ return (lines || []).map(line => (line || []).map(t => t && t.v != null ? t.v : '').join('')).join('\n'); }
 async function addTemplate(d, fallbackName){
   const code = linesToCode(d.lines);
@@ -175,10 +182,8 @@ $('#rescue').onclick = async () => {
       const j = await fetch('/api/data/get?id=' + encodeURIComponent(it.id)).then(r => r.json());
       // если без lang, но имя файла .js/.py и data — строка кода, завернём в кусок
       let d = j.data;
-      if(!looksLikePiece(d) && typeof d === 'string' && /\.(js|mjs|ts|py|rb|php|go|lua|sh|ps1|r|sql|css|html?)$/i.test(j.name || '')){
-        const ext = (j.name.split('.').pop() || '').toLowerCase();
-        const L = { js:'js', mjs:'js', ts:'ts', py:'python', rb:'ruby', php:'php', go:'go', lua:'lua', sh:'bash', ps1:'powershell', r:'r', sql:'sql', css:'css', html:'html', htm:'html' };
-        d = { lang: L[ext] || 'txt', title: j.name.replace(/\.[^.]+$/, ''), code: d };
+      if(!looksLikePiece(d) && typeof d === 'string' && extLang(j.name)){   // застрявшая строка кода → завернём в кусок
+        d = { lang: extLang(j.name), title: j.name.replace(/\.[^.]+$/, ''), code: d };
       }
       if(looksLikePiece(d)){
         const r = await importPiece(d);
