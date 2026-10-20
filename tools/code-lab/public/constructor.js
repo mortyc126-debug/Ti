@@ -318,7 +318,25 @@ function subOf(t, pk){ if(t.comp && t.comp.subcat) return t.comp.subcat; const d
 
 // ── палитра: Базовые блоки + компоненты каталога по иерархии назначений ───────
 let CATALOG = [];
-async function loadCatalog(){ try { CATALOG = await fetch('/api/list').then(r => r.json()); } catch(_){ CATALOG = []; } renderPalette(); }
+async function loadCatalog(){ try { CATALOG = await fetch('/api/list').then(r => r.json()); } catch(_){ CATALOG = []; } fillPalLangs(); renderPalette(); }
+
+// ── фильтр языков в палитре: показывать только отмеченные языки ──
+let palLangs = null;   // null = показывать все
+try { const s = localStorage.getItem('codelab_pal_langs'); if(s){ const a = JSON.parse(s); if(Array.isArray(a) && a.length) palLangs = new Set(a); } } catch(_){}
+function allLangs(){ return [...new Set(CATALOG.map(t => String(t.lang || '').toLowerCase()).filter(Boolean))].sort(); }
+function langActive(l){ return !palLangs || palLangs.has(l); }
+function savePalLangs(){ try { if(palLangs) localStorage.setItem('codelab_pal_langs', JSON.stringify([...palLangs])); else localStorage.removeItem('codelab_pal_langs'); } catch(_){} }
+function setPalLangs(next){ const all = allLangs(); if(!next || next.size === 0 || next.size >= all.length) palLangs = null; else palLangs = next; savePalLangs(); fillPalLangs(); renderPalette(); }
+function toggleLang(l){ const all = allLangs(); const cur = palLangs ? new Set(palLangs) : new Set(all); if(cur.has(l)) cur.delete(l); else cur.add(l); setPalLangs(cur); }
+function fillPalLangs(){
+  const host = $('#palLangs'); if(!host) return;
+  const langs = allLangs();
+  if(langs.length < 2){ host.style.display = 'none'; host.innerHTML = ''; return; }   // один язык — фильтр ни к чему
+  host.style.display = ''; host.innerHTML = '';
+  host.appendChild(el('span', 'pl-lbl', 'язык:'));
+  const all = el('span', 'pal-lang pl-all' + (!palLangs ? ' on' : ''), 'все'); all.onclick = () => setPalLangs(null); host.appendChild(all);
+  langs.forEach(l => { const c = el('span', 'pal-lang' + (langActive(l) && palLangs ? ' on' : ''), l.toUpperCase()); c.onclick = () => toggleLang(l); host.appendChild(c); });
+}
 function palDetails(title, count, open){
   const d = document.createElement('details'); d.className = 'pal-d'; if(open) d.open = true;
   const s = document.createElement('summary'); s.innerHTML = '<span>' + esc(title) + '</span><span class="pal-n">' + count + '</span>'; d.appendChild(s); return d;
@@ -335,7 +353,7 @@ function renderPalette(){
     host.appendChild(d);
   }
   // каталог — единое дерево по разделу (поле «раздел», через «/»); все языки
-  const cat = CATALOG.filter(t => !q || (t.title + ' ' + (t.desc || '') + ' ' + (t.lang || '') + ' ' + (t.group || '')).toLowerCase().includes(q));
+  const cat = CATALOG.filter(t => langActive(String(t.lang || '').toLowerCase()) && (!q || (t.title + ' ' + (t.desc || '') + ' ' + (t.lang || '') + ' ' + (t.group || '')).toLowerCase().includes(q)));
   const root = { children: new Map(), items: [] };
   cat.forEach(t => {
     const path = String(t.group || '').split('/').map(s => s.trim()).filter(Boolean);
@@ -1183,10 +1201,21 @@ function inspWhy(nd, b){
   const box = document.createElement('div');
   const first = (b.hint || '').split('.')[0];
   box.appendChild(el('div', 'insp-text', 'Это «' + nodeLabel(nd) + '». ' + (first ? first + '.' : '')));
+  const code = nodeCode(nd);
+  const bar = el('div', 'insp-codebar');
+  const cp = el('button', 'btn insp-copy', '⧉ копировать код');
+  cp.onclick = () => copyToClip(code, cp);
+  bar.appendChild(cp); box.appendChild(bar);
   const cw = el('div', 'insp-code');
   const pre = document.createElement('pre'); pre.className = 'code mono'; pre.style.maxHeight = '240px';
-  buildHighlight(nodeCode(nd)).forEach(l => pre.appendChild(l)); cw.appendChild(pre); box.appendChild(cw);
+  buildHighlight(code).forEach(l => pre.appendChild(l)); cw.appendChild(pre); box.appendChild(cw);
   return box;
+}
+// копирование в буфер + отметка ✓
+function copyToClip(text, btn){
+  const o = btn.textContent, done = () => { btn.textContent = '✓ скопировано'; setTimeout(() => { btn.textContent = o; }, 1100); };
+  const fb = () => { const t = document.createElement('textarea'); t.value = text; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch(_){} t.remove(); done(); };
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fb); else fb();
 }
 
 // ── сборка кода по связям ─────────────────────────────────────────────────────

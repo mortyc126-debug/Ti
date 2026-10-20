@@ -16,6 +16,12 @@
   /* палитра слева — компоненты по категориям */
   .palette{background:var(--bg2);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;min-height:0}
   .pal-top{padding:10px;border-bottom:1px solid var(--border)}
+  .pal-langs{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border)}
+  .pal-langs .pl-lbl{font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-right:2px}
+  .pal-lang{font-size:11px;color:var(--text3);background:var(--bg);border:1px solid var(--border);border-radius:13px;padding:3px 9px;cursor:pointer;font-family:ui-monospace,monospace}
+  .pal-lang:hover{color:var(--text)}
+  .pal-lang.on{color:var(--acc);border-color:rgba(255,0,110,.45);background:rgba(255,0,110,.12)}
+  .pal-lang.pl-all{font-family:inherit}
   .pal-search{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:7px 9px}
   .pal-search:focus{outline:none;border-color:var(--name)}
   .pal-list{overflow:auto;padding:10px 10px 24px;flex:1}
@@ -176,7 +182,9 @@
   .insp-field input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--name);font-family:ui-monospace,monospace;font-size:13px}
   .insp-field input:focus{outline:none;border-color:var(--name)}
   .insp-text{font-size:13px;color:var(--text2);line-height:1.65}
-  .insp-code{margin-top:10px}
+  .insp-codebar{display:flex;justify-content:flex-end;margin-top:10px}
+  .insp-copy{font-size:11.5px;padding:5px 10px}
+  .insp-code{margin-top:6px}
   .insp-desc{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-size:13px;line-height:1.5;min-height:58px;resize:vertical}
   .insp-desc:focus{outline:none;border-color:var(--name)}
   .insp-save{font:12px/1 ui-monospace,monospace;color:var(--str);background:var(--s2);border:1px dashed rgba(82,242,201,.45);border-radius:7px;padding:8px 11px;cursor:pointer;margin:2px 0 12px}
@@ -244,6 +252,7 @@
         <button class="pal-btn" id="fromtpl">+ компонент из каталога</button>
         <button class="pal-btn" id="palsort" title="разово проставить раздел по смыслу там, где он пуст">✨ авто-разложить</button>
       </div>
+      <div class="pal-langs" id="palLangs"></div>
       <div class="pal-list" id="palList"></div>
     </aside>
 
