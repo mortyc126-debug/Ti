@@ -52,6 +52,8 @@ function git(args, cwd){
   });
 }
 async function gitRoot(){ const r = await git(['rev-parse', '--show-toplevel']); return r.code === 0 ? r.out : null; }
+// гарантируем, что папки лаборатории существуют — иначе git add/status по ним даёт «pathspec did not match»
+async function ensureLabDirs(){ for(const d of [TEMPLATES, FLOWS, DATA, RECIPES]){ try { await fs.mkdir(d, { recursive: true }); } catch(_){} } }
 
 // ── токенайзер: сырой код → строки токенов {k, v, r?} ───────────────────────
 const KW = {
@@ -488,6 +490,7 @@ const server = http.createServer(async (req, res) => {
 
     // ── синхронизация шаблонов с GitHub ───────────────────────────────────
     if(u.pathname === '/api/git/info'){
+      await ensureLabDirs();
       let templates = 0;
       try { templates = (await fs.readdir(TEMPLATES)).filter(n => n.endsWith('.json')).length; } catch(_){}
       const root = await gitRoot();
@@ -500,6 +503,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { repo: !!root, branch, dirty, templates });
     }
     if(u.pathname === '/api/git/sync' && req.method === 'POST'){
+      await ensureLabDirs();
       const root = await gitRoot();
       if(!root) return json(res, 200, { ok: false, stage: 'repo', message: 'Папка лаборатории не внутри git-репозитория — шаблоны сохранены только локально.' });
       const add = await git(["add", "--", TEMPLATES, FLOWS, RECIPES], root);
