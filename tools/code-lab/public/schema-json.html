@@ -139,7 +139,7 @@ async function handle(fileList){
   }
   if(!files.length) return;
   const st = await autostore();   // данные складываем; шаблоны кода уводим в Библиотеку
-  const dataFiles = files.filter(f => !isTemplate(f.data));
+  const dataFiles = files.filter(f => !looksLikePiece(f.data));
   const note = [];
   if(st.saved) note.push('в данные легло: ' + st.saved);
   if(st.skipped) note.push('уже было: ' + st.skipped);
@@ -151,6 +151,14 @@ async function handle(fileList){
 
 // json — это на самом деле шаблон кода? (как файлы из templates/: есть lines + lang)
 function isTemplate(d){ return d && typeof d === 'object' && !Array.isArray(d) && Array.isArray(d.lines) && typeof d.lang === 'string'; }
+// шире: любой кусок/сборник, который примет загрузчик (/api/import): lines+lang, code+lang, массив кусков, {pieces}/{dict}
+function looksLikePiece(d){
+  if(!d || typeof d !== 'object') return false;
+  if(Array.isArray(d)) return d.some(x => x && typeof x === 'object' && (Array.isArray(x.lines) || typeof x.code === 'string') && typeof x.lang === 'string');
+  if(Array.isArray(d.pieces) || (d.dict && typeof d.dict === 'object')) return true;
+  return (Array.isArray(d.lines) || typeof d.code === 'string') && typeof d.lang === 'string';
+}
+async function importPiece(d){ return fetch('/api/import', { method: 'POST', body: JSON.stringify(d) }).then(r => r.json()).catch(() => ({})); }
 function linesToCode(lines){ return (lines || []).map(line => (line || []).map(t => t && t.v != null ? t.v : '').join('')).join('\n'); }
 async function addTemplate(d, fallbackName){
   const code = linesToCode(d.lines);
@@ -165,13 +173,20 @@ $('#rescue').onclick = async () => {
   for(const it of list){
     try {
       const j = await fetch('/api/data/get?id=' + encodeURIComponent(it.id)).then(r => r.json());
-      if(isTemplate(j.data)){
-        const r = await addTemplate(j.data, j.name);
-        if(r.id){ await fetch('/api/data/delete', { method: 'POST', body: JSON.stringify({ id: it.id }) }); moved++; }
+      // если без lang, но имя файла .js/.py и data — строка кода, завернём в кусок
+      let d = j.data;
+      if(!looksLikePiece(d) && typeof d === 'string' && /\.(js|mjs|ts|py|rb|php|go|lua|sh|ps1|r|sql|css|html?)$/i.test(j.name || '')){
+        const ext = (j.name.split('.').pop() || '').toLowerCase();
+        const L = { js:'js', mjs:'js', ts:'ts', py:'python', rb:'ruby', php:'php', go:'go', lua:'lua', sh:'bash', ps1:'powershell', r:'r', sql:'sql', css:'css', html:'html', htm:'html' };
+        d = { lang: L[ext] || 'txt', title: j.name.replace(/\.[^.]+$/, ''), code: d };
+      }
+      if(looksLikePiece(d)){
+        const r = await importPiece(d);
+        if(r && r.ok){ await fetch('/api/data/delete', { method: 'POST', body: JSON.stringify({ id: it.id }) }); moved += (r.created || 0) + (r.updated || 0) || 1; }
       }
     } catch(_){}
   }
-  let msg = moved ? ('перенесено в Библиотеку: ' + moved) : 'шаблонов кода в Данных не нашлось';
+  let msg = moved ? ('перенесено в Библиотеку: ' + moved) : 'кусков кода в Данных не нашлось';
   if(moved){ const g = await syncGh(); msg += ' · GitHub: ' + g; }
   btn.textContent = (moved ? '✓ ' : '') + msg;
   loadSaved();
@@ -359,9 +374,9 @@ async function autostore(){
   const have = new Set(existing.map(x => x.name));
   let saved = 0, skipped = 0, toLib = 0;
   for(const f of files){
-    if(isTemplate(f.data)){                       // это шаблон кода — ему место в Библиотеке
-      const r = await addTemplate(f.data, f.name);
-      if(r.id) toLib++;
+    if(looksLikePiece(f.data)){                   // это кусок/сборник — ему место в Библиотеке
+      const r = await importPiece(f.data);
+      if(r && r.ok) toLib += (r.created || 0) + (r.updated || 0) || 1;
       continue;
     }
     if(have.has(f.name)){ skipped++; continue; }
