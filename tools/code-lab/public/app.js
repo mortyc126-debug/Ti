@@ -444,4 +444,14 @@ if(_impColl && _impCollFile){
   };
 }
 
+// копировать текст образца формата в буфер (альтернатива скачиванию)
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('.dl-copy'); if(!b) return;
+  e.preventDefault();
+  let text = ''; try { text = await fetch(b.dataset.src).then(r => r.text()); } catch(_){ b.textContent = 'ошибка'; return; }
+  const o = b.textContent; const done = () => { b.textContent = '✓ скопировано'; setTimeout(() => { b.textContent = o; }, 1200); };
+  const fallback = () => { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch(_){} ta.remove(); done(); };
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+});
+
 loadList();
