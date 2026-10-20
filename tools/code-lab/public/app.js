@@ -402,4 +402,14 @@ function descFmt(s){
 }
 const cssEsc = s => String(s).replace(/["\\]/g, '\\$&');
 
+// автоподпись слов во всех шаблонах из словаря keyword-dict.json (вручную вписанные пояснения не трогает)
+const _annAll = document.getElementById('annAll');
+if(_annAll) _annAll.onclick = async () => {
+  const o = _annAll.textContent; _annAll.disabled = true; _annAll.textContent = '…';
+  let r; try { r = await fetch('/api/annotate-all', { method: 'POST' }).then(x => x.json()); } catch(_){ r = { ok: false }; }
+  _annAll.disabled = false;
+  if(r && r.ok){ _annAll.textContent = '✓ ' + r.added + ' слов в ' + r.files + ' кусках'; if(curId) loadList(curId); setTimeout(() => { _annAll.textContent = o; }, 2500); }
+  else { _annAll.textContent = 'ошибка'; setTimeout(() => { _annAll.textContent = o; }, 2000); }
+};
+
 loadList();

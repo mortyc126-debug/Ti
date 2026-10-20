@@ -100,6 +100,33 @@ function tokenizeLine(line, lang){
 }
 function tokenize(code, lang){ return String(code).replace(/\r\n/g, '\n').split('\n').map(l => tokenizeLine(l, lang)); }
 
+// единый словарь пояснений к ключевым словам (тот же, что у песочницы) — для автоподписи кусков
+let _kwDict = null;
+async function kwDict(){
+  if(_kwDict) return _kwDict;
+  try { _kwDict = JSON.parse(await fs.readFile(path.join(PUBLIC, 'keyword-dict.json'), 'utf8')); }
+  catch(_){ _kwDict = { words:{}, htmlTags:{}, htmlAttrs:{}, cssProps:{}, cssVals:{} }; }
+  return _kwDict;
+}
+// проставить e (пояснение) токенам из словаря, не затирая уже вписанные вручную; вернуть число проставленных
+function annotateLines(lines, lang, dict){
+  const W = dict.words || {}, TAGS = dict.htmlTags || {}, ATTRS = dict.htmlAttrs || {}, PROPS = dict.cssProps || {}, VALS = dict.cssVals || {};
+  const L = String(lang || '').toLowerCase();
+  const look = v => {
+    const lw = String(v).toLowerCase();
+    if(L === 'css') return PROPS[lw] || VALS[lw] || W[lw] || null;
+    if(L === 'html' || L === 'htm') return TAGS[lw] || ATTRS[lw] || W[lw] || null;
+    return W[lw] || null;
+  };
+  let count = 0;
+  for(const line of (lines || [])){ for(const tok of (line || [])){
+    if(!tok || tok.e) continue;   // уже есть пояснение — не трогаем
+    if(tok.k === 'sp' || tok.k === 'op' || tok.k === 'num' || tok.k === 'str' || tok.k === 'com') continue;
+    const ex = look(tok.v); if(ex){ tok.e = ex; count++; }
+  } }
+  return count;
+}
+
 // контракт куска: что он ОБЪЯВЛЯЕТ наружу (provides) и какие имена БЕРЁТ со стороны (requires)
 const _GLOBALS = new Set(['console','document','window','globalThis','Math','JSON','Array','Object','Number','String','Boolean','Date','Map','Set','Promise','RegExp','Error','Symbol','fetch','setTimeout','setInterval','clearTimeout','clearInterval','requestAnimationFrame','parseInt','parseFloat','isNaN','isFinite','localStorage','sessionStorage','URL','URLSearchParams','true','false','null','undefined','NaN','Infinity']);
 const _KWSET = new Set(['const','let','var','function','return','if','else','for','while','of','in','new','await','async','class','extends','super','try','catch','finally','throw','typeof','instanceof','this','break','continue','switch','case','do','yield','delete','void','import','export','from','default','static','get','set']);
@@ -283,6 +310,7 @@ const server = http.createServer(async (req, res) => {
       };
       if(b.component && typeof b.component === 'object') obj.component = b.component;   // метаданные компонента (теги осей, подкатегория, контракт)
       if(lang === 'js'){ const c = codeContract(code); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
+      annotateLines(obj.lines, lang, await kwDict());   // автоподпись ключевых слов из словаря
       await fs.mkdir(TEMPLATES, { recursive: true });
       await fs.writeFile(path.join(TEMPLATES, obj.id + '.json'), JSON.stringify(obj, null, 2), 'utf8');
       return json(res, 200, { id: obj.id });
@@ -300,6 +328,22 @@ const server = http.createServer(async (req, res) => {
       tok.e = String(b.e || '').slice(0, 600);
       await fs.writeFile(full, JSON.stringify(j, null, 2), 'utf8');
       return json(res, 200, { ok: true });
+    }
+
+    // автоподпись всех шаблонов из словаря: проставить e там, где его ещё нет
+    if(u.pathname === '/api/annotate-all' && req.method === 'POST'){
+      const dict = await kwDict();
+      const names = (await fs.readdir(TEMPLATES)).filter(n => n.endsWith('.json'));
+      let files = 0, added = 0;
+      for(const n of names){
+        const full = path.join(TEMPLATES, n);
+        try {
+          const j = JSON.parse(await fs.readFile(full, 'utf8'));
+          const c = annotateLines(j.lines, j.lang, dict);
+          if(c > 0){ await fs.writeFile(full, JSON.stringify(j, null, 2), 'utf8'); files++; added += c; }
+        } catch(_){}
+      }
+      return json(res, 200, { ok: true, files, added, total: names.length });
     }
 
     // правка шаблона целиком: новый код → заново токенизируем, перезаписываем файл

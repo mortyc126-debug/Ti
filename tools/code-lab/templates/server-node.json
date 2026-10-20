@@ -26,7 +26,8 @@
       },
       {
         "k": "kw",
-        "v": "from"
+        "v": "from",
+        "e": "from — часть import: откуда берём (import x from \"файл\")."
       },
       {
         "k": "sp",

@@ -334,6 +334,12 @@
     'system-ui':'system-ui — системный шрифт ОС.', auto:'auto — браузер решает сам.', hidden:'hidden — спрятать (например overflow:hidden).',
     transparent:'transparent — прозрачный.', row:'row — в ряд (по горизонтали).', column:'column — в столбец (по вертикали).'
   };
+  // единый источник словаря — keyword-dict.json (тот же, что подписывает куски на сервере).
+  // Встроенные словари выше — запасной вариант офлайн; JSON, если доступен, дополняет их.
+  fetch('/keyword-dict.json').then(r => r.json()).then(d => {
+    Object.assign(EXPLAIN, d.words || {}); Object.assign(HTML_TAGS, d.htmlTags || {});
+    Object.assign(HTML_ATTRS, d.htmlAttrs || {}); Object.assign(CSS_PROPS, d.cssProps || {}); Object.assign(CSS_VALS, d.cssVals || {});
+  }).catch(() => {});
   let pop = null;
   function hidePop(){ if(pop){ pop.remove(); pop = null; } }
   function showPop(title, role, body, ev){

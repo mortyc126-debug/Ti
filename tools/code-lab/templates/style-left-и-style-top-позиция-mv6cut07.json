@@ -8,7 +8,8 @@
     [
       {
         "k": "kw",
-        "v": "const"
+        "v": "const",
+        "e": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная»."
       },
       {
         "k": "sp",
@@ -33,7 +34,8 @@
       },
       {
         "k": "fn",
-        "v": "document"
+        "v": "document",
+        "e": "document — вся загруженная страница; через него находят и меняют элементы."
       },
       {
         "k": "op",
@@ -41,7 +43,8 @@
       },
       {
         "k": "fn",
-        "v": "querySelector"
+        "v": "querySelector",
+        "e": "querySelector — находит на странице первый элемент по CSS-селектору."
       },
       {
         "k": "op",
@@ -73,7 +76,8 @@
       {
         "k": "name",
         "v": "style",
-        "r": "style"
+        "r": "style",
+        "e": "style — инлайновые стили элемента: element.style.color = \"red\"."
       },
       {
         "k": "op",
@@ -118,7 +122,8 @@
       {
         "k": "name",
         "v": "style",
-        "r": "style"
+        "r": "style",
+        "e": "style — инлайновые стили элемента: element.style.color = \"red\"."
       },
       {
         "k": "op",
@@ -163,7 +168,8 @@
       {
         "k": "name",
         "v": "style",
-        "r": "style"
+        "r": "style",
+        "e": "style — инлайновые стили элемента: element.style.color = \"red\"."
       },
       {
         "k": "op",
@@ -208,7 +214,8 @@
       {
         "k": "name",
         "v": "textContent",
-        "r": "textContent"
+        "r": "textContent",
+        "e": "textContent — текст внутри элемента; можно прочитать или заменить."
       },
       {
         "k": "sp",

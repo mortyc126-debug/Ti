@@ -28,7 +28,8 @@
       {
         "k": "name",
         "v": "width",
-        "r": "width"
+        "r": "width",
+        "e": "width — ширина."
       },
       {
         "k": "op",
@@ -185,7 +186,8 @@
       {
         "k": "name",
         "v": "max",
-        "r": "max"
+        "r": "max",
+        "e": "Math.max — наибольшее из чисел."
       },
       {
         "k": "op",
@@ -194,7 +196,8 @@
       {
         "k": "name",
         "v": "width",
-        "r": "width"
+        "r": "width",
+        "e": "width — ширина."
       },
       {
         "k": "op",
@@ -333,7 +336,8 @@
       {
         "k": "name",
         "v": "padding",
-        "r": "padding"
+        "r": "padding",
+        "e": "padding — внутренний отступ, от края до содержимого."
       },
       {
         "k": "op",
@@ -730,7 +734,8 @@
       {
         "k": "name",
         "v": "height",
-        "r": "height"
+        "r": "height",
+        "e": "height — высота. 100vh — вся высота экрана."
       },
       {
         "k": "op",

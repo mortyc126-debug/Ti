@@ -71,7 +71,8 @@
       {
         "k": "name",
         "v": "none",
-        "r": "none"
+        "r": "none",
+        "e": "none — выключить (например display:none — спрятать элемент)."
       },
       {
         "k": "op",
@@ -215,7 +216,8 @@
       {
         "k": "name",
         "v": "none",
-        "r": "none"
+        "r": "none",
+        "e": "none — выключить (например display:none — спрятать элемент)."
       },
       {
         "k": "op",
@@ -230,7 +232,8 @@
       {
         "k": "name",
         "v": "height",
-        "r": "height"
+        "r": "height",
+        "e": "height — высота. 100vh — вся высота экрана."
       },
       {
         "k": "op",
@@ -262,7 +265,8 @@
       {
         "k": "name",
         "v": "border",
-        "r": "border"
+        "r": "border",
+        "e": "border — рамка: толщина, стиль, цвет (1px solid #000)."
       },
       {
         "k": "op",
@@ -303,7 +307,8 @@
       {
         "k": "name",
         "v": "background",
-        "r": "background"
+        "r": "background",
+        "e": "background — фон: цвет и/или картинка."
       },
       {
         "k": "op",
@@ -594,7 +599,8 @@
       {
         "k": "name",
         "v": "none",
-        "r": "none"
+        "r": "none",
+        "e": "none — выключить (например display:none — спрятать элемент)."
       },
       {
         "k": "op",
@@ -609,7 +615,8 @@
       {
         "k": "name",
         "v": "width",
-        "r": "width"
+        "r": "width",
+        "e": "width — ширина."
       },
       {
         "k": "op",
@@ -639,7 +646,8 @@
       {
         "k": "name",
         "v": "height",
-        "r": "height"
+        "r": "height",
+        "e": "height — высота. 100vh — вся высота экрана."
       },
       {
         "k": "op",
@@ -671,7 +679,8 @@
       {
         "k": "name",
         "v": "border",
-        "r": "border"
+        "r": "border",
+        "e": "border — рамка: толщина, стиль, цвет (1px solid #000)."
       },
       {
         "k": "op",
@@ -711,7 +720,8 @@
       {
         "k": "name",
         "v": "background",
-        "r": "background"
+        "r": "background",
+        "e": "background — фон: цвет и/или картинка."
       },
       {
         "k": "op",
@@ -815,7 +825,8 @@
       {
         "k": "name",
         "v": "cursor",
-        "r": "cursor"
+        "r": "cursor",
+        "e": "cursor — вид курсора при наведении (pointer — «рука»)."
       },
       {
         "k": "op",
@@ -828,7 +839,8 @@
       {
         "k": "name",
         "v": "pointer",
-        "r": "pointer"
+        "r": "pointer",
+        "e": "pointer — курсор-«рука», намёк что кликабельно."
       },
       {
         "k": "op",
@@ -963,7 +975,8 @@
       {
         "k": "name",
         "v": "range",
-        "r": "range"
+        "r": "range",
+        "e": "range — последовательность чисел для цикла (Python)."
       },
       {
         "k": "op",
@@ -987,7 +1000,8 @@
       {
         "k": "name",
         "v": "width",
-        "r": "width"
+        "r": "width",
+        "e": "width — ширина."
       },
       {
         "k": "op",
@@ -1017,7 +1031,8 @@
       {
         "k": "name",
         "v": "height",
-        "r": "height"
+        "r": "height",
+        "e": "height — высота. 100vh — вся высота экрана."
       },
       {
         "k": "op",
@@ -1047,7 +1062,8 @@
       {
         "k": "name",
         "v": "border",
-        "r": "border"
+        "r": "border",
+        "e": "border — рамка: толщина, стиль, цвет (1px solid #000)."
       },
       {
         "k": "op",
@@ -1060,7 +1076,8 @@
       {
         "k": "name",
         "v": "none",
-        "r": "none"
+        "r": "none",
+        "e": "none — выключить (например display:none — спрятать элемент)."
       },
       {
         "k": "op",
@@ -1075,7 +1092,8 @@
       {
         "k": "name",
         "v": "border",
-        "r": "border"
+        "r": "border",
+        "e": "border — рамка: толщина, стиль, цвет (1px solid #000)."
       },
       {
         "k": "op",
@@ -1113,7 +1131,8 @@
       {
         "k": "name",
         "v": "background",
-        "r": "background"
+        "r": "background",
+        "e": "background — фон: цвет и/или картинка."
       },
       {
         "k": "op",
@@ -1143,7 +1162,8 @@
       {
         "k": "name",
         "v": "cursor",
-        "r": "cursor"
+        "r": "cursor",
+        "e": "cursor — вид курсора при наведении (pointer — «рука»)."
       },
       {
         "k": "op",
@@ -1156,7 +1176,8 @@
       {
         "k": "name",
         "v": "pointer",
-        "r": "pointer"
+        "r": "pointer",
+        "e": "pointer — курсор-«рука», намёк что кликабельно."
       },
       {
         "k": "op",

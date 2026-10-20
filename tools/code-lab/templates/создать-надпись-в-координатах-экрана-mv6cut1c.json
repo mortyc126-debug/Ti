@@ -8,7 +8,8 @@
     [
       {
         "k": "kw",
-        "v": "function"
+        "v": "function",
+        "e": "function — объявляет функцию: кусок кода, который можно вызывать по имени."
       },
       {
         "k": "sp",
@@ -73,7 +74,8 @@
       },
       {
         "k": "kw",
-        "v": "const"
+        "v": "const",
+        "e": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная»."
       },
       {
         "k": "sp",
@@ -98,7 +100,8 @@
       },
       {
         "k": "fn",
-        "v": "document"
+        "v": "document",
+        "e": "document — вся загруженная страница; через него находят и меняют элементы."
       },
       {
         "k": "op",
@@ -106,7 +109,8 @@
       },
       {
         "k": "fn",
-        "v": "createElement"
+        "v": "createElement",
+        "e": "createElement — создаёт новый элемент (например div), который потом можно вставить на страницу."
       },
       {
         "k": "op",
@@ -142,7 +146,8 @@
       {
         "k": "name",
         "v": "textContent",
-        "r": "textContent"
+        "r": "textContent",
+        "e": "textContent — текст внутри элемента; можно прочитать или заменить."
       },
       {
         "k": "sp",
@@ -183,7 +188,8 @@
       {
         "k": "name",
         "v": "style",
-        "r": "style"
+        "r": "style",
+        "e": "style — инлайновые стили элемента: element.style.color = \"red\"."
       },
       {
         "k": "op",
@@ -232,7 +238,8 @@
       {
         "k": "name",
         "v": "style",
-        "r": "style"
+        "r": "style",
+        "e": "style — инлайновые стили элемента: element.style.color = \"red\"."
       },
       {
         "k": "op",
@@ -281,7 +288,8 @@
       {
         "k": "name",
         "v": "style",
-        "r": "style"
+        "r": "style",
+        "e": "style — инлайновые стили элемента: element.style.color = \"red\"."
       },
       {
         "k": "op",
@@ -330,7 +338,8 @@
       {
         "k": "name",
         "v": "classList",
-        "r": "classList"
+        "r": "classList",
+        "e": "classList — список CSS-классов элемента: add/remove/toggle/contains."
       },
       {
         "k": "op",
@@ -364,7 +373,8 @@
       },
       {
         "k": "fn",
-        "v": "document"
+        "v": "document",
+        "e": "document — вся загруженная страница; через него находят и меняют элементы."
       },
       {
         "k": "op",
@@ -381,7 +391,8 @@
       },
       {
         "k": "fn",
-        "v": "append"
+        "v": "append",
+        "e": "append — добавляет узлы/текст в конец элемента."
       },
       {
         "k": "op",

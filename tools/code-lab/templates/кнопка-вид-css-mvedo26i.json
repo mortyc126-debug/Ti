@@ -94,7 +94,8 @@
       {
         "k": "name",
         "v": "padding",
-        "r": "padding"
+        "r": "padding",
+        "e": "padding — внутренний отступ, от края до содержимого."
       },
       {
         "k": "op",
@@ -328,7 +329,8 @@
       {
         "k": "name",
         "v": "color",
-        "r": "color"
+        "r": "color",
+        "e": "color — цвет текста."
       },
       {
         "k": "op",
@@ -360,7 +362,8 @@
       {
         "k": "name",
         "v": "background",
-        "r": "background"
+        "r": "background",
+        "e": "background — фон: цвет и/или картинка."
       },
       {
         "k": "op",
@@ -392,7 +395,8 @@
       {
         "k": "name",
         "v": "border",
-        "r": "border"
+        "r": "border",
+        "e": "border — рамка: толщина, стиль, цвет (1px solid #000)."
       },
       {
         "k": "op",
@@ -405,7 +409,8 @@
       {
         "k": "name",
         "v": "none",
-        "r": "none"
+        "r": "none",
+        "e": "none — выключить (например display:none — спрятать элемент)."
       },
       {
         "k": "op",
@@ -420,7 +425,8 @@
       {
         "k": "name",
         "v": "border",
-        "r": "border"
+        "r": "border",
+        "e": "border — рамка: толщина, стиль, цвет (1px solid #000)."
       },
       {
         "k": "op",
@@ -553,7 +559,8 @@
       {
         "k": "name",
         "v": "cursor",
-        "r": "cursor"
+        "r": "cursor",
+        "e": "cursor — вид курсора при наведении (pointer — «рука»)."
       },
       {
         "k": "op",
@@ -566,7 +573,8 @@
       {
         "k": "name",
         "v": "pointer",
-        "r": "pointer"
+        "r": "pointer",
+        "e": "pointer — курсор-«рука», намёк что кликабельно."
       },
       {
         "k": "op",
@@ -609,7 +617,8 @@
       {
         "k": "name",
         "v": "background",
-        "r": "background"
+        "r": "background",
+        "e": "background — фон: цвет и/или картинка."
       },
       {
         "k": "op",
@@ -751,7 +760,8 @@
       {
         "k": "name",
         "v": "transform",
-        "r": "transform"
+        "r": "transform",
+        "e": "transform — сдвиг/поворот/масштаб элемента."
       },
       {
         "k": "op",

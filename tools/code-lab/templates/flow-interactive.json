@@ -15,7 +15,8 @@
       {
         "k": "name",
         "v": "document",
-        "r": "document"
+        "r": "document",
+        "e": "document — вся загруженная страница; через него находят и меняют элементы."
       },
       {
         "k": "op",
@@ -23,7 +24,8 @@
       },
       {
         "k": "fn",
-        "v": "querySelector"
+        "v": "querySelector",
+        "e": "querySelector — находит на странице первый элемент по CSS-селектору."
       },
       {
         "k": "op",
@@ -43,7 +45,8 @@
       },
       {
         "k": "fn",
-        "v": "innerHTML"
+        "v": "innerHTML",
+        "e": "innerHTML — HTML-содержимое элемента; осторожно с чужими данными."
       },
       {
         "k": "sp",
@@ -137,7 +140,8 @@
       {
         "k": "name",
         "v": "document",
-        "r": "document"
+        "r": "document",
+        "e": "document — вся загруженная страница; через него находят и меняют элементы."
       },
       {
         "k": "op",
@@ -145,7 +149,8 @@
       },
       {
         "k": "fn",
-        "v": "querySelector"
+        "v": "querySelector",
+        "e": "querySelector — находит на странице первый элемент по CSS-селектору."
       },
       {
         "k": "op",
@@ -257,7 +262,8 @@
       {
         "k": "name",
         "v": "document",
-        "r": "document"
+        "r": "document",
+        "e": "document — вся загруженная страница; через него находят и меняют элементы."
       },
       {
         "k": "op",
@@ -265,7 +271,8 @@
       },
       {
         "k": "fn",
-        "v": "querySelector"
+        "v": "querySelector",
+        "e": "querySelector — находит на странице первый элемент по CSS-селектору."
       },
       {
         "k": "op",
@@ -440,7 +447,8 @@
       {
         "k": "name",
         "v": "document",
-        "r": "document"
+        "r": "document",
+        "e": "document — вся загруженная страница; через него находят и меняют элементы."
       },
       {
         "k": "op",
@@ -448,7 +456,8 @@
       },
       {
         "k": "fn",
-        "v": "querySelector"
+        "v": "querySelector",
+        "e": "querySelector — находит на странице первый элемент по CSS-селектору."
       },
       {
         "k": "op",

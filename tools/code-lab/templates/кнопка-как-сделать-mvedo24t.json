@@ -77,7 +77,8 @@
       {
         "k": "name",
         "v": "button",
-        "r": "button"
+        "r": "button",
+        "e": "<button> — кнопка, по клику запускает действие."
       },
       {
         "k": "sp",
@@ -176,7 +177,8 @@
       {
         "k": "name",
         "v": "button",
-        "r": "button"
+        "r": "button",
+        "e": "<button> — кнопка, по клику запускает действие."
       },
       {
         "k": "sp",
@@ -185,7 +187,8 @@
       {
         "k": "name",
         "v": "id",
-        "r": "id"
+        "r": "id",
+        "e": "id — уникальное имя элемента. По нему его находят в CSS (#имя) и JS (getElementById)."
       },
       {
         "k": "op",
@@ -250,7 +253,8 @@
       {
         "k": "name",
         "v": "button",
-        "r": "button"
+        "r": "button",
+        "e": "<button> — кнопка, по клику запускает действие."
       },
       {
         "k": "op",
@@ -265,7 +269,8 @@
       {
         "k": "name",
         "v": "script",
-        "r": "script"
+        "r": "script",
+        "e": "<script> — подключает или содержит JavaScript."
       },
       {
         "k": "op",
@@ -279,7 +284,8 @@
       },
       {
         "k": "fn",
-        "v": "document"
+        "v": "document",
+        "e": "document — вся загруженная страница; через него находят и меняют элементы."
       },
       {
         "k": "op",
@@ -287,7 +293,8 @@
       },
       {
         "k": "fn",
-        "v": "querySelector"
+        "v": "querySelector",
+        "e": "querySelector — находит на странице первый элемент по CSS-селектору."
       },
       {
         "k": "op",
@@ -307,7 +314,8 @@
       },
       {
         "k": "fn",
-        "v": "addEventListener"
+        "v": "addEventListener",
+        "e": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.)."
       },
       {
         "k": "op",
@@ -418,7 +426,8 @@
       {
         "k": "name",
         "v": "script",
-        "r": "script"
+        "r": "script",
+        "e": "<script> — подключает или содержит JavaScript."
       },
       {
         "k": "op",
