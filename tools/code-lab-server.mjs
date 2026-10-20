@@ -158,7 +158,7 @@ async function importBundle(b){
     const dup = await findSameTemplate(title, codeForDup);
     let obj, full;
     if(dup){ full = path.join(TEMPLATES, dup); obj = JSON.parse(await fs.readFile(full, 'utf8')); obj.lang = lang; obj.title = title; if(pc.group) obj.group = String(pc.group).slice(0, 60); if(pc.desc) obj.desc = String(pc.desc).slice(0, 400); obj.lines = hasLines ? pc.lines : tokenize(code, lang); if(pc.output != null) obj.output = String(pc.output); updated++; }
-    else { obj = { id: slug(title || lang), lang, group: String(pc.group || 'Мои куски').slice(0, 60), title, desc: String(pc.desc || '').slice(0, 400), lines: hasLines ? pc.lines : tokenize(code, lang), output: pc.output != null ? String(pc.output) : '', descAt: Date.now() }; if(pc.component && typeof pc.component === 'object') obj.component = pc.component; full = path.join(TEMPLATES, obj.id + '.json'); created++; }
+    else { obj = { id: slug(title || lang), lang, group: (pc.group != null ? String(pc.group) : 'Мои куски').slice(0, 60), title, desc: String(pc.desc || '').slice(0, 400), lines: hasLines ? pc.lines : tokenize(code, lang), output: pc.output != null ? String(pc.output) : '', descAt: Date.now() }; if(pc.component && typeof pc.component === 'object') obj.component = pc.component; full = path.join(TEMPLATES, obj.id + '.json'); created++; }
     if(lang === 'js' && !hasLines){ const c = codeContract(code); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
     annotateLines(obj.lines, lang, dict);   // автоподпись из словаря (уже с новыми словами); готовые e не трогает
     if(pc.words && typeof pc.words === 'object'){   // ручные пояснения куска — поверх авто

@@ -76,6 +76,11 @@
     host.innerHTML =
       '<div class="up-box">' +
         '<div class="up-row">' +
+          '<label class="up-note">положить в раздел:</label>' +
+          '<select class="up-group"><option value="">— как в файле / без раздела —</option></select>' +
+          '<input class="up-newgroup" placeholder="новый раздел (можно «Группа / Подгруппа»)" style="display:none">' +
+        '</div>' +
+        '<div class="up-row">' +
           '<button class="btn ok up-load">📥 загрузить куски</button>' +
           '<input type="file" class="up-file" accept=".json,.js,.mjs,.jsx,.ts,.tsx,.py,.rb,.php,.go,.lua,.sh,.bash,.ps1,.r,.sql,.html,.htm,.css,.txt" multiple style="display:none">' +
           '<span class="up-note muted">код-файлы (.js/.py/.css/.html…), полный кусок JSON или сборник — можно несколько сразу</span>' +
@@ -91,6 +96,23 @@
           '</div>' +
         '</div>' +
       '</div>';
+
+    // выбор раздела для загружаемых кусков: существующие разделы + «создать новый»
+    const grpSel = host.querySelector('.up-group'), newGrp = host.querySelector('.up-newgroup');
+    fetch('/api/list').then(r => r.json()).then(list => {
+      const groups = [...new Set((list || []).map(t => String(t.group || '').split('/')[0].trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru'));
+      groups.forEach(g => { const o = document.createElement('option'); o.value = g; o.textContent = g; grpSel.appendChild(o); });
+      const nw = document.createElement('option'); nw.value = '__new__'; nw.textContent = '➕ создать новый раздел…'; grpSel.appendChild(nw);
+    }).catch(() => {});
+    grpSel.onchange = () => { newGrp.style.display = grpSel.value === '__new__' ? '' : 'none'; if(grpSel.value === '__new__') newGrp.focus(); };
+    const targetGroup = () => (grpSel.value === '__new__' ? newGrp.value.trim() : grpSel.value);
+    const applyGroup = (payload, g) => {
+      if(!g) return payload;
+      if(Array.isArray(payload)) payload.forEach(p => { if(p && typeof p === 'object') p.group = g; });
+      else if(payload && Array.isArray(payload.pieces)) payload.pieces.forEach(p => { if(p && typeof p === 'object') p.group = g; });
+      else if(payload && typeof payload === 'object') payload.group = g;
+      return payload;
+    };
 
     const sel = host.querySelector('.up-lang'), descEl = host.querySelector('.up-desc'), codeEl = host.querySelector('.up-code'), whatEl = host.querySelector('.up-what');
     ORDER.forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = EXAMPLES[k]._label; sel.appendChild(o); });
@@ -114,12 +136,14 @@
     loadBtn.onclick = () => fileIn.click();
     fileIn.onchange = async () => {
       const files = [...fileIn.files]; if(!files.length) return;
+      const g = targetGroup();   // выбранный раздел — применится ко всем загружаемым
       const o = loadBtn.textContent; loadBtn.disabled = true; loadBtn.textContent = '…';
       let created = 0, learned = 0, updated = 0, bad = 0;
       for(const f of files){
         const ext = (f.name.split('.').pop() || '').toLowerCase(); const text = await f.text(); let payload;
         if(ext === 'json'){ try { payload = JSON.parse(text); } catch(_){ bad++; continue; } }
-        else payload = { lang: EXT_LANG[ext] || 'txt', title: f.name.replace(/\.[^.]+$/, ''), code: text, group: 'Мои куски' };
+        else payload = { lang: EXT_LANG[ext] || 'txt', title: f.name.replace(/\.[^.]+$/, ''), code: text, group: g || '' };   // без выбора — без раздела (попадёт в «⚠ без раздела»)
+        applyGroup(payload, g);   // выбран раздел → кладём туда всё из файла
         let r; try { r = await fetch('/api/import', { method: 'POST', body: JSON.stringify(payload) }).then(x => x.json()); } catch(_){ r = null; }
         if(r && r.ok){ created += r.created || 0; learned += r.learned || 0; updated += r.updated || 0; } else bad++;
       }
