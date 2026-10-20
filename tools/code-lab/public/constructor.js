@@ -920,7 +920,11 @@ function rawInspFields(nd){
   }
   // весь код — в раскрывашке (или сразу, если полей нет)
   const det = document.createElement('details'); det.style.marginTop = '8px'; if(!vars.length) det.open = true;
-  const sum = document.createElement('summary'); sum.textContent = 'весь код'; sum.style.cssText = 'cursor:pointer;color:var(--text3);font-size:12px;margin-bottom:6px'; det.appendChild(sum);
+  const sum = document.createElement('summary'); sum.style.cssText = 'cursor:pointer;color:var(--text3);font-size:12px;margin-bottom:6px;display:flex;align-items:center;gap:8px';
+  sum.appendChild(el('span', '', 'весь код'));
+  const cp = el('button', 'btn insp-copy', '⧉ копировать весь код'); cp.style.marginLeft = 'auto';
+  cp.onclick = e => { e.preventDefault(); e.stopPropagation(); copyToClip(nd.fields.code || '', cp); };
+  sum.appendChild(cp); det.appendChild(sum);
   const ta = document.createElement('textarea'); ta.className = 'blk-code'; ta.spellcheck = false; ta.value = nd.fields.code;
   ta.rows = Math.min(18, String(nd.fields.code).split('\n').length + 1);
   ta.addEventListener('input', () => { nd.fields.code = ta.value; updateCard(nd); renderCode(); persist(); });
