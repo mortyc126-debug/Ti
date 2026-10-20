@@ -45,6 +45,7 @@
         '<button class="btn ok" id="sbRun">▶ запустить</button>' +
         '<label class="sb-live"><input type="checkbox" id="sbLive"> живой предпросмотр</label>' +
         '<button class="btn" id="sbAdd">+ файл</button>' +
+        '<button class="btn" id="sbExplain" title="режим разбора: кликай по цветным словам в коде — объясню, что это">🔍 разбор</button>' +
         '<span style="flex:1"></span>' +
         '<button class="btn" id="sbClr">× консоль</button>' +
       '</div>' +
@@ -108,6 +109,97 @@
     conEl.scrollTop = conEl.scrollHeight;
   }
 
+  // ── разбор: клик по слову → пояснение ──
+  // роль слова определяем по цвету, которым его раскрасил buildHighlight
+  const COLOR_ROLE = { '#9090bb':'комментарий', '#52f2c9':'строка', '#ff8800':'число', '#b45cff':'ключевое слово', '#3dd9ff':'имя/вызов', '#cbc2ea':'имя', '#9c90c4':'знак' };
+  function roleOf(sp){
+    let c = sp.style.color || '';
+    const m = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(c);
+    if(m) c = '#' + [1,2,3].map(i => (+m[i]).toString(16).padStart(2,'0')).join('');
+    return COLOR_ROLE[c.toLowerCase()] || 'имя';
+  }
+  // короткие пояснения по частым словам (JS + немного CSS/HTML)
+  const EXPLAIN = {
+    const:'const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».',
+    let:'let — объявляет переменную, значение которой можно менять позже.',
+    var:'var — старый способ объявить переменную. Сейчас предпочитают let/const.',
+    function:'function — объявляет функцию: кусок кода, который можно вызывать по имени.',
+    return:'return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.',
+    if:'if — «если»: выполнить блок, только когда условие в скобках истинно.',
+    else:'else — «иначе»: что делать, когда условие if не выполнилось.',
+    for:'for — цикл: повторять блок заданное число раз.',
+    while:'while — цикл: повторять блок, пока условие истинно.',
+    async:'async — помечает функцию как асинхронную; внутри можно использовать await.',
+    await:'await — ждёт результат промиса (например ответа из сети), не блокируя страницу.',
+    new:'new — создаёт новый объект по «чертежу» (классу или конструктору).',
+    class:'class — описывает «чертёж» объектов: их свойства и методы.',
+    import:'import — подключает код из другого файла/модуля.',
+    export:'export — открывает имя наружу, чтобы его можно было импортировать.',
+    try:'try — пробуем выполнить код, который может дать ошибку.',
+    catch:'catch — ловит ошибку из try и позволяет её обработать.',
+    true:'true — логическая «истина» (да).', false:'false — логическая «ложь» (нет).',
+    null:'null — «пусто намеренно»: значения нет.', undefined:'undefined — значение не задано.',
+    this:'this — ссылка на текущий объект/контекст, в котором выполняется код.',
+    console:'console — встроенный объект для вывода в консоль (отладки).',
+    log:'log — печатает значение в консоль. console.log(x) — показать x.',
+    document:'document — вся загруженная страница; через него находят и меняют элементы.',
+    queryselector:'querySelector — находит на странице первый элемент по CSS-селектору.',
+    queryselectorall:'querySelectorAll — находит все элементы по селектору (список).',
+    getelementbyid:'getElementById — находит элемент по его id.',
+    addeventlistener:'addEventListener — вешает обработчик на событие (клик, ввод и т.д.).',
+    textcontent:'textContent — текст внутри элемента; можно прочитать или заменить.',
+    innerhtml:'innerHTML — HTML-содержимое элемента; осторожно с чужими данными.',
+    fetch:'fetch — делает запрос в сеть и возвращает промис с ответом.',
+    json:'json() — разбирает ответ сети в объект JavaScript.',
+    then:'then — что сделать, когда промис выполнится (получит результат).',
+    catch2:'catch — обработать ошибку промиса.',
+    map:'map — проходит по массиву и возвращает новый массив из результатов.',
+    filter:'filter — оставляет из массива только элементы, подходящие под условие.',
+    foreach:'forEach — выполняет действие для каждого элемента массива.',
+    push:'push — добавляет элемент в конец массива.',
+    length:'length — длина: сколько элементов в массиве или символов в строке.',
+    settimeout:'setTimeout — выполнить код один раз через заданную задержку.',
+    // CSS
+    color:'color (CSS) — цвет текста элемента.',
+    background:'background (CSS) — фон элемента: цвет, картинка.',
+    'background-color':'background-color (CSS) — цвет фона.',
+    margin:'margin (CSS) — внешний отступ, расстояние снаружи элемента.',
+    padding:'padding (CSS) — внутренний отступ, расстояние внутри, от края до содержимого.',
+    display:'display (CSS) — как элемент раскладывается: block, flex, grid, none…',
+    flex:'flex (CSS) — гибкая раскладка: дети выстраиваются в ряд/колонку.',
+    height:'height (CSS) — высота элемента. 100vh — на всю высоту экрана.',
+    width:'width (CSS) — ширина элемента.',
+    'font-size':'font-size (CSS) — размер шрифта.',
+    'border-radius':'border-radius (CSS) — скругление углов.'
+  };
+  let pop = null;
+  function hidePop(){ if(pop){ pop.remove(); pop = null; } }
+  function showPop(title, role, body, ev){
+    hidePop();
+    pop = document.createElement('div'); pop.className = 'sb-pop';
+    pop.innerHTML = '<div class="sb-pop-h"><b>' + title.replace(/[<>&]/g, '') + '</b> <span class="sb-pop-r">' + role + '</span></div><div class="sb-pop-b"></div>';
+    pop.querySelector('.sb-pop-b').textContent = body;
+    document.body.appendChild(pop);
+    const x = Math.min(ev.clientX, innerWidth - pop.offsetWidth - 12), y = Math.min(ev.clientY + 14, innerHeight - pop.offsetHeight - 12);
+    pop.style.left = Math.max(8, x) + 'px'; pop.style.top = Math.max(8, y) + 'px';
+  }
+  document.addEventListener('mousedown', ev => { if(pop && !pop.contains(ev.target) && !(ev.target.closest && ev.target.closest('.sb-hl'))) hidePop(); });
+  function explainToken(sp, ev){
+    const word = sp.textContent.trim();
+    if(!word || /^[\s{}()[\];,.<>/=+\-*%!?:&|@#'"`~^]+$/.test(word)) return;
+    const role = roleOf(sp);
+    let body = EXPLAIN[word] || EXPLAIN[word.toLowerCase()];
+    if(!body){
+      if(role === 'строка') body = 'Строка — текст в кавычках. Хранится как есть: буквы, символы, адрес и т.п.';
+      else if(role === 'число') body = 'Число — значение для вычислений или размеров.';
+      else if(role === 'комментарий') body = 'Комментарий — заметка для человека. Код её не выполняет.';
+      else if(role === 'ключевое слово') body = 'Служебное слово языка — часть его грамматики.';
+      else if(role === 'имя/вызов') body = '«' + word + '» — имя функции или встроенного объекта. Скобки после него значат вызов.';
+      else body = '«' + word + '» — имя: так названа переменная, функция или свойство. Имя придумал автор кода; загляни, где оно задано.';
+    }
+    showPop(word, role, body, ev);
+  }
+
   // ── рендер панелей-редакторов ──
   function renderEds(){
     edsEl.innerHTML = '';
@@ -134,12 +226,25 @@
       del.onclick = () => { files = files.filter(x => x !== f); if(!files.length) files = [{ id:uid(), name:'index.html', lang:'html', code:'' }]; save(); renderEds(); schedulePreview(); };
       head.appendChild(del);
 
-      const ta = document.createElement('textarea'); ta.className = 'sb-code'; ta.spellcheck = false; ta.value = f.code;
-      ta.oninput = () => { f.code = ta.value; save(); schedulePreview(); };
+      // редактор с цветной подсветкой: прозрачная textarea поверх раскрашенного pre
+      const wrap = document.createElement('div'); wrap.className = 'sb-ed-wrap';
+      const pre = document.createElement('pre'); pre.className = 'sb-hl'; pre.setAttribute('aria-hidden', 'true');
+      const ta = document.createElement('textarea'); ta.className = 'sb-code'; ta.spellcheck = false; ta.wrap = 'off'; ta.value = f.code;
+      const paint = () => { pre.innerHTML = ''; (window.buildHighlight ? window.buildHighlight(ta.value) : [document.createTextNode(ta.value)]).forEach(l => pre.appendChild(l)); };
+      const syncScroll = () => { pre.scrollTop = ta.scrollTop; pre.scrollLeft = ta.scrollLeft; };
+      ta.oninput = () => { f.code = ta.value; save(); paint(); schedulePreview(); };
+      ta.addEventListener('scroll', syncScroll);
       // Tab вставляет отступ, а не прыгает по форме
-      ta.onkeydown = ev => { if(ev.key === 'Tab'){ ev.preventDefault(); const s = ta.selectionStart, e2 = ta.selectionEnd; ta.value = ta.value.slice(0, s) + '  ' + ta.value.slice(e2); ta.selectionStart = ta.selectionEnd = s + 2; f.code = ta.value; save(); schedulePreview(); } };
-
-      ed.appendChild(head); ed.appendChild(ta); edsEl.appendChild(ed);
+      ta.onkeydown = ev => { if(ev.key === 'Tab'){ ev.preventDefault(); const s = ta.selectionStart, e2 = ta.selectionEnd; ta.value = ta.value.slice(0, s) + '  ' + ta.value.slice(e2); ta.selectionStart = ta.selectionEnd = s + 2; f.code = ta.value; save(); paint(); schedulePreview(); } };
+      // клик по слову в режиме «разбор» — пояснение
+      pre.addEventListener('click', ev => {
+        if(!center.classList.contains('explain-on')) return;
+        const sp = ev.target.closest('span'); if(!sp) return;
+        explainToken(sp, ev);
+      });
+      paint();
+      wrap.append(pre, ta);
+      ed.appendChild(head); ed.appendChild(wrap); edsEl.appendChild(ed);
     });
   }
 
@@ -152,6 +257,18 @@
     files.filter(f => !isFront(f.lang)).forEach(runServer);
   };
   liveIn.onchange = () => { live = liveIn.checked; try { localStorage.setItem('codelab_sandbox_live', live ? '1' : '0'); } catch(_){} if(live) renderPreview(); };
+  const exBtn = box.querySelector('#sbExplain');
+  const setExplain = on => {
+    center.classList.toggle('explain-on', on);
+    exBtn.classList.toggle('ok', on);
+    exBtn.textContent = on ? '🔍 разбор: вкл' : '🔍 разбор';
+    exBtn.title = on ? 'клик по цветному слову в коде → пояснение. Нажми ещё раз, чтобы вернуться к правке.' : 'режим разбора: кликай по цветным словам в коде — объясню, что это';
+    if(!on) hidePop();
+    try { localStorage.setItem('codelab_sandbox_explain', on ? '1' : '0'); } catch(_){}
+  };
+  exBtn.onclick = () => setExplain(!center.classList.contains('explain-on'));
+  let exInit = false; try { exInit = localStorage.getItem('codelab_sandbox_explain') === '1'; } catch(_){}
+  setExplain(exInit);
 
   // ── перетягиваемая граница редактор | превью ──
   let EW = 50; try { EW = +localStorage.getItem('codelab_sandbox_ew') || 50; } catch(_){}
