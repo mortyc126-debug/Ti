@@ -19,6 +19,80 @@
   const isFront = v => { const l = LANGS.find(x => x.v === v); return l && l.front; };
   const langName = v => { const l = LANGS.find(x => x.v === v); return l ? l.t : v; };
 
+  // ── подсветка по языку ──
+  // Палитра (та же, что в общем buildHighlight): где хранится — здесь, в C.
+  const C = { com:'#9090BB', str:'#52F2C9', num:'#FF8800', kw:'#B45CFF', fn:'#3DD9FF', name:'#CBC2EA', punct:'#9C90C4' };
+  const LEGEND = [
+    { c:C.fn,  n:'тег / селектор / вызов', d:'имя HTML-тега, CSS-селектора или вызываемой функции' },
+    { c:C.kw,  n:'атрибут / свойство / ключевое слово', d:'атрибут тега, свойство CSS или служебное слово языка' },
+    { c:C.str, n:'строка', d:'текст в кавычках' },
+    { c:C.num, n:'число / размер / цвет', d:'число, размер (px, %), hex-цвет' },
+    { c:C.name,n:'имя / значение / текст', d:'переменная, значение свойства, текст страницы' },
+    { c:C.com, n:'комментарий', d:'заметка для человека, не выполняется' },
+    { c:C.punct,n:'знаки', d:'скобки, точки, операторы' }
+  ];
+  const spanEl = (color, kind, text) => { const s = document.createElement('span'); if(color) s.style.color = color; if(kind) s.dataset.k = kind; s.textContent = text; return s; };
+  const lineDiv = () => { const d = document.createElement('div'); d.className = 'line'; return d; };
+
+  function hlCss(code){
+    const lines = []; let inCom = false, inBlk = false, afterColon = false;
+    String(code).split('\n').forEach(line => {
+      const div = lineDiv(); let i = 0; const n = line.length;
+      while(i < n){
+        const c = line[i], rest = line.slice(i);
+        if(inCom){ const e = line.indexOf('*/', i); if(e < 0){ div.appendChild(spanEl(C.com,'com',line.slice(i))); i = n; } else { div.appendChild(spanEl(C.com,'com',line.slice(i, e+2))); i = e+2; inCom = false; } continue; }
+        if(rest.startsWith('/*')){ const e = line.indexOf('*/', i+2); if(e < 0){ div.appendChild(spanEl(C.com,'com',line.slice(i))); i = n; inCom = true; } else { div.appendChild(spanEl(C.com,'com',line.slice(i, e+2))); i = e+2; } continue; }
+        if(c === '"' || c === "'"){ let j = i+1; while(j < n && line[j] !== c) j++; j++; div.appendChild(spanEl(C.str,'str',line.slice(i, j))); i = j; continue; }
+        if(c === '{'){ div.appendChild(spanEl(C.punct,'punct','{')); i++; inBlk = true; afterColon = false; continue; }
+        if(c === '}'){ div.appendChild(spanEl(C.punct,'punct','}')); i++; inBlk = false; afterColon = false; continue; }
+        if(c === ';'){ div.appendChild(spanEl(C.punct,'punct',';')); i++; afterColon = false; continue; }
+        if(c === ':' && inBlk){ div.appendChild(spanEl(C.punct,'punct',':')); i++; afterColon = true; continue; }
+        if(c === '#'){ const mm = /^#[0-9A-Fa-f]+/.exec(rest); if(mm){ div.appendChild(spanEl(C.num,'css-num',mm[0])); i += mm[0].length; continue; } }
+        if(/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(line[i+1] || ''))){ const mm = /^[0-9.]+[a-z%]*/i.exec(rest); div.appendChild(spanEl(C.num,'css-num',mm[0])); i += mm[0].length; continue; }
+        const wm = /^[A-Za-z_-][\w-]*/.exec(rest);
+        if(wm){ const w = wm[0]; let kind, col; if(!inBlk){ kind = 'sel'; col = C.fn; } else if(afterColon){ kind = 'val'; col = C.name; } else { kind = 'prop'; col = C.kw; } div.appendChild(spanEl(col, kind, w)); i += w.length; continue; }
+        const ws = /^\s+/.exec(rest); if(ws){ div.appendChild(spanEl(null, null, ws[0])); i += ws[0].length; continue; }
+        div.appendChild(spanEl(C.punct,'punct',c)); i++;
+      }
+      if(!line) div.appendChild(document.createTextNode('​'));
+      lines.push(div);
+    });
+    return lines;
+  }
+
+  function hlHtml(code){
+    const lines = []; let inCom = false, inTag = false;
+    String(code).split('\n').forEach(line => {
+      const div = lineDiv(); let i = 0; const n = line.length;
+      while(i < n){
+        const c = line[i], rest = line.slice(i);
+        if(inCom){ const e = line.indexOf('-->', i); if(e < 0){ div.appendChild(spanEl(C.com,'com',line.slice(i))); i = n; } else { div.appendChild(spanEl(C.com,'com',line.slice(i, e+3))); i = e+3; inCom = false; } continue; }
+        if(!inTag){
+          if(rest.startsWith('<!--')){ const e = line.indexOf('-->', i+4); if(e < 0){ div.appendChild(spanEl(C.com,'com',line.slice(i))); i = n; inCom = true; } else { div.appendChild(spanEl(C.com,'com',line.slice(i, e+3))); i = e+3; } continue; }
+          if(c === '<'){ let j = i+1, slash = ''; if(line[j] === '/'){ slash = '/'; j++; } div.appendChild(spanEl(C.punct,'punct','<'+slash)); const wm = /^[A-Za-z!][\w-]*/.exec(line.slice(j)); if(wm){ div.appendChild(spanEl(C.fn,'tag',wm[0])); j += wm[0].length; } i = j; inTag = true; continue; }
+          const lt = line.indexOf('<', i); const seg = lt < 0 ? line.slice(i) : line.slice(i, lt); div.appendChild(spanEl(C.name,'text',seg)); i += seg.length || 1; continue;
+        } else {
+          if(rest.startsWith('/>')){ div.appendChild(spanEl(C.punct,'punct','/>')); i += 2; inTag = false; continue; }
+          if(c === '>'){ div.appendChild(spanEl(C.punct,'punct','>')); i++; inTag = false; continue; }
+          if(c === '"' || c === "'"){ let j = i+1; while(j < n && line[j] !== c) j++; j++; div.appendChild(spanEl(C.str,'str',line.slice(i, j))); i = j; continue; }
+          if(c === '='){ div.appendChild(spanEl(C.punct,'punct','=')); i++; continue; }
+          const wm = /^[A-Za-z_:][\w:-]*/.exec(rest); if(wm){ div.appendChild(spanEl(C.kw,'attr',wm[0])); i += wm[0].length; continue; }
+          const ws = /^\s+/.exec(rest); if(ws){ div.appendChild(spanEl(null, null, ws[0])); i += ws[0].length; continue; }
+          div.appendChild(spanEl(C.punct,'punct',c)); i++;
+        }
+      }
+      if(!line) div.appendChild(document.createTextNode('​'));
+      lines.push(div);
+    });
+    return lines;
+  }
+
+  function sbHighlight(code, lang){
+    if(lang === 'css') return hlCss(code);
+    if(lang === 'html') return hlHtml(code);
+    return window.buildHighlight ? window.buildHighlight(code) : [(() => { const d = lineDiv(); d.textContent = code; return d; })()];
+  }
+
   const DEFAULTS = [
     { id:'f1', name:'index.html', lang:'html', code:'<h1>Привет!</h1>\n<p>Меняй код слева — превью обновится само.</p>\n<button id="b">нажми</button>' },
     { id:'f2', name:'style.css', lang:'css', code:'body{ font-family:system-ui, sans-serif; padding:24px; background:#0E0720; color:#eee }\nh1{ color:#52F2C9 }\nbutton{ padding:8px 14px; border-radius:8px; border:0; background:#FF006E; color:#fff; cursor:pointer }' },
@@ -46,6 +120,7 @@
         '<label class="sb-live"><input type="checkbox" id="sbLive"> живой предпросмотр</label>' +
         '<button class="btn" id="sbAdd">+ файл</button>' +
         '<button class="btn" id="sbExplain" title="режим разбора: кликай по цветным словам в коде — объясню, что это">🔍 разбор</button>' +
+        '<button class="btn" id="sbLegend" title="что значат цвета в коде">🎨 цвета</button>' +
         '<span style="flex:1"></span>' +
         '<button class="btn" id="sbClr">× консоль</button>' +
       '</div>' +
@@ -159,18 +234,97 @@
     push:'push — добавляет элемент в конец массива.',
     length:'length — длина: сколько элементов в массиве или символов в строке.',
     settimeout:'setTimeout — выполнить код один раз через заданную задержку.',
-    // CSS
-    color:'color (CSS) — цвет текста элемента.',
-    background:'background (CSS) — фон элемента: цвет, картинка.',
-    'background-color':'background-color (CSS) — цвет фона.',
-    margin:'margin (CSS) — внешний отступ, расстояние снаружи элемента.',
-    padding:'padding (CSS) — внутренний отступ, расстояние внутри, от края до содержимого.',
-    display:'display (CSS) — как элемент раскладывается: block, flex, grid, none…',
-    flex:'flex (CSS) — гибкая раскладка: дети выстраиваются в ряд/колонку.',
-    height:'height (CSS) — высота элемента. 100vh — на всю высоту экрана.',
-    width:'width (CSS) — ширина элемента.',
-    'font-size':'font-size (CSS) — размер шрифта.',
-    'border-radius':'border-radius (CSS) — скругление углов.'
+    setinterval:'setInterval — повторять код каждые N миллисекунд.',
+    addeventlistener2:'', removeeventlistener:'removeEventListener — снять ранее повешенный обработчик события.',
+    createelement:'createElement — создаёт новый элемент (например div), который потом можно вставить на страницу.',
+    appendchild:'appendChild — вставляет элемент внутрь другого, последним ребёнком.',
+    append:'append — добавляет узлы/текст в конец элемента.',
+    classlist:'classList — список CSS-классов элемента: add/remove/toggle.',
+    style:'style — инлайновые стили элемента: element.style.color = "red".',
+    value:'value — текущее значение поля ввода (input).',
+    settimeout2:'', preventdefault:'preventDefault — отменяет стандартное действие события (например отправку формы).',
+    target:'target — элемент, на котором произошло событие.',
+    'typeof':'typeof — возвращает тип значения строкой: "number", "string"…',
+    of:'of — часть цикла for…of: перебрать элементы массива.',
+    in:'in — часть for…in (ключи объекта) или проверка наличия свойства.',
+    'break':'break — выйти из цикла досрочно.', 'continue':'continue — перейти к следующей итерации цикла.',
+    switch:'switch — выбрать ветку по значению (замена цепочки if/else).',
+    case:'case — одна ветка внутри switch.', 'default':'default — ветка switch, когда ни один case не подошёл.',
+    json2:'', parseint:'parseInt — превратить строку в целое число.', parsefloat:'parseFloat — строку в дробное число.',
+    math:'Math — встроенный объект с математикой: Math.round, Math.random, Math.max…',
+    date:'Date — работа с датой и временем.', promise:'Promise — «обещание» результата, который придёт позже.',
+    reduce:'reduce — свернуть массив в одно значение (сумма, объект…).',
+    includes:'includes — есть ли элемент в массиве / подстрока в строке (true/false).',
+    split:'split — разрезать строку на массив по разделителю.', join:'join — склеить массив в строку через разделитель.',
+    slice:'slice — вырезать часть массива/строки, не меняя оригинал.', trim:'trim — убрать пробелы по краям строки.',
+    tostring:'toString — превратить значение в строку.', keys:'Object.keys — массив имён свойств объекта.'
+  };
+  // HTML-теги
+  const HTML_TAGS = {
+    html:'<html> — корень страницы, оборачивает всё.', head:'<head> — служебная часть: заголовок, стили, мета. На странице не видна.',
+    body:'<body> — видимое содержимое страницы.', title:'<title> — заголовок вкладки браузера.',
+    meta:'<meta> — служебные данные о странице (кодировка, viewport…).', link:'<link> — подключает внешний файл, чаще CSS.',
+    script:'<script> — подключает или содержит JavaScript.', style:'<style> — CSS прямо внутри страницы.',
+    div:'<div> — блок-контейнер без особого смысла, для группировки и вёрстки.', span:'<span> — строчный контейнер для кусочка текста.',
+    h1:'<h1> — заголовок первого (самого крупного) уровня. Бывают h1…h6.', h2:'<h2> — заголовок второго уровня.', h3:'<h3> — заголовок третьего уровня.',
+    p:'<p> — абзац текста.', a:'<a> — ссылка. Адрес задаётся атрибутом href.', img:'<img> — картинка. Источник в атрибуте src.',
+    ul:'<ul> — маркированный список.', ol:'<ol> — нумерованный список.', li:'<li> — пункт списка.',
+    button:'<button> — кнопка, по клику запускает действие.', input:'<input> — поле ввода (текст, число, чекбокс…).',
+    form:'<form> — форма: группа полей для отправки.', label:'<label> — подпись к полю ввода.',
+    table:'<table> — таблица.', tr:'<tr> — строка таблицы.', td:'<td> — ячейка таблицы.', th:'<th> — ячейка-заголовок таблицы.',
+    header:'<header> — шапка страницы или секции.', footer:'<footer> — подвал.', nav:'<nav> — блок навигации (меню).',
+    section:'<section> — смысловая секция страницы.', article:'<article> — самостоятельный блок содержимого.',
+    main:'<main> — основное содержимое страницы.', select:'<select> — выпадающий список.', option:'<option> — пункт выпадающего списка.',
+    textarea:'<textarea> — многострочное поле ввода.', br:'<br> — перенос строки.', '!doctype':'<!doctype html> — объявление: это современный HTML.'
+  };
+  // HTML-атрибуты
+  const HTML_ATTRS = {
+    id:'id — уникальное имя элемента. По нему его находят в CSS (#имя) и JS (getElementById).',
+    class:'class — класс(ы) элемента. По классу стилизуют группу элементов (.имя) и находят в JS.',
+    href:'href — адрес, куда ведёт ссылка <a>.', src:'src — источник: откуда взять картинку/скрипт.',
+    alt:'alt — текст вместо картинки, если она не загрузилась (и для читалок).',
+    type:'type — тип: у input (text, number, checkbox…), у кнопки или скрипта.',
+    value:'value — значение поля ввода по умолчанию.', placeholder:'placeholder — серая подсказка внутри пустого поля.',
+    name:'name — имя поля, под которым оно уходит при отправке формы.', rel:'rel — отношение ссылки (например stylesheet у <link>).',
+    lang:'lang — язык содержимого (lang="ru").', charset:'charset — кодировка текста (обычно UTF-8).',
+    content:'content — значение мета-тега.', width:'width — ширина (например картинки).', height:'height — высота.',
+    style:'style — инлайновые CSS-стили прямо на элементе.', disabled:'disabled — поле/кнопка выключены.',
+    checked:'checked — галочка отмечена.', 'for':'for — к какому полю (его id) относится подпись <label>.'
+  };
+  // CSS-свойства
+  const CSS_PROPS = {
+    color:'color — цвет текста.', background:'background — фон: цвет и/или картинка.',
+    'background-color':'background-color — цвет фона.', 'background-image':'background-image — картинка фона: url(...).',
+    'background-size':'background-size — размер фоновой картинки: cover, contain, размеры.',
+    'background-position':'background-position — положение фоновой картинки (center…).',
+    margin:'margin — внешний отступ, расстояние снаружи элемента.', padding:'padding — внутренний отступ, от края до содержимого.',
+    border:'border — рамка: толщина, стиль, цвет (1px solid #000).', 'border-radius':'border-radius — скругление углов.',
+    display:'display — тип раскладки: block, inline, flex, grid, none.', flex:'flex — как элемент тянется внутри flex-контейнера.',
+    'flex-direction':'flex-direction — направление flex: row (в ряд) или column (в столбец).',
+    'justify-content':'justify-content — выравнивание по главной оси flex (center, space-between…).',
+    'align-items':'align-items — выравнивание по поперечной оси flex.',
+    width:'width — ширина.', height:'height — высота. 100vh — вся высота экрана.',
+    'min-width':'min-width — минимальная ширина, уже не станет.', 'max-width':'max-width — максимальная ширина.',
+    'font-size':'font-size — размер шрифта.', 'font-family':'font-family — шрифт(ы) текста.',
+    'font-weight':'font-weight — жирность шрифта (normal, bold, 700).', 'text-align':'text-align — выравнивание текста (left/center/right).',
+    position:'position — позиционирование: static, relative, absolute, fixed.', top:'top — смещение сверху (при позиционировании).',
+    left:'left — смещение слева.', right:'right — смещение справа.', bottom:'bottom — смещение снизу.',
+    'box-shadow':'box-shadow — тень вокруг элемента.', opacity:'opacity — прозрачность (0 прозрачно … 1 непрозрачно).',
+    cursor:'cursor — вид курсора при наведении (pointer — «рука»).', overflow:'overflow — что делать с содержимым, которое не влезло (hidden, auto, scroll).',
+    gap:'gap — расстояние между элементами в flex/grid.', transition:'transition — плавная анимация изменения свойства.',
+    transform:'transform — сдвиг/поворот/масштаб элемента.', 'z-index':'z-index — кто выше по слоям (больше — поверх).'
+  };
+  // частые CSS-значения
+  const CSS_VALS = {
+    flex:'flex — раскладка, где дети выстраиваются в ряд/столбец и гибко тянутся.', block:'block — блочный: занимает всю ширину, с новой строки.',
+    inline:'inline — строчный: по размеру содержимого, в строке.', 'inline-block':'inline-block — строчный, но с шириной/высотой как у блока.',
+    grid:'grid — сеточная раскладка по строкам и колонкам.', none:'none — выключить (например display:none — спрятать элемент).',
+    center:'center — по центру.', cover:'cover — картинка заполняет всю область, края могут обрезаться.', contain:'contain — картинка влезает целиком.',
+    bold:'bold — жирный шрифт.', solid:'solid — сплошная линия рамки.', pointer:'pointer — курсор-«рука», намёк что кликабельно.',
+    absolute:'absolute — позиция относительно ближайшего позиционированного родителя.', relative:'relative — обычная позиция, но можно сдвигать и быть точкой отсчёта для absolute.',
+    fixed:'fixed — прибит к окну, не прокручивается.', 'sans-serif':'sans-serif — рубленый шрифт без засечек (семейство по умолчанию).',
+    'system-ui':'system-ui — системный шрифт ОС.', auto:'auto — браузер решает сам.', hidden:'hidden — спрятать (например overflow:hidden).',
+    transparent:'transparent — прозрачный.', row:'row — в ряд (по горизонтали).', column:'column — в столбец (по вертикали).'
   };
   let pop = null;
   function hidePop(){ if(pop){ pop.remove(); pop = null; } }
@@ -184,15 +338,26 @@
     pop.style.left = Math.max(8, x) + 'px'; pop.style.top = Math.max(8, y) + 'px';
   }
   document.addEventListener('mousedown', ev => { if(pop && !pop.contains(ev.target) && !(ev.target.closest && ev.target.closest('.sb-hl'))) hidePop(); });
+  const KIND_ROLE = { tag:'HTML-тег', attr:'атрибут', prop:'CSS-свойство', val:'CSS-значение', sel:'CSS-селектор', 'css-num':'размер', str:'строка', com:'комментарий', text:'текст страницы' };
   function explainToken(sp, ev){
     const word = sp.textContent.trim();
     if(!word || /^[\s{}()[\];,.<>/=+\-*%!?:&|@#'"`~^]+$/.test(word)) return;
-    const role = roleOf(sp);
-    let body = EXPLAIN[word] || EXPLAIN[word.toLowerCase()];
+    const k = sp.dataset.k || '';
+    const lw = word.toLowerCase();
+    const role = KIND_ROLE[k] || roleOf(sp);
+    let body;
+    if(k === 'tag') body = HTML_TAGS[lw] || ('<' + word + '> — HTML-тег. Обрамляет содержимое и задаёт его смысл.');
+    else if(k === 'attr') body = HTML_ATTRS[lw] || ('«' + word + '» — атрибут тега: настройка элемента (пишется имя="значение").');
+    else if(k === 'prop') body = CSS_PROPS[lw] || ('«' + word + '» — CSS-свойство: что меняем у элемента. Значение идёт после двоеточия.');
+    else if(k === 'val') body = CSS_VALS[lw] || ('«' + word + '» — значение CSS-свойства (стоит после двоеточия).');
+    else if(k === 'sel') body = '«' + word + '» — CSS-селектор: к каким элементам применить стиль. Тег (h1), .класс или #id.';
+    else if(k === 'css-num') body = 'Размер/число: ' + word + '. Единицы: px — пиксели, % — доля, em/rem — от шрифта, vh/vw — от экрана.';
+    else body = EXPLAIN[word] || EXPLAIN[lw];
     if(!body){
       if(role === 'строка') body = 'Строка — текст в кавычках. Хранится как есть: буквы, символы, адрес и т.п.';
       else if(role === 'число') body = 'Число — значение для вычислений или размеров.';
       else if(role === 'комментарий') body = 'Комментарий — заметка для человека. Код её не выполняет.';
+      else if(role === 'текст страницы') body = 'Текст — то, что увидит пользователь на странице.';
       else if(role === 'ключевое слово') body = 'Служебное слово языка — часть его грамматики.';
       else if(role === 'имя/вызов') body = '«' + word + '» — имя функции или встроенного объекта. Скобки после него значат вызов.';
       else body = '«' + word + '» — имя: так названа переменная, функция или свойство. Имя придумал автор кода; загляни, где оно задано.';
@@ -230,7 +395,7 @@
       const wrap = document.createElement('div'); wrap.className = 'sb-ed-wrap';
       const pre = document.createElement('pre'); pre.className = 'sb-hl'; pre.setAttribute('aria-hidden', 'true');
       const ta = document.createElement('textarea'); ta.className = 'sb-code'; ta.spellcheck = false; ta.wrap = 'off'; ta.value = f.code;
-      const paint = () => { pre.innerHTML = ''; (window.buildHighlight ? window.buildHighlight(ta.value) : [document.createTextNode(ta.value)]).forEach(l => pre.appendChild(l)); };
+      const paint = () => { pre.innerHTML = ''; sbHighlight(ta.value, f.lang).forEach(l => pre.appendChild(l)); };
       const syncScroll = () => { pre.scrollTop = ta.scrollTop; pre.scrollLeft = ta.scrollLeft; };
       ta.oninput = () => { f.code = ta.value; save(); paint(); schedulePreview(); };
       ta.addEventListener('scroll', syncScroll);
@@ -269,6 +434,21 @@
   exBtn.onclick = () => setExplain(!center.classList.contains('explain-on'));
   let exInit = false; try { exInit = localStorage.getItem('codelab_sandbox_explain') === '1'; } catch(_){}
   setExplain(exInit);
+
+  // легенда цветов — «где спецификация покраса»
+  box.querySelector('#sbLegend').onclick = ev => {
+    const ex = document.querySelector('.sb-legend'); if(ex){ ex.remove(); return; }
+    const lg = document.createElement('div'); lg.className = 'sb-legend';
+    lg.innerHTML = '<div class="sb-lg-h">Что значат цвета</div>' + LEGEND.map(x =>
+      '<div class="sb-lg-row"><span class="sb-lg-sw" style="background:' + x.c + '"></span><span class="sb-lg-n">' + x.n + '</span><span class="sb-lg-d">' + x.d + '</span></div>').join('') +
+      '<div class="sb-lg-foot">Включи «🔍 разбор» и кликай по словам — расскажу про каждое.</div>';
+    document.body.appendChild(lg);
+    const b = ev.target.getBoundingClientRect();
+    lg.style.left = Math.max(8, Math.min(b.left, innerWidth - lg.offsetWidth - 12)) + 'px';
+    lg.style.top = Math.min(b.bottom + 6, innerHeight - lg.offsetHeight - 12) + 'px';
+    const close = e => { if(!lg.contains(e.target) && e.target.id !== 'sbLegend'){ lg.remove(); document.removeEventListener('mousedown', close); } };
+    setTimeout(() => document.addEventListener('mousedown', close), 0);
+  };
 
   // ── перетягиваемая граница редактор | превью ──
   let EW = 50; try { EW = +localStorage.getItem('codelab_sandbox_ew') || 50; } catch(_){}

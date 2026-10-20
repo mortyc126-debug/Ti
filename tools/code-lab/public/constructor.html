@@ -117,7 +117,7 @@
   /* редактор с подсветкой: прозрачная textarea поверх раскрашенного pre */
   .sb-ed-wrap{position:relative;flex:1;min-height:64px;overflow:hidden;background:#0E0720}
   .sb-hl,.sb-code{margin:0;padding:9px 11px;font:12px/1.5 ui-monospace,monospace;white-space:pre;tab-size:2;letter-spacing:0;border:0;box-sizing:border-box}
-  .sb-hl{position:absolute;inset:0;overflow:auto;color:#CBC2EA;pointer-events:none}
+  .sb-hl{position:absolute;inset:0;overflow:hidden;color:#CBC2EA;pointer-events:none}
   .sb-hl .line{min-height:1.5em}
   .sb-code{position:absolute;inset:0;overflow:auto;background:transparent;color:transparent;caret-color:#fff;resize:none;outline:none}
   .sb-code::selection{background:rgba(124,108,160,.4)}
@@ -127,6 +127,13 @@
   .sb-pop{position:fixed;z-index:9999;max-width:300px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font:12.5px/1.55 system-ui,sans-serif;color:var(--text);box-shadow:0 8px 28px rgba(0,0,0,.45)}
   .sb-pop-h{margin-bottom:4px} .sb-pop-h b{color:var(--acc);font-family:ui-monospace,monospace}
   .sb-pop-r{font-size:10.5px;color:var(--text3);border:1px solid var(--border);border-radius:5px;padding:1px 5px;margin-left:5px}
+  .sb-legend{position:fixed;z-index:9999;max-width:360px;background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:11px 13px;box-shadow:0 8px 28px rgba(0,0,0,.45);font:12px/1.5 system-ui,sans-serif;color:var(--text)}
+  .sb-lg-h{font-weight:600;margin-bottom:7px}
+  .sb-lg-row{display:flex;align-items:baseline;gap:8px;margin:4px 0}
+  .sb-lg-sw{flex:none;width:12px;height:12px;border-radius:3px;align-self:center}
+  .sb-lg-n{flex:none;font-family:ui-monospace,monospace;font-size:11.5px;min-width:0}
+  .sb-lg-d{color:var(--text3);font-size:11px}
+  .sb-lg-foot{margin-top:8px;padding-top:7px;border-top:1px solid var(--border);color:var(--text3);font-size:11px}
   .sb-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .sb-live{font-size:11.5px;color:var(--text2);display:flex;align-items:center;gap:4px;cursor:pointer}
   .sb-frame{flex:1;min-height:120px;width:100%;border:1px solid var(--border);border-radius:10px;background:#fff}
