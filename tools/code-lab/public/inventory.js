@@ -62,7 +62,7 @@ function pieceRows(list){
       + '<td class="give edit-cell" data-field="provides" title="клик — изменить (имя: тип)">' + (g.length ? contractChips(g) : '<span class="muted">+ отметить</span>') + '</td>'
       + '<td class="need edit-cell" data-field="requires" title="клик — изменить (имя: тип)">' + (n.length ? contractChips(n) : '<span class="muted">+ отметить</span>') + '</td>'
       + '<td>' + covCell(t) + '</td>'
-      + '<td class="pc-act"><button class="mini pc-move" data-id="' + esc(t.id) + '" title="переместить в раздел">📁</button><button class="mini pc-del" data-id="' + esc(t.id) + '" title="удалить кусок">🗑</button></td>'
+      + '<td class="pc-act"><button class="mini pc-copy" data-id="' + esc(t.id) + '" title="скопировать как готовый шаблон (JSON) — вставить в сборник или загрузить как новый">⧉</button><button class="mini pc-move" data-id="' + esc(t.id) + '" title="переместить в раздел">📁</button><button class="mini pc-del" data-id="' + esc(t.id) + '" title="удалить кусок">🗑</button></td>'
       + '</tr>';
   }).join('');
 }
@@ -107,11 +107,25 @@ async function deletePiece(id){
   try { PIECES = await fetch('/api/list').then(r => r.json()); } catch(_){ PIECES = PIECES.filter(x => x.id !== id); }
   fillFilters(); renderPieces();
 }
+// скопировать кусок как готовый шаблон (JSON) — вставить в сборник или загрузить как новый кусок
+async function copyPiece(id, btn){
+  let tpl; try { tpl = await fetch('/api/template?id=' + encodeURIComponent(id)).then(r => r.json()); } catch(_){ return; }
+  // чистый переиспользуемый кусок: с разметкой lines (и пояснениями e), как принимает «📥 загрузить куски»
+  const piece = { lang: tpl.lang || 'js', title: tpl.title || id, group: tpl.group || '', desc: tpl.desc || '', output: tpl.output || '', lines: tpl.lines || [] };
+  const text = JSON.stringify(piece, null, 2);
+  const done = () => { if(!btn) return; const o = btn.textContent; btn.textContent = '✓'; setTimeout(() => { btn.textContent = o; }, 900); };
+  const fallback = () => { const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch(_){} ta.remove(); done(); };
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+}
 document.addEventListener('click', e => {
+  const cp = e.target.closest && e.target.closest('.pc-copy'); if(cp){ e.preventDefault(); copyPiece(cp.dataset.id, cp); return; }
   const mv = e.target.closest && e.target.closest('.pc-move'); if(mv){ e.preventDefault(); movePiece(mv.dataset.id); return; }
   const dl = e.target.closest && e.target.closest('.pc-del'); if(dl){ e.preventDefault(); deletePiece(dl.dataset.id); return; }
 });
 const _val = id => { const e = document.getElementById(id); return e ? e.value : ''; };
+// «неразложенный» кусок — без раздела или в дефолтной корзине (автораздел, не настоящая категория)
+const _UNSORTED_BUCKETS = new Set(['', 'мои куски', 'разное', 'без раздела', 'мои шаблоны', 'мой сборник']);
+function isUnsorted(t){ return _UNSORTED_BUCKETS.has(String(t.group || '').split('/')[0].trim().toLowerCase()); }
 function filteredPieces(){
   const q = (document.getElementById('pq').value || '').toLowerCase().trim();
   const incompleteOnly = document.getElementById('pincomplete') && document.getElementById('pincomplete').checked;
@@ -119,7 +133,8 @@ function filteredPieces(){
   let list = PIECES;
   if(q) list = list.filter(t => ((t.title || '') + ' ' + (t.id || '') + ' ' + (t.group || '') + ' ' + give(t).join(' ') + ' ' + need(t).join(' ')).toLowerCase().includes(q));
   if(lang) list = list.filter(t => (t.lang || '') === lang);
-  if(group) list = list.filter(t => String(t.group || '').split('/')[0].trim() === group);   // по верхнему уровню раздела
+  if(group === '__unsorted__') list = list.filter(isUnsorted);   // быстрый фильтр «неразложенные»
+  else if(group) list = list.filter(t => String(t.group || '').split('/')[0].trim() === group);   // по верхнему уровню раздела
   if(facet) list = list.filter(t => !cov(t)[facet]);           // показать только те, где этой грани НЕТ
   if(incompleteOnly) list = list.filter(t => covCount(t) < FACETS.length);
   return list;
@@ -130,7 +145,8 @@ function fillFilters(){
   const groups = [...new Set(PIECES.map(t => String(t.group || '').split('/')[0].trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru'));
   const opt = (v, label) => '<option value="' + esc(v) + '">' + esc(label) + '</option>';
   const pl = document.getElementById('plang'); if(pl) pl.innerHTML = opt('', 'язык: все') + langs.map(l => opt(l, l.toUpperCase())).join('');
-  const pg = document.getElementById('pgroup'); if(pg) pg.innerHTML = opt('', 'раздел: все') + groups.map(g => opt(g, g)).join('');
+  const nUnsorted = PIECES.filter(isUnsorted).length;
+  const pg = document.getElementById('pgroup'); if(pg) pg.innerHTML = opt('', 'раздел: все') + (nUnsorted ? opt('__unsorted__', '⚠ без раздела (' + nUnsorted + ')') : '') + groups.map(g => opt(g, g)).join('');
   const pf = document.getElementById('pfacet'); if(pf) pf.innerHTML = opt('', 'не хватает: —') + FACETS.map(f => opt(f[0], 'нет: ' + f[2])).join('');
 }
 // дерево разделов: group «Сеть / Запросы» → вложенность по «/»
@@ -156,6 +172,7 @@ function gpPieceRow(t){
     + (g.length ? '<span class="gp-cr give">даёт: ' + contractChips(g) + '</span>' : '')
     + (n.length ? '<span class="gp-cr need">нужно: ' + contractChips(n) + '</span>' : '')
     + '<span class="gp-sp"></span>' + covCell(t)
+    + '<button class="mini pc-copy" data-id="' + esc(t.id) + '" title="скопировать как готовый шаблон (JSON)">⧉</button>'
     + '<button class="mini pc-move" data-id="' + esc(t.id) + '" title="переместить в раздел">📁</button>'
     + '<button class="mini pc-del" data-id="' + esc(t.id) + '" title="удалить кусок">🗑</button></div>';
 }

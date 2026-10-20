@@ -116,6 +116,13 @@ pre.code{background:var(--bg2);border:1px solid var(--border);border-radius:9px;
 .tab-btn{font-size:12px;padding:5px 12px;border-radius:7px;color:var(--text2);background:none;border:1px solid var(--border);cursor:pointer;margin-top:8px}
 .tab-btn:hover{color:var(--text)}
 .tab-btn:disabled{opacity:.6;cursor:default}
+.dl-tpl{margin-top:8px;font-size:12.5px}
+.dl-tpl>summary{cursor:pointer;color:var(--text2);padding:5px 0;user-select:none}
+.dl-tpl>summary:hover{color:var(--text)}
+.dl-tpl-body{background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:10px 13px;margin-top:4px;line-height:1.55;max-width:680px}
+.dl-tpl-body ul{margin:6px 0;padding-left:18px}
+.dl-tpl-body li{margin:4px 0}
+.dl-tpl-body a{color:var(--acc)}
 
 /* словарик (бледный) */
 .glossary{margin-top:10px;max-width:980px}
