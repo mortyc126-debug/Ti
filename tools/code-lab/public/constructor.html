@@ -100,6 +100,26 @@
   /* свёрнутый холст: прячем визуал, код+превью на всю высоту */
   .center.canvas-collapsed .canvas-scroll{display:none}
   .center.canvas-collapsed .result{height:auto;flex:1;min-height:0}
+  /* режим песочницы: прячем визуальный холст и собранный результат */
+  .center.sandbox-on .canvas-scroll,.center.sandbox-on .paste-panel,.center.sandbox-on .result,.center.sandbox-on #collapseCanvas{display:none}
+  .sandbox{flex:1;min-height:0;display:flex}
+  .sb-eds{width:var(--sb-ew,50%);min-width:0;display:flex;flex-direction:column;gap:8px;overflow:auto;padding-right:2px}
+  .sb-gut{flex:none;width:7px;margin:0 4px;cursor:col-resize;border-radius:6px;background:var(--border);opacity:.45;align-self:stretch}
+  .sb-gut:hover,.sb-gut.drag{opacity:1;background:var(--num,#f80)}
+  .sb-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+  .sb-ed{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:10px;overflow:hidden;min-height:110px;flex:1}
+  .sb-ed-head{display:flex;gap:6px;align-items:center;padding:5px 7px;background:var(--bg2);border-bottom:1px solid var(--border)}
+  .sb-name{flex:1;min-width:0;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font:12px ui-monospace,monospace;padding:3px 6px}
+  .sb-lang{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;padding:3px 4px}
+  .sb-run1{padding:2px 9px;font-size:12px}
+  .sb-ed-del{background:none;border:0;color:var(--text3);cursor:pointer;font-size:12px;padding:0 3px}
+  .sb-ed-del:hover{color:#FF6B6B}
+  .sb-code{flex:1;min-height:64px;resize:none;border:0;background:#0E0720;color:#e7e2f3;font:12px/1.5 ui-monospace,monospace;padding:9px 11px;outline:none;white-space:pre;overflow:auto;tab-size:2}
+  .sb-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .sb-live{font-size:11.5px;color:var(--text2);display:flex;align-items:center;gap:4px;cursor:pointer}
+  .sb-frame{flex:1;min-height:120px;width:100%;border:1px solid var(--border);border-radius:10px;background:#fff}
+  .sb-con{flex:none;max-height:30%;overflow:auto;margin:0;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font:11.5px/1.5 ui-monospace,monospace;color:var(--text2);white-space:pre-wrap}
+  @media(max-width:1000px){.sandbox{flex-direction:column}.sb-eds{width:auto}.sb-gut{display:none}}
   pre.code{background:#0E0720;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:0;overflow:auto;font-size:12px;line-height:1.55}
   .result .preview{margin:0}
   .result iframe{width:100%;height:100%;border:1px solid var(--border);border-radius:10px;background:#0E0720}.preview{position:relative}.runtime-status{position:absolute;right:7px;top:7px;z-index:2;padding:4px 7px;border-radius:7px;background:rgba(14,7,32,.9);border:1px solid var(--border);font:10px ui-monospace,monospace;color:var(--text3);pointer-events:none}.runtime-status.ok{color:var(--str);border-color:rgba(82,242,201,.45)}.runtime-status.error{color:#ffb3c1;border-color:rgba(255,107,107,.45)}.runtime-status.checking{color:var(--num);border-color:rgba(255,136,0,.45)}
@@ -221,6 +241,7 @@
           <button class="btn" id="zoomIn" title="крупнее">+</button>
         </span>
         <button class="btn" id="collapseCanvas" title="свернуть визуальный холст — больше места коду и предпросмотру">🔽 свернуть холст</button>
+        <button class="btn" id="sandboxToggle" title="песочница: панели кода (HTML/CSS/JS и др.) + живой предпросмотр">🧪 песочница</button>
         <span style="flex:1"></span>
         <button class="btn" id="example">пример</button>
         <button class="btn" id="clear">× очистить</button>
@@ -266,5 +287,6 @@
   <script src="/relations.js"></script>
   <script src="/contract.js"></script>
   <script src="/constructor.js"></script>
+  <script src="/sandbox.js"></script>
 </body>
 </html>
