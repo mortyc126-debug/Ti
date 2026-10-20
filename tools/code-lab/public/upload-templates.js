@@ -81,12 +81,11 @@
           '<span class="up-note muted">код-файлы (.js/.py/.css/.html…), полный кусок JSON или сборник — можно несколько сразу</span>' +
         '</div>' +
         '<div class="up-nav">' +
-          '<div class="up-nav-head">📂 разделы сейчас (живая навигация). Клик — выбрать, раздел впишется в образец ниже:</div>' +
+          '<div class="up-nav-head">📂 актуальные разделы и подразделы. Клик по строке — скопировать её, чтобы вписать в поле <code>group</code> своего файла. Новый раздел — просто впиши новый путь (через « / » — подраздел), он создастся при загрузке:</div>' +
           '<div class="up-nav-tree">загрузка…</div>' +
           '<div class="up-row">' +
-            '<span class="up-note">файл уедет в раздел:</span> <b class="up-sel">— без раздела —</b>' +
-            '<input class="up-newgroup" placeholder="или впиши новый: «Группа / Подгруппа»">' +
-            '<button class="btn up-newbtn">добавить</button>' +
+            '<button class="btn up-navcopy">⧉ копировать весь список</button>' +
+            '<span class="up-navmsg up-note muted"></span>' +
           '</div>' +
         '</div>' +
         '<div class="up-tpl">' +
@@ -101,59 +100,46 @@
         '</div>' +
       '</div>';
 
-    // выбранный раздел (куда уедет файл; впишется в образец)
-    const navTree = host.querySelector('.up-nav-tree'), selEl = host.querySelector('.up-sel'), newGrp = host.querySelector('.up-newgroup');
-    let selGroup = '';
+    // КОПИРУЕМЫЙ живой список разделов и подразделов (все пути, включая промежуточные)
+    const navTree = host.querySelector('.up-nav-tree'), navMsg = host.querySelector('.up-navmsg');
     const escAttr = s => String(s).replace(/"/g, '&quot;');
-    const setSel = g => {
-      selGroup = g || '';
-      selEl.textContent = selGroup || '— без раздела —';
-      navTree.querySelectorAll('.up-nav-i').forEach(el => el.classList.toggle('on', el.dataset.path === selGroup));
-      show();   // перерисовать образец — раздел уже вписан
-    };
-    // живое дерево всех разделов (с подразделами) + счётчики
-    const buildTreeHtml = (list) => {
-      const root = {};
+    let allPaths = [];
+    const buildNav = (list) => {
+      const root = {}; const paths = new Set();
       (list || []).forEach(t => {
         const parts = String(t.group || 'Разное').split('/').map(s => s.trim()).filter(Boolean);
         let node = root; const acc = [];
-        (parts.length ? parts : ['Разное']).forEach(seg => { acc.push(seg); node[seg] = node[seg] || { c: 0, p: acc.join(' / '), ch: {} }; node[seg].c++; node = node[seg].ch; });
+        (parts.length ? parts : ['Разное']).forEach(seg => { acc.push(seg); const p = acc.join(' / '); paths.add(p); node[seg] = node[seg] || { c: 0, p, ch: {} }; node[seg].c++; node = node[seg].ch; });
       });
+      allPaths = [...paths].sort((a, b) => a.localeCompare(b, 'ru'));
       const render = (node, depth) => Object.keys(node).sort((a, b) => a.localeCompare(b, 'ru')).map(k => {
         const n = node[k];
-        return '<div class="up-nav-i" data-path="' + escAttr(n.p) + '" style="padding-left:' + (depth * 15 + 6) + 'px">' + esc(k) + ' <span class="up-nav-c">' + n.c + '</span></div>' + render(n.ch, depth + 1);
+        return '<div class="up-nav-i" data-path="' + escAttr(n.p) + '" title="клик — скопировать «' + escAttr(n.p) + '»" style="padding-left:' + (depth * 15 + 6) + 'px">' + esc(k) + ' <span class="up-nav-c">' + n.c + '</span></div>' + render(n.ch, depth + 1);
       }).join('');
-      const inner = render(root, 0);
-      return '<div class="up-nav-i up-nav-none" data-path="">— без раздела —</div>' + (inner || '<div class="up-note muted" style="padding:4px 6px">разделов пока нет</div>');
+      navTree.innerHTML = render(root, 0) || '<div class="up-note muted" style="padding:4px 6px">разделов пока нет</div>';
     };
-    fetch('/api/list').then(r => r.json()).then(list => { navTree.innerHTML = buildTreeHtml(list); navTree.querySelectorAll('.up-nav-i').forEach(el => el.classList.toggle('on', el.dataset.path === selGroup)); }).catch(() => { navTree.textContent = 'сервер недоступен'; });
-    navTree.addEventListener('click', e => { const i = e.target.closest('.up-nav-i'); if(i){ newGrp.value = ''; setSel(i.dataset.path); } });
-    host.querySelector('.up-newbtn').onclick = () => { const v = newGrp.value.trim(); if(v) setSel(v); };
-    newGrp.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); const v = newGrp.value.trim(); if(v) setSel(v); } });
-
-    const targetGroup = () => selGroup;
-    const applyGroup = (payload, g) => {
-      if(!g) return payload;
-      if(Array.isArray(payload)) payload.forEach(p => { if(p && typeof p === 'object') p.group = g; });
-      else if(payload && Array.isArray(payload.pieces)) payload.pieces.forEach(p => { if(p && typeof p === 'object') p.group = g; });
-      else if(payload && typeof payload === 'object') payload.group = g;
-      return payload;
-    };
+    const refreshNav = () => fetch('/api/list').then(r => r.json()).then(buildNav).catch(() => { navTree.textContent = 'сервер недоступен'; });
+    refreshNav();
+    // клик по строке — копируем именно этот путь (чтобы вписать в group файла)
+    navTree.addEventListener('click', e => {
+      const i = e.target.closest('.up-nav-i'); if(!i) return;
+      const path = i.dataset.path;
+      if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(path).catch(() => {});
+      navMsg.textContent = '✓ скопировано: ' + path; setTimeout(() => { navMsg.textContent = ''; }, 2500);
+    });
+    host.querySelector('.up-navcopy').onclick = e => copyText(allPaths.join('\n'), e.currentTarget);
 
     const sel = host.querySelector('.up-lang'), descEl = host.querySelector('.up-desc'), codeEl = host.querySelector('.up-code'), whatEl = host.querySelector('.up-what');
     ORDER.forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = EXAMPLES[k]._label; sel.appendChild(o); });
     const clean = ex => { const c = {}; for(const [k, v] of Object.entries(ex)) if(k[0] !== '_') c[k] = v; return c; };
     let curText = '', curName = '';
     const show = () => {
-      const ex = EXAMPLES[sel.value]; const obj = clean(ex);
-      // раздел из навигации вписываем прямо в образец — чтобы он был описан в самом файле
-      if(Array.isArray(obj.pieces)) obj.pieces.forEach(p => { p.group = selGroup; });
-      else obj.group = selGroup;
+      const ex = EXAMPLES[sel.value]; const obj = clean(ex);   // образец с полем group — его ты и впишешь сама
       curText = JSON.stringify(obj, null, 2);
       curName = (sel.value === 'collection' ? 'сборник' : 'кусок-' + ex.lang) + '.json';
       descEl.textContent = ex._desc;
       codeEl.textContent = curText;
-      whatEl.textContent = (selGroup ? 'уедет в раздел «' + selGroup + '»' : 'раздел не выбран — ляжет в «без раздела»');
+      whatEl.textContent = 'раздел задаётся полем group внутри файла — скопируй путь из списка выше';
     };
     sel.onchange = show; show();
 
@@ -165,14 +151,13 @@
     loadBtn.onclick = () => fileIn.click();
     fileIn.onchange = async () => {
       const files = [...fileIn.files]; if(!files.length) return;
-      const g = targetGroup();   // выбранный раздел — применится ко всем загружаемым
       const o = loadBtn.textContent; loadBtn.disabled = true; loadBtn.textContent = '…';
       let created = 0, learned = 0, updated = 0, bad = 0;
       for(const f of files){
         const ext = (f.name.split('.').pop() || '').toLowerCase(); const text = await f.text(); let payload;
+        // раздел берём ИЗ файла (поле group). Код-файлы без group — лягут в «без раздела», разложишь в Описи.
         if(ext === 'json'){ try { payload = JSON.parse(text); } catch(_){ bad++; continue; } }
-        else payload = { lang: EXT_LANG[ext] || 'txt', title: f.name.replace(/\.[^.]+$/, ''), code: text, group: g || '' };   // без выбора — без раздела (попадёт в «⚠ без раздела»)
-        applyGroup(payload, g);   // выбран раздел → кладём туда всё из файла
+        else payload = { lang: EXT_LANG[ext] || 'txt', title: f.name.replace(/\.[^.]+$/, ''), code: text, group: '' };
         let r; try { r = await fetch('/api/import', { method: 'POST', body: JSON.stringify(payload) }).then(x => x.json()); } catch(_){ r = null; }
         if(r && r.ok){ created += r.created || 0; learned += r.learned || 0; updated += r.updated || 0; } else bad++;
       }
@@ -180,8 +165,7 @@
       const parts = ['+' + created + ' кусков']; if(updated) parts.push(updated + ' обновл.'); if(learned) parts.push('+' + learned + ' слов'); if(bad) parts.push(bad + ' пропущено');
       loadBtn.textContent = '✓ ' + parts.join(', ');
       setTimeout(() => { loadBtn.textContent = o; }, 3500);
-      // навигация живая: подтянуть разделы заново (появился новый — сразу виден)
-      fetch('/api/list').then(r => r.json()).then(list => { navTree.innerHTML = buildTreeHtml(list); navTree.querySelectorAll('.up-nav-i').forEach(el => el.classList.toggle('on', el.dataset.path === selGroup)); }).catch(() => {});
+      refreshNav();   // список разделов живой: новый раздел из файла виден сразу
       if(typeof opts.onDone === 'function') opts.onDone();
     };
   };
