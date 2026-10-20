@@ -1602,3 +1602,23 @@ document.addEventListener('keydown', e => {
   if(pal) gw.insertBefore(mkGutter('left'), pal.nextSibling);
   if(insp) gw.insertBefore(mkGutter('right'), insp);
 })();
+
+// граница между кодом (слева) и превью (справа) в блоке .result — ширину превью запоминаем
+(function(){
+  const res = document.querySelector('.result'), gut = document.getElementById('resultGutter'); if(!res || !gut) return;
+  let PV = 300;
+  try { PV = +localStorage.getItem('codelab_prevw') || 300; } catch(_){}
+  const apply = () => res.style.setProperty('--prev-w', PV + 'px');
+  apply();
+  gut.addEventListener('pointerdown', e => {
+    e.preventDefault(); gut.classList.add('drag');
+    const sx = e.clientX, sPV = PV;
+    const mv = ev => { PV = Math.max(150, Math.min(900, sPV - (ev.clientX - sx))); apply(); };
+    const up = () => {
+      gut.classList.remove('drag');
+      document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up);
+      try { localStorage.setItem('codelab_prevw', PV); } catch(_){}
+    };
+    document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
+  });
+})();
