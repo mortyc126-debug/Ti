@@ -17,6 +17,19 @@
   ];
   const cur = document.body.dataset.page || '';
 
+  // как показывать названия «англ — рус»: по умолчанию русское вперёд (настраивается)
+  function codelabTitle(title){
+    try { if(localStorage.getItem('codelab_ru_first') === '0') return title; } catch(_){}
+    const s = String(title == null ? '' : title);
+    const parts = s.split(/\s+—\s+/);
+    if(parts.length < 2) return s;
+    const left = parts[0], rest = parts.slice(1).join(' — ');
+    const hasRu = x => /[а-яё]/i.test(x);
+    if(!hasRu(left) && hasRu(rest)) return rest + ' — ' + left;   // слева чистый англ, справа русский → поменять
+    return s;
+  }
+  window.codelabTitle = codelabTitle;
+
   // переносим текущее содержимое страницы (кроме скриптов) в .app-main
   const main = document.createElement('div'); main.className = 'app-main';
   [...document.body.childNodes].forEach(n => {
@@ -55,7 +68,7 @@
     if(!q){ sres.style.display = 'none'; sres.innerHTML = ''; return; }
     const list = await loadAll();
     const hits = list.filter(t => ((t.title || '') + ' ' + (t.group || '') + ' ' + (t.lang || '') + ' ' + (t.desc || '') + ' ' + give(t).join(' ') + ' ' + need(t).join(' ')).toLowerCase().includes(q)).slice(0, 14);
-    sres.innerHTML = hits.map(t => '<a class="ss-item" href="/component.html?id=' + encodeURIComponent(t.id) + '"><span class="ss-t">' + esc2(t.title || t.id) + '</span><span class="ss-g">' + esc2((t.group || '').split('/')[0].trim()) + ' · ' + esc2((t.lang || '').toUpperCase()) + '</span></a>').join('')
+    sres.innerHTML = hits.map(t => '<a class="ss-item" href="/component.html?id=' + encodeURIComponent(t.id) + '"><span class="ss-t">' + esc2(codelabTitle(t.title || t.id)) + '</span><span class="ss-g">' + esc2((t.group || '').split('/')[0].trim()) + ' · ' + esc2((t.lang || '').toUpperCase()) + '</span></a>').join('')
       + '<a class="ss-item ss-all" href="/inventory.html?q=' + encodeURIComponent(sin.value.trim()) + '">показать все в Описи →</a>';
     sres.style.display = '';
   };
@@ -74,6 +87,13 @@
     side.appendChild(a);
   });
   const sp = document.createElement('div'); sp.className = 'spacer'; side.appendChild(sp);
+  // переключатель порядка названий
+  const ruf = document.createElement('label'); ruf.className = 'ru-first';
+  const rufIn = document.createElement('input'); rufIn.type = 'checkbox';
+  let rfOn = true; try { rfOn = localStorage.getItem('codelab_ru_first') !== '0'; } catch(_){}
+  rufIn.checked = rfOn;
+  rufIn.onchange = () => { try { localStorage.setItem('codelab_ru_first', rufIn.checked ? '1' : '0'); } catch(_){} location.reload(); };
+  ruf.append(rufIn, document.createTextNode(' названия: сначала по-русски')); side.appendChild(ruf);
   const srv = document.createElement('div'); srv.className = 'srv';
   srv.innerHTML = '<span class="dot"></span><span>Локальный сервер · запущен</span>';
   side.appendChild(srv);

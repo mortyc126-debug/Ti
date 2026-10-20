@@ -345,7 +345,7 @@ function renderPalette(){
   });
   const count = n => { let c = n.items.length; n.children.forEach(x => c += count(x)); return c; };
   const mkItem = t => {
-    const it = palItem(t.title, t.desc); it.onclick = () => addFromCatalog(t);
+    const it = palItem(window.codelabTitle ? window.codelabTitle(t.title) : t.title, t.desc); it.onclick = () => addFromCatalog(t);
     if(t.lang){ const lg = el('span', 'pi-lang', String(t.lang).toUpperCase()); it.appendChild(lg); }
     const del = el('span', 'pi-del', '🗑'); del.title = 'удалить шаблон насовсем';
     del.onclick = e => { e.stopPropagation(); delTemplate(t); };

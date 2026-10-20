@@ -217,7 +217,7 @@ function card(t){
   a.innerHTML = top + '<div class="cdesc"></div>' + io + contract + tags + '<div class="ccols"></div>'
     + '<div class="cact"><span class="cbtn" data-x="use">Открыть</span><span class="cbtn" data-x="ctor">→ в конструктор</span>'
     + '<span class="cbtn" data-x="col" title="в мой раздел">🏷</span><span class="cbtn" data-x="desc" title="описание">📝</span><span class="cbtn" data-x="ren" title="переименовать">✎</span><span class="cbtn del" data-x="del" title="удалить">🗑</span></div>';
-  a.querySelector('.ctitle').textContent = t.title || t.id;
+  a.querySelector('.ctitle').textContent = window.codelabTitle ? window.codelabTitle(t.title || t.id) : (t.title || t.id);
   a.querySelector('.cdesc').innerHTML = descFmt(t.desc || '');
   fillCols(a, t);
   a.querySelector('[data-x="col"]').onclick = e => { e.preventDefault(); e.stopPropagation(); collectionMenu(t, e.target); };

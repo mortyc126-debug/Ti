@@ -88,7 +88,7 @@ async function loadList(openId){
     nav.appendChild(h);
     for(const t of g.items){
       const d = document.createElement('div'); d.className = 'tpl'; d.dataset.id = t.id;
-      d.innerHTML = `<span>${esc(t.title)}</span><span class="lang">${esc((t.lang||'').toUpperCase())}</span>`;
+      d.innerHTML = `<span>${esc(window.codelabTitle ? window.codelabTitle(t.title) : t.title)}</span><span class="lang">${esc((t.lang||'').toUpperCase())}</span>`;
       d.onclick = () => select(t.id, d);
       box.appendChild(d);
     }

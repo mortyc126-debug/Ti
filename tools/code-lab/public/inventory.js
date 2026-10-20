@@ -20,6 +20,7 @@ function applyUrlFilters(){
 }
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+const dispTitle = t => { const s = t.title || t.id; return window.codelabTitle ? window.codelabTitle(s) : s; };
 const give = t => (t.comp && t.comp.provides) || [];
 const need = t => (t.comp && t.comp.requires) || [];
 // 8 граней «что описано» — ключ, буква, название, пояснение
@@ -55,7 +56,7 @@ function pieceRows(list){
   return list.map(t => {
     const g = give(t), n = need(t);
     return '<tr data-id="' + esc(t.id) + '">'
-      + '<td class="t-title"><a href="/component.html?id=' + encodeURIComponent(t.id) + '">' + esc(t.title || t.id) + '</a><div class="t-id">' + esc(t.id) + '</div></td>'
+      + '<td class="t-title"><a href="/component.html?id=' + encodeURIComponent(t.id) + '">' + esc(dispTitle(t)) + '</a><div class="t-id">' + esc(t.id) + '</div></td>'
       + '<td>' + esc((t.lang || '').toUpperCase()) + '</td>'
       + '<td class="edit-cell" data-field="group" title="клик — сменить раздел">' + (t.group ? esc(t.group) : '<span class="muted">+ раздел</span>') + '</td>'
       + '<td class="give edit-cell" data-field="provides" title="клик — изменить (имя: тип)">' + (g.length ? contractChips(g) : '<span class="muted">+ отметить</span>') + '</td>'
@@ -150,7 +151,7 @@ function treeCount(node){ let n = node.items.length; node.children.forEach(c => 
 function gpPieceRow(t){
   const g = give(t), n = need(t);
   return '<div class="gp-piece">'
-    + '<a href="/component.html?id=' + encodeURIComponent(t.id) + '">' + esc(t.title || t.id) + '</a>'
+    + '<a href="/component.html?id=' + encodeURIComponent(t.id) + '">' + esc(dispTitle(t)) + '</a>'
     + '<span class="gp-lang">' + esc((t.lang || '').toUpperCase()) + '</span>'
     + (g.length ? '<span class="gp-cr give">даёт: ' + contractChips(g) + '</span>' : '')
     + (n.length ? '<span class="gp-cr need">нужно: ' + contractChips(n) + '</span>' : '')
