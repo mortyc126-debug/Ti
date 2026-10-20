@@ -412,18 +412,35 @@ if(_annAll) _annAll.onclick = async () => {
   else { _annAll.textContent = 'ошибка'; setTimeout(() => { _annAll.textContent = o; }, 2000); }
 };
 
-// импорт сборника кусков: добавляет куски и дополняет словарь
+// объединённый загрузчик: код-файлы, полноценный кусок JSON или сборник. Можно несколько файлов.
+const _EXT_LANG = { js:'js', mjs:'js', jsx:'js', ts:'ts', tsx:'ts', py:'python', rb:'ruby', php:'php', go:'go', lua:'lua', sh:'bash', bash:'bash', ps1:'powershell', r:'r', sql:'sql', html:'html', htm:'html', css:'css', txt:'txt' };
 const _impColl = document.getElementById('impColl'), _impCollFile = document.getElementById('impCollFile');
 if(_impColl && _impCollFile){
   _impColl.onclick = () => _impCollFile.click();
   _impCollFile.onchange = async () => {
-    const f = _impCollFile.files[0]; if(!f) return;
+    const files = [..._impCollFile.files]; if(!files.length) return;
     const o = _impColl.textContent; _impColl.disabled = true; _impColl.textContent = '…';
-    let bundle; try { bundle = JSON.parse(await f.text()); } catch(_){ _impColl.disabled = false; _impColl.textContent = 'не JSON'; setTimeout(() => { _impColl.textContent = o; }, 2000); _impCollFile.value = ''; return; }
-    let r; try { r = await fetch('/api/import-collection', { method: 'POST', body: JSON.stringify(bundle) }).then(x => x.json()); } catch(_){ r = { ok: false }; }
+    let created = 0, learned = 0, updated = 0, bad = 0, lastId = null;
+    for(const f of files){
+      const ext = (f.name.split('.').pop() || '').toLowerCase();
+      const text = await f.text();
+      let payload;
+      if(ext === 'json'){
+        try { payload = JSON.parse(text); }   // кусок, массив кусков или сборник {dict,pieces}
+        catch(_){ bad++; continue; }
+      } else {
+        // обычный код-файл → один кусок; имя файла (без расширения) = название
+        payload = { lang: _EXT_LANG[ext] || 'txt', title: f.name.replace(/\.[^.]+$/, ''), code: text, group: 'Мои куски' };
+      }
+      let r; try { r = await fetch('/api/import', { method: 'POST', body: JSON.stringify(payload) }).then(x => x.json()); } catch(_){ r = null; }
+      if(r && r.ok){ created += r.created || 0; learned += r.learned || 0; updated += r.updated || 0; }
+      else bad++;
+    }
     _impColl.disabled = false; _impCollFile.value = '';
-    if(r && r.ok){ _impColl.textContent = '✓ +' + r.created + ' кусков, +' + r.learned + ' слов'; loadList(); setTimeout(() => { _impColl.textContent = o; }, 3000); }
-    else { _impColl.textContent = 'ошибка'; setTimeout(() => { _impColl.textContent = o; }, 2000); }
+    loadList();
+    const parts = ['+' + created + ' кусков']; if(updated) parts.push(updated + ' обновл.'); if(learned) parts.push('+' + learned + ' слов'); if(bad) parts.push(bad + ' пропущено');
+    _impColl.textContent = '✓ ' + parts.join(', ');
+    setTimeout(() => { _impColl.textContent = o; }, 3500);
   };
 }
 
