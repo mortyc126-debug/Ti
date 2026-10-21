@@ -1087,6 +1087,11 @@ function componentPreflight(nd, code){
   const text = String(code || '');
   if(!text.trim()) errors.push('Код пустой — компонент нечего запускать.');
 
+  // Синтаксис/переменные/DOM проверяем только для JS — у CSS/HTML/прочего своя грамматика,
+  // JS-проверка там даёт ложные ошибки и зря блокирует сохранение.
+  const _lng = nodeLang(nd);
+  if(_lng !== 'js' && _lng !== 'javascript' && _lng !== 'ts' && _lng !== 'typescript') return { errors, warnings };
+
   // Проверяем синтаксис в том же режиме, в котором preview сможет выполнить код.
   if(text.trim()){
     try {
