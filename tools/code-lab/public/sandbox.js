@@ -93,6 +93,29 @@
     return window.buildHighlight ? window.buildHighlight(code) : [(() => { const d = lineDiv(); d.textContent = code; return d; })()];
   }
 
+  // ── авто-пары: печатаешь «<body>» → появляется «</body>», «{» → «}», кавычки/скобки парой ──
+  const VOID_TAGS = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr','!doctype']);
+  const PAIR = { '(': ')', '[': ']', '{': '}', '"': '"', "'": "'", '`': '`' };
+  // обрабатывает нажатие; возвращает true (вставили пару/удалили), 'skip' (перешагнули) или false (не наше)
+  function autoPair(ev, ta, lang){
+    const k = ev.key, s = ta.selectionStart, e = ta.selectionEnd, v = ta.value, html = (lang === 'html' || lang === 'htm');
+    // перешагнуть уже стоящую закрывающую — чтобы не плодить вторую
+    if((k === ')' || k === ']' || k === '}' || k === '"' || k === "'" || k === '`') && s === e && v[s] === k){ ev.preventDefault(); ta.selectionStart = ta.selectionEnd = s + 1; return 'skip'; }
+    // backspace между пустой парой → снести обе
+    if(k === 'Backspace' && s === e && s > 0 && PAIR[v[s - 1]] === v[s]){ ev.preventDefault(); ta.value = v.slice(0, s - 1) + v.slice(s + 1); ta.selectionStart = ta.selectionEnd = s - 1; return true; }
+    // открывающая скобка/кавычка → вставить пару
+    if(PAIR[k] && s === e){
+      if((k === '"' || k === "'" || k === '`') && /[\w]/.test(v[s] || '')) return false;   // апостроф внутри слова — не парим
+      ev.preventDefault(); const c = PAIR[k]; ta.value = v.slice(0, s) + k + c + v.slice(e); ta.selectionStart = ta.selectionEnd = s + 1; return true;
+    }
+    // «>» завершает открывающий HTML-тег <name …> → дописать </name>
+    if(k === '>' && html && s === e){
+      const before = v.slice(0, s), m = before.match(/<([a-zA-Z][\w-]*)(?:\s[^<>]*)?$/);
+      if(m && !/\/\s*$/.test(before) && !VOID_TAGS.has(m[1].toLowerCase())){ ev.preventDefault(); ta.value = before + '>' + '</' + m[1] + '>' + v.slice(e); ta.selectionStart = ta.selectionEnd = s + 1; return true; }
+    }
+    return false;
+  }
+
   const DEFAULTS = [
     { id:'f1', name:'index.html', lang:'html', code:'<h1>Привет!</h1>\n<p>Меняй код слева — превью обновится само.</p>\n<button id="b">нажми</button>' },
     { id:'f2', name:'style.css', lang:'css', code:'body{ font-family:system-ui, sans-serif; padding:24px; background:#0E0720; color:#eee }\nh1{ color:#52F2C9 }\nbutton{ padding:8px 14px; border-radius:8px; border:0; background:#FF006E; color:#fff; cursor:pointer }' },
@@ -418,8 +441,12 @@
       const syncScroll = () => { pre.scrollTop = ta.scrollTop; pre.scrollLeft = ta.scrollLeft; };
       ta.oninput = () => { f.code = ta.value; save(); paint(); schedulePreview(); };
       ta.addEventListener('scroll', syncScroll);
-      // Tab вставляет отступ, а не прыгает по форме
-      ta.onkeydown = ev => { if(ev.key === 'Tab'){ ev.preventDefault(); const s = ta.selectionStart, e2 = ta.selectionEnd; ta.value = ta.value.slice(0, s) + '  ' + ta.value.slice(e2); ta.selectionStart = ta.selectionEnd = s + 2; f.code = ta.value; save(); paint(); schedulePreview(); } };
+      // Tab вставляет отступ, а не прыгает по форме; плюс авто-пары (<body>→</body>, {→})
+      ta.onkeydown = ev => {
+        if(ev.key === 'Tab'){ ev.preventDefault(); const s = ta.selectionStart, e2 = ta.selectionEnd; ta.value = ta.value.slice(0, s) + '  ' + ta.value.slice(e2); ta.selectionStart = ta.selectionEnd = s + 2; f.code = ta.value; save(); paint(); schedulePreview(); return; }
+        const r = autoPair(ev, ta, f.lang);
+        if(r && r !== 'skip'){ f.code = ta.value; save(); paint(); schedulePreview(); }
+      };
       // клик по слову в режиме «пояснения»: курсор ставится как обычно (редактирование не ломается),
       // а под курсором находим раскрашенный span и показываем окошко
       ta.addEventListener('click', ev => {
