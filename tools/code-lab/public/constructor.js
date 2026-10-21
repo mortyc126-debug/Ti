@@ -327,7 +327,13 @@ function allLangs(){ return [...new Set(CATALOG.map(t => String(t.lang || '').to
 function langActive(l){ return !palLangs || palLangs.has(l); }
 function savePalLangs(){ try { if(palLangs) localStorage.setItem('codelab_pal_langs', JSON.stringify([...palLangs])); else localStorage.removeItem('codelab_pal_langs'); } catch(_){} }
 function setPalLangs(next){ const all = allLangs(); if(!next || next.size === 0 || next.size >= all.length) palLangs = null; else palLangs = next; savePalLangs(); fillPalLangs(); renderPalette(); }
-function toggleLang(l){ const all = allLangs(); const cur = palLangs ? new Set(palLangs) : new Set(all); if(cur.has(l)) cur.delete(l); else cur.add(l); setPalLangs(cur); }
+function toggleLang(l){
+  // из «все» клик по языку выбирает ТОЛЬКО его; дальше клики добавляют/снимают
+  let cur;
+  if(!palLangs) cur = new Set([l]);
+  else { cur = new Set(palLangs); if(cur.has(l)) cur.delete(l); else cur.add(l); }
+  setPalLangs(cur);   // пусто или все → снова «все»
+}
 function fillPalLangs(){
   const host = $('#palLangs'); if(!host) return;
   const langs = allLangs();
