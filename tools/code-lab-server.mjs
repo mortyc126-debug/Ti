@@ -246,9 +246,11 @@ async function listTemplates(){
 }
 async function fileForId(id){ const l = await listTemplates(); const m = l.find(x => x.id === id); return m ? m.file : null; }
 // найти уже существующий шаблон с таким же названием и кодом (для дедупа при добавлении)
-const _tplCode = j => (Array.isArray(j.lines) ? j.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : '').trim();
+// нормализуем переводы строк (\r\n → \n), иначе «тот же» код из Windows-файла считается другим → дубли
+const _normCode = s => String(s == null ? '' : s).replace(/\r\n?/g, '\n').trim();
+const _tplCode = j => _normCode(Array.isArray(j.lines) ? j.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : '');
 async function findSameTemplate(title, code){
-  const wantT = String(title || '').trim().toLowerCase(), wantC = String(code || '').trim();
+  const wantT = String(title || '').trim().toLowerCase(), wantC = _normCode(code);
   let names = [];
   try { names = (await fs.readdir(TEMPLATES)).filter(n => n.endsWith('.json')); } catch(_){ return null; }
   for(const n of names){
@@ -260,7 +262,7 @@ async function findSameTemplate(title, code){
 }
 // дубль по коду, даже под другим названием: тот же код — тот же кусок (пустой код не считаем)
 async function findByCode(code){
-  const wantC = String(code || '').trim(); if(!wantC) return null;
+  const wantC = _normCode(code); if(!wantC) return null;
   let names = [];
   try { names = (await fs.readdir(TEMPLATES)).filter(n => n.endsWith('.json')); } catch(_){ return null; }
   for(const n of names){

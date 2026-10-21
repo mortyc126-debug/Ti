@@ -776,6 +776,10 @@ function renderInspector(nd){
   body.appendChild(el('div', 'insp-kind', b.type === 'draw' ? 'рисование' : 'компонент'));
   body.appendChild(renderBlockContract(nd, b));
   const save = el('button', 'insp-save', '💾 сохранить в каталог'); save.title = 'добавить этот кусок в каталог как компонент'; save.onclick = () => saveToCatalog(nd); body.appendChild(save);
+  // скачать этот кусок файлом в его родном формате (css→.css, py→.py, …)
+  const dlf = el('button', 'insp-save', '⬇ скачать файл'); const lx = nodeLang(nd); dlf.title = 'сохранить код этого куска как .' + (LANG_EXT[lx] || 'txt');
+  dlf.onclick = () => { const ext = LANG_EXT[lx] || 'txt'; const nm = (nodeLabel(nd) || 'кусок').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 60) + '.' + ext; download(nm, nodeCode(nd), MIME[ext] || 'text/plain'); };
+  body.appendChild(dlf);
   // кусок — целый файл? предложить разложить на блоки (разметка/стили/скрипт, JS по шагам)
   if(nd.blockId === 'raw'){
     const parts = breakdownText(String((nd.fields || {}).code || ''), 'auto').parts;
@@ -1184,7 +1188,8 @@ function saveToCatalog(nd){
   // совпадение по названию → предложить обновить вместо дубля (приоритет — родной шаблон узла)
   const findDup = () => { const t = q('#s-title').value.trim().toLowerCase(); if(!t) return null;
     if(nd.src && (nd.src.title||'').trim().toLowerCase() === t) return { id: nd.src.id, title: nd.src.title };
-    return CATALOG.find(x => (x.title||'').trim().toLowerCase() === t && (x.lang||'js') === 'js'); };
+    const lng = nodeLang(nd);
+    return CATALOG.find(x => (x.title||'').trim().toLowerCase() === t && (x.lang||'js').toLowerCase() === lng); };
   const refreshDup = () => { const d = findDup(), box = q('#s-dup');
     if(d){ box.style.display = 'block'; box.innerHTML = 'Компонент «' + esc(d.title) + '» уже есть. <label class="m-dup-lbl"><input type="checkbox" id="s-asnew"> создать новый, а не обновлять</label>'; q('#s-save').textContent = 'Обновить существующий'; }
     else { box.style.display = 'none'; box.innerHTML = ''; q('#s-save').textContent = 'Сохранить'; } };
@@ -1195,8 +1200,9 @@ function saveToCatalog(nd){
     const preflight = refreshPreflight();
     if(preflight.errors.length){ q('#s-err').textContent = 'Сохранение заблокировано: сначала исправь ошибки самопроверки.'; return; }
     const purpose = q('#s-purpose').value, subcat = q('#s-sub').value;
-    const detectedDeps=runtimeLibraryNeeds(code).map(d=>d.provider?`${d.name} — источник/блок: ${d.provider}`:d.name); const component = { type:'component', tags:{ purpose:[purpose], technology:['JavaScript'], runtime:[] }, subcat, summary:{ input:'', output:'', dependencies:detectedDeps, requirements:[] } };
-    const payload = { title, lang:'js', group: subcat, desc: q('#s-desc').value.trim(), code, component };
+    const lng = nodeLang(nd);
+    const detectedDeps=runtimeLibraryNeeds(code).map(d=>d.provider?`${d.name} — источник/блок: ${d.provider}`:d.name); const component = { type:'component', tags:{ purpose:[purpose], technology:[lng.toUpperCase()], runtime:[] }, subcat, summary:{ input:'', output:'', dependencies:detectedDeps, requirements:[] } };
+    const payload = { title, lang: lng, group: subcat, desc: q('#s-desc').value.trim(), code, component };
     const dup = findDup(), asNew = q('#s-asnew') && q('#s-asnew').checked;
     q('#s-save').textContent = 'сохраняю…';
     let r;
@@ -1341,6 +1347,9 @@ $('#copy').onclick = () => { navigator.clipboard.writeText(currentCode()); flash
 $('#run').onclick = run;
 // «🔌 собрать и проверить»: что не стыкуется + чего не хватает + запуск
 function nodeLang(nd){ return (nd && nd.src && nd.src.lang) ? String(nd.src.lang).toLowerCase() : 'js'; }
+// язык → расширение файла и mime (для «скачать файл» в родном формате)
+const LANG_EXT = { js:'js', javascript:'js', ts:'ts', typescript:'ts', python:'py', py:'py', ruby:'rb', php:'php', go:'go', lua:'lua', bash:'sh', sh:'sh', powershell:'ps1', r:'R', sql:'sql', css:'css', html:'html', htm:'html', json:'json', txt:'txt' };
+const MIME = { js:'text/javascript', ts:'text/plain', py:'text/x-python', rb:'text/plain', php:'text/plain', go:'text/plain', lua:'text/plain', sh:'text/plain', ps1:'text/plain', R:'text/plain', sql:'text/plain', css:'text/css', html:'text/html', json:'application/json', txt:'text/plain' };
 // каких входов не хватает: имя нужно куску, но никто РАНЬШЕ него (по порядку) его не даёт
 function missingInputs(){
   const order = orderedNodes(); const provided = new Set(); const out = [];
