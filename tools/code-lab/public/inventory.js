@@ -276,6 +276,15 @@ async function copy(text, btn){
   const o = btn.textContent; btn.textContent = '✓ скопировано'; setTimeout(() => btn.textContent = o, 1200);
 }
 document.getElementById('pcopy').onclick = e => copy(piecesAsText(), e.target);
+// убрать дубли — куски с одинаковым кодом схлопнуть в один
+(function(){ const btn = document.getElementById('pdedup'); if(!btn) return; btn.onclick = async () => {
+  if(!confirm('Схлопнуть куски с ОДИНАКОВЫМ кодом в один? Оставляется самый полный (с разделом/описанием/пояснениями), остальные удаляются без возврата.')) return;
+  const o = btn.textContent; btn.disabled = true; btn.textContent = 'чищу…';
+  let r; try { r = await fetch('/api/dedup', { method:'POST' }).then(x => x.json()); } catch(_){ r = null; }
+  btn.disabled = false;
+  if(r && r.ok){ btn.textContent = r.removed ? ('✓ удалено ' + r.removed + ' дублей') : 'дублей не нашлось'; try { PIECES = await fetch('/api/list').then(x => x.json()); } catch(_){} fillFilters(); renderPieces(); setTimeout(() => { btn.textContent = o; }, 3000); }
+  else { btn.textContent = 'ошибка'; setTimeout(() => { btn.textContent = o; }, 2000); }
+}; })();
 document.getElementById('fcopy').onclick = e => copy(flowsAsText(), e.target);
 
 // ── импорт связей/контрактов из текста ────────────────────────────────────────

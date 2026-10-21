@@ -407,6 +407,30 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, files, added, total: names.length });
     }
 
+    // убрать дубли: куски с одинаковым кодом схлопнуть в один (оставить самый полный)
+    if(u.pathname === '/api/dedup' && req.method === 'POST'){
+      const names = (await fs.readdir(TEMPLATES)).filter(n => n.endsWith('.json'));
+      const byCode = new Map();
+      for(const n of names){
+        try { const j = JSON.parse(await fs.readFile(path.join(TEMPLATES, n), 'utf8'));
+          const code = _tplCode(j); if(!code) continue;   // пустой код не трогаем
+          const key = (j.lang || '') + '\u0000' + code;    // одинаковый код В ТОМ ЖЕ языке
+          if(!byCode.has(key)) byCode.set(key, []);
+          byCode.get(key).push({ n, j });
+        } catch(_){}
+      }
+      // оценка «полноты»: есть раздел, описание, пояснения к словам — такой оставляем
+      const score = x => { let s = 0; if(String(x.j.group || '').trim()) s += 3; if(String(x.j.desc || '').trim()) s += 2; let e = 0; for(const ln of (x.j.lines || [])) for(const t of (ln || [])) if(t && t.e) e++; return s + Math.min(e, 20); };
+      let removed = 0, groups = 0;
+      for(const [, arr] of byCode){
+        if(arr.length < 2) continue;
+        groups++;
+        arr.sort((a, b) => score(b) - score(a));   // лучший — первым, его оставляем
+        for(let i = 1; i < arr.length; i++){ try { await fs.unlink(path.join(TEMPLATES, arr[i].n)); removed++; } catch(_){} }
+      }
+      return json(res, 200, { ok: true, groups, removed, total: names.length });
+    }
+
     // объединённый импорт: один код-файл, полноценный кусок JSON, массив кусков или сборник {dict,pieces}
     if((u.pathname === '/api/import' || u.pathname === '/api/import-collection') && req.method === 'POST'){
       return json(res, 200, await importBundle(await readBody(req)));
