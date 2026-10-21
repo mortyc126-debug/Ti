@@ -2,6 +2,39 @@
 // Переиспользуется и в Библиотеке, и в разделе «Данные». window.renderUploader(el, {onDone}).
 (function(){
   const EXT_LANG = { js:'js', mjs:'js', jsx:'js', ts:'ts', tsx:'ts', py:'python', rb:'ruby', php:'php', go:'go', lua:'lua', sh:'bash', bash:'bash', ps1:'powershell', r:'r', sql:'sql', html:'html', htm:'html', css:'css', txt:'txt' };
+  const CODE_RE = /\.(json|js|mjs|jsx|ts|tsx|py|rb|php|go|lua|sh|bash|ps1|r|sql|css|html?|txt)$/i;
+  // распаковка архивов прямо в загрузчике: zip / gz / обычный файл → список {name,text}
+  async function decomp(buf, fmt){ const ds = new DecompressionStream(fmt); return await new Response(new Blob([buf]).stream().pipeThrough(ds)).text(); }
+  async function extractFile(f){
+    const name = f.name.toLowerCase(); const buf = await f.arrayBuffer(); const b = new Uint8Array(buf);
+    if(name.endsWith('.zip') || (b[0] === 0x50 && b[1] === 0x4b)) return await unzip(buf);
+    if(name.endsWith('.gz') || (b[0] === 0x1f && b[1] === 0x8b)){ const text = await decomp(buf, 'gzip'); return [{ name: f.name.replace(/\.gz$/i, '') || f.name, text }]; }
+    return [{ name: f.name, text: new TextDecoder().decode(buf) }];
+  }
+  async function unzip(buf){
+    const dv = new DataView(buf), bytes = new Uint8Array(buf), dec = new TextDecoder();
+    let eocd = -1;
+    for(let i = buf.byteLength - 22; i >= 0 && i > buf.byteLength - 22 - 65536; i--){ if(dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; } }
+    if(eocd < 0) throw new Error('повреждённый ZIP');
+    const count = dv.getUint16(eocd + 10, true); let off = dv.getUint32(eocd + 16, true); const out = [];
+    for(let n = 0; n < count; n++){
+      if(dv.getUint32(off, true) !== 0x02014b50) break;
+      const method = dv.getUint16(off + 10, true), compSize = dv.getUint32(off + 20, true);
+      const nameLen = dv.getUint16(off + 28, true), extraLen = dv.getUint16(off + 30, true), commentLen = dv.getUint16(off + 32, true);
+      const lho = dv.getUint32(off + 42, true);
+      const name = dec.decode(bytes.subarray(off + 46, off + 46 + nameLen));
+      off += 46 + nameLen + extraLen + commentLen;
+      if(/\/$/.test(name) || !CODE_RE.test(name)) continue;   // папки и не-код тихо пропускаем
+      const lnameLen = dv.getUint16(lho + 26, true), lextraLen = dv.getUint16(lho + 28, true);
+      const dataStart = lho + 30 + lnameLen + lextraLen, comp = bytes.subarray(dataStart, dataStart + compSize);
+      let text;
+      if(method === 0) text = dec.decode(comp);
+      else if(method === 8) text = await decomp(comp, 'deflate-raw');
+      else continue;
+      out.push({ name: name.split('/').pop(), text });
+    }
+    return out;
+  }
 
   // видимые образцы: один кусок на каждый язык + сборник. Это то, что реально принимает загрузчик.
   const EXAMPLES = {
@@ -77,8 +110,8 @@
       '<div class="up-box">' +
         '<div class="up-row">' +
           '<button class="btn ok up-load">📥 загрузить куски</button>' +
-          '<input type="file" class="up-file" accept=".json,.js,.mjs,.jsx,.ts,.tsx,.py,.rb,.php,.go,.lua,.sh,.bash,.ps1,.r,.sql,.html,.htm,.css,.txt" multiple style="display:none">' +
-          '<span class="up-note muted">код-файлы (.js/.py/.css/.html…), полный кусок JSON или сборник — можно несколько сразу</span>' +
+          '<input type="file" class="up-file" accept=".zip,.gz,.json,.js,.mjs,.jsx,.ts,.tsx,.py,.rb,.php,.go,.lua,.sh,.bash,.ps1,.r,.sql,.html,.htm,.css,.txt" multiple style="display:none">' +
+          '<span class="up-note muted">код-файлы (.js/.py/.css/.html…), архив (.zip/.gz), полный кусок JSON или сборник — можно несколько сразу</span>' +
         '</div>' +
         '<div class="up-nav">' +
           '<div class="up-nav-head">📂 актуальные разделы и подразделы. Клик по строке — скопировать её, чтобы вписать в поле <code>group</code> своего файла. Новый раздел — просто впиши новый путь (через « / » — подраздел), он создастся при загрузке:</div>' +
@@ -152,12 +185,15 @@
     fileIn.onchange = async () => {
       const files = [...fileIn.files]; if(!files.length) return;
       const o = loadBtn.textContent; loadBtn.disabled = true; loadBtn.textContent = '…';
+      // архивы (zip/gz) распаковываем в записи; обычные файлы — одна запись
+      let entries = [];
+      for(const f of files){ try { entries = entries.concat(await extractFile(f)); } catch(_){} }
       let created = 0, learned = 0, updated = 0, bad = 0;
-      for(const f of files){
-        const ext = (f.name.split('.').pop() || '').toLowerCase(); const text = await f.text(); let payload;
+      for(const e of entries){
+        const ext = (e.name.split('.').pop() || '').toLowerCase(); let payload;
         // раздел берём ИЗ файла (поле group). Код-файлы без group — лягут в «без раздела», разложишь в Описи.
-        if(ext === 'json'){ try { payload = JSON.parse(text); } catch(_){ bad++; continue; } }
-        else payload = { lang: EXT_LANG[ext] || 'txt', title: f.name.replace(/\.[^.]+$/, ''), code: text, group: '' };
+        if(ext === 'json'){ try { payload = JSON.parse(e.text); } catch(_){ bad++; continue; } }
+        else payload = { lang: EXT_LANG[ext] || 'txt', title: e.name.replace(/\.[^.]+$/, ''), code: e.text, group: '' };
         let r; try { r = await fetch('/api/import', { method: 'POST', body: JSON.stringify(payload) }).then(x => x.json()); } catch(_){ r = null; }
         if(r && r.ok){ created += r.created || 0; learned += r.learned || 0; updated += r.updated || 0; } else bad++;
       }
