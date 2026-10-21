@@ -1595,6 +1595,8 @@ function cssEsc(s){ return String(s).replace(/["\\]/g, '\\$&'); }
 
 restore();
 loadCatalog();
+// вернулась на вкладку конструктора — подтянуть свежий каталог (разделы, правленные в Описи, применятся)
+document.addEventListener('visibilitychange', () => { if(!document.hidden) loadCatalog(); });
 renderCanvas();
 renderInspector();
 renderCode();
