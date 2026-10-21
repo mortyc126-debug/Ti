@@ -132,7 +132,7 @@ function filteredPieces(){
   const lang = _val('plang'), group = _val('pgroup'), facet = _val('pfacet');
   let list = PIECES;
   if(q) list = list.filter(t => ((t.title || '') + ' ' + (t.id || '') + ' ' + (t.group || '') + ' ' + give(t).join(' ') + ' ' + need(t).join(' ')).toLowerCase().includes(q));
-  if(lang) list = list.filter(t => (t.lang || '') === lang);
+  if(lang) list = list.filter(t => String(t.lang || '').toLowerCase() === lang);
   if(group === '__unsorted__') list = list.filter(isUnsorted);   // быстрый фильтр «неразложенные»
   else if(group) list = list.filter(t => String(t.group || '').split('/')[0].trim() === group);   // по верхнему уровню раздела
   if(facet) list = list.filter(t => !cov(t)[facet]);           // показать только те, где этой грани НЕТ
@@ -141,7 +141,7 @@ function filteredPieces(){
 }
 // наполнить выпадашки языком/разделом (из данных) и гранями (из FACETS)
 function fillFilters(){
-  const langs = [...new Set(PIECES.map(t => t.lang).filter(Boolean))].sort();
+  const langs = [...new Set(PIECES.map(t => String(t.lang || '').toLowerCase()).filter(Boolean))].sort();
   const groups = [...new Set(PIECES.map(t => String(t.group || '').split('/')[0].trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru'));
   const opt = (v, label) => '<option value="' + esc(v) + '">' + esc(label) + '</option>';
   const pl = document.getElementById('plang'); if(pl) pl.innerHTML = opt('', 'язык: все') + langs.map(l => opt(l, l.toUpperCase())).join('');
