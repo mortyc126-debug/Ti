@@ -381,9 +381,12 @@ function renderPalette(){
   };
   renderBranch(root, host);
 }
-// разово проставить раздел по смыслу там, где он пуст (ключевые слова → «Раздел / Подраздел»)
+// «не разложен» — пусто ИЛИ дефолтная корзина (туда куски валятся при кривом group)
+const _AUTOSORT_BUCKETS = new Set(['', 'мои куски', 'разное', 'без раздела', 'мои шаблоны', 'мой сборник', 'из конструктора']);
+function needsSort(t){ return _AUTOSORT_BUCKETS.has(String(t.group || '').split('/')[0].trim().toLowerCase()); }
+// разово проставить раздел по смыслу там, где его нет или он дефолтный (ключевые слова → «Раздел / Подраздел»)
 async function autoSortCatalog(){
-  const need = CATALOG.filter(t => !String(t.group || '').trim());
+  const need = CATALOG.filter(needsSort);
   if(!need.length) return { done: 0 };
   let done = 0;
   for(const t of need){
@@ -396,9 +399,9 @@ async function autoSortCatalog(){
   return { done };
 }
 (function(){ const btn = $('#palsort'); if(!btn) return; btn.onclick = async () => {
-  const empty = CATALOG.filter(t => !String(t.group || '').trim()).length;
+  const empty = CATALOG.filter(needsSort).length;
   if(!empty){ const o = btn.textContent; btn.textContent = 'всё уже разложено'; setTimeout(() => btn.textContent = o, 1600); return; }
-  if(!confirm('Проставить раздел по смыслу у ' + empty + ' кусков без раздела? Уже заданные разделы не трогаются; потом можно переименовать/переместить.')) return;
+  if(!confirm('Разложить по смыслу ' + empty + ' кусков без раздела или в дефолтной корзине («Мои куски» и т.п.)? Нормальные разделы не трогаются; потом можно переименовать/переместить.')) return;
   btn.disabled = true; const o = btn.textContent; btn.textContent = 'раскладываю…';
   const r = await autoSortCatalog();
   btn.textContent = '✓ разложено ' + r.done; setTimeout(() => { btn.textContent = o; btn.disabled = false; }, 2000);

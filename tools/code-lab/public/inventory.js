@@ -276,6 +276,19 @@ async function copy(text, btn){
   const o = btn.textContent; btn.textContent = '✓ скопировано'; setTimeout(() => btn.textContent = o, 1200);
 }
 document.getElementById('pcopy').onclick = e => copy(piecesAsText(), e.target);
+// массовый перенос: все показанные (с учётом фильтров) → в один раздел
+(function(){ const btn = document.getElementById('pmoveall'); if(!btn) return; btn.onclick = async () => {
+  const list = filteredPieces();
+  if(!list.length){ const o = btn.textContent; btn.textContent = 'нечего переносить'; setTimeout(() => btn.textContent = o, 1600); return; }
+  const v = prompt('Переместить ВСЕ показанные (' + list.length + ' шт.) в раздел (подраздел через «/»). Пусто = без раздела:', '');
+  if(v === null) return;
+  const group = v.trim();
+  const o = btn.textContent; btn.disabled = true; btn.textContent = 'переношу…';
+  let done = 0;
+  for(const t of list){ const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: t.id, group }) }).then(x => x.json()).catch(() => ({})); if(r && r.ok){ t.group = group; done++; } }
+  btn.disabled = false; btn.textContent = '✓ перенесено ' + done; fillFilters(); renderPieces();
+  setTimeout(() => { btn.textContent = o; }, 2500);
+}; })();
 // убрать дубли — куски с одинаковым кодом схлопнуть в один
 (function(){ const btn = document.getElementById('pdedup'); if(!btn) return; btn.onclick = async () => {
   if(!confirm('Схлопнуть куски с ОДИНАКОВЫМ кодом в один? Оставляется самый полный (с разделом/описанием/пояснениями), остальные удаляются без возврата.')) return;
