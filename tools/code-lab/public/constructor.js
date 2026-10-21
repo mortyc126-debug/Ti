@@ -954,7 +954,7 @@ function nodeDirty(nd){
 // описание узла: пишется и сразу видно здесь же, во вкладке «Разобраться»
 function descEditor(nd, b){
   const box = document.createElement('div');
-  box.appendChild(el('div', 'insp-kind', 'описание — своими словами, сохраняется сразу'));
+  box.appendChild(el('div', 'insp-kind', 'описание — своими словами; у куска из каталога сохраняется в сам кусок (без дубля)'));
   const ta = document.createElement('textarea'); ta.className = 'insp-desc'; ta.spellcheck = false; ta.value = nd.desc || '';
   ta.placeholder = 'что это и зачем — чтобы не забыть. `код` в кавычках — цветная плашка';
   const prev = el('div', 'desc-prev');
@@ -983,7 +983,18 @@ function descEditor(nd, b){
     down.onclick = () => { const t = (CATALOG || []).find(x => x.id === nd.src.id); ta.value = there; nd.desc = there; nd.descAt = (t && t.descAt) || 0; nd.src.desc = there; persist(); draw(); drawSync(); };
     row.append(up, down); sync.appendChild(row);
   };
-  ta.addEventListener('input', () => { nd.desc = ta.value; nd.descAt = Date.now(); persist(); draw(); drawSync(); });
+  // описание пишется в узел сразу, а в сам кусок каталога — с задержкой (без дубля, правка по id)
+  let descSaveT = null;
+  const saveDescToCatalog = () => {
+    if(!nd.src || !nd.src.id) return;
+    clearTimeout(descSaveT);
+    descSaveT = setTimeout(async () => {
+      const val = nd.desc || '';
+      const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: nd.src.id, desc: val, descAt: nd.descAt || Date.now() }) }).then(r => r.json()).catch(() => ({}));
+      if(r && r.ok){ nd.src.desc = val; const t = (CATALOG || []).find(x => x.id === nd.src.id); if(t) t.desc = val; drawSync(); }
+    }, 800);
+  };
+  ta.addEventListener('input', () => { nd.desc = ta.value; nd.descAt = Date.now(); persist(); draw(); drawSync(); saveDescToCatalog(); });
   box.appendChild(ta);
   const tools = el('div', 'desc-tools');
   const chip = el('button', 'btn', '⟨⟩ код в плашку'); chip.type = 'button'; chip.onclick = () => { wrapBackticks(ta); nd.desc = ta.value; nd.descAt = Date.now(); persist(); draw(); drawSync(); };
