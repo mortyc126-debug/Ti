@@ -1,0 +1,74 @@
+{
+  "id": "подчёркивание-mvhtfr4q",
+  "lang": "css",
+  "group": "Мои куски",
+  "title": "подчёркивание",
+  "desc": "",
+  "lines": [
+    [
+      {
+        "k": "op",
+        "v": "."
+      },
+      {
+        "k": "name",
+        "v": "underline",
+        "r": "underline"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "op",
+        "v": "{"
+      }
+    ],
+    [
+      {
+        "k": "sp",
+        "v": "  "
+      },
+      {
+        "k": "name",
+        "v": "text",
+        "r": "text"
+      },
+      {
+        "k": "op",
+        "v": "-"
+      },
+      {
+        "k": "name",
+        "v": "decoration",
+        "r": "decoration"
+      },
+      {
+        "k": "op",
+        "v": ":"
+      },
+      {
+        "k": "sp",
+        "v": " "
+      },
+      {
+        "k": "name",
+        "v": "underline",
+        "r": "underline"
+      },
+      {
+        "k": "op",
+        "v": ";"
+      }
+    ],
+    [
+      {
+        "k": "op",
+        "v": "}"
+      }
+    ],
+    []
+  ],
+  "output": "",
+  "descAt": 1792569231386
+}
