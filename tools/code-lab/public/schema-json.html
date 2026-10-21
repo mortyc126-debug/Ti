@@ -447,7 +447,9 @@ async function unzip(buf){
     const lho = dv.getUint32(off + 42, true);
     const name = dec.decode(bytes.subarray(off + 46, off + 46 + nameLen));
     off += 46 + nameLen + extraLen + commentLen;
-    if(!/\.json$/i.test(name)) continue;
+    if(/\/$/.test(name)) continue;   // запись-папка
+    // берём json И файлы кода; прочее (картинки и т.п.) тихо пропускаем
+    if(!/\.(json|js|mjs|jsx|ts|tsx|py|rb|php|go|lua|sh|bash|ps1|r|sql|css|html?|txt)$/i.test(name)) continue;
     const lnameLen = dv.getUint16(lho + 26, true), lextraLen = dv.getUint16(lho + 28, true);
     const dataStart = lho + 30 + lnameLen + lextraLen;
     const comp = bytes.subarray(dataStart, dataStart + compSize);
