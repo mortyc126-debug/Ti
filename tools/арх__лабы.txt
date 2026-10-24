@@ -199,7 +199,7 @@ library/
 |---|---|---|
 | Старт | Главная, С чего начать, Обучение | `index.html` (`home.js`), `start.html` (`start.js`), `schema.html` |
 | Кусочки кода | **Опись**, **Библиотека** | `inventory.html` (`inventory.js`, `ai-tools.js`), `library.html` (`app.js`, `upload-templates.js`, `cm-bridge.js`) |
-| Собирать | **Конструктор**, Рецепты | `constructor.html` (`constructor.js`, `sandbox.js`, `workspace.js`, `tabs.js`, `fileio.js`, `search.js`), `recipes.html` (`recipes.js`) |
+| Собирать | **Конструктор**, Рецепты | `constructor.html` (`constructor.js`, `sandbox.js`, `workspace.js`, `tabs.js`, `fileio.js`, `search.js`, `navigate.js`), `recipes.html` (`recipes.js`) |
 | Данные | Данные (загрузка) | `schema-json.html` |
 
 Страницы вне меню:
@@ -313,6 +313,10 @@ code-lab/vendor/codemirror/
 ### Поиск в песочнице (`search.js`, с 24.10.2026)
 
 Кнопка «🔎 поиск» в панели песочницы и Ctrl/Cmd+F открывают полосу поиска под вкладками (`.sb-find` в `.sb-edcol`). Два режима (сегмент-переключатель): «в файле» — ищет в активном файле; «по приёмам» — по всем открытым файлам, слово-приём разворачивается в набор регулярок через словарь `TRICKS` в модуле (цикл→for/while/forEach/.map/do, условие→if/else/switch/?:, функция→function/=>/def/func, массив, объект, класс, импорт, вывод→console.log/print/echo/alert, переменная, событие, ошибка→try/catch/throw, запрос→fetch/axios). По умолчанию регистр не учитывается, галочка «Аа» включает учёт. Совпадения считаются (`n / m`), подсвечиваются в CodeMirror через `markText` (`.cm-find`, текущее — `.cm-find-cur`); Enter/Shift+Enter и кнопки ‹ › листают, при совпадении в другом файле переходит на его вкладку (`window.codelabTabs.setActive`). «Начать с последнего»: по файлу помнится смещение последнего совпадения (`lastPos`), поиск стартует с него. Esc закрывает. Работает и без CodeMirror (обычная `textarea` — выделение через `setSelectionRange`, без подсветки всех совпадений). Использует только core-методы CM (`posFromIndex`, `markText`, `setSelection`, `scrollIntoView`), экземпляр берёт из `ta.__cm`.
+
+### Клик по слову: определение и использования (`navigate.js`, с 24.10.2026)
+
+Галочка «🔗 связи по клику» в панели песочницы (рядом с «пояснения по клику»). Когда включена, клик по имени показывает попап `.nav-pop`: где имя **задано** (определение) и где **используется**, по всем открытым файлам. Эвристика по имени, не настоящий анализатор: определение — строка, где по слову совпали `function/def/func/fn/sub W`, `class W`, `const/let/var W`, `W = функция/стрелка/объект/массив`, `W(...) {` или присваивание `W =`; остальные вхождения (по границе `(?<![\w$])W(?![\w$])`) — использования. Ключевые слова и слова короче 2 символов пропускаются (`STOP`). Каждая ссылка кликабельна: переход на нужную вкладку (`window.codelabTabs.setActive`) и выделение места (CM `posFromIndex`+`setSelection`+`scrollIntoView`, либо `textarea.setSelectionRange`). Слово под курсором берётся через CM `coordsChar`+`findWordAt`+`getRange`, в обычной `textarea` — вокруг каретки. Наружу отдаёт `window.codelabNav = { analyze, jump }` (пригодится будущей панели связей).
 
 ## 11. Безопасность
 
