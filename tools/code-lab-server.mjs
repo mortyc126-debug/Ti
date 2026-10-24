@@ -766,6 +766,35 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, added, where, total: Object.keys(target).length, langs: Object.keys(dict.langs) });
     }
 
+    // сборщик «непонятных слов»: из кода (или из кусков языка) собираем токены, которых НЕТ в словаре,
+    // склеиваем повторы, сортируем по частоте и отдаём готовый запрос для ИИ (ответ — строки «слово: пояснение»).
+    if(u.pathname === '/api/dict/unknown' && req.method === 'POST'){
+      const b = await readBody(req);
+      const lang = String(b.lang || '').trim().toLowerCase();
+      const dict = await kwDict();
+      const has = w => { const lw = w.toLowerCase();
+        return !!((dict.langs && dict.langs[lang] && dict.langs[lang][lw]) || (dict.words && dict.words[lw])
+          || (dict.htmlTags && dict.htmlTags[lw]) || (dict.htmlAttrs && dict.htmlAttrs[lw])
+          || (dict.cssProps && dict.cssProps[lw]) || (dict.cssVals && dict.cssVals[lw])); };
+      // источник кода: присланный код, иначе склейка кусков этого языка из библиотеки
+      let code = String(b.code || '');
+      let scanned = code ? 1 : 0;
+      if(!code){ for(const e of await store.entries()){ if(!lang || String(e.lang || '').toLowerCase() === lang){ code += '\n' + String(e.code || ''); scanned++; } } }
+      // токены: слова и устойчивые конструкции (std::cout, System.out.println, #include, obj->field)
+      const re = /#?[A-Za-z_][A-Za-z0-9_]*(?:(?:::|->|\.)[A-Za-z_][A-Za-z0-9_]*)*/g;
+      const counts = new Map(); let m;
+      while((m = re.exec(code))){ const w = m[0]; if(w.length < 2 || /^\d/.test(w)) continue; if(has(w)) continue; counts.set(w, (counts.get(w) || 0) + 1); }
+      const words = [...counts.entries()].map(([w, c]) => ({ w, c })).sort((a, b2) => b2.c - a.c).slice(0, 300);
+      const list = words.map(x => x.w + ' (' + x.c + ')').join('\n');
+      const prompt = 'Язык: ' + (lang || 'общий') + '.\n'
+        + 'Ниже — слова и устойчивые конструкции из кода на этом языке, которых ещё нет в словаре пояснений (в скобках — сколько раз встретились).\n'
+        + 'Выдели значимые ключевые слова и устойчивые формулировки языка и дай каждому короткое пояснение по-русски — строго по одному на строку, в формате:\n'
+        + 'слово: пояснение\n'
+        + 'Без нумерации и лишнего текста. Пропусти случайные имена переменных и незначимое. Эти строки я вставлю в словарь.\n\n'
+        + list;
+      return json(res, 200, { lang, scanned, count: words.length, words, prompt });
+    }
+
     // ── рецепты (название + описание + список кусков) ──────────────────────────
     if(u.pathname === '/api/recipes/list'){
       let names = [];

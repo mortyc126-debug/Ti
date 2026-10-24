@@ -670,8 +670,15 @@ function openDictModal(){
     + '<p class="mh">Бесконечно пополняй пояснения к особым словам <b>любого языка</b>. Укажи язык (c, cpp, java, python, rust, go…) — слова лягут в словарь этого языка и будут показываться, когда открыт файл на нём (в приоритете над общим). Пусто — общий словарь (для слов, общих всем языкам). Строка: <b>слово: пояснение</b> (или «=», или «|»). Всё попадает в <b>keyword-dict.json</b> — его читают песочница («пояснения», «🧩», «🔗»), автоподпись и бэкофилл.</p>'
     + '<div class="mbtns" style="margin-bottom:6px"><label class="inv-chk">язык: <input class="inv-search" id="dc-lang" list="dc-langs" placeholder="c, cpp, java, python… (пусто — общий)" style="width:230px"></label>'
     + '<datalist id="dc-langs"><option value="c"><option value="cpp"><option value="java"><option value="python"><option value="rust"><option value="go"><option value="sql"><option value="php"><option value="ruby"><option value="lua"><option value="bash"><option value="js"><option value="ts"></datalist></div>'
+    + '<div class="lp-sec" style="margin:2px 0 4px">Шаг 1 (необязательно): собрать непонятные слова</div>'
+    + '<p class="mh" style="margin:0 0 4px">Вставь код на этом языке (или оставь пусто — возьму куски этого языка из библиотеки). Соберу слова и устойчивые конструкции, которых ещё нет в словаре, склею повторы и дам готовый запрос — отдай его мне или GPT, ответ вставь в Шаг 2.</p>'
+    + '<textarea id="dc-code" placeholder="код на этом языке (или пусто — из библиотеки)" style="min-height:64px"></textarea>'
+    + '<div class="mbtns"><button class="btn" id="dc-scan">🔍 собрать непонятные слова</button><span class="pp-note" id="dc-scan-note"></span></div>'
+    + '<textarea id="dc-prompt" placeholder="сюда ляжет готовый запрос для ИИ" readonly style="min-height:64px;display:none"></textarea>'
+    + '<div class="mbtns" id="dc-prompt-btns" style="display:none"><button class="btn" id="dc-copy">⧉ скопировать запрос</button></div>'
+    + '<div class="lp-sec" style="margin:8px 0 4px">Шаг 2: добавить в словарь</div>'
     + '<div class="fmt">printf: printf — вывод в консоль в C&#10;malloc: выделить память вручную, потом free()&#10;std::cout: поток вывода в C++ (cout &lt;&lt; x)</div>'
-    + '<textarea id="dc-text" placeholder="вставь строки «слово: пояснение» или нажми «пример»"></textarea>'
+    + '<textarea id="dc-text" placeholder="вставь строки «слово: пояснение» (ответ ИИ) или нажми «пример»"></textarea>'
     + '<div class="mbtns"><button class="btn" id="dc-sample">пример</button><button class="btn ok" id="dc-parse">разобрать</button><button class="btn" id="dc-apply" style="display:none">добавить в словарь</button><button class="btn" id="dc-close">закрыть</button></div>'
     + '<div class="lp-prev" id="dc-prev"></div>';
   bg.appendChild(box); document.body.appendChild(bg);
@@ -679,6 +686,18 @@ function openDictModal(){
   bg.onclick = e => { if(e.target === bg) bg.remove(); };
   q('#dc-close').onclick = () => bg.remove();
   q('#dc-sample').onclick = () => { q('#dc-text').value = DICT_SAMPLE; };
+  // Шаг 1: собрать непонятные слова → готовый запрос для ИИ
+  q('#dc-scan').onclick = async () => {
+    const lang = q('#dc-lang').value.trim(), code = q('#dc-code').value;
+    q('#dc-scan').textContent = 'собираю…'; q('#dc-scan').disabled = true; q('#dc-scan-note').textContent = '';
+    const r = await fetch('/api/dict/unknown', { method: 'POST', body: JSON.stringify({ lang, code }) }).then(x => x.json()).catch(() => null);
+    q('#dc-scan').textContent = '🔍 собрать непонятные слова'; q('#dc-scan').disabled = false;
+    if(!r){ q('#dc-scan-note').textContent = 'ошибка'; return; }
+    q('#dc-scan-note').textContent = 'непонятных: ' + r.count + (code ? '' : ' (просмотрено кусков: ' + r.scanned + ')');
+    if(r.count){ q('#dc-prompt').value = r.prompt; q('#dc-prompt').style.display = ''; q('#dc-prompt-btns').style.display = ''; }
+    else { q('#dc-prompt').style.display = 'none'; q('#dc-prompt-btns').style.display = 'none'; q('#dc-scan-note').textContent += ' — всё уже в словаре 👍'; }
+  };
+  q('#dc-copy').onclick = () => { const t = q('#dc-prompt'); t.select(); try { navigator.clipboard.writeText(t.value); } catch(_){ try { document.execCommand('copy'); } catch(e){} } q('#dc-copy').textContent = '✓ скопировано'; setTimeout(() => q('#dc-copy').textContent = '⧉ скопировать запрос', 1200); };
   let parsed = null;
   q('#dc-parse').onclick = () => {
     parsed = parseDict(q('#dc-text').value);
