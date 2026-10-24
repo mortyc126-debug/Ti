@@ -1,0 +1,120 @@
+{
+  "schema": 1,
+  "id": "случайный-цвет-mvh8fr9g",
+  "file": "случайный-цвет-mvh8fr9g.js",
+  "title": "случайный цвет",
+  "lang": "js",
+  "group": "Графика и визуализация / Цвета и градиенты",
+  "desc": "Возвращает случайный цвет в формате hex.",
+  "output": "",
+  "tags": [
+    "генерация цвета",
+    "hex-цвет",
+    "случайность",
+    "графика",
+    "javascript",
+    "цветовые коды"
+  ],
+  "aliases": [
+    "как сгенерировать случайный hex цвет",
+    "рандомный цвет в js",
+    "случайный цвет для градиента",
+    "генератор цветов hex формат",
+    "цветовой код случайным образом"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 17,
+      "text": "floor",
+      "kind": "fn",
+      "note": "Math.floor — округлить вниз.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 23,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 28,
+      "text": "random",
+      "kind": "fn",
+      "note": "Math.random — случайное число от 0 до 1.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 17,
+      "text": "toString",
+      "kind": "fn",
+      "note": "toString — превратить значение в строку.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 30,
+      "text": "padStart",
+      "kind": "fn",
+      "note": "padStart — дополняет строку нулями слева до нужной длины",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "randomColor",
+      "n"
+    ],
+    "requires": [
+      "xffffff"
+    ]
+  },
+  "legacy": {
+    "template": "случайный-цвет-mvh8fr9g.json",
+    "descAt": 1792533959620
+  },
+  "enriched": true
+}

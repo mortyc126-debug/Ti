@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "id": "enumerate-и-zip-цикл-с-номером-и-по-пара-mvdrpuqu",
+  "file": "enumerate-и-zip-цикл-с-номером-и-по-пара-mvdrpuqu.py",
+  "title": "enumerate и zip — цикл с номером и по парам",
+  "lang": "python",
+  "group": "Данные / Перебирать коллекции",
+  "desc": "enumerate добавляет к каждому элементу индекс (по умолчанию с нуля, start меняет начало); zip объединяет элементы нескольких последовательностей по позициям и останавливается на самой короткой.",
+  "output": "1 аня\n2 лев\n3 олег\nаня 90\nлев 75\nолег 60",
+  "tags": [
+    "enumerate",
+    "zip",
+    "индекс элемента",
+    "параллельный обход",
+    "перебор списков",
+    "итераторы",
+    "python"
+  ],
+  "aliases": [
+    "перебирать список с номером python",
+    "цикл по двум спискам одновременно",
+    "объединить списки попарно"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 3,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторять блок заданное число раз.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 11,
+      "text": "in",
+      "kind": "kw",
+      "note": "in — часть for…in (ключи объекта) или проверка наличия свойства.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторять блок заданное число раз.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 14,
+      "text": "in",
+      "kind": "kw",
+      "note": "in — часть for…in (ключи объекта) или проверка наличия свойства.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "Данные: хранить, находить и преобразовывать"
+      ]
+    },
+    "subcat": "Перебирать, фи"
+  },
+  "legacy": {
+    "template": "enumerate-и-zip-цикл-с-номером-и-по-пара-mvdrpuqu.json",
+    "descAt": 1792324478695
+  },
+  "enriched": true
+}

@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "id": "var-mvxcnhory",
+  "file": "переменная-mvxcnhory.html",
+  "title": "var",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Переменная",
+  "tags": [
+    "var",
+    "html",
+    "тег var"
+  ],
+  "aliases": [
+    "<var>",
+    "var",
+    "html var",
+    "пример var",
+    "как сделать var",
+    "p",
+    "<p>",
+    "тег p",
+    "элемент p",
+    "html p",
+    "абзац текста",
+    "параграф",
+    "обычный текст",
+    "тег var",
+    "элемент var",
+    "переменная в тексте",
+    "математическая переменная",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "Переменная"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

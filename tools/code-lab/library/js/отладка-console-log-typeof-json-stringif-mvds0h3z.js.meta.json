@@ -1,0 +1,155 @@
+{
+  "schema": 1,
+  "id": "отладка-console-log-typeof-json-stringif-mvds0h3z",
+  "file": "отладка-console-log-typeof-json-stringif-mvds0h3z.js",
+  "title": "Отладка: console.log, typeof, JSON.stringify",
+  "lang": "js",
+  "group": "Ошибки и отладка / Найти причину сбоя",
+  "desc": "Три самых частых способа посмотреть, что внутри: вывести значение, узнать тип, красиво распечатать объект.",
+  "output": "цена = 100\nnumber object true\n{\n  \"цена\": 100\n}",
+  "tags": [
+    "отладка",
+    "typeof",
+    "JSON.stringify",
+    "типизация",
+    "консольный вывод"
+  ],
+  "aliases": [
+    "как проверить тип переменной в js",
+    "красивый вывод объекта в консоль",
+    "определить тип данных в javascript",
+    "отладка через консоль",
+    "как распечатать объект в js"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 12,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — возвращает тип значения строкой: \"number\", \"string\"…",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 25,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — возвращает тип значения строкой: \"number\", \"string\"…",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 12,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 17,
+      "text": "stringify",
+      "kind": "fn",
+      "note": "JSON.stringify — превратить объект в строку JSON (для хранения/передачи).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 35,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "цена",
+      "данные"
+    ],
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Ошибки и отладка"
+      ]
+    },
+    "subcat": "Найти причину сбоя"
+  },
+  "legacy": {
+    "template": "отладка-console-log-typeof-json-stringif-mvds0h3z.json",
+    "descAt": 1792324974239
+  },
+  "enriched": true
+}

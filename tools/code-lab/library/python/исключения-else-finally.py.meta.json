@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "исключения-else-finally",
+  "file": "исключения-else-finally.py",
+  "title": "try, except, else и finally",
+  "lang": "python",
+  "group": "Ошибки и отладка / Исключения",
+  "desc": "else выполняется только при отсутствии исключения в try, finally — в любом случае. Перехватывается только ожидаемая ошибка преобразования.",
+  "output": "Для корректного числа печатается результат; блок finally выполняется всегда.",
+  "tags": [
+    "try",
+    "except",
+    "else",
+    "finally",
+    "исключения",
+    "python"
+  ],
+  "aliases": [
+    "обработка исключений",
+    "блок finally"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

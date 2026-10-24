@@ -1,0 +1,172 @@
+{
+  "schema": 1,
+  "id": "libs-howto",
+  "file": "libs-howto.js",
+  "title": "Как подключать библиотеки",
+  "lang": "js",
+  "group": "Основы / Как устроена программа",
+  "desc": "Библиотека — чужой готовый код, который подключаешь к себе. Два пути: через npm (в проекте со сборкой) или через CDN (прямо в HTML).",
+  "output": "2026-10-11",
+  "tags": [
+    "npm",
+    "CDN",
+    "библиотеки",
+    "импорт",
+    "javascript",
+    "подключение"
+  ],
+  "aliases": [
+    "как подключить библиотеку в проекте",
+    "npm install пример",
+    "использование dayjs через CDN",
+    "как импортировать библиотеку в js",
+    "подключение сторонних библиотек"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 3,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "Подключить библиотеку в код (после npm install).",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 7,
+      "text": "dayjs",
+      "kind": "name",
+      "note": "Имя библиотеки (пример: работа с датами).",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 13,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "Встроенный объект вывода в консоль (F12 → Console).",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "Печатает в консоль то, что в скобках.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 12,
+      "text": "dayjs",
+      "kind": "fn",
+      "note": "Имя библиотеки (пример: работа с датами).",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 20,
+      "text": "format",
+      "kind": "fn",
+      "note": "Метод библиотеки — форматировать дату.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "2026-10-11",
+      "dependencies": [],
+      "requirements": [
+        "Запускай как ES-модуль и проверь наличие импортируемых файлов/пакетов."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "// 1) В проекте (есть package.json): сначала в терминале\n//    npm install dayjs\n//    затем в коде:\nimport dayjs from \"dayjs\";\nconsole.log(dayjs().format(\"YYYY-MM-DD\"));\n\n// 2) В обычном HTML без сборки — через CDN:\n// <script src=\"https://cdn.jsdelivr.net/npm/dayjs/dayjs.min.js\"></script>"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "2026-10-11",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [
+      "dayjs"
+    ],
+    "subcat": "Как устроена программа"
+  },
+  "legacy": {
+    "template": "libs-howto.json"
+  },
+  "enriched": true
+}

@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "словарь-get-и-значение-по-умолчанию",
+  "file": "словарь-get-и-значение-по-умолчанию.py",
+  "title": "Словарь — безопасное получение значения",
+  "lang": "python",
+  "group": "Данные / Словари",
+  "desc": "dict.get возвращает значение по ключу или значение по умолчанию, не вызывая KeyError при отсутствии ключа.",
+  "output": "",
+  "tags": [
+    "словарь",
+    "dict.get",
+    "ключ и значение",
+    "значение по умолчанию",
+    "KeyError",
+    "python"
+  ],
+  "aliases": [
+    "как получить значение словаря без ошибки",
+    "dict get default python",
+    "проверить наличие ключа в словаре",
+    "dict"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

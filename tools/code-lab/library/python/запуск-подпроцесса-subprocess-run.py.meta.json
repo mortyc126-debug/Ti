@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "запуск-подпроцесса-subprocess-run",
+  "file": "запуск-подпроцесса-subprocess-run.py",
+  "title": "Запуск внешней команды через subprocess.run",
+  "lang": "python",
+  "group": "Повседневная разработка / Процессы и отладка",
+  "desc": "Запускает команду без shell=True, задаёт тайм-аут и проверяет код завершения. Для динамических аргументов предпочтителен список аргументов, а не склеенная строка команды.",
+  "output": "Печатается вывод команды Python.",
+  "tags": [
+    "subprocess",
+    "процессы",
+    "тайм-аут",
+    "отладка",
+    "безопасность",
+    "python"
+  ],
+  "aliases": [
+    "запустить команду из Python",
+    "subprocess run"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

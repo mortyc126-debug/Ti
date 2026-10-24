@@ -1,0 +1,7 @@
+input:checked + label {
+  font-weight: 600;
+}
+
+input:invalid {
+  border-color: crimson;
+}

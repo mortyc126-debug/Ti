@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "id": "связать-списки-по-id-mvh8h3bq",
+  "file": "связать-списки-по-id-mvh8h3bq.js",
+  "title": "связать списки по id",
+  "lang": "js",
+  "group": "Сеть и запросы / Разобрать ответ и связать данные",
+  "desc": "Подставляет пользователя в каждый заказ.",
+  "output": "",
+  "tags": [
+    "map",
+    "поиск по ключу",
+    "объединение данных",
+    "javascript",
+    "data transformation"
+  ],
+  "aliases": [
+    "как связать заказы с пользователями по ID",
+    "быстрая подстановка данных из массива",
+    "замена userId на объект пользователя",
+    "объединение двух массивов по ключу"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 17,
+      "text": "Map",
+      "kind": "fn",
+      "note": "Map — быстрый поиск по ключу",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 27,
+      "text": "map",
+      "kind": "fn",
+      "note": "Map — быстрый поиск по ключу",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 22,
+      "text": "map",
+      "kind": "fn",
+      "note": "Map — быстрый поиск по ключу",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 13,
+      "text": "get",
+      "kind": "fn",
+      "note": "get — читает значение по ключу",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "byId",
+      "result"
+    ],
+    "requires": [
+      "users",
+      "orders",
+      "user"
+    ]
+  },
+  "legacy": {
+    "template": "связать-списки-по-id-mvh8h3bq.json",
+    "descAt": 1792534021910
+  },
+  "enriched": true
+}

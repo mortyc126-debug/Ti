@@ -1,0 +1,109 @@
+{
+  "schema": 1,
+  "id": "прочитать-значение-поля-mvh8fzwi",
+  "file": "прочитать-значение-поля-mvh8fzwi.js",
+  "title": "прочитать значение поля",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Поля ввода и формы",
+  "desc": "Берёт текст из поля и убирает пробелы по краям.",
+  "output": "",
+  "tags": [
+    "trim",
+    "пользовательский ввод",
+    "форма",
+    "валидация",
+    "javascript",
+    "dom"
+  ],
+  "aliases": [
+    "убрать пробелы в input",
+    "очистка строки от пробелов",
+    "trim в js для формы",
+    "как обрезать пробелы в поле ввода"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "input",
+      "kind": "name",
+      "note": "input — событие изменения значения поля",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 23,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 13,
+      "text": "input",
+      "kind": "name",
+      "note": "input — событие изменения значения поля",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "value",
+      "kind": "name",
+      "note": "value — текущее значение поля",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 25,
+      "text": "trim",
+      "kind": "fn",
+      "note": "trim — убирает пробелы в начале и конце строки",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "provides": [
+      "input",
+      "name"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "прочитать-значение-поля-mvh8fzwi.json",
+    "descAt": 1792533970818
+  },
+  "enriched": true
+}

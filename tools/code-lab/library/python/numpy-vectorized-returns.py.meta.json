@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "numpy-vectorized-returns",
+  "file": "numpy-vectorized-returns.py",
+  "title": "NumPy — векторный расчёт доходностей",
+  "lang": "python",
+  "group": "Математика, финансы и анализ данных / NumPy и pandas",
+  "desc": "NumPy позволяет считать простые доходности векторно. Цены должны быть положительными и конечными; для доходностей берутся соседние цены. Требуется numpy.",
+  "output": "[0.05, -0.02857142857142858]",
+  "tags": [
+    "numpy",
+    "доходность",
+    "векторизация",
+    "финансы",
+    "python"
+  ],
+  "aliases": [
+    "numpy посчитать доходности",
+    "np.diff prices returns"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

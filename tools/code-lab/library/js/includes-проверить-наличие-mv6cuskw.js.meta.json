@@ -1,0 +1,170 @@
+{
+  "schema": 1,
+  "id": "includes-проверить-наличие-mv6cuskw",
+  "file": "includes-проверить-наличие-mv6cuskw.js",
+  "title": "includes — проверить наличие",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Строки и текст",
+  "desc": "includes(fragment) возвращает true, если строка содержит указанный фрагмент, иначе false.",
+  "output": "true\nfalse",
+  "tags": [
+    "строки",
+    "проверка подстроки",
+    "расширения файлов",
+    "валидация",
+    "javascript"
+  ],
+  "aliases": [
+    "как проверить расширение файла в строке",
+    "проверка содержит ли строка точку с расширением",
+    "валидация расширения файла через includes",
+    "поиск подстроки расширения в имени файла"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 21,
+      "text": "includes",
+      "kind": "fn",
+      "note": "includes — есть ли элемент в массиве / подстрока в строке (true/false).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 21,
+      "text": "includes",
+      "kind": "fn",
+      "note": "includes — есть ли элемент в массиве / подстрока в строке (true/false).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Данные: хранить, находить и преобразовывать"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "true\nfalse",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const filename = \"palette.json\";\nconsole.log(filename.includes(\".json\"));\nconsole.log(filename.includes(\".html\"));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "true\nfalse",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "filename"
+    ],
+    "requires": [],
+    "subcat": "Строки и текст"
+  },
+  "legacy": {
+    "template": "includes-проверить-наличие-mv6cuskw.json"
+  },
+  "enriched": true
+}

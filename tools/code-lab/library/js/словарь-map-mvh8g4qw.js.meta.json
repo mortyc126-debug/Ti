@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "id": "словарь-map-mvh8g4qw",
+  "file": "словарь-map-mvh8g4qw.js",
+  "title": "словарь Map",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Коллекции и ст",
+  "desc": "Хранит пары «ключ и значение».",
+  "output": "",
+  "tags": [
+    "map",
+    "коллекции",
+    "ключ-значение",
+    "динамическое хранение",
+    "javascript"
+  ],
+  "aliases": [
+    "как хранить пары ключ-значение в js",
+    "map вместо объекта для хранения данных",
+    "динамическая коллекция в js",
+    "получить значение по ключу в map"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 19,
+      "text": "Map",
+      "kind": "fn",
+      "note": "Map — коллекция пар ключ и значение",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 7,
+      "text": "set",
+      "kind": "fn",
+      "note": "set — записывает значение по ключу",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 7,
+      "text": "set",
+      "kind": "fn",
+      "note": "set — записывает значение по ключу",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 19,
+      "text": "get",
+      "kind": "fn",
+      "note": "get — читает значение по ключу",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "prices"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "словарь-map-mvh8g4qw.json",
+    "descAt": 1792533977096
+  },
+  "enriched": true
+}

@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "id": "null-и-coalesce-пустые-значения-mvds0h69",
+  "file": "null-и-coalesce-пустые-значения-mvds0h69.sql",
+  "title": "NULL и COALESCE — пустые значения",
+  "lang": "sql",
+  "group": "SQL: запросы и таблицы / Изменить данные и обработать пустые",
+  "desc": "NULL — «значения нет». Сравнивают с ним только через IS NULL, а заменить на запасное значение можно функцией COALESCE.",
+  "output": "А|100.0\nБ|0",
+  "tags": [
+    "sql",
+    "coalesce",
+    "null-обработка",
+    "фильтрация",
+    "замена значений",
+    "базы данных"
+  ],
+  "aliases": [
+    "как заменить null на значение в sql",
+    "фильтр по null или условию в запросе",
+    "замена пропусков в таблице sql",
+    "coalesce для обработки пустых значений",
+    "выборка с заменой null и условием"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "INSERT",
+      "kind": "kw",
+      "note": "INSERT — добавить строку в таблицу (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 17,
+      "text": "VALUES",
+      "kind": "kw",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 42,
+      "text": "NULL",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "SELECT",
+      "kind": "kw",
+      "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "FROM",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "WHERE",
+      "kind": "kw",
+      "note": "WHERE — условие отбора строк (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 14,
+      "text": "NULL",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "SQL: запросы и таблицы"
+      ]
+    },
+    "subcat": "Изменить данные и обработать пустые"
+  },
+  "legacy": {
+    "template": "null-и-coalesce-пустые-значения-mvds0h69.json",
+    "descAt": 1792324974321
+  },
+  "enriched": true
+}

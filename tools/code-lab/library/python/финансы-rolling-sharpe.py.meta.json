@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "финансы-rolling-sharpe",
+  "file": "финансы-rolling-sharpe.py",
+  "title": "Скользящий коэффициент Шарпа",
+  "lang": "python",
+  "group": "Математика, финансы и анализ данных / Финансовые метрики",
+  "desc": "Рассчитывает rolling Sharpe для периодических избыточных доходностей. Годовой коэффициент умножается на корень из периодов в году; интерпретация зависит от частоты и автокорреляции доходностей. Требуется pandas.",
+  "output": "Получается ряд скользящего коэффициента Шарпа с окном 20 наблюдений.",
+  "tags": [
+    "финансы",
+    "Sharpe",
+    "rolling",
+    "pandas",
+    "риск",
+    "python"
+  ],
+  "aliases": [
+    "rolling sharpe ratio",
+    "скользящий коэффициент Шарпа"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

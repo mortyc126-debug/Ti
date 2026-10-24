@@ -1,0 +1,1 @@
+const result = 'a-b-c'.replaceAll('-', '_');

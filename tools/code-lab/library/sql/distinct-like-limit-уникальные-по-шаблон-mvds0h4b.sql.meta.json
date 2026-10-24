@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "id": "distinct-like-limit-уникальные-по-шаблон-mvds0h4b",
+  "file": "distinct-like-limit-уникальные-по-шаблон-mvds0h4b.sql",
+  "title": "DISTINCT, LIKE, LIMIT — уникальные, по шаблону, первые N",
+  "lang": "sql",
+  "group": "SQL: запросы и таблицы / Выбрать и сгруппировать данные",
+  "desc": "DISTINCT убирает повторы, LIKE ищет по шаблону (% — любые символы), LIMIT берёт первые N строк.",
+  "output": "гос\nкорп\nОФЗ-1",
+  "tags": [
+    "DISTINCT",
+    "LIKE",
+    "LIMIT",
+    "SQL-фильтрация",
+    "уникальные значения",
+    "шаблонный поиск"
+  ],
+  "aliases": [
+    "как получить только уникальные значения в SQL",
+    "фильтрация по частичному совпадению в таблице",
+    "ограничение количества строк в запросе",
+    "выборка уникальных категорий из базы данных"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "INSERT",
+      "kind": "kw",
+      "note": "INSERT — добавить строку в таблицу (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "VALUES",
+      "kind": "kw",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "SELECT",
+      "kind": "kw",
+      "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 20,
+      "text": "FROM",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "SELECT",
+      "kind": "kw",
+      "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 11,
+      "text": "FROM",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 23,
+      "text": "WHERE",
+      "kind": "kw",
+      "note": "WHERE — условие отбора строк (SQL).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "SQL: запросы и таблицы"
+      ]
+    },
+    "subcat": "Выбрать и сгруппировать данные"
+  },
+  "legacy": {
+    "template": "distinct-like-limit-уникальные-по-шаблон-mvds0h4b.json",
+    "descAt": 1792324974251
+  },
+  "enriched": true
+}

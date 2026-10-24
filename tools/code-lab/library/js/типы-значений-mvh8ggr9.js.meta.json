@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "id": "типы-значений-mvh8ggr9",
+  "file": "типы-значений-mvh8ggr9.js",
+  "title": "типы значений",
+  "lang": "js",
+  "group": "Основы / Синтаксис",
+  "desc": "Основные типы в JavaScript.",
+  "output": "",
+  "tags": [
+    "typeof",
+    "типы данных",
+    "примитивы",
+    "javascript",
+    "синтаксис"
+  ],
+  "aliases": [
+    "как проверить тип переменной в js",
+    "оператор typeof примеры",
+    "typeof для null и undefined",
+    "определение типа в javascript"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — показывает тип значения",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — показывает тип значения",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — показывает тип значения",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 12,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — показывает тип значения",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 19,
+      "text": "undefined",
+      "kind": "kw",
+      "note": "undefined — значение не задано.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 12,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — показывает тип значения",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 19,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто»; typeof null по историческим причинам даёт object",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "provides": [],
+    "requires": []
+  },
+  "legacy": {
+    "template": "типы-значений-mvh8ggr9.json",
+    "descAt": 1792533992661
+  },
+  "enriched": true
+}

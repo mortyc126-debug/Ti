@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "id": "сортировка-объектов-по-полю-mvh8g3hz",
+  "file": "сортировка-объектов-по-полю-mvh8g3hz.js",
+  "title": "сортировка объектов по полю",
+  "lang": "js",
+  "group": "Данные / Сортировка",
+  "desc": "Сортирует людей по возрасту.",
+  "output": "",
+  "tags": [
+    "sort",
+    "массивы",
+    "объекты",
+    "числовая сортировка",
+    "javascript",
+    "функция сравнения"
+  ],
+  "aliases": [
+    "как отсортировать массив объектов по числу",
+    "сортировка по возрасту js",
+    "sort по числовому полю",
+    "функция сравнения для sort",
+    "упорядочить объекты по числовому значению"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "age",
+      "kind": "name",
+      "note": "age — поле объекта, по которому сравниваем",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 18,
+      "text": "age",
+      "kind": "name",
+      "note": "age — поле объекта, по которому сравниваем",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 7,
+      "text": "sort",
+      "kind": "fn",
+      "note": "sort — отсортировать массив (по умолчанию как строки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 13,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 22,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 24,
+      "text": "age",
+      "kind": "name",
+      "note": "age — поле объекта, по которому сравниваем",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 32,
+      "text": "age",
+      "kind": "name",
+      "note": "age — поле объекта, по которому сравниваем",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "people"
+    ],
+    "requires": [
+      "name",
+      "age",
+      "a"
+    ]
+  },
+  "legacy": {
+    "template": "сортировка-объектов-по-полю-mvh8g3hz.json",
+    "descAt": 1792533975479
+  },
+  "enriched": true
+}

@@ -1,0 +1,9 @@
+.parent {
+  position: relative;
+}
+
+.child {
+  position: absolute;
+  top: 0;
+  right: 0;
+}

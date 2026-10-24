@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "pandas-merge-join",
+  "file": "pandas-merge-join.py",
+  "title": "pandas: объединение таблиц через merge",
+  "lang": "python",
+  "group": "Данные / pandas и таблицы",
+  "desc": "Объединяет цены и справочник инструментов по ключу symbol. validate=\"many_to_one\" проверяет, что справочник не размножает строки из-за повторных ключей. Требуется pandas.",
+  "output": "К каждой цене добавляется название инструмента.",
+  "tags": [
+    "pandas",
+    "merge",
+    "join",
+    "объединение таблиц",
+    "python"
+  ],
+  "aliases": [
+    "pandas merge validate",
+    "соединить датафреймы"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

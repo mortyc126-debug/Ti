@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "id": "asyncio-gather-и-сбор-результатов",
+  "file": "asyncio-gather-и-сбор-результатов.py",
+  "title": "asyncio.gather — собрать результаты задач",
+  "lang": "python",
+  "group": "Асинхронность / asyncio",
+  "desc": "asyncio.gather ожидает несколько awaitable-объектов и возвращает результаты в порядке переданных задач. Он не делает CPU-bound вычисления параллельными сам по себе.",
+  "output": "['A', 'B'] — порядок результатов соответствует порядку переданных задач, а не времени завершения.",
+  "tags": [
+    "asyncio",
+    "gather",
+    "асинхронность",
+    "параллельное ожидание",
+    "корутины",
+    "сбор результатов",
+    "python"
+  ],
+  "aliases": [
+    "как дождаться нескольких корутин asyncio",
+    "asyncio gather пример",
+    "собрать результаты асинхронных задач",
+    "asyncio"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

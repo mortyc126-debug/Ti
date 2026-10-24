@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "oop-property-validation",
+  "file": "oop-property-validation.py",
+  "title": "property — контролируемый доступ к атрибуту",
+  "lang": "python",
+  "group": "Основы / Объектно-ориентированное программирование",
+  "desc": "property позволяет сохранить интерфейс доступа к атрибуту и добавить валидацию при записи. Пример ограничивает цену положительными конечными числами.",
+  "output": "125.0",
+  "tags": [
+    "class",
+    "property",
+    "инкапсуляция",
+    "валидация",
+    "ООП",
+    "python"
+  ],
+  "aliases": [
+    "проверка значения свойства класса",
+    "python property setter"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

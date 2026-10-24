@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "id": "urlsearchparams-собрать-строку-запроса-mvds0h63",
+  "file": "urlsearchparams-собрать-строку-запроса-mvds0h63.js",
+  "title": "URLSearchParams — собрать строку запроса",
+  "lang": "js",
+  "group": "Сеть и запросы / Получить данные",
+  "desc": "Превращает объект в строку параметров ?a=1&b=2 и сам кодирует кириллицу и спецсимволы. Читает параметры обратно через get.",
+  "output": "https://example.com/search?q=%D0%9E%D0%A4%D0%97&years=5\n2",
+  "tags": [
+    "URLSearchParams",
+    "URL-кодирование",
+    "GET-запросы",
+    "JavaScript",
+    "параметры запроса",
+    "API"
+  ],
+  "aliases": [
+    "как создать строку запроса из объекта",
+    "парсинг параметров из URL",
+    "кодирование кириллицы в URL",
+    "URLSearchParams пример использования",
+    "как получить параметр из строки запроса"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 18,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 54,
+      "text": "toString",
+      "kind": "fn",
+      "note": "toString — превратить значение в строку.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 12,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "параметры",
+      "url"
+    ],
+    "requires": [
+      "q",
+      "years"
+    ],
+    "tags": {
+      "purpose": [
+        "Сеть и запросы"
+      ]
+    },
+    "subcat": "Получить данные"
+  },
+  "legacy": {
+    "template": "urlsearchparams-собрать-строку-запроса-mvds0h63.json",
+    "descAt": 1792324974315
+  },
+  "enriched": true
+}

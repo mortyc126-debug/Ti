@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "id": "logical-properties",
+  "file": "logical-properties.css",
+  "title": "Отступы и отцентровка с логическими свойствами",
+  "lang": "css",
+  "group": "CSS: текст и шрифты / Шрифт и размер",
+  "desc": "Устанавливает внутренние отступы и центровку блока относительно направления текста. Использует `margin-inline: auto` для горизонтального выравнивания, а `padding-block` и `padding-inline` для вертикальных и горизонтальных отступов соответственно. Подходит для адаптации под RTL и LTR.",
+  "output": "Использует логические свойства CSS вместо `left/right` и `top/bottom`",
+  "tags": [
+    "css",
+    "logical-properties",
+    "ltr",
+    "margin-inline",
+    "padding-block",
+    "padding-inline",
+    "rtl",
+    "адаптивность",
+    "арабский",
+    "иврит",
+    "направление-текста",
+    "margin-auto",
+    "padding-block-start",
+    "padding-block-end",
+    "padding-inline-start",
+    "padding-inline-end"
+  ],
+  "aliases": [
+    "как центровать блок логическими свойствами css",
+    "отступы сверху снизу логические свойства",
+    "отступы слева справа логические свойства css",
+    "css margin auto для rtl",
+    "padding для направления текста"
+  ],
+  "source": {
+    "title": "ai",
+    "desc": "ai",
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: дополнительные приёмы"
+      ],
+      "technology": [
+        "CSS"
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ]
+  },
+  "architectureNote": {
+    "role": "Контролирует геометрию блока: размер, внутреннее пространство, расстояние до соседей или обработку переполнения.",
+    "architecturalUse": "Подключай там, где требуется: Использует логические свойства CSS вместо `left/right` и `top/bottom`. Это делает компоненты лучше совместимыми с разными направлениями текста, включая RTL.",
+    "combineWith": [
+      "box-sizing: border-box для предсказуемых размеров",
+      "max-width для ограничения широкого контента",
+      "единая шкала отступов вместо случайных значений"
+    ],
+    "watchFor": "Проверь суммарную ширину с padding/border, длинное содержимое и поведение при изменении ширины окна.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

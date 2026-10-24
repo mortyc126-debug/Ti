@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "id": "нажатие-enter-mvh8g1wt",
+  "file": "нажатие-enter-mvh8g1wt.js",
+  "title": "нажатие Enter",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Реакция на действия поль",
+  "desc": "Срабатывает по нажатию клавиши Enter.",
+  "output": "",
+  "tags": [
+    "event listener",
+    "keyboard events",
+    "input handling",
+    "javascript",
+    "DOM events"
+  ],
+  "aliases": [
+    "поймать нажатие энтер на странице",
+    "обработчик клавиши Enter",
+    "реакция на Enter в js",
+    "как проверить нажатие Enter"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "key",
+      "kind": "name",
+      "note": "key — функция, по значению которой идёт сортировка",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [],
+    "requires": [
+      "event"
+    ]
+  },
+  "legacy": {
+    "template": "нажатие-enter-mvh8g1wt.json",
+    "descAt": 1792533973421
+  },
+  "enriched": true
+}

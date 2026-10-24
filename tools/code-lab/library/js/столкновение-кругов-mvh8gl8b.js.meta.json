@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "id": "столкновение-кругов-mvh8gl8b",
+  "file": "столкновение-кругов-mvh8gl8b.js",
+  "title": "столкновение кругов",
+  "lang": "js",
+  "group": "Игры и интерактивные проекты / Геометрия и попадания",
+  "desc": "Круги касаются, если расстояние меньше суммы радиусов.",
+  "output": "",
+  "tags": [
+    "геометрия",
+    "столкновения",
+    "плоскостные объекты",
+    "математика",
+    "проверка попадания",
+    "интерактивная графика"
+  ],
+  "aliases": [
+    "как проверить пересечение кругов",
+    "расстояние между центрами кругов для столкновений",
+    "проверка касания кругов в js",
+    "алгоритм детектирования столкновений кругов",
+    "проверка попадания объектов круглой формы"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 20,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 26,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 37,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 44,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 46,
+      "text": "r",
+      "kind": "name",
+      "note": "r — радиус круга",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 52,
+      "text": "r",
+      "kind": "name",
+      "note": "r — радиус круга",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "circlesHit"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "столкновение-кругов-mvh8gl8b.json",
+    "descAt": 1792533998459
+  },
+  "enriched": true
+}

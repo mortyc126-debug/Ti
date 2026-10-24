@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "id": "кнопка-как-сделать-mvedo24t",
+  "file": "кнопка-как-сделать-mvedo24t.html",
+  "title": "Кнопка — как сделать",
+  "lang": "html",
+  "group": "Интерфейс / Кнопки и размеры",
+  "desc": "Кнопка = тег <button>. Текст между тегами — надпись. Реакция на нажатие вешается через addEventListener(\"click\", ...). Так делают любые кликабельные элементы.",
+  "output": "",
+  "tags": [
+    "button",
+    "event listener",
+    "html",
+    "интерактивность",
+    "кликабельные элементы"
+  ],
+  "aliases": [
+    "как сделать кнопку с реакцией на клик",
+    "обработчик нажатия кнопки",
+    "событие клика на кнопке",
+    "кнопка с alert по нажатию",
+    "Кнопка — как сделать",
+    "пример Кнопка — как сделать",
+    "html Кнопка — как сделать",
+    "как сделать Кнопка — как сделать",
+    "button",
+    "<button>",
+    "тег button",
+    "элемент button",
+    "html button",
+    "кнопка",
+    "нажать кнопку",
+    "кнопка отправки",
+    "кликабельная кнопка",
+    "script",
+    "<script>",
+    "тег script",
+    "элемент script",
+    "html script",
+    "javascript в html",
+    "подключить js",
+    "скрипт на странице",
+    "id",
+    "атрибут id",
+    "html атрибут id",
+    "уникальный идентификатор",
+    "id элемента",
+    "event listener",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "интерактивность",
+    "кликабельные элементы",
+    "как",
+    "сделать",
+    "Текст",
+    "между",
+    "тегами",
+    "надпись",
+    "Реакция",
+    "нажатие",
+    "вешается",
+    "addEventListener",
+    "click",
+    "делают",
+    "любые",
+    "кликабельные",
+    "элементы"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 17,
+      "text": "button",
+      "kind": "name",
+      "note": "<button> — кнопка, по клику запускает действие.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 1,
+      "text": "button",
+      "kind": "name",
+      "note": "<button> — кнопка, по клику запускает действие.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "id",
+      "kind": "name",
+      "note": "id — уникальное имя элемента. По нему его находят в CSS (#имя) и JS (getElementById).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 28,
+      "text": "button",
+      "kind": "name",
+      "note": "<button> — кнопка, по клику запускает действие.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 1,
+      "text": "script",
+      "kind": "name",
+      "note": "<script> — подключает или содержит JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 11,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 32,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "script",
+      "kind": "name",
+      "note": "<script> — подключает или содержит JavaScript.",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "кнопка-как-сделать-mvedo24t.json",
+    "descAt": 1792361346510
+  },
+  "enriched": true
+}

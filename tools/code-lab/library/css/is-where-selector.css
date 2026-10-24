@@ -1,0 +1,7 @@
+.card :is(h2, h3, h4) {
+  margin-block: 0.5rem;
+}
+
+.nav :where(a, button) {
+  text-decoration: none;
+}

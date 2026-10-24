@@ -1,0 +1,270 @@
+{
+  "schema": 1,
+  "id": "sys-modules",
+  "file": "sys-modules.js",
+  "title": "Файлы общаются: export / import",
+  "lang": "js",
+  "group": "Основы / Как устроена программа",
+  "desc": "Как «куча файликов» одного языка образует систему. Один файл ОТДАЁТ (export) функции, другой их БЕРЁТ (import) по пути к соседу. Копируй в два файла рядом — заработает (в проекте со сборкой или type=module).",
+  "output": "20\nверсия: 1.0",
+  "tags": [
+    "модули ES6",
+    "export/import",
+    "разделение кода",
+    "javascript",
+    "модульная архитектура"
+  ],
+  "aliases": [
+    "как экспортировать функцию в js",
+    "импорт модуля по относительному пути",
+    "как подключить функцию из другого файла",
+    "модули в javascript без сборщика",
+    "export default vs export named"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "export",
+      "kind": "kw",
+      "note": "«Отдать наружу»: помечаем, что это можно брать в других файлах.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 7,
+      "text": "function",
+      "kind": "kw",
+      "note": "Определение функции.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 16,
+      "text": "среднее",
+      "kind": "fn",
+      "note": "Функция, которую один файл отдал, а другой взял.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 16,
+      "text": "reduce",
+      "kind": "fn",
+      "note": "Свернуть массив в сумму.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 52,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "export",
+      "kind": "kw",
+      "note": "«Отдать наружу»: помечаем, что это можно брать в других файлах.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 7,
+      "text": "const",
+      "kind": "kw",
+      "note": "Значение.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 13,
+      "text": "ВЕРСИЯ",
+      "kind": "name",
+      "note": "Можно отдавать и значения, не только функции.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "«Взять»: подключить то, что отдал другой файл.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 9,
+      "text": "среднее",
+      "kind": "name",
+      "note": "Функция, которую один файл отдал, а другой взял.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 18,
+      "text": "ВЕРСИЯ",
+      "kind": "name",
+      "note": "Можно отдавать и значения, не только функции.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 27,
+      "text": "from",
+      "kind": "kw",
+      "note": "Откуда брать — путь к файлу-соседу.",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 12,
+      "text": "среднее",
+      "kind": "fn",
+      "note": "Функция, которую один файл отдал, а другой взял.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 23,
+      "text": "ВЕРСИЯ",
+      "kind": "name",
+      "note": "Можно отдавать и значения, не только функции.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Массив, объявленный в коде",
+      "output": "20\nверсия: 1.0",
+      "dependencies": [],
+      "requirements": [
+        "Запускай как ES-модуль и проверь наличие импортируемых файлов/пакетов."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "// ── файл  math.js  —  отдаёт функции наружу ──\nexport function среднее(список){\n  return список.reduce((a, b) => a + b, 0) / список.length;\n}\nexport const ВЕРСИЯ = \"1.0\";\n\n// ── файл  main.js  —  берёт их у соседа ──\nimport { среднее, ВЕРСИЯ } from \"./math.js\";   // путь к файлу-соседу\n\nconsole.log(среднее([10, 20, 30]));   // 20\nconsole.log(\"версия:\", ВЕРСИЯ);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "20\nверсия: 1.0",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "среднее",
+      "ВЕРСИЯ"
+    ],
+    "requires": [
+      "a"
+    ],
+    "subcat": "Как устроена программа"
+  },
+  "legacy": {
+    "template": "sys-modules.json"
+  },
+  "enriched": true
+}

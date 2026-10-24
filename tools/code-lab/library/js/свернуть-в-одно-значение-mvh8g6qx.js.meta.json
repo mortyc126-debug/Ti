@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "id": "свернуть-в-одно-значение-mvh8g6qx",
+  "file": "свернуть-в-одно-значение-mvh8g6qx.js",
+  "title": "свернуть в одно значение",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Перебирать, фи",
+  "desc": "Считает сумму чисел.",
+  "output": "",
+  "tags": [
+    "reduce",
+    "массивы",
+    "функциональное программирование",
+    "js",
+    "итерация"
+  ],
+  "aliases": [
+    "reduce сумма элементов массива",
+    "как посчитать сумму через reduce",
+    "reduce пример сложения чисел",
+    "reduce с начальным значением 0"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "sum",
+      "kind": "name",
+      "note": "SUM — сумма значений",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 25,
+      "text": "reduce",
+      "kind": "fn",
+      "note": "reduce — сворачивает массив в одно значение",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 57,
+      "text": "0",
+      "kind": "num",
+      "note": "0 — начальное значение суммы",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "sum"
+    ],
+    "requires": [
+      "total"
+    ]
+  },
+  "legacy": {
+    "template": "свернуть-в-одно-значение-mvh8g6qx.json",
+    "descAt": 1792533979689
+  },
+  "enriched": true
+}

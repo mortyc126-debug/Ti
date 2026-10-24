@@ -1,0 +1,248 @@
+{
+  "schema": 1,
+  "id": "py-function",
+  "file": "py-function.py",
+  "title": "Функция (def)",
+  "lang": "python",
+  "group": "Основы / Синтаксис",
+  "desc": "Функция в Python начинается с def. Тело — с отступом. return отдаёт результат наружу.",
+  "output": "20",
+  "tags": [
+    "функции",
+    "геометрия",
+    "математика",
+    "синтаксис",
+    "python",
+    "def"
+  ],
+  "aliases": [
+    "как посчитать площадь прямоугольника на питоне",
+    "функция умножения двух аргументов",
+    "возврат значения из функции в python",
+    "простой пример функции с параметрами",
+    "функция в python начинается с def"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "«Определить» — объявляет функцию. С этого слова начинается любая функция в Python.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 4,
+      "text": "площадь",
+      "kind": "name",
+      "note": "Имя функции — придумываешь сам. По нему вызываешь.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 11,
+      "text": "(",
+      "kind": "op",
+      "note": "Начало параметров — что функция принимает на вход.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "ширина",
+      "kind": "name",
+      "note": "Параметр — имя входного значения внутри функции.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 18,
+      "text": ",",
+      "kind": "op",
+      "note": "Запятая разделяет параметры.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 20,
+      "text": "высота",
+      "kind": "name",
+      "note": "Второй параметр.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 26,
+      "text": ")",
+      "kind": "op",
+      "note": "Конец параметров.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 27,
+      "text": ":",
+      "kind": "op",
+      "note": "Двоеточие открывает тело функции (дальше — с отступом).",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "«Вернуть» — отдаёт результат наружу. Отступ показывает, что строка внутри функции.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "ширина",
+      "kind": "name",
+      "note": "Первый параметр.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "*",
+      "kind": "op",
+      "note": "Умножение.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "высота",
+      "kind": "name",
+      "note": "Второй параметр.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "print",
+      "kind": "fn",
+      "note": "Вывод результата.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 6,
+      "text": "площадь",
+      "kind": "name",
+      "note": "Вызов функции по имени.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 13,
+      "text": "(",
+      "kind": "op",
+      "note": "Начало аргументов — конкретные значения.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 14,
+      "text": "4",
+      "kind": "num",
+      "note": "Значение для первого параметра. Впиши своё.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 17,
+      "text": "5",
+      "kind": "num",
+      "note": "Значение для второго параметра.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "Python"
+      ],
+      "technology": [
+        "Код"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "20",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "python",
+          "content": "defплощадь(ширина,высота):\n    returnширина*высота\n\nprint(площадь(4,5))"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "20",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "subcat": "Синтаксис"
+  },
+  "legacy": {
+    "template": "py-function.json"
+  },
+  "enriched": true
+}

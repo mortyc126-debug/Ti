@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "id": "строка-в-число-mvh8gc0y",
+  "file": "строка-в-число-mvh8gc0y.js",
+  "title": "строка в число",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Числа и просты",
+  "desc": "Превращает текст в число и проверяет результат.",
+  "output": "",
+  "tags": [
+    "преобразование типов",
+    "валидация данных",
+    "NaN проверка",
+    "javascript",
+    "числовые операции"
+  ],
+  "aliases": [
+    "как проверить строку на число",
+    "проверка NaN после Number()",
+    "валидация числового ввода",
+    "преобразование строки в число с проверкой"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 10,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — превращает значение в число",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — превращает значение в число",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "isNaN",
+      "kind": "fn",
+      "note": "isNaN — проверка, что получилось не число",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "provides": [
+      "n"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "строка-в-число-mvh8gc0y.json",
+    "descAt": 1792533986530
+  },
+  "enriched": true
+}

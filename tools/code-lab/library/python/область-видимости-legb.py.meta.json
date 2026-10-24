@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "id": "область-видимости-legb",
+  "file": "область-видимости-legb.py",
+  "title": "Область видимости переменных — правило LEGB",
+  "lang": "python",
+  "group": "Python — основы / Функции и область видимости",
+  "desc": "Python ищет имя в порядке Local, Enclosing, Global, Built-in. Присваивание внутри функции обычно создаёт локальное имя; для изменения глобальной переменной требуется global, а для переменной внешней функции — nonlocal.",
+  "output": "30\n20\n10",
+  "tags": [
+    "python",
+    "область видимости",
+    "LEGB",
+    "local",
+    "global",
+    "nonlocal",
+    "функции"
+  ],
+  "aliases": [
+    "правило LEGB python",
+    "локальные и глобальные переменные"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

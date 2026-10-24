@@ -1,0 +1,173 @@
+{
+  "schema": 1,
+  "id": "style-left-и-style-top-позиция-mv6cut07",
+  "file": "style-left-и-style-top-позиция-mv6cut07.js",
+  "title": "style.left и style.top — позиция",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
+  "desc": "Для абсолютного позиционирования задайте элементу position: absolute или fixed. Значения координат CSS задаются строками с единицами, например px.",
+  "output": "Надпись размещается на странице по координатам 120×80 px",
+  "tags": [
+    "css",
+    "position",
+    "absolute",
+    "координаты",
+    "интерфейс",
+    "javascript"
+  ],
+  "aliases": [
+    "как разместить элемент по координатам",
+    "absolute позиционирование с px",
+    "задать точные координаты для блока",
+    "стиль position absolute пример",
+    "разместить текст в конкретной точке экрана"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 23,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "style",
+      "kind": "name",
+      "note": "style — инлайновые стили элемента: element.style.color = \"red\".",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "style",
+      "kind": "name",
+      "note": "style — инлайновые стили элемента: element.style.color = \"red\".",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 6,
+      "text": "style",
+      "kind": "name",
+      "note": "style — инлайновые стили элемента: element.style.color = \"red\".",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 6,
+      "text": "textContent",
+      "kind": "name",
+      "note": "textContent — текст внутри элемента; можно прочитать или заменить.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс: поля, кнопки и события"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "Надпись размещается на странице по координатам 120×80 px",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: label."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const label = document.querySelector(\"#label\");\nlabel.style.position = \"absolute\";\nlabel.style.left = \"120px\";\nlabel.style.top = \"80px\";\nlabel.textContent = \"Привет в точке (120, 80)\";"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Надпись размещается на странице по координатам 120×80 px",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "label"
+    ],
+    "requires": [],
+    "subcat": "Обновлять страницу и эле"
+  },
+  "legacy": {
+    "template": "style-left-и-style-top-позиция-mv6cut07.json"
+  },
+  "enriched": true
+}

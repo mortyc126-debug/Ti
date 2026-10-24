@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "python-asyncio-taskgroup-py",
+  "file": "asyncio-taskgroup.py",
+  "title": "asyncio.TaskGroup — структурированная конкуренция",
+  "lang": "python",
+  "group": "Продвинутые темы / Асинхронность",
+  "desc": "Запускает несколько корутин в TaskGroup и ожидает завершения всех задач.",
+  "output": "TaskGroup доступен с Python 3.11; ошибка одной задачи отменяет остальные задачи группы.",
+  "tags": [
+    "asyncio",
+    "TaskGroup",
+    "concurrency",
+    "корутины"
+  ],
+  "aliases": [],
+  "source": "curated",
+  "status": "active",
+  "enriched": true
+}

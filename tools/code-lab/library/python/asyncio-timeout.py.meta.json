@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "asyncio-timeout",
+  "file": "asyncio-timeout.py",
+  "title": "asyncio.timeout — ограничить время ожидания",
+  "lang": "python",
+  "group": "Сеть и запросы / Асинхронные операции",
+  "desc": "asyncio.timeout ограничивает время выполнения блока и при превышении вызывает TimeoutError снаружи блока. Доступно в Python 3.11+.",
+  "output": "TimeoutError перехвачен",
+  "tags": [
+    "asyncio",
+    "timeout",
+    "асинхронность",
+    "тайм-аут",
+    "python"
+  ],
+  "aliases": [
+    "asyncio timeout python 3.11",
+    "ограничить время async функции"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

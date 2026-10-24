@@ -1,0 +1,5 @@
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}

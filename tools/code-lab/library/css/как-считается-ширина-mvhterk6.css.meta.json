@@ -1,0 +1,100 @@
+{
+  "schema": 1,
+  "id": "как-считается-ширина-mvhterk6",
+  "file": "как-считается-ширина-mvhterk6.css",
+  "title": "как считается ширина",
+  "lang": "css",
+  "group": "CSS: отступы и размеры / Ширина и высота",
+  "desc": "Показывает модель `box-sizing: border-box`: заданная ширина включает padding и border, что упрощает предсказуемый расчёт размеров.",
+  "output": "Показывает модель `box-sizing: border-box`: заданная ширина включает padding и border, что упрощает предсказуемый расчёт размеров",
+  "tags": [
+    "border",
+    "box-model",
+    "box-sizing",
+    "css",
+    "frontend",
+    "padding",
+    "web",
+    "width",
+    "внутренний-отступ",
+    "вёрстка",
+    "практический-приём",
+    "пример",
+    "размеры-блока",
+    "размеры-элементов",
+    "рамка",
+    "ширина"
+  ],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 14,
+      "text": "border",
+      "kind": "name",
+      "note": "border — рамка: толщина, стиль, цвет (1px solid #000).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "padding",
+      "kind": "name",
+      "note": "padding — внутренний отступ, от края до содержимого.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "border",
+      "kind": "name",
+      "note": "border — рамка: толщина, стиль, цвет (1px solid #000).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 14,
+      "text": "solid",
+      "kind": "name",
+      "note": "solid — сплошная линия рамки.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: отступы и размеры"
+      ]
+    },
+    "subcat": "Ширина и высота"
+  },
+  "legacy": {
+    "template": "как-считается-ширина-mvhterk6.json",
+    "descAt": 1792569185286
+  },
+  "architectureNote": {
+    "role": "Контролирует геометрию блока: размер, внутреннее пространство, расстояние до соседей или обработку переполнения.",
+    "architecturalUse": "Подключай там, где требуется: Показывает модель `box-sizing: border-box`: заданная ширина включает padding и border, что упрощает предсказуемый расчёт размеров.",
+    "combineWith": [
+      "box-sizing: border-box для предсказуемых размеров",
+      "max-width для ограничения широкого контента",
+      "единая шкала отступов вместо случайных значений"
+    ],
+    "watchFor": "Проверь суммарную ширину с padding/border, длинное содержимое и поведение при изменении ширины окна.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  }
+}

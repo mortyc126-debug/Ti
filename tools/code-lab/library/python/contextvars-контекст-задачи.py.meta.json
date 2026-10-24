@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "contextvars-контекст-задачи",
+  "file": "contextvars-контекст-задачи.py",
+  "title": "contextvars: контекстные значения для задач",
+  "lang": "python",
+  "group": "Продвинутые темы / Асинхронность",
+  "desc": "ContextVar позволяет хранить значение в контексте выполнения, не передавая его через каждый вызов. В асинхронном коде значения изолируются между контекстами задач.",
+  "output": "Каждая корутина читает собственный request_id.",
+  "tags": [
+    "contextvars",
+    "asyncio",
+    "контекст",
+    "корутины",
+    "python"
+  ],
+  "aliases": [
+    "контекстная переменная Python",
+    "request id async"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

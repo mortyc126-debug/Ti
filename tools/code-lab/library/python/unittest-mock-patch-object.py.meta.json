@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "unittest-mock-patch-object",
+  "file": "unittest-mock-patch-object.py",
+  "title": "unittest.mock.patch.object — подмена метода",
+  "lang": "python",
+  "group": "Повседневная разработка / Тестирование и моки",
+  "desc": "Подменяет метод объекта только на время контекстного блока. Позволяет тестировать поведение без обращения к реальному внешнему сервису.",
+  "output": "Внутри блока метод возвращает заданное значение, после блока восстанавливается.",
+  "tags": [
+    "unittest",
+    "mock",
+    "patch.object",
+    "тестирование",
+    "python"
+  ],
+  "aliases": [
+    "подменить метод объекта",
+    "mock patch object"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "id": "простой-сервер-mvh8h99o",
+  "file": "простой-сервер-mvh8h99o.js",
+  "title": "простой сервер",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Сервер и API",
+  "desc": "Сервер на Node.js без библиотек.",
+  "output": "",
+  "tags": [
+    "node.js",
+    "http-сервер",
+    "базовый api",
+    "без фреймворков",
+    "текстовый ответ",
+    "порт 3000"
+  ],
+  "aliases": [
+    "как создать сервер на node без express",
+    "минимальный http сервер на js",
+    "сервер на node без npm пакетов",
+    "ответить текстовым сообщением на запрос",
+    "сервер на 3000 порту"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 20,
+      "text": "createServer",
+      "kind": "fn",
+      "note": "createServer — создаёт сервер, функция вызывается на каждый запрос",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 7,
+      "text": "listen",
+      "kind": "fn",
+      "note": "listen — запускает сервер на порту",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "http",
+      "server"
+    ],
+    "requires": [
+      "require",
+      "req"
+    ]
+  },
+  "legacy": {
+    "template": "простой-сервер-mvh8h99o.json",
+    "descAt": 1792534029612
+  },
+  "enriched": true
+}

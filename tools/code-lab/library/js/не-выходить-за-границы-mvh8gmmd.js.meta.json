@@ -1,0 +1,152 @@
+{
+  "schema": 1,
+  "id": "не-выходить-за-границы-mvh8gmmd",
+  "file": "не-выходить-за-границы-mvh8gmmd.js",
+  "title": "не выходить за границы",
+  "lang": "js",
+  "group": "Игры и интерактивные проекты / Движение и отрисовка",
+  "desc": "Ограничивает значение между минимумом и максимумом.",
+  "output": "",
+  "tags": [
+    "математика",
+    "ограничение",
+    "диапазон",
+    "javascript",
+    "игровой движок",
+    "отрисовка"
+  ],
+  "aliases": [
+    "как ограничить значение между min и max",
+    "ограничение координат в игре",
+    "защита от выхода за пределы canvas",
+    "функция clamp в js",
+    "ограничение переменной в диапазоне"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "value",
+      "kind": "name",
+      "note": "value — текущее значение поля ввода (input, textarea, select).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 22,
+      "text": "min",
+      "kind": "name",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 27,
+      "text": "max",
+      "kind": "name",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "min",
+      "kind": "fn",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 23,
+      "text": "max",
+      "kind": "fn",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 27,
+      "text": "value",
+      "kind": "name",
+      "note": "value — текущее значение поля ввода (input, textarea, select).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 34,
+      "text": "min",
+      "kind": "name",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 40,
+      "text": "max",
+      "kind": "name",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 37,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина элемента",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "clamp"
+    ],
+    "requires": [
+      "player",
+      "canvas"
+    ]
+  },
+  "legacy": {
+    "template": "не-выходить-за-границы-mvh8gmmd.json",
+    "descAt": 1792534000261
+  },
+  "enriched": true
+}

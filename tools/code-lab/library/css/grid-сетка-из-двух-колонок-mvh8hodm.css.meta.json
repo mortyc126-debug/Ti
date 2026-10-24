@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "id": "grid-сетка-из-двух-колонок-mvh8hodm",
+  "file": "grid-сетка-из-двух-колонок-mvh8hodm.css",
+  "title": "Grid: сетка из двух колонок",
+  "lang": "css",
+  "group": "CSS: раскладка / Grid",
+  "desc": "Создаёт две равные колонки CSS Grid через `repeat(2, minmax(0, 1fr))` и задаёт расстояние между ними через `gap`.",
+  "output": "Создаёт две равные колонки CSS Grid через `repeat(2, minmax(0, 1fr))` и задаёт расстояние между ними через `gap`",
+  "tags": [
+    "css",
+    "css-grid",
+    "display",
+    "em",
+    "frontend",
+    "gap",
+    "grid-template-columns",
+    "layout",
+    "minmax",
+    "web",
+    "вёрстка",
+    "колонки",
+    "практический-приём",
+    "пример",
+    "промежутки",
+    "flexible-gap",
+    "auto-layout",
+    "responsive-design",
+    "css-grid-practical"
+  ],
+  "aliases": [
+    "как сделать две колонки с одинаковым отступом в grid",
+    "гибкая сетка с фиксированным gap",
+    "равномерные колонки в css grid",
+    "minmax(0, 1fr) для адаптивных колонок"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "display",
+      "kind": "name",
+      "note": "display: grid — включает CSS Grid.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "gap",
+      "kind": "name",
+      "note": "gap — расстояние между ячейками сетки.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: раскладка"
+      ]
+    },
+    "subcat": "Grid"
+  },
+  "legacy": {
+    "template": "grid-сетка-из-двух-колонок-mvh8hodm.json",
+    "descAt": 1792534049194
+  },
+  "architectureNote": {
+    "role": "Отвечает за структуру и взаимное расположение областей или карточек.",
+    "architecturalUse": "Подключай там, где требуется: Создаёт две равные колонки CSS Grid через `repeat(2, minmax(0, 1fr))` и задаёт расстояние между ними через `gap`.",
+    "combineWith": [
+      "gap для ритма между ячейками",
+      "minmax(0, 1fr) или minmax() для контроля переполнения",
+      "@media либо auto-fit/minmax() для узких экранов"
+    ],
+    "watchFor": "Не задавай фиксированные ширины всем колонкам без необходимости; проверь длинный текст и узкий экран.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

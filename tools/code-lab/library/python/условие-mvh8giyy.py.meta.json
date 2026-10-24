@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "id": "условие-mvh8giyy",
+  "file": "условие-mvh8giyy.py",
+  "title": "условие",
+  "lang": "python",
+  "group": "Основы / Python",
+  "desc": "условие: пример на Python, показывающий основной приём и его применение. Проверьте входные данные и граничные случаи перед использованием в реальном проекте.",
+  "output": "",
+  "tags": [
+    "условный оператор",
+    "if-else",
+    "логика",
+    "python",
+    "сравнение"
+  ],
+  "aliases": [
+    "как проверить возраст на совершеннолетие в питоне",
+    "условие по возрасту",
+    "оператор if для возраста",
+    "вывод сообщения по условию",
+    "условие: пример на python, показывающий основной приём и его применение"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "age",
+      "kind": "name",
+      "note": "age — поле объекта, по которому сравниваем",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — выполнить, если условие верно",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "age",
+      "kind": "name",
+      "note": "age — поле объекта, по которому сравниваем",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "else",
+      "kind": "kw",
+      "note": "else — «иначе»: что делать, когда условие if не выполнилось.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "условие-mvh8giyy.json",
+    "descAt": 1792533995530
+  },
+  "enriched": true
+}

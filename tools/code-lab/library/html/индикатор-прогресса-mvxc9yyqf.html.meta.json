@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "id": "progress-mvxc9yyqf",
+  "file": "индикатор-прогресса-mvxc9yyqf.html",
+  "title": "progress",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Прогресс",
+  "tags": [
+    "progress",
+    "html",
+    "тег progress"
+  ],
+  "aliases": [
+    "<progress>",
+    "progress",
+    "html progress",
+    "пример progress",
+    "как сделать progress",
+    "тег progress",
+    "элемент progress",
+    "индикатор загрузки",
+    "полоса прогресса",
+    "ход выполнения",
+    "max",
+    "атрибут max",
+    "html атрибут max",
+    "максимальное значение",
+    "верхняя граница",
+    "value",
+    "атрибут value",
+    "html атрибут value",
+    "значение поля",
+    "значение input",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "Прогресс"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

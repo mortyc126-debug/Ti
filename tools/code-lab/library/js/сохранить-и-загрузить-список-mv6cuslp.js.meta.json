@@ -1,0 +1,229 @@
+{
+  "schema": 1,
+  "id": "сохранить-и-загрузить-список-mv6cuslp",
+  "file": "сохранить-и-загрузить-список-mv6cuslp.js",
+  "title": "Сохранить и загрузить список",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Хранение в браузере",
+  "desc": "Типичный шаблон: безопасно прочитать JSON-массив из localStorage, добавить элемент и сохранить обновлённый массив.",
+  "output": "1 (если список изначально пуст)",
+  "tags": [
+    "localStorage",
+    "JSON-парсинг",
+    "хранение данных",
+    "браузерное API",
+    "массивы",
+    "клиентская персистентность"
+  ],
+  "aliases": [
+    "как добавить элемент в localStorage массив",
+    "сохранить обновлённый массив в localStorage",
+    "работа с JSON в localStorage",
+    "добавить строку в localStorage безопасно",
+    "обновить массив в localStorage"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "parse",
+      "kind": "fn",
+      "note": "JSON.parse — разобрать строку JSON обратно в объект.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 26,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 39,
+      "text": "getItem",
+      "kind": "fn",
+      "note": "getItem — прочитать значение из localStorage по ключу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 7,
+      "text": "push",
+      "kind": "fn",
+      "note": "push — добавляет элемент в конец массива.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 13,
+      "text": "setItem",
+      "kind": "fn",
+      "note": "setItem — записать значение в localStorage по ключу.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 26,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 31,
+      "text": "stringify",
+      "kind": "fn",
+      "note": "JSON.stringify — превратить объект в строку JSON (для хранения/передачи).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 19,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Файлы, хранение и сервер"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "1 (если список изначально пуст)",
+      "dependencies": [],
+      "requirements": [
+        "Нужен браузерный контекст с доступным localStorage; значения хранилища — строки."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const key = \"savedColors\";\nconst colors = JSON.parse(localStorage.getItem(key) || \"[]\");\n\ncolors.push(\"#FF006E\");\nlocalStorage.setItem(key, JSON.stringify(colors));\n\nconsole.log(colors.length);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "1 (если список изначально пуст)",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "key",
+      "colors"
+    ],
+    "requires": [],
+    "subcat": "Хранение в браузере"
+  },
+  "legacy": {
+    "template": "сохранить-и-загрузить-список-mv6cuslp.json"
+  },
+  "enriched": true
+}

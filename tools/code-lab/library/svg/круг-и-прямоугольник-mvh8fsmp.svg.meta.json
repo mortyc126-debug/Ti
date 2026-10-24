@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "id": "круг-и-прямоугольник-mvh8fsmp",
+  "file": "круг-и-прямоугольник-mvh8fsmp.svg",
+  "title": "круг и прямоугольник",
+  "lang": "svg",
+  "group": "Графика и визуализация / SVG и графики",
+  "desc": "Две простые фигуры в SVG.",
+  "output": "",
+  "tags": [
+    "svg-фигуры",
+    "векторная графика",
+    "rect",
+    "circle",
+    "графические примитивы",
+    "svg-базовый синтаксис"
+  ],
+  "aliases": [
+    "как нарисовать прямоугольник и круг в svg",
+    "svg пример с rect и circle",
+    "базовый пример svg с фигурами",
+    "svg фигуры фиксированного размера",
+    "создание простых фигур в svg"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 5,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина элемента",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 30,
+      "text": "viewBox",
+      "kind": "name",
+      "note": "viewBox — внутренняя система координат рисунка",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 3,
+      "text": "rect",
+      "kind": "name",
+      "note": "rect — прямоугольник",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 22,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина элемента",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 45,
+      "text": "fill",
+      "kind": "name",
+      "note": "fill — залить текущий контур цветом (fillStyle).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "circle",
+      "kind": "name",
+      "note": "circle — круг: центр cx, cy и радиус r",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 27,
+      "text": "r",
+      "kind": "name",
+      "note": "r — радиус круга",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 34,
+      "text": "fill",
+      "kind": "name",
+      "note": "fill — залить текущий контур цветом (fillStyle).",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "круг-и-прямоугольник-mvh8fsmp.json",
+    "descAt": 1792533961393
+  },
+  "enriched": true
+}

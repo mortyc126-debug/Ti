@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "id": "flexbox-расположить-элементы-в-ряд-mvh8hrb8",
+  "file": "flexbox-расположить-элементы-в-ряд-mvh8hrb8.css",
+  "title": "Flexbox: расположить элементы в ряд",
+  "lang": "css",
+  "group": "CSS: раскладка / Flexbox",
+  "desc": "Располагает элементы горизонтально через Flexbox с `display: flex`, `flex-direction: row` и `gap`.",
+  "output": "Располагает элементы горизонтально через Flexbox с `display: flex`, `flex-direction: row` и `gap`",
+  "tags": [
+    "css",
+    "display",
+    "flexbox",
+    "frontend",
+    "gap",
+    "layout",
+    "row",
+    "web",
+    "вёрстка",
+    "горизонтальная-раскладка",
+    "практический-приём",
+    "пример",
+    "промежутки",
+    "элемент",
+    "равномерные-отступы",
+    "гибкая-вёрстка",
+    "адаптивный-дизайн"
+  ],
+  "aliases": [
+    "как сделать равные промежутки между элементами flexbox",
+    "flexbox с равномерным gap",
+    "горизонтальная компоновка с отступами css",
+    "равномерное распределение элементов в строке"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "display",
+      "kind": "name",
+      "note": "display — задаёт способ отображения элемента; flex включает Flexbox.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "flex",
+      "kind": "name",
+      "note": "flex — как элемент тянется внутри flex-контейнера.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "flex",
+      "kind": "name",
+      "note": "flex — как элемент тянется внутри flex-контейнера.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 18,
+      "text": "row",
+      "kind": "name",
+      "note": "row — в ряд (по горизонтали).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "gap",
+      "kind": "name",
+      "note": "gap — расстояние между элементами.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: раскладка"
+      ]
+    },
+    "subcat": "Flexbox"
+  },
+  "legacy": {
+    "template": "flexbox-расположить-элементы-в-ряд-mvh8hrb8.json",
+    "descAt": 1792534052996
+  },
+  "architectureNote": {
+    "role": "Организует элементы внутри одного контейнера: направление, выравнивание и распределение свободного места.",
+    "architecturalUse": "Подключай там, где требуется: Располагает элементы горизонтально через Flexbox с `display: flex`, `flex-direction: row` и `gap`.",
+    "combineWith": [
+      "gap для стабильных промежутков",
+      "flex-wrap для переноса, если элементы не помещаются",
+      "min-width: 0 для сжимаемого содержимого"
+    ],
+    "watchFor": "Flexbox работает только для непосредственных детей контейнера; не путай главную и поперечную оси.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

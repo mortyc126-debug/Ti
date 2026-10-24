@@ -1,0 +1,11 @@
+input {
+  border: 1px solid #aaa;
+}
+
+input::placeholder {
+  color: #777;
+}
+
+input:focus {
+  outline: 2px solid currentColor;
+}

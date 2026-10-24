@@ -1,0 +1,183 @@
+{
+  "schema": 1,
+  "id": "подготовка-и-уборка-mvh8h8pv",
+  "file": "подготовка-и-уборка-mvh8h8pv.py",
+  "title": "подготовка и уборка",
+  "lang": "python",
+  "group": "Тесты (Python) / Подготовить тестовые данные и окружение",
+  "desc": "подготовка и уборка: пример на Python, показывающий основной приём и его применение. Проверьте входные данные и граничные случаи перед использованием в реальном проекте.",
+  "output": "При прямом запуске unittest выводит OK, если тест прошёл.",
+  "tags": [
+    "None",
+    "проверка утверждений",
+    "множества",
+    "python"
+  ],
+  "aliases": [
+    "подготовка и уборка: пример на python, показывающий основной приём и его применение"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "unittest",
+      "kind": "name",
+      "note": "unittest — встроенная библиотека для тестов",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — описывает «чертёж» объектов: их свойства и методы.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 18,
+      "text": "unittest",
+      "kind": "name",
+      "note": "unittest — встроенная библиотека для тестов",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "setUp",
+      "kind": "fn",
+      "note": "setUp — выполняется перед каждым тестом",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 14,
+      "text": "self",
+      "kind": "name",
+      "note": "self — ссылка на текущий объект внутри метода (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "self",
+      "kind": "name",
+      "note": "self — ссылка на текущий объект внутри метода (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "tearDown",
+      "kind": "fn",
+      "note": "tearDown — выполняется после каждого теста",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 17,
+      "text": "self",
+      "kind": "name",
+      "note": "self — ссылка на текущий объект внутри метода (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "self",
+      "kind": "name",
+      "note": "self — ссылка на текущий объект внутри метода (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 21,
+      "text": "None",
+      "kind": "kw",
+      "note": "None — «пусто» (Python, как null).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 4,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 17,
+      "text": "self",
+      "kind": "name",
+      "note": "self — ссылка на текущий объект внутри метода (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 8,
+      "text": "self",
+      "kind": "name",
+      "note": "self — ссылка на текущий объект внутри метода (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 13,
+      "text": "assertEqual",
+      "kind": "fn",
+      "note": "assertEqual — проверяет, что два значения равны",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 25,
+      "text": "len",
+      "kind": "fn",
+      "note": "len — длина (Python): элементов в списке, символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 29,
+      "text": "self",
+      "kind": "name",
+      "note": "self — ссылка на текущий объект внутри метода (Python).",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "подготовка-и-уборка-mvh8h8pv.json",
+    "descAt": 1792534028899
+  }
+}

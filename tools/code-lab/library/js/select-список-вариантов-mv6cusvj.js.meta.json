@@ -1,0 +1,204 @@
+{
+  "schema": 1,
+  "id": "select-список-вариантов-mv6cusvj",
+  "file": "select-список-вариантов-mv6cusvj.js",
+  "title": "select — список вариантов",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Поля ввода и формы",
+  "desc": "У select свойство value содержит значение выбранного option. Событие change срабатывает при смене выбора.",
+  "output": "data-theme у body соответствует выбранному варианту",
+  "tags": [
+    "dataset",
+    "event listener",
+    "динамическое обновление",
+    "темы оформления",
+    "html-атрибуты"
+  ],
+  "aliases": [
+    "как изменить data-атрибут по событию change",
+    "переключение тем через select",
+    "событие change для select",
+    "менять стили по выбору в выпадающем списке"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "select",
+      "kind": "name",
+      "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 13,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 22,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "select",
+      "kind": "name",
+      "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 23,
+      "text": "select",
+      "kind": "name",
+      "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 30,
+      "text": "value",
+      "kind": "name",
+      "note": "value — текущее значение поля ввода (input, textarea, select).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс: поля, кнопки и события"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "data-theme у body соответствует выбранному варианту",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: theme."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const select = document.querySelector(\"#theme\");\nconst page = document.querySelector(\"body\");\n\nselect.addEventListener(\"change\", () => {\n  page.dataset.theme = select.value;\n});"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "data-theme у body соответствует выбранному варианту",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "select",
+      "page"
+    ],
+    "requires": [],
+    "subcat": "Поля ввода и формы"
+  },
+  "legacy": {
+    "template": "select-список-вариантов-mv6cusvj.json"
+  },
+  "enriched": true
+}

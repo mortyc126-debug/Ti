@@ -1,0 +1,2 @@
+.parent { color: tomato; }
+.child { /* color наследуется от parent */ }

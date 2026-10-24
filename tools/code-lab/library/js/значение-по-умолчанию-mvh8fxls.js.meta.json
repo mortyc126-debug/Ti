@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "id": "значение-по-умолчанию-mvh8fxls",
+  "file": "значение-по-умолчанию-mvh8fxls.js",
+  "title": "значение по умолчанию",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Безопасный доступ к знач",
+  "desc": "Подставляет запасное значение.",
+  "output": "",
+  "tags": [
+    "оператор nullish coalescing",
+    "значение по умолчанию",
+    "javascript",
+    "обработка undefined",
+    "валидация данных"
+  ],
+  "aliases": [
+    "как задать значение по умолчанию в js",
+    "оператор ?? в javascript",
+    "запасное значение для null или undefined",
+    "проверка на undefined с заменой",
+    "default value для пустых данных"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "limit",
+      "kind": "name",
+      "note": "LIMIT — ограничить число строк",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 23,
+      "text": "limit",
+      "kind": "name",
+      "note": "LIMIT — ограничить число строк",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "limit",
+      "title"
+    ],
+    "requires": [
+      "settings",
+      "inputValue"
+    ]
+  },
+  "legacy": {
+    "template": "значение-по-умолчанию-mvh8fxls.json",
+    "descAt": 1792533967840
+  },
+  "enriched": true
+}

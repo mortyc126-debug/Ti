@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "id": "из-объекта-в-строку-mvh8garz",
+  "file": "из-объекта-в-строку-mvh8garz.js",
+  "title": "из объекта в строку",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Форматы данных",
+  "desc": "Превращает объект в красивый JSON.",
+  "output": "",
+  "tags": [
+    "json.stringify",
+    "форматирование данных",
+    "преобразование объектов",
+    "отладочный вывод",
+    "javascript"
+  ],
+  "aliases": [
+    "как красиво вывести объект в json",
+    "отступы в json.stringify",
+    "преобразование объекта в читаемый json",
+    "форматированный вывод json"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 29,
+      "text": "age",
+      "kind": "name",
+      "note": "age — поле объекта, по которому сравниваем",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 13,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "stringify",
+      "kind": "fn",
+      "note": "JSON.stringify — превратить объект в строку JSON (для хранения/передачи).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 34,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 40,
+      "text": "2",
+      "kind": "num",
+      "note": "2 — отступ в два пробела для читаемости",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "data",
+      "text"
+    ],
+    "requires": [
+      "name",
+      "age"
+    ]
+  },
+  "legacy": {
+    "template": "из-объекта-в-строку-mvh8garz.json",
+    "descAt": 1792533984911
+  },
+  "enriched": true
+}

@@ -1,0 +1,4 @@
+.error-word {
+  text-decoration: underline wavy red;
+  text-underline-offset: 3px;
+}

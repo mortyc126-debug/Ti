@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "id": "noscript-mvxfvcr05",
+  "file": "резервный-контент-без-javascript-mvxfvcr05.html",
+  "title": "noscript",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Резервный контент",
+  "tags": [
+    "noscript",
+    "html",
+    "тег noscript"
+  ],
+  "aliases": [
+    "<noscript>",
+    "noscript",
+    "html noscript",
+    "пример noscript",
+    "как сделать noscript",
+    "тег noscript",
+    "элемент noscript",
+    "если javascript отключен",
+    "резерв без javascript",
+    "сообщение без js",
+    "p",
+    "<p>",
+    "тег p",
+    "элемент p",
+    "html p",
+    "абзац текста",
+    "параграф",
+    "обычный текст",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "Резервный",
+    "контент"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

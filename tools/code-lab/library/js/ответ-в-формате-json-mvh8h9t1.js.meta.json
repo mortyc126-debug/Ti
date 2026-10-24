@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "id": "ответ-в-формате-json-mvh8h9t1",
+  "file": "ответ-в-формате-json-mvh8h9t1.js",
+  "title": "ответ в формате JSON",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Сервер и API",
+  "desc": "Отдаёт данные как API.",
+  "output": "",
+  "tags": [
+    "node.js",
+    "http-server",
+    "json-ответ",
+    "api-эндпоинт",
+    "backend",
+    "express-alternative"
+  ],
+  "aliases": [
+    "как создать api на node",
+    "простой сервер на node js",
+    "отправка json через http",
+    "node js сервер без express",
+    "тестовый api на js"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 5,
+      "text": "createServer",
+      "kind": "fn",
+      "note": "createServer — создаёт сервер, функция вызывается на каждый запрос",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 31,
+      "text": "age",
+      "kind": "name",
+      "note": "age — поле объекта, по которому сравниваем",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 10,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 15,
+      "text": "stringify",
+      "kind": "fn",
+      "note": "JSON.stringify — превратить объект в строку JSON (для хранения/передачи).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 3,
+      "text": "listen",
+      "kind": "fn",
+      "note": "listen — запускает сервер на порту",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "http",
+      "data"
+    ],
+    "requires": [
+      "require",
+      "req",
+      "name",
+      "age"
+    ]
+  },
+  "legacy": {
+    "template": "ответ-в-формате-json-mvh8h9t1.json",
+    "descAt": 1792534030310
+  },
+  "enriched": true
+}

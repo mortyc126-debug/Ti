@@ -1,0 +1,188 @@
+{
+  "schema": 1,
+  "id": "обработка-сбоя-сети-mvh8h1qf",
+  "file": "обработка-сбоя-сети-mvh8h1qf.js",
+  "title": "обработка сбоя сети",
+  "lang": "js",
+  "group": "Сеть и запросы / Ошибки сети и диагностика",
+  "desc": "Ловит и ошибки сети, и ошибки сервера.",
+  "output": "",
+  "tags": [
+    "fetch",
+    "ошибки сети",
+    "асинхронные запросы",
+    "диагностика",
+    "проверка статуса"
+  ],
+  "aliases": [
+    "как поймать ошибку fetch",
+    "обработка ошибок api запроса",
+    "проверка status в fetch",
+    "вывод ошибки при неудачном запросе",
+    "диагностика проблем с fetch"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 25,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "fetch — делает запрос в сеть и возвращает промис с ответом.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 20,
+      "text": "throw",
+      "kind": "kw",
+      "note": "throw — выбросить ошибку намеренно.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 26,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 30,
+      "text": "Error",
+      "kind": "fn",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 45,
+      "text": "status",
+      "kind": "name",
+      "note": "status — код ответа: 200 успех, 404 не найдено, 500 ошибка сервера",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 14,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 29,
+      "text": "json",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — сработает и при обрыве связи, и при нашей ошибке",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 9,
+      "text": "error",
+      "kind": "name",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 10,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 44,
+      "text": "error",
+      "kind": "name",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "response"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "обработка-сбоя-сети-mvh8h1qf.json",
+    "descAt": 1792534019847
+  },
+  "enriched": true
+}

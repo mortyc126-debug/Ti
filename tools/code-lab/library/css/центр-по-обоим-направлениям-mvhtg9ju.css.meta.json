@@ -1,0 +1,116 @@
+{
+  "schema": 1,
+  "id": "центр-по-обоим-направлениям-mvhtg9ju",
+  "file": "центр-по-обоим-направлениям-mvhtg9ju.css",
+  "title": "центр по обоим направлениям",
+  "lang": "css",
+  "group": "CSS: положение на странице / Центрирование",
+  "desc": "Центрирует дочерние элементы по горизонтали и вертикали через `display: flex`, `justify-content: center` и `align-items: center`.",
+  "output": "Центрирует дочерние элементы по горизонтали и вертикали через `display: flex`, `justify-content: center` и `align-items: center`",
+  "tags": [
+    "align-items",
+    "center",
+    "css",
+    "display",
+    "em",
+    "frontend",
+    "height",
+    "justify-content",
+    "web",
+    "выравнивание",
+    "выравнивание-по-поперечной-оси",
+    "высота",
+    "вёрстка",
+    "позиционирование",
+    "практический-приём",
+    "пример",
+    "раскладка",
+    "центр",
+    "центрирование",
+    "flexbox",
+    "центрирование-без-absolute",
+    "фиксированная-высота",
+    "блочная-модель",
+    "относительное-позиционирование"
+  ],
+  "aliases": [
+    "центрировать блоки flexbox",
+    "выравнивание по центру без margin auto",
+    "центр элементов в контейнере с высотой",
+    "css центрирование flex",
+    "как центрировать по оси x и y в css"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "display",
+      "kind": "name",
+      "note": "display — тип раскладки: block, inline, flex, grid, none.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "flex",
+      "kind": "name",
+      "note": "flex — как элемент тянется внутри flex-контейнера.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "center",
+      "kind": "name",
+      "note": "center — по центру.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 15,
+      "text": "center",
+      "kind": "name",
+      "note": "center — по центру.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "height",
+      "kind": "name",
+      "note": "height — высота. 100vh — вся высота экрана.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: положение на странице"
+      ]
+    },
+    "subcat": "Центрирование"
+  },
+  "legacy": {
+    "template": "центр-по-обоим-направлениям-mvhtg9ju.json",
+    "descAt": 1792569255258
+  },
+  "architectureNote": {
+    "role": "Организует элементы внутри одного контейнера: направление, выравнивание и распределение свободного места.",
+    "architecturalUse": "Подключай там, где требуется: Центрирует дочерние элементы по горизонтали и вертикали через `display: flex`, `justify-content: center` и `align-items: center`.",
+    "combineWith": [
+      "gap для стабильных промежутков",
+      "flex-wrap для переноса, если элементы не помещаются",
+      "min-width: 0 для сжимаемого содержимого"
+    ],
+    "watchFor": "Flexbox работает только для непосредственных детей контейнера; не путай главную и поперечную оси.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

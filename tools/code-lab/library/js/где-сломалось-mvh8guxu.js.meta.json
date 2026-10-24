@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "id": "где-сломалось-mvh8guxu",
+  "file": "где-сломалось-mvh8guxu.js",
+  "title": "где сломалось",
+  "lang": "js",
+  "group": "Ошибки и отладка / Найти причину сбоя",
+  "desc": "Печатает цепочку вызовов.",
+  "output": "",
+  "tags": [
+    "console.trace",
+    "отладка",
+    "стек вызовов",
+    "поиск ошибок",
+    "JavaScript",
+    "логирование"
+  ],
+  "aliases": [
+    "как вывести стек вызовов",
+    "отладка цепочки функций",
+    "console trace пример",
+    "поиск причины ошибки через стек",
+    "как проследить путь выполнения кода"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "inner",
+      "outer"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "где-сломалось-mvh8guxu.json",
+    "descAt": 1792534011042
+  },
+  "enriched": true
+}

@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "id": "kbd-mvxcsbeba",
+  "file": "клавиши-клавиатуры-mvxcsbeba.html",
+  "title": "kbd",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Клавиши",
+  "tags": [
+    "kbd",
+    "html",
+    "тег kbd"
+  ],
+  "aliases": [
+    "<kbd>",
+    "kbd",
+    "html kbd",
+    "пример kbd",
+    "как сделать kbd",
+    "тег kbd",
+    "элемент kbd",
+    "клавиша клавиатуры",
+    "сочетание клавиш",
+    "горячие клавиши",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "Клавиши"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

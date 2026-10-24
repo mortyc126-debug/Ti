@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "лямбда-функция",
+  "file": "лямбда-функция.py",
+  "title": "lambda — короткая функция-выражение",
+  "lang": "python",
+  "group": "Основы / Функции",
+  "desc": "lambda создаёт небольшую анонимную функцию из одного выражения. Полезна как key для сортировки; для сложной логики лучше def.",
+  "output": "",
+  "tags": [
+    "lambda",
+    "анонимная функция",
+    "key",
+    "сортировка",
+    "функции высшего порядка",
+    "python"
+  ],
+  "aliases": [
+    "что такое lambda python",
+    "анонимная функция для sorted",
+    "сортировка с lambda",
+    "lambda создаёт небольшую анонимную функцию из одного выражения"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

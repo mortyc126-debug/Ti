@@ -1,0 +1,293 @@
+{
+  "schema": 1,
+  "id": "js-condition",
+  "file": "js-condition.js",
+  "title": "Условие (if / else)",
+  "lang": "js",
+  "group": "Основы / Синтаксис",
+  "desc": "«Если … то … иначе …». Код решает, какую ветку выполнить, в зависимости от того, правда условие или нет.",
+  "output": "можно",
+  "tags": [
+    "условные операторы",
+    "синтаксис js",
+    "ветвление",
+    "логические условия",
+    "if-else",
+    "контроль потока"
+  ],
+  "aliases": [
+    "как проверить условие в js",
+    "оператор ветвления js",
+    "синтаксис if else javascript",
+    "условие больше или равно в js",
+    "как сделать выборку по условию"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Создаёт переменную, которую НЕ будем менять (константа).",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "возраст",
+      "kind": "name",
+      "note": "Имя переменной. Придумываешь сам; меняется во всём шаблоне.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "=",
+      "kind": "op",
+      "note": "Присваивание — кладём значение справа в переменную слева.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 16,
+      "text": "20",
+      "kind": "num",
+      "note": "Проверяемое значение. Впиши своё и посмотри, какая ветка сработает по смыслу.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 18,
+      "text": ";",
+      "kind": "op",
+      "note": "Конец инструкции.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "«Если». За ним в скобках — условие. Если оно истинно, выполняется блок в фигурных скобках ниже.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "(",
+      "kind": "op",
+      "note": "Начало условия.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "возраст",
+      "kind": "name",
+      "note": "Та же переменная — её и проверяем.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": ">=",
+      "kind": "op",
+      "note": "Сравнение «больше или равно». Возвращает true (правда) или false (ложь).",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "18",
+      "kind": "num",
+      "note": "Порог, с которым сравниваем.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 17,
+      "text": ")",
+      "kind": "op",
+      "note": "Конец условия.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "{",
+      "kind": "op",
+      "note": "Начало блока: что делать, если условие истинно.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "Объект вывода в консоль.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "Печатает в консоль то, что в скобках.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 14,
+      "text": "\"можно\"",
+      "kind": "str",
+      "note": "Строка — текст в кавычках. Замени на свой.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "}",
+      "kind": "op",
+      "note": "Конец блока if.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "else",
+      "kind": "kw",
+      "note": "«Иначе» — блок, который выполнится, если условие было ложным.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 7,
+      "text": "{",
+      "kind": "op",
+      "note": "Начало блока else.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "Объект вывода.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "Печать.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 14,
+      "text": "\"нельзя\"",
+      "kind": "str",
+      "note": "Строка для ветки «иначе». Замени на свой текст.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "}",
+      "kind": "op",
+      "note": "Конец блока else.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "можно",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "constвозраст=20;\n\nif(возраст>=18){\n  console.log(\"можно\");\n}else{\n  console.log(\"нельзя\");\n}"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "можно",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [
+      "constвозраст",
+      "возраст"
+    ],
+    "subcat": "Синтаксис"
+  },
+  "legacy": {
+    "template": "js-condition.json"
+  },
+  "enriched": true
+}

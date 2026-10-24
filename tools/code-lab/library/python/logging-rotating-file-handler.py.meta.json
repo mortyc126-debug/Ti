@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "logging-rotating-file-handler",
+  "file": "logging-rotating-file-handler.py",
+  "title": "Логи с ротацией файлов",
+  "lang": "python",
+  "group": "Повседневная разработка / Логирование",
+  "desc": "RotatingFileHandler ограничивает размер текущего файла журнала и хранит несколько резервных файлов. Путь в примере временный, чтобы не засорять рабочую папку.",
+  "output": "Временный лог-файл создаётся в системной временной папке.",
+  "tags": [
+    "logging",
+    "логи",
+    "RotatingFileHandler",
+    "ротация",
+    "python"
+  ],
+  "aliases": [
+    "ротация логов",
+    "логирование в файл"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

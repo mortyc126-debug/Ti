@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "pip-install-editable-проект",
+  "file": "pip-install-editable-проект.py",
+  "title": "pip install -e — установка проекта для разработки",
+  "lang": "python",
+  "group": "Разработка и инструменты / Упаковка проекта",
+  "desc": "Editable install подключает локальный проект к окружению так, чтобы изменения исходников были видны без повторной установки. Проект должен иметь корректные метаданные и build backend в pyproject.toml. Команда ниже дана как инструкция и не запускается из примера.",
+  "output": "Стандартный модуль найден: json",
+  "inputs": "Установленный Python и каталог проекта с pyproject.toml.",
+  "preconditions": "Python 3.11+ для примеров с современным синтаксисом; для карточек pytest необходим pytest.",
+  "side_effects": "Проверяет разрешение стандартного модуля; установка проекта не выполняется.",
+  "errors": "Если в каталоге нет корректного pyproject.toml, editable install завершится ошибкой.",
+  "checks": "В отдельном тестовом проекте выполнить pip install -e . и проверить импорт пакета вне корня проекта.",
+  "tags": [
+    "pip install -e",
+    "editable install",
+    "pyproject.toml",
+    "пакет"
+  ],
+  "aliases": [
+    "установить собственный проект Python в режиме разработки"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "manual review",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

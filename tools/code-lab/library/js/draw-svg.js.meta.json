@@ -1,0 +1,191 @@
+{
+  "schema": 1,
+  "id": "draw-svg",
+  "file": "draw-svg.js",
+  "title": "SVG — линия из точек (мини-график)",
+  "lang": "js",
+  "group": "Графика и визуализация / SVG и графики",
+  "desc": "SVG — это картинка из тегов. Линию задаёт атрибут points: пары x,y. Так рисуются sparkline и кривые в проекте.",
+  "output": "<svg …><polyline points=\"0,90 20,80 …\" …/></svg>",
+  "tags": [
+    "svg",
+    "графика",
+    "визуализация данных",
+    "polyline",
+    "масштабирование координат",
+    "веб-графика"
+  ],
+  "aliases": [
+    "как нарисовать график из массива в svg",
+    "преобразование данных в svg линию",
+    "svg график без библиотек",
+    "масштабирование координат для svg",
+    "рисование sparkline на чистом js"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "Объявляет функцию — кусок кода, вызываемый по имени.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная, которую не будем переназначать (константа).",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 5,
+      "text": "map",
+      "kind": "fn",
+      "note": "Метод массива: сделать НОВЫЙ массив, применив функцию к каждому элементу.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 10,
+      "text": "y",
+      "kind": "name",
+      "note": "Значение (высота). 100 - y — переворот, т.к. в SVG ось Y вниз.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 13,
+      "text": "x",
+      "kind": "name",
+      "note": "Номер точки → горизонтальная позиция (×20 — шаг).",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 20,
+      "text": "x",
+      "kind": "name",
+      "note": "Номер точки → горизонтальная позиция (×20 — шаг).",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 43,
+      "text": "y",
+      "kind": "name",
+      "note": "Значение (высота). 100 - y — переворот, т.к. в SVG ось Y вниз.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 5,
+      "text": "join",
+      "kind": "fn",
+      "note": "Склеить массив в строку через разделитель.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "«Вернуть» — отдаёт результат наружу и завершает функцию.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Графика и визуализация"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Массив, объявленный в коде",
+      "output": "<svg …><polyline points=\"0,90 20,80 …\" …/></svg>",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function график(значения){\n  const точки = значения\n    .map((y, x) => (x * 20) + \",\" + (100 - y))\n    .join(\" \");\n  return '<svg width=\"200\" height=\"100\">'\n    + '<polyline points=\"' + точки + '\" fill=\"none\" stroke=\"#52F2C9\"/>'\n    + '</svg>';\n}"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "<svg …><polyline points=\"0,90 20,80 …\" …/></svg>",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "график",
+      "точки"
+    ],
+    "requires": [
+      "y"
+    ],
+    "subcat": "SVG и графики"
+  },
+  "legacy": {
+    "template": "draw-svg.json"
+  },
+  "enriched": true
+}

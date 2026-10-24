@@ -1,0 +1,111 @@
+{
+  "schema": 1,
+  "id": "args-и-kwargs-любое-число-аргументов-mvdrpus9",
+  "file": "args-и-kwargs-любое-число-аргументов-mvdrpus9.py",
+  "title": "*args и **kwargs — любое число аргументов",
+  "lang": "python",
+  "group": "Основы / Синтаксис",
+  "desc": "*args собирает дополнительные позиционные аргументы в кортеж, **kwargs — именованные аргументы в словарь. Используйте понятные имена параметров; это не связано с округлением результата.",
+  "output": "6.6\n7",
+  "tags": [
+    "*args",
+    "**kwargs",
+    "аргументы функции",
+    "позиционные аргументы",
+    "именованные аргументы",
+    "распаковка аргументов",
+    "python",
+    "args"
+  ],
+  "aliases": [
+    "что такое args и kwargs",
+    "функция с произвольным числом аргументов",
+    "передать именованные аргументы в функцию"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 15,
+      "text": "round",
+      "kind": "fn",
+      "note": "Math.round — округлить до ближайшего целого.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 33,
+      "text": "True",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "Основы"
+      ]
+    },
+    "subcat": "Синтаксис"
+  },
+  "legacy": {
+    "template": "args-и-kwargs-любое-число-аргументов-mvdrpus9.json",
+    "descAt": 1792324478745
+  },
+  "enriched": true
+}

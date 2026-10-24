@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "modules-import-patterns",
+  "file": "modules-import-patterns.py",
+  "title": "import и from … import — подключение модулей",
+  "lang": "python",
+  "group": "Основы / Модули и импорты",
+  "desc": "Импортируйте конкретные имена или модуль с псевдонимом. Не называйте собственные файлы именами стандартных модулей вроде json.py, statistics.py или random.py.",
+  "output": "0.03",
+  "tags": [
+    "import",
+    "from import",
+    "модули",
+    "псевдоним",
+    "stdlib",
+    "python"
+  ],
+  "aliases": [
+    "как импортировать модуль python",
+    "from import as"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

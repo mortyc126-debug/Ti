@@ -1,0 +1,2 @@
+a[href$=".pdf"] { color: crimson; }
+input[required] { border-color: orange; }

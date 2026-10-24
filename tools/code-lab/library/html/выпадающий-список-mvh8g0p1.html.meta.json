@@ -1,0 +1,192 @@
+{
+  "schema": 1,
+  "id": "выпадающий-список-mvh8g0p1",
+  "file": "выпадающий-список-mvh8g0p1.html",
+  "title": "выпадающий список",
+  "lang": "html",
+  "group": "Интерфейс: поля, кнопки и события / Поля ввода и формы",
+  "desc": "Выбор одного значения из списка.",
+  "output": "",
+  "tags": [
+    "html",
+    "form",
+    "select",
+    "пользовательский ввод",
+    "валидация"
+  ],
+  "aliases": [
+    "как сделать обязательный выбор в списке",
+    "выпадающий список с пустым значением",
+    "html select с предупреждением о выборе",
+    "список с обязательным элементом",
+    "выпадающий список",
+    "пример выпадающий список",
+    "html выпадающий список",
+    "как сделать выпадающий список",
+    "option",
+    "<option>",
+    "тег option",
+    "элемент option",
+    "html option",
+    "вариант выпадающего списка",
+    "пункт select",
+    "select",
+    "<select>",
+    "тег select",
+    "элемент select",
+    "html select",
+    "выбор значения",
+    "селект",
+    "id",
+    "атрибут id",
+    "html атрибут id",
+    "уникальный идентификатор",
+    "id элемента",
+    "name",
+    "атрибут name",
+    "html атрибут name",
+    "имя поля формы",
+    "имя параметра отправки",
+    "value",
+    "атрибут value",
+    "html атрибут value",
+    "значение поля",
+    "значение input",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "form",
+    "форма html",
+    "форма отправки данных",
+    "форма регистрации",
+    "форма входа",
+    "пользовательский ввод",
+    "валидация",
+    "выпадающий",
+    "список",
+    "Выбор",
+    "одного",
+    "значения",
+    "списка"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "select",
+      "kind": "name",
+      "note": "select — выпадающий список",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "id",
+      "kind": "name",
+      "note": "id — уникальное имя элемента. По нему его находят в CSS (#имя) и JS (getElementById).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 18,
+      "text": "name",
+      "kind": "name",
+      "note": "name — имя поля, под которым оно уходит при отправке формы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 3,
+      "text": "option",
+      "kind": "name",
+      "note": "option — пункт списка, value уйдёт на сервер",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "value",
+      "kind": "name",
+      "note": "value — значение поля ввода по умолчанию.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 35,
+      "text": "option",
+      "kind": "name",
+      "note": "option — пункт списка, value уйдёт на сервер",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "option",
+      "kind": "name",
+      "note": "option — пункт списка, value уйдёт на сервер",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 10,
+      "text": "value",
+      "kind": "name",
+      "note": "value — значение поля ввода по умолчанию.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 30,
+      "text": "option",
+      "kind": "name",
+      "note": "option — пункт списка, value уйдёт на сервер",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 3,
+      "text": "option",
+      "kind": "name",
+      "note": "option — пункт списка, value уйдёт на сервер",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "value",
+      "kind": "name",
+      "note": "value — значение поля ввода по умолчанию.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 30,
+      "text": "option",
+      "kind": "name",
+      "note": "option — пункт списка, value уйдёт на сервер",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "select",
+      "kind": "name",
+      "note": "select — выпадающий список",
+      "source": "custom"
+    }
+  ],
+  "legacy": {
+    "template": "выпадающий-список-mvh8g0p1.json",
+    "descAt": 1792533971845
+  },
+  "enriched": true
+}

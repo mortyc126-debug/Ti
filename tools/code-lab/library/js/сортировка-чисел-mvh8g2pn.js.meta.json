@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "id": "сортировка-чисел-mvh8g2pn",
+  "file": "сортировка-чисел-mvh8g2pn.js",
+  "title": "сортировка чисел",
+  "lang": "js",
+  "group": "Данные / Сортировка",
+  "desc": "Сортирует числа по возрастанию.",
+  "output": "",
+  "tags": [
+    "массивы",
+    "функция сравнения",
+    "числа",
+    "стандартная сортировка",
+    "javascript"
+  ],
+  "aliases": [
+    "как отсортировать массив чисел в js",
+    "сортировка чисел в js по возрастанию",
+    "функция sort с числовым сравнением",
+    "стандартная сортировка массива в js"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "sort",
+      "kind": "fn",
+      "note": "sort — сортирует массив на месте",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 23,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "numbers"
+    ],
+    "requires": [
+      "a"
+    ]
+  },
+  "legacy": {
+    "template": "сортировка-чисел-mvh8g2pn.json",
+    "descAt": 1792533974459
+  },
+  "enriched": true
+}

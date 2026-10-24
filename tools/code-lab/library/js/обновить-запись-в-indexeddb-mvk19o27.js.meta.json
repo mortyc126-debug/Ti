@@ -1,0 +1,228 @@
+{
+  "schema": 1,
+  "id": "обновить-запись-в-indexeddb-mvk19o27",
+  "file": "обновить-запись-в-indexeddb-mvk19o27.js",
+  "lang": "js",
+  "title": "Обновить запись в IndexedDB",
+  "group": "Файлы, хранение и сервер / Хранение в браузере",
+  "desc": "Обновляет существующую запись в хранилище IndexedDB по её ключу. Возвращает обновлённый объект.",
+  "output": "[object Object]",
+  "descAt": 1792703316751,
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Файлы, хранение и сервер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "subcat": "Хранение в браузере",
+    "summary": {
+      "output": "[object Object]"
+    },
+    "generated": {
+      "by": "ai",
+      "at": "2026-10-22T21:08:36.751Z",
+      "note": "создано ИИ; код не запускался и не проверялся человеком"
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "updateItem",
+      "transaction",
+      "store",
+      "request"
+    ],
+    "requires": [
+      "resolve",
+      "initDB",
+      "id",
+      "name",
+      "getAllItems"
+    ]
+  },
+  "tags": [
+    "CRUD",
+    "IndexedDB",
+    "обновить данные",
+    "асинхронно"
+  ],
+  "aliases": [
+    "изменить в IndexedDB",
+    "обновить объект",
+    "IndexedDB: update"
+  ],
+  "source": {
+    "title": "ai",
+    "desc": "ai",
+    "tags": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 13,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — «обещание» результата, который придёт позже.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 22,
+      "text": "resolve",
+      "kind": "name",
+      "note": "resolve — завершить промис успешно с результатом.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 31,
+      "text": "reject",
+      "kind": "name",
+      "note": "reject — завершить промис ошибкой.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 30,
+      "text": "resolve",
+      "kind": "fn",
+      "note": "resolve — завершить промис успешно с результатом.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 28,
+      "text": "reject",
+      "kind": "fn",
+      "note": "reject — завершить промис ошибкой.",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 3,
+      "text": "then",
+      "kind": "fn",
+      "note": "then — что сделать, когда промис выполнится (получит результат).",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 3,
+      "text": "then",
+      "kind": "fn",
+      "note": "then — что сделать, когда промис выполнится (получит результат).",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 3,
+      "text": "then",
+      "kind": "fn",
+      "note": "then — что сделать, когда промис выполнится (получит результат).",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 17,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 25,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 3,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 16,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 24,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    }
+  ]
+}

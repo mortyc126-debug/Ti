@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "id": "записать-файл-mvh8hbgv",
+  "file": "записать-файл-mvh8hbgv.js",
+  "title": "записать файл",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Файлы и временные данные",
+  "desc": "Записывает текст в файл.",
+  "output": "",
+  "tags": [
+    "node.js",
+    "fs/promises",
+    "асинхронное ввод-вывод",
+    "файловая система",
+    "promise",
+    "utf-8"
+  ],
+  "aliases": [
+    "как записать текст в файл асинхронно",
+    "node.js запись файла без callback",
+    "fs writeFile с промисом",
+    "неблокирующая запись в файл"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "fs",
+      "kind": "name",
+      "note": "fs — модуль для работы с файлами",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "fs",
+      "kind": "name",
+      "note": "fs — модуль для работы с файлами",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 11,
+      "text": "writeFile",
+      "kind": "fn",
+      "note": "writeFile — записывает текст, а старое содержимое стирает",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "fs",
+      "main"
+    ],
+    "requires": [
+      "require"
+    ]
+  },
+  "legacy": {
+    "template": "записать-файл-mvh8hbgv.json",
+    "descAt": 1792534032463
+  },
+  "enriched": true
+}

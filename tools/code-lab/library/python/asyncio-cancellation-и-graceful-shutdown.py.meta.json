@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "id": "asyncio-cancellation-и-graceful-shutdown",
+  "file": "asyncio-cancellation-и-graceful-shutdown.py",
+  "title": "asyncio cancellation и корректное завершение",
+  "lang": "python",
+  "group": "Продвинутый Python / Асинхронность",
+  "desc": "Отмена asyncio-задачи обычно приходит как CancelledError в точке await. Освобождение ресурсов делайте в finally; не подавляйте отмену без необходимости. При завершении приложения нужно остановить приём новой работы, дождаться или отменить задачи и закрыть соединения.",
+  "output": "Отмена обработана, ресурс закрыт",
+  "inputs": "Асинхронная среда asyncio.",
+  "preconditions": "Python 3.11+; для HAC нужен statsmodels, для запуска тестов/проверок по проекту следуйте инструкциям в карточке.",
+  "side_effects": "Создаёт задачу, отменяет её и проверяет очистку ресурса в finally.",
+  "errors": "CancelledError должен передаваться дальше, если нет осознанной политики обработки; зависшая очистка может задержать shutdown.",
+  "checks": "Проверить отмену до старта, во время await и при ошибке; обеспечить timeout на shutdown и закрытие клиента/пула.",
+  "tags": [
+    "asyncio",
+    "CancelledError",
+    "graceful shutdown",
+    "finally",
+    "задачи"
+  ],
+  "aliases": [
+    "правильно отменить asyncio задачу",
+    "корректно завершить async приложение"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "manual review",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

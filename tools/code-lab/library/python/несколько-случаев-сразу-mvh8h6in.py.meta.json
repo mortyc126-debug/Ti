@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "id": "несколько-случаев-сразу-mvh8h6in",
+  "file": "несколько-случаев-сразу-mvh8h6in.py",
+  "title": "несколько случаев сразу",
+  "lang": "python",
+  "group": "Тесты (Python) / Написать тест",
+  "desc": "Параметризация pytest запускает один тест с несколькими наборами входных данных. Это упрощает проверку обычных, граничных и отрицательных случаев.",
+  "output": "",
+  "tags": [
+    "pytest",
+    "parametrize",
+    "параметризация тестов",
+    "граничные случаи",
+    "unit-тесты",
+    "тестирование",
+    "python"
+  ],
+  "aliases": [
+    "один тест на много значений pytest",
+    "pytest mark parametrize пример",
+    "проверка граничных случаев",
+    "параметризация pytest запускает один тест с несколькими наборами входных данных"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "pytest",
+      "kind": "name",
+      "note": "pytest — популярный фреймворк для тестов",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 1,
+      "text": "pytest",
+      "kind": "name",
+      "note": "pytest — популярный фреймворк для тестов",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 13,
+      "text": "parametrize",
+      "kind": "fn",
+      "note": "parametrize — запускает тест несколько раз с разными данными",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 13,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 4,
+      "text": "assert",
+      "kind": "kw",
+      "note": "assert — проверка: если условие ложно, программа остановится",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 11,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "несколько-случаев-сразу-mvh8h6in.json",
+    "descAt": 1792534026047
+  },
+  "enriched": true
+}

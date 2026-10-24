@@ -1,0 +1,177 @@
+{
+  "schema": 1,
+  "id": "same-mean-py",
+  "file": "same-mean-py.py",
+  "title": "Среднее — Python",
+  "lang": "python",
+  "group": "Данные / Числа и простые операции",
+  "desc": "То же среднее. Python: есть готовые sum() и len(), код короче и читается почти как фраза. Но это скрипт — в браузере не запустится, нужен Python.",
+  "output": "20.0",
+  "tags": [
+    "python",
+    "математика",
+    "статистика",
+    "встроенные функции",
+    "список чисел",
+    "среднее значение"
+  ],
+  "aliases": [
+    "среднее значение списка python",
+    "как посчитать среднее в питоне",
+    "вычисление среднего через sum и len",
+    "среднее арифметическое в python",
+    "простое вычисление среднего",
+    "то же среднее"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "числа",
+      "kind": "name",
+      "note": "Список чисел (переменная без const/let).",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "среднее",
+      "kind": "name",
+      "note": "Сумма / количество.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "sum",
+      "kind": "fn",
+      "note": "Встроенная сумма списка.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "числа",
+      "kind": "name",
+      "note": "Список чисел (переменная без const/let).",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 23,
+      "text": "len",
+      "kind": "fn",
+      "note": "Встроенная длина списка.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 27,
+      "text": "числа",
+      "kind": "name",
+      "note": "Список чисел (переменная без const/let).",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "print",
+      "kind": "fn",
+      "note": "Вывод на экран.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "среднее",
+      "kind": "name",
+      "note": "Сумма / количество.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Данные: хранить, находить и преобразовывать"
+      ],
+      "runtime": [
+        "Python"
+      ],
+      "technology": [
+        "Код"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "20.0",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "python",
+          "content": "числа = [10, 20, 30]\nсреднее = sum(числа) / len(числа)  # sum и len — встроенные\nprint(среднее)  # 20.0"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "20.0",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "subcat": "Числа и просты"
+  },
+  "legacy": {
+    "template": "same-mean-py.json"
+  },
+  "enriched": true
+}

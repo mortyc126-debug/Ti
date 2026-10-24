@@ -1,0 +1,146 @@
+{
+  "schema": 1,
+  "id": "mousemove-движение-мыши-mv6cusxy",
+  "file": "mousemove-движение-мыши-mv6cusxy.js",
+  "title": "mousemove — движение мыши",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Реакция на действия поль",
+  "desc": "mousemove передаёт координаты указателя. Для canvas обычно удобно преобразовать clientX/clientY в координаты относительно его границ.",
+  "output": "Текущие экранные координаты указателя",
+  "tags": [
+    "event listener",
+    "mousemove",
+    "координаты мыши",
+    "интерактивность",
+    "javascript",
+    "отладка"
+  ],
+  "aliases": [
+    "как получить координаты мыши при движении",
+    "отслеживание движения курсора",
+    "логирование клиентских координат",
+    "событие mousemove пример",
+    "получить позицию мыши в браузере"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "window",
+      "kind": "fn",
+      "note": "window — глобальный объект браузера (окно): таймеры, адрес, размеры экрана.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс: поля, кнопки и события"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Текущие экранные координаты указателя",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "window.addEventListener(\"mousemove\", event => {\n  console.log(event.clientX, event.clientY);\n});"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Текущие экранные координаты указателя",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Реакция на действия поль"
+  },
+  "legacy": {
+    "template": "mousemove-движение-мыши-mv6cusxy.json"
+  },
+  "enriched": true
+}

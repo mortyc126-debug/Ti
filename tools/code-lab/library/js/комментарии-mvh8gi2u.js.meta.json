@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "id": "комментарии-mvh8gi2u",
+  "file": "комментарии-mvh8gi2u.js",
+  "title": "комментарии",
+  "lang": "js",
+  "group": "Основы / Синтаксис",
+  "desc": "Заметки, которые программа не читает.",
+  "output": "",
+  "tags": [
+    "комментарии",
+    "синтаксис",
+    "javascript",
+    "документирование",
+    "код"
+  ],
+  "aliases": [
+    "как прокомментировать строку в js",
+    "многострочный комментарий в javascript",
+    "однострочный комментарий js",
+    "закомментировать код временно",
+    "синтаксис комментариев в js"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [],
+  "component": {
+    "provides": [],
+    "requires": []
+  },
+  "legacy": {
+    "template": "комментарии-mvh8gi2u.json",
+    "descAt": 1792533994374
+  },
+  "enriched": true
+}

@@ -1,0 +1,112 @@
+{
+  "schema": 1,
+  "id": "insert-update-delete-менять-данные-mvds0h3u",
+  "file": "insert-update-delete-менять-данные-mvds0h3u.sql",
+  "title": "INSERT / UPDATE / DELETE — менять данные",
+  "lang": "sql",
+  "group": "SQL: запросы и таблицы / Изменить данные и обработать пустые",
+  "desc": "INSERT добавляет строки, UPDATE меняет существующие, DELETE удаляет. Условие WHERE определяет, каких строк это касается.",
+  "output": "1|купить хлеб|1",
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 72,
+      "text": "DEFAULT",
+      "kind": "name",
+      "note": "default — значение/ветка по умолчанию (в export, switch, параметрах).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "INSERT",
+      "kind": "kw",
+      "note": "INSERT — добавить строку в таблицу (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 27,
+      "text": "VALUES",
+      "kind": "kw",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "UPDATE",
+      "kind": "kw",
+      "note": "UPDATE — изменить строки в таблице (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 29,
+      "text": "WHERE",
+      "kind": "kw",
+      "note": "WHERE — условие отбора строк (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "DELETE",
+      "kind": "kw",
+      "note": "delete — удалить свойство из объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 7,
+      "text": "FROM",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 19,
+      "text": "WHERE",
+      "kind": "kw",
+      "note": "WHERE — условие отбора строк (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "SELECT",
+      "kind": "kw",
+      "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 9,
+      "text": "FROM",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "SQL: запросы и таблицы"
+      ]
+    },
+    "subcat": "Изменить данные и обработать пустые"
+  },
+  "legacy": {
+    "template": "insert-update-delete-менять-данные-mvds0h3u.json",
+    "descAt": 1792324974234
+  }
+}

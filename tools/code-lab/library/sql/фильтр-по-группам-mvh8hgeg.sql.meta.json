@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "id": "фильтр-по-группам-mvh8hgeg",
+  "file": "фильтр-по-группам-mvh8hgeg.sql",
+  "title": "фильтр по группам",
+  "lang": "sql",
+  "group": "SQL: запросы и таблицы / Выбрать и сгруппировать данные",
+  "desc": "Только клиенты, потратившие больше 1000.",
+  "output": "",
+  "tags": [
+    "sql",
+    "group by",
+    "having",
+    "агрегация",
+    "фильтрация",
+    "запросы"
+  ],
+  "aliases": [
+    "как отфильтровать пользователей по сумме заказов",
+    "sql группировка с условием на сумму",
+    "выборка клиентов с большим оборотом",
+    "having с агрегатной функцией",
+    "отбор пользователей по итоговой сумме"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "SELECT",
+      "kind": "kw",
+      "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 16,
+      "text": "SUM",
+      "kind": "kw",
+      "note": "SUM — сумма значений",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 27,
+      "text": "AS",
+      "kind": "kw",
+      "note": "AS — даёт имя столбцу результата",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "FROM",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "HAVING",
+      "kind": "kw",
+      "note": "HAVING — условие для групп, а не для отдельных строк",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 7,
+      "text": "SUM",
+      "kind": "kw",
+      "note": "SUM — сумма значений",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "фильтр-по-группам-mvh8hgeg.json",
+    "descAt": 1792534038856
+  },
+  "enriched": true
+}

@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "проверка-значений-на-nan-и-infinity",
+  "file": "проверка-значений-на-nan-и-infinity.py",
+  "title": "Проверка NaN и бесконечности",
+  "lang": "python",
+  "group": "Данные / Форматы и валидация",
+  "desc": "math.isfinite проверяет, что число не является NaN или бесконечностью. NaN не равен даже самому себе, поэтому сравнение x == float(\"nan\") не подходит; используйте math.isnan.",
+  "output": "[1.2, -3.0]\nTrue",
+  "tags": [
+    "math.isfinite",
+    "NaN",
+    "Infinity",
+    "бесконечность",
+    "очистка числовых данных",
+    "числовая валидация",
+    "Python"
+  ],
+  "aliases": [
+    "удалить nan и inf из списка",
+    "проверить конечное ли число python",
+    "почему nan не равен самому себе"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

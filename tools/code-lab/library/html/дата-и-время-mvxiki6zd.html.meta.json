@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "time-mvxiki6zd",
+  "file": "дата-и-время-mvxiki6zd.html",
+  "title": "time",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Дата",
+  "tags": [
+    "time",
+    "html",
+    "тег time"
+  ],
+  "aliases": [
+    "<time>",
+    "time",
+    "html time",
+    "пример time",
+    "как сделать time",
+    "тег time",
+    "элемент time",
+    "дата и время",
+    "время публикации",
+    "дата в html",
+    "datetime",
+    "атрибут datetime",
+    "html атрибут datetime",
+    "машинная дата",
+    "формат даты для программы",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "Дата"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

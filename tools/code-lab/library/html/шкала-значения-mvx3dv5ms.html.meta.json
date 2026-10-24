@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "meter-mvx3dv5ms",
+  "file": "шкала-значения-mvx3dv5ms.html",
+  "title": "meter",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Шкала",
+  "tags": [
+    "meter",
+    "html",
+    "тег meter"
+  ],
+  "aliases": [
+    "<meter>",
+    "meter",
+    "html meter",
+    "пример meter",
+    "как сделать meter",
+    "тег meter",
+    "элемент meter",
+    "шкала значения",
+    "индикатор уровня",
+    "измерение в диапазоне",
+    "value",
+    "атрибут value",
+    "html атрибут value",
+    "значение поля",
+    "значение input",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "Шкала"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

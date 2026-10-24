@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "id": "сортировка-по-ключу-mvh8g3x9",
+  "file": "сортировка-по-ключу-mvh8g3x9.py",
+  "title": "сортировка по ключу",
+  "lang": "python",
+  "group": "Данные / Сортировка",
+  "desc": "Сортировка по ключу: key задаёт вычисляемое значение для сравнения элементов. sorted возвращает новый список; list.sort изменяет существующий список.",
+  "output": "",
+  "tags": [
+    "сортировка",
+    "sorted",
+    "key",
+    "lambda",
+    "сортировка по полю",
+    "списки",
+    "python"
+  ],
+  "aliases": [
+    "как сортировать список словарей по полю",
+    "sorted key lambda пример",
+    "сортировка по длине строки python",
+    "сортировка по ключу: key задаёт вычисляемое значение для сравнения элементов"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 9,
+      "text": "sorted",
+      "kind": "fn",
+      "note": "sorted — возвращает новый отсортированный список",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 23,
+      "text": "key",
+      "kind": "name",
+      "note": "key — функция, по значению которой идёт сортировка",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 27,
+      "text": "len",
+      "kind": "fn",
+      "note": "len — длина строки",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "сортировка-по-ключу-mvh8g3x9.json",
+    "descAt": 1792533976029
+  },
+  "enriched": true
+}

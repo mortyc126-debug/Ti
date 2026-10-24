@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "id": "canvas-mvxzqajkk",
+  "file": "холст-для-рисования-mvxzqajkk.html",
+  "title": "canvas",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Canvas",
+  "tags": [
+    "canvas",
+    "html",
+    "тег canvas"
+  ],
+  "aliases": [
+    "<canvas>",
+    "canvas",
+    "html canvas",
+    "пример canvas",
+    "как сделать canvas",
+    "тег canvas",
+    "элемент canvas",
+    "canvas графика",
+    "рисование через javascript",
+    "графика canvas",
+    "height",
+    "атрибут height",
+    "html атрибут height",
+    "высота элемента",
+    "высота изображения",
+    "width",
+    "атрибут width",
+    "html атрибут width",
+    "ширина элемента",
+    "ширина изображения",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

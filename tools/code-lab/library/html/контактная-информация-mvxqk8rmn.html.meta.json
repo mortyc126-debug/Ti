@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "id": "address-mvxqk8rmn",
+  "file": "контактная-информация-mvxqk8rmn.html",
+  "title": "address",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Контакты",
+  "tags": [
+    "address",
+    "html",
+    "тег address"
+  ],
+  "aliases": [
+    "<address>",
+    "address",
+    "html address",
+    "пример address",
+    "как сделать address",
+    "тег address",
+    "элемент address",
+    "контакты автора",
+    "контактная информация",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "Контакты"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,206 @@
+{
+  "schema": 1,
+  "id": "частицы-обновление-и-отрисовка-mv6cuta3",
+  "file": "частицы-обновление-и-отрисовка-mv6cuta3.js",
+  "title": "Частицы: обновление и отрисовка",
+  "lang": "js",
+  "group": "Игры и интерактивные проекты / Движение и отрисовка",
+  "desc": "Каждый кадр очищайте canvas, обновляйте координаты и рисуйте каждую частицу. Здесь показан один шаг; его можно вызывать из requestAnimationFrame.",
+  "output": "Два маленьких квадрата перемещаются на один шаг и рисуются на canvas",
+  "tags": [
+    "canvas",
+    "2d-графика",
+    "анимация",
+    "физика движения",
+    "requestAnimationFrame",
+    "интерактивная визуализация"
+  ],
+  "aliases": [
+    "как анимировать частицы на canvas",
+    "движение объектов по скорости на холсте",
+    "обновление координат частиц в js",
+    "простая анимация с canvas",
+    "шаг анимации для requestAnimationFrame"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "getContext",
+      "kind": "fn",
+      "note": "getContext — получить «кисть» canvas: getContext(\"2d\") для рисования.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 6,
+      "text": "clearRect",
+      "kind": "fn",
+      "note": "clearRect — стереть прямоугольную область (очистить кадр).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 12,
+      "text": "forEach",
+      "kind": "fn",
+      "note": "forEach — выполняет действие для каждого элемента массива.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 8,
+      "text": "fillRect",
+      "kind": "fn",
+      "note": "fillRect — залить прямоугольник.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Игры и интерактивные проекты"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "Два маленьких квадрата перемещаются на один шаг и рисуются на canvas",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: scene.",
+        "Для рисования нужен canvas с подходящим id и доступным 2D-контекстом."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\nconst particles = [\n  { x: 30, y: 40, vx: 1.5, vy: -0.5 },\n  { x: 80, y: 60, vx: -1, vy: 1 }\n];\n\nfunction drawFrame() {\n  ctx.clearRect(0, 0, canvas.width, canvas.height);\n\n  particles.forEach(particle => {\n    particle.x += particle.vx;\n    particle.y += particle.vy;\n    ctx.fillRect(particle.x, particle.y, 4, 4);\n  });\n}\n\ndrawFrame();"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Два маленьких квадрата перемещаются на один шаг и рисуются на canvas",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "canvas",
+      "ctx",
+      "particles",
+      "drawFrame"
+    ],
+    "requires": [
+      "x",
+      "y",
+      "vx",
+      "vy"
+    ],
+    "subcat": "Движение и отрисовка"
+  },
+  "legacy": {
+    "template": "частицы-обновление-и-отрисовка-mv6cuta3.json"
+  },
+  "enriched": true
+}

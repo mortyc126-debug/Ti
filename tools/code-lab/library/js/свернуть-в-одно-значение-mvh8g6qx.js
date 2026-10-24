@@ -1,0 +1,1 @@
+const sum = [10, 20, 30].reduce((total, n) => total + n, 0);

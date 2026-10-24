@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "collections-counter",
+  "file": "collections-counter.py",
+  "title": "Counter — подсчёт частот",
+  "lang": "python",
+  "group": "Данные / Коллекции",
+  "desc": "Counter подсчитывает количество каждого значения. Подходит для частот категорий и подсчёта повторов.",
+  "output": "Counter({'рост': 3, 'падение': 2})",
+  "tags": [
+    "collections",
+    "Counter",
+    "частоты",
+    "подсчёт значений",
+    "python"
+  ],
+  "aliases": [
+    "посчитать частоты значений",
+    "collections Counter python"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

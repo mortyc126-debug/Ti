@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "id": "pytest-raises-проверить-что-будет-ошибка-mvdrpuq7",
+  "file": "pytest-raises-проверить-что-будет-ошибка-mvdrpuq7.py",
+  "title": "pytest.raises — проверить, что будет ошибка",
+  "lang": "python",
+  "group": "Ошибки и отладка / Проверить значения и результат",
+  "desc": "Тест проходит, если внутри with действительно возникло указанное исключение. Так проверяют «функция должна падать на плохих данных».",
+  "output": "1 passed",
+  "tags": [
+    "pytest",
+    "тестирование",
+    "исключения",
+    "отладка",
+    "assertions",
+    "unit-testing",
+    "raise",
+    "python",
+    "raises"
+  ],
+  "aliases": [
+    "как проверить деление на ноль в pytest",
+    "тест на исключение ZeroDivisionError",
+    "проверка ошибок в юнит-тестах",
+    "assertion для исключений в питоне",
+    "тестирование некорректных входных данных",
+    "тест проходит, если внутри with действительно возникло указанное исключение"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "Ошибки и отладка"
+      ]
+    },
+    "subcat": "Проверить значения и результат"
+  },
+  "legacy": {
+    "template": "pytest-raises-проверить-что-будет-ошибка-mvdrpuq7.json",
+    "descAt": 1792324478671
+  },
+  "enriched": true
+}

@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "id": "localstorage-сохранить-и-прочитать-mvh8hd3x",
+  "file": "localstorage-сохранить-и-прочитать-mvh8hd3x.js",
+  "title": "localStorage: сохранить и прочитать",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Хранение в браузере",
+  "desc": "Сохраняет строку между визитами.",
+  "output": "",
+  "tags": [
+    "localStorage",
+    "браузерное хранилище",
+    "персистентность",
+    "javascript",
+    "хранение данных",
+    "клиентская сторона"
+  ],
+  "aliases": [
+    "как сохранить данные в браузере",
+    "localStorage пример использования",
+    "хранение тем пользователя в браузере",
+    "браузерное кеширование настроек",
+    "получить значение из localStorage"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере, не стирается при закрытии",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "setItem",
+      "kind": "fn",
+      "note": "setItem — записывает значение под ключом",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере, не стирается при закрытии",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 25,
+      "text": "getItem",
+      "kind": "fn",
+      "note": "getItem — читает значение, а если нет, вернёт null",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "provides": [],
+    "requires": []
+  },
+  "legacy": {
+    "template": "localstorage-сохранить-и-прочитать-mvh8hd3x.json",
+    "descAt": 1792534034590
+  },
+  "enriched": true
+}

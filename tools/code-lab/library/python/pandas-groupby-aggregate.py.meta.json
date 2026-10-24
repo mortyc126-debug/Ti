@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "pandas-groupby-aggregate",
+  "file": "pandas-groupby-aggregate.py",
+  "title": "pandas: группировка и агрегация",
+  "lang": "python",
+  "group": "Данные / pandas и таблицы",
+  "desc": "Группирует сделки по тикеру и рассчитывает число записей, суммарный объём и среднюю цену. Требуется pandas.",
+  "output": "Для каждого тикера возвращается одна агрегированная строка.",
+  "tags": [
+    "pandas",
+    "groupby",
+    "агрегация",
+    "таблицы",
+    "python"
+  ],
+  "aliases": [
+    "pandas groupby agg",
+    "агрегировать по группе"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

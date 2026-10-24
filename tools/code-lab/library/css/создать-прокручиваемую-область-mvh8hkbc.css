@@ -1,0 +1,4 @@
+.scroll-area {
+  max-height: 240px;
+  overflow: auto;
+}

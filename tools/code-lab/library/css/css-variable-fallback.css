@@ -1,0 +1,3 @@
+.button {
+  color: var(--button-color, #222);
+}

@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "потоки-threadpoolexecutor",
+  "file": "потоки-threadpoolexecutor.py",
+  "title": "ThreadPoolExecutor для параллельных I/O-задач",
+  "lang": "python",
+  "group": "Продвинутые темы / Потоки и процессы",
+  "desc": "Запускает независимые задачи в пуле потоков. Потоки полезны прежде всего для ожидания ввода-вывода; они не гарантируют ускорение CPU-bound вычислений в обычном CPython.",
+  "output": "Результаты возвращаются в порядке исходного списка через map.",
+  "tags": [
+    "concurrent.futures",
+    "ThreadPoolExecutor",
+    "потоки",
+    "параллелизм",
+    "python"
+  ],
+  "aliases": [
+    "пул потоков Python",
+    "параллельные IO задачи"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

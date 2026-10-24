@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "генератор-множества-set-comprehension",
+  "file": "генератор-множества-set-comprehension.py",
+  "title": "Генератор множества — set comprehension",
+  "lang": "python",
+  "group": "Python — основы / Коллекции",
+  "desc": "Выражение {выражение for элемент in итерируемом_объекте if условие} создаёт множество уникальных значений. Порядок элементов множества не гарантирован.",
+  "output": "[4, 16]",
+  "tags": [
+    "python",
+    "set",
+    "множество",
+    "comprehension",
+    "коллекции",
+    "фильтрация"
+  ],
+  "aliases": [
+    "set comprehension python",
+    "генератор множества"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

@@ -1,0 +1,176 @@
+{
+  "schema": 1,
+  "id": "createlineargradient-градиент-canvas-mv6cutbb",
+  "file": "createlineargradient-градиент-canvas-mv6cutbb.js",
+  "title": "createLinearGradient — градиент Canvas",
+  "lang": "js",
+  "group": "Графика и визуализация / Canvas: рисование",
+  "desc": "createLinearGradient создаёт градиент, addColorStop задаёт цветовые точки от 0 до 1. Назначьте градиент в fillStyle или strokeStyle.",
+  "output": "Прямоугольник с переходом от розового к голубому",
+  "tags": [
+    "canvas",
+    "градиент",
+    "графика",
+    "2d-context",
+    "css-эффекты",
+    "визуализация"
+  ],
+  "aliases": [
+    "как нарисовать градиент на канвасе",
+    "линейный градиент в canvas js",
+    "заливка прямоугольника градиентом",
+    "создание градиента в html5 canvas",
+    "плавный переход цветов на холсте"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "getContext",
+      "kind": "fn",
+      "note": "getContext — получить «кисть» canvas: getContext(\"2d\") для рисования.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "fillRect",
+      "kind": "fn",
+      "note": "fillRect — залить прямоугольник.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Графика и визуализация"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "Прямоугольник с переходом от розового к голубому",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: scene.",
+        "Для рисования нужен canvas с подходящим id и доступным 2D-контекстом."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\nconst gradient = ctx.createLinearGradient(0, 0, 180, 0);\n\ngradient.addColorStop(0, \"#FF006E\");\ngradient.addColorStop(1, \"#3DD9FF\");\nctx.fillStyle = gradient;\nctx.fillRect(10, 10, 180, 70);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Прямоугольник с переходом от розового к голубому",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "canvas",
+      "ctx",
+      "gradient"
+    ],
+    "requires": [],
+    "subcat": "Canvas: рисование"
+  },
+  "legacy": {
+    "template": "createlineargradient-градиент-canvas-mv6cutbb.json"
+  },
+  "enriched": true
+}

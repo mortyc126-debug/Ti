@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "id": "пустые-значения-mvh8hj6b",
+  "file": "пустые-значения-mvh8hj6b.sql",
+  "title": "пустые значения",
+  "lang": "sql",
+  "group": "SQL: запросы и таблицы / Изменить данные и обработать пустые",
+  "desc": "Находит и подменяет NULL.",
+  "output": "",
+  "tags": [
+    "sql",
+    "coalesce",
+    "замена null",
+    "обработка пустых значений",
+    "поиск null"
+  ],
+  "aliases": [
+    "как заменить null на значение по умолчанию в sql",
+    "замена пустых значений в выборке",
+    "обработка null в sql запросе",
+    "заполнение пропусков в таблице",
+    "замена null в sql с coalesce"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "SELECT",
+      "kind": "kw",
+      "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "COALESCE",
+      "kind": "fn",
+      "note": "COALESCE — первое непустое значение из списка",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 41,
+      "text": "AS",
+      "kind": "kw",
+      "note": "AS — даёт имя столбцу результата",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "FROM",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "SELECT",
+      "kind": "kw",
+      "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "FROM",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "WHERE",
+      "kind": "kw",
+      "note": "WHERE — условие отбора строк (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 14,
+      "text": "NULL",
+      "kind": "kw",
+      "note": "NULL — «нет значения»; сравнивать через = нельзя",
+      "source": "custom"
+    }
+  ],
+  "legacy": {
+    "template": "пустые-значения-mvh8hj6b.json",
+    "descAt": 1792534042451
+  },
+  "enriched": true
+}

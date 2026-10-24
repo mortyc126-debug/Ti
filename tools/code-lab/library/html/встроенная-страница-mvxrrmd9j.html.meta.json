@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "id": "iframe-mvxrrmd9j",
+  "file": "встроенная-страница-mvxrrmd9j.html",
+  "title": "iframe",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Встраивание",
+  "tags": [
+    "iframe",
+    "html",
+    "тег iframe"
+  ],
+  "aliases": [
+    "<iframe>",
+    "iframe",
+    "html iframe",
+    "пример iframe",
+    "как сделать iframe",
+    "тег iframe",
+    "элемент iframe",
+    "встроенная страница",
+    "встроить сайт",
+    "внешний документ внутри страницы",
+    "src",
+    "атрибут src",
+    "html атрибут src",
+    "путь к файлу",
+    "адрес картинки",
+    "источник файла",
+    "title",
+    "атрибут title",
+    "html атрибут title",
+    "всплывающая подсказка",
+    "подсказка при наведении",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "Встраивание"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

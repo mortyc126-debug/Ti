@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "python-pandas-merge-py",
+  "file": "pandas-merge-проверка-ключей.py",
+  "title": "pandas merge(validate=...) — контроль связей",
+  "lang": "python",
+  "group": "Данные / pandas и таблицы",
+  "desc": "Объединяет таблицы и проверяет ожидаемую кардинальность ключей.",
+  "output": "validate=\"many_to_one\" обнаруживает дубликаты ключа в правой таблице, которые могли бы размножить строки.",
+  "tags": [
+    "pandas",
+    "merge",
+    "join",
+    "валидация"
+  ],
+  "aliases": [],
+  "source": "curated",
+  "status": "active",
+  "enriched": true
+}

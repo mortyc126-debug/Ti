@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "id": "из-строки-в-объект-mvh8gad7",
+  "file": "из-строки-в-объект-mvh8gad7.js",
+  "title": "из строки в объект",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Форматы данных",
+  "desc": "Разбирает JSON-строку.",
+  "output": "",
+  "tags": [
+    "json",
+    "парсинг",
+    "объект",
+    "данные",
+    "форматы"
+  ],
+  "aliases": [
+    "как преобразовать json строку в объект js",
+    "парсинг json в js",
+    "разбор строки json",
+    "получить данные из json строки",
+    "json.parse пример использования"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 13,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "parse",
+      "kind": "fn",
+      "note": "JSON.parse — разобрать строку JSON обратно в объект.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "text",
+      "data"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "из-строки-в-объект-mvh8gad7.json",
+    "descAt": 1792533984379
+  },
+  "enriched": true
+}

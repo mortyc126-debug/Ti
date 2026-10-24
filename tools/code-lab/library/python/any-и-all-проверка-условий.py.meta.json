@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "any-и-all-проверка-условий",
+  "file": "any-и-all-проверка-условий.py",
+  "title": "any и all — проверить набор условий",
+  "lang": "python",
+  "group": "Основы / Логика",
+  "desc": "any возвращает True, если истинен хотя бы один элемент; all — только если истинны все элементы. Оба работают с итерируемыми объектами.",
+  "output": "True False",
+  "tags": [
+    "any",
+    "all",
+    "логические проверки",
+    "условия",
+    "итераторы",
+    "python"
+  ],
+  "aliases": [
+    "проверить хотя бы одно условие python",
+    "проверить все условия all",
+    "any all пример",
+    "any возвращает true, если истинен хотя бы один элемент; all — только если истинны все элементы"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

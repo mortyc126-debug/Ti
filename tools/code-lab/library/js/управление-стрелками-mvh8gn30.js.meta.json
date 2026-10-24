@@ -1,0 +1,160 @@
+{
+  "schema": 1,
+  "id": "управление-стрелками-mvh8gn30",
+  "file": "управление-стрелками-mvh8gn30.js",
+  "title": "управление стрелками",
+  "lang": "js",
+  "group": "Игры и интерактивные проекты / Движение и отрисовка",
+  "desc": "Запоминает, какие клавиши зажаты.",
+  "output": "",
+  "tags": [
+    "клавиатурный ввод",
+    "геймпад",
+    "инпут",
+    "движение персонажа",
+    "javascript",
+    "events"
+  ],
+  "aliases": [
+    "как отследить зажатые клавиши для игры",
+    "движение по стрелкам js",
+    "проверка нажатых клавиш в браузере",
+    "считывание клавиш для анимации",
+    "отслеживание клавиш для игрового персонажа"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "keys",
+      "kind": "name",
+      "note": "Object.keys — массив имён свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 35,
+      "text": "keys",
+      "kind": "name",
+      "note": "Object.keys — массив имён свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 42,
+      "text": "key",
+      "kind": "name",
+      "note": "key — функция, по значению которой идёт сортировка",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 49,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 33,
+      "text": "keys",
+      "kind": "name",
+      "note": "Object.keys — массив имён свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 40,
+      "text": "key",
+      "kind": "name",
+      "note": "key — функция, по значению которой идёт сортировка",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 47,
+      "text": "false",
+      "kind": "kw",
+      "note": "false — логическая «ложь» (нет).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "keys",
+      "kind": "name",
+      "note": "Object.keys — массив имён свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "keys",
+      "kind": "name",
+      "note": "Object.keys — массив имён свойств объекта.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "keys"
+    ],
+    "requires": [
+      "addEventListener",
+      "player"
+    ]
+  },
+  "legacy": {
+    "template": "управление-стрелками-mvh8gn30.json",
+    "descAt": 1792534000860
+  },
+  "enriched": true
+}

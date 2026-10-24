@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "id": "pass-заглушка-mvdrpupt",
+  "file": "pass-заглушка-mvdrpupt.py",
+  "title": "pass — заглушка",
+  "lang": "python",
+  "group": "Основы / Синтаксис",
+  "desc": "pass значит «здесь пока ничего». Нужен там, где Python требует хотя бы одну строку (тело функции, класса, if), а писать пока нечего.",
+  "output": "запустилось, ошибок нет",
+  "tags": [
+    "синтаксис",
+    "заглушка",
+    "пустое тело",
+    "python",
+    "конструкции",
+    "pass"
+  ],
+  "aliases": [
+    "как оставить пустое тело функции",
+    "заглушка вместо кода",
+    "синтаксическая пустота в питоне",
+    "заполнитель для кода",
+    "pass в python что делает",
+    "pass значит «здесь пока ничего»"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — описывает «чертёж» объектов: их свойства и методы.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 3,
+      "text": "True",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "Основы"
+      ]
+    },
+    "subcat": "Синтаксис"
+  },
+  "legacy": {
+    "template": "pass-заглушка-mvdrpupt.json",
+    "descAt": 1792324478657
+  },
+  "enriched": true
+}

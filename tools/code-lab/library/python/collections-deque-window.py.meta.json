@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "collections-deque-window",
+  "file": "collections-deque-window.py",
+  "title": "deque — очередь и окно фиксированной длины",
+  "lang": "python",
+  "group": "Данные / Коллекции",
+  "desc": "deque(maxlen=N) автоматически удаляет самые старые элементы при добавлении новых. Это удобно для последних N наблюдений, но не заменяет полноценный расчёт скользящей статистики.",
+  "output": "[3, 4, 5]",
+  "tags": [
+    "collections",
+    "deque",
+    "очередь",
+    "скользящее окно",
+    "python"
+  ],
+  "aliases": [
+    "хранить последние N значений",
+    "deque maxlen"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

@@ -1,0 +1,143 @@
+{
+  "schema": 1,
+  "id": "grid-именованные-области-макета-mvh8hn7j",
+  "file": "grid-именованные-области-макета-mvh8hn7j.css",
+  "title": "Grid: именованные области макета",
+  "lang": "css",
+  "group": "CSS: раскладка / Grid",
+  "desc": "Строит макет страницы через CSS Grid с именованными областями `grid-template-areas`: header, sidebar, main и footer легко переставлять и адаптировать.",
+  "output": "Строит макет страницы через CSS Grid с именованными областями `grid-template-areas`: header, sidebar, main и footer легко переставлять и адаптировать",
+  "tags": [
+    "css",
+    "css-grid",
+    "display",
+    "em",
+    "frontend",
+    "gap",
+    "grid-template-columns",
+    "layout",
+    "minmax",
+    "web",
+    "вёрстка",
+    "колонки",
+    "практический-приём",
+    "пример",
+    "промежутки",
+    "фиксированная-ширина",
+    "гибкая-колонка",
+    "адаптивная-вёрстка",
+    "css-grid-приёмы"
+  ],
+  "aliases": [
+    "как сделать колонку фиксированной ширины в grid",
+    "minmax для адаптивных колонок css",
+    "боковая панель фиксированной ширины в grid",
+    "гибкая колонка рядом с фиксированной в css grid",
+    "grid layout с одной фиксированной колонкой"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "display",
+      "kind": "name",
+      "note": "display — тип раскладки: block, inline, flex, grid, none.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "gap",
+      "kind": "name",
+      "note": "gap — расстояние между элементами в flex/grid.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 10,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 11,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 8,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 10,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: раскладка"
+      ]
+    },
+    "subcat": "Grid"
+  },
+  "legacy": {
+    "template": "grid-именованные-области-макета-mvh8hn7j.json",
+    "descAt": 1792534047679
+  },
+  "architectureNote": {
+    "role": "Отвечает за структуру и взаимное расположение областей или карточек.",
+    "architecturalUse": "Подключай там, где требуется: Строит макет страницы через CSS Grid с именованными областями `grid-template-areas`: header, sidebar, main и footer легко переставлять и адаптировать.",
+    "combineWith": [
+      "gap для ритма между ячейками",
+      "minmax(0, 1fr) или minmax() для контроля переполнения",
+      "@media либо auto-fit/minmax() для узких экранов"
+    ],
+    "watchFor": "Не задавай фиксированные ширины всем колонкам без необходимости; проверь длинный текст и узкий экран.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

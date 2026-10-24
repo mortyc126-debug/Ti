@@ -1,0 +1,205 @@
+{
+  "schema": 1,
+  "id": "создать-надпись-в-координатах-экрана-mv6cut1c",
+  "file": "создать-надпись-в-координатах-экрана-mv6cut1c.js",
+  "title": "Создать надпись в координатах экрана",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
+  "desc": "Создайте элемент, задайте ему fixed-позиционирование и координаты в пикселях. Координаты clientX/clientY относятся к видимой области окна.",
+  "output": "На экране появляется надпись в точке (120, 80)",
+  "tags": [
+    "fixed positioning",
+    "всплывающие подсказки",
+    "координаты экрана",
+    "javascript",
+    "ui-элементы",
+    "отображение меток"
+  ],
+  "aliases": [
+    "как создать фиксированный div на экране",
+    "отображение метки по координатам в js",
+    "фиксированное позиционирование блока с текстом",
+    "создание всплывающей подсказки на странице",
+    "как разместить элемент по координатам в пикселях"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 16,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 25,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт новый элемент (например div), который потом можно вставить на страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "textContent",
+      "kind": "name",
+      "note": "textContent — текст внутри элемента; можно прочитать или заменить.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "style",
+      "kind": "name",
+      "note": "style — инлайновые стили элемента: element.style.color = \"red\".",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "style",
+      "kind": "name",
+      "note": "style — инлайновые стили элемента: element.style.color = \"red\".",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "style",
+      "kind": "name",
+      "note": "style — инлайновые стили элемента: element.style.color = \"red\".",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "classList",
+      "kind": "name",
+      "note": "classList — список CSS-классов элемента: add/remove/toggle/contains.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 16,
+      "text": "append",
+      "kind": "fn",
+      "note": "append — добавляет узлы/текст в конец элемента.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс: поля, кнопки и события"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "На экране появляется надпись в точке (120, 80)",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function showLabel(x, y, message) {\n  const label = document.createElement(\"div\");\n  label.textContent = message;\n  label.style.position = \"fixed\";\n  label.style.left = `${x}px`;\n  label.style.top = `${y}px`;\n  label.classList.add(\"screen-label\");\n  document.body.append(label);\n}\n\nshowLabel(120, 80, \"Привет!\");"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "На экране появляется надпись в точке (120, 80)",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "showLabel",
+      "label"
+    ],
+    "requires": [],
+    "subcat": "Обновлять страницу и эле"
+  },
+  "legacy": {
+    "template": "создать-надпись-в-координатах-экрана-mv6cut1c.json"
+  },
+  "enriched": true
+}

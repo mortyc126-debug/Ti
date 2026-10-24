@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "pytest-monkeypatch-env",
+  "file": "pytest-monkeypatch-env.py",
+  "title": "pytest monkeypatch: переменные окружения",
+  "lang": "python",
+  "group": "Повседневная разработка / Тестирование и моки",
+  "desc": "Изолированно задаёт переменную окружения для теста; pytest автоматически возвращает прежнее состояние после завершения теста.",
+  "output": "Тест проверяет чтение конфигурации из окружения.",
+  "tags": [
+    "pytest",
+    "monkeypatch",
+    "окружение",
+    "тестирование",
+    "python"
+  ],
+  "aliases": [
+    "pytest env variable",
+    "тест переменной окружения"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

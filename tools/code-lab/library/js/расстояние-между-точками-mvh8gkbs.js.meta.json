@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "id": "расстояние-между-точками-mvh8gkbs",
+  "file": "расстояние-между-точками-mvh8gkbs.js",
+  "title": "расстояние между точками",
+  "lang": "js",
+  "group": "Игры и интерактивные проекты / Геометрия и попадания",
+  "desc": "Длина отрезка между двумя точками.",
+  "output": "",
+  "tags": [
+    "математика",
+    "геометрия",
+    "попадания",
+    "коллизии",
+    "2D",
+    "тригонометрия"
+  ],
+  "aliases": [
+    "как посчитать расстояние между точками",
+    "евклидово расстояние в js",
+    "проверка попадания в цель",
+    "расстояние между объектами в игре",
+    "дистанция между координатами"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 18,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 26,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 37,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "distance"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "расстояние-между-точками-mvh8gkbs.json",
+    "descAt": 1792533997288
+  },
+  "enriched": true
+}

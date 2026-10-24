@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "id": "маршруты-mvh8hact",
+  "file": "маршруты-mvh8hact.js",
+  "title": "маршруты",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Сервер и API",
+  "desc": "Разные ответы для разных адресов.",
+  "output": "",
+  "tags": [
+    "node.js",
+    "http-сервер",
+    "маршрутизация",
+    "api-эндпоинты",
+    "backend",
+    "express-alternative"
+  ],
+  "aliases": [
+    "как обрабатывать разные url на node.js",
+    "простой http сервер на node",
+    "разные ответы по url в node",
+    "сервер с разными маршрутами без express",
+    "node.js разные ответы для разных запросов"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 5,
+      "text": "createServer",
+      "kind": "fn",
+      "note": "createServer — создаёт сервер, функция вызывается на каждый запрос",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "url",
+      "kind": "name",
+      "note": "URL — объект адреса",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "else",
+      "kind": "kw",
+      "note": "else — «иначе»: что делать, когда условие if не выполнилось.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "statusCode",
+      "kind": "name",
+      "note": "statusCode — код ответа, 404 означает «не найдено»",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 3,
+      "text": "listen",
+      "kind": "fn",
+      "note": "listen — запускает сервер на порту",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "http"
+    ],
+    "requires": [
+      "require",
+      "req"
+    ]
+  },
+  "legacy": {
+    "template": "маршруты-mvh8hact.json",
+    "descAt": 1792534031021
+  },
+  "enriched": true
+}

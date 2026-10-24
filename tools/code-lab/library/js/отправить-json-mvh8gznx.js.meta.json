@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "id": "отправить-json-mvh8gznx",
+  "file": "отправить-json-mvh8gznx.js",
+  "title": "отправить JSON",
+  "lang": "js",
+  "group": "Сеть и запросы / Отправить данные",
+  "desc": "POST-запрос с телом в формате JSON.",
+  "output": "",
+  "tags": [
+    "fetch API",
+    "HTTP POST",
+    "JSON-данные",
+    "асинхронные запросы",
+    "JavaScript",
+    "API-интеграция"
+  ],
+  "aliases": [
+    "как отправить JSON через fetch",
+    "POST запрос с JSON телом",
+    "отправка данных на сервер через fetch",
+    "создание записи через API на JavaScript",
+    "отправка POST запроса с JSON в теле"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "fetch — делает запрос в сеть и возвращает промис с ответом.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "method",
+      "kind": "name",
+      "note": "method — способ запроса: GET читает, POST отправляет",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "headers",
+      "kind": "name",
+      "note": "headers — служебные заголовки запроса",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "body",
+      "kind": "name",
+      "note": "body — тело запроса",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 13,
+      "text": "stringify",
+      "kind": "fn",
+      "note": "JSON.stringify — превратить объект в строку JSON (для хранения/передачи).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [],
+    "requires": [
+      "method",
+      "headers",
+      "body",
+      "name"
+    ]
+  },
+  "legacy": {
+    "template": "отправить-json-mvh8gznx.json",
+    "descAt": 1792534017165
+  },
+  "enriched": true
+}

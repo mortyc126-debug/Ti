@@ -1,0 +1,1 @@
+const names = data.users.map(u => ({ id: u.id, name: u.name }));

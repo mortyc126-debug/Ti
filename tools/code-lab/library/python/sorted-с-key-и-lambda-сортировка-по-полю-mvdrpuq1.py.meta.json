@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "id": "sorted-с-key-и-lambda-сортировка-по-полю-mvdrpuq1",
+  "file": "sorted-с-key-и-lambda-сортировка-по-полю-mvdrpuq1.py",
+  "title": "sorted с key и lambda — сортировка по полю",
+  "lang": "python",
+  "group": "Данные / Перебирать коллекции",
+  "desc": "Сортировка по ключу: key задаёт вычисляемое значение для сравнения элементов. sorted возвращает новый список; list.sort изменяет существующий список.",
+  "output": "['Б', 'А', 'В']",
+  "tags": [
+    "сортировка",
+    "sorted",
+    "key",
+    "lambda",
+    "сортировка по полю",
+    "списки",
+    "python"
+  ],
+  "aliases": [
+    "как сортировать список словарей по полю",
+    "sorted key lambda пример",
+    "сортировка по длине строки python",
+    "сортировка по ключу: key задаёт вычисляемое значение для сравнения элементов"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 6,
+      "col": 28,
+      "text": "lambda",
+      "kind": "kw",
+      "note": "lambda — короткая безымянная функция (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 55,
+      "text": "reverse",
+      "kind": "name",
+      "note": "reverse — перевернуть порядок элементов массива.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 63,
+      "text": "True",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 16,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторять блок заданное число раз.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 22,
+      "text": "in",
+      "kind": "kw",
+      "note": "in — часть for…in (ключи объекта) или проверка наличия свойства.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "Данные: хранить, находить и преобразовывать"
+      ]
+    },
+    "subcat": "Перебирать, фи"
+  },
+  "legacy": {
+    "template": "sorted-с-key-и-lambda-сортировка-по-полю-mvdrpuq1.json",
+    "descAt": 1792324478665
+  },
+  "enriched": true
+}

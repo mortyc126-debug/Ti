@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "id": "logging-уровни-и-формат",
+  "file": "logging-уровни-и-формат.py",
+  "title": "logging — уровни сообщений журнала",
+  "lang": "python",
+  "group": "Файлы, хранение и сервер / Логирование",
+  "desc": "Стандартный logging поддерживает уровни DEBUG, INFO, WARNING, ERROR и CRITICAL. Уровень определяет, какие сообщения будут выведены; журнал лучше print для диагностики приложения.",
+  "output": "",
+  "tags": [
+    "logging",
+    "логирование",
+    "DEBUG",
+    "INFO",
+    "WARNING",
+    "ERROR",
+    "диагностика",
+    "python"
+  ],
+  "aliases": [
+    "как писать логи python",
+    "уровни logging python",
+    "logging вместо print",
+    "стандартный logging поддерживает уровни debug, info, warning, error и critical"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

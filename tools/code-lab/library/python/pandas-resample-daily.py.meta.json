@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "pandas-resample-daily",
+  "file": "pandas-resample-daily.py",
+  "title": "pandas: агрегация временного ряда по дням",
+  "lang": "python",
+  "group": "Данные / Временные ряды",
+  "desc": "Приводит индекс к datetime и агрегирует внутридневные цены до дневной последней цены. Для финансовых данных важно заранее выбрать корректную торговую временную зону и календарь. Требуется pandas.",
+  "output": "Получается по одному последнему наблюдению на календарный день.",
+  "tags": [
+    "pandas",
+    "resample",
+    "временные ряды",
+    "частота",
+    "python"
+  ],
+  "aliases": [
+    "pandas resample дневные данные",
+    "intraday to daily"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

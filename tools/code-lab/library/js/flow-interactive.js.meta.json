@@ -1,0 +1,311 @@
+{
+  "schema": 1,
+  "id": "flow-interactive",
+  "file": "flow-interactive.js",
+  "title": "Клик → расчёт → экран (+состояние)",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
+  "desc": "Связь через СОБЫТИЕ. Нажал → читаем поле (вход) → считаем → обновляем экран. Переменная «всего» — состояние: живёт между кликами и копит результат.",
+  "output": "поле + кнопка; каждый клик удваивает число и прибавляет к итогу",
+  "tags": [
+    "события",
+    "состояние",
+    "DOM-обновление",
+    "интерактивность",
+    "javascript",
+    "клик"
+  ],
+  "aliases": [
+    "как хранить данные между кликами",
+    "накопление результата по кнопке",
+    "обновление интерфейса при клике",
+    "сохранение состояния в js",
+    "счётчик на кнопку"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "document",
+      "kind": "name",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 31,
+      "text": "innerHTML",
+      "kind": "fn",
+      "note": "innerHTML — HTML-содержимое элемента; осторожно с чужими данными.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "Переменная, которую будем менять (состояние).",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "всего",
+      "kind": "name",
+      "note": "Состояние: не исчезает после клика, копит сумму.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "document",
+      "kind": "name",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 9,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 30,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "Подписка: «когда клик — выполни функцию».",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "n",
+      "kind": "name",
+      "note": "Вход: число из поля ввода.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 12,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Текст из поля → число (иначе склеит как строки).",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 19,
+      "text": "document",
+      "kind": "name",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 28,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 48,
+      "text": "value",
+      "kind": "fn",
+      "note": "Текущее значение поля ввода.",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 8,
+      "text": "удвоено",
+      "kind": "name",
+      "note": "Промежуточный расчёт.",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 18,
+      "text": "n",
+      "kind": "name",
+      "note": "Вход: число из поля ввода.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 2,
+      "text": "всего",
+      "kind": "name",
+      "note": "Состояние: не исчезает после клика, копит сумму.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 10,
+      "text": "всего",
+      "kind": "name",
+      "note": "Состояние: не исчезает после клика, копит сумму.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 18,
+      "text": "удвоено",
+      "kind": "name",
+      "note": "Промежуточный расчёт.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "document",
+      "kind": "name",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 11,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 33,
+      "text": "textContent",
+      "kind": "fn",
+      "note": "Текст элемента (меняем = обновляем экран).",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 58,
+      "text": "всего",
+      "kind": "name",
+      "note": "Состояние: не исчезает после клика, копит сумму.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс: поля, кнопки и события"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "поле + кнопка; каждый клик удваивает число и прибавляет к итогу",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: go, n, out, res."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "// рисуем поле, кнопку и место для ответа\ndocument.querySelector(\"#out\").innerHTML =\n  '<input id=\"n\" value=\"10\" style=\"width:60px\"> ' +\n  '<button id=\"go\">+ удвоить</button> <span id=\"res\"></span>';\n\nlet всего = 0;   // состояние: копится между нажатиями\n\ndocument.querySelector(\"#go\").addEventListener(\"click\", () => {\n  const n = Number(document.querySelector(\"#n\").value); // вход: из поля\n  const удвоено = n * 2;                                 // расчёт\n  всего = всего + удвоено;                               // обновляем состояние\n  document.querySelector(\"#res\").textContent = \"итог: \" + всего; // вывод\n});"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "поле + кнопка; каждый клик удваивает число и прибавляет к итогу",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "всего",
+      "n",
+      "удвоено"
+    ],
+    "requires": [],
+    "subcat": "Обновлять страницу и эле"
+  },
+  "legacy": {
+    "template": "flow-interactive.json"
+  },
+  "enriched": true
+}

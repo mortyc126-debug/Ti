@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "id": "try-catch-finally-поймать-ошибку-mvds0h5y",
+  "file": "try-catch-finally-поймать-ошибку-mvds0h5y.js",
+  "title": "try / catch / finally — поймать ошибку",
+  "lang": "js",
+  "group": "Ошибки и отладка / Найти причину сбоя",
+  "desc": "Пробуем опасное действие в try; при ошибке управление уходит в catch, а finally выполняется в любом случае.",
+  "output": "разбор закончен\n{ a: 1 }\nошибка: SyntaxError\nразбор закончен\nnull",
+  "tags": [
+    "json.parse",
+    "ошибки парсинга",
+    "отладка",
+    "javascript",
+    "обработка исключений"
+  ],
+  "aliases": [
+    "как обработать ошибку JSON.parse",
+    "перехват ошибок при разборе json",
+    "finally в обработке json",
+    "вывод типа ошибки при парсинге"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 11,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 16,
+      "text": "parse",
+      "kind": "fn",
+      "note": "JSON.parse — разобрать строку JSON обратно в объект.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 11,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "finally",
+      "kind": "kw",
+      "note": "finally — выполнится в любом случае, с ошибкой или без.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "разобрать"
+    ],
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Ошибки и отладка"
+      ]
+    },
+    "subcat": "Найти причину сбоя"
+  },
+  "legacy": {
+    "template": "try-catch-finally-поймать-ошибку-mvds0h5y.json",
+    "descAt": 1792324974310
+  },
+  "enriched": true
+}

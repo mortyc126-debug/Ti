@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "id": "строки-strip-split-join",
+  "file": "строки-strip-split-join.py",
+  "title": "Строки: strip, split и join",
+  "lang": "python",
+  "group": "Основы / Строки и текст",
+  "desc": "Удаляет внешние пробелы, разбивает строку на элементы и собирает их обратно. split() без аргумента обрабатывает последовательности пробельных символов.",
+  "output": "Исходная строка очищена; элементы объединены через запятую.",
+  "tags": [
+    "строки",
+    "strip",
+    "split",
+    "join",
+    "очистка текста",
+    "python"
+  ],
+  "aliases": [
+    "обрезать пробелы",
+    "разделить строку",
+    "объединить строки"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

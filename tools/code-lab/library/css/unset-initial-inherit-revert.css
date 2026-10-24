@@ -1,0 +1,6 @@
+.child {
+  color: inherit;
+  margin: initial;
+  display: revert;
+  padding: unset;
+}

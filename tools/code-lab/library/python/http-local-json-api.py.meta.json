@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "http-local-json-api",
+  "file": "http-local-json-api.py",
+  "title": "HTTP API — локальный JSON-сервер и запрос",
+  "lang": "python",
+  "group": "Сеть и запросы / HTTP и API",
+  "desc": "Самодостаточный пример HTTP: сервер возвращает JSON, клиент читает ответ и проверяет статус. Работает только на localhost; для внешних API дополнительно нужны тайм-ауты, обработка ошибок и проверка схемы ответа.",
+  "output": "{'status': 'ok', 'items': 2}",
+  "tags": [
+    "http.server",
+    "urllib",
+    "JSON",
+    "API",
+    "HTTP",
+    "python"
+  ],
+  "aliases": [
+    "локальный HTTP API python",
+    "запрос к json api urllib"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

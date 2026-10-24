@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "id": "samp-mvxoxvxmq",
+  "file": "вывод-программы-mvxoxvxmq.html",
+  "title": "samp",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Вывод программы",
+  "tags": [
+    "samp",
+    "html",
+    "тег samp"
+  ],
+  "aliases": [
+    "<samp>",
+    "samp",
+    "html samp",
+    "пример samp",
+    "как сделать samp",
+    "тег samp",
+    "элемент samp",
+    "вывод программы",
+    "результат выполнения программы",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "Вывод",
+    "программы"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

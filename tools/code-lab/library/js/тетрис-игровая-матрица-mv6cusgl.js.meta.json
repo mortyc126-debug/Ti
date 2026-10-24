@@ -1,0 +1,182 @@
+{
+  "schema": 1,
+  "id": "тетрис-игровая-матрица-mv6cusgl",
+  "file": "тетрис-игровая-матрица-mv6cusgl.js",
+  "title": "Тетрис: игровая матрица",
+  "lang": "js",
+  "group": "Игры и интерактивные проекты / Движение и отрисовка",
+  "desc": "Поле можно хранить как двумерный массив. Ноль означает пустую клетку, а положительное число — занятый блок или его цветовой индекс.",
+  "output": "[0, 0, 0, 1, 1, 0]",
+  "tags": [
+    "двумерный массив",
+    "инициализация игрового поля",
+    "js",
+    "структуры данных",
+    "игровой движок"
+  ],
+  "aliases": [
+    "создать пустую доску в js",
+    "инициализация поля для игры",
+    "заполнение двумерного массива нулями",
+    "как создать сетку для игры"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 20,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 23,
+      "text": "fill",
+      "kind": "fn",
+      "note": "fill — залить текущий контур цветом (fillStyle).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Игры и интерактивные проекты"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "[0, 0, 0, 1, 1, 0]",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const rows = 4;\nconst columns = 6;\nconst board = Array.from(\n  { length: rows },\n  () => Array(columns).fill(0)\n);\n\nboard[2][3] = 1;\nboard[2][4] = 1;\nconsole.log(board[2]);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "[0, 0, 0, 1, 1, 0]",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "rows",
+      "columns",
+      "board"
+    ],
+    "requires": [
+      "length"
+    ],
+    "subcat": "Движение и отрисовка"
+  },
+  "legacy": {
+    "template": "тетрис-игровая-матрица-mv6cusgl.json"
+  },
+  "enriched": true
+}

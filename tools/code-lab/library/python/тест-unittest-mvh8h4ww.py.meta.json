@@ -1,0 +1,154 @@
+{
+  "schema": 1,
+  "id": "тест-unittest-mvh8h4ww",
+  "file": "тест-unittest-mvh8h4ww.py",
+  "title": "тест unittest",
+  "lang": "python",
+  "group": "Тесты (Python) / Написать тест",
+  "desc": "тест unittest: пример на Python, показывающий основной приём и его применение. Проверьте входные данные и граничные случаи перед использованием в реальном проекте.",
+  "output": "",
+  "tags": [
+    "unittest",
+    "юнит-тестирование",
+    "тестирование",
+    "assert",
+    "стандартная библиотека",
+    "проверка утверждений",
+    "точка входа",
+    "python"
+  ],
+  "aliases": [
+    "как написать тест на unittest",
+    "тест сложения unittest",
+    "минимальный тест на python",
+    "тестирование функции unittest",
+    "assertEqual пример",
+    "тест unittest: пример на python, показывающий основной приём и его применение"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "unittest",
+      "kind": "name",
+      "note": "unittest — встроенная библиотека для тестов",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 11,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — описывает «чертёж» объектов: их свойства и методы.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 14,
+      "text": "unittest",
+      "kind": "name",
+      "note": "unittest — встроенная библиотека для тестов",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 17,
+      "text": "self",
+      "kind": "name",
+      "note": "self — ссылка на текущий объект внутри метода (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "self",
+      "kind": "name",
+      "note": "self — ссылка на текущий объект внутри метода (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 13,
+      "text": "assertEqual",
+      "kind": "fn",
+      "note": "assertEqual — проверяет, что два значения равны",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 4,
+      "text": "unittest",
+      "kind": "name",
+      "note": "unittest — встроенная библиотека для тестов",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "тест-unittest-mvh8h4ww.json",
+    "descAt": 1792534023968
+  },
+  "enriched": true
+}

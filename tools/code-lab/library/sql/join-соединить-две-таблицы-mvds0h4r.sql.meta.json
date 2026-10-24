@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "id": "join-соединить-две-таблицы-mvds0h4r",
+  "file": "join-соединить-две-таблицы-mvds0h4r.sql",
+  "title": "JOIN — соединить две таблицы",
+  "lang": "sql",
+  "group": "SQL: запросы и таблицы / Выбрать и сгруппировать данные",
+  "desc": "JOIN приклеивает к строкам одной таблицы подходящие строки другой по условию ON.",
+  "output": "Банк|Бонд-1\nМинфин|ОФЗ-1\nМинфин|ОФЗ-2",
+  "tags": [
+    "JOIN",
+    "SQL",
+    "связь таблиц",
+    "ORDER BY",
+    "базы данных",
+    "выборка данных"
+  ],
+  "aliases": [
+    "как объединить таблицы по ключу",
+    "выборка с сортировкой по связанному полю",
+    "получить данные из двух таблиц SQL",
+    "JOIN с ORDER BY в SQL",
+    "вывести связанные записи из разных таблиц"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 0,
+      "text": "INSERT",
+      "kind": "kw",
+      "note": "INSERT — добавить строку в таблицу (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 21,
+      "text": "VALUES",
+      "kind": "kw",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "INSERT",
+      "kind": "kw",
+      "note": "INSERT — добавить строку в таблицу (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 20,
+      "text": "VALUES",
+      "kind": "kw",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "SELECT",
+      "kind": "kw",
+      "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "FROM",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "JOIN",
+      "kind": "kw",
+      "note": "join — склеить массив в строку через разделитель.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "SQL: запросы и таблицы"
+      ]
+    },
+    "subcat": "Выбрать и сгруппировать данные"
+  },
+  "legacy": {
+    "template": "join-соединить-две-таблицы-mvds0h4r.json",
+    "descAt": 1792324974268
+  },
+  "enriched": true
+}

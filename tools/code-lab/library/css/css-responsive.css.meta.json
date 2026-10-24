@@ -1,0 +1,242 @@
+{
+  "schema": 1,
+  "id": "css-responsive",
+  "file": "css-responsive.css",
+  "title": "Масштабируемая страница (grid + clamp)",
+  "lang": "css",
+  "group": "CSS: адаптивность / Экраны разных размеров",
+  "desc": "Создаёт адаптивную сетку карточек через CSS Grid: `auto-fit` и `minmax()` подбирают число колонок, а `clamp()` плавно масштабирует заголовок между минимальным и максимальным размером.",
+  "output": "карточки сами переносятся, текст плавно меняет размер, на телефоне — компактнее",
+  "tags": [
+    "@media",
+    "auto-fit",
+    "breakpoints",
+    "clamp",
+    "css",
+    "css-grid",
+    "display",
+    "em",
+    "font-size",
+    "frontend",
+    "gap",
+    "grid-template-columns",
+    "media-query",
+    "minmax",
+    "responsive",
+    "vw",
+    "web",
+    "адаптивная-сетка",
+    "адаптивный-размер",
+    "вёрстка",
+    "колонки",
+    "практический-приём",
+    "пример",
+    "промежутки",
+    "размер-шрифта",
+    "страница",
+    "ширина-экрана",
+    "adaptive-layout",
+    "flexible-design"
+  ],
+  "aliases": [
+    "как сделать сетку карточек с auto-fit",
+    "адаптивные колонки css grid",
+    "плавное изменение размера шрифта по ширине экрана",
+    "гибкая вёрстка карточек на css",
+    "auto-fit и minmax для адаптивности"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "display",
+      "kind": "fn",
+      "note": "Как раскладывать детей. grid — сетка.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "grid",
+      "kind": "name",
+      "note": "Режим сетки.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "grid-template-columns",
+      "kind": "fn",
+      "note": "Описание колонок сетки.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 25,
+      "text": "repeat",
+      "kind": "fn",
+      "note": "Повторить описание колонок.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 32,
+      "text": "auto-fit",
+      "kind": "name",
+      "note": "Столько колонок, сколько влезет; остальное переносится.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 42,
+      "text": "minmax",
+      "kind": "fn",
+      "note": "Размер от..до: не меньше первого, не больше второго.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "gap",
+      "kind": "fn",
+      "note": "Отступ между ячейками.",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "font-size",
+      "kind": "fn",
+      "note": "Размер шрифта.",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 13,
+      "text": "clamp",
+      "kind": "fn",
+      "note": "«Резиновый» размер: минимум, предпочтительно, максимум.",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 0,
+      "text": "@media",
+      "kind": "kw",
+      "note": "Медиа-запрос: правила только при условии (ширина экрана и т.п.).",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 8,
+      "text": "max-width",
+      "kind": "fn",
+      "note": "Условие: ширина окна не больше заданной.",
+      "source": "custom"
+    },
+    {
+      "line": 13,
+      "col": 11,
+      "text": "gap",
+      "kind": "fn",
+      "note": "Отступ между ячейками.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "CSS: адаптивность"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "CSS"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "карточки сами переносятся, текст плавно меняет размер, на телефоне — компактнее",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "css",
+          "content": ".cards {\n  display: grid;\n  /* колонки сами переносятся: минимум 220px, иначе поровну */\n  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));\n  gap: 16px;\n}\n\n.title {\n  /* размер между 18 и 28px, плавно по ширине окна */\n  font-size: clamp(18px, 4vw, 28px);\n}\n\n@media (max-width: 600px) {\n  .cards { gap: 8px; }   /* на телефоне теснее */\n}"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "карточки сами переносятся, текст плавно меняет размер, на телефоне — компактнее",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "subcat": "Экраны разных размеров"
+  },
+  "legacy": {
+    "template": "css-responsive.json"
+  },
+  "architectureNote": {
+    "role": "Отвечает за структуру и взаимное расположение областей или карточек.",
+    "architecturalUse": "Подключай там, где требуется: Создаёт адаптивную сетку карточек через CSS Grid: `auto-fit` и `minmax()` подбирают число колонок, а `clamp()` плавно масштабирует заголовок между минимальным и максимальным размером.",
+    "combineWith": [
+      "gap для ритма между ячейками",
+      "minmax(0, 1fr) или minmax() для контроля переполнения",
+      "@media либо auto-fit/minmax() для узких экранов"
+    ],
+    "watchFor": "Не задавай фиксированные ширины всем колонкам без необходимости; проверь длинный текст и узкий экран.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

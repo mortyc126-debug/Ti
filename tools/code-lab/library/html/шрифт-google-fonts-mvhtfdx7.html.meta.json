@@ -1,0 +1,147 @@
+{
+  "schema": 1,
+  "id": "шрифт-google-fonts-mvhtfdx7",
+  "file": "шрифт-google-fonts-mvhtfdx7.html",
+  "title": "шрифт Google Fonts",
+  "lang": "html",
+  "group": "CSS: текст и шрифты / Шрифт и размер",
+  "desc": "Фрагмент для подключения внешнего шрифта Roboto из библиотеки Google Fonts с весами 400 (обычный) и 700 (полужирный) через CSS. Использует преконнект для ускорения загрузки.",
+  "output": "",
+  "tags": [
+    "google-fonts",
+    "roboto",
+    "шрифт",
+    "веса",
+    "preconnect",
+    "css",
+    "загрузка"
+  ],
+  "aliases": [
+    "подключение Roboto",
+    "шрифт Roboto",
+    "Google Fonts Roboto",
+    "веса шрифта",
+    "шрифт Google Fonts",
+    "пример шрифт Google Fonts",
+    "html шрифт Google Fonts",
+    "как сделать шрифт Google Fonts",
+    "link",
+    "<link>",
+    "тег link",
+    "элемент link",
+    "html link",
+    "подключить ресурс",
+    "подключение css",
+    "иконка сайта",
+    "favicon",
+    "display",
+    "атрибут display",
+    "html атрибут display",
+    "family",
+    "атрибут family",
+    "html атрибут family",
+    "href",
+    "атрибут href",
+    "html атрибут href",
+    "адрес ссылки",
+    "куда ведет ссылка",
+    "url ссылки",
+    "rel",
+    "атрибут rel",
+    "html атрибут rel",
+    "тип связи ссылки",
+    "noopener",
+    "nofollow",
+    "google-fonts",
+    "google fonts",
+    "roboto",
+    "шрифт",
+    "веса",
+    "preconnect",
+    "css",
+    "загрузка",
+    "Google",
+    "Fonts",
+    "Фрагмент",
+    "подключения",
+    "внешнего",
+    "шрифта",
+    "библиотеки",
+    "весами",
+    "обычный",
+    "полужирный",
+    "Использует",
+    "преконнект",
+    "ускорения",
+    "загрузки"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "ai",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "link",
+      "kind": "name",
+      "note": "<link> — подключает внешний файл, чаще CSS.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "rel",
+      "kind": "name",
+      "note": "rel — отношение ссылки (например stylesheet у <link>).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 23,
+      "text": "href",
+      "kind": "name",
+      "note": "href — адрес, куда ведёт ссылка <a>.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 1,
+      "text": "link",
+      "kind": "name",
+      "note": "<link> — подключает внешний файл, чаще CSS.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "href",
+      "kind": "name",
+      "note": "href — адрес, куда ведёт ссылка <a>.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 87,
+      "text": "rel",
+      "kind": "name",
+      "note": "rel — отношение ссылки (например stylesheet у <link>).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: текст и шрифты"
+      ]
+    },
+    "subcat": "Шрифт и размер"
+  },
+  "legacy": {
+    "template": "шрифт-google-fonts-mvhtfdx7.json",
+    "descAt": 1792569214267
+  }
+}

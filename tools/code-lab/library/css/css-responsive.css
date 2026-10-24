@@ -1,0 +1,15 @@
+.cards {
+  display: grid;
+  /* колонки сами переносятся: минимум 220px, иначе поровну */
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.title {
+  /* размер между 18 и 28px, плавно по ширине окна */
+  font-size: clamp(18px, 4vw, 28px);
+}
+
+@media (max-width: 600px) {
+  .cards { gap: 8px; }   /* на телефоне теснее */
+}

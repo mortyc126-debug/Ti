@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "http-json-запрос-urllib",
+  "file": "http-json-запрос-urllib.py",
+  "title": "HTTP JSON через urllib с тайм-аутом",
+  "lang": "python",
+  "group": "Повседневная разработка / HTTP и API",
+  "desc": "Показывает формирование JSON POST-запроса стандартной библиотекой и ограничение времени ожидания. Фактический сетевой вызов вынесен в функцию и не выполняется при импорте.",
+  "output": "Функция возвращает разобранный JSON-ответ сервера.",
+  "tags": [
+    "HTTP",
+    "API",
+    "urllib",
+    "JSON",
+    "timeout",
+    "python"
+  ],
+  "aliases": [
+    "POST JSON запрос без requests",
+    "urllib request"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

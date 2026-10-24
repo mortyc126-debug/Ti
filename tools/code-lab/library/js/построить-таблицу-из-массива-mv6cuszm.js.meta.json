@@ -1,0 +1,340 @@
+{
+  "schema": 1,
+  "id": "построить-таблицу-из-массива-mv6cuszm",
+  "file": "построить-таблицу-из-массива-mv6cuszm.js",
+  "title": "Построить таблицу из массива",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
+  "desc": "Создавайте строки и ячейки через createElement, а текст задавайте через textContent. Это безопаснее, чем собирать HTML из пользовательских строк.",
+  "output": "В tbody таблицы #colors добавляются две строки с цветами",
+  "tags": [
+    "DOM-манipulation",
+    "динамический HTML",
+    "таблицы",
+    "javascript",
+    "безопасное создание элементов"
+  ],
+  "aliases": [
+    "как создать таблицу из массива js",
+    "динамическое добавление строк в таблицу",
+    "генерация таблицы через document.createElement",
+    "отображение данных в таблице без innerHTML"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 14,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 23,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 19,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 7,
+      "text": "forEach",
+      "kind": "fn",
+      "note": "forEach — выполняет действие для каждого элемента массива.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 14,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 23,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт новый элемент (например div), который потом можно вставить на страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 19,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 28,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт новый элемент (например div), который потом можно вставить на страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 18,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 27,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт новый элемент (например div), который потом можно вставить на страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 11,
+      "text": "textContent",
+      "kind": "name",
+      "note": "textContent — текст внутри элемента; можно прочитать или заменить.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 10,
+      "text": "textContent",
+      "kind": "name",
+      "note": "textContent — текст внутри элемента; можно прочитать или заменить.",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 6,
+      "text": "append",
+      "kind": "fn",
+      "note": "append — добавляет узлы/текст в конец элемента.",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 7,
+      "text": "append",
+      "kind": "fn",
+      "note": "append — добавляет узлы/текст в конец элемента.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "component",
+    "tags": {
+      "purpose": [
+        "Интерфейс: поля, кнопки и события"
+      ],
+      "runtime": [
+        "Браузер",
+        "DOM"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Массив объектов [{name, hex}]",
+      "output": "Строки в <tbody>",
+      "dependencies": [],
+      "requirements": [
+        "HTML-таблица с элементом <tbody>"
+      ]
+    },
+    "safety": {
+      "level": "ok",
+      "notes": []
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project",
+      "view_connections"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "html": "<table id=\"colors\">\n  <thead><tr><th>Название</th><th>Код</th></tr></thead>\n  <tbody></tbody>\n</table>",
+        "code": {
+          "language": "javascript",
+          "content": "function renderColors(colors) {\n  const tbody = document.querySelector('#colors tbody');\n  if (!tbody) throw new Error('Не найден #colors tbody');\n  tbody.replaceChildren();\n  colors.forEach(({ name, hex }) => {\n    const tr = document.createElement('tr');\n    const nameCell = document.createElement('td');\n    const hexCell = document.createElement('td');\n    nameCell.textContent = name;\n    hexCell.textContent = hex;\n    tr.append(nameCell, hexCell);\n    tbody.append(tr);\n  });\n}"
+        },
+        "steps": [
+          "Добавь таблицу с id=colors и элементом <tbody>",
+          "Вставь функцию renderColors в JavaScript",
+          "Передай массив в renderColors(colors)"
+        ],
+        "example_input": [
+          {
+            "name": "Красный",
+            "hex": "#ff0000"
+          },
+          {
+            "name": "Синий",
+            "hex": "#0000ff"
+          }
+        ],
+        "demo": "renderColors(colors);"
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "В таблице появляются две строки: Красный #ff0000 и Синий #0000ff",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Пустой массив",
+            "Два объекта",
+            "Отсутствует <tbody>",
+            "Повторный вызов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Строк нет",
+            "cause": "Неверный id или <tbody> ещё не создан",
+            "solution": "Проверь id=\"colors\" и наличие <tbody>, вызывай после отрисовки таблицы"
+          },
+          {
+            "symptom": "Cannot read properties…",
+            "cause": "Неверная структура входных данных",
+            "solution": "Проверь, что у объектов есть поля name и hex"
+          },
+          {
+            "symptom": "Данные не обновляются",
+            "cause": "Старые строки не очищены / массив устарел",
+            "solution": "replaceChildren() уже чистит; убедись, что передаёшь актуальный массив"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [
+          {
+            "name": "querySelector",
+            "role": "находит <tbody>"
+          },
+          {
+            "name": "replaceChildren",
+            "role": "очищает старые строки"
+          },
+          {
+            "name": "createElement",
+            "role": "создаёт строки и ячейки"
+          },
+          {
+            "name": "textContent",
+            "role": "устанавливает текст ячеек (безопасно)"
+          },
+          {
+            "name": "append",
+            "role": "добавляет элементы в DOM"
+          }
+        ],
+        "effects": [
+          "Изменяет DOM",
+          "Удаляет прежнее содержимое <tbody>"
+        ],
+        "network": false,
+        "connections": [
+          {
+            "name": "Простая база в памяти (CRUD)",
+            "role": "источник массива"
+          }
+        ]
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "version": "1.0.0",
+    "provides": [
+      "colors",
+      "table",
+      "body",
+      "row",
+      "nameCell",
+      "hexCell"
+    ],
+    "requires": [
+      "name",
+      "hex"
+    ],
+    "subcat": "Обновлять страницу и эле"
+  },
+  "legacy": {
+    "template": "построить-таблицу-из-массива-mv6cuszm.json"
+  },
+  "enriched": true
+}

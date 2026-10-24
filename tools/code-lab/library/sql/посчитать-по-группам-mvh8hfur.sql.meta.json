@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "id": "посчитать-по-группам-mvh8hfur",
+  "file": "посчитать-по-группам-mvh8hfur.sql",
+  "title": "посчитать по группам",
+  "lang": "sql",
+  "group": "SQL: запросы и таблицы / Выбрать и сгруппировать данные",
+  "desc": "Сколько пользователей в каждом городе.",
+  "output": "",
+  "tags": [
+    "sql",
+    "group by",
+    "aggregate functions",
+    "data aggregation",
+    "count",
+    "relational databases"
+  ],
+  "aliases": [
+    "как посчитать пользователей по городам в sql",
+    "группировка данных по столбцу",
+    "запрос на количество записей по категории",
+    "sql count с group by",
+    "выборка с подсчётом по признаку"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "SELECT",
+      "kind": "kw",
+      "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "COUNT",
+      "kind": "kw",
+      "note": "COUNT — считает строки",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 22,
+      "text": "AS",
+      "kind": "kw",
+      "note": "AS — даёт имя столбцу результата",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "FROM",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "посчитать-по-группам-mvh8hfur.json",
+    "descAt": 1792534038147
+  },
+  "enriched": true
+}

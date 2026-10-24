@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "id": "dialog-mvxmtigk8",
+  "file": "диалоговое-окно-mvxmtigk8.html",
+  "title": "dialog",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Dialog",
+  "tags": [
+    "dialog",
+    "html",
+    "тег dialog"
+  ],
+  "aliases": [
+    "<dialog>",
+    "dialog",
+    "html dialog",
+    "пример dialog",
+    "как сделать dialog",
+    "тег dialog",
+    "элемент dialog",
+    "диалоговое окно",
+    "модальное окно",
+    "окно подтверждения",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "id": "фикстура-mvh8h72i",
+  "file": "фикстура-mvh8h72i.py",
+  "title": "фикстура",
+  "lang": "python",
+  "group": "Тесты (Python) / Подготовить тестовые данные и окружение",
+  "desc": "Фикстура pytest подготавливает повторно используемые данные или ресурсы. Pytest передаёт её результат тесту по имени аргумента; область действия задаётся scope.",
+  "output": "",
+  "tags": [
+    "pytest",
+    "fixture",
+    "фикстуры",
+    "тестовые данные",
+    "подготовка теста",
+    "автоматизация тестирования",
+    "python"
+  ],
+  "aliases": [
+    "как использовать fixture pytest",
+    "передать данные в тест pytest",
+    "переиспользовать подготовку тестов",
+    "фикстура pytest подготавливает повторно используемые данные или ресурсы"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "pytest",
+      "kind": "name",
+      "note": "pytest — популярный фреймворк для тестов",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 1,
+      "text": "pytest",
+      "kind": "name",
+      "note": "pytest — популярный фреймворк для тестов",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "fixture",
+      "kind": "name",
+      "note": "fixture — подготовка данных, которую pytest подставляет по имени параметра",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "assert",
+      "kind": "kw",
+      "note": "assert — проверка: если условие ложно, программа остановится",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "фикстура-mvh8h72i.json",
+    "descAt": 1792534026762
+  },
+  "enriched": true
+}

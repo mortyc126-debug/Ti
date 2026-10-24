@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "id": "stacking-context-z-index",
+  "file": "stacking-context-z-index.css",
+  "title": "stacking context z index",
+  "lang": "css",
+  "group": "CSS: положение на странице / position и слои",
+  "desc": "Базовый шаблон слоёв для модального окна. Важно помнить, что `z-index` сравнивается внутри stacking context; огромный `z-index` не всегда перекрывает элемент из другого контекста.",
+  "output": "Базовый шаблон слоёв для модального окна",
+  "tags": [
+    "css",
+    "fixed",
+    "inset",
+    "layers",
+    "modal",
+    "position",
+    "stacking-context",
+    "z-index",
+    "модальное-окно",
+    "порядок",
+    "почему-z-index-не-работает",
+    "слои"
+  ],
+  "aliases": [],
+  "source": {
+    "title": "catalog extension",
+    "desc": "added for search-oriented coverage",
+    "tags": null
+  },
+  "status": "described",
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: дополнительные приёмы"
+      ],
+      "technology": [
+        "CSS"
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ]
+  },
+  "architectureNote": {
+    "role": "Управляет расположением относительно окна или позиционированного предка, иногда создаёт визуальный слой.",
+    "architecturalUse": "Подключай там, где требуется: Базовый шаблон слоёв для модального окна. Важно помнить, что `z-index` сравнивается внутри stacking context; огромный `z-index` не всегда перекрывает элемент из другого контекста.",
+    "combineWith": [
+      "position: relative у нужного предка для локального absolute",
+      "z-index только при понимании контекста наложения",
+      "отступы и фон, чтобы слой не перекрывал важное содержимое"
+    ],
+    "watchFor": "Проверь контекст позиционирования, перекрытие кликабельных элементов и поведение на маленьком экране.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  }
+}

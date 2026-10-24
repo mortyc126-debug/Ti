@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "id": "цикл-mvh8ggbr",
+  "file": "цикл-mvh8ggbr.js",
+  "title": "цикл",
+  "lang": "js",
+  "group": "Основы / Как устроена программа",
+  "desc": "Повторяет действие несколько раз.",
+  "output": "",
+  "tags": [
+    "цикл for",
+    "итерации",
+    "основы js",
+    "повторение",
+    "инкремент"
+  ],
+  "aliases": [
+    "как повторить код 3 раза",
+    "цикл с фиксированным числом повторений",
+    "выполнить блок кода n раз",
+    "основы циклов в js",
+    "цикл от 1 до n"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл со счётчиком",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 5,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять позже.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "i"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "цикл-mvh8ggbr.json",
+    "descAt": 1792533992103
+  },
+  "enriched": true
+}

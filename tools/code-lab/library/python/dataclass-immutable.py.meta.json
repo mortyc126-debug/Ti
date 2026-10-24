@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "dataclass-immutable",
+  "file": "dataclass-immutable.py",
+  "title": "dataclass(frozen=True) — неизменяемая запись",
+  "lang": "python",
+  "group": "Основы / Объектно-ориентированное программирование",
+  "desc": "frozen=True запрещает переназначение полей экземпляра обычным способом. Это не делает автоматически неизменяемыми вложенные списки или словари.",
+  "output": "Quote(ticker='Si', bid=99.0, ask=101.0)",
+  "tags": [
+    "dataclass",
+    "frozen",
+    "неизменяемость",
+    "ООП",
+    "python"
+  ],
+  "aliases": [
+    "неизменяемый dataclass python",
+    "dataclass frozen true"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

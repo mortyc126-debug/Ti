@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "id": "сравнение-is-и-равенство",
+  "file": "сравнение-is-и-равенство.py",
+  "title": "== сравнивает значения, is — идентичность объектов",
+  "lang": "python",
+  "group": "Python — основы / Сравнения и логика",
+  "desc": "Оператор == проверяет равенство значений, а is — один и тот же ли это объект. Для проверки отсутствующего значения используют is None, а не сравнение через ==.",
+  "output": "True\nFalse\nTrue\nTrue",
+  "tags": [
+    "python",
+    "сравнение",
+    "равенство",
+    "identity",
+    "is",
+    "None",
+    "объекты"
+  ],
+  "aliases": [
+    "разница между is и ==",
+    "is None python"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

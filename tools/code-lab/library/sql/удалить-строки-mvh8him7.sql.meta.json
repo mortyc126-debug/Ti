@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "id": "удалить-строки-mvh8him7",
+  "file": "удалить-строки-mvh8him7.sql",
+  "title": "удалить строки",
+  "lang": "sql",
+  "group": "SQL: запросы и таблицы / Изменить данные и обработать пустые",
+  "desc": "Удаляет заказы с нулевой суммой.",
+  "output": "",
+  "tags": [
+    "sql",
+    "delete",
+    "очистка данных",
+    "условие фильтрации",
+    "нулевые значения"
+  ],
+  "aliases": [
+    "как удалить строки с нулевым значением в sql",
+    "удалить записи где поле равно 0",
+    "очистка таблицы от нулевых записей",
+    "sql delete по условию равенства нулю"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "DELETE",
+      "kind": "kw",
+      "note": "delete — удалить свойство из объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "FROM",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "WHERE",
+      "kind": "kw",
+      "note": "WHERE — условие отбора строк (SQL).",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "удалить-строки-mvh8him7.json",
+    "descAt": 1792534041728
+  },
+  "enriched": true
+}

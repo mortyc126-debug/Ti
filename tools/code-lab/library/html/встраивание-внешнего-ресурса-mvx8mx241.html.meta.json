@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "id": "embed-mvx8mx241",
+  "file": "встраивание-внешнего-ресурса-mvx8mx241.html",
+  "title": "embed",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Встраивание PDF",
+  "tags": [
+    "embed",
+    "html",
+    "тег embed"
+  ],
+  "aliases": [
+    "<embed>",
+    "embed",
+    "html embed",
+    "пример embed",
+    "как сделать embed",
+    "тег embed",
+    "элемент embed",
+    "встроенный файл",
+    "вставить pdf",
+    "встроенный медиафайл",
+    "src",
+    "атрибут src",
+    "html атрибут src",
+    "путь к файлу",
+    "адрес картинки",
+    "источник файла",
+    "type",
+    "атрибут type",
+    "html атрибут type",
+    "тип поля",
+    "тип кнопки",
+    "тип ресурса",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "Встраивание"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

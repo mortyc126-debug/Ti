@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "id": "очистка-и-перерисовка-кадра-mvh8fs9u",
+  "file": "очистка-и-перерисовка-кадра-mvh8fs9u.js",
+  "title": "очистка и перерисовка кадра",
+  "lang": "js",
+  "group": "Графика и визуализация / Canvas: рисование",
+  "desc": "Стираем холст перед каждым новым кадром.",
+  "output": "",
+  "tags": [
+    "canvas",
+    "графика",
+    "анимация",
+    "очистка экрана",
+    "requestAnimationFrame"
+  ],
+  "aliases": [
+    "как очистить canvas перед рисованием",
+    "стирать холст перед каждым кадром",
+    "удалить предыдущий рисунок на canvas",
+    "clearRect для анимации",
+    "обнуление canvas в js"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "clearRect",
+      "kind": "fn",
+      "note": "clearRect — стирает прямоугольную область холста",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 29,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина элемента",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "requestAnimationFrame",
+      "kind": "fn",
+      "note": "requestAnimationFrame — вызвать функцию перед следующим кадром (для анимации).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "draw"
+    ],
+    "requires": [
+      "ctx",
+      "canvas"
+    ]
+  },
+  "legacy": {
+    "template": "очистка-и-перерисовка-кадра-mvh8fs9u.json",
+    "descAt": 1792533960931
+  },
+  "enriched": true
+}

@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "id": "pytest-fixture-общая-подготовка-данных-mvdrpuro",
+  "file": "pytest-fixture-общая-подготовка-данных-mvdrpuro.py",
+  "title": "@pytest.fixture — общая подготовка данных",
+  "lang": "python",
+  "group": "Тесты (Python) / Подготовить тестовые данные и окружение",
+  "desc": "Фикстура pytest подготавливает повторно используемые данные или ресурсы. Pytest передаёт её результат тесту по имени аргумента; область действия задаётся scope.",
+  "output": "2 passed",
+  "tags": [
+    "pytest",
+    "fixture",
+    "фикстуры",
+    "тестовые данные",
+    "подготовка теста",
+    "автоматизация тестирования",
+    "python",
+    "@pytest.fixture"
+  ],
+  "aliases": [
+    "как использовать fixture pytest",
+    "передать данные в тест pytest",
+    "переиспользовать подготовку тестов",
+    "фикстура pytest подготавливает повторно используемые данные или ресурсы"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 23,
+      "text": "len",
+      "kind": "fn",
+      "note": "len — длина (Python): элементов в списке, символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 11,
+      "text": "len",
+      "kind": "fn",
+      "note": "len — длина (Python): элементов в списке, символов в строке.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "Тесты (Python)"
+      ]
+    },
+    "subcat": "Подготовить тестовые данные и окруж"
+  },
+  "legacy": {
+    "template": "pytest-fixture-общая-подготовка-данных-mvdrpuro.json",
+    "descAt": 1792324478724
+  }
+}

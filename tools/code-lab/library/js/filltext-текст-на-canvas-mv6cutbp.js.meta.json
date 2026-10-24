@@ -1,0 +1,159 @@
+{
+  "schema": 1,
+  "id": "filltext-текст-на-canvas-mv6cutbp",
+  "file": "filltext-текст-на-canvas-mv6cutbp.js",
+  "title": "fillText — текст на canvas",
+  "lang": "js",
+  "group": "Графика и визуализация / Canvas: рисование",
+  "desc": "fillText(text, x, y) рисует текст. Координата y — базовая линия текста, а не верхняя граница.",
+  "output": "Надпись «Привет, canvas!» на холсте",
+  "tags": [
+    "canvas",
+    "2d-context",
+    "графика",
+    "текст",
+    "веб-дизайн",
+    "рисование"
+  ],
+  "aliases": [
+    "как нарисовать текст на canvas",
+    "y координата текста canvas",
+    "базовая линия текста в canvas",
+    "стиль текста на холсте",
+    "отображение текста в 2d контексте"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "getContext",
+      "kind": "fn",
+      "note": "getContext — получить «кисть» canvas: getContext(\"2d\") для рисования.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Графика и визуализация"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "Надпись «Привет, canvas!» на холсте",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: scene.",
+        "Для рисования нужен canvas с подходящим id и доступным 2D-контекстом."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\n\nctx.font = \"20px sans-serif\";\nctx.fillStyle = \"#F6F4FF\";\nctx.fillText(\"Привет, canvas!\", 20, 50);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Надпись «Привет, canvas!» на холсте",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "canvas",
+      "ctx"
+    ],
+    "requires": [],
+    "subcat": "Canvas: рисование"
+  },
+  "legacy": {
+    "template": "filltext-текст-на-canvas-mv6cutbp.json"
+  },
+  "enriched": true
+}

@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "open-режимы-и-кодировка-файла",
+  "file": "open-режимы-и-кодировка-файла.py",
+  "title": "Режимы open и явная кодировка файла",
+  "lang": "python",
+  "group": "Python — основы / Файлы",
+  "desc": "Режим r читает существующий файл, w перезаписывает или создаёт, a дописывает в конец, x создаёт новый и выдаёт ошибку при существующем пути. Для текстовых файлов задавайте encoding=\"utf-8\"; для безопасного создания используйте with.",
+  "output": "цена: 125\nобъём: 10",
+  "tags": [
+    "python",
+    "open",
+    "режим файла",
+    "encoding",
+    "utf-8",
+    "with",
+    "чтение",
+    "запись"
+  ],
+  "aliases": [
+    "режимы открытия файлов python",
+    "open encoding utf-8"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

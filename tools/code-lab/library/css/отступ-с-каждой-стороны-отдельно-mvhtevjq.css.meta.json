@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "id": "отступ-с-каждой-стороны-отдельно-mvhtevjq",
+  "file": "отступ-с-каждой-стороны-отдельно-mvhtevjq.css",
+  "title": "отступ с каждой стороны отдельно",
+  "lang": "css",
+  "group": "CSS: отступы и размеры / Отступы",
+  "desc": "Задаёт `margin-top`, `margin-right`, `margin-bottom` и `margin-left` независимо, когда сторонам нужны разные значения.",
+  "output": "Задаёт `margin-top`, `margin-right`, `margin-bottom` и `margin-left` независимо, когда сторонам нужны разные значения",
+  "tags": [
+    "box-model",
+    "css",
+    "frontend",
+    "spacing",
+    "web",
+    "вёрстка",
+    "отступ",
+    "отступы",
+    "практический-приём",
+    "пример",
+    "размеры-элементов"
+  ],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "margin",
+      "kind": "name",
+      "note": "margin — внешний отступ, расстояние снаружи элемента.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "top",
+      "kind": "name",
+      "note": "top — смещение сверху (при позиционировании).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "margin",
+      "kind": "name",
+      "note": "margin — внешний отступ, расстояние снаружи элемента.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 9,
+      "text": "right",
+      "kind": "name",
+      "note": "right — смещение справа.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "margin",
+      "kind": "name",
+      "note": "margin — внешний отступ, расстояние снаружи элемента.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 9,
+      "text": "bottom",
+      "kind": "name",
+      "note": "bottom — смещение снизу.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "margin",
+      "kind": "name",
+      "note": "margin — внешний отступ, расстояние снаружи элемента.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 9,
+      "text": "left",
+      "kind": "name",
+      "note": "left — смещение слева.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: отступы и размеры"
+      ]
+    },
+    "subcat": "Отступы"
+  },
+  "legacy": {
+    "template": "отступ-с-каждой-стороны-отдельно-mvhtevjq.json",
+    "descAt": 1792581922736
+  },
+  "architectureNote": {
+    "role": "Контролирует геометрию блока: размер, внутреннее пространство, расстояние до соседей или обработку переполнения.",
+    "architecturalUse": "Подключай там, где требуется: Задаёт `margin-top`, `margin-right`, `margin-bottom` и `margin-left` независимо, когда сторонам нужны разные значения.",
+    "combineWith": [
+      "box-sizing: border-box для предсказуемых размеров",
+      "max-width для ограничения широкого контента",
+      "единая шкала отступов вместо случайных значений"
+    ],
+    "watchFor": "Проверь суммарную ширину с padding/border, длинное содержимое и поведение при изменении ширины окна.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  }
+}

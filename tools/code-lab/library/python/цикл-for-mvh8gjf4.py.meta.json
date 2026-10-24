@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "id": "цикл-for-mvh8gjf4",
+  "file": "цикл-for-mvh8gjf4.py",
+  "title": "цикл for",
+  "lang": "python",
+  "group": "Основы / Python",
+  "desc": "цикл for: пример на Python, показывающий основной приём и его применение. Проверьте входные данные и граничные случаи перед использованием в реальном проекте.",
+  "output": "",
+  "tags": [
+    "циклы",
+    "for",
+    "итерация",
+    "python",
+    "диапазон",
+    "коллекции",
+    "цикл"
+  ],
+  "aliases": [
+    "как перебрать числа от 0 до n",
+    "цикл по списку в питоне",
+    "итерация по диапазону range",
+    "вывод элементов списка по очереди",
+    "цикл for: пример на python, показывающий основной приём и его применение"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторять блок заданное число раз.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "in",
+      "kind": "kw",
+      "note": "in — берёт элементы по одному",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "range",
+      "kind": "fn",
+      "note": "range — числа от 0 до заданного, не включая его",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 4,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторять блок заданное число раз.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "in",
+      "kind": "kw",
+      "note": "in — берёт элементы по одному",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "цикл-for-mvh8gjf4.json",
+    "descAt": 1792533996112
+  },
+  "enriched": true
+}

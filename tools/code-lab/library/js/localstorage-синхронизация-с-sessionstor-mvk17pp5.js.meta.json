@@ -1,0 +1,245 @@
+{
+  "schema": 1,
+  "id": "localstorage-синхронизация-с-sessionstor-mvk17pp5",
+  "file": "localstorage-синхронизация-с-sessionstor-mvk17pp5.js",
+  "lang": "js",
+  "title": "localStorage: синхронизация с sessionStorage",
+  "group": "Файлы, хранение и сервер / Хранение в браузере",
+  "desc": "Копирует данные из localStorage в sessionStorage при открытии страницы, чтобы данные были доступны даже если они не были загружены из localStorage.",
+  "output": "Данные из localStorage дублируются в sessionStorage при загрузке страницы.",
+  "descAt": 1792703225561,
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Файлы, хранение и сервер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "subcat": "Хранение в браузере",
+    "summary": {
+      "output": "Данные из localStorage дублируются в sessionStorage при загрузке страницы."
+    },
+    "generated": {
+      "by": "ai",
+      "at": "2026-10-22T21:07:05.561Z",
+      "note": "создано ИИ; код не запускался и не проверялся человеком"
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "syncLocalToSession",
+      "localKeys",
+      "data"
+    ],
+    "requires": []
+  },
+  "tags": [
+    "дублирование",
+    "синхронизация",
+    "переключение",
+    "сессия"
+  ],
+  "aliases": [
+    "копирование localStorage",
+    "данные в сессии",
+    "дубликат хранения"
+  ],
+  "source": {
+    "title": "ai",
+    "desc": "ai",
+    "tags": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 27,
+      "text": "keys",
+      "kind": "fn",
+      "note": "Object.keys — массив имён свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 32,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "forEach",
+      "kind": "fn",
+      "note": "forEach — выполняет действие для каждого элемента массива.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 20,
+      "text": "key",
+      "kind": "name",
+      "note": "key — функция, по значению которой идёт сортировка",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 6,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 19,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 24,
+      "text": "parse",
+      "kind": "fn",
+      "note": "JSON.parse — разобрать строку JSON обратно в объект.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 30,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 43,
+      "text": "getItem",
+      "kind": "fn",
+      "note": "getItem — прочитать значение из localStorage по ключу.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 51,
+      "text": "key",
+      "kind": "name",
+      "note": "key — функция, по значению которой идёт сортировка",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 6,
+      "text": "sessionStorage",
+      "kind": "name",
+      "note": "sessionStorage — хранилище до закрытия вкладки",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 21,
+      "text": "setItem",
+      "kind": "fn",
+      "note": "setItem — записать значение в localStorage по ключу.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 29,
+      "text": "key",
+      "kind": "name",
+      "note": "key — функция, по значению которой идёт сортировка",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 34,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 39,
+      "text": "stringify",
+      "kind": "fn",
+      "note": "JSON.stringify — превратить объект в строку JSON (для хранения/передачи).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 6,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 6,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 14,
+      "text": "warn",
+      "kind": "fn",
+      "note": "warn — console.warn печатает предупреждение (жёлтым).",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 0,
+      "text": "window",
+      "kind": "fn",
+      "note": "window — глобальный объект браузера (окно): таймеры, адрес, размеры экрана.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
+      "source": "dict"
+    }
+  ]
+}

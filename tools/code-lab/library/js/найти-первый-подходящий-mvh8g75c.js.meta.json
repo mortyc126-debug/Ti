@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "id": "найти-первый-подходящий-mvh8g75c",
+  "file": "найти-первый-подходящий-mvh8g75c.js",
+  "title": "найти первый подходящий",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Перебирать, фи",
+  "desc": "Ищет пользователя по id.",
+  "output": "",
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "find",
+      "kind": "fn",
+      "note": "find — первый элемент, подходящий под условие, или undefined",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "provides": [
+      "users",
+      "user"
+    ],
+    "requires": [
+      "id",
+      "name"
+    ]
+  },
+  "legacy": {
+    "template": "найти-первый-подходящий-mvh8g75c.json",
+    "descAt": 1792533980208
+  }
+}

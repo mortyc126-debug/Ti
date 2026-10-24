@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "id": "monkeypatch-подменить-значение-на-время--mvdrpurc",
+  "file": "monkeypatch-подменить-значение-на-время--mvdrpurc.py",
+  "title": "monkeypatch — подменить значение на время теста",
+  "lang": "python",
+  "group": "Тесты (Python) / Подготовить тестовые данные и окружение",
+  "desc": "Подмена зависимости в тесте позволяет изолировать проверяемый код от окружения или внешнего вызова. monkeypatch автоматически откатывает изменения после теста; unittest.mock.patch действует в пределах контекста или декоратора.",
+  "output": "1 passed",
+  "tags": [
+    "мок",
+    "mock",
+    "monkeypatch",
+    "unittest.mock",
+    "подмена зависимости",
+    "изоляция тестов",
+    "pytest",
+    "python"
+  ],
+  "aliases": [
+    "как подменить переменную окружения в pytest",
+    "mock patch python пример",
+    "изолировать тест от внешней зависимости",
+    "подмена зависимости в тесте позволяет изолировать проверяемый код от окружения или внешнего вызова"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "Тесты (Python)"
+      ]
+    },
+    "subcat": "Подготовить тестовые данные и окруж"
+  },
+  "legacy": {
+    "template": "monkeypatch-подменить-значение-на-время--mvdrpurc.json",
+    "descAt": 1792324478712
+  },
+  "enriched": true
+}

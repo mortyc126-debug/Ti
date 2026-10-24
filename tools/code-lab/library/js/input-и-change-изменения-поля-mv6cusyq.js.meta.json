@@ -1,0 +1,221 @@
+{
+  "schema": 1,
+  "id": "input-и-change-изменения-поля-mv6cusyq",
+  "file": "input-и-change-изменения-поля-mv6cusyq.js",
+  "title": "input и change — изменения поля",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Поля ввода и формы",
+  "desc": "input срабатывает при каждом изменении значения, change — когда изменение подтверждено (например, после выбора или потери фокуса, в зависимости от типа поля).",
+  "output": "Текущие и подтверждённые значения поля #colorName",
+  "tags": [
+    "input-event",
+    "change-event",
+    "формы",
+    "динамическое обновление",
+    "javascript",
+    "пользовательский ввод"
+  ],
+  "aliases": [
+    "разница между input и change в js",
+    "как отследить ввод в поле",
+    "события при изменении значения инпута",
+    "отслеживание подтверждения изменения поля",
+    "реагировать на ввод в реальном времени"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 23,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 31,
+      "text": "target",
+      "kind": "name",
+      "note": "target — элемент, на котором произошло событие.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 38,
+      "text": "value",
+      "kind": "name",
+      "note": "value — текущее значение поля ввода (input, textarea, select).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 6,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 37,
+      "text": "target",
+      "kind": "name",
+      "note": "target — элемент, на котором произошло событие.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 44,
+      "text": "value",
+      "kind": "name",
+      "note": "value — текущее значение поля ввода (input, textarea, select).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс: поля, кнопки и события"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "Текущие и подтверждённые значения поля #colorName",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: colorName."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const field = document.querySelector(\"#colorName\");\n\nfield.addEventListener(\"input\", event => {\n  console.log(\"Сейчас:\", event.target.value);\n});\n\nfield.addEventListener(\"change\", event => {\n  console.log(\"Подтверждено:\", event.target.value);\n});"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Текущие и подтверждённые значения поля #colorName",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "field"
+    ],
+    "requires": [],
+    "subcat": "Поля ввода и формы"
+  },
+  "legacy": {
+    "template": "input-и-change-изменения-поля-mv6cusyq.json"
+  },
+  "enriched": true
+}

@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "id": "sqlite-целостность-и-ограничения",
+  "file": "sqlite-целостность-и-ограничения.py",
+  "title": "SQLite — ограничения целостности данных",
+  "lang": "python",
+  "group": "Базы данных / Целостность",
+  "desc": "Ограничения NOT NULL, CHECK и UNIQUE должны защищать инварианты на уровне базы, даже если ошибку допустил вызывающий код. В SQLite внешние ключи необходимо включать для каждого соединения через PRAGMA foreign_keys = ON.",
+  "output": "Нарушение ограничения обнаружено",
+  "inputs": "SQLite в памяти.",
+  "preconditions": "Python 3.11+ для примеров с современным синтаксисом; для карточек pytest необходим pytest.",
+  "side_effects": "Создаёт таблицы и проверяет ограничение положительного количества.",
+  "errors": "Нарушение NOT NULL, UNIQUE, CHECK или FK вызывает sqlite3.IntegrityError.",
+  "checks": "Проверить валидную запись, дубликат имени, нулевое количество и несуществующий внешний ключ.",
+  "tags": [
+    "sqlite3",
+    "CHECK",
+    "UNIQUE",
+    "foreign key",
+    "целостность"
+  ],
+  "aliases": [
+    "ограничения целостности SQLite Python"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "manual review",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

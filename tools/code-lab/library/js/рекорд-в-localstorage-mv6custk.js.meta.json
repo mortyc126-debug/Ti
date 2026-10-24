@@ -1,0 +1,212 @@
+{
+  "schema": 1,
+  "id": "рекорд-в-localstorage-mv6custk",
+  "file": "рекорд-в-localstorage-mv6custk.js",
+  "title": "Рекорд в localStorage",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Хранение в браузере",
+  "desc": "Загружайте сохранённый рекорд, сравнивайте с текущим счётом и сохраняйте только новый максимум.",
+  "output": "125 (если прежний рекорд меньше 125)",
+  "tags": [
+    "localStorage",
+    "хранение данных",
+    "браузерное хранилище",
+    "сравнение значений",
+    "JavaScript"
+  ],
+  "aliases": [
+    "обновить рекорд в localStorage",
+    "сохранить максимум в браузере",
+    "проверка и обновление лучшего результата",
+    "как обновить значение в localStorage только если больше"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 33,
+      "text": "getItem",
+      "kind": "fn",
+      "note": "getItem — прочитать значение из localStorage по ключу.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 15,
+      "text": "setItem",
+      "kind": "fn",
+      "note": "setItem — записать значение в localStorage по ключу.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 12,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 17,
+      "text": "max",
+      "kind": "fn",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Файлы, хранение и сервер"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "125 (если прежний рекорд меньше 125)",
+      "dependencies": [],
+      "requirements": [
+        "Нужен браузерный контекст с доступным localStorage; значения хранилища — строки."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const key = \"bestScore\";\nconst best = Number(localStorage.getItem(key) || 0);\nconst score = 125;\n\nif (score > best) {\n  localStorage.setItem(key, String(score));\n}\n\nconsole.log(Math.max(best, score));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "125 (если прежний рекорд меньше 125)",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "key",
+      "best",
+      "score"
+    ],
+    "requires": [],
+    "subcat": "Хранение в браузере"
+  },
+  "legacy": {
+    "template": "рекорд-в-localstorage-mv6custk.json"
+  },
+  "enriched": true
+}

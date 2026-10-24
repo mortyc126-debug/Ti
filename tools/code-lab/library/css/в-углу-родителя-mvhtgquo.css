@@ -1,0 +1,8 @@
+.card {
+  position: relative;
+}
+.card .close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}

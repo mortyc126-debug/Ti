@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "id": "прочитать-файл-mvh8hax7",
+  "file": "прочитать-файл-mvh8hax7.js",
+  "title": "прочитать файл",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Файлы и временные данные",
+  "desc": "Читает текстовый файл в Node.js.",
+  "output": "",
+  "tags": [
+    "node.js",
+    "fs/promises",
+    "асинхронное чтение",
+    "файловая система",
+    "promise"
+  ],
+  "aliases": [
+    "читать файл асинхронно node",
+    "промис чтение файла js",
+    "async read file node",
+    "неблокирующее чтение файла"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "fs",
+      "kind": "name",
+      "note": "fs — модуль для работы с файлами",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 15,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 21,
+      "text": "fs",
+      "kind": "name",
+      "note": "fs — модуль для работы с файлами",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 24,
+      "text": "readFile",
+      "kind": "fn",
+      "note": "readFile — читает файл целиком",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "fs",
+      "main",
+      "text"
+    ],
+    "requires": [
+      "require"
+    ]
+  },
+  "legacy": {
+    "template": "прочитать-файл-mvh8hax7.json",
+    "descAt": 1792534031755
+  },
+  "enriched": true
+}

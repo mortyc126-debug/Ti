@@ -1,0 +1,239 @@
+{
+  "schema": 1,
+  "id": "server-node",
+  "file": "server-node.js",
+  "title": "Как запустить сервер (Node)",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Сервер и API",
+  "desc": "Минимальный веб-сервер: слушает порт и на каждый запрос отвечает. Запуск: node файл.mjs. Так устроена и Лаборатория кода.",
+  "output": "сервер на http://localhost:8788/",
+  "tags": [
+    "node.js",
+    "http-сервер",
+    "api-прототип",
+    "минималистичный код",
+    "backend",
+    "port-binding"
+  ],
+  "aliases": [
+    "как создать сервер на node без express",
+    "node сервер на одном файле",
+    "тестовый http-сервер для локального хостинга",
+    "запуск сервера на порту 8788",
+    "минимальный сервер для отладки"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "Подключить встроенный модуль.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "http",
+      "kind": "fn",
+      "note": "Встроенный модуль Node для веб-сервера.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная, которую не будем переназначать (константа).",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "http",
+      "kind": "fn",
+      "note": "Встроенный модуль Node для веб-сервера.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 20,
+      "text": "createServer",
+      "kind": "fn",
+      "note": "Создать сервер; функция внутри вызывается на КАЖДЫЙ запрос.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 34,
+      "text": "req",
+      "kind": "name",
+      "note": "Запрос от браузера (что просят).",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 39,
+      "text": "res",
+      "kind": "name",
+      "note": "Ответ, который мы формируем.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "res",
+      "kind": "name",
+      "note": "Ответ, который мы формируем.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 6,
+      "text": "writeHead",
+      "kind": "fn",
+      "note": "Записать код ответа (200 = ок) и заголовки.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "res",
+      "kind": "name",
+      "note": "Ответ, который мы формируем.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 6,
+      "text": "end",
+      "kind": "fn",
+      "note": "Отправить тело ответа и закрыть.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 7,
+      "text": "listen",
+      "kind": "fn",
+      "note": "Начать слушать порт. 8788 — номер порта.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 26,
+      "text": "console",
+      "kind": "fn",
+      "note": "Встроенный объект вывода в консоль (F12 → Console).",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 34,
+      "text": "log",
+      "kind": "fn",
+      "note": "Печатает в консоль то, что в скобках.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Файлы, хранение и сервер"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "сервер на http://localhost:8788/",
+      "dependencies": [],
+      "requirements": [
+        "Запускай как ES-модуль и проверь наличие импортируемых файлов/пакетов."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import http from \"node:http\";\n\nconst сервер = http.createServer((req, res) => {\n  res.writeHead(200, { \"Content-Type\": \"text/plain; charset=utf-8\" });\n  res.end(\"Привет!\");\n});\n\nсервер.listen(8788, () => console.log(\"http://localhost:8788/\"));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "сервер на http://localhost:8788/",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "сервер"
+    ],
+    "requires": [
+      "http",
+      "req"
+    ],
+    "subcat": "Сервер и API"
+  },
+  "legacy": {
+    "template": "server-node.json"
+  },
+  "enriched": true
+}

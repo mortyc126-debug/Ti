@@ -1,0 +1,9 @@
+.layer-back {
+  position: relative;
+  z-index: 1;
+}
+
+.layer-front {
+  position: relative;
+  z-index: 2;
+}

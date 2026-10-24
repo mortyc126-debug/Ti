@@ -1,0 +1,5 @@
+.hero {
+  background:
+    linear-gradient(rgb(0 0 0 / 45%), rgb(0 0 0 / 45%)),
+    url("hero.jpg") center / cover;
+}

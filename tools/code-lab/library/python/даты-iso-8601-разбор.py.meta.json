@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "python-iso-8601-py",
+  "file": "даты-iso-8601-разбор.py",
+  "title": "datetime.fromisoformat — разбор ISO 8601",
+  "lang": "python",
+  "group": "Стандартная библиотека / Дата и время",
+  "desc": "Разбирает ISO-строку с часовым поясом и показывает перевод в UTC.",
+  "output": "Сравнивать моменты времени корректнее после нормализации часовых поясов; наивный datetime не содержит зоны.",
+  "tags": [
+    "datetime",
+    "ISO 8601",
+    "timezone",
+    "UTC"
+  ],
+  "aliases": [],
+  "source": "curated",
+  "status": "active",
+  "enriched": true
+}

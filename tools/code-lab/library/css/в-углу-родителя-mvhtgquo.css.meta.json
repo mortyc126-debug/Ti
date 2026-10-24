@@ -1,0 +1,115 @@
+{
+  "schema": 1,
+  "id": "в-углу-родителя-mvhtgquo",
+  "file": "в-углу-родителя-mvhtgquo.css",
+  "title": "в углу родителя",
+  "lang": "css",
+  "group": "CSS: положение на странице / position и слои",
+  "desc": "Размещает дочерний элемент в углу родителя через связку `position: relative` у родителя и `position: absolute` с `top`/`right` у дочернего.",
+  "output": "Размещает дочерний элемент в углу родителя через связку `position: relative` у родителя и `position: absolute` с `top`/`right` у дочернего",
+  "tags": [
+    "absolute",
+    "css",
+    "frontend",
+    "position",
+    "position-",
+    "relative",
+    "right",
+    "top",
+    "web",
+    "вёрстка",
+    "позиционирование",
+    "практический-приём",
+    "пример",
+    "раскладка",
+    "position-relative"
+  ],
+  "aliases": [
+    "как зафиксировать элемент внутри блока",
+    "относительное позиционирование absolute",
+    "фиксированное положение внутри контейнера",
+    "css позиционирование внутри родителя",
+    "как разместить элемент в углу блока"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "position",
+      "kind": "name",
+      "note": "position — позиционирование: static, relative, absolute, fixed.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "relative",
+      "kind": "name",
+      "note": "relative — обычная позиция, но можно сдвигать и быть точкой отсчёта для absolute.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "position",
+      "kind": "name",
+      "note": "position — позиционирование: static, relative, absolute, fixed.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 12,
+      "text": "absolute",
+      "kind": "name",
+      "note": "absolute — позиция относительно ближайшего позиционированного родителя.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "top",
+      "kind": "name",
+      "note": "top — смещение сверху (при позиционировании).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "right",
+      "kind": "name",
+      "note": "right — смещение справа.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: положение на странице"
+      ]
+    },
+    "subcat": "position и слои"
+  },
+  "legacy": {
+    "template": "в-углу-родителя-mvhtgquo.json",
+    "descAt": 1792569277680
+  },
+  "architectureNote": {
+    "role": "Управляет расположением относительно окна или позиционированного предка, иногда создаёт визуальный слой.",
+    "architecturalUse": "Подключай там, где требуется: Размещает дочерний элемент в углу родителя через связку `position: relative` у родителя и `position: absolute` с `top`/`right` у дочернего.",
+    "combineWith": [
+      "position: relative у нужного предка для локального absolute",
+      "z-index только при понимании контекста наложения",
+      "отступы и фон, чтобы слой не перекрывал важное содержимое"
+    ],
+    "watchFor": "Проверь контекст позиционирования, перекрытие кликабельных элементов и поведение на маленьком экране.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

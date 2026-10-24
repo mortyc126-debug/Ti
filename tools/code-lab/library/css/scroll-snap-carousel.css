@@ -1,0 +1,10 @@
+.carousel {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+
+.slide {
+  flex: 0 0 85%;
+  scroll-snap-align: start;
+}

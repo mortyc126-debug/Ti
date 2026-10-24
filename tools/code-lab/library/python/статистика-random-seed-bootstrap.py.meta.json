@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "python-random-seed-bootstrap-py",
+  "file": "статистика-random-seed-bootstrap.py",
+  "title": "Воспроизводимый bootstrap с фиксированным seed",
+  "lang": "python",
+  "group": "Математика, финансы и анализ данных / Статистика",
+  "desc": "Показывает, как фиксировать seed генератора для воспроизводимого ресэмплинга.",
+  "output": "Фиксированный seed делает пример воспроизводимым, но не гарантирует репрезентативность выборки.",
+  "tags": [
+    "bootstrap",
+    "random",
+    "seed",
+    "статистика"
+  ],
+  "aliases": [],
+  "source": "curated",
+  "status": "active",
+  "enriched": true
+}

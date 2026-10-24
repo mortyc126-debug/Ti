@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "процессы-processpoolexecutor",
+  "file": "процессы-processpoolexecutor.py",
+  "title": "ProcessPoolExecutor для CPU-задач",
+  "lang": "python",
+  "group": "Продвинутые темы / Потоки и процессы",
+  "desc": "Показывает пул отдельных процессов для CPU-bound вычислений. Функция должна быть определена на уровне модуля, а запуск в Windows и переносимых скриптах защищается блоком __main__.",
+  "output": "Возвращается список квадратов.",
+  "tags": [
+    "concurrent.futures",
+    "ProcessPoolExecutor",
+    "процессы",
+    "CPU-bound",
+    "python"
+  ],
+  "aliases": [
+    "пул процессов Python",
+    "параллельные вычисления"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

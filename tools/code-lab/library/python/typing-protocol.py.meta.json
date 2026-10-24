@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "typing-protocol",
+  "file": "typing-protocol.py",
+  "title": "Protocol — описать требуемый интерфейс",
+  "lang": "python",
+  "group": "Основы / Типизация",
+  "desc": "Protocol описывает набор требуемых методов для статической проверки типов. Он не заставляет класс явно наследоваться от протокола.",
+  "output": "Si",
+  "tags": [
+    "typing",
+    "Protocol",
+    "аннотации типов",
+    "структурная типизация",
+    "python"
+  ],
+  "aliases": [
+    "typing Protocol пример",
+    "описать интерфейс python typing"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

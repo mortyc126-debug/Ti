@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "строки-replace-startswith",
+  "file": "строки-replace-startswith.py",
+  "title": "Строки: replace, startswith и endswith",
+  "lang": "python",
+  "group": "Основы / Строки и текст",
+  "desc": "Показывает замену подстроки и проверку префикса/суффикса. Строки неизменяемы: replace возвращает новую строку.",
+  "output": "Получается нормализованная строка с заменённым разделителем.",
+  "tags": [
+    "строки",
+    "replace",
+    "startswith",
+    "endswith",
+    "проверка текста",
+    "python"
+  ],
+  "aliases": [
+    "заменить подстроку",
+    "проверить начало строки"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

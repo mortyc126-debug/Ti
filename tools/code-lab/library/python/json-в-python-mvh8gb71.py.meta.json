@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "id": "json-в-python-mvh8gb71",
+  "file": "json-в-python-mvh8gb71.py",
+  "title": "JSON в Python",
+  "lang": "python",
+  "group": "Данные / Форматы и валидация",
+  "desc": "JSON: преобразование между строкой и объектом Python. loads/dumps работают со строками, load/dump — с файловыми потоками.",
+  "output": "Печатает объект JSON с полями name и age в читаемом многострочном виде.",
+  "tags": [
+    "json",
+    "сериализация",
+    "десериализация",
+    "словарь",
+    "обмен данными",
+    "api",
+    "python"
+  ],
+  "aliases": [
+    "как прочитать json в python",
+    "как превратить json строку в словарь",
+    "как сериализовать словарь в json",
+    "json loads dumps пример",
+    "json: преобразование между строкой и объектом python"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "json",
+      "kind": "name",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 7,
+      "text": "json",
+      "kind": "name",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "loads",
+      "kind": "fn",
+      "note": "loads — строка в объект",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 7,
+      "text": "json",
+      "kind": "name",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 12,
+      "text": "dumps",
+      "kind": "fn",
+      "note": "dumps — объект в строку",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 24,
+      "text": "ensure_ascii",
+      "kind": "name",
+      "note": "ensure_ascii — False оставляет русские буквы как есть",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 37,
+      "text": "False",
+      "kind": "kw",
+      "note": "false — логическая «ложь» (нет).",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "json-в-python-mvh8gb71.json",
+    "descAt": 1792533985453
+  },
+  "enriched": true
+}

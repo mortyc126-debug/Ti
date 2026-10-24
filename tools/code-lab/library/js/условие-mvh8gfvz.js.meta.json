@@ -1,0 +1,115 @@
+{
+  "schema": 1,
+  "id": "условие-mvh8gfvz",
+  "file": "условие-mvh8gfvz.js",
+  "title": "условие",
+  "lang": "js",
+  "group": "Основы / Как устроена программа",
+  "desc": "Выбор действия по условию.",
+  "output": "",
+  "tags": [
+    "условный оператор",
+    "логика",
+    "сравнение",
+    "javascript",
+    "базовый синтаксис"
+  ],
+  "aliases": [
+    "проверка возраста на 18 лет",
+    "условие if-else для возраста",
+    "оператор if с числом",
+    "как проверить совершеннолетие в js"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "age",
+      "kind": "name",
+      "note": "age — поле объекта, по которому сравниваем",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — выполнить, если условие верно",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "age",
+      "kind": "name",
+      "note": "age — поле объекта, по которому сравниваем",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "else",
+      "kind": "kw",
+      "note": "else — иначе",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "age"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "условие-mvh8gfvz.json",
+    "descAt": 1792533991535
+  },
+  "enriched": true
+}

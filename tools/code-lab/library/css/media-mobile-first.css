@@ -1,0 +1,10 @@
+/* базовые стили — мобильные */
+.cards {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "id": "select-where-order-by-выбрать-и-отсортир-mvds0h5n",
+  "file": "select-where-order-by-выбрать-и-отсортир-mvds0h5n.sql",
+  "title": "SELECT … WHERE … ORDER BY — выбрать и отсортировать",
+  "lang": "sql",
+  "group": "SQL: запросы и таблицы / Выбрать и сгруппировать данные",
+  "desc": "SELECT выбирает колонки, FROM — таблицу, WHERE — фильтрует строки, ORDER BY — сортирует (DESC — по убыванию).",
+  "output": "Б|12.4\nА|9.1",
+  "tags": [
+    "sql запросы",
+    "фильтрация данных",
+    "сортировка",
+    "условия where",
+    "группировка данных",
+    "аналитика"
+  ],
+  "aliases": [
+    "как отсортировать данные по столбцу в sql",
+    "выборка строк с условием в sql",
+    "сортировка по убыванию в sql",
+    "фильтрация по числовому значению в таблице",
+    "отбор данных по критерию доходности"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "INSERT",
+      "kind": "kw",
+      "note": "INSERT — добавить строку в таблицу (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "VALUES",
+      "kind": "kw",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "SELECT",
+      "kind": "kw",
+      "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "FROM",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "WHERE",
+      "kind": "kw",
+      "note": "WHERE — условие отбора строк (SQL).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "SQL: запросы и таблицы"
+      ]
+    },
+    "subcat": "Выбрать и сгруппировать данные"
+  },
+  "legacy": {
+    "template": "select-where-order-by-выбрать-и-отсортир-mvds0h5n.json",
+    "descAt": 1792324974299
+  },
+  "enriched": true
+}

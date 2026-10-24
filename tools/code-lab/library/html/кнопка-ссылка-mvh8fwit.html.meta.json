@@ -1,0 +1,112 @@
+{
+  "schema": 1,
+  "id": "кнопка-ссылка-mvh8fwit",
+  "file": "кнопка-ссылка-mvh8fwit.html",
+  "title": "кнопка-ссылка",
+  "lang": "html",
+  "group": "Интерфейс / Кнопки и размеры",
+  "desc": "Ссылка, оформленная как кнопка.",
+  "output": "",
+  "tags": [],
+  "aliases": [
+    "кнопка-ссылка",
+    "кнопка ссылка",
+    "пример кнопка-ссылка",
+    "html кнопка-ссылка",
+    "как сделать кнопка-ссылка",
+    "a",
+    "<a>",
+    "тег a",
+    "элемент a",
+    "html a",
+    "ссылка",
+    "гиперссылка",
+    "кликабельный текст",
+    "ссылка на страницу",
+    "class",
+    "атрибут class",
+    "html атрибут class",
+    "css класс",
+    "класс элемента",
+    "стилизация класса",
+    "href",
+    "атрибут href",
+    "html атрибут href",
+    "адрес ссылки",
+    "куда ведет ссылка",
+    "url ссылки",
+    "rel",
+    "атрибут rel",
+    "html атрибут rel",
+    "тип связи ссылки",
+    "noopener",
+    "nofollow",
+    "target",
+    "атрибут target",
+    "html атрибут target",
+    "открыть в новой вкладке",
+    "куда открыть ссылку",
+    "оформленная",
+    "кнопка"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "a",
+      "kind": "name",
+      "note": "a — <a> — ссылка",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 3,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — класс(ы) элемента. По классу стилизуют группу элементов (.имя) и находят в JS.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "href",
+      "kind": "name",
+      "note": "href — адрес, куда ведёт ссылка <a>.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 27,
+      "text": "target",
+      "kind": "name",
+      "note": "target — элемент, на котором произошло событие.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 43,
+      "text": "rel",
+      "kind": "name",
+      "note": "rel — тип связи; noopener noreferrer защищают страницу",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 77,
+      "text": "a",
+      "kind": "name",
+      "note": "a — <a> — ссылка",
+      "source": "custom"
+    }
+  ],
+  "legacy": {
+    "template": "кнопка-ссылка-mvh8fwit.json",
+    "descAt": 1792533966437
+  }
+}

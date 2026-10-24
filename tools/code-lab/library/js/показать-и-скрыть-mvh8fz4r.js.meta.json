@@ -1,0 +1,100 @@
+{
+  "schema": 1,
+  "id": "показать-и-скрыть-mvh8fz4r",
+  "file": "показать-и-скрыть-mvh8fz4r.js",
+  "title": "показать и скрыть",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
+  "desc": "Прячет и показывает блок.",
+  "output": "",
+  "tags": [
+    "css",
+    "javascript",
+    "dom-элементы",
+    "свойство hidden",
+    "видимость элементов"
+  ],
+  "aliases": [
+    "скрыть блок с помощью js",
+    "показать элемент через hidden",
+    "как управлять видимостью элемента",
+    "переключение видимости элемента",
+    "скрыть элемент без css"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 21,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 4,
+      "text": "hidden",
+      "kind": "name",
+      "note": "hidden — атрибут, скрывающий элемент со страницы",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 13,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "hidden",
+      "kind": "name",
+      "note": "hidden — атрибут, скрывающий элемент со страницы",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 13,
+      "text": "false",
+      "kind": "kw",
+      "note": "false — логическая «ложь» (нет).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "box"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "показать-и-скрыть-mvh8fz4r.json",
+    "descAt": 1792533969819
+  },
+  "enriched": true
+}

@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "id": "функция-mvh8gfg9",
+  "file": "функция-mvh8gfg9.js",
+  "title": "функция",
+  "lang": "js",
+  "group": "Основы / Как устроена программа",
+  "desc": "Принимает аргументы и возвращает результат.",
+  "output": "",
+  "tags": [
+    "функции",
+    "арифметика",
+    "базовые операции",
+    "javascript",
+    "возврат значения"
+  ],
+  "aliases": [
+    "как написать функцию сложения",
+    "функция с двумя аргументами",
+    "простое сложение в js",
+    "функция возвращает результат"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявление функции",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — возвращает результат",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "add"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "функция-mvh8gfg9.json",
+    "descAt": 1792533990969
+  },
+  "enriched": true
+}

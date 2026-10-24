@@ -1,0 +1,380 @@
+{
+  "schema": 1,
+  "id": "net-chain",
+  "file": "net-chain.js",
+  "title": "Цепочка и параллельные запросы",
+  "lang": "js",
+  "group": "Сеть и запросы / Получить данные",
+  "desc": "Два способа нескольких запросов. ЦЕПОЧКА (await, потом await) — когда второй нуждается в результате первого. ПАРАЛЛЕЛЬНО (Promise.all) — когда запросы независимы: так быстрее, ждём все разом.",
+  "output": "по цепочке, secid: SBER…\nпараллельно пришли оба ответа",
+  "tags": [
+    "fetch",
+    "async/await",
+    "Promise.all",
+    "API-запросы",
+    "асинхронность",
+    "javascript"
+  ],
+  "aliases": [
+    "как сделать несколько запросов fetch",
+    "последовательные и параллельные запросы js",
+    "запросы с зависимостями и без",
+    "fetch с Promise.all пример",
+    "как оптимизировать запросы к API"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "q",
+      "kind": "name",
+      "note": "Короткий помощник: запрос → объект.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "Сходить в сеть по адресу.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "then",
+      "kind": "fn",
+      "note": "«Когда промис готов — сделай…».",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 36,
+      "text": "json",
+      "kind": "fn",
+      "note": "Тело ответа → объект.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "Функция умеет ждать (сеть).",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "main",
+      "kind": "fn",
+      "note": "Дирижёр: сначала цепочка, потом параллель.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "поиск",
+      "kind": "name",
+      "note": "Ответ 1-го запроса.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 16,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат, потом иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 22,
+      "text": "q",
+      "kind": "fn",
+      "note": "Короткий помощник: запрос → объект.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "secid",
+      "kind": "name",
+      "note": "Достали из 1-го ответа — нужен для 2-го (поэтому ЦЕПОЧКА).",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 16,
+      "text": "поиск",
+      "kind": "name",
+      "note": "Ответ 1-го запроса.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "инфо",
+      "kind": "name",
+      "note": "Ответ 2-го запроса (зависит от secid).",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 16,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат, потом иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 22,
+      "text": "q",
+      "kind": "fn",
+      "note": "Короткий помощник: запрос → объект.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 65,
+      "text": "secid",
+      "kind": "name",
+      "note": "Достали из 1-го ответа — нужен для 2-го (поэтому ЦЕПОЧКА).",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 36,
+      "text": "secid",
+      "kind": "name",
+      "note": "Достали из 1-го ответа — нужен для 2-го (поэтому ЦЕПОЧКА).",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 17,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат, потом иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 23,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Обещание результата попозже.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 31,
+      "text": "all",
+      "kind": "fn",
+      "note": "Promise.all — ждать НЕСКОЛЬКО запросов разом (параллельно).",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 4,
+      "text": "q",
+      "kind": "fn",
+      "note": "Короткий помощник: запрос → объект.",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 4,
+      "text": "q",
+      "kind": "fn",
+      "note": "Короткий помощник: запрос → объект.",
+      "source": "custom"
+    },
+    {
+      "line": 14,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 0,
+      "text": "main",
+      "kind": "fn",
+      "note": "Дирижёр: сначала цепочка, потом параллель.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Сеть и запросы"
+      ],
+      "runtime": [
+        "Браузер или Node.js с поддержкой fetch"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "URL запроса и ответ внешнего API",
+      "output": "по цепочке, secid: SBER…\nпараллельно пришли оба ответа",
+      "dependencies": [],
+      "requirements": [
+        "Нужен доступ к сети; сервер должен разрешать запросы через CORS. Проверь HTTP-статус и обработку ошибок.",
+        "Код с await должен выполняться внутри async-функции или другого допустимого async-контекста."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const q = u => fetch(u).then(r => r.json());\n\nasync function main(){\n  // — ЦЕПОЧКА: шаг 2 зависит от шага 1 —\n  const поиск = await q(\"https://iss.moex.com/iss/securities.json?q=Сбербанк&iss.meta=off\");\n  const secid = поиск.securities.data[0][1];          // берём код из 1-го ответа\n  const инфо  = await q(\"https://iss.moex.com/iss/securities/\" + secid + \".json?iss.meta=off\");\n  console.log(\"по цепочке, secid:\", secid);\n\n  // — ПАРАЛЛЕЛЬНО: запросы НЕ зависят друг от друга —\n  const [a, b] = await Promise.all([\n    q(\"https://iss.moex.com/iss/engines.json?iss.meta=off\"),\n    q(\"https://iss.moex.com/iss/index.json?iss.meta=off\"),\n  ]);\n  console.log(\"параллельно пришли оба ответа\");\n}\nmain();"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "по цепочке, secid: SBER…\nпараллельно пришли оба ответа",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "q",
+      "main",
+      "поиск",
+      "secid",
+      "инфо"
+    ],
+    "requires": [
+      "a",
+      "b"
+    ],
+    "subcat": "Получить данные"
+  },
+  "legacy": {
+    "template": "net-chain.json"
+  },
+  "enriched": true
+}

@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "цикл-while-break-continue",
+  "file": "цикл-while-break-continue.py",
+  "title": "while, break и continue — управление циклом",
+  "lang": "python",
+  "group": "Основы / Управление потоком",
+  "desc": "Цикл while повторяется, пока условие истинно. continue пропускает остаток текущей итерации, break полностью завершает цикл. Следите, чтобы условие while могло стать ложным, иначе цикл может стать бесконечным.",
+  "output": "4\n2",
+  "tags": [
+    "while",
+    "break",
+    "continue",
+    "цикл с условием",
+    "пропустить итерацию",
+    "прервать цикл",
+    "Python"
+  ],
+  "aliases": [
+    "как сделать цикл пока условие истинно",
+    "чем отличаются break и continue",
+    "как остановить цикл while"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

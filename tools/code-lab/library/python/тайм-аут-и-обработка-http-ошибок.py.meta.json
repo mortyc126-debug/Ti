@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "id": "тайм-аут-и-обработка-http-ошибок",
+  "file": "тайм-аут-и-обработка-http-ошибок.py",
+  "title": "HTTP-запрос: тайм-аут и обработка ошибок",
+  "lang": "python",
+  "group": "Сеть и запросы / HTTP и API",
+  "desc": "При сетевом запросе задавайте тайм-аут и различайте HTTP-ошибки, ошибки URL и тайм-аут соединения. Внешний API может быть недоступен или вернуть неожиданный формат.",
+  "output": "",
+  "tags": [
+    "HTTP",
+    "API",
+    "timeout",
+    "urllib",
+    "HTTPError",
+    "URLError",
+    "сеть",
+    "python"
+  ],
+  "aliases": [
+    "обработать ошибку http запроса python",
+    "urllib timeout пример",
+    "тайм-аут запроса к api",
+    "при сетевом запросе задавайте тайм-аут и различайте http-ошибки, ошибки url и тайм-аут соединения"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

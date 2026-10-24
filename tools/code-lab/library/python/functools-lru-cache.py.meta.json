@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "functools-lru-cache",
+  "file": "functools-lru-cache.py",
+  "title": "lru_cache — кэширование результата функции",
+  "lang": "python",
+  "group": "Основы / Функции",
+  "desc": "lru_cache сохраняет результаты вызовов функции с хешируемыми аргументами. Не используйте кэш бездумно для функций, зависящих от меняющегося внешнего состояния.",
+  "output": "55",
+  "tags": [
+    "functools",
+    "lru_cache",
+    "кэширование",
+    "рекурсия",
+    "python"
+  ],
+  "aliases": [
+    "кэшировать функцию python",
+    "functools lru_cache"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

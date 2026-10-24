@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "id": "if-elif-else-выбор-из-вариантов-mvdrpuqp",
+  "file": "if-elif-else-выбор-из-вариантов-mvdrpuqp.py",
+  "title": "if / elif / else — выбор из вариантов",
+  "lang": "python",
+  "group": "Основы / Синтаксис",
+  "desc": "Выбирает одну из веток по условию. elif — «иначе если», else — «во всех остальных случаях».",
+  "output": "тепло",
+  "tags": [
+    "условный оператор",
+    "ветвление",
+    "elif-else",
+    "синтаксис python",
+    "логические условия",
+    "python",
+    "if",
+    "elif",
+    "else"
+  ],
+  "aliases": [
+    "как проверить несколько условий в питоне",
+    "elif пример с температурой",
+    "как выбрать одно из нескольких значений по условию",
+    "синтаксис if elif else на примере",
+    "выбирает одну из веток по условию"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "elif",
+      "kind": "kw",
+      "note": "elif — «иначе если» (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "else",
+      "kind": "kw",
+      "note": "else — «иначе»: что делать, когда условие if не выполнилось.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "Основы"
+      ]
+    },
+    "subcat": "Синтаксис"
+  },
+  "legacy": {
+    "template": "if-elif-else-выбор-из-вариантов-mvdrpuqp.json",
+    "descAt": 1792324478689
+  },
+  "enriched": true
+}

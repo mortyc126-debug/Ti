@@ -1,0 +1,20 @@
+input[type="range"]{
+  -webkit-appearance: none;  /* убрать стандартный вид */
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: #3DD9FF;       /* цвет дорожки */
+}
+/* бегунок — Chrome/Safari */
+input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #FF2D78;       /* цвет кружка */
+  cursor: pointer;
+}
+/* бегунок — Firefox */
+input[type="range"]::-moz-range-thumb{
+  width: 18px; height: 18px; border: none;
+  border-radius: 50%; background: #FF2D78; cursor: pointer;
+}

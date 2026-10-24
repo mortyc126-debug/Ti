@@ -1,0 +1,271 @@
+{
+  "schema": 1,
+  "id": "fetch-await-получить-данные-mv6cuspk",
+  "file": "fetch-await-получить-данные-mv6cuspk.js",
+  "title": "fetch + await — получить данные",
+  "lang": "js",
+  "group": "Сеть и запросы / Получить данные",
+  "desc": "async-функция может ждать Promise через await. fetch возвращает Response; json() читает тело ответа. В реальном примере обрабатывайте ошибки и проверяйте response.ok.",
+  "output": "Данные ответа сервера либо сообщение об ошибке",
+  "tags": [
+    "fetch API",
+    "async/await",
+    "ошибки HTTP",
+    "JSON-парсинг",
+    "промисы",
+    "клиентский запрос"
+  ],
+  "aliases": [
+    "как получить json с сервера через fetch",
+    "обработка ошибок в fetch",
+    "проверка response.ok в js",
+    "async fetch с обработкой ошибок",
+    "запрос к api с обработкой ответа"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 25,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "fetch — делает запрос в сеть и возвращает промис с ответом.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "throw",
+      "kind": "kw",
+      "note": "throw — выбросить ошибку намеренно.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 14,
+      "text": "Error",
+      "kind": "fn",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 15,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 30,
+      "text": "json",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 11,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 17,
+      "text": "error",
+      "kind": "name",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 26,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 34,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 38,
+      "text": "error",
+      "kind": "name",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Сеть и запросы"
+      ],
+      "runtime": [
+        "Браузер или Node.js с поддержкой fetch"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "URL запроса и ответ внешнего API",
+      "output": "Данные ответа сервера либо сообщение об ошибке",
+      "dependencies": [],
+      "requirements": [
+        "Нужен доступ к сети; сервер должен разрешать запросы через CORS. Проверь HTTP-статус и обработку ошибок.",
+        "Код с await должен выполняться внутри async-функции или другого допустимого async-контекста."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "async function loadData() {\n  const response = await fetch(\"/api/colors\");\n  if (!response.ok) {\n    throw new Error(\"Не удалось загрузить данные\");\n  }\n  const data = await response.json();\n  console.log(data);\n}\n\nloadData().catch(error => console.log(error.message));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Данные ответа сервера либо сообщение об ошибке",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "loadData",
+      "response",
+      "data"
+    ],
+    "requires": [],
+    "subcat": "Получить данные"
+  },
+  "legacy": {
+    "template": "fetch-await-получить-данные-mv6cuspk.json"
+  },
+  "enriched": true
+}

@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "id": "вывод-значений-для-отладки-mvh8gtxz",
+  "file": "вывод-значений-для-отладки-mvh8gtxz.js",
+  "title": "вывод значений для отладки",
+  "lang": "js",
+  "group": "Ошибки и отладка / Найти причину сбоя",
+  "desc": "Печатает переменные и таблицы.",
+  "output": "",
+  "tags": [
+    "debugging",
+    "console.log",
+    "console.table",
+    "javascript",
+    "отладка",
+    "визуализация данных"
+  ],
+  "aliases": [
+    "как вывести массив объектов в таблицу",
+    "отладка массива данных в js",
+    "console.table пример использования",
+    "печать структуры данных в браузере",
+    "как отладить массив объектов"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 31,
+      "text": "age",
+      "kind": "name",
+      "note": "age — поле объекта, по которому сравниваем",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 58,
+      "text": "age",
+      "kind": "name",
+      "note": "age — поле объекта, по которому сравниваем",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "users"
+    ],
+    "requires": [
+      "name",
+      "age"
+    ]
+  },
+  "legacy": {
+    "template": "вывод-значений-для-отладки-mvh8gtxz.json",
+    "descAt": 1792534009751
+  },
+  "enriched": true
+}

@@ -1,0 +1,160 @@
+{
+  "schema": 1,
+  "id": "попадание-точки-в-прямоугольник-mv6cussc",
+  "file": "попадание-точки-в-прямоугольник-mv6cussc.js",
+  "title": "Попадание точки в прямоугольник",
+  "lang": "js",
+  "group": "Игры и интерактивные проекты / Геометрия и попадания",
+  "desc": "Точка попадает в прямоугольник, если её координаты находятся между левой/правой и верхней/нижней границами.",
+  "output": "true",
+  "tags": [
+    "коллизия",
+    "проверка попадания",
+    "геометрия",
+    "2d",
+    "интерактивность",
+    "javascript"
+  ],
+  "aliases": [
+    "как проверить попадание точки в прямоугольник",
+    "проверка клика на кнопку координатами",
+    "детектирование коллизий с прямоугольником",
+    "проверка вхождения точки в область",
+    "геометрическая проверка попадания"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Игры и интерактивные проекты"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "true",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function containsPoint(x, y, rect) {\n  return x >= rect.x &&\n    x <= rect.x + rect.width &&\n    y >= rect.y &&\n    y <= rect.y + rect.height;\n}\n\nconst button = { x: 20, y: 30, width: 100, height: 40 };\nconsole.log(containsPoint(50, 45, button));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "true",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "containsPoint",
+      "button"
+    ],
+    "requires": [
+      "width",
+      "height"
+    ],
+    "subcat": "Геометрия и попадания"
+  },
+  "legacy": {
+    "template": "попадание-точки-в-прямоугольник-mv6cussc.json"
+  },
+  "enriched": true
+}

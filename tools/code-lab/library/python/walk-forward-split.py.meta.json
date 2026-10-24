@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "walk-forward-split",
+  "file": "walk-forward-split.py",
+  "title": "Walk-forward — хронологическое разбиение на train и test",
+  "lang": "python",
+  "group": "Математика, финансы и анализ данных / Бэктестинг",
+  "desc": "Хронологическое разбиение не перемешивает будущее с прошлым. Пример формирует расширяющееся обучающее окно и следующий тестовый блок. Границы следует выбирать до оценки стратегии; не подбирайте их по результатам теста.",
+  "output": "[(0, 6, 6, 8), (0, 8, 8, 10)]",
+  "tags": [
+    "walk-forward",
+    "временной ряд",
+    "train test",
+    "бэктест",
+    "python"
+  ],
+  "aliases": [
+    "walk forward validation python",
+    "хронологическое разделение временного ряда"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

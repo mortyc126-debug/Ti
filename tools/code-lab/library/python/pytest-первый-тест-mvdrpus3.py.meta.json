@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "id": "pytest-первый-тест-mvdrpus3",
+  "file": "pytest-первый-тест-mvdrpus3.py",
+  "title": "pytest — первый тест",
+  "lang": "python",
+  "group": "Тесты (Python) / Написать тест",
+  "desc": "Тест — функция с именем test_..., внутри которой assert. Файл тоже должен называться test_*.py. Запуск — командой pytest.",
+  "output": "1 passed",
+  "tags": [
+    "pytest",
+    "тестирование",
+    "assert",
+    "модульное тестирование",
+    "python",
+    "проверка утверждений"
+  ],
+  "aliases": [
+    "как написать тест на сложение в пайтон",
+    "тестовая функция pytest пример",
+    "запуск тестов pytest командой",
+    "assert в тестах python",
+    "тестирование функций в python",
+    "тест — функция с именем test_"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "Тесты (Python)"
+      ]
+    },
+    "subcat": "Написать тест"
+  },
+  "legacy": {
+    "template": "pytest-первый-тест-mvdrpus3.json",
+    "descAt": 1792324478740
+  },
+  "enriched": true
+}

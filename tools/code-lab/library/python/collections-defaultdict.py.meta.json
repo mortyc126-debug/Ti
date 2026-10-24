@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "collections-defaultdict",
+  "file": "collections-defaultdict.py",
+  "title": "defaultdict — группировка без проверки ключа",
+  "lang": "python",
+  "group": "Данные / Коллекции",
+  "desc": "defaultdict(list) создаёт пустой список при первом обращении к отсутствующему ключу. Удобен для группировки записей.",
+  "output": "{'MOEX': ['Si', 'RI'], 'NYSE': ['AAPL']}",
+  "tags": [
+    "collections",
+    "defaultdict",
+    "группировка",
+    "словарь",
+    "python"
+  ],
+  "aliases": [
+    "сгруппировать элементы по ключу",
+    "defaultdict list"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

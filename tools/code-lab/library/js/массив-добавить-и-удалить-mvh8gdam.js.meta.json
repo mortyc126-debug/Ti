@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "id": "массив-добавить-и-удалить-mvh8gdam",
+  "file": "массив-добавить-и-удалить-mvh8gdam.js",
+  "title": "массив: добавить и удалить",
+  "lang": "js",
+  "group": "Массивы и объекты",
+  "desc": "Основные операции с концом и началом массива.",
+  "output": "",
+  "tags": [
+    "массивы",
+    "push",
+    "pop",
+    "unshift",
+    "shift",
+    "js"
+  ],
+  "aliases": [
+    "как добавить элемент в конец массива",
+    "как удалить элемент из начала массива",
+    "операции с краями массива",
+    "push и pop в js",
+    "изменение начала и конца массива"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "push",
+      "kind": "fn",
+      "note": "push — добавить в конец",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "pop",
+      "kind": "fn",
+      "note": "pop — убрать с конца",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 6,
+      "text": "unshift",
+      "kind": "fn",
+      "note": "unshift — добавить в начало",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 6,
+      "text": "shift",
+      "kind": "fn",
+      "note": "shift — убрать с начала",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "provides": [
+      "items"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "массив-добавить-и-удалить-mvh8gdam.json",
+    "descAt": 1792533988174
+  },
+  "enriched": true
+}

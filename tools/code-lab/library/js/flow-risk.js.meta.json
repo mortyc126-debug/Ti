@@ -1,0 +1,486 @@
+{
+  "schema": 1,
+  "id": "flow-risk",
+  "file": "flow-risk.js",
+  "title": "Цены → доходности → риск",
+  "lang": "js",
+  "group": "Математика, финансы и анализ данных / Статистика и временные",
+  "desc": "Сквозной расчёт без сети. Видно стыковку по типу: доходности() отдаёт массив, волатильность() его принимает. Выход одного = вход другого.",
+  "output": "риск: 0.0266",
+  "tags": [
+    "статистика",
+    "финансовый анализ",
+    "стандартное отклонение",
+    "массивы данных",
+    "javascript",
+    "временные ряды"
+  ],
+  "aliases": [
+    "как посчитать волатильность по ценам",
+    "стандартное отклонение доходностей",
+    "риск активов через доходности",
+    "преобразование цен в волатильность",
+    "вычисление дисперсии для финансов"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "цены",
+      "kind": "name",
+      "note": "Вход всей цепочки.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "Определить функцию (заготовку).",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 9,
+      "text": "доходности",
+      "kind": "fn",
+      "note": "Шаг 1: цены → доходности (массив → массив).",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 20,
+      "text": "цены",
+      "kind": "name",
+      "note": "Вход всей цепочки.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторять блок заданное число раз.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 6,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять позже.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 21,
+      "text": "цены",
+      "kind": "name",
+      "note": "Вход всей цепочки.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 26,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 43,
+      "text": "push",
+      "kind": "fn",
+      "note": "push — добавляет элемент в конец массива.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 48,
+      "text": "цены",
+      "kind": "name",
+      "note": "Вход всей цепочки.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 58,
+      "text": "цены",
+      "kind": "name",
+      "note": "Вход всей цепочки.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции — что она отдаёт наружу.",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "Определить функцию (заготовку).",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 9,
+      "text": "волатильность",
+      "kind": "fn",
+      "note": "Шаг 2: доходности → риск (массив → число).",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 23,
+      "text": "дох",
+      "kind": "name",
+      "note": "Провод: выход шага 1, он же вход шага 2.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 8,
+      "text": "среднее",
+      "kind": "name",
+      "note": "Средняя доходность.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 18,
+      "text": "дох",
+      "kind": "name",
+      "note": "Провод: выход шага 1, он же вход шага 2.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 22,
+      "text": "reduce",
+      "kind": "fn",
+      "note": "Свернуть массив в одно число.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 51,
+      "text": "дох",
+      "kind": "name",
+      "note": "Провод: выход шага 1, он же вход шага 2.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 55,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 8,
+      "text": "дисп",
+      "kind": "name",
+      "note": "Дисперсия (разброс).",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 15,
+      "text": "дох",
+      "kind": "name",
+      "note": "Провод: выход шага 1, он же вход шага 2.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 19,
+      "text": "reduce",
+      "kind": "fn",
+      "note": "Свернуть массив в одно число.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 45,
+      "text": "среднее",
+      "kind": "name",
+      "note": "Средняя доходность.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 61,
+      "text": "среднее",
+      "kind": "name",
+      "note": "Средняя доходность.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 76,
+      "text": "дох",
+      "kind": "name",
+      "note": "Провод: выход шага 1, он же вход шага 2.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 80,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции — что она отдаёт наружу.",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 9,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 19,
+      "text": "дисп",
+      "kind": "name",
+      "note": "Дисперсия (разброс).",
+      "source": "custom"
+    },
+    {
+      "line": 15,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 15,
+      "col": 6,
+      "text": "дох",
+      "kind": "name",
+      "note": "Провод: выход шага 1, он же вход шага 2.",
+      "source": "custom"
+    },
+    {
+      "line": 15,
+      "col": 12,
+      "text": "доходности",
+      "kind": "fn",
+      "note": "Шаг 1: цены → доходности (массив → массив).",
+      "source": "custom"
+    },
+    {
+      "line": 15,
+      "col": 23,
+      "text": "цены",
+      "kind": "name",
+      "note": "Вход всей цепочки.",
+      "source": "custom"
+    },
+    {
+      "line": 16,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 16,
+      "col": 6,
+      "text": "риск",
+      "kind": "name",
+      "note": "Итог.",
+      "source": "custom"
+    },
+    {
+      "line": 16,
+      "col": 13,
+      "text": "волатильность",
+      "kind": "fn",
+      "note": "Шаг 2: доходности → риск (массив → число).",
+      "source": "custom"
+    },
+    {
+      "line": 16,
+      "col": 27,
+      "text": "дох",
+      "kind": "name",
+      "note": "Провод: выход шага 1, он же вход шага 2.",
+      "source": "custom"
+    },
+    {
+      "line": 17,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 21,
+      "text": "риск",
+      "kind": "name",
+      "note": "Итог.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Математика, финансы и анализ данных"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Массив, объявленный в коде",
+      "output": "риск: 0.0266",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const цены = [100, 102, 101, 105, 103, 108];\n\n// шаг 1: массив цен → массив доходностей\nfunction доходности(цены){\n  const out = [];\n  for(let i = 1; i < цены.length; i++) out.push(цены[i] / цены[i - 1] - 1);\n  return out;\n}\n// шаг 2: массив доходностей → одно число (риск)\nfunction волатильность(дох){\n  const среднее = дох.reduce((a, b) => a + b, 0) / дох.length;\n  const дисп = дох.reduce((a, b) => a + (b - среднее) * (b - среднее), 0) / дох.length;\n  return Math.sqrt(дисп);\n}\n\nconst дох = доходности(цены);       // провод: массив доходностей\nconst риск = волатильность(дох);    // дох ВХОДИТ сюда → число\nconsole.log(\"риск:\", риск.toFixed(4));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "риск: 0.0266",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "цены",
+      "доходности",
+      "out",
+      "i",
+      "волатильность",
+      "среднее",
+      "дисп",
+      "дох",
+      "риск"
+    ],
+    "requires": [
+      "a"
+    ],
+    "subcat": "Статистика и временные"
+  },
+  "legacy": {
+    "template": "flow-risk.json"
+  },
+  "enriched": true
+}

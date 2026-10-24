@@ -1,0 +1,203 @@
+{
+  "schema": 1,
+  "id": "адаптивность-media-и-auto-fit-mvedo299",
+  "file": "адаптивность-media-и-auto-fit-mvedo299.css",
+  "title": "Адаптивность: media и auto-fit",
+  "lang": "css",
+  "group": "CSS: адаптивность / Экраны разных размеров",
+  "desc": "Показывает два подхода к адаптивной сетке: явное изменение колонок через `@media` и автоматический подбор количества колонок через `auto-fit`/`minmax()`.",
+  "output": "Показывает два подхода к адаптивной сетке: явное изменение колонок через `@media` и автоматический подбор количества колонок через `auto-fit`/`minmax()`",
+  "tags": [
+    "@media",
+    "auto-fit",
+    "breakpoints",
+    "css",
+    "em",
+    "frontend",
+    "grid-template-columns",
+    "media-query",
+    "minmax",
+    "responsive",
+    "web",
+    "адаптивная-вёрстка",
+    "адаптивная-сетка",
+    "вёрстка",
+    "колонки",
+    "практический-приём",
+    "пример",
+    "css-grid",
+    "auto-fit/minmax",
+    "без-медиа-запросов",
+    "реактивная-вёрстка",
+    "гибкая-сетка",
+    "практический-пример"
+  ],
+  "aliases": [
+    "как сделать сетку без media query",
+    "auto-fit вместо брейкпоинтов",
+    "гибкая сетка на css grid",
+    "адаптивная вёрстка без медиа-запросов",
+    "minmax для колонок"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "display",
+      "kind": "name",
+      "note": "display — тип раскладки: block, inline, flex, grid, none.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 21,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 60,
+      "text": "gap",
+      "kind": "name",
+      "note": "gap — расстояние между элементами в flex/grid.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "max",
+      "kind": "name",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 9,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 1,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 6,
+      "text": "auto",
+      "kind": "name",
+      "note": "auto — браузер решает сам.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 12,
+      "text": "display",
+      "kind": "name",
+      "note": "display — тип раскладки: block, inline, flex, grid, none.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 20,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 26,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 56,
+      "text": "auto",
+      "kind": "name",
+      "note": "auto — браузер решает сам.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 87,
+      "text": "gap",
+      "kind": "name",
+      "note": "gap — расстояние между элементами в flex/grid.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: адаптивность"
+      ]
+    },
+    "subcat": "Экраны разных размеров"
+  },
+  "legacy": {
+    "template": "адаптивность-media-и-auto-fit-mvedo299.json",
+    "descAt": 1792361346670
+  },
+  "architectureNote": {
+    "role": "Отвечает за структуру и взаимное расположение областей или карточек.",
+    "architecturalUse": "Подключай там, где требуется: Показывает два подхода к адаптивной сетке: явное изменение колонок через `@media` и автоматический подбор количества колонок через `auto-fit`/`minmax()`.",
+    "combineWith": [
+      "gap для ритма между ячейками",
+      "minmax(0, 1fr) или minmax() для контроля переполнения",
+      "@media либо auto-fit/minmax() для узких экранов"
+    ],
+    "watchFor": "Не задавай фиксированные ширины всем колонкам без необходимости; проверь длинный текст и узкий экран.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "csv-dictreader",
+  "file": "csv-dictreader.py",
+  "title": "csv.DictReader — чтение таблицы по названиям столбцов",
+  "lang": "python",
+  "group": "Файлы, хранение и сервер / Табличные данные",
+  "desc": "DictReader возвращает строки как словари по заголовкам CSV. Все значения читаются строками, поэтому числа и даты нужно преобразовывать и валидировать отдельно.",
+  "output": "['Si', '125.5']",
+  "tags": [
+    "csv",
+    "DictReader",
+    "табличные данные",
+    "файлы",
+    "python"
+  ],
+  "aliases": [
+    "прочитать csv как словари",
+    "csv DictReader python"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

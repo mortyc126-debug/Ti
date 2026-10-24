@@ -1,0 +1,6 @@
+{
+  "name": "Анна",
+  "age": 31,
+  "skills": ["css", "js"],
+  "address": { "city": "Казань" }
+}

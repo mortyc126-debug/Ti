@@ -1,0 +1,186 @@
+{
+  "schema": 1,
+  "id": "обработка-данных-в-web-worker-с-промежут-mvk1jfat",
+  "file": "обработка-данных-в-web-worker-с-промежут-mvk1jfat.js",
+  "lang": "js",
+  "title": "Обработка данных в Web Worker с промежуточными результатами",
+  "group": "Сеть и запросы / Параллельная обработка данных",
+  "desc": "Создаёт Worker для поэтапной обработки данных (например, фильтрация и преобразование) с передачей промежуточных результатов.",
+  "output": "[object Object]",
+  "descAt": 1792703771957,
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Сеть и запросы"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "subcat": "Параллельная обработка данных",
+    "summary": {
+      "output": "[object Object]"
+    },
+    "generated": {
+      "by": "ai",
+      "at": "2026-10-22T21:16:11.958Z",
+      "note": "создано ИИ; код не запускался и не проверялся человеком"
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "data",
+      "worker",
+      "filtered",
+      "transformed"
+    ],
+    "requires": [
+      "Worker",
+      "self"
+    ]
+  },
+  "tags": [
+    "промежуточные шаги",
+    "фильтрация",
+    "трансформация",
+    "Web Worker"
+  ],
+  "aliases": [
+    "шаги в worker",
+    "поэтапная обработка",
+    "фильтр и преобразование",
+    "потоковая обработка"
+  ],
+  "source": {
+    "title": "ai",
+    "desc": "ai",
+    "tags": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 10,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 0,
+      "text": "self",
+      "kind": "name",
+      "note": "self — ссылка на текущий объект внутри метода (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 26,
+      "text": "filter",
+      "kind": "fn",
+      "note": "filter — оставляет из массива только элементы, подходящие под условие.",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 31,
+      "text": "map",
+      "kind": "fn",
+      "note": "map — проходит по массиву и возвращает новый массив из результатов.",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 2,
+      "text": "self",
+      "kind": "name",
+      "note": "self — ссылка на текущий объект внутри метода (Python).",
+      "source": "dict"
+    }
+  ]
+}

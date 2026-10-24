@@ -1,0 +1,10 @@
+@font-face {
+  font-family: "MyFont";
+  src: url("fonts/myfont.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+body {
+  font-family: "MyFont", sans-serif;
+}

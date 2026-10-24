@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "собственное-исключение-и-raise-from",
+  "file": "собственное-исключение-и-raise-from.py",
+  "title": "raise и цепочка причин исключения",
+  "lang": "python",
+  "group": "Ошибки и отладка / Исключения",
+  "desc": "raise выбрасывает исключение; конструкция raise ... from e сохраняет исходную ошибку как причину и помогает понять цепочку сбоя.",
+  "output": "",
+  "tags": [
+    "raise",
+    "исключения",
+    "raise from",
+    "цепочка ошибок",
+    "обработка ошибок",
+    "python"
+  ],
+  "aliases": [
+    "как выбросить исключение python",
+    "сохранить причину ошибки raise from",
+    "собственное сообщение об ошибке",
+    "raise выбрасывает исключение; конструкция raise"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

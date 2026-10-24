@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "id": "if-__name__-__main__-запуск-только-напря-mvdrpurh",
+  "file": "if-__name__-__main__-запуск-только-напря-mvdrpurh.py",
+  "title": "if __name__ == \"__main__\" — запуск только напрямую",
+  "lang": "python",
+  "group": "Основы / Python",
+  "desc": "Код под этой проверкой выполняется, когда файл запущен напрямую, и не выполняется, когда файл импортируют из другого.",
+  "output": "программа работает",
+  "tags": [
+    "python",
+    "if __name__",
+    "модульность",
+    "точка входа",
+    "скрипт",
+    "импорт",
+    "if",
+    "__name__",
+    "__main__"
+  ],
+  "aliases": [
+    "как проверить запуск скрипта напрямую",
+    "разница между запуском и импортом",
+    "точка входа в python",
+    "код не выполняется при импорте",
+    "проверка основного модуля"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 4,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "Основы"
+      ]
+    },
+    "subcat": "Python"
+  },
+  "legacy": {
+    "template": "if-__name__-__main__-запуск-только-напря-mvdrpurh.json",
+    "descAt": 1792324478717
+  },
+  "enriched": true
+}

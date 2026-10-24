@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "oop-inheritance",
+  "file": "oop-inheritance.py",
+  "title": "Наследование и super()",
+  "lang": "python",
+  "group": "Основы / Объектно-ориентированное программирование",
+  "desc": "Наследование позволяет расширить поведение базового класса. super() вызывает реализацию родительского класса в соответствии с порядком разрешения методов.",
+  "output": "Si: фьючерс",
+  "tags": [
+    "class",
+    "наследование",
+    "super",
+    "ООП",
+    "python"
+  ],
+  "aliases": [
+    "пример наследования классов python",
+    "super init python"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

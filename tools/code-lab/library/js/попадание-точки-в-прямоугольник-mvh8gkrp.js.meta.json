@@ -1,0 +1,125 @@
+{
+  "schema": 1,
+  "id": "попадание-точки-в-прямоугольник-mvh8gkrp",
+  "file": "попадание-точки-в-прямоугольник-mvh8gkrp.js",
+  "title": "попадание точки в прямоугольник",
+  "lang": "js",
+  "group": "Игры и интерактивные проекты / Геометрия и попадания",
+  "desc": "Проверяет, лежит ли клик внутри блока.",
+  "output": "",
+  "tags": [
+    "коллизия",
+    "прямоугольник",
+    "точка",
+    "геометрия",
+    "клик",
+    "интерактив"
+  ],
+  "aliases": [
+    "как проверить попадание мыши в область",
+    "проверка клика внутри прямоугольника",
+    "определение точки внутри блока",
+    "геометрическая проверка попадания",
+    "проверка координат внутри прямоугольника"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 23,
+      "text": "rect",
+      "kind": "name",
+      "note": "rect — прямоугольник",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "rect",
+      "kind": "name",
+      "note": "rect — прямоугольник",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 41,
+      "text": "rect",
+      "kind": "name",
+      "note": "rect — прямоугольник",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 50,
+      "text": "rect",
+      "kind": "name",
+      "note": "rect — прямоугольник",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 55,
+      "text": "w",
+      "kind": "name",
+      "note": "w — ширина, h высота прямоугольника",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 20,
+      "text": "rect",
+      "kind": "name",
+      "note": "rect — прямоугольник",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 41,
+      "text": "rect",
+      "kind": "name",
+      "note": "rect — прямоугольник",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 50,
+      "text": "rect",
+      "kind": "name",
+      "note": "rect — прямоугольник",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "inside"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "попадание-точки-в-прямоугольник-mvh8gkrp.json",
+    "descAt": 1792533997861
+  },
+  "enriched": true
+}

@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "id": "переключить-класс-mvh8fyqp",
+  "file": "переключить-класс-mvh8fyqp.js",
+  "title": "переключить класс",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
+  "desc": "Включает и выключает класс у элемента.",
+  "output": "",
+  "tags": [
+    "classList.toggle",
+    "интерактивные элементы",
+    "меню",
+    "css-классы",
+    "javascript",
+    "события"
+  ],
+  "aliases": [
+    "как переключать класс при клике",
+    "меню раскрывается по клику",
+    "toggle класс на элементе",
+    "смена класса по событию",
+    "меню с классом open"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 22,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 5,
+      "text": "classList",
+      "kind": "name",
+      "note": "classList — список классов элемента",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "toggle",
+      "kind": "fn",
+      "note": "toggle — добавляет класс, если его нет, и убирает, если есть",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "menu"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "переключить-класс-mvh8fyqp.json",
+    "descAt": 1792533969313
+  },
+  "enriched": true
+}

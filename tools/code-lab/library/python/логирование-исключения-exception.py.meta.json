@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "python-exception-py",
+  "file": "логирование-исключения-exception.py",
+  "title": "logger.exception — сохранить traceback",
+  "lang": "python",
+  "group": "Повседневная разработка / Логирование",
+  "desc": "Логирует сообщение и стек исключения внутри except.",
+  "output": "logger.exception автоматически добавляет traceback; не используйте его вне обработчика исключения без причины.",
+  "tags": [
+    "logging",
+    "traceback",
+    "исключения",
+    "отладка"
+  ],
+  "aliases": [],
+  "source": "curated",
+  "status": "active",
+  "enriched": true
+}

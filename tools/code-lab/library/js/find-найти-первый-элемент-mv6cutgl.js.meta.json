@@ -1,0 +1,175 @@
+{
+  "schema": 1,
+  "id": "find-найти-первый-элемент-mv6cutgl",
+  "file": "find-найти-первый-элемент-mv6cutgl.js",
+  "title": "find — найти первый элемент",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Перебирать, фи",
+  "desc": "find возвращает первый элемент, который подходит под условие, или undefined, если совпадения нет.",
+  "output": "Лев",
+  "tags": [
+    "массивы",
+    "перебор",
+    "условие",
+    "find",
+    "javascript",
+    "поиск"
+  ],
+  "aliases": [
+    "найти объект в массиве по условию",
+    "первый элемент с условием",
+    "как найти активного пользователя в массиве",
+    "find метод массива пример"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 25,
+      "text": "false",
+      "kind": "kw",
+      "note": "false — логическая «ложь» (нет).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 25,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 19,
+      "text": "find",
+      "kind": "fn",
+      "note": "find — вернуть первый элемент массива, подходящий под условие.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Данные: хранить, находить и преобразовывать"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Лев",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const users = [\n  { name: \"Аня\", active: false },\n  { name: \"Лев\", active: true }\n];\nconst user = users.find(item => item.active);\nconsole.log(user.name);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Лев",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "users",
+      "user"
+    ],
+    "requires": [
+      "name",
+      "active"
+    ],
+    "subcat": "Перебирать, фи"
+  },
+  "legacy": {
+    "template": "find-найти-первый-элемент-mv6cutgl.json"
+  },
+  "enriched": true
+}

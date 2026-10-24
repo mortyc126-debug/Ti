@@ -1,0 +1,163 @@
+{
+  "schema": 1,
+  "id": "throw-самому-выбросить-ошибку-mvds0h5s",
+  "file": "throw-самому-выбросить-ошибку-mvds0h5s.js",
+  "title": "throw — самому выбросить ошибку",
+  "lang": "js",
+  "group": "Ошибки и отладка / Найти причину сбоя",
+  "desc": "throw new Error(...) останавливает функцию и передаёт ошибку ближайшему catch. Так функция сообщает, что ей дали плохие данные.",
+  "output": "2\nпоймано: деление на ноль",
+  "tags": [
+    "ошибки",
+    "отладка",
+    "проверка входных данных",
+    "try-catch",
+    "javascript",
+    "контроль ошибок"
+  ],
+  "aliases": [
+    "как поймать ошибку деления на ноль",
+    "обработка ошибок в js",
+    "проверка на ноль в функции",
+    "выбрасывание ошибки в js",
+    "как обработать некорректные данные"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "throw",
+      "kind": "kw",
+      "note": "throw — выбросить ошибку намеренно.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 10,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 14,
+      "text": "Error",
+      "kind": "fn",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 2,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "делить"
+    ],
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Ошибки и отладка"
+      ]
+    },
+    "subcat": "Найти причину сбоя"
+  },
+  "legacy": {
+    "template": "throw-самому-выбросить-ошибку-mvds0h5s.json",
+    "descAt": 1792324974304
+  },
+  "enriched": true
+}

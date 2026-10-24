@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "типизация-generic-typevar",
+  "file": "типизация-generic-typevar.py",
+  "title": "Generic и TypeVar для типизированных контейнеров",
+  "lang": "python",
+  "group": "Продвинутые темы / Типизация",
+  "desc": "Generic-класс хранит значение произвольного типа, сохраняя типовую информацию для статического анализатора. Аннотации сами по себе не выполняют runtime-валидацию.",
+  "output": "Box хранит и возвращает строковое значение.",
+  "tags": [
+    "typing",
+    "Generic",
+    "TypeVar",
+    "типизация",
+    "python"
+  ],
+  "aliases": [
+    "generic class python",
+    "обобщённый тип"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

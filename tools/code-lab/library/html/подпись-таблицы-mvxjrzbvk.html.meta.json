@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "id": "caption-mvxjrzbvk",
+  "file": "подпись-таблицы-mvxjrzbvk.html",
+  "title": "caption",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Подпись таблицы",
+  "tags": [
+    "caption",
+    "html",
+    "тег caption"
+  ],
+  "aliases": [
+    "<caption>",
+    "caption",
+    "html caption",
+    "пример caption",
+    "как сделать caption",
+    "тег caption",
+    "элемент caption",
+    "название таблицы",
+    "подпись таблицы",
+    "table",
+    "<table>",
+    "тег table",
+    "элемент table",
+    "html table",
+    "таблица html",
+    "таблица данных",
+    "таблица строк и столбцов",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "Подпись",
+    "таблицы"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

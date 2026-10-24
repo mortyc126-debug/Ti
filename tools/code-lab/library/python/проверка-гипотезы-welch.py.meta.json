@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "проверка-гипотезы-welch",
+  "file": "проверка-гипотезы-welch.py",
+  "title": "Welch t-test для двух средних",
+  "lang": "python",
+  "group": "Математика, финансы и анализ данных / Проверка гипотез",
+  "desc": "Сравнивает средние двух независимых выборок без предположения о равенстве дисперсий. p-value не является вероятностью истинности нулевой гипотезы и не измеряет размер эффекта. Требуется SciPy.",
+  "output": "Печатаются статистика теста и p-value.",
+  "tags": [
+    "гипотезы",
+    "Welch t-test",
+    "scipy",
+    "p-value",
+    "python"
+  ],
+  "aliases": [
+    "сравнить средние двух выборок",
+    "ttest_ind equal_var false"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

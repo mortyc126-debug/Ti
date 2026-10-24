@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "id": "try-except-поймать-ошибку-mvdrpuss",
+  "file": "try-except-поймать-ошибку-mvdrpuss.py",
+  "title": "try / except — поймать ошибку",
+  "lang": "python",
+  "group": "Ошибки и отладка / Найти причину сбоя",
+  "desc": "try/except перехватывает ожидаемые исключения; finally выполняется независимо от того, произошла ошибка или нет. Перехватывайте конкретные типы ошибок и не скрывайте их без причины.",
+  "output": "не число\nпроверка закончена",
+  "tags": [
+    "try except",
+    "обработка исключений",
+    "finally",
+    "ValueError",
+    "ошибки",
+    "python",
+    "try",
+    "except"
+  ],
+  "aliases": [
+    "как обработать ошибку python",
+    "try except finally пример",
+    "что делать при ValueError"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 0,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 12,
+      "text": "None",
+      "kind": "kw",
+      "note": "None — «пусто» (Python, как null).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "finally",
+      "kind": "kw",
+      "note": "finally — выполнится в любом случае, с ошибкой или без.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 4,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "Ошибки и отладка"
+      ]
+    },
+    "subcat": "Найти причину сбоя"
+  },
+  "legacy": {
+    "template": "try-except-поймать-ошибку-mvdrpuss.json",
+    "descAt": 1792324478764
+  },
+  "enriched": true
+}

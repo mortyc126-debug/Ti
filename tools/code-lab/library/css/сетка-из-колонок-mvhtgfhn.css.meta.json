@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "id": "сетка-из-колонок-mvhtgfhn",
+  "file": "сетка-из-колонок-mvhtgfhn.css",
+  "title": "сетка из колонок",
+  "lang": "css",
+  "group": "CSS: раскладка / Grid",
+  "desc": "Создаёт CSS Grid из трёх равных колонок через `repeat(3, 1fr)` и задаёт промежутки через `gap`.",
+  "output": "Создаёт CSS Grid из трёх равных колонок через `repeat(3, 1fr)` и задаёт промежутки через `gap`",
+  "tags": [
+    "css",
+    "display",
+    "em",
+    "frontend",
+    "gap",
+    "grid-template-columns",
+    "layout",
+    "web",
+    "вёрстка",
+    "колонки",
+    "практический-приём",
+    "пример",
+    "промежутки",
+    "repeat",
+    "flexible-box",
+    "респонсивная-вёрстка",
+    "отступы-между-элементами"
+  ],
+  "aliases": [
+    "как сделать три равные колонки в css grid",
+    "css grid с равными колонками и gap",
+    "равномерная сетка из трёх колонок",
+    "grid с фиксированными промежутками между элементами"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "display",
+      "kind": "name",
+      "note": "display — тип раскладки: block, inline, flex, grid, none.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "gap",
+      "kind": "name",
+      "note": "gap — расстояние между элементами в flex/grid.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: раскладка"
+      ]
+    },
+    "subcat": "Grid"
+  },
+  "legacy": {
+    "template": "сетка-из-колонок-mvhtgfhn.json",
+    "descAt": 1792569262955
+  },
+  "architectureNote": {
+    "role": "Отвечает за структуру и взаимное расположение областей или карточек.",
+    "architecturalUse": "Подключай там, где требуется: Создаёт CSS Grid из трёх равных колонок через `repeat(3, 1fr)` и задаёт промежутки через `gap`.",
+    "combineWith": [
+      "gap для ритма между ячейками",
+      "minmax(0, 1fr) или minmax() для контроля переполнения",
+      "@media либо auto-fit/minmax() для узких экранов"
+    ],
+    "watchFor": "Не задавай фиксированные ширины всем колонкам без необходимости; проверь длинный текст и узкий экран.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

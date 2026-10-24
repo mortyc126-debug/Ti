@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "id": "http-retry-after-и-exponential-backoff",
+  "file": "http-retry-after-и-exponential-backoff.py",
+  "title": "Retry-After и экспоненциальная задержка",
+  "lang": "python",
+  "group": "Сеть и API / Надёжность запросов",
+  "desc": "Экспоненциальная задержка ограничивает частоту повторов. Реальная реализация должна добавлять jitter, ограничивать число попыток и общую длительность, а также учитывать Retry-After. Функция здесь рассчитывает задержку и не делает sleep.",
+  "output": "Задержки рассчитаны",
+  "inputs": "Номер попытки, базовая задержка и максимальный предел.",
+  "preconditions": "Python 3.11+ для примеров с современным синтаксисом; для карточек pytest необходим pytest.",
+  "side_effects": "Возвращает секунды, не ждёт.",
+  "errors": "ValueError при некорректных параметрах; огромный номер попытки в продакшене лучше ограничивать числом попыток.",
+  "checks": "Проверить рост задержки, предел cap, неверный номер попытки; добавить jitter в вызывающем коде.",
+  "tags": [
+    "backoff",
+    "Retry-After",
+    "retry",
+    "HTTP",
+    "jitter"
+  ],
+  "aliases": [
+    "экспоненциальная задержка повторов Python"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "manual review",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

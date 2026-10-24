@@ -1,0 +1,12 @@
+/* Вид кнопки */
+.btn{
+  padding: 10px 16px;     /* отступы внутри = размер кнопки */
+  font-size: 14px;
+  color: #fff;
+  background: #FF2D78;
+  border: none;
+  border-radius: 10px;    /* скругление углов */
+  cursor: pointer;
+}
+.btn:hover{ background: #e02468; }           /* при наведении */
+.btn:active{ transform: translateY(1px); }   /* в момент нажатия */

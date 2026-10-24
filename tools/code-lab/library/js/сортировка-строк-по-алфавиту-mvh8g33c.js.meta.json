@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "id": "сортировка-строк-по-алфавиту-mvh8g33c",
+  "file": "сортировка-строк-по-алфавиту-mvh8g33c.js",
+  "title": "сортировка строк по алфавиту",
+  "lang": "js",
+  "group": "Данные / Сортировка",
+  "desc": "Сравнивает русские слова по правилам языка.",
+  "output": "",
+  "tags": [
+    "localeCompare",
+    "сортировка строк",
+    "русский язык",
+    "javascript",
+    "алгоритмы"
+  ],
+  "aliases": [
+    "как отсортировать русские слова по алфавиту",
+    "сортировка кириллицы в js",
+    "localeCompare для русского языка",
+    "правильная сортировка слов на русском"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "sort",
+      "kind": "fn",
+      "note": "sort — отсортировать массив (по умолчанию как строки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 21,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 23,
+      "text": "localeCompare",
+      "kind": "fn",
+      "note": "localeCompare — сравнение строк с учётом языка",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "words"
+    ],
+    "requires": [
+      "a"
+    ]
+  },
+  "legacy": {
+    "template": "сортировка-строк-по-алфавиту-mvh8g33c.json",
+    "descAt": 1792533974952
+  },
+  "enriched": true
+}

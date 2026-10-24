@@ -1,0 +1,202 @@
+{
+  "schema": 1,
+  "id": "then-и-catch-mv6cuson",
+  "file": "then-и-catch-mv6cuson.js",
+  "title": ".then и .catch",
+  "lang": "js",
+  "group": "Сеть и запросы / Получить данные",
+  "desc": "then обрабатывает успешно завершившийся Promise, catch — ошибку в цепочке. Этот стиль можно использовать вместо async/await.",
+  "output": "Зависит от ответа сервера; при ошибке — сообщение об ошибке",
+  "tags": [
+    "fetch API",
+    "promise",
+    "HTTP-запросы",
+    "JSON-парсинг",
+    "ошибки сети",
+    "асинхронность"
+  ],
+  "aliases": [
+    "как получить json через fetch",
+    "обработка ответа fetch",
+    "fetch с then catch",
+    "получить данные с сервера через js",
+    "fetch с парсингом ответа"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "fetch — делает запрос в сеть и возвращает промис с ответом.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 3,
+      "text": "then",
+      "kind": "fn",
+      "note": "then — что сделать, когда промис выполнится (получит результат).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 29,
+      "text": "json",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "then",
+      "kind": "fn",
+      "note": "then — что сделать, когда промис выполнится (получит результат).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 16,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 24,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 3,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 9,
+      "text": "error",
+      "kind": "name",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 18,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 26,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 41,
+      "text": "error",
+      "kind": "name",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Сеть и запросы"
+      ],
+      "runtime": [
+        "Браузер или Node.js с поддержкой fetch"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "URL запроса и ответ внешнего API",
+      "output": "Зависит от ответа сервера; при ошибке — сообщение об ошибке",
+      "dependencies": [],
+      "requirements": [
+        "Нужен доступ к сети; сервер должен разрешать запросы через CORS. Проверь HTTP-статус и обработку ошибок."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "fetch(\"/api/status\")\n  .then(response => response.json())\n  .then(data => console.log(data.status))\n  .catch(error => console.log(\"Ошибка:\", error.message));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Зависит от ответа сервера; при ошибке — сообщение об ошибке",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Получить данные"
+  },
+  "legacy": {
+    "template": "then-и-catch-mv6cuson.json"
+  },
+  "enriched": true
+}

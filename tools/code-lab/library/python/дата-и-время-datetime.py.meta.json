@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "id": "дата-и-время-datetime",
+  "file": "дата-и-время-datetime.py",
+  "title": "datetime — даты и интервалы времени",
+  "lang": "python",
+  "group": "Стандартная библиотека / Дата и время",
+  "desc": "datetime.date и datetime.datetime представляют даты и моменты времени; timedelta задаёт интервал. Для временных зон используйте timezone-aware значения.",
+  "output": "",
+  "tags": [
+    "datetime",
+    "дата",
+    "время",
+    "timedelta",
+    "временные зоны",
+    "стандартная библиотека",
+    "python"
+  ],
+  "aliases": [
+    "как работать с датой python",
+    "разница между датами timedelta",
+    "текущая дата и время python",
+    "datetime"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

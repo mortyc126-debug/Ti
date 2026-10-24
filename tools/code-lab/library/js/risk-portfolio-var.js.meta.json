@@ -1,0 +1,328 @@
+{
+  "schema": 1,
+  "id": "risk-portfolio-var",
+  "file": "risk-portfolio-var.js",
+  "title": "Дисперсия портфеля (ковариация)",
+  "lang": "js",
+  "group": "Математика, финансы и анализ данных / Риск портфеля",
+  "desc": "Риск портфеля — НЕ сумма рисков бумаг. Он зависит от того, как бумаги движутся вместе (ковариация). Формула: wᵀ·Σ·w. w — веса, Σ — матрица ковариаций.",
+  "output": "число — дисперсия; Math.sqrt(дисперсия) = риск портфеля",
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "Объявить функцию.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 27,
+      "text": "w",
+      "kind": "name",
+      "note": "Веса бумаг в портфеле (в сумме 1).",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 30,
+      "text": "cov",
+      "kind": "name",
+      "note": "Матрица ковариаций: cov[i][j] — как вместе движутся бумаги i и j.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "let",
+      "kind": "kw",
+      "note": "Переменная, которую можно менять.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "for",
+      "kind": "kw",
+      "note": "Цикл.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 6,
+      "text": "let",
+      "kind": "kw",
+      "note": "Переменная, которую можно менять.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "i",
+      "kind": "name",
+      "note": "Номер первой бумаги в паре.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 17,
+      "text": "i",
+      "kind": "name",
+      "note": "Номер первой бумаги в паре.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 21,
+      "text": "w",
+      "kind": "name",
+      "note": "Веса бумаг в портфеле (в сумме 1).",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 23,
+      "text": "length",
+      "kind": "fn",
+      "note": "Сколько элементов.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 31,
+      "text": "i",
+      "kind": "name",
+      "note": "Номер первой бумаги в паре.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "for",
+      "kind": "kw",
+      "note": "Цикл.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "let",
+      "kind": "kw",
+      "note": "Переменная, которую можно менять.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 12,
+      "text": "j",
+      "kind": "name",
+      "note": "Номер второй бумаги в паре.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 19,
+      "text": "j",
+      "kind": "name",
+      "note": "Номер второй бумаги в паре.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 23,
+      "text": "w",
+      "kind": "name",
+      "note": "Веса бумаг в портфеле (в сумме 1).",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 25,
+      "text": "length",
+      "kind": "fn",
+      "note": "Сколько элементов.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 33,
+      "text": "j",
+      "kind": "name",
+      "note": "Номер второй бумаги в паре.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 15,
+      "text": "w",
+      "kind": "name",
+      "note": "Веса бумаг в портфеле (в сумме 1).",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 17,
+      "text": "i",
+      "kind": "name",
+      "note": "Номер первой бумаги в паре.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 20,
+      "text": "*",
+      "kind": "op",
+      "note": "Умножение. Вклад пары = доля·доля·ковариация.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 22,
+      "text": "w",
+      "kind": "name",
+      "note": "Веса бумаг в портфеле (в сумме 1).",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 24,
+      "text": "j",
+      "kind": "name",
+      "note": "Номер второй бумаги в паре.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 27,
+      "text": "*",
+      "kind": "op",
+      "note": "Умножение. Вклад пары = доля·доля·ковариация.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 29,
+      "text": "cov",
+      "kind": "name",
+      "note": "Матрица ковариаций: cov[i][j] — как вместе движутся бумаги i и j.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 33,
+      "text": "i",
+      "kind": "name",
+      "note": "Номер первой бумаги в паре.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 36,
+      "text": "j",
+      "kind": "name",
+      "note": "Номер второй бумаги в паре.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "Вернуть результат наружу.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Математика, финансы и анализ данных"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "число — дисперсия; Math.sqrt(дисперсия) = риск портфеля",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "// w — веса бумаг [0.5, 0.5]; cov — матрица ковариаций N×N\nfunction дисперсияПортфеля(w, cov){\n  let сумма = 0;\n  for(let i = 0; i < w.length; i++){\n    for(let j = 0; j < w.length; j++){\n      сумма += w[i] * w[j] * cov[i][j]; // вклад пары (i,j)\n    }\n  }\n  return сумма;                        // дисперсия; корень = волатильность\n}"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "число — дисперсия; Math.sqrt(дисперсия) = риск портфеля",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "дисперсияПортфеля",
+      "сумма",
+      "i",
+      "j"
+    ],
+    "requires": [],
+    "subcat": "Риск портфеля"
+  },
+  "legacy": {
+    "template": "risk-portfolio-var.json"
+  }
+}

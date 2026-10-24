@@ -1,0 +1,422 @@
+{
+  "schema": 1,
+  "id": "сохранить-и-удалить-цвета-в-таблице-mv6cut6v",
+  "file": "сохранить-и-удалить-цвета-в-таблице-mv6cut6v.js",
+  "title": "Сохранить и удалить цвета в таблице",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Хранение в браузере",
+  "desc": "Храните цвета как массив объектов в localStorage. После добавления или удаления перерисуйте таблицу; пользовательский текст вставляйте через textContent.",
+  "output": "Таблица отражает сохранённые цвета; кнопка удаляет строку и обновляет хранилище",
+  "tags": [
+    "localStorage",
+    "хранение данных",
+    "DOM-обновление",
+    "палитра цветов",
+    "JavaScript",
+    "CRUD"
+  ],
+  "aliases": [
+    "как сохранить массив в localStorage",
+    "обновление таблицы после изменения данных",
+    "удаление элемента из массива и localStorage",
+    "хранение цветов в браузере",
+    "динамическое отображение данных из localStorage"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять позже.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 13,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "parse",
+      "kind": "fn",
+      "note": "JSON.parse — разобрать строку JSON обратно в объект.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 24,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 37,
+      "text": "getItem",
+      "kind": "fn",
+      "note": "getItem — прочитать значение из localStorage по ключу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 15,
+      "text": "setItem",
+      "kind": "fn",
+      "note": "setItem — записать значение в localStorage по ключу.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 35,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 40,
+      "text": "stringify",
+      "kind": "fn",
+      "note": "JSON.stringify — превратить объект в строку JSON (для хранения/передачи).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 24,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 9,
+      "text": "forEach",
+      "kind": "fn",
+      "note": "forEach — выполняет действие для каждого элемента массива.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 16,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 25,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт новый элемент (например div), который потом можно вставить на страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 17,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 26,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт новый элемент (например div), который потом можно вставить на страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 10,
+      "text": "remove",
+      "kind": "name",
+      "note": "remove — удаляет элемент со страницы.",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 19,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 28,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт новый элемент (например div), который потом можно вставить на страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 9,
+      "text": "textContent",
+      "kind": "name",
+      "note": "textContent — текст внутри элемента; можно прочитать или заменить.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 4,
+      "text": "remove",
+      "kind": "name",
+      "note": "remove — удаляет элемент со страницы.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 11,
+      "text": "textContent",
+      "kind": "name",
+      "note": "textContent — текст внутри элемента; можно прочитать или заменить.",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 4,
+      "text": "remove",
+      "kind": "name",
+      "note": "remove — удаляет элемент со страницы.",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 11,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 13,
+      "text": "splice",
+      "kind": "fn",
+      "note": "splice — вставить/удалить элементы в середине массива.",
+      "source": "dict"
+    },
+    {
+      "line": 24,
+      "col": 8,
+      "text": "append",
+      "kind": "fn",
+      "note": "append — добавляет узлы/текст в конец элемента.",
+      "source": "dict"
+    },
+    {
+      "line": 24,
+      "col": 21,
+      "text": "remove",
+      "kind": "name",
+      "note": "remove — удаляет элемент со страницы.",
+      "source": "dict"
+    },
+    {
+      "line": 25,
+      "col": 9,
+      "text": "append",
+      "kind": "fn",
+      "note": "append — добавляет узлы/текст в конец элемента.",
+      "source": "dict"
+    },
+    {
+      "line": 29,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 30,
+      "col": 9,
+      "text": "push",
+      "kind": "fn",
+      "note": "push — добавляет элемент в конец массива.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Файлы, хранение и сервер"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "Таблица отражает сохранённые цвета; кнопка удаляет строку и обновляет хранилище",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: colors.",
+        "Нужен браузерный контекст с доступным localStorage; значения хранилища — строки."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const storageKey = \"palette\";\nlet colors = JSON.parse(localStorage.getItem(storageKey) || \"[]\");\n\nfunction saveColors() {\n  localStorage.setItem(storageKey, JSON.stringify(colors));\n}\n\nfunction renderColors() {\n  const body = document.querySelector(\"#colors tbody\");\n  body.replaceChildren();\n\n  colors.forEach((color, index) => {\n    const row = document.createElement(\"tr\");\n    const cell = document.createElement(\"td\");\n    const remove = document.createElement(\"button\");\n\n    cell.textContent = color;\n    remove.textContent = \"Удалить\";\n    remove.addEventListener(\"click\", () => {\n      colors.splice(index, 1);\n      saveColors();\n      renderColors();\n    });\n\n    row.append(cell, remove);\n    body.append(row);\n  });\n}\n\nfunction addColor(color) {\n  colors.push(color);\n  saveColors();\n  renderColors();\n}"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Таблица отражает сохранённые цвета; кнопка удаляет строку и обновляет хранилище",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "storageKey",
+      "colors",
+      "saveColors",
+      "renderColors",
+      "body",
+      "row",
+      "cell",
+      "remove",
+      "addColor"
+    ],
+    "requires": [],
+    "subcat": "Хранение в браузере"
+  },
+  "legacy": {
+    "template": "сохранить-и-удалить-цвета-в-таблице-mv6cut6v.json"
+  },
+  "enriched": true
+}

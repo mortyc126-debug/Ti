@@ -1,0 +1,247 @@
+{
+  "schema": 1,
+  "id": "js-click",
+  "file": "js-click.js",
+  "title": "Реакция на клики",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Реакция на действия поль",
+  "desc": "Чтобы элемент отвечал на клик — вешают «слушатель» события. Функция внутри срабатывает при каждом клике. Делегирование — один слушатель на контейнер вместо многих.",
+  "output": "клик по кнопке меняет её текст; клик по пункту списка печатает его",
+  "tags": [
+    "event listener",
+    "клики",
+    "делегирование событий",
+    "DOM-обработка",
+    "javascript",
+    "интерактивность"
+  ],
+  "aliases": [
+    "как реагировать на клик по кнопке",
+    "слушатель клика на элемент",
+    "обработчик событий нажатия",
+    "делегирование кликов в js",
+    "как изменить текст при клике"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная без переназначения.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "Доступ к странице.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "Найти первый элемент по CSS-селектору.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "Подписаться на событие: «когда случится X — вызови функцию».",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 9,
+      "text": "textContent",
+      "kind": "name",
+      "note": "Текст внутри элемента (можно читать и менять).",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "Подписаться на событие: «когда случится X — вызови функцию».",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 34,
+      "text": "e",
+      "kind": "name",
+      "note": "Объект события: что и где произошло.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "Если условие истинно — выполнить блок.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 5,
+      "text": "e",
+      "kind": "name",
+      "note": "Объект события: что и где произошло.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 7,
+      "text": "target",
+      "kind": "name",
+      "note": "Элемент, по которому реально кликнули.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 14,
+      "text": "matches",
+      "kind": "fn",
+      "note": "Проверить, подходит ли элемент под селектор.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 29,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 37,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 41,
+      "text": "e",
+      "kind": "name",
+      "note": "Объект события: что и где произошло.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 43,
+      "text": "target",
+      "kind": "name",
+      "note": "Элемент, по которому реально кликнули.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 50,
+      "text": "textContent",
+      "kind": "name",
+      "note": "Текст внутри элемента (можно читать и менять).",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс: поля, кнопки и события"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "клик по кнопке меняет её текст; клик по пункту списка печатает его",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const кнопка = document.querySelector(\".btn\");\nкнопка.addEventListener(\"click\", () => {\n  кнопка.textContent = \"нажато!\";   // меняем элемент в ответ\n});\n\n// делегирование: один слушатель на список ловит клики по пунктам\nсписок.addEventListener(\"click\", (e) => {\n  if(e.target.matches(\"li\")) console.log(e.target.textContent);\n});"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "клик по кнопке меняет её текст; клик по пункту списка печатает его",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "кнопка"
+    ],
+    "requires": [
+      "список",
+      "e"
+    ],
+    "subcat": "Реакция на действия поль"
+  },
+  "legacy": {
+    "template": "js-click.json"
+  },
+  "enriched": true
+}

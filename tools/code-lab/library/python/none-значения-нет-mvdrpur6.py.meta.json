@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "id": "none-значения-нет-mvdrpur6",
+  "file": "none-значения-нет-mvdrpur6.py",
+  "title": "None — «значения нет»",
+  "lang": "python",
+  "group": "Основы / Python",
+  "desc": "None — особое значение «ничего нет». Его возвращают функции без return и методы вроде dict.get, когда ключа нет. Сравнивать нужно через is.",
+  "output": "нет такого пользователя",
+  "tags": [
+    "словарь",
+    "проверка ключа",
+    "None",
+    "python",
+    "обработка отсутствия данных"
+  ],
+  "aliases": [
+    "как проверить отсутствие ключа в словаре",
+    "получить значение по ключу с проверкой на None",
+    "dict.get возвращает None",
+    "обработка отсутствующего ключа в словаре",
+    "none — особое значение «ничего нет»"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 4,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 14,
+      "text": "None",
+      "kind": "kw",
+      "note": "None — «пусто» (Python, как null).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "else",
+      "kind": "kw",
+      "note": "else — «иначе»: что делать, когда условие if не выполнилось.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "Основы"
+      ]
+    },
+    "subcat": "Python"
+  },
+  "legacy": {
+    "template": "none-значения-нет-mvdrpur6.json",
+    "descAt": 1792324478706
+  },
+  "enriched": true
+}

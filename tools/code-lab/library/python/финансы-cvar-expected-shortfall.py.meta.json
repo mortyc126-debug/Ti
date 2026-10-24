@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "финансы-cvar-expected-shortfall",
+  "file": "финансы-cvar-expected-shortfall.py",
+  "title": "Expected Shortfall: средний убыток за пределами VaR",
+  "lang": "python",
+  "group": "Математика, финансы и анализ данных / Риск и метрики",
+  "desc": "Для распределения PnL оценивает средний убыток в хвосте за квантилем VaR. В этой реализации используются убытки положительным числом и дискретный хвост худших наблюдений; при малой выборке оценка грубая.",
+  "output": "Печатаются VaR и средний убыток в худших 5% наблюдений.",
+  "tags": [
+    "Expected Shortfall",
+    "CVaR",
+    "VaR",
+    "риск",
+    "хвостовые риски",
+    "python"
+  ],
+  "aliases": [
+    "conditional value at risk",
+    "средний хвостовой убыток"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

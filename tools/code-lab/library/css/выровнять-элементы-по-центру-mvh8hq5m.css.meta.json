@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "id": "выровнять-элементы-по-центру-mvh8hq5m",
+  "file": "выровнять-элементы-по-центру-mvh8hq5m.css",
+  "title": "Выровнять элементы по центру",
+  "lang": "css",
+  "group": "CSS: положение на странице / Центрирование",
+  "desc": "Центрирует дочерние элементы по двум осям через Flexbox с `justify-content: center` и `align-items: center`.",
+  "output": "Центрирует дочерние элементы по двум осям через Flexbox с `justify-content: center` и `align-items: center`",
+  "tags": [
+    "align-items",
+    "center",
+    "css",
+    "display",
+    "em",
+    "frontend",
+    "justify-content",
+    "web",
+    "выравнивание",
+    "выравнивание-по-поперечной-оси",
+    "вёрстка",
+    "позиционирование",
+    "практический-приём",
+    "пример",
+    "раскладка",
+    "центр",
+    "центрирование",
+    "элемент",
+    "flexbox",
+    "центрирование-по-осям",
+    "блочная-модель",
+    "относительное-позиционирование"
+  ],
+  "aliases": [
+    "как центрировать элементы внутри flex контейнера",
+    "центр элементов по вертикали и горизонтали css",
+    "выравнивание элементов в центре flex",
+    "центрирование дочерних элементов flexbox"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "display",
+      "kind": "name",
+      "note": "display: flex — включает Flexbox.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "flex",
+      "kind": "name",
+      "note": "flex — как элемент тянется внутри flex-контейнера.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "center",
+      "kind": "name",
+      "note": "center — по центру.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 15,
+      "text": "center",
+      "kind": "name",
+      "note": "center — по центру.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: положение на странице"
+      ]
+    },
+    "subcat": "Центрирование"
+  },
+  "legacy": {
+    "template": "выровнять-элементы-по-центру-mvh8hq5m.json",
+    "descAt": 1792534051498
+  },
+  "architectureNote": {
+    "role": "Организует элементы внутри одного контейнера: направление, выравнивание и распределение свободного места.",
+    "architecturalUse": "Подключай там, где требуется: Центрирует дочерние элементы по двум осям через Flexbox с `justify-content: center` и `align-items: center`.",
+    "combineWith": [
+      "gap для стабильных промежутков",
+      "flex-wrap для переноса, если элементы не помещаются",
+      "min-width: 0 для сжимаемого содержимого"
+    ],
+    "watchFor": "Flexbox работает только для непосредственных детей контейнера; не путай главную и поперечную оси.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

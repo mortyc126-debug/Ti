@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "id": "asyncio-queue-backpressure",
+  "file": "asyncio-queue-backpressure.py",
+  "title": "asyncio.Queue — очередь и backpressure",
+  "lang": "python",
+  "group": "Продвинутый Python / Асинхронность",
+  "desc": "Очередь с maxsize ограничивает количество элементов в памяти. Когда очередь заполнена, await put() приостанавливает производителя, создавая backpressure. Для реального сервиса нужно также обрабатывать sentinel, ошибки workers и отмену задач.",
+  "output": "first second 0",
+  "inputs": "Асинхронная очередь с ограниченной вместимостью.",
+  "preconditions": "Python 3.11+; для HAC нужен statsmodels, для запуска тестов/проверок по проекту следуйте инструкциям в карточке.",
+  "side_effects": "Показывает ограничение очереди и корректный task_done для извлечённого элемента.",
+  "errors": "Если для каждого get не вызвать task_done, join может зависнуть; ошибка worker должна быть передана управляющей задаче.",
+  "checks": "Проверить переполнение, остановку producers, worker exception и завершение всех задач без зависания.",
+  "tags": [
+    "asyncio.Queue",
+    "backpressure",
+    "производитель-потребитель",
+    "maxsize"
+  ],
+  "aliases": [
+    "ограничить очередь asyncio",
+    "реализовать backpressure"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "manual review",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

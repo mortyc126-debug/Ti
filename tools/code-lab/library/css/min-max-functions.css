@@ -1,0 +1,7 @@
+.content {
+  width: min(100% - 2rem, 70rem);
+}
+
+.sidebar {
+  width: max(12rem, 20vw);
+}

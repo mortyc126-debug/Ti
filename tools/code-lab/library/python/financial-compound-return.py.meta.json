@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "financial-compound-return",
+  "file": "financial-compound-return.py",
+  "title": "Совокупная доходность — геометрическое накопление",
+  "lang": "python",
+  "group": "Математика, финансы и анализ данных / Финансовые метрики",
+  "desc": "Совокупная доходность равна произведению (1+r) по всем периодам минус 1. Простое суммирование доходностей не учитывает эффект сложного процента.",
+  "output": "-0.01 — совокупная доходность −1%: +10%, затем −10% дают 1.1 × 0.9 − 1.",
+  "tags": [
+    "совокупная доходность",
+    "compounding",
+    "финансы",
+    "доходность",
+    "python"
+  ],
+  "aliases": [
+    "compound return python",
+    "накопленная доходность по периодам"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

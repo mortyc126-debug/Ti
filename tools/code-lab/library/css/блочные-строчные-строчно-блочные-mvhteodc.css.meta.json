@@ -1,0 +1,133 @@
+{
+  "schema": 1,
+  "id": "блочные-строчные-строчно-блочные-mvhteodc",
+  "file": "блочные-строчные-строчно-блочные-mvhteodc.css",
+  "title": "блочные, строчные, строчно-блочные",
+  "lang": "css",
+  "group": "CSS: отступы и размеры / Переполнение и видимость",
+  "desc": "Сравнивает `display: block`, `inline` и `inline-block`: показывает, как меняется участие элемента в строке и возможность задавать ему размеры.",
+  "output": "Сравнивает `display: block`, `inline` и `inline-block`: показывает, как меняется участие элемента в строке и возможность задавать ему размеры",
+  "tags": [
+    "box-model",
+    "css",
+    "frontend",
+    "web",
+    "вёрстка",
+    "практический-приём",
+    "пример",
+    "размеры-элементов",
+    "отступы"
+  ],
+  "aliases": [
+    "разница между block и inline",
+    "как задать ширину inline элементу",
+    "inline-block пример использования",
+    "как элементы располагаются в потоке",
+    "css display свойство сравнение"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 5,
+      "text": "display",
+      "kind": "name",
+      "note": "display — тип раскладки: block, inline, flex, grid, none.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "block",
+      "kind": "name",
+      "note": "block — блочный: занимает всю ширину, с новой строки.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 5,
+      "text": "display",
+      "kind": "name",
+      "note": "display — тип раскладки: block, inline, flex, grid, none.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "inline",
+      "kind": "name",
+      "note": "inline — строчный: по размеру содержимого, в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 5,
+      "text": "display",
+      "kind": "name",
+      "note": "display — тип раскладки: block, inline, flex, grid, none.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 14,
+      "text": "inline",
+      "kind": "name",
+      "note": "inline — строчный: по размеру содержимого, в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 21,
+      "text": "block",
+      "kind": "name",
+      "note": "block — блочный: занимает всю ширину, с новой строки.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 28,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: отступы и размеры"
+      ]
+    },
+    "subcat": "Переполнение и видимость"
+  },
+  "legacy": {
+    "template": "блочные-строчные-строчно-блочные-mvhteodc.json",
+    "descAt": 1792569181152
+  },
+  "architectureNote": {
+    "role": "Контролирует геометрию блока: размер, внутреннее пространство, расстояние до соседей или обработку переполнения.",
+    "architecturalUse": "Подключай там, где требуется: Сравнивает `display: block`, `inline` и `inline-block`: показывает, как меняется участие элемента в строке и возможность задавать ему размеры.",
+    "combineWith": [
+      "box-sizing: border-box для предсказуемых размеров",
+      "max-width для ограничения широкого контента",
+      "единая шкала отступов вместо случайных значений"
+    ],
+    "watchFor": "Проверь суммарную ширину с padding/border, длинное содержимое и поведение при изменении ширины окна.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

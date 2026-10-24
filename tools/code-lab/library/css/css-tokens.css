@@ -1,0 +1,14 @@
+:root {
+  --bg: #140A24;        /* фон */
+  --text: #F6F4FF;      /* основной текст */
+  --acc: #FF006E;       /* акцент */
+  --font: ui-sans-serif, Segoe UI, Roboto, sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+}
+
+.button { color: var(--acc); }  /* тот же акцент, одно место правки */

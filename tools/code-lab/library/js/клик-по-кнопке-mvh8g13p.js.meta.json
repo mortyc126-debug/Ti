@@ -1,0 +1,109 @@
+{
+  "schema": 1,
+  "id": "клик-по-кнопке-mvh8g13p",
+  "file": "клик-по-кнопке-mvh8g13p.js",
+  "title": "клик по кнопке",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Реакция на действия поль",
+  "desc": "Выполняет функцию при клике.",
+  "output": "",
+  "tags": [
+    "eventlistener",
+    "клик",
+    "обработка событий",
+    "javascript",
+    "dom",
+    "интерактивность"
+  ],
+  "aliases": [
+    "как обработать клик на кнопку",
+    "реагировать на нажатие кнопки js",
+    "событие клик на элемент",
+    "функция при нажатии кнопки",
+    "обработчик клика в js"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "button",
+      "kind": "name",
+      "note": "button — <button> — кнопка, по клику запускает действие.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "button",
+      "kind": "name",
+      "note": "button — <button> — кнопка, по клику запускает действие.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "button"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "клик-по-кнопке-mvh8g13p.json",
+    "descAt": 1792533972373
+  },
+  "enriched": true
+}

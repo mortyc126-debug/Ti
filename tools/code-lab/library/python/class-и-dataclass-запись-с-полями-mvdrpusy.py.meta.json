@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "id": "class-и-dataclass-запись-с-полями-mvdrpusy",
+  "file": "class-и-dataclass-запись-с-полями-mvdrpusy.py",
+  "title": "class и @dataclass — запись с полями",
+  "lang": "python",
+  "group": "Основы / Синтаксис",
+  "desc": "@dataclass генерирует типовые методы класса на основе аннотаций полей, включая __init__ и __repr__. Аннотации сами по себе не обеспечивают автоматическую проверку типов.",
+  "output": "Облигация(имя='ОФЗ', купон=7.5, лет=5)\n7.5",
+  "tags": [
+    "class",
+    "dataclass",
+    "классы",
+    "объекты",
+    "аннотации типов",
+    "магические методы",
+    "python",
+    "@dataclass"
+  ],
+  "aliases": [
+    "dataclass пример на python",
+    "класс без ручного init",
+    "как описать объект с полями",
+    "@dataclass генерирует типовые методы класса на основе аннотаций полей, включая __init__ и __repr__"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 17,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — описывает «чертёж» объектов: их свойства и методы.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 0,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "Основы"
+      ]
+    },
+    "subcat": "Синтаксис"
+  },
+  "legacy": {
+    "template": "class-и-dataclass-запись-с-полями-mvdrpusy.json",
+    "descAt": 1792324478770
+  },
+  "enriched": true
+}

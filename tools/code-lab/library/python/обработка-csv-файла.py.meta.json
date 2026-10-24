@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "обработка-csv-файла",
+  "file": "обработка-csv-файла.py",
+  "title": "CSV — чтение строк таблицы",
+  "lang": "python",
+  "group": "Файлы, хранение и сервер / Табличные данные",
+  "desc": "Модуль csv читает и записывает табличные данные. newline=\"\" помогает избежать лишних пустых строк при записи; кодировку следует задавать явно.",
+  "output": "",
+  "tags": [
+    "csv",
+    "табличные данные",
+    "чтение файла",
+    "DictReader",
+    "экспорт данных",
+    "python"
+  ],
+  "aliases": [
+    "как прочитать csv python",
+    "csv DictReader пример",
+    "читать таблицу из csv",
+    "модуль csv читает и записывает табличные данные"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

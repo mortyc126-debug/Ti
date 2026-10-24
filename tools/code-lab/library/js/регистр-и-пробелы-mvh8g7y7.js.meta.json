@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "id": "регистр-и-пробелы-mvh8g7y7",
+  "file": "регистр-и-пробелы-mvh8g7y7.js",
+  "title": "регистр и пробелы",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Строки и текст",
+  "desc": "Приводит текст к единому виду.",
+  "output": "",
+  "tags": [
+    "строки",
+    "нормализация",
+    "trim",
+    "toLowerCase",
+    "текстовая обработка",
+    "js"
+  ],
+  "aliases": [
+    "убрать пробелы в строке js",
+    "привести строку к нижнему регистру и обрезать пробелы",
+    "нормализовать строку javascript",
+    "как очистить строку от пробелов и регистра"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 32,
+      "text": "trim",
+      "kind": "fn",
+      "note": "trim — убирает пробелы по краям",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 39,
+      "text": "toLowerCase",
+      "kind": "fn",
+      "note": "toLowerCase — переводит в строчные буквы",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "provides": [
+      "clean"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "регистр-и-пробелы-mvh8g7y7.json",
+    "descAt": 1792533981247
+  },
+  "enriched": true
+}

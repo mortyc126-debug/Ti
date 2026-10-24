@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "декоратор-functools-wraps",
+  "file": "декоратор-functools-wraps.py",
+  "title": "Декоратор с functools.wraps",
+  "lang": "python",
+  "group": "Продвинутые темы / Декораторы",
+  "desc": "functools.wraps сохраняет имя, документацию и другие метаданные оборачиваемой функции. Поддерживает прозрачнее introspection и документацию.",
+  "output": "Имя и документация функции остаются доступными после декорирования.",
+  "tags": [
+    "декораторы",
+    "functools.wraps",
+    "метаданные",
+    "python"
+  ],
+  "aliases": [
+    "wraps decorator",
+    "сохранить имя функции в декораторе"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

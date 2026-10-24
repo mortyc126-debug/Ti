@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "очередь-производитель-потребитель",
+  "file": "очередь-производитель-потребитель.py",
+  "title": "queue.Queue: производитель и потребитель",
+  "lang": "python",
+  "group": "Продвинутые темы / Потоки и процессы",
+  "desc": "Потокобезопасная очередь передаёт задания между потоками. task_done и join позволяют дождаться обработки всех добавленных элементов.",
+  "output": "Потребитель обрабатывает три задания, очередь завершается.",
+  "tags": [
+    "queue",
+    "потоки",
+    "producer consumer",
+    "очередь",
+    "python"
+  ],
+  "aliases": [
+    "producer consumer queue",
+    "очередь между потоками"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

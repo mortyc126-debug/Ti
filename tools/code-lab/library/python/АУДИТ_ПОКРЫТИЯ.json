@@ -1,0 +1,178 @@
+{
+  "base_stage": 8,
+  "base_count": 197,
+  "added_count": 38,
+  "total_count": 235,
+  "stages": {
+    "13": [
+      "торговый-календарь-и-таймзоны.py",
+      "annualization-и-risk-free-rate.py",
+      "purged-embargo-split.py",
+      "bid-ask-spread-и-market-impact.py",
+      "survivorship-bias-и-corporate-actions.py",
+      "multiple-testing-pbo-концепция.py",
+      "hac-newey-west-стандартные-ошибки.py"
+    ],
+    "14": [
+      "asyncio-cancellation-и-graceful-shutdown.py",
+      "asyncio-queue-backpressure.py",
+      "выбор-thread-process-async.py",
+      "deadlock-и-порядок-блокировок.py",
+      "shared-memory-и-сериализация-процессов.py"
+    ],
+    "15": [
+      "ruff-lint-format-и-статические-проверки.py",
+      "проверка-метаданных-python-каталога.py",
+      "проверка-дубликатов-имен-и-id.py",
+      "smoke-test-библиотеки-python.py"
+    ]
+  },
+  "ast_checked": 235,
+  "metadata_pairs_checked": 235,
+  "new_script_runs": {
+    "торговый-календарь-и-таймзоны.py": [
+      0,
+      "2026-10-23T07:00:00+00:00",
+      ""
+    ],
+    "annualization-и-risk-free-rate.py": [
+      0,
+      "12.0886",
+      ""
+    ],
+    "purged-embargo-split.py": [
+      0,
+      "Перекрывающиеся интервалы исключены",
+      ""
+    ],
+    "bid-ask-spread-и-market-impact.py": [
+      0,
+      "Издержки, bps: 5.0",
+      ""
+    ],
+    "survivorship-bias-и-corporate-actions.py": [
+      0,
+      "Контракт рыночных данных проверен",
+      ""
+    ],
+    "multiple-testing-pbo-концепция.py": [
+      0,
+      "Победитель IS проиграл медиане OOS: True",
+      ""
+    ],
+    "hac-newey-west-стандартные-ошибки.py": [
+      0,
+      "HAC пример готов; для расчёта нужен statsmodels и согласованные y/X",
+      ""
+    ],
+    "asyncio-cancellation-и-graceful-shutdown.py": [
+      0,
+      "Отмена обработана, ресурс закрыт",
+      ""
+    ],
+    "asyncio-queue-backpressure.py": [
+      0,
+      "first second 0",
+      ""
+    ],
+    "выбор-thread-process-async.py": [
+      0,
+      "Рекомендации по типу нагрузки проверены",
+      ""
+    ],
+    "deadlock-и-порядок-блокировок.py": [
+      0,
+      "locks acquired in canonical order",
+      ""
+    ],
+    "shared-memory-и-сериализация-процессов.py": [
+      0,
+      "Размер сериализованного payload: 2772 байт",
+      ""
+    ],
+    "ruff-lint-format-и-статические-проверки.py": [
+      0,
+      "Команды контроля качества описаны",
+      ""
+    ],
+    "проверка-метаданных-python-каталога.py": [
+      0,
+      "Аудит тестового каталога пройден",
+      ""
+    ],
+    "проверка-дубликатов-имен-и-id.py": [
+      0,
+      "Поиск дубликатов проверен",
+      ""
+    ],
+    "smoke-test-библиотеки-python.py": [
+      0,
+      "Smoke test синтаксиса пройден",
+      ""
+    ]
+  },
+  "errors": [],
+  "duplicate_ids_fixed": 12,
+  "duplicate_id_fixes": [
+    {
+      "file": "статистика-поправка-на-множественные-проверки.py.meta.json",
+      "old_id": "python-py",
+      "new_id": "статистика-поправка-на-множественные-проверки"
+    },
+    {
+      "file": "генераторное-выражение.py.meta.json",
+      "old_id": "python-py",
+      "new_id": "генераторное-выражение"
+    },
+    {
+      "file": "логические-операторы-и-проверка-условий.py.meta.json",
+      "old_id": "python-py",
+      "new_id": "логические-операторы-и-проверка-условий"
+    },
+    {
+      "file": "изменяемый-аргумент-по-умолчанию.py.meta.json",
+      "old_id": "python-py",
+      "new_id": "изменяемый-аргумент-по-умолчанию"
+    },
+    {
+      "file": "преобразование-типов-и-ошибки-ввода.py.meta.json",
+      "old_id": "python-py",
+      "new_id": "преобразование-типов-и-ошибки-ввода"
+    },
+    {
+      "file": "статистика-корреляция-и-малые-выборки.py.meta.json",
+      "old_id": "python-py",
+      "new_id": "статистика-корреляция-и-малые-выборки"
+    },
+    {
+      "file": "финансы-комиссии-и-проскальзывание.py.meta.json",
+      "old_id": "python-py",
+      "new_id": "финансы-комиссии-и-проскальзывание"
+    },
+    {
+      "file": "строка-форматирование-чисел.py.meta.json",
+      "old_id": "python-py",
+      "new_id": "строка-форматирование-чисел"
+    },
+    {
+      "file": "импорт-по-имени-модуля.py.meta.json",
+      "old_id": "python-py",
+      "new_id": "импорт-по-имени-модуля"
+    },
+    {
+      "file": "проверка-пути-внутри-каталога.py.meta.json",
+      "old_id": "python-py",
+      "new_id": "проверка-пути-внутри-каталога"
+    },
+    {
+      "file": "финансы-максимальная-серия-убытков.py.meta.json",
+      "old_id": "python-py",
+      "new_id": "финансы-максимальная-серия-убытков"
+    },
+    {
+      "file": "финансы-скользящая-просадка-с-пиками.py.meta.json",
+      "old_id": "python-py",
+      "new_id": "финансы-скользящая-просадка-с-пиками"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "id": "bdi-mvxt69kse",
+  "file": "изоляция-направления-текста-mvxt69kse.html",
+  "title": "bdi",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Изоляция направления",
+  "tags": [
+    "bdi",
+    "html",
+    "тег bdi"
+  ],
+  "aliases": [
+    "<bdi>",
+    "bdi",
+    "html bdi",
+    "пример bdi",
+    "как сделать bdi",
+    "тег bdi",
+    "элемент bdi",
+    "изолировать направление текста",
+    "текст справа налево рядом с латиницей",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "Изоляция",
+    "направления"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

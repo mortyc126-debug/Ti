@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "id": "slot-mvxhysunz",
+  "file": "слот-компонента-mvxhysunz.html",
+  "title": "slot",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Slot",
+  "tags": [
+    "slot",
+    "html",
+    "тег slot"
+  ],
+  "aliases": [
+    "<slot>",
+    "slot",
+    "html slot",
+    "пример slot",
+    "как сделать slot",
+    "тег slot",
+    "элемент slot",
+    "слот веб компонента",
+    "место для содержимого компонента",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

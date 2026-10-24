@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "id": "в-столбик-mvhtg8ky",
+  "file": "в-столбик-mvhtg8ky.css",
+  "title": "в столбик",
+  "lang": "css",
+  "group": "CSS: раскладка / Flexbox",
+  "desc": "Располагает дочерние элементы вертикально с помощью Flexbox и `flex-direction: column`, добавляя одинаковые промежутки через `gap`.",
+  "output": "Располагает дочерние элементы вертикально с помощью Flexbox и `flex-direction: column`, добавляя одинаковые промежутки через `gap`",
+  "tags": [
+    "column",
+    "css",
+    "display",
+    "frontend",
+    "gap",
+    "layout",
+    "web",
+    "вертикальная-раскладка",
+    "вёрстка",
+    "практический-приём",
+    "пример",
+    "промежутки",
+    "flexbox",
+    "gap-between",
+    "css-grid",
+    "responsive-layout",
+    "spacing"
+  ],
+  "aliases": [
+    "как сделать равные отступы между элементами flexbox",
+    "вертикальная вёрстка с gap",
+    "flex-direction column с промежутками",
+    "css равномерные отступы в колонке"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "display",
+      "kind": "name",
+      "note": "display — тип раскладки: block, inline, flex, grid, none.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "flex",
+      "kind": "name",
+      "note": "flex — как элемент тянется внутри flex-контейнера.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "flex",
+      "kind": "name",
+      "note": "flex — как элемент тянется внутри flex-контейнера.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 18,
+      "text": "column",
+      "kind": "name",
+      "note": "column — в столбец (по вертикали).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "gap",
+      "kind": "name",
+      "note": "gap — расстояние между элементами в flex/grid.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: раскладка"
+      ]
+    },
+    "subcat": "Flexbox"
+  },
+  "legacy": {
+    "template": "в-столбик-mvhtg8ky.json",
+    "descAt": 1792569254002
+  },
+  "architectureNote": {
+    "role": "Организует элементы внутри одного контейнера: направление, выравнивание и распределение свободного места.",
+    "architecturalUse": "Подключай там, где требуется: Располагает дочерние элементы вертикально с помощью Flexbox и `flex-direction: column`, добавляя одинаковые промежутки через `gap`.",
+    "combineWith": [
+      "gap для стабильных промежутков",
+      "flex-wrap для переноса, если элементы не помещаются",
+      "min-width: 0 для сжимаемого содержимого"
+    ],
+    "watchFor": "Flexbox работает только для непосредственных детей контейнера; не путай главную и поперечную оси.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

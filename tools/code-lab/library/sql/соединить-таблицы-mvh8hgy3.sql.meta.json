@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "id": "соединить-таблицы-mvh8hgy3",
+  "file": "соединить-таблицы-mvh8hgy3.sql",
+  "title": "соединить таблицы",
+  "lang": "sql",
+  "group": "SQL: запросы и таблицы / Выбрать и сгруппировать данные",
+  "desc": "Заказы вместе с именем пользователя.",
+  "output": "",
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "SELECT",
+      "kind": "kw",
+      "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "FROM",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "JOIN",
+      "kind": "kw",
+      "note": "JOIN — соединяет таблицы",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 11,
+      "text": "ON",
+      "kind": "kw",
+      "note": "ON — условие соединения",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "соединить-таблицы-mvh8hgy3.json",
+    "descAt": 1792534039563
+  }
+}

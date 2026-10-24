@@ -1,0 +1,9 @@
+.card-list {
+  container-type: inline-size;
+}
+
+@container (max-width: 500px) {
+  .card {
+    grid-template-columns: 1fr;
+  }
+}

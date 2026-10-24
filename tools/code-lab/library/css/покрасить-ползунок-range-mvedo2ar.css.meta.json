@@ -1,0 +1,238 @@
+{
+  "schema": 1,
+  "id": "покрасить-ползунок-range-mvedo2ar",
+  "file": "покрасить-ползунок-range-mvedo2ar.css",
+  "title": "Покрасить ползунок (range)",
+  "lang": "css",
+  "group": "Интерфейс / Кнопки и размеры",
+  "desc": "Стилизует `input[type=\"range\"]`: убирает стандартный вид, настраивает дорожку и внешний вид бегунка.",
+  "output": "Стилизует `input[type=\"range\"]`: убирает стандартный вид, настраивает дорожку и внешний вид бегунка",
+  "tags": [
+    "appearance",
+    "background",
+    "border-radius",
+    "ch",
+    "css",
+    "cursor",
+    "frontend",
+    "height",
+    "pointer",
+    "web",
+    "width",
+    "высота",
+    "вёрстка",
+    "кликабельность",
+    "курсор",
+    "нативный-вид",
+    "практический-приём",
+    "пример",
+    "скругление",
+    "фон",
+    "ширина",
+    "кастомный-слайдер",
+    "псевдоэлементы",
+    "цветовые-схемы",
+    "кроссплатформенная-стилизация",
+    "интерактивные-элементы"
+  ],
+  "aliases": [
+    "как стилизовать ползунок input range",
+    "кастомный слайдер css",
+    "убрать стандартный вид ползунка",
+    "стилизация дорожки слайдера",
+    "круглый бегунок для range"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 22,
+      "text": "none",
+      "kind": "name",
+      "note": "none — выключить (например display:none — спрятать элемент).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 14,
+      "text": "none",
+      "kind": "name",
+      "note": "none — выключить (например display:none — спрятать элемент).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "height",
+      "kind": "name",
+      "note": "height — высота. 100vh — вся высота экрана.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "border",
+      "kind": "name",
+      "note": "border — рамка: толщина, стиль, цвет (1px solid #000).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "background",
+      "kind": "name",
+      "note": "background — фон: цвет и/или картинка.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 22,
+      "text": "none",
+      "kind": "name",
+      "note": "none — выключить (например display:none — спрятать элемент).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 2,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 15,
+      "text": "height",
+      "kind": "name",
+      "note": "height — высота. 100vh — вся высота экрана.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "border",
+      "kind": "name",
+      "note": "border — рамка: толщина, стиль, цвет (1px solid #000).",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 2,
+      "text": "background",
+      "kind": "name",
+      "note": "background — фон: цвет и/или картинка.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 2,
+      "text": "cursor",
+      "kind": "name",
+      "note": "cursor — вид курсора при наведении (pointer — «рука»).",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 10,
+      "text": "pointer",
+      "kind": "name",
+      "note": "pointer — курсор-«рука», намёк что кликабельно.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 26,
+      "text": "range",
+      "kind": "name",
+      "note": "range — последовательность чисел для цикла (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 2,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 15,
+      "text": "height",
+      "kind": "name",
+      "note": "height — высота. 100vh — вся высота экрана.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 29,
+      "text": "border",
+      "kind": "name",
+      "note": "border — рамка: толщина, стиль, цвет (1px solid #000).",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 37,
+      "text": "none",
+      "kind": "name",
+      "note": "none — выключить (например display:none — спрятать элемент).",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 2,
+      "text": "border",
+      "kind": "name",
+      "note": "border — рамка: толщина, стиль, цвет (1px solid #000).",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 22,
+      "text": "background",
+      "kind": "name",
+      "note": "background — фон: цвет и/или картинка.",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 43,
+      "text": "cursor",
+      "kind": "name",
+      "note": "cursor — вид курсора при наведении (pointer — «рука»).",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 51,
+      "text": "pointer",
+      "kind": "name",
+      "note": "pointer — курсор-«рука», намёк что кликабельно.",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "покрасить-ползунок-range-mvedo2ar.json",
+    "descAt": 1792361346724
+  },
+  "architectureNote": {
+    "role": "Создаёт визуальную поверхность и разделяет уровни интерфейса: фон, панель, карточку, оверлей или акцент.",
+    "architecturalUse": "Подключай там, где требуется: Стилизует `input[type=\"range\"]`: убирает стандартный вид, настраивает дорожку и внешний вид бегунка.",
+    "combineWith": [
+      "ограниченная палитра поверхностей и акцентов",
+      "border или тень — выбрать основной способ отделения, не добавлять все сразу",
+      "контраст текста и состояния фокуса"
+    ],
+    "watchFor": "Эффект должен помогать считывать иерархию, а не конкурировать с текстом; проверь контраст и интенсивность.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

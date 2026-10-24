@@ -1,0 +1,131 @@
+{
+  "schema": 1,
+  "id": "случайное-число-в-диапазоне-mvh8gcg8",
+  "file": "случайное-число-в-диапазоне-mvh8gcg8.js",
+  "title": "случайное число в диапазоне",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Числа и просты",
+  "desc": "Целое число от min до max включительно.",
+  "output": "",
+  "tags": [
+    "математика",
+    "случайные числа",
+    "диапазон",
+    "генерация",
+    "js"
+  ],
+  "aliases": [
+    "как сгенерировать случайное число js",
+    "рандомное целое число между min и max",
+    "равномерное распределение целых чисел",
+    "случайное число в диапазоне javascript"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 19,
+      "text": "min",
+      "kind": "name",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "max",
+      "kind": "name",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "floor",
+      "kind": "fn",
+      "note": "Math.floor — округлить вниз.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 25,
+      "text": "random",
+      "kind": "fn",
+      "note": "Math.random — случайное число от 0 до 1.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 37,
+      "text": "max",
+      "kind": "name",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 43,
+      "text": "min",
+      "kind": "name",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 55,
+      "text": "min",
+      "kind": "name",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "randomInt"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "случайное-число-в-диапазоне-mvh8gcg8.json",
+    "descAt": 1792533987080
+  },
+  "enriched": true
+}

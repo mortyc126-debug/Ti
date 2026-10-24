@@ -1,0 +1,1 @@
+const city = user?.address?.city;

@@ -1,0 +1,109 @@
+{
+  "schema": 1,
+  "id": "выбросить-свою-ошибку-mvh8gvyz",
+  "file": "выбросить-свою-ошибку-mvh8gvyz.js",
+  "title": "выбросить свою ошибку",
+  "lang": "js",
+  "group": "Ошибки и отладка / Проверить значения и результат",
+  "desc": "Останавливает функцию при неверных данных.",
+  "output": "",
+  "tags": [
+    "ошибки",
+    "валидация",
+    "деление",
+    "try-catch",
+    "математика",
+    "js"
+  ],
+  "aliases": [
+    "как проверить деление на ноль",
+    "бросить ошибку при делении на ноль",
+    "проверка аргументов в функции",
+    "валидация входных данных js",
+    "остановка функции при неверных данных"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 16,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "throw",
+      "kind": "kw",
+      "note": "throw — выбрасывает ошибку",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 10,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 14,
+      "text": "Error",
+      "kind": "fn",
+      "note": "Error — объект ошибки с текстом",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 9,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "divide"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "выбросить-свою-ошибку-mvh8gvyz.json",
+    "descAt": 1792534012379
+  },
+  "enriched": true
+}

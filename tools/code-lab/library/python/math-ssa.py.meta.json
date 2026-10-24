@@ -1,0 +1,399 @@
+{
+  "schema": 1,
+  "id": "math-ssa",
+  "file": "math-ssa.py",
+  "title": "SSA — восстановить первую компоненту ряда",
+  "lang": "python",
+  "group": "Математика, финансы и анализ данных / Статистика и временные ряды",
+  "desc": "Строит траекторную матрицу, выполняет SVD и восстанавливает ряд по первой ранговой компоненте диагональным усреднением. Первая компонента не обязана быть трендом: для выделения тренда нужно отдельно выбрать и суммировать подходящие компоненты. Проверяет одномерность ряда, конечность значений и целочисленную длину окна.",
+  "output": "Список восстановленных значений первой компоненты SSA; это не гарантированно тренд.",
+  "tags": [
+    "ssa",
+    "singular spectrum analysis",
+    "сингулярное спектральное разложение",
+    "svd",
+    "сглаживание ряда",
+    "выделение тренда",
+    "временные ряды",
+    "numpy",
+    "Python"
+  ],
+  "aliases": [
+    "как выделить тренд из временного ряда python",
+    "ssa анализ временных рядов",
+    "сглаживание ряда через svd"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "Подключить библиотеку.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 16,
+      "text": "np",
+      "kind": "name",
+      "note": "numpy — библиотека для матриц и линейной алгебры.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "Объявить функцию.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "L",
+      "kind": "name",
+      "note": "Длина окна — главный параметр SSA (сколько точек в окне).",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "N",
+      "kind": "name",
+      "note": "Длина ряда.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "len",
+      "kind": "fn",
+      "note": "len — длина (Python): элементов в списке, символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "K",
+      "kind": "name",
+      "note": "Сколько окон поместится.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "N",
+      "kind": "name",
+      "note": "Длина ряда.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 12,
+      "text": "L",
+      "kind": "name",
+      "note": "Длина окна — главный параметр SSA (сколько точек в окне).",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "X",
+      "kind": "name",
+      "note": "Траекторная матрица: ряд, нарезанный перекрывающимися окнами.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "np",
+      "kind": "name",
+      "note": "numpy — библиотека для матриц и линейной алгебры.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 11,
+      "text": "column_stack",
+      "kind": "fn",
+      "note": "Собрать столбцы в матрицу.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 29,
+      "text": "i",
+      "kind": "name",
+      "note": "Номер окна.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 31,
+      "text": "i",
+      "kind": "name",
+      "note": "Номер окна.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 33,
+      "text": "L",
+      "kind": "name",
+      "note": "Длина окна — главный параметр SSA (сколько точек в окне).",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 36,
+      "text": "for",
+      "kind": "kw",
+      "note": "Перебор — создаёт окна ряд[i:i+L].",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 40,
+      "text": "i",
+      "kind": "name",
+      "note": "Номер окна.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 42,
+      "text": "in",
+      "kind": "kw",
+      "note": "По чему перебираем.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 45,
+      "text": "range",
+      "kind": "fn",
+      "note": "Последовательность 0..K-1.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 51,
+      "text": "K",
+      "kind": "name",
+      "note": "Сколько окон поместится.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 4,
+      "text": "U",
+      "kind": "name",
+      "note": "Левые векторы (формы компонент).",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 7,
+      "text": "S",
+      "kind": "name",
+      "note": "Сингулярные числа — «мощность» каждой компоненты (по убыванию).",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 10,
+      "text": "Vt",
+      "kind": "name",
+      "note": "Правые векторы.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 15,
+      "text": "np",
+      "kind": "name",
+      "note": "numpy — библиотека для матриц и линейной алгебры.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 18,
+      "text": "linalg",
+      "kind": "name",
+      "note": "Модуль линейной алгебры numpy.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 25,
+      "text": "svd",
+      "kind": "fn",
+      "note": "Сингулярное разложение: X = U·S·Vt. Ядро SSA.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 29,
+      "text": "X",
+      "kind": "name",
+      "note": "Траекторная матрица: ряд, нарезанный перекрывающимися окнами.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 46,
+      "text": "False",
+      "kind": "kw",
+      "note": "false — логическая «ложь» (нет).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 4,
+      "text": "X0",
+      "kind": "name",
+      "note": "Матрица только первой компоненты (ранг 1) = тренд.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 9,
+      "text": "S",
+      "kind": "name",
+      "note": "Сингулярные числа — «мощность» каждой компоненты (по убыванию).",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 16,
+      "text": "np",
+      "kind": "name",
+      "note": "numpy — библиотека для матриц и линейной алгебры.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 19,
+      "text": "outer",
+      "kind": "fn",
+      "note": "Внешнее произведение векторов → матрица.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 25,
+      "text": "U",
+      "kind": "name",
+      "note": "Левые векторы (формы компонент).",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 34,
+      "text": "Vt",
+      "kind": "name",
+      "note": "Правые векторы.",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "Вернуть результат.",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 32,
+      "text": "X0",
+      "kind": "name",
+      "note": "Матрица только первой компоненты (ранг 1) = тренд.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Математика, финансы и анализ данных"
+      ],
+      "runtime": [
+        "Python"
+      ],
+      "technology": [
+        "Код"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "сглаженный тренд ряда (без шума и мелких циклов)",
+      "dependencies": [],
+      "requirements": [
+        "Запусти как Python 3-скрипт; установи внешние пакеты, если они используются в импортах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "python",
+          "content": "import numpy as np\n\ndef ssa_тренд(ряд, L):\n    N = len(ряд)\n    K = N - L + 1\n    # 1) траекторная матрица: столбцы — окна длины L\n    X = np.column_stack([ряд[i:i+L] for i in range(K)])\n    # 2) разложение SVD: X = U · S · Vt (главные компоненты)\n    U, S, Vt = np.linalg.svd(X, full_matrices=False)\n    # 3) первая компонента (самая мощная) = тренд, собираем матрицу ранга 1\n    X0 = S[0] * np.outer(U[:, 0], Vt[0])\n    # 4) диагональное усреднение матрицы обратно в ряд\n    return _усреднить_диагонали(X0)"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "сглаженный тренд ряда (без шума и мелких циклов)",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "subcat": "Статистика и временные"
+  },
+  "legacy": {
+    "template": "math-ssa.json"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "pandas-clean-missing-values",
+  "file": "pandas-clean-missing-values.py",
+  "title": "pandas: очистка пропусков и дубликатов",
+  "lang": "python",
+  "group": "Данные / Очистка данных",
+  "desc": "Преобразует числовой столбец с ошибочными значениями в числа, отмечает пропуски и удаляет дубли по ключевым полям. Требуется pandas.",
+  "output": "Остаётся одна запись с числовой ценой 100.0.",
+  "tags": [
+    "pandas",
+    "очистка данных",
+    "NaN",
+    "дубликаты",
+    "python"
+  ],
+  "aliases": [
+    "pandas drop_duplicates",
+    "to_numeric errors coerce"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

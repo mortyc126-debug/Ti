@@ -1,0 +1,266 @@
+{
+  "schema": 1,
+  "id": "обработка-ошибок-в-web-worker-mvk1jfhu",
+  "file": "обработка-ошибок-в-web-worker-mvk1jfhu.js",
+  "lang": "js",
+  "title": "Обработка ошибок в Web Worker",
+  "group": "Ошибки и отладка / Обработка ошибок в Web Worker",
+  "desc": "Показывает, как обрабатывать ошибки в Worker и передавать сообщения об ошибках обратно в главный поток.",
+  "output": "[object Object]",
+  "descAt": 1792703772210,
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Ошибки и отладка"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "subcat": "Обработка ошибок в Web Worker",
+    "summary": {
+      "output": "[object Object]"
+    },
+    "generated": {
+      "by": "ai",
+      "at": "2026-10-22T21:16:12.210Z",
+      "note": "создано ИИ; код не запускался и не проверялся человеком"
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "worker"
+    ],
+    "requires": [
+      "Worker",
+      "self",
+      "a",
+      "b",
+      "error"
+    ]
+  },
+  "tags": [
+    "ошибки",
+    "Web Worker",
+    "отладка",
+    "обработка исключений"
+  ],
+  "aliases": [
+    "ошибка в worker",
+    "поймать ошибку",
+    "обработка исключений",
+    "диагностика worker"
+  ],
+  "source": {
+    "title": "ai",
+    "desc": "ai",
+    "tags": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 23,
+      "text": "error",
+      "kind": "name",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 12,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 36,
+      "text": "error",
+      "kind": "name",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "else",
+      "kind": "kw",
+      "note": "else — «иначе»: что делать, когда условие if не выполнилось.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 24,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 32,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 0,
+      "text": "self",
+      "kind": "name",
+      "note": "self — ссылка на текущий объект внутри метода (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 2,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 11,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 4,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 17,
+      "text": "throw",
+      "kind": "kw",
+      "note": "throw — выбросить ошибку намеренно.",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 23,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 27,
+      "text": "Error",
+      "kind": "fn",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    },
+    {
+      "line": 21,
+      "col": 4,
+      "text": "self",
+      "kind": "name",
+      "note": "self — ссылка на текущий объект внутри метода (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 21,
+      "col": 21,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 22,
+      "col": 4,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 23,
+      "col": 4,
+      "text": "self",
+      "kind": "name",
+      "note": "self — ссылка на текущий объект внутри метода (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 23,
+      "col": 23,
+      "text": "error",
+      "kind": "name",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    }
+  ]
+}

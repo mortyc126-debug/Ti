@@ -1,0 +1,173 @@
+{
+  "schema": 1,
+  "id": "clearrect-очистить-кадр-mv6cutcv",
+  "file": "clearrect-очистить-кадр-mv6cutcv.js",
+  "title": "clearRect — очистить кадр",
+  "lang": "js",
+  "group": "Графика и визуализация / Canvas: рисование",
+  "desc": "clearRect стирает пиксели заданной области. В анимации обычно очищают весь canvas перед рисованием нового кадра.",
+  "output": "Розовый квадрат с прозрачным квадратным отверстием в центре",
+  "tags": [
+    "canvas",
+    "2d контекст",
+    "графика",
+    "прямоугольники",
+    "стирание области"
+  ],
+  "aliases": [
+    "как вырезать область на канвасе",
+    "canvas удаление части рисунка",
+    "прозрачные области на canvas",
+    "заливка и стирание на канвасе"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "getContext",
+      "kind": "fn",
+      "note": "getContext — получить «кисть» canvas: getContext(\"2d\") для рисования.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "fillRect",
+      "kind": "fn",
+      "note": "fillRect — залить прямоугольник.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "clearRect",
+      "kind": "fn",
+      "note": "clearRect — стереть прямоугольную область (очистить кадр).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Графика и визуализация"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "Розовый квадрат с прозрачным квадратным отверстием в центре",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: scene.",
+        "Для рисования нужен canvas с подходящим id и доступным 2D-контекстом."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\n\nctx.fillStyle = \"#FF006E\";\nctx.fillRect(10, 10, 80, 80);\nctx.clearRect(30, 30, 40, 40);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Розовый квадрат с прозрачным квадратным отверстием в центре",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "canvas",
+      "ctx"
+    ],
+    "requires": [],
+    "subcat": "Canvas: рисование"
+  },
+  "legacy": {
+    "template": "clearrect-очистить-кадр-mv6cutcv.json"
+  },
+  "enriched": true
+}

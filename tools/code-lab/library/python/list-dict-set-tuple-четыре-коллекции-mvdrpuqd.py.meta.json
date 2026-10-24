@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "id": "list-dict-set-tuple-четыре-коллекции-mvdrpuqd",
+  "file": "list-dict-set-tuple-четыре-коллекции-mvdrpuqd.py",
+  "title": "list, dict, set, tuple — четыре коллекции",
+  "lang": "python",
+  "group": "Данные / Коллекции",
+  "desc": "list — изменяемый список, dict — ключ→значение, set — уникальные значения, tuple — как список, но неизменяемый.",
+  "output": "4 ОФЗ [100, 250] 10",
+  "tags": [
+    "коллекции",
+    "list",
+    "set",
+    "dict",
+    "tuple",
+    "python",
+    "изменяемость",
+    "индексация",
+    "сортировка",
+    "множества"
+  ],
+  "aliases": [
+    "как добавить элемент в список python",
+    "уникальные значения через set",
+    "доступ к значению по ключу в словаре",
+    "кортеж индексация python",
+    "коллекции python примеры"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 5,
+      "col": 5,
+      "text": "append",
+      "kind": "fn",
+      "note": "append — добавляет узлы/текст в конец элемента.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 6,
+      "text": "len",
+      "kind": "fn",
+      "note": "len — длина (Python): элементов в списке, символов в строке.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "Данные: хранить, находить и преобразовывать"
+      ]
+    },
+    "subcat": "Коллекции и ст"
+  },
+  "legacy": {
+    "template": "list-dict-set-tuple-четыре-коллекции-mvdrpuqd.json",
+    "descAt": 1792324478677
+  },
+  "enriched": true
+}

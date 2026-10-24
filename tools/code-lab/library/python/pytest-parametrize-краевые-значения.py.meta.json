@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "python-pytest-parametrize-py",
+  "file": "pytest-parametrize-краевые-значения.py",
+  "title": "pytest.parametrize — нормальные и граничные случаи",
+  "lang": "python",
+  "group": "Тесты (Python) / Написать тест",
+  "desc": "Проверяет обычные, пустые и отрицательные значения одной функцией теста.",
+  "output": "Запуск: pytest -q имя_файла.py. Пример использует pytest.",
+  "tags": [
+    "pytest",
+    "parametrize",
+    "граничные случаи",
+    "тестирование"
+  ],
+  "aliases": [],
+  "source": "curated",
+  "status": "active",
+  "enriched": true
+}

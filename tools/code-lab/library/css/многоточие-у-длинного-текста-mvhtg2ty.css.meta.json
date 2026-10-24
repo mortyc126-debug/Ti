@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "id": "многоточие-у-длинного-текста-mvhtg2ty",
+  "file": "многоточие-у-длинного-текста-mvhtg2ty.css",
+  "title": "многоточие у длинного текста",
+  "lang": "css",
+  "group": "CSS: текст и шрифты / Выравнивание и перенос",
+  "desc": "Обрезает однострочный длинный текст и показывает многоточие через `white-space: nowrap`, `overflow: hidden` и `text-overflow: ellipsis`.",
+  "output": "Обрезает однострочный длинный текст и показывает многоточие через `white-space: nowrap`, `overflow: hidden` и `text-overflow: ellipsis`",
+  "tags": [
+    "css",
+    "ellipsis",
+    "frontend",
+    "nowrap",
+    "overflow",
+    "text-overflow-",
+    "web",
+    "white-space",
+    "white-space-",
+    "без-переноса",
+    "вёрстка",
+    "многоточие",
+    "перенос-текста",
+    "переполнение",
+    "практический-приём",
+    "пример",
+    "текст",
+    "типографика"
+  ],
+  "aliases": [
+    "css обрезка текста с многоточием",
+    "как сделать многоточие при переполнении текста",
+    "однострочный текст с ellipsis",
+    "css обрезать текст и добавить многоточие",
+    "решение для длинных заголовков в css"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 2,
+      "text": "overflow",
+      "kind": "name",
+      "note": "overflow — что делать с содержимым, которое не влезло (hidden, auto, scroll).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "hidden",
+      "kind": "name",
+      "note": "hidden — спрятать (например overflow:hidden).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 7,
+      "text": "overflow",
+      "kind": "name",
+      "note": "overflow — что делать с содержимым, которое не влезло (hidden, auto, scroll).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: текст и шрифты"
+      ]
+    },
+    "subcat": "Выравнивание и перенос"
+  },
+  "legacy": {
+    "template": "многоточие-у-длинного-текста-mvhtg2ty.json",
+    "descAt": 1792569246550
+  },
+  "architectureNote": {
+    "role": "Формирует типографическую иерархию: различимость заголовков, основного текста, подписей и кода.",
+    "architecturalUse": "Подключай там, где требуется: Обрезает однострочный длинный текст и показывает многоточие через `white-space: nowrap`, `overflow: hidden` и `text-overflow: ellipsis`.",
+    "combineWith": [
+      "ограниченная шкала размеров (rem/clamp)",
+      "line-height и длина строки для читаемости",
+      "контраст текста и фона"
+    ],
+    "watchFor": "Не используй размер, жирность и цвет как единственные способы обозначить смысл; проверь переносы и масштабирование.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

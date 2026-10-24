@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "генератор-словаря-dict-comprehension",
+  "file": "генератор-словаря-dict-comprehension.py",
+  "title": "Генератор словаря — dict comprehension",
+  "lang": "python",
+  "group": "Python — основы / Коллекции",
+  "desc": "Выражение {ключ: значение for элемент in итерируемом_объекте} собирает словарь. Если ключи повторяются, более позднее значение заменяет предыдущее.",
+  "output": "{'акция': 1.255, 'фьючерс': 1.26, 'облигация': 0.987}",
+  "tags": [
+    "python",
+    "dict",
+    "словарь",
+    "comprehension",
+    "ключ",
+    "значение"
+  ],
+  "aliases": [
+    "dict comprehension python",
+    "генератор словаря"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

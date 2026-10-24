@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "id": "assert-быстрая-проверка-mvdrpusg",
+  "file": "assert-быстрая-проверка-mvdrpusg.py",
+  "title": "assert — быстрая проверка",
+  "lang": "python",
+  "group": "Ошибки и отладка / Проверить значения и результат",
+  "desc": "assert условие — если условие ложно, программа остановится с AssertionError. Основа любых тестов.",
+  "output": "все проверки прошли",
+  "tags": [
+    "проверка утверждений",
+    "python",
+    "assert"
+  ],
+  "aliases": [
+    "assert условие — если условие ложно, программа остановится с assertionerror"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "Ошибки и отладка"
+      ]
+    },
+    "subcat": "Проверить значения и результат"
+  },
+  "legacy": {
+    "template": "assert-быстрая-проверка-mvdrpusg.json",
+    "descAt": 1792324478752
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "id": "центрирование-через-flex-mvh8fue2",
+  "file": "центрирование-через-flex-mvh8fue2.css",
+  "title": "центрирование через flex",
+  "lang": "css",
+  "group": "CSS: оформление и адаптивность / Стили и адаптивная вёрстка",
+  "desc": "Центрирует содержимое по горизонтали и вертикали с помощью Flexbox; `min-height: 100vh` позволяет центрировать блок относительно окна.",
+  "output": "Центрирует содержимое по горизонтали и вертикали с помощью Flexbox; `min-height: 100vh` позволяет центрировать блок относительно окна",
+  "tags": [
+    "align-items",
+    "breakpoints",
+    "center",
+    "css",
+    "display",
+    "em",
+    "flexbox",
+    "frontend",
+    "justify-content",
+    "min-height",
+    "responsive",
+    "vh",
+    "web",
+    "выравнивание",
+    "выравнивание-по-поперечной-оси",
+    "высота-экрана",
+    "вёрстка",
+    "практический-приём",
+    "пример",
+    "центр",
+    "центрирование"
+  ],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "center",
+      "kind": "name",
+      "note": "center — по центру.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "display",
+      "kind": "name",
+      "note": "display — тип раскладки: block, inline, flex, grid, none.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "flex",
+      "kind": "name",
+      "note": "flex — как элемент тянется внутри flex-контейнера.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "center",
+      "kind": "name",
+      "note": "center — по центру.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 15,
+      "text": "center",
+      "kind": "name",
+      "note": "center — по центру.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "min",
+      "kind": "name",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 6,
+      "text": "height",
+      "kind": "name",
+      "note": "height — высота. 100vh — вся высота экрана.",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "центрирование-через-flex-mvh8fue2.json",
+    "descAt": 1792533963674
+  },
+  "architectureNote": {
+    "role": "Организует элементы внутри одного контейнера: направление, выравнивание и распределение свободного места.",
+    "architecturalUse": "Подключай там, где требуется: Центрирует содержимое по горизонтали и вертикали с помощью Flexbox; `min-height: 100vh` позволяет центрировать блок относительно окна.",
+    "combineWith": [
+      "gap для стабильных промежутков",
+      "flex-wrap для переноса, если элементы не помещаются",
+      "min-width: 0 для сжимаемого содержимого"
+    ],
+    "watchFor": "Flexbox работает только для непосредственных детей контейнера; не путай главную и поперечную оси.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  }
+}

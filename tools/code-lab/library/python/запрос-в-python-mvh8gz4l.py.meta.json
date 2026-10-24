@@ -1,0 +1,120 @@
+{
+  "schema": 1,
+  "id": "запрос-в-python-mvh8gz4l",
+  "file": "запрос-в-python-mvh8gz4l.py",
+  "title": "запрос в Python",
+  "lang": "python",
+  "group": "Сеть и запросы / Получить данные",
+  "desc": "Учебный пример HTTP GET-запроса и разбора JSON-ответа стандартной библиотекой urllib. Адрес example.com — заглушка; для реального API добавьте обработку HTTP-ошибок, тайм-аут и проверку ответа.",
+  "output": "",
+  "tags": [
+    "HTTP",
+    "GET запрос",
+    "API",
+    "urllib",
+    "JSON",
+    "сетевые запросы",
+    "получить данные",
+    "python"
+  ],
+  "aliases": [
+    "как отправить get запрос python",
+    "получить json из api python",
+    "urllib urlopen пример",
+    "учебный пример http get-запроса и разбора json-ответа стандартной библиотекой urllib"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "json",
+      "kind": "name",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 27,
+      "text": "urlopen",
+      "kind": "name",
+      "note": "urlopen — открывает адрес и читает ответ",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "with",
+      "kind": "kw",
+      "note": "with — закрывает соединение автоматически",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 5,
+      "text": "urlopen",
+      "kind": "fn",
+      "note": "urlopen — открывает адрес и читает ответ",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 46,
+      "text": "as",
+      "kind": "kw",
+      "note": "AS — даёт имя столбцу результата",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 11,
+      "text": "json",
+      "kind": "name",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "запрос-в-python-mvh8gz4l.json",
+    "descAt": 1792534016469
+  },
+  "enriched": true
+}

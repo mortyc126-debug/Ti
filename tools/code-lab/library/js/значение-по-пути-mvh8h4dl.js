@@ -1,0 +1,1 @@
+const city = response?.data?.user?.address?.city ?? 'не указан';

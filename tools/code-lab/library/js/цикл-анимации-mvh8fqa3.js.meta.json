@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "id": "цикл-анимации-mvh8fqa3",
+  "file": "цикл-анимации-mvh8fqa3.js",
+  "title": "цикл анимации",
+  "lang": "js",
+  "group": "Графика и визуализация / Анимация",
+  "desc": "Двигает элемент, пока он не доедет до конца.",
+  "output": "",
+  "tags": [
+    "requestAnimationFrame",
+    "CSS transform",
+    "анимация JS",
+    "плавное движение",
+    "графика"
+  ],
+  "aliases": [
+    "анимировать элемент до точки js",
+    "плавное перемещение по x",
+    "requestAnimationFrame пример",
+    "движение без css анимаций",
+    "анимировать div до конца"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 21,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять позже.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 6,
+      "text": "style",
+      "kind": "name",
+      "note": "style — доступ к CSS-стилям элемента из скрипта",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 12,
+      "text": "transform",
+      "kind": "name",
+      "note": "transform — поворот, масштаб или сдвиг элемента",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 15,
+      "text": "requestAnimationFrame",
+      "kind": "fn",
+      "note": "requestAnimationFrame — просит браузер вызвать функцию перед следующей отрисовкой",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "requestAnimationFrame",
+      "kind": "fn",
+      "note": "requestAnimationFrame — просит браузер вызвать функцию перед следующей отрисовкой",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "provides": [
+      "box",
+      "x",
+      "frame"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "цикл-анимации-mvh8fqa3.json",
+    "descAt": 1792533958347
+  },
+  "enriched": true
+}

@@ -1,0 +1,128 @@
+{
+  "schema": 1,
+  "id": "проверка-ошибки-с-помощью-assert-и-raise-mvk14krx",
+  "file": "проверка-ошибки-с-помощью-assert-и-raise-mvk14krx.py",
+  "lang": "python",
+  "title": "Проверка ошибки с помощью assert и raise",
+  "group": "Ошибки и отладка / Проверить значения и результат",
+  "desc": "Показывает raise ValueError для проверки пользовательского значения и assert для внутреннего инварианта. Не используйте assert для валидации входных данных: python -O отключает assert.",
+  "output": "Ошибка валидации: Возраст -3 не может быть отрицательным",
+  "descAt": 1792703079213,
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Ошибки и отладка"
+      ],
+      "technology": [
+        "Python"
+      ]
+    },
+    "subcat": "Проверить значения и результат",
+    "summary": {
+      "output": "Если возраст отрицательный, будет выброшено исключение с детализированным сообщением."
+    },
+    "generated": {
+      "by": "ai",
+      "at": "2026-10-22T21:04:39.213Z",
+      "note": "создано ИИ; код не запускался и не проверялся человеком"
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    }
+  },
+  "tags": [
+    "проверка",
+    "assert",
+    "ошибка",
+    "детализация",
+    "проверка утверждений",
+    "raise",
+    "python",
+    "AssertionError",
+    "валидация входных данных",
+    "оптимизация Python"
+  ],
+  "aliases": [
+    "проверка с ошибкой",
+    "assert с исключением",
+    "валидация",
+    "почему assert нельзя использовать для обязательной валидации",
+    "разница assert и raise",
+    "проверить входные данные и выбросить исключение"
+  ],
+  "source": {
+    "title": "ai",
+    "desc": "ai",
+    "tags": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 17,
+      "text": "age",
+      "kind": "name",
+      "note": "age — поле объекта, по которому сравниваем",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 4,
+      "text": "assert",
+      "kind": "kw",
+      "note": "assert — проверка: если условие ложно, программа остановится",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "age",
+      "kind": "name",
+      "note": "age — поле объекта, по которому сравниваем",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 22,
+      "text": "as",
+      "kind": "kw",
+      "note": "AS — даёт имя столбцу результата",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 4,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    }
+  ]
+}

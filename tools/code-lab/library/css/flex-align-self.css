@@ -1,0 +1,8 @@
+.row {
+  display: flex;
+  align-items: center;
+}
+
+.special {
+  align-self: flex-start;
+}

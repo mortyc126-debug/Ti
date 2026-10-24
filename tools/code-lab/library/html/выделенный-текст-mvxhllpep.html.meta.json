@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "id": "mark-mvxhllpep",
+  "file": "выделенный-текст-mvxhllpep.html",
+  "title": "mark",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Подсветка",
+  "tags": [
+    "mark",
+    "html",
+    "тег mark"
+  ],
+  "aliases": [
+    "<mark>",
+    "mark",
+    "html mark",
+    "пример mark",
+    "как сделать mark",
+    "тег mark",
+    "элемент mark",
+    "подсветка текста",
+    "выделить найденное",
+    "поиск по тексту",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "Подсветка"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

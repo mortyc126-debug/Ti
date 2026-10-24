@@ -1,0 +1,116 @@
+{
+  "schema": 1,
+  "id": "плавное-изменение-при-наведении-mvhtelbx",
+  "file": "плавное-изменение-при-наведении-mvhtelbx.css",
+  "title": "плавное изменение при наведении",
+  "lang": "css",
+  "group": "CSS: фон и эффекты / Эффекты при наведении",
+  "desc": "Добавляет плавный переход свойства при `:hover` через `transition`, чтобы изменение состояния не происходило мгновенно.",
+  "output": "Добавляет плавный переход свойства при `:hover` через `transition`, чтобы изменение состояния не происходило мгновенно",
+  "tags": [
+    ":hover",
+    "background",
+    "css",
+    "frontend",
+    "hover",
+    "transition",
+    "web",
+    "вёрстка",
+    "наведение",
+    "плавный-переход",
+    "практический-приём",
+    "пример",
+    "фон",
+    "css3",
+    "animation",
+    "ui/ux",
+    "interactive-effects"
+  ],
+  "aliases": [
+    "css transition hover",
+    "плавное изменение цвета при наведении",
+    "сглаживание hover эффекта",
+    "css transition background color"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "button",
+      "kind": "name",
+      "note": "button — <button> — кнопка, по клику запускает действие.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "background",
+      "kind": "name",
+      "note": "background — фон: цвет и/или картинка.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "transition",
+      "kind": "name",
+      "note": "transition — плавная анимация изменения свойства.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 14,
+      "text": "background",
+      "kind": "name",
+      "note": "background — фон: цвет и/или картинка.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 1,
+      "text": "button",
+      "kind": "name",
+      "note": "button — <button> — кнопка, по клику запускает действие.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "background",
+      "kind": "name",
+      "note": "background — фон: цвет и/или картинка.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: фон и эффекты"
+      ]
+    },
+    "subcat": "Эффекты при наведении"
+  },
+  "legacy": {
+    "template": "плавное-изменение-при-наведении-mvhtelbx.json",
+    "descAt": 1792569177213
+  },
+  "architectureNote": {
+    "role": "Создаёт визуальную поверхность и разделяет уровни интерфейса: фон, панель, карточку, оверлей или акцент.",
+    "architecturalUse": "Подключай там, где требуется: Добавляет плавный переход свойства при `:hover` через `transition`, чтобы изменение состояния не происходило мгновенно.",
+    "combineWith": [
+      "ограниченная палитра поверхностей и акцентов",
+      "border или тень — выбрать основной способ отделения, не добавлять все сразу",
+      "контраст текста и состояния фокуса"
+    ],
+    "watchFor": "Эффект должен помогать считывать иерархию, а не конкурировать с текстом; проверь контраст и интенсивность.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

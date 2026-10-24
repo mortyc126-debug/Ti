@@ -1,0 +1,111 @@
+{
+  "schema": 1,
+  "id": "стили-для-широких-экранов-mvhtgv51",
+  "file": "стили-для-широких-экранов-mvhtgv51.css",
+  "title": "стили для широких экранов",
+  "lang": "css",
+  "group": "CSS: адаптивность / Экраны разных размеров",
+  "desc": "Применяет отдельную раскладку на широких экранах от 900px; пример включает двухколоночный Grid.",
+  "output": "Применяет отдельную раскладку на широких экранах от 900px; пример включает двухколоночный Grid",
+  "tags": [
+    "@media",
+    "breakpoint",
+    "breakpoints",
+    "css",
+    "display",
+    "em",
+    "frontend",
+    "grid-template-columns",
+    "media-query",
+    "responsive",
+    "viewport",
+    "web",
+    "вёрстка",
+    "колонки",
+    "практический-приём",
+    "пример",
+    "flexible-ratio",
+    "grid-ratio",
+    "min-width-media-query",
+    "responsive-grid"
+  ],
+  "aliases": [
+    "css grid с соотношением колонок 1 к 3",
+    "как сделать две колонки с разными пропорциями на десктопе",
+    "media query для широких экранов с grid",
+    "адаптивный grid с фиксированным breakpoint"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 8,
+      "text": "min",
+      "kind": "name",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "display",
+      "kind": "name",
+      "note": "display — тип раскладки: block, inline, flex, grid, none.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 13,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: адаптивность"
+      ]
+    },
+    "subcat": "Экраны разных размеров"
+  },
+  "legacy": {
+    "template": "стили-для-широких-экранов-mvhtgv51.json",
+    "descAt": 1792569283237
+  },
+  "architectureNote": {
+    "role": "Отвечает за структуру и взаимное расположение областей или карточек.",
+    "architecturalUse": "Подключай там, где требуется: Применяет отдельную раскладку на широких экранах от 900px; пример включает двухколоночный Grid.",
+    "combineWith": [
+      "gap для ритма между ячейками",
+      "minmax(0, 1fr) или minmax() для контроля переполнения",
+      "@media либо auto-fit/minmax() для узких экранов"
+    ],
+    "watchFor": "Не задавай фиксированные ширины всем колонкам без необходимости; проверь длинный текст и узкий экран.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

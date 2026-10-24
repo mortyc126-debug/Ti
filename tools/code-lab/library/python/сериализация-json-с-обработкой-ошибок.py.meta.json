@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "сериализация-json-с-обработкой-ошибок",
+  "file": "сериализация-json-с-обработкой-ошибок.py",
+  "title": "JSON — обработка ошибки разбора",
+  "lang": "python",
+  "group": "Данные / Форматы и валидация",
+  "desc": "json.loads преобразует корректную JSON-строку в объекты Python. Некорректный синтаксис вызывает JSONDecodeError; после успешного разбора поля всё равно нужно проверять на наличие и ожидаемый тип.",
+  "output": "SBER 275.4",
+  "tags": [
+    "json",
+    "json.loads",
+    "JSONDecodeError",
+    "валидация данных",
+    "API",
+    "разбор ответа",
+    "Python"
+  ],
+  "aliases": [
+    "обработать некорректный json",
+    "почему json loads выдаёт ошибку",
+    "проверить поля ответа api"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

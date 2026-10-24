@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "id": "отправить-с-токеном-mvh8h0pt",
+  "file": "отправить-с-токеном-mvh8h0pt.js",
+  "title": "отправить с токеном",
+  "lang": "js",
+  "group": "Сеть и запросы / Отправить данные",
+  "desc": "Добавляет ключ доступа в заголовок.",
+  "output": "",
+  "tags": [
+    "fetch API",
+    "авторизация",
+    "Bearer-токен",
+    "HTTP-заголовки",
+    "JavaScript",
+    "REST"
+  ],
+  "aliases": [
+    "как отправить запрос с токеном",
+    "Bearer токен в fetch",
+    "авторизация в API запросе",
+    "заголовок Authorization в fetch",
+    "GET запрос с токеном"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "fetch — делает запрос в сеть и возвращает промис с ответом.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "headers",
+      "kind": "name",
+      "note": "headers — служебные заголовки запроса",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 13,
+      "text": "Authorization",
+      "kind": "name",
+      "note": "Authorization — заголовок с ключом доступа",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [],
+    "requires": [
+      "headers",
+      "Authorization"
+    ]
+  },
+  "legacy": {
+    "template": "отправить-с-токеном-mvh8h0pt.json",
+    "descAt": 1792534018529
+  },
+  "enriched": true
+}

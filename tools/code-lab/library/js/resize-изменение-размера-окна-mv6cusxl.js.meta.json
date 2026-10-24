@@ -1,0 +1,160 @@
+{
+  "schema": 1,
+  "id": "resize-изменение-размера-окна-mv6cusxl",
+  "file": "resize-изменение-размера-окна-mv6cusxl.js",
+  "title": "resize — изменение размера окна",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Реакция на действия поль",
+  "desc": "Событие resize удобно для обновления размеров canvas и пересчёта раскладки. Не забывайте задавать canvas.width и canvas.height с учётом нужного масштаба.",
+  "output": "Ширина и высота окна после изменения размера",
+  "tags": [
+    "resize",
+    "события окна",
+    "отладка интерфейса",
+    "javascript",
+    "браузерные события"
+  ],
+  "aliases": [
+    "как отследить изменение размера окна",
+    "получить ширину и высоту окна при resize",
+    "событие resize в js",
+    "отладочный вывод размеров окна"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "window",
+      "kind": "fn",
+      "note": "window — глобальный объект браузера (окно): таймеры, адрес, размеры экрана.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "window",
+      "kind": "fn",
+      "note": "window — глобальный объект браузера (окно): таймеры, адрес, размеры экрана.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 33,
+      "text": "window",
+      "kind": "fn",
+      "note": "window — глобальный объект браузера (окно): таймеры, адрес, размеры экрана.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс: поля, кнопки и события"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Ширина и высота окна после изменения размера",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "window.addEventListener(\"resize\", () => {\n  console.log(window.innerWidth, window.innerHeight);\n});"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Ширина и высота окна после изменения размера",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Реакция на действия поль"
+  },
+  "legacy": {
+    "template": "resize-изменение-размера-окна-mv6cusxl.json"
+  },
+  "enriched": true
+}

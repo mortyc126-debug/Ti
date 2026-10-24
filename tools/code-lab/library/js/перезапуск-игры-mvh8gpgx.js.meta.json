@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "id": "перезапуск-игры-mvh8gpgx",
+  "file": "перезапуск-игры-mvh8gpgx.js",
+  "title": "перезапуск игры",
+  "lang": "js",
+  "group": "Игры и интерактивные проекты / Игровое состояние и правила",
+  "desc": "Возвращает состояние к начальному.",
+  "output": "",
+  "tags": [
+    "игровое состояние",
+    "объект state",
+    "сброс параметров",
+    "интерактивные игры",
+    "javascript"
+  ],
+  "aliases": [
+    "как обнулить счёт в игре",
+    "сброс уровня в js",
+    "восстановление начальных параметров игры",
+    "reset состояние игры"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "assign",
+      "kind": "fn",
+      "note": "Object.assign — скопировать свойства из одного объекта в другой.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 16,
+      "text": "state",
+      "kind": "name",
+      "note": "state — состояние: единый объект с данными игры",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 64,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "reset"
+    ],
+    "requires": [
+      "state",
+      "score",
+      "lives",
+      "level",
+      "running"
+    ]
+  },
+  "legacy": {
+    "template": "перезапуск-игры-mvh8gpgx.json",
+    "descAt": 1792534003953
+  },
+  "enriched": true
+}

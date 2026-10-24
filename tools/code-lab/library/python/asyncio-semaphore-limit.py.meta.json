@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "asyncio-semaphore-limit",
+  "file": "asyncio-semaphore-limit.py",
+  "title": "asyncio.Semaphore: ограничить параллелизм",
+  "lang": "python",
+  "group": "Продвинутые темы / Асинхронность",
+  "desc": "Семафор ограничивает количество одновременно выполняемых корутин в критическом участке. Он не превращает синхронный блокирующий код в неблокирующий.",
+  "output": "Одновременно активны не более двух корутин.",
+  "tags": [
+    "asyncio",
+    "Semaphore",
+    "асинхронность",
+    "параллелизм",
+    "python"
+  ],
+  "aliases": [
+    "ограничить число async задач",
+    "asyncio semaphore"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

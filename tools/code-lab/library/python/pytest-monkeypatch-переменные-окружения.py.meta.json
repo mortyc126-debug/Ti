@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "pytest-monkeypatch-переменные-окружения",
+  "file": "pytest-monkeypatch-переменные-окружения.py",
+  "title": "pytest monkeypatch — тестирование конфигурации",
+  "lang": "python",
+  "group": "Тестирование и отладка / pytest",
+  "desc": "monkeypatch временно меняет окружение теста и восстанавливает исходное состояние после теста. Это предотвращает зависимость тестов от реальных настроек машины и не требует устанавливать настоящий API-токен.",
+  "output": "pytest: 2 passed",
+  "inputs": "pytest и фикстура monkeypatch.",
+  "preconditions": "Python 3.11+ для примеров с современным синтаксисом; для карточек pytest необходим pytest.",
+  "side_effects": "Временно устанавливает и удаляет переменную окружения.",
+  "errors": "Тесты упадут, если функция неправильно обрабатывает отсутствующую переменную.",
+  "checks": "Запустить через python -m pytest -q; проверить оба сценария.",
+  "tags": [
+    "pytest",
+    "monkeypatch",
+    "os.environ",
+    "конфигурация"
+  ],
+  "aliases": [
+    "тестировать переменные окружения Python"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "manual review",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "id": "добавить-строку-mvh8hhi9",
+  "file": "добавить-строку-mvh8hhi9.sql",
+  "title": "добавить строку",
+  "lang": "sql",
+  "group": "SQL: запросы и таблицы / Изменить данные и обработать пустые",
+  "desc": "Добавляет пользователя.",
+  "output": "",
+  "tags": [
+    "sql",
+    "insert",
+    "вставка данных",
+    "язык запросов",
+    "таблицы"
+  ],
+  "aliases": [
+    "как вставить данные в таблицу sql",
+    "insert с указанием столбцов",
+    "добавить запись в базу данных",
+    "sql insert с частичными полями"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "INSERT",
+      "kind": "kw",
+      "note": "INSERT — добавить строку в таблицу (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "VALUES",
+      "kind": "kw",
+      "note": "VALUES — значения в том же порядке, что и столбцы",
+      "source": "custom"
+    }
+  ],
+  "legacy": {
+    "template": "добавить-строку-mvh8hhi9.json",
+    "descAt": 1792534040289
+  },
+  "enriched": true
+}

@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "python-decimal-py",
+  "file": "decimal-точная-десятичная-арифметика.py",
+  "title": "Decimal — точная десятичная арифметика",
+  "lang": "python",
+  "group": "Основы / Числа и простые операции",
+  "desc": "Показывает отличие Decimal от двоичной арифметики float на денежном примере.",
+  "output": "Создавайте Decimal из строк, а не из float, чтобы не переносить двоичную погрешность.",
+  "tags": [
+    "Decimal",
+    "деньги",
+    "float",
+    "точность"
+  ],
+  "aliases": [],
+  "source": "curated",
+  "status": "active",
+  "enriched": true
+}

@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "contextlib-contextmanager",
+  "file": "contextlib-contextmanager.py",
+  "title": "contextmanager — свой менеджер контекста",
+  "lang": "python",
+  "group": "Файлы, хранение и сервер / Управление ресурсами",
+  "desc": "@contextmanager позволяет описать действия до и после yield. Код после yield выполняется и при исключении внутри with, если исключение не подавлено явно.",
+  "output": "ресурс открыт\nработа с ресурсом\nресурс закрыт",
+  "tags": [
+    "contextlib",
+    "contextmanager",
+    "with",
+    "ресурсы",
+    "python"
+  ],
+  "aliases": [
+    "создать свой контекстный менеджер",
+    "contextlib contextmanager"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

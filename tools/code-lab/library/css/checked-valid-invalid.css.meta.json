@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "id": "checked-valid-invalid",
+  "file": "checked-valid-invalid.css",
+  "title": "checked valid invalid",
+  "lang": "css",
+  "group": "Интерфейс / Поля и состояния форм",
+  "desc": "Показывает состояние form-контролов через `:checked` и `:invalid`. Используется для чекбоксов, radio и визуальной индикации ошибок формы.",
+  "output": "Показывает состояние form-контролов через `:checked` и `:invalid`",
+  "tags": [
+    "checked",
+    "css",
+    "forms",
+    "input",
+    "invalid",
+    "pseudo-class",
+    "radio",
+    "valid",
+    "валидация",
+    "ошибка",
+    "состояние",
+    "форма",
+    "чекбокс"
+  ],
+  "aliases": [],
+  "source": {
+    "title": "catalog extension",
+    "desc": "added for search-oriented coverage",
+    "tags": null
+  },
+  "status": "described",
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: дополнительные приёмы"
+      ],
+      "technology": [
+        "CSS"
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ]
+  },
+  "architectureNote": {
+    "role": "Формирует типографическую иерархию: различимость заголовков, основного текста, подписей и кода.",
+    "architecturalUse": "Подключай там, где требуется: Показывает состояние form-контролов через `:checked` и `:invalid`. Используется для чекбоксов, radio и визуальной индикации ошибок формы.",
+    "combineWith": [
+      "ограниченная шкала размеров (rem/clamp)",
+      "line-height и длина строки для читаемости",
+      "контраст текста и фона"
+    ],
+    "watchFor": "Не используй размер, жирность и цвет как единственные способы обозначить смысл; проверь переносы и масштабирование.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  }
+}

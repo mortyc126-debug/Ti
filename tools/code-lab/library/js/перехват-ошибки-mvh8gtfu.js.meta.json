@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "id": "перехват-ошибки-mvh8gtfu",
+  "file": "перехват-ошибки-mvh8gtfu.js",
+  "title": "перехват ошибки",
+  "lang": "js",
+  "group": "Ошибки и отладка / Найти причину сбоя",
+  "desc": "Не даёт программе упасть и показывает причину.",
+  "output": "",
+  "tags": [
+    "ошибки парсинга",
+    "json.parse",
+    "отладка",
+    "try-catch",
+    "javascript"
+  ],
+  "aliases": [
+    "как поймать ошибку при разборе json",
+    "обработка невалидного json",
+    "вывод сообщения об ошибке парсинга",
+    "перехват исключения при json.parse"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — блок, где может случиться ошибка",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 7,
+      "text": "parse",
+      "kind": "fn",
+      "note": "JSON.parse — разобрать строку JSON обратно в объект.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — что делать при ошибке",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 9,
+      "text": "error",
+      "kind": "name",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 41,
+      "text": "error",
+      "kind": "name",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [],
+    "requires": []
+  },
+  "legacy": {
+    "template": "перехват-ошибки-mvh8gtfu.json",
+    "descAt": 1792534009098
+  },
+  "enriched": true
+}

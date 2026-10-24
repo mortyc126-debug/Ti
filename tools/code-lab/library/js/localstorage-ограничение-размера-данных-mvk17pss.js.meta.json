@@ -1,0 +1,223 @@
+{
+  "schema": 1,
+  "id": "localstorage-ограничение-размера-данных-mvk17pss",
+  "file": "localstorage-ограничение-размера-данных-mvk17pss.js",
+  "lang": "js",
+  "title": "localStorage: ограничение размера данных",
+  "group": "Файлы, хранение и сервер / Хранение в браузере",
+  "desc": "Проверяет размер данных перед сохранением в localStorage и обрезает их, если превышает лимит (обычно ~5 МБ).",
+  "output": "Данные сохраняются в localStorage, но обрезаются, если их размер превышает 4 МБ.",
+  "descAt": 1792703225692,
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Файлы, хранение и сервер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "subcat": "Хранение в браузере",
+    "summary": {
+      "output": "Данные сохраняются в localStorage, но обрезаются, если их размер превышает 4 МБ."
+    },
+    "generated": {
+      "by": "ai",
+      "at": "2026-10-22T21:07:05.692Z",
+      "note": "создано ИИ; код не запускался и не проверялся человеком"
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "saveWithSizeLimit",
+      "jsonStr",
+      "truncated"
+    ],
+    "requires": [
+      "hugeArray"
+    ]
+  },
+  "tags": [
+    "лимит",
+    "обрезка",
+    "размер",
+    "оптимизация"
+  ],
+  "aliases": [
+    "ограничение localStorage",
+    "сжатие данных",
+    "размер хранения"
+  ],
+  "source": {
+    "title": "ai",
+    "desc": "ai",
+    "tags": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 27,
+      "text": "key",
+      "kind": "name",
+      "note": "key — функция, по значению которой идёт сортировка",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 32,
+      "text": "value",
+      "kind": "name",
+      "note": "value — текущее значение поля ввода (input, textarea, select).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 23,
+      "text": "stringify",
+      "kind": "fn",
+      "note": "JSON.stringify — превратить объект в строку JSON (для хранения/передачи).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 33,
+      "text": "value",
+      "kind": "name",
+      "note": "value — текущее значение поля ввода (input, textarea, select).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 14,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 12,
+      "text": "warn",
+      "kind": "fn",
+      "note": "warn — console.warn печатает предупреждение (жёлтым).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 17,
+      "text": "setItem",
+      "kind": "fn",
+      "note": "setItem — записать значение в localStorage по ключу.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 25,
+      "text": "key",
+      "kind": "name",
+      "note": "key — функция, по значению которой идёт сортировка",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "else",
+      "kind": "kw",
+      "note": "else — «иначе»: что делать, когда условие if не выполнилось.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 4,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 17,
+      "text": "setItem",
+      "kind": "fn",
+      "note": "setItem — записать значение в localStorage по ключу.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 25,
+      "text": "key",
+      "kind": "name",
+      "note": "key — функция, по значению которой идёт сортировка",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 56,
+      "text": "fill",
+      "kind": "fn",
+      "note": "fill — залить текущий контур цветом (fillStyle).",
+      "source": "dict"
+    }
+  ]
+}

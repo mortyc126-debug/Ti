@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "id": "временная-папка-mvh8h7m0",
+  "file": "временная-папка-mvh8h7m0.py",
+  "title": "временная папка",
+  "lang": "python",
+  "group": "Тесты (Python) / Подготовить тестовые данные и окружение",
+  "desc": "tmp_path — уникальная временная директория, которую pytest предоставляет тесту. Удобно проверять чтение и запись без загрязнения рабочей папки проекта.",
+  "output": "",
+  "tags": [
+    "pytest",
+    "tmp_path",
+    "временная директория",
+    "файловые тесты",
+    "изоляция тестов",
+    "тестирование",
+    "python"
+  ],
+  "aliases": [
+    "как тестировать запись файла pytest",
+    "временная папка в тесте python",
+    "pytest tmp_path пример",
+    "tmp_path — уникальная временная директория, которую pytest предоставляет тесту"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "tmp_path",
+      "kind": "name",
+      "note": "tmp_path — готовая временная папка от pytest",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "tmp_path",
+      "kind": "name",
+      "note": "tmp_path — готовая временная папка от pytest",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "assert",
+      "kind": "kw",
+      "note": "assert — проверка: если условие ложно, программа остановится",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "временная-папка-mvh8h7m0.json",
+    "descAt": 1792534027464
+  },
+  "enriched": true
+}

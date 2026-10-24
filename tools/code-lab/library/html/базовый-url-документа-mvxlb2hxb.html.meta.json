@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "id": "base-mvxlb2hxb",
+  "file": "базовый-url-документа-mvxlb2hxb.html",
+  "title": "base",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Базовый URL документа",
+  "tags": [
+    "base",
+    "html",
+    "тег base"
+  ],
+  "aliases": [
+    "<base>",
+    "base",
+    "html base",
+    "пример base",
+    "как сделать base",
+    "тег base",
+    "элемент base",
+    "базовый адрес",
+    "базовый url",
+    "относительные ссылки",
+    "href",
+    "атрибут href",
+    "html атрибут href",
+    "адрес ссылки",
+    "куда ведет ссылка",
+    "url ссылки",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "Базовый",
+    "документа"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

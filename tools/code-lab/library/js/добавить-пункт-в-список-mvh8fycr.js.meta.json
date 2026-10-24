@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "id": "добавить-пункт-в-список-mvh8fycr",
+  "file": "добавить-пункт-в-список-mvh8fycr.js",
+  "title": "добавить пункт в список",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
+  "desc": "Создаёт li и добавляет в конец списка.",
+  "output": "",
+  "tags": [
+    "DOM-манipulation",
+    "динамическое создание элементов",
+    "appendChild",
+    "список ul",
+    "javascript"
+  ],
+  "aliases": [
+    "добавить элемент в список js",
+    "создать li и добавить в ul",
+    "динамическое обновление списка",
+    "как добавить пункт в список без перезагрузки"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 22,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт новый элемент",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "textContent",
+      "kind": "name",
+      "note": "textContent — текст внутри элемента; можно прочитать или заменить.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 5,
+      "text": "append",
+      "kind": "fn",
+      "note": "append — добавляет в конец",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "provides": [
+      "list",
+      "li"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "добавить-пункт-в-список-mvh8fycr.json",
+    "descAt": 1792533968811
+  },
+  "enriched": true
+}

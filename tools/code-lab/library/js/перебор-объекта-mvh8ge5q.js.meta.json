@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "id": "перебор-объекта-mvh8ge5q",
+  "file": "перебор-объекта-mvh8ge5q.js",
+  "title": "перебор объекта",
+  "lang": "js",
+  "group": "Массивы и объекты",
+  "desc": "Проходит по ключам и значениям объекта.",
+  "output": "",
+  "tags": [
+    "Object.entries",
+    "итерация",
+    "объекты",
+    "javascript",
+    "цикл for...of"
+  ],
+  "aliases": [
+    "как перебрать объект по ключам и значениям",
+    "Object.entries пример использования",
+    "итерация по объекту js",
+    "вывод всех пар ключ-значение"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторять блок заданное число раз.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 5,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 25,
+      "text": "of",
+      "kind": "kw",
+      "note": "of — часть цикла for…of: перебрать элементы массива/коллекции.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 35,
+      "text": "entries",
+      "kind": "fn",
+      "note": "Object.entries — массив пар [ключ, значение].",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "prices"
+    ],
+    "requires": [
+      "чай",
+      "кофе",
+      "name",
+      "price"
+    ]
+  },
+  "legacy": {
+    "template": "перебор-объекта-mvh8ge5q.json",
+    "descAt": 1792533989294
+  },
+  "enriched": true
+}

@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "id": "blockquote-mvxikxr80",
+  "file": "блочная-цитата-mvxikxr80.html",
+  "title": "blockquote",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Блочная цитата",
+  "tags": [
+    "blockquote",
+    "html",
+    "тег blockquote"
+  ],
+  "aliases": [
+    "<blockquote>",
+    "blockquote",
+    "html blockquote",
+    "пример blockquote",
+    "как сделать blockquote",
+    "тег blockquote",
+    "элемент blockquote",
+    "большая цитата",
+    "цитата отдельным блоком",
+    "p",
+    "<p>",
+    "тег p",
+    "элемент p",
+    "html p",
+    "абзац текста",
+    "параграф",
+    "обычный текст",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент",
+    "Блочная",
+    "цитата"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

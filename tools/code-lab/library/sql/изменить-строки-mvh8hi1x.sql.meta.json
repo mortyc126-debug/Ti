@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "id": "изменить-строки-mvh8hi1x",
+  "file": "изменить-строки-mvh8hi1x.sql",
+  "title": "изменить строки",
+  "lang": "sql",
+  "group": "SQL: запросы и таблицы / Изменить данные и обработать пустые",
+  "desc": "Меняет город у одного пользователя.",
+  "output": "",
+  "tags": [
+    "sql",
+    "update",
+    "условие where",
+    "обновление таблицы",
+    "базы данных"
+  ],
+  "aliases": [
+    "как обновить строку в sql",
+    "изменить данные по id",
+    "запрос update с where",
+    "обновить запись в таблице"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "UPDATE",
+      "kind": "kw",
+      "note": "UPDATE — изменяет строки",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "SET",
+      "kind": "kw",
+      "note": "SET — новые значения",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "WHERE",
+      "kind": "kw",
+      "note": "WHERE — без него изменятся все строки",
+      "source": "custom"
+    }
+  ],
+  "legacy": {
+    "template": "изменить-строки-mvh8hi1x.json",
+    "descAt": 1792534040997
+  },
+  "enriched": true
+}

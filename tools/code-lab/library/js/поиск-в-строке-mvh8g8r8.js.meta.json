@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "id": "поиск-в-строке-mvh8g8r8",
+  "file": "поиск-в-строке-mvh8g8r8.js",
+  "title": "поиск в строке",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Строки и текст",
+  "desc": "Проверяет, есть ли подстрока.",
+  "output": "",
+  "tags": [
+    "строки",
+    "регистрозависимость",
+    "поиск подстроки",
+    "методы строк",
+    "case-insensitive"
+  ],
+  "aliases": [
+    "поиск подстроки без учёта регистра",
+    "toLowerCase для поиска",
+    "как искать текст нечувствительно к регистру",
+    "проверка подстроки с регистронезависимостью"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 17,
+      "text": "includes",
+      "kind": "fn",
+      "note": "includes — есть ли подстрока; регистр важен",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 17,
+      "text": "toLowerCase",
+      "kind": "fn",
+      "note": "toLowerCase — привести строку к нижнему регистру.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 31,
+      "text": "includes",
+      "kind": "fn",
+      "note": "includes — есть ли подстрока; регистр важен",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "provides": [
+      "text"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "поиск-в-строке-mvh8g8r8.json",
+    "descAt": 1792533982292
+  },
+  "enriched": true
+}

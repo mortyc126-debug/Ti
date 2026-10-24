@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "id": "сравнение-mvh8gh74",
+  "file": "сравнение-mvh8gh74.js",
+  "title": "сравнение",
+  "lang": "js",
+  "group": "Основы / Синтаксис",
+  "desc": "Строгое и нестрогое сравнение.",
+  "output": "",
+  "tags": [
+    "операторы сравнения",
+    "типы данных",
+    "javascript",
+    "логика",
+    "приведение типов"
+  ],
+  "aliases": [
+    "разница между === и ==",
+    "как сравнивать значения с учётом типа",
+    "нестрогое сравнение js",
+    "строгое сравнение пример",
+    "приведение типов при сравнении"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [],
+    "requires": []
+  },
+  "legacy": {
+    "template": "сравнение-mvh8gh74.json",
+    "descAt": 1792533993232
+  },
+  "enriched": true
+}

@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "id": "замена-в-строке-mvh8g9jj",
+  "file": "замена-в-строке-mvh8g9jj.js",
+  "title": "замена в строке",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Строки и текст",
+  "desc": "Заменяет все вхождения.",
+  "output": "",
+  "tags": [
+    "строки",
+    "замена символов",
+    "replaceAll",
+    "текстовые операции",
+    "javascript",
+    "регулярные выражения"
+  ],
+  "aliases": [
+    "как заменить все символы в строке js",
+    "массовая замена в строке",
+    "замена всех вхождений в строке",
+    "замена символов в строке javascript",
+    "замена разделителей в строке"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 23,
+      "text": "replaceAll",
+      "kind": "fn",
+      "note": "replaceAll — заменяет все совпадения, а не только первое",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "result"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "замена-в-строке-mvh8g9jj.json",
+    "descAt": 1792533983311
+  },
+  "enriched": true
+}

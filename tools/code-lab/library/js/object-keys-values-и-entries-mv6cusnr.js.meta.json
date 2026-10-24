@@ -1,0 +1,197 @@
+{
+  "schema": 1,
+  "id": "object-keys-values-и-entries-mv6cusnr",
+  "file": "object-keys-values-и-entries-mv6cusnr.js",
+  "title": "Object.keys, values и entries",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Коллекции и ст",
+  "desc": "keys возвращает массив ключей, values — значений, entries — пар [ключ, значение] объекта.",
+  "output": "[Аня, Лев]\n[8, 10]\n[[Аня, 8], [Лев, 10]]",
+  "tags": [
+    "object methods",
+    "array conversion",
+    "javascript",
+    "data extraction",
+    "iterable"
+  ],
+  "aliases": [
+    "как получить все ключи объекта",
+    "преобразовать объект в массив пар",
+    "методы объекта для извлечения данных",
+    "получить значения всех свойств объекта"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "keys",
+      "kind": "fn",
+      "note": "Object.keys — массив имён свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "values",
+      "kind": "fn",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 19,
+      "text": "entries",
+      "kind": "fn",
+      "note": "Object.entries — массив пар [ключ, значение].",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Данные: хранить, находить и преобразовывать"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "[Аня, Лев]\n[8, 10]\n[[Аня, 8], [Лев, 10]]",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const scores = { Аня: 8, Лев: 10 };\nconsole.log(Object.keys(scores));\nconsole.log(Object.values(scores));\nconsole.log(Object.entries(scores));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "[Аня, Лев]\n[8, 10]\n[[Аня, 8], [Лев, 10]]",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "scores"
+    ],
+    "requires": [
+      "Аня",
+      "Лев"
+    ],
+    "subcat": "Коллекции и ст"
+  },
+  "legacy": {
+    "template": "object-keys-values-и-entries-mv6cusnr.json"
+  },
+  "enriched": true
+}

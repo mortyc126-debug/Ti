@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "id": "выбрать-с-условием-mvh8hfay",
+  "file": "выбрать-с-условием-mvh8hfay.sql",
+  "title": "выбрать с условием",
+  "lang": "sql",
+  "group": "SQL: запросы и таблицы / Выбрать и сгруппировать данные",
+  "desc": "Пользователи из Казани, самые старшие первыми.",
+  "output": "",
+  "tags": [
+    "sql",
+    "order by",
+    "limit",
+    "фильтрация данных",
+    "сортировка",
+    "запросы"
+  ],
+  "aliases": [
+    "как отсортировать пользователей по возрасту в SQL",
+    "выборка топ пользователей по возрасту из города",
+    "sql запрос с ограничением по количеству записей",
+    "сортировка данных в базе по убыванию",
+    "фильтрация и лимит в одном запросе"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "SELECT",
+      "kind": "kw",
+      "note": "SELECT — какие столбцы выбрать",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "age",
+      "kind": "name",
+      "note": "age — поле объекта, по которому сравниваем",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "FROM",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "WHERE",
+      "kind": "kw",
+      "note": "WHERE — условие отбора строк",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 9,
+      "text": "age",
+      "kind": "name",
+      "note": "age — поле объекта, по которому сравниваем",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "LIMIT",
+      "kind": "kw",
+      "note": "LIMIT — ограничить число строк",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "выбрать-с-условием-mvh8hfay.json",
+    "descAt": 1792534037434
+  },
+  "enriched": true
+}

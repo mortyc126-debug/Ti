@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "id": "точка-останова-mvh8gufs",
+  "file": "точка-останова-mvh8gufs.js",
+  "title": "точка останова",
+  "lang": "js",
+  "group": "Ошибки и отладка / Найти причину сбоя",
+  "desc": "Останавливает выполнение, когда открыты инструменты разработчика.",
+  "output": "",
+  "tags": [
+    "debugger",
+    "отладка",
+    "точка останова",
+    "инструменты разработчика",
+    "javascript"
+  ],
+  "aliases": [
+    "как остановить код для отладки",
+    "где сработает debugger",
+    "остановка скрипта в браузере",
+    "поиск ошибок с debugger"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "debugger",
+      "kind": "name",
+      "note": "debugger — приостанавливает программу и открывает отладчик",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 9,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "calc"
+    ],
+    "requires": [
+      "debugger"
+    ]
+  },
+  "legacy": {
+    "template": "точка-останова-mvh8gufs.json",
+    "descAt": 1792534010392
+  },
+  "enriched": true
+}

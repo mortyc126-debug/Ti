@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "id": "pyproject-toml-метаданные-проекта",
+  "file": "pyproject-toml-метаданные-проекта.py",
+  "title": "pyproject.toml — настройки и метаданные проекта",
+  "lang": "python",
+  "group": "Разработка и инструменты / Упаковка проекта",
+  "desc": "pyproject.toml — стандартное место для метаданных проекта и настроек инструментов сборки, тестирования и линтинга. Секция build-system определяет backend сборки; project описывает имя, версию и зависимости. Минимальный пример ниже разбирает TOML, но не устанавливает проект.",
+  "output": "market-tools 0.1.0",
+  "inputs": "Текст TOML-конфигурации проекта.",
+  "preconditions": "Python 3.11+ для примеров с современным синтаксисом; для карточек pytest необходим pytest.",
+  "side_effects": "Только читает строку в памяти. tomllib входит в стандартную библиотеку Python 3.11+.",
+  "errors": "Невалидный TOML вызывает tomllib.TOMLDecodeError; в Python до 3.11 встроенного tomllib нет.",
+  "checks": "Запустить на Python 3.11+; затем отдельно проверить сборку проекта командой python -m pip install -e . после добавления корректной секции build-system.",
+  "tags": [
+    "pyproject.toml",
+    "TOML",
+    "упаковка",
+    "зависимости"
+  ],
+  "aliases": [
+    "что писать в pyproject.toml",
+    "настроить Python-проект"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "manual review",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

@@ -1,0 +1,7 @@
+.card {
+  --accent: tomato;
+}
+
+.card .icon {
+  color: var(--accent);
+}

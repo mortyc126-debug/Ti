@@ -1,0 +1,112 @@
+{
+  "schema": 1,
+  "id": "проверка-ошибки-mvh8h5zh",
+  "file": "проверка-ошибки-mvh8h5zh.py",
+  "title": "проверка ошибки",
+  "lang": "python",
+  "group": "Тесты (Python) / Написать тест",
+  "desc": "Проверяет, что функция выбрасывает нужную ошибку.",
+  "output": "",
+  "tags": [
+    "pytest",
+    "тестирование исключений",
+    "assertions",
+    "unittest",
+    "python",
+    "raise"
+  ],
+  "aliases": [
+    "как проверить исключение в pytest",
+    "тест на деление на ноль",
+    "assertion для ошибок",
+    "проверка ZeroDivisionError",
+    "тестирование ошибок в питоне",
+    "проверяет, что функция выбрасывает нужную ошибку"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "pytest",
+      "kind": "name",
+      "note": "pytest — популярный фреймворк для тестов",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 11,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 11,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "with",
+      "kind": "kw",
+      "note": "with — закрывает соединение автоматически",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 9,
+      "text": "pytest",
+      "kind": "name",
+      "note": "pytest — популярный фреймворк для тестов",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "проверка-ошибки-mvh8h5zh.json",
+    "descAt": 1792534025357
+  },
+  "enriched": true
+}

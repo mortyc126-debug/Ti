@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "id": "линейный-график-mvh8fsyx",
+  "file": "линейный-график-mvh8fsyx.svg",
+  "title": "линейный график",
+  "lang": "svg",
+  "group": "Графика и визуализация / SVG и графики",
+  "desc": "Ломаная линия по точкам.",
+  "output": "",
+  "tags": [
+    "svg",
+    "графика",
+    "векторная графика",
+    "пололиния",
+    "полотно",
+    "css"
+  ],
+  "aliases": [
+    "как нарисовать ломаную в svg",
+    "svg пололиния с координатами",
+    "стилизация линии в svg",
+    "векторная ломаная с толщиной",
+    "svg stroke-width пример"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 5,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина элемента",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 30,
+      "text": "viewBox",
+      "kind": "name",
+      "note": "viewBox — внутренняя система координат рисунка",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 3,
+      "text": "polyline",
+      "kind": "name",
+      "note": "polyline — ломаная линия через точки",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "points",
+      "kind": "name",
+      "note": "points — список координат x,y через пробел",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "fill",
+      "kind": "name",
+      "note": "fill — залить текущий контур цветом (fillStyle).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 24,
+      "text": "stroke",
+      "kind": "name",
+      "note": "stroke — цвет линии",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 41,
+      "text": "stroke",
+      "kind": "name",
+      "note": "stroke — цвет линии",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 48,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина элемента",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "линейный-график-mvh8fsyx.json",
+    "descAt": 1792533961833
+  },
+  "enriched": true
+}

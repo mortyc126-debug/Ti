@@ -1,0 +1,124 @@
+{
+  "schema": 1,
+  "id": "две-колонки-и-одна-на-телефоне-mvh8fuqf",
+  "file": "две-колонки-и-одна-на-телефоне-mvh8fuqf.css",
+  "title": "две колонки и одна на телефоне",
+  "lang": "css",
+  "group": "CSS: оформление и адаптивность / Стили и адаптивная вёрстка",
+  "desc": "Создаёт две колонки через CSS Grid, а при ширине до 600px переключает макет в одну колонку с помощью `@media`.",
+  "output": "Создаёт две колонки через CSS Grid, а при ширине до 600px переключает макет в одну колонку с помощью `@media`",
+  "tags": [
+    "@media",
+    "background",
+    "breakpoints",
+    "columns",
+    "css",
+    "display",
+    "em",
+    "frontend",
+    "gap",
+    "grid-template-columns",
+    "media-query",
+    "responsive",
+    "web",
+    "вёрстка",
+    "колонки",
+    "практический-приём",
+    "пример",
+    "промежутки",
+    "фон",
+    "grid",
+    "flexible",
+    "responsive-design",
+    "mobile-first",
+    "adaptive-layout"
+  ],
+  "aliases": [
+    "как сделать две колонки на десктопе и одну на мобиле",
+    "css grid адаптивный макет",
+    "переключение колонок по ширине экрана",
+    "одноколонный макет при малых разрешениях",
+    "адаптивная сетка без flexbox"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "display",
+      "kind": "name",
+      "note": "display — тип раскладки: block, inline, flex, grid, none.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сетка из строк и столбцов",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сетка из строк и столбцов",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "gap",
+      "kind": "name",
+      "note": "gap — промежуток между ячейками",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "max",
+      "kind": "name",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 12,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 4,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сетка из строк и столбцов",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "две-колонки-и-одна-на-телефоне-mvh8fuqf.json",
+    "descAt": 1792533964119
+  },
+  "architectureNote": {
+    "role": "Отвечает за структуру и взаимное расположение областей или карточек.",
+    "architecturalUse": "Подключай там, где требуется: Создаёт две колонки через CSS Grid, а при ширине до 600px переключает макет в одну колонку с помощью `@media`.",
+    "combineWith": [
+      "gap для ритма между ячейками",
+      "minmax(0, 1fr) или minmax() для контроля переполнения",
+      "@media либо auto-fit/minmax() для узких экранов"
+    ],
+    "watchFor": "Не задавай фиксированные ширины всем колонкам без необходимости; проверь длинный текст и узкий экран.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

@@ -1,0 +1,128 @@
+{
+  "schema": 1,
+  "id": "подмена-функции-mvh8h86h",
+  "file": "подмена-функции-mvh8h86h.py",
+  "title": "подмена функции",
+  "lang": "python",
+  "group": "Тесты (Python) / Подготовить тестовые данные и окружение",
+  "desc": "unittest.mock.patch.object временно подменяет функцию в текущем модуле. Этот вариант надёжнее строкового пути, если имя файла содержит дефисы.",
+  "output": "Тест проходит, если во время подмены get_price() возвращает 5.",
+  "tags": [
+    "мок",
+    "mock",
+    "monkeypatch",
+    "unittest.mock",
+    "подмена зависимости",
+    "изоляция тестов",
+    "pytest",
+    "python"
+  ],
+  "aliases": [
+    "как подменить переменную окружения в pytest",
+    "mock patch python пример",
+    "изолировать тест от внешней зависимости",
+    "подмена зависимости в тесте позволяет изолировать проверяемый код от окружения или внешнего вызова"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 5,
+      "text": "unittest",
+      "kind": "name",
+      "note": "unittest — встроенная библиотека для тестов",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 19,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 26,
+      "text": "patch",
+      "kind": "name",
+      "note": "patch — временно заменяет объект",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "def",
+      "kind": "kw",
+      "note": "def — объявляет функцию (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "with",
+      "kind": "kw",
+      "note": "with — закрывает соединение автоматически",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 9,
+      "text": "patch",
+      "kind": "fn",
+      "note": "patch — временно заменяет объект",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 37,
+      "text": "return_value",
+      "kind": "name",
+      "note": "return_value — что вернёт заглушка",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "assert",
+      "kind": "kw",
+      "note": "assert — проверка: если условие ложно, программа остановится",
+      "source": "dict"
+    }
+  ],
+  "legacy": {
+    "template": "подмена-функции-mvh8h86h.json",
+    "descAt": 1792534028201
+  },
+  "enriched": true
+}

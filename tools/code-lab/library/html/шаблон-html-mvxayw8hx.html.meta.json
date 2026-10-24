@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "id": "template-mvxayw8hx",
+  "file": "шаблон-html-mvxayw8hx.html",
+  "title": "template",
+  "lang": "html",
+  "group": "HTML / Элементы стандарта",
+  "desc": "Template",
+  "tags": [
+    "template",
+    "html",
+    "тег template"
+  ],
+  "aliases": [
+    "<template>",
+    "template",
+    "html template",
+    "пример template",
+    "как сделать template",
+    "div",
+    "<div>",
+    "тег div",
+    "элемент div",
+    "html div",
+    "контейнер",
+    "блок div",
+    "группировка элементов",
+    "тег template",
+    "элемент template",
+    "шаблон html",
+    "скрытый шаблон разметки",
+    "html",
+    "html документ",
+    "страница html",
+    "каркас страницы",
+    "корневой элемент"
+  ],
+  "source": {
+    "title": "coverage",
+    "desc": "coverage",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": []
+}

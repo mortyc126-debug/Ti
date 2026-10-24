@@ -1,0 +1,9 @@
+:root {
+  --space: 1rem;
+  --brand-color: #356ae6;
+}
+
+.card {
+  padding: var(--space);
+  color: var(--brand-color);
+}

@@ -1,0 +1,7 @@
+input:required {
+  border-left: 3px solid currentColor;
+}
+
+input:user-invalid {
+  border-color: crimson;
+}

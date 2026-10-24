@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "python-pytest-caplog-py",
+  "file": "pytest-caplog-проверить-лог.py",
+  "title": "pytest caplog — проверка сообщений лога",
+  "lang": "python",
+  "group": "Тесты (Python) / Подготовить тестовые данные и окружение",
+  "desc": "Проверяет, что при ошибочном вводе приложение пишет ожидаемое сообщение в лог.",
+  "output": "caplog — встроенная фикстура pytest для перехвата логов; не проверяет вывод print.",
+  "tags": [
+    "pytest",
+    "caplog",
+    "logging",
+    "тестирование"
+  ],
+  "aliases": [],
+  "source": "curated",
+  "status": "active",
+  "enriched": true
+}

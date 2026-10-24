@@ -1,0 +1,131 @@
+{
+  "schema": 1,
+  "id": "картинка-на-фоне-mvhteh4e",
+  "file": "картинка-на-фоне-mvhteh4e.css",
+  "title": "картинка на фоне",
+  "lang": "css",
+  "group": "CSS: фон и эффекты / Фон",
+  "desc": "Устанавливает изображение как фон и показывает типичный набор `background-size: cover`, позиционирование по центру и запрет повтора.",
+  "output": "Устанавливает изображение как фон и показывает типичный набор `background-size: cover`, позиционирование по центру и запрет повтора",
+  "tags": [
+    "background",
+    "background-image",
+    "css",
+    "frontend",
+    "image",
+    "img",
+    "position-",
+    "url",
+    "web",
+    "вёрстка",
+    "изображение",
+    "картинка",
+    "практический-приём",
+    "пример",
+    "фон"
+  ],
+  "aliases": [
+    "как растянуть фон по всей области",
+    "центрировать фоновое изображение css",
+    "background cover пример",
+    "фон без повторений css",
+    "полноэкранный фон с изображением"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "background",
+      "kind": "name",
+      "note": "background — фон: цвет и/или картинка.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "url",
+      "kind": "fn",
+      "note": "URL — объект адреса",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "background",
+      "kind": "name",
+      "note": "background — фон: цвет и/или картинка.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "cover",
+      "kind": "name",
+      "note": "cover — картинка заполняет всю область, края могут обрезаться.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "background",
+      "kind": "name",
+      "note": "background — фон: цвет и/или картинка.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 13,
+      "text": "position",
+      "kind": "name",
+      "note": "position — позиционирование: static, relative, absolute, fixed.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 23,
+      "text": "center",
+      "kind": "name",
+      "note": "center — по центру.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "background",
+      "kind": "name",
+      "note": "background — фон: цвет и/или картинка.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: фон и эффекты"
+      ]
+    },
+    "subcat": "Фон"
+  },
+  "legacy": {
+    "template": "картинка-на-фоне-mvhteh4e.json",
+    "descAt": 1792569171759
+  },
+  "architectureNote": {
+    "role": "Управляет расположением относительно окна или позиционированного предка, иногда создаёт визуальный слой.",
+    "architecturalUse": "Подключай там, где требуется: Устанавливает изображение как фон и показывает типичный набор `background-size: cover`, позиционирование по центру и запрет повтора.",
+    "combineWith": [
+      "position: relative у нужного предка для локального absolute",
+      "z-index только при понимании контекста наложения",
+      "отступы и фон, чтобы слой не перекрывал важное содержимое"
+    ],
+    "watchFor": "Проверь контекст позиционирования, перекрытие кликабельных элементов и поведение на маленьком экране.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

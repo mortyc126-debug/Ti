@@ -1,0 +1,190 @@
+{
+  "schema": 1,
+  "id": "arc-нарисовать-круг-mv6cutd9",
+  "file": "arc-нарисовать-круг-mv6cutd9.js",
+  "title": "arc — нарисовать круг",
+  "lang": "js",
+  "group": "Графика и визуализация / Canvas: рисование",
+  "desc": "arc(x, y, radius, startAngle, endAngle) задаёт дугу. Для полного круга используй угол от 0 до Math.PI * 2, затем fill() или stroke().",
+  "output": "Мятный круг с центром (80, 70) и радиусом 35",
+  "tags": [
+    "canvas",
+    "2d-графика",
+    "геометрия",
+    "fillStyle",
+    "svg-аналог"
+  ],
+  "aliases": [
+    "как нарисовать круг на канвасе",
+    "закрасить круг на html5 canvas",
+    "полный круг через arc canvas",
+    "canvas круг с заливкой",
+    "рисование круга в браузере"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "getContext",
+      "kind": "fn",
+      "note": "getContext — получить «кисть» canvas: getContext(\"2d\") для рисования.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "beginPath",
+      "kind": "fn",
+      "note": "beginPath — начать новый контур рисования на canvas.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "arc",
+      "kind": "fn",
+      "note": "arc — нарисовать дугу/круг на canvas.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 23,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "fill",
+      "kind": "fn",
+      "note": "fill — залить текущий контур цветом (fillStyle).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Графика и визуализация"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "HTML-элементы и/или данные для отображения",
+      "output": "Мятный круг с центром (80, 70) и радиусом 35",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: scene.",
+        "Для рисования нужен canvas с подходящим id и доступным 2D-контекстом."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\n\nctx.beginPath();\nctx.arc(80, 70, 35, 0, Math.PI * 2);\nctx.fillStyle = \"#52F2C9\";\nctx.fill();"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Мятный круг с центром (80, 70) и радиусом 35",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "canvas",
+      "ctx"
+    ],
+    "requires": [],
+    "subcat": "Canvas: рисование"
+  },
+  "legacy": {
+    "template": "arc-нарисовать-круг-mv6cutd9.json"
+  },
+  "enriched": true
+}

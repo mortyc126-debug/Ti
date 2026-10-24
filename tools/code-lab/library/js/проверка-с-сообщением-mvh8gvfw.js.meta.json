@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "id": "проверка-с-сообщением-mvh8gvfw",
+  "file": "проверка-с-сообщением-mvh8gvfw.js",
+  "title": "проверка с сообщением",
+  "lang": "js",
+  "group": "Ошибки и отладка / Проверить значения и результат",
+  "desc": "Печатает сообщение, только если условие ложно.",
+  "output": "",
+  "tags": [
+    "отладка",
+    "assert",
+    "консоль",
+    "валидация",
+    "javascript"
+  ],
+  "aliases": [
+    "как проверить условие в js",
+    "assert в javascript",
+    "вывод ошибки при неверном условии",
+    "проверка результата вычислений"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "assert",
+      "kind": "fn",
+      "note": "assert — проверка: если условие ложно, программа остановится",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "total"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "проверка-с-сообщением-mvh8gvfw.json",
+    "descAt": 1792534011692
+  },
+  "enriched": true
+}

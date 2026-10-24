@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "конфигурация-tomllib",
+  "file": "конфигурация-tomllib.py",
+  "title": "Чтение конфигурации TOML",
+  "lang": "python",
+  "group": "Повседневная разработка / Конфигурация",
+  "desc": "Читает TOML через tomllib из стандартной библиотеки Python 3.11+. Для старых версий требуется сторонний tomli.",
+  "output": "Печатаются параметры секции database.",
+  "tags": [
+    "конфигурация",
+    "toml",
+    "tomllib",
+    "настройки",
+    "python"
+  ],
+  "aliases": [
+    "прочитать pyproject toml",
+    "TOML config"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

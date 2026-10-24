@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "id": "survivorship-bias-и-corporate-actions",
+  "file": "survivorship-bias-и-corporate-actions.py",
+  "title": "Survivorship bias и корпоративные действия",
+  "lang": "python",
+  "group": "Данные и временные ряды / Качество рыночных данных",
+  "desc": "Исторический набор только нынешних активов исключает делистингованные компании и может завышать доходность стратегии. Сплиты, дивиденды и другие корпоративные действия меняют сопоставимость цен. Для теста нужен point-in-time universe и согласованные raw/adjusted цены; простая проверка ниже фиксирует контракт набора данных, но не загружает рынок.",
+  "output": "Контракт рыночных данных проверен",
+  "inputs": "Строки рыночных данных с символом, датой, статусом листинга на дату и базой цен.",
+  "preconditions": "Python 3.11+; для HAC нужен statsmodels, для запуска тестов/проверок по проекту следуйте инструкциям в карточке.",
+  "side_effects": "Проверяет наличие обязательных полей и допустимую маркировку цен.",
+  "errors": "Не обнаруживает survivorship bias автоматически; достоверность требует источника delisted assets и point-in-time состава индекса.",
+  "checks": "Проверить delisted assets, даты включения/исключения, split/dividend adjustments, валюту и timestamp доступности данных.",
+  "tags": [
+    "survivorship bias",
+    "corporate actions",
+    "delisted assets",
+    "point-in-time",
+    "рыночные данные"
+  ],
+  "aliases": [
+    "избежать survivorship bias в бэктесте"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "manual review",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

@@ -1,0 +1,106 @@
+{
+  "schema": 1,
+  "id": "flexbox-расположить-элементы-в-колонку-mvh8hqqm",
+  "file": "flexbox-расположить-элементы-в-колонку-mvh8hqqm.css",
+  "title": "Flexbox: расположить элементы в колонку",
+  "lang": "css",
+  "group": "CSS: раскладка / Flexbox",
+  "desc": "Располагает элементы вертикально через Flexbox с `display: flex`, `flex-direction: column` и `gap`.",
+  "output": "Располагает элементы вертикально через Flexbox с `display: flex`, `flex-direction: column` и `gap`",
+  "tags": [
+    "columns",
+    "css",
+    "display",
+    "flexbox",
+    "frontend",
+    "gap",
+    "layout",
+    "web",
+    "вёрстка",
+    "колонки",
+    "практический-приём",
+    "пример",
+    "промежутки",
+    "элемент"
+  ],
+  "aliases": [
+    "как сделать колонки с отступами css",
+    "flexbox вертикальные элементы с gap",
+    "вертикальная вёрстка с промежутками",
+    "отступы между элементами в колонке flexbox",
+    "flex-direction column с gap пример"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "display",
+      "kind": "name",
+      "note": "display — задаёт способ отображения элемента; flex включает Flexbox.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "flex",
+      "kind": "name",
+      "note": "flex — как элемент тянется внутри flex-контейнера.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "flex",
+      "kind": "name",
+      "note": "flex — как элемент тянется внутри flex-контейнера.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 18,
+      "text": "column",
+      "kind": "name",
+      "note": "column — в столбец (по вертикали).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "gap",
+      "kind": "name",
+      "note": "gap — расстояние между элементами.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: раскладка"
+      ]
+    },
+    "subcat": "Flexbox"
+  },
+  "legacy": {
+    "template": "flexbox-расположить-элементы-в-колонку-mvh8hqqm.json",
+    "descAt": 1792534052254
+  },
+  "architectureNote": {
+    "role": "Отвечает за структуру и взаимное расположение областей или карточек.",
+    "architecturalUse": "Подключай там, где требуется: Располагает элементы вертикально через Flexbox с `display: flex`, `flex-direction: column` и `gap`.",
+    "combineWith": [
+      "gap для ритма между ячейками",
+      "minmax(0, 1fr) или minmax() для контроля переполнения",
+      "@media либо auto-fit/minmax() для узких экранов"
+    ],
+    "watchFor": "Не задавай фиксированные ширины всем колонкам без необходимости; проверь длинный текст и узкий экран.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "python-sortino-ratio-py",
+  "file": "финансы-sortino-ratio.py",
+  "title": "Sortino ratio — доходность относительно downside deviation",
+  "lang": "python",
+  "group": "Математика, финансы и анализ данных / Финансовые метрики",
+  "desc": "Считает упрощённый Sortino ratio с заданной целевой доходностью за период.",
+  "output": "Периодичность доходностей и target должны совпадать; annualization требует отдельного множителя.",
+  "tags": [
+    "Sortino",
+    "риск",
+    "доходность",
+    "downside deviation"
+  ],
+  "aliases": [],
+  "source": "curated",
+  "status": "active",
+  "enriched": true
+}

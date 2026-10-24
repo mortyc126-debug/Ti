@@ -1,0 +1,130 @@
+{
+  "schema": 1,
+  "id": "grid-адаптивная-сетка-карточек-mvh8hnsa",
+  "file": "grid-адаптивная-сетка-карточек-mvh8hnsa.css",
+  "title": "Grid: адаптивная сетка карточек",
+  "lang": "css",
+  "group": "CSS: раскладка / Grid",
+  "desc": "Создаёт адаптивную сетку карточек через Grid: `auto-fit` и `minmax()` автоматически подбирают число колонок, сохраняя минимальную ширину карточки.",
+  "output": "Создаёт адаптивную сетку карточек через Grid: `auto-fit` и `minmax()` автоматически подбирают число колонок, сохраняя минимальную ширину карточки",
+  "tags": [
+    "auto-fit",
+    "css",
+    "css-grid",
+    "display",
+    "em",
+    "frontend",
+    "gap",
+    "grid-template-columns",
+    "layout",
+    "minmax",
+    "responsive",
+    "web",
+    "адаптивная-вёрстка",
+    "адаптивная-сетка",
+    "вёрстка",
+    "колонки",
+    "практический-приём",
+    "пример",
+    "промежутки",
+    "flexible",
+    "adaptive-grid",
+    "fluid-layout"
+  ],
+  "aliases": [
+    "css grid auto-fit minmax пример",
+    "как сделать сетку карточек с фиксированной минимальной шириной",
+    "адаптивная сетка с ограничением по ширине",
+    "grid layout с динамическим числом колонок",
+    "css grid с минимальной шириной элемента"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 6,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "display",
+      "kind": "name",
+      "note": "display: grid — включает CSS Grid.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сеточная раскладка по строкам и колонкам.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 32,
+      "text": "auto",
+      "kind": "name",
+      "note": "auto — браузер решает сам.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 49,
+      "text": "min",
+      "kind": "fn",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "gap",
+      "kind": "name",
+      "note": "gap — расстояние между карточками.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: раскладка"
+      ]
+    },
+    "subcat": "Grid"
+  },
+  "legacy": {
+    "template": "grid-адаптивная-сетка-карточек-mvh8hnsa.json",
+    "descAt": 1792534048426
+  },
+  "architectureNote": {
+    "role": "Отвечает за структуру и взаимное расположение областей или карточек.",
+    "architecturalUse": "Подключай там, где требуется: Создаёт адаптивную сетку карточек через Grid: `auto-fit` и `minmax()` автоматически подбирают число колонок, сохраняя минимальную ширину карточки.",
+    "combineWith": [
+      "gap для ритма между ячейками",
+      "minmax(0, 1fr) или minmax() для контроля переполнения",
+      "@media либо auto-fit/minmax() для узких экранов"
+    ],
+    "watchFor": "Не задавай фиксированные ширины всем колонкам без необходимости; проверь длинный текст и узкий экран.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

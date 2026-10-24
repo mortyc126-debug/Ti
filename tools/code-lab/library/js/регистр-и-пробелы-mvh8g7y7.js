@@ -1,0 +1,1 @@
+const clean = '  Привет, МИР  '.trim().toLowerCase();

@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "itertools-combinations",
+  "file": "itertools-combinations.py",
+  "title": "itertools.combinations — все пары без повторения",
+  "lang": "python",
+  "group": "Данные / Перебирать коллекции",
+  "desc": "combinations перебирает сочетания заданной длины без повторов и без учёта порядка. Число сочетаний быстро растёт с размером входа.",
+  "output": "[('Si', 'RI'), ('Si', 'MX'), ('RI', 'MX')]",
+  "tags": [
+    "itertools",
+    "combinations",
+    "сочетания",
+    "пары",
+    "python"
+  ],
+  "aliases": [
+    "получить все пары элементов",
+    "itertools combinations"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

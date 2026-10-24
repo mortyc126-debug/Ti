@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "pdb-breakpoint-отладка",
+  "file": "pdb-breakpoint-отладка.py",
+  "title": "breakpoint() и pdb — пошаговая отладка",
+  "lang": "python",
+  "group": "Тестирование и отладка / Отладчик",
+  "desc": "breakpoint() запускает отладчик Python, если не переопределён PYTHONBREAKPOINT. В интерактивном режиме можно изучить переменные, выполнить шаг и продолжить выполнение. Не оставляйте breakpoint в production-коде: он может остановить процесс.",
+  "output": "Результат: 10.13",
+  "inputs": "Числовое значение цены.",
+  "preconditions": "Python 3.11+ для примеров с современным синтаксисом; для карточек pytest необходим pytest.",
+  "side_effects": "Округляет число; breakpoint намеренно закомментирован, чтобы пример запускался без остановки.",
+  "errors": "Оставленный breakpoint может зависнуть в ожидании ввода в неинтерактивной среде.",
+  "checks": "Временно раскомментировать breakpoint локально, проверить переменные и удалить его перед коммитом.",
+  "tags": [
+    "pdb",
+    "breakpoint",
+    "отладка",
+    "debugging"
+  ],
+  "aliases": [
+    "как отлаживать Python пошагово"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "manual review",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

@@ -1,0 +1,246 @@
+{
+  "schema": 1,
+  "id": "передача-больших-данных-в-web-worker-mvk1jfeb",
+  "file": "передача-больших-данных-в-web-worker-mvk1jfeb.js",
+  "lang": "js",
+  "title": "Передача больших данных в Web Worker",
+  "group": "Сеть и запросы / Параллельная обработка данных",
+  "desc": "Демонстрирует, как передавать большие массивы данных в Worker и обратно, используя `Transferable Objects` для оптимизации.",
+  "output": "[object Object]",
+  "descAt": 1792703772083,
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Сеть и запросы"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "subcat": "Параллельная обработка данных",
+    "summary": {
+      "output": "[object Object]"
+    },
+    "generated": {
+      "by": "ai",
+      "at": "2026-10-22T21:16:12.083Z",
+      "note": "создано ИИ; код не запускался и не проверялся человеком"
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "size",
+      "largeArray",
+      "i",
+      "worker",
+      "processed",
+      "data"
+    ],
+    "requires": [
+      "_000_000",
+      "Int32Array",
+      "Worker",
+      "self"
+    ]
+  },
+  "tags": [
+    "большие данные",
+    "Transferable Objects",
+    "Web Worker",
+    "оптимизация"
+  ],
+  "aliases": [
+    "большой массив",
+    "передача данных",
+    "оптимизация worker",
+    "быстрая передача"
+  ],
+  "source": {
+    "title": "ai",
+    "desc": "ai",
+    "tags": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторять блок заданное число раз.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 5,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять позже.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 20,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 39,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 68,
+      "text": "slice",
+      "kind": "fn",
+      "note": "slice — вырезать часть массива/строки, не меняя оригинал.",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 24,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 32,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 0,
+      "text": "self",
+      "kind": "name",
+      "note": "self — ссылка на текущий объект внутри метода (Python).",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 2,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторять блок заданное число раз.",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 7,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять позже.",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 27,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 21,
+      "col": 2,
+      "text": "self",
+      "kind": "name",
+      "note": "self — ссылка на текущий объект внутри метода (Python).",
+      "source": "dict"
+    }
+  ]
+}

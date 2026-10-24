@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "zip-longest-перебор-разной-длины",
+  "file": "zip-longest-перебор-разной-длины.py",
+  "title": "zip_longest — обход последовательностей разной длины",
+  "lang": "python",
+  "group": "Данные / Коллекции",
+  "desc": "itertools.zip_longest продолжает обход до самой длинной последовательности, подставляя fillvalue там, где элементы закончились. Обычный zip обрывается по кратчайшей.",
+  "output": "",
+  "tags": [
+    "zip_longest",
+    "itertools",
+    "параллельный обход",
+    "разная длина списков",
+    "итераторы",
+    "python"
+  ],
+  "aliases": [
+    "соединить списки разной длины python",
+    "zip до самого длинного списка",
+    "itertools zip_longest пример",
+    "itertools"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

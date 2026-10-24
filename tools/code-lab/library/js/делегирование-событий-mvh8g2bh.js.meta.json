@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "id": "делегирование-событий-mvh8g2bh",
+  "file": "делегирование-событий-mvh8g2bh.js",
+  "title": "делегирование событий",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Реакция на действия поль",
+  "desc": "Один обработчик на весь список вместо одного на каждый пункт.",
+  "output": "",
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 22,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 5,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 19,
+      "text": "target",
+      "kind": "name",
+      "note": "target — элемент, на котором произошло событие.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 26,
+      "text": "closest",
+      "kind": "fn",
+      "note": "closest — ближайший родитель, подходящий под селектор",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 13,
+      "text": "classList",
+      "kind": "name",
+      "note": "classList — список CSS-классов элемента: add/remove/toggle/contains.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 23,
+      "text": "toggle",
+      "kind": "fn",
+      "note": "toggle — добавляет класс, если его нет, и убирает, если есть",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [
+      "list",
+      "li"
+    ],
+    "requires": [
+      "event"
+    ]
+  },
+  "legacy": {
+    "template": "делегирование-событий-mvh8g2bh.json",
+    "descAt": 1792533973949
+  }
+}

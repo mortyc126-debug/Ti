@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "id": "строчные-и-с-заглавной-mvhtfvi9",
+  "file": "строчные-и-с-заглавной-mvhtfvi9.css",
+  "title": "строчные и с заглавной",
+  "lang": "css",
+  "group": "CSS: текст и шрифты / Регистр и индексы",
+  "desc": "Показывает `text-transform: lowercase` для строчных букв и `capitalize` для заглавной первой буквы слов.",
+  "output": "Показывает `text-transform: lowercase` для строчных букв и `capitalize` для заглавной первой буквы слов",
+  "tags": [
+    "capitalize",
+    "css",
+    "frontend",
+    "lowercase",
+    "web",
+    "вёрстка",
+    "практический-приём",
+    "пример",
+    "строчные",
+    "текст",
+    "типографика",
+    "text-transform",
+    "регистр"
+  ],
+  "aliases": [
+    "css lowercase пример",
+    "как сделать заглавные буквы в css",
+    "css capitalize для заголовков",
+    "нижний регистр в css без js",
+    "преобразование текста в css"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null,
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 14,
+      "text": "transform",
+      "kind": "name",
+      "note": "transform — сдвиг/поворот/масштаб элемента.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "transform",
+      "kind": "name",
+      "note": "transform — сдвиг/поворот/масштаб элемента.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: текст и шрифты"
+      ]
+    },
+    "subcat": "Регистр и индексы"
+  },
+  "legacy": {
+    "template": "строчные-и-с-заглавной-mvhtfvi9.json",
+    "descAt": 1792569237057
+  },
+  "architectureNote": {
+    "role": "Используй как локальный строительный блок, а не как самостоятельную архитектуру страницы.",
+    "architecturalUse": "Подключай там, где требуется: Показывает `text-transform: lowercase` для строчных букв и `capitalize` для заглавной первой буквы слов.",
+    "combineWith": [
+      "общие токены цвета, расстояний и типографики",
+      "основная компоновка через Grid/Flex",
+      "проверка состояний и узких экранов"
+    ],
+    "watchFor": "Проверяй результат в контексте реального родителя и соседних элементов: CSS зависит от структуры HTML и каскада.",
+    "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
+  },
+  "enriched": true
+}

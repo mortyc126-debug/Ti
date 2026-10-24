@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "итератор-свой-класс",
+  "file": "итератор-свой-класс.py",
+  "title": "Собственный итератор через __iter__ и __next__",
+  "lang": "python",
+  "group": "Продвинутые темы / Итераторы и генераторы",
+  "desc": "Реализует протокол итератора: __iter__ возвращает объект итератора, __next__ возвращает следующее значение или выбрасывает StopIteration.",
+  "output": "Итератор выдаёт три значения и завершает обход.",
+  "tags": [
+    "итераторы",
+    "__iter__",
+    "__next__",
+    "StopIteration",
+    "python"
+  ],
+  "aliases": [
+    "custom iterator",
+    "реализовать протокол итератора"
+  ],
+  "source": {
+    "title": "curated addition",
+    "desc": "curated addition",
+    "tags": "manual",
+    "aliases": "manual"
+  },
+  "status": "described",
+  "enriched": true
+}

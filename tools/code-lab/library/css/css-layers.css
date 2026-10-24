@@ -1,0 +1,9 @@
+@layer reset, components, utilities;
+
+@layer components {
+  .button { padding: 1rem; }
+}
+
+@layer utilities {
+  .p-0 { padding: 0; }
+}
