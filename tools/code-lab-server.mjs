@@ -105,8 +105,11 @@ async function labTargets(){ const out = await labPaths();
 // лежат ОТДЕЛЬНЫМИ файлами dict/langs/<язык>.json и подмешиваются в dict.langs при загрузке.
 // Так каждый язык в своём файле — чисто и без конфликтов при заливке.
 const DICT_BASE = path.join(PUBLIC, 'keyword-dict.json');
-const LANGS_DIR = path.join(PUBLIC, 'dict', 'langs');
+const DICT_DIR = path.join(PUBLIC, 'dict');
+const LANGS_DIR = path.join(DICT_DIR, 'langs');
+const EXAMPLES_FILE = path.join(DICT_DIR, 'examples.json');   // привязка «слово/конструкция → кусок-пример» {term:{id,title}}
 let _kwDict = null;
+async function loadExamples(){ try { const o = JSON.parse(await fs.readFile(EXAMPLES_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
 async function loadLangDicts(){
   const out = {};
   let files = []; try { files = (await fs.readdir(LANGS_DIR)).filter(n => n.endsWith('.json')); } catch(_){ return out; }
@@ -124,6 +127,7 @@ async function kwDict(){
   // файлы языков поверх (приоритет у файлов)
   const fromFiles = await loadLangDicts();
   for(const [lang, m] of Object.entries(fromFiles)){ base.langs[lang] = Object.assign({}, base.langs[lang] || {}, m); }
+  base.examples = await loadExamples();   // привязки «термин → кусок-пример»
   _kwDict = base;
   return _kwDict;
 }
@@ -849,6 +853,25 @@ const server = http.createServer(async (req, res) => {
       for(let [w, t] of pairs){ w = String(w || '').trim().toLowerCase(); t = String(t || '').trim(); if(!w || !t) continue; target[w] = t.slice(0, 600); added++; }
       await fs.writeFile(DICT_BASE, JSON.stringify(dict, null, 2), 'utf8'); _kwDict = null;
       return json(res, 200, { ok: true, added, where: section, total: Object.keys(target).length });
+    }
+
+    // привязать к термину (слову/конструкции) кусок-пример: {term, piece: название|id|''(снять)}
+    if(u.pathname === '/api/dict/example' && req.method === 'POST'){
+      const b = await readBody(req);
+      const term = String(b.term || '').trim().toLowerCase();
+      if(!term) return json(res, 400, { error: 'не задан термин' });
+      const ex = await loadExamples();
+      const piece = String(b.piece || '').trim();
+      if(!piece){ delete ex[term]; }
+      else {
+        let found = null;
+        for(const e of await store.entries()){ if(e.id === piece || (e.title || '').trim().toLowerCase() === piece.toLowerCase()){ found = { id: e.id, title: e.title || e.id }; break; } }
+        if(!found) return json(res, 404, { error: 'кусок не найден: ' + piece });
+        ex[term] = found;
+      }
+      await fs.mkdir(DICT_DIR, { recursive: true });
+      await fs.writeFile(EXAMPLES_FILE, JSON.stringify(ex, null, 2), 'utf8'); _kwDict = null;
+      return json(res, 200, { ok: true, term, example: ex[term] || null });
     }
 
     // сборщик «непонятных слов»: из кода (или из кусков языка) собираем токены, которых НЕТ в словаре,

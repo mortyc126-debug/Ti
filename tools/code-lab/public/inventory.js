@@ -750,6 +750,22 @@ function openDictViewModal(){
   const SECTS = [['words', 'Общее / код'], ['htmlTags', 'HTML-теги'], ['htmlAttrs', 'HTML-атрибуты'], ['cssProps', 'CSS-свойства'], ['cssVals', 'CSS-значения']];
   const copy = text => { try { navigator.clipboard.writeText(text); } catch(_){ const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch(e){} t.remove(); } };
 
+  // привязать/снять кусок-пример к термину
+  async function setExample(term, piece){
+    const r = await fetch('/api/dict/example', { method: 'POST', body: JSON.stringify({ term, piece }) }).then(x => x.json()).catch(() => null);
+    if(r && r.ok){ dict.examples = dict.examples || {}; const k = term.toLowerCase(); if(r.example) dict.examples[k] = r.example; else delete dict.examples[k]; render(); }
+    else alert(r && r.error ? r.error : 'не удалось привязать пример');
+  }
+  // показать/скрыть код куска-примера под строкой
+  async function toggleCode(rowEl, id){
+    const nx = rowEl.nextSibling; if(nx && nx.__code){ nx.remove(); return; }
+    const t = await fetch('/api/template?id=' + encodeURIComponent(id)).then(x => x.json()).catch(() => null);
+    const code = t ? (t.code != null ? t.code : (Array.isArray(t.lines) ? t.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : '')) : '(не загрузилось)';
+    const pre = document.createElement('pre'); pre.__code = true; pre.textContent = code;
+    pre.style.cssText = 'background:var(--code-bg,#0e0720);border:1px solid var(--border,#3a2f55);border-radius:7px;padding:8px;margin:2px 0 6px;font:11.5px/1.4 monospace;white-space:pre-wrap;max-height:220px;overflow:auto';
+    rowEl.after(pre);
+  }
+
   function render(){
     const body = q('#dv-body'); body.innerHTML = '';
     if(!dict){ body.textContent = 'загрузка…'; return; }
@@ -772,7 +788,22 @@ function openDictViewModal(){
       const isCon = k => !/^[a-z0-9_$-]+$/i.test(k);
       const sorted = rows.slice().sort((a, b) => a[0].localeCompare(b[0]));
       const cons = sorted.filter(([w]) => isCon(w)), words = sorted.filter(([w]) => !isCon(w));
-      const renderRow = ([w, t]) => { const d = el2('div', 'lp-row'); const b = document.createElement('b'); b.textContent = w; b.style.color = 'var(--name,#cbc2ea)'; d.appendChild(b); d.appendChild(document.createTextNode(' — ' + t)); body.appendChild(d); };
+      const renderRow = ([w, t]) => {
+        const d = el2('div', 'lp-row'); d.style.display = 'flex'; d.style.alignItems = 'baseline'; d.style.gap = '6px'; d.style.flexWrap = 'wrap';
+        const b = document.createElement('b'); b.textContent = w; b.style.color = 'var(--name,#cbc2ea)'; b.style.flex = 'none'; d.appendChild(b);
+        const tx = document.createElement('span'); tx.textContent = ' — ' + t; tx.style.flex = '1'; tx.style.minWidth = '120px'; d.appendChild(tx);
+        const ctl = document.createElement('span'); ctl.style.cssText = 'font-size:11px;white-space:nowrap';
+        const ex = dict.examples && dict.examples[w];
+        if(ex){
+          const lnk = el2('button', 'btn'); lnk.style.padding = '0 6px'; lnk.textContent = '▶ ' + (ex.title || ex.id); lnk.title = 'показать код примера'; lnk.onclick = () => toggleCode(d, ex.id);
+          const rm = el2('button', 'btn'); rm.style.padding = '0 6px'; rm.textContent = '✕'; rm.title = 'снять пример'; rm.onclick = () => setExample(w, '');
+          ctl.append(lnk, rm);
+        } else {
+          const add = el2('button', 'btn'); add.style.padding = '0 6px'; add.textContent = '＋ пример'; add.title = 'привязать кусок-пример'; add.onclick = () => { const p = prompt('Название или id куска-примера для «' + w + '»:'); if(p && p.trim()) setExample(w, p.trim()); };
+          ctl.appendChild(add);
+        }
+        d.appendChild(ctl); body.appendChild(d);
+      };
       if(cons.length){ const sub = el2('div', 'muted'); sub.style.cssText = 'font-size:11px;margin:3px 0 1px 6px'; sub.textContent = '— конструкции (' + cons.length + ')'; body.appendChild(sub); cons.forEach(renderRow); }
       if(words.length){ if(cons.length){ const sub = el2('div', 'muted'); sub.style.cssText = 'font-size:11px;margin:5px 0 1px 6px'; sub.textContent = '— слова (' + words.length + ')'; body.appendChild(sub); } words.forEach(renderRow); }
     });

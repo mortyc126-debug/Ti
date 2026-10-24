@@ -213,6 +213,9 @@
     if(expl){
       // нашли пояснение в словаре — показываем его (главное, что хотел пользователь)
       const b = document.createElement('div'); b.className = 'sig'; b.style.whiteSpace = 'pre-wrap'; b.textContent = expl; d.appendChild(b);
+      // пример: живой кусок → открыть в редакторе
+      const exm = window.codelabExample ? window.codelabExample(word) : null;
+      if(exm){ const eb = document.createElement('button'); eb.className = 'ibtn'; eb.style.marginTop = '6px'; eb.textContent = '▶ пример → ' + (exm.title || 'кусок'); eb.onclick = () => { if(window.codelabOpenExample) window.codelabOpenExample(exm); }; d.appendChild(eb); }
       // для HTML/CSS список вхождений не нужен — это шум; для кода покажем, где встречается
       if(/^(js|ts)$/.test(lang || '')) appendUsages(d, word);
     } else {

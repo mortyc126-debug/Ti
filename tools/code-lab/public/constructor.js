@@ -1675,6 +1675,7 @@ function openCodeInEditor(name, lang, code){
   if(window.codelabTabs) window.codelabTabs.setActive(id, true);
   if(sb.renderNow) sb.renderNow();   // обновить превью сразу, чтобы не висело старое (даже если «живой» выключен)
 }
+window.codelabOpenInEditor = openCodeInEditor;   // чтобы «пример →» из попапов открывал кусок в редакторе
 $('#openEditor').onclick = () => $('#openfile').click();
 $('#openfile').onchange = async e => {
   const f = e.target.files && e.target.files[0]; if(!f) return;

@@ -105,6 +105,12 @@
     // пояснение из словаря (конструкция / CSS / HTML / ключевое слово)
     if(expl){ const ge = document.createElement('div'); ge.className = 'grp'; ge.textContent = 'Что это'; pop.appendChild(ge);
       const be = document.createElement('div'); be.style.whiteSpace = 'pre-wrap'; be.style.font = '12px/1.45 system-ui,sans-serif'; be.textContent = expl; pop.appendChild(be); }
+    // пример: живой кусок, демонстрирующий этот термин → открыть в редакторе
+    const exm = window.codelabExample ? window.codelabExample(term) : null;
+    if(exm){ const b = document.createElement('button'); b.className = 'ref def'; b.style.marginTop = '4px';
+      b.textContent = '▶ пример → ' + (exm.title || 'кусок');
+      b.onclick = () => { if(window.codelabOpenExample) window.codelabOpenExample(exm); hide(); };
+      pop.appendChild(b); }
 
     if(onlyExpl){
       // для разметки/конструкций код-«определение/использования» не нужны — только пояснение + сколько раз встречается

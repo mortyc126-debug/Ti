@@ -371,7 +371,20 @@
     Object.assign(EXPLAIN, d.words || {}); Object.assign(HTML_TAGS, d.htmlTags || {});
     Object.assign(HTML_ATTRS, d.htmlAttrs || {}); Object.assign(CSS_PROPS, d.cssProps || {}); Object.assign(CSS_VALS, d.cssVals || {});
     if(d.langs && typeof d.langs === 'object'){ for(const [lang, words] of Object.entries(d.langs)){ if(words && typeof words === 'object'){ const lk = lang.toLowerCase(); LANG_DICTS[lk] = LANG_DICTS[lk] || {}; for(const [w, t] of Object.entries(words)) LANG_DICTS[lk][w.toLowerCase()] = t; } } }
+    if(d.examples && typeof d.examples === 'object') EXAMPLES = d.examples;
   }).catch(() => {});
+  // привязки «термин → кусок-пример» {term:{id,title}} — для ссылки «пример →» в попапах
+  let EXAMPLES = {};
+  window.codelabExample = term => (term && EXAMPLES[String(term).toLowerCase()]) || null;
+  // открыть кусок-пример в редакторе песочницы
+  window.codelabOpenExample = async function(ex){
+    if(!ex || !ex.id) return;
+    try {
+      const t = await fetch('/api/template?id=' + encodeURIComponent(ex.id)).then(r => r.json());
+      const code = t.code != null ? t.code : (Array.isArray(t.lines) ? t.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : '');
+      if(window.codelabOpenInEditor) window.codelabOpenInEditor((t.title || ex.title || 'пример'), t.lang || 'txt', code);
+    } catch(_){}
+  };
   let pop = null;
   function hidePop(){ if(pop){ pop.remove(); pop = null; } }
   function showPop(title, role, body, ev){
