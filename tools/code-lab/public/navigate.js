@@ -91,21 +91,24 @@
 
   function activeLang(){ let id = null; try { id = localStorage.getItem('codelab_sb_active'); } catch(_){} const fs = files(); const f = fs.find(x => x.id === id) || fs[0]; return f ? (f.lang || '') : ''; }
 
-  function showRefs(word, ev){
+  // con — найденная конструкция под курсором {term, text} (из codelabExplainAt), иначе одиночное слово
+  function showRefs(word, ev, con){
     const lang = activeLang(), markup = /^(css|html|htm)$/.test(lang);
-    const expl = window.codelabExplain ? window.codelabExplain(word, lang) : null;
+    const term = con ? con.term : word;
+    const expl = con ? con.text : (window.codelabExplain ? window.codelabExplain(word, lang) : null);
+    const onlyExpl = markup || !!con;   // для разметки и конструкций — только пояснение, без код-«определений»
     const { defs, uses } = analyze(word);
     hide();
     pop = document.createElement('div'); pop.className = 'nav-pop';
-    const h = document.createElement('h4'); h.innerHTML = '<code></code> — ' + (markup ? 'что это' : 'связи'); h.querySelector('code').textContent = word; pop.appendChild(h);
+    const h = document.createElement('h4'); h.innerHTML = '<code></code> — ' + (con ? 'конструкция' : (markup ? 'что это' : 'связи')); h.querySelector('code').textContent = term; pop.appendChild(h);
 
-    // пояснение из словаря (CSS-свойства/значения, HTML-теги/атрибуты, ключевые слова)
+    // пояснение из словаря (конструкция / CSS / HTML / ключевое слово)
     if(expl){ const ge = document.createElement('div'); ge.className = 'grp'; ge.textContent = 'Что это'; pop.appendChild(ge);
       const be = document.createElement('div'); be.style.whiteSpace = 'pre-wrap'; be.style.font = '12px/1.45 system-ui,sans-serif'; be.textContent = expl; pop.appendChild(be); }
 
-    if(markup){
-      // для разметки/стилей код-«определение/использования» не нужны — только пояснение + сколько раз встречается
-      if(!expl){ const n = document.createElement('div'); n.className = 'none'; n.textContent = 'нет пояснения в словаре (можно добавить в keyword-dict.json)'; pop.appendChild(n); }
+    if(onlyExpl){
+      // для разметки/конструкций код-«определение/использования» не нужны — только пояснение + сколько раз встречается
+      if(!expl){ const n = document.createElement('div'); n.className = 'none'; n.textContent = 'нет пояснения в словаре (можно добавить через «📖 словарь пояснений»)'; pop.appendChild(n); }
       const g = document.createElement('div'); g.className = 'grp'; g.textContent = 'В этом файле'; pop.appendChild(g);
       const cnt = document.createElement('div'); cnt.className = 'none'; cnt.textContent = 'встречается ' + uses.length + ' раз(а)'; pop.appendChild(cnt);
     } else {
@@ -141,6 +144,13 @@
     }
     return '';
   }
+  // строка и позиция под кликом — чтобы узнавать конструкцию, накрывающую курсор
+  function lineColAt(ed, ev){
+    const ta = ed.querySelector('textarea'), cm = ta && ta.__cm;
+    if(cm){ const pos = cm.coordsChar({ left: ev.clientX, top: ev.clientY }, 'window'); return { text: cm.getLine(pos.line) || '', col: pos.ch }; }
+    if(ta){ const v = ta.value, c = ta.selectionStart; const nl = v.lastIndexOf('\n', c - 1) + 1; const end = v.indexOf('\n', c); return { text: v.slice(nl, end < 0 ? v.length : end), col: c - nl }; }
+    return { text: '', col: 0 };
+  }
 
   let navOn = false;
   edsEl.addEventListener('click', ev => {
@@ -148,6 +158,10 @@
     const ed = ev.target.closest && ev.target.closest('.sb-ed'); if(!ed || !ed.__f) return;
     const markup = /^(css|html|htm)$/.test(ed.__f.lang || '');
     setTimeout(() => {
+      // сперва — конструкция под курсором (for…of, std::cout, try/catch)
+      const loc = lineColAt(ed, ev);
+      const con = window.codelabExplainAt ? window.codelabExplainAt(loc.text, loc.col, ed.__f.lang || '') : null;
+      if(con){ showRefs(con.term, ev, con); return; }
       const w = wordAt(ed, ev);
       const ok = markup ? /^[A-Za-z0-9_$-]{2,}$/.test(w) : (/^[A-Za-z_$][\w$]*$/.test(w) && !STOP.has(w.toLowerCase()) && w.length >= 2);
       if(!w || !ok){ hide(); return; }

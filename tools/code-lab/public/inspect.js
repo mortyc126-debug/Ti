@@ -311,10 +311,21 @@
     if(ta){ const v = ta.value, cc = ta.selectionStart; let a = cc, b = cc; while(a > 0 && ch.test(v[a - 1])) a--; while(b < v.length && ch.test(v[b])) b++; return { w: v.slice(a, b), line: (v.slice(0, cc).match(/\n/g) || []).length + 1 }; }
     return { w: '', line: 0 };
   }
+  // строка и позиция под кликом — для распознавания конструкции
+  function lineColAt(ed, ev){
+    const ta = ed.querySelector('textarea'), cm = ta && ta.__cm;
+    if(cm){ const pos = cm.coordsChar({ left: ev.clientX, top: ev.clientY }, 'window'); return { text: cm.getLine(pos.line) || '', col: pos.ch }; }
+    if(ta){ const v = ta.value, c = ta.selectionStart; const nl = v.lastIndexOf('\n', c - 1) + 1; const end = v.indexOf('\n', c); return { text: v.slice(nl, end < 0 ? v.length : end), col: c - nl }; }
+    return { text: '', col: 0 };
+  }
   edsEl.addEventListener('click', ev => {
     if(!open) return;
     const ed = ev.target.closest && ev.target.closest('.sb-ed'); if(!ed || !ed.__f) return;
     setTimeout(() => {
+      // сперва — конструкция под курсором (for…of, std::cout, try/catch): показываем её пояснение
+      const loc = lineColAt(ed, ev);
+      const con = window.codelabExplainAt ? window.codelabExplainAt(loc.text, loc.col, ed.__f.lang || '') : null;
+      if(con){ showWord(con.term); return; }
       const { w, line } = wordAt(ed, ev);
       // для css/html допускаем дефис и цифры (grid-template-columns, 1fr), для кода — обычное имя
       const ok = /^(css|html|htm)$/.test(ed.__f.lang || '') ? /^[A-Za-z0-9_$-]{2,}$/.test(w) : /^[A-Za-z_$][\w$]*$/.test(w);

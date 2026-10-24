@@ -768,10 +768,13 @@ function openDictViewModal(){
       const cp = el2('button', 'btn'); cp.textContent = '⧉'; cp.title = 'скопировать раздел строками «слово: пояснение»'; cp.style.marginLeft = 'auto'; cp.style.padding = '1px 8px';
       cp.onclick = () => { copy(rows.map(([w, t]) => w + ': ' + t).join('\n')); cp.textContent = '✓'; setTimeout(() => cp.textContent = '⧉', 1000); };
       head.appendChild(cp); body.appendChild(head);
-      rows.sort((a, b) => a[0].localeCompare(b[0])).forEach(([w, t]) => {
-        const d = el2('div', 'lp-row'); const b = document.createElement('b'); b.textContent = w; b.style.color = 'var(--name,#cbc2ea)';
-        d.appendChild(b); d.appendChild(document.createTextNode(' — ' + t)); body.appendChild(d);
-      });
+      // внутри раздела делим на конструкции (многословные ключи) и одиночные слова
+      const isCon = k => !/^[a-z0-9_$-]+$/i.test(k);
+      const sorted = rows.slice().sort((a, b) => a[0].localeCompare(b[0]));
+      const cons = sorted.filter(([w]) => isCon(w)), words = sorted.filter(([w]) => !isCon(w));
+      const renderRow = ([w, t]) => { const d = el2('div', 'lp-row'); const b = document.createElement('b'); b.textContent = w; b.style.color = 'var(--name,#cbc2ea)'; d.appendChild(b); d.appendChild(document.createTextNode(' — ' + t)); body.appendChild(d); };
+      if(cons.length){ const sub = el2('div', 'muted'); sub.style.cssText = 'font-size:11px;margin:3px 0 1px 6px'; sub.textContent = '— конструкции (' + cons.length + ')'; body.appendChild(sub); cons.forEach(renderRow); }
+      if(words.length){ if(cons.length){ const sub = el2('div', 'muted'); sub.style.cssText = 'font-size:11px;margin:5px 0 1px 6px'; sub.textContent = '— слова (' + words.length + ')'; body.appendChild(sub); } words.forEach(renderRow); }
     });
     q('#dv-note').textContent = 'всего: ' + total + (flt ? ' · найдено: ' + shown : '');
     if(!shown) body.appendChild(el2('div', 'lp-row muted', flt ? 'ничего не найдено' : 'словарь пуст'));

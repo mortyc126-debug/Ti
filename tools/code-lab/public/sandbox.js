@@ -421,6 +421,28 @@
     if(l === 'html' || l === 'htm') return HTML_TAGS[lw] || HTML_ATTRS[lw] || CSS_PROPS[lw] || CSS_VALS[lw] || EXPLAIN[w] || EXPLAIN[lw] || null;
     return EXPLAIN[w] || EXPLAIN[lw] || CSS_PROPS[lw] || CSS_VALS[lw] || HTML_TAGS[lw] || null;
   };
+  // ключи-конструкции (многословные / с ::, ->, ., /, пробелом) для языка — чтобы узнавать их под кликом
+  const isConstruct = k => !/^[a-z0-9_$-]+$/i.test(k);
+  function constructKeys(lang){
+    const l = String(lang || '').toLowerCase(), set = new Set();
+    const take = obj => { if(obj) for(const k of Object.keys(obj)) if(isConstruct(k)) set.add(k.toLowerCase()); };
+    if(l && LANG_DICTS[l]) take(LANG_DICTS[l]);
+    take(EXPLAIN);
+    if(l === 'css'){ take(CSS_PROPS); take(CSS_VALS); }
+    if(l === 'html' || l === 'htm'){ take(HTML_TAGS); take(HTML_ATTRS); take(CSS_PROPS); take(CSS_VALS); }
+    return [...set];
+  }
+  // пояснение по позиции в строке: сперва ищем конструкцию, накрывающую курсор (самую длинную), потом — слово
+  window.codelabExplainAt = function(line, col, lang){
+    const low = String(line || '').toLowerCase(); let best = null;
+    for(const k of constructKeys(lang)){
+      let i = 0; while((i = low.indexOf(k, i)) !== -1){ const end = i + k.length;
+        if(col >= i && col <= end && (!best || k.length > best.term.length)) best = { term: k, from: i, to: end };
+        i = end; }
+    }
+    if(best){ const t = window.codelabExplain(best.term, lang); if(t) return { term: best.term, text: t, from: best.from, to: best.to, construct: true }; }
+    return null;
+  };
 
   // ── редактор CodeMirror поверх прежнего поля (если CodeMirror установлен; иначе всё как раньше) ──
   const CM_ADDONS = ['fold/xml-fold', 'edit/closetag', 'edit/closebrackets', 'comment/comment', 'selection/active-line', 'hint/show-hint', 'hint/anyword-hint'];
