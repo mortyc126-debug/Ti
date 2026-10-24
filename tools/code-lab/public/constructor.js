@@ -1608,12 +1608,10 @@ function openCodeInEditor(name, lang, code){
   if(box && box.style.display === 'none'){ const t = $('#sandboxToggle'); if(t) t.click(); }   // включить песочницу, если скрыта
   const sb = window.codelabSandbox;
   if(!sb){ alert('Песочница недоступна — обнови страницу.'); return; }
+  if(sb.dropPristineDefaults) sb.dropPristineDefaults();   // убрать нетронутые стартовые демо-файлы, чтобы предпросмотр не показывал их
   const id = 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-  const cur = sb.getFiles();
-  // если в песочнице только нетронутые демо-файлы (id f1–f3, не из проекта) — заменить их, чтобы живой предпросмотр не показывал чужое демо
-  const onlyDefaults = cur.length > 0 && cur.length <= 3 && cur.every(x => /^f[1-3]$/.test(x.id) && !x.path);
   const nf = { id, name: name || 'файл.txt', lang: lang || 'txt', code: code || '' };
-  sb.setFiles(onlyDefaults ? [nf] : [...cur, nf]);
+  sb.setFiles([...sb.getFiles(), nf]);
   if(window.codelabTabs) window.codelabTabs.setActive(id, true);
 }
 $('#openEditor').onclick = () => $('#openfile').click();

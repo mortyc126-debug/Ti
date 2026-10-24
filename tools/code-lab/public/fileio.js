@@ -88,7 +88,11 @@
   const bSave = document.createElement('button'); bSave.className = 'btn'; bSave.textContent = '💾 на диск…';
   bSave.title = hasFS ? 'сохранить активный файл на диск: в тот же файл, если открыт с диска, иначе выбрать куда' : 'скачать активный файл';
   bSave.onclick = saveToDisk;
+  // «🧹 очистить» — убрать все файлы песочницы (в т. ч. стартовые демо), оставить один пустой
+  const bClear = document.createElement('button'); bClear.className = 'btn'; bClear.textContent = '🧹 очистить';
+  bClear.title = 'убрать все файлы песочницы (включая стартовые демо index.html/style.css/script.js) — останется один пустой';
+  bClear.onclick = () => { if(sb.clearAll && confirm('Убрать все файлы песочницы? Останется один пустой.')) { sb.clearAll(); toast('песочница очищена'); } };
   const addBtn = bar.querySelector('#sbAdd');
-  if(addBtn){ addBtn.after(bSave); addBtn.after(bOpen); } else { bar.appendChild(bOpen); bar.appendChild(bSave); }
+  if(addBtn){ addBtn.after(bClear); addBtn.after(bSave); addBtn.after(bOpen); } else { bar.appendChild(bOpen); bar.appendChild(bSave); bar.appendChild(bClear); }
   bar.appendChild(inp);
 })();

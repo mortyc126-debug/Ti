@@ -633,7 +633,11 @@
   window.codelabSandbox = {
     getFiles: () => files,
     setFiles: arr => { files = arr; save(); renderEds(); schedulePreview(); },
-    refresh: () => { save(); syncHeads(); schedulePreview(); }
+    refresh: () => { save(); syncHeads(); schedulePreview(); },
+    // убрать нетронутые стартовые демо-файлы (index.html/style.css/script.js, если их код не меняли)
+    dropPristineDefaults: () => { const def = Object.fromEntries(DEFAULTS.map(d => [d.id, d.code])); const kept = files.filter(f => !(def[f.id] !== undefined && !f.path && f.code === def[f.id])); if(kept.length !== files.length){ files = kept; save(); renderEds(); schedulePreview(); } return files.length; },
+    // полностью очистить песочницу (один пустой файл)
+    clearAll: () => { files = [{ id: uid(), name: 'файл.txt', lang: 'txt', code: '' }]; save(); renderEds(); schedulePreview(); }
   };
 
   // ── переключение режимов: визуал ↔ песочница ──
