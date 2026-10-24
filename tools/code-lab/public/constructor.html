@@ -143,7 +143,23 @@
   .sb-live{font-size:11.5px;color:var(--text2);display:flex;align-items:center;gap:4px;cursor:pointer}
   .sb-frame{flex:1;min-height:120px;width:100%;border:1px solid var(--border);border-radius:10px;background:#fff}
   .sb-con{flex:none;max-height:30%;overflow:auto;margin:0;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font:11.5px/1.5 ui-monospace,monospace;color:var(--text2);white-space:pre-wrap}
-  @media(max-width:1000px){.sandbox{flex-direction:column}.sb-eds{width:auto}.sb-gut{display:none}}
+  @media(max-width:1000px){.sandbox{flex-direction:column}.sb-eds,.sb-edcol{width:auto}.sb-gut{display:none}}
+  /* вкладки редактора (tabs.js): #sbEds оборачивается в .sb-edcol с полосой вкладок сверху */
+  .sb-edcol{width:var(--sb-ew,50%);min-width:0;display:flex;flex-direction:column;min-height:0}
+  .sb-edcol > .sb-eds{width:auto;flex:1;padding-right:0}
+  .sb-tabs{flex:none;display:flex;gap:3px;overflow-x:auto;overflow-y:hidden;padding:3px 2px 0;scrollbar-width:thin}
+  .sb-tab{flex:none;display:flex;align-items:center;gap:6px;max-width:210px;padding:5px 9px;border:1px solid var(--border);border-bottom:none;border-radius:8px 8px 0 0;background:var(--bg2);color:var(--text2);font-size:12px;cursor:pointer;white-space:nowrap}
+  .sb-tab:hover{color:var(--text)}
+  .sb-tab.on{background:var(--code-bg,#0E0720);color:var(--acc);border-color:var(--acc)}
+  .sb-tab .tb-nm{overflow:hidden;text-overflow:ellipsis}
+  .sb-tab .tb-dot{color:#ffb454;font-size:13px;line-height:1}
+  .sb-tab .tb-x{opacity:.55;border-radius:4px;padding:0 4px;line-height:1.3}
+  .sb-tab .tb-x:hover{opacity:1;background:rgba(255,107,107,.2);color:#FF6B6B}
+  .sb-tab.dragging{opacity:.5}
+  .sb-tab.drag-over{outline:2px solid var(--acc);outline-offset:-2px}
+  .sb-eds.tabbed{gap:0}
+  .sb-eds.tabbed > .sb-ed{display:none}
+  .sb-eds.tabbed > .sb-ed.sb-active{display:flex}
   pre.code{background:var(--code-bg,#0E0720);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:0;overflow:auto;font-size:12px;line-height:1.55}
   .result .preview{margin:0}
   .result iframe{width:100%;height:100%;border:1px solid var(--border);border-radius:10px;background:var(--code-bg,#0E0720)}.preview{position:relative}.runtime-status{position:absolute;right:7px;top:7px;z-index:2;padding:4px 7px;border-radius:7px;background:rgba(14,7,32,.9);border:1px solid var(--border);font:10px ui-monospace,monospace;color:var(--text3);pointer-events:none}.runtime-status.ok{color:var(--str);border-color:rgba(82,242,201,.45)}.runtime-status.error{color:#ffb3c1;border-color:rgba(255,107,107,.45)}.runtime-status.checking{color:var(--num);border-color:rgba(255,136,0,.45)}
@@ -366,6 +382,7 @@
   <script src="/constructor.js"></script>
   <script src="/sandbox.js"></script>
   <script src="/workspace.js"></script>
+  <script src="/tabs.js"></script>
   <script>
   // меню панели инструментов: открыть/закрыть, Esc и клик мимо закрывают
   (function(){

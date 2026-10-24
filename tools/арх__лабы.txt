@@ -199,7 +199,7 @@ library/
 |---|---|---|
 | Старт | Главная, С чего начать, Обучение | `index.html` (`home.js`), `start.html` (`start.js`), `schema.html` |
 | Кусочки кода | **Опись**, **Библиотека** | `inventory.html` (`inventory.js`, `ai-tools.js`), `library.html` (`app.js`, `upload-templates.js`, `cm-bridge.js`) |
-| Собирать | **Конструктор**, Рецепты | `constructor.html` (`constructor.js`, `sandbox.js`, `workspace.js`), `recipes.html` (`recipes.js`) |
+| Собирать | **Конструктор**, Рецепты | `constructor.html` (`constructor.js`, `sandbox.js`, `workspace.js`, `tabs.js`), `recipes.html` (`recipes.js`) |
 | Данные | Данные (загрузка) | `schema-json.html` |
 
 Страницы вне меню:
@@ -301,6 +301,10 @@ code-lab/vendor/codemirror/
 Ограничения: ничего вне выбранной папки (проверяются `..`, абсолютные пути, ссылки наружу); `.git` не трогается; удаление уходит в `.codelab-trash` внутри папки; CRLF и BOM сохраняются; запись отказывает (409), если файл изменён снаружи после открытия.
 
 Подключение к проекту: три вставки (`apply-workspace-patch.mjs`): строка в сервере (`handleWorkspace`), объект `window.codelabSandbox` в `sandbox.js`, `<script src="/workspace.js">` в `constructor.html`. От разметки песочницы `workspace.js` зависит, см. `WORKSPACE-PATCHES.md`.
+
+### Вкладки редактора (`tabs.js`, с 24.10.2026)
+
+Надстройка над песочницей: вместо стопки панелей `.sb-ed` — полоса вкладок сверху и один видимый активный редактор. Не трогает ни `sandbox.js`, ни `workspace.js`, работает только через `window.codelabSandbox.getFiles()/setFiles()` и показ/скрытие панелей классом `.sb-active`. Оборачивает `#sbEds` в `.sb-edcol` с полосой `#sbTabs`; на `#sbEds` вешает класс `tabbed` (в CSS `constructor.html`: `.sb-eds.tabbed > .sb-ed{display:none}`, `.sb-active{display:flex}`). Активная вкладка запоминается в `localStorage['codelab_sb_active']`. Вкладка: точка «не сохранено» (из класса `.ws-dirty`, который ставит `workspace.js` на файлы проекта), имя файла, крестик закрытия. Перетаскивание меняет порядок (через `setFiles`). Два `MutationObserver` на `#sbEds`: по `childList` (открыли/закрыли/переставили файл) и по атрибуту `class` в поддереве (появление/снятие `.ws-dirty`) — пересобирают полосу. Закрытие последней вкладки создаёт пустой `файл.txt`.
 
 ## 11. Безопасность
 
