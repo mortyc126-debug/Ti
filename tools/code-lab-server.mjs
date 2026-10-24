@@ -388,7 +388,11 @@ const server = http.createServer(async (req, res) => {
       try {
         const cfg = aiRuntime.getConfig();
         const resp = await aiRuntime.chat(cfg, key, { temperature: 0.3, max_tokens: 900, messages: [ { role: 'system', content: sys }, { role: 'user', content: user } ] });
-        if(!resp.ok){ const t = await resp.text(); return json(res, 502, { error: 'ИИ вернул ошибку ' + resp.status + ': ' + t.slice(0, 300) }); }
+        if(!resp.ok){
+          const t = await resp.text();
+          if(resp.status === 429){ const ra = (resp.headers.get && resp.headers.get('retry-after')) || ''; return json(res, 429, { error: 'ИИ отвечает «слишком часто» (429 — лимит запросов тарифа)' + (ra ? '. Повтори через ' + ra + ' сек.' : '. Подожди 10–60 сек и повтори, или выдели меньше кода.') }); }
+          return json(res, 502, { error: 'ИИ вернул ошибку ' + resp.status + ': ' + t.slice(0, 300) });
+        }
         const data = await resp.json();
         let content = data?.choices?.[0]?.message?.content;
         if(Array.isArray(content)) content = content.map(x => x.text || '').join('');
