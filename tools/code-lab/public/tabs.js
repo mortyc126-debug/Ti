@@ -73,4 +73,7 @@
   new MutationObserver(() => { clearTimeout(dt); dt = setTimeout(buildTabs, 150); }).observe(eds, { subtree: true, attributes: true, attributeFilter: ['class'] });
 
   applyActive(); buildTabs();
+
+  // наружу: переключить вкладку и перестроить полосу (нужно fileio.js — открыл файл, сразу показать его)
+  window.codelabTabs = { setActive, rebuild: () => { applyActive(); buildTabs(); }, active: () => activeId };
 })();

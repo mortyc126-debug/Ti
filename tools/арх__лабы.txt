@@ -199,7 +199,7 @@ library/
 |---|---|---|
 | Старт | Главная, С чего начать, Обучение | `index.html` (`home.js`), `start.html` (`start.js`), `schema.html` |
 | Кусочки кода | **Опись**, **Библиотека** | `inventory.html` (`inventory.js`, `ai-tools.js`), `library.html` (`app.js`, `upload-templates.js`, `cm-bridge.js`) |
-| Собирать | **Конструктор**, Рецепты | `constructor.html` (`constructor.js`, `sandbox.js`, `workspace.js`, `tabs.js`), `recipes.html` (`recipes.js`) |
+| Собирать | **Конструктор**, Рецепты | `constructor.html` (`constructor.js`, `sandbox.js`, `workspace.js`, `tabs.js`, `fileio.js`), `recipes.html` (`recipes.js`) |
 | Данные | Данные (загрузка) | `schema-json.html` |
 
 Страницы вне меню:
@@ -304,7 +304,11 @@ code-lab/vendor/codemirror/
 
 ### Вкладки редактора (`tabs.js`, с 24.10.2026)
 
-Надстройка над песочницей: вместо стопки панелей `.sb-ed` — полоса вкладок сверху и один видимый активный редактор. Не трогает ни `sandbox.js`, ни `workspace.js`, работает только через `window.codelabSandbox.getFiles()/setFiles()` и показ/скрытие панелей классом `.sb-active`. Оборачивает `#sbEds` в `.sb-edcol` с полосой `#sbTabs`; на `#sbEds` вешает класс `tabbed` (в CSS `constructor.html`: `.sb-eds.tabbed > .sb-ed{display:none}`, `.sb-active{display:flex}`). Активная вкладка запоминается в `localStorage['codelab_sb_active']`. Вкладка: точка «не сохранено» (из класса `.ws-dirty`, который ставит `workspace.js` на файлы проекта), имя файла, крестик закрытия. Перетаскивание меняет порядок (через `setFiles`). Два `MutationObserver` на `#sbEds`: по `childList` (открыли/закрыли/переставили файл) и по атрибуту `class` в поддереве (появление/снятие `.ws-dirty`) — пересобирают полосу. Закрытие последней вкладки создаёт пустой `файл.txt`.
+Надстройка над песочницей: вместо стопки панелей `.sb-ed` — полоса вкладок сверху и один видимый активный редактор. Не трогает ни `sandbox.js`, ни `workspace.js`, работает только через `window.codelabSandbox.getFiles()/setFiles()` и показ/скрытие панелей классом `.sb-active`. Оборачивает `#sbEds` в `.sb-edcol` с полосой `#sbTabs`; на `#sbEds` вешает класс `tabbed` (в CSS `constructor.html`: `.sb-eds.tabbed > .sb-ed{display:none}`, `.sb-active{display:flex}`). Активная вкладка запоминается в `localStorage['codelab_sb_active']`. Вкладка: точка «не сохранено» (из класса `.ws-dirty`, который ставит `workspace.js` на файлы проекта), имя файла, крестик закрытия. Перетаскивание меняет порядок (через `setFiles`). Два `MutationObserver` на `#sbEds`: по `childList` (открыли/закрыли/переставили файл) и по атрибуту `class` в поддереве (появление/снятие `.ws-dirty`) — пересобирают полосу. Закрытие последней вкладки создаёт пустой `файл.txt`. Наружу отдаёт `window.codelabTabs = { setActive, rebuild, active }` (нужен `fileio.js`, чтобы открытый файл сразу стал активной вкладкой).
+
+### Открыть/сохранить файл с диска (`fileio.js`, с 24.10.2026)
+
+Две кнопки в панели песочницы рядом с «+ файл»: «📂 открыть…» и «💾 на диск…». Это НЕ папка проекта (её ведёт `workspace.js`) — отдельные файлы откуда угодно с диска. В Chrome/Edge через File System Access API (`showOpenFilePicker`/`showSaveFilePicker`): открытие читает файл и кладёт новой вкладкой (язык по расширению), дескриптор помнится по `id` куска в `Map`, поэтому «на диск…» перезаписывает тот же файл без повторного выбора; если дескриптора нет — спрашивает, куда (как «сохранить как»). В браузерах без API откат: открытие через скрытый `<input type=file multiple>`, сохранение — скачиванием (`Blob` + `a[download]`). Дескрипторы живут только в памяти (после перезагрузки «на диск…» снова спросит место). Активный файл для сохранения берётся по `localStorage['codelab_sb_active']` (или первый). Сообщения выводит в строку `#wsMsg` из `workspace.js`, если она есть.
 
 ## 11. Безопасность
 
