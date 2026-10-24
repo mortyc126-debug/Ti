@@ -1314,17 +1314,21 @@ function buildHighlight(code){
   String(code).split('\n').forEach(line => {
     const div = document.createElement('div'); div.className = 'line';
     let i = 0; const n = line.length;
-    const push = (cls, v) => { const s = document.createElement('span'); if(cls) s.style.color = cls; s.textContent = v; div.appendChild(s); };
+    // цвета — из переменных темы (как в «Библиотеке»), hex только запасной; data-k для панели «объяснить»
+    const push = (varColor, kind, v) => { const s = document.createElement('span'); if(varColor) s.style.color = varColor; if(kind) s.dataset.k = kind; s.textContent = v; div.appendChild(s); };
     while(i < n){
       const rest = line.slice(i), c = line[i];
-      if(rest.startsWith('//')){ push('#9090BB', line.slice(i)); break; }
-      if(c === '"' || c === "'" || c === '`'){ let j = i+1; while(j<n && line[j]!==c) j++; j++; push('#52F2C9', line.slice(i, j)); i = j; continue; }
-      if(/[0-9]/.test(c)){ const mm=/^\d[\d.]*/.exec(rest); push('#FF8800', mm[0]); i+=mm[0].length; continue; }
+      if(rest.startsWith('//')){ push('var(--com,#9090BB)', 'com', line.slice(i)); break; }
+      if(c === '"' || c === "'" || c === '`'){ let j = i+1; while(j<n && line[j]!==c) j++; j++; push('var(--str,#52F2C9)', 'str', line.slice(i, j)); i = j; continue; }
+      if(/[0-9]/.test(c)){ const mm=/^\d[\d.]*/.exec(rest); push('var(--num,#FF8800)', 'num', mm[0]); i+=mm[0].length; continue; }
       const im = /^[A-Za-zА-Яа-яЁё_$][\wА-Яа-яЁё$]*/.exec(rest);
       if(im){ const w=im[0]; let k=i+w.length; while(k<n&&line[k]===' ')k++;
-        push(KW.has(w)?'#B45CFF':(line[k]==='('||BI.has(w))?'#3DD9FF':'#CBC2EA', w); i+=w.length; continue; }
-      const ws2=/^\s+/.exec(rest); if(ws2){ push(null, ws2[0]); i+=ws2[0].length; continue; }
-      push('#9C90C4', c); i++;
+        if(KW.has(w)) push('var(--kw,#B45CFF)', 'kw', w);
+        else if(line[k]==='('||BI.has(w)) push('var(--fn,#3DD9FF)', 'fn', w);
+        else push('var(--name,#CBC2EA)', 'name', w);
+        i+=w.length; continue; }
+      const ws2=/^\s+/.exec(rest); if(ws2){ push(null, null, ws2[0]); i+=ws2[0].length; continue; }
+      push('var(--op,#9C90C4)', 'op', c); i++;
     }
     if(!line) div.appendChild(document.createTextNode('​'));
     lines.push(div);
@@ -1605,7 +1609,11 @@ function openCodeInEditor(name, lang, code){
   const sb = window.codelabSandbox;
   if(!sb){ alert('Песочница недоступна — обнови страницу.'); return; }
   const id = 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-  sb.setFiles([...sb.getFiles(), { id, name: name || 'файл.txt', lang: lang || 'txt', code: code || '' }]);
+  const cur = sb.getFiles();
+  // если в песочнице только нетронутые демо-файлы (id f1–f3, не из проекта) — заменить их, чтобы живой предпросмотр не показывал чужое демо
+  const onlyDefaults = cur.length > 0 && cur.length <= 3 && cur.every(x => /^f[1-3]$/.test(x.id) && !x.path);
+  const nf = { id, name: name || 'файл.txt', lang: lang || 'txt', code: code || '' };
+  sb.setFiles(onlyDefaults ? [nf] : [...cur, nf]);
   if(window.codelabTabs) window.codelabTabs.setActive(id, true);
 }
 $('#openEditor').onclick = () => $('#openfile').click();

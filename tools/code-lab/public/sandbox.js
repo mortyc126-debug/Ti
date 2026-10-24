@@ -21,7 +21,8 @@
 
   // ── подсветка по языку ──
   // Палитра (та же, что в общем buildHighlight): где хранится — здесь, в C.
-  const C = { com:'#9090BB', str:'#52F2C9', num:'#FF8800', kw:'#B45CFF', fn:'#3DD9FF', name:'#CBC2EA', punct:'#9C90C4' };
+  // цвета — из переменных темы (как в «Библиотеке» и конструкторе), hex только запасной
+  const C = { com:'var(--com,#9090BB)', str:'var(--str,#52F2C9)', num:'var(--num,#FF8800)', kw:'var(--kw,#B45CFF)', fn:'var(--fn,#3DD9FF)', name:'var(--name,#CBC2EA)', punct:'var(--op,#9C90C4)' };
   const LEGEND = [
     { c:C.fn,  n:'тег / селектор / вызов', d:'имя HTML-тега, CSS-селектора или вызываемой функции' },
     { c:C.kw,  n:'атрибут / свойство / ключевое слово', d:'атрибут тега, свойство CSS или служебное слово языка' },
@@ -219,7 +220,10 @@
   // ── разбор: клик по слову → пояснение ──
   // роль слова определяем по цвету, которым его раскрасил buildHighlight
   const COLOR_ROLE = { '#9090bb':'комментарий', '#52f2c9':'строка', '#ff8800':'число', '#b45cff':'ключевое слово', '#3dd9ff':'имя/вызов', '#cbc2ea':'имя', '#9c90c4':'знак' };
+  const KIND_ROLE2 = { com:'комментарий', str:'строка', num:'число', kw:'ключевое слово', fn:'имя/вызов', name:'имя', op:'знак', 'css-num':'размер' };
   function roleOf(sp){
+    // теперь цвет задаётся переменной темы — роль берём из data-k, цвет лишь как запас
+    if(sp.dataset && sp.dataset.k && KIND_ROLE2[sp.dataset.k]) return KIND_ROLE2[sp.dataset.k];
     let c = sp.style.color || '';
     const m = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(c);
     if(m) c = '#' + [1,2,3].map(i => (+m[i]).toString(16).padStart(2,'0')).join('');
