@@ -93,6 +93,8 @@ async function gitRoot(){ const r = await git(['rev-parse', '--show-toplevel']);
 async function ensureLabDirs(){ for(const d of [LIBRARY, FLOWS, DATA, RECIPES]){ try { await fs.mkdir(d, { recursive: true }); } catch(_){} } }
 // только НЕпустые папки лаборатории — пустую git commit не примет («did not match any file(s) known to git»)
 async function labPaths(){ const out = []; for(const d of [LIBRARY, FLOWS, RECIPES]){ try { if((await fs.readdir(d)).length) out.push(d); } catch(_){} } return out; }
+// то же + файл словаря пояснений (keyword-dict.json) — чтобы правки словаря тоже уезжали на GitHub, а не терялись при pull
+async function labTargets(){ const out = await labPaths(); const dp = path.join(PUBLIC, 'keyword-dict.json'); try { await fs.access(dp); out.push(dp); } catch(_){} return out; }
 
 // ── токенайзер: см. code-lab/lib/tokenizer.mjs (сырой код → строки токенов {k, v, r?}) ──
 
@@ -665,7 +667,7 @@ const server = http.createServer(async (req, res) => {
       let branch = '', dirty = 0;
       if(root){
         branch = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], root)).out;
-        const paths = await labPaths();
+        const paths = await labTargets();
         if(paths.length){ const st = await git(["status", "--porcelain", "--", ...paths], root); dirty = st.out ? st.out.split('\n').filter(Boolean).length : 0; }
       }
       return json(res, 200, { repo: !!root, branch, dirty, templates });
@@ -674,13 +676,13 @@ const server = http.createServer(async (req, res) => {
       await ensureLabDirs();
       const root = await gitRoot();
       if(!root) return json(res, 200, { ok: false, stage: 'repo', message: 'Папка лаборатории не внутри git-репозитория — шаблоны сохранены только локально.' });
-      const paths = await labPaths();   // только непустые папки — иначе git спотыкается на пустых
+      const paths = await labTargets();   // непустые папки + файл словаря — иначе git спотыкается на пустых
       if(!paths.length) return json(res, 200, { ok: true, pushed: false, message: 'нечего сохранять' });
       const add = await git(["add", "--", ...paths], root);
       if(add.code !== 0) return json(res, 200, { ok: false, stage: 'add', message: add.err || 'git add не удался' });
       const staged = (await git(["diff", "--cached", "--name-only", "--", ...paths], root)).out.split('\n').filter(Boolean).length;
       if(staged > 0){
-        const c = await git(["commit", "-m", "Лаборатория: мои шаблоны и схемы", "--", ...paths], root);
+        const c = await git(["commit", "-m", "Лаборатория: мои шаблоны, схемы и словарь", "--", ...paths], root);
         if(c.code !== 0) return json(res, 200, { ok: false, stage: 'commit', message: c.err || c.out });
       }
       // подтянуть серверные изменения ПЕРЕД push, чтобы не упираться в отклонение.
