@@ -89,38 +89,54 @@
     return b;
   }
 
+  function activeLang(){ let id = null; try { id = localStorage.getItem('codelab_sb_active'); } catch(_){} const fs = files(); const f = fs.find(x => x.id === id) || fs[0]; return f ? (f.lang || '') : ''; }
+
   function showRefs(word, ev){
+    const lang = activeLang(), markup = /^(css|html|htm)$/.test(lang);
+    const expl = window.codelabExplain ? window.codelabExplain(word, lang) : null;
     const { defs, uses } = analyze(word);
     hide();
     pop = document.createElement('div'); pop.className = 'nav-pop';
-    const h = document.createElement('h4'); h.innerHTML = '<code></code> — связи'; h.querySelector('code').textContent = word; pop.appendChild(h);
+    const h = document.createElement('h4'); h.innerHTML = '<code></code> — ' + (markup ? 'что это' : 'связи'); h.querySelector('code').textContent = word; pop.appendChild(h);
 
-    const g1 = document.createElement('div'); g1.className = 'grp'; g1.textContent = 'Определение' + (defs.length > 1 ? ' (' + defs.length + ')' : ''); pop.appendChild(g1);
-    if(defs.length) defs.slice(0, 20).forEach(d => pop.appendChild(refBtn(d, true)));
-    else { const n = document.createElement('div'); n.className = 'none'; n.textContent = 'не нашлось явного объявления'; pop.appendChild(n); }
+    // пояснение из словаря (CSS-свойства/значения, HTML-теги/атрибуты, ключевые слова)
+    if(expl){ const ge = document.createElement('div'); ge.className = 'grp'; ge.textContent = 'Что это'; pop.appendChild(ge);
+      const be = document.createElement('div'); be.style.whiteSpace = 'pre-wrap'; be.style.font = '12px/1.45 system-ui,sans-serif'; be.textContent = expl; pop.appendChild(be); }
 
-    const g2 = document.createElement('div'); g2.className = 'grp'; g2.textContent = 'Использования (' + uses.length + ')'; pop.appendChild(g2);
-    if(uses.length) uses.slice(0, 40).forEach(u => pop.appendChild(refBtn(u, false)));
-    else { const n = document.createElement('div'); n.className = 'none'; n.textContent = 'нет других вхождений'; pop.appendChild(n); }
-    if(uses.length > 40){ const m = document.createElement('div'); m.className = 'none'; m.textContent = '…и ещё ' + (uses.length - 40); pop.appendChild(m); }
+    if(markup){
+      // для разметки/стилей код-«определение/использования» не нужны — только пояснение + сколько раз встречается
+      if(!expl){ const n = document.createElement('div'); n.className = 'none'; n.textContent = 'нет пояснения в словаре (можно добавить в keyword-dict.json)'; pop.appendChild(n); }
+      const g = document.createElement('div'); g.className = 'grp'; g.textContent = 'В этом файле'; pop.appendChild(g);
+      const cnt = document.createElement('div'); cnt.className = 'none'; cnt.textContent = 'встречается ' + uses.length + ' раз(а)'; pop.appendChild(cnt);
+    } else {
+      const g1 = document.createElement('div'); g1.className = 'grp'; g1.textContent = 'Определение' + (defs.length > 1 ? ' (' + defs.length + ')' : ''); pop.appendChild(g1);
+      if(defs.length) defs.slice(0, 20).forEach(d => pop.appendChild(refBtn(d, true)));
+      else { const n = document.createElement('div'); n.className = 'none'; n.textContent = 'не нашлось явного объявления'; pop.appendChild(n); }
+
+      const g2 = document.createElement('div'); g2.className = 'grp'; g2.textContent = 'Использования (' + uses.length + ')'; pop.appendChild(g2);
+      if(uses.length) uses.slice(0, 40).forEach(u => pop.appendChild(refBtn(u, false)));
+      else { const n = document.createElement('div'); n.className = 'none'; n.textContent = 'нет других вхождений'; pop.appendChild(n); }
+      if(uses.length > 40){ const m = document.createElement('div'); m.className = 'none'; m.textContent = '…и ещё ' + (uses.length - 40); pop.appendChild(m); }
+    }
 
     document.body.appendChild(pop);
     const x = Math.min(ev.clientX, innerWidth - pop.offsetWidth - 12), y = Math.min(ev.clientY + 14, innerHeight - pop.offsetHeight - 12);
     pop.style.left = Math.max(8, x) + 'px'; pop.style.top = Math.max(8, y) + 'px';
   }
 
-  // слово под кликом (CodeMirror или обычная textarea)
+  // слово под кликом (CodeMirror или обычная textarea); в CSS/HTML ловим дефисы и цифры
   function wordAt(ed, ev){
     const ta = ed.querySelector('textarea'), cm = ta && ta.__cm;
+    const markup = ed.__f && /^(css|html|htm)$/.test(ed.__f.lang || '');
+    const ch = markup ? /[\w$-]/ : /[\w$]/;
     if(cm){
       const pos = cm.coordsChar({ left: ev.clientX, top: ev.clientY }, 'window');
-      const r = cm.findWordAt(pos); const w = cm.getRange(r.anchor, r.head);
-      return (w || '').trim();
+      if(markup){ const ln = cm.getLine(pos.line) || ''; let a = pos.ch, b = pos.ch; while(a > 0 && ch.test(ln[a - 1])) a--; while(b < ln.length && ch.test(ln[b])) b++; return ln.slice(a, b); }
+      const r = cm.findWordAt(pos); return (cm.getRange(r.anchor, r.head) || '').trim();
     }
     if(ta){
-      // клик уже поставил каретку — читаем слово вокруг неё
       const v = ta.value, c = ta.selectionStart; let a = c, b = c;
-      while(a > 0 && /[\w$]/.test(v[a - 1])) a--; while(b < v.length && /[\w$]/.test(v[b])) b++;
+      while(a > 0 && ch.test(v[a - 1])) a--; while(b < v.length && ch.test(v[b])) b++;
       return v.slice(a, b);
     }
     return '';
@@ -130,10 +146,11 @@
   edsEl.addEventListener('click', ev => {
     if(!navOn) return;
     const ed = ev.target.closest && ev.target.closest('.sb-ed'); if(!ed || !ed.__f) return;
-    // textarea ставит каретку — дождёмся её, потом читаем слово
+    const markup = /^(css|html|htm)$/.test(ed.__f.lang || '');
     setTimeout(() => {
       const w = wordAt(ed, ev);
-      if(!w || !/^[A-Za-z_$][\w$]*$/.test(w) || STOP.has(w.toLowerCase()) || w.length < 2){ hide(); return; }
+      const ok = markup ? /^[A-Za-z0-9_$-]{2,}$/.test(w) : (/^[A-Za-z_$][\w$]*$/.test(w) && !STOP.has(w.toLowerCase()) && w.length >= 2);
+      if(!w || !ok){ hide(); return; }
       showRefs(w, ev);
     }, 0);
   }, true);
