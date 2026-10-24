@@ -71,6 +71,21 @@
     return out;
   }
 
+  // вид связи c → x по телу c, терминами единого словаря CODE_RELATIONS (relations.js).
+  // Берём как можно более точный вид; порядок проверок = приоритет.
+  function classifyRel(body, nm){
+    const re = p => new RegExp(p).test(body);
+    if(re('extends\\s+' + nm + '(?![\\w$])')) return 'extends';                 // расширяет (наследует)
+    if(re('new\\s+' + nm + '(?![\\w$])')) return 'creates';                     // создаёт экземпляр
+    if(re('(?<![\\w$])' + nm + '\\.addEventListener')) return 'listens';        // слушает событие
+    if(re('(?<![\\w$])' + nm + '\\.(dispatchEvent|emit)\\s*\\(')) return 'emits'; // шлёт событие
+    if(re('(?<![\\w$])' + nm + '\\.(push|pop|shift|unshift|splice|set|add|delete|clear|sort)\\s*\\(')) return 'mutates'; // меняет
+    if(re('(?<![\\w$])' + nm + '\\.\\w+\\s*=(?!=)')) return 'mutates';          // меняет поле
+    if(re('(?<![\\w$])' + nm + '\\s*\\(')) return 'calls';                      // вызывает
+    if(re('(?<![\\w$])' + nm + '\\.\\w+')) return 'reads';                      // читает поле/значение
+    return 'uses';                                                              // общее «использует»
+  }
+
   // поля объекта-значения (ключи верхнего уровня) из value вида name = { ... }
   function objectFields(value){
     const bi = value.indexOf('{'); if(bi < 0) return [];
@@ -228,10 +243,7 @@
     comps.filter(x => x.name !== c.name).forEach(x => {
       const nm = x.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       if(!new RegExp('(?<![\\w$])' + nm + '(?![\\w$])').test(body)) return;
-      let rel = 'uses';                                             // по умолчанию «использует»
-      if(new RegExp('new\\s+' + nm + '(?![\\w$])').test(body)) rel = 'creates';   // создаёт экземпляр
-      else if(new RegExp('(?<![\\w$])' + nm + '\\s*\\(').test(body)) rel = 'calls'; // вызывает
-      deps.push({ name: x.name, rel });
+      deps.push({ name: x.name, rel: classifyRel(body, nm) });
     });
     const gd = document.createElement('div'); gd.className = 'grp'; gd.textContent = 'Связи с компонентами файла (' + deps.length + ')'; d.appendChild(gd);
     if(deps.length){ const w = document.createElement('div'); deps.forEach(x => {
