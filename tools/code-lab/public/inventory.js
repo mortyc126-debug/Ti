@@ -638,7 +638,7 @@ document.getElementById('psections').onclick = openSectionsModal;
 const DICT_SAMPLE = [
   '# Пополнение словаря пояснений. Одна строка — одно слово.',
   '# Формат: слово: пояснение   (можно «слово = пояснение» или «слово | пояснение»)',
-  '# Раздел выбирается сверху (общее/код, HTML-теги, HTML-атрибуты, CSS-свойства, CSS-значения).',
+  '# Язык указывается в поле сверху (c, cpp, java…). Пусто — общий словарь.',
   '# Строки с # или // — комментарии.',
   '',
   'printf: printf — вывод в консоль в C: printf("%d", x). %d — число, %s — строка.',
@@ -667,11 +667,10 @@ function openDictModal(){
   const bg = el2('div', 'modal-bg');
   const box = el2('div', 'modal');
   box.innerHTML = '<h3>Словарь пояснений</h3>'
-    + '<p class="mh">Добавь сразу много пояснений к словам. Они попадут в общий словарь <b>keyword-dict.json</b> — его читают песочница («пояснения по клику», «🧩 разобрать», «🔗 связи»), автоподпись кусков и бэкофилл. Пригодится для новых языков (C, C++, Java…). Формат строки: <b>слово: пояснение</b> (или «=», или «|»). Раздел выбери ниже.</p>'
-    + '<div class="mbtns" style="margin-bottom:6px"><label class="inv-chk">раздел: <select class="inv-sel" id="dc-section">'
-    + '<option value="words">общее / код</option><option value="htmlTags">HTML-теги</option><option value="htmlAttrs">HTML-атрибуты</option><option value="cssProps">CSS-свойства</option><option value="cssVals">CSS-значения</option>'
-    + '</select></label></div>'
-    + '<div class="fmt">printf: printf — вывод в консоль в C&#10;std::cout: поток вывода в C++&#10;System.out.println: печать строки в Java</div>'
+    + '<p class="mh">Бесконечно пополняй пояснения к особым словам <b>любого языка</b>. Укажи язык (c, cpp, java, python, rust, go…) — слова лягут в словарь этого языка и будут показываться, когда открыт файл на нём (в приоритете над общим). Пусто — общий словарь (для слов, общих всем языкам). Строка: <b>слово: пояснение</b> (или «=», или «|»). Всё попадает в <b>keyword-dict.json</b> — его читают песочница («пояснения», «🧩», «🔗»), автоподпись и бэкофилл.</p>'
+    + '<div class="mbtns" style="margin-bottom:6px"><label class="inv-chk">язык: <input class="inv-search" id="dc-lang" list="dc-langs" placeholder="c, cpp, java, python… (пусто — общий)" style="width:230px"></label>'
+    + '<datalist id="dc-langs"><option value="c"><option value="cpp"><option value="java"><option value="python"><option value="rust"><option value="go"><option value="sql"><option value="php"><option value="ruby"><option value="lua"><option value="bash"><option value="js"><option value="ts"></datalist></div>'
+    + '<div class="fmt">printf: printf — вывод в консоль в C&#10;malloc: выделить память вручную, потом free()&#10;std::cout: поток вывода в C++ (cout &lt;&lt; x)</div>'
     + '<textarea id="dc-text" placeholder="вставь строки «слово: пояснение» или нажми «пример»"></textarea>'
     + '<div class="mbtns"><button class="btn" id="dc-sample">пример</button><button class="btn ok" id="dc-parse">разобрать</button><button class="btn" id="dc-apply" style="display:none">добавить в словарь</button><button class="btn" id="dc-close">закрыть</button></div>'
     + '<div class="lp-prev" id="dc-prev"></div>';
@@ -693,9 +692,9 @@ function openDictModal(){
   q('#dc-apply').onclick = async () => {
     if(!parsed || !parsed.entries.length) return;
     q('#dc-apply').textContent = 'добавляю…'; q('#dc-apply').disabled = true;
-    const section = q('#dc-section').value;
-    const r = await fetch('/api/dict/add', { method: 'POST', body: JSON.stringify({ section, entries: parsed.entries }) }).then(x => x.json()).catch(() => ({}));
-    q('#dc-prev').innerHTML = '<div class="lp-row ' + (r && r.ok ? 'lp-ok' : 'lp-bad') + '">' + (r && r.ok ? ('Готово: добавлено ' + r.added + ' (всего в разделе ' + r.total + '). Обнови страницу песочницы (Ctrl+F5), чтобы пояснения подхватились.') : 'Ошибка сохранения') + '</div>';
+    const lang = q('#dc-lang').value.trim();
+    const r = await fetch('/api/dict/add', { method: 'POST', body: JSON.stringify({ lang, entries: parsed.entries }) }).then(x => x.json()).catch(() => ({}));
+    q('#dc-prev').innerHTML = '<div class="lp-row ' + (r && r.ok ? 'lp-ok' : 'lp-bad') + '">' + (r && r.ok ? ('Готово: добавлено ' + r.added + ' в ' + (r.where || 'словарь') + ' (всего там ' + r.total + '). Обнови страницу песочницы (Ctrl+F5), чтобы подхватилось.') : 'Ошибка сохранения') + '</div>';
     q('#dc-apply').style.display = 'none';
   };
 }

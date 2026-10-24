@@ -362,11 +362,15 @@
     'system-ui':'system-ui — системный шрифт ОС.', auto:'auto — браузер решает сам.', hidden:'hidden — спрятать (например overflow:hidden).',
     transparent:'transparent — прозрачный.', row:'row — в ряд (по горизонтали).', column:'column — в столбец (по вертикали).'
   };
+  // словари пояснений по языкам (c, cpp, java, python, rust…) — открытый, бесконечно пополняемый список.
+  // Ключ — язык в нижнем регистре; значение — {слово: пояснение}. Имеет приоритет над общим словарём.
+  const LANG_DICTS = {};
   // единый источник словаря — keyword-dict.json (тот же, что подписывает куски на сервере).
   // Встроенные словари выше — запасной вариант офлайн; JSON, если доступен, дополняет их.
   fetch('/keyword-dict.json').then(r => r.json()).then(d => {
     Object.assign(EXPLAIN, d.words || {}); Object.assign(HTML_TAGS, d.htmlTags || {});
     Object.assign(HTML_ATTRS, d.htmlAttrs || {}); Object.assign(CSS_PROPS, d.cssProps || {}); Object.assign(CSS_VALS, d.cssVals || {});
+    if(d.langs && typeof d.langs === 'object'){ for(const [lang, words] of Object.entries(d.langs)){ if(words && typeof words === 'object'){ const lk = lang.toLowerCase(); LANG_DICTS[lk] = LANG_DICTS[lk] || {}; for(const [w, t] of Object.entries(words)) LANG_DICTS[lk][w.toLowerCase()] = t; } } }
   }).catch(() => {});
   let pop = null;
   function hidePop(){ if(pop){ pop.remove(); pop = null; } }
@@ -411,6 +415,8 @@
   window.codelabExplain = function(word, lang){
     if(!word) return null;
     const w = String(word), lw = w.toLowerCase(), l = String(lang || '').toLowerCase();
+    // словарь конкретного языка (c, cpp, java…) — в приоритете
+    if(l && LANG_DICTS[l] && LANG_DICTS[l][lw]) return LANG_DICTS[l][lw];
     if(l === 'css') return CSS_PROPS[lw] || CSS_VALS[lw] || EXPLAIN[w] || EXPLAIN[lw] || null;
     if(l === 'html' || l === 'htm') return HTML_TAGS[lw] || HTML_ATTRS[lw] || CSS_PROPS[lw] || CSS_VALS[lw] || EXPLAIN[w] || EXPLAIN[lw] || null;
     return EXPLAIN[w] || EXPLAIN[lw] || CSS_PROPS[lw] || CSS_VALS[lw] || HTML_TAGS[lw] || null;

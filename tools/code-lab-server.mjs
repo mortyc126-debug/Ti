@@ -747,17 +747,23 @@ const server = http.createServer(async (req, res) => {
     if(u.pathname === '/api/dict/add' && req.method === 'POST'){
       const b = await readBody(req);
       const SECTIONS = ['words', 'htmlTags', 'htmlAttrs', 'cssProps', 'cssVals'];
-      const section = SECTIONS.includes(b.section) ? b.section : 'words';
       const dictPath = path.join(PUBLIC, 'keyword-dict.json');
       let dict; try { dict = JSON.parse(await fs.readFile(dictPath, 'utf8')); } catch(_){ dict = {}; }
       for(const s of SECTIONS) if(!dict[s]) dict[s] = {};
+      if(!dict.langs || typeof dict.langs !== 'object') dict.langs = {};
+      // язык — свободное поле (c, cpp, java, python, rust…): пишем в dict.langs[lang].
+      // иначе — одна из фиксированных секций (общее/код, HTML, CSS).
+      const lang = String(b.lang || '').trim().toLowerCase();
+      let target, where;
+      if(lang){ dict.langs[lang] = dict.langs[lang] || {}; target = dict.langs[lang]; where = 'язык «' + lang + '»'; }
+      else { const section = SECTIONS.includes(b.section) ? b.section : 'words'; target = dict[section]; where = section; }
       let pairs = [];
       if(Array.isArray(b.entries)) pairs = b.entries.map(e => Array.isArray(e) ? [e[0], e[1]] : [e && e.word, e && e.text]);
       else if(b.entries && typeof b.entries === 'object') pairs = Object.entries(b.entries);
       let added = 0;
-      for(let [w, t] of pairs){ w = String(w || '').trim().toLowerCase(); t = String(t || '').trim(); if(!w || !t) continue; dict[section][w] = t.slice(0, 600); added++; }
+      for(let [w, t] of pairs){ w = String(w || '').trim().toLowerCase(); t = String(t || '').trim(); if(!w || !t) continue; target[w] = t.slice(0, 600); added++; }
       await fs.writeFile(dictPath, JSON.stringify(dict, null, 2), 'utf8'); _kwDict = dict;
-      return json(res, 200, { ok: true, added, section, total: Object.keys(dict[section]).length });
+      return json(res, 200, { ok: true, added, where, total: Object.keys(target).length, langs: Object.keys(dict.langs) });
     }
 
     // ── рецепты (название + описание + список кусков) ──────────────────────────
