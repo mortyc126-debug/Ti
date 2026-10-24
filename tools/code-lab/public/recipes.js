@@ -58,7 +58,7 @@ function editRecipe(id){
     + '<div class="mfield"><label>Название</label><input id="r-title"></div>'
     + '<div class="mfield"><label>Описание — что собираем и зачем</label><textarea id="r-desc" rows="3"></textarea></div>'
     + '<div class="mfield"><label>Куски по порядку</label><div id="r-items" class="r-items"></div></div>'
-    + '<div class="r-add"><input id="r-search" placeholder="найти кусок по названию…"><div id="r-results" class="r-results"></div></div>'
+    + '<div class="r-add"><input id="r-search" placeholder="найти кусок: по названию, теме или коду…"><div id="r-results" class="r-results"></div></div>'
     + '<div class="merr" id="r-err"></div>'
     + '<div class="mbtns"><button class="btn ok" id="r-save">💾 сохранить</button><button class="btn" id="r-close">отмена</button></div>';
   bg.appendChild(box); document.body.appendChild(bg);
@@ -82,16 +82,30 @@ function editRecipe(id){
       host.appendChild(row);
     });
   };
+  // поиск куска: на сервере (название, описание, код, синонимы); без сервера — по названию и разделу, как раньше
+  let rsSeq = 0, rsTimer = null;
   const search = () => {
     const v = (q('#r-search').value || '').toLowerCase().trim();
-    const box2 = q('#r-results'); box2.innerHTML = '';
-    if(!v){ return; }
-    PIECES.filter(p => ((p.title || '') + ' ' + (p.group || '')).toLowerCase().includes(v)).slice(0, 12).forEach(p => {
-      const r = el('div', 'r-res');
-      r.innerHTML = '<span>' + esc(p.title || p.id) + '</span><span class="r-res-g">' + esc((p.group || '').split('/')[0].trim()) + '</span>';
-      r.onclick = () => { items.push({ id: p.id, title: p.title || p.id, note: '' }); q('#r-search').value = ''; box2.innerHTML = ''; draw(); };
-      box2.appendChild(r);
-    });
+    const box2 = q('#r-results');
+    clearTimeout(rsTimer);
+    if(!v){ rsSeq++; box2.innerHTML = ''; return; }
+    rsTimer = setTimeout(async () => {
+      const seq = ++rsSeq; let list = null;
+      try {
+        const r = await fetch('/api/search?q=' + encodeURIComponent(v) + '&limit=12').then(r => r.json());
+        const by = new Map(PIECES.map(p => [p.id, p]));
+        if(r && Array.isArray(r.hits)) list = r.hits.map(h => by.get(h.id)).filter(Boolean);
+      } catch(_){}
+      if(seq !== rsSeq) return;
+      if(!list) list = PIECES.filter(p => ((p.title || '') + ' ' + (p.group || '')).toLowerCase().includes(v)).slice(0, 12);
+      box2.innerHTML = '';
+      list.forEach(p => {
+        const r = el('div', 'r-res');
+        r.innerHTML = '<span>' + esc(p.title || p.id) + '</span><span class="r-res-g">' + esc((p.group || '').split('/')[0].trim()) + '</span>';
+        r.onclick = () => { items.push({ id: p.id, title: p.title || p.id, note: '' }); q('#r-search').value = ''; box2.innerHTML = ''; draw(); };
+        box2.appendChild(r);
+      });
+    }, 120);
   };
   q('#r-search').oninput = search;
   q('#r-save').onclick = async () => {

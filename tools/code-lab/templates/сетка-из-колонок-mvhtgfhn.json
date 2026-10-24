@@ -1,7 +1,7 @@
 {
   "id": "сетка-из-колонок-mvhtgfhn",
   "lang": "css",
-  "group": "Мои куски",
+  "group": "CSS: раскладка / Grid",
   "title": "сетка из колонок",
   "desc": "",
   "lines": [
@@ -172,5 +172,13 @@
     []
   ],
   "output": "",
-  "descAt": 1792569262955
+  "descAt": 1792569262955,
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: раскладка"
+      ]
+    },
+    "subcat": "Grid"
+  }
 }

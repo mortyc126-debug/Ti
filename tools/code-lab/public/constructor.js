@@ -999,7 +999,40 @@ function descEditor(nd, b){
   const tools = el('div', 'desc-tools');
   const chip = el('button', 'btn', '⟨⟩ код в плашку'); chip.type = 'button'; chip.onclick = () => { wrapBackticks(ta); nd.desc = ta.value; nd.descAt = Date.now(); persist(); draw(); drawSync(); };
   tools.appendChild(chip); tools.appendChild(el('span', 'desc-hint', '`код` — плашка, блок — в тройных ```'));
+  // ✨ дополнить описание через Mistral: показывает предложение, в узел пишется только после выбора
+  const aiB = el('button', 'btn', '✨ дополнить через ИИ'); aiB.type = 'button';
+  aiB.title = 'Mistral допишет описание по коду узла. Ключ — тот же, что в «Настройках» каталога.';
+  const aiOut = el('div', 'desc-sync'); aiOut.style.display = 'none';
+  aiB.onclick = async () => {
+    let key = ''; try { key = localStorage.getItem('codeLab.mistralApiKey') || ''; } catch(_){}
+    aiOut.style.display = ''; aiOut.innerHTML = '';
+    if(!key){ aiOut.appendChild(el('div', 'desc-hint', 'Нет ключа Mistral. Открой каталог → «Настройки» и вставь ключ.')); return; }
+    aiB.disabled = true; aiB.textContent = 'думаю…';
+    try {
+      const body = { section: 'desc', instruction: ta.value.trim() ? 'Дополни и улучши существующее описание, сохрани мои формулировки.' : '' };
+      body.piece = { title: nodeLabel(nd), lang: nodeLang(nd), code: nodeCode(nd), desc: ta.value };
+      const r = await fetch('/api/ai-complete', { method:'POST', headers:{ 'Content-Type':'application/json', 'x-mistral-api-key': key }, body: JSON.stringify(body) });
+      const j = await r.json().catch(() => ({}));
+      if(!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+      const sug = (j.suggestion && j.suggestion.desc) || '';
+      if(!sug){ aiOut.appendChild(el('div', 'desc-hint', 'ИИ ничего не предложил, попробуй ещё раз.')); }
+      else {
+        aiOut.appendChild(el('div', 'desc-sync-h', 'Предложение ИИ'));
+        const pv = el('div', 'desc-prev'); pv.style.margin = '2px 0 6px'; pv.innerHTML = descFmt(sug); aiOut.appendChild(pv);
+        const apply = mode => { ta.value = mode === 'append' && ta.value.trim() ? ta.value.trim() + '\n\n' + sug : sug;
+          nd.desc = ta.value; nd.descAt = Date.now(); persist(); draw(); drawSync(); saveDescToCatalog(); aiOut.style.display = 'none'; };
+        const row = el('div', 'desc-sync-btns');
+        const rep = el('button', 'btn', 'заменить моё'); rep.type = 'button'; rep.onclick = () => apply('replace');
+        const app = el('button', 'btn', 'добавить в конец'); app.type = 'button'; app.onclick = () => apply('append');
+        const no = el('button', 'btn', 'отмена'); no.type = 'button'; no.onclick = () => { aiOut.style.display = 'none'; };
+        row.append(rep, app, no); aiOut.appendChild(row);
+      }
+    } catch(e){ aiOut.appendChild(el('div', 'desc-hint', '⛔ ' + e.message)); }
+    aiB.disabled = false; aiB.textContent = '✨ дополнить через ИИ';
+  };
+  tools.appendChild(aiB);
   box.appendChild(tools);
+  box.appendChild(aiOut);
   box.appendChild(el('div', 'desc-prev-h', 'как выглядит'));
   box.appendChild(prev);
   box.appendChild(sync);

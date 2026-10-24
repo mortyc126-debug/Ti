@@ -1,7 +1,7 @@
 {
   "id": "прозрачность-mvhtelyw",
   "lang": "css",
-  "group": "Мои куски",
+  "group": "CSS: фон и эффекты / Фон",
   "title": "прозрачность",
   "desc": "",
   "lines": [
@@ -61,5 +61,13 @@
     []
   ],
   "output": "",
-  "descAt": 1792569178040
+  "descAt": 1792569178040,
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: фон и эффекты"
+      ]
+    },
+    "subcat": "Фон"
+  }
 }

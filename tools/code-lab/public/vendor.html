@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Редактор кода (CodeMirror)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{--bg:#0E0720;--bg2:#160d23;--line:#49305f;--text:#f5eaff;--mut:#bca9d8;--ok:#52F2C9;--bad:#ff6b8b;--warn:#ffcb6b;--acc:#6934a0}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif}
+.wrap{max-width:900px;margin:0 auto;padding:22px 18px 90px}
+a{color:#c9a8ff}h1{font-size:22px;margin:4px 0 4px}h2{font-size:16px;margin:26px 0 8px}
+.mut{color:var(--mut)}.card{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:8px 0}
+button{border:1px solid #51336e;border-radius:8px;background:#2a1740;color:#fff;padding:7px 12px;cursor:pointer;margin:3px 6px 3px 0;font:inherit}
+button.primary{background:var(--acc)}button:disabled{opacity:.45;cursor:not-allowed}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #2a1740;vertical-align:top}th{color:var(--mut);font-weight:600;font-size:12px}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}.pill{display:inline-block;border:1px solid var(--line);border-radius:10px;padding:0 8px;font-size:12px;margin-right:6px}
+#msg{position:sticky;top:0;z-index:5;min-height:22px;padding:8px 12px;margin:10px 0;border-radius:8px;background:#21112f;border:1px solid var(--line)}
+details{margin-top:4px}summary{cursor:pointer;color:var(--mut)}code{background:#0d0716;padding:1px 5px;border-radius:5px}
+</style></head>
+<body><div class="wrap">
+  <a href="/">← к библиотеке</a>
+  <h1>Редактор кода: CodeMirror 5</h1>
+  <div class="mut">Подсветка и редактирование кода. В интернет сервер ходит только когда вы нажимаете «Проверить обновления» или «Скачать». Без этого всё работает с файлами, уже лежащими у вас на диске.</div>
+  <div id="msg" aria-live="polite">Загружаю состояние…</div>
+
+  <h2>Сейчас используется</h2><div id="now" class="card"></div>
+  <h2>Установленные версии</h2><div id="installed"></div>
+  <h2>Обновления</h2>
+  <div class="card"><button id="btn-check" class="primary">Проверить обновления</button>
+    <span class="mut">Скачанная версия сама не включается: сначала проверка на вашей библиотеке, потом кнопка «Включить».</span>
+    <div id="check-result"></div></div>
+  <h2>Языки вашей библиотеки</h2><div id="langs" class="card"></div>
+</div>
+<script src="/vendor.js"></script>
+</body></html>

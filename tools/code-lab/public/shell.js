@@ -10,9 +10,6 @@
     { key:'learn',       label:'Обучение',     href:'/schema.html',     sect:'Старт' },
     { key:'inventory',   label:'Опись',        href:'/inventory.html',  sect:'Кусочки кода' },
     { key:'library',     label:'Библиотека',   href:'/library.html',    sect:'Кусочки кода' },
-    // «Каталог» убран из меню: дублировал Опись по старой авто-классификации. Файл catalog.html/js
-    // оставлен — чтобы вернуть, достаточно раскомментировать строку ниже.
-    // { key:'catalog',     label:'Каталог',      href:'/catalog.html',    sect:'Кусочки кода' },
     { key:'constructor', label:'Конструктор',  href:'/constructor.html',sect:'Собирать' },
     { key:'recipes',     label:'Рецепты',      href:'/recipes.html',    sect:'Собирать' },
     { key:'data',        label:'Данные (загрузка)', href:'/schema-json.html', sect:'Данные' },
@@ -45,7 +42,7 @@
 
   const side = document.createElement('aside'); side.className = 'side';
   const brand = document.createElement('div'); brand.className = 'brand';
-  brand.innerHTML = '<span class="logo"></span><span class="brand-t">Лаборатория</span>';
+  brand.innerHTML = '<span class="logo"></span>';
   const collapse = document.createElement('button'); collapse.className = 'side-collapse'; collapse.textContent = '⟨'; collapse.title = 'свернуть меню';
   brand.appendChild(collapse); side.appendChild(brand);
 
@@ -152,4 +149,5 @@
   const scan = root => { if(!root || root.nodeType !== 1) return; if(root.tagName === 'TEXTAREA') grow(root); root.querySelectorAll && root.querySelectorAll('textarea').forEach(grow); };
   new MutationObserver(ms => ms.forEach(m => m.addedNodes && m.addedNodes.forEach(scan))).observe(document.body, { childList:true, subtree:true });
   scan(document.body);
+  const ts = document.createElement('script'); ts.src = '/theme.js'; document.head.appendChild(ts);
 })();

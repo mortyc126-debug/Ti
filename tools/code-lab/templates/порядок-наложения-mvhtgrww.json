@@ -1,7 +1,7 @@
 {
   "id": "порядок-наложения-mvhtgrww",
   "lang": "css",
-  "group": "Мои куски",
+  "group": "CSS: положение на странице / position и слои",
   "title": "порядок наложения",
   "desc": "",
   "lines": [
@@ -99,5 +99,13 @@
     []
   ],
   "output": "",
-  "descAt": 1792569279056
+  "descAt": 1792569279056,
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: положение на странице"
+      ]
+    },
+    "subcat": "position и слои"
+  }
 }

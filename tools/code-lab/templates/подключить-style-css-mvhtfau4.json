@@ -1,7 +1,7 @@
 {
   "id": "подключить-style-css-mvhtfau4",
   "lang": "html",
-  "group": "Мои куски",
+  "group": "CSS: основы / Селекторы",
   "title": "подключить style.css",
   "desc": "",
   "lines": [
@@ -60,5 +60,13 @@
     []
   ],
   "output": "",
-  "descAt": 1792569210268
+  "descAt": 1792569210268,
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: основы"
+      ]
+    },
+    "subcat": "Селекторы"
+  }
 }

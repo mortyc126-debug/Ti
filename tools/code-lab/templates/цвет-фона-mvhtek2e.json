@@ -1,7 +1,7 @@
 {
   "id": "цвет-фона-mvhtek2e",
   "lang": "css",
-  "group": "Мои куски",
+  "group": "CSS: фон и эффекты / Фон",
   "title": "цвет фона",
   "desc": "",
   "lines": [
@@ -73,5 +73,13 @@
     []
   ],
   "output": "",
-  "descAt": 1792569175574
+  "descAt": 1792569175574,
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: фон и эффекты"
+      ]
+    },
+    "subcat": "Фон"
+  }
 }

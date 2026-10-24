@@ -236,7 +236,7 @@ function piecesAsText(){
 function flowNodeLabel(nd){ return (nd && (nd.title || (nd.fields && (nd.fields.name || nd.fields.code && String(nd.fields.code).split('\n')[0])) || nd.blockId)) || '?'; }
 async function loadFlowEdges(f){
   const full = await fetch('/api/flows/get?id=' + encodeURIComponent(f.id)).then(r => r.json()).catch(() => null);
-  if(!full || !full.graph) return { nodes: [], edges: [] };
+  if(!full || !full.graph) return { nodes: [], nodeLabels: [], edges: [] };
   const byId = {}; (full.graph.nodes || []).forEach(n => byId[n.id] = n);
   const edges = (full.graph.edges || []).map(e => ({ from: flowNodeLabel(byId[e.from]), to: flowNodeLabel(byId[e.to]), kind: e.kind || 'data', src: e.src || '' }));
   const nodeLabels = (full.graph.nodes || []).map(flowNodeLabel);

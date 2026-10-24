@@ -1,7 +1,7 @@
 {
   "id": "в-углу-родителя-mvhtgquo",
   "lang": "css",
-  "group": "Мои куски",
+  "group": "CSS: положение на странице / position и слои",
   "title": "в углу родителя",
   "desc": "",
   "lines": [
@@ -197,5 +197,13 @@
     []
   ],
   "output": "",
-  "descAt": 1792569277680
+  "descAt": 1792569277680,
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: положение на странице"
+      ]
+    },
+    "subcat": "position и слои"
+  }
 }

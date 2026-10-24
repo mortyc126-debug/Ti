@@ -1,7 +1,7 @@
 {
   "id": "селектор-по-id-mvhtfccz",
   "lang": "css",
-  "group": "Мои куски",
+  "group": "CSS: основы / Селекторы",
   "title": "селектор по id",
   "desc": "",
   "lines": [
@@ -98,5 +98,13 @@
     []
   ],
   "output": "",
-  "descAt": 1792569212243
+  "descAt": 1792569212243,
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: основы"
+      ]
+    },
+    "subcat": "Селекторы"
+  }
 }

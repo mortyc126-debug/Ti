@@ -1,7 +1,7 @@
 {
   "id": "элемент-занимает-остаток-mvhtgghy",
   "lang": "css",
-  "group": "Мои куски",
+  "group": "CSS: раскладка / Flexbox",
   "title": "элемент занимает остаток",
   "desc": "",
   "lines": [
@@ -174,5 +174,13 @@
     []
   ],
   "output": "",
-  "descAt": 1792569264262
+  "descAt": 1792569264262,
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: раскладка"
+      ]
+    },
+    "subcat": "Flexbox"
+  }
 }

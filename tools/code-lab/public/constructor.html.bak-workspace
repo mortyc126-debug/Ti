@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Конструктор кода</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .gwrap{display:grid;grid-template-columns:var(--pw,230px) 10px 1fr 10px var(--iw,300px);gap:0;padding:12px 14px;height:calc(100vh - 2px)}
+  @media(max-width:1000px){.gwrap{grid-template-columns:200px 1fr;gap:12px}.gutter,.g-insp{display:none}}
+  /* перетягиваемые границы между колонками */
+  .gutter{align-self:stretch;cursor:col-resize;display:flex;align-items:center;justify-content:center;touch-action:none}
+  .gutter:after{content:'';width:3px;height:36px;border-radius:3px;background:var(--border);transition:background .12s,height .12s}
+  .gutter:hover:after,.gutter.drag:after{background:var(--acc);height:60px}
+
+  /* палитра слева — компоненты по категориям */
+  .palette{background:var(--bg2);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;min-height:0}
+  .pal-top{padding:10px;border-bottom:1px solid var(--border)}
+  .pal-langs{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border)}
+  .pal-langs .pl-lbl{font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-right:2px}
+  .pal-lang{font-size:11px;color:var(--text3);background:var(--bg);border:1px solid var(--border);border-radius:13px;padding:3px 9px;cursor:pointer;font-family:ui-monospace,monospace}
+  .pal-lang:hover{color:var(--text)}
+  .pal-lang.on{color:var(--acc);border-color:rgba(255,0,110,.45);background:rgba(255,0,110,.12)}
+  .pal-lang.pl-all{font-family:inherit}
+  .pal-search{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:7px 9px}
+  .pal-search:focus{outline:none;border-color:var(--name)}
+  .pal-list{overflow:auto;padding:10px 10px 24px;flex:1}
+  .pal-cat{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin:10px 6px 4px}
+  .pal-item{padding:7px 9px;border-radius:7px;cursor:pointer;font-size:12.5px;color:var(--text2);border:1px solid transparent}
+  .pal-item:hover{background:var(--s2);color:var(--text);border-color:var(--border)}
+  .pal-item .pi-h{font-size:10.5px;color:var(--text3);margin-top:1px;line-height:1.35}
+  .pal-btn{display:block;width:100%;text-align:left;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--str);font-size:12.5px;padding:8px 10px;cursor:pointer;margin-top:6px}
+  .pal-btn:hover{border-color:rgba(82,242,201,.5)}
+  /* сворачиваемая иерархия назначений — с воздухом и разделителями */
+  .pal-d{margin-bottom:8px;border:1px solid transparent;border-radius:10px}
+  .pal-d[open]{border-color:var(--border);background:rgba(124,108,160,.05);padding-bottom:8px}
+  .pal-d>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:10px 11px;border-radius:10px;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text2)}
+  .pal-d>summary::-webkit-details-marker{display:none}
+  .pal-d>summary:before{content:'▸';font-size:9px;color:var(--text3)}
+  .pal-d[open]>summary:before{content:'▾'}
+  .pal-d>summary:hover{color:var(--acc)}
+  .pal-d .pal-n{margin-left:auto;font-size:10px;font-family:ui-monospace,monospace;color:var(--text3);background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:2px 8px}
+  .pal-sub{font-size:10px;font-weight:600;color:var(--text3);margin:12px 11px 5px;padding-top:9px;border-top:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em}
+  .pal-d .pal-sub:first-of-type{border-top:0;padding-top:2px;margin-top:4px}
+  .pal-item2{display:flex;align-items:center;gap:9px;margin:2px 7px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;line-height:1.3;color:var(--text2);white-space:nowrap;overflow:hidden}
+  .pal-item2:before{content:'';flex:none;width:6px;height:6px;border-radius:50%;background:var(--text3);opacity:.45}
+  .pal-item2 .pi-t{overflow:hidden;text-overflow:ellipsis;flex:1}
+  .pal-item2:hover{background:var(--s2);color:var(--text)}
+  .pal-item2:hover:before{background:var(--acc);opacity:1}
+  .pal-item2 .pi-lang{flex:none;font-size:9px;color:var(--text3);font-family:ui-monospace,monospace;border:1px solid var(--border);border-radius:4px;padding:1px 4px}
+  .pal-item2 .pi-del{flex:none;font-size:12px;opacity:0;padding:0 2px;border-radius:5px;cursor:pointer}
+  .pal-item2:hover .pi-del{opacity:.55}
+  .pal-item2 .pi-del:hover{opacity:1}
+
+  /* центр — холст */
+  .center{display:flex;flex-direction:column;min-width:0;min-height:0;gap:10px}
+  .c-toolbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+  .c-toolbar .btn:disabled{opacity:.35;cursor:default}
+  #undo,#redo{font-size:15px;line-height:1;padding:6px 10px}
+  .zoom-grp{display:inline-flex;gap:2px;align-items:center}
+  .zoom-grp .btn{padding:6px 9px}
+  #zoomLbl{font-size:11px;min-width:34px;display:inline-block;text-align:center}
+  .canvas-scroll{flex:1;min-height:0;overflow:auto;border:1px solid var(--border);border-radius:12px;background:
+      radial-gradient(circle, rgba(124,108,160,.10) 1px, transparent 1px) 0 0/22px 22px, var(--bg)}
+  .canvas{position:relative;width:2400px;height:1600px}
+  .edges{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+  .edges path{fill:none;stroke:#6a5a8a;stroke-width:2}
+  .edges path.tmp{stroke:var(--acc);stroke-dasharray:5 4}
+  .edges path.sel{stroke:var(--acc);stroke-width:3}
+  .edges path.edge-hit{stroke:transparent;stroke-width:14;cursor:pointer;pointer-events:stroke}
+  .edges path.edge-bad{stroke:#FF6B6B;stroke-dasharray:6 4}
+  .bc-sec{font-size:12.5px;color:var(--text2);background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:9px 12px;margin:8px 0;line-height:1.55}
+  .bc-sec ul{margin:5px 0 0;padding-left:18px}
+  .bc-sec li{margin:2px 0}
+  .bc-sec code{background:var(--s2);padding:1px 5px;border-radius:4px;color:var(--name)}
+  .bc-out{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;color:var(--str);background:var(--bg);border:1px solid var(--border);border-left:3px solid var(--str);border-radius:8px;padding:10px 12px;margin-top:10px;max-height:40vh;overflow:auto}
+  .gnode{position:absolute;width:190px;background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--name);border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.35);user-select:none}
+  .gnode.needs-input{border-left-color:var(--num,#FF8800);border-color:rgba(255,136,0,.5)}
+  .gnode .need-badge{position:absolute;top:-9px;right:8px;font-size:9.5px;line-height:1;padding:3px 7px;border-radius:9px;background:rgba(255,136,0,.16);border:1px solid rgba(255,136,0,.6);color:var(--num,#FF8800);white-space:nowrap;cursor:help}
+  .gnode.container{border-left-color:var(--kw)} .gnode.draw{border-left-color:var(--str)}
+  .gnode.sel{border-color:var(--acc);box-shadow:0 0 0 2px rgba(255,0,110,.4),0 4px 14px rgba(0,0,0,.4)}
+  .sel-box{position:absolute;border:1px solid var(--acc);background:rgba(255,0,110,.08);border-radius:3px;pointer-events:none;z-index:5}
+  .fl-list{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto}
+  .fl-row{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:9px 11px}
+  .fl-row .fl-n{font-size:13.5px;color:var(--text);font-weight:600}
+  .fl-row .fl-meta{font-size:11.5px;color:var(--text3)}
+  .fl-row .fl-acts{margin-left:auto;display:flex;gap:6px}
+  .fl-row .fl-acts .btn{padding:6px 10px;font-size:12px}
+  .gnode-head{display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:grab;border-bottom:1px solid var(--border)}
+  .gnode-head:active{cursor:grabbing}
+  .gnode-title{flex:1;font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .gnode-del{background:none;border:0;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px}
+  .gnode-del:hover{color:#FF6B6B}
+  .gnode-prev{font-family:ui-monospace,monospace;font-size:11px;color:var(--text3);padding:7px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .port{position:absolute;width:13px;height:13px;border-radius:50%;background:var(--s2);border:2px solid #6a5a8a;left:50%;transform:translateX(-50%);cursor:crosshair;z-index:2}
+  .port:hover{border-color:var(--acc);background:var(--acc)}
+  .port.in{top:-7px} .port.out{bottom:-7px}
+  .port.out:hover,.port.in.hot{border-color:var(--str);background:var(--str)}
+  .canvas-empty{position:absolute;left:24px;top:20px;color:var(--text3);font-size:13px;max-width:360px;line-height:1.6}
+
+  /* результат снизу */
+  .result{display:grid;grid-template-columns:1fr 7px var(--prev-w,300px);gap:6px;height:210px}
+  .result-gutter{cursor:col-resize;align-self:stretch;border-radius:6px;background:var(--border);opacity:.45}
+  .result-gutter:hover,.result-gutter.drag{opacity:1;background:var(--num,#f80)}
+  @media(max-width:1000px){.result{grid-template-columns:1fr}.result-gutter{display:none}}
+  /* свёрнутый холст: прячем визуал, код+превью на всю высоту */
+  .center.canvas-collapsed .canvas-scroll{display:none}
+  .center.canvas-collapsed .result{height:auto;flex:1;min-height:0}
+  /* режим песочницы: прячем визуальный холст и собранный результат */
+  .center.sandbox-on .canvas-scroll,.center.sandbox-on .paste-panel,.center.sandbox-on .result,.center.sandbox-on #collapseCanvas{display:none}
+  .sandbox{flex:1;min-height:0;display:flex}
+  .sb-eds{width:var(--sb-ew,50%);min-width:0;display:flex;flex-direction:column;gap:8px;overflow:auto;padding-right:2px}
+  .sb-gut{flex:none;width:7px;margin:0 4px;cursor:col-resize;border-radius:6px;background:var(--border);opacity:.45;align-self:stretch}
+  .sb-gut:hover,.sb-gut.drag{opacity:1;background:var(--num,#f80)}
+  .sb-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+  .sb-ed{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:10px;overflow:hidden;min-height:110px;flex:1}
+  .sb-ed-head{display:flex;gap:6px;align-items:center;padding:5px 7px;background:var(--bg2);border-bottom:1px solid var(--border)}
+  .sb-name{flex:1;min-width:0;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font:12px ui-monospace,monospace;padding:3px 6px}
+  .sb-lang{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;padding:3px 4px}
+  .sb-run1{padding:2px 9px;font-size:12px}
+  .sb-ed-del{background:none;border:0;color:var(--text3);cursor:pointer;font-size:12px;padding:0 3px}
+  .sb-ed-del:hover{color:#FF6B6B}
+  /* редактор с подсветкой: прозрачная textarea поверх раскрашенного pre */
+  .sb-ed-wrap{position:relative;display:flex;flex:1;min-height:64px;overflow:hidden;background:#0E0720}
+  .sb-hl,.sb-code{margin:0;padding:9px 11px;font:12px/1.5 ui-monospace,monospace;white-space:pre;tab-size:2;letter-spacing:0;border:0;box-sizing:border-box}
+  /* textarea тянется как flex-элемент (абсолютная не растягивается в Chromium), pre — абсолютная подложка под ней */
+  .sb-hl{position:absolute;top:0;right:0;bottom:0;left:0;overflow:hidden;color:#CBC2EA;pointer-events:none;z-index:0}
+  .sb-hl .line{min-height:1.5em}
+  .sb-code{position:relative;z-index:1;flex:1;min-width:0;min-height:0;overflow:auto;background:transparent;color:transparent;caret-color:#fff;resize:none;outline:none}
+  .sb-code::selection{background:rgba(124,108,160,.4)}
+  .center.explain-on .sb-code{cursor:help}
+  .sb-pop{position:fixed;z-index:9999;max-width:300px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font:12.5px/1.55 system-ui,sans-serif;color:var(--text);box-shadow:0 8px 28px rgba(0,0,0,.45)}
+  .sb-pop-h{margin-bottom:4px} .sb-pop-h b{color:var(--acc);font-family:ui-monospace,monospace}
+  .sb-pop-r{font-size:10.5px;color:var(--text3);border:1px solid var(--border);border-radius:5px;padding:1px 5px;margin-left:5px}
+  .sb-legend{position:fixed;z-index:9999;max-width:360px;background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:11px 13px;box-shadow:0 8px 28px rgba(0,0,0,.45);font:12px/1.5 system-ui,sans-serif;color:var(--text)}
+  .sb-lg-h{font-weight:600;margin-bottom:7px}
+  .sb-lg-row{display:flex;align-items:baseline;gap:8px;margin:4px 0}
+  .sb-lg-sw{flex:none;width:12px;height:12px;border-radius:3px;align-self:center}
+  .sb-lg-n{flex:none;font-family:ui-monospace,monospace;font-size:11.5px;min-width:0}
+  .sb-lg-d{color:var(--text3);font-size:11px}
+  .sb-lg-foot{margin-top:8px;padding-top:7px;border-top:1px solid var(--border);color:var(--text3);font-size:11px}
+  .sb-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .sb-live{font-size:11.5px;color:var(--text2);display:flex;align-items:center;gap:4px;cursor:pointer}
+  .sb-frame{flex:1;min-height:120px;width:100%;border:1px solid var(--border);border-radius:10px;background:#fff}
+  .sb-con{flex:none;max-height:30%;overflow:auto;margin:0;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font:11.5px/1.5 ui-monospace,monospace;color:var(--text2);white-space:pre-wrap}
+  @media(max-width:1000px){.sandbox{flex-direction:column}.sb-eds{width:auto}.sb-gut{display:none}}
+  pre.code{background:#0E0720;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:0;overflow:auto;font-size:12px;line-height:1.55}
+  .result .preview{margin:0}
+  .result iframe{width:100%;height:100%;border:1px solid var(--border);border-radius:10px;background:#0E0720}.preview{position:relative}.runtime-status{position:absolute;right:7px;top:7px;z-index:2;padding:4px 7px;border-radius:7px;background:rgba(14,7,32,.9);border:1px solid var(--border);font:10px ui-monospace,monospace;color:var(--text3);pointer-events:none}.runtime-status.ok{color:var(--str);border-color:rgba(82,242,201,.45)}.runtime-status.error{color:#ffb3c1;border-color:rgba(255,107,107,.45)}.runtime-status.checking{color:var(--num);border-color:rgba(255,136,0,.45)}
+
+  /* правый инспектор */
+  .g-insp{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:auto;min-height:0}
+  .insp-head{display:flex;gap:2px;border-bottom:1px solid var(--border);padding:6px 8px;position:sticky;top:0;background:var(--bg2)}
+  .insp-head button{font-size:12.5px;color:var(--text2);background:none;border:0;border-radius:7px;padding:6px 10px;cursor:pointer}
+  .insp-head button:hover{color:var(--text)} .insp-head button.on{background:var(--s2);color:var(--acc)}
+  .insp-body{padding:13px 14px}
+  .insp-empty{color:var(--text3);font-size:12.5px;line-height:1.7}
+
+  /* Явный контракт блока: вход, результат, требования и ограничения */
+  .block-contract{border:1px solid var(--border);background:rgba(124,108,160,.06);border-radius:10px;padding:10px;margin:8px 0 12px}
+  .bc-io{display:grid;grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr);gap:5px;align-items:center}
+  .bc-side{min-width:0}
+  .bc-label{display:block;font-size:9px;letter-spacing:.08em;color:var(--text3);margin-bottom:4px}
+  .bc-value{display:block;font-size:11px;line-height:1.45;color:var(--text2);overflow-wrap:anywhere}
+  .bc-arrow{text-align:center;color:var(--acc)}
+  .bc-status{font-size:10.5px;line-height:1.45;padding:6px 8px;border-radius:6px;margin-top:9px}
+  .bc-status.needs-work{color:#FFB18A;background:rgba(232,137,90,.09);border:1px solid rgba(232,137,90,.28)}
+  .bc-status.ready{color:var(--str);background:rgba(82,242,201,.07);border:1px solid rgba(82,242,201,.2)}
+  .bc-section{margin-top:10px}
+  .bc-heading{font-size:11px;font-weight:600;color:var(--text);margin-bottom:4px}
+  .block-contract ul{padding-left:17px;margin:5px 0 0;color:var(--text2);font-size:11px;line-height:1.5}
+  .block-contract li{margin:0 0 5px}
+  .block-contract .bc-alert{color:#FFB18A}
+  .bc-details{margin-top:9px;border-top:1px solid var(--border);padding-top:8px}
+  .bc-details summary{cursor:pointer;font-size:11px;color:var(--text3)}
+  .bc-details[open] summary{margin-bottom:5px;color:var(--text2)}
+
+  .insp-title{font-size:14px;font-weight:600;margin:0 0 2px}
+  .insp-kind{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:10px}
+  .insp-field{margin-bottom:11px}
+  .insp-field label{display:block;font-size:11px;color:var(--text3);margin-bottom:4px}
+  .insp-field input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--name);font-family:ui-monospace,monospace;font-size:13px}
+  .insp-field input:focus{outline:none;border-color:var(--name)}
+  .insp-text{font-size:13px;color:var(--text2);line-height:1.65}
+  .insp-codebar{display:flex;justify-content:flex-end;margin-top:10px}
+  .insp-copy{font-size:11.5px;padding:5px 10px}
+  .insp-code{margin-top:6px}
+  .insp-desc{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-size:13px;line-height:1.5;min-height:58px;resize:vertical}
+  .insp-desc:focus{outline:none;border-color:var(--name)}
+  .insp-save{font:12px/1 ui-monospace,monospace;color:var(--str);background:var(--s2);border:1px dashed rgba(82,242,201,.45);border-radius:7px;padding:8px 11px;cursor:pointer;margin:2px 0 12px}
+  .insp-save:hover{border-color:var(--str)}
+  /* панель «вставить код» */
+  .paste-panel{background:var(--bg2);border:1px solid rgba(82,242,201,.4);border-radius:11px;padding:12px 13px;margin-bottom:10px}
+  .paste-panel .pp-head{font-size:12px;color:var(--text3);line-height:1.5;margin-bottom:8px}
+  .paste-panel textarea{width:100%;min-height:150px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.55;padding:10px 12px;resize:both}
+  .paste-panel textarea:focus{outline:none;border-color:var(--name)}
+  .paste-panel .pp-btns{display:flex;gap:8px;align-items:center;margin-top:9px;flex-wrap:wrap}
+  .paste-panel .pp-note{font-size:11.5px;color:var(--text3)}
+  /* где живут правки узла: только в схеме или в шаблоне */
+  .desc-sync{margin-top:12px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:9px;display:flex;flex-direction:column;gap:6px;align-items:stretch}
+  .desc-sync-h{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)}
+  .desc-sync-btns{display:flex;gap:7px;flex-wrap:wrap;margin-top:2px}
+  .insp-scope{margin-top:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:9px}
+  .scope-h{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px}
+  .scope-src{font-size:12px;color:var(--text2)}
+  .scope-st{font-size:10.5px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--text3)}
+  .scope-st.dirty{color:var(--acc);border-color:rgba(255,0,110,.4)}
+  .scope-st.clean{color:var(--str);border-color:rgba(82,242,201,.4)}
+  .scope-note{font-size:11.5px;color:var(--text3);line-height:1.5}
+  .scope-btns{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}
+  .scope-save,.scope-revert{font:12px/1 ui-sans-serif,system-ui;border-radius:7px;padding:8px 11px;cursor:pointer;border:1px solid var(--border);background:var(--s2)}
+  .scope-save{color:var(--str);border-color:rgba(82,242,201,.5)}
+  .scope-save:hover{border-color:var(--str)}
+  .scope-save:disabled{opacity:.6;cursor:default}
+  .scope-revert{color:var(--text2)}
+  .scope-revert:hover{color:var(--acc);border-color:rgba(255,0,110,.4)}
+  /* модалка «сохранить в каталог» */
+  .modal-bg{position:fixed;inset:0;background:rgba(5,2,14,.72);display:flex;align-items:flex-start;justify-content:center;z-index:60;overflow:auto;padding:28px 16px}
+  .modal{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;max-width:600px;padding:20px 22px}
+  .modal h3{margin:0 0 4px;font-size:17px}
+  .modal .mh{color:var(--text3);font-size:12.5px;margin:0 0 16px}
+  .mfield{margin-bottom:13px}
+  .mfield label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:5px}
+  .mfield input,.mfield select,.mfield textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:9px 11px}
+  .mfield textarea{font-family:ui-monospace,monospace;resize:both;min-height:120px}
+  .mfield input:focus,.mfield select:focus,.mfield textarea:focus{outline:none;border-color:var(--name)}
+  .mrow{display:flex;gap:12px}.mrow .mfield{flex:1}
+  .mbtns{display:flex;gap:8px;margin-top:6px}
+  .mbtns .btn{font:13px/1 ui-sans-serif,system-ui;padding:9px 14px}
+  .merr{color:#FF6B6B;font-size:12.5px;margin-top:8px}
+  .m-dup{font-size:12.5px;color:var(--num);background:rgba(255,136,0,.08);border:1px solid rgba(255,136,0,.35);border-radius:8px;padding:9px 11px;margin-bottom:12px;line-height:1.5}
+  .m-dup-lbl{display:inline-flex;align-items:center;gap:6px;margin-left:6px;color:var(--text2);cursor:pointer}
+  .blk-code-wrap{position:relative;width:100%;margin-top:3px}
+  textarea.blk-code,pre.blk-hl{width:100%;box-sizing:border-box;margin:0;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word;tab-size:2}
+  pre.blk-hl{position:absolute;inset:0;pointer-events:none;overflow:hidden;color:#CBC2EA;background:var(--bg);border-color:transparent}
+  textarea.blk-code{position:relative;z-index:1;background:transparent;color:transparent;caret-color:#F6F4FF;-webkit-text-fill-color:transparent;resize:vertical}
+  .btn{font:12px/1 ui-monospace,monospace;color:var(--text2);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:7px 11px;cursor:pointer}
+  .btn:hover{color:var(--acc);border-color:rgba(255,0,110,.4)} .btn.ok{color:var(--str);border-color:rgba(82,242,201,.4)}
+  select.btn{appearance:auto}
+
+.edge-message{position:fixed;right:18px;bottom:18px;z-index:1000;max-width:420px;padding:10px 13px;border:1px solid var(--line,#3a2d55);border-radius:10px;background:#170d29;color:var(--text,#f6f4ff);box-shadow:0 8px 30px rgba(0,0,0,.35);font-size:12px;line-height:1.45}
+.edge-message.error{border-color:#a94b62}.edge-message.warn{border-color:#a7833e}.edge-message.ok{border-color:#3d9a83}
+.bc-status.needs-work{border-color:#a7833e}.bc-status.ready{border-color:#3d9a83}
+.bc-alert{color:#ffb3c1}.edge-message{display:none}
+</style>
+</head>
+<body data-page="constructor">
+  <div class="gwrap">
+    <aside class="palette">
+      <div class="pal-top">
+        <input class="pal-search" id="palSearch" placeholder="поиск компонента…">
+        <button class="pal-btn" id="fromtpl">+ компонент из каталога</button>
+        <button class="pal-btn" id="palsort" title="разово проставить раздел по смыслу там, где он пуст">✨ авто-разложить</button>
+      </div>
+      <div class="pal-langs" id="palLangs"></div>
+      <div class="pal-list" id="palList"></div>
+    </aside>
+
+    <section class="center">
+      <div class="c-toolbar">
+        <span style="font-size:12.5px;color:var(--text2);font-weight:600">Холст</span>
+        <span style="font-size:11px;color:var(--str);border:1px solid rgba(82,242,201,.5);border-radius:6px;padding:2px 7px">граф v3</span>
+        <button class="btn" id="undo" title="отменить (Ctrl+Z)" disabled>↶</button>
+        <button class="btn" id="redo" title="повторить (Ctrl+Y)" disabled>↷</button>
+        <span class="zoom-grp">
+          <button class="btn" id="zoomOut" title="мельче (Ctrl+колесо)">−</button>
+          <button class="btn" id="zoomReset" title="100%"><span id="zoomLbl">100%</span></button>
+          <button class="btn" id="zoomIn" title="крупнее">+</button>
+        </span>
+        <button class="btn" id="collapseCanvas" title="свернуть визуальный холст — больше места коду и предпросмотру">🔽 свернуть холст</button>
+        <button class="btn" id="sandboxToggle" title="песочница: панели кода (HTML/CSS/JS и др.) + живой предпросмотр">🧪 песочница</button>
+        <span style="flex:1"></span>
+        <button class="btn" id="example">пример</button>
+        <button class="btn" id="clear">× очистить</button>
+        <button class="btn" id="imp">⬆ разобрать файл</button>
+        <button class="btn" id="paste">✎ вставить код</button>
+        <button class="btn" id="reconcile" title="свести описания узлов и каталога — автоматически берётся самое свежее по дате">⇅ свести описания</button>
+        <button class="btn" id="flows" title="сохранить эту схему со связями в файл или открыть сохранённую">🗂 схемы</button>
+        <button class="btn" id="autowire" title="авто-связи: соединять новые куски с совместимыми по именам">🔗 авто-связи</button>
+        <input type="file" id="impfile" accept=".js,.mjs,.jsx,.ts,.html,.htm,.css,.py,.sql,.json,.txt" style="display:none">
+        <button class="btn" id="copy">⧉ код</button>
+        <button class="btn" id="buildcheck" title="проверить стыковку по типам и запустить собранное">🔌 собрать и проверить</button>
+        <button class="btn ok" id="run">▶ запустить</button>
+        <select id="fmt" class="btn" title="формат файла"><option value="html">.html</option><option value="js">.js</option><option value="txt">.txt</option></select>
+        <button class="btn" id="dl">⬇ скачать</button>
+        <button class="btn" id="save">💾 в шаблоны</button>
+      </div>
+      <div class="canvas-scroll">
+        <div class="canvas" id="canvas">
+          <svg class="edges" id="edges"></svg>
+          <div class="canvas-empty" id="emptyHint">Пусто. Слева выбери компонент — он появится на холсте. Тащи узлы за шапку. Соедини: потяни от нижнего кружка одного узла к верхнему кружку другого — выход пойдёт на вход. Внизу — собранный код и запуск.</div>
+        </div>
+      </div>
+      <div class="paste-panel" id="pastePanel" style="display:none">
+        <div class="pp-head">Вставь сюда код — разобью на блоки и разложу на холсте. HTML — на разметку/стили/скрипт, JS — по шагам.</div>
+        <textarea id="pasteCode" spellcheck="false" placeholder="сюда — свой код (HTML или JS), потом «разобрать на блоки»"></textarea>
+        <div class="pp-btns">
+          <button class="btn ok" id="pasteGo">разобрать на блоки</button>
+          <select id="pasteKind" class="btn" title="как разбирать"><option value="auto">определить само</option><option value="html">как HTML</option><option value="js">как JS</option></select>
+          <button class="btn" id="pasteCancel">отмена</button>
+          <span class="pp-note" id="pasteNote"></span>
+        </div>
+      </div>
+      <div class="result">
+        <pre class="code mono" id="code"></pre>
+        <div class="result-gutter" id="resultGutter" title="потяни — шире превью или код"></div>
+        <div class="preview"><div id="runtimeStatus" class="runtime-status" aria-live="polite">Preview не запускался</div><iframe id="preview" sandbox="allow-scripts"></iframe></div>
+      </div>
+    </section>
+
+    <aside class="g-insp" id="inspector"></aside>
+  </div>
+  <script src="/shell.js"></script>
+  <script src="/relations.js"></script>
+  <script src="/contract.js"></script>
+  <script src="/constructor.js"></script>
+  <script src="/sandbox.js"></script>
+</body>
+</html>

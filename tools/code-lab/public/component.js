@@ -14,7 +14,13 @@ let LNOTES = {};  // пояснения к строкам, ключ — текс
 })();
 
 // секция с номером и заголовком — страница куска идёт сверху вниз в этом порядке
-function panel(title, node){ const d = el('div', 'cpanel'); d.appendChild(el('h3', 'cpanel-h', title)); if(node) d.appendChild(node); return d; }
+function panel(title, node, ai){
+  const d = el('div', 'cpanel');
+  const h = el('h3', 'cpanel-h'); h.appendChild(el('span', '', title));
+  const slot = el('div', 'ai-slot');
+  (ai || []).forEach(sec => h.appendChild(aiButton(sec, slot)));
+  d.appendChild(h); d.appendChild(slot); if(node) d.appendChild(node); return d;
+}
 function elHtml(tag, cls, html){ const e = document.createElement(tag); if(cls) e.className = cls; if(html != null) e.innerHTML = html; return e; }
 // чипы имён с типом («имя: тип» → имя + цветной тег)
 function nameChips(arr){
@@ -51,7 +57,7 @@ function render(t){
 
   // ① Что делает — функция куска одним-двумя предложениями
   root.appendChild(panel('① Что делает', elHtml('div', 'func', descFmt(t.desc || (c && c.description) || '<span class="muted">не описано — допиши в Описи</span>')
-    + (summary.output ? '<div class="func-out">Отдаёт: ' + esc(summary.output) + '</div>' : ''))));
+    + (summary.output ? '<div class="func-out">Отдаёт: ' + esc(summary.output) + '</div>' : '')), ['desc']));
 
   // ② Что меняешь (код) + запуск
   const codeWrap = document.createElement('div');
@@ -62,7 +68,7 @@ function render(t){
     const box = el('div', 'preview'); rb.onclick = () => runDemo(box, c, codeText);
     const h = document.createElement('div'); h.append(rb, box); codeWrap.appendChild(h);
   }
-  root.appendChild(panel('② Что меняешь', codeWrap));
+  root.appendChild(panel('② Что меняешь', codeWrap, ['notes']));
 
   // ③ Имена и требования — что даёт/берёт (с типами) + требования к значениям
   const s3 = document.createElement('div');
@@ -72,12 +78,12 @@ function render(t){
   const reqTxt = Array.isArray(reqs) ? reqs.map(esc).join('<br>') : (reqs ? esc(reqs) : '');
   s3.appendChild(elHtml('div', 'nm-req', '<b>Требования к значениям:</b> ' + (reqTxt || '<span class="muted">не описаны</span>')
     + (summary.input ? '<br><b>Что подать на вход:</b> ' + esc(summary.input) : '')));
-  root.appendChild(panel('③ Имена и требования', s3));
+  root.appendChild(panel('③ Имена и требования', s3, ['requirements']));
 
   // ④ Можно / нельзя — ограничения, края, что сломается
   root.appendChild(panel('④ Можно / нельзя', elHtml('div', 'cando', check.errors
     ? esc(check.errors)
-    : '<span class="muted">ограничения не описаны. Проверь на краях: пустой вход, не те типы, спецсимволы.</span>')));
+    : '<span class="muted">ограничения не описаны. Проверь на краях: пустой вход, не те типы, спецсимволы.</span>'), ['limits', 'errors']));
 
   // ⑤ Связи — к чему подключается (редактируется; влияет на авто-разводку)
   const s5 = document.createElement('div');
@@ -343,4 +349,124 @@ function descFmt(s){
   s = s.replace(/```([\s\S]*?)```/g, (m, c) => { blocks.push(c.replace(/^\n+|\n+$/g, '')); return '\u0001' + (blocks.length - 1) + '\u0001'; });
   let html = esc(s).replace(/`([^`\n]+)`/g, (m, c) => '<code class="desc-chip">' + c + '</code>').replace(/\n/g, '<br>');
   return html.replace(/\u0001(\d+)\u0001/g, (m, i) => '<pre class="desc-code">' + esc(blocks[+i]) + '</pre>');
+}
+
+
+// ═══ ИИ-дополнение раздела (Mistral) ═══════════════════════════════════════
+// Порядок: «✨ дополнить» → (пожелание) → «предложить» → правишь текст → «применить».
+// Пока не нажал «применить», в кусок ничего не пишется. Код куска ИИ не меняет.
+const AI_KEY_LS = 'codeLab.mistralApiKey';
+const AI_LABEL = { desc: 'описание', notes: 'пояснения', requirements: 'требования', limits: 'можно/нельзя', errors: 'ошибки' };
+function aiKey(){ try { return localStorage.getItem(AI_KEY_LS) || ''; } catch(_){ return ''; } }
+
+function aiButton(section, slot){
+  const b = el('button', 'ai-btn', '✨ ' + AI_LABEL[section]);
+  b.type = 'button'; b.title = 'Дополнить этот раздел через Mistral (сначала покажет предложение, ничего не запишет без твоего «применить»)';
+  b.onclick = () => { slot.innerHTML = ''; slot.appendChild(aiBox(section, () => { slot.innerHTML = ''; })); };
+  return b;
+}
+
+async function aiPost(url, body){
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-mistral-api-key': aiKey() }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if(!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+
+function aiBox(section, close){
+  const box = el('div', 'ai-box');
+  const head = el('div', 'ai-h', 'ИИ дополнит раздел «' + AI_LABEL[section] + '». То, что уже написано тобой, сохраняется.');
+  box.appendChild(head);
+
+  // ключ: если его нет — спросим здесь же (тот же ключ, что в «Настройках» каталога)
+  if(!aiKey()){
+    const kr = el('div', 'ai-row');
+    const ki = document.createElement('input'); ki.type = 'password'; ki.className = 'ai-in'; ki.placeholder = 'ключ Mistral (сохранится в этом браузере)';
+    const kb = el('button', 'ai-go', 'сохранить ключ'); kb.type = 'button';
+    kb.onclick = () => { const v = ki.value.trim(); if(!v) return; try { localStorage.setItem(AI_KEY_LS, v); } catch(_){ } box.replaceWith(aiBox(section, close)); };
+    kr.append(ki, kb); box.appendChild(kr);
+    const cancel = el('button', 'ai-cancel', 'закрыть'); cancel.type = 'button'; cancel.onclick = close; box.appendChild(cancel);
+    return box;
+  }
+
+  const row = el('div', 'ai-row');
+  const instr = document.createElement('input'); instr.className = 'ai-in'; instr.placeholder = 'пожелание (необязательно): «проще», «добавь пример», «объясни для новичка»';
+  const go = el('button', 'ai-go', 'предложить'); go.type = 'button';
+  const cancel = el('button', 'ai-cancel', 'закрыть'); cancel.type = 'button'; cancel.onclick = close;
+  row.append(instr, go, cancel); box.appendChild(row);
+  const out = el('div', 'ai-out'); box.appendChild(out);
+
+  const run = async () => {
+    go.disabled = true; go.textContent = 'думаю…'; out.innerHTML = '';
+    try {
+      const r = await aiPost('/api/ai-complete', { id: ID, section, instruction: instr.value });
+      renderSuggestion(section, r, out, close);
+    } catch(e){ out.appendChild(el('div', 'ai-err', '⛔ ' + e.message)); }
+    go.disabled = false; go.textContent = 'ещё вариант';
+  };
+  go.onclick = run;
+  instr.addEventListener('keydown', e => { if(e.key === 'Enter') run(); });
+  setTimeout(() => instr.focus(), 0);
+  return box;
+}
+
+function aiField(label, value, multi){
+  const w = el('label', 'ai-f'); w.appendChild(el('span', 'ai-fl', label));
+  const f = document.createElement(multi ? 'textarea' : 'input'); f.className = 'ai-fi'; f.value = value || '';
+  if(multi) f.rows = Math.min(8, Math.max(2, String(value || '').split('\n').length + 1));
+  w.appendChild(f); w.value = () => f.value; return w;
+}
+
+function renderSuggestion(section, r, out, close){
+  out.innerHTML = '';
+  const s = r.suggestion || {}, cur = r.current || {};
+  let getValue;
+  out.appendChild(el('div', 'ai-note', 'Это предложение. Поправь текст как нужно и нажми «применить».'));
+
+  if(section === 'desc'){
+    const a = aiField('Что делает', s.desc, true), b = aiField('Что на выходе', s.output, false);
+    out.append(a, b); getValue = () => ({ desc: a.value(), output: b.value() });
+  } else if(section === 'requirements'){
+    const a = aiField('Что подать на вход', s.input, false), b = aiField('Требования (по одному на строку)', (s.requirements || []).join('\n'), true);
+    out.append(a, b); getValue = () => ({ input: a.value(), requirements: b.value().split('\n').map(x => x.trim()).filter(Boolean) });
+  } else if(section === 'limits'){
+    const a = aiField('Можно / нельзя', s.errors, true); out.appendChild(a); getValue = () => ({ errors: a.value() });
+  } else if(section === 'errors'){
+    const rows = [];
+    (s.common_errors || []).forEach(e => {
+      const line = el('div', 'ai-err-row');
+      const f1 = aiField('симптом', e.symptom), f2 = aiField('причина', e.cause), f3 = aiField('решение', e.solution);
+      const keep = document.createElement('input'); keep.type = 'checkbox'; keep.checked = true; keep.title = 'взять эту строку';
+      line.append(keep, f1, f2, f3); out.appendChild(line); rows.push({ keep, f1, f2, f3 });
+    });
+    getValue = () => ({ common_errors: rows.filter(x => x.keep.checked).map(x => ({ symptom: x.f1.value(), cause: x.f2.value(), solution: x.f3.value() })) });
+    if(!rows.length) out.appendChild(el('div', 'ai-err', 'ИИ не предложил ошибок. Попробуй добавить пожелание.'));
+  } else if(section === 'notes'){
+    const items = [];
+    const add = (kind, map, existing) => Object.entries(map || {}).forEach(([k, v]) => {
+      if(existing && existing[k]) return;                      // то, что человек уже написал, не трогаем
+      const line = el('div', 'ai-note-row');
+      const keep = document.createElement('input'); keep.type = 'checkbox'; keep.checked = true;
+      const key = el('code', 'ai-key', k.length > 70 ? k.slice(0, 70) + '…' : k); key.title = k;
+      const f = aiField('', v, true);
+      line.append(keep, el('span', 'ai-kind', kind === 'line' ? 'строка' : 'слово'), key, f); out.appendChild(line); items.push({ kind, k, keep, f });
+    });
+    add('line', s.lineNotes, cur.lineNotes); add('word', s.words, cur.words);
+    if(!items.length) out.appendChild(el('div', 'ai-err', 'Новых пояснений нет — всё важное уже подписано. Попробуй добавить пожелание.'));
+    getValue = () => {
+      const v = { lineNotes: {}, words: {} };
+      items.filter(x => x.keep.checked && x.f.value().trim()).forEach(x => { (x.kind === 'line' ? v.lineNotes : v.words)[x.k] = x.f.value(); });
+      return v;
+    };
+  }
+
+  const ok = el('button', 'ai-go ai-apply', 'применить'); ok.type = 'button';
+  ok.onclick = async () => {
+    ok.disabled = true; ok.textContent = 'сохраняю…';
+    try {
+      await aiPost('/api/ai-apply', { id: ID, section, value: getValue() });
+      location.reload();
+    } catch(e){ out.appendChild(el('div', 'ai-err', '⛔ не сохранилось: ' + e.message)); ok.disabled = false; ok.textContent = 'применить'; }
+  };
+  out.appendChild(ok);
 }

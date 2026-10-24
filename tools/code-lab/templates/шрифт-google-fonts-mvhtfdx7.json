@@ -1,7 +1,7 @@
 {
   "id": "шрифт-google-fonts-mvhtfdx7",
   "lang": "html",
-  "group": "Мои куски",
+  "group": "CSS: текст и шрифты / Шрифт и размер",
   "title": "шрифт Google Fonts",
   "desc": "",
   "lines": [
@@ -112,5 +112,13 @@
     []
   ],
   "output": "",
-  "descAt": 1792569214267
+  "descAt": 1792569214267,
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: текст и шрифты"
+      ]
+    },
+    "subcat": "Шрифт и размер"
+  }
 }

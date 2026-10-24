@@ -1,7 +1,7 @@
 {
   "id": "перенос-на-новую-строку-mvhtgehh",
   "lang": "css",
-  "group": "Мои куски",
+  "group": "CSS: раскладка / Flexbox",
   "title": "перенос на новую строку",
   "desc": "",
   "lines": [
@@ -135,5 +135,13 @@
     []
   ],
   "output": "",
-  "descAt": 1792569261653
+  "descAt": 1792569261653,
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: раскладка"
+      ]
+    },
+    "subcat": "Flexbox"
+  }
 }

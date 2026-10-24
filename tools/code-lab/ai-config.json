@@ -1,0 +1,9 @@
+{
+  "type": "mistral",
+  "model": "",
+  "baseUrl": "",
+  "scope": "",
+  "authUrl": "",
+  "caPath": "",
+  "insecureTls": false
+}

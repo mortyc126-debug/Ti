@@ -92,6 +92,7 @@
     if(lang === 'html') return hlHtml(code);
     return window.buildHighlight ? window.buildHighlight(code) : [(() => { const d = lineDiv(); d.textContent = code; return d; })()];
   }
+  window.sbHighlight = sbHighlight;
 
   // ── авто-пары: печатаешь «<body>» → появляется «</body>», «{» → «}», кавычки/скобки парой ──
   const VOID_TAGS = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr','!doctype']);
@@ -402,11 +403,95 @@
     showPop(word, role, body, ev);
   }
 
+  // ── редактор CodeMirror поверх прежнего поля (если CodeMirror установлен; иначе всё как раньше) ──
+  const CM_ADDONS = ['fold/xml-fold', 'edit/closetag', 'edit/closebrackets', 'comment/comment', 'selection/active-line', 'hint/show-hint', 'hint/anyword-hint'];
+  let cmReady = null;
+  function loadCM(){
+    if(cmReady) return cmReady;
+    const bridge = window.CMBridge ? Promise.resolve() : new Promise(res => { const s = document.createElement('script'); s.src = '/cm-bridge.js'; s.onload = s.onerror = () => res(); document.head.appendChild(s); });
+    cmReady = bridge.then(() => window.CMBridge ? window.CMBridge.ready() : false).then(ok => {
+      if(!ok || !window.CodeMirror) return false;
+      const base = '/vendor/cm/' + window.CMBridge.version() + '/addon/';
+      const lk = document.createElement('link'); lk.rel = 'stylesheet'; lk.href = base + 'hint/show-hint.css'; document.head.appendChild(lk);
+      const one = p => new Promise(res => { const s = document.createElement('script'); s.src = base + p + '.js'; s.async = false; s.onload = () => res(); s.onerror = () => res(); document.head.appendChild(s); });
+      return CM_ADDONS.reduce((chain, a) => chain.then(() => one(a)), Promise.resolve()).then(() => true);
+    }).catch(() => false);
+    return cmReady;
+  }
+  function cmOptions(){
+    const any = window.CodeMirror && window.CodeMirror.hint && window.CodeMirror.hint.anyword;
+    return {
+      autoCloseBrackets: true, autoCloseTags: true, styleActiveLine: true,
+      hintOptions: { hint: any, completeSingle: false },
+      extraKeys: {
+        Tab: c => { if(c.somethingSelected()) c.execCommand('indentMore'); else c.execCommand('insertSoftTab'); },
+        'Shift-Tab': c => c.execCommand('indentLess'),
+        'Ctrl-/': 'toggleComment', 'Cmd-/': 'toggleComment', 'Ctrl-Space': 'autocomplete'
+      }
+    };
+  }
+  if(!document.getElementById('sb-cm-css')){
+    const st = document.createElement('style'); st.id = 'sb-cm-css';
+    st.textContent = [
+      '.sb-ed.cm-on .sb-hl{display:none}',
+      '.sb-ed.cm-on .sb-ed-wrap{background:var(--code-bg,#0E0720)}',
+      '.sb-ed.cm-on .CodeMirror{position:absolute;top:0;right:0;bottom:0;left:0;height:auto;border:0;border-radius:0;background:var(--code-bg,#0E0720);font-size:12.5px}',
+      '.sb-ed.cm-on .CodeMirror-scroll{min-height:0;max-height:none}',
+      '.sb-ed.cm-on .CodeMirror-activeline-background{background:rgba(255,255,255,.04)}',
+      '.CodeMirror-hints{z-index:2147483002}'
+    ].join('\n');
+    document.head.appendChild(st);
+  }
+  const rafOnce = fn => { let q = 0; return () => { if(q) return; q = requestAnimationFrame(() => { q = 0; fn(); }); }; };
+  // раскрашенная строка прежней подсветки → span на позиции (нужно для «пояснений по клику» поверх CodeMirror)
+  function spanAt(pre, line, ch){
+    const ld = pre.children[line]; if(!ld) return null;
+    let n = 0;
+    for(const s of ld.children){ const len = s.textContent.length; if(ch >= n && ch < n + len) return s; n += len; }
+    return null;
+  }
+  function upgradeEditor(ed, ta, pre, wrap, f, paint){
+    let wantFocus = false;
+    const nativeFocus = HTMLElement.prototype.focus;
+    ta.focus = () => { wantFocus = true; nativeFocus.call(ta); };   // фокус, запрошенный до готовности редактора (workspace.js), не теряется
+    loadCM().then(ok => ok ? window.CMBridge.enhance(ta, f.lang, cmOptions()) : null).then(cm => {
+      if(!cm) return;
+      ed.classList.add('cm-on');
+      ta.oninput = () => { f.code = ta.value; save(); schedulePreview(); };   // CodeMirror сам сообщает об изменениях событием input
+      const refresh = rafOnce(() => { if(wrap.clientHeight) cm.refresh(); });
+      const watchCm = () => { const ro = new ResizeObserver(refresh); ro.observe(wrap); ros.push(ro); };
+      const prev = ed.__watch; ed.__watch = () => { if(prev) prev(); watchCm(); };
+      watchCm();
+      cm.getWrapperElement().addEventListener('click', ev => {
+        if(!center.classList.contains('explain-on')) return;
+        paint();
+        const pos = cm.coordsChar({ left: ev.clientX, top: ev.clientY }, 'window');
+        const sp = [pos.ch, pos.ch - 1].map(c => c >= 0 ? spanAt(pre, pos.line, c) : null).find(s => s && s.textContent.trim());
+        if(sp) explainToken(sp, ev); else hidePop();
+      });
+      if(wantFocus) cm.focus();
+    });
+  }
+  // имя и язык в заголовках без перерисовки редакторов (после сохранения и переименования)
+  function syncHeads(){
+    const eds = edsEl.querySelectorAll('.sb-ed');
+    if(eds.length !== files.length){ renderEds(); return; }
+    files.forEach((f, i) => {
+      const nm = eds[i].querySelector('.sb-name'), sl = eds[i].querySelector('.sb-lang');
+      if(nm && nm !== document.activeElement && nm.value !== f.name) nm.value = f.name;
+      if(sl && sl.value !== f.lang) sl.value = f.lang;
+    });
+  }
+
   // ── рендер панелей-редакторов ──
   function renderEds(){
     ros.forEach(r => r.disconnect()); ros = [];
-    edsEl.innerHTML = '';
+    const keepScroll = edsEl.scrollTop;
+    const keep = new Map(); [...edsEl.children].forEach(e => { if(e.__f) keep.set(e.__f, e); });
+    edsEl.textContent = '';
     files.forEach(f => {
+      const old = keep.get(f), oldTa = old && old.querySelector('textarea');
+      if(old && old.__lang === f.lang && oldTa && oldTa.value === f.code){ edsEl.appendChild(old); if(old.__watch) old.__watch(); return; }   // редактор уже построен: курсор, прокрутка и история правок остаются
       const ed = document.createElement('div'); ed.className = 'sb-ed';
       const head = document.createElement('div'); head.className = 'sb-ed-head';
 
@@ -462,10 +547,12 @@
       wrap.append(pre, ta);
       // textarea (форм-контрол) в Chromium не растягивается ни flex'ом, ни height:100% —
       // задаём высоту явно по размеру обёртки и держим в синхроне
-      const ro = new ResizeObserver(() => { const h = wrap.clientHeight; if(h) ta.style.height = h + 'px'; });
-      ro.observe(wrap); ros.push(ro);
+      const watch = () => { const ro = new ResizeObserver(() => { const h = wrap.clientHeight; if(h) ta.style.height = h + 'px'; }); ro.observe(wrap); ros.push(ro); };
+      watch(); ed.__watch = watch; ed.__f = f; ed.__lang = f.lang;
       ed.appendChild(head); ed.appendChild(wrap); edsEl.appendChild(ed);
+      upgradeEditor(ed, ta, pre, wrap, f, paint);
     });
+    edsEl.scrollTop = keepScroll;
   }
 
   // ── кнопки ──
@@ -533,6 +620,13 @@
   });
 
   renderEds();
+
+  // доступ к файлам панелей для workspace.js (открыть/сохранить файлы проекта)
+  window.codelabSandbox = {
+    getFiles: () => files,
+    setFiles: arr => { files = arr; save(); renderEds(); schedulePreview(); },
+    refresh: () => { save(); syncHeads(); schedulePreview(); }
+  };
 
   // ── переключение режимов: визуал ↔ песочница ──
   const btn = document.getElementById('sandboxToggle');

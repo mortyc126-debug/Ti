@@ -58,6 +58,14 @@
   .pcat .pc{font-size:10px;font-family:ui-monospace,monospace;color:var(--text3);background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:1px 8px}
 
   .cat-main{display:block;padding:22px 24px;min-width:0}
+  .lab-settings-btn{margin-left:auto;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text2);padding:7px 10px;cursor:pointer;font-size:12px}
+  .lab-settings-btn:hover{border-color:var(--acc);color:var(--acc)}
+  .key-modal{position:fixed;inset:0;background:rgba(5,2,14,.78);display:none;align-items:center;justify-content:center;z-index:100;padding:18px}
+  .key-modal.open{display:flex}.key-panel{width:min(520px,100%);background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:0 20px 70px #0008}
+  .key-panel h2{font-size:17px;margin:0 0 8px}.key-panel p{font-size:12px;line-height:1.55;color:var(--text3)}
+  .key-panel input{width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font:13px ui-monospace,monospace}
+  .key-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}.key-actions button{border:1px solid var(--border);background:var(--s2);color:var(--text);border-radius:8px;padding:8px 12px;cursor:pointer}.key-actions .primary{color:var(--str);border-color:rgba(82,242,201,.5)}
+  .key-status{font-size:12px;color:var(--str);min-height:18px;margin-top:8px}
   .cat-main h1{font-size:19px;margin:0}
   .cat-lead{color:var(--text3);font-size:12px;margin:0;flex:1;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .filters{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:18px}
@@ -78,6 +86,28 @@
   .card.sel{border-color:var(--acc);box-shadow:0 0 0 2px rgba(255,0,110,.4)}
   .cat-hint{font-size:11px;color:var(--text3);margin:0 0 12px}
   .cat-hint b{color:var(--text2)}
+  .gen-panel{width:min(760px,100%);max-height:90vh;overflow:auto}
+  .gen-gaps{display:flex;align-items:center;gap:10px;margin:0 0 6px}.gen-gaps button{background:none;border:1px dashed var(--border);border-radius:12px;color:var(--text2);padding:4px 11px;cursor:pointer;font-size:12px}.gen-gaps button:hover{color:var(--acc);border-color:var(--acc)}.gen-gaps button:disabled{opacity:.5}
+  .gen-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+  .gen-chip{font-size:12px;background:var(--s2);border:1px solid var(--border);border-radius:12px;color:var(--text2);padding:4px 10px;cursor:pointer;text-align:left}.gen-chip:hover{border-color:var(--name);color:var(--text)}.gen-chip.on{border-color:var(--str);color:var(--str)}
+  .gen-lead{font-size:12.5px;color:var(--text2);margin:4px 0 12px}
+  .gen-form{display:flex;gap:8px;margin-bottom:8px}.gen-n{width:70px;flex:none}
+  .gen-in{width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font:13px/1.5 system-ui,sans-serif;padding:7px 10px;margin:0 0 6px}
+  .gen-in:focus{outline:none;border-color:var(--name)}
+  .gen-bar{display:flex;align-items:center;gap:10px;margin:4px 0 10px}.gen-bar button{background:var(--s2);border:1px solid rgba(255,0,110,.55);border-radius:7px;color:var(--acc);padding:7px 12px;cursor:pointer;font-size:12px}
+  .gen-bar button:disabled{opacity:.5}.gen-status{font-size:12px;color:var(--text3)}
+  .gen-card{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:var(--bg2)}
+  .gen-top{display:flex;gap:8px;align-items:center}.gen-title{font-weight:600}
+  .gen-badges{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 6px}
+  .gen-b{font-size:11px;border:1px solid var(--border);border-radius:10px;padding:1px 8px;color:var(--text3)}.gen-b.ok{color:var(--str);border-color:rgba(82,242,201,.4)}.gen-b.bad{color:#FFB18A;border-color:#E8895A}
+  .gen-code{font:12.5px/1.5 ui-monospace,monospace;white-space:pre}
+  .describe-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 18px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:10px}
+  .describe-tools button{background:var(--s2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:7px 10px;cursor:pointer;font-size:12px}
+  .describe-tools button.primary{border-color:rgba(255,0,110,.55);color:var(--acc)}
+  .describe-tools button:disabled{opacity:.45;cursor:wait}
+  .describe-status{font-size:11px;color:var(--text3);flex:1;min-width:180px}
+  .describe-status.error{color:#FF6B6B}.describe-status.good{color:var(--str)}
+  .tg.needs-desc{color:#FFB454;border-color:rgba(255,180,84,.45)}
   .card-top{display:flex;align-items:center;gap:7px}
   .ctype{font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:5px;border:1px solid var(--border)}
   .ctype.component{color:var(--kw);border-color:rgba(180,92,255,.5)}
@@ -117,17 +147,53 @@
         <button id="sideToggle" class="side-toggle" title="свернуть/развернуть разделы">☰</button>
         <h1 id="cName">Каталог</h1>
         <span class="cat-lead" id="cLead"></span>
+        <button id="labSettingsBtn" class="lab-settings-btn" type="button">⚙ Настройки</button>
       </div>
       <div class="filters">
         <div class="fgroup"><span class="flabel">место</span><span id="placeF"></span></div>
         <div class="fgroup"><span class="flabel">технология</span><span id="techF"></span></div>
-        <input class="search" id="q" placeholder="поиск по названию и описанию…">
+        <input class="search" id="q" placeholder="поиск: по названию, теме, коду и тегам…">
       </div>
       <div class="cat-hint">Клик — выделить · <b>Delete</b> — удалить · двойной клик — подробнее</div>
+      <div class="describe-tools" aria-label="ИИ-описания">
+        <button id="describeSelected" type="button">✦ Описать выбранный</button>
+        <button id="describeAll" class="primary" type="button">✦ Описать все без описания</button>
+        <button id="genOpen" class="primary" type="button">✦ Создать куски через ИИ</button>
+        <button id="refreshJobs" type="button">Обновить статус</button>
+        <span id="describeStatus" class="describe-status">Для запуска сохраните ключ Mistral в ⚙ Настройки.</span>
+      </div>
       <div id="sections"></div>
     </main>
   </div>
+  <div class="key-modal" id="keyModal" role="dialog" aria-modal="true" aria-labelledby="keyTitle">
+    <section class="key-panel">
+      <h2 id="keyTitle">Настройки лаборатории</h2>
+      <p>API-ключ Mistral хранится только в локальном хранилище этого браузера и передаётся локальному серверу при запуске описания. Он не записывается в файлы проекта или очередь. Любой JavaScript на этой странице технически может прочитать ключ, поэтому не используйте его на недоверенном компьютере.</p>
+      <label for="mistralKeyInput" style="display:block;font-size:11px;color:var(--text3);margin:12px 0 6px">MISTRAL API KEY</label>
+      <input id="mistralKeyInput" type="password" autocomplete="off" placeholder="Вставьте API-ключ Mistral" spellcheck="false">
+      <div class="key-status" id="mistralKeyStatus"></div>
+      <div class="key-actions"><button id="clearMistralKey" type="button">Удалить ключ</button><button id="cancelMistralKey" type="button">Закрыть</button><button class="primary" id="saveMistralKey" type="button">Сохранить</button></div>
+    </section>
+  </div>
+  <div class="key-modal" id="genModal" role="dialog" aria-modal="true" aria-labelledby="genTitle">
+    <section class="key-panel gen-panel">
+      <h2 id="genTitle">Создать куски через ИИ</h2>
+      <p class="gen-lead">Выберите язык и напишите, что дополнить. ИИ предложит новые куски, которых ещё нет в библиотеке. В библиотеку попадёт только то, что вы отметите.</p>
+      <div class="gen-form">
+        <select id="genLang" class="gen-in"></select>
+        <input id="genCount" class="gen-in gen-n" type="number" min="1" max="8" value="4" title="сколько кусков предложить">
+      </div>
+      <div class="gen-gaps"><button id="genGaps" type="button" title="ИИ посмотрит, что уже есть в этом языке, и предложит темы, которых не хватает">🔍 что тут не хватает?</button><span id="genGapsHint" class="gen-status"></span></div>
+      <div id="genChips" class="gen-chips"></div>
+      <textarea id="genTopic" class="gen-in" rows="2" placeholder="что дополнить: «работа со строками», «чтение и запись файлов», «JOIN между таблицами»… (можно оставить пустым)"></textarea>
+      <div class="gen-bar"><button id="genGo" class="primary" type="button">предложить</button><span id="genStatus" class="gen-status"></span></div>
+      <div id="genList" class="gen-list"></div>
+      <div class="key-actions"><button id="genClose" type="button">Закрыть</button><button class="primary" id="genAdd" type="button" style="display:none">добавить отмеченные</button></div>
+    </section>
+  </div>
   <script src="/shell.js"></script>
   <script src="/catalog.js"></script>
+  <script src="/settings.js"></script>
+  <script src="/generate.js"></script>
 </body>
 </html>

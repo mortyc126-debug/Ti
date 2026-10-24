@@ -16,15 +16,47 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
+import { annotateLines } from './code-lab/lib/annotate.mjs';
+import { createLibraryStore } from './code-lab/lib/library-store.mjs';
+import { createSearchService } from './code-lab/lib/search.mjs';
+import { tokenize } from './code-lab/lib/tokenizer.mjs';
+import { parseSnippets } from './code-lab/lib/ingest.mjs';
+import { createDescriptionQueue } from './code-lab/lib/describe-queue.mjs';
+import { createAiAssist } from './code-lab/lib/ai-assist.mjs';
+import { createProviderRuntime } from './code-lab/lib/ai-providers.mjs';
+import { handleWorkspace } from './code-lab/lib/workspace.mjs';
+import { createAiGenerate, LANGS as AI_LANGS } from './code-lab/lib/ai-generate.mjs';   // токенайзер вынесен в модуль — его тестируют отдельно
+import { createVendor } from './code-lab/lib/vendor.mjs';   // управляемые обновления CodeMirror (по кнопке)
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, 'code-lab');
 const PUBLIC = path.join(ROOT, 'public');
-const TEMPLATES = path.join(ROOT, 'templates');
+const TEMPLATES = path.join(ROOT, 'templates');   // старые карточки: теперь только источник для миграции
+const LIBRARY = path.join(ROOT, 'library');       // куски кода: обычные файлы + .meta.json рядом
 const FLOWS = path.join(ROOT, 'flows');   // сохранённые схемы-сборки (граф со связями)
 const DATA = path.join(ROOT, 'data');     // сохранённые JSON-данные пользователя
 const RECIPES = path.join(ROOT, 'recipes'); // рецепты: название + описание + список кусков
 const PORT = Number(process.argv[2]) || 8788;
+// файловое хранилище библиотеки (код — обычные файлы; подсветка и пояснения строятся из текста при загрузке)
+const store = createLibraryStore({ root: LIBRARY, legacyDir: TEMPLATES, dictPath: path.join(PUBLIC, 'keyword-dict.json'), getDict: () => kwDict(), coverage: j => coverage(j) });
+// поиск: по названию, описанию, тегам, коду и пояснениям; синонимы лежат в library/_synonyms.json (правятся руками)
+const search = createSearchService({ store, synonymsPath: path.join(LIBRARY, '_synonyms.json'), defaultSynonymsPath: path.join(ROOT, 'lib', 'default-synonyms.json') });
+const aiRuntime = createProviderRuntime({ configPath: path.join(ROOT, 'ai-config.json') });   // выбранный ИИ-сервис (ключей в файле нет)
+// настройки ИИ меняют только запросы со своей страницы: проверяем Host и Origin
+const aiLocalOnly = req => {
+  const host = String(req.headers.host || '').toLowerCase();
+  const origin = String(req.headers.origin || '').toLowerCase();
+  const okHost = [`localhost:${PORT}`, `127.0.0.1:${PORT}`, `[::1]:${PORT}`].includes(host);
+  const okOrigin = !origin || [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`, `http://[::1]:${PORT}`].includes(origin);
+  return okHost && okOrigin;
+};
+const describeQueue = createDescriptionQueue({ store, statePath: path.join(DATA, 'description-jobs.json'), fetchImpl: aiRuntime.fetch });
+const aiAssist = createAiAssist({ store, fetchImpl: aiRuntime.fetch });   // ИИ-дополнение разделов куска (предложить → человек правит → применить)
+const aiGenerate = createAiGenerate({ store, fetchImpl: aiRuntime.fetch });   // ИИ-создание новых кусков (предложить → человек отмечает → создать)
+const vendor = createVendor({ root: path.join(ROOT, 'vendor') });   // CodeMirror лежит в code-lab/vendor/codemirror/<версия>/
+// кто может обращаться к серверу: только своя страница (чужой сайт в браузере не должен уметь писать файлы, запускать код, качать версии)
+const isLocalHost = h => { const m = /^(localhost|127\.0\.0\.1|\[::1\])(?::(\d+))?$/.exec(String(h || '')); return !!m && Number(m[2] || 80) === PORT; };
+const isLocalOrigin = o => { try { const x = new URL(o); return (x.hostname === 'localhost' || x.hostname === '127.0.0.1' || x.hostname === '[::1]') && Number(x.port || (x.protocol === 'https:' ? 443 : 80)) === PORT; } catch { return false; } };
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8' };
 // no-store обязателен: иначе браузер кэширует GET /api/list и /api/template и показывает старые описания после правок
@@ -53,56 +85,11 @@ function git(args, cwd){
 }
 async function gitRoot(){ const r = await git(['rev-parse', '--show-toplevel']); return r.code === 0 ? r.out : null; }
 // гарантируем, что папки лаборатории существуют — иначе git add/status по ним даёт «pathspec did not match»
-async function ensureLabDirs(){ for(const d of [TEMPLATES, FLOWS, DATA, RECIPES]){ try { await fs.mkdir(d, { recursive: true }); } catch(_){} } }
+async function ensureLabDirs(){ for(const d of [LIBRARY, FLOWS, DATA, RECIPES]){ try { await fs.mkdir(d, { recursive: true }); } catch(_){} } }
 // только НЕпустые папки лаборатории — пустую git commit не примет («did not match any file(s) known to git»)
-async function labPaths(){ const out = []; for(const d of [TEMPLATES, FLOWS, RECIPES]){ try { if((await fs.readdir(d)).length) out.push(d); } catch(_){} } return out; }
+async function labPaths(){ const out = []; for(const d of [LIBRARY, FLOWS, RECIPES]){ try { if((await fs.readdir(d)).length) out.push(d); } catch(_){} } return out; }
 
-// ── токенайзер: сырой код → строки токенов {k, v, r?} ───────────────────────
-const KW = {
-  js: new Set(['const','let','var','function','return','if','else','for','while','of','in','new','await','async','import','export','from','default','class','extends','super','try','catch','finally','throw','typeof','instanceof','null','undefined','true','false','this','break','continue','switch','case','do','yield','delete','void']),
-  python: new Set(['def','return','if','elif','else','for','while','in','not','and','or','import','from','as','class','try','except','finally','raise','with','lambda','None','True','False','pass','break','continue','yield','global','nonlocal','del','assert','is','async','await']),
-  sql: new Set(['select','from','where','group','by','order','having','join','left','right','inner','outer','full','cross','on','as','and','or','not','in','is','null','insert','into','values','update','set','delete','create','table','view','index','primary','key','foreign','references','distinct','count','sum','avg','min','max','case','when','then','else','end','limit','offset','union','all','with','desc','asc','between','like','exists']),
-};
-const BUILTIN = {
-  js: new Set(['console','log','Math','JSON','Array','Object','String','Number','parseInt','parseFloat','fetch','document','window','map','filter','reduce','forEach','push','length','pow','sqrt','round','floor','random']),
-  python: new Set(['print','range','len','int','float','str','list','dict','tuple','set','input','sum','min','max','abs','round','enumerate','zip','sorted','map','filter','open']),
-  sql: new Set(),
-};
-function lineComment(lang){ return lang === 'sql' ? '--' : lang === 'python' ? '#' : '//'; }
-
-function tokenizeLine(line, lang){
-  const kws = KW[lang] || KW.js;
-  const builtins = BUILTIN[lang] || BUILTIN.js;
-  const lc = lineComment(lang);
-  const out = [];
-  const n = line.length;
-  let i = 0;
-  while(i < n){
-    const rest = line.slice(i);
-    const c = line[i];
-    if(rest.startsWith(lc)){ out.push({ k: 'com', v: line.slice(i) }); break; }
-    if(c === '"' || c === "'" || (lang === 'js' && c === '`')){
-      let j = i + 1; while(j < n){ if(line[j] === '\\'){ j += 2; continue; } if(line[j] === c){ j++; break; } j++; }
-      out.push({ k: 'str', v: line.slice(i, j) }); i = j; continue;
-    }
-    if(/[0-9]/.test(c)){ const m = /^(0x[0-9a-fA-F]+|\d[\d_]*\.?\d*(?:[eE][+-]?\d+)?)/.exec(rest); if(m){ out.push({ k: 'num', v: m[0] }); i += m[0].length; continue; } }
-    const im = /^[A-Za-z_$][\w$]*/.exec(rest);
-    if(im){
-      const w = im[0];
-      const key = lang === 'sql' ? w.toLowerCase() : w;
-      let k = i + w.length; while(k < n && line[k] === ' ') k++;
-      if(kws.has(key)) out.push({ k: 'kw', v: w });
-      else if(line[k] === '(' || builtins.has(w)) out.push({ k: 'fn', v: w });
-      else out.push({ k: 'name', v: w, r: w });   // имя → редактируемое, ref=само слово (переименование синхронно)
-      i += w.length; continue;
-    }
-    const ws = /^\s+/.exec(rest);
-    if(ws){ out.push({ k: 'sp', v: ws[0] }); i += ws[0].length; continue; }
-    out.push({ k: 'op', v: c }); i++;
-  }
-  return out;
-}
-function tokenize(code, lang){ return String(code).replace(/\r\n/g, '\n').split('\n').map(l => tokenizeLine(l, lang)); }
+// ── токенайзер: см. code-lab/lib/tokenizer.mjs (сырой код → строки токенов {k, v, r?}) ──
 
 // единый словарь пояснений к ключевым словам (тот же, что у песочницы) — для автоподписи кусков
 let _kwDict = null;
@@ -112,24 +99,7 @@ async function kwDict(){
   catch(_){ _kwDict = { words:{}, htmlTags:{}, htmlAttrs:{}, cssProps:{}, cssVals:{} }; }
   return _kwDict;
 }
-// проставить e (пояснение) токенам из словаря, не затирая уже вписанные вручную; вернуть число проставленных
-function annotateLines(lines, lang, dict){
-  const W = dict.words || {}, TAGS = dict.htmlTags || {}, ATTRS = dict.htmlAttrs || {}, PROPS = dict.cssProps || {}, VALS = dict.cssVals || {};
-  const L = String(lang || '').toLowerCase();
-  const look = v => {
-    const lw = String(v).toLowerCase();
-    if(L === 'css') return PROPS[lw] || VALS[lw] || W[lw] || null;
-    if(L === 'html' || L === 'htm') return TAGS[lw] || ATTRS[lw] || W[lw] || null;
-    return W[lw] || null;
-  };
-  let count = 0;
-  for(const line of (lines || [])){ for(const tok of (line || [])){
-    if(!tok || tok.e) continue;   // уже есть пояснение — не трогаем
-    if(tok.k === 'sp' || tok.k === 'op' || tok.k === 'num' || tok.k === 'str' || tok.k === 'com') continue;
-    const ex = look(tok.v); if(ex){ tok.e = ex; count++; }
-  } }
-  return count;
-}
+// автоподпись слов из словаря: см. code-lab/lib/annotate.mjs
 
 // объединённый импорт. Принимает: сборник {dict, pieces}, массив кусков, или один кусок
 // ({code,...} или полноценный {lines,...} с готовой разметкой и пояснениями). Дополняет словарь
@@ -161,17 +131,16 @@ async function importBundle(b){
     const codeForDup = hasLines ? pc.lines.map(ln => (ln || []).map(t => (t && t.v) || '').join('')).join('\n') : code;
     // дубль: сначала точное совпадение (название+код), иначе — тот же КОД под другим названием
     const dup = (await findSameTemplate(title, codeForDup)) || (await findByCode(codeForDup));
-    let obj, full;
-    if(dup){ full = path.join(TEMPLATES, dup); obj = JSON.parse(await fs.readFile(full, 'utf8')); obj.lang = lang; obj.title = title; if(pc.group) obj.group = String(pc.group).slice(0, 60); if(pc.desc) obj.desc = String(pc.desc).slice(0, 400); obj.lines = hasLines ? pc.lines : tokenize(code, lang); if(pc.output != null) obj.output = String(pc.output); updated++; }
-    else { obj = { id: slug(title || lang), lang, group: (pc.group != null ? String(pc.group) : 'Мои куски').slice(0, 60), title, desc: String(pc.desc || '').slice(0, 400), lines: hasLines ? pc.lines : tokenize(code, lang), output: pc.output != null ? String(pc.output) : '', descAt: Date.now() }; if(pc.component && typeof pc.component === 'object') obj.component = pc.component; full = path.join(TEMPLATES, obj.id + '.json'); created++; }
+    let obj;
+    if(dup){ obj = await store.get(dup); obj.lang = lang; obj.title = title; if(pc.group) obj.group = String(pc.group).slice(0, 60); if(pc.desc) obj.desc = String(pc.desc).slice(0, 400); obj.lines = hasLines ? pc.lines : tokenize(code, lang); if(pc.output != null) obj.output = String(pc.output); updated++; }
+    else { obj = { id: slug(title || lang), lang, group: (pc.group != null ? String(pc.group) : 'Мои куски').slice(0, 60), title, desc: String(pc.desc || '').slice(0, 400), lines: hasLines ? pc.lines : tokenize(code, lang), output: pc.output != null ? String(pc.output) : '', descAt: Date.now() }; if(pc.component && typeof pc.component === 'object') obj.component = pc.component; created++; }
     if(lang === 'js' && !hasLines){ const c = codeContract(code); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
     annotateLines(obj.lines, lang, dict);   // автоподпись из словаря (уже с новыми словами); готовые e не трогает
     if(pc.words && typeof pc.words === 'object'){   // ручные пояснения куска — поверх авто
       const low = {}; for(const [k, v] of Object.entries(pc.words)) low[k.toLowerCase()] = v;
       for(const line of obj.lines) for(const t of line){ if(!t || t.k === 'sp' || t.k === 'op') continue; const e = low[String(t.v).toLowerCase()]; if(e) t.e = String(e).slice(0, 600); }
     }
-    await fs.mkdir(TEMPLATES, { recursive: true });
-    await fs.writeFile(full, JSON.stringify(obj, null, 2), 'utf8');
+    await store.save(obj, { origin: 'imported' });
   }
   return { ok: true, learned, created, updated, skipped, total: pieces.length };
 }
@@ -210,7 +179,7 @@ function slug(s){
 // что из 8 граней описано/видно у куска — для колонки «описано» в Описи
 function coverage(j){
   const c = j.component || {}, s = c.summary || {}, v = c.views || {};
-  const code = Array.isArray(j.lines) ? j.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : '';
+  const code = j._code != null ? String(j._code) : (Array.isArray(j.lines) ? j.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : '');
   const effects = { dom: /\bdocument\.|innerHTML|\.style\b|createElement|appendChild|querySelector/.test(code), storage: /localStorage|sessionStorage|indexedDB/.test(code), net: /\bfetch\(|XMLHttpRequest|\.ajax\(/.test(code), timers: /setInterval|setTimeout|requestAnimationFrame/.test(code) };
   const envBrowser = /\bdocument\b|\bwindow\b|localStorage|querySelector/.test(code);
   const envNode = /\brequire\(|\bprocess\.|module\.exports|__dirname/.test(code);
@@ -225,51 +194,19 @@ function coverage(j){
     check:   !!(v.check && (v.check.expected_result || v.check.how)) || (Array.isArray(c.verification) && c.verification.length > 0)
   };
 }
-async function listTemplates(){
-  let names = [];
-  try { names = (await fs.readdir(TEMPLATES)).filter(n => n.endsWith('.json')); } catch(_){ return []; }
-  const out = [];
-  for(const n of names.sort()){
-    try {
-      const j = JSON.parse(await fs.readFile(path.join(TEMPLATES, n), 'utf8'));
-      const nlines = Array.isArray(j.lines) ? j.lines.filter(l => (l || []).some(k => (k.v || '').trim())).length : 0;
-      const row = { id: j.id || n.replace(/\.json$/, ''), lang: j.lang || '', group: j.group || 'Разное', title: j.title || n, desc: j.desc || '', descAt: j.descAt || 0, file: n, nlines, cov: coverage(j) };
-      // краткая сводка компонента — чтобы каталог показывал тип/контракт/теги без лишних запросов
-      if(j.component){
-        const c = j.component;
-        row.comp = { type: c.type || '', tags: c.tags || {}, subcat: c.subcat || '', collections: Array.isArray(c.collections) ? c.collections : [], input: (c.summary && c.summary.input) || '', output: (c.summary && c.summary.output) || '', provides: Array.isArray(c.provides) ? c.provides : [], requires: Array.isArray(c.requires) ? c.requires : [] };
-      }
-      out.push(row);
-    } catch(_){}
-  }
-  return out;
-}
-async function fileForId(id){ const l = await listTemplates(); const m = l.find(x => x.id === id); return m ? m.file : null; }
-// найти уже существующий шаблон с таким же названием и кодом (для дедупа при добавлении)
+async function listTemplates(){ return store.rows(); }
+// найти уже существующий кусок с таким же названием и кодом (для дедупа при добавлении) → id или null
 // нормализуем переводы строк (\r\n → \n), иначе «тот же» код из Windows-файла считается другим → дубли
-const _normCode = s => String(s == null ? '' : s).replace(/\r\n?/g, '\n').trim();
-const _tplCode = j => _normCode(Array.isArray(j.lines) ? j.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : '');
+const _normCode = store.normCode;
 async function findSameTemplate(title, code){
   const wantT = String(title || '').trim().toLowerCase(), wantC = _normCode(code);
-  let names = [];
-  try { names = (await fs.readdir(TEMPLATES)).filter(n => n.endsWith('.json')); } catch(_){ return null; }
-  for(const n of names){
-    try { const j = JSON.parse(await fs.readFile(path.join(TEMPLATES, n), 'utf8'));
-      if((j.title || '').trim().toLowerCase() === wantT && _tplCode(j) === wantC) return n;
-    } catch(_){}
-  }
+  for(const e of await store.entries()){ if((e.title || '').trim().toLowerCase() === wantT && _normCode(e.code) === wantC) return e.id; }
   return null;
 }
 // дубль по коду, даже под другим названием: тот же код — тот же кусок (пустой код не считаем)
 async function findByCode(code){
   const wantC = _normCode(code); if(!wantC) return null;
-  let names = [];
-  try { names = (await fs.readdir(TEMPLATES)).filter(n => n.endsWith('.json')); } catch(_){ return null; }
-  for(const n of names){
-    try { const j = JSON.parse(await fs.readFile(path.join(TEMPLATES, n), 'utf8'));
-      if(_tplCode(j) === wantC) return n;
-    } catch(_){}
-  }
+  for(const e of await store.entries()){ if(_normCode(e.code) === wantC) return e.id; }
   return null;
 }
 
@@ -335,13 +272,169 @@ async function runCode(lang, code){
 const server = http.createServer(async (req, res) => {
   try {
     const u = new URL(req.url, 'http://localhost');
+    // ── защита от чужих сайтов и подмены адреса (DNS rebinding): сервер умеет писать файлы и запускать код ──
+    if(u.pathname.startsWith('/api/') || u.pathname.startsWith('/vendor/')){
+      if(!isLocalHost(req.headers.host)) return json(res, 403, { error: 'запрещено: открывайте сервер по адресу http://localhost:' + PORT });
+      if(req.headers.origin && !isLocalOrigin(req.headers.origin)) return json(res, 403, { error: 'запрещено: запрос с чужой страницы' });
+    }
+
+    // ── ИИ-сервисы: выбранный провайдер и проверка ключа (ключи в файлы не пишутся) ──
+    if(u.pathname.startsWith('/api/ai/')){
+      if(!aiLocalOnly(req)) return json(res, 403, { error: 'Запрос отклонён: чужой адрес или источник.' });
+      if(u.pathname === '/api/ai/config' && req.method === 'GET') return json(res, 200, { config: aiRuntime.getConfig() });
+      if(req.method === 'POST' && req.headers['x-code-lab'] !== '1') return json(res, 403, { error: 'Нужен заголовок X-Code-Lab.' });
+      if(u.pathname === '/api/ai/config' && req.method === 'POST'){
+        const b = await readBody(req);
+        const allowed = {}; for(const k of ['type', 'model', 'baseUrl', 'scope', 'authUrl', 'caPath', 'insecureTls']) if(k in b) allowed[k] = b[k];
+        return json(res, 200, { config: await aiRuntime.save(allowed) });
+      }
+      if(u.pathname === '/api/ai/models' && req.method === 'POST'){
+        const b = await readBody(req);
+        const key = String(req.headers['x-mistral-api-key'] || '').trim();
+        try { return json(res, 200, { models: await aiRuntime.listModels({ ...aiRuntime.getConfig(), type: b.type, model: b.model, baseUrl: b.baseUrl, scope: b.scope }, key) }); }
+        catch(e){ return json(res, 502, { error: String(e?.message || e) }); }
+      }
+    }
+    if(u.pathname === '/api/describe' && req.method === 'POST'){
+      const b = await readBody(req);
+      const requestKey = String(req.headers['x-mistral-api-key'] || '').trim();
+      if (requestKey) describeQueue.setApiKey(requestKey);
+      if (!requestKey && !process.env.MISTRAL_API_KEY) return json(res, 503, { error: 'Добавьте API-ключ Mistral в Настройках лаборатории.' });
+      const ids = Array.isArray(b.ids) ? [...new Set(b.ids.map(String))] : null;
+      try { return json(res, 202, await describeQueue.start({ ids, apiKey: requestKey || null })); }
+      catch (e) { return json(res, 503, { error: String(e?.message || e) }); }
+    }
+    // ── ИИ-создание новых кусков ────────────────────────────────────────
+    // языки, которые можно дополнять, и сколько кусков в каждом уже есть
+    if(u.pathname === '/api/ai-langs'){
+      const counts = {}; for(const r of await store.rows()) counts[r.lang] = (counts[r.lang] || 0) + 1;
+      return json(res, 200, { langs: AI_LANGS, counts });
+    }
+    // необязательно: «чего здесь не хватает?» → темы для подстановки в поле. Тело: { lang }. Ничего не сохраняет.
+    if(u.pathname === '/api/ai-gaps' && req.method === 'POST'){
+      const b = await readBody(req);
+      const key = String(req.headers['x-mistral-api-key'] || '').trim();
+      try { return json(res, 200, await aiGenerate.gaps({ lang: b.lang, key })); }
+      catch(e){ const m = String(e?.message || e); return json(res, /ключ Mistral/.test(m) ? 503 : /Неизвестный язык/.test(m) ? 400 : 502, { error: m }); }
+    }
+    // шаг 1: предложить. Тело: { lang, topic, count, instruction }. Ничего не сохраняет и не запускает.
+    if(u.pathname === '/api/ai-generate' && req.method === 'POST'){
+      const b = await readBody(req);
+      const key = String(req.headers['x-mistral-api-key'] || '').trim();
+      try { return json(res, 200, await aiGenerate.propose({ lang: b.lang, topic: b.topic, count: b.count, instruction: b.instruction, key })); }
+      catch(e){ const m = String(e?.message || e); return json(res, /ключ Mistral/.test(m) ? 503 : /Неизвестный язык/.test(m) ? 400 : 502, { error: m }); }
+    }
+    // шаг 2: создать то, что человек отметил (после правок). Тело: { pieces:[{title,lang,group,desc,output,tags,aliases,code}] }
+    if(u.pathname === '/api/ai-create' && req.method === 'POST'){
+      const b = await readBody(req);
+      const list = Array.isArray(b.pieces) ? b.pieces.slice(0, 20) : [];
+      const created = [], skipped = [];
+      const dict = await kwDict();
+      for(const p of list){
+        const lang = String(p.lang || '').toLowerCase(), title = String(p.title || '').trim().slice(0, 80), code = String(p.code || '').replace(/\u0000/g, '');
+        if(!AI_LANGS[lang]){ skipped.push({ title, reason: 'неизвестный язык' }); continue; }
+        if(!title || !code.trim() || code.length > 20000){ skipped.push({ title, reason: 'нет названия или кода (или код слишком длинный)' }); continue; }
+        const dup = await findByCode(code);
+        if(dup){ skipped.push({ title, reason: 'такой код уже есть', id: dup }); continue; }
+        let id = slug(title), n = 2; while(await store.has(id)) id = slug(title) + '-' + (n++);
+        const group = String(p.group || 'Мои шаблоны').trim().slice(0, 60) || 'Мои шаблоны';
+        const segs = group.split('/').map(x => x.trim()).filter(Boolean);
+        const tidy = a => [...new Set((Array.isArray(a) ? a : []).map(x => String(x).trim().slice(0, 60)).filter(Boolean))].slice(0, 8);
+        const obj = {
+          id, lang, group, title, desc: String(p.desc || '').trim().slice(0, 400), output: String(p.output || '').trim().slice(0, 300),
+          tags: tidy(p.tags), aliases: tidy(p.aliases), descAt: Date.now(),
+          lines: tokenize(code, lang),
+          component: {
+            type: 'fragment',
+            tags: { purpose: [segs[0] || 'Мои шаблоны'], technology: [AI_LANGS[lang]] },
+            subcat: segs.slice(1).join(' / ') || 'Разное',
+            summary: { output: String(p.output || '').trim().slice(0, 300) },
+            generated: { by: 'ai', at: new Date().toISOString(), note: 'создано ИИ; код не запускался и не проверялся человеком' },
+            verification: { code_review: 'not_verified', tests: 'not_run', compatibility: 'not_verified' },
+          },
+        };
+        if(lang === 'js'){ const c = codeContract(code); obj.component.provides = c.provides; obj.component.requires = c.requires; }
+        annotateLines(obj.lines, lang, dict);
+        try { await store.save(obj, { origin: 'ai' }); created.push({ id, title }); }
+        catch(e){ skipped.push({ title, reason: String(e?.message || e) }); }
+      }
+      return json(res, 200, { created, skipped });
+    }
+
+    // ИИ-дополнение раздела куска. Шаг 1: предложить (ничего не сохраняет). Тело: { id | piece:{title,lang,code,desc}, section, instruction }
+    if(u.pathname === '/api/ai-complete' && req.method === 'POST'){
+      const b = await readBody(req);
+      const key = String(req.headers['x-mistral-api-key'] || '').trim();
+      try { return json(res, 200, await aiAssist.suggest({ id: b.id, piece: b.piece, section: String(b.section || ''), instruction: b.instruction, key })); }
+      catch(e){ const m = String(e?.message || e); return json(res, /ключ Mistral/.test(m) ? 503 : /не найден|нет кода|Неизвестный/.test(m) ? 400 : 502, { error: m }); }
+    }
+    // Шаг 2: записать то, что человек принял (после правок). Тело: { id, section, value }
+    if(u.pathname === '/api/ai-apply' && req.method === 'POST'){
+      const b = await readBody(req);
+      try { return json(res, 200, await aiAssist.apply({ id: b.id, section: String(b.section || ''), value: b.value })); }
+      catch(e){ return json(res, 400, { error: String(e?.message || e) }); }
+    }
+    // ── CodeMirror: проверить → скачать → проверить на библиотеке → включить / откатить. Всё по кнопкам со страницы vendor.html ──
+    if(u.pathname.startsWith('/vendor/cm/') || u.pathname.startsWith('/api/vendor/')){
+      const origin = req.headers.origin;
+      if(origin && !isLocalOrigin(origin)) return json(res, 403, { error: 'запрещено: запрос с чужой страницы' });
+      if(u.pathname.startsWith('/vendor/cm/') && req.method === 'GET'){
+        const mm = /^\/vendor\/cm\/(5\.\d+\.\d+)\/(.+)$/.exec(u.pathname);
+        let rel = null; try { rel = mm && decodeURIComponent(mm[2]); } catch(_){}
+        const abs = rel && vendor.resolveFile(mm[1], rel);
+        const data = abs ? await fs.readFile(abs).catch(() => null) : null;
+        if(!data) return json(res, 404, { error: 'not found' });
+        // файлы версии не меняются никогда (проверяются по sha256), поэтому кэш вечный
+        res.writeHead(200, { 'Content-Type': MIME[path.extname(abs)] || 'application/octet-stream', 'Cache-Control': 'public, max-age=31536000, immutable' });
+        return res.end(data);
+      }
+      if(u.pathname === '/api/vendor/active') return json(res, 200, vendor.activeInfo());
+      if(u.pathname === '/api/vendor/status'){
+        const counts = {};
+        for(const en of await store.entries()){ const l = String(en.lang || (en.meta && en.meta.lang) || 'txt').toLowerCase(); counts[l] = (counts[l] || 0) + 1; }
+        const langs = Object.entries(counts).map(([lang, count]) => ({ lang, count })).sort((a, b) => b.count - a.count);
+        return json(res, 200, { ...(await vendor.status()), langs });
+      }
+      if(u.pathname === '/api/vendor/sample'){      // куски библиотеки для проверки новой версии подсветки (только чтение)
+        const entries = (await store.entries()).map(en => ({ id: en.id, lang: String(en.lang || (en.meta && en.meta.lang) || 'txt').toLowerCase(), code: String(en.code || '').slice(0, 20000) }));
+        return json(res, 200, { entries });
+      }
+      if(req.method === 'POST'){
+        if(req.headers['x-code-lab'] !== '1') return json(res, 403, { error: 'запрещено' });
+        const b = await readBody(req);
+        const wrap = async fn => { try { return json(res, 200, await fn()); } catch(e){ return json(res, e && e.name === 'VendorError' ? 400 : 500, { error: String(e && e.message || e), code: e && e.code }); } };
+        if(u.pathname === '/api/vendor/check') return wrap(() => vendor.check());
+        if(u.pathname === '/api/vendor/install') return wrap(() => vendor.install(String(b.version || ''), { allowYoung: b.allowYoung === true }));
+        if(u.pathname === '/api/vendor/activate') return wrap(() => vendor.activate(String(b.version || '')));
+        if(u.pathname === '/api/vendor/rollback') return wrap(() => vendor.rollback());
+        if(u.pathname === '/api/vendor/deactivate') return wrap(() => vendor.deactivate());
+        if(u.pathname === '/api/vendor/remove') return wrap(() => vendor.remove(String(b.version || '')));
+        if(u.pathname === '/api/vendor/verify') return wrap(() => vendor.verify(String(b.version || '')));
+        if(u.pathname === '/api/vendor/test-result') return wrap(() => vendor.recordTest(String(b.version || ''), b.result));
+      }
+      return json(res, 404, { error: 'not found' });
+    }
+
+    if(u.pathname === '/api/jobs') {
+      const requestKey = String(req.headers['x-mistral-api-key'] || '').trim();
+      if (requestKey) describeQueue.setApiKey(requestKey);
+      return json(res, 200, await describeQueue.get());
+    }
 
     if(u.pathname === '/api/list'){ return json(res, 200, await listTemplates()); }
 
+    // поиск по всей библиотеке: ?q=слова&limit=60 → { hits:[{id, score, why:[…]}], total, terms }
+    if(u.pathname === '/api/search'){
+      const q = u.searchParams.get('q') || '';
+      const limit = Math.min(200, Number(u.searchParams.get('limit')) || 60);
+      return json(res, 200, await search.search(q, { limit }));
+    }
+
+    if(await handleWorkspace(req, res, u, { readBody, json, root: ROOT })) return;   // рабочая папка проекта (/api/ws/*)
     if(u.pathname === '/api/template'){
-      const file = await fileForId(u.searchParams.get('id'));
-      if(!file) return json(res, 404, { error: 'нет такого шаблона' });
-      return json(res, 200, JSON.parse(await fs.readFile(path.join(TEMPLATES, file), 'utf8')));
+      const t = await store.get(u.searchParams.get('id'));
+      if(!t) return json(res, 404, { error: 'нет такого шаблона' });
+      return json(res, 200, t);
     }
 
     // создать шаблон из вставленного кода
@@ -351,16 +444,15 @@ const server = http.createServer(async (req, res) => {
       const code = String(b.code || '');
       const title = String(b.title || 'Без названия').slice(0, 80);
       // дедуп: тот же код (точное совпадение по названию+коду или просто тот же код) — обновляем, не плодим
-      const dupFile = (await findSameTemplate(title, code)) || (await findByCode(code));
-      if(dupFile){
-        const full = path.join(TEMPLATES, dupFile);
-        const j = JSON.parse(await fs.readFile(full, 'utf8'));
+      const dupId = (await findSameTemplate(title, code)) || (await findByCode(code));
+      if(dupId){
+        const j = await store.get(dupId);
         j.lang = lang; j.title = title;
         if(b.group != null) j.group = String(b.group).slice(0, 60) || j.group;
         if(b.desc) j.desc = String(b.desc).slice(0, 400);
         if(b.component && typeof b.component === 'object') j.component = Object.assign({}, j.component, b.component);
-        await fs.writeFile(full, JSON.stringify(j, null, 2), 'utf8');
-        return json(res, 200, { id: j.id || dupFile.replace(/\.json$/, ''), dedup: true });
+        await store.save(j);
+        return json(res, 200, { id: j.id || dupId, dedup: true });
       }
       const obj = {
         id: slug(title || lang),
@@ -374,66 +466,79 @@ const server = http.createServer(async (req, res) => {
       if(b.component && typeof b.component === 'object') obj.component = b.component;   // метаданные компонента (теги осей, подкатегория, контракт)
       if(lang === 'js'){ const c = codeContract(code); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
       annotateLines(obj.lines, lang, await kwDict());   // автоподпись ключевых слов из словаря
-      await fs.mkdir(TEMPLATES, { recursive: true });
-      await fs.writeFile(path.join(TEMPLATES, obj.id + '.json'), JSON.stringify(obj, null, 2), 'utf8');
+      await store.save(obj);
       return json(res, 200, { id: obj.id });
     }
 
     // вписать/изменить пояснение к конкретному слову (сохраняется в файл)
     if(u.pathname === '/api/annotate' && req.method === 'POST'){
       const b = await readBody(req);
-      const file = await fileForId(b.id);
-      if(!file) return json(res, 404, { error: 'нет такого шаблона' });
-      const full = path.join(TEMPLATES, file);
-      const j = JSON.parse(await fs.readFile(full, 'utf8'));
+      const j = await store.get(b.id);
+      if(!j) return json(res, 404, { error: 'нет такого шаблона' });
       const tok = j.lines && j.lines[b.line] && j.lines[b.line][b.idx];
       if(!tok) return json(res, 400, { error: 'не нашлось слово' });
       tok.e = String(b.e || '').slice(0, 600);
-      await fs.writeFile(full, JSON.stringify(j, null, 2), 'utf8');
+      await store.save(j);
       return json(res, 200, { ok: true });
     }
 
-    // автоподпись всех шаблонов из словаря: проставить e там, где его ещё нет
+    // автоподпись из словаря теперь происходит при каждой загрузке куска, поэтому писать ничего не нужно
     if(u.pathname === '/api/annotate-all' && req.method === 'POST'){
-      const dict = await kwDict();
-      const names = (await fs.readdir(TEMPLATES)).filter(n => n.endsWith('.json'));
-      let files = 0, added = 0;
-      for(const n of names){
-        const full = path.join(TEMPLATES, n);
-        try {
-          const j = JSON.parse(await fs.readFile(full, 'utf8'));
-          const c = annotateLines(j.lines, j.lang, dict);
-          if(c > 0){ await fs.writeFile(full, JSON.stringify(j, null, 2), 'utf8'); files++; added += c; }
-        } catch(_){}
-      }
-      return json(res, 200, { ok: true, files, added, total: names.length });
+      return json(res, 200, { ok: true, files: 0, added: 0, total: await store.count(), note: 'пояснения из словаря подставляются автоматически при загрузке' });
     }
 
     // убрать дубли: куски с одинаковым кодом схлопнуть в один (оставить самый полный)
     if(u.pathname === '/api/dedup' && req.method === 'POST'){
-      const names = (await fs.readdir(TEMPLATES)).filter(n => n.endsWith('.json'));
+      const ents = await store.entries();
       const byCode = new Map();
-      for(const n of names){
-        try { const j = JSON.parse(await fs.readFile(path.join(TEMPLATES, n), 'utf8'));
-          const code = _tplCode(j); if(!code) continue;   // пустой код не трогаем
-          const key = (j.lang || '') + '\u0000' + code;    // одинаковый код В ТОМ ЖЕ языке
-          if(!byCode.has(key)) byCode.set(key, []);
-          byCode.get(key).push({ n, j });
-        } catch(_){}
+      for(const e of ents){
+        const code = _normCode(e.code); if(!code) continue;   // пустой код не трогаем
+        const key = (e.lang || '') + '\u0000' + code;          // одинаковый код В ТОМ ЖЕ языке
+        if(!byCode.has(key)) byCode.set(key, []);
+        byCode.get(key).push(e);
       }
       // оценка «полноты»: есть раздел, описание, пояснения к словам — такой оставляем
-      const score = x => { let s = 0; if(String(x.j.group || '').trim()) s += 3; if(String(x.j.desc || '').trim()) s += 2; let e = 0; for(const ln of (x.j.lines || [])) for(const t of (ln || [])) if(t && t.e) e++; return s + Math.min(e, 20); };
+      const score = e => { let n = 0; if(String(e.meta.group || '').trim()) n += 3; if(String(e.meta.desc || '').trim()) n += 2; return n + Math.min((e.meta.wordNotes || []).filter(w => w.source === 'custom').length, 20); };
       let removed = 0, groups = 0;
       for(const [, arr] of byCode){
         if(arr.length < 2) continue;
         groups++;
         arr.sort((a, b) => score(b) - score(a));   // лучший — первым, его оставляем
-        for(let i = 1; i < arr.length; i++){ try { await fs.unlink(path.join(TEMPLATES, arr[i].n)); removed++; } catch(_){} }
+        for(let i = 1; i < arr.length; i++){ if(await store.remove(arr[i].id)) removed++; }
       }
-      return json(res, 200, { ok: true, groups, removed, total: names.length });
+      return json(res, 200, { ok: true, groups, removed, total: ents.length });
     }
 
     // объединённый импорт: один код-файл, полноценный кусок JSON, массив кусков или сборник {dict,pieces}
+    // пачка кусков одним текстом (txt) → файлы в library/. dry:true — только показать, что получится
+    if(u.pathname === '/api/ingest' && req.method === 'POST'){
+      const b = await readBody(req);
+      const { pieces, warnings } = parseSnippets(b.text, { lang: b.lang, group: b.group });
+      const dict = await kwDict();
+      const items = []; let created = 0, duplicates = 0;
+      for(const pc of pieces){
+        const dupId = await findByCode(pc.code);
+        const item = { title: pc.title, lang: pc.lang, group: pc.group || 'Мои куски', lines: pc.code.split('\n').length, status: dupId ? 'duplicate' : 'new', id: dupId || null };
+        if(dupId) duplicates++;
+        else {
+          created++;
+          if(!b.dry){
+            const title = String(pc.title).slice(0, 80);
+            const obj = { id: slug(title || pc.lang), lang: pc.lang, group: item.group.slice(0, 60), title, desc: String(pc.desc || '').slice(0, 400), output: pc.output || '', lines: tokenize(pc.code, pc.lang), descAt: Date.now() };
+            if(pc.tags) obj.tags = pc.tags;
+            if(pc.aliases) obj.aliases = pc.aliases;
+            obj.source = { title: 'manual', desc: pc.desc ? 'manual' : null, tags: pc.tags ? 'manual' : null };
+            if(pc.lang === 'js'){ const c = codeContract(pc.code); obj.component = { provides: c.provides, requires: c.requires }; }
+            annotateLines(obj.lines, pc.lang, dict);
+            await store.save(obj, { origin: 'imported' });
+            item.id = obj.id;
+          }
+        }
+        items.push(item);
+      }
+      return json(res, 200, { ok: true, dry: !!b.dry, total: pieces.length, created, duplicates, needDescription: pieces.filter((p, i) => items[i].status === 'new' && !p.desc).length, warnings, items });
+    }
+
     if((u.pathname === '/api/import' || u.pathname === '/api/import-collection') && req.method === 'POST'){
       return json(res, 200, await importBundle(await readBody(req)));
     }
@@ -441,10 +546,8 @@ const server = http.createServer(async (req, res) => {
     // правка шаблона целиком: новый код → заново токенизируем, перезаписываем файл
     if(u.pathname === '/api/edit' && req.method === 'POST'){
       const b = await readBody(req);
-      const file = await fileForId(b.id);
-      if(!file) return json(res, 404, { error: 'нет такого шаблона' });
-      const full = path.join(TEMPLATES, file);
-      const j = JSON.parse(await fs.readFile(full, 'utf8'));
+      const j = await store.get(b.id);
+      if(!j) return json(res, 404, { error: 'нет такого шаблона' });
       if(b.lang != null) j.lang = String(b.lang).toLowerCase();
       if(b.title != null) j.title = String(b.title).slice(0, 80) || j.title;
       if(b.group != null){
@@ -466,7 +569,7 @@ const server = http.createServer(async (req, res) => {
       if(b.notes && typeof b.notes === 'object'){ j.component = j.component || {}; j.component.notes = b.notes; }
       if(b.lineNotes && typeof b.lineNotes === 'object'){ j.component = j.component || {}; j.component.lineNotes = b.lineNotes; }
       if(b.component && typeof b.component === 'object'){ j.component = Object.assign({}, j.component || {}, b.component); }
-      await fs.writeFile(full, JSON.stringify(j, null, 2), 'utf8');
+      await store.save(j);
       return json(res, 200, { ok: true, id: j.id });
     }
 
@@ -520,7 +623,7 @@ const server = http.createServer(async (req, res) => {
     if(u.pathname === '/api/git/info'){
       await ensureLabDirs();
       let templates = 0;
-      try { templates = (await fs.readdir(TEMPLATES)).filter(n => n.endsWith('.json')).length; } catch(_){}
+      try { templates = await store.count(); } catch(_){}
       const root = await gitRoot();
       let branch = '', dirty = 0;
       if(root){
@@ -565,9 +668,8 @@ const server = http.createServer(async (req, res) => {
     // удалить шаблон
     if(u.pathname === '/api/delete' && req.method === 'POST'){
       const b = await readBody(req);
-      const file = await fileForId(b.id);
-      if(!file) return json(res, 404, { error: 'нет такого шаблона' });
-      await fs.unlink(path.join(TEMPLATES, file));
+      if(!(await store.has(b.id))) return json(res, 404, { error: 'нет такого шаблона' });
+      await store.remove(b.id);
       return json(res, 200, { ok: true });
     }
 
@@ -663,11 +765,48 @@ const server = http.createServer(async (req, res) => {
     if(data == null) return json(res, 404, { error: 'not found' });
     // no-store: иначе браузер показывает старый app.js/style.css после правок
     res.writeHead(200, { 'Content-Type': MIME[path.extname(abs)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
-    res.end(data);
+    // Настройки Mistral встраиваются в фактически отдаваемую главную страницу,
+    // независимо от того, как устроена оболочка приложения.
+    if (path.extname(abs) === '.html' && (u.pathname === '/' || u.pathname.endsWith('.html'))) {
+      let html = data.toString('utf8');
+      if (!html.includes('id="lab-mistral-settings"')) {
+        const widget = `
+<style>
+#lab-mistral-open{position:fixed;right:20px;bottom:20px;z-index:2147483000;border:1px solid #51336e;border-radius:12px;background:#21112f;color:#f5eaff;padding:11px 15px;font:600 14px system-ui;cursor:pointer;box-shadow:0 6px 24px #0006}
+#lab-mistral-settings{display:none;position:fixed;inset:0;z-index:2147483001;background:#090512cc;align-items:center;justify-content:center;font:14px system-ui;color:#f5eaff}
+#lab-mistral-settings .panel{width:min(460px,calc(100vw - 32px));box-sizing:border-box;background:#160d23;border:1px solid #49305f;border-radius:16px;padding:22px;box-shadow:0 20px 80px #0009}
+#lab-mistral-settings h2{margin:0 0 8px;font-size:20px}#lab-mistral-settings p{color:#bca9d8;line-height:1.5}
+#lab-mistral-key{box-sizing:border-box;width:100%;background:#0d0716;color:#fff;border:1px solid #49305f;border-radius:8px;padding:12px;margin:8px 0 12px}
+#lab-mistral-settings button{border:1px solid #51336e;border-radius:8px;background:#2a1740;color:#fff;padding:9px 12px;cursor:pointer;margin:3px 4px 3px 0}#lab-mistral-settings .primary{background:#6934a0}
+#lab-mistral-status{min-height:20px;color:#c9b7e5}
+</style>
+<button id="lab-mistral-open" type="button">⚙ Настройки</button>
+<div id="lab-mistral-settings" role="dialog" aria-modal="true" aria-labelledby="lab-mistral-title"><div class="panel"><h2 id="lab-mistral-title">Настройки Mistral</h2><p>Ключ хранится в этом браузере. Он отправляется локальному серверу только при запуске ИИ-описаний.</p><label for="lab-mistral-key">API-ключ</label><input id="lab-mistral-key" type="password" autocomplete="off" placeholder="Вставь ключ Mistral"><div><button class="primary" id="lab-mistral-save">Сохранить</button><button id="lab-mistral-test">Проверить подключение</button><button id="lab-mistral-delete">Удалить ключ</button><button id="lab-mistral-close">Закрыть</button><a href="/vendor.html" style="color:#c9a8ff;margin-left:10px;font-size:13px">Редактор кода…</a></div><p id="lab-mistral-status" aria-live="polite"></p></div></div>
+<script>
+(()=>{const $=id=>document.getElementById(id),keyName='codeLab.mistralApiKey',modal=$('lab-mistral-settings'),input=$('lab-mistral-key'),status=$('lab-mistral-status');if(!modal||!input)return;
+const open=()=>{input.value=localStorage.getItem(keyName)||'';status.textContent='';modal.style.display='flex';input.focus()};$('lab-mistral-open').addEventListener('click',open);$('lab-mistral-close').addEventListener('click',()=>modal.style.display='none');modal.addEventListener('click',e=>{if(e.target===modal)modal.style.display='none'});
+$('lab-mistral-save').addEventListener('click',()=>{const k=input.value.trim();if(k)localStorage.setItem(keyName,k);else localStorage.removeItem(keyName);status.textContent=k?'Ключ сохранён в этом браузере.':'Ключ очищен.'});
+$('lab-mistral-delete').addEventListener('click',()=>{localStorage.removeItem(keyName);input.value='';status.textContent='Ключ удалён.'});
+$('lab-mistral-test').addEventListener('click',async()=>{const k=input.value.trim()||localStorage.getItem(keyName)||'';if(!k){status.textContent='Сначала введи API-ключ.';return}status.textContent='Проверяю доступность очереди…';try{const r=await fetch('/api/jobs',{headers:{'X-Mistral-API-Key':k}});const j=await r.json();if(!r.ok)throw Error(j.error||('HTTP '+r.status));status.textContent='Сервер доступен. Очередь отвечает; настоящий запрос к Mistral выполняется при запуске описаний.'}catch(e){status.textContent='Ошибка: '+e.message}});
+})();
+</script>`;
+        const aiTag = '\n<script src="/ai-settings.js"></script>';
+        html = html.includes('</body>') ? html.replace('</body>', widget + aiTag + '</body>') : html + widget + aiTag;
+      }
+      res.end(html);
+    } else res.end(data);
   } catch(e){ json(res, 500, { error: String(e && e.message || e) }); }
 });
 
+{
+  const r = await store.init();
+  await aiRuntime.load();
+  await describeQueue.init();
+  await search.init();
+  await vendor.init();
+  if(r.migrated && r.migrated.created) console.log(`Из templates/ перенесено в library/: ${r.migrated.created} (старые карточки не тронуты)`);
+}
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`Лаборатория кода: http://localhost:${PORT}/`);
-  console.log(`Шаблоны: ${TEMPLATES}  (можно добавлять со страницы или класть .json руками)`);
+  console.log(`Библиотека: ${LIBRARY}  (куски кода — обычные файлы; положите файл сюда — он появится в списке)`);
 });

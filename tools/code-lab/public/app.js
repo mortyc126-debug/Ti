@@ -301,6 +301,8 @@ function showAddForm(){
     <div class="toolbar"><button class="btn ok" id="f-save">сохранить шаблон</button><button class="btn" id="f-cancel">отмена</button></div>
     <div class="muted" id="f-err"></div>`;
   work.appendChild(f);
+  // CodeMirror (если установлен и включён на странице «Редактор кода»); иначе остаётся обычное поле
+  if(window.CMBridge){ CMBridge.enhance($('#f-code'), $('#f-lang').value); $('#f-lang').addEventListener('change', ev => CMBridge.setLang($('#f-code'), ev.target.value)); }
 
   $('#f-file').onchange = async e => {
     const file = e.target.files && e.target.files[0]; if(!file) return;
@@ -309,6 +311,7 @@ function showAddForm(){
     const ext = (file.name.split('.').pop() || '').toLowerCase();
     const map = { py: 'python', sql: 'sql', js: 'js', mjs: 'js', jsx: 'js', ts: 'js' };
     if(map[ext]) $('#f-lang').value = map[ext];
+    if(window.CMBridge) CMBridge.setLang($('#f-code'), $('#f-lang').value);
   };
   $('#f-cancel').onclick = () => loadList();
   $('#f-save').onclick = async () => {
@@ -346,6 +349,7 @@ function showEditForm(tpl){
   work.appendChild(f);
   $('#e-title').value = tpl.title || ''; $('#e-group').value = tpl.group || '';
   $('#e-desc').value = tpl.desc || ''; $('#e-code').value = code; $('#e-out').value = tpl.output || '';
+  if(window.CMBridge){ CMBridge.enhance($('#e-code'), $('#e-lang').value); $('#e-lang').addEventListener('change', ev => CMBridge.setLang($('#e-code'), ev.target.value)); }
   $('#e-cancel').onclick = () => select(curId, nav.querySelector('.tpl.on'));
   $('#e-save').onclick = async () => {
     const body = { id: curId, title: $('#e-title').value, lang: $('#e-lang').value, group: $('#e-group').value, desc: $('#e-desc').value, code: $('#e-code').value, output: $('#e-out').value };

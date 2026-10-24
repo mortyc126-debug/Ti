@@ -1,9 +1,9 @@
 {
   "id": "отступ-с-каждой-стороны-отдельно-mvhtevjq",
   "lang": "css",
-  "group": "Мои куски",
+  "group": "CSS: отступы и размеры / Отступы",
   "title": "отступ с каждой стороны отдельно",
-  "desc": "",
+  "desc": "margin — внешний отступ;\nbottom — снизу;\nmargin-bottom: 10px; \n\n.box {\n  margin-top: 10px;\n  margin-right: 20px;\n  margin-bottom: 30px;\n  margin-left: 40px;\n}\npadding-bottom — это внутренний отступ снизу, между содержимым элемента и его границей.",
   "lines": [
     [
       {
@@ -205,5 +205,13 @@
     []
   ],
   "output": "",
-  "descAt": 1792569190454
+  "descAt": 1792581922736,
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: отступы и размеры"
+      ]
+    },
+    "subcat": "Отступы"
+  }
 }

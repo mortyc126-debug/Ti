@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "active": "5.65.21",
+  "previous": [],
+  "installed": {
+    "5.65.21": {
+      "installedAt": "2026-10-24T07:32:29.074Z",
+      "published": "2026-02-07T07:45:37.180Z",
+      "integrity": "sha512",
+      "fileCount": 265,
+      "bytes": 2424688,
+      "test": {
+        "ok": true,
+        "at": "2026-10-24T07:32:40.942Z",
+        "cmVersion": "5.65.21",
+        "entries": 763,
+        "ms": 380,
+        "errors": [],
+        "missingModes": [],
+        "warnings": []
+      }
+    }
+  },
+  "lastCheck": {
+    "at": "2026-10-24T07:32:20.611Z",
+    "ok": true,
+    "latest": "5.65.21",
+    "candidates": [
+      {
+        "version": "5.65.21",
+        "published": "2026-02-07T07:45:37.180Z",
+        "ageDays": 258,
+        "young": false,
+        "fileCount": 338,
+        "unpackedSize": 2963250
+      }
+    ],
+    "newestInstalled": null,
+    "datesKnown": true
+  },
+  "lastGood": {
+    "at": "2026-10-24T07:32:20.611Z",
+    "ok": true,
+    "latest": "5.65.21",
+    "candidates": [
+      {
+        "version": "5.65.21",
+        "published": "2026-02-07T07:45:37.180Z",
+        "ageDays": 258,
+        "young": false,
+        "fileCount": 338,
+        "unpackedSize": 2963250
+      }
+    ],
+    "newestInstalled": null,
+    "datesKnown": true
+  }
+}

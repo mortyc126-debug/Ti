@@ -114,6 +114,7 @@ async function loadAll(){
   renderCats(); renderFilters(); render();
 }
 loadAll();
+initDescriptionControls();
 
 function renderCats(){
   const box = document.getElementById('pcats'); box.innerHTML='';
@@ -137,7 +138,33 @@ function renderFilters(){
 }
 function chip(text, on){ const s=document.createElement('span'); s.className='fchip'+(on?' on':''); s.textContent=text; return s; }
 
-document.getElementById('q').oninput = e => { query = e.target.value.trim().toLowerCase(); render(); };
+// Поиск идёт на сервере (/api/search): по названию, описанию, тегам, коду и пояснениям слов, с синонимами и словоформами.
+// Если сервер недоступен, работает прежний поиск по подстроке в названии и описании.
+let searchRes = null, searchSeq = 0, searchTimer = null;
+document.getElementById('q').oninput = e => {
+  query = e.target.value.trim().toLowerCase();
+  clearTimeout(searchTimer);
+  if(!query){ searchRes = null; searchSeq++; render(); return; }
+  searchTimer = setTimeout(async () => {
+    const seq = ++searchSeq;
+    let res = null;
+    try { const r = await fetch('/api/search?q=' + encodeURIComponent(query) + '&limit=150').then(r => r.json()); if(r && Array.isArray(r.hits)) res = r; } catch(_){}
+    if(seq !== searchSeq) return;          // пока ждали, запрос уже поменялся
+    searchRes = res || { q: query, fallback: true };
+    render();
+  }, 120);
+};
+// «найдено: толщина → font-weight (код)» — короткое объяснение, почему кусок попал в выдачу
+function whyText(why){
+  if(!why || !why.length) return '';
+  const parts = why.slice(0, 3).map(w => {
+    if(w.kind === 'substring') return 'есть в названии или описании';
+    const via = w.via && w.via.toLowerCase() !== w.q.toLowerCase() ? ' → ' + w.via : '';
+    const found = w.found && w.found.toLowerCase() !== (w.via || w.q).toLowerCase() ? ' [' + w.found + ']' : '';
+    return w.q + via + found + (w.in ? ' (' + w.in + ')' : '');
+  });
+  return 'найдено: ' + parts.join('; ');
+}
 
 function render(){
   if(axis === 'custom') return renderCustom();
@@ -178,16 +205,56 @@ function render(){
 
 // результаты поиска по всем разделам, сгруппированные по назначению
 function renderSearch(){
-  let items = ALL.slice();
+  const why = new Map();
+  let items;
+  const ready = searchRes && !searchRes.fallback && String(searchRes.q).toLowerCase() === query;
+  if(ready){
+    // порядок — по релевантности, как вернул сервер
+    const byId = new Map(ALL.map(t=>[t.id, t]));
+    items = searchRes.hits.map(h => { const t = byId.get(h.id); if(t) why.set(t.id, h.why); return t; }).filter(Boolean);
+  } else {
+    items = ALL.filter(t=>((t.title||'')+' '+(t.desc||'')).toLowerCase().includes(query));
+  }
   if(fPlace) items = items.filter(t=>t._places.includes(fPlace));
   if(fTech) items = items.filter(t=>t._techs.includes(fTech));
-  items = items.filter(t=>((t.title||'')+' '+(t.desc||'')).toLowerCase().includes(query));
   document.getElementById('cName').textContent = 'Поиск';
-  document.getElementById('cLead').textContent = items.length ? ('«'+query+'» — найдено '+items.length+' по всем разделам') : ('«'+query+'» — ничего не найдено');
+  const alsoAs = ready ? searchRes.terms.filter(t=>t.alts && t.alts.some(a=>a.kind==='syn')).map(t=>'«'+t.q+'» ищется и как: '+t.alts.filter(a=>a.kind==='syn').slice(0,4).map(a=>a.label).join(', ')).join(' · ') : '';
+  document.getElementById('cLead').textContent = items.length ? ('«'+query+'» — найдено '+items.length+' по всем разделам'+(alsoAs ? '. '+alsoAs : '')) : ('«'+query+'» — ничего не найдено');
   const host = document.getElementById('sections'); host.innerHTML='';
   if(!items.length){ host.innerHTML='<div class="empty">Ничего не нашлось. Попробуй другое слово или очисти поиск.</div>'; return; }
+  if(ready){
+    // Результаты строго по релевантности (как вернул сервер), без разбивки по разделам.
+    // Раздел и сила совпадения показаны на самой карточке. Слабые совпадения свёрнуты.
+    const score = new Map(searchRes.hits.map(h => [h.id, h.score]));
+    const topScore = Math.max(0.0001, ...items.map(t => score.get(t.id) || 0));
+    const strong = [], weak = [];
+    items.forEach((t, i) => {
+      const rel = (score.get(t.id) || 0) / topScore;
+      (i < 5 || rel >= 0.5 ? strong : weak).push({ t, rel });
+    });
+    const fill = (grid, arr) => arr.forEach(({ t, rel }) => {
+      const c = card(t);
+      const w = whyText(why.get(t.id));
+      const d = document.createElement('div'); d.className = 'cwhy';
+      d.textContent = 'совпадение ' + Math.round(rel * 100) + '% · раздел: ' + (t._purpose || 'Разное') + (w ? ' · ' + w : '');
+      c.appendChild(d); grid.appendChild(c);
+    });
+    const sec = document.createElement('div'); sec.className = 'subsec';
+    sec.innerHTML = '<div class="subh">Лучшие совпадения <span class="sc">' + strong.length + '</span></div>';
+    const grid = document.createElement('div'); grid.className = 'grid'; fill(grid, strong);
+    sec.appendChild(grid); host.appendChild(sec);
+    if(weak.length){
+      const tog = document.createElement('div'); tog.className = 'frag-toggle'; tog.textContent = '▸ слабые совпадения (' + weak.length + ')';
+      const wg = document.createElement('div'); wg.className = 'grid'; wg.style.display = 'none'; fill(wg, weak);
+      tog.onclick = () => { const open = wg.style.display === 'none'; wg.style.display = open ? 'grid' : 'none'; tog.textContent = (open ? '▾' : '▸') + ' слабые совпадения (' + weak.length + ')'; };
+      host.append(tog, wg);
+    }
+    return;
+  }
+  // запасной режим (сервер недоступен): как раньше, по разделам
   const byP = {}; items.forEach(t=>{ const k=t._purpose||'Разное'; (byP[k]=byP[k]||[]).push(t); });
-  PURPOSE.map(x=>x.key).concat(Object.keys(byP).filter(k=>!PURPOSE.some(x=>x.key===k))).forEach(pk=>{
+  const order = PURPOSE.map(x=>x.key).concat(Object.keys(byP).filter(k=>!PURPOSE.some(x=>x.key===k)));
+  order.forEach(pk=>{
     const list = byP[pk]; if(!list||!list.length) return;
     list.sort((a,b)=>(TYPE_RANK[a._type]-TYPE_RANK[b._type]));
     const sec = document.createElement('div'); sec.className='subsec';
@@ -207,6 +274,7 @@ function card(t){
     + '<span class="tg">'+esc(t._places[0]||'')+'</span>'
     + '<span class="tg">'+esc((t._techs[0]||''))+'</span>'
     + (warn?'<span class="tg warnflag">⚠ риск</span>':'')
+    + ((!String(t.desc || '').trim() || t.status === 'needs_description')?'<span class="tg needs-desc">нужно описание</span>':'')
     + '</div>';
   const prov = (t.comp && t.comp.provides) || [], req = (t.comp && t.comp.requires) || [];
   const contract = (prov.length || req.length)
@@ -444,4 +512,68 @@ function descFmt(s){
   s = s.replace(/```([\s\S]*?)```/g, (m, c) => { blocks.push(c.replace(/^\n+|\n+$/g, '')); return '\u0001' + (blocks.length - 1) + '\u0001'; });
   let html = esc(s).replace(/`([^`\n]+)`/g, (m, c) => '<code class="desc-chip">' + c + '</code>').replace(/\n/g, '<br>');
   return html.replace(/\u0001(\d+)\u0001/g, (m, i) => '<pre class="desc-code">' + esc(blocks[+i]) + '</pre>');
+}
+
+
+// Связка настроек браузера с серверной очередью Mistral.
+let lastDescriptionCompleted = -1;
+function initDescriptionControls(){
+  const selected = document.getElementById('describeSelected');
+  const all = document.getElementById('describeAll');
+  const refresh = document.getElementById('refreshJobs');
+  if(!selected || !all || !refresh) return;
+  selected.addEventListener('click', () => {
+    if(!selCardId){ setDescribeStatus('Сначала выберите карточку одним кликом.', ''); return; }
+    startDescriptionJobs([selCardId]);
+  });
+  all.addEventListener('click', () => startDescriptionJobs(null));
+  refresh.addEventListener('click', refreshDescriptionJobs);
+  refreshDescriptionJobs();
+  window.setInterval(refreshDescriptionJobs, 2500);
+}
+function describeHeaders(){
+  const key = typeof window.codeLabMistralKey === 'function' ? window.codeLabMistralKey() : '';
+  return key ? {'x-mistral-api-key': key} : {};
+}
+function setDescribeStatus(message, kind){
+  const el = document.getElementById('describeStatus'); if(!el) return;
+  el.textContent = message; el.className = 'describe-status' + (kind ? ' ' + kind : '');
+}
+async function startDescriptionJobs(ids){
+  const key = typeof window.codeLabMistralKey === 'function' ? window.codeLabMistralKey() : '';
+  if(!key){
+    setDescribeStatus('Нет ключа Mistral. Откройте ⚙ Настройки и сохраните ключ.', 'error');
+    document.getElementById('labSettingsBtn')?.click();
+    return;
+  }
+  const buttons = [document.getElementById('describeSelected'), document.getElementById('describeAll')].filter(Boolean);
+  buttons.forEach(b => b.disabled = true);
+  setDescribeStatus('Добавляю фрагменты в очередь…', '');
+  try {
+    const response = await fetch('/api/describe', {method:'POST', headers:{'Content-Type':'application/json', ...describeHeaders()}, body:JSON.stringify(ids ? {ids} : {})});
+    const data = await response.json().catch(() => ({}));
+    if(!response.ok) throw new Error(data.error || `Ошибка сервера HTTP ${response.status}`);
+    setDescribeStatus(`Очередь запущена: добавлено ${data.added ?? 0}.`, 'good');
+    await refreshDescriptionJobs();
+  } catch(e){ setDescribeStatus(e.message || 'Не удалось запустить очередь.', 'error'); }
+  finally { buttons.forEach(b => b.disabled = false); }
+}
+async function refreshDescriptionJobs(){
+  try {
+    const response = await fetch('/api/jobs', {headers:describeHeaders(), cache:'no-store'});
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    const bits = [`в очереди: ${data.queued || 0}`, `обрабатывается: ${data.running || 0}`, `готово: ${data.completed || 0}`];
+    if(data.failed) bits.push(`ошибок: ${data.failed}`);
+    if(data.active || data.queued || data.running){
+      setDescribeStatus('ИИ-описания — ' + bits.join(' · '), data.failed ? 'error' : 'good');
+    } else if(data.total){
+      setDescribeStatus('Последняя очередь — ' + bits.join(' · ') + (data.failed ? '. Проверьте ошибки в статусе задания.' : '.'), data.failed ? 'error' : 'good');
+    } else {
+      setDescribeStatus('Очередь не запускалась. Сохраните ключ Mistral в ⚙ Настройки.', '');
+    }
+    const completed = data.completed || 0;
+    if(lastDescriptionCompleted >= 0 && completed !== lastDescriptionCompleted) await loadAll();
+    lastDescriptionCompleted = completed;
+  } catch(e){ setDescribeStatus('Не удалось получить статус очереди: ' + (e.message || 'ошибка сервера'), 'error'); }
 }

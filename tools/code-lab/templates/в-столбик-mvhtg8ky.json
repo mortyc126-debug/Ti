@@ -1,7 +1,7 @@
 {
   "id": "в-столбик-mvhtg8ky",
   "lang": "css",
-  "group": "Мои куски",
+  "group": "CSS: раскладка / Flexbox",
   "title": "в столбик",
   "desc": "",
   "lines": [
@@ -135,5 +135,13 @@
     []
   ],
   "output": "",
-  "descAt": 1792569254002
+  "descAt": 1792569254002,
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: раскладка"
+      ]
+    },
+    "subcat": "Flexbox"
+  }
 }

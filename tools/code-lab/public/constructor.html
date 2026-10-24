@@ -121,10 +121,10 @@
   .sb-ed-del{background:none;border:0;color:var(--text3);cursor:pointer;font-size:12px;padding:0 3px}
   .sb-ed-del:hover{color:#FF6B6B}
   /* редактор с подсветкой: прозрачная textarea поверх раскрашенного pre */
-  .sb-ed-wrap{position:relative;display:flex;flex:1;min-height:64px;overflow:hidden;background:#0E0720}
+  .sb-ed-wrap{position:relative;display:flex;flex:1;min-height:64px;overflow:hidden;background:var(--code-bg,#0E0720)}
   .sb-hl,.sb-code{margin:0;padding:9px 11px;font:12px/1.5 ui-monospace,monospace;white-space:pre;tab-size:2;letter-spacing:0;border:0;box-sizing:border-box}
   /* textarea тянется как flex-элемент (абсолютная не растягивается в Chromium), pre — абсолютная подложка под ней */
-  .sb-hl{position:absolute;top:0;right:0;bottom:0;left:0;overflow:hidden;color:#CBC2EA;pointer-events:none;z-index:0}
+  .sb-hl{position:absolute;top:0;right:0;bottom:0;left:0;overflow:hidden;color:var(--text2,#CBC2EA);pointer-events:none;z-index:0}
   .sb-hl .line{min-height:1.5em}
   .sb-code{position:relative;z-index:1;flex:1;min-width:0;min-height:0;overflow:auto;background:transparent;color:transparent;caret-color:#fff;resize:none;outline:none}
   .sb-code::selection{background:rgba(124,108,160,.4)}
@@ -144,9 +144,9 @@
   .sb-frame{flex:1;min-height:120px;width:100%;border:1px solid var(--border);border-radius:10px;background:#fff}
   .sb-con{flex:none;max-height:30%;overflow:auto;margin:0;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font:11.5px/1.5 ui-monospace,monospace;color:var(--text2);white-space:pre-wrap}
   @media(max-width:1000px){.sandbox{flex-direction:column}.sb-eds{width:auto}.sb-gut{display:none}}
-  pre.code{background:#0E0720;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:0;overflow:auto;font-size:12px;line-height:1.55}
+  pre.code{background:var(--code-bg,#0E0720);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:0;overflow:auto;font-size:12px;line-height:1.55}
   .result .preview{margin:0}
-  .result iframe{width:100%;height:100%;border:1px solid var(--border);border-radius:10px;background:#0E0720}.preview{position:relative}.runtime-status{position:absolute;right:7px;top:7px;z-index:2;padding:4px 7px;border-radius:7px;background:rgba(14,7,32,.9);border:1px solid var(--border);font:10px ui-monospace,monospace;color:var(--text3);pointer-events:none}.runtime-status.ok{color:var(--str);border-color:rgba(82,242,201,.45)}.runtime-status.error{color:#ffb3c1;border-color:rgba(255,107,107,.45)}.runtime-status.checking{color:var(--num);border-color:rgba(255,136,0,.45)}
+  .result iframe{width:100%;height:100%;border:1px solid var(--border);border-radius:10px;background:var(--code-bg,#0E0720)}.preview{position:relative}.runtime-status{position:absolute;right:7px;top:7px;z-index:2;padding:4px 7px;border-radius:7px;background:rgba(14,7,32,.9);border:1px solid var(--border);font:10px ui-monospace,monospace;color:var(--text3);pointer-events:none}.runtime-status.ok{color:var(--str);border-color:rgba(82,242,201,.45)}.runtime-status.error{color:#ffb3c1;border-color:rgba(255,107,107,.45)}.runtime-status.checking{color:var(--num);border-color:rgba(255,136,0,.45)}
 
   /* правый инспектор */
   .g-insp{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:auto;min-height:0}
@@ -232,7 +232,7 @@
   .m-dup-lbl{display:inline-flex;align-items:center;gap:6px;margin-left:6px;color:var(--text2);cursor:pointer}
   .blk-code-wrap{position:relative;width:100%;margin-top:3px}
   textarea.blk-code,pre.blk-hl{width:100%;box-sizing:border-box;margin:0;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word;tab-size:2}
-  pre.blk-hl{position:absolute;inset:0;pointer-events:none;overflow:hidden;color:#CBC2EA;background:var(--bg);border-color:transparent}
+  pre.blk-hl{position:absolute;inset:0;pointer-events:none;overflow:hidden;color:var(--text2,#CBC2EA);background:var(--bg);border-color:transparent}
   textarea.blk-code{position:relative;z-index:1;background:transparent;color:transparent;caret-color:#F6F4FF;-webkit-text-fill-color:transparent;resize:vertical}
   .btn{font:12px/1 ui-monospace,monospace;color:var(--text2);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:7px 11px;cursor:pointer}
   .btn:hover{color:var(--acc);border-color:rgba(255,0,110,.4)} .btn.ok{color:var(--str);border-color:rgba(82,242,201,.4)}
@@ -242,6 +242,35 @@
 .edge-message.error{border-color:#a94b62}.edge-message.warn{border-color:#a7833e}.edge-message.ok{border-color:#3d9a83}
 .bc-status.needs-work{border-color:#a7833e}.bc-status.ready{border-color:#3d9a83}
 .bc-alert{color:#ffb3c1}.edge-message{display:none}
+  /* ---- панель инструментов холста: одна высота, группы, меню ---- */
+  .c-toolbar{justify-content:space-between;gap:8px 12px}
+  .c-toolbar{min-width:0}
+  .tb-grp{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;max-width:100%}
+  .tb-right{margin-left:auto;justify-content:flex-end}
+  .tb-title{font-size:12.5px;color:var(--text2);font-weight:600}
+  .tb-badge{font-size:11px;color:var(--str);border:1px solid rgba(82,242,201,.5);border-radius:6px;padding:2px 7px;white-space:nowrap}
+  .c-toolbar .btn{box-sizing:border-box;height:30px;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 11px;white-space:nowrap}
+  .c-toolbar #undo,.c-toolbar #redo{width:30px;padding:0}
+  .c-toolbar .zoom-grp .btn{padding:0 9px}
+  .c-toolbar select.btn{padding:0 6px}
+  /* главное действие — одно, залито цветом */
+  .tb-run{display:inline-flex}
+  .c-toolbar #run{background:var(--str);color:#0E0720;border-color:var(--str);font-weight:600;border-radius:6px 0 0 6px}
+  .c-toolbar #run:hover{filter:brightness(1.1);color:#0E0720}
+  .c-toolbar #fmt{border-radius:0 6px 6px 0;margin-left:-1px}
+  /* выпадающие меню */
+  .tb-menu{position:relative}
+  .tb-pop{display:none;position:absolute;top:calc(100% + 6px);left:0;min-width:200px;flex-direction:column;gap:1px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:5px;box-shadow:0 8px 28px rgba(0,0,0,.45);z-index:70}
+  .tb-right .tb-pop{left:auto;right:0}
+  .tb-menu.open .tb-pop{display:flex}
+  .tb-menu.open .tb-menu-btn{color:var(--acc);border-color:rgba(255,0,110,.4)}
+  .c-toolbar .tb-pop .btn{width:100%;height:auto;min-height:32px;justify-content:flex-start;background:none;border-color:transparent;border-radius:7px;padding:7px 10px;color:var(--text2);font:12.5px/1.2 system-ui,sans-serif}
+  .c-toolbar .tb-pop .btn:hover{background:var(--s2);color:var(--text);border-color:var(--border)}
+  .c-toolbar .tb-pop .tb-danger:hover{color:#FF6B6B;border-color:rgba(255,107,107,.4)}
+  .tb-sep{height:1px;background:var(--border);margin:4px 2px}
+  /* пока превью пустое — не занимает место */
+  .result.no-preview{grid-template-columns:1fr}
+  .result.no-preview .result-gutter,.result.no-preview .preview{display:none}
 </style>
 </head>
 <body data-page="constructor">
@@ -258,32 +287,53 @@
 
     <section class="center">
       <div class="c-toolbar">
-        <span style="font-size:12.5px;color:var(--text2);font-weight:600">Холст</span>
-        <span style="font-size:11px;color:var(--str);border:1px solid rgba(82,242,201,.5);border-radius:6px;padding:2px 7px">граф v3</span>
-        <button class="btn" id="undo" title="отменить (Ctrl+Z)" disabled>↶</button>
-        <button class="btn" id="redo" title="повторить (Ctrl+Y)" disabled>↷</button>
-        <span class="zoom-grp">
-          <button class="btn" id="zoomOut" title="мельче (Ctrl+колесо)">−</button>
-          <button class="btn" id="zoomReset" title="100%"><span id="zoomLbl">100%</span></button>
-          <button class="btn" id="zoomIn" title="крупнее">+</button>
-        </span>
-        <button class="btn" id="collapseCanvas" title="свернуть визуальный холст — больше места коду и предпросмотру">🔽 свернуть холст</button>
-        <button class="btn" id="sandboxToggle" title="песочница: панели кода (HTML/CSS/JS и др.) + живой предпросмотр">🧪 песочница</button>
-        <span style="flex:1"></span>
-        <button class="btn" id="example">пример</button>
-        <button class="btn" id="clear">× очистить</button>
-        <button class="btn" id="imp">⬆ разобрать файл</button>
-        <button class="btn" id="paste">✎ вставить код</button>
-        <button class="btn" id="reconcile" title="свести описания узлов и каталога — автоматически берётся самое свежее по дате">⇅ свести описания</button>
-        <button class="btn" id="flows" title="сохранить эту схему со связями в файл или открыть сохранённую">🗂 схемы</button>
-        <button class="btn" id="autowire" title="авто-связи: соединять новые куски с совместимыми по именам">🔗 авто-связи</button>
-        <input type="file" id="impfile" accept=".js,.mjs,.jsx,.ts,.html,.htm,.css,.py,.sql,.json,.txt" style="display:none">
-        <button class="btn" id="copy">⧉ код</button>
-        <button class="btn" id="buildcheck" title="проверить стыковку по типам и запустить собранное">🔌 собрать и проверить</button>
-        <button class="btn ok" id="run">▶ запустить</button>
-        <select id="fmt" class="btn" title="формат файла"><option value="html">.html</option><option value="js">.js</option><option value="txt">.txt</option></select>
-        <button class="btn" id="dl">⬇ скачать</button>
-        <button class="btn" id="save">💾 в шаблоны</button>
+        <div class="tb-grp">
+          <span class="tb-title">Холст</span>
+          <span class="tb-badge">граф v3</span>
+          <button class="btn" id="undo" title="отменить (Ctrl+Z)" disabled>↶</button>
+          <button class="btn" id="redo" title="повторить (Ctrl+Y)" disabled>↷</button>
+          <span class="zoom-grp">
+            <button class="btn" id="zoomOut" title="мельче (Ctrl+колесо)">−</button>
+            <button class="btn" id="zoomReset" title="100%"><span id="zoomLbl">100%</span></button>
+            <button class="btn" id="zoomIn" title="крупнее">+</button>
+          </span>
+          <button class="btn" id="collapseCanvas" title="свернуть визуальный холст — больше места коду и предпросмотру">🔽 свернуть холст</button>
+          <button class="btn" id="sandboxToggle" title="песочница: панели кода (HTML/CSS/JS и др.) + живой предпросмотр">🧪 песочница</button>
+        </div>
+        <div class="tb-grp tb-right">
+          <div class="tb-menu">
+            <button class="btn tb-menu-btn" type="button" aria-haspopup="true" aria-expanded="false">＋ добавить ▾</button>
+            <div class="tb-pop">
+              <button class="btn" id="paste">✎ вставить код</button>
+              <button class="btn" id="imp">⬆ разобрать файл</button>
+              <button class="btn" id="flows" title="сохранить эту схему со связями в файл или открыть сохранённую">🗂 схемы</button>
+              <button class="btn" id="example">пример</button>
+            </div>
+          </div>
+          <div class="tb-menu">
+            <button class="btn tb-menu-btn" type="button" aria-haspopup="true" aria-expanded="false">✨ авто ▾</button>
+            <div class="tb-pop">
+              <button class="btn" id="autowire" title="авто-связи: соединять новые куски с совместимыми по именам">🔗 авто-связи</button>
+              <button class="btn" id="reconcile" title="свести описания узлов и каталога — автоматически берётся самое свежее по дате">⇅ свести описания</button>
+            </div>
+          </div>
+          <input type="file" id="impfile" accept=".js,.mjs,.jsx,.ts,.html,.htm,.css,.py,.sql,.json,.txt" style="display:none">
+          <button class="btn" id="copy" title="скопировать весь собранный код">⧉ код</button>
+          <button class="btn" id="buildcheck" title="проверить стыковку по типам и запустить собранное">🔌 собрать и проверить</button>
+          <span class="tb-run">
+            <button class="btn ok" id="run">▶ запустить</button>
+            <select id="fmt" class="btn" title="формат файла"><option value="html">.html</option><option value="js">.js</option><option value="txt">.txt</option></select>
+          </span>
+          <div class="tb-menu">
+            <button class="btn tb-menu-btn" type="button" aria-haspopup="true" aria-expanded="false" title="ещё">⋯</button>
+            <div class="tb-pop">
+              <button class="btn" id="dl">⬇ скачать</button>
+              <button class="btn" id="save">💾 в шаблоны</button>
+              <div class="tb-sep"></div>
+              <button class="btn tb-danger" id="clear">× очистить</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="canvas-scroll">
         <div class="canvas" id="canvas">
@@ -315,5 +365,41 @@
   <script src="/contract.js"></script>
   <script src="/constructor.js"></script>
   <script src="/sandbox.js"></script>
+  <script src="/workspace.js"></script>
+  <script>
+  // меню панели инструментов: открыть/закрыть, Esc и клик мимо закрывают
+  (function(){
+    var menus = [].slice.call(document.querySelectorAll('.tb-menu'));
+    function closeAll(except){
+      menus.forEach(function(m){
+        if(m === except) return;
+        m.classList.remove('open');
+        var b = m.querySelector('.tb-menu-btn'); if(b) b.setAttribute('aria-expanded','false');
+      });
+    }
+    menus.forEach(function(m){
+      var b = m.querySelector('.tb-menu-btn'), p = m.querySelector('.tb-pop');
+      b.addEventListener('click', function(e){
+        e.stopPropagation();
+        var open = !m.classList.contains('open');
+        closeAll(m); m.classList.toggle('open', open);
+        b.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      p.addEventListener('click', function(){ setTimeout(function(){ closeAll(); }, 0); });
+    });
+    document.addEventListener('click', function(e){ if(!e.target.closest || !e.target.closest('.tb-menu')) closeAll(); });
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeAll(); });
+  })();
+  </script>
+  <script>
+  // превью показываем только после запуска (пока в статусе исходная надпись — скрыто)
+  (function(){
+    var st = document.getElementById('runtimeStatus'), res = document.querySelector('.result');
+    if(!st || !res) return;
+    function upd(){ res.classList.toggle('no-preview', st.textContent.trim() === 'Preview не запускался'); }
+    new MutationObserver(upd).observe(st, { childList:true, characterData:true, subtree:true });
+    upd();
+  })();
+  </script>
 </body>
 </html>

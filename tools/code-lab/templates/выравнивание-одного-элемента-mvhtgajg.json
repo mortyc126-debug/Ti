@@ -1,7 +1,7 @@
 {
   "id": "выравнивание-одного-элемента-mvhtgajg",
   "lang": "css",
-  "group": "Мои куски",
+  "group": "CSS: раскладка / Flexbox",
   "title": "выравнивание одного элемента",
   "desc": "",
   "lines": [
@@ -81,5 +81,13 @@
     []
   ],
   "output": "",
-  "descAt": 1792569256540
+  "descAt": 1792569256540,
+  "component": {
+    "tags": {
+      "purpose": [
+        "CSS: раскладка"
+      ]
+    },
+    "subcat": "Flexbox"
+  }
 }
