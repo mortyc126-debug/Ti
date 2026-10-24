@@ -908,37 +908,97 @@ function inspFields(nd, b){
   });
   return box;
 }
-// «Настроить» для своего кода: понятные поля по строкам `имя = значение;`
-// (значения правятся прямо отсюда) + весь код в раскрывашке.
-const VAR_RE = /^(\s*(?:const|let|var)\s+([A-Za-zА-Яа-яЁё_$][\wА-Яа-яЁё$]*)\s*=\s*)(.+);\s*$/;
-function rawVars(code){ const out = []; String(code).split('\n').forEach((ln, i) => { const m = ln.match(VAR_RE); if(m) out.push({ i, name: m[2], value: m[3] }); }); return out; }
-function setVar(nd, name, val){
-  const lines = String(nd.fields.code || '').split('\n');
-  for(let i = 0; i < lines.length; i++){ const m = lines[i].match(VAR_RE); if(m && m[2] === name){ lines[i] = m[1] + val + ';'; break; } }
-  nd.fields.code = lines.join('\n');
+// «Настроить» для своего кода: форма по объявлениям `const/let/var имя = значение`
+// (одно- и многострочные; у объекта — поле на каждый ключ) + весь код в раскрывашке.
+// Разбор эвристический: гасим строки/комментарии, глубина скобок даёт верхний уровень.
+function _rawBlank(code){
+  let out = '', i = 0, n = code.length;
+  while(i < n){ const c = code[i], two = code.slice(i, i + 2);
+    if(two === '//'){ let j = i; while(j < n && code[j] !== '\n') j++; out += ' '.repeat(j - i); i = j; continue; }
+    if(two === '/*'){ let j = i + 2; while(j < n && code.slice(j, j + 2) !== '*/') j++; j = Math.min(n, j + 2); out += ' '.repeat(j - i); i = j; continue; }
+    if(c === '"' || c === "'" || c === '`'){ let j = i + 1; while(j < n && code[j] !== c){ if(code[j] === '\\') j++; j++; } j = Math.min(n, j + 1); out += ' '.repeat(j - i); i = j; continue; }
+    out += c; i++; }
+  return out;
 }
+const _rawDepth = (s, idx) => { let d = 0; for(let i = 0; i < idx; i++){ const c = s[i]; if(c === '{' || c === '(' || c === '[') d++; else if(c === '}' || c === ')' || c === ']') d--; } return d; };
+function _rawValEnd(s, from){ let d = 0, i = from, n = s.length;
+  for(; i < n; i++){ const c = s[i]; if(c === '{' || c === '(' || c === '[') d++; else if(c === '}' || c === ')' || c === ']'){ if(d === 0) break; d--; } else if(d === 0 && (c === ';' || c === '\n')) break; } return i; }
+// объявления верхнего уровня (имя, вид, границы значения в исходном коде)
+function rawDecls(code){
+  const s = _rawBlank(code), out = []; let m;
+  const re = /(?:^|[;{}\n])[ \t]*(const|let|var)\s+([A-Za-zА-Яа-яЁё_$][\wА-Яа-яЁё$]*)\s*=/g;
+  while((m = re.exec(s))){ const nameI = m.index + m[0].indexOf(m[2]); if(_rawDepth(s, nameI) !== 0) continue;
+    const eq = m.index + m[0].length, end = _rawValEnd(s, eq);
+    out.push({ name: m[2], kind: m[1], valStart: eq, valEnd: end, value: code.slice(eq, end).trim(), line: (code.slice(0, nameI).match(/\n/g) || []).length + 1 }); }
+  return out;
+}
+// ключи объекта-значения (поля): смещения относительно строки значения val
+function rawObjFields(val){
+  if(val.indexOf('{') < 0) return [];
+  const s = _rawBlank(val), out = []; let m;
+  const re = /([A-Za-zА-Яа-яЁё_$][\wА-Яа-яЁё$]*|'[^']*'|"[^"]*")\s*:/g;
+  while((m = re.exec(s))){ if(_rawDepth(s, m.index) !== 1) continue;
+    const key = m[1].replace(/['"]/g, ''), vStart = m.index + m[0].length;
+    let i = vStart, d = 0; const n = s.length;
+    for(; i < n; i++){ const c = s[i]; if(c === '{' || c === '(' || c === '[') d++; else if(c === '}' || c === ')' || c === ']'){ if(d === 0) break; d--; } else if(d === 0 && c === ',') break; }
+    out.push({ key, valStart: vStart, valEnd: i, value: val.slice(vStart, i).trim() }); }
+  return out;
+}
+// записать новое значение переменной (целиком) — перечитываем код, ищем по имени
+function setDeclValue(nd, name, newVal){
+  const code = String(nd.fields.code || ''), d = rawDecls(code).find(x => x.name === name); if(!d) return;
+  nd.fields.code = code.slice(0, d.valStart) + ' ' + newVal + code.slice(d.valEnd);
+}
+// записать новое значение поля объекта внутри переменной
+function setFieldValue(nd, name, key, newVal){
+  const code = String(nd.fields.code || ''), d = rawDecls(code).find(x => x.name === name); if(!d) return;
+  const val = code.slice(d.valStart, d.valEnd), f = rawObjFields(val).find(x => x.key === key); if(!f) return;
+  const a = d.valStart + f.valStart, b = d.valStart + f.valEnd;
+  nd.fields.code = code.slice(0, a) + ' ' + newVal + code.slice(b);
+}
+// частые «постоянные» имена полей — помечаем «станд.», остальные — «своё»
+const RAW_STD_KEYS = new Set(('type name id value key class style src href method url mode async headers body status code title label width height color background font display position target data default min max step rows cols placeholder').split(/\s+/));
 function rawInspFields(nd){
   const box = document.createElement('div');
-  const vars = rawVars(nd.fields.code);
-  if(vars.length){
+  const decls = rawDecls(nd.fields.code);
+  if(decls.length){
     const note = el('div', 'insp-kind', 'что можно поменять'); note.style.marginBottom = '6px'; box.appendChild(note);
-    vars.forEach(v => {
-      const row = el('div', 'insp-field'); row.appendChild(el('label', '', v.name));
-      const inp = document.createElement('input'); inp.value = v.value; inp.spellcheck = false;
-      inp.addEventListener('input', () => { setVar(nd, v.name, inp.value); updateCard(nd); renderCode(); persist(); });
-      row.appendChild(inp); box.appendChild(row);
+    decls.forEach(d => {
+      const fields = rawObjFields(d.value);
+      if(fields.length){
+        // объект-значение: заголовок-имя + поле ввода на каждый ключ (развилки)
+        const grp = el('div', 'insp-field'); grp.style.flexDirection = 'column'; grp.style.alignItems = 'stretch';
+        const head = el('label', '', d.name + '  (объект: ' + fields.length + ' пол.)'); head.style.fontWeight = '600'; grp.appendChild(head);
+        fields.forEach(f => {
+          const row = el('div', 'insp-field'); row.style.margin = '3px 0 3px 10px';
+          const lb = el('label', '', f.key); lb.title = RAW_STD_KEYS.has(f.key) ? 'стандартное имя поля' : 'имя на твоё усмотрение';
+          lb.style.opacity = RAW_STD_KEYS.has(f.key) ? '.7' : '1'; row.appendChild(lb);
+          const inp = document.createElement('input'); inp.value = f.value; inp.spellcheck = false;
+          inp.addEventListener('input', () => { setFieldValue(nd, d.name, f.key, inp.value); updateCard(nd); renderCode(); persist(); syncRawCode(); });
+          row.appendChild(inp); grp.appendChild(row);
+        });
+        box.appendChild(grp);
+      } else {
+        // простое значение: одно поле на всю правую часть
+        const row = el('div', 'insp-field'); row.appendChild(el('label', '', d.name));
+        const inp = document.createElement('input'); inp.value = d.value; inp.spellcheck = false;
+        inp.addEventListener('input', () => { setDeclValue(nd, d.name, inp.value); updateCard(nd); renderCode(); persist(); syncRawCode(); });
+        row.appendChild(inp); box.appendChild(row);
+      }
     });
   } else {
     box.appendChild(el('div', 'insp-text', 'Готовых полей тут нет — весь код ниже можно править целиком.'));
   }
+  // держим «весь код» в синхроне, когда правим через поля формы
+  let codeTa = null; const syncRawCode = () => { if(codeTa && codeTa.value !== nd.fields.code) codeTa.value = nd.fields.code; };
   // весь код — в раскрывашке (или сразу, если полей нет)
-  const det = document.createElement('details'); det.style.marginTop = '8px'; if(!vars.length) det.open = true;
+  const det = document.createElement('details'); det.style.marginTop = '8px'; if(!decls.length) det.open = true;
   const sum = document.createElement('summary'); sum.style.cssText = 'cursor:pointer;color:var(--text3);font-size:12px;margin-bottom:6px;display:flex;align-items:center;gap:8px';
   sum.appendChild(el('span', '', 'весь код'));
   const cp = el('button', 'btn insp-copy', '⧉ копировать весь код'); cp.style.marginLeft = 'auto';
   cp.onclick = e => { e.preventDefault(); e.stopPropagation(); copyToClip(nd.fields.code || '', cp); };
   sum.appendChild(cp); det.appendChild(sum);
-  const ta = document.createElement('textarea'); ta.className = 'blk-code'; ta.spellcheck = false; ta.value = nd.fields.code;
+  const ta = document.createElement('textarea'); ta.className = 'blk-code'; ta.spellcheck = false; ta.value = nd.fields.code; codeTa = ta;
   ta.rows = Math.min(18, String(nd.fields.code).split('\n').length + 1);
   ta.addEventListener('input', () => { nd.fields.code = ta.value; updateCard(nd); renderCode(); persist(); });
   det.appendChild(attachHighlight(ta));
