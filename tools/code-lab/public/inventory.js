@@ -525,7 +525,7 @@ function openLinksModal(){
     + '<div class="fmt">Плоско: A -> B · A зависит от B · A конфликтует с B …&#10;Дерево:  «Кусок A»&#10;             — создаёт → «Кусок B» (пояснение) [условие]&#10;Контракт: Имя:: нужно=x,y; даёт=z; среда=браузер; раздел=Сеть; проверка=…&#10;Разделы: раздел: Сеть / Запросы&#10;             + Имя куска   (подраздел — через «/»)&#10;схема: Название</div>'
     + '<details class="rr"><summary>виды связей, которые понимает парсер (' + (window.CODE_RELATIONS || []).length + ')</summary><div class="rr-box">' + relationsRef() + '</div></details>'
     + '<textarea id="lk-text" placeholder="вставь текст или нажми «пример»"></textarea>'
-    + '<div class="mbtns"><button class="btn" id="lk-sample">пример</button><button class="btn ok" id="lk-parse">разобрать</button><button class="btn" id="lk-apply" style="display:none">применить</button><button class="btn" id="lk-close">закрыть</button><label class="inv-chk" style="margin-left:auto"><input type="checkbox" id="lk-missing" checked> создавать узлы для ненайденных (ящики данных)</label></div>'
+    + '<div class="mbtns"><button class="btn" id="lk-sample">пример</button><button class="btn" id="lk-suggest" title="предложить связи автоматически — по контрактам «даёт/нужно» кусков">✨ по контрактам</button><button class="btn" id="lk-aiprompt" title="собрать список кусков в запрос для ИИ (он предложит связи)">📋 куски → ИИ</button><button class="btn ok" id="lk-parse">разобрать</button><button class="btn" id="lk-apply" style="display:none">применить</button><button class="btn" id="lk-close">закрыть</button><label class="inv-chk" style="margin-left:auto"><input type="checkbox" id="lk-missing" checked> создавать узлы для ненайденных (ящики данных)</label></div>'
     + '<div class="lp-prev" id="lk-prev"></div>';
   bg.appendChild(box); document.body.appendChild(bg);
   const q = s => bg.querySelector(s);
@@ -533,8 +533,7 @@ function openLinksModal(){
   q('#lk-close').onclick = () => bg.remove();
   q('#lk-sample').onclick = () => { q('#lk-text').value = LINKS_SAMPLE; };
   let parsed = null;
-  q('#lk-parse').onclick = () => {
-    parsed = parseLinks(q('#lk-text').value);
+  function showPreview(){
     const prev = q('#lk-prev'); prev.innerHTML = '';
     const line = (txt, cls) => { const d = el2('div', 'lp-row ' + (cls || '')); d.textContent = txt; return d; };
     prev.appendChild(el2('div', 'lp-sec', 'связи (' + parsed.edges.length + ')'));
@@ -544,6 +543,29 @@ function openLinksModal(){
     parsed.contracts.forEach(c => { const t = resolveName(c.name); prev.appendChild(line((t ? '✓ ' : '✕ ') + c.name + ': ' + Object.keys(c.fields).join(', ') + (t ? '' : '  (кусок не найден)'), t ? 'lp-ok' : 'lp-bad')); });
     if(parsed.errors.length){ prev.appendChild(el2('div', 'lp-sec', 'не разобрано')); parsed.errors.forEach(x => prev.appendChild(line(x, 'lp-bad'))); }
     q('#lk-apply').style.display = (parsed.edges.length || parsed.contracts.length) ? '' : 'none';
+  }
+  q('#lk-parse').onclick = () => { parsed = parseLinks(q('#lk-text').value); showPreview(); };
+  // ✨ авто-предложение связей по контрактам «даёт/нужно»: A даёт имя X, B требует X → A передаёт данные B
+  q('#lk-suggest').onclick = () => {
+    const byProv = new Map();
+    (PIECES || []).forEach(p => { const pr = (p.comp && p.comp.provides) || []; pr.forEach(n => { const k = String(n).toLowerCase(); if(!byProv.has(k)) byProv.set(k, []); byProv.get(k).push(p); }); });
+    const edges = [], seen = new Set();
+    (PIECES || []).forEach(b => { const rq = (b.comp && b.comp.requires) || []; rq.forEach(n => { const k = String(n).toLowerCase(); (byProv.get(k) || []).forEach(a => { if(a.id === b.id) return; const key = a.id + '>' + b.id + '>' + k; if(seen.has(key)) return; seen.add(key); edges.push({ a: a.title, b: b.title, kind: 'data', src: 'контракт: «' + a.title + '» даёт «' + n + '» → «' + b.title + '» требует' }); }); }); });
+    parsed = { edges, contracts: [], errors: [], flowName: 'Связи по контрактам' };
+    const prev = q('#lk-prev');
+    if(!edges.length){ prev.innerHTML = '<div class="lp-row muted">по контрактам ничего не нашлось — у кусков должны быть заполнены «даёт/нужно» (provides/requires)</div>'; q('#lk-apply').style.display = 'none'; return; }
+    showPreview();
+  };
+  // 📋 собрать список кусков в запрос для ИИ (он предложит связи в формате «A | связь | B»)
+  q('#lk-aiprompt').onclick = () => {
+    const list = (PIECES || []).map(p => { const c = p.comp || {}; const pr = (c.provides || []).join(', '), rq = (c.requires || []).join(', '); return '• ' + p.title + (pr ? ('  [даёт: ' + pr + ']') : '') + (rq ? ('  [нужно: ' + rq + ']') : ''); }).join('\n');
+    const rels = (window.CODE_RELATIONS || []).map(r => r.label).join(', ');
+    const prompt = 'Вот куски кода проекта (в скобках — что кусок даёт и что ему нужно). Предложи осмысленные связи между ними.\n'
+      + 'Формат строго: «Название A | вид связи | Название B», по одной связи на строку.\n'
+      + 'Вид связи выбирай из списка: ' + rels + '.\n'
+      + 'Названия — точь-в-точь как в списке. Лишнего не добавляй.\n\n' + list;
+    copy(prompt, q('#lk-aiprompt'));
+    q('#lk-prev').innerHTML = '<div class="lp-row lp-ok">Запрос для ИИ скопирован (' + (PIECES || []).length + ' кусков). Отдай его ИИ, ответ вставь сюда в поле и нажми «разобрать».</div>';
   };
   q('#lk-apply').onclick = async () => {
     if(!parsed) return;
