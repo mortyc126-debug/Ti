@@ -731,3 +731,53 @@ function openDictModal(){
   };
 }
 document.getElementById('pdict').onclick = openDictModal;
+
+// ── отдельное окно: весь словарь пояснений (перечень описанного синтаксиса) ──────
+function openDictViewModal(){
+  const bg = el2('div', 'modal-bg');
+  const box = el2('div', 'modal');
+  box.innerHTML = '<h3>Весь словарь пояснений</h3>'
+    + '<p class="mh">Всё описанное — из <b>keyword-dict.json</b>. Разделы: общее/код, по языкам (c, cpp, java…), HTML-теги/атрибуты, CSS-свойства/значения. Поиск фильтрует по слову и тексту. «⧉» у раздела копирует его строками «слово: пояснение».</p>'
+    + '<input class="inv-search" id="dv-q" placeholder="поиск по слову или пояснению…" style="width:100%;box-sizing:border-box;margin-bottom:8px">'
+    + '<div class="mbtns"><button class="btn" id="dv-close">закрыть</button><span class="pp-note" id="dv-note" style="margin-left:auto"></span></div>'
+    + '<div class="lp-prev" id="dv-body" style="max-height:60vh"></div>';
+  bg.appendChild(box); document.body.appendChild(bg);
+  const q = s => bg.querySelector(s);
+  bg.onclick = e => { if(e.target === bg) bg.remove(); };
+  q('#dv-close').onclick = () => bg.remove();
+
+  let dict = null;
+  const SECTS = [['words', 'Общее / код'], ['htmlTags', 'HTML-теги'], ['htmlAttrs', 'HTML-атрибуты'], ['cssProps', 'CSS-свойства'], ['cssVals', 'CSS-значения']];
+  const copy = text => { try { navigator.clipboard.writeText(text); } catch(_){ const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch(e){} t.remove(); } };
+
+  function render(){
+    const body = q('#dv-body'); body.innerHTML = '';
+    if(!dict){ body.textContent = 'загрузка…'; return; }
+    const flt = (q('#dv-q').value || '').trim().toLowerCase();
+    // собрать все разделы: фиксированные + языки
+    const groups = [];
+    for(const [key, title] of SECTS){ if(dict[key] && Object.keys(dict[key]).length) groups.push([title, dict[key]]); }
+    if(dict.langs) for(const lang of Object.keys(dict.langs).sort()){ if(Object.keys(dict.langs[lang] || {}).length) groups.push(['Язык: ' + lang, dict.langs[lang]]); }
+    let total = 0, shown = 0;
+    groups.forEach(([title, obj]) => {
+      const rows = Object.entries(obj).filter(([w, t]) => !flt || w.toLowerCase().includes(flt) || String(t).toLowerCase().includes(flt));
+      total += Object.keys(obj).length; shown += rows.length;
+      if(!rows.length) return;
+      const head = el2('div', 'lp-sec'); head.style.display = 'flex'; head.style.alignItems = 'center'; head.style.gap = '8px';
+      head.appendChild(document.createTextNode(title + ' (' + rows.length + (flt ? ' из ' + Object.keys(obj).length : '') + ')'));
+      const cp = el2('button', 'btn'); cp.textContent = '⧉'; cp.title = 'скопировать раздел строками «слово: пояснение»'; cp.style.marginLeft = 'auto'; cp.style.padding = '1px 8px';
+      cp.onclick = () => { copy(rows.map(([w, t]) => w + ': ' + t).join('\n')); cp.textContent = '✓'; setTimeout(() => cp.textContent = '⧉', 1000); };
+      head.appendChild(cp); body.appendChild(head);
+      rows.sort((a, b) => a[0].localeCompare(b[0])).forEach(([w, t]) => {
+        const d = el2('div', 'lp-row'); const b = document.createElement('b'); b.textContent = w; b.style.color = 'var(--name,#cbc2ea)';
+        d.appendChild(b); d.appendChild(document.createTextNode(' — ' + t)); body.appendChild(d);
+      });
+    });
+    q('#dv-note').textContent = 'всего: ' + total + (flt ? ' · найдено: ' + shown : '');
+    if(!shown) body.appendChild(el2('div', 'lp-row muted', flt ? 'ничего не найдено' : 'словарь пуст'));
+  }
+  q('#dv-q').addEventListener('input', render);
+  render();
+  fetch('/keyword-dict.json', { cache: 'no-store' }).then(r => r.json()).then(d => { dict = d; render(); }).catch(() => { q('#dv-body').textContent = 'не удалось загрузить словарь'; });
+}
+document.getElementById('pdictview').onclick = openDictViewModal;
