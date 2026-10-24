@@ -51,18 +51,21 @@
     let d = 0; for(; i < s.length; i++){ const c = s[i]; if(c === '{') d++; else if(c === '}'){ d--; if(d === 0) return i + 1; } } return s.length;
   }
 
-  // разобрать код на компоненты верхнего уровня
+  // разобрать код на компоненты. Берём объявления на самом мелком уровне, где они есть:
+  // для обычного файла это глубина 0, для файла в обёртке (IIFE/модуль «(() => { … })()») — 1.
   function parse(code){
-    const s = blank(code), out = [];
-    const add = (kind, name, start, declEnd) => { if(depthAt(s, start) !== 0) return; out.push({ kind, name, start, declEnd, line: lineOf(code, start) }); };
+    const s = blank(code), raw = [];
+    const add = (kind, name, start, declEnd) => raw.push({ kind, name, start, declEnd, line: lineOf(code, start), depth: depthAt(s, start) });
     let m;
     const reV = /(?:^|[;{}\n])[ \t]*(const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/g;
-    while((m = reV.exec(s))){ const nameI = m.index + m[0].indexOf(m[2]); const eq = m.index + m[0].length; const end = valueEnd(s, eq); add(m[1], m[2], nameI, end); }
+    while((m = reV.exec(s))){ const nameI = m.index + m[0].indexOf(m[2]); const eq = m.index + m[0].length; add(m[1], m[2], nameI, valueEnd(s, eq)); }
     const reF = /(?:^|[;{}\n])[ \t]*(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)\s*\(/g;
     while((m = reF.exec(s))){ const nameI = m.index + m[0].indexOf(m[1]); add('function', m[1], nameI, bodyEnd(s, nameI)); }
     const reC = /(?:^|[;{}\n])[ \t]*class\s+([A-Za-z_$][\w$]*)/g;
     while((m = reC.exec(s))){ const nameI = m.index + m[0].indexOf(m[1]); add('class', m[1], nameI, bodyEnd(s, nameI)); }
-    // значение/сигнатуру берём из исходного кода
+    if(!raw.length) return [];
+    const minD = Math.min(...raw.map(r => r.depth));
+    const out = raw.filter(r => r.depth === minD);
     out.forEach(c => { c.value = code.slice(c.start, c.declEnd).trim(); });
     out.sort((a, b) => a.start - b.start);
     return out;
@@ -80,9 +83,10 @@
   // ── стили ──
   const st = document.createElement('style');
   st.textContent = `
-  .sb-insp{position:absolute;top:0;right:0;width:340px;max-width:70vw;height:100%;z-index:40;display:none;flex-direction:column;gap:8px;
-    background:var(--bg2,#150a2b);border-left:1px solid var(--border,#3a2f55);box-shadow:-8px 0 24px rgba(0,0,0,.35);padding:10px;overflow:auto;font-size:12.5px}
+  .sb-insp{flex:0 0 320px;max-width:46vw;min-height:0;display:none;flex-direction:column;gap:8px;
+    background:var(--bg2,#150a2b);border:1px solid var(--border,#3a2f55);border-radius:10px;margin-left:8px;padding:10px;overflow:auto;font-size:12.5px}
   .sb-insp.on{display:flex}
+  @media(max-width:1000px){.sb-insp{flex-basis:auto;max-width:none;margin:8px 0 0}}
   .sb-insp .ih{display:flex;align-items:center;gap:6px}
   .sb-insp .ih b{flex:1;font-size:13px}
   .sb-insp .grp{font-size:11px;color:var(--muted,#9a93b5);text-transform:uppercase;letter-spacing:.04em;margin:6px 0 2px}
@@ -107,12 +111,12 @@
   .sb-insp .ibtn:hover{border-color:var(--acc,#52F2C9)}
   `;
   document.head.appendChild(st);
-  box.style.position = box.style.position || 'relative';
 
   const panel = document.createElement('div'); panel.className = 'sb-insp';
   panel.innerHTML = '<div class="ih"><b>🧩 Разбор файла</b><button class="ibtn" id="inspRef" title="пересобрать">⟳</button><button class="ibtn" id="inspX" title="закрыть">×</button></div>'
     + '<div id="inspList"></div><div class="grp">Подробно</div><div id="inspDet"><div class="none">выбери компонент сверху или кликни по имени в коде</div></div>';
-  box.appendChild(panel);
+  // встраиваем панель в раскладку песочницы (между кодом и превью), а не поверх — чтобы не наезжала
+  const right = box.querySelector('.sb-right'); if(right) box.insertBefore(panel, right); else box.appendChild(panel);
   const listEl = panel.querySelector('#inspList'), detEl = panel.querySelector('#inspDet'), nameEl = panel.querySelector('b');
   let comps = [], selName = null, open = false;
 
@@ -123,7 +127,7 @@
     listEl.innerHTML = '';
     if(!f){ listEl.innerHTML = '<div class="none">нет открытого файла</div>'; return; }
     if(!/^(js|ts)$/.test(f.lang)){ listEl.innerHTML = '<div class="none">разбор пока для JS/TS; для ' + (f.lang || '?') + ' — клик по имени тоже работает</div>'; return; }
-    if(!comps.length){ listEl.innerHTML = '<div class="none">не нашлось объявлений (const/let/function/class) верхнего уровня</div>'; return; }
+    if(!comps.length){ listEl.innerHTML = '<div class="none">не нашлось объявлений const/let/function/class</div>'; return; }
     comps.forEach(c => {
       const b = document.createElement('button'); b.className = 'comp' + (c.name === selName ? ' sel' : '');
       b.innerHTML = '<span class="badge b-' + c.kind + '">' + c.kind + '</span>';
@@ -131,6 +135,8 @@
       b.onclick = () => { selName = c.name; selectInCode(c); showDetail(c.name); rebuild(); };
       listEl.appendChild(b);
     });
+    // авто-выбор: чтобы «Подробно» не было пустым — показываем первый компонент
+    if(!selName || !comps.find(x => x.name === selName)){ selName = comps[0].name; showDetail(selName); }
   }
 
   function selectInCode(c){
@@ -159,10 +165,10 @@
     const d = document.createElement('div'); d.className = 'det';
     const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = word; d.appendChild(nm);
     const role = document.createElement('div'); role.className = 'role';
-    role.textContent = STD.has(word) ? 'стандартное имя (ключевое слово / встроенное — его смысл задан языком)' : 'имя не объявлено в этом файле (приходит извне или задаётся не на верхнем уровне)';
+    role.textContent = STD.has(word) ? 'стандартное имя (ключевое слово / встроенное — его смысл задан языком)' : 'имя не объявлено в этом файле (приходит извне или задаётся глубже верхнего уровня)';
     d.appendChild(role);
-    // использования по файлам
-    appendUsages(d, word);
+    // для ключевых слов список вхождений не нужен (это шум); для прочих имён — где встречается
+    if(!STD.has(word)) appendUsages(d, word);
     detEl.appendChild(d);
   }
 
@@ -216,28 +222,49 @@
       }
     }
 
-    // зависит от: другие компоненты файла, упомянутые внутри значения/тела
+    // связи с другими компонентами файла — видами из единого словаря CODE_RELATIONS
     const body = c.value;
-    const deps = comps.filter(x => x.name !== c.name).filter(x => new RegExp('(?<![\\w$])' + x.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w$])').test(body));
-    const gd = document.createElement('div'); gd.className = 'grp'; gd.textContent = 'Зависит от (' + deps.length + ')'; d.appendChild(gd);
-    if(deps.length){ const w = document.createElement('div'); deps.forEach(x => { const ch = document.createElement('span'); ch.className = 'chip'; ch.textContent = x.name; ch.onclick = () => { selName = x.name; const cc = comps.find(y => y.name === x.name); if(cc) selectInCode(cc); showDetail(x.name); rebuild(); }; w.appendChild(ch); }); d.appendChild(w); }
-    else { const n = document.createElement('div'); n.className = 'none'; n.textContent = 'не использует других компонентов файла'; d.appendChild(n); }
+    const deps = [];
+    comps.filter(x => x.name !== c.name).forEach(x => {
+      const nm = x.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if(!new RegExp('(?<![\\w$])' + nm + '(?![\\w$])').test(body)) return;
+      let rel = 'uses';                                             // по умолчанию «использует»
+      if(new RegExp('new\\s+' + nm + '(?![\\w$])').test(body)) rel = 'creates';   // создаёт экземпляр
+      else if(new RegExp('(?<![\\w$])' + nm + '\\s*\\(').test(body)) rel = 'calls'; // вызывает
+      deps.push({ name: x.name, rel });
+    });
+    const gd = document.createElement('div'); gd.className = 'grp'; gd.textContent = 'Связи с компонентами файла (' + deps.length + ')'; d.appendChild(gd);
+    if(deps.length){ const w = document.createElement('div'); deps.forEach(x => {
+      const r = (window.relationById ? window.relationById(x.rel) : null), lbl = r ? r.label : x.rel, col = (window.relationColor ? window.relationColor(x.rel) : 'var(--acc)');
+      const ch = document.createElement('span'); ch.className = 'chip'; ch.style.borderColor = col;
+      const t = document.createElement('span'); t.textContent = lbl + ' → '; t.style.color = col; t.style.opacity = '.85'; ch.appendChild(t); ch.appendChild(document.createTextNode(x.name));
+      ch.title = c.name + ' ' + lbl + ' ' + x.name;
+      ch.onclick = () => { selName = x.name; const cc = comps.find(y => y.name === x.name); if(cc) selectInCode(cc); showDetail(x.name); rebuild(); }; w.appendChild(ch);
+    }); d.appendChild(w); }
+    else { const n = document.createElement('div'); n.className = 'none'; n.textContent = 'не связан с другими компонентами файла'; d.appendChild(n); }
 
     appendUsages(d, c.name);
     detEl.appendChild(d);
   }
 
-  // клик по слову в коде, когда панель открыта
+  // клик по слову в коде, когда панель открыта; заодно отдаём номер строки
+  const DECL_KW = new Set(['const', 'let', 'var', 'function', 'class']);
   function wordAt(ed, ev){
     const ta = ed.querySelector('textarea'), cm = ta && ta.__cm;
-    if(cm){ const pos = cm.coordsChar({ left: ev.clientX, top: ev.clientY }, 'window'); const r = cm.findWordAt(pos); return (cm.getRange(r.anchor, r.head) || '').trim(); }
-    if(ta){ const v = ta.value, cc = ta.selectionStart; let a = cc, b = cc; while(a > 0 && /[\w$]/.test(v[a - 1])) a--; while(b < v.length && /[\w$]/.test(v[b])) b++; return v.slice(a, b); }
-    return '';
+    if(cm){ const pos = cm.coordsChar({ left: ev.clientX, top: ev.clientY }, 'window'); const r = cm.findWordAt(pos); return { w: (cm.getRange(r.anchor, r.head) || '').trim(), line: pos.line + 1 }; }
+    if(ta){ const v = ta.value, cc = ta.selectionStart; let a = cc, b = cc; while(a > 0 && /[\w$]/.test(v[a - 1])) a--; while(b < v.length && /[\w$]/.test(v[b])) b++; return { w: v.slice(a, b), line: (v.slice(0, cc).match(/\n/g) || []).length + 1 }; }
+    return { w: '', line: 0 };
   }
   edsEl.addEventListener('click', ev => {
     if(!open) return;
     const ed = ev.target.closest && ev.target.closest('.sb-ed'); if(!ed || !ed.__f) return;
-    setTimeout(() => { const w = wordAt(ed, ev); if(w && /^[A-Za-z_$][\w$]*$/.test(w)) showWord(w); }, 0);
+    setTimeout(() => {
+      const { w, line } = wordAt(ed, ev);
+      if(!w || !/^[A-Za-z_$][\w$]*$/.test(w)) return;
+      // клик по слову-объявлению (const/function/…) → показать саму константу/функцию на этой строке
+      if(DECL_KW.has(w)){ const c = comps.find(x => x.line === line); if(c){ selName = c.name; showDetail(c.name); rebuild(); return; } }
+      showWord(w);
+    }, 0);
   }, true);
 
   panel.querySelector('#inspRef').onclick = () => rebuild();
