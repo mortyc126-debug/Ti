@@ -672,8 +672,9 @@ function openDictModal(){
     + '<datalist id="dc-langs"><option value="c"><option value="cpp"><option value="java"><option value="python"><option value="rust"><option value="go"><option value="sql"><option value="php"><option value="ruby"><option value="lua"><option value="bash"><option value="js"><option value="ts"></datalist></div>'
     + '<div class="lp-sec" style="margin:2px 0 4px">Шаг 1 (необязательно): собрать непонятные слова</div>'
     + '<p class="mh" style="margin:0 0 4px">Вставь код на этом языке (или оставь пусто — возьму куски этого языка из библиотеки). Соберу слова и устойчивые конструкции, которых ещё нет в словаре, склею повторы и дам готовый запрос — отдай его мне или GPT, ответ вставь в Шаг 2.</p>'
-    + '<textarea id="dc-code" placeholder="код на этом языке (или пусто — из библиотеки)" style="min-height:64px"></textarea>'
-    + '<div class="mbtns"><button class="btn" id="dc-scan">🔍 собрать непонятные слова</button><span class="pp-note" id="dc-scan-note"></span></div>'
+    + '<textarea id="dc-code" placeholder="код на этом языке (или выбери файл / оставь пусто — из библиотеки)" style="min-height:64px"></textarea>'
+    + '<div class="mbtns"><button class="btn" id="dc-file">📄 из файла…</button><button class="btn" id="dc-scan">🔍 собрать непонятные слова</button><span class="pp-note" id="dc-scan-note"></span>'
+    + '<input type="file" id="dc-fileinp" multiple style="display:none"></div>'
     + '<textarea id="dc-prompt" placeholder="сюда ляжет готовый запрос для ИИ" readonly style="min-height:64px;display:none"></textarea>'
     + '<div class="mbtns" id="dc-prompt-btns" style="display:none"><button class="btn" id="dc-copy">⧉ скопировать запрос</button></div>'
     + '<div class="lp-sec" style="margin:8px 0 4px">Шаг 2: добавить в словарь</div>'
@@ -686,6 +687,18 @@ function openDictModal(){
   bg.onclick = e => { if(e.target === bg) bg.remove(); };
   q('#dc-close').onclick = () => bg.remove();
   q('#dc-sample').onclick = () => { q('#dc-text').value = DICT_SAMPLE; };
+  // выбрать файл(ы): прочитать текст в поле кода, подставить язык по расширению и сразу собрать
+  const EXT2LANG = { c:'c', h:'c', cpp:'cpp', cc:'cpp', cxx:'cpp', hpp:'cpp', hxx:'cpp', java:'java', py:'python', rs:'rust', go:'go', sql:'sql', php:'php', rb:'ruby', lua:'lua', sh:'bash', bash:'bash', js:'js', mjs:'js', ts:'ts', tsx:'ts', jsx:'js', html:'html', htm:'html', css:'css', kt:'kotlin', swift:'swift', cs:'csharp' };
+  q('#dc-file').onclick = () => q('#dc-fileinp').click();
+  q('#dc-fileinp').onchange = async e => {
+    const fs = [...(e.target.files || [])]; if(!fs.length) return;
+    let text = '', ext = '';
+    for(const f of fs){ try { text += (text ? '\n\n' : '') + await f.text(); } catch(_){} if(!ext){ ext = (f.name.split('.').pop() || '').toLowerCase(); } }
+    q('#dc-code').value = text;
+    if(!q('#dc-lang').value.trim() && EXT2LANG[ext]) q('#dc-lang').value = EXT2LANG[ext];
+    e.target.value = '';
+    q('#dc-scan').click();   // сразу собрать непонятные слова
+  };
   // Шаг 1: собрать непонятные слова → готовый запрос для ИИ
   q('#dc-scan').onclick = async () => {
     const lang = q('#dc-lang').value.trim(), code = q('#dc-code').value;
