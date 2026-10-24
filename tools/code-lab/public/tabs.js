@@ -63,6 +63,11 @@
       t.addEventListener('drop', e => { e.preventDefault(); t.classList.remove('drag-over'); let from = ''; try { from = e.dataTransfer.getData('text/plain'); } catch(_){} if(from && from !== f.id) reorder(from, f.id); });
       tabs.appendChild(t);
     });
+    // «+» в конце полосы — добавить новую вкладку (пустой файл)
+    const add = document.createElement('div'); add.className = 'sb-tab tb-add'; add.title = 'новая вкладка';
+    add.textContent = '+';
+    add.onclick = () => { const id = uid(); sb.setFiles([...files(), { id, name: 'файл' + (files().length + 1) + '.txt', lang: 'txt', code: '' }]); setActive(id, true); };
+    tabs.appendChild(add);
   }
 
   // набор панелей изменился (открыли/закрыли/переставили файл) — пересобрать

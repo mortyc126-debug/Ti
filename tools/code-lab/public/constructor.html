@@ -160,6 +160,8 @@
   .sb-tab .tb-x:hover{opacity:1;background:rgba(255,107,107,.2);color:#FF6B6B}
   .sb-tab.dragging{opacity:.5}
   .sb-tab.drag-over{outline:2px solid var(--acc);outline-offset:-2px}
+  .sb-tab.tb-add{padding:5px 11px;font-size:15px;font-weight:600;color:var(--text3);justify-content:center}
+  .sb-tab.tb-add:hover{color:var(--acc);border-color:var(--acc)}
   .sb-eds.tabbed{gap:0}
   .sb-eds.tabbed > .sb-ed{display:none}
   .sb-eds.tabbed > .sb-ed.sb-active{display:flex}
@@ -394,6 +396,7 @@
   <script src="/search.js"></script>
   <script src="/navigate.js"></script>
   <script src="/inspect.js"></script>
+  <script src="/ai-ask.js"></script>
   <script>
   // меню панели инструментов: открыть/закрыть, Esc и клик мимо закрывают
   (function(){

@@ -368,6 +368,34 @@ const server = http.createServer(async (req, res) => {
       try { return json(res, 200, await aiAssist.suggest({ id: b.id, piece: b.piece, section: String(b.section || ''), instruction: b.instruction, key })); }
       catch(e){ const m = String(e?.message || e); return json(res, /ключ Mistral/.test(m) ? 503 : /не найден|нет кода|Неизвестный/.test(m) ? 400 : 502, { error: m }); }
     }
+    // свободный вопрос к ИИ о коде: {code, action|question, lang}. Ответ — обычный текст (не JSON-схема).
+    if(u.pathname === '/api/ai-ask' && req.method === 'POST'){
+      const b = await readBody(req);
+      const key = String(req.headers['x-mistral-api-key'] || '').trim();
+      if(!key) return json(res, 503, { error: 'Не задан ключ ИИ. Открой Настройки и сохрани API-ключ.' });
+      const code = String(b.code || '').slice(0, 12000), lang = String(b.lang || '').slice(0, 20);
+      const q = String(b.question || '').slice(0, 1000);
+      const ACTIONS = {
+        explain: 'Объясни простыми словами, по-русски, что делает этот код и зачем. Коротко и по делу.',
+        bugs: 'Найди возможные баги, ошибки и слабые места в этом коде. Перечисли конкретные проблемы и как их починить. Если явных багов нет — так и скажи.',
+        improve: 'Предложи, как улучшить этот код: читаемость, надёжность, краткость. Короткий список конкретных правок.',
+        tests: 'Предложи, что и как стоит проверить/протестировать в этом коде. Короткий список случаев (включая граничные).'
+      };
+      const task = ACTIONS[b.action] || (q ? q : ACTIONS.explain);
+      if(!code.trim() && !q){ return json(res, 400, { error: 'Нечего спрашивать: выдели код или впиши вопрос.' }); }
+      const sys = 'Ты внимательный помощник-программист. Отвечай по-русски, кратко и по делу, без воды и без Markdown-заголовков. Не выдумывай того, чего в коде нет.';
+      const user = task + (code.trim() ? ('\n\nКод' + (lang ? ' (' + lang + ')' : '') + ':\n```\n' + code + '\n```') : '');
+      try {
+        const cfg = aiRuntime.getConfig();
+        const resp = await aiRuntime.chat(cfg, key, { temperature: 0.3, max_tokens: 900, messages: [ { role: 'system', content: sys }, { role: 'user', content: user } ] });
+        if(!resp.ok){ const t = await resp.text(); return json(res, 502, { error: 'ИИ вернул ошибку ' + resp.status + ': ' + t.slice(0, 300) }); }
+        const data = await resp.json();
+        let content = data?.choices?.[0]?.message?.content;
+        if(Array.isArray(content)) content = content.map(x => x.text || '').join('');
+        return json(res, 200, { answer: String(content || '').trim() || '(пустой ответ)' });
+      } catch(e){ return json(res, 502, { error: 'Не удалось связаться с ИИ: ' + String(e?.message || e) }); }
+    }
+
     // Шаг 2: записать то, что человек принял (после правок). Тело: { id, section, value }
     if(u.pathname === '/api/ai-apply' && req.method === 'POST'){
       const b = await readBody(req);
