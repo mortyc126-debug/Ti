@@ -19,6 +19,16 @@ let selected = null;      // выбранный токен-элемент
 let curId = null;         // id открытого шаблона
 let curTpl = null;        // объект открытого шаблона
 
+// опции языков для форм куска — из единого списка (langs.js); + «другой» и текущий, если он не из списка
+function langOptionsHtml(sel){
+  const list = (window.CODELAB_LANGS && window.CODELAB_LANGS.length) ? window.CODELAB_LANGS.map(l => [l.v, l.t]) : [['js','JavaScript'],['python','Python'],['sql','SQL']];
+  const vals = list.map(x => x[0]);
+  let opts = list.map(([v, t]) => `<option value="${v}"${sel === v ? ' selected' : ''}>${esc(t)}</option>`).join('');
+  opts += `<option value="other"${sel === 'other' ? ' selected' : ''}>другой</option>`;
+  if(sel && !vals.includes(sel) && sel !== 'other') opts = `<option value="${esc(sel)}" selected>${esc(sel)}</option>` + opts;
+  return opts;
+}
+
 async function loadList(openId){
   let list;
   try { list = await fetch('/api/list').then(r => r.json()); }
@@ -289,7 +299,7 @@ function showAddForm(){
   f.innerHTML = `
     <label>Название<input id="f-title" placeholder="например: Цикл по массиву"></label>
     <div class="row">
-      <label>Язык<select id="f-lang"><option value="js">JavaScript</option><option value="python">Python</option><option value="sql">SQL</option><option value="other">другой</option></select></label>
+      <label>Язык<select id="f-lang">${langOptionsHtml('js')}</select></label>
       <label>Группа<input id="f-group" placeholder="Мои шаблоны" value="Мои шаблоны"></label>
     </div>
     <label>Описание (необязательно)<input id="f-desc" placeholder="пара слов, зачем этот шаблон"></label>
@@ -334,11 +344,10 @@ function showEditForm(tpl){
   p.textContent = 'Меняй код как хочешь — структуру, слова, строки. После сохранения он заново раскрасится. Пояснения к словам сбросятся (код же поменялся).';
   work.append(h, p);
   const f = document.createElement('div'); f.className = 'form';
-  const opt = l => `<option value="${l}"${(tpl.lang||'js')===l?' selected':''}>${l}</option>`;
   f.innerHTML = `
     <label>Название<input id="e-title"></label>
     <div class="row">
-      <label>Язык<select id="e-lang">${opt('js')}${opt('python')}${opt('sql')}${opt('other')}</select></label>
+      <label>Язык<select id="e-lang">${langOptionsHtml(tpl.lang || 'js')}</select></label>
       <label>Группа<input id="e-group"></label>
     </div>
     <label>Описание<input id="e-desc"></label>

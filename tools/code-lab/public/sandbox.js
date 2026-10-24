@@ -5,16 +5,10 @@
   const center = document.querySelector('.center'); if(!center) return;
 
   // языки панелей: frontend рисуются в превью, остальные запускаются на сервере
-  const LANGS = [
-    { v:'html', t:'HTML', front:true },
-    { v:'css',  t:'CSS',  front:true },
-    { v:'js',   t:'JS',   front:true },
-    { v:'python', t:'Python' },
-    { v:'sql',  t:'SQL' },
-    { v:'json', t:'JSON' },
-    { v:'txt',  t:'текст' },
-    { v:'ruby', t:'Ruby' }, { v:'php', t:'PHP' }, { v:'go', t:'Go' },
-    { v:'ts', t:'TypeScript' }, { v:'bash', t:'Bash' }, { v:'lua', t:'Lua' }, { v:'r', t:'R' }
+  // единый список языков (langs.js); запасной — если скрипт не загрузился
+  const LANGS = (window.CODELAB_LANGS && window.CODELAB_LANGS.length) ? window.CODELAB_LANGS : [
+    { v:'html', t:'HTML', front:true }, { v:'css', t:'CSS', front:true }, { v:'js', t:'JS', front:true },
+    { v:'python', t:'Python' }, { v:'sql', t:'SQL' }, { v:'json', t:'JSON' }, { v:'txt', t:'текст' }
   ];
   const isFront = v => { const l = LANGS.find(x => x.v === v); return l && l.front; };
   const langName = v => { const l = LANGS.find(x => x.v === v); return l ? l.t : v; };
