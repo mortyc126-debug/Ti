@@ -199,7 +199,7 @@ library/
 |---|---|---|
 | Старт | Главная, С чего начать, Обучение | `index.html` (`home.js`), `start.html` (`start.js`), `schema.html` |
 | Кусочки кода | **Опись**, **Библиотека** | `inventory.html` (`inventory.js`, `ai-tools.js`), `library.html` (`app.js`, `upload-templates.js`, `cm-bridge.js`) |
-| Собирать | **Конструктор**, Рецепты | `constructor.html` (`constructor.js`, `sandbox.js`, `workspace.js`, `tabs.js`, `fileio.js`), `recipes.html` (`recipes.js`) |
+| Собирать | **Конструктор**, Рецепты | `constructor.html` (`constructor.js`, `sandbox.js`, `workspace.js`, `tabs.js`, `fileio.js`, `search.js`), `recipes.html` (`recipes.js`) |
 | Данные | Данные (загрузка) | `schema-json.html` |
 
 Страницы вне меню:
@@ -309,6 +309,10 @@ code-lab/vendor/codemirror/
 ### Открыть/сохранить файл с диска (`fileio.js`, с 24.10.2026)
 
 Две кнопки в панели песочницы рядом с «+ файл»: «📂 открыть…» и «💾 на диск…». Это НЕ папка проекта (её ведёт `workspace.js`) — отдельные файлы откуда угодно с диска. В Chrome/Edge через File System Access API (`showOpenFilePicker`/`showSaveFilePicker`): открытие читает файл и кладёт новой вкладкой (язык по расширению), дескриптор помнится по `id` куска в `Map`, поэтому «на диск…» перезаписывает тот же файл без повторного выбора; если дескриптора нет — спрашивает, куда (как «сохранить как»). В браузерах без API откат: открытие через скрытый `<input type=file multiple>`, сохранение — скачиванием (`Blob` + `a[download]`). Дескрипторы живут только в памяти (после перезагрузки «на диск…» снова спросит место). Активный файл для сохранения берётся по `localStorage['codelab_sb_active']` (или первый). Сообщения выводит в строку `#wsMsg` из `workspace.js`, если она есть.
+
+### Поиск в песочнице (`search.js`, с 24.10.2026)
+
+Кнопка «🔎 поиск» в панели песочницы и Ctrl/Cmd+F открывают полосу поиска под вкладками (`.sb-find` в `.sb-edcol`). Два режима (сегмент-переключатель): «в файле» — ищет в активном файле; «по приёмам» — по всем открытым файлам, слово-приём разворачивается в набор регулярок через словарь `TRICKS` в модуле (цикл→for/while/forEach/.map/do, условие→if/else/switch/?:, функция→function/=>/def/func, массив, объект, класс, импорт, вывод→console.log/print/echo/alert, переменная, событие, ошибка→try/catch/throw, запрос→fetch/axios). По умолчанию регистр не учитывается, галочка «Аа» включает учёт. Совпадения считаются (`n / m`), подсвечиваются в CodeMirror через `markText` (`.cm-find`, текущее — `.cm-find-cur`); Enter/Shift+Enter и кнопки ‹ › листают, при совпадении в другом файле переходит на его вкладку (`window.codelabTabs.setActive`). «Начать с последнего»: по файлу помнится смещение последнего совпадения (`lastPos`), поиск стартует с него. Esc закрывает. Работает и без CodeMirror (обычная `textarea` — выделение через `setSelectionRange`, без подсветки всех совпадений). Использует только core-методы CM (`posFromIndex`, `markText`, `setSelection`, `scrollIntoView`), экземпляр берёт из `ta.__cm`.
 
 ## 11. Безопасность
 
