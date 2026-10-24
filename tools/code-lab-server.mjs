@@ -94,17 +94,62 @@ async function ensureLabDirs(){ for(const d of [LIBRARY, FLOWS, DATA, RECIPES]){
 // только НЕпустые папки лаборатории — пустую git commit не примет («did not match any file(s) known to git»)
 async function labPaths(){ const out = []; for(const d of [LIBRARY, FLOWS, RECIPES]){ try { if((await fs.readdir(d)).length) out.push(d); } catch(_){} } return out; }
 // то же + файл словаря пояснений (keyword-dict.json) — чтобы правки словаря тоже уезжали на GitHub, а не терялись при pull
-async function labTargets(){ const out = await labPaths(); const dp = path.join(PUBLIC, 'keyword-dict.json'); try { await fs.access(dp); out.push(dp); } catch(_){} return out; }
+async function labTargets(){ const out = await labPaths();
+  const dp = path.join(PUBLIC, 'keyword-dict.json'); try { await fs.access(dp); out.push(dp); } catch(_){}
+  const ld = path.join(PUBLIC, 'dict'); try { if((await fs.readdir(ld)).length) out.push(ld); } catch(_){}   // словари по языкам
+  return out; }
 
 // ── токенайзер: см. code-lab/lib/tokenizer.mjs (сырой код → строки токенов {k, v, r?}) ──
 
-// единый словарь пояснений к ключевым словам (тот же, что у песочницы) — для автоподписи кусков
+// словарь пояснений. База (общее/код + HTML + CSS) — keyword-dict.json; словари по языкам
+// лежат ОТДЕЛЬНЫМИ файлами dict/langs/<язык>.json и подмешиваются в dict.langs при загрузке.
+// Так каждый язык в своём файле — чисто и без конфликтов при заливке.
+const DICT_BASE = path.join(PUBLIC, 'keyword-dict.json');
+const LANGS_DIR = path.join(PUBLIC, 'dict', 'langs');
 let _kwDict = null;
+async function loadLangDicts(){
+  const out = {};
+  let files = []; try { files = (await fs.readdir(LANGS_DIR)).filter(n => n.endsWith('.json')); } catch(_){ return out; }
+  for(const fn of files){ const lang = fn.replace(/\.json$/, '').toLowerCase();
+    try { const o = JSON.parse(await fs.readFile(path.join(LANGS_DIR, fn), 'utf8')); if(o && typeof o === 'object'){ const m = {}; for(const [w, t] of Object.entries(o)) if(typeof t === 'string') m[w.toLowerCase()] = t; out[lang] = m; } } catch(_){}
+  }
+  return out;
+}
 async function kwDict(){
   if(_kwDict) return _kwDict;
-  try { _kwDict = JSON.parse(await fs.readFile(path.join(PUBLIC, 'keyword-dict.json'), 'utf8')); }
-  catch(_){ _kwDict = { words:{}, htmlTags:{}, htmlAttrs:{}, cssProps:{}, cssVals:{} }; }
+  let base;
+  try { base = JSON.parse(await fs.readFile(DICT_BASE, 'utf8')); } catch(_){ base = {}; }
+  for(const s of ['words','htmlTags','htmlAttrs','cssProps','cssVals']) if(!base[s]) base[s] = {};
+  base.langs = base.langs && typeof base.langs === 'object' ? base.langs : {};
+  // файлы языков поверх (приоритет у файлов)
+  const fromFiles = await loadLangDicts();
+  for(const [lang, m] of Object.entries(fromFiles)){ base.langs[lang] = Object.assign({}, base.langs[lang] || {}, m); }
+  _kwDict = base;
   return _kwDict;
+}
+// записать словарь языка в свой файл dict/langs/<lang>.json (мёрдж с существующим)
+async function saveLangDict(lang, pairs){
+  lang = String(lang || '').trim().toLowerCase().replace(/[^a-z0-9_+-]/g, '') || 'other';
+  await fs.mkdir(LANGS_DIR, { recursive: true });
+  const fp = path.join(LANGS_DIR, lang + '.json');
+  let cur = {}; try { cur = JSON.parse(await fs.readFile(fp, 'utf8')); } catch(_){}
+  if(!cur || typeof cur !== 'object') cur = {};
+  let added = 0;
+  for(let [w, t] of pairs){ w = String(w || '').trim().toLowerCase(); t = String(t || '').trim(); if(!w || !t) continue; cur[w] = t.slice(0, 600); added++; }
+  // ключи по алфавиту — файл стабилен в git
+  const sorted = {}; for(const k of Object.keys(cur).sort()) sorted[k] = cur[k];
+  await fs.writeFile(fp, JSON.stringify(sorted, null, 2), 'utf8');
+  _kwDict = null;   // сбросить кэш — пересоберётся с новым языком
+  return { added, total: Object.keys(cur).length, file: 'dict/langs/' + lang + '.json' };
+}
+// разовая миграция: если в базовом keyword-dict.json есть langs — вынести их в отдельные файлы
+async function migrateLangsOut(){
+  let base; try { base = JSON.parse(await fs.readFile(DICT_BASE, 'utf8')); } catch(_){ return; }
+  if(!base.langs || !Object.keys(base.langs).length) return;
+  for(const [lang, m] of Object.entries(base.langs)){ if(m && typeof m === 'object' && Object.keys(m).length) await saveLangDict(lang, Object.entries(m)); }
+  delete base.langs;
+  await fs.writeFile(DICT_BASE, JSON.stringify(base, null, 2), 'utf8');
+  _kwDict = null;
 }
 // автоподпись слов из словаря: см. code-lab/lib/annotate.mjs
 
@@ -786,23 +831,24 @@ const server = http.createServer(async (req, res) => {
     if(u.pathname === '/api/dict/add' && req.method === 'POST'){
       const b = await readBody(req);
       const SECTIONS = ['words', 'htmlTags', 'htmlAttrs', 'cssProps', 'cssVals'];
-      const dictPath = path.join(PUBLIC, 'keyword-dict.json');
-      let dict; try { dict = JSON.parse(await fs.readFile(dictPath, 'utf8')); } catch(_){ dict = {}; }
-      for(const s of SECTIONS) if(!dict[s]) dict[s] = {};
-      if(!dict.langs || typeof dict.langs !== 'object') dict.langs = {};
-      // язык — свободное поле (c, cpp, java, python, rust…): пишем в dict.langs[lang].
-      // иначе — одна из фиксированных секций (общее/код, HTML, CSS).
-      const lang = String(b.lang || '').trim().toLowerCase();
-      let target, where;
-      if(lang){ dict.langs[lang] = dict.langs[lang] || {}; target = dict.langs[lang]; where = 'язык «' + lang + '»'; }
-      else { const section = SECTIONS.includes(b.section) ? b.section : 'words'; target = dict[section]; where = section; }
       let pairs = [];
       if(Array.isArray(b.entries)) pairs = b.entries.map(e => Array.isArray(e) ? [e[0], e[1]] : [e && e.word, e && e.text]);
       else if(b.entries && typeof b.entries === 'object') pairs = Object.entries(b.entries);
+      const lang = String(b.lang || '').trim().toLowerCase();
+      if(lang){
+        // язык — свой отдельный файл dict/langs/<lang>.json
+        const r = await saveLangDict(lang, pairs);
+        return json(res, 200, { ok: true, added: r.added, where: 'язык «' + lang + '» (' + r.file + ')', total: r.total });
+      }
+      // общее/HTML/CSS — в базовый keyword-dict.json
+      let dict; try { dict = JSON.parse(await fs.readFile(DICT_BASE, 'utf8')); } catch(_){ dict = {}; }
+      for(const s of SECTIONS) if(!dict[s]) dict[s] = {};
+      const section = SECTIONS.includes(b.section) ? b.section : 'words';
+      const target = dict[section];
       let added = 0;
       for(let [w, t] of pairs){ w = String(w || '').trim().toLowerCase(); t = String(t || '').trim(); if(!w || !t) continue; target[w] = t.slice(0, 600); added++; }
-      await fs.writeFile(dictPath, JSON.stringify(dict, null, 2), 'utf8'); _kwDict = dict;
-      return json(res, 200, { ok: true, added, where, total: Object.keys(target).length, langs: Object.keys(dict.langs) });
+      await fs.writeFile(DICT_BASE, JSON.stringify(dict, null, 2), 'utf8'); _kwDict = null;
+      return json(res, 200, { ok: true, added, where: section, total: Object.keys(target).length });
     }
 
     // сборщик «непонятных слов»: из кода (или из кусков языка) собираем токены, которых НЕТ в словаре,
@@ -879,6 +925,13 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, out);
     }
 
+    // словарь отдаём собранным (база + файлы языков), а не как статический файл —
+    // чтобы песочница и просмотрщик видели и языки из dict/langs/*.json
+    if(u.pathname === '/keyword-dict.json'){
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(JSON.stringify(await kwDict()));
+    }
+
     const rel = u.pathname === '/' ? 'index.html' : u.pathname;
     const abs = within(PUBLIC, rel);
     if(!abs) return json(res, 400, { error: 'bad path' });
@@ -925,6 +978,7 @@ $('lab-mistral-test').addEventListener('click',async()=>{const k=input.value.tri
   await describeQueue.init();
   await search.init();
   await vendor.init();
+  await migrateLangsOut();   // вынести словари языков из базового файла в dict/langs/*.json
   if(r.migrated && r.migrated.created) console.log(`Из templates/ перенесено в library/: ${r.migrated.created} (старые карточки не тронуты)`);
 }
 server.listen(PORT, '127.0.0.1', () => {
