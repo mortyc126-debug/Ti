@@ -690,8 +690,8 @@ function openDictModal(){
   const box = el2('div', 'modal');
   box.innerHTML = '<h3>Словарь пояснений</h3>'
     + '<p class="mh">Бесконечно пополняй пояснения к особым словам <b>любого языка</b>. Укажи язык (c, cpp, java, python, rust, go…) — слова лягут в словарь этого языка и будут показываться, когда открыт файл на нём (в приоритете над общим). Пусто — общий словарь (для слов, общих всем языкам). Строка: <b>слово: пояснение</b> (или «=», или «|»). Всё попадает в <b>keyword-dict.json</b> — его читают песочница («пояснения», «🧩», «🔗»), автоподпись и бэкофилл.</p>'
-    + '<div class="mbtns" style="margin-bottom:6px"><label class="inv-chk">язык: <input class="inv-search" id="dc-lang" list="dc-langs" placeholder="c, cpp, java, python… (пусто — общий)" style="width:230px"></label>'
-    + '<datalist id="dc-langs"><option value="c"><option value="cpp"><option value="java"><option value="python"><option value="rust"><option value="go"><option value="sql"><option value="php"><option value="ruby"><option value="lua"><option value="bash"><option value="js"><option value="ts"></datalist></div>'
+    + '<div class="mbtns" style="margin-bottom:6px"><label class="inv-chk">язык: <input class="inv-search" id="dc-lang" list="dc-langs" placeholder="css, html, js, python, c, cpp… (пусто — общий, для всех языков)" style="width:260px"></label></div>'
+    + '<datalist id="dc-langs">' + ['css','html','js','ts','python','sql','json','svg','bash','powershell','go','ruby','php','lua','r','perl','c','cpp','java','rust','kotlin','csharp','swift','sh'].map(v => '<option value="' + v + '">').join('') + '</datalist>'
     + '<div class="lp-sec" style="margin:2px 0 4px">Шаг 1 (необязательно): собрать непонятные слова</div>'
     + '<p class="mh" style="margin:0 0 4px">Вставь код на этом языке (или оставь пусто — возьму куски этого языка из библиотеки). Соберу слова и устойчивые конструкции, которых ещё нет в словаре, склею повторы и дам готовый запрос — отдай его мне или GPT, ответ вставь в Шаг 2.</p>'
     + '<textarea id="dc-code" placeholder="код на этом языке (или выбери файл / оставь пусто — из библиотеки)" style="min-height:64px"></textarea>'
