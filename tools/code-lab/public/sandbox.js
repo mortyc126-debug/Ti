@@ -456,7 +456,8 @@
     ta.focus = () => { wantFocus = true; nativeFocus.call(ta); };   // фокус, запрошенный до готовности редактора (workspace.js), не теряется
     loadCM().then(ok => ok ? window.CMBridge.enhance(ta, f.lang, cmOptions()) : null).then(cm => {
       if(!cm) return;
-      ed.classList.add('cm-on');
+      ed.classList.add('cm-on'); ed.classList.remove('has-ln');   // у CodeMirror свои номера строк
+      const g = ed.querySelector('.sb-ln'); if(g) g.remove();
       ta.oninput = () => { f.code = ta.value; save(); schedulePreview(); };   // CodeMirror сам сообщает об изменениях событием input
       const refresh = rafOnce(() => { if(wrap.clientHeight) cm.refresh(); });
       const watchCm = () => { const ro = new ResizeObserver(refresh); ro.observe(wrap); ros.push(ro); };
@@ -520,10 +521,13 @@
 
       // редактор с цветной подсветкой: прозрачная textarea поверх раскрашенного pre
       const wrap = document.createElement('div'); wrap.className = 'sb-ed-wrap';
+      const gut = document.createElement('div'); gut.className = 'sb-ln'; gut.setAttribute('aria-hidden', 'true');
       const pre = document.createElement('pre'); pre.className = 'sb-hl'; pre.setAttribute('aria-hidden', 'true');
       const ta = document.createElement('textarea'); ta.className = 'sb-code'; ta.spellcheck = false; ta.wrap = 'off'; ta.value = f.code;
-      const paint = () => { pre.innerHTML = ''; sbHighlight(ta.value, f.lang).forEach(l => pre.appendChild(l)); };
-      const syncScroll = () => { pre.scrollTop = ta.scrollTop; pre.scrollLeft = ta.scrollLeft; };
+      ed.classList.add('has-ln');   // пока CodeMirror не активен — показываем свои номера строк
+      const updateLn = () => { const n = (ta.value.match(/\n/g) || []).length + 1; let s = ''; for(let i = 1; i <= n; i++) s += i + '\n'; gut.textContent = s; };
+      const paint = () => { pre.innerHTML = ''; sbHighlight(ta.value, f.lang).forEach(l => pre.appendChild(l)); updateLn(); };
+      const syncScroll = () => { pre.scrollTop = ta.scrollTop; pre.scrollLeft = ta.scrollLeft; gut.scrollTop = ta.scrollTop; };
       ta.oninput = () => { f.code = ta.value; save(); paint(); schedulePreview(); };
       ta.addEventListener('scroll', syncScroll);
       // Tab вставляет отступ, а не прыгает по форме; плюс авто-пары (<body>→</body>, {→})
@@ -544,7 +548,7 @@
         if(sp) explainToken(sp, ev); else hidePop();
       });
       paint();
-      wrap.append(pre, ta);
+      wrap.append(gut, pre, ta);
       // textarea (форм-контрол) в Chromium не растягивается ни flex'ом, ни height:100% —
       // задаём высоту явно по размеру обёртки и держим в синхроне
       const watch = () => { const ro = new ResizeObserver(() => { const h = wrap.clientHeight; if(h) ta.style.height = h + 'px'; }); ro.observe(wrap); ros.push(ro); };

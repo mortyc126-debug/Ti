@@ -1597,6 +1597,39 @@ $('#impfile').onchange = async e => {
   e.target.value = '';
 };
 
+// «готовый файл → редактор»: не резать на блоки, а открыть код целиком в песочнице (правка + номера строк)
+const EXT2LANG = { js:'js', mjs:'js', cjs:'js', jsx:'js', ts:'ts', tsx:'ts', html:'html', htm:'html', css:'css', py:'python', sql:'sql', json:'json', md:'txt', txt:'txt', rb:'ruby', php:'php', go:'go', lua:'lua', sh:'bash' };
+function openCodeInEditor(name, lang, code){
+  const box = document.getElementById('sandbox');
+  if(box && box.style.display === 'none'){ const t = $('#sandboxToggle'); if(t) t.click(); }   // включить песочницу, если скрыта
+  const sb = window.codelabSandbox;
+  if(!sb){ alert('Песочница недоступна — обнови страницу.'); return; }
+  const id = 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  sb.setFiles([...sb.getFiles(), { id, name: name || 'файл.txt', lang: lang || 'txt', code: code || '' }]);
+  if(window.codelabTabs) window.codelabTabs.setActive(id, true);
+}
+$('#openEditor').onclick = () => $('#openfile').click();
+$('#openfile').onchange = async e => {
+  const f = e.target.files && e.target.files[0]; if(!f) return;
+  const text = await f.text();
+  const ext = (f.name.split('.').pop() || '').toLowerCase();
+  openCodeInEditor(f.name, EXT2LANG[ext] || 'txt', text);
+  e.target.value = '';
+};
+$('#pasteEdit').onclick = () => {
+  const text = $('#pasteCode').value; const note = $('#pasteNote');
+  if(!text.trim()){ note.textContent = 'поле пустое'; return; }
+  const kind = $('#pasteKind').value;
+  const lang = kind === 'html' ? 'html' : kind === 'js' ? 'js' : (/<\s*(!doctype|html|head|body|div|script|style)\b/i.test(text) ? 'html' : 'js');
+  openCodeInEditor('вставленное.' + (lang === 'html' ? 'html' : 'js'), lang, text);
+  $('#pasteCode').value = ''; note.textContent = ''; $('#pastePanel').style.display = 'none';
+};
+$('#editCode').onclick = () => {
+  const code = currentCode(); if(!code.trim()){ alert('Код пуст — сначала добавь блоки или вставь код.'); return; }
+  const fmt = $('#fmt').value, lang = fmt === 'html' ? 'html' : fmt === 'txt' ? 'txt' : 'js';
+  openCodeInEditor('собранный.' + (lang === 'txt' ? 'txt' : lang), lang, code);
+};
+
 $('#clear').onclick = () => { graph = { nodes: [], edges: [] }; selectedId = null; renderCanvas(); renderInspector(); renderCode(); persist(); };
 // свернуть/развернуть визуальный холст — чтобы коду и предпросмотру досталась почти вся высота
 (function(){

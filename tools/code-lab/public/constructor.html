@@ -129,6 +129,9 @@
   .sb-code{position:relative;z-index:1;flex:1;min-width:0;min-height:0;overflow:auto;background:transparent;color:transparent;caret-color:#fff;resize:none;outline:none}
   .sb-code::selection{background:rgba(124,108,160,.4)}
   .center.explain-on .sb-code{cursor:help}
+  /* номера строк (когда CodeMirror не активен) */
+  .sb-ln{position:absolute;top:0;left:0;bottom:0;width:38px;overflow:hidden;text-align:right;padding:9px 6px 9px 0;margin:0;color:var(--text3,#6b6090);font:12px/1.5 ui-monospace,monospace;white-space:pre;background:var(--code-bg,#0E0720);border-right:1px solid var(--border);z-index:2;pointer-events:none;box-sizing:border-box}
+  .sb-ed.has-ln .sb-hl,.sb-ed.has-ln .sb-code{padding-left:48px}
   .sb-pop{position:fixed;z-index:9999;max-width:300px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font:12.5px/1.55 system-ui,sans-serif;color:var(--text);box-shadow:0 8px 28px rgba(0,0,0,.45)}
   .sb-pop-h{margin-bottom:4px} .sb-pop-h b{color:var(--acc);font-family:ui-monospace,monospace}
   .sb-pop-r{font-size:10.5px;color:var(--text3);border:1px solid var(--border);border-radius:5px;padding:1px 5px;margin-left:5px}
@@ -322,6 +325,7 @@
             <div class="tb-pop">
               <button class="btn" id="paste">✎ вставить код</button>
               <button class="btn" id="imp">⬆ разобрать файл</button>
+              <button class="btn" id="openEditor" title="открыть готовый файл целиком в редакторе песочницы — править как код, с номерами строк (не режет на блоки)">📝 файл в редактор</button>
               <button class="btn" id="flows" title="сохранить эту схему со связями в файл или открыть сохранённую">🗂 схемы</button>
               <button class="btn" id="example">пример</button>
             </div>
@@ -334,6 +338,7 @@
             </div>
           </div>
           <input type="file" id="impfile" accept=".js,.mjs,.jsx,.ts,.html,.htm,.css,.py,.sql,.json,.txt" style="display:none">
+          <input type="file" id="openfile" accept=".js,.mjs,.jsx,.ts,.html,.htm,.css,.py,.sql,.json,.txt,.md" style="display:none">
           <button class="btn" id="copy" title="скопировать весь собранный код">⧉ код</button>
           <button class="btn" id="buildcheck" title="проверить стыковку по типам и запустить собранное">🔌 собрать и проверить</button>
           <span class="tb-run">
@@ -343,6 +348,7 @@
           <div class="tb-menu">
             <button class="btn tb-menu-btn" type="button" aria-haspopup="true" aria-expanded="false" title="ещё">⋯</button>
             <div class="tb-pop">
+              <button class="btn" id="editCode" title="открыть собранный код в редакторе песочницы — править целиком, с номерами строк">✎ править код в редакторе</button>
               <button class="btn" id="dl">⬇ скачать</button>
               <button class="btn" id="save">💾 в шаблоны</button>
               <div class="tb-sep"></div>
@@ -362,6 +368,7 @@
         <textarea id="pasteCode" spellcheck="false" placeholder="сюда — свой код (HTML или JS), потом «разобрать на блоки»"></textarea>
         <div class="pp-btns">
           <button class="btn ok" id="pasteGo">разобрать на блоки</button>
+          <button class="btn" id="pasteEdit" title="не резать на блоки — открыть этот код целиком в редакторе песочницы">📝 править как код</button>
           <select id="pasteKind" class="btn" title="как разбирать"><option value="auto">определить само</option><option value="html">как HTML</option><option value="js">как JS</option></select>
           <button class="btn" id="pasteCancel">отмена</button>
           <span class="pp-note" id="pasteNote"></span>
