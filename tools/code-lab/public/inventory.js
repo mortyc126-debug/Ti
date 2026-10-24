@@ -370,6 +370,17 @@ function parseLinks(text){
       if(!target){ errors.push('строка ' + ln + ': не понял цель связи — «' + line + '»'); return; }
       addEdge(subject, target, rel.r, line, ln); return;
     }
+    // формат «A | связь | B» (как в экспортированной таблице связей): три части через «|»
+    if(line.includes('|')){
+      const parts = line.split('|').map(s => s.trim());
+      if(parts.length === 3 && parts[0] && parts[1] && parts[2]){
+        const rl = parts[1].toLowerCase();
+        const rec = (window.relationKwIndex || []).find(x => x.k === rl);
+        const r = rec ? rec.r : (window.CODE_RELATIONS || []).find(x => x.label.toLowerCase() === rl);
+        if(r){ addEdge(cleanName(parts[0]), cleanName(parts[2]), r, line, ln); return; }
+        errors.push('строка ' + ln + ': не понял вид связи «' + parts[1] + '» — «' + line + '»'); return;
+      }
+    }
     // строка целиком в кавычках — это имя куста (заголовок), а не связь
     if(fullyQuoted(line)){ subject = cleanName(line); return; }
     // плоский формат: цепочка стрелок A → B → C = поток данных по звеньям
@@ -622,3 +633,70 @@ function openSectionsModal(){
   };
 }
 document.getElementById('psections').onclick = openSectionsModal;
+
+// ── отдельное окно: массовое пополнение словаря пояснений ───────────────────────
+const DICT_SAMPLE = [
+  '# Пополнение словаря пояснений. Одна строка — одно слово.',
+  '# Формат: слово: пояснение   (можно «слово = пояснение» или «слово | пояснение»)',
+  '# Раздел выбирается сверху (общее/код, HTML-теги, HTML-атрибуты, CSS-свойства, CSS-значения).',
+  '# Строки с # или // — комментарии.',
+  '',
+  'printf: printf — вывод в консоль в C: printf("%d", x). %d — число, %s — строка.',
+  'malloc: malloc — выделить память вручную (C). Потом обязательно free().',
+  'std::cout: std::cout — поток вывода в C++ (cout << x). Нужен #include <iostream>.',
+  'System.out.println: System.out.println — печать строки с переводом строки в Java.',
+  'public: public — модификатор доступа: виден отовсюду (C++/Java).'
+].join('\n');
+// разобрать строки «слово: пояснение» → [{word, text}]
+function parseDict(text){
+  const entries = [], errors = [];
+  String(text).split('\n').forEach((raw, i) => {
+    const line = raw.trim(), ln = i + 1;
+    if(!line || line.startsWith('#') || line.startsWith('//')) return;
+    // разделитель: первый из | : =  (чтобы двоеточия внутри пояснения не мешали — берём ПЕРВЫЙ)
+    let sep = -1, ch = '';
+    for(const c of ['|', ':', '=']){ const k = line.indexOf(c); if(k > 0 && (sep < 0 || k < sep)){ sep = k; ch = c; } }
+    if(sep < 0){ errors.push('строка ' + ln + ': нет разделителя (слово: пояснение) — «' + line + '»'); return; }
+    const word = line.slice(0, sep).trim(), expl = line.slice(sep + 1).trim();
+    if(!word || !expl){ errors.push('строка ' + ln + ': пусто слово или пояснение — «' + line + '»'); return; }
+    entries.push({ word, text: expl, ln });
+  });
+  return { entries, errors };
+}
+function openDictModal(){
+  const bg = el2('div', 'modal-bg');
+  const box = el2('div', 'modal');
+  box.innerHTML = '<h3>Словарь пояснений</h3>'
+    + '<p class="mh">Добавь сразу много пояснений к словам. Они попадут в общий словарь <b>keyword-dict.json</b> — его читают песочница («пояснения по клику», «🧩 разобрать», «🔗 связи»), автоподпись кусков и бэкофилл. Пригодится для новых языков (C, C++, Java…). Формат строки: <b>слово: пояснение</b> (или «=», или «|»). Раздел выбери ниже.</p>'
+    + '<div class="mbtns" style="margin-bottom:6px"><label class="inv-chk">раздел: <select class="inv-sel" id="dc-section">'
+    + '<option value="words">общее / код</option><option value="htmlTags">HTML-теги</option><option value="htmlAttrs">HTML-атрибуты</option><option value="cssProps">CSS-свойства</option><option value="cssVals">CSS-значения</option>'
+    + '</select></label></div>'
+    + '<div class="fmt">printf: printf — вывод в консоль в C&#10;std::cout: поток вывода в C++&#10;System.out.println: печать строки в Java</div>'
+    + '<textarea id="dc-text" placeholder="вставь строки «слово: пояснение» или нажми «пример»"></textarea>'
+    + '<div class="mbtns"><button class="btn" id="dc-sample">пример</button><button class="btn ok" id="dc-parse">разобрать</button><button class="btn" id="dc-apply" style="display:none">добавить в словарь</button><button class="btn" id="dc-close">закрыть</button></div>'
+    + '<div class="lp-prev" id="dc-prev"></div>';
+  bg.appendChild(box); document.body.appendChild(bg);
+  const q = s => bg.querySelector(s);
+  bg.onclick = e => { if(e.target === bg) bg.remove(); };
+  q('#dc-close').onclick = () => bg.remove();
+  q('#dc-sample').onclick = () => { q('#dc-text').value = DICT_SAMPLE; };
+  let parsed = null;
+  q('#dc-parse').onclick = () => {
+    parsed = parseDict(q('#dc-text').value);
+    const prev = q('#dc-prev'); prev.innerHTML = '';
+    const line = (txt, cls) => { const d = el2('div', 'lp-row ' + (cls || '')); d.textContent = txt; return d; };
+    prev.appendChild(el2('div', 'lp-sec', 'слова (' + parsed.entries.length + ')'));
+    parsed.entries.slice(0, 200).forEach(e => prev.appendChild(line('✓ ' + e.word + '  →  ' + e.text.slice(0, 80), 'lp-ok')));
+    if(parsed.errors.length){ prev.appendChild(el2('div', 'lp-sec', 'не разобрано')); parsed.errors.forEach(x => prev.appendChild(line(x, 'lp-bad'))); }
+    q('#dc-apply').style.display = parsed.entries.length ? '' : 'none';
+  };
+  q('#dc-apply').onclick = async () => {
+    if(!parsed || !parsed.entries.length) return;
+    q('#dc-apply').textContent = 'добавляю…'; q('#dc-apply').disabled = true;
+    const section = q('#dc-section').value;
+    const r = await fetch('/api/dict/add', { method: 'POST', body: JSON.stringify({ section, entries: parsed.entries }) }).then(x => x.json()).catch(() => ({}));
+    q('#dc-prev').innerHTML = '<div class="lp-row ' + (r && r.ok ? 'lp-ok' : 'lp-bad') + '">' + (r && r.ok ? ('Готово: добавлено ' + r.added + ' (всего в разделе ' + r.total + '). Обнови страницу песочницы (Ctrl+F5), чтобы пояснения подхватились.') : 'Ошибка сохранения') + '</div>';
+    q('#dc-apply').style.display = 'none';
+  };
+}
+document.getElementById('pdict').onclick = openDictModal;

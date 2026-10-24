@@ -742,6 +742,24 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { matched: ptitle || (pid ? '' : null), relations: uniq });
     }
 
+    // массовое пополнение словаря пояснений: {section, entries}. entries — {слово:текст} или [{word,text}]/[[w,t]].
+    // Пишем в keyword-dict.json (тот же словарь читают песочница, автоподпись, бэкофилл) и сбрасываем кэш.
+    if(u.pathname === '/api/dict/add' && req.method === 'POST'){
+      const b = await readBody(req);
+      const SECTIONS = ['words', 'htmlTags', 'htmlAttrs', 'cssProps', 'cssVals'];
+      const section = SECTIONS.includes(b.section) ? b.section : 'words';
+      const dictPath = path.join(PUBLIC, 'keyword-dict.json');
+      let dict; try { dict = JSON.parse(await fs.readFile(dictPath, 'utf8')); } catch(_){ dict = {}; }
+      for(const s of SECTIONS) if(!dict[s]) dict[s] = {};
+      let pairs = [];
+      if(Array.isArray(b.entries)) pairs = b.entries.map(e => Array.isArray(e) ? [e[0], e[1]] : [e && e.word, e && e.text]);
+      else if(b.entries && typeof b.entries === 'object') pairs = Object.entries(b.entries);
+      let added = 0;
+      for(let [w, t] of pairs){ w = String(w || '').trim().toLowerCase(); t = String(t || '').trim(); if(!w || !t) continue; dict[section][w] = t.slice(0, 600); added++; }
+      await fs.writeFile(dictPath, JSON.stringify(dict, null, 2), 'utf8'); _kwDict = dict;
+      return json(res, 200, { ok: true, added, section, total: Object.keys(dict[section]).length });
+    }
+
     // ── рецепты (название + описание + список кусков) ──────────────────────────
     if(u.pathname === '/api/recipes/list'){
       let names = [];
