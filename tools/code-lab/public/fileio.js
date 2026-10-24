@@ -95,4 +95,13 @@
   const addBtn = bar.querySelector('#sbAdd');
   if(addBtn){ addBtn.after(bClear); addBtn.after(bSave); addBtn.after(bOpen); } else { bar.appendChild(bOpen); bar.appendChild(bSave); bar.appendChild(bClear); }
   bar.appendChild(inp);
+
+  // «🚫 превью» — спрятать окно предпросмотра (и обнулить его, чтобы не висело старое)
+  const frame = box.querySelector('#sbFrame');
+  let pvOff = false; try { pvOff = localStorage.getItem('codelab_sb_pv_off') === '1'; } catch(_){}
+  const bPv = document.createElement('button'); bPv.className = 'btn';
+  const applyPv = () => { if(frame) frame.style.display = pvOff ? 'none' : ''; bPv.textContent = pvOff ? '👁 превью' : '🚫 превью'; bPv.title = pvOff ? 'показать окно предпросмотра' : 'спрятать окно предпросмотра'; };
+  bPv.onclick = () => { pvOff = !pvOff; try { localStorage.setItem('codelab_sb_pv_off', pvOff ? '1' : '0'); } catch(_){} if(pvOff && frame){ try { frame.srcdoc = ''; } catch(_){} } applyPv(); };
+  const clrBtn = bar.querySelector('#sbClr'); if(clrBtn){ clrBtn.before(bPv); } else { bar.appendChild(bPv); }
+  applyPv();
 })();

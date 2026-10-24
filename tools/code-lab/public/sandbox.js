@@ -636,8 +636,10 @@
     refresh: () => { save(); syncHeads(); schedulePreview(); },
     // убрать нетронутые стартовые демо-файлы (index.html/style.css/script.js, если их код не меняли)
     dropPristineDefaults: () => { const def = Object.fromEntries(DEFAULTS.map(d => [d.id, d.code])); const kept = files.filter(f => !(def[f.id] !== undefined && !f.path && f.code === def[f.id])); if(kept.length !== files.length){ files = kept; save(); renderEds(); schedulePreview(); } return files.length; },
-    // полностью очистить песочницу (один пустой файл)
-    clearAll: () => { files = [{ id: uid(), name: 'файл.txt', lang: 'txt', code: '' }]; save(); renderEds(); schedulePreview(); }
+    // полностью очистить песочницу (один пустой файл); превью обнуляем сразу, даже если «живой» выключен
+    clearAll: () => { files = [{ id: uid(), name: 'файл.txt', lang: 'txt', code: '' }]; save(); renderEds(); renderPreview(); },
+    // отрисовать превью немедленно, игнорируя чекбокс «живой» (после очистки/открытия файла)
+    renderNow: () => renderPreview()
   };
 
   // ── переключение режимов: визуал ↔ песочница ──

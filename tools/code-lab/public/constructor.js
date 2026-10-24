@@ -1613,6 +1613,7 @@ function openCodeInEditor(name, lang, code){
   const nf = { id, name: name || 'файл.txt', lang: lang || 'txt', code: code || '' };
   sb.setFiles([...sb.getFiles(), nf]);
   if(window.codelabTabs) window.codelabTabs.setActive(id, true);
+  if(sb.renderNow) sb.renderNow();   // обновить превью сразу, чтобы не висело старое (даже если «живой» выключен)
 }
 $('#openEditor').onclick = () => $('#openfile').click();
 $('#openfile').onchange = async e => {
