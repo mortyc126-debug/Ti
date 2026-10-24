@@ -200,18 +200,29 @@
     setTimeout(() => { rebuild(); showDetail(c.name); }, 0);
   }
 
-  // данные по слову: если объявлено в файле — компонент; иначе стандартное/внешнее имя
+  // данные по слову: если объявлено в файле — компонент; иначе сначала пояснение из словаря
+  // (CSS-свойства/значения, HTML-теги, ключевые слова — та же база, что у «пояснений по клику»)
   function showWord(word){
     const c = comps.find(x => x.name === word);
     if(c){ selName = word; showDetail(word); rebuild(); return; }
+    const f = activeFile(), lang = f ? f.lang : '';
+    const expl = window.codelabExplain ? window.codelabExplain(word, lang) : null;
     detEl.innerHTML = '';
     const d = document.createElement('div'); d.className = 'det';
     const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = word; d.appendChild(nm);
-    const role = document.createElement('div'); role.className = 'role';
-    role.textContent = STD.has(word) ? 'стандартное имя (ключевое слово / встроенное — его смысл задан языком)' : 'имя не объявлено в этом файле (приходит извне или задаётся глубже верхнего уровня)';
-    d.appendChild(role);
-    // для ключевых слов список вхождений не нужен (это шум); для прочих имён — где встречается
-    if(!STD.has(word)) appendUsages(d, word);
+    if(expl){
+      // нашли пояснение в словаре — показываем его (главное, что хотел пользователь)
+      const b = document.createElement('div'); b.className = 'sig'; b.style.whiteSpace = 'pre-wrap'; b.textContent = expl; d.appendChild(b);
+      // для HTML/CSS список вхождений не нужен — это шум; для кода покажем, где встречается
+      if(/^(js|ts)$/.test(lang || '')) appendUsages(d, word);
+    } else {
+      const role = document.createElement('div'); role.className = 'role';
+      role.textContent = STD.has(word) ? 'стандартное имя (ключевое слово / встроенное — его смысл задан языком)'
+        : (/^(css|html|htm)$/.test(lang || '') ? 'нет пояснения в словаре для этого слова (можно добавить в keyword-dict.json)'
+          : 'имя не объявлено в этом файле (приходит извне или задаётся глубже верхнего уровня)');
+      d.appendChild(role);
+      if(!STD.has(word) && /^(js|ts)$/.test(lang || '')) appendUsages(d, word);
+    }
     detEl.appendChild(d);
   }
 
@@ -291,8 +302,13 @@
   const DECL_KW = new Set(['const', 'let', 'var', 'function', 'class']);
   function wordAt(ed, ev){
     const ta = ed.querySelector('textarea'), cm = ta && ta.__cm;
-    if(cm){ const pos = cm.coordsChar({ left: ev.clientX, top: ev.clientY }, 'window'); const r = cm.findWordAt(pos); return { w: (cm.getRange(r.anchor, r.head) || '').trim(), line: pos.line + 1 }; }
-    if(ta){ const v = ta.value, cc = ta.selectionStart; let a = cc, b = cc; while(a > 0 && /[\w$]/.test(v[a - 1])) a--; while(b < v.length && /[\w$]/.test(v[b])) b++; return { w: v.slice(a, b), line: (v.slice(0, cc).match(/\n/g) || []).length + 1 }; }
+    const f = ed.__f, css = f && /^(css|html|htm)$/.test(f.lang || '');
+    // в CSS/HTML имя может содержать дефис и цифры (grid-template-columns, 1fr) — ловим шире
+    const ch = css ? /[\w$-]/ : /[\w$]/;
+    if(cm){ const pos = cm.coordsChar({ left: ev.clientX, top: ev.clientY }, 'window');
+      if(css){ const ln = cm.getLine(pos.line) || ''; let a = pos.ch, b = pos.ch; while(a > 0 && ch.test(ln[a - 1])) a--; while(b < ln.length && ch.test(ln[b])) b++; return { w: ln.slice(a, b), line: pos.line + 1 }; }
+      const r = cm.findWordAt(pos); return { w: (cm.getRange(r.anchor, r.head) || '').trim(), line: pos.line + 1 }; }
+    if(ta){ const v = ta.value, cc = ta.selectionStart; let a = cc, b = cc; while(a > 0 && ch.test(v[a - 1])) a--; while(b < v.length && ch.test(v[b])) b++; return { w: v.slice(a, b), line: (v.slice(0, cc).match(/\n/g) || []).length + 1 }; }
     return { w: '', line: 0 };
   }
   edsEl.addEventListener('click', ev => {
@@ -300,7 +316,9 @@
     const ed = ev.target.closest && ev.target.closest('.sb-ed'); if(!ed || !ed.__f) return;
     setTimeout(() => {
       const { w, line } = wordAt(ed, ev);
-      if(!w || !/^[A-Za-z_$][\w$]*$/.test(w)) return;
+      // для css/html допускаем дефис и цифры (grid-template-columns, 1fr), для кода — обычное имя
+      const ok = /^(css|html|htm)$/.test(ed.__f.lang || '') ? /^[A-Za-z0-9_$-]{2,}$/.test(w) : /^[A-Za-z_$][\w$]*$/.test(w);
+      if(!w || !ok) return;
       // клик по слову-объявлению (const/function/…) → показать саму константу/функцию на этой строке
       if(DECL_KW.has(w)){ const c = comps.find(x => x.line === line); if(c){ selName = c.name; showDetail(c.name); rebuild(); return; } }
       showWord(w);

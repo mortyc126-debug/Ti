@@ -407,6 +407,15 @@
     showPop(word, role, body, ev);
   }
 
+  // пояснение слова по языку — из тех же словарей (включая keyword-dict.json). Для панели «🧩 разобрать» и др.
+  window.codelabExplain = function(word, lang){
+    if(!word) return null;
+    const w = String(word), lw = w.toLowerCase(), l = String(lang || '').toLowerCase();
+    if(l === 'css') return CSS_PROPS[lw] || CSS_VALS[lw] || EXPLAIN[w] || EXPLAIN[lw] || null;
+    if(l === 'html' || l === 'htm') return HTML_TAGS[lw] || HTML_ATTRS[lw] || CSS_PROPS[lw] || CSS_VALS[lw] || EXPLAIN[w] || EXPLAIN[lw] || null;
+    return EXPLAIN[w] || EXPLAIN[lw] || CSS_PROPS[lw] || CSS_VALS[lw] || HTML_TAGS[lw] || null;
+  };
+
   // ── редактор CodeMirror поверх прежнего поля (если CodeMirror установлен; иначе всё как раньше) ──
   const CM_ADDONS = ['fold/xml-fold', 'edit/closetag', 'edit/closebrackets', 'comment/comment', 'selection/active-line', 'hint/show-hint', 'hint/anyword-hint'];
   let cmReady = null;
