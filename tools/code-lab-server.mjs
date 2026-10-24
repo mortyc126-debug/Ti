@@ -28,6 +28,11 @@ import { handleWorkspace } from './code-lab/lib/workspace.mjs';
 import { createAiGenerate, LANGS as AI_LANGS } from './code-lab/lib/ai-generate.mjs';   // токенайзер вынесен в модуль — его тестируют отдельно
 import { createVendor } from './code-lab/lib/vendor.mjs';   // управляемые обновления CodeMirror (по кнопке)
 
+// сетевые/TLS-ошибки провайдеров ИИ (GigaChat и пр.) не должны ронять весь сервер —
+// логируем и продолжаем работать, чтобы Лаборатория оставалась доступной.
+process.on('uncaughtException', e => { console.error('[code-lab] uncaughtException:', (e && e.stack) || e); });
+process.on('unhandledRejection', e => { console.error('[code-lab] unhandledRejection:', (e && e.stack) || e); });
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, 'code-lab');
 const PUBLIC = path.join(ROOT, 'public');
