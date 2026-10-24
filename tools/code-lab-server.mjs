@@ -713,6 +713,35 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
+    // связи КУСКА в проекте: по коду/названию находим кусок, собираем рёбра всех сохранённых схем,
+    // где он участвует. Возвращаем [{dir:'out'|'in', rel, other, scheme}] видами из CODE_RELATIONS.
+    if(u.pathname === '/api/relations/piece' && req.method === 'POST'){
+      const b = await readBody(req);
+      const code = _normCode(b.code || ''), title = String(b.title || '').trim().toLowerCase();
+      let pid = null, ptitle = null;
+      for(const e of await store.entries()){
+        if((code && _normCode(e.code) === code) || (title && (e.title || '').trim().toLowerCase() === title)){ pid = e.id; ptitle = e.title || ''; break; }
+      }
+      const rels = [];
+      let names = [];
+      try { names = (await fs.readdir(FLOWS)).filter(n => n.endsWith('.json')); } catch(_){ names = []; }
+      const low = s => String(s || '').trim().toLowerCase();
+      const meTitle = low(ptitle) || title;
+      for(const fn of names){
+        let g; try { g = JSON.parse(await fs.readFile(path.join(FLOWS, fn), 'utf8')); } catch(_){ continue; }
+        const nodes = (g.graph && g.graph.nodes) || [], edges = (g.graph && g.graph.edges) || [];
+        const map = {}; nodes.forEach(n => { map[n.id] = { title: (n.src && n.src.title) || n.title || '', pid: (n.src && n.src.id) || null }; });
+        const isMe = nd => nd && ((pid && nd.pid === pid) || (meTitle && low(nd.title) === meTitle));
+        edges.forEach(ed => { const a = map[ed.from], c = map[ed.to]; if(!a || !c) return; const rel = ed.rel || 'data';
+          if(isMe(a)) rels.push({ dir: 'out', rel, other: c.title, scheme: g.name || fn });
+          else if(isMe(c)) rels.push({ dir: 'in', rel, other: a.title, scheme: g.name || fn }); });
+      }
+      // схлопнуть одинаковые рёбра (одна и та же связь в одноимённых схемах)
+      const seen = new Set(), uniq = [];
+      for(const r of rels){ const k = r.dir + '|' + r.rel + '|' + r.other + '|' + r.scheme; if(seen.has(k)) continue; seen.add(k); uniq.push(r); }
+      return json(res, 200, { matched: ptitle || (pid ? '' : null), relations: uniq });
+    }
+
     // ── рецепты (название + описание + список кусков) ──────────────────────────
     if(u.pathname === '/api/recipes/list'){
       let names = [];

@@ -129,15 +129,43 @@
 
   const panel = document.createElement('div'); panel.className = 'sb-insp';
   panel.innerHTML = '<div class="ih"><b>🧩 Разбор файла</b><button class="ibtn" id="inspRef" title="пересобрать">⟳</button><button class="ibtn" id="inspX" title="закрыть">×</button></div>'
-    + '<div id="inspList"></div><div class="grp">Подробно</div><div id="inspDet"><div class="none">выбери компонент сверху или кликни по имени в коде</div></div>';
+    + '<div class="grp" id="inspProjH" style="display:none">Связи этого куска в проекте</div><div id="inspProj"></div>'
+    + '<div class="grp">Компоненты файла</div><div id="inspList"></div>'
+    + '<div class="grp">Подробно</div><div id="inspDet"><div class="none">выбери компонент сверху или кликни по имени в коде</div></div>';
   // встраиваем панель в раскладку песочницы (между кодом и превью), а не поверх — чтобы не наезжала
   const right = box.querySelector('.sb-right'); if(right) box.insertBefore(panel, right); else box.appendChild(panel);
   const listEl = panel.querySelector('#inspList'), detEl = panel.querySelector('#inspDet'), nameEl = panel.querySelector('b');
-  let comps = [], selName = null, open = false;
+  const projEl = panel.querySelector('#inspProj'), projH = panel.querySelector('#inspProjH');
+  let comps = [], selName = null, open = false, lastProjCode = null;
+
+  // связи этого куска в проекте (из сохранённых схем): если открытый код совпал с сохранённым куском
+  async function loadProjectRels(f){
+    if(!f){ projEl.innerHTML = ''; projH.style.display = 'none'; return; }
+    if(f.code === lastProjCode) return;           // не дёргать сервер на каждую перерисовку
+    lastProjCode = f.code;
+    let data = null;
+    try { data = await fetch('/api/relations/piece', { method: 'POST', body: JSON.stringify({ code: f.code, title: (f.name || '').replace(/\.[^.]+$/, '') }) }).then(r => r.json()); } catch(_){}
+    if(f.code !== lastProjCode) return;           // пока грузили — файл сменился
+    projEl.innerHTML = '';
+    const rels = (data && data.relations) || [];
+    if(!rels.length){ projH.style.display = 'none'; return; }
+    projH.style.display = '';
+    rels.slice(0, 40).forEach(x => {
+      const r = (window.relationById ? window.relationById(x.rel) : null), lbl = r ? r.label : x.rel, col = (window.relationColor ? window.relationColor(x.rel) : 'var(--acc)');
+      const ch = document.createElement('span'); ch.className = 'chip std'; ch.style.borderColor = col;
+      const t = document.createElement('span'); t.style.color = col; t.style.opacity = '.85';
+      // out: этот → other ; in: other → этот
+      t.textContent = x.dir === 'in' ? (x.other + ' ' + lbl + ' →') : (lbl + ' →');
+      ch.appendChild(t); if(x.dir !== 'in') ch.appendChild(document.createTextNode(' ' + x.other));
+      ch.title = (x.dir === 'in' ? (x.other + ' ' + lbl + ' этот кусок') : ('этот кусок ' + lbl + ' ' + x.other)) + (x.scheme ? ('  ·  схема: ' + x.scheme) : '');
+      projEl.appendChild(ch);
+    });
+  }
 
   function rebuild(){
     const f = activeFile();
     nameEl.textContent = '🧩 ' + (f ? (f.name || 'файл') : 'файл');
+    loadProjectRels(f);
     comps = f && /^(js|ts)$/.test(f.lang) ? parse(f.code || '') : [];
     listEl.innerHTML = '';
     if(!f){ listEl.innerHTML = '<div class="none">нет открытого файла</div>'; return; }
