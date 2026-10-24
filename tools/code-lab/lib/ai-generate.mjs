@@ -7,9 +7,11 @@
 import { extFor } from './lang.mjs';
 
 // языки, которые библиотека умеет хранить (см. lang.mjs); значение — как назвать язык в промпте
+// единый набор языков — зеркало public/langs.js (CODELAB_LANGS), без txt. Держать синхронно.
 export const LANGS = {
-  js: 'JavaScript', ts: 'TypeScript', python: 'Python', css: 'CSS', html: 'HTML', svg: 'SVG', json: 'JSON',
-  sql: 'SQL', bash: 'Bash', powershell: 'PowerShell', go: 'Go', ruby: 'Ruby', php: 'PHP', lua: 'Lua', r: 'R', perl: 'Perl',
+  html: 'HTML', css: 'CSS', js: 'JavaScript', ts: 'TypeScript', python: 'Python', sql: 'SQL', json: 'JSON', svg: 'SVG',
+  bash: 'Bash', powershell: 'PowerShell', go: 'Go', ruby: 'Ruby', php: 'PHP', lua: 'Lua', r: 'R', perl: 'Perl',
+  c: 'C', cpp: 'C++', java: 'Java', rust: 'Rust', kotlin: 'Kotlin', csharp: 'C#', swift: 'Swift',
 };
 
 const clean = (v, max) => String(v ?? '').replace(/\u0000/g, '').trim().slice(0, max);

@@ -9,8 +9,8 @@
   const bar = box && box.querySelector('.sb-bar');
   if(!sb || !box || !bar){ return; }
 
-  const EXT_LANG = { html:'html', htm:'html', css:'css', scss:'css', js:'js', mjs:'js', cjs:'js', jsx:'js', ts:'ts', tsx:'ts', json:'json', py:'python', rb:'ruby', php:'php', go:'go', lua:'lua', sh:'bash', bash:'bash', r:'r', sql:'sql', md:'txt', txt:'txt', svg:'html', xml:'txt', yml:'txt', yaml:'txt', csv:'txt' };
-  const langOf = n => EXT_LANG[(String(n).split('.').pop() || '').toLowerCase()] || 'txt';
+  // расширение → язык из единого источника (langs.js); запасной — минимальный
+  const langOf = n => { const ext = (String(n).split('.').pop() || '').toLowerCase(); return window.langByExt ? window.langByExt(ext) : ({ html:'html', css:'css', js:'js', py:'python', json:'json' }[ext] || 'txt'); };
   const uid = () => 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   const hasFS = typeof window.showOpenFilePicker === 'function' && typeof window.showSaveFilePicker === 'function';
 

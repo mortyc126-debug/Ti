@@ -710,14 +710,15 @@ function openDictModal(){
   q('#dc-close').onclick = () => bg.remove();
   q('#dc-sample').onclick = () => { q('#dc-text').value = DICT_SAMPLE; };
   // выбрать файл(ы): прочитать текст в поле кода, подставить язык по расширению и сразу собрать
-  const EXT2LANG = { c:'c', h:'c', cpp:'cpp', cc:'cpp', cxx:'cpp', hpp:'cpp', hxx:'cpp', java:'java', py:'python', rs:'rust', go:'go', sql:'sql', php:'php', rb:'ruby', lua:'lua', sh:'bash', bash:'bash', js:'js', mjs:'js', ts:'ts', tsx:'ts', jsx:'js', html:'html', htm:'html', css:'css', kt:'kotlin', swift:'swift', cs:'csharp' };
+  const EXT2LANG_FB = { c:'c', cpp:'cpp', java:'java', py:'python', js:'js', ts:'ts', html:'html', css:'css' };
+  const extToLang = ext => window.langByExt ? window.langByExt(ext) : (EXT2LANG_FB[ext] || 'txt');
   q('#dc-file').onclick = () => q('#dc-fileinp').click();
   q('#dc-fileinp').onchange = async e => {
     const fs = [...(e.target.files || [])]; if(!fs.length) return;
     let text = '', ext = '';
     for(const f of fs){ try { text += (text ? '\n\n' : '') + await f.text(); } catch(_){} if(!ext){ ext = (f.name.split('.').pop() || '').toLowerCase(); } }
     q('#dc-code').value = text;
-    if(!q('#dc-lang').value.trim() && EXT2LANG[ext]) q('#dc-lang').value = EXT2LANG[ext];
+    if(!q('#dc-lang').value.trim()){ const l = extToLang(ext); if(l && l !== 'txt') q('#dc-lang').value = l; }
     e.target.value = '';
     q('#dc-scan').click();   // сразу собрать непонятные слова
   };

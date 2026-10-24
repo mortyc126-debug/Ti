@@ -7,8 +7,8 @@
   const bar = box && box.querySelector('.sb-bar');
   if(!sb || !box || !bar){ console.warn('workspace.js: нет window.codelabSandbox — примените правку к sandbox.js'); return; }
 
-  const EXT_LANG = { html:'html', htm:'html', css:'css', scss:'css', js:'js', mjs:'js', cjs:'js', jsx:'js', ts:'ts', tsx:'ts', json:'json', py:'python', rb:'ruby', php:'php', go:'go', lua:'lua', sh:'bash', bash:'bash', r:'r', sql:'sql', md:'txt', txt:'txt', svg:'html', xml:'txt', yml:'txt', yaml:'txt', csv:'txt' };
-  const langOf = n => EXT_LANG[(String(n).split('.').pop() || '').toLowerCase()] || 'txt';
+  // расширение → язык из единого источника (langs.js); запасной — минимальный
+  const langOf = n => { const ext = (String(n).split('.').pop() || '').toLowerCase(); return window.langByExt ? window.langByExt(ext) : ({ html:'html', css:'css', js:'js', py:'python', json:'json' }[ext] || 'txt'); };
   const base = p => String(p).split('/').pop();
   const hash = s => { let h = 5381; s = String(s); for(let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return s.length + ':' + h; };
   const uid = () => 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);

@@ -1662,7 +1662,9 @@ $('#impfile').onchange = async e => {
 };
 
 // «готовый файл → редактор»: не резать на блоки, а открыть код целиком в песочнице (правка + номера строк)
-const EXT2LANG = { js:'js', mjs:'js', cjs:'js', jsx:'js', ts:'ts', tsx:'ts', html:'html', htm:'html', css:'css', py:'python', sql:'sql', json:'json', md:'txt', txt:'txt', rb:'ruby', php:'php', go:'go', lua:'lua', sh:'bash' };
+// расширение → язык: единый источник langs.js (window.langByExt)
+const EXT2LANG_FB = { js:'js', ts:'ts', html:'html', css:'css', py:'python', sql:'sql', json:'json' };
+const extToLang = ext => window.langByExt ? window.langByExt(ext) : (EXT2LANG_FB[ext] || 'txt');
 function openCodeInEditor(name, lang, code){
   const box = document.getElementById('sandbox');
   if(box && box.style.display === 'none'){ const t = $('#sandboxToggle'); if(t) t.click(); }   // включить песочницу, если скрыта
@@ -1681,7 +1683,7 @@ $('#openfile').onchange = async e => {
   const f = e.target.files && e.target.files[0]; if(!f) return;
   const text = await f.text();
   const ext = (f.name.split('.').pop() || '').toLowerCase();
-  openCodeInEditor(f.name, EXT2LANG[ext] || 'txt', text);
+  openCodeInEditor(f.name, extToLang(ext), text);
   e.target.value = '';
 };
 $('#pasteEdit').onclick = () => {
