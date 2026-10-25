@@ -4,6 +4,43 @@ const ID = decodeURIComponent((location.search.match(/[?&]id=([^&]+)/) || [])[1]
 const root = document.getElementById('root');
 let NOTES = {};   // пояснения к словам, хранятся на компоненте (component.notes)
 let LNOTES = {};  // пояснения к строкам, ключ — текст строки без пробелов по краям (component.lineNotes)
+let DICT = {};    // общий словарь пояснений + варианты значений (тот же, что в разборе кода)
+let CUR_LANG = '', CODE = '';   // язык и текущий код куска (для переключения вариантов)
+fetch('/keyword-dict.json', { cache: 'no-store' }).then(r => r.json()).then(d => { DICT = d || {}; markVariants(); }).catch(() => {});
+
+// пояснение слова из словаря (сначала язык куска, потом общий/HTML/CSS/любой язык)
+function dictExplain(word){
+  const lw = String(word).toLowerCase(), l = (CUR_LANG || '').toLowerCase();
+  if(l && DICT.langs && DICT.langs[l] && DICT.langs[l][lw]) return DICT.langs[l][lw];
+  if(DICT.words && DICT.words[lw]) return DICT.words[lw];
+  for(const s of ['cssProps','cssVals','htmlTags','htmlAttrs']) if(DICT[s] && DICT[s][lw]) return DICT[s][lw];
+  if(DICT.langs) for(const k of Object.keys(DICT.langs)) if(DICT.langs[k][lw]) return DICT.langs[k][lw];
+  return '';
+}
+const variantsOf = word => (DICT.variants && DICT.variants[String(word).toLowerCase()]) || null;
+// подчеркнуть слова-свойства, у которых есть варианты — видно, что можно менять
+function markVariants(){
+  document.querySelectorAll('.cln .w').forEach(s => { if(variantsOf(s.textContent)){ s.classList.add('has-var'); if(!s.title) s.title = 'клик — сменить значение'; } });
+}
+// текущее значение свойства prop на строке li
+function currentValue(li, prop){
+  const lines = String(CODE).split('\n'); const line = lines[li] || '';
+  const m = new RegExp('\\b' + prop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:\\s*([^;{}!]*)').exec(line);
+  return m ? m[1].trim() : '';
+}
+// сменить значение свойства prop на строке li → val, сохранить код куска и перерисовать
+async function setVariant(li, prop, val){
+  const lines = String(CODE).split('\n'); if(li < 0 || li >= lines.length) return;
+  const re = new RegExp('(\\b' + prop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:\\s*)([^;{}!]*)');
+  if(!re.test(lines[li])) return;
+  lines[li] = lines[li].replace(re, (m, p) => p + val);
+  CODE = lines.join('\n');
+  closeNotePop();
+  rerenderCode();
+  await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: ID, code: CODE }) }).catch(() => {});
+}
+// перерисовать блок кода (② «Что меняешь») после правки
+function rerenderCode(){ const host = document.querySelector('.code-host'); if(host){ host.innerHTML = ''; host.appendChild(noteCode(CODE)); markVariants(); } }
 
 (async function(){
   if(!ID){ root.innerHTML = '<div class="muted pad">не указан компонент</div>'; return; }
@@ -60,9 +97,11 @@ function render(t){
     + (summary.output ? '<div class="func-out">Отдаёт: ' + esc(summary.output) + '</div>' : '')), ['desc']));
 
   // ② Что меняешь (код) + запуск
+  CUR_LANG = t.lang || ''; CODE = codeText;
   const codeWrap = document.createElement('div');
-  codeWrap.appendChild(el('div', 'note-hint', 'Клик по слову — что это значит; клик по точке слева — пояснение к строке. Меняй значения и имена под себя.'));
-  codeWrap.appendChild(noteCode(codeText));
+  codeWrap.appendChild(el('div', 'note-hint', 'Клик по слову — пояснение из словаря и своя заметка. Свойства с вариантами подчёркнуты — клик меняет значение сразу. Клик по точке слева — пояснение к строке.'));
+  const codeHost = el('div', 'code-host'); codeHost.appendChild(noteCode(CODE)); codeWrap.appendChild(codeHost);
+  setTimeout(markVariants, 0);   // подчеркнуть изменяемые свойства (если словарь уже загружен)
   if(runnable){
     const rb = btn('▶ запустить', 'primary'); rb.style.marginTop = '6px';
     const box = el('div', 'preview'); rb.onclick = () => runDemo(box, c, codeText);
@@ -243,8 +282,8 @@ function hl(code, lang){
 function noteCode(text){
   const wrap = el('div', 'codewrap');
   const pre = document.createElement('pre'); pre.className = 'code noted';
-  String(text).split('\n').forEach(line => {
-    const row = el('div', 'crow');
+  String(text).split('\n').forEach((line, _i) => {
+    const row = el('div', 'crow'); row.dataset.i = _i;
     const lkey = line.trim();
     // клик по номеру строки слева — пояснение ко всей строке
     const g = el('span', 'lng', '•'); g.title = 'пояснение к строке';
@@ -276,7 +315,21 @@ function noteCode(text){
 function openNote(word, span){
   closeNotePop();
   const pop = el('div', 'note-pop'); pop.id = '_notepop';
-  pop.appendChild(el('div', 'np-h', 'пояснение к «' + word + '»'));
+  pop.appendChild(el('div', 'np-h', '«' + word + '»'));
+  // пояснение из словаря (то же, что в разборе кода) — только показываем
+  const dx = dictExplain(word);
+  if(dx){ const e = el('div', 'np-expl'); e.textContent = dx; pop.appendChild(e); }
+  // варианты значения: кнопки — клик меняет значение прямо в коде куска и сохраняет
+  const vars = variantsOf(word);
+  if(vars && vars.length){
+    pop.appendChild(el('div', 'np-sub', 'сменить значение:'));
+    const li = (span.closest('.crow') ? +span.closest('.crow').dataset.i : -1);
+    const cur = currentValue(li, word);
+    const vb = el('div', 'np-vars');
+    vars.forEach(v => { const b = el('button', 'np-var' + (v.toLowerCase() === (cur || '').toLowerCase() ? ' cur' : ''), v); b.onclick = () => setVariant(li, word, v); vb.appendChild(b); });
+    pop.appendChild(vb);
+  }
+  pop.appendChild(el('div', 'np-sub', 'своя заметка:'));
   const ta = document.createElement('textarea'); ta.value = NOTES[word] || ''; ta.placeholder = 'что это значит, своими словами';
   const btns = el('div', 'np-btns');
   const sv = el('button', 'np-ok', 'сохранить'); const del = el('button', '', 'убрать');
