@@ -496,6 +496,24 @@
     document.head.appendChild(st);
   }
   const rafOnce = fn => { let q = 0; return () => { if(q) return; q = requestAnimationFrame(() => { q = 0; fn(); }); }; };
+  // определить язык по коду — чтобы файл без языка (txt у новой вкладки) красился и разбирался
+  function guessLang(code){
+    const t = String(code || ''); if(t.trim().length < 3) return 'txt';
+    if(/<\s*(!doctype|html|head|body|div|span|script|style|p|a|ul|ol|li|table|tr|td|img|section|header|footer|button|input|form|h[1-6]|nav|main|svg)\b/i.test(t)) return 'html';
+    if(/[^{}]*\{[^{}]*[a-z-]+\s*:\s*[^;{}]+;/i.test(t) && !/\bfunction\b|=>|\b(const|let|var)\s|console\./.test(t)) return 'css';
+    if(/\bdef\s+\w+\s*\(.*\)\s*:|^\s*(import|from)\s+\w|\bprint\s*\(/m.test(t) && !/[;{]/.test(t.replace(/(["'`]).*?\1/g, ''))) return 'python';
+    if(/\b(SELECT|INSERT|UPDATE|DELETE)\b[\s\S]*\bFROM\b|\bCREATE\s+TABLE\b/i.test(t)) return 'sql';
+    if(/\b(function|const|let|var|=>|return|class|import|export)\b|console\.|document\./.test(t)) return 'js';
+    return 'txt';
+  }
+  // один раз повысить язык txt-файла до распознанного (красит CM/подсветку + включает словарь)
+  function autoLang(ed, ta, f){
+    if(f.lang && f.lang !== 'txt') return;
+    const g = guessLang(f.code); if(g === 'txt') return;
+    f.lang = g;
+    const sl = ed.querySelector('.sb-lang'); if(sl) sl.value = g;
+    if(ta.__cm && window.CMBridge && window.CMBridge.setLang) window.CMBridge.setLang(ta, g);
+  }
   // раскрашенная строка прежней подсветки → span на позиции (нужно для «пояснений по клику» поверх CodeMirror)
   function spanAt(pre, line, ch){
     const ld = pre.children[line]; if(!ld) return null;
@@ -511,7 +529,7 @@
       if(!cm) return;
       ed.classList.add('cm-on'); ed.classList.remove('has-ln');   // у CodeMirror свои номера строк
       const g = ed.querySelector('.sb-ln'); if(g) g.remove();
-      ta.oninput = () => { f.code = ta.value; save(); schedulePreview(); };   // CodeMirror сам сообщает об изменениях событием input
+      ta.oninput = () => { f.code = ta.value; autoLang(ed, ta, f); save(); schedulePreview(); };   // CodeMirror сам сообщает об изменениях событием input
       const refresh = rafOnce(() => { if(wrap.clientHeight) cm.refresh(); });
       const watchCm = () => { const ro = new ResizeObserver(refresh); ro.observe(wrap); ros.push(ro); };
       const prev = ed.__watch; ed.__watch = () => { if(prev) prev(); watchCm(); };
@@ -581,7 +599,7 @@
       const updateLn = () => { const n = (ta.value.match(/\n/g) || []).length + 1; let s = ''; for(let i = 1; i <= n; i++) s += i + '\n'; gut.textContent = s; };
       const paint = () => { pre.innerHTML = ''; sbHighlight(ta.value, f.lang).forEach(l => pre.appendChild(l)); updateLn(); };
       const syncScroll = () => { pre.scrollTop = ta.scrollTop; pre.scrollLeft = ta.scrollLeft; gut.scrollTop = ta.scrollTop; };
-      ta.oninput = () => { f.code = ta.value; save(); paint(); schedulePreview(); };
+      ta.oninput = () => { f.code = ta.value; autoLang(ed, ta, f); save(); paint(); schedulePreview(); };
       ta.addEventListener('scroll', syncScroll);
       // Tab вставляет отступ, а не прыгает по форме; плюс авто-пары (<body>→</body>, {→})
       ta.onkeydown = ev => {
