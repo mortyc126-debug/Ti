@@ -251,6 +251,9 @@ body.dragging-side{user-select:none;cursor:col-resize}
 .side .ss-t{font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .side .ss-g{font-size:10px;color:var(--text3);font-family:ui-monospace,monospace}
 .side .ss-all{color:var(--acc);font-size:11.5px}
+.side .ss-grp{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);padding:7px 9px 2px}
+.side .ss-dict{cursor:pointer}
+.side .ss-expl{font-size:11.5px;color:var(--text2);line-height:1.5;padding:2px 9px 8px;white-space:pre-wrap}
 .side .ru-first{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text3);padding:6px 8px;cursor:pointer}
 .side .ru-first input{cursor:pointer}
 .side .nav-hist{display:flex;gap:6px;margin:2px 2px 8px}

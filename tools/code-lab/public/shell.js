@@ -57,24 +57,63 @@
   const sin = document.createElement('input'); sin.className = 'ss-in'; sin.placeholder = '🔎 найти кусок…'; sin.spellcheck = false;
   const sres = document.createElement('div'); sres.className = 'ss-res'; sres.style.display = 'none';
   sbox.append(sin, sres); side.appendChild(sbox);
-  let ALL = null;
-  const esc2 = s => String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c]));
+  sin.placeholder = '🔎 найти что угодно…';
+  let ALL = null, DICT = null;
+  const esc2 = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
   const loadAll = () => ALL || (ALL = fetch('/api/list').then(r => r.json()).catch(() => []));
+  const loadDict = () => DICT || (DICT = fetch('/keyword-dict.json', { cache:'no-store' }).then(r => r.json()).catch(() => ({})));
   const give = t => (t.comp && t.comp.provides) || [], need = t => (t.comp && t.comp.requires) || [];
+  // поиск по словарю (слова + языки + HTML/CSS + синонимы по смыслу)
+  function dictSearch(d, q){
+    const out = [], seen = new Set();
+    const push = (term, text, where) => { const k = where + '|' + term; if(seen.has(k)) return; seen.add(k); out.push({ term, text: String(text || ''), where }); };
+    const scan = (obj, where) => { if(!obj) return; for(const [k, v] of Object.entries(obj)){ if(typeof v !== 'string') continue; if(k.toLowerCase().includes(q) || v.toLowerCase().includes(q)) push(k, v, where); } };
+    scan(d.words, 'слово'); ['htmlTags','htmlAttrs','cssProps','cssVals'].forEach(s => scan(d[s], s));
+    if(d.langs) for(const l of Object.keys(d.langs)) scan(d.langs[l], l);
+    if(d.synonyms){
+      const explOf = t => { const lt = t.toLowerCase(); if(d.words && d.words[lt]) return d.words[lt]; for(const s of ['htmlTags','htmlAttrs','cssProps','cssVals']) if(d[s] && d[s][lt]) return d[s][lt]; if(d.langs) for(const l of Object.keys(d.langs)) if(d.langs[l][lt]) return d.langs[l][lt]; return ''; };
+      for(const [term, syns] of Object.entries(d.synonyms)){ if(!Array.isArray(syns)) continue; const hit = syns.find(s => String(s).toLowerCase().includes(q)); if(hit) push(term, (explOf(term) || '(нет пояснения)') + '  ← ' + hit, 'синоним'); }
+    }
+    return out.slice(0, 12);
+  }
+  let drawSeq = 0;
   const draw = async () => {
     const q = sin.value.toLowerCase().trim();
     if(!q){ sres.style.display = 'none'; sres.innerHTML = ''; return; }
-    const list = await loadAll();
-    const hits = list.filter(t => ((t.title || '') + ' ' + (t.group || '') + ' ' + (t.lang || '') + ' ' + (t.desc || '') + ' ' + give(t).join(' ') + ' ' + need(t).join(' ')).toLowerCase().includes(q)).slice(0, 14);
-    sres.innerHTML = hits.map(t => '<a class="ss-item" href="/component.html?id=' + encodeURIComponent(t.id) + '"><span class="ss-t">' + esc2(codelabTitle(t.title || t.id)) + '</span><span class="ss-g">' + esc2((t.group || '').split('/')[0].trim()) + ' · ' + esc2((t.lang || '').toUpperCase()) + '</span></a>').join('')
-      + '<a class="ss-item ss-all" href="/inventory.html?q=' + encodeURIComponent(sin.value.trim()) + '">показать все в Описи →</a>';
+    const seq = ++drawSeq;
+    sres.innerHTML = ''; let any = false;
+    const grp = name => { const d = document.createElement('div'); d.className = 'ss-grp'; d.textContent = name; sres.appendChild(d); };
+    const item = (href, title, tag) => { const a = document.createElement('a'); a.className = 'ss-item'; a.href = href; a.innerHTML = '<span class="ss-t">' + esc2(title) + '</span><span class="ss-g">' + esc2(tag) + '</span>'; sres.appendChild(a); any = true; };
+    // 1) разделы программы
+    const sects = PAGES.filter(p => (p.label + ' ' + (p.sect || '')).toLowerCase().includes(q)).slice(0, 5);
+    if(sects.length){ grp('Разделы'); sects.forEach(p => item(p.href, p.label, 'раздел')); }
+    // 2) куски
+    const list = await loadAll(); if(seq !== drawSeq) return;
+    const pieces = list.filter(t => ((t.title || '') + ' ' + (t.group || '') + ' ' + (t.lang || '') + ' ' + (t.desc || '') + ' ' + give(t).join(' ') + ' ' + need(t).join(' ')).toLowerCase().includes(q)).slice(0, 10);
+    if(pieces.length){ grp('Куски'); pieces.forEach(t => item('/component.html?id=' + encodeURIComponent(t.id), codelabTitle(t.title || t.id), (t.group || '').split('/')[0].trim() + ' · ' + (t.lang || '').toUpperCase())); }
+    // 3) словарь (+синонимы) — клик разворачивает пояснение прямо здесь, без перехода
+    const d = await loadDict(); if(seq !== drawSeq) return;
+    dictSearch(d, q).forEach((h, i) => { if(i === 0) grp('Словарь');
+      const row = document.createElement('div'); row.className = 'ss-item ss-dict'; row.innerHTML = '<span class="ss-t">' + esc2(h.term) + '</span><span class="ss-g">' + esc2(h.where) + '</span>';
+      const expl = document.createElement('div'); expl.className = 'ss-expl'; expl.style.display = 'none'; expl.textContent = h.text;
+      row.onclick = () => { expl.style.display = expl.style.display === 'none' ? '' : 'none'; };
+      sres.appendChild(row); sres.appendChild(expl); any = true;
+    });
+    // 4) рецепты и схемы
+    const rc = await fetch('/api/recipes/list').then(r => r.json()).catch(() => []); if(seq !== drawSeq) return;
+    const rh = (rc || []).filter(r => (r.name || r.title || '').toLowerCase().includes(q)).slice(0, 5);
+    if(rh.length){ grp('Рецепты'); rh.forEach(r => item('/recipes.html', r.name || r.title || r.id, 'рецепт')); }
+    const fl = await fetch('/api/flows/list').then(r => r.json()).catch(() => []); if(seq !== drawSeq) return;
+    const fh = (fl || []).filter(f => (f.name || '').toLowerCase().includes(q)).slice(0, 5);
+    if(fh.length){ grp('Схемы'); fh.forEach(f => item('/constructor.html', f.name || f.id, 'схема')); }
+    if(!any) sres.innerHTML = '<div class="ss-grp">ничего не нашлось</div>';
     sres.style.display = '';
   };
   sin.addEventListener('input', draw);
   sin.addEventListener('focus', () => { if(sin.value.trim()) draw(); });
   sin.addEventListener('keydown', e => {
     if(e.key === 'Escape'){ sin.value = ''; sres.style.display = 'none'; }
-    if(e.key === 'Enter'){ const first = sres.querySelector('.ss-item'); if(first) location.href = first.getAttribute('href'); }
+    if(e.key === 'Enter'){ const first = sres.querySelector('a.ss-item[href]'); if(first) location.href = first.getAttribute('href'); }
   });
   document.addEventListener('click', e => { if(!sbox.contains(e.target)) sres.style.display = 'none'; });
   let lastSect = null;
