@@ -99,7 +99,9 @@
   function jump(it){
     const f = activeFile(); if(!f) return;
     const ta = taFor(f.id), cm = ta && ta.__cm, len = (it.name || '').length || 1;
-    if(cm){ const from = cm.posFromIndex(it.off), to = cm.posFromIndex(it.off + len); cm.setSelection(from, to); cm.scrollIntoView({ from, to }, 80); cm.focus(); }
+    if(cm){ try { cm.refresh(); } catch(_){}   // пересчитать гуттер/разметку (иначе после прыжка текст налезает на номера)
+      const from = cm.posFromIndex(it.off), to = cm.posFromIndex(it.off + len); cm.setSelection(from, to); cm.scrollIntoView({ from, to }, 80); cm.focus();
+      setTimeout(() => { try { cm.refresh(); cm.scrollIntoView({ from, to }, 80); } catch(_){} }, 0); }
     else if(ta){ ta.focus(); try { ta.setSelectionRange(it.off, it.off + len); } catch(_){} }
   }
   function draw(){
