@@ -670,18 +670,28 @@ const DICT_SAMPLE = [
   'public: public — модификатор доступа: виден отовсюду (C++/Java).'
 ].join('\n');
 // разобрать строки «слово: пояснение» → [{word, text}]
+// разбить строку «слово РАЗДЕЛИТЕЛЬ пояснение». Терпим к формату, чтобы большие списки не теряли строки:
+// порядок разделителей — | , одиночное : (НЕ часть ::, иначе ломался std::cout), таб, « — »/« – », « = » (не ==/=>).
+function splitDictLine(line){
+  let k = line.indexOf('|'); if(k > 0) return [line.slice(0, k), line.slice(k + 1)];
+  for(let i = 1; i < line.length; i++){ if(line[i] === ':' && line[i - 1] !== ':' && line[i + 1] !== ':') return [line.slice(0, i), line.slice(i + 1)]; }  // одиночное двоеточие
+  k = line.indexOf('\t'); if(k > 0) return [line.slice(0, k), line.slice(k + 1)];
+  let m = line.match(/\s[—–]\s/); if(m) return [line.slice(0, m.index), line.slice(m.index + m[0].length)];   // тире с пробелами
+  m = line.match(/\s=\s/); if(m && line[m.index + 2] !== '=' && line[m.index + 2] !== '>') return [line.slice(0, m.index), line.slice(m.index + m[0].length)];  // « = », но не ==/=>
+  return null;
+}
 function parseDict(text){
-  const entries = [], errors = [];
+  const entries = [], errors = [], seen = new Set();
   String(text).split('\n').forEach((raw, i) => {
     const line = raw.trim(), ln = i + 1;
     if(!line || line.startsWith('#') || line.startsWith('//')) return;
-    // разделитель: первый из | : =  (чтобы двоеточия внутри пояснения не мешали — берём ПЕРВЫЙ)
-    let sep = -1, ch = '';
-    for(const c of ['|', ':', '=']){ const k = line.indexOf(c); if(k > 0 && (sep < 0 || k < sep)){ sep = k; ch = c; } }
-    if(sep < 0){ errors.push('строка ' + ln + ': нет разделителя (слово: пояснение) — «' + line + '»'); return; }
-    const word = line.slice(0, sep).trim(), expl = line.slice(sep + 1).trim();
+    const pair = splitDictLine(line);
+    if(!pair){ errors.push('строка ' + ln + ': нет разделителя (слово: пояснение) — «' + line + '»'); return; }
+    const word = pair[0].trim(), expl = pair[1].trim();
     if(!word || !expl){ errors.push('строка ' + ln + ': пусто слово или пояснение — «' + line + '»'); return; }
-    entries.push({ word, text: expl, ln });
+    const key = word.toLowerCase();
+    if(seen.has(key)) return;   // в самой вставке повтор — берём первый, молча (дедуп и так будет на сервере)
+    seen.add(key); entries.push({ word, text: expl, ln });
   });
   return { entries, errors };
 }
@@ -739,9 +749,12 @@ function openDictModal(){
     parsed = parseDict(q('#dc-text').value);
     const prev = q('#dc-prev'); prev.innerHTML = '';
     const line = (txt, cls) => { const d = el2('div', 'lp-row ' + (cls || '')); d.textContent = txt; return d; };
-    prev.appendChild(el2('div', 'lp-sec', 'слова (' + parsed.entries.length + ')'));
+    const hd = el2('div', 'lp-sec', 'разобрано слов: ' + parsed.entries.length + (parsed.errors.length ? '  ·  ⚠ НЕ разобрано: ' + parsed.errors.length + ' (ниже — поправь и вставь снова)' : ''));
+    if(parsed.errors.length) hd.style.color = '#ffb454';
+    prev.appendChild(hd);
     parsed.entries.slice(0, 200).forEach(e => prev.appendChild(line('✓ ' + e.word + '  →  ' + e.text.slice(0, 80), 'lp-ok')));
-    if(parsed.errors.length){ prev.appendChild(el2('div', 'lp-sec', 'не разобрано')); parsed.errors.forEach(x => prev.appendChild(line(x, 'lp-bad'))); }
+    if(parsed.entries.length > 200) prev.appendChild(line('…и ещё ' + (parsed.entries.length - 200) + ' (все добавятся, тут показаны первые 200)', 'muted'));
+    if(parsed.errors.length){ prev.appendChild(el2('div', 'lp-sec', '⚠ не разобрано (эти строки НЕ добавятся):')); parsed.errors.forEach(x => prev.appendChild(line(x, 'lp-bad'))); }
     q('#dc-apply').style.display = parsed.entries.length ? '' : 'none';
   };
   q('#dc-apply').onclick = async () => {
