@@ -108,11 +108,13 @@ const DICT_BASE = path.join(PUBLIC, 'keyword-dict.json');
 const DICT_DIR = path.join(PUBLIC, 'dict');
 const LANGS_DIR = path.join(DICT_DIR, 'langs');
 const EXAMPLES_FILE = path.join(DICT_DIR, 'examples.json');   // привязка «слово/конструкция → кусок-пример» {term:{id,title}}
+const SYN_FILE = path.join(DICT_DIR, 'synonyms.json');        // синонимы для поиска по смыслу: {term:[фраза,…]} — найти, не помня имени
 // алиасы языка → канон: чтобы «javascript»/«py»/«c++» не плодили файл-двойник рядом с js/python/cpp
 const LANG_ALIAS = { javascript: 'js', typescript: 'ts', py: 'python', python3: 'python', shell: 'bash', sh: 'bash', zsh: 'bash', 'c++': 'cpp', cplusplus: 'cpp', cxx: 'cpp', 'c#': 'csharp', 'c-sharp': 'csharp', cs: 'csharp', golang: 'go', rb: 'ruby', kt: 'kotlin', rs: 'rust', jsx: 'js', tsx: 'ts', htm: 'html', yml: 'yaml' };
 const canonLang = v => { v = String(v || '').trim().toLowerCase(); return LANG_ALIAS[v] || v.replace(/[^a-z0-9_+-]/g, '') || 'other'; };
 let _kwDict = null;
 async function loadExamples(){ try { const o = JSON.parse(await fs.readFile(EXAMPLES_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
+async function loadSynonyms(){ try { const o = JSON.parse(await fs.readFile(SYN_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
 async function loadLangDicts(){
   const out = {};
   let files = []; try { files = (await fs.readdir(LANGS_DIR)).filter(n => n.endsWith('.json')); } catch(_){ return out; }
@@ -131,6 +133,7 @@ async function kwDict(){
   const fromFiles = await loadLangDicts();
   for(const [lang, m] of Object.entries(fromFiles)){ base.langs[lang] = Object.assign({}, base.langs[lang] || {}, m); }
   base.examples = await loadExamples();   // привязки «термин → кусок-пример»
+  base.synonyms = await loadSynonyms();   // синонимы/фразы для поиска по смыслу
   _kwDict = base;
   return _kwDict;
 }
@@ -901,6 +904,29 @@ const server = http.createServer(async (req, res) => {
       for(const fn of langFiles){ const o = langData[fn]; if(!o) continue; let touched = false; for(const k of Object.keys(o)) if(!balanced(k)){ delete o[k]; touched = true; } if(touched){ const sorted = {}; for(const kk of Object.keys(o).sort()) sorted[kk] = o[kk]; await fs.writeFile(path.join(LANGS_DIR, fn), JSON.stringify(sorted, null, 2), 'utf8'); } }
       _kwDict = null;
       return json(res, 200, { ok: true, applied: true, removed });
+    }
+
+    // синонимы для поиска по смыслу: {entries:[[term, "фраза1, фраза2"], …]}. Объединяем с существующими,
+    // дедуп; пустой список синонимов у термина — снять термин. Хранится в dict/synonyms.json (уезжает с dict/).
+    if(u.pathname === '/api/dict/synonyms' && req.method === 'POST'){
+      const b = await readBody(req);
+      let pairs = [];
+      if(Array.isArray(b.entries)) pairs = b.entries.map(e => Array.isArray(e) ? [e[0], e[1]] : [e && e.term, e && e.syns]);
+      else if(b.entries && typeof b.entries === 'object') pairs = Object.entries(b.entries);
+      const syn = await loadSynonyms();
+      let terms = 0, added = 0;
+      for(let [term, list] of pairs){
+        term = String(term || '').trim().toLowerCase(); if(!term) continue;
+        const parts = String(list || '').split(/[,;\n]+/).map(s => s.trim().toLowerCase()).filter(Boolean);
+        if(!parts.length){ if(syn[term]){ delete syn[term]; terms++; } continue; }
+        const set = new Set(syn[term] || []); const before = set.size;
+        parts.forEach(p => set.add(p)); syn[term] = [...set].sort();
+        added += set.size - before; terms++;
+      }
+      const sorted = {}; for(const k of Object.keys(syn).sort()) sorted[k] = syn[k];
+      await fs.mkdir(DICT_DIR, { recursive: true });
+      await fs.writeFile(SYN_FILE, JSON.stringify(sorted, null, 2), 'utf8'); _kwDict = null;
+      return json(res, 200, { ok: true, terms, added, totalTerms: Object.keys(sorted).length });
     }
 
     // привязать к термину (слову/конструкции) кусок-пример: {term, piece: название|id|''(снять)}

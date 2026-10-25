@@ -129,7 +129,18 @@
     const scan = (obj, where) => { if(!obj) return; for(const [k, v] of Object.entries(obj)){ if(typeof v !== 'string') continue; if(k.toLowerCase().includes(lq) || v.toLowerCase().includes(lq)){ const key = where + '|' + k; if(seen.has(key)) continue; seen.add(key); out.push({ term: k, text: v, where }); } } };
     scan(dictData.words, 'слово'); ['htmlTags','htmlAttrs','cssProps','cssVals'].forEach(s => scan(dictData[s], s));
     if(dictData.langs) for(const l of Object.keys(dictData.langs)) scan(dictData.langs[l], l);
-    return out.slice(0, 60); }
+    // синонимы/фразы: найти термин по смыслу, даже если не помнишь имя
+    if(dictData.synonyms){
+      const explOf = t => { const lt = t.toLowerCase(); if(dictData.words && dictData.words[lt]) return dictData.words[lt]; for(const s of ['htmlTags','htmlAttrs','cssProps','cssVals']) if(dictData[s] && dictData[s][lt]) return dictData[s][lt]; if(dictData.langs) for(const l of Object.keys(dictData.langs)) if(dictData.langs[l][lt]) return dictData.langs[l][lt]; return ''; };
+      for(const [term, syns] of Object.entries(dictData.synonyms)){
+        if(!Array.isArray(syns)) continue;
+        const hit = syns.find(s => String(s).toLowerCase().includes(lq)) || (term.toLowerCase().includes(lq) ? term : null);
+        if(!hit) continue;
+        const key = 'синоним|' + term; if(seen.has(key)) continue; seen.add(key);
+        out.push({ term, text: (explOf(term) || '(нет пояснения)') + '  ← ' + hit, where: 'синоним' });
+      }
+    }
+    return out.slice(0, 80); }
 
   // ── отрисовка результатов ──
   function render(query){

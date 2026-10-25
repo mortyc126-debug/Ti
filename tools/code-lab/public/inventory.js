@@ -899,3 +899,57 @@ function openDictViewModal(){
   fetch('/keyword-dict.json', { cache: 'no-store' }).then(r => r.json()).then(d => { dict = d; render(); }).catch(() => { q('#dv-body').textContent = 'не удалось загрузить словарь'; });
 }
 document.getElementById('pdictview').onclick = openDictViewModal;
+
+// ── окно: синонимы для поиска по смыслу (найти термин, не помня имени) ───────────
+function openSynModal(){
+  const bg = el2('div', 'modal-bg');
+  const box = el2('div', 'modal');
+  box.innerHTML = '<h3>Синонимы для поиска</h3>'
+    + '<p class="mh">Чтобы находить термин по смыслу, когда не помнишь имя. Строка: <b>термин: синоним, фраза, ещё…</b> (синонимы через запятую). Пример: <code>console.log: вывод в консоль, печать, показать в консоли</code> или <code>.map: перебор массива, преобразовать каждый элемент</code>. Эти фразы ищет единый поиск в песочнице (фильтр «словарь») и находит нужный термин.</p>'
+    + '<div class="fmt">console.log: вывод в консоль, печать&#10;.map: перебор массива, преобразовать каждый&#10;try/catch: поймать ошибку, обработка исключений&#10;padding: внутренний отступ, поля внутри</div>'
+    + '<textarea id="sy-text" placeholder="термин: синоним, фраза, ещё синоним" style="min-height:140px"></textarea>'
+    + '<div class="mbtns"><button class="btn" id="sy-sample">пример</button><button class="btn ok" id="sy-parse">разобрать</button><button class="btn" id="sy-apply" style="display:none">добавить</button><button class="btn" id="sy-view">показать текущие</button><button class="btn" id="sy-close">закрыть</button></div>'
+    + '<div class="lp-prev" id="sy-prev"></div>';
+  bg.appendChild(box); document.body.appendChild(bg);
+  const q = s => bg.querySelector(s);
+  bg.onclick = e => { if(e.target === bg) bg.remove(); };
+  q('#sy-close').onclick = () => bg.remove();
+  q('#sy-sample').onclick = () => { q('#sy-text').value = 'console.log: вывод в консоль, печать\n.map: перебор массива, преобразовать каждый\ntry/catch: поймать ошибку, обработка исключений'; };
+  // парсер: «термин: синонимы» (тот же splitDictLine, что и у словаря)
+  let parsed = null;
+  q('#sy-parse').onclick = () => {
+    const entries = [], errors = []; const seen = new Set();
+    String(q('#sy-text').value).split('\n').forEach((raw, i) => {
+      const line = raw.trim(); if(!line || line.startsWith('#') || line.startsWith('//')) return;
+      const pair = splitDictLine(line);
+      if(!pair){ errors.push('строка ' + (i + 1) + ': нет разделителя (термин: синонимы) — «' + line + '»'); return; }
+      const term = pair[0].trim().toLowerCase(), rest = pair[1].trim();
+      if(!term || !rest){ errors.push('строка ' + (i + 1) + ': пусто'); return; }
+      if(seen.has(term)) return; seen.add(term);
+      entries.push([term, rest]);
+    });
+    parsed = { entries, errors };
+    const prev = q('#sy-prev'); prev.innerHTML = '';
+    const hd = el2('div', 'lp-sec', 'терминов: ' + entries.length + (errors.length ? '  ·  ⚠ не разобрано: ' + errors.length : '')); if(errors.length) hd.style.color = '#ffb454'; prev.appendChild(hd);
+    entries.slice(0, 200).forEach(([t, r]) => { const d = el2('div', 'lp-row lp-ok'); d.textContent = '✓ ' + t + '  →  ' + r; prev.appendChild(d); });
+    errors.forEach(x => prev.appendChild(el2('div', 'lp-row lp-bad', x)));
+    q('#sy-apply').style.display = entries.length ? '' : 'none';
+  };
+  q('#sy-apply').onclick = async () => {
+    if(!parsed || !parsed.entries.length) return;
+    q('#sy-apply').textContent = 'добавляю…'; q('#sy-apply').disabled = true;
+    const r = await fetch('/api/dict/synonyms', { method: 'POST', body: JSON.stringify({ entries: parsed.entries }) }).then(x => x.json()).catch(() => ({}));
+    q('#sy-prev').innerHTML = '<div class="lp-row ' + (r && r.ok ? 'lp-ok' : 'lp-bad') + '">' + (r && r.ok ? ('Готово: терминов затронуто ' + r.terms + ', новых синонимов ' + r.added + ' (всего терминов с синонимами ' + r.totalTerms + '). Не забудь синхронизацию. Обнови песочницу (Ctrl+F5).') : 'Ошибка сохранения') + '</div>';
+    q('#sy-apply').style.display = 'none'; q('#sy-apply').textContent = 'добавить'; q('#sy-apply').disabled = false;
+  };
+  q('#sy-view').onclick = async () => {
+    const prev = q('#sy-prev'); prev.innerHTML = 'загрузка…';
+    const d = await fetch('/keyword-dict.json', { cache: 'no-store' }).then(x => x.json()).catch(() => null);
+    prev.innerHTML = '';
+    const syn = (d && d.synonyms) || {}; const keys = Object.keys(syn).sort();
+    prev.appendChild(el2('div', 'lp-sec', 'Текущие синонимы: ' + keys.length + ' терминов'));
+    if(!keys.length){ prev.appendChild(el2('div', 'lp-row muted', 'пока пусто')); return; }
+    keys.forEach(t => { const d2 = el2('div', 'lp-row'); const b = document.createElement('b'); b.textContent = t; b.style.color = 'var(--name,#cbc2ea)'; d2.appendChild(b); d2.appendChild(document.createTextNode(' — ' + (syn[t] || []).join(', '))); prev.appendChild(d2); });
+  };
+}
+document.getElementById('pdictsyn').onclick = openSynModal;
