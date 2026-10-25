@@ -502,6 +502,14 @@ async function openFlowModal(){
   };
   reload();
 }
+// открыть проект по ссылке ?flow=id (с Главной — «последние проекты»)
+(async function(){
+  const m = location.search.match(/[?&]flow=([^&]+)/); if(!m) return;
+  const id = decodeURIComponent(m[1]);
+  try { const full = await fetch('/api/flows/get?id=' + encodeURIComponent(id)).then(r => r.json());
+    if(full && full.graph){ graph = { nodes: full.graph.nodes || [], edges: full.graph.edges || [] }; selectedId = null; multi.clear(); renderCanvas(); renderInspector(); renderCode(); persist(); showEdgeMessage('Проект «' + (full.name || id) + '» открыт.', 'ok'); }
+  } catch(_){}
+})();
 // «свести описания» — авто-сведение по дате, массово по всем узлам из каталога
 (function(){ const btn = $('#reconcile'); if(!btn) return; btn.onclick = async () => {
   btn.disabled = true; const o = btn.textContent; btn.textContent = 'свожу…';

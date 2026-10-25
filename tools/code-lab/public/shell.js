@@ -11,7 +11,7 @@
     { key:'library',     label:'Библиотека',   href:'/library.html',    sect:'Кусочки кода' },
     { key:'constructor', label:'Конструктор',  href:'/constructor.html',sect:'Собирать' },
     { key:'recipes',     label:'Рецепты',      href:'/recipes.html',    sect:'Собирать' },
-    { key:'data',        label:'Данные (загрузка)', href:'/schema-json.html', sect:'Данные' },
+    { key:'data',        label:'Куски кода', href:'/schema-json.html', sect:'Данные' },
   ];
   const cur = document.body.dataset.page || '';
 
