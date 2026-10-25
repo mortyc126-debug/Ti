@@ -289,7 +289,8 @@ function setZoom(z){
 const byId = id => graph.nodes.find(n => n.id === id);
 function nodeLabel(nd){ const b = BLOCKS[nd.blockId]; return nd.title || (b.labelFn ? b.labelFn(nd.fields) : b.label); }
 function nodeCode(nd){ const b = BLOCKS[nd.blockId]; const c = b.code(nd.fields); return b.type === 'container' ? (c.open + '\n' + c.close) : String(c); }
-function nodePreview(nd){ const l = nodeCode(nd).split('\n')[0] || ''; return l.length > 36 ? l.slice(0, 36) + '…' : l; }
+// превью кода в узле: несколько первых НЕпустых строк (а не одна обрезанная) — иначе узел пуст/сплющен
+function nodePreview(nd){ const lines = nodeCode(nd).split('\n'); while(lines.length && !lines[0].trim()) lines.shift(); while(lines.length && !lines[lines.length - 1].trim()) lines.pop(); return lines.slice(0, 7).join('\n'); }
 function kindClass(nd){ const b = BLOCKS[nd.blockId]; return b.type === 'draw' ? 'draw' : b.type === 'container' ? 'container' : 'leaf'; }
 
 // ── таксономия как в каталоге: назначение → подкатегория ─────────────────────
@@ -587,7 +588,10 @@ function nodeEl(nd){
   const del = document.createElement('button'); del.className = 'gnode-del'; del.textContent = '×'; del.title = 'удалить';
   del.onclick = e => { e.stopPropagation(); removeNode(nd.id); };
   head.append(title, del);
-  const prev = document.createElement('div'); prev.className = 'gnode-prev'; prev.textContent = nodePreview(nd);
+  const prev = document.createElement('div'); prev.className = 'gnode-prev';
+  const code = nodePreview(nd);
+  if(code.trim()) buildHighlight(code).forEach(l => prev.appendChild(l));   // подсветка, несколько строк
+  else { prev.textContent = '(пусто)'; prev.classList.add('empty'); }
   el.append(pin, head, prev, pout);
   headDrag(head, el, nd);
   portConnect(pout, nd);
@@ -764,11 +768,12 @@ function updateCard(nd){
 function renderInspector(nd){
   const host = $('#inspector'); if(!host) return;
   nd = nd || (selectedId ? byId(selectedId) : null);
-  if(!nd){ host.innerHTML = '<div class="insp-body"><div class="insp-empty">Выбери узел на холсте — здесь его поля (Настроить), подсказка (Разобраться) и объяснение с кодом (Объяснить).<br><br>Пусто? Слева выбери компонент.</div></div>'; return; }
+  if(!nd){ host.innerHTML = '<div class="insp-body"><div class="insp-empty">Выбери узел на холсте — сверху его код, под ним описание. Настройки и разбор — в свёрнутых разделах.<br><br>Пусто? Слева выбери компонент.</div></div>'; return; }
   const b = BLOCKS[nd.blockId];
+  if(inspTab === 'why') inspTab = 'learn';   // было 3 вкладки, стало 2 — переносим старое состояние
   host.innerHTML = '';
   const head = document.createElement('div'); head.className = 'insp-head';
-  [['set','Настроить'],['learn','Разобраться'],['why','Объяснить']].forEach(([k, lbl]) => {
+  [['set','Код'],['learn','Пояснение']].forEach(([k, lbl]) => {
     const btn = document.createElement('button'); btn.textContent = lbl; if(k === inspTab) btn.classList.add('on');
     btn.onclick = () => { inspTab = k; renderInspector(nd); };
     head.appendChild(btn);
@@ -777,26 +782,26 @@ function renderInspector(nd){
   const body = document.createElement('div'); body.className = 'insp-body';
   const titleEl = el('div', 'insp-title', nodeLabel(nd)); body.appendChild(titleEl);
   body.appendChild(el('div', 'insp-kind', b.type === 'draw' ? 'рисование' : 'компонент'));
-  body.appendChild(renderBlockContract(nd, b));
-  const save = el('button', 'insp-save', '💾 сохранить в каталог'); save.title = 'добавить этот кусок в каталог как компонент'; save.onclick = () => saveToCatalog(nd); body.appendChild(save);
-  // скачать этот кусок файлом в его родном формате (css→.css, py→.py, …)
-  const dlf = el('button', 'insp-save', '⬇ скачать файл'); const lx = nodeLang(nd); dlf.title = 'сохранить код этого куска как .' + (LANG_EXT[lx] || 'txt');
-  dlf.onclick = () => { const ext = LANG_EXT[lx] || 'txt'; const nm = (nodeLabel(nd) || 'кусок').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 60) + '.' + ext; download(nm, nodeCode(nd), MIME[ext] || 'text/plain'); };
-  body.appendChild(dlf);
-  // кусок — целый файл? предложить разложить на блоки (разметка/стили/скрипт, JS по шагам)
-  if(nd.blockId === 'raw'){
-    const parts = breakdownText(String((nd.fields || {}).code || ''), 'auto').parts;
-    if(parts.length > 1){
-      const split = el('button', 'insp-save', '🧩 разложить на блоки (' + parts.length + ')');
-      split.style.color = '#3DD9FF'; split.style.borderColor = 'rgba(61,217,255,.45)';
-      split.title = 'разбить этот целый файл на отдельные блоки и соединить их';
-      split.onclick = () => explodeNode(nd);
-      body.appendChild(split);
-    }
+  // компактный ряд действий иконками вместо крупных кнопок, которые громоздили панель
+  const acts = el('div', 'insp-acts');
+  const mkAct = (txt, title, fn, color) => { const x = el('button', 'insp-act', txt); x.title = title; if(color) x.style.color = color; x.onclick = fn; return x; };
+  acts.appendChild(mkAct('💾 в каталог', 'сохранить этот кусок в каталог', () => saveToCatalog(nd)));
+  const lx = nodeLang(nd);
+  acts.appendChild(mkAct('⬇ файл', 'скачать код как .' + (LANG_EXT[lx] || 'txt'), () => { const ext = LANG_EXT[lx] || 'txt'; const nm = (nodeLabel(nd) || 'кусок').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 60) + '.' + ext; download(nm, nodeCode(nd), MIME[ext] || 'text/plain'); }));
+  if(nd.blockId === 'raw'){ const parts = breakdownText(String((nd.fields || {}).code || ''), 'auto').parts; if(parts.length > 1) acts.appendChild(mkAct('🧩 разложить (' + parts.length + ')', 'разбить этот файл на отдельные блоки', () => explodeNode(nd), '#3DD9FF')); }
+  body.appendChild(acts);
+  if(inspTab === 'set'){
+    body.appendChild(nodeMetaEditor(nd, titleEl));
+    body.appendChild(inspFields(nd, b));                  // код (у «своего кода» — сразу открыт и первым) + поля
+    const det = document.createElement('details'); det.style.marginTop = '10px';
+    const sum = document.createElement('summary'); sum.textContent = '🔗 связи и контракт'; sum.style.cssText = 'cursor:pointer;color:var(--text3);font-size:12px;margin-bottom:6px';
+    det.appendChild(sum); det.appendChild(renderBlockContract(nd, b)); body.appendChild(det);
+  } else {
+    body.appendChild(descEditor(nd, b));                  // описание своими словами
+    const det = document.createElement('details'); det.style.marginTop = '10px';
+    const sum = document.createElement('summary'); sum.textContent = '🔍 почему это работает'; sum.style.cssText = 'cursor:pointer;color:var(--text3);font-size:12px;margin-bottom:6px';
+    det.appendChild(sum); det.appendChild(inspWhy(nd, b)); body.appendChild(det);
   }
-  if(inspTab === 'set'){ body.appendChild(nodeMetaEditor(nd, titleEl)); body.appendChild(inspFields(nd, b)); }
-  else if(inspTab === 'learn') body.appendChild(descEditor(nd, b));
-  else body.appendChild(inspWhy(nd, b));
   host.appendChild(body);
 }
 
@@ -961,12 +966,25 @@ const RAW_STD_KEYS = new Set(('type name id value key class style src href metho
 function rawInspFields(nd){
   const box = document.createElement('div');
   const decls = rawDecls(nd.fields.code);
+  // держим код в синхроне, когда правим через поля формы
+  let codeTa = null; const syncRawCode = () => { if(codeTa && codeTa.value !== nd.fields.code) codeTa.value = nd.fields.code; };
+  // 1) КОД — первым и сразу открыт (именно он должен быть виден прежде всего)
+  const bar = el('div', 'insp-codebar');
+  const cp = el('button', 'btn insp-copy', '⧉ копировать весь код');
+  cp.onclick = e => { e.preventDefault(); e.stopPropagation(); copyToClip(nd.fields.code || '', cp); };
+  bar.appendChild(cp); box.appendChild(bar);
+  const ta = document.createElement('textarea'); ta.className = 'blk-code'; ta.spellcheck = false; ta.value = nd.fields.code; codeTa = ta;
+  ta.rows = Math.min(18, String(nd.fields.code).split('\n').length + 1);
+  ta.addEventListener('input', () => { nd.fields.code = ta.value; updateCard(nd); renderCode(); persist(); });
+  box.appendChild(attachHighlight(ta));
+  // 2) правка по полям — под кодом, в свёрнутом разделе (код остаётся главным)
   if(decls.length){
-    const note = el('div', 'insp-kind', 'что можно поменять'); note.style.marginBottom = '6px'; box.appendChild(note);
+    const det = document.createElement('details'); det.style.marginTop = '10px';
+    const sum = document.createElement('summary'); sum.style.cssText = 'cursor:pointer;color:var(--text3);font-size:12px;margin-bottom:6px'; sum.textContent = '✎ править по полям (' + decls.length + ')';
+    det.appendChild(sum);
     decls.forEach(d => {
       const fields = rawObjFields(d.value);
       if(fields.length){
-        // объект-значение: заголовок-имя + поле ввода на каждый ключ (развилки)
         const grp = el('div', 'insp-field'); grp.style.flexDirection = 'column'; grp.style.alignItems = 'stretch';
         const head = el('label', '', d.name + '  (объект: ' + fields.length + ' пол.)'); head.style.fontWeight = '600'; grp.appendChild(head);
         fields.forEach(f => {
@@ -977,32 +995,16 @@ function rawInspFields(nd){
           inp.addEventListener('input', () => { setFieldValue(nd, d.name, f.key, inp.value); updateCard(nd); renderCode(); persist(); syncRawCode(); });
           row.appendChild(inp); grp.appendChild(row);
         });
-        box.appendChild(grp);
+        det.appendChild(grp);
       } else {
-        // простое значение: одно поле на всю правую часть
         const row = el('div', 'insp-field'); row.appendChild(el('label', '', d.name));
         const inp = document.createElement('input'); inp.value = d.value; inp.spellcheck = false;
         inp.addEventListener('input', () => { setDeclValue(nd, d.name, inp.value); updateCard(nd); renderCode(); persist(); syncRawCode(); });
-        row.appendChild(inp); box.appendChild(row);
+        row.appendChild(inp); det.appendChild(row);
       }
     });
-  } else {
-    box.appendChild(el('div', 'insp-text', 'Готовых полей тут нет — весь код ниже можно править целиком.'));
+    box.appendChild(det);
   }
-  // держим «весь код» в синхроне, когда правим через поля формы
-  let codeTa = null; const syncRawCode = () => { if(codeTa && codeTa.value !== nd.fields.code) codeTa.value = nd.fields.code; };
-  // весь код — в раскрывашке (или сразу, если полей нет)
-  const det = document.createElement('details'); det.style.marginTop = '8px'; if(!decls.length) det.open = true;
-  const sum = document.createElement('summary'); sum.style.cssText = 'cursor:pointer;color:var(--text3);font-size:12px;margin-bottom:6px;display:flex;align-items:center;gap:8px';
-  sum.appendChild(el('span', '', 'весь код'));
-  const cp = el('button', 'btn insp-copy', '⧉ копировать весь код'); cp.style.marginLeft = 'auto';
-  cp.onclick = e => { e.preventDefault(); e.stopPropagation(); copyToClip(nd.fields.code || '', cp); };
-  sum.appendChild(cp); det.appendChild(sum);
-  const ta = document.createElement('textarea'); ta.className = 'blk-code'; ta.spellcheck = false; ta.value = nd.fields.code; codeTa = ta;
-  ta.rows = Math.min(18, String(nd.fields.code).split('\n').length + 1);
-  ta.addEventListener('input', () => { nd.fields.code = ta.value; updateCard(nd); renderCode(); persist(); });
-  det.appendChild(attachHighlight(ta));
-  box.appendChild(det);
   return box;
 }
 

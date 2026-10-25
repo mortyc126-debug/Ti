@@ -91,7 +91,10 @@
   .gnode-title{flex:1;font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .gnode-del{background:none;border:0;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px}
   .gnode-del:hover{color:#FF6B6B}
-  .gnode-prev{font-family:ui-monospace,monospace;font-size:11px;color:var(--text3);padding:7px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .gnode-prev{font-family:ui-monospace,monospace;font-size:10.5px;line-height:1.5;color:var(--text2);padding:7px 10px;max-height:122px;overflow:hidden;position:relative}
+  .gnode-prev .line{white-space:pre;overflow:hidden;text-overflow:ellipsis}
+  .gnode-prev.empty{color:var(--text3);font-style:italic}
+  .gnode-prev::after{content:"";position:absolute;left:0;right:0;bottom:0;height:16px;background:linear-gradient(transparent,var(--bg2));pointer-events:none}
   .port{position:absolute;width:13px;height:13px;border-radius:50%;background:var(--s2);border:2px solid #6a5a8a;left:50%;transform:translateX(-50%);cursor:crosshair;z-index:2}
   .port:hover{border-color:var(--acc);background:var(--acc)}
   .port.in{top:-7px} .port.out{bottom:-7px}
@@ -210,6 +213,9 @@
   .insp-desc:focus{outline:none;border-color:var(--name)}
   .insp-save{font:12px/1 ui-monospace,monospace;color:var(--str);background:var(--s2);border:1px dashed rgba(82,242,201,.45);border-radius:7px;padding:8px 11px;cursor:pointer;margin:2px 0 12px}
   .insp-save:hover{border-color:var(--str)}
+  .insp-acts{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+  .insp-act{font:11.5px/1 ui-monospace,monospace;color:var(--text2);background:var(--s2);border:1px solid var(--border);border-radius:7px;padding:6px 9px;cursor:pointer}
+  .insp-act:hover{color:var(--text);border-color:var(--name)}
   /* панель «вставить код» */
   .paste-panel{background:var(--bg2);border:1px solid rgba(82,242,201,.4);border-radius:11px;padding:12px 13px;margin-bottom:10px}
   .paste-panel .pp-head{font-size:12px;color:var(--text3);line-height:1.5;margin-bottom:8px}
