@@ -18,13 +18,13 @@
 
   const st = document.createElement('style');
   st.textContent = `
-  .dg{position:fixed;z-index:9998;right:16px;bottom:16px;width:360px;max-height:72vh;display:none;flex-direction:column;
+  .dg{position:fixed;z-index:9998;right:16px;bottom:16px;width:360px;height:min(74vh,580px);display:none;flex-direction:column;
     background:var(--bg2,#150a2b);border:1px solid var(--border,#3a2f55);border-radius:12px;box-shadow:0 10px 32px rgba(0,0,0,.5);overflow:hidden}
   .dg.on{display:flex}
   .dg .dh{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border,#3a2f55);font-size:12.5px}
   .dg .dh b{flex:1}
   .dg .dh button{background:none;border:0;color:var(--text2,#cbc2ea);cursor:pointer;font-size:14px;padding:2px 5px;border-radius:5px}
-  .dg .db{padding:9px 10px;overflow:auto}
+  .dg .db{padding:9px 10px;overflow:auto;flex:1;min-height:0}
   .dg textarea{width:100%;box-sizing:border-box;background:var(--bg,#0e0720);color:var(--text,#eee);border:1px solid var(--border,#3a2f55);border-radius:8px;padding:7px 9px;font:13px system-ui,sans-serif;min-height:48px;resize:vertical}
   .dg .row{display:flex;gap:6px;margin:7px 0}
   .dg .grp{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#9a93b5);margin:9px 0 3px}
