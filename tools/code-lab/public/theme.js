@@ -23,7 +23,7 @@
   // ── применение темы ──
   // все панели-поверхности, которые должны одинаково «матироваться» при фоне-картинке (иначе «то прозрачно, то нет»):
   // оболочка/каталог + песочница (редактор, попапы, поиск, структура, окно ИИ) + конструктор (инспектор, холст, узлы) + модалки.
-  var BLUR_SEL = '.side,.palette,.g-insp,.canvas-scroll,.modal,.th-box,.sb-ed,.sb-pop,.sb-find,.sb-find-note,.sb-outline,.ai-ask,.gnode,.sb-pop-b,.modal-bg .modal';
+  var BLUR_SEL = '.side,.palette,.g-insp,.canvas-scroll,.modal,.th-box,.sb-ed,.sb-pop,.sb-find,.sb-find-note,.sb-outline,.ai-ask,.gnode,.sb-pop-b,.modal-bg .modal,.sb-bar,.c-toolbar,.tb-pop,.ac-pop,.sim-panel,.note-pop,.nav-pop,.btn,.lp-prev,.inv-card,.tpl,header,nav';
   var sty = document.createElement('style'); sty.id = 'th-style'; document.head.appendChild(sty);
   var IC = {};
   function bgImg(id){ if(!(id in IC)){ try { IC[id] = localStorage.getItem(KEY + '_img_' + id) || ''; } catch(e){ IC[id] = ''; } } return IC[id]; }
