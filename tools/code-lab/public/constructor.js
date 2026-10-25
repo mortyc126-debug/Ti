@@ -502,6 +502,55 @@ async function openFlowModal(){
   };
   reload();
 }
+// ── большие шаблоны (рецепты) → развернуть на холст связанными блоками ──
+function pieceTitleCat(id){ const p = (CATALOG || []).find(x => x.id === id); return p ? (p.title || id) : id; }
+async function unpackRecipe(id, name){
+  const r = await fetch('/api/recipes/get?id=' + encodeURIComponent(id)).then(x => x.json()).catch(() => null);
+  if(!r || !Array.isArray(r.items) || !r.items.length){ showEdgeMessage('Пустой шаблон — нечего разворачивать.', 'warn'); return; }
+  histFlush();
+  const base = spawnPos(); let y = base.y; const added = [];
+  for(const it of r.items){
+    try {
+      const tpl = await fetch('/api/template?id=' + encodeURIComponent(it.id)).then(x => x.json());
+      const code = (tpl.lines || []).map(line => (line || []).map(k => k.v != null ? k.v : '').join('')).join('\n');
+      const comp = tpl.component || {};
+      const contract = { provides: Array.isArray(comp.provides) ? comp.provides : [], requires: Array.isArray(comp.requires) ? comp.requires : [] };
+      const nd = makeNode('raw', { x: base.x, y, fields: { code }, title: it.title || tpl.title || pieceTitleCat(it.id), desc: (it.note || tpl.desc || ''), descAt: tpl.descAt || 0, src: { id: it.id, title: it.title || tpl.title, desc: tpl.desc || '', code, lang: tpl.lang || 'js', contract } });
+      graph.nodes.push(nd); added.push(nd); y += 180;
+    } catch(_){}
+  }
+  added.forEach(nd => { try { autoConnect(nd); } catch(_){} });   // связать блоки по контрактам (даёт/берёт)
+  renderCanvas(); persist(); renderCode();
+  showEdgeMessage('Большой шаблон «' + (name || r.title || '') + '» развёрнут: ' + added.length + ' блоков.', 'ok');
+}
+async function openBigTplModal(){
+  const bg = el('div', 'modal-bg'); bg.innerHTML =
+    '<div class="modal" style="max-width:620px"><h3>Большой шаблон на холст</h3>'
+    + '<p class="mh">Большой шаблон — целая штука из нескольких кусков. Разворачивается на холсте в связанные блоки по смыслу; внутри — обычные куски. Собрать/править шаблоны пока в разделе «Рецепты».</p>'
+    + '<input class="pal-search" id="bt-q" placeholder="поиск шаблона…" style="width:100%;box-sizing:border-box;margin-bottom:8px">'
+    + '<div id="bt-list" class="fl-list"><div class="muted">загрузка…</div></div>'
+    + '<div class="mbtns" style="margin-top:14px"><button class="btn" id="bt-close">Закрыть</button></div></div>';
+  document.body.appendChild(bg);
+  const q = s => bg.querySelector(s);
+  bg.onclick = e => { if(e.target === bg) bg.remove(); };
+  q('#bt-close').onclick = () => bg.remove();
+  const all = await fetch('/api/recipes/list').then(r => r.json()).catch(() => []);
+  const draw = () => {
+    const needle = (q('#bt-q').value || '').toLowerCase();
+    const list = (all || []).filter(r => !needle || (r.title + ' ' + (r.desc || '')).toLowerCase().includes(needle));
+    const box = q('#bt-list'); box.innerHTML = '';
+    if(!list.length){ box.innerHTML = '<div class="muted">нет больших шаблонов. Собери рецепт в разделе «Рецепты» — и он появится тут.</div>'; return; }
+    list.forEach(r => {
+      const row = el('div', 'fl-row'); row.innerHTML = '<span class="fl-n"></span><span class="fl-meta">' + (r.items || 0) + ' кусок(ов)</span>';
+      row.querySelector('.fl-n').textContent = r.title;
+      const go = el('button', 'btn ok', '📋 развернуть'); go.onclick = () => { bg.remove(); unpackRecipe(r.id, r.title); };
+      const acts = el('div', 'fl-acts'); acts.append(go); row.appendChild(acts); box.appendChild(row);
+    });
+  };
+  q('#bt-q').oninput = draw; draw();
+}
+(function(){ const b = $('#bigtpl'); if(b) b.onclick = openBigTplModal; })();
+
 // открыть проект по ссылке ?flow=id (с Главной — «последние проекты»)
 (async function(){
   const m = location.search.match(/[?&]flow=([^&]+)/); if(!m) return;
