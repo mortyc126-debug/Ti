@@ -36,7 +36,7 @@
       "text": "for",
       "kind": "kw",
       "note": "for — цикл: повторять блок заданное число раз.",
-      "source": "dict"
+      "source": "custom"
     },
     {
       "line": 0,
@@ -44,6 +44,30 @@
       "text": "let",
       "kind": "kw",
       "note": "let — объявляет переменную, значение которой можно менять позже.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "number",
+      "kind": "name",
+      "note": "Number — превращает значение в число",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 21,
+      "text": "number",
+      "kind": "name",
+      "note": "Number — превращает значение в число",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 34,
+      "text": "number",
+      "kind": "name",
+      "note": "Number — превращает значение в число",
       "source": "dict"
     },
     {
@@ -55,12 +79,20 @@
       "source": "dict"
     },
     {
+      "line": 1,
+      "col": 6,
+      "text": "number",
+      "kind": "name",
+      "note": "Number — превращает значение в число",
+      "source": "dict"
+    },
+    {
       "line": 2,
       "col": 4,
       "text": "continue",
       "kind": "kw",
       "note": "continue — перейти к следующей итерации цикла.",
-      "source": "dict"
+      "source": "custom"
     },
     {
       "line": 4,
@@ -71,12 +103,20 @@
       "source": "dict"
     },
     {
+      "line": 4,
+      "col": 6,
+      "text": "number",
+      "kind": "name",
+      "note": "Number — превращает значение в число",
+      "source": "dict"
+    },
+    {
       "line": 5,
       "col": 4,
       "text": "break",
       "kind": "kw",
       "note": "break — выйти из цикла или switch досрочно.",
-      "source": "dict"
+      "source": "custom"
     },
     {
       "line": 7,
@@ -92,6 +132,14 @@
       "text": "log",
       "kind": "fn",
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 14,
+      "text": "number",
+      "kind": "name",
+      "note": "Number — превращает значение в число",
       "source": "dict"
     }
   ],
@@ -171,7 +219,8 @@
       "number"
     ],
     "requires": [],
-    "subcat": "Синтаксис"
+    "subcat": "Синтаксис",
+    "contractLocked": true
   },
   "legacy": {
     "template": "break-и-continue-mv6cut6g.json"

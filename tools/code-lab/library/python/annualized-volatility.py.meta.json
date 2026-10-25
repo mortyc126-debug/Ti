@@ -25,5 +25,139 @@
     "aliases": "manual"
   },
   "status": "described",
-  "enriched": true
+  "enriched": true,
+  "component": {
+    "provides": [],
+    "contractLocked": true
+  },
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "math",
+      "kind": "name",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 3,
+      "text": "len",
+      "kind": "fn",
+      "note": "len — длина (Python): элементов в списке, символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 11,
+      "text": "math",
+      "kind": "name",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 25,
+      "text": "r",
+      "kind": "name",
+      "note": "r — радиус круга",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 28,
+      "text": "for",
+      "kind": "kw",
+      "note": "цикл с инициализацией, условием и шагом",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 32,
+      "text": "r",
+      "kind": "name",
+      "note": "r — радиус круга",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 34,
+      "text": "in",
+      "kind": "kw",
+      "note": "проверить наличие свойства в объекте или его цепочке прототипов",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 27,
+      "text": "stdev",
+      "kind": "fn",
+      "note": "stdev — стандартное отклонение выборки, чем оно больше, тем рискованнее",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 26,
+      "text": "math",
+      "kind": "name",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 0,
+      "text": "print",
+      "kind": "fn",
+      "note": "print — напечатать значение (Python: вывод в консоль).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 6,
+      "text": "round",
+      "kind": "fn",
+      "note": "Math.round — округлить до ближайшего целого.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 31,
+      "text": "round",
+      "kind": "fn",
+      "note": "Math.round — округлить до ближайшего целого.",
+      "source": "dict"
+    }
+  ]
 }
