@@ -31,6 +31,7 @@
   .pal-item .pi-h{font-size:10.5px;color:var(--text3);margin-top:1px;line-height:1.35}
   .pal-btn{display:block;width:100%;text-align:left;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--str);font-size:12.5px;padding:8px 10px;cursor:pointer;margin-top:6px}
   .pal-btn:hover{border-color:rgba(82,242,201,.5)}
+  .pal-btn.on{background:var(--acc);color:#06231c;border-color:var(--acc)}
   /* сворачиваемая иерархия назначений — с воздухом и разделителями */
   .pal-d{margin-bottom:8px;border:1px solid transparent;border-radius:10px}
   .pal-d[open]{border-color:var(--border);background:rgba(124,108,160,.05);padding-bottom:8px}
@@ -307,6 +308,7 @@
         <input class="pal-search" id="palSearch" placeholder="поиск компонента…">
         <button class="pal-btn" id="fromtpl">+ компонент из каталога</button>
         <button class="pal-btn" id="palsort" title="разово проставить раздел по смыслу там, где он пуст">✨ авто-разложить</button>
+        <button class="pal-btn" id="palsim" title="показать компоненты, похожие на открытый в редакторе файл">🫧 похожие на файл</button>
       </div>
       <div class="pal-langs" id="palLangs"></div>
       <div class="pal-list" id="palList"></div>
@@ -403,7 +405,6 @@
   <script src="/search.js"></script>
   <script src="/navigate.js"></script>
   <script src="/outline.js"></script>
-  <script src="/similar.js"></script>
   <script src="/insert.js"></script>
   <script src="/ai-ask.js"></script>
   <script>

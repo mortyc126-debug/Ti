@@ -349,7 +349,9 @@ function palDetails(title, count, open){
   const s = document.createElement('summary'); s.innerHTML = '<span>' + esc(title) + '</span><span class="pal-n">' + count + '</span>'; d.appendChild(s); return d;
 }
 function palItem(title, hint){ const it = el('div', 'pal-item2'); it.appendChild(el('span', 'pi-t', title)); if(hint) it.title = hint; return it; }
+let palSimilar = false;   // режим «похожие на открытый файл»
 function renderPalette(){
+  if(palSimilar){ renderSimilar(); return; }
   const host = $('#palList'); host.innerHTML = '';
   const q = ($('#palSearch').value || '').toLowerCase();
   // базовые блоки (со структурными полями)
@@ -382,6 +384,33 @@ function renderPalette(){
   };
   renderBranch(root, host);
 }
+// активный файл редактора песочницы (для режима «похожие»)
+function activeSbFile(){ const sb = window.codelabSandbox; if(!sb) return null; const fs = sb.getFiles(); let id = null; try { id = localStorage.getItem('codelab_sb_active'); } catch(_){} return fs.find(f => f.id === id) || fs[0] || null; }
+// элемент палитры для куска каталога (клик добавляет блок, как обычный компонент)
+function palCatItem(t){
+  const it = palItem(window.codelabTitle ? window.codelabTitle(t.title) : t.title, t.desc); it.onclick = () => addFromCatalog(t);
+  if(t.lang){ const lg = el('span', 'pi-lang', String(t.lang).toUpperCase()); it.appendChild(lg); }
+  const del = el('span', 'pi-del', '🗑'); del.title = 'удалить шаблон насовсем';
+  del.onclick = e => { e.stopPropagation(); delTemplate(t); };
+  it.appendChild(del); return it;
+}
+// режим «похожие на открытый файл»: сравниваем код файла с каталогом (сервер /api/similar), список в палитре
+async function renderSimilar(){
+  const host = $('#palList'); host.innerHTML = '<div class="muted" style="padding:8px">ищу похожие…</div>';
+  const f = activeSbFile();
+  if(!f || !(f.code || '').trim()){ host.innerHTML = '<div class="muted" style="padding:8px">Открой файл в редакторе (вкладка с кодом) — покажу похожие компоненты.</div>'; return; }
+  let hits = [];
+  try { const r = await fetch('/api/similar', { method:'POST', body: JSON.stringify({ code: f.code, lang: f.lang || '' }) }).then(x => x.json()); hits = (r && r.hits) || []; } catch(_){}
+  const byId = {}; CATALOG.forEach(t => byId[t.id] = t);
+  const q = ($('#palSearch').value || '').toLowerCase();
+  const items = hits.map(h => ({ t: byId[h.id], score: h.score })).filter(x => x.t && (!q || (x.t.title + ' ' + (x.t.desc || '')).toLowerCase().includes(q)));
+  host.innerHTML = '';
+  const d = palDetails('🫧 Похожие на: ' + (f.name || 'файл'), items.length, true);
+  if(!items.length){ d.appendChild(el('div', 'muted', 'похожих компонентов не нашлось')); }
+  items.forEach(({ t, score }) => { const it = palCatItem(t); const pc = el('span', 'pi-lang', score + '%'); pc.style.color = 'var(--acc)'; const del = it.querySelector('.pi-del'); it.insertBefore(pc, del); d.appendChild(it); });
+  host.appendChild(d);
+}
+(function(){ const b = $('#palsim'); if(!b) return; b.onclick = () => { palSimilar = !palSimilar; b.classList.toggle('on', palSimilar); renderPalette(); }; })();
 // «не разложен» — пусто ИЛИ дефолтная корзина (туда куски валятся при кривом group)
 const _AUTOSORT_BUCKETS = new Set(['', 'мои куски', 'разное', 'без раздела', 'мои шаблоны', 'мой сборник', 'из конструктора']);
 function needsSort(t){ return _AUTOSORT_BUCKETS.has(String(t.group || '').split('/')[0].trim().toLowerCase()); }
