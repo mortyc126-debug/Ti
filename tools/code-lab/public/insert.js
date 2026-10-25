@@ -58,7 +58,9 @@
     const lq = q.toLowerCase(); const out = [];
     const d = await loadDict();
     const seen = new Set();
-    const addTerm = (term, text) => { const k = term.toLowerCase(); if(seen.has(k) || k === lq) return; seen.add(k); out.push({ type: 'term', label: term, desc: text || '' }); };
+    // подсказываем только КОД-токены: ключи-фразы/понятия (с пробелом или кириллицей) вставлять в код нельзя
+    const isCode = t => !/\s/.test(t) && !/[А-Яа-яЁё]/.test(t);
+    const addTerm = (term, text) => { const k = term.toLowerCase(); if(seen.has(k) || k === lq || !isCode(term)) return; seen.add(k); out.push({ type: 'term', label: term, desc: text || '' }); };
     // префикс по именам (быстро и предсказуемо для набора)
     const scanPrefix = o => { if(o) for(const k of Object.keys(o)){ if(k.toLowerCase().startsWith(lq)) addTerm(k, o[k]); } };
     const l = (curCtx && curCtx.lang || '').toLowerCase();
