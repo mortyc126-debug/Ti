@@ -48,6 +48,8 @@
     + '<div id="dgOut"></div></div>';
   document.body.appendChild(panel);
   const q = s => panel.querySelector(s);
+  // перетаскиваемое/масштабируемое окно (общий каркас win.js): шапка — ручка, позиция/размер запоминаются
+  const win = window.codelabWindow ? window.codelabWindow.make(panel, { handle: panel.querySelector('.dh'), key: 'codelab_win_dg', defaultGeo: { w: 360, h: 520 }, minW: 260, minH: 220 }) : null;
   q('#dgX').onclick = () => panel.classList.remove('on');
 
   // вставить код в активный редактор (на место курсора)
@@ -115,6 +117,6 @@
 
   const b = document.createElement('button'); b.className = 'btn'; b.id = 'sbDgBtn'; b.textContent = '🩺 решить';
   b.title = 'опиши проблему — подскажу пути решения: словарь, готовые куски и диагноз от ИИ';
-  b.onclick = () => { const on = !panel.classList.contains('on'); panel.classList.toggle('on', on); if(on){ const sel = (function(){ const ed = edFor(activeId()); const ta = ed && ed.querySelector('textarea'); const cm = ta && ta.__cm; try { return cm ? cm.getSelection() : (ta ? ta.value.slice(ta.selectionStart, ta.selectionEnd) : ''); } catch(_){ return ''; } })(); if(sel && !q('#dgQ').value) q('#dgQ').value = sel; q('#dgQ').focus(); quick(); } };
+  b.onclick = () => { const on = !panel.classList.contains('on'); panel.classList.toggle('on', on); if(on){ if(win) win.clamp(); const sel = (function(){ const ed = edFor(activeId()); const ta = ed && ed.querySelector('textarea'); const cm = ta && ta.__cm; try { return cm ? cm.getSelection() : (ta ? ta.value.slice(ta.selectionStart, ta.selectionEnd) : ''); } catch(_){ return ''; } })(); if(sel && !q('#dgQ').value) q('#dgQ').value = sel; q('#dgQ').focus(); quick(); } };
   const legend = bar.querySelector('#sbLegend'); if(legend) legend.after(b); else bar.appendChild(b);
 })();
