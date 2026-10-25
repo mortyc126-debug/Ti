@@ -1690,8 +1690,13 @@ $('#pasteEdit').onclick = () => {
   const text = $('#pasteCode').value; const note = $('#pasteNote');
   if(!text.trim()){ note.textContent = 'поле пустое'; return; }
   const kind = $('#pasteKind').value;
-  const lang = kind === 'html' ? 'html' : kind === 'js' ? 'js' : (/<\s*(!doctype|html|head|body|div|script|style)\b/i.test(text) ? 'html' : 'js');
-  openCodeInEditor('вставленное.' + (lang === 'html' ? 'html' : 'js'), lang, text);
+  let lang = kind;
+  if(kind !== 'html' && kind !== 'js'){   // авто: html → css → js
+    if(/<\s*(!doctype|html|head|body|div|script|style)\b/i.test(text)) lang = 'html';
+    else if(/[^{}]*\{[^{}]*[a-z-]+\s*:\s*[^;{}]+;/i.test(text) && !/\bfunction\b|=>|\b(const|let|var)\s|console\./.test(text)) lang = 'css';
+    else lang = 'js';
+  }
+  openCodeInEditor('вставленное.' + (LANG_EXT[lang] || 'txt'), lang, text);
   $('#pasteCode').value = ''; note.textContent = ''; $('#pastePanel').style.display = 'none';
 };
 $('#editCode').onclick = () => {

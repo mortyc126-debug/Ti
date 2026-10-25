@@ -365,6 +365,11 @@
     Object.assign(EXPLAIN, d.words || {}); Object.assign(HTML_TAGS, d.htmlTags || {});
     Object.assign(HTML_ATTRS, d.htmlAttrs || {}); Object.assign(CSS_PROPS, d.cssProps || {}); Object.assign(CSS_VALS, d.cssVals || {});
     if(d.langs && typeof d.langs === 'object'){ for(const [lang, words] of Object.entries(d.langs)){ if(words && typeof words === 'object'){ const lk = lang.toLowerCase(); LANG_DICTS[lk] = LANG_DICTS[lk] || {}; for(const [w, t] of Object.entries(words)) LANG_DICTS[lk][w.toLowerCase()] = t; } } }
+    // HTML/CSS теперь обычные языки (миграция вынесла их в dict/langs/html.json и css.json). Старые карты
+    // HTML_TAGS/HTML_ATTRS/CSS_PROPS/CSS_VALS — то, что читают клик-пояснения (explainToken, codelabExplain);
+    // переливаем в них языковые словари, иначе разметка перестаёт находиться (например padding-block).
+    if(LANG_DICTS.html){ Object.assign(HTML_TAGS, LANG_DICTS.html); Object.assign(HTML_ATTRS, LANG_DICTS.html); }
+    if(LANG_DICTS.css){ Object.assign(CSS_PROPS, LANG_DICTS.css); Object.assign(CSS_VALS, LANG_DICTS.css); }
     if(d.examples && typeof d.examples === 'object') EXAMPLES = d.examples;
   }).catch(() => {});
   // привязки «термин → кусок-пример» {term:{id,title}} — для ссылки «пример →» в попапах
