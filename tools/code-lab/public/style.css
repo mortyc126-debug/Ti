@@ -40,6 +40,10 @@ nav{border-right:1px solid var(--border);padding:10px;overflow:auto}
 .grp-name{flex:1}
 .grp-n{font-size:9px;font-family:ui-monospace,monospace;background:var(--bg);padding:1px 6px;border-radius:5px}
 .grp-items{margin-bottom:4px}
+.lib-langs{display:flex;flex-wrap:wrap;gap:5px;margin:6px 2px 8px}
+.lib-lang{font-size:11px;border:1px solid var(--border);border-radius:12px;padding:2px 10px;cursor:pointer;color:var(--text3)}
+.lib-lang:hover{color:var(--text2)}
+.lib-lang.on{background:var(--acc);color:#06231c;border-color:var(--acc)}
 .tpl{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;cursor:pointer;color:var(--text2);font-size:13px}
 .tpl:hover{background:var(--s2)}
 .tpl.on{background:rgba(255,0,110,.14);color:var(--acc)}

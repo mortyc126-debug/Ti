@@ -15,6 +15,7 @@ function serverLangs(){ return _serverLangs || (_serverLangs = fetch('/api/run/l
 
 const $ = s => document.querySelector(s);
 const nav = $('#nav'), work = $('#work'), info = $('#info');
+let navLang = '';   // фильтр списка по языку (чтобы углубиться в один)
 let selected = null;      // выбранный токен-элемент
 let curId = null;         // id открытого шаблона
 let curTpl = null;        // объект открытого шаблона
@@ -78,8 +79,19 @@ async function loadList(openId){
   nav.appendChild(gh); refreshGh();
 
   if(!list.length){ const m = document.createElement('div'); m.className = 'muted pad'; m.textContent = 'Пока пусто. Нажми «+ новый шаблон».'; nav.appendChild(m); return; }
+  // фильтр по языкам — чтобы углубиться нормально в один
+  const langs = [...new Set(list.map(t => String(t.lang || '').toLowerCase()).filter(Boolean))].sort();
+  if(langs.length > 1){
+    const bar = document.createElement('div'); bar.className = 'lib-langs';
+    const mk = (val, label) => { const c = document.createElement('span'); c.className = 'lib-lang' + (navLang === val ? ' on' : ''); c.textContent = label; c.onclick = () => { navLang = val; loadList(openId); }; return c; };
+    bar.appendChild(mk('', 'все'));
+    langs.forEach(l => bar.appendChild(mk(l, l.toUpperCase())));
+    nav.appendChild(bar);
+  }
+  const shown = navLang ? list.filter(t => String(t.lang || '').toLowerCase() === navLang) : list;
+  if(!shown.length){ const m = document.createElement('div'); m.className = 'muted pad'; m.textContent = 'Нет кусков на языке ' + navLang.toUpperCase() + '.'; nav.appendChild(m); return; }
   const groups = [];
-  for(const t of list){ let g = groups.find(x => x.name === t.group); if(!g){ g = { name: t.group, items: [] }; groups.push(g); } g.items.push(t); }
+  for(const t of shown){ let g = groups.find(x => x.name === t.group); if(!g){ g = { name: t.group, items: [] }; groups.push(g); } g.items.push(t); }
   const hashId = decodeURIComponent((location.hash || '').replace(/^#/, ''));
   const want = openId || curId || hashId || null;
   // какую группу раскрыть: с нужным шаблоном, иначе первую
