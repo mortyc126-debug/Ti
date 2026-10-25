@@ -6,7 +6,7 @@ let NOTES = {};   // пояснения к словам, хранятся на �
 let LNOTES = {};  // пояснения к строкам, ключ — текст строки без пробелов по краям (component.lineNotes)
 let DICT = {};    // общий словарь пояснений + варианты значений (тот же, что в разборе кода)
 let CUR_LANG = '', CODE = '';   // язык и текущий код куска (для переключения вариантов)
-fetch('/keyword-dict.json', { cache: 'no-store' }).then(r => r.json()).then(d => { DICT = d || {}; markVariants(); }).catch(() => {});
+fetch('/keyword-dict.json', { cache: 'no-store' }).then(r => r.json()).then(d => { DICT = d || {}; _pool = null; markVariants(); }).catch(() => {});
 
 // пояснение слова из словаря (сначала язык куска, потом общий/HTML/CSS/любой язык)
 function dictExplain(word){
@@ -17,39 +17,23 @@ function dictExplain(word){
   if(DICT.langs) for(const k of Object.keys(DICT.langs)) if(DICT.langs[k][lw]) return DICT.langs[k][lw];
   return '';
 }
-const variantsOf = word => (DICT.variants && DICT.variants[String(word).toLowerCase()]) || null;
-// подчеркнуть слова-свойства, у которых есть варианты — видно, что можно менять
+// подчеркнуть слова, у которых в словаре есть похожие (тот же корень) — видно, что можно менять
 function markVariants(){
-  document.querySelectorAll('.cln .w').forEach(s => { if(variantsOf(s.textContent)){ s.classList.add('has-var'); if(!s.title) s.title = 'клик — сменить значение'; } });
-}
-// текущее значение свойства prop на строке li
-function currentValue(li, prop){
-  const lines = String(CODE).split('\n'); const line = lines[li] || '';
-  const m = new RegExp('\\b' + prop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:\\s*([^;{}!]*)').exec(line);
-  return m ? m[1].trim() : '';
-}
-// сменить значение свойства prop на строке li → val, сохранить код куска и перерисовать
-async function setVariant(li, prop, val){
-  const lines = String(CODE).split('\n'); if(li < 0 || li >= lines.length) return;
-  const re = new RegExp('(\\b' + prop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:\\s*)([^;{}!]*)');
-  if(!re.test(lines[li])) return;
-  lines[li] = lines[li].replace(re, (m, p) => p + val);
-  CODE = lines.join('\n');
-  closeNotePop();
-  rerenderCode();
-  await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: ID, code: CODE }) }).catch(() => {});
+  document.querySelectorAll('.cln .w').forEach(s => { if(siblingWords(s.textContent).length){ s.classList.add('has-var'); if(!s.title) s.title = 'клик — похожие варианты из словаря'; } });
 }
 // перерисовать блок кода (② «Что меняешь») после правки
 function rerenderCode(){ const host = document.querySelector('.code-host'); if(host){ host.innerHTML = ''; host.appendChild(noteCode(CODE)); markVariants(); } }
 
-// словарь-пул под язык куска: {ключ: пояснение} — из него выводим похожие слова
+// словарь-пул под язык куска: {ключ: пояснение} — из него выводим похожие слова (кэш, т.к. зовётся на каждый токен)
+let _pool = null, _poolLang = null;
 function poolKeys(){
-  const out = {}; const put = o => { if(o) for(const k of Object.keys(o)) if(typeof o[k] === 'string') out[k.toLowerCase()] = o[k]; };
   const l = (CUR_LANG || '').toLowerCase();
+  if(_pool && _poolLang === l) return _pool;
+  const out = {}; const put = o => { if(o) for(const k of Object.keys(o)) if(typeof o[k] === 'string') out[k.toLowerCase()] = o[k]; };
   if(DICT.langs && DICT.langs[l]) put(DICT.langs[l]);
   if(l === 'css' || l === 'html' || l === 'htm'){ ['cssProps','cssVals','htmlTags','htmlAttrs'].forEach(s => put(DICT[s])); }
   put(DICT.words);
-  return out;
+  _pool = out; _poolLang = l; return out;
 }
 const stemOf = w => String(w).split(/[-.:_]/)[0].toLowerCase();
 // похожие слова из словаря — с общим «корнем» (padding → padding-top/left…, Object → Object.assign…)
@@ -353,15 +337,6 @@ function openNote(word, span){
   // пояснение из словаря (то же, что в разборе кода) — только показываем
   const dx = dictExplain(word);
   if(dx){ const e = el('div', 'np-expl'); e.textContent = dx; pop.appendChild(e); }
-  const li = (span.closest('.crow') ? +span.closest('.crow').dataset.i : -1);
-  // значения свойства (заданные варианты) — клик меняет значение после «:»; у каждого пояснение из словаря
-  const vals = variantsOf(word) || [];
-  if(vals.length){
-    pop.appendChild(el('div', 'np-sub', 'значения — сменить:'));
-    const cur = currentValue(li, word); const vb = el('div', 'np-choices');
-    vals.forEach(v => vb.appendChild(choiceRow(v, dictExplain(v), () => setVariant(li, word, v), v.toLowerCase() === (cur || '').toLowerCase())));
-    pop.appendChild(vb);
-  }
   // похожие слова из словаря (общий корень) — клик заменяет само слово; с пояснениями, чтобы понимать выбор
   const sibs = siblingWords(word);
   if(sibs.length){

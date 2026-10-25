@@ -109,14 +109,12 @@ const DICT_DIR = path.join(PUBLIC, 'dict');
 const LANGS_DIR = path.join(DICT_DIR, 'langs');
 const EXAMPLES_FILE = path.join(DICT_DIR, 'examples.json');   // привязка «слово/конструкция → кусок-пример» {term:{id,title}}
 const SYN_FILE = path.join(DICT_DIR, 'synonyms.json');        // синонимы для поиска по смыслу: {term:[фраза,…]} — найти, не помня имени
-const VAR_FILE = path.join(DICT_DIR, 'variants.json');        // варианты значений: {term:[значение,…]} — клик по слову → сменить (position→absolute/fixed…)
 // алиасы языка → канон: чтобы «javascript»/«py»/«c++» не плодили файл-двойник рядом с js/python/cpp
 const LANG_ALIAS = { javascript: 'js', typescript: 'ts', py: 'python', python3: 'python', shell: 'bash', sh: 'bash', zsh: 'bash', 'c++': 'cpp', cplusplus: 'cpp', cxx: 'cpp', 'c#': 'csharp', 'c-sharp': 'csharp', cs: 'csharp', golang: 'go', rb: 'ruby', kt: 'kotlin', rs: 'rust', jsx: 'js', tsx: 'ts', htm: 'html', yml: 'yaml' };
 const canonLang = v => { v = String(v || '').trim().toLowerCase(); return LANG_ALIAS[v] || v.replace(/[^a-z0-9_+-]/g, '') || 'other'; };
 let _kwDict = null;
 async function loadExamples(){ try { const o = JSON.parse(await fs.readFile(EXAMPLES_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
 async function loadSynonyms(){ try { const o = JSON.parse(await fs.readFile(SYN_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
-async function loadVariants(){ try { const o = JSON.parse(await fs.readFile(VAR_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
 async function loadLangDicts(){
   const out = {};
   let files = []; try { files = (await fs.readdir(LANGS_DIR)).filter(n => n.endsWith('.json')); } catch(_){ return out; }
@@ -136,7 +134,6 @@ async function kwDict(){
   for(const [lang, m] of Object.entries(fromFiles)){ base.langs[lang] = Object.assign({}, base.langs[lang] || {}, m); }
   base.examples = await loadExamples();   // привязки «термин → кусок-пример»
   base.synonyms = await loadSynonyms();   // синонимы/фразы для поиска по смыслу
-  base.variants = await loadVariants();   // варианты значений для переключателя в редакторе
   _kwDict = base;
   return _kwDict;
 }
@@ -950,29 +947,6 @@ const server = http.createServer(async (req, res) => {
       const sorted = {}; for(const k of Object.keys(syn).sort()) sorted[k] = syn[k];
       await fs.mkdir(DICT_DIR, { recursive: true });
       await fs.writeFile(SYN_FILE, JSON.stringify(sorted, null, 2), 'utf8'); _kwDict = null;
-      return json(res, 200, { ok: true, terms, added, totalTerms: Object.keys(sorted).length });
-    }
-
-    // варианты значений для переключателя: {entries:[[term, "вар1, вар2"], …]}. Порядок сохраняем (в отличие
-    // от синонимов), дедуп, пустой список снимает термин. Хранится в dict/variants.json.
-    if(u.pathname === '/api/dict/variants' && req.method === 'POST'){
-      const b = await readBody(req);
-      let pairs = [];
-      if(Array.isArray(b.entries)) pairs = b.entries.map(e => Array.isArray(e) ? [e[0], e[1]] : [e && e.term, e && e.vars]);
-      else if(b.entries && typeof b.entries === 'object') pairs = Object.entries(b.entries);
-      const vars = await loadVariants();
-      let terms = 0, added = 0;
-      for(let [term, list] of pairs){
-        term = String(term || '').trim().toLowerCase(); if(!term) continue;
-        const parts = String(list || '').split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
-        if(!parts.length){ if(vars[term]){ delete vars[term]; terms++; } continue; }
-        const cur = Array.isArray(vars[term]) ? vars[term].slice() : []; const have = new Set(cur.map(x => x.toLowerCase()));
-        parts.forEach(p => { if(!have.has(p.toLowerCase())){ cur.push(p); have.add(p.toLowerCase()); added++; } });
-        vars[term] = cur; terms++;
-      }
-      const sorted = {}; for(const k of Object.keys(vars).sort()) sorted[k] = vars[k];
-      await fs.mkdir(DICT_DIR, { recursive: true });
-      await fs.writeFile(VAR_FILE, JSON.stringify(sorted, null, 2), 'utf8'); _kwDict = null;
       return json(res, 200, { ok: true, terms, added, totalTerms: Object.keys(sorted).length });
     }
 
