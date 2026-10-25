@@ -215,6 +215,8 @@ textarea.blk-code{position:relative;z-index:1;background:transparent;color:trans
 
 /* панель пояснения */
 aside#info{border-left:1px solid var(--border);padding:16px;overflow:auto;position:sticky;top:0;align-self:start;max-height:100vh}
+/* большие колонки библиотеки — такие же панели (фон темы), а не прозрачные над картинкой */
+#nav,section#work,aside#info{background:var(--bg2)}
 .info-empty{font-size:13px}
 .info-kind{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)}
 .info-word{font-size:20px;font-weight:600;margin:4px 0 10px;word-break:break-word}
