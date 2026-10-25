@@ -809,10 +809,15 @@ function openDictViewModal(){
     const body = q('#dv-body'); body.innerHTML = '';
     if(!dict){ body.textContent = 'загрузка…'; return; }
     const flt = (q('#dv-q').value || '').trim().toLowerCase();
-    // собрать все разделы: языки — первыми (это главная разбивка), затем общее/HTML/CSS
+    // собрать разделы: языки первыми. HTML и CSS — ЕДИНЫЕ разделы: базовые секции (теги/атрибуты,
+    // свойства/значения из стартового seed) + языковой файл html.json/css.json вместе, иначе «3 вида HTML».
     const groups = [];
-    if(dict.langs) for(const lang of Object.keys(dict.langs).sort()){ if(Object.keys(dict.langs[lang] || {}).length) groups.push(['Язык: ' + lang, dict.langs[lang]]); }
-    for(const [key, title] of SECTS){ if(dict[key] && Object.keys(dict[key]).length) groups.push([title, dict[key]]); }
+    const htmlMerged = Object.assign({}, dict.htmlTags || {}, dict.htmlAttrs || {}, (dict.langs && dict.langs.html) || {});
+    const cssMerged = Object.assign({}, dict.cssProps || {}, dict.cssVals || {}, (dict.langs && dict.langs.css) || {});
+    if(Object.keys(htmlMerged).length) groups.push(['html', htmlMerged]);
+    if(Object.keys(cssMerged).length) groups.push(['css', cssMerged]);
+    if(dict.langs) for(const lang of Object.keys(dict.langs).sort()){ if(lang === 'html' || lang === 'css') continue; if(Object.keys(dict.langs[lang] || {}).length) groups.push(['Язык: ' + lang, dict.langs[lang]]); }
+    if(dict.words && Object.keys(dict.words).length) groups.push(['Общее / код', dict.words]);
     // чипы-разделы сверху: видно, что языки есть, и можно показать только нужный
     const chips = q('#dv-groups'); chips.innerHTML = '';
     const chip = (label, on, onClick) => { const b = el2('button', 'btn'); b.textContent = label; b.style.cssText = 'padding:2px 10px;border-radius:12px;font-size:11.5px' + (on ? ';background:var(--acc,#52F2C9);color:#06231c' : ''); b.onclick = onClick; return b; };
@@ -862,10 +867,12 @@ function openDictViewModal(){
     panel.style.display = ''; panel.innerHTML = '';
     if(!dict){ panel.textContent = 'словарь ещё не загружен'; return; }
     const where = new Map();
-    const scan = (obj, label) => { if(!obj) return; for(const k of Object.keys(obj)){ const kk = k.toLowerCase(); if(!where.has(kk)) where.set(kk, []); where.get(kk).push(label); } };
-    SECTS.forEach(([key, title]) => scan(dict[key], title));
-    if(dict.langs) for(const lang of Object.keys(dict.langs)) scan(dict.langs[lang], 'язык: ' + lang);
-    const dups = [...where].filter(([, src]) => src.length > 1).sort((a, b) => a[0].localeCompare(b[0]));
+    // html-теги/атрибуты и язык html — одно ведро «html» (то же для css), иначе единый раздел HTML светится как «дубль»
+    const bucket = { htmlTags: 'html', htmlAttrs: 'html', cssProps: 'css', cssVals: 'css', words: 'общее' };
+    const scan = (obj, label) => { if(!obj) return; for(const k of Object.keys(obj)){ const kk = k.toLowerCase(); if(!where.has(kk)) where.set(kk, new Set()); where.get(kk).add(label); } };
+    SECTS.forEach(([key]) => scan(dict[key], bucket[key] || key));
+    if(dict.langs) for(const lang of Object.keys(dict.langs)) scan(dict.langs[lang], lang === 'html' || lang === 'css' ? lang : 'язык: ' + lang);
+    const dups = [...where].map(([k, set]) => [k, [...set]]).filter(([, src]) => src.length > 1).sort((a, b) => a[0].localeCompare(b[0]));
     const head = el2('div', 'lp-sec'); head.textContent = dups.length ? ('Ключи в нескольких местах: ' + dups.length) : 'Дублей нет — каждый ключ ровно в одном разделе'; panel.appendChild(head);
     if(dups.length){
       const note = el2('div', 'muted'); note.style.cssText = 'font-size:11px;margin:0 0 4px 6px'; note.textContent = 'при клике по слову в коде побеждает язык (его пояснение). Общие строки можно оставить или убрать из общего раздела.'; panel.appendChild(note);
