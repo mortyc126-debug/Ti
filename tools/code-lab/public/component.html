@@ -87,7 +87,11 @@
   .ct-item{display:inline-flex;align-items:center;gap:4px;margin:1px 4px 1px 0}
   .ct-ty{font-size:9px;font-family:ui-monospace,monospace;border:1px solid;border-radius:4px;padding:0 4px;line-height:1.5;opacity:.9}
   .muted{color:var(--text3)}
-  .note-pop{position:absolute;z-index:70;background:var(--bg2);border:1px solid var(--acc);border-radius:10px;padding:10px;width:280px;box-shadow:0 12px 34px rgba(0,0,0,.55)}
+  .note-pop{position:absolute;z-index:70;background:var(--bg2);border:1px solid var(--acc);border-radius:10px;padding:10px;width:330px;max-height:70vh;overflow:auto;box-shadow:0 12px 34px rgba(0,0,0,.55)}
+  .note-pop .np-choices{display:flex;flex-direction:column;gap:5px;margin-bottom:9px}
+  .note-pop .np-choice{display:flex;align-items:baseline;gap:8px}
+  .note-pop .np-choice .np-var{flex:0 0 auto}
+  .note-pop .np-ce{flex:1;min-width:0;font-size:11px;color:var(--text3);line-height:1.4}
   .note-pop .np-h{font-size:13px;color:var(--text);margin-bottom:6px;font-weight:600}
   .note-pop .np-expl{font-size:12px;color:var(--text2);line-height:1.5;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:7px 9px;margin-bottom:8px}
   .note-pop .np-sub{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin:2px 0 4px}

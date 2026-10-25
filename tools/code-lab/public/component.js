@@ -42,6 +42,40 @@ async function setVariant(li, prop, val){
 // перерисовать блок кода (② «Что меняешь») после правки
 function rerenderCode(){ const host = document.querySelector('.code-host'); if(host){ host.innerHTML = ''; host.appendChild(noteCode(CODE)); markVariants(); } }
 
+// словарь-пул под язык куска: {ключ: пояснение} — из него выводим похожие слова
+function poolKeys(){
+  const out = {}; const put = o => { if(o) for(const k of Object.keys(o)) if(typeof o[k] === 'string') out[k.toLowerCase()] = o[k]; };
+  const l = (CUR_LANG || '').toLowerCase();
+  if(DICT.langs && DICT.langs[l]) put(DICT.langs[l]);
+  if(l === 'css' || l === 'html' || l === 'htm'){ ['cssProps','cssVals','htmlTags','htmlAttrs'].forEach(s => put(DICT[s])); }
+  put(DICT.words);
+  return out;
+}
+const stemOf = w => String(w).split(/[-.:_]/)[0].toLowerCase();
+// похожие слова из словаря — с общим «корнем» (padding → padding-top/left…, Object → Object.assign…)
+function siblingWords(word){
+  const pool = poolKeys(), stem = stemOf(word), lw = String(word).toLowerCase(), out = [];
+  if(stem.length < 3) return out;
+  for(const k of Object.keys(pool)){ if(k === lw) continue;
+    if(k === stem || k.startsWith(stem + '-') || k.startsWith(stem + '.') || k.startsWith(stem + '_')) out.push({ value: k, expl: pool[k] }); }
+  return out.sort((a, b) => a.value.localeCompare(b.value)).slice(0, 16);
+}
+// заменить само слово под кликом новым (родственным) — правит код куска и сохраняет
+function setWord(span, newWord){
+  span.textContent = newWord;
+  const rows = document.querySelectorAll('.code-host .crow');
+  CODE = [...rows].map(r => { const c = r.querySelector('.cln'); return c ? c.textContent.replace(/​/g, '') : ''; }).join('\n');
+  closeNotePop(); rerenderCode();
+  fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: ID, code: CODE }) }).catch(() => {});
+}
+// строка выбора: яркая кнопка + пояснение из словаря рядом
+function choiceRow(label, expl, onPick, isCur){
+  const row = el('div', 'np-choice');
+  const b = el('button', 'np-var' + (isCur ? ' cur' : ''), label); b.onclick = onPick; row.appendChild(b);
+  if(expl){ const e = el('span', 'np-ce'); e.textContent = expl; row.appendChild(e); }
+  return row;
+}
+
 (async function(){
   if(!ID){ root.innerHTML = '<div class="muted pad">не указан компонент</div>'; return; }
   let t;
@@ -319,15 +353,22 @@ function openNote(word, span){
   // пояснение из словаря (то же, что в разборе кода) — только показываем
   const dx = dictExplain(word);
   if(dx){ const e = el('div', 'np-expl'); e.textContent = dx; pop.appendChild(e); }
-  // варианты значения: кнопки — клик меняет значение прямо в коде куска и сохраняет
-  const vars = variantsOf(word);
-  if(vars && vars.length){
-    pop.appendChild(el('div', 'np-sub', 'сменить значение:'));
-    const li = (span.closest('.crow') ? +span.closest('.crow').dataset.i : -1);
-    const cur = currentValue(li, word);
-    const vb = el('div', 'np-vars');
-    vars.forEach(v => { const b = el('button', 'np-var' + (v.toLowerCase() === (cur || '').toLowerCase() ? ' cur' : ''), v); b.onclick = () => setVariant(li, word, v); vb.appendChild(b); });
+  const li = (span.closest('.crow') ? +span.closest('.crow').dataset.i : -1);
+  // значения свойства (заданные варианты) — клик меняет значение после «:»; у каждого пояснение из словаря
+  const vals = variantsOf(word) || [];
+  if(vals.length){
+    pop.appendChild(el('div', 'np-sub', 'значения — сменить:'));
+    const cur = currentValue(li, word); const vb = el('div', 'np-choices');
+    vals.forEach(v => vb.appendChild(choiceRow(v, dictExplain(v), () => setVariant(li, word, v), v.toLowerCase() === (cur || '').toLowerCase())));
     pop.appendChild(vb);
+  }
+  // похожие слова из словаря (общий корень) — клик заменяет само слово; с пояснениями, чтобы понимать выбор
+  const sibs = siblingWords(word);
+  if(sibs.length){
+    pop.appendChild(el('div', 'np-sub', 'похожее — заменить слово:'));
+    const sb = el('div', 'np-choices');
+    sibs.forEach(s => sb.appendChild(choiceRow(s.value, s.expl, () => setWord(span, s.value), s.value === String(word).toLowerCase())));
+    pop.appendChild(sb);
   }
   pop.appendChild(el('div', 'np-sub', 'своя заметка:'));
   const ta = document.createElement('textarea'); ta.value = NOTES[word] || ''; ta.placeholder = 'что это значит, своими словами';
