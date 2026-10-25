@@ -548,6 +548,27 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, await search.search(q, { limit }));
     }
 
+    // «на что похоже»: сравнить присланный код с кусками библиотеки по общим токенам (Жаккар).
+    // {code, lang?, exclude?} → { hits:[{id,title,lang,score, shared:[токены]}] } — похожие фрагменты.
+    if(u.pathname === '/api/similar' && req.method === 'POST'){
+      const b = await readBody(req);
+      const toks = s => { const set = new Set(); const m = String(s || '').toLowerCase().match(/[a-zа-яё_$][\wа-яё$-]{1,}/gi) || []; for(const t of m) if(t.length > 1) set.add(t); return set; };
+      const A = toks(b.code); if(!A.size) return json(res, 200, { hits: [] });
+      const lang = String(b.lang || '').toLowerCase();
+      const hits = [];
+      for(const e of await store.entries()){
+        if(b.exclude && e.id === b.exclude) continue;
+        const B = toks(e.code); if(!B.size) continue;
+        let inter = 0; const shared = []; for(const t of A) if(B.has(t)){ inter++; if(shared.length < 8) shared.push(t); }
+        if(!inter) continue;
+        let score = inter / (A.size + B.size - inter);   // Жаккар
+        if(lang && e.lang && e.lang.toLowerCase() === lang) score *= 1.15;   // тот же язык — чуть выше
+        hits.push({ id: e.id, title: e.title || e.id, lang: e.lang || '', score: Math.round(score * 100), shared });
+      }
+      hits.sort((x, y) => y.score - x.score);
+      return json(res, 200, { hits: hits.filter(h => h.score > 0).slice(0, 20) });
+    }
+
     if(await handleWorkspace(req, res, u, { readBody, json, root: ROOT })) return;   // рабочая папка проекта (/api/ws/*)
     if(u.pathname === '/api/template'){
       const t = await store.get(u.searchParams.get('id'));
