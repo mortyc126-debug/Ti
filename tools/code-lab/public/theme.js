@@ -21,6 +21,9 @@
   function adj(hex, b, s){ var c = hex2rgb(hex), v = rgb2hsv(c); v.v = Math.min(1, v.v*b); v.s = Math.min(1, v.s*s); var o = hsv2rgb(v.h, v.s, v.v); return rgb2hex(o.r, o.g, o.b, c.a); }
 
   // ── применение темы ──
+  // все панели-поверхности, которые должны одинаково «матироваться» при фоне-картинке (иначе «то прозрачно, то нет»):
+  // оболочка/каталог + песочница (редактор, попапы, поиск, структура, окно ИИ) + конструктор (инспектор, холст, узлы) + модалки.
+  var BLUR_SEL = '.side,.palette,.g-insp,.canvas-scroll,.modal,.th-box,.sb-ed,.sb-pop,.sb-find,.sb-find-note,.sb-outline,.ai-ask,.gnode,.sb-pop-b,.modal-bg .modal';
   var sty = document.createElement('style'); sty.id = 'th-style'; document.head.appendChild(sty);
   var IC = {};
   function bgImg(id){ if(!(id in IC)){ try { IC[id] = localStorage.getItem(KEY + '_img_' + id) || ''; } catch(e){ IC[id] = ''; } } return IC[id]; }
@@ -48,7 +51,7 @@
     L.push(t.vars.bg || DEF.bg);
     sty.textContent = 'html{background:#000;' + (t.bright == 100 && t.sat == 100 ? '' : 'filter:brightness(' + t.bright + '%) saturate(' + t.sat + '%);') + '}'
       + (L.length > 1 ? 'body{background:' + L.join(',') + '!important}' : '')
-      + (im && t.blur > 0 ? '.side,.palette,.g-insp,.canvas-scroll,.modal,.th-box{backdrop-filter:blur(' + t.blur + 'px)}' : '');
+      + (im && t.blur > 0 ? BLUR_SEL + '{backdrop-filter:blur(' + t.blur + 'px)}' : '');
   }
   apply();
 
