@@ -879,6 +879,30 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, added, where: section, total: Object.keys(target).length });
     }
 
+    // чистка словаря от обрывков кода: ключи с несбалансированными скобками ()[]{} — это не термины,
+    // а куски строк (вставляли код, парсер резал по первому двоеточию). {apply:false} — только показать.
+    if(u.pathname === '/api/dict/clean' && req.method === 'POST'){
+      const b = await readBody(req);
+      const balanced = k => { let p = 0, c = 0, s = 0; for(const ch of String(k)){ if(ch === '(') p++; else if(ch === ')') p--; else if(ch === '{') c++; else if(ch === '}') c--; else if(ch === '[') s++; else if(ch === ']') s--; if(p < 0 || c < 0 || s < 0) return false; } return p === 0 && c === 0 && s === 0; };
+      const found = [];
+      // база: разделы-объекты
+      let base; try { base = JSON.parse(await fs.readFile(DICT_BASE, 'utf8')); } catch(_){ base = {}; }
+      const baseSects = ['words', 'htmlTags', 'htmlAttrs', 'cssProps', 'cssVals'].filter(s => base[s] && typeof base[s] === 'object');
+      for(const s of baseSects) for(const k of Object.keys(base[s])) if(!balanced(k)) found.push({ where: s, key: k });
+      // языки: отдельные файлы
+      let langFiles = []; try { langFiles = (await fs.readdir(LANGS_DIR)).filter(n => n.endsWith('.json')); } catch(_){}
+      const langData = {};
+      for(const fn of langFiles){ try { const o = JSON.parse(await fs.readFile(path.join(LANGS_DIR, fn), 'utf8')); langData[fn] = o; for(const k of Object.keys(o)) if(!balanced(k)) found.push({ where: fn.replace(/\.json$/, ''), key: k }); } catch(_){} }
+      if(!b.apply) return json(res, 200, { ok: true, applied: false, count: found.length, sample: found.slice(0, 40) });
+      // удаляем
+      let removed = 0;
+      for(const s of baseSects){ for(const k of Object.keys(base[s])) if(!balanced(k)){ delete base[s][k]; removed++; } }
+      if(baseSects.length) await fs.writeFile(DICT_BASE, JSON.stringify(base, null, 2), 'utf8');
+      for(const fn of langFiles){ const o = langData[fn]; if(!o) continue; let touched = false; for(const k of Object.keys(o)) if(!balanced(k)){ delete o[k]; touched = true; } if(touched){ const sorted = {}; for(const kk of Object.keys(o).sort()) sorted[kk] = o[kk]; await fs.writeFile(path.join(LANGS_DIR, fn), JSON.stringify(sorted, null, 2), 'utf8'); } }
+      _kwDict = null;
+      return json(res, 200, { ok: true, applied: true, removed });
+    }
+
     // привязать к термину (слову/конструкции) кусок-пример: {term, piece: название|id|''(снять)}
     if(u.pathname === '/api/dict/example' && req.method === 'POST'){
       const b = await readBody(req);

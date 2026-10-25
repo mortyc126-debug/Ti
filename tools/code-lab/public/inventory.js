@@ -776,7 +776,7 @@ function openDictViewModal(){
     + '<p class="mh">Всё описанное — из <b>keyword-dict.json</b>. Разделы: общее/код, по языкам (c, cpp, java…), HTML-теги/атрибуты, CSS-свойства/значения. Поиск фильтрует по слову и тексту. «⧉» у раздела копирует его строками «слово: пояснение».</p>'
     + '<input class="inv-search" id="dv-q" placeholder="поиск по слову или пояснению…" style="width:100%;box-sizing:border-box;margin-bottom:8px">'
     + '<div id="dv-groups" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px"></div>'
-    + '<div class="mbtns"><button class="btn" id="dv-close">закрыть</button><button class="btn" id="dv-dups" title="найти ключи, лежащие сразу в нескольких разделах/языках">🔍 дубли</button><span class="pp-note" id="dv-note" style="margin-left:auto"></span></div>'
+    + '<div class="mbtns"><button class="btn" id="dv-close">закрыть</button><button class="btn" id="dv-dups" title="найти ключи, лежащие сразу в нескольких разделах/языках">🔍 дубли</button><button class="btn" id="dv-clean" title="убрать обрывки кода: ключи с несбалансированными скобками — это куски строк, а не термины">🧹 обрывки кода</button><span class="pp-note" id="dv-note" style="margin-left:auto"></span></div>'
     + '<div class="lp-prev" id="dv-dupbox" style="display:none;max-height:28vh;margin-bottom:8px;border-color:#b45cff"></div>'
     + '<div class="lp-prev" id="dv-body" style="max-height:60vh"></div>';
   bg.appendChild(box); document.body.appendChild(bg);
@@ -880,6 +880,20 @@ function openDictViewModal(){
     }
   }
   q('#dv-dups').onclick = showDups;
+  // чистка обрывков кода: показать найденное → подтвердить удаление
+  q('#dv-clean').onclick = async () => {
+    const panel = q('#dv-dupbox'); panel.style.display = ''; panel.innerHTML = 'ищу обрывки кода…';
+    const r = await fetch('/api/dict/clean', { method: 'POST', body: JSON.stringify({ apply: false }) }).then(x => x.json()).catch(() => null);
+    panel.innerHTML = '';
+    if(!r || !r.ok){ panel.textContent = 'не удалось проверить'; return; }
+    if(!r.count){ panel.appendChild(el2('div', 'lp-sec', 'Обрывков кода не найдено — словарь чистый ✓')); return; }
+    panel.appendChild(el2('div', 'lp-sec', 'Обрывки кода (несбалансированные скобки): ' + r.count));
+    const note = el2('div', 'muted'); note.style.cssText = 'font-size:11px;margin:0 0 4px 6px'; note.textContent = 'это куски строк, а не термины. Нормальные конструкции (сбалансированные) не тронутся. Примеры:'; panel.appendChild(note);
+    r.sample.forEach(x => { const d = el2('div', 'lp-row'); const b = document.createElement('b'); b.textContent = x.where; b.style.cssText = 'color:var(--muted,#9a93b5);font-size:10px;margin-right:6px'; d.appendChild(b); d.appendChild(document.createTextNode(x.key.slice(0, 70))); panel.appendChild(d); });
+    const go = el2('button', 'btn ok'); go.textContent = 'удалить ' + r.count; go.style.marginTop = '6px';
+    go.onclick = async () => { go.textContent = 'удаляю…'; go.disabled = true; const rr = await fetch('/api/dict/clean', { method: 'POST', body: JSON.stringify({ apply: true }) }).then(x => x.json()).catch(() => null); if(rr && rr.ok){ panel.innerHTML = '<div class="lp-row lp-ok">Удалено: ' + rr.removed + '. Не забудь синхронизацию, чтобы чистка уехала в репозиторий.</div>'; dict = null; fetch('/keyword-dict.json', { cache: 'no-store' }).then(x => x.json()).then(d => { dict = d; render(); }); } else panel.innerHTML = '<div class="lp-row lp-bad">ошибка удаления</div>'; };
+    panel.appendChild(go);
+  };
   q('#dv-q').addEventListener('input', render);
   render();
   fetch('/keyword-dict.json', { cache: 'no-store' }).then(r => r.json()).then(d => { dict = d; render(); }).catch(() => { q('#dv-body').textContent = 'не удалось загрузить словарь'; });
