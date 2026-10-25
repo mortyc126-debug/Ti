@@ -158,6 +158,27 @@ async function migrateLangsOut(){
   await fs.writeFile(DICT_BASE, JSON.stringify(base, null, 2), 'utf8');
   _kwDict = null;
 }
+// разовая миграция: сделать HTML и CSS обычными языками. Вливаем seed-секции базового файла
+// (htmlTags/htmlAttrs → html.json, cssProps/cssVals → css.json) и убираем спец-секции.
+// Записи пользователя в языковом файле ПОБЕЖДАЮТ (seed добавляется только для отсутствующих ключей). Идемпотентно.
+async function migrateHtmlCssToLangs(){
+  let base; try { base = JSON.parse(await fs.readFile(DICT_BASE, 'utf8')); } catch(_){ return; }
+  const plan = [['html', ['htmlTags', 'htmlAttrs']], ['css', ['cssProps', 'cssVals']]];
+  let changedBase = false;
+  for(const [lang, sects] of plan){
+    const seed = {};
+    for(const s of sects){ if(base[s] && typeof base[s] === 'object') for(const [k, v] of Object.entries(base[s])) if(typeof v === 'string' && v.trim()) seed[k.toLowerCase()] = v; }
+    const fp = path.join(LANGS_DIR, lang + '.json');
+    let cur = {}; try { cur = JSON.parse(await fs.readFile(fp, 'utf8')); } catch(_){}
+    if(!cur || typeof cur !== 'object') cur = {};
+    const curLow = new Set(Object.keys(cur).map(x => x.toLowerCase()));
+    let add = 0;
+    for(const [k, v] of Object.entries(seed)){ if(!curLow.has(k)){ cur[k] = v.slice(0, 600); curLow.add(k); add++; } }
+    if(add){ await fs.mkdir(LANGS_DIR, { recursive: true }); const sorted = {}; for(const kk of Object.keys(cur).sort()) sorted[kk] = cur[kk]; await fs.writeFile(fp, JSON.stringify(sorted, null, 2), 'utf8'); }
+    for(const s of sects) if(base[s] !== undefined){ delete base[s]; changedBase = true; }
+  }
+  if(changedBase){ await fs.writeFile(DICT_BASE, JSON.stringify(base, null, 2), 'utf8'); _kwDict = null; }
+}
 // автоподпись слов из словаря: см. code-lab/lib/annotate.mjs
 
 // объединённый импорт. Принимает: сборник {dict, pieces}, массив кусков, или один кусок
@@ -1005,6 +1026,7 @@ $('lab-mistral-test').addEventListener('click',async()=>{const k=input.value.tri
   await search.init();
   await vendor.init();
   await migrateLangsOut();   // вынести словари языков из базового файла в dict/langs/*.json
+  await migrateHtmlCssToLangs();   // HTML/CSS → обычные языки: seed-секции влить в html.json/css.json
   if(r.migrated && r.migrated.created) console.log(`Из templates/ перенесено в library/: ${r.migrated.created} (старые карточки не тронуты)`);
 }
 server.listen(PORT, '127.0.0.1', () => {
