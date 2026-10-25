@@ -112,7 +112,7 @@ export function createVendor({ root, fetchImpl = fetch, now = () => Date.now() }
   let chain = Promise.resolve();
   let busy = null;
 
-  function fresh() { return { schema: 1, active: null, previous: [], installed: {}, lastCheck: null, lastGood: null }; }
+  function fresh() { return { schema: 1, active: null, userOff: false, previous: [], installed: {}, lastCheck: null, lastGood: null }; }
   const iso = () => new Date(now()).toISOString();
   const ageDays = published => (published ? Math.floor((now() - Date.parse(published)) / 86400000) : null);
 
@@ -145,6 +145,21 @@ export function createVendor({ root, fetchImpl = fetch, now = () => Date.now() }
     }
     m.previous = m.previous.filter(v => m.installed[v]);
     if (m.active && !m.installed[m.active]) { m.active = null; changed = true; }
+    // версии, лежащие на диске, но не в манифесте — зарегистрировать (локальная копия/клон)
+    for (const name of await fs.readdir(base).catch(() => [])) {
+      if (VERSION_RE.test(name) && !m.installed[name] && await exists(vdir(name))) {
+        m.installed[name] = { installedAt: iso(), published: null, integrity: null, fileCount: null, bytes: null, test: null }; changed = true;
+      }
+    }
+    // CodeMirror по умолчанию: если активной версии нет И пользователь не выключал её явно —
+    // включить самую новую установленную (приоритет — прошедшую проверку). Редактор с подсветкой
+    // и номерами строк (и виртуализацией больших файлов) работает сразу.
+    if (!m.active && !m.userOff) {
+      const inst = Object.keys(m.installed);
+      const tested = inst.filter(v => m.installed[v].test && m.installed[v].test.ok);
+      const pick = (tested.length ? tested : inst).sort(cmpVer).pop();
+      if (pick) { m.active = pick; changed = true; }
+    }
     if (changed) await save();
   }
 
@@ -312,7 +327,7 @@ export function createVendor({ root, fetchImpl = fetch, now = () => Date.now() }
       if (!v.ok) throw new VendorError('Файлы версии повреждены или изменены: ' + v.problems.slice(0, 3).join('; '), 'CORRUPT');
       if (!force && !(m.installed[version].test && m.installed[version].test.ok)) throw new VendorError('Сначала запустите проверку на вашей библиотеке: без успешной проверки версию включать нельзя', 'NOT_TESTED');
       const prev = m.active;
-      m.active = version;
+      m.active = version; m.userOff = false;   // снова включили — снимаем метку «выключено пользователем»
       m.previous = (prev && prev !== version ? [prev, ...m.previous] : m.previous).filter((x, i, a) => x !== version && a.indexOf(x) === i).slice(0, HISTORY_MAX);
       await save();
       return { active: m.active, previous: m.previous };
@@ -325,7 +340,7 @@ export function createVendor({ root, fetchImpl = fetch, now = () => Date.now() }
     return activateLocked(target, true);
   });
   const deactivate = () => withLock('deactivate', async () => {
-    if (m.active) { m.previous = [m.active, ...m.previous.filter(v => v !== m.active)].slice(0, HISTORY_MAX); m.active = null; await save(); }
+    if (m.active) { m.previous = [m.active, ...m.previous.filter(v => v !== m.active)].slice(0, HISTORY_MAX); m.active = null; m.userOff = true; await save(); }
     return { active: null, previous: m.previous };
   });
   const remove = version => withLock('remove', async () => {
