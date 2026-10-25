@@ -775,6 +775,7 @@ function openDictViewModal(){
   box.innerHTML = '<h3>Весь словарь пояснений</h3>'
     + '<p class="mh">Всё описанное — из <b>keyword-dict.json</b>. Разделы: общее/код, по языкам (c, cpp, java…), HTML-теги/атрибуты, CSS-свойства/значения. Поиск фильтрует по слову и тексту. «⧉» у раздела копирует его строками «слово: пояснение».</p>'
     + '<input class="inv-search" id="dv-q" placeholder="поиск по слову или пояснению…" style="width:100%;box-sizing:border-box;margin-bottom:8px">'
+    + '<div id="dv-groups" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px"></div>'
     + '<div class="mbtns"><button class="btn" id="dv-close">закрыть</button><button class="btn" id="dv-dups" title="найти ключи, лежащие сразу в нескольких разделах/языках">🔍 дубли</button><span class="pp-note" id="dv-note" style="margin-left:auto"></span></div>'
     + '<div class="lp-prev" id="dv-dupbox" style="display:none;max-height:28vh;margin-bottom:8px;border-color:#b45cff"></div>'
     + '<div class="lp-prev" id="dv-body" style="max-height:60vh"></div>';
@@ -803,16 +804,23 @@ function openDictViewModal(){
     rowEl.after(pre);
   }
 
+  let activeGroup = null;   // null = показывать все разделы; иначе — только выбранный (клик по чипу)
   function render(){
     const body = q('#dv-body'); body.innerHTML = '';
     if(!dict){ body.textContent = 'загрузка…'; return; }
     const flt = (q('#dv-q').value || '').trim().toLowerCase();
-    // собрать все разделы: фиксированные + языки
+    // собрать все разделы: языки — первыми (это главная разбивка), затем общее/HTML/CSS
     const groups = [];
-    for(const [key, title] of SECTS){ if(dict[key] && Object.keys(dict[key]).length) groups.push([title, dict[key]]); }
     if(dict.langs) for(const lang of Object.keys(dict.langs).sort()){ if(Object.keys(dict.langs[lang] || {}).length) groups.push(['Язык: ' + lang, dict.langs[lang]]); }
+    for(const [key, title] of SECTS){ if(dict[key] && Object.keys(dict[key]).length) groups.push([title, dict[key]]); }
+    // чипы-разделы сверху: видно, что языки есть, и можно показать только нужный
+    const chips = q('#dv-groups'); chips.innerHTML = '';
+    const chip = (label, on, onClick) => { const b = el2('button', 'btn'); b.textContent = label; b.style.cssText = 'padding:2px 10px;border-radius:12px;font-size:11.5px' + (on ? ';background:var(--acc,#52F2C9);color:#06231c' : ''); b.onclick = onClick; return b; };
+    chips.appendChild(chip('всё (' + groups.reduce((s, [, o]) => s + Object.keys(o).length, 0) + ')', !activeGroup, () => { activeGroup = null; render(); }));
+    groups.forEach(([title, obj]) => chips.appendChild(chip(title.replace('Язык: ', '') + ' (' + Object.keys(obj).length + ')', activeGroup === title, () => { activeGroup = title; render(); })));
     let total = 0, shown = 0;
     groups.forEach(([title, obj]) => {
+      if(activeGroup && title !== activeGroup){ total += Object.keys(obj).length; return; }   // показываем только выбранный раздел, но «всего» считаем по всем
       const rows = Object.entries(obj).filter(([w, t]) => !flt || w.toLowerCase().includes(flt) || String(t).toLowerCase().includes(flt));
       total += Object.keys(obj).length; shown += rows.length;
       if(!rows.length) return;
