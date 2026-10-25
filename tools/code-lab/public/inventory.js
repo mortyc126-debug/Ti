@@ -762,7 +762,8 @@ function openDictViewModal(){
   box.innerHTML = '<h3>Весь словарь пояснений</h3>'
     + '<p class="mh">Всё описанное — из <b>keyword-dict.json</b>. Разделы: общее/код, по языкам (c, cpp, java…), HTML-теги/атрибуты, CSS-свойства/значения. Поиск фильтрует по слову и тексту. «⧉» у раздела копирует его строками «слово: пояснение».</p>'
     + '<input class="inv-search" id="dv-q" placeholder="поиск по слову или пояснению…" style="width:100%;box-sizing:border-box;margin-bottom:8px">'
-    + '<div class="mbtns"><button class="btn" id="dv-close">закрыть</button><span class="pp-note" id="dv-note" style="margin-left:auto"></span></div>'
+    + '<div class="mbtns"><button class="btn" id="dv-close">закрыть</button><button class="btn" id="dv-dups" title="найти ключи, лежащие сразу в нескольких разделах/языках">🔍 дубли</button><span class="pp-note" id="dv-note" style="margin-left:auto"></span></div>'
+    + '<div class="lp-prev" id="dv-dupbox" style="display:none;max-height:28vh;margin-bottom:8px;border-color:#b45cff"></div>'
     + '<div class="lp-prev" id="dv-body" style="max-height:60vh"></div>';
   bg.appendChild(box); document.body.appendChild(bg);
   const q = s => bg.querySelector(s);
@@ -833,6 +834,24 @@ function openDictViewModal(){
     q('#dv-note').textContent = 'всего: ' + total + (flt ? ' · найдено: ' + shown : '');
     if(!shown) body.appendChild(el2('div', 'lp-row muted', flt ? 'ничего не найдено' : 'словарь пуст'));
   }
+  // проверка дублей: один и тот же ключ в нескольких разделах/языках (внутри одного раздела дублей быть не может — объект по ключу)
+  function showDups(){
+    const panel = q('#dv-dupbox');
+    if(panel.style.display !== 'none'){ panel.style.display = 'none'; return; }
+    panel.style.display = ''; panel.innerHTML = '';
+    if(!dict){ panel.textContent = 'словарь ещё не загружен'; return; }
+    const where = new Map();
+    const scan = (obj, label) => { if(!obj) return; for(const k of Object.keys(obj)){ const kk = k.toLowerCase(); if(!where.has(kk)) where.set(kk, []); where.get(kk).push(label); } };
+    SECTS.forEach(([key, title]) => scan(dict[key], title));
+    if(dict.langs) for(const lang of Object.keys(dict.langs)) scan(dict.langs[lang], 'язык: ' + lang);
+    const dups = [...where].filter(([, src]) => src.length > 1).sort((a, b) => a[0].localeCompare(b[0]));
+    const head = el2('div', 'lp-sec'); head.textContent = dups.length ? ('Ключи в нескольких местах: ' + dups.length) : 'Дублей нет — каждый ключ ровно в одном разделе'; panel.appendChild(head);
+    if(dups.length){
+      const note = el2('div', 'muted'); note.style.cssText = 'font-size:11px;margin:0 0 4px 6px'; note.textContent = 'при клике по слову в коде побеждает язык (его пояснение). Общие строки можно оставить или убрать из общего раздела.'; panel.appendChild(note);
+      dups.forEach(([k, src]) => { const d = el2('div', 'lp-row'); const b = document.createElement('b'); b.textContent = k; b.style.color = 'var(--name,#cbc2ea)'; d.appendChild(b); d.appendChild(document.createTextNode(' → ' + src.join(', '))); panel.appendChild(d); });
+    }
+  }
+  q('#dv-dups').onclick = showDups;
   q('#dv-q').addEventListener('input', render);
   render();
   fetch('/keyword-dict.json', { cache: 'no-store' }).then(r => r.json()).then(d => { dict = d; render(); }).catch(() => { q('#dv-body').textContent = 'не удалось загрузить словарь'; });

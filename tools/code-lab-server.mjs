@@ -108,6 +108,9 @@ const DICT_BASE = path.join(PUBLIC, 'keyword-dict.json');
 const DICT_DIR = path.join(PUBLIC, 'dict');
 const LANGS_DIR = path.join(DICT_DIR, 'langs');
 const EXAMPLES_FILE = path.join(DICT_DIR, 'examples.json');   // привязка «слово/конструкция → кусок-пример» {term:{id,title}}
+// алиасы языка → канон: чтобы «javascript»/«py»/«c++» не плодили файл-двойник рядом с js/python/cpp
+const LANG_ALIAS = { javascript: 'js', typescript: 'ts', py: 'python', python3: 'python', shell: 'bash', sh: 'bash', zsh: 'bash', 'c++': 'cpp', cplusplus: 'cpp', cxx: 'cpp', 'c#': 'csharp', 'c-sharp': 'csharp', cs: 'csharp', golang: 'go', rb: 'ruby', kt: 'kotlin', rs: 'rust', jsx: 'js', tsx: 'ts', htm: 'html', yml: 'yaml' };
+const canonLang = v => { v = String(v || '').trim().toLowerCase(); return LANG_ALIAS[v] || v.replace(/[^a-z0-9_+-]/g, '') || 'other'; };
 let _kwDict = null;
 async function loadExamples(){ try { const o = JSON.parse(await fs.readFile(EXAMPLES_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
 async function loadLangDicts(){
@@ -133,7 +136,7 @@ async function kwDict(){
 }
 // записать словарь языка в свой файл dict/langs/<lang>.json (мёрдж с существующим)
 async function saveLangDict(lang, pairs){
-  lang = String(lang || '').trim().toLowerCase().replace(/[^a-z0-9_+-]/g, '') || 'other';
+  lang = canonLang(lang);
   await fs.mkdir(LANGS_DIR, { recursive: true });
   const fp = path.join(LANGS_DIR, lang + '.json');
   let cur = {}; try { cur = JSON.parse(await fs.readFile(fp, 'utf8')); } catch(_){}
