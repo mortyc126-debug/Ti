@@ -7,7 +7,6 @@
   const PAGES = [
     { key:'home',        label:'Главная',      href:'/',                sect:'Старт' },
     { key:'start',       label:'С чего начать', href:'/start.html',      sect:'Старт' },
-    { key:'learn',       label:'Обучение',     href:'/schema.html',     sect:'Старт' },
     { key:'inventory',   label:'Опись',        href:'/inventory.html',  sect:'Кусочки кода' },
     { key:'library',     label:'Библиотека',   href:'/library.html',    sect:'Кусочки кода' },
     { key:'constructor', label:'Конструктор',  href:'/constructor.html',sect:'Собирать' },

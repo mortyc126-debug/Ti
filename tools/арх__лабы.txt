@@ -197,7 +197,7 @@ library/
 
 | Раздел меню | Пункт | Страница |
 |---|---|---|
-| Старт | Главная, С чего начать, Обучение | `index.html` (`home.js`), `start.html` (`start.js`), `schema.html` |
+| Старт | Главная, С чего начать | `index.html` (`home.js`), `start.html` (`start.js`) |
 | Кусочки кода | **Опись**, **Библиотека** | `inventory.html` (`inventory.js`, `ai-tools.js`), `library.html` (`app.js`, `upload-templates.js`, `cm-bridge.js`) |
 | Собирать | **Конструктор**, Рецепты | `constructor.html` (`constructor.js`, `sandbox.js`, `workspace.js`, `tabs.js`, `fileio.js`, `search.js`, `navigate.js`, `inspect.js`), `recipes.html` (`recipes.js`) |
 | Данные | Данные (загрузка) | `schema-json.html` |
@@ -205,7 +205,6 @@ library/
 Страницы вне меню:
 - `catalog.html` (`catalog.js`, `settings.js`, `generate.js`): прежний «Каталог компонентов»; ссылок на него в интерфейсе нет, открывается только по адресу;
 - `component.html` (`component.js`, `contract.js`): страница одного куска (4 уровня раскрытия, кнопки ИИ «✨»);
-- `schema-*.html`: учебные практикумы (диаграммы, структуры данных, отладка, отрисовка);
 - `vendor.html`, `vendor-test.html`: управление и проверка CodeMirror.
 
 ### Файлы с общей логикой
