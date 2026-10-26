@@ -56,7 +56,7 @@
   document.head.appendChild(st);
 
   const panel = document.createElement('div'); panel.className = 'ai-ask';
-  panel.innerHTML = '<div class="aa-h" id="aa-head"><b>🤖 Спросить ИИ</b><button id="aa-max" title="на весь экран">⤢</button><button id="aa-min" title="закрыть">×</button></div>'
+  panel.innerHTML = '<div class="aa-h" id="aa-head"><b>Спросить</b><button id="aa-max" title="на весь экран">⤢</button><button id="aa-min" title="закрыть">×</button></div>'
     + '<div class="aa-body">'
     + '<div class="aa-src" id="aa-src"></div>'
     + '<div class="aa-acts">'
@@ -147,7 +147,7 @@
   q('#aa-copy').onclick = () => { try { navigator.clipboard.writeText(q('#aa-ans').textContent); } catch(_){} q('#aa-copy').textContent = '✓ скопировано'; setTimeout(() => q('#aa-copy').textContent = '⧉ копировать ответ', 1200); };
 
   // кнопка в панели песочницы
-  const b = document.createElement('button'); b.className = 'btn'; b.id = 'sbAskBtn'; b.textContent = '🤖 спросить ИИ';
+  const b = document.createElement('button'); b.className = 'btn'; b.id = 'sbAskBtn'; b.textContent = 'спросить';
   b.title = 'выдели код и спроси ИИ: объяснить, найти баги, улучшить';
   b.onclick = () => { const on = !panel.classList.contains('on'); panel.classList.toggle('on', on); if(on){ applyGeo(); refreshSrc(); } };
   const legend = bar.querySelector('#sbLegend'); if(legend) legend.after(b); else bar.appendChild(b);
