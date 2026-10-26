@@ -127,3 +127,47 @@ function editRecipe(id){
   } else draw();
 }
 document.getElementById('new').onclick = () => editRecipe(null);
+
+// загрузка больших шаблонов ПАЧКОЙ: один JSON с кодом внутри — куски извлекаются и связываются сами
+const BULK_SAMPLE = JSON.stringify([
+  {
+    title: 'Таблица из API со светящейся шапкой',
+    desc: 'Берём массив из API, рисуем таблицу, подсвечиваем шапку.',
+    pieces: [
+      { title: 'Загрузить массив из API', lang: 'js', note: 'берём данные', code: 'const rows = await (await fetch(api)).json();' },
+      { title: 'Таблица-разметка', lang: 'html', note: 'куда выводим', code: '<table id="tbl"><thead class="glow"><tr><th>Имя</th></tr></thead><tbody></tbody></table>' },
+      { title: 'Заполнить таблицу', lang: 'js', note: 'пишем строки', code: 'const tb = document.querySelector("#tbl tbody");\nrows.forEach(r => { const tr = document.createElement("tr"); tr.textContent = r.name; tb.appendChild(tr); });' },
+      { title: 'Светящаяся шапка', lang: 'css', note: 'стиль', code: '#tbl .glow { box-shadow: 0 0 8px #0ff; }' }
+    ]
+  }
+], null, 2);
+
+function openBulkModal(){
+  const bg = el('div', 'modal-bg'); const box = el('div', 'modal'); box.style.maxWidth = '760px';
+  box.innerHTML = '<h3>Загрузить большие шаблоны пачкой</h3>'
+    + '<p class="mh" style="color:var(--text3);font-size:12.5px;line-height:1.5;margin:0 0 10px">Один JSON — сколько угодно рецептов. Код кусков пишешь прямо внутри: они сами создадутся в библиотеке (повторы не задвоятся) и соберутся в рецепт. Заполнять руками ничего не надо. Формат: массив <code>[{title, desc, pieces:[{title, lang, code, note}]}]</code>. Можно и ссылаться на готовый кусок по <code>id</code> или <code>title</code> вместо кода.</p>'
+    + '<div class="mfield"><label>JSON с рецептами</label><textarea id="bk-text" rows="12" placeholder="вставь сюда JSON (или нажми «пример»)" style="font-family:ui-monospace,monospace;font-size:12px"></textarea></div>'
+    + '<div class="mbtns"><button class="btn" id="bk-file">📄 из файла…</button><button class="btn" id="bk-sample">пример</button><button class="btn ok" id="bk-load">📥 загрузить</button><button class="btn" id="bk-close">закрыть</button><input type="file" id="bk-fileinp" accept=".json" style="display:none"></div>'
+    + '<div class="merr" id="bk-err" style="margin-top:10px"></div>';
+  bg.appendChild(box); document.body.appendChild(bg);
+  const q = s => box.querySelector(s);
+  bg.onclick = e => { if(e.target === bg) bg.remove(); };
+  q('#bk-close').onclick = () => bg.remove();
+  q('#bk-sample').onclick = () => { q('#bk-text').value = BULK_SAMPLE; };
+  q('#bk-file').onclick = () => q('#bk-fileinp').click();
+  q('#bk-fileinp').onchange = async e => { const f = e.target.files[0]; if(!f) return; try { q('#bk-text').value = await f.text(); } catch(_){} e.target.value = ''; };
+  q('#bk-load').onclick = async () => {
+    const err = q('#bk-err'); err.textContent = ''; err.style.color = '';
+    let data; try { data = JSON.parse(q('#bk-text').value); } catch(e){ err.textContent = 'Это не похоже на JSON: ' + e.message; return; }
+    q('#bk-load').disabled = true; q('#bk-load').textContent = 'граблю…';
+    const r = await fetch('/api/recipes/import', { method: 'POST', body: JSON.stringify(data) }).then(x => x.json()).catch(() => null);
+    q('#bk-load').disabled = false; q('#bk-load').textContent = '📥 загрузить';
+    if(!r || !r.ok){ err.textContent = 'Не вышло загрузить (сервер не ответил или формат не тот).'; return; }
+    err.style.color = 'var(--str,#52F2C9)';
+    err.textContent = '✓ Готово. Больших шаблонов: ' + r.recipes + ' · новых кусков в библиотеку: ' + r.piecesAdded + ' · переиспользовано: ' + r.piecesReused + (r.itemsUnresolved ? ' · без кода/не найдено: ' + r.itemsUnresolved : '');
+    try { PIECES = await fetch('/api/list').then(x => x.json()); } catch(_){}
+    await reload();
+    setTimeout(() => bg.remove(), 1800);
+  };
+}
+document.getElementById('bulk').onclick = openBulkModal;

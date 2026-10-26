@@ -1215,6 +1215,52 @@ const server = http.createServer(async (req, res) => {
       await fs.unlink(abs).catch(() => {});
       return json(res, 200, { ok: true });
     }
+    // загрузить большие шаблоны (рецепты) ПАЧКОЙ с кодом внутри: куски сами создаются/находятся,
+    // рецепт собирается по ним. Формат: [{title, desc, pieces:[{title,lang,code,note}]}] (или {recipes:[…]}).
+    // items по id/названию тоже поддерживаются — тогда ищем уже существующий кусок.
+    if(u.pathname === '/api/recipes/import' && req.method === 'POST'){
+      const b = await readBody(req);
+      let recs = [];
+      if(Array.isArray(b)) recs = b;
+      else if(b && Array.isArray(b.recipes)) recs = b.recipes;
+      else if(b && (b.title || b.pieces || b.items)) recs = [b];
+      let created = 0, piecesAdded = 0, piecesReused = 0, itemsUnresolved = 0; const savedTitles = [];
+      let rows = null; const rowsOf = async () => rows || (rows = await store.rows());
+      for(const rec of recs){
+        if(!rec || typeof rec !== 'object') continue;
+        const title = String(rec.title || 'Рецепт').slice(0, 120);
+        const desc = String(rec.desc || '').slice(0, 2000);
+        const srcItems = Array.isArray(rec.pieces) ? rec.pieces : (Array.isArray(rec.items) ? rec.items : []);
+        const items = [];
+        for(const it of srcItems){
+          if(!it || typeof it !== 'object') continue;
+          const note = String(it.note || '').slice(0, 300);
+          if(it.id && await store.has(String(it.id))){ const t = await store.get(String(it.id)); items.push({ id: String(it.id), title: String(it.title || (t && t.title) || it.id).slice(0, 120), note }); continue; }
+          const code = typeof it.code === 'string' ? it.code : '';
+          if(code.trim()){
+            const lang = String(it.lang || 'js').toLowerCase();
+            const ptitle = String(it.title || 'кусок').slice(0, 80);
+            const dup = (await findSameTemplate(ptitle, code)) || (await findByCode(code));
+            let pid;
+            if(dup){ pid = dup; piecesReused++; }
+            else {
+              const obj = { id: slug(ptitle || lang), lang, group: String(it.group || rec.group || 'Мои куски').slice(0, 60), title: ptitle, desc: String(it.desc || '').slice(0, 400), lines: tokenize(code, lang), output: it.output != null ? String(it.output) : '' };
+              if(_CONTRACT_LANGS.has(lang)){ const c = codeContract(code, lang); obj.component = { provides: c.provides, requires: c.requires }; }
+              const r = await store.save(obj, { origin: 'imported' }); pid = r.id; piecesAdded++; rows = null;
+            }
+            items.push({ id: pid, title: ptitle, note }); continue;
+          }
+          if(it.title){ const hit = (await rowsOf()).find(x => (x.title || '').trim().toLowerCase() === String(it.title).trim().toLowerCase()); if(hit){ items.push({ id: hit.id, title: hit.title, note }); continue; } }
+          items.push({ id: '', title: String(it.title || 'кусок').slice(0, 120), note }); itemsUnresolved++;
+        }
+        const id = slug(title);
+        const obj = { id, title, desc, items: items.slice(0, 200), savedAt: Date.now() };
+        await fs.mkdir(RECIPES, { recursive: true });
+        await fs.writeFile(path.join(RECIPES, id + '.json'), JSON.stringify(obj, null, 2), 'utf8');
+        created++; savedTitles.push(title);
+      }
+      return json(res, 200, { ok: true, recipes: created, piecesAdded, piecesReused, itemsUnresolved, saved: savedTitles.slice(0, 50) });
+    }
 
     // какие языки установлены у пользователя
     if(u.pathname === '/api/run/langs'){ return json(res, 200, await detectLangs()); }
