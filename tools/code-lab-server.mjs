@@ -43,7 +43,7 @@ const DATA = path.join(ROOT, 'data');     // сохранённые JSON-дан�
 const RECIPES = path.join(ROOT, 'recipes'); // рецепты: название + описание + список кусков
 const PORT = Number(process.argv[2]) || 8788;
 // файловое хранилище библиотеки (код — обычные файлы; подсветка и пояснения строятся из текста при загрузке)
-const store = createLibraryStore({ root: LIBRARY, legacyDir: TEMPLATES, dictPath: path.join(PUBLIC, 'keyword-dict.json'), getDict: () => kwDict(), coverage: j => coverage(j) });
+const store = createLibraryStore({ root: LIBRARY, legacyDir: TEMPLATES, dictPath: path.join(PUBLIC, 'keyword-dict.json'), getDict: () => kwDict(), coverage: j => coverage(j), contract: (code, lang) => codeContract(code, lang) });
 // поиск: по названию, описанию, тегам, коду и пояснениям; синонимы лежат в library/_synonyms.json (правятся руками)
 const search = createSearchService({ store, synonymsPath: path.join(LIBRARY, '_synonyms.json'), defaultSynonymsPath: path.join(ROOT, 'lib', 'default-synonyms.json') });
 const aiRuntime = createProviderRuntime({ configPath: path.join(ROOT, 'ai-config.json') });   // выбранный ИИ-сервис (ключей в файле нет)
@@ -231,7 +231,7 @@ async function importBundle(b){
     let obj;
     if(dup){ obj = await store.get(dup); obj.lang = lang; obj.title = title; if(pc.group) obj.group = String(pc.group).slice(0, 60); if(pc.desc) obj.desc = String(pc.desc).slice(0, 400); obj.lines = hasLines ? pc.lines : tokenize(code, lang); if(pc.output != null) obj.output = String(pc.output); updated++; }
     else { obj = { id: slug(title || lang), lang, group: (pc.group != null ? String(pc.group) : 'Мои куски').slice(0, 60), title, desc: String(pc.desc || '').slice(0, 400), lines: hasLines ? pc.lines : tokenize(code, lang), output: pc.output != null ? String(pc.output) : '', descAt: Date.now() }; if(pc.component && typeof pc.component === 'object') obj.component = pc.component; created++; }
-    if(lang === 'js' && !hasLines){ const c = codeContract(code); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
+    if(_CONTRACT_LANGS.has(lang) && !hasLines){ const c = codeContract(code, lang); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
     annotateLines(obj.lines, lang, dict);   // автоподпись из словаря (уже с новыми словами); готовые e не трогает
     if(pc.words && typeof pc.words === 'object'){   // ручные пояснения куска — поверх авто
       const low = {}; for(const [k, v] of Object.entries(pc.words)) low[k.toLowerCase()] = v;
@@ -245,28 +245,55 @@ async function importBundle(b){
 // контракт куска: что он ОБЪЯВЛЯЕТ наружу (provides) и какие имена БЕРЁТ со стороны (requires)
 const _GLOBALS = new Set(['console','document','window','globalThis','Math','JSON','Array','Object','Number','String','Boolean','Date','Map','Set','Promise','RegExp','Error','Symbol','fetch','setTimeout','setInterval','clearTimeout','clearInterval','requestAnimationFrame','parseInt','parseFloat','isNaN','isFinite','localStorage','sessionStorage','URL','URLSearchParams','true','false','null','undefined','NaN','Infinity']);
 const _KWSET = new Set(['const','let','var','function','return','if','else','for','while','of','in','new','await','async','class','extends','super','try','catch','finally','throw','typeof','instanceof','this','break','continue','switch','case','do','yield','delete','void','import','export','from','default','static','get','set']);
-function codeContract(code){
-  const txt = String(code || '').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1 ').replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, ' ');
-  const ID = '[A-Za-zА-Яа-яЁё_$][\\wА-Яа-яЁё$]*';
-  const provides = new Set();          // что кусок объявляет наружу
-  for(const m of txt.matchAll(new RegExp('(?:const|let|var|function|class)\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
-  // локальные имена, которые НЕ являются внешней зависимостью: объявления + параметры + счётчики циклов
-  const local = new Set(provides);
-  const addParams = s => String(s || '').split(',').forEach(p => { const m = p.trim().match(new RegExp('^(' + ID + ')')); if(m) local.add(m[1]); });
-  for(const m of txt.matchAll(new RegExp('function\\s*' + ID + '?\\s*\\(([^)]*)\\)', 'g'))) addParams(m[1]);   // function f(a,b)
-  for(const m of txt.matchAll(/\(([^)]*)\)\s*=>/g)) addParams(m[1]);                                            // (a,b)=>
-  for(const m of txt.matchAll(new RegExp('(' + ID + ')\\s*=>', 'g'))) local.add(m[1]);                          // x =>
-  for(const m of txt.matchAll(new RegExp('catch\\s*\\(\\s*(' + ID + ')', 'g'))) local.add(m[1]);                // catch(e)
-  for(const m of txt.matchAll(new RegExp('for\\s*\\(\\s*(?:const|let|var)?\\s*(' + ID + ')', 'g'))) local.add(m[1]);
-  const requires = new Set();
-  for(const m of txt.matchAll(new RegExp('(' + ID + ')', 'g'))){
-    const w = m[1]; const i = m.index || 0;
-    if(i > 0 && txt[i - 1] === '.') continue;           // свойство после точки — не внешняя зависимость
-    if(_KWSET.has(w) || _GLOBALS.has(w) || local.has(w)) continue;
-    requires.add(w);
+// DOM-якоря из СЫРОГО кода (строки ещё не вырезаны): #id / .class, по которым связывается стек.
+// html создаёт элемент (provides #id/.class) → js пишет в него (requires) → css стилизует (requires).
+const _HEX = /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;   // не путать id-селектор с hex-цветом
+function domAnchors(code, lang, provides, requires){
+  const t = String(code || '');
+  if(lang === 'html'){
+    for(const m of t.matchAll(/\bid\s*=\s*["']([^"']+)["']/g)) provides.add('#' + m[1].trim());
+    for(const m of t.matchAll(/\bclass\s*=\s*["']([^"']+)["']/g)) m[1].trim().split(/\s+/).forEach(c => c && provides.add('.' + c));
+  } else if(lang === 'css'){
+    for(const block of t.split('}')){ const sel = block.split('{')[0];   // только селекторная часть, не значения (hex-цвета)
+      for(const m of sel.matchAll(/#([A-Za-z_][\w-]*)/g)) requires.add('#' + m[1]);
+      for(const m of sel.matchAll(/\.([A-Za-z_][\w-]*)/g)) requires.add('.' + m[1]); }
+  } else {   // js/ts: куда пишет (requires) и что помечает id/классом (provides)
+    for(const m of t.matchAll(/querySelector(?:All)?\(\s*["'`]([^"'`]+)["'`]/g)) for(const s of (m[1].match(/[#.][A-Za-z_][\w-]*/g) || [])) requires.add(s);
+    for(const m of t.matchAll(/getElementById\(\s*["'`]([^"'`]+)["'`]/g)) requires.add('#' + m[1].trim());
+    for(const m of t.matchAll(/getElementsByClassName\(\s*["'`]([^"'`]+)["'`]/g)) m[1].trim().split(/\s+/).forEach(c => c && requires.add('.' + c));
+    for(const m of t.matchAll(/\.id\s*=\s*["'`]([^"'`]+)["'`]/g)) provides.add('#' + m[1].trim());
+    for(const m of t.matchAll(/setAttribute\(\s*["'`]id["'`]\s*,\s*["'`]([^"'`]+)["'`]/g)) provides.add('#' + m[1].trim());
+    for(const m of t.matchAll(/classList\.add\(\s*["'`]([^"'`]+)["'`]/g)) provides.add('.' + m[1].trim());
   }
-  return { provides: [...provides].slice(0, 40), requires: [...requires].slice(0, 40) };
+  for(const s of [...requires]) if(_HEX.test(s)) requires.delete(s);
+  for(const s of [...provides]) if(_HEX.test(s)) provides.delete(s);
 }
+function codeContract(code, lang){
+  lang = String(lang || 'js').toLowerCase();
+  const provides = new Set(), requires = new Set();
+  if(lang === 'js' || lang === 'ts'){
+    const txt = String(code || '').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1 ').replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, ' ');
+    const ID = '[A-Za-zА-Яа-яЁё_$][\\wА-Яа-яЁё$]*';
+    for(const m of txt.matchAll(new RegExp('(?:const|let|var|function|class)\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
+    // локальные имена, которые НЕ являются внешней зависимостью: объявления + параметры + счётчики циклов
+    const local = new Set(provides);
+    const addParams = s => String(s || '').split(',').forEach(p => { const m = p.trim().match(new RegExp('^(' + ID + ')')); if(m) local.add(m[1]); });
+    for(const m of txt.matchAll(new RegExp('function\\s*' + ID + '?\\s*\\(([^)]*)\\)', 'g'))) addParams(m[1]);   // function f(a,b)
+    for(const m of txt.matchAll(/\(([^)]*)\)\s*=>/g)) addParams(m[1]);                                            // (a,b)=>
+    for(const m of txt.matchAll(new RegExp('(' + ID + ')\\s*=>', 'g'))) local.add(m[1]);                          // x =>
+    for(const m of txt.matchAll(new RegExp('catch\\s*\\(\\s*(' + ID + ')', 'g'))) local.add(m[1]);                // catch(e)
+    for(const m of txt.matchAll(new RegExp('for\\s*\\(\\s*(?:const|let|var)?\\s*(' + ID + ')', 'g'))) local.add(m[1]);
+    for(const m of txt.matchAll(new RegExp('(' + ID + ')', 'g'))){
+      const w = m[1]; const i = m.index || 0;
+      if(i > 0 && txt[i - 1] === '.') continue;           // свойство после точки — не внешняя зависимость
+      if(_KWSET.has(w) || _GLOBALS.has(w) || local.has(w)) continue;
+      requires.add(w);
+    }
+  }
+  domAnchors(code, lang, provides, requires);             // #id/.class — связь по DOM, для всех фронт-языков
+  return { provides: [...provides].slice(0, 60), requires: [...requires].slice(0, 60) };
+}
+const _CONTRACT_LANGS = new Set(['js', 'ts', 'html', 'css']);
 
 function slug(s){
   const base = String(s || 'tpl').toLowerCase().replace(/[^\wа-яё]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'tpl';
@@ -450,7 +477,7 @@ const server = http.createServer(async (req, res) => {
             verification: { code_review: 'not_verified', tests: 'not_run', compatibility: 'not_verified' },
           },
         };
-        if(lang === 'js'){ const c = codeContract(code); obj.component.provides = c.provides; obj.component.requires = c.requires; }
+        if(_CONTRACT_LANGS.has(lang)){ const c = codeContract(code, lang); obj.component.provides = c.provides; obj.component.requires = c.requires; }
         annotateLines(obj.lines, lang, dict);
         try { await store.save(obj, { origin: 'ai' }); created.push({ id, title }); }
         catch(e){ skipped.push({ title, reason: String(e?.message || e) }); }
@@ -614,7 +641,7 @@ const server = http.createServer(async (req, res) => {
         descAt: Date.now(),   // когда описание задано/изменено — для авто-сведения по дате
       };
       if(b.component && typeof b.component === 'object') obj.component = b.component;   // метаданные компонента (теги осей, подкатегория, контракт)
-      if(lang === 'js'){ const c = codeContract(code); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
+      if(_CONTRACT_LANGS.has(lang)){ const c = codeContract(code, lang); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
       annotateLines(obj.lines, lang, await kwDict());   // автоподпись ключевых слов из словаря
       await store.save(obj);
       return json(res, 200, { id: obj.id });
@@ -678,7 +705,7 @@ const server = http.createServer(async (req, res) => {
             if(pc.tags) obj.tags = pc.tags;
             if(pc.aliases) obj.aliases = pc.aliases;
             obj.source = { title: 'manual', desc: pc.desc ? 'manual' : null, tags: pc.tags ? 'manual' : null };
-            if(pc.lang === 'js'){ const c = codeContract(pc.code); obj.component = { provides: c.provides, requires: c.requires }; }
+            if(_CONTRACT_LANGS.has(pc.lang)){ const c = codeContract(pc.code, pc.lang); obj.component = { provides: c.provides, requires: c.requires }; }
             annotateLines(obj.lines, pc.lang, dict);
             await store.save(obj, { origin: 'imported' });
             item.id = obj.id;
@@ -713,7 +740,7 @@ const server = http.createServer(async (req, res) => {
       if(b.provides !== undefined){ j.component = j.component || {}; j.component.provides = _names(b.provides); j.component.contractLocked = true; }
       if(b.requires !== undefined){ j.component = j.component || {}; j.component.requires = _names(b.requires); j.component.contractLocked = true; }
       if(b.code != null){ j.lines = tokenize(b.code, j.lang);   // код заново раскрашивается
-        if((j.lang || 'js') === 'js' && !(j.component && j.component.contractLocked)){ const c = codeContract(b.code); j.component = j.component || {}; j.component.provides = c.provides; j.component.requires = c.requires; } }
+        if(_CONTRACT_LANGS.has(j.lang || 'js') && !(j.component && j.component.contractLocked)){ const c = codeContract(b.code, j.lang || 'js'); j.component = j.component || {}; j.component.provides = c.provides; j.component.requires = c.requires; } }
       // свои разделы (классификация пользователя) и заметки к словам — хранятся на компоненте
       if(Array.isArray(b.collections)){ j.component = j.component || {}; j.component.collections = b.collections.map(x => String(x).slice(0, 60)).slice(0, 30); }
       if(b.notes && typeof b.notes === 'object'){ j.component = j.component || {}; j.component.notes = b.notes; }

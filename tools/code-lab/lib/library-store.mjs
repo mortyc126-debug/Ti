@@ -65,7 +65,8 @@ function placeNotes(lines, notes, look, { onlyEmpty = true } = {}){
   return unplaced;
 }
 
-export function createLibraryStore({ root, legacyDir = null, dictPath = null, getDict, coverage = () => ({}) }){
+export function createLibraryStore({ root, legacyDir = null, dictPath = null, getDict, coverage = () => ({}), contract = null }){
+  const _CONTRACT_LANGS = new Set(['js', 'ts', 'html', 'css']);
   const byPath = new Map();   // путь кода → запись
   let byId = new Map();
   let version = 0, lastScan = 0, dirty = true;
@@ -107,6 +108,10 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
     };
     if(j){
       row.comp = { type: j.type || '', tags: j.tags || {}, subcat: j.subcat || '', collections: Array.isArray(j.collections) ? j.collections : [], input: (j.summary && j.summary.input) || '', output: (j.summary && j.summary.output) || '', provides: Array.isArray(j.provides) ? j.provides : [], requires: Array.isArray(j.requires) ? j.requires : [] };
+    }
+    // контракт по коду на лету, если в meta пусто — чтобы связи/кандидаты работали без перезаписи файлов на диске
+    if(contract && _CONTRACT_LANGS.has(e.lang) && (!row.comp || (!row.comp.provides.length && !row.comp.requires.length))){
+      try { const c = contract(e.code, e.lang); row.comp = Object.assign(row.comp || { type: '', tags: {}, subcat: '', collections: [], input: '', output: '' }, { provides: c.provides || [], requires: c.requires || [] }); } catch(_){}
     }
     return row;
   }
