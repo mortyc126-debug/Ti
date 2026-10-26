@@ -762,6 +762,39 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, await importBundle(await readBody(req)));
     }
 
+    // восстановление бэкапа библиотеки КАК ЕСТЬ: {files:[{name,text,lang?}]} — пишем код и паспорта
+    // .meta.json прямо в library/<язык>/ байт-в-байт, без токенизации/аннотации/дедупа. Паспорт
+    // (настоящее название, разделы, пояснения) сохраняется ровно как в бэкапе.
+    if(u.pathname === '/api/library/restore' && req.method === 'POST'){
+      const b = await readBody(req);
+      const files = Array.isArray(b.files) ? b.files : [];
+      const EXT2LANG = { js:'js', mjs:'js', cjs:'js', ts:'ts', tsx:'ts', jsx:'js', py:'python', rb:'ruby', php:'php', go:'go', rs:'rust', java:'java', c:'c', h:'c', cpp:'cpp', cs:'csharp', css:'css', html:'html', htm:'html', svg:'svg', sql:'sql', sh:'bash', json:'json' };
+      const safeLang = l => (String(l || 'txt').toLowerCase().replace(/[^a-z0-9_+-]/g, '') || 'txt');
+      const langOfName = n => safeLang(EXT2LANG[String(n).split('.').pop().toLowerCase()] || 'txt');
+      const isMeta = n => /\.meta\.json$/i.test(n);
+      const metas = files.filter(f => f && isMeta(f.name));
+      const codes = files.filter(f => f && !isMeta(f.name));
+      const codeByBase = {}; codes.forEach(c => { codeByBase[path.basename(c.name)] = c; });
+      let wroteCode = 0, wroteMeta = 0, pairs = 0, metaOnly = 0, codeOnly = 0; const consumed = new Set();
+      for(const m of metas){
+        let meta; try { meta = JSON.parse(m.text); } catch(_){ continue; }
+        const base = path.basename(m.name).replace(/\.meta\.json$/i, '');   // «arc-….js»
+        const lang = safeLang(meta.lang) || langOfName(base);
+        const dir = path.join(LIBRARY, lang); await fs.mkdir(dir, { recursive: true });
+        await fs.writeFile(path.join(dir, base + '.meta.json'), m.text.endsWith('\n') ? m.text : m.text + '\n', 'utf8'); wroteMeta++;
+        const code = codeByBase[base];
+        if(code){ await fs.writeFile(path.join(dir, base), String(code.text), 'utf8'); wroteCode++; pairs++; consumed.add(base); }
+        else metaOnly++;
+      }
+      for(const c of codes){ const bn = path.basename(c.name); if(consumed.has(bn)) continue;
+        const lang = safeLang(c.lang) || langOfName(bn);
+        const dir = path.join(LIBRARY, lang); await fs.mkdir(dir, { recursive: true });
+        await fs.writeFile(path.join(dir, bn), String(c.text), 'utf8'); wroteCode++; codeOnly++;
+      }
+      try { await store.refresh(); } catch(_){}
+      return json(res, 200, { ok: true, pairs, metaOnly, codeOnly, wroteCode, wroteMeta });
+    }
+
     // правка шаблона целиком: новый код → заново токенизируем, перезаписываем файл
     if(u.pathname === '/api/edit' && req.method === 'POST'){
       const b = await readBody(req);
@@ -837,6 +870,23 @@ const server = http.createServer(async (req, res) => {
       await fs.unlink(abs).catch(() => {});
       return json(res, 200, { ok: true });
     }
+    // убрать из «Данных» паспорта библиотеки (.meta.json), случайно загруженные как объекты.
+    // Паспорт живёт рядом с кодом в библиотеке и создаётся сам; в «Данных» ему не место. {apply:false} — только показать.
+    if(u.pathname === '/api/data/clean' && req.method === 'POST'){
+      const b = await readBody(req);
+      let names = []; try { names = (await fs.readdir(DATA)).filter(n => n.endsWith('.json')); } catch(_){}
+      const junk = [];
+      for(const n of names){ if(n === 'description-jobs.json') continue;
+        try { const j = JSON.parse(await fs.readFile(path.join(DATA, n), 'utf8')); const nm = String(j.name || ''); const d = j.data;
+          const isMetaName = /\.meta\.json$/i.test(nm);
+          const isMetaData = d && typeof d === 'object' && !Array.isArray(d) && d.id != null && d.lang != null && (d.component != null || d.schema != null) && (d.file != null || Array.isArray(d.wordNotes));
+          if(isMetaName || isMetaData) junk.push({ file: n, name: nm });
+        } catch(_){}
+      }
+      if(!b.apply) return json(res, 200, { ok: true, applied: false, count: junk.length, sample: junk.slice(0, 20).map(x => x.name) });
+      let removed = 0; for(const x of junk){ try { await fs.unlink(path.join(DATA, x.file)); removed++; } catch(_){} }
+      return json(res, 200, { ok: true, applied: true, removed });
+    }
 
     // ── синхронизация шаблонов с GitHub ───────────────────────────────────
     if(u.pathname === '/api/git/info'){
@@ -875,13 +925,20 @@ const server = http.createServer(async (req, res) => {
           return json(res, 200, { ok: false, stage: 'pull', committed: staged, message: 'С сервера пришли изменения, которые конфликтуют с твоими — автослияние не вышло. Я откатила, ничего не испорчено. Нужно слить вручную (git pull) и повторить. ' + (pull.err || pull.out || '').slice(0, 240) });
         }
       }
-      let push = await git(['push'], root);
-      if(push.code !== 0){
-        const br = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], root)).out;
-        push = await git(['push', '-u', 'origin', br], root);
-        if(push.code !== 0) return json(res, 200, { ok: false, stage: 'push', committed: staged, message: push.err || push.out || 'push отклонён' });
+      const curBr = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], root)).out;
+      let push, detNote = '';
+      if(curBr && curBr !== 'HEAD'){
+        push = await git(['push'], root);
+        if(push.code !== 0) push = await git(['push', '-u', 'origin', curBr], root);   // нет upstream — задаём
+      } else {
+        // detached HEAD (не на ветке): пушить «origin HEAD» нельзя (HEAD — не имя ветки).
+        // Отправляем текущий коммит на ветку по умолчанию удалёнки (обычно main).
+        const def = ((await git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], root)).out || '').replace(/^origin\//, '') || 'main';
+        push = await git(['push', 'origin', 'HEAD:refs/heads/' + def], root);
+        detNote = ' Важно: ты была НЕ на ветке (detached HEAD) — отправила на «' + def + '». Чтобы это не повторялось, один раз выполни в терминале: git checkout ' + def;
       }
-      return json(res, 200, { ok: true, committed: staged, message: staged ? ('Отправлено на GitHub: ' + staged + ' файл(ов).') : 'На GitHub уже всё актуально.' });
+      if(push.code !== 0) return json(res, 200, { ok: false, stage: 'push', committed: staged, message: (push.err || push.out || 'push отклонён') + (curBr === 'HEAD' ? '  ·  Ты не на ветке (detached HEAD). В терминале проекта выполни: git checkout main — затем повтори отправку.' : '') });
+      return json(res, 200, { ok: true, committed: staged, message: (staged ? ('Отправлено на GitHub: ' + staged + ' файл(ов).') : 'На GitHub уже всё актуально.') + detNote });
     }
 
     // удалить шаблон

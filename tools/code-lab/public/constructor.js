@@ -319,7 +319,11 @@ function subOf(t, pk){ if(t.comp && t.comp.subcat) return t.comp.subcat; const d
 
 // ── палитра: Базовые блоки + компоненты каталога по иерархии назначений ───────
 let CATALOG = [];
-async function loadCatalog(){ try { CATALOG = await fetch('/api/list').then(r => r.json()); } catch(_){ CATALOG = []; } fillPalLangs(); renderPalette(); }
+async function loadCatalog(){ try { CATALOG = await fetch('/api/list').then(r => r.json()); } catch(_){ CATALOG = []; }
+  // защита: если запомненный фильтр языка не пересекается с тем, что реально есть — сбросить в «все»,
+  // иначе палитра молча пустеет (куски есть, но все скрыты несуществующим языком)
+  if(palLangs){ const all = new Set(allLangs()); if(![...palLangs].some(l => all.has(l))){ palLangs = null; savePalLangs(); } }
+  fillPalLangs(); renderPalette(); }
 
 // ── фильтр языков в палитре: показывать только отмеченные языки ──
 let palLangs = null;   // null = показывать все
@@ -363,6 +367,15 @@ function renderPalette(){
   }
   // каталог — единое дерево по разделу (поле «раздел», через «/»); все языки
   const cat = CATALOG.filter(t => langActive(String(t.lang || '').toLowerCase()) && (!q || (t.title + ' ' + (t.desc || '') + ' ' + (t.lang || '') + ' ' + (t.group || '')).toLowerCase().includes(q)));
+  // счётчик: видно сразу, что куски загружены, и если что-то скрыто фильтром/поиском
+  if(CATALOG.length){
+    const cnt = el('div', 'pal-count');
+    cnt.style.cssText = 'font-size:11px;color:var(--text3);padding:4px 8px 6px;font-family:ui-monospace,monospace';
+    const hidden = CATALOG.length - cat.length;
+    cnt.textContent = 'кусков в каталоге: ' + CATALOG.length + (hidden ? ' · показано ' + cat.length + ' (скрыто фильтром: ' + hidden + ')' : '');
+    if(hidden){ cnt.style.color = 'var(--num,#FF8800)'; const r = el('span', '', ' сброс'); r.style.cssText = 'cursor:pointer;text-decoration:underline;margin-left:6px'; r.onclick = () => { setPalLangs(null); const s = $('#palSearch'); if(s){ s.value = ''; } renderPalette(); }; cnt.appendChild(r); }
+    host.appendChild(cnt);
+  }
   const root = { children: new Map(), items: [] };
   cat.forEach(t => {
     const path = String(t.group || '').split('/').map(s => s.trim()).filter(Boolean);
