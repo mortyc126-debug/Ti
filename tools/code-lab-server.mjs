@@ -242,58 +242,100 @@ async function importBundle(b){
   return { ok: true, learned, created, updated, skipped, warnings, total: pieces.length };
 }
 
-// контракт куска: что он ОБЪЯВЛЯЕТ наружу (provides) и какие имена БЕРЁТ со стороны (requires)
+// ── контракт куска: что он ОБЪЯВЛЯЕТ наружу (provides) и что БЕРЁТ со стороны (requires) ──────
+// Один механизм на ВСЕ языки, без привилегий: имена (js/ts/python), DOM-селекторы (html/svg/css/js),
+// CSS-переменные и @keyframes, таблицы SQL. autoConnect стыкует куски по общему токену.
 const _GLOBALS = new Set(['console','document','window','globalThis','Math','JSON','Array','Object','Number','String','Boolean','Date','Map','Set','Promise','RegExp','Error','Symbol','fetch','setTimeout','setInterval','clearTimeout','clearInterval','requestAnimationFrame','parseInt','parseFloat','isNaN','isFinite','localStorage','sessionStorage','URL','URLSearchParams','true','false','null','undefined','NaN','Infinity']);
 const _KWSET = new Set(['const','let','var','function','return','if','else','for','while','of','in','new','await','async','class','extends','super','try','catch','finally','throw','typeof','instanceof','this','break','continue','switch','case','do','yield','delete','void','import','export','from','default','static','get','set']);
-// DOM-якоря из СЫРОГО кода (строки ещё не вырезаны): #id / .class, по которым связывается стек.
-// html создаёт элемент (provides #id/.class) → js пишет в него (requires) → css стилизует (requires).
+const _PY_KW = new Set(['False','True','None','and','as','assert','async','await','break','class','continue','def','del','elif','else','except','finally','for','from','global','if','import','in','is','lambda','nonlocal','not','or','pass','raise','return','try','while','with','yield','match','case','self','cls']);
+const _PY_BUILTIN = new Set(['print','len','range','int','str','float','list','dict','set','tuple','bool','type','enumerate','zip','map','filter','sum','min','max','abs','open','input','isinstance','issubclass','super','Exception','ValueError','KeyError','TypeError','IndexError','RuntimeError','StopIteration','sorted','reversed','any','all','round','format','repr','id','hash','object','property','staticmethod','classmethod','next','iter','getattr','setattr','hasattr','vars','dir','bytes','bytearray','frozenset','complex','divmod','pow','chr','ord','hex','oct','bin','slice','callable','globals','locals','__name__']);
 const _HEX = /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;   // не путать id-селектор с hex-цветом
-function domAnchors(code, lang, provides, requires){
-  const t = String(code || '');
-  if(lang === 'html'){
-    for(const m of t.matchAll(/\bid\s*=\s*["']([^"']+)["']/g)) provides.add('#' + m[1].trim());
-    for(const m of t.matchAll(/\bclass\s*=\s*["']([^"']+)["']/g)) m[1].trim().split(/\s+/).forEach(c => c && provides.add('.' + c));
-  } else if(lang === 'css'){
-    for(const block of t.split('}')){ const sel = block.split('{')[0];   // только селекторная часть, не значения (hex-цвета)
-      for(const m of sel.matchAll(/#([A-Za-z_][\w-]*)/g)) requires.add('#' + m[1]);
-      for(const m of sel.matchAll(/\.([A-Za-z_][\w-]*)/g)) requires.add('.' + m[1]); }
-  } else {   // js/ts: куда пишет (requires) и что помечает id/классом (provides)
-    for(const m of t.matchAll(/querySelector(?:All)?\(\s*["'`]([^"'`]+)["'`]/g)) for(const s of (m[1].match(/[#.][A-Za-z_][\w-]*/g) || [])) requires.add(s);
-    for(const m of t.matchAll(/getElementById\(\s*["'`]([^"'`]+)["'`]/g)) requires.add('#' + m[1].trim());
-    for(const m of t.matchAll(/getElementsByClassName\(\s*["'`]([^"'`]+)["'`]/g)) m[1].trim().split(/\s+/).forEach(c => c && requires.add('.' + c));
-    for(const m of t.matchAll(/\.id\s*=\s*["'`]([^"'`]+)["'`]/g)) provides.add('#' + m[1].trim());
-    for(const m of t.matchAll(/setAttribute\(\s*["'`]id["'`]\s*,\s*["'`]([^"'`]+)["'`]/g)) provides.add('#' + m[1].trim());
-    for(const m of t.matchAll(/classList\.add\(\s*["'`]([^"'`]+)["'`]/g)) provides.add('.' + m[1].trim());
+// html/svg: элемент с id/классом — его создаёт эта разметка (provides)
+function markupAnchors(t, provides){
+  for(const m of t.matchAll(/\bid\s*=\s*["']([^"']+)["']/g)) provides.add('#' + m[1].trim());
+  for(const m of t.matchAll(/\bclass\s*=\s*["']([^"']+)["']/g)) m[1].trim().split(/\s+/).forEach(c => c && provides.add('.' + c));
+}
+// css: стилизует селекторы (requires #id/.class), объявляет @keyframes и --переменные (provides), берёт var()/animation (requires)
+function cssAnchors(t, provides, requires){
+  for(const block of t.split('}')){ const sel = block.split('{')[0];   // селекторная часть — без значений (hex-цвета)
+    for(const m of sel.matchAll(/#([A-Za-z_][\w-]*)/g)) requires.add('#' + m[1]);
+    for(const m of sel.matchAll(/\.([A-Za-z_][\w-]*)/g)) requires.add('.' + m[1]); }
+  for(const m of t.matchAll(/@keyframes\s+([A-Za-z_][\w-]*)/g)) provides.add('@' + m[1]);                 // анимация объявлена тут
+  for(const m of t.matchAll(/(--[A-Za-z_][\w-]*)\s*:/g)) provides.add(m[1]);                              // --переменная задана тут
+  for(const m of t.matchAll(/var\(\s*(--[A-Za-z_][\w-]*)/g)) requires.add(m[1]);                          // var(--x) — нужна переменная
+  for(const m of t.matchAll(/animation(?:-name)?\s*:\s*([^;}]+)/g)) for(const w of (m[1].match(/[A-Za-z_][\w-]*/g) || [])) requires.add('@' + w);
+}
+// js/ts: куда пишет (requires #sel), что помечает id/классом (provides), какие @keyframes/--vars трогает
+function scriptDomAnchors(t, provides, requires){
+  for(const m of t.matchAll(/querySelector(?:All)?\(\s*["'`]([^"'`]+)["'`]/g)) for(const s of (m[1].match(/[#.][A-Za-z_][\w-]*/g) || [])) requires.add(s);
+  for(const m of t.matchAll(/getElementById\(\s*["'`]([^"'`]+)["'`]/g)) requires.add('#' + m[1].trim());
+  for(const m of t.matchAll(/getElementsByClassName\(\s*["'`]([^"'`]+)["'`]/g)) m[1].trim().split(/\s+/).forEach(c => c && requires.add('.' + c));
+  for(const m of t.matchAll(/\.id\s*=\s*["'`]([^"'`]+)["'`]/g)) provides.add('#' + m[1].trim());
+  for(const m of t.matchAll(/setAttribute\(\s*["'`]id["'`]\s*,\s*["'`]([^"'`]+)["'`]/g)) provides.add('#' + m[1].trim());
+  for(const m of t.matchAll(/classList\.add\(\s*["'`]([^"'`]+)["'`]/g)) provides.add('.' + m[1].trim());
+}
+// js/ts: имена, объявленные наружу, и имена, взятые со стороны (строки/комменты вырезаны)
+function jsIdents(code, provides, requires){
+  const txt = String(code || '').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1 ').replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, ' ');
+  const ID = '[A-Za-zА-Яа-яЁё_$][\\wА-Яа-яЁё$]*';
+  for(const m of txt.matchAll(new RegExp('(?:const|let|var|function|class)\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
+  const local = new Set(provides);
+  const addParams = s => String(s || '').split(',').forEach(p => { const m = p.trim().match(new RegExp('^(' + ID + ')')); if(m) local.add(m[1]); });
+  for(const m of txt.matchAll(new RegExp('function\\s*' + ID + '?\\s*\\(([^)]*)\\)', 'g'))) addParams(m[1]);
+  for(const m of txt.matchAll(/\(([^)]*)\)\s*=>/g)) addParams(m[1]);
+  for(const m of txt.matchAll(new RegExp('(' + ID + ')\\s*=>', 'g'))) local.add(m[1]);
+  for(const m of txt.matchAll(new RegExp('catch\\s*\\(\\s*(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of txt.matchAll(new RegExp('for\\s*\\(\\s*(?:const|let|var)?\\s*(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of txt.matchAll(new RegExp('(' + ID + ')', 'g'))){
+    const w = m[1]; const i = m.index || 0;
+    if(i > 0 && txt[i - 1] === '.') continue;             // свойство после точки — не внешняя зависимость
+    if(_KWSET.has(w) || _GLOBALS.has(w) || local.has(w)) continue;
+    requires.add(w);
   }
-  for(const s of [...requires]) if(_HEX.test(s)) requires.delete(s);
-  for(const s of [...provides]) if(_HEX.test(s)) provides.delete(s);
+}
+// python: def/class/присваивание на верхнем уровне → provides; импорты/параметры/локальные → не requires
+function pyIdents(code, provides, requires){
+  const t = String(code || '').replace(/'''[\s\S]*?'''/g, ' ').replace(/"""[\s\S]*?"""/g, ' ').replace(/#[^\n]*/g, ' ').replace(/'(?:\\.|[^'\\])*'/g, ' ').replace(/"(?:\\.|[^"\\])*"/g, ' ');
+  const ID = '[A-Za-z_][A-Za-z0-9_]*';
+  for(const m of t.matchAll(new RegExp('(?:^|\\n)\\s*(?:async\\s+)?def\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
+  for(const m of t.matchAll(new RegExp('(?:^|\\n)\\s*class\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
+  for(const m of t.matchAll(new RegExp('(?:^|\\n)(' + ID + ')\\s*=(?!=)', 'g'))) provides.add(m[1]);   // модульная переменная (с начала строки)
+  const local = new Set(provides);
+  for(const m of t.matchAll(new RegExp('import\\s+(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of t.matchAll(new RegExp('\\bas\\s+(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of t.matchAll(new RegExp('from\\s+' + ID + '(?:\\.' + ID + ')*\\s+import\\s+([^\\n]+)', 'g'))) m[1].split(',').forEach(x => { const mm = x.trim().match(new RegExp('^(' + ID + ')')); if(mm) local.add(mm[1]); });
+  for(const m of t.matchAll(new RegExp('(' + ID + ')\\s*=(?!=)', 'g'))) local.add(m[1]);                // любое присваивание — локальное имя
+  for(const m of t.matchAll(new RegExp('def\\s+' + ID + '\\s*\\(([^)]*)\\)', 'g'))) m[1].split(',').forEach(p => { const mm = p.trim().match(new RegExp('^\\*{0,2}(' + ID + ')')); if(mm) local.add(mm[1]); });
+  for(const m of t.matchAll(new RegExp('lambda\\s+([^:]*):', 'g'))) m[1].split(',').forEach(p => { const mm = p.trim().match(new RegExp('^(' + ID + ')')); if(mm) local.add(mm[1]); });
+  for(const m of t.matchAll(new RegExp('for\\s+(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of t.matchAll(new RegExp('(' + ID + ')', 'g'))){
+    const w = m[1]; const i = m.index || 0;
+    if(i > 0 && t[i - 1] === '.') continue;
+    if(w.length < 2 || !/[A-Za-z]/.test(w) || _PY_KW.has(w) || _PY_BUILTIN.has(w) || local.has(w)) continue;   // без букв (напр. _000 из 1_000) — не имя
+    requires.add(w);
+  }
+}
+// sql: CREATE TABLE/VIEW/… → provides tbl:имя; FROM/JOIN/INTO/UPDATE → requires tbl:имя (имена в своём namespace)
+function sqlAnchors(code, provides, requires){
+  const t = String(code || '').replace(/--[^\n]*/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/'(?:''|[^'])*'/g, ' ');
+  const NAME = '[`"\\[]?([A-Za-z_][A-Za-z0-9_$.]*)[`"\\]]?';
+  for(const m of t.matchAll(new RegExp('create\\s+(?:or\\s+replace\\s+)?(?:global\\s+|local\\s+)?(?:temp(?:orary)?\\s+)?(?:table|view|materialized\\s+view|index|sequence)\\s+(?:if\\s+not\\s+exists\\s+)?' + NAME, 'gi'))) provides.add('tbl:' + m[1].toLowerCase());
+  for(const m of t.matchAll(new RegExp('(?:\\bfrom|\\bjoin|\\binto|\\bupdate|delete\\s+from)\\s+' + NAME, 'gi'))) requires.add('tbl:' + m[1].toLowerCase());
 }
 function codeContract(code, lang){
   lang = String(lang || 'js').toLowerCase();
+  const raw = String(code || '');
   const provides = new Set(), requires = new Set();
-  if(lang === 'js' || lang === 'ts'){
-    const txt = String(code || '').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1 ').replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, ' ');
-    const ID = '[A-Za-zА-Яа-яЁё_$][\\wА-Яа-яЁё$]*';
-    for(const m of txt.matchAll(new RegExp('(?:const|let|var|function|class)\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
-    // локальные имена, которые НЕ являются внешней зависимостью: объявления + параметры + счётчики циклов
-    const local = new Set(provides);
-    const addParams = s => String(s || '').split(',').forEach(p => { const m = p.trim().match(new RegExp('^(' + ID + ')')); if(m) local.add(m[1]); });
-    for(const m of txt.matchAll(new RegExp('function\\s*' + ID + '?\\s*\\(([^)]*)\\)', 'g'))) addParams(m[1]);   // function f(a,b)
-    for(const m of txt.matchAll(/\(([^)]*)\)\s*=>/g)) addParams(m[1]);                                            // (a,b)=>
-    for(const m of txt.matchAll(new RegExp('(' + ID + ')\\s*=>', 'g'))) local.add(m[1]);                          // x =>
-    for(const m of txt.matchAll(new RegExp('catch\\s*\\(\\s*(' + ID + ')', 'g'))) local.add(m[1]);                // catch(e)
-    for(const m of txt.matchAll(new RegExp('for\\s*\\(\\s*(?:const|let|var)?\\s*(' + ID + ')', 'g'))) local.add(m[1]);
-    for(const m of txt.matchAll(new RegExp('(' + ID + ')', 'g'))){
-      const w = m[1]; const i = m.index || 0;
-      if(i > 0 && txt[i - 1] === '.') continue;           // свойство после точки — не внешняя зависимость
-      if(_KWSET.has(w) || _GLOBALS.has(w) || local.has(w)) continue;
-      requires.add(w);
-    }
-  }
-  domAnchors(code, lang, provides, requires);             // #id/.class — связь по DOM, для всех фронт-языков
+  if(lang === 'js' || lang === 'ts'){ jsIdents(raw, provides, requires); scriptDomAnchors(raw, provides, requires); }
+  else if(lang === 'python'){ pyIdents(raw, provides, requires); }
+  else if(lang === 'html' || lang === 'svg'){ markupAnchors(raw, provides); }
+  else if(lang === 'css'){ cssAnchors(raw, provides, requires); }
+  else if(lang === 'sql'){ sqlAnchors(raw, provides, requires); }
+  for(const s of [...requires]){ if(provides.has(s) || _HEX.test(s)) requires.delete(s); }   // своё не требуем; hex — не селектор
+  for(const s of [...provides]) if(_HEX.test(s)) provides.delete(s);
   return { provides: [...provides].slice(0, 60), requires: [...requires].slice(0, 60) };
 }
-const _CONTRACT_LANGS = new Set(['js', 'ts', 'html', 'css']);
+const _CONTRACT_LANGS = new Set(['js', 'ts', 'html', 'svg', 'css', 'python', 'sql']);
 
 function slug(s){
   const base = String(s || 'tpl').toLowerCase().replace(/[^\wа-яё]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'tpl';

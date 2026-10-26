@@ -66,7 +66,7 @@ function placeNotes(lines, notes, look, { onlyEmpty = true } = {}){
 }
 
 export function createLibraryStore({ root, legacyDir = null, dictPath = null, getDict, coverage = () => ({}), contract = null }){
-  const _CONTRACT_LANGS = new Set(['js', 'ts', 'html', 'css']);
+  const _CONTRACT_LANGS = new Set(['js', 'ts', 'html', 'svg', 'css', 'python', 'sql']);
   const byPath = new Map();   // путь кода → запись
   let byId = new Map();
   let version = 0, lastScan = 0, dirty = true;

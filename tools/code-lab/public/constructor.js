@@ -589,51 +589,88 @@ function addNode(blockId, extra){
 // контракт узла по его коду: какие имена даёт (provides) и какие берёт (requires)
 const _NC_GLOB = new Set(['console','document','window','globalThis','Math','JSON','Array','Object','Number','String','Boolean','Date','Map','Set','Promise','RegExp','Error','Symbol','fetch','setTimeout','setInterval','clearTimeout','clearInterval','requestAnimationFrame','parseInt','parseFloat','isNaN','isFinite','localStorage','sessionStorage','URL','URLSearchParams','true','false','null','undefined','NaN','Infinity']);
 const _NC_KW = new Set(['const','let','var','function','return','if','else','for','while','of','in','new','await','async','class','extends','super','try','catch','finally','throw','typeof','instanceof','this','break','continue','switch','case','do','yield','delete','void','import','export','from','default','static','get','set']);
-// DOM-якоря из СЫРОГО кода: #id/.class связывают стек (html создаёт → js пишет → css стилизует)
+// Контракт на ВСЕ языки (зеркало сервера): имена (js/ts/python), DOM-селекторы (html/svg/css/js),
+// CSS-переменные/@keyframes, таблицы SQL. Строки/комменты режем только там, где считаем имена.
 const _NC_HEX = /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
-function nodeDomAnchors(raw, lang, provides, requires){
-  const t = String(raw || '');
-  if(lang === 'html'){
-    for(const m of t.matchAll(/\bid\s*=\s*["']([^"']+)["']/g)) provides.add('#' + m[1].trim());
-    for(const m of t.matchAll(/\bclass\s*=\s*["']([^"']+)["']/g)) m[1].trim().split(/\s+/).forEach(c => c && provides.add('.' + c));
-  } else if(lang === 'css'){
-    for(const block of t.split('}')){ const sel = block.split('{')[0];
-      for(const m of sel.matchAll(/#([A-Za-z_][\w-]*)/g)) requires.add('#' + m[1]);
-      for(const m of sel.matchAll(/\.([A-Za-z_][\w-]*)/g)) requires.add('.' + m[1]); }
-  } else {
-    for(const m of t.matchAll(/querySelector(?:All)?\(\s*["'`]([^"'`]+)["'`]/g)) for(const s of (m[1].match(/[#.][A-Za-z_][\w-]*/g) || [])) requires.add(s);
-    for(const m of t.matchAll(/getElementById\(\s*["'`]([^"'`]+)["'`]/g)) requires.add('#' + m[1].trim());
-    for(const m of t.matchAll(/getElementsByClassName\(\s*["'`]([^"'`]+)["'`]/g)) m[1].trim().split(/\s+/).forEach(c => c && requires.add('.' + c));
-    for(const m of t.matchAll(/\.id\s*=\s*["'`]([^"'`]+)["'`]/g)) provides.add('#' + m[1].trim());
-    for(const m of t.matchAll(/setAttribute\(\s*["'`]id["'`]\s*,\s*["'`]([^"'`]+)["'`]/g)) provides.add('#' + m[1].trim());
-    for(const m of t.matchAll(/classList\.add\(\s*["'`]([^"'`]+)["'`]/g)) provides.add('.' + m[1].trim());
+const _NC_PYKW = new Set(['False','True','None','and','as','assert','async','await','break','class','continue','def','del','elif','else','except','finally','for','from','global','if','import','in','is','lambda','nonlocal','not','or','pass','raise','return','try','while','with','yield','match','case','self','cls']);
+const _NC_PYBI = new Set(['print','len','range','int','str','float','list','dict','set','tuple','bool','type','enumerate','zip','map','filter','sum','min','max','abs','open','input','isinstance','issubclass','super','Exception','ValueError','KeyError','TypeError','IndexError','RuntimeError','StopIteration','sorted','reversed','any','all','round','format','repr','id','hash','object','property','staticmethod','classmethod','next','iter','getattr','setattr','hasattr','vars','dir','bytes','bytearray','frozenset','complex','divmod','pow','chr','ord','hex','oct','bin','slice','callable','globals','locals','__name__']);
+function _ncMarkup(t, provides){
+  for(const m of t.matchAll(/\bid\s*=\s*["']([^"']+)["']/g)) provides.add('#' + m[1].trim());
+  for(const m of t.matchAll(/\bclass\s*=\s*["']([^"']+)["']/g)) m[1].trim().split(/\s+/).forEach(c => c && provides.add('.' + c));
+}
+function _ncCss(t, provides, requires){
+  for(const block of t.split('}')){ const sel = block.split('{')[0];
+    for(const m of sel.matchAll(/#([A-Za-z_][\w-]*)/g)) requires.add('#' + m[1]);
+    for(const m of sel.matchAll(/\.([A-Za-z_][\w-]*)/g)) requires.add('.' + m[1]); }
+  for(const m of t.matchAll(/@keyframes\s+([A-Za-z_][\w-]*)/g)) provides.add('@' + m[1]);
+  for(const m of t.matchAll(/(--[A-Za-z_][\w-]*)\s*:/g)) provides.add(m[1]);
+  for(const m of t.matchAll(/var\(\s*(--[A-Za-z_][\w-]*)/g)) requires.add(m[1]);
+  for(const m of t.matchAll(/animation(?:-name)?\s*:\s*([^;}]+)/g)) for(const w of (m[1].match(/[A-Za-z_][\w-]*/g) || [])) requires.add('@' + w);
+}
+function _ncScriptDom(t, provides, requires){
+  for(const m of t.matchAll(/querySelector(?:All)?\(\s*["'`]([^"'`]+)["'`]/g)) for(const s of (m[1].match(/[#.][A-Za-z_][\w-]*/g) || [])) requires.add(s);
+  for(const m of t.matchAll(/getElementById\(\s*["'`]([^"'`]+)["'`]/g)) requires.add('#' + m[1].trim());
+  for(const m of t.matchAll(/getElementsByClassName\(\s*["'`]([^"'`]+)["'`]/g)) m[1].trim().split(/\s+/).forEach(c => c && requires.add('.' + c));
+  for(const m of t.matchAll(/\.id\s*=\s*["'`]([^"'`]+)["'`]/g)) provides.add('#' + m[1].trim());
+  for(const m of t.matchAll(/setAttribute\(\s*["'`]id["'`]\s*,\s*["'`]([^"'`]+)["'`]/g)) provides.add('#' + m[1].trim());
+  for(const m of t.matchAll(/classList\.add\(\s*["'`]([^"'`]+)["'`]/g)) provides.add('.' + m[1].trim());
+}
+function _ncJs(raw, provides, requires){
+  const txt = raw.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1 ').replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, ' ');
+  const ID = '[A-Za-zА-Яа-яЁё_$][\\wА-Яа-яЁё$]*';
+  for(const m of txt.matchAll(new RegExp('(?:const|let|var|function|class)\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
+  const local = new Set(provides);
+  const addP = s => String(s || '').split(',').forEach(x => { const m = x.trim().match(new RegExp('^(' + ID + ')')); if(m) local.add(m[1]); });
+  for(const m of txt.matchAll(new RegExp('function\\s*' + ID + '?\\s*\\(([^)]*)\\)', 'g'))) addP(m[1]);
+  for(const m of txt.matchAll(/\(([^)]*)\)\s*=>/g)) addP(m[1]);
+  for(const m of txt.matchAll(new RegExp('(' + ID + ')\\s*=>', 'g'))) local.add(m[1]);
+  for(const m of txt.matchAll(new RegExp('catch\\s*\\(\\s*(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of txt.matchAll(new RegExp('for\\s*\\(\\s*(?:const|let|var)?\\s*(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of txt.matchAll(new RegExp('(' + ID + ')', 'g'))){
+    const w = m[1], i = m.index || 0;
+    if(i > 0 && txt[i - 1] === '.') continue;
+    if(_NC_KW.has(w) || _NC_GLOB.has(w) || local.has(w)) continue;
+    requires.add(w);
   }
-  for(const s of [...provides]) if(_NC_HEX.test(s)) provides.delete(s);
-  for(const s of [...requires]) if(_NC_HEX.test(s)) requires.delete(s);
+}
+function _ncPy(raw, provides, requires){
+  const t = raw.replace(/'''[\s\S]*?'''/g, ' ').replace(/"""[\s\S]*?"""/g, ' ').replace(/#[^\n]*/g, ' ').replace(/'(?:\\.|[^'\\])*'/g, ' ').replace(/"(?:\\.|[^"\\])*"/g, ' ');
+  const ID = '[A-Za-z_][A-Za-z0-9_]*';
+  for(const m of t.matchAll(new RegExp('(?:^|\\n)\\s*(?:async\\s+)?def\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
+  for(const m of t.matchAll(new RegExp('(?:^|\\n)\\s*class\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
+  for(const m of t.matchAll(new RegExp('(?:^|\\n)(' + ID + ')\\s*=(?!=)', 'g'))) provides.add(m[1]);
+  const local = new Set(provides);
+  for(const m of t.matchAll(new RegExp('import\\s+(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of t.matchAll(new RegExp('\\bas\\s+(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of t.matchAll(new RegExp('from\\s+' + ID + '(?:\\.' + ID + ')*\\s+import\\s+([^\\n]+)', 'g'))) m[1].split(',').forEach(x => { const mm = x.trim().match(new RegExp('^(' + ID + ')')); if(mm) local.add(mm[1]); });
+  for(const m of t.matchAll(new RegExp('(' + ID + ')\\s*=(?!=)', 'g'))) local.add(m[1]);
+  for(const m of t.matchAll(new RegExp('def\\s+' + ID + '\\s*\\(([^)]*)\\)', 'g'))) m[1].split(',').forEach(p => { const mm = p.trim().match(new RegExp('^\\*{0,2}(' + ID + ')')); if(mm) local.add(mm[1]); });
+  for(const m of t.matchAll(new RegExp('lambda\\s+([^:]*):', 'g'))) m[1].split(',').forEach(p => { const mm = p.trim().match(new RegExp('^(' + ID + ')')); if(mm) local.add(mm[1]); });
+  for(const m of t.matchAll(new RegExp('for\\s+(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of t.matchAll(new RegExp('(' + ID + ')', 'g'))){
+    const w = m[1], i = m.index || 0;
+    if(i > 0 && t[i - 1] === '.') continue;
+    if(w.length < 2 || !/[A-Za-z]/.test(w) || _NC_PYKW.has(w) || _NC_PYBI.has(w) || local.has(w)) continue;
+    requires.add(w);
+  }
+}
+function _ncSql(raw, provides, requires){
+  const t = raw.replace(/--[^\n]*/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/'(?:''|[^'])*'/g, ' ');
+  const NAME = '[`"\\[]?([A-Za-z_][A-Za-z0-9_$.]*)[`"\\]]?';
+  for(const m of t.matchAll(new RegExp('create\\s+(?:or\\s+replace\\s+)?(?:global\\s+|local\\s+)?(?:temp(?:orary)?\\s+)?(?:table|view|materialized\\s+view|index|sequence)\\s+(?:if\\s+not\\s+exists\\s+)?' + NAME, 'gi'))) provides.add('tbl:' + m[1].toLowerCase());
+  for(const m of t.matchAll(new RegExp('(?:\\bfrom|\\bjoin|\\binto|\\bupdate|delete\\s+from)\\s+' + NAME, 'gi'))) requires.add('tbl:' + m[1].toLowerCase());
 }
 function nodeContract(nd){
   const raw = String(nodeCode(nd));
   const lang = String((typeof nodeLang === 'function' ? nodeLang(nd) : (nd && nd.src && nd.src.lang)) || 'js').toLowerCase();
   const provides = new Set(), reqSet = new Set();
-  if(lang === 'js' || lang === 'ts'){
-    const txt = raw.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1 ').replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, ' ');
-    const ID = '[A-Za-zА-Яа-яЁё_$][\\wА-Яа-яЁё$]*';
-    for(const m of txt.matchAll(new RegExp('(?:const|let|var|function|class)\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
-    const local = new Set(provides);
-    const addP = s => String(s || '').split(',').forEach(x => { const m = x.trim().match(new RegExp('^(' + ID + ')')); if(m) local.add(m[1]); });
-    for(const m of txt.matchAll(new RegExp('function\\s*' + ID + '?\\s*\\(([^)]*)\\)', 'g'))) addP(m[1]);
-    for(const m of txt.matchAll(/\(([^)]*)\)\s*=>/g)) addP(m[1]);
-    for(const m of txt.matchAll(new RegExp('(' + ID + ')\\s*=>', 'g'))) local.add(m[1]);
-    for(const m of txt.matchAll(new RegExp('catch\\s*\\(\\s*(' + ID + ')', 'g'))) local.add(m[1]);
-    for(const m of txt.matchAll(new RegExp('for\\s*\\(\\s*(?:const|let|var)?\\s*(' + ID + ')', 'g'))) local.add(m[1]);
-    for(const m of txt.matchAll(new RegExp('(' + ID + ')', 'g'))){
-      const w = m[1], i = m.index || 0;
-      if(i > 0 && txt[i - 1] === '.') continue;
-      if(_NC_KW.has(w) || _NC_GLOB.has(w) || local.has(w)) continue;
-      reqSet.add(w);
-    }
-  }
-  nodeDomAnchors(raw, lang, provides, reqSet);   // #id/.class — та же связь, через весь стек
+  if(lang === 'js' || lang === 'ts'){ _ncJs(raw, provides, reqSet); _ncScriptDom(raw, provides, reqSet); }
+  else if(lang === 'python'){ _ncPy(raw, provides, reqSet); }
+  else if(lang === 'html' || lang === 'svg'){ _ncMarkup(raw, provides); }
+  else if(lang === 'css'){ _ncCss(raw, provides, reqSet); }
+  else if(lang === 'sql'){ _ncSql(raw, provides, reqSet); }
+  for(const s of [...reqSet]){ if(provides.has(s) || _NC_HEX.test(s)) reqSet.delete(s); }
+  for(const s of [...provides]) if(_NC_HEX.test(s)) provides.delete(s);
   return { provides, requires: [...reqSet] };
 }
 // типизированный контракт узла из шаблона (имя→тип), если он сохранён в src
