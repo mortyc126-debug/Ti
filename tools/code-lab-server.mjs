@@ -775,24 +775,26 @@ const server = http.createServer(async (req, res) => {
       const metas = files.filter(f => f && isMeta(f.name));
       const codes = files.filter(f => f && !isMeta(f.name));
       const codeByBase = {}; codes.forEach(c => { codeByBase[path.basename(c.name)] = c; });
-      let wroteCode = 0, wroteMeta = 0, pairs = 0, metaOnly = 0, codeOnly = 0; const consumed = new Set();
+      let wroteCode = 0, wroteMeta = 0, pairs = 0; const consumed = new Set();
+      const metaOnlyList = [], codeOnlyList = [], badMeta = [];
       for(const m of metas){
-        let meta; try { meta = JSON.parse(m.text); } catch(_){ continue; }
+        let meta; try { meta = JSON.parse(m.text); } catch(_){ badMeta.push(path.basename(m.name)); continue; }
         const base = path.basename(m.name).replace(/\.meta\.json$/i, '');   // «arc-….js»
         const lang = safeLang(meta.lang) || langOfName(base);
         const dir = path.join(LIBRARY, lang); await fs.mkdir(dir, { recursive: true });
         await fs.writeFile(path.join(dir, base + '.meta.json'), m.text.endsWith('\n') ? m.text : m.text + '\n', 'utf8'); wroteMeta++;
         const code = codeByBase[base];
         if(code){ await fs.writeFile(path.join(dir, base), String(code.text), 'utf8'); wroteCode++; pairs++; consumed.add(base); }
-        else metaOnly++;
+        else metaOnlyList.push(base);
       }
       for(const c of codes){ const bn = path.basename(c.name); if(consumed.has(bn)) continue;
         const lang = safeLang(c.lang) || langOfName(bn);
         const dir = path.join(LIBRARY, lang); await fs.mkdir(dir, { recursive: true });
-        await fs.writeFile(path.join(dir, bn), String(c.text), 'utf8'); wroteCode++; codeOnly++;
+        await fs.writeFile(path.join(dir, bn), String(c.text), 'utf8'); wroteCode++; codeOnlyList.push(bn);
       }
       try { await store.refresh(); } catch(_){}
-      return json(res, 200, { ok: true, pairs, metaOnly, codeOnly, wroteCode, wroteMeta });
+      return json(res, 200, { ok: true, pairs, metaOnly: metaOnlyList.length, codeOnly: codeOnlyList.length, wroteCode, wroteMeta,
+        metaOnlyList: metaOnlyList.slice(0, 60), codeOnlyList: codeOnlyList.slice(0, 60), badMeta: badMeta.slice(0, 20) });
     }
 
     // правка шаблона целиком: новый код → заново токенизируем, перезаписываем файл

@@ -145,11 +145,20 @@ async function handle(fileList){
     const payload = [...metaFiles.map(g => ({ name: g.name, text: g.text })), ...codeFiles.map(g => ({ name: g.name, text: g.text, lang: extLang(g.name) }))];
     const r = await fetch('/api/library/restore', { method: 'POST', body: JSON.stringify({ files: payload }) }).then(x => x.json()).catch(() => null);
     if(r && r.ok){
-      if(r.pairs) note.push('восстановлено (код+паспорт): ' + r.pairs);
-      if(r.metaOnly) note.push('паспортов без кода: ' + r.metaOnly);
-      if(r.codeOnly) note.push('кода без паспорта: ' + r.codeOnly);
-      const g = await syncGh(); if(g) note.push('GitHub: ' + g);
-    } else note.push('восстановление библиотеки не удалось');
+      note.push('✓ архив обработан');
+      note.push('в библиотеку легло кусков: ' + r.pairs);
+      const g = await syncGh(); if(g) note.push('на GitHub ушло изменённых: ' + (String(g).match(/\d+/) ? String(g).match(/\d+/)[0] : g) + ' (остальное уже совпадало — это норма)');
+      // непарные файлы — показать, чтобы было видно, что в архиве без пары, а не прятать за цифрой
+      if(r.metaOnly || r.codeOnly || (r.badMeta && r.badMeta.length)){
+        let msg = 'Загрузка прошла. В библиотеку легло ' + r.pairs + ' кусков (код + паспорт).\n\n';
+        msg += 'Без пары в архиве (это не ошибка, просто у них нет второй половинки):\n';
+        if(r.metaOnly) msg += '\n• паспортов без файла кода — ' + r.metaOnly + ':\n  ' + (r.metaOnlyList || []).slice(0, 30).join('\n  ') + (r.metaOnly > 30 ? '\n  …и ещё ' + (r.metaOnly - 30) : '');
+        if(r.codeOnly) msg += '\n\n• файлов кода без паспорта — ' + r.codeOnly + ':\n  ' + (r.codeOnlyList || []).slice(0, 30).join('\n  ') + (r.codeOnly > 30 ? '\n  …и ещё ' + (r.codeOnly - 30) : '');
+        if(r.badMeta && r.badMeta.length) msg += '\n\n• битые паспорта (не JSON) — ' + r.badMeta.length + ':\n  ' + r.badMeta.join('\n  ');
+        msg += '\n\nКод без паспорта в библиотеке есть, просто с именем по файлу. Паспорт без кода ни на что не влияет.';
+        alert(msg);
+      }
+    } else { note.push('восстановление не удалось — сервер не ответил'); alert('Не удалось загрузить: сервер не ответил. Запущен ли локальный сервер?'); }
     // прочий JSON из того же бэкапа (эталоны и т.п.) → в «Данные»
     files = otherFiles.map(g => { let d; try { d = JSON.parse(g.text); } catch(_){ d = null; } return { name: g.name, data: d }; }).filter(f => f.data != null);
     if(files.length){ const st = await autostore(); if(st.saved) note.push('в данные: ' + st.saved); dataFiles = files.filter(f => !looksLikePiece(f.data)); }
@@ -481,7 +490,7 @@ async function unzip(buf){
     off += 46 + nameLen + extraLen + commentLen;
     if(/\/$/.test(name)) continue;   // запись-папка
     // берём json И файлы кода; прочее (картинки и т.п.) тихо пропускаем
-    if(!/\.(json|js|mjs|jsx|ts|tsx|py|rb|php|go|lua|sh|bash|ps1|r|sql|css|html?|txt)$/i.test(name)) continue;
+    if(!/\.(json|js|mjs|cjs|jsx|ts|tsx|py|rb|php|go|rs|java|c|h|cpp|cs|lua|sh|bash|ps1|r|sql|css|html?|svg|txt)$/i.test(name)) continue;
     const lnameLen = dv.getUint16(lho + 26, true), lextraLen = dv.getUint16(lho + 28, true);
     const dataStart = lho + 30 + lnameLen + lextraLen;
     const comp = bytes.subarray(dataStart, dataStart + compSize);
