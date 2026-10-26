@@ -3,10 +3,10 @@
   "id": "custom-error-class-mvox325p",
   "file": "custom-error-class-mvox325p.js",
   "lang": "js",
-  "title": "custom-error-class",
+  "title": "Свой класс ошибки",
   "group": "Ошибки и отладка / Исключения",
-  "desc": "",
-  "output": "",
+  "desc": "Наследуйте Error, задайте name и сохраняйте исходную ошибку через cause при необходимости.",
+  "output": "ОшибкаДанных",
   "descAt": 1792998620845,
   "component": {
     "provides": [
@@ -24,14 +24,22 @@
     },
     "subcat": "Исключения"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Error",
+    "class",
+    "ошибки"
+  ],
+  "aliases": [
+    "создать собственный тип ошибки",
+    "наследовать Error",
+    "различать ошибки по name"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

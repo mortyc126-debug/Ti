@@ -3,10 +3,10 @@
   "id": "array-chunk-mvox3dkq",
   "file": "array-chunk-mvox3dkq.js",
   "lang": "js",
-  "title": "array-chunk",
+  "title": "Разбить массив на чанки",
   "group": "Данные / Коллекции",
-  "desc": "",
-  "output": "",
+  "desc": "Создаёт массивы фиксированного размера; последний чанк может быть короче.",
+  "output": "[[1, 2], [3, 4], [5]]",
   "descAt": 1792998635642,
   "component": {
     "provides": [
@@ -24,14 +24,22 @@
     },
     "subcat": "Коллекции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "массив",
+    "chunk",
+    "пакетная обработка"
+  ],
+  "aliases": [
+    "разбить массив на части",
+    "чанки фиксированного размера",
+    "пакетная обработка элементов"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

@@ -3,10 +3,10 @@
   "id": "event-abort-signal-mvox3880",
   "file": "event-abort-signal-mvox3880.js",
   "lang": "js",
-  "title": "event-abort-signal",
+  "title": "Удалить группу обработчиков через AbortController",
   "group": "Асинхронность / Отмена операций",
-  "desc": "",
-  "output": "",
+  "desc": "Передача одного signal позволяет удалить несколько обработчиков одним вызовом abort.",
+  "output": "обработчики удаляются по abort",
   "descAt": 1792998628704,
   "component": {
     "provides": [
@@ -27,14 +27,22 @@
     },
     "subcat": "Отмена операций"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "AbortController",
+    "addEventListener",
+    "очистка"
+  ],
+  "aliases": [
+    "удалить несколько слушателей событий",
+    "cleanup event listeners",
+    "signal для addEventListener"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

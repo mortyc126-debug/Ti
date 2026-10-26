@@ -3,10 +3,10 @@
   "id": "object-descriptor-mvox2ei0",
   "file": "object-descriptor-mvox2ei0.js",
   "lang": "js",
-  "title": "object-descriptor",
+  "title": "Object.getOwnPropertyDescriptor — узнать параметры свойства",
   "group": "Данные / Работа с объектами",
-  "desc": "",
-  "output": "",
+  "desc": "Возвращает дескриптор свойства: value, writable, enumerable, configurable или get/set.",
+  "output": "{ value: 50, writable: true, enumerable: true, configurable: true }",
   "descAt": 1792998590184,
   "component": {
     "provides": [
@@ -22,14 +22,22 @@
     },
     "subcat": "Работа с объектами"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "дескриптор",
+    "свойства",
+    "Object.getOwnPropertyDescriptor"
+  ],
+  "aliases": [
+    "посмотреть дескриптор свойства",
+    "узнать writable enumerable configurable",
+    "параметры свойства объекта"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

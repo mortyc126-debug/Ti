@@ -3,10 +3,10 @@
   "id": "object-has-own-mvox2cbd",
   "file": "object-has-own-mvox2cbd.js",
   "lang": "js",
-  "title": "object-has-own",
+  "title": "Object.hasOwn — проверить собственное свойство",
   "group": "Данные / Работа с объектами",
-  "desc": "",
-  "output": "",
+  "desc": "Проверяет, находится ли свойство непосредственно в объекте, а не в его цепочке прототипов.",
+  "output": "true\nfalse",
   "descAt": 1792998587353,
   "component": {
     "provides": [
@@ -22,14 +22,22 @@
     },
     "subcat": "Работа с объектами"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Object.hasOwn",
+    "свойства",
+    "объекты"
+  ],
+  "aliases": [
+    "как проверить собственное свойство объекта",
+    "отличить унаследованное свойство",
+    "проверить наличие ключа без прототипа"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

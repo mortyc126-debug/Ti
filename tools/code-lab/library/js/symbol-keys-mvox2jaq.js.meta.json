@@ -3,10 +3,10 @@
   "id": "symbol-keys-mvox2jaq",
   "file": "symbol-keys-mvox2jaq.js",
   "lang": "js",
-  "title": "symbol-keys",
+  "title": "Object.getOwnPropertySymbols — найти символьные ключи",
   "group": "Продвинутые темы / ООП и модели данных",
-  "desc": "",
-  "output": "",
+  "desc": "Возвращает собственные символьные ключи объекта.",
+  "output": "1",
   "descAt": 1792998596402,
   "component": {
     "provides": [
@@ -23,14 +23,21 @@
     },
     "subcat": "ООП и модели данных"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Symbol",
+    "Object.getOwnPropertySymbols"
+  ],
+  "aliases": [
+    "найти свойства Symbol",
+    "получить символьные ключи",
+    "перебрать скрытые ключи"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

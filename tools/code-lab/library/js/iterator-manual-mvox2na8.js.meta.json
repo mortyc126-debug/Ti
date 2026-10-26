@@ -3,10 +3,10 @@
   "id": "iterator-manual-mvox2na8",
   "file": "iterator-manual-mvox2na8.js",
   "lang": "js",
-  "title": "iterator-manual",
+  "title": "Итератор — вручную получить следующий элемент",
   "group": "Основы / Итераторы и генераторы",
-  "desc": "",
-  "output": "",
+  "desc": "Метод next возвращает объект с полями value и done.",
+  "output": "{ value: \"a\", done: false }\n{ value: \"b\", done: false }\n{ value: undefined, done: true }",
   "descAt": 1792998601568,
   "component": {
     "provides": [
@@ -20,14 +20,22 @@
     },
     "subcat": "Итераторы и генераторы"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "итератор",
+    "Symbol.iterator",
+    "next"
+  ],
+  "aliases": [
+    "вручную пройти массив итератором",
+    "как работает next",
+    "объект done value"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

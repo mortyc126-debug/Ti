@@ -3,10 +3,10 @@
   "id": "async-queue-sequential-mvox2zi2",
   "file": "async-queue-sequential-mvox2zi2.js",
   "lang": "js",
-  "title": "async-queue-sequential",
+  "title": "Последовательно обработать список async-операций",
   "group": "Асинхронность / Очереди",
-  "desc": "",
-  "output": "",
+  "desc": "Обычный for...of с await запускает следующую операцию только после завершения предыдущей.",
+  "output": "зависит от функции получитьДанные",
   "descAt": 1792998617402,
   "component": {
     "provides": [
@@ -24,14 +24,22 @@
     },
     "subcat": "Очереди"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "async",
+    "await",
+    "очередь"
+  ],
+  "aliases": [
+    "последовательные async запросы",
+    "не запускать параллельно",
+    "цикл с await"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

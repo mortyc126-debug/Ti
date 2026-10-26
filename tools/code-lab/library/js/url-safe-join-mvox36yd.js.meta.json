@@ -3,10 +3,10 @@
   "id": "url-safe-join-mvox36yd",
   "file": "url-safe-join-mvox36yd.js",
   "lang": "js",
-  "title": "url-safe-join",
+  "title": "URL — безопасно собрать относительный адрес",
   "group": "Сеть / Построение запросов",
-  "desc": "",
-  "output": "",
+  "desc": "URL конструктор разрешает относительный путь относительно базового адреса и нормализует результат.",
+  "output": "https://example.com/api/items",
   "descAt": 1792998627061,
   "component": {
     "provides": [
@@ -20,14 +20,22 @@
     },
     "subcat": "Построение запросов"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "URL",
+    "адрес",
+    "сеть"
+  ],
+  "aliases": [
+    "собрать полный URL из пути",
+    "разрешить относительный адрес",
+    "нормализовать URL"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

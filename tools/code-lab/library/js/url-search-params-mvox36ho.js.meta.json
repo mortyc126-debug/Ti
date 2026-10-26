@@ -3,10 +3,10 @@
   "id": "url-search-params-mvox36ho",
   "file": "url-search-params-mvox36ho.js",
   "lang": "js",
-  "title": "url-search-params",
+  "title": "URLSearchParams — собрать параметры URL",
   "group": "Сеть / Построение запросов",
-  "desc": "",
-  "output": "",
+  "desc": "Корректно кодирует пары query-параметров и поддерживает повторяющиеся ключи.",
+  "output": "%D0%BF%D0%BE%D0%B8%D1%81%D0%BA=%D1%81%D0%B5%D1%80%D0%B5%D0%B1%D1%80%D0%BE&страница=2&тег=металл",
   "descAt": 1792998626460,
   "component": {
     "provides": [
@@ -23,14 +23,22 @@
     },
     "subcat": "Построение запросов"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "URLSearchParams",
+    "URL",
+    "query"
+  ],
+  "aliases": [
+    "собрать query string",
+    "добавить параметры URL",
+    "кодировать параметры запроса"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

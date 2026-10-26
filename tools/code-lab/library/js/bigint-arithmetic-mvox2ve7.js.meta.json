@@ -3,10 +3,10 @@
   "id": "bigint-arithmetic-mvox2ve7",
   "file": "bigint-arithmetic-mvox2ve7.js",
   "lang": "js",
-  "title": "bigint-arithmetic",
+  "title": "BigInt — целочисленная арифметика больших значений",
   "group": "Данные / Числа и простые операции",
-  "desc": "",
-  "output": "",
+  "desc": "BigInt хранит целые числа произвольной точности; смешивать BigInt и Number в арифметике нельзя без явного преобразования.",
+  "output": "9007199254740995",
   "descAt": 1792998612079,
   "component": {
     "provides": [
@@ -22,14 +22,22 @@
     },
     "subcat": "Числа и простые операции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "BigInt",
+    "точность",
+    "числа"
+  ],
+  "aliases": [
+    "число больше MAX_SAFE_INTEGER",
+    "арифметика BigInt",
+    "точные большие целые"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

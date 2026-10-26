@@ -3,10 +3,10 @@
   "id": "number-safe-integer-mvox2uxp",
   "file": "number-safe-integer-mvox2uxp.js",
   "lang": "js",
-  "title": "number-safe-integer",
+  "title": "Number.isSafeInteger — проверить безопасное целое",
   "group": "Данные / Числа и простые операции",
-  "desc": "",
-  "output": "",
+  "desc": "Проверяет, что значение — целое число в диапазоне точного представления Number.",
+  "output": "true\nfalse",
   "descAt": 1792998611485,
   "component": {
     "provides": [],
@@ -18,14 +18,22 @@
     },
     "subcat": "Числа и простые операции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Number.isSafeInteger",
+    "точность",
+    "числа"
+  ],
+  "aliases": [
+    "проверить безопасное целое",
+    "границы Number.MAX_SAFE_INTEGER",
+    "проверка точности целого"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

@@ -3,10 +3,10 @@
   "id": "regex-replace-callback-mvox2rrq",
   "file": "regex-replace-callback-mvox2rrq.js",
   "lang": "js",
-  "title": "regex-replace-callback",
+  "title": "replace — заменить совпадения функцией",
   "group": "Данные / Разбор текста",
-  "desc": "",
-  "output": "",
+  "desc": "Функция-замена получает совпадение и может вычислять результат для каждого найденного фрагмента.",
+  "output": "цена=20; цена=50",
   "descAt": 1792998607382,
   "component": {
     "provides": [
@@ -24,14 +24,22 @@
     },
     "subcat": "Разбор текста"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "replace",
+    "RegExp",
+    "callback"
+  ],
+  "aliases": [
+    "заменить числа в строке",
+    "replace с функцией",
+    "динамическая замена совпадений"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

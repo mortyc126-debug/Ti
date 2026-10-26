@@ -3,10 +3,10 @@
   "id": "array-to-sorted-mvox3aq6",
   "file": "array-to-sorted-mvox3aq6.js",
   "lang": "js",
-  "title": "array-to-sorted",
+  "title": "toSorted — отсортировать без изменения исходного массива",
   "group": "Данные / Коллекции",
-  "desc": "",
-  "output": "",
+  "desc": "toSorted возвращает новый отсортированный массив, в отличие от sort, который мутирует исходный.",
+  "output": "[3, 1, 2]\n[1, 2, 3]",
   "descAt": 1792998631950,
   "component": {
     "provides": [
@@ -23,14 +23,22 @@
     },
     "subcat": "Коллекции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "toSorted",
+    "массив",
+    "иммутабельность"
+  ],
+  "aliases": [
+    "отсортировать массив без мутации",
+    "не менять исходный массив при сортировке",
+    "sort без изменения"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

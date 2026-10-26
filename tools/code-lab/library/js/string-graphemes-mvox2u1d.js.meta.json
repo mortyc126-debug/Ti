@@ -3,10 +3,10 @@
   "id": "string-graphemes-mvox2u1d",
   "file": "string-graphemes-mvox2u1d.js",
   "lang": "js",
-  "title": "string-graphemes",
+  "title": "Intl.Segmenter — разбить текст на символы пользователя",
   "group": "Данные / Строки и текст",
-  "desc": "",
-  "output": "",
+  "desc": "Segmenter учитывает графемные кластеры, в отличие от индексов UTF-16, которые могут делить составной символ.",
+  "output": "[\"A\", \"👩‍💻\", \"Б\"]",
   "descAt": 1792998610321,
   "component": {
     "provides": [
@@ -24,14 +24,22 @@
     },
     "subcat": "Строки и текст"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Intl.Segmenter",
+    "Unicode",
+    "строки"
+  ],
+  "aliases": [
+    "посчитать видимые символы",
+    "разбить строку на графемы",
+    "эмодзи как один символ"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

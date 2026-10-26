@@ -3,10 +3,10 @@
   "id": "object-assign-copy-mvox2dmj",
   "file": "object-assign-copy-mvox2dmj.js",
   "lang": "js",
-  "title": "object-assign-copy",
+  "title": "Object.assign — поверхностно скопировать поля",
   "group": "Данные / Работа с объектами",
-  "desc": "",
-  "output": "",
+  "desc": "Копирует перечисляемые собственные свойства из источников в целевой объект; вложенные объекты остаются общими ссылками.",
+  "output": "12 20\ntrue",
   "descAt": 1792998589051,
   "component": {
     "provides": [
@@ -25,14 +25,22 @@
     },
     "subcat": "Работа с объектами"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Object.assign",
+    "копирование",
+    "ссылки"
+  ],
+  "aliases": [
+    "поверхностная копия объекта",
+    "скопировать свойства объекта",
+    "почему вложенный объект не скопировался"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

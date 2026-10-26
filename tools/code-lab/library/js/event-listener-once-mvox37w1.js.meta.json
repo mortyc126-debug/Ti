@@ -3,10 +3,10 @@
   "id": "event-listener-once-mvox37w1",
   "file": "event-listener-once-mvox37w1.js",
   "lang": "js",
-  "title": "event-listener-once",
+  "title": "addEventListener once — выполнить обработчик один раз",
   "group": "Интерфейс / Реакция на действия пользователя",
-  "desc": "",
-  "output": "",
+  "desc": "Параметр once удаляет обработчик после первого вызова.",
+  "output": "срабатывает один раз",
   "descAt": 1792998628273,
   "component": {
     "provides": [],
@@ -21,14 +21,22 @@
     },
     "subcat": "Реакция на действия пользователя"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "addEventListener",
+    "once",
+    "события"
+  ],
+  "aliases": [
+    "обработчик события один раз",
+    "автоматически удалить listener",
+    "once true"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 1,

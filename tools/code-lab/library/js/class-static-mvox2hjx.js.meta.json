@@ -3,10 +3,10 @@
   "id": "class-static-mvox2hjx",
   "file": "class-static-mvox2hjx.js",
   "lang": "js",
-  "title": "class-static",
+  "title": "class — статический метод",
   "group": "Основы / Объектно-ориентированное программирование",
-  "desc": "",
-  "output": "",
+  "desc": "Статический метод вызывается у самого класса, а не у экземпляра.",
+  "output": "170",
   "descAt": 1792998594141,
   "component": {
     "provides": [
@@ -24,14 +24,22 @@
     },
     "subcat": "Объектно-ориентированное программирование"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "static",
+    "class",
+    "метод класса"
+  ],
+  "aliases": [
+    "статическая функция класса",
+    "вызвать метод без new",
+    "утилита внутри класса"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

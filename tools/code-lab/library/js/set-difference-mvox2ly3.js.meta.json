@@ -3,10 +3,10 @@
   "id": "set-difference-mvox2ly3",
   "file": "set-difference-mvox2ly3.js",
   "lang": "js",
-  "title": "set-difference",
+  "title": "Set — разность множеств",
   "group": "Данные / Коллекции",
-  "desc": "",
-  "output": "",
+  "desc": "Получает элементы первого множества, которых нет во втором.",
+  "output": "[1, 3]",
   "descAt": 1792998599835,
   "component": {
     "provides": [
@@ -21,14 +21,22 @@
     },
     "subcat": "Коллекции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Set",
+    "filter",
+    "разность"
+  ],
+  "aliases": [
+    "элементы только первого массива",
+    "разность множеств",
+    "найти отсутствующие во втором"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

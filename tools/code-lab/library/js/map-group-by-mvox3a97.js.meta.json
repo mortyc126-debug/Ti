@@ -3,10 +3,10 @@
   "id": "map-group-by-mvox3a97",
   "file": "map-group-by-mvox3a97.js",
   "lang": "js",
-  "title": "map-group-by",
+  "title": "Object.groupBy — сгруппировать массив по признаку",
   "group": "Данные / Коллекции",
-  "desc": "",
-  "output": "",
+  "desc": "Группирует элементы по строковому ключу, возвращая объект групп; доступность зависит от среды.",
+  "output": "2",
   "descAt": 1792998631339,
   "component": {
     "provides": [
@@ -24,14 +24,22 @@
     },
     "subcat": "Коллекции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Object.groupBy",
+    "массив",
+    "группировка"
+  ],
+  "aliases": [
+    "сгруппировать массив по полю",
+    "группировка объектов",
+    "groupBy JavaScript"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

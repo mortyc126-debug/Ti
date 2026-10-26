@@ -3,10 +3,10 @@
   "id": "promise-all-results-mvox2x7m",
   "file": "promise-all-results-mvox2x7m.js",
   "lang": "js",
-  "title": "promise-all-results",
+  "title": "Promise.all — дождаться всех результатов",
   "group": "Асинхронность / Пакетная обработка",
-  "desc": "",
-  "output": "",
+  "desc": "Выполняет промисы параллельно и завершается ошибкой, если хотя бы один из них отклонён.",
+  "output": "[2, 4]",
   "descAt": 1792998614434,
   "component": {
     "provides": [
@@ -20,14 +20,22 @@
     },
     "subcat": "Пакетная обработка"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Promise.all",
+    "async",
+    "параллельность"
+  ],
+  "aliases": [
+    "дождаться нескольких промисов",
+    "параллельные запросы",
+    "собрать результаты Promise.all"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

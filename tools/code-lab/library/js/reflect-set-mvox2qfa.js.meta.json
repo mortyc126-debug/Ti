@@ -3,10 +3,10 @@
   "id": "reflect-set-mvox2qfa",
   "file": "reflect-set-mvox2qfa.js",
   "lang": "js",
-  "title": "reflect-set",
+  "title": "Reflect.set — установить свойство с результатом boolean",
   "group": "Продвинутые темы / ООП и модели данных",
-  "desc": "",
-  "output": "",
+  "desc": "Возвращает true или false в зависимости от успешности записи свойства.",
+  "output": "true тест",
   "descAt": 1792998605638,
   "component": {
     "provides": [
@@ -23,14 +23,22 @@
     },
     "subcat": "ООП и модели данных"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Reflect.set",
+    "свойства",
+    "Proxy"
+  ],
+  "aliases": [
+    "установить свойство через Reflect",
+    "проверить успешность записи",
+    "Reflect в ловушках Proxy"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

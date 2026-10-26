@@ -3,10 +3,10 @@
   "id": "abortcontroller-fetch-mvox2yvz",
   "file": "abortcontroller-fetch-mvox2yvz.js",
   "lang": "js",
-  "title": "abortcontroller-fetch",
+  "title": "AbortController — отменить fetch",
   "group": "Асинхронность / Отмена операций",
-  "desc": "",
-  "output": "",
+  "desc": "Передаёт сигнал отмены запросу; abort прекращает ожидание сетевой операции, если поддерживается API.",
+  "output": "AbortError",
   "descAt": 1792998616607,
   "component": {
     "provides": [
@@ -24,14 +24,22 @@
     },
     "subcat": "Отмена операций"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "AbortController",
+    "fetch",
+    "отмена"
+  ],
+  "aliases": [
+    "отменить fetch",
+    "прервать сетевой запрос",
+    "AbortSignal"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

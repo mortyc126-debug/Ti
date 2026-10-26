@@ -3,10 +3,10 @@
   "id": "structured-clone-mvox34mm",
   "file": "structured-clone-mvox34mm.js",
   "lang": "js",
-  "title": "structured-clone",
+  "title": "structuredClone — глубокая копия поддерживаемых данных",
   "group": "Данные / Преобразование форматов",
-  "desc": "",
-  "output": "",
+  "desc": "Создаёт независимую копию поддерживаемых структурированных данных; функции и некоторые специальные объекты не копируются.",
+  "output": "2 3",
   "descAt": 1792998624047,
   "component": {
     "provides": [
@@ -25,14 +25,22 @@
     },
     "subcat": "Преобразование форматов"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "structuredClone",
+    "копирование",
+    "объекты"
+  ],
+  "aliases": [
+    "глубоко скопировать объект",
+    "копия без общих вложенных ссылок",
+    "клонировать дату и массив"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

@@ -3,10 +3,10 @@
   "id": "promise-allsettled-mvox2xns",
   "file": "promise-allsettled-mvox2xns.js",
   "lang": "js",
-  "title": "promise-allsettled",
+  "title": "Promise.allSettled — получить все исходы",
   "group": "Асинхронность / Пакетная обработка",
-  "desc": "",
-  "output": "",
+  "desc": "Возвращает статус и результат каждого промиса, не прерывая сбор при отдельной ошибке.",
+  "output": "[\"fulfilled\", \"rejected\"]",
   "descAt": 1792998615016,
   "component": {
     "provides": [
@@ -20,14 +20,22 @@
     },
     "subcat": "Пакетная обработка"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Promise.allSettled",
+    "ошибки",
+    "async"
+  ],
+  "aliases": [
+    "дождаться всех промисов даже при ошибке",
+    "собрать статусы запросов",
+    "не прерывать по reject"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

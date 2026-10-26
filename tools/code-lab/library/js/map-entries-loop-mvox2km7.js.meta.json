@@ -3,10 +3,10 @@
   "id": "map-entries-loop-mvox2km7",
   "file": "map-entries-loop-mvox2km7.js",
   "lang": "js",
-  "title": "map-entries-loop",
+  "title": "Map — перебрать пары",
   "group": "Данные / Коллекции",
-  "desc": "",
-  "output": "",
+  "desc": "for...of по Map выдаёт пары [ключ, значение] в порядке вставки.",
+  "output": "серебро 90\nнефть 75",
   "descAt": 1792998598111,
   "component": {
     "provides": [
@@ -23,14 +23,22 @@
     },
     "subcat": "Коллекции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Map",
+    "for...of",
+    "деструктуризация"
+  ],
+  "aliases": [
+    "перебрать Map",
+    "цикл по ключам и значениям Map",
+    "получить пары Map"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

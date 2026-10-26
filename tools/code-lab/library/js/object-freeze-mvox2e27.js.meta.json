@@ -3,10 +3,10 @@
   "id": "object-freeze-mvox2e27",
   "file": "object-freeze-mvox2e27.js",
   "lang": "js",
-  "title": "object-freeze",
+  "title": "Object.freeze — запретить изменение верхнего уровня",
   "group": "Данные / Работа с объектами",
-  "desc": "",
-  "output": "",
+  "desc": "Запрещает добавлять, удалять и менять собственные свойства объекта; вложенные объекты автоматически не замораживаются.",
+  "output": "true\nfalse",
   "descAt": 1792998589615,
   "component": {
     "provides": [
@@ -24,14 +24,23 @@
     },
     "subcat": "Работа с объектами"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Object.freeze",
+    "неизменяемость",
+    "объекты"
+  ],
+  "aliases": [
+    "запретить изменение объекта",
+    "заморозить объект",
+    "проверить Object.isFrozen",
+    "почему freeze не глубокий"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

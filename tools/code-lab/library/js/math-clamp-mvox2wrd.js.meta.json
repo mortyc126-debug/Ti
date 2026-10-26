@@ -3,10 +3,10 @@
   "id": "math-clamp-mvox2wrd",
   "file": "math-clamp-mvox2wrd.js",
   "lang": "js",
-  "title": "math-clamp",
+  "title": "Math.min / Math.max — ограничить диапазон",
   "group": "Данные / Числа и простые операции",
-  "desc": "",
-  "output": "",
+  "desc": "Зажимает значение между нижней и верхней границами.",
+  "output": "100\n0",
   "descAt": 1792998613849,
   "component": {
     "provides": [
@@ -20,14 +20,22 @@
     },
     "subcat": "Числа и простые операции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Math.min",
+    "Math.max",
+    "диапазон"
+  ],
+  "aliases": [
+    "ограничить число диапазоном",
+    "clamp",
+    "зажать значение между минимумом и максимумом"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

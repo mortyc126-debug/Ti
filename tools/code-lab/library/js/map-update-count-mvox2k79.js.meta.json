@@ -3,10 +3,10 @@
   "id": "map-update-count-mvox2k79",
   "file": "map-update-count-mvox2k79.js",
   "lang": "js",
-  "title": "map-update-count",
+  "title": "Map — безопасно увеличить счётчик",
   "group": "Данные / Коллекции",
-  "desc": "",
-  "output": "",
+  "desc": "Частый шаблон подсчёта значений в Map с начальным значением ноль.",
+  "output": "Map(2) { \"A\" => 2, \"B\" => 1 }",
   "descAt": 1792998597573,
   "component": {
     "provides": [
@@ -21,14 +21,22 @@
     },
     "subcat": "Коллекции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Map",
+    "счётчик",
+    "nullish coalescing"
+  ],
+  "aliases": [
+    "посчитать частоту через Map",
+    "увеличить значение Map",
+    "группировка количества элементов"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

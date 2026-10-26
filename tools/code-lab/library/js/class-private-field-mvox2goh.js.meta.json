@@ -3,10 +3,10 @@
   "id": "class-private-field-mvox2goh",
   "file": "class-private-field-mvox2goh.js",
   "lang": "js",
-  "title": "class-private-field",
+  "title": "class — приватное поле #",
   "group": "Основы / Объектно-ориентированное программирование",
-  "desc": "",
-  "output": "",
+  "desc": "Приватные поля доступны только внутри тела класса и не являются обычными публичными свойствами.",
+  "output": "25",
   "descAt": 1792998593009,
   "component": {
     "provides": [
@@ -26,14 +26,22 @@
     },
     "subcat": "Объектно-ориентированное программирование"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "class",
+    "приватное поле",
+    "инкапсуляция"
+  ],
+  "aliases": [
+    "приватное свойство класса",
+    "поле с решёткой",
+    "скрыть внутреннее состояние объекта"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

@@ -3,10 +3,10 @@
   "id": "symbol-key-mvox2iuw",
   "file": "symbol-key-mvox2iuw.js",
   "lang": "js",
-  "title": "symbol-key",
+  "title": "Symbol — уникальный ключ объекта",
   "group": "Продвинутые темы / ООП и модели данных",
-  "desc": "",
-  "output": "",
+  "desc": "Каждый вызов Symbol создаёт уникальное значение; символические ключи не попадают в Object.keys.",
+  "output": "42\n[\"имя\"]",
   "descAt": 1792998595832,
   "component": {
     "provides": [
@@ -23,14 +23,22 @@
     },
     "subcat": "ООП и модели данных"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Symbol",
+    "ключ",
+    "объекты"
+  ],
+  "aliases": [
+    "уникальный ключ объекта",
+    "символьное свойство",
+    "почему Symbol не виден в Object.keys"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

@@ -3,10 +3,10 @@
   "id": "generator-delegate-mvox2o6u",
   "file": "generator-delegate-mvox2o6u.js",
   "lang": "js",
-  "title": "generator-delegate",
+  "title": "yield* — делегировать другому итератору",
   "group": "Основы / Итераторы и генераторы",
-  "desc": "",
-  "output": "",
+  "desc": "yield* передаёт элементы из другой итерируемой последовательности.",
+  "output": "[\"начало\", 1, 2, \"конец\"]",
   "descAt": 1792998602742,
   "component": {
     "provides": [],
@@ -20,14 +20,22 @@
     },
     "subcat": "Итераторы и генераторы"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "yield*",
+    "generator",
+    "итератор"
+  ],
+  "aliases": [
+    "объединить генераторы",
+    "делегировать итератор",
+    "yield звёздочка"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

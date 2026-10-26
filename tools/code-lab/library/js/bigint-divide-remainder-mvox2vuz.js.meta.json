@@ -3,10 +3,10 @@
   "id": "bigint-divide-remainder-mvox2vuz",
   "file": "bigint-divide-remainder-mvox2vuz.js",
   "lang": "js",
-  "title": "bigint-divide-remainder",
+  "title": "BigInt — деление и остаток",
   "group": "Данные / Числа и простые операции",
-  "desc": "",
-  "output": "",
+  "desc": "Деление BigInt отбрасывает дробную часть, как целочисленное деление.",
+  "output": "3\n2",
   "descAt": 1792998612683,
   "component": {
     "provides": [],
@@ -20,14 +20,21 @@
     },
     "subcat": "Числа и простые операции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "BigInt",
+    "деление",
+    "остаток"
+  ],
+  "aliases": [
+    "остаток от деления BigInt",
+    "целочисленное деление больших чисел"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

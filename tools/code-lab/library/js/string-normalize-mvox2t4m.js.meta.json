@@ -3,10 +3,10 @@
   "id": "string-normalize-mvox2t4m",
   "file": "string-normalize-mvox2t4m.js",
   "lang": "js",
-  "title": "string-normalize",
+  "title": "normalize — привести Unicode к нормальной форме",
   "group": "Данные / Строки и текст",
-  "desc": "",
-  "output": "",
+  "desc": "Нормализация Unicode помогает сравнивать визуально одинаковый текст, записанный разными последовательностями кодовых точек.",
+  "output": "false\ntrue",
   "descAt": 1792998609142,
   "component": {
     "provides": [
@@ -21,14 +21,22 @@
     },
     "subcat": "Строки и текст"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "normalize",
+    "Unicode",
+    "строки"
+  ],
+  "aliases": [
+    "нормализовать Unicode",
+    "сравнить визуально одинаковые строки",
+    "NFC NFC"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

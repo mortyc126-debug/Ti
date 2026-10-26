@@ -3,10 +3,10 @@
   "id": "weakset-mark-visited-mvox2mu7",
   "file": "weakset-mark-visited-mvox2mu7.js",
   "lang": "js",
-  "title": "weakset-mark-visited",
+  "title": "WeakSet — отметить посещённые объекты",
   "group": "Продвинутые темы / ООП и модели данных",
-  "desc": "",
-  "output": "",
+  "desc": "WeakSet удобно использовать для отметки объектов без создания сильной коллекции ссылок.",
+  "output": "true",
   "descAt": 1792998600991,
   "component": {
     "provides": [
@@ -23,14 +23,22 @@
     },
     "subcat": "ООП и модели данных"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "WeakSet",
+    "обход",
+    "объекты"
+  ],
+  "aliases": [
+    "отметить объект посещённым",
+    "WeakSet для обхода графа",
+    "проверить обработку объекта"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

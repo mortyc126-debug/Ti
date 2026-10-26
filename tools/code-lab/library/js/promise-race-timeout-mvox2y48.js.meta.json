@@ -3,10 +3,10 @@
   "id": "promise-race-timeout-mvox2y48",
   "file": "promise-race-timeout-mvox2y48.js",
   "lang": "js",
-  "title": "promise-race-timeout",
+  "title": "Promise.race — ограничить ожидание тайм-аутом",
   "group": "Асинхронность / Тайм-ауты",
-  "desc": "",
-  "output": "",
+  "desc": "Первый завершившийся промис определяет результат гонки; тайм-аут сам по себе не отменяет исходную операцию.",
+  "output": "зависит от ответа API",
   "descAt": 1792998615608,
   "component": {
     "provides": [
@@ -23,14 +23,22 @@
     },
     "subcat": "Тайм-ауты"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Promise.race",
+    "timeout",
+    "fetch"
+  ],
+  "aliases": [
+    "тайм-аут для промиса",
+    "ограничить время ожидания",
+    "гонка запрос и таймер"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

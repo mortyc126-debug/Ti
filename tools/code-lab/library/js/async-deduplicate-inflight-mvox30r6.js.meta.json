@@ -3,10 +3,10 @@
   "id": "async-deduplicate-inflight-mvox30r6",
   "file": "async-deduplicate-inflight-mvox30r6.js",
   "lang": "js",
-  "title": "async-deduplicate-inflight",
+  "title": "Объединить одинаковые запросы в один выполняющийся промис",
   "group": "Асинхронность / Надёжность",
-  "desc": "",
-  "output": "",
+  "desc": "Кэширует незавершённые операции по ключу, чтобы параллельные потребители ждали один результат.",
+  "output": "возвращает общий Promise для одинакового ключа",
   "descAt": 1792998619026,
   "component": {
     "provides": [
@@ -22,14 +22,23 @@
     },
     "subcat": "Надёжность"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "deduplicate",
+    "in-flight",
+    "Promise",
+    "API"
+  ],
+  "aliases": [
+    "не отправлять одинаковые запросы одновременно",
+    "склеить параллельные запросы",
+    "общий промис по ключу"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

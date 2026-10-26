@@ -3,10 +3,10 @@
   "id": "error-cause-mvox32s5",
   "file": "error-cause-mvox32s5.js",
   "lang": "js",
-  "title": "error-cause",
+  "title": "Error cause — сохранить первопричину",
   "group": "Ошибки и отладка / Исключения",
-  "desc": "",
-  "output": "",
+  "desc": "Поле cause связывает ошибку высокого уровня с исходной ошибкой, не теряя контекст.",
+  "output": "сбой сети",
   "descAt": 1792998621653,
   "component": {
     "provides": [],
@@ -20,14 +20,22 @@
     },
     "subcat": "Исключения"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Error.cause",
+    "обработка ошибок",
+    "цепочка"
+  ],
+  "aliases": [
+    "сохранить исходную ошибку",
+    "Error с cause",
+    "обернуть исключение с причиной"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

@@ -3,10 +3,10 @@
   "id": "proxy-default-value-mvox2piy",
   "file": "proxy-default-value-mvox2piy.js",
   "lang": "js",
-  "title": "proxy-default-value",
+  "title": "Proxy — значение по умолчанию для отсутствующего поля",
   "group": "Продвинутые темы / ООП и модели данных",
-  "desc": "",
-  "output": "",
+  "desc": "Ловушка get может возвращать значение по умолчанию, если ключ отсутствует.",
+  "output": "ночь\nпо умолчанию",
   "descAt": 1792998604475,
   "component": {
     "provides": [
@@ -25,14 +25,22 @@
     },
     "subcat": "ООП и модели данных"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Proxy",
+    "get",
+    "значение по умолчанию"
+  ],
+  "aliases": [
+    "вернуть fallback для отсутствующего свойства",
+    "Proxy с дефолтным значением",
+    "обработка неизвестных ключей"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

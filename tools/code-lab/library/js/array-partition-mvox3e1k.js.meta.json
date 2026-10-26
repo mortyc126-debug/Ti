@@ -3,10 +3,10 @@
   "id": "array-partition-mvox3e1k",
   "file": "array-partition-mvox3e1k.js",
   "lang": "js",
-  "title": "array-partition",
+  "title": "Разделить массив на прошедшие и не прошедшие условие",
   "group": "Данные / Коллекции",
-  "desc": "",
-  "output": "",
+  "desc": "Один проход формирует две группы: элементы, удовлетворяющие предикату, и остальные.",
+  "output": "[[2, 4], [1, 3]]",
   "descAt": 1792998636248,
   "component": {
     "provides": [
@@ -22,14 +22,22 @@
     },
     "subcat": "Коллекции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "массив",
+    "filter",
+    "partition"
+  ],
+  "aliases": [
+    "разбить массив по условию",
+    "две группы по предикату",
+    "partition JavaScript"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

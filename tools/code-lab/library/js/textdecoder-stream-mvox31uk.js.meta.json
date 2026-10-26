@@ -3,10 +3,10 @@
   "id": "textdecoder-stream-mvox31uk",
   "file": "textdecoder-stream-mvox31uk.js",
   "lang": "js",
-  "title": "textdecoder-stream",
+  "title": "TextDecoder — декодировать байтовый поток",
   "group": "Сеть и запросы / Получить данные",
-  "desc": "",
-  "output": "",
+  "desc": "Декодирует Uint8Array в текст; stream:true сохраняет состояние между частями UTF-8.",
+  "output": "зависит от bytes1 и bytes2",
   "descAt": 1792998620444,
   "component": {
     "provides": [
@@ -28,14 +28,22 @@
     },
     "subcat": "Получить данные"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "TextDecoder",
+    "UTF-8",
+    "потоки"
+  ],
+  "aliases": [
+    "декодировать поток байтов в текст",
+    "чанки UTF-8",
+    "не ломать символы между чанками"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

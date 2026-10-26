@@ -3,10 +3,10 @@
   "id": "array-with-mvox3bok",
   "file": "array-with-mvox3bok.js",
   "lang": "js",
-  "title": "array-with",
+  "title": "with — заменить элемент массива по индексу без мутации",
   "group": "Данные / Коллекции",
-  "desc": "",
-  "output": "",
+  "desc": "Создаёт копию массива с заменённым элементом по индексу; поддерживает отрицательные индексы.",
+  "output": "[10, 99, 30]\n[10, 20, 30]",
   "descAt": 1792998633188,
   "component": {
     "provides": [
@@ -20,14 +20,22 @@
     },
     "subcat": "Коллекции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Array.with",
+    "массив",
+    "иммутабельность"
+  ],
+  "aliases": [
+    "заменить элемент массива без мутации",
+    "изменить элемент в копии",
+    "Array with index"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

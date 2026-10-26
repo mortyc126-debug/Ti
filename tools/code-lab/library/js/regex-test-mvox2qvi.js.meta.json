@@ -3,10 +3,10 @@
   "id": "regex-test-mvox2qvi",
   "file": "regex-test-mvox2qvi.js",
   "lang": "js",
-  "title": "regex-test",
+  "title": "RegExp.test — проверить соответствие",
   "group": "Данные / Разбор текста",
-  "desc": "",
-  "output": "",
+  "desc": "Возвращает true, если строка соответствует регулярному выражению.",
+  "output": "true\nfalse",
   "descAt": 1792998606223,
   "component": {
     "provides": [
@@ -25,14 +25,22 @@
     },
     "subcat": "Разбор текста"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "RegExp",
+    "test",
+    "валидация"
+  ],
+  "aliases": [
+    "проверить строку регулярным выражением",
+    "regex test",
+    "валидировать формат кода"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

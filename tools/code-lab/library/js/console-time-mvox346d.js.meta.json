@@ -3,10 +3,10 @@
   "id": "console-time-mvox346d",
   "file": "console-time-mvox346d.js",
   "lang": "js",
-  "title": "console-time",
+  "title": "console.time — измерить длительность участка",
   "group": "Повседневная разработка / Производительность",
-  "desc": "",
-  "output": "",
+  "desc": "Пара time/timeEnd измеряет прошедшее время между вызовами с одинаковой меткой.",
+  "output": "расчёт: ... ms",
   "descAt": 1792998623461,
   "component": {
     "provides": [
@@ -20,14 +20,22 @@
     },
     "subcat": "Производительность"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "console.time",
+    "производительность",
+    "профилирование"
+  ],
+  "aliases": [
+    "измерить время выполнения кода",
+    "замерить длительность функции",
+    "таймер консоли"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

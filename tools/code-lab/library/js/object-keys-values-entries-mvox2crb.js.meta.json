@@ -3,10 +3,10 @@
   "id": "object-keys-values-entries-mvox2crb",
   "file": "object-keys-values-entries-mvox2crb.js",
   "lang": "js",
-  "title": "object-keys-values-entries",
+  "title": "Object.keys / values / entries — разобрать объект",
   "group": "Данные / Работа с объектами",
-  "desc": "",
-  "output": "",
+  "desc": "Получает ключи, значения или пары ключ-значение собственного перечисляемого содержимого объекта.",
+  "output": "[\"цена\", \"количество\"]\n[120, 3]\n[[\"цена\", 120], [\"количество\", 3]]",
   "descAt": 1792998587928,
   "component": {
     "provides": [
@@ -23,14 +23,24 @@
     },
     "subcat": "Работа с объектами"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Object.keys",
+    "Object.values",
+    "Object.entries",
+    "объекты"
+  ],
+  "aliases": [
+    "получить все ключи объекта",
+    "получить значения объекта",
+    "преобразовать объект в пары",
+    "перебрать поля объекта"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

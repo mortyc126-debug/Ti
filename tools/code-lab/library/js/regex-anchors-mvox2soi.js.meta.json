@@ -3,10 +3,10 @@
   "id": "regex-anchors-mvox2soi",
   "file": "regex-anchors-mvox2soi.js",
   "lang": "js",
-  "title": "regex-anchors",
+  "title": "^ и $ — проверить всю строку",
   "group": "Данные / Разбор текста",
-  "desc": "",
-  "output": "",
+  "desc": "Якоря начала и конца ограничивают совпадение всей строкой, а не её частью.",
+  "output": "true\nfalse",
   "descAt": 1792998608562,
   "component": {
     "provides": [
@@ -24,14 +24,22 @@
     },
     "subcat": "Разбор текста"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "regex",
+    "якоря",
+    "валидация"
+  ],
+  "aliases": [
+    "проверить всю строку регулярным выражением",
+    "начало и конец regex",
+    "якорь строки"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

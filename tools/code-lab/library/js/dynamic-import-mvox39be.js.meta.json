@@ -3,10 +3,10 @@
   "id": "dynamic-import-mvox39be",
   "file": "dynamic-import-mvox39be.js",
   "lang": "js",
-  "title": "dynamic-import",
+  "title": "import() — загрузить модуль динамически",
   "group": "Основы / Модули и импорты",
-  "desc": "",
-  "output": "",
+  "desc": "Динамический import возвращает промис и позволяет загружать код по условию.",
+  "output": "результат зависит от модуля report.js",
   "descAt": 1792998630122,
   "component": {
     "provides": [
@@ -21,14 +21,22 @@
     },
     "subcat": "Модули и импорты"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "import()",
+    "модули",
+    "ленивая загрузка"
+  ],
+  "aliases": [
+    "динамически импортировать модуль",
+    "lazy loading JavaScript",
+    "загрузить код по условию"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

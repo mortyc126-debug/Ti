@@ -3,10 +3,10 @@
   "id": "class-getter-setter-mvox2h4b",
   "file": "class-getter-setter-mvox2h4b.js",
   "lang": "js",
-  "title": "class-getter-setter",
+  "title": "class — getter и setter",
   "group": "Основы / Объектно-ориентированное программирование",
-  "desc": "",
-  "output": "",
+  "desc": "Геттер и сеттер позволяют читать и валидировать значение через синтаксис свойства.",
+  "output": "8",
   "descAt": 1792998593579,
   "component": {
     "provides": [
@@ -25,14 +25,23 @@
     },
     "subcat": "Объектно-ориентированное программирование"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "getter",
+    "setter",
+    "class",
+    "валидация"
+  ],
+  "aliases": [
+    "геттер и сеттер в JavaScript",
+    "проверять значение при присваивании",
+    "свойство с логикой чтения"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

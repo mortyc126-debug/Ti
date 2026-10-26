@@ -3,10 +3,10 @@
   "id": "set-unique-mvox2l25",
   "file": "set-unique-mvox2l25.js",
   "lang": "js",
-  "title": "set-unique",
+  "title": "Set — удалить дубликаты",
   "group": "Данные / Коллекции",
-  "desc": "",
-  "output": "",
+  "desc": "Set хранит только уникальные значения; распространённый способ убрать повторы из массива.",
+  "output": "[2, 5, 7]",
   "descAt": 1792998598685,
   "component": {
     "provides": [
@@ -21,14 +21,22 @@
     },
     "subcat": "Коллекции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Set",
+    "массив",
+    "дубликаты"
+  ],
+  "aliases": [
+    "убрать дубликаты массива",
+    "уникальные значения",
+    "дедупликация массива через Set"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

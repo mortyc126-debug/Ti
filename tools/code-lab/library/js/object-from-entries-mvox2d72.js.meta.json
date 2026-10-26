@@ -3,10 +3,10 @@
   "id": "object-from-entries-mvox2d72",
   "file": "object-from-entries-mvox2d72.js",
   "lang": "js",
-  "title": "object-from-entries",
+  "title": "Object.fromEntries — собрать объект из пар",
   "group": "Данные / Работа с объектами",
-  "desc": "",
-  "output": "",
+  "desc": "Преобразует массив пар [ключ, значение] в объект.",
+  "output": "{ режим: \"тест\", лимит: 5 }",
   "descAt": 1792998588494,
   "component": {
     "provides": [
@@ -20,14 +20,22 @@
     },
     "subcat": "Работа с объектами"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Object.fromEntries",
+    "массив",
+    "объекты"
+  ],
+  "aliases": [
+    "собрать объект из массива",
+    "преобразовать пары в объект",
+    "обратная операция Object.entries"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

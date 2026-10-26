@@ -3,10 +3,10 @@
   "id": "promise-any-mvox2yki",
   "file": "promise-any-mvox2yki.js",
   "lang": "js",
-  "title": "promise-any",
+  "title": "Promise.any — дождаться первого успешного",
   "group": "Асинхронность / Пакетная обработка",
-  "desc": "",
-  "output": "",
+  "desc": "Возвращает первый успешно выполненный промис; отклоняется AggregateError, если отклонились все.",
+  "output": "B",
   "descAt": 1792998616194,
   "component": {
     "provides": [
@@ -20,14 +20,22 @@
     },
     "subcat": "Пакетная обработка"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Promise.any",
+    "резервные запросы",
+    "async"
+  ],
+  "aliases": [
+    "первый успешный запрос",
+    "fallback endpoints",
+    "дождаться первого fulfilled"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

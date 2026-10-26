@@ -3,10 +3,10 @@
   "id": "reflect-apply-mvox2pz0",
   "file": "reflect-apply-mvox2pz0.js",
   "lang": "js",
-  "title": "reflect-apply",
+  "title": "Reflect.apply — вызвать функцию с this и аргументами",
   "group": "Продвинутые темы / ООП и модели данных",
-  "desc": "",
-  "output": "",
+  "desc": "Reflect.apply вызывает функцию с заданным this и массивом аргументов.",
+  "output": "15",
   "descAt": 1792998605052,
   "component": {
     "provides": [
@@ -23,14 +23,22 @@
     },
     "subcat": "ООП и модели данных"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Reflect.apply",
+    "this",
+    "вызов функции"
+  ],
+  "aliases": [
+    "вызвать функцию с контекстом",
+    "передать массив аргументов",
+    "аналог Function.apply"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

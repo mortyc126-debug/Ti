@@ -3,10 +3,10 @@
   "id": "object-create-mvox2fth",
   "file": "object-create-mvox2fth.js",
   "lang": "js",
-  "title": "object-create",
+  "title": "Object.create — объект с заданным прототипом",
   "group": "Данные / Работа с объектами",
-  "desc": "",
-  "output": "",
+  "desc": "Создаёт новый объект, чей прототип указан первым аргументом.",
+  "output": "Привет Ада",
   "descAt": 1792998591893,
   "component": {
     "provides": [
@@ -23,14 +23,22 @@
     },
     "subcat": "Работа с объектами"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Object.create",
+    "прототип",
+    "наследование"
+  ],
+  "aliases": [
+    "создать объект от прототипа",
+    "наследование без class",
+    "объект с заданным прототипом"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

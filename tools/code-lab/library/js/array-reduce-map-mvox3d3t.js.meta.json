@@ -3,10 +3,10 @@
   "id": "array-reduce-map-mvox3d3t",
   "file": "array-reduce-map-mvox3d3t.js",
   "lang": "js",
-  "title": "array-reduce-map",
+  "title": "reduce — собрать объект-индекс по ключу",
   "group": "Данные / Коллекции",
-  "desc": "",
-  "output": "",
+  "desc": "Собирает элементы массива в объект для быстрого доступа по идентификатору; ключи строковые.",
+  "output": "20",
   "descAt": 1792998635033,
   "component": {
     "provides": [
@@ -25,14 +25,22 @@
     },
     "subcat": "Коллекции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "reduce",
+    "индекс",
+    "объекты"
+  ],
+  "aliases": [
+    "сделать индекс массива по id",
+    "преобразовать массив в словарь",
+    "быстрый доступ по ключу"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

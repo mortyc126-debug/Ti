@@ -3,10 +3,10 @@
   "id": "feature-detection-mvox38uj",
   "file": "feature-detection-mvox38uj.js",
   "lang": "js",
-  "title": "feature-detection",
+  "title": "Проверить поддержку функции вместо браузерного имени",
   "group": "Разработка и инструменты / Совместимость",
-  "desc": "",
-  "output": "",
+  "desc": "Проверяйте конкретный API через typeof или наличие свойства, а не угадывайте поддержку по user-agent.",
+  "output": "зависит от среды",
   "descAt": 1792998629515,
   "component": {
     "provides": [],
@@ -18,14 +18,22 @@
     },
     "subcat": "Совместимость"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "совместимость",
+    "feature detection",
+    "globalThis"
+  ],
+  "aliases": [
+    "проверить поддержку API",
+    "feature detection вместо user agent",
+    "условие совместимости"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

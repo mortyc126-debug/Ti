@@ -3,10 +3,10 @@
   "id": "prototype-chain-mvox2fdl",
   "file": "prototype-chain-mvox2fdl.js",
   "lang": "js",
-  "title": "prototype-chain",
+  "title": "Object.getPrototypeOf — посмотреть прототип",
   "group": "Основы / Объектно-ориентированное программирование",
-  "desc": "",
-  "output": "",
+  "desc": "Возвращает непосредственный прототип объекта; помогает исследовать цепочку наследования.",
+  "output": "true",
   "descAt": 1792998591321,
   "component": {
     "provides": [
@@ -23,14 +23,22 @@
     },
     "subcat": "Объектно-ориентированное программирование"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "прототип",
+    "Object.getPrototypeOf",
+    "наследование"
+  ],
+  "aliases": [
+    "узнать прототип объекта",
+    "проверить цепочку прототипов",
+    "как устроено наследование в JS"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

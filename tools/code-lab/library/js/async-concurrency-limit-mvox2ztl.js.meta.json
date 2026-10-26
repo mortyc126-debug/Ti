@@ -3,10 +3,10 @@
   "id": "async-concurrency-limit-mvox2ztl",
   "file": "async-concurrency-limit-mvox2ztl.js",
   "lang": "js",
-  "title": "async-concurrency-limit",
+  "title": "Ограничить параллельность задач — каркас",
   "group": "Асинхронность / Ограничение нагрузки",
-  "desc": "",
-  "output": "",
+  "desc": "Разбивает работу на ограниченное число одновременно выполняемых задач; полезно для API с лимитами.",
+  "output": "зависит от переданной задачи",
   "descAt": 1792998617817,
   "component": {
     "provides": [
@@ -27,14 +27,23 @@
     },
     "subcat": "Ограничение нагрузки"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "async",
+    "concurrency",
+    "очередь",
+    "API"
+  ],
+  "aliases": [
+    "ограничить количество одновременных запросов",
+    "пул воркеров на Promise",
+    "лимит параллельности"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

@@ -3,10 +3,10 @@
   "id": "string-locale-compare-mvox2tl1",
   "file": "string-locale-compare-mvox2tl1.js",
   "lang": "js",
-  "title": "string-locale-compare",
+  "title": "localeCompare — сравнить строки с учётом языка",
   "group": "Данные / Строки и текст",
-  "desc": "",
-  "output": "",
+  "desc": "Сравнивает строки с учётом правил локали; для сортировки используйте результат сравнения.",
+  "output": "[\"Арбуз\", \"Банан\", \"Ёлка\"]",
   "descAt": 1792998609733,
   "component": {
     "provides": [
@@ -22,14 +22,22 @@
     },
     "subcat": "Строки и текст"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "localeCompare",
+    "сортировка",
+    "локаль"
+  ],
+  "aliases": [
+    "русская сортировка строк",
+    "сравнить строки по локали",
+    "правильно сортировать кириллицу"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

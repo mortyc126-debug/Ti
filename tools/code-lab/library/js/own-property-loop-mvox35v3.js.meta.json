@@ -3,10 +3,10 @@
   "id": "own-property-loop-mvox35v3",
   "file": "own-property-loop-mvox35v3.js",
   "lang": "js",
-  "title": "own-property-loop",
+  "title": "Перебрать только собственные перечисляемые поля",
   "group": "Данные / Работа с объектами",
-  "desc": "",
-  "output": "",
+  "desc": "Проверяет собственность ключа при for...in, чтобы не обрабатывать унаследованные свойства.",
+  "output": "своё",
   "descAt": 1792998625647,
   "component": {
     "provides": [
@@ -23,14 +23,22 @@
     },
     "subcat": "Работа с объектами"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "for...in",
+    "Object.hasOwn",
+    "безопасность"
+  ],
+  "aliases": [
+    "перебирать только свои свойства",
+    "защитить for in от прототипа",
+    "не читать унаследованные поля"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

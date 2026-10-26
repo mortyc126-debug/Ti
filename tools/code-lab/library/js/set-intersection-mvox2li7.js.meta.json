@@ -3,10 +3,10 @@
   "id": "set-intersection-mvox2li7",
   "file": "set-intersection-mvox2li7.js",
   "lang": "js",
-  "title": "set-intersection",
+  "title": "Set — пересечение двух множеств",
   "group": "Данные / Коллекции",
-  "desc": "",
-  "output": "",
+  "desc": "Оставляет элементы первого множества, которые присутствуют во втором.",
+  "output": "[2, 3]",
   "descAt": 1792998599263,
   "component": {
     "provides": [
@@ -22,14 +22,22 @@
     },
     "subcat": "Коллекции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Set",
+    "filter",
+    "пересечение"
+  ],
+  "aliases": [
+    "найти общие элементы двух наборов",
+    "пересечение множеств",
+    "сравнить два Set"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

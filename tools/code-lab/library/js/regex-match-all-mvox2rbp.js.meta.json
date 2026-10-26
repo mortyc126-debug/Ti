@@ -3,10 +3,10 @@
   "id": "regex-match-all-mvox2rbp",
   "file": "regex-match-all-mvox2rbp.js",
   "lang": "js",
-  "title": "regex-match-all",
+  "title": "matchAll — получить все совпадения с группами",
   "group": "Данные / Разбор текста",
-  "desc": "",
-  "output": "",
+  "desc": "matchAll возвращает итератор совпадений; для повторяющихся совпадений нужен флаг g.",
+  "output": "[{ буква: \"A\", число: \"12\" }, { буква: \"B\", число: \"34\" }]",
   "descAt": 1792998606805,
   "component": {
     "provides": [
@@ -27,14 +27,22 @@
     },
     "subcat": "Разбор текста"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "matchAll",
+    "RegExp",
+    "группы"
+  ],
+  "aliases": [
+    "извлечь все совпадения регулярки",
+    "получить группы regex",
+    "найти все подстроки с захватами"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

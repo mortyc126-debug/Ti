@@ -3,10 +3,10 @@
   "id": "instanceof-mvox2if5",
   "file": "instanceof-mvox2if5.js",
   "lang": "js",
-  "title": "instanceof",
+  "title": "instanceof — проверить тип экземпляра",
   "group": "Основы / Объектно-ориентированное программирование",
-  "desc": "",
-  "output": "",
+  "desc": "Проверяет, присутствует ли prototype указанного конструктора в цепочке прототипов объекта.",
+  "output": "true\nfalse",
   "descAt": 1792998595265,
   "component": {
     "provides": [
@@ -21,14 +21,22 @@
     },
     "subcat": "Объектно-ориентированное программирование"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "instanceof",
+    "тип",
+    "класс"
+  ],
+  "aliases": [
+    "проверить объект на экземпляр класса",
+    "узнать принадлежность классу",
+    "проверить тип объекта"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

@@ -3,10 +3,10 @@
   "id": "array-to-reversed-mvox3b25",
   "file": "array-to-reversed-mvox3b25.js",
   "lang": "js",
-  "title": "array-to-reversed",
+  "title": "toReversed — развернуть без мутации",
   "group": "Данные / Коллекции",
-  "desc": "",
-  "output": "",
+  "desc": "Возвращает новый массив с обратным порядком элементов, не меняя исходный.",
+  "output": "[3, 2, 1]\n[1, 2, 3]",
   "descAt": 1792998632381,
   "component": {
     "provides": [
@@ -20,14 +20,22 @@
     },
     "subcat": "Коллекции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "toReversed",
+    "массив",
+    "иммутабельность"
+  ],
+  "aliases": [
+    "развернуть массив без изменения исходного",
+    "reverse без мутации",
+    "обратная копия массива"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

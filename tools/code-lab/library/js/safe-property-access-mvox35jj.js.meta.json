@@ -3,10 +3,10 @@
   "id": "safe-property-access-mvox35jj",
   "file": "safe-property-access-mvox35jj.js",
   "lang": "js",
-  "title": "safe-property-access",
+  "title": "Безопасно прочитать вложенное поле",
   "group": "Данные / Работа с объектами",
-  "desc": "",
-  "output": "",
+  "desc": "Опциональная цепочка и nullish coalescing защищают от отсутствующих промежуточных объектов.",
+  "output": "неизвестно",
   "descAt": 1792998625232,
   "component": {
     "provides": [
@@ -24,14 +24,22 @@
     },
     "subcat": "Работа с объектами"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "optional chaining",
+    "nullish coalescing",
+    "объекты"
+  ],
+  "aliases": [
+    "прочитать вложенное свойство без ошибки",
+    "защититься от undefined",
+    "значение по умолчанию для null"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

@@ -3,10 +3,10 @@
   "id": "readable-stream-reader-mvox31dp",
   "file": "readable-stream-reader-mvox31dp.js",
   "lang": "js",
-  "title": "readable-stream-reader",
+  "title": "ReadableStream — читать поток порциями",
   "group": "Сеть и запросы / Получить данные",
-  "desc": "",
-  "output": "",
+  "desc": "Читает поток через reader.read до done; важно освобождать reader, когда чтение завершено.",
+  "output": "порции представлены Uint8Array",
   "descAt": 1792998619838,
   "component": {
     "provides": [
@@ -25,14 +25,22 @@
     },
     "subcat": "Получить данные"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "ReadableStream",
+    "reader",
+    "потоки"
+  ],
+  "aliases": [
+    "читать тело ответа потоком",
+    "получить чанки fetch",
+    "reader.read loop"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

@@ -3,10 +3,10 @@
   "id": "weakmap-private-data-mvox2me5",
   "file": "weakmap-private-data-mvox2me5.js",
   "lang": "js",
-  "title": "weakmap-private-data",
+  "title": "WeakMap — данные, привязанные к объекту",
   "group": "Продвинутые темы / ООП и модели данных",
-  "desc": "",
-  "output": "",
+  "desc": "WeakMap хранит объектные ключи слабыми ссылками; коллекция не удерживает ключ только из-за записи в ней.",
+  "output": "true",
   "descAt": 1792998600413,
   "component": {
     "provides": [
@@ -24,14 +24,22 @@
     },
     "subcat": "ООП и модели данных"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "WeakMap",
+    "память",
+    "объекты"
+  ],
+  "aliases": [
+    "WeakMap для приватных данных",
+    "данные по объектному ключу",
+    "слабая ссылка на ключ"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

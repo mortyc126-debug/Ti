@@ -3,10 +3,10 @@
   "id": "class-extends-super-mvox2hzb",
   "file": "class-extends-super-mvox2hzb.js",
   "lang": "js",
-  "title": "class-extends-super",
+  "title": "extends и super — наследование класса",
   "group": "Основы / Объектно-ориентированное программирование",
-  "desc": "",
-  "output": "",
+  "desc": "extends создаёт наследование класса; super вызывает конструктор или метод родителя.",
+  "output": "Температура (°C)",
   "descAt": 1792998594695,
   "component": {
     "provides": [
@@ -26,14 +26,23 @@
     },
     "subcat": "Объектно-ориентированное программирование"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "extends",
+    "super",
+    "наследование",
+    "class"
+  ],
+  "aliases": [
+    "наследование классов",
+    "переопределить метод родителя",
+    "вызвать super constructor"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

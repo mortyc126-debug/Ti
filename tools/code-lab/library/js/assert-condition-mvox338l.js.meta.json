@@ -3,10 +3,10 @@
   "id": "assert-condition-mvox338l",
   "file": "assert-condition-mvox338l.js",
   "lang": "js",
-  "title": "assert-condition",
+  "title": "Проверка условия в тесте",
   "group": "Тестирование / Проверки функций",
-  "desc": "",
-  "output": "",
+  "desc": "Простая функция assert прерывает тест, если условие ложно.",
+  "output": "OK",
   "descAt": 1792998622245,
   "component": {
     "provides": [
@@ -20,14 +20,22 @@
     },
     "subcat": "Проверки функций"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "assert",
+    "тестирование",
+    "проверки"
+  ],
+  "aliases": [
+    "написать простую проверку",
+    "проверить ожидаемое условие",
+    "assert без библиотеки"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

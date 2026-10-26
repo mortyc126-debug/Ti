@@ -3,10 +3,10 @@
   "id": "map-set-get-mvox2jqj",
   "file": "map-set-get-mvox2jqj.js",
   "lang": "js",
-  "title": "map-set-get",
+  "title": "Map — записать и получить значение",
   "group": "Данные / Коллекции",
-  "desc": "",
-  "output": "",
+  "desc": "Map хранит пары ключ-значение и позволяет использовать объект как ключ.",
+  "output": "готово\ntrue",
   "descAt": 1792998596971,
   "component": {
     "provides": [
@@ -23,14 +23,23 @@
     },
     "subcat": "Коллекции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Map",
+    "set",
+    "get",
+    "коллекции"
+  ],
+  "aliases": [
+    "Map set get",
+    "словарь с любыми ключами",
+    "проверить ключ в Map"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

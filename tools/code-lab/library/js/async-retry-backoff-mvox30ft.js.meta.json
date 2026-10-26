@@ -3,10 +3,10 @@
   "id": "async-retry-backoff-mvox30ft",
   "file": "async-retry-backoff-mvox30ft.js",
   "lang": "js",
-  "title": "async-retry-backoff",
+  "title": "Повторить async-операцию с задержкой",
   "group": "Асинхронность / Надёжность",
-  "desc": "",
-  "output": "",
+  "desc": "Повторяет временно неудачную операцию ограниченное число раз с экспоненциальной задержкой.",
+  "output": "возвращает результат операции или выбрасывает последнюю ошибку",
   "descAt": 1792998618617,
   "component": {
     "provides": [
@@ -22,14 +22,23 @@
     },
     "subcat": "Надёжность"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "retry",
+    "backoff",
+    "async",
+    "ошибки"
+  ],
+  "aliases": [
+    "повторить запрос при сбое",
+    "экспоненциальная задержка",
+    "retry с лимитом попыток"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

@@ -3,10 +3,10 @@
   "id": "bigint-json-replacer-mvox39s9",
   "file": "bigint-json-replacer-mvox39s9.js",
   "lang": "js",
-  "title": "bigint-json-replacer",
+  "title": "JSON.stringify — сериализовать BigInt через replacer",
   "group": "Данные / Преобразование форматов",
-  "desc": "",
-  "output": "",
+  "desc": "JSON.stringify по умолчанию не сериализует BigInt; replacer может преобразовать его в строку.",
+  "output": "{\"id\":\"9007199254740993\"}",
   "descAt": 1792998630729,
   "component": {
     "provides": [
@@ -25,14 +25,22 @@
     },
     "subcat": "Преобразование форматов"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "BigInt",
+    "JSON.stringify",
+    "replacer"
+  ],
+  "aliases": [
+    "сериализовать BigInt в JSON",
+    "BigInt JSON ошибка",
+    "преобразовать большие числа в строки"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

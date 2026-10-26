@@ -3,10 +3,10 @@
   "id": "regex-escape-literal-mvox2s7y",
   "file": "regex-escape-literal-mvox2s7y.js",
   "lang": "js",
-  "title": "regex-escape-literal",
+  "title": "RegExp.escape — экранировать текст для поиска",
   "group": "Данные / Разбор текста",
-  "desc": "",
-  "output": "",
+  "desc": "Преобразует произвольный текст в буквальный фрагмент регулярного выражения; доступность зависит от среды.",
+  "output": "true",
   "descAt": 1792998607966,
   "component": {
     "provides": [
@@ -21,14 +21,21 @@
     },
     "subcat": "Разбор текста"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "RegExp.escape",
+    "regex",
+    "экранирование"
+  ],
+  "aliases": [
+    "экранировать строку для регулярки",
+    "искать буквальный текст через RegExp"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

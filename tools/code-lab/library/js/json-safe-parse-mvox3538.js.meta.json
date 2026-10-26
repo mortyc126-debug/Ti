@@ -3,10 +3,10 @@
   "id": "json-safe-parse-mvox3538",
   "file": "json-safe-parse-mvox3538.js",
   "lang": "js",
-  "title": "json-safe-parse",
+  "title": "Безопасно разобрать JSON",
   "group": "Данные / Преобразование форматов",
-  "desc": "",
-  "output": "",
+  "desc": "Оборачивает JSON.parse в try/catch и возвращает явный результат успеха или ошибки.",
+  "output": "false",
   "descAt": 1792998624644,
   "component": {
     "provides": [
@@ -24,14 +24,22 @@
     },
     "subcat": "Преобразование форматов"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "JSON.parse",
+    "try catch",
+    "валидация"
+  ],
+  "aliases": [
+    "обработать ошибку JSON.parse",
+    "безопасно разобрать JSON",
+    "не падать на битом JSON"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

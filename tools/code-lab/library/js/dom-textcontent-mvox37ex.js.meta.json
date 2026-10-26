@@ -3,10 +3,10 @@
   "id": "dom-textcontent-mvox37ex",
   "file": "dom-textcontent-mvox37ex.js",
   "lang": "js",
-  "title": "dom-textcontent",
+  "title": "textContent — вставить текст без HTML-разбора",
   "group": "Интерфейс / Отрисовка данных",
-  "desc": "",
-  "output": "",
+  "desc": "Для пользовательского текста предпочтителен textContent; innerHTML разбирает строку как HTML и может создавать XSS-риск.",
+  "output": "текст отображается как текст",
   "descAt": 1792998627657,
   "component": {
     "provides": [
@@ -22,14 +22,22 @@
     },
     "subcat": "Отрисовка данных"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "textContent",
+    "DOM",
+    "XSS"
+  ],
+  "aliases": [
+    "безопасно вывести пользовательский текст",
+    "не использовать innerHTML для текста",
+    "защита от HTML-инъекции"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

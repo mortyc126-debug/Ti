@@ -3,10 +3,10 @@
   "id": "object-define-property-mvox2ey1",
   "file": "object-define-property-mvox2ey1.js",
   "lang": "js",
-  "title": "object-define-property",
+  "title": "Object.defineProperty — задать дескриптор свойства",
   "group": "Данные / Работа с объектами",
-  "desc": "",
-  "output": "",
+  "desc": "Позволяет определить значение и управляемость свойства объекта.",
+  "output": "1\n[\"версия\"]",
   "descAt": 1792998590761,
   "component": {
     "provides": [
@@ -24,14 +24,22 @@
     },
     "subcat": "Работа с объектами"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "Object.defineProperty",
+    "дескриптор",
+    "свойства"
+  ],
+  "aliases": [
+    "создать свойство с параметрами",
+    "сделать поле только для чтения",
+    "управлять enumerable writable configurable"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

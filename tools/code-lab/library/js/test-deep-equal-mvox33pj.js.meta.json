@@ -3,10 +3,10 @@
   "id": "test-deep-equal-mvox33pj",
   "file": "test-deep-equal-mvox33pj.js",
   "lang": "js",
-  "title": "test-deep-equal",
+  "title": "Сравнить структуры в тесте",
   "group": "Тестирование / Проверки функций",
-  "desc": "",
-  "output": "",
+  "desc": "Для структурного сравнения используйте тестовый фреймворк или node:assert/strict, а не сравнение объектов через ===.",
+  "output": "структуры равны",
   "descAt": 1792998622855,
   "component": {
     "provides": [],
@@ -21,14 +21,22 @@
     },
     "subcat": "Проверки функций"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "node:assert",
+    "deepEqual",
+    "тестирование"
+  ],
+  "aliases": [
+    "сравнить два объекта по содержимому",
+    "глубокое равенство в Node.js",
+    "проверить структуру результата"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,

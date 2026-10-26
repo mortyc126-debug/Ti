@@ -3,10 +3,10 @@
   "id": "array-findlast-mvox3c5a",
   "file": "array-findlast-mvox3c5a.js",
   "lang": "js",
-  "title": "array-findlast",
+  "title": "findLast — найти последнее подходящее значение",
   "group": "Данные / Коллекции",
-  "desc": "",
-  "output": "",
+  "desc": "Ищет с конца массива и возвращает первый найденный с конца элемент, подходящий условию.",
+  "output": "14",
   "descAt": 1792998633790,
   "component": {
     "provides": [
@@ -20,14 +20,22 @@
     },
     "subcat": "Коллекции"
   },
-  "tags": [],
-  "aliases": [],
+  "tags": [
+    "findLast",
+    "массив",
+    "поиск"
+  ],
+  "aliases": [
+    "найти последний элемент по условию",
+    "поиск с конца массива",
+    "findLast JavaScript"
+  ],
   "source": {
     "title": "imported",
     "desc": null,
     "tags": null
   },
-  "status": "needs_description",
+  "status": "described",
   "wordNotes": [
     {
       "line": 0,
