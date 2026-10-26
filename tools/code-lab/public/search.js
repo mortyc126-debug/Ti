@@ -190,7 +190,7 @@
     const query = q.value.trim();
     searchText(query);
     render(query);
-    if(enabled.has('dict') && !dictData){ fetch('/keyword-dict.json', { cache: 'no-store' }).then(r => r.json()).then(d => { dictData = d; render(q.value.trim()); }).catch(() => {}); }
+    if(enabled.has('dict') && !dictData){ (window.codelabKwDict ? window.codelabKwDict() : fetch('/keyword-dict.json', { cache: 'no-store' }).then(r => r.json())).then(d => { dictData = d; render(q.value.trim()); }).catch(() => {}); }
     if(enabled.has('pieces')){ clearTimeout(pieceTimer); pieceTimer = setTimeout(() => searchPieces(query), 300); }
   }
 

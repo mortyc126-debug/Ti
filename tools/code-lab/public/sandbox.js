@@ -361,7 +361,7 @@
   const LANG_DICTS = {};
   // единый источник словаря — keyword-dict.json (тот же, что подписывает куски на сервере).
   // Встроенные словари выше — запасной вариант офлайн; JSON, если доступен, дополняет их.
-  fetch('/keyword-dict.json').then(r => r.json()).then(d => {
+  (window.codelabKwDict ? window.codelabKwDict() : fetch('/keyword-dict.json').then(r => r.json())).then(d => {
     Object.assign(EXPLAIN, d.words || {}); Object.assign(HTML_TAGS, d.htmlTags || {});
     Object.assign(HTML_ATTRS, d.htmlAttrs || {}); Object.assign(CSS_PROPS, d.cssProps || {}); Object.assign(CSS_VALS, d.cssVals || {});
     if(d.langs && typeof d.langs === 'object'){ for(const [lang, words] of Object.entries(d.langs)){ if(words && typeof words === 'object'){ const lk = lang.toLowerCase(); LANG_DICTS[lk] = LANG_DICTS[lk] || {}; for(const [w, t] of Object.entries(words)) LANG_DICTS[lk][w.toLowerCase()] = t; } } }

@@ -53,31 +53,26 @@
     return null;
   }
 
-  // подсказки по началу слова: термины (префикс + смысл через синонимы) и куски-код
-  async function suggest(q){
-    const lq = q.toLowerCase(); const out = [];
-    const d = await loadDict();
-    const seen = new Set();
-    // подсказываем только КОД-токены: ключи-фразы/понятия (с пробелом или кириллицей) вставлять в код нельзя
-    const isCode = t => !/\s/.test(t) && !/[А-Яа-яЁё]/.test(t);
+  // термины по началу слова (мгновенно, из закэшированного словаря): префикс + смысл через синонимы
+  function termsFrom(q, d){
+    const lq = q.toLowerCase(); const out = []; const seen = new Set();
+    const isCode = t => !/\s/.test(t) && !/[А-Яа-яЁё]/.test(t);   // в код вставляем только код-токены, не фразы
     const addTerm = (term, text) => { const k = term.toLowerCase(); if(seen.has(k) || k === lq || !isCode(term)) return; seen.add(k); out.push({ type: 'term', label: term, desc: text || '' }); };
-    // префикс по именам (быстро и предсказуемо для набора)
     const scanPrefix = o => { if(o) for(const k of Object.keys(o)){ if(k.toLowerCase().startsWith(lq)) addTerm(k, o[k]); } };
     const l = (curCtx && curCtx.lang || '').toLowerCase();
     if(d.langs && d.langs[l]) scanPrefix(d.langs[l]);
     scanPrefix(d.words); ['cssProps','cssVals','htmlTags','htmlAttrs'].forEach(s => scanPrefix(d[s]));
     if(d.langs) for(const k of Object.keys(d.langs)) if(k !== l) scanPrefix(d.langs[k]);
-    // смысл → термин через синонимы (напр. «сортир…» → sort)
     if(d.synonyms && out.length < 8){ const explOf = t => { const lt = t.toLowerCase(); if(d.words && d.words[lt]) return d.words[lt]; for(const s of ['cssProps','cssVals','htmlTags','htmlAttrs']) if(d[s] && d[s][lt]) return d[s][lt]; if(d.langs) for(const k of Object.keys(d.langs)) if(d.langs[k][lt]) return d.langs[k][lt]; return ''; };
       for(const [term, syns] of Object.entries(d.synonyms)){ if(Array.isArray(syns) && syns.some(x => String(x).toLowerCase().startsWith(lq))) addTerm(term, explOf(term)); } }
-    const terms = out.slice(0, 7);
-    // куски-код (поиск по библиотеке)
-    let pieces = [];
+    return out.slice(0, 7);
+  }
+  // куски-код из библиотеки (отдельно, чтобы не ждать сеть ради показа слов)
+  async function piecesFor(q){
     try { const r = await fetch('/api/search?q=' + encodeURIComponent(q) + '&limit=6').then(x => x.json());
       const list = await loadPieces(); const byId = {}; list.forEach(p => byId[p.id] = p);
-      pieces = ((r && r.hits) || []).slice(0, 5).map(h => { const p = byId[h.id] || {}; return { type: 'piece', id: h.id, label: p.title || h.id, desc: (p.lang || '').toUpperCase() }; });
-    } catch(_){}
-    return terms.concat(pieces);
+      return ((r && r.hits) || []).slice(0, 5).map(h => { const p = byId[h.id] || {}; return { type: 'piece', id: h.id, label: p.title || h.id, desc: (p.lang || '').toUpperCase() }; });
+    } catch(_){ return []; }
   }
 
   async function accept(it){
@@ -109,7 +104,13 @@
     const ctx = wordCtx(ed); if(!ctx || ctx.word.length < 2){ hide(); return; }
     ctx.lang = ed.__f && ed.__f.lang; curCtx = ctx;
     const my = ++seq;
-    suggest(ctx.word).then(res => { if(my !== seq) return; if(!res.length){ hide(); return; } items = res; sel = 0; renderPop(); });
+    const dp = window.codelabKwDict ? window.codelabKwDict(ctx.lang || '') : loadDict();
+    dp.then(d => {
+      if(my !== seq) return;
+      const terms = termsFrom(ctx.word, d);   // слова — сразу
+      items = terms; sel = 0; if(items.length) renderPop(); else hide();
+      piecesFor(ctx.word).then(pc => { if(my !== seq || !pc.length) return; items = terms.concat(pc); if(sel >= items.length) sel = 0; renderPop(); });
+    });
   }
 
   // набор в редакторе → подсказки (с задержкой); служебные клавиши не триггерят

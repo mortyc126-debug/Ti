@@ -1046,8 +1046,13 @@ const server = http.createServer(async (req, res) => {
     // словарь отдаём собранным (база + файлы языков), а не как статический файл —
     // чтобы песочница и просмотрщик видели и языки из dict/langs/*.json
     if(u.pathname === '/keyword-dict.json'){
+      const d = await kwDict();
+      // ?lang=X — отдать только этот язык (+ база/синонимы/примеры), чтобы клиент не грузил все языки разом
+      const lang = (u.searchParams.get('lang') || '').toLowerCase();
+      let out = d;
+      if(lang){ out = Object.assign({}, d); out.langs = (d.langs && d.langs[lang]) ? { [lang]: d.langs[lang] } : {}; }
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-      return res.end(JSON.stringify(await kwDict()));
+      return res.end(JSON.stringify(out));
     }
 
     const rel = u.pathname === '/' ? 'index.html' : u.pathname;

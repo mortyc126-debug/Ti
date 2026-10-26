@@ -6,7 +6,7 @@ let NOTES = {};   // пояснения к словам, хранятся на �
 let LNOTES = {};  // пояснения к строкам, ключ — текст строки без пробелов по краям (component.lineNotes)
 let DICT = {};    // общий словарь пояснений + варианты значений (тот же, что в разборе кода)
 let CUR_LANG = '', CODE = '';   // язык и текущий код куска (для переключения вариантов)
-fetch('/keyword-dict.json', { cache: 'no-store' }).then(r => r.json()).then(d => { DICT = d || {}; _pool = null; markVariants(); }).catch(() => {});
+(window.codelabKwDict ? window.codelabKwDict() : fetch('/keyword-dict.json', { cache: 'no-store' }).then(r => r.json())).then(d => { DICT = d || {}; _pool = null; markVariants(); }).catch(() => {});
 
 // пояснение слова из словаря (сначала язык куска, потом общий/HTML/CSS/любой язык)
 function dictExplain(word){
