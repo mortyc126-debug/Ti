@@ -82,7 +82,7 @@
       <div id="uploader"></div>
     </details>
     <div class="catline">а ниже — загрузка архивов данных (json/gz/zip) для инспектора</div>
-    <div class="drop" id="drop">перетащи сюда архивы (можно пачкой) или нажми — распакуются и сохранятся<input type="file" id="file" accept=".json,.gz,.zip,application/json,application/gzip,application/zip" multiple style="display:none"></div>
+    <div class="drop" id="drop">перетащи сюда бэкап библиотеки (код + .meta.json) или архивы — восстановятся как есть, без переработки<input type="file" id="file" multiple style="display:none"></div>
     <div style="margin:8px 0"><button class="btn" id="rescue">Перенести шаблоны кода из Данных в Библиотеку</button>
       <button class="btn" id="cleanmeta" title="убрать паспорта библиотеки (.meta.json), случайно загруженные в Данные — им место рядом с кодом, а не здесь">🧹 убрать паспорта из Данных</button></div>
     <div class="saved" id="saved"></div>
@@ -129,47 +129,43 @@ drop.addEventListener('drop', e => handle(e.dataTransfer.files));
 
 async function handle(fileList){
   err.textContent = ''; files = [];
-  // сначала собираем ВСЁ сырьё, чтобы спарить файлы кода с их паспортами .meta.json
   const raw = [];
   for(const f of fileList){
     try { const got = await extract(f); for(const g of got) raw.push(g); }
     catch(e){ err.textContent += '«' + f.name + '»: ' + e.message + '\n'; }
   }
-  // индекс паспортов: «имя.js.meta.json» → объект; ключ — имя файла кода «имя.js»
-  const metaBy = {};
-  for(const g of raw){ if(/\.meta\.json$/i.test(g.name)){ try { metaBy[g.name.replace(/\.meta\.json$/i, '')] = JSON.parse(g.text); } catch(_){} } }
-  let metaPaired = 0, metaOrphan = 0;
-  for(const g of raw){
-    if(/\.meta\.json$/i.test(g.name)){   // паспорт сам по себе в «Данные» НЕ кладём
-      if(metaBy[g.name.replace(/\.meta\.json$/i, '')] && raw.some(x => x.name === g.name.replace(/\.meta\.json$/i, ''))) {} else metaOrphan++;
-      continue;
-    }
-    let data;
-    try { data = JSON.parse(g.text); }
-    catch(e){ const L = extLang(g.name); if(L) data = { lang: L, title: g.name.replace(/\.[^.]+$/, ''), code: g.text }; else { err.textContent += '«' + g.name + '» не JSON и не похоже на код: ' + e.message + '\n'; continue; } }
-    // есть паспорт рядом → восстановим нормальное название/раздел/описание куска
-    const m = metaBy[g.name];
-    if(m && looksLikePiece(data)){
-      if(m.title) data.title = m.title;
-      if(m.group) data.group = m.group;
-      if(m.desc) data.desc = m.desc;
-      if(m.lang) data.lang = m.lang;
-      if(m.component && typeof m.component === 'object') data.component = m.component;
-      metaPaired++;
-    }
-    files.push({ name: g.name, data });
-  }
-  if(!files.length){ err.textContent = metaOrphan ? ('Это паспорта кусков (.meta.json) без самих файлов кода — ' + metaOrphan + ' шт. Их грузить не нужно: паспорт создаётся сам рядом с кодом. Грузи файлы кода (.js, .css, .py…).') : (err.textContent || 'нечего загружать'); return; }
-  const st = await autostore();   // данные складываем; шаблоны кода уводим в Библиотеку
-  const dataFiles = files.filter(f => !looksLikePiece(f.data));
+  const isMeta = n => /\.meta\.json$/i.test(n);
+  const metaFiles = raw.filter(g => isMeta(g.name));
+  const codeFiles = raw.filter(g => !isMeta(g.name) && extLang(g.name));
+  const otherFiles = raw.filter(g => !isMeta(g.name) && !extLang(g.name));
   const note = [];
-  if(metaPaired) note.push('паспортов подхвачено: ' + metaPaired);
-  if(metaOrphan) note.push('паспортов без кода пропущено: ' + metaOrphan);
-  if(st.saved) note.push('в данные легло: ' + st.saved);
-  if(st.skipped) note.push('уже было: ' + st.skipped);
-  if(st.toLib){ note.push('шаблонов кода → в Библиотеку: ' + st.toLib); const g = await syncGh(); if(g) note.push('GitHub: ' + g); }
-  if(st.warns && st.warns.length){ note.push('⚠ не код: ' + st.warns.length); alert('Пропущены куски, где «код» — это русский текст без кода (похоже на словарь/синонимы, а не кусок):\n\n' + st.warns.slice(0, 20).map(w => '• ' + w.title).join('\n') + (st.warns.length > 20 ? '\n…и ещё ' + (st.warns.length - 20) : '') + '\n\nПояснения грузи через «Словарь пояснений», синонимы — через «Синонимы».'); }
-  err.textContent = note.join(' · ');
+  let dataFiles = [];
+  if(metaFiles.length){
+    // бэкап библиотеки: есть паспорта → код + .meta.json пишем в библиотеку КАК ЕСТЬ, без переработки
+    const payload = [...metaFiles.map(g => ({ name: g.name, text: g.text })), ...codeFiles.map(g => ({ name: g.name, text: g.text, lang: extLang(g.name) }))];
+    const r = await fetch('/api/library/restore', { method: 'POST', body: JSON.stringify({ files: payload }) }).then(x => x.json()).catch(() => null);
+    if(r && r.ok){
+      if(r.pairs) note.push('восстановлено (код+паспорт): ' + r.pairs);
+      if(r.metaOnly) note.push('паспортов без кода: ' + r.metaOnly);
+      if(r.codeOnly) note.push('кода без паспорта: ' + r.codeOnly);
+      const g = await syncGh(); if(g) note.push('GitHub: ' + g);
+    } else note.push('восстановление библиотеки не удалось');
+    // прочий JSON из того же бэкапа (эталоны и т.п.) → в «Данные»
+    files = otherFiles.map(g => { let d; try { d = JSON.parse(g.text); } catch(_){ d = null; } return { name: g.name, data: d }; }).filter(f => f.data != null);
+    if(files.length){ const st = await autostore(); if(st.saved) note.push('в данные: ' + st.saved); dataFiles = files.filter(f => !looksLikePiece(f.data)); }
+  } else {
+    // паспортов нет: обычная загрузка — JSON-куски идут в библиотеку, данные в «Данные»
+    const all = [...codeFiles, ...otherFiles];
+    files = all.map(g => { let d; try { d = JSON.parse(g.text); } catch(e){ const L = extLang(g.name); if(L) d = { lang: L, title: g.name.replace(/\.[^.]+$/, ''), code: g.text }; else { err.textContent += '«' + g.name + '» не JSON и не похоже на код: ' + e.message + '\n'; return null; } } return { name: g.name, data: d }; }).filter(Boolean);
+    if(!files.length){ err.textContent = err.textContent || 'нечего загружать'; return; }
+    const st = await autostore();
+    if(st.saved) note.push('в данные легло: ' + st.saved);
+    if(st.skipped) note.push('уже было: ' + st.skipped);
+    if(st.toLib){ note.push('кусков → в библиотеку: ' + st.toLib); const g = await syncGh(); if(g) note.push('GitHub: ' + g); }
+    if(st.warns && st.warns.length){ note.push('⚠ не код: ' + st.warns.length); alert('Пропущены куски, где «код» — это русский текст без кода (похоже на словарь/синонимы, а не кусок):\n\n' + st.warns.slice(0, 20).map(w => '• ' + w.title).join('\n') + (st.warns.length > 20 ? '\n…и ещё ' + (st.warns.length - 20) : '')); }
+    dataFiles = files.filter(f => !looksLikePiece(f.data));
+  }
+  err.textContent = note.join(' · ') || err.textContent;
   if(dataFiles.length) openFiles(dataFiles, 0, null);
   else $('#comp').style.display = 'none';
 }

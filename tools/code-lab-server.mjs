@@ -762,6 +762,39 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, await importBundle(await readBody(req)));
     }
 
+    // восстановление бэкапа библиотеки КАК ЕСТЬ: {files:[{name,text,lang?}]} — пишем код и паспорта
+    // .meta.json прямо в library/<язык>/ байт-в-байт, без токенизации/аннотации/дедупа. Паспорт
+    // (настоящее название, разделы, пояснения) сохраняется ровно как в бэкапе.
+    if(u.pathname === '/api/library/restore' && req.method === 'POST'){
+      const b = await readBody(req);
+      const files = Array.isArray(b.files) ? b.files : [];
+      const EXT2LANG = { js:'js', mjs:'js', cjs:'js', ts:'ts', tsx:'ts', jsx:'js', py:'python', rb:'ruby', php:'php', go:'go', rs:'rust', java:'java', c:'c', h:'c', cpp:'cpp', cs:'csharp', css:'css', html:'html', htm:'html', svg:'svg', sql:'sql', sh:'bash', json:'json' };
+      const safeLang = l => (String(l || 'txt').toLowerCase().replace(/[^a-z0-9_+-]/g, '') || 'txt');
+      const langOfName = n => safeLang(EXT2LANG[String(n).split('.').pop().toLowerCase()] || 'txt');
+      const isMeta = n => /\.meta\.json$/i.test(n);
+      const metas = files.filter(f => f && isMeta(f.name));
+      const codes = files.filter(f => f && !isMeta(f.name));
+      const codeByBase = {}; codes.forEach(c => { codeByBase[path.basename(c.name)] = c; });
+      let wroteCode = 0, wroteMeta = 0, pairs = 0, metaOnly = 0, codeOnly = 0; const consumed = new Set();
+      for(const m of metas){
+        let meta; try { meta = JSON.parse(m.text); } catch(_){ continue; }
+        const base = path.basename(m.name).replace(/\.meta\.json$/i, '');   // «arc-….js»
+        const lang = safeLang(meta.lang) || langOfName(base);
+        const dir = path.join(LIBRARY, lang); await fs.mkdir(dir, { recursive: true });
+        await fs.writeFile(path.join(dir, base + '.meta.json'), m.text.endsWith('\n') ? m.text : m.text + '\n', 'utf8'); wroteMeta++;
+        const code = codeByBase[base];
+        if(code){ await fs.writeFile(path.join(dir, base), String(code.text), 'utf8'); wroteCode++; pairs++; consumed.add(base); }
+        else metaOnly++;
+      }
+      for(const c of codes){ const bn = path.basename(c.name); if(consumed.has(bn)) continue;
+        const lang = safeLang(c.lang) || langOfName(bn);
+        const dir = path.join(LIBRARY, lang); await fs.mkdir(dir, { recursive: true });
+        await fs.writeFile(path.join(dir, bn), String(c.text), 'utf8'); wroteCode++; codeOnly++;
+      }
+      try { await store.refresh(); } catch(_){}
+      return json(res, 200, { ok: true, pairs, metaOnly, codeOnly, wroteCode, wroteMeta });
+    }
+
     // правка шаблона целиком: новый код → заново токенизируем, перезаписываем файл
     if(u.pathname === '/api/edit' && req.method === 'POST'){
       const b = await readBody(req);
