@@ -10,7 +10,7 @@
     { key:'inventory',   label:'Опись',        href:'/inventory.html',  sect:'Кусочки кода' },
     { key:'library',     label:'Библиотека',   href:'/library.html',    sect:'Кусочки кода' },
     { key:'constructor', label:'Конструктор',  href:'/constructor.html',sect:'Собирать' },
-    { key:'recipes',     label:'Рецепты',      href:'/recipes.html',    sect:'Собирать' },
+    { key:'recipes',     label:'Шаблоны',      href:'/recipes.html',    sect:'Собирать' },
     { key:'data',        label:'Куски кода', href:'/schema-json.html', sect:'Данные' },
   ];
   const cur = document.body.dataset.page || '';
@@ -102,7 +102,7 @@
     // 4) рецепты и схемы
     const rc = await fetch('/api/recipes/list').then(r => r.json()).catch(() => []); if(seq !== drawSeq) return;
     const rh = (rc || []).filter(r => (r.name || r.title || '').toLowerCase().includes(q)).slice(0, 5);
-    if(rh.length){ grp('Рецепты'); rh.forEach(r => item('/recipes.html', r.name || r.title || r.id, 'рецепт')); }
+    if(rh.length){ grp('Шаблоны'); rh.forEach(r => item('/recipes.html', r.name || r.title || r.id, 'шаблон')); }
     const fl = await fetch('/api/flows/list').then(r => r.json()).catch(() => []); if(seq !== drawSeq) return;
     const fh = (fl || []).filter(f => (f.name || '').toLowerCase().includes(q)).slice(0, 5);
     if(fh.length){ grp('Схемы'); fh.forEach(f => item('/constructor.html', f.name || f.id, 'схема')); }

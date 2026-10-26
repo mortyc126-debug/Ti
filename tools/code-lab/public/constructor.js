@@ -539,7 +539,7 @@ async function unpackRecipe(id, name){
 async function openBigTplModal(){
   const bg = el('div', 'modal-bg'); bg.innerHTML =
     '<div class="modal" style="max-width:620px"><h3>Большой шаблон на холст</h3>'
-    + '<p class="mh">Большой шаблон — целая штука из нескольких кусков. Разворачивается на холсте в связанные блоки по смыслу; внутри — обычные куски. Собрать/править шаблоны пока в разделе «Рецепты».</p>'
+    + '<p class="mh">Большой шаблон — целая штука из нескольких кусков. Разворачивается на холсте в связанные блоки по смыслу; внутри — обычные куски. Собрать/загрузить шаблоны — в разделе «Шаблоны».</p>'
     + '<input class="pal-search" id="bt-q" placeholder="поиск шаблона…" style="width:100%;box-sizing:border-box;margin-bottom:8px">'
     + '<div id="bt-list" class="fl-list"><div class="muted">загрузка…</div></div>'
     + '<div class="mbtns" style="margin-top:14px"><button class="btn" id="bt-close">Закрыть</button></div></div>';
@@ -552,7 +552,7 @@ async function openBigTplModal(){
     const needle = (q('#bt-q').value || '').toLowerCase();
     const list = (all || []).filter(r => !needle || (r.title + ' ' + (r.desc || '')).toLowerCase().includes(needle));
     const box = q('#bt-list'); box.innerHTML = '';
-    if(!list.length){ box.innerHTML = '<div class="muted">нет больших шаблонов. Собери рецепт в разделе «Рецепты» — и он появится тут.</div>'; return; }
+    if(!list.length){ box.innerHTML = '<div class="muted">нет больших шаблонов. Загрузи или собери шаблон в разделе «Шаблоны» — и он появится тут.</div>'; return; }
     list.forEach(r => {
       const row = el('div', 'fl-row'); row.innerHTML = '<span class="fl-n"></span><span class="fl-meta">' + (r.items || 0) + ' кусок(ов)</span>';
       row.querySelector('.fl-n').textContent = r.title;

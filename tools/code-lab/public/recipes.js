@@ -14,7 +14,7 @@ async function reload(){
 function renderList(){
   const host = document.getElementById('list');
   document.getElementById('cnt').textContent = RECIPES.length;
-  if(!RECIPES.length){ host.innerHTML = '<div class="empty">Рецептов пока нет. Рецепт — это название, описание и список кусков по порядку: «чтобы собрать X, нужны такие куски». Нажми «＋ новый рецепт».</div>'; return; }
+  if(!RECIPES.length){ host.innerHTML = '<div class="empty">Больших шаблонов пока нет. Шаблон — это название, описание и список кусков по порядку: «чтобы собрать X, нужны такие куски». Нажми «📥 загрузить пачкой» или «＋ новый шаблон».</div>'; return; }
   host.innerHTML = '';
   RECIPES.slice().sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0)).forEach(r => {
     const card = el('div', 'rc');
@@ -24,7 +24,7 @@ function renderList(){
       + '<div class="rc-acts"><button class="btn" data-a="open">открыть</button><button class="btn" data-a="edit">править</button><button class="btn danger" data-a="del">удалить</button></div>';
     card.querySelector('[data-a=open]').onclick = () => openRecipe(r.id);
     card.querySelector('[data-a=edit]').onclick = () => editRecipe(r.id);
-    card.querySelector('[data-a=del]').onclick = async () => { if(!confirm('Удалить рецепт «' + r.title + '»?')) return; await fetch('/api/recipes/delete', { method:'POST', body: JSON.stringify({ id: r.id }) }); reload(); };
+    card.querySelector('[data-a=del]').onclick = async () => { if(!confirm('Удалить шаблон «' + r.title + '»?')) return; await fetch('/api/recipes/delete', { method:'POST', body: JSON.stringify({ id: r.id }) }); reload(); };
     host.appendChild(card);
   });
 }
@@ -54,7 +54,7 @@ async function openRecipe(id){
 function editRecipe(id){
   const existing = RECIPES.find(r => r.id === id);
   const bg = el('div', 'modal-bg'); const box = el('div', 'modal'); box.style.maxWidth = '720px';
-  box.innerHTML = '<h3>' + (id ? 'Править рецепт' : 'Новый рецепт') + '</h3>'
+  box.innerHTML = '<h3>' + (id ? 'Править шаблон' : 'Новый шаблон') + '</h3>'
     + '<div class="mfield"><label>Название</label><input id="r-title"></div>'
     + '<div class="mfield"><label>Описание — что собираем и зачем</label><textarea id="r-desc" rows="3"></textarea></div>'
     + '<div class="mfield"><label>Куски по порядку</label><div id="r-items" class="r-items"></div></div>'
@@ -128,26 +128,78 @@ function editRecipe(id){
 }
 document.getElementById('new').onclick = () => editRecipe(null);
 
-// загрузка больших шаблонов ПАЧКОЙ: один JSON с кодом внутри — куски извлекаются и связываются сами
-const BULK_SAMPLE = JSON.stringify([
-  {
-    title: 'Таблица из API со светящейся шапкой',
-    desc: 'Берём массив из API, рисуем таблицу, подсвечиваем шапку.',
-    pieces: [
-      { title: 'Загрузить массив из API', lang: 'js', note: 'берём данные', code: 'const rows = await (await fetch(api)).json();' },
-      { title: 'Таблица-разметка', lang: 'html', note: 'куда выводим', code: '<table id="tbl"><thead class="glow"><tr><th>Имя</th></tr></thead><tbody></tbody></table>' },
-      { title: 'Заполнить таблицу', lang: 'js', note: 'пишем строки', code: 'const tb = document.querySelector("#tbl tbody");\nrows.forEach(r => { const tr = document.createElement("tr"); tr.textContent = r.name; tb.appendChild(tr); });' },
-      { title: 'Светящаяся шапка', lang: 'css', note: 'стиль', code: '#tbl .glow { box-shadow: 0 0 8px #0ff; }' }
-    ]
+// Markdown-парсер больших шаблонов: любой синтаксис кода без экранирования (код в ```-заборчиках).
+// # Название → новый шаблон; > строка → описание; ## Кусок `язык` → кусок; строки под ним → заметка;
+// блок ```язык … ``` → код куска.
+function parseTemplatesMarkdown(text){
+  const lines = String(text).replace(/\r\n?/g, '\n').split('\n');
+  const recipes = []; let rec = null, piece = null, inCode = false, codeBuf = [];
+  const flushPiece = () => { if(rec && piece){ piece.code = codeBuf.join('\n'); rec.pieces.push(piece); } piece = null; codeBuf = []; };
+  for(const raw of lines){
+    const line = raw.trim();
+    if(inCode){ if(/^(```|~~~)/.test(line)){ inCode = false; } else { codeBuf.push(raw); } continue; }
+    const mFence = line.match(/^(?:```|~~~)\s*([A-Za-z0-9#+_-]*)/);
+    if(mFence && piece){ inCode = true; if(mFence[1] && !piece.lang) piece.lang = mFence[1].toLowerCase(); codeBuf = []; continue; }
+    const mR = line.match(/^#\s+(.+)/);
+    if(mR){ flushPiece(); if(rec) recipes.push(rec); rec = { title: mR[1].trim(), desc: '', pieces: [] }; continue; }
+    if(!rec) continue;
+    const mP = line.match(/^##\s+(.+)/);
+    if(mP){ flushPiece(); let t = mP[1].trim(), lang = ''; const ml = t.match(/`([^`]+)`\s*$/); if(ml){ lang = ml[1].trim().toLowerCase(); t = t.replace(/`[^`]+`\s*$/, '').trim(); } piece = { title: t, lang, note: '', code: '' }; codeBuf = []; continue; }
+    const mD = line.match(/^>\s?(.*)/);
+    const txt = mD ? mD[1] : line;
+    if(!txt) continue;
+    if(piece) piece.note = (piece.note ? piece.note + ' ' : '') + txt;
+    else rec.desc = (rec.desc ? rec.desc + ' ' : '') + txt;
   }
-], null, 2);
+  flushPiece(); if(rec) recipes.push(rec);
+  recipes.forEach(r => r.pieces.forEach(p => { if(!p.lang) p.lang = 'js'; }));
+  return recipes;
+}
+const BULK_SAMPLE = [
+  '# Таблица из API со светящейся шапкой',
+  '> берём массив из API, рисуем таблицу, подсвечиваем шапку',
+  '',
+  '## Загрузить массив из API `js`',
+  'берём данные',
+  '```js',
+  'const rows = await (await fetch(api)).json();',
+  '```',
+  '',
+  '## Таблица-разметка `html`',
+  'куда выводим',
+  '```html',
+  '<table id="tbl"><thead class="glow"><tr><th>Имя</th></tr></thead><tbody></tbody></table>',
+  '```',
+  '',
+  '## Заполнить таблицу `js`',
+  '```js',
+  'const tb = document.querySelector("#tbl tbody");',
+  'rows.forEach(r => { const tr = document.createElement("tr"); tr.textContent = r.name; tb.appendChild(tr); });',
+  '```',
+  '',
+  '## Светящаяся шапка `css`',
+  '```css',
+  '#tbl .glow { box-shadow: 0 0 8px #0ff; }',
+  '```'
+].join('\n');
 
 function openBulkModal(){
-  const bg = el('div', 'modal-bg'); const box = el('div', 'modal'); box.style.maxWidth = '760px';
-  box.innerHTML = '<h3>Загрузить большие шаблоны пачкой</h3>'
-    + '<p class="mh" style="color:var(--text3);font-size:12.5px;line-height:1.5;margin:0 0 10px">Один JSON — сколько угодно рецептов. Код кусков пишешь прямо внутри: они сами создадутся в библиотеке (повторы не задвоятся) и соберутся в рецепт. Заполнять руками ничего не надо. Формат: массив <code>[{title, desc, pieces:[{title, lang, code, note}]}]</code>. Можно и ссылаться на готовый кусок по <code>id</code> или <code>title</code> вместо кода.</p>'
-    + '<div class="mfield"><label>JSON с рецептами</label><textarea id="bk-text" rows="12" placeholder="вставь сюда JSON (или нажми «пример»)" style="font-family:ui-monospace,monospace;font-size:12px"></textarea></div>'
-    + '<div class="mbtns"><button class="btn" id="bk-file">📄 из файла…</button><button class="btn" id="bk-sample">пример</button><button class="btn ok" id="bk-load">📥 загрузить</button><button class="btn" id="bk-close">закрыть</button><input type="file" id="bk-fileinp" accept=".json" style="display:none"></div>'
+  const bg = el('div', 'modal-bg'); const box = el('div', 'modal'); box.style.maxWidth = '780px';
+  box.innerHTML = '<h3>Загрузить шаблоны пачкой</h3>'
+    + '<div class="mh" style="color:var(--text3);font-size:12.5px;line-height:1.55;margin:0 0 10px">'
+      + 'Один файл — сколько угодно больших шаблонов. Код кусков пишешь прямо внутри, <b>любой язык</b> — куски сами создадутся в библиотеке (повторы не задвоятся) и соберутся в шаблон. Руками подбирать ничего не надо.'
+      + '<div style="margin:8px 0 2px"><b>Разметка (Markdown — любой синтаксис кода без экранирования):</b></div>'
+      + '<ul style="margin:2px 0 0;padding-left:18px">'
+        + '<li><code># Название</code> — новый большой шаблон (можно много в одном файле)</li>'
+        + '<li><code>&gt; текст</code> — описание шаблона (необязательно)</li>'
+        + '<li><code>## Название куска `язык`</code> — кусок; язык в обратных кавычках (js, html, css, python, sql…)</li>'
+        + '<li>строка(и) под ним — заметка «зачем этот кусок» (необязательно)</li>'
+        + '<li>блок <code>```язык … ```</code> — сам код куска, как есть</li>'
+      + '</ul>'
+      + '<div style="margin-top:6px;opacity:.85">Куски одного шаблона стыкуются сами: JS — по общим именам переменных, HTML/JS/CSS — по общему <code>#id</code>/классу. JSON-формат (<code>[{title,desc,pieces:[…]}]</code>) тоже принимается.</div>'
+    + '</div>'
+    + '<div class="mfield"><label>Шаблоны (Markdown или JSON)</label><textarea id="bk-text" rows="13" placeholder="вставь сюда (или нажми «пример»)" style="font-family:ui-monospace,monospace;font-size:12px"></textarea></div>'
+    + '<div class="mbtns"><button class="btn" id="bk-file">📄 из файла…</button><button class="btn" id="bk-sample">пример</button><button class="btn ok" id="bk-load">📥 загрузить</button><button class="btn" id="bk-close">закрыть</button><input type="file" id="bk-fileinp" accept=".md,.markdown,.txt,.json" style="display:none"></div>'
     + '<div class="merr" id="bk-err" style="margin-top:10px"></div>';
   bg.appendChild(box); document.body.appendChild(bg);
   const q = s => box.querySelector(s);
@@ -158,7 +210,10 @@ function openBulkModal(){
   q('#bk-fileinp').onchange = async e => { const f = e.target.files[0]; if(!f) return; try { q('#bk-text').value = await f.text(); } catch(_){} e.target.value = ''; };
   q('#bk-load').onclick = async () => {
     const err = q('#bk-err'); err.textContent = ''; err.style.color = '';
-    let data; try { data = JSON.parse(q('#bk-text').value); } catch(e){ err.textContent = 'Это не похоже на JSON: ' + e.message; return; }
+    const t = q('#bk-text').value.trim();
+    let data;
+    if(t[0] === '[' || t[0] === '{'){ try { data = JSON.parse(t); } catch(e){ err.textContent = 'Похоже на JSON, но с ошибкой: ' + e.message; return; } }
+    else { data = parseTemplatesMarkdown(t); if(!data.length){ err.textContent = 'Не нашла ни одного шаблона. Начни строку с «# Название».'; return; } }
     q('#bk-load').disabled = true; q('#bk-load').textContent = 'граблю…';
     const r = await fetch('/api/recipes/import', { method: 'POST', body: JSON.stringify(data) }).then(x => x.json()).catch(() => null);
     q('#bk-load').disabled = false; q('#bk-load').textContent = '📥 загрузить';
