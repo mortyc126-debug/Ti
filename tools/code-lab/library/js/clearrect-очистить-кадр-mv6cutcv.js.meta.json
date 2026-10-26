@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "clearrect-очистить-кадр-mv6cutcv",
   "file": "clearrect-очистить-кадр-mv6cutcv.js",
-  "title": "clearrect-очистить-кадр-mv6cutcv",
+  "title": "clearRect — очистить кадр",
   "lang": "js",
   "group": "Графика и визуализация / Canvas: рисование",
   "desc": "clearRect стирает пиксели заданной области. В анимации обычно очищают весь canvas перед рисованием нового кадра.",
@@ -33,7 +33,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -45,11 +45,19 @@
       "source": "dict"
     },
     {
+      "line": 0,
+      "col": 24,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
       "line": 1,
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -58,14 +66,6 @@
       "text": "getContext",
       "kind": "fn",
       "note": "getContext — получить «кисть» canvas: getContext(\"2d\") для рисования.",
-      "source": "dict"
-    },
-    {
-      "line": 3,
-      "col": 4,
-      "text": "fillStyle",
-      "kind": "name",
-      "note": "fillStyle — цвет заливки",
       "source": "dict"
     },
     {

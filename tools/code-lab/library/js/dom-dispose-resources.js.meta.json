@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "dom-dispose-resources",
+  "file": "dom-dispose-resources.js",
+  "title": "Собрать функции очистки ресурса в один dispose",
+  "lang": "js",
+  "group": "Интерфейс / Жизненный цикл",
+  "desc": "Регистрирует очистку обработчиков, таймеров и подписок; dispose идемпотентен и выполняет очистки в обратном порядке.",
+  "output": "все зарегистрированные очистки выполняются один раз",
+  "tags": [
+    "очистка",
+    "dispose",
+    "ресурсы",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "cleanup listeners timers",
+    "освободить ресурсы компонента",
+    "dispose pattern javascript"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

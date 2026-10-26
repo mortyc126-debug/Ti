@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "resize-изменение-размера-окна-mv6cusxl",
   "file": "resize-изменение-размера-окна-mv6cusxl.js",
-  "title": "resize-изменение-размера-окна-mv6cusxl",
+  "title": "resize — изменение размера окна",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Реакция на действия поль",
   "desc": "Событие resize удобно для обновления размеров canvas и пересчёта раскладки. Не забывайте задавать canvas.width и canvas.height с учётом нужного масштаба.",
@@ -34,6 +34,14 @@
       "text": "window",
       "kind": "fn",
       "note": "window — глобальный объект браузера (окно): таймеры, адрес, размеры экрана.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
       "source": "dict"
     },
     {

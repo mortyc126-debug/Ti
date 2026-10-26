@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "string-locale-compare",
+  "file": "string-locale-compare.js",
+  "title": "localeCompare — сравнить строки с учётом языка",
+  "lang": "js",
+  "group": "Регулярные выражения и текст",
+  "desc": "Сравнивает строки с учётом правил локали; для сортировки используйте результат сравнения.",
+  "output": "[\"Арбуз\", \"Банан\", \"Ёлка\"]",
+  "tags": [
+    "localeCompare",
+    "сортировка",
+    "локаль"
+  ],
+  "aliases": [
+    "русская сортировка строк",
+    "сравнить строки по локали",
+    "правильно сортировать кириллицу"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "safe-property-access",
+  "file": "safe-property-access.js",
+  "title": "Безопасно прочитать вложенное поле",
+  "lang": "js",
+  "group": "Ошибки, тестирование и отладка",
+  "desc": "Опциональная цепочка и nullish coalescing защищают от отсутствующих промежуточных объектов.",
+  "output": "неизвестно",
+  "tags": [
+    "optional chaining",
+    "nullish coalescing",
+    "объекты"
+  ],
+  "aliases": [
+    "прочитать вложенное свойство без ошибки",
+    "защититься от undefined",
+    "значение по умолчанию для null"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

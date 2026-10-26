@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-022-finally",
+  "file": "add-022-finally.js",
+  "title": "finally — освободить ресурс",
+  "lang": "js",
+  "group": "Ошибки и отладка / Исключения",
+  "desc": "Выполняет завершающее действие независимо от успеха или ошибки.",
+  "output": "Работа, затем Завершение операции",
+  "tags": [
+    "освобождение ресурсов",
+    "обработка ошибок"
+  ],
+  "aliases": [
+    "finally",
+    "завершение независимо от ошибки",
+    "try catch finally"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "освобождение ресурсов",
+      "kind": "concept",
+      "note": "освобождение ресурсов — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "обработка ошибок",
+      "kind": "concept",
+      "note": "обработка ошибок — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-015-snippet",
+  "file": "add-015-snippet.js",
+  "title": "Сортировка без изменения исходного массива",
+  "lang": "js",
+  "group": "Данные / Сортировка",
+  "desc": "Сортирует копию массива чисел, сохраняя исходный порядок данных.",
+  "output": "[4, 12, 30] [30, 4, 12]",
+  "tags": [
+    "spread",
+    "числовая сортировка"
+  ],
+  "aliases": [
+    "sort без мутации",
+    "сортировать копию",
+    "не менять исходный массив"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "spread",
+      "kind": "concept",
+      "note": "spread — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "числовая сортировка",
+      "kind": "concept",
+      "note": "числовая сортировка — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

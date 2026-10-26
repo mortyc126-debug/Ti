@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "event-listener-once",
+  "file": "event-listener-once.js",
+  "title": "addEventListener once — выполнить обработчик один раз",
+  "lang": "js",
+  "group": "Безопасность и совместимость",
+  "desc": "Параметр once удаляет обработчик после первого вызова.",
+  "output": "срабатывает один раз",
+  "tags": [
+    "addEventListener",
+    "once",
+    "события"
+  ],
+  "aliases": [
+    "обработчик события один раз",
+    "автоматически удалить listener",
+    "once true"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

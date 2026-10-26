@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "async-batch-by-size",
+  "file": "async-batch-by-size.js",
+  "title": "Пакетировать записи и отправлять порциями",
+  "lang": "js",
+  "group": "Асинхронность / Пакетная обработка",
+  "desc": "Делит входные записи на последовательные порции и передаёт каждую в async-обработчик; не запускает все пакеты сразу.",
+  "output": "пакеты выполняются последовательно",
+  "tags": [
+    "batch",
+    "пакеты",
+    "асинхронность",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "отправлять записи пачками",
+    "batch async requests",
+    "обработать массив порциями"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "workflow-snapshot-restore",
+  "file": "workflow-snapshot-restore.js",
+  "title": "Сохранить и восстановить JSON-совместимый снимок состояния",
+  "lang": "js",
+  "group": "Состояние / Снимки",
+  "desc": "Создаёт сериализуемый снимок и восстанавливает его через парсинг; подходит только для JSON-совместимых данных.",
+  "output": "снимок сериализуется; восстановленное состояние проходит валидатор",
+  "tags": [
+    "snapshot",
+    "restore",
+    "JSON",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "snapshot restore state",
+    "сохранить состояние в json и восстановить",
+    "снимок данных"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

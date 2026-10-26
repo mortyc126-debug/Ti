@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "object-deep-set-immutable",
+  "file": "object-deep-set-immutable.js",
+  "title": "Обновить вложенное поле без мутации исходного объекта",
+  "lang": "js",
+  "group": "Данные / Обновление состояния",
+  "desc": "Копирует только объекты вдоль пути, оставляя исходную структуру неизменной; путь задаётся массивом ключей.",
+  "output": "dark light",
+  "tags": [
+    "иммутабельность",
+    "вложенный объект",
+    "обновление",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "изменить вложенное поле без мутации",
+    "immutable update nested object",
+    "обновить a.b.c"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

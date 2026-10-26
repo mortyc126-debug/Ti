@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "js-function",
   "file": "js-function.js",
-  "title": "js-function",
+  "title": "Функция",
   "lang": "js",
   "group": "Основы / Синтаксис",
   "desc": "Функция — это рецепт: даёшь ей что-то на вход, она возвращает результат. Написал один раз — вызываешь сколько угодно.",
@@ -33,14 +33,14 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "объявить функцию",
-      "source": "dict"
+      "note": "Объявляет функцию — именованный кусок кода, который можно вызывать по имени.",
+      "source": "custom"
     },
     {
       "line": 0,
       "col": 9,
       "text": "площадь",
-      "kind": "fn",
+      "kind": "name",
       "note": "Имя функции — придумываешь сам. По нему потом вызываешь.",
       "source": "custom"
     },
@@ -97,8 +97,8 @@
       "col": 2,
       "text": "return",
       "kind": "kw",
-      "note": "вернуть результат из функции и завершить её выполнение",
-      "source": "dict"
+      "note": "«Вернуть» — отдаёт результат наружу и завершает функцию. То, что после return, станет ответом вызова.",
+      "source": "custom"
     },
     {
       "line": 1,
@@ -137,22 +137,22 @@
       "col": 0,
       "text": "console",
       "kind": "fn",
-      "note": "console — встроенный объект для вывода в консоль (отладки).",
-      "source": "dict"
+      "note": "Объект вывода.",
+      "source": "custom"
     },
     {
       "line": 4,
       "col": 8,
       "text": "log",
       "kind": "fn",
-      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
-      "source": "dict"
+      "note": "Печать результата.",
+      "source": "custom"
     },
     {
       "line": 4,
       "col": 12,
       "text": "площадь",
-      "kind": "fn",
+      "kind": "name",
       "note": "Вызов функции по имени — запускаем рецепт.",
       "source": "custom"
     },
@@ -261,48 +261,16 @@
       "tests": "not_run",
       "compatibility": "not_verified"
     },
-    "provides": [
+    "provides": [],
+    "requires": [
+      "functionплощадь",
+      "returnширина",
       "площадь"
     ],
-    "requires": [],
     "subcat": "Синтаксис"
   },
   "legacy": {
     "template": "js-function.json"
   },
-  "enriched": true,
-  "orphanNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "function",
-      "kind": "kw",
-      "note": "Объявляет функцию — именованный кусок кода, который можно вызывать по имени.",
-      "source": "custom"
-    },
-    {
-      "line": 1,
-      "col": 2,
-      "text": "return",
-      "kind": "kw",
-      "note": "«Вернуть» — отдаёт результат наружу и завершает функцию. То, что после return, станет ответом вызова.",
-      "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 0,
-      "text": "console",
-      "kind": "fn",
-      "note": "Объект вывода.",
-      "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 8,
-      "text": "log",
-      "kind": "fn",
-      "note": "Печать результата.",
-      "source": "custom"
-    }
-  ]
+  "enriched": true
 }

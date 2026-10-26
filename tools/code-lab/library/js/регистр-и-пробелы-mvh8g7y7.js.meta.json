@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "регистр-и-пробелы-mvh8g7y7",
   "file": "регистр-и-пробелы-mvh8g7y7.js",
-  "title": "регистр-и-пробелы-mvh8g7y7",
+  "title": "регистр и пробелы",
   "lang": "js",
   "group": "Данные: хранить, находить и преобразовывать / Строки и текст",
   "desc": "Приводит текст к единому виду.",
@@ -34,39 +34,9 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
-    {
-      "line": 0,
-      "col": 32,
-      "text": "trim",
-      "kind": "fn",
-      "note": "trim — убрать пробелы по краям строки.",
-      "source": "dict"
-    },
-    {
-      "line": 0,
-      "col": 39,
-      "text": "toLowerCase",
-      "kind": "fn",
-      "note": "toLowerCase — привести строку к нижнему регистру.",
-      "source": "dict"
-    }
-  ],
-  "component": {
-    "provides": [
-      "clean"
-    ],
-    "requires": []
-  },
-  "legacy": {
-    "template": "регистр-и-пробелы-mvh8g7y7.json",
-    "descAt": 1792533981247
-  },
-  "enriched": true,
-  "descAt": 1792533981247,
-  "orphanNotes": [
     {
       "line": 0,
       "col": 32,
@@ -83,5 +53,16 @@
       "note": "toLowerCase — переводит в строчные буквы",
       "source": "custom"
     }
-  ]
+  ],
+  "component": {
+    "provides": [
+      "clean"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "регистр-и-пробелы-mvh8g7y7.json",
+    "descAt": 1792533981247
+  },
+  "enriched": true
 }

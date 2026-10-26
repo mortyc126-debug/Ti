@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "array-to-reversed",
+  "file": "array-to-reversed.js",
+  "title": "toReversed — развернуть без мутации",
+  "lang": "js",
+  "group": "Безопасность и совместимость",
+  "desc": "Возвращает новый массив с обратным порядком элементов, не меняя исходный.",
+  "output": "[3, 2, 1]\n[1, 2, 3]",
+  "tags": [
+    "toReversed",
+    "массив",
+    "иммутабельность"
+  ],
+  "aliases": [
+    "развернуть массив без изменения исходного",
+    "reverse без мутации",
+    "обратная копия массива"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

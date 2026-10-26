@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "async-queue-sequential",
+  "file": "async-queue-sequential.js",
+  "title": "Последовательно обработать список async-операций",
+  "lang": "js",
+  "group": "Асинхронность и потоки данных",
+  "desc": "Обычный for...of с await запускает следующую операцию только после завершения предыдущей.",
+  "output": "зависит от функции получитьДанные",
+  "tags": [
+    "async",
+    "await",
+    "очередь"
+  ],
+  "aliases": [
+    "последовательные async запросы",
+    "не запускать параллельно",
+    "цикл с await"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "class-static",
+  "file": "class-static.js",
+  "title": "class — статический метод",
+  "lang": "js",
+  "group": "Объекты, прототипы и классы",
+  "desc": "Статический метод вызывается у самого класса, а не у экземпляра.",
+  "output": "170",
+  "tags": [
+    "static",
+    "class",
+    "метод класса"
+  ],
+  "aliases": [
+    "статическая функция класса",
+    "вызвать метод без new",
+    "утилита внутри класса"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "array-unique-by-key",
+  "file": "array-unique-by-key.js",
+  "title": "Удалить дубли по ключу, сохранив первый элемент",
+  "lang": "js",
+  "group": "Данные / Преобразование коллекций",
+  "desc": "Возвращает новый массив без повторов по выбранному ключу; сохраняет исходный порядок и первый встретившийся объект.",
+  "output": "[{id:1},{id:2}]",
+  "tags": [
+    "массив",
+    "дедупликация",
+    "ключ",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "убрать дубли объектов по полю",
+    "уникальные записи по id",
+    "дедупликация массива объектов"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "array-group-by-key",
+  "file": "array-group-by-key.js",
+  "title": "Сгруппировать записи по значению поля",
+  "lang": "js",
+  "group": "Данные / Преобразование коллекций",
+  "desc": "Группирует элементы в Map по вычисляемому ключу; подходит для отчётов, категорий и агрегаций.",
+  "output": "a → 2 записи; b → 1 запись",
+  "tags": [
+    "группировка",
+    "Map",
+    "агрегация",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "сгруппировать массив объектов по полю",
+    "разбить записи по категории",
+    "group by в javascript"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

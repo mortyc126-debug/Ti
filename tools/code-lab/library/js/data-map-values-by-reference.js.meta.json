@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "data-map-values-by-reference",
+  "file": "data-map-values-by-reference.js",
+  "title": "Преобразовать объект-сопоставление в список записей",
+  "lang": "js",
+  "group": "Данные / Преобразование форматов",
+  "desc": "Преобразует пары ключ-значение в структуру, удобную для таблицы или перебора; имя поля для ключа и значения задаётся параметрами.",
+  "output": "[{key:\"a\",value:1},{key:\"b\",value:2}]",
+  "tags": [
+    "объект",
+    "массив",
+    "форматы",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "object map to array",
+    "превратить словарь в массив объектов",
+    "ключи объекта в записи"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

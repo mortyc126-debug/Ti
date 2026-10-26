@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "комментарии-mvh8gi2u",
   "file": "комментарии-mvh8gi2u.js",
-  "title": "комментарии-mvh8gi2u",
+  "title": "комментарии",
   "lang": "js",
   "group": "Основы / Синтаксис",
   "desc": "Заметки, которые программа не читает.",
@@ -37,6 +37,5 @@
     "template": "комментарии-mvh8gi2u.json",
     "descAt": 1792533994374
   },
-  "enriched": true,
-  "descAt": 1792533994374
+  "enriched": true
 }

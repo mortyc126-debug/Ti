@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "fillrect-и-strokerect-прямоугольники-mv6cutc3",
   "file": "fillrect-и-strokerect-прямоугольники-mv6cutc3.js",
-  "title": "fillrect-и-strokerect-прямоугольники-mv6cutc3",
+  "title": "fillRect и strokeRect — прямоугольники",
   "lang": "js",
   "group": "Графика и визуализация / Canvas: рисование",
   "desc": "fillRect рисует заполненный прямоугольник, strokeRect — только контур. Координаты и размеры задаются в пикселях canvas.",
@@ -34,7 +34,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -46,11 +46,19 @@
       "source": "dict"
     },
     {
+      "line": 0,
+      "col": 24,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
       "line": 1,
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -59,14 +67,6 @@
       "text": "getContext",
       "kind": "fn",
       "note": "getContext — получить «кисть» canvas: getContext(\"2d\") для рисования.",
-      "source": "dict"
-    },
-    {
-      "line": 3,
-      "col": 4,
-      "text": "fillStyle",
-      "kind": "name",
-      "note": "fillStyle — цвет заливки",
       "source": "dict"
     },
     {

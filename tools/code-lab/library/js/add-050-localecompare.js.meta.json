@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-050-localecompare",
+  "file": "add-050-localecompare.js",
+  "title": "Стабильный ключ для сортировки: localeCompare",
+  "lang": "js",
+  "group": "Данные / Сортировка",
+  "desc": "Сортирует текст с учётом языковых правил вместо сравнения кодов символов.",
+  "output": "Строки в русском алфавитном порядке",
+  "tags": [
+    "локаль",
+    "сортировка строк"
+  ],
+  "aliases": [
+    "localeCompare",
+    "русская сортировка",
+    "сортировка кириллицы"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "локаль",
+      "kind": "concept",
+      "note": "локаль — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "сортировка строк",
+      "kind": "concept",
+      "note": "сортировка строк — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

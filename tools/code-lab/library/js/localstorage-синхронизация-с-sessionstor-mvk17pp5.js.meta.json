@@ -3,7 +3,7 @@
   "id": "localstorage-синхронизация-с-sessionstor-mvk17pp5",
   "file": "localstorage-синхронизация-с-sessionstor-mvk17pp5.js",
   "lang": "js",
-  "title": "localstorage-синхронизация-с-sessionstor-mvk17pp5",
+  "title": "localStorage: синхронизация с sessionStorage",
   "group": "Файлы, хранение и сервер / Хранение в браузере",
   "desc": "Копирует данные из localStorage в sessionStorage при открытии страницы, чтобы данные были доступны даже если они не были загружены из localStorage.",
   "output": "Данные из localStorage дублируются в sessionStorage при загрузке страницы.",
@@ -51,7 +51,7 @@
     "дубликат хранения"
   ],
   "source": {
-    "title": "imported",
+    "title": "ai",
     "desc": "ai",
     "tags": "ai"
   },
@@ -62,7 +62,7 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "объявить функцию",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
       "source": "dict"
     },
     {
@@ -70,7 +70,7 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -79,6 +79,22 @@
       "text": "keys",
       "kind": "fn",
       "note": "Object.keys — массив имён свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 32,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "forEach",
+      "kind": "fn",
+      "note": "forEach — выполняет действие для каждого элемента массива.",
       "source": "dict"
     },
     {
@@ -102,7 +118,15 @@
       "col": 6,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 19,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
       "source": "dict"
     },
     {
@@ -111,6 +135,14 @@
       "text": "parse",
       "kind": "fn",
       "note": "JSON.parse — разобрать строку JSON обратно в объект.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 30,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
       "source": "dict"
     },
     {
@@ -131,6 +163,14 @@
     },
     {
       "line": 5,
+      "col": 6,
+      "text": "sessionStorage",
+      "kind": "name",
+      "note": "sessionStorage — хранилище до закрытия вкладки",
+      "source": "dict"
+    },
+    {
+      "line": 5,
       "col": 21,
       "text": "setItem",
       "kind": "fn",
@@ -143,6 +183,14 @@
       "text": "key",
       "kind": "name",
       "note": "key — функция, по значению которой идёт сортировка",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 34,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
       "source": "dict"
     },
     {
@@ -183,6 +231,14 @@
       "text": "window",
       "kind": "fn",
       "note": "window — глобальный объект браузера (окно): таймеры, адрес, размеры экрана.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
       "source": "dict"
     }
   ]

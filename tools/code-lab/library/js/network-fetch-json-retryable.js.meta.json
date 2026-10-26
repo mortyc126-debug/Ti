@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "id": "network-fetch-json-retryable",
+  "file": "network-fetch-json-retryable.js",
+  "title": "Запросить JSON с проверкой HTTP-статуса и классификацией ошибки",
+  "lang": "js",
+  "group": "Сеть / Клиент API",
+  "desc": "Разделяет ошибки сети, HTTP-ошибки и ошибки JSON; прикладывает status для принятия решения о повторе.",
+  "output": "возвращает разобранный JSON или ошибку с kind",
+  "tags": [
+    "fetch",
+    "HTTP",
+    "JSON",
+    "ошибки",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "fetch json классифицировать ошибки",
+    "api request helper",
+    "разделить network и http errors"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

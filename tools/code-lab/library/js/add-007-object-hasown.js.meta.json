@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "id": "add-007-object-hasown",
+  "file": "add-007-object-hasown.js",
+  "title": "Проверка существования свойства: Object.hasOwn",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Коллекции и структуры",
+  "desc": "Проверяет собственное свойство объекта, не обращаясь к прототипу.",
+  "output": "true, false",
+  "tags": [
+    "объекты",
+    "безопасный доступ"
+  ],
+  "aliases": [
+    "Object.hasOwn",
+    "есть ли ключ",
+    "собственное свойство",
+    "проверить ключ объекта"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "объекты",
+      "kind": "concept",
+      "note": "объекты — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "безопасный доступ",
+      "kind": "concept",
+      "note": "безопасный доступ — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

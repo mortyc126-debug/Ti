@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "security-allowlist-object-fields",
+  "file": "security-allowlist-object-fields.js",
+  "title": "Создать объект только из разрешённых входных полей",
+  "lang": "js",
+  "group": "Безопасность / Границы данных",
+  "desc": "Строит объект по allowlist ключей, не копируя неожиданные поля от пользователя; полезно на границе API.",
+  "output": "{name:\"A\"}",
+  "tags": [
+    "безопасность",
+    "allowlist",
+    "payload",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "защитить объект от лишних полей",
+    "allowlist поля из payload",
+    "не доверять входному объекту"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "клик-по-кнопке-mvh8g13p",
   "file": "клик-по-кнопке-mvh8g13p.js",
-  "title": "клик-по-кнопке-mvh8g13p",
+  "title": "клик по кнопке",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Реакция на действия поль",
   "desc": "Выполняет функцию при клике.",
@@ -35,7 +35,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -55,11 +55,27 @@
       "source": "dict"
     },
     {
+      "line": 0,
+      "col": 24,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
       "line": 2,
       "col": 0,
       "text": "button",
       "kind": "name",
       "note": "button — <button> — кнопка, по клику запускает действие.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
       "source": "dict"
     },
     {
@@ -89,6 +105,5 @@
     "template": "клик-по-кнопке-mvh8g13p.json",
     "descAt": 1792533972373
   },
-  "enriched": true,
-  "descAt": 1792533972373
+  "enriched": true
 }

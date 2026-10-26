@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "цикл-mvh8ggbr",
   "file": "цикл-mvh8ggbr.js",
-  "title": "цикл-mvh8ggbr",
+  "title": "цикл",
   "lang": "js",
   "group": "Основы / Как устроена программа",
   "desc": "Повторяет действие несколько раз.",
@@ -34,15 +34,15 @@
       "col": 0,
       "text": "for",
       "kind": "kw",
-      "note": "цикл с инициализацией, условием и шагом",
-      "source": "dict"
+      "note": "for — цикл со счётчиком",
+      "source": "custom"
     },
     {
       "line": 0,
       "col": 5,
       "text": "let",
       "kind": "kw",
-      "note": "объявить переменную с блочной областью видимости",
+      "note": "let — объявляет переменную, значение которой можно менять позже.",
       "source": "dict"
     },
     {
@@ -72,16 +72,5 @@
     "template": "цикл-mvh8ggbr.json",
     "descAt": 1792533992103
   },
-  "enriched": true,
-  "descAt": 1792533992103,
-  "orphanNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "for",
-      "kind": "kw",
-      "note": "for — цикл со счётчиком",
-      "source": "custom"
-    }
-  ]
+  "enriched": true
 }

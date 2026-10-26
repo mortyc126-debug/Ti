@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "assert-condition",
+  "file": "assert-condition.js",
+  "title": "Проверка условия в тесте",
+  "lang": "js",
+  "group": "Ошибки, тестирование и отладка",
+  "desc": "Простая функция assert прерывает тест, если условие ложно.",
+  "output": "OK",
+  "tags": [
+    "assert",
+    "тестирование",
+    "проверки"
+  ],
+  "aliases": [
+    "написать простую проверку",
+    "проверить ожидаемое условие",
+    "assert без библиотеки"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

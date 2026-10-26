@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-070-formdata",
+  "file": "add-070-formdata.js",
+  "title": "Отправка формы через FormData",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Поля ввода и формы",
+  "desc": "Собирает значения именованных полей формы в FormData.",
+  "output": "Объект с парами имя-поля и значение",
+  "tags": [
+    "повторяющиеся имена полей",
+    "валидация"
+  ],
+  "aliases": [
+    "Object.fromEntries FormData",
+    "форма в объект",
+    "собрать поля формы"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "повторяющиеся имена полей",
+      "kind": "concept",
+      "note": "повторяющиеся имена полей — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "валидация",
+      "kind": "concept",
+      "note": "валидация — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

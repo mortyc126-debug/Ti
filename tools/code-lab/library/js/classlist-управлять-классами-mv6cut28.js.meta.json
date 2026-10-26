@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "classlist-управлять-классами-mv6cut28",
   "file": "classlist-управлять-классами-mv6cut28.js",
-  "title": "classlist-управлять-классами-mv6cut28",
+  "title": "classList — управлять классами",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
   "desc": "classList.add добавляет класс, remove удаляет, toggle переключает, contains проверяет наличие класса.",
@@ -32,7 +32,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -41,6 +41,14 @@
       "text": "document",
       "kind": "fn",
       "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 22,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
       "source": "dict"
     },
     {
@@ -57,14 +65,6 @@
       "text": "classList",
       "kind": "name",
       "note": "classList — список CSS-классов элемента: add/remove/toggle/contains.",
-      "source": "dict"
-    },
-    {
-      "line": 2,
-      "col": 15,
-      "text": "toggle",
-      "kind": "fn",
-      "note": "toggle — добавляет класс, если его нет, и убирает, если есть",
       "source": "dict"
     },
     {

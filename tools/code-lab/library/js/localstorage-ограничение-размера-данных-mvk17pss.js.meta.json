@@ -3,7 +3,7 @@
   "id": "localstorage-ограничение-размера-данных-mvk17pss",
   "file": "localstorage-ограничение-размера-данных-mvk17pss.js",
   "lang": "js",
-  "title": "localstorage-ограничение-размера-данных-mvk17pss",
+  "title": "localStorage: ограничение размера данных",
   "group": "Файлы, хранение и сервер / Хранение в браузере",
   "desc": "Проверяет размер данных перед сохранением в localStorage и обрезает их, если превышает лимит (обычно ~5 МБ).",
   "output": "Данные сохраняются в localStorage, но обрезаются, если их размер превышает 4 МБ.",
@@ -53,7 +53,7 @@
     "размер хранения"
   ],
   "source": {
-    "title": "imported",
+    "title": "ai",
     "desc": "ai",
     "tags": "ai"
   },
@@ -64,7 +64,7 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "объявить функцию",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
       "source": "dict"
     },
     {
@@ -76,11 +76,27 @@
       "source": "dict"
     },
     {
+      "line": 0,
+      "col": 32,
+      "text": "value",
+      "kind": "name",
+      "note": "value — текущее значение поля ввода (input, textarea, select).",
+      "source": "dict"
+    },
+    {
       "line": 1,
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназнач��ть. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
       "source": "dict"
     },
     {
@@ -89,6 +105,14 @@
       "text": "stringify",
       "kind": "fn",
       "note": "JSON.stringify — превратить объект в строку JSON (для хранения/передачи).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 33,
+      "text": "value",
+      "kind": "name",
+      "note": "value — текущее значение поля ввода (input, textarea, select).",
       "source": "dict"
     },
     {
@@ -112,7 +136,7 @@
       "col": 4,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -129,6 +153,14 @@
       "text": "warn",
       "kind": "fn",
       "note": "warn — console.warn печатает предупреждение (жёлтым).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
       "source": "dict"
     },
     {
@@ -153,6 +185,14 @@
       "text": "else",
       "kind": "kw",
       "note": "else — «иначе»: что делать, когда условие if не выполнилось.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 4,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
       "source": "dict"
     },
     {

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "js-loop",
   "file": "js-loop.js",
-  "title": "js-loop",
+  "title": "Цикл (for)",
   "lang": "js",
   "group": "Данные: хранить, находить и преобразовывать / Перебирать, фи",
   "desc": "Повторяет блок кода несколько раз. Счётчик идёт от старта до условия, каждый проход меняется на шаг.",
@@ -33,8 +33,8 @@
       "col": 0,
       "text": "for",
       "kind": "kw",
-      "note": "цикл с инициализацией, условием и шагом",
-      "source": "dict"
+      "note": "«Для». Цикл: повторяет блок, пока выполняется условие. В скобках три части через ;",
+      "source": "custom"
     },
     {
       "line": 0,
@@ -49,8 +49,8 @@
       "col": 5,
       "text": "let",
       "kind": "kw",
-      "note": "объявить переменную с блочной областью видимости",
-      "source": "dict"
+      "note": "Объявляем переменную-счётчик (живёт только внутри цикла).",
+      "source": "custom"
     },
     {
       "line": 0,
@@ -127,7 +127,7 @@
     {
       "line": 0,
       "col": 24,
-      "text": "+",
+      "text": "++",
       "kind": "op",
       "note": "Увеличить на 1. Это шаг цикла после каждого прохода.",
       "source": "custom"
@@ -153,16 +153,16 @@
       "col": 2,
       "text": "console",
       "kind": "fn",
-      "note": "console — встроенный объект для вывода в консоль (отладки).",
-      "source": "dict"
+      "note": "Объект вывода.",
+      "source": "custom"
     },
     {
       "line": 1,
       "col": 10,
       "text": "log",
       "kind": "fn",
-      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
-      "source": "dict"
+      "note": "Печать.",
+      "source": "custom"
     },
     {
       "line": 1,
@@ -253,48 +253,14 @@
       "tests": "not_run",
       "compatibility": "not_verified"
     },
-    "provides": [
-      "i"
+    "provides": [],
+    "requires": [
+      "leti"
     ],
-    "requires": [],
     "subcat": "Перебирать, фи"
   },
   "legacy": {
     "template": "js-loop.json"
   },
-  "enriched": true,
-  "orphanNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "for",
-      "kind": "kw",
-      "note": "«Для». Цикл: повторяет блок, пока выполняется условие. В скобках три части через ;",
-      "source": "custom"
-    },
-    {
-      "line": 0,
-      "col": 5,
-      "text": "let",
-      "kind": "kw",
-      "note": "Объявляем переменную-счётчик (живёт только внутри цикла).",
-      "source": "custom"
-    },
-    {
-      "line": 1,
-      "col": 2,
-      "text": "console",
-      "kind": "fn",
-      "note": "Объект вывода.",
-      "source": "custom"
-    },
-    {
-      "line": 1,
-      "col": 10,
-      "text": "log",
-      "kind": "fn",
-      "note": "Печать.",
-      "source": "custom"
-    }
-  ]
+  "enriched": true
 }

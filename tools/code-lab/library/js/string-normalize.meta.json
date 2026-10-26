@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "string-normalize",
+  "file": "string-normalize.js",
+  "title": "normalize — привести Unicode к нормальной форме",
+  "lang": "js",
+  "group": "Регулярные выражения и текст",
+  "desc": "Нормализация Unicode помогает сравнивать визуально одинаковый текст, записанный разными последовательностями кодовых точек.",
+  "output": "false\ntrue",
+  "tags": [
+    "normalize",
+    "Unicode",
+    "строки"
+  ],
+  "aliases": [
+    "нормализовать Unicode",
+    "сравнить визуально одинаковые строки",
+    "NFC NFC"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "array-reduce-map",
+  "file": "array-reduce-map.js",
+  "title": "reduce — собрать объект-индекс по ключу",
+  "lang": "js",
+  "group": "Безопасность и совместимость",
+  "desc": "Собирает элементы массива в объект для быстрого доступа по идентификатору; ключи строковые.",
+  "output": "20",
+  "tags": [
+    "reduce",
+    "индекс",
+    "объекты"
+  ],
+  "aliases": [
+    "сделать индекс массива по id",
+    "преобразовать массив в словарь",
+    "быстрый доступ по ключу"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

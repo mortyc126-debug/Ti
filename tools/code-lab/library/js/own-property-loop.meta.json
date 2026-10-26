@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "own-property-loop",
+  "file": "own-property-loop.js",
+  "title": "Перебрать только собственные перечисляемые поля",
+  "lang": "js",
+  "group": "Безопасность и совместимость",
+  "desc": "Проверяет собственность ключа при for...in, чтобы не обрабатывать унаследованные свойства.",
+  "output": "своё",
+  "tags": [
+    "for...in",
+    "Object.hasOwn",
+    "безопасность"
+  ],
+  "aliases": [
+    "перебирать только свои свойства",
+    "защитить for in от прототипа",
+    "не читать унаследованные поля"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

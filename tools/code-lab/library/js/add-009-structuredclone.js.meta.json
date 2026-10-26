@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "id": "add-009-structuredclone",
+  "file": "add-009-structuredclone.js",
+  "title": "Глубокая копия через structuredClone",
+  "lang": "js",
+  "group": "Массивы и объекты",
+  "desc": "Копирует вложенные структуры данных, поддерживаемые structuredClone.",
+  "output": "фиолетовый",
+  "tags": [
+    "копирование данных",
+    "ограничения structuredClone"
+  ],
+  "aliases": [
+    "structuredClone",
+    "глубокая копия",
+    "deep clone",
+    "копия вложенного объекта"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "копирование данных",
+      "kind": "concept",
+      "note": "копирование данных — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "ограничения structuredClone",
+      "kind": "concept",
+      "note": "ограничения structuredClone — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

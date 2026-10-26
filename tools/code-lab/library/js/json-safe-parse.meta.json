@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "json-safe-parse",
+  "file": "json-safe-parse.js",
+  "title": "Безопасно разобрать JSON",
+  "lang": "js",
+  "group": "Ошибки, тестирование и отладка",
+  "desc": "Оборачивает JSON.parse в try/catch и возвращает явный результат успеха или ошибки.",
+  "output": "false",
+  "tags": [
+    "JSON.parse",
+    "try catch",
+    "валидация"
+  ],
+  "aliases": [
+    "обработать ошибку JSON.parse",
+    "безопасно разобрать JSON",
+    "не падать на битом JSON"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "array-to-sorted",
+  "file": "array-to-sorted.js",
+  "title": "toSorted — отсортировать без изменения исходного массива",
+  "lang": "js",
+  "group": "Безопасность и совместимость",
+  "desc": "toSorted возвращает новый отсортированный массив, в отличие от sort, который мутирует исходный.",
+  "output": "[3, 1, 2]\n[1, 2, 3]",
+  "tags": [
+    "toSorted",
+    "массив",
+    "иммутабельность"
+  ],
+  "aliases": [
+    "отсортировать массив без мутации",
+    "не менять исходный массив при сортировке",
+    "sort без изменения"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

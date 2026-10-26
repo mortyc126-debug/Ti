@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "set-difference",
+  "file": "set-difference.js",
+  "title": "Set — разность множеств",
+  "lang": "js",
+  "group": "Коллекции и итераторы",
+  "desc": "Получает элементы первого множества, которых нет во втором.",
+  "output": "[1, 3]",
+  "tags": [
+    "Set",
+    "filter",
+    "разность"
+  ],
+  "aliases": [
+    "элементы только первого массива",
+    "разность множеств",
+    "найти отсутствующие во втором"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

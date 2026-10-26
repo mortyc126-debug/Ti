@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "error-cause",
+  "file": "error-cause.js",
+  "title": "Error cause — сохранить первопричину",
+  "lang": "js",
+  "group": "Ошибки, тестирование и отладка",
+  "desc": "Поле cause связывает ошибку высокого уровня с исходной ошибкой, не теряя контекст.",
+  "output": "сбой сети",
+  "tags": [
+    "Error.cause",
+    "обработка ошибок",
+    "цепочка"
+  ],
+  "aliases": [
+    "сохранить исходную ошибку",
+    "Error с cause",
+    "обернуть исключение с причиной"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "array-findlast",
+  "file": "array-findlast.js",
+  "title": "findLast — найти последнее подходящее значение",
+  "lang": "js",
+  "group": "Безопасность и совместимость",
+  "desc": "Ищет с конца массива и возвращает первый найденный с конца элемент, подходящий условию.",
+  "output": "14",
+  "tags": [
+    "findLast",
+    "массив",
+    "поиск"
+  ],
+  "aliases": [
+    "найти последний элемент по условию",
+    "поиск с конца массива",
+    "findLast JavaScript"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

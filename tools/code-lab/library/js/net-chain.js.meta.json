@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "net-chain",
   "file": "net-chain.js",
-  "title": "net-chain",
+  "title": "Цепочка и параллельные запросы",
   "lang": "js",
   "group": "Сеть и запросы / Получить данные",
   "desc": "Два способа нескольких запросов. ЦЕПОЧКА (await, потом await) — когда второй нуждается в результате первого. ПАРАЛЛЕЛЬНО (Promise.all) — когда запросы независимы: так быстрее, ждём все разом.",
@@ -35,8 +35,8 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная-провод.",
+      "source": "custom"
     },
     {
       "line": 0,
@@ -59,24 +59,8 @@
       "col": 24,
       "text": "then",
       "kind": "fn",
-      "note": "then — что сделать, когда промис выполнится (получит результат).",
-      "source": "dict"
-    },
-    {
-      "line": 0,
-      "col": 29,
-      "text": "r",
-      "kind": "name",
-      "note": "r — радиус круга",
-      "source": "dict"
-    },
-    {
-      "line": 0,
-      "col": 34,
-      "text": "r",
-      "kind": "name",
-      "note": "r — радиус круга",
-      "source": "dict"
+      "note": "«Когда промис готов — сделай…».",
+      "source": "custom"
     },
     {
       "line": 0,
@@ -91,15 +75,15 @@
       "col": 0,
       "text": "async",
       "kind": "kw",
-      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
-      "source": "dict"
+      "note": "Функция умеет ждать (сеть).",
+      "source": "custom"
     },
     {
       "line": 2,
       "col": 6,
       "text": "function",
       "kind": "kw",
-      "note": "объявить функцию",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
       "source": "dict"
     },
     {
@@ -115,8 +99,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная-провод.",
+      "source": "custom"
     },
     {
       "line": 4,
@@ -131,8 +115,8 @@
       "col": 16,
       "text": "await",
       "kind": "kw",
-      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
-      "source": "dict"
+      "note": "Подожди результат, потом иди дальше.",
+      "source": "custom"
     },
     {
       "line": 4,
@@ -147,8 +131,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная-провод.",
+      "source": "custom"
     },
     {
       "line": 5,
@@ -171,8 +155,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная-провод.",
+      "source": "custom"
     },
     {
       "line": 6,
@@ -187,15 +171,15 @@
       "col": 16,
       "text": "await",
       "kind": "kw",
-      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
-      "source": "dict"
+      "note": "Подожди результат, потом иди дальше.",
+      "source": "custom"
     },
     {
       "line": 6,
       "col": 22,
       "text": "q",
       "kind": "fn",
-      "note": "Короткий помощник: запрос → объект.",
+      "note": "Коротк��й помощник: запрос → объект.",
       "source": "custom"
     },
     {
@@ -235,30 +219,22 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
-    },
-    {
-      "line": 10,
-      "col": 9,
-      "text": "a",
-      "kind": "name",
-      "note": "a — селектор всех ссылок",
-      "source": "dict"
+      "note": "Переменная-провод.",
+      "source": "custom"
     },
     {
       "line": 10,
       "col": 17,
       "text": "await",
       "kind": "kw",
-      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
-      "source": "dict"
+      "note": "Подожди результат, потом иди дальше.",
+      "source": "custom"
     },
     {
       "line": 10,
       "col": 23,
       "text": "Promise",
-      "kind": "name",
+      "kind": "fn",
       "note": "Обещание результата попозже.",
       "source": "custom"
     },
@@ -400,87 +376,5 @@
   "legacy": {
     "template": "net-chain.json"
   },
-  "enriched": true,
-  "orphanNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
-    },
-    {
-      "line": 0,
-      "col": 24,
-      "text": "then",
-      "kind": "fn",
-      "note": "«Когда промис готов — сделай…».",
-      "source": "custom"
-    },
-    {
-      "line": 2,
-      "col": 0,
-      "text": "async",
-      "kind": "kw",
-      "note": "Функция умеет ждать (сеть).",
-      "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 2,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 16,
-      "text": "await",
-      "kind": "kw",
-      "note": "Подожди результат, потом иди дальше.",
-      "source": "custom"
-    },
-    {
-      "line": 5,
-      "col": 2,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
-    },
-    {
-      "line": 6,
-      "col": 2,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
-    },
-    {
-      "line": 6,
-      "col": 16,
-      "text": "await",
-      "kind": "kw",
-      "note": "Подожди результат, потом иди дальше.",
-      "source": "custom"
-    },
-    {
-      "line": 10,
-      "col": 2,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
-    },
-    {
-      "line": 10,
-      "col": 17,
-      "text": "await",
-      "kind": "kw",
-      "note": "Подожди результат, потом иди дальше.",
-      "source": "custom"
-    }
-  ]
+  "enriched": true
 }

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "textcontent-и-innerhtml-mv6cusz6",
   "file": "textcontent-и-innerhtml-mv6cusz6.js",
-  "title": "textcontent-и-innerhtml-mv6cusz6",
+  "title": "textContent и innerHTML",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
   "desc": "textContent вставляет текст безопасно, не интерпретируя его как HTML. innerHTML разбирает строку как HTML-разметку; не вставляйте туда недоверенные данные.",
@@ -31,7 +31,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -40,6 +40,22 @@
       "text": "document",
       "kind": "fn",
       "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 21,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 4,
+      "text": "textContent",
+      "kind": "name",
+      "note": "textContent — текст внутри элемента; можно прочитать или заменить.",
       "source": "dict"
     },
     {
@@ -56,6 +72,14 @@
       "text": "log",
       "kind": "fn",
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 16,
+      "text": "textContent",
+      "kind": "name",
+      "note": "textContent — текст внутри элемента; можно прочитать или заменить.",
       "source": "dict"
     }
   ],

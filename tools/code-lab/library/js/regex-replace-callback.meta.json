@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "regex-replace-callback",
+  "file": "regex-replace-callback.js",
+  "title": "replace — заменить совпадения функцией",
+  "lang": "js",
+  "group": "Регулярные выражения и текст",
+  "desc": "Функция-замена получает совпадение и может вычислять результат для каждого найденного фрагмента.",
+  "output": "цена=20; цена=50",
+  "tags": [
+    "replace",
+    "RegExp",
+    "callback"
+  ],
+  "aliases": [
+    "заменить числа в строке",
+    "replace с функцией",
+    "динамическая замена совпадений"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

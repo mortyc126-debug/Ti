@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "same-mean-js",
   "file": "same-mean-js.js",
-  "title": "same-mean-js",
+  "title": "Среднее — JavaScript",
   "lang": "js",
   "group": "Данные: хранить, находить и преобразовывать / Числа и просты",
   "desc": "Задача одна: среднее от [10,20,30]. JS: встроенного «среднего» нет — суммируем сами через reduce, делим на длину. Больше ручной работы, зато работает в браузере.",
@@ -35,8 +35,8 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная.",
+      "source": "custom"
     },
     {
       "line": 0,
@@ -51,8 +51,8 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная.",
+      "source": "custom"
     },
     {
       "line": 1,
@@ -79,28 +79,12 @@
       "source": "custom"
     },
     {
-      "line": 1,
-      "col": 28,
-      "text": "a",
-      "kind": "name",
-      "note": "a — селектор всех ссылок",
-      "source": "dict"
-    },
-    {
-      "line": 1,
-      "col": 37,
-      "text": "a",
-      "kind": "name",
-      "note": "a — селектор всех ссылок",
-      "source": "dict"
-    },
-    {
       "line": 2,
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная.",
+      "source": "custom"
     },
     {
       "line": 2,
@@ -131,16 +115,16 @@
       "col": 30,
       "text": "length",
       "kind": "fn",
-      "note": "length — длина: сколько элементов в массиве или символов в строке.",
-      "source": "dict"
+      "note": "Сколько элементов.",
+      "source": "custom"
     },
     {
       "line": 3,
       "col": 0,
       "text": "console",
       "kind": "fn",
-      "note": "console — встроенный объект для вывода в консоль (отладки).",
-      "source": "dict"
+      "note": "Вывод в консоль.",
+      "source": "custom"
     },
     {
       "line": 3,
@@ -244,47 +228,5 @@
   "legacy": {
     "template": "same-mean-js.json"
   },
-  "enriched": true,
-  "orphanNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная.",
-      "source": "custom"
-    },
-    {
-      "line": 1,
-      "col": 0,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная.",
-      "source": "custom"
-    },
-    {
-      "line": 2,
-      "col": 0,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная.",
-      "source": "custom"
-    },
-    {
-      "line": 2,
-      "col": 30,
-      "text": "length",
-      "kind": "fn",
-      "note": "Сколько элементов.",
-      "source": "custom"
-    },
-    {
-      "line": 3,
-      "col": 0,
-      "text": "console",
-      "kind": "fn",
-      "note": "Вывод в консоль.",
-      "source": "custom"
-    }
-  ]
+  "enriched": true
 }

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "validation-collect-field-errors",
+  "file": "validation-collect-field-errors.js",
+  "title": "Собрать ошибки валидации по нескольким полям",
+  "lang": "js",
+  "group": "Данные / Валидация",
+  "desc": "Запускает независимые проверки и возвращает ошибки по полям, чтобы интерфейс мог показать их все сразу.",
+  "output": "valid=false; errors по name и age",
+  "tags": [
+    "валидация",
+    "форма",
+    "ошибки",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "валидация нескольких полей формы",
+    "собрать ошибки полей",
+    "field validation"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "string-graphemes",
+  "file": "string-graphemes.js",
+  "title": "Intl.Segmenter — разбить текст на символы пользователя",
+  "lang": "js",
+  "group": "Регулярные выражения и текст",
+  "desc": "Segmenter учитывает графемные кластеры, в отличие от индексов UTF-16, которые могут делить составной символ.",
+  "output": "[\"A\", \"👩‍💻\", \"Б\"]",
+  "tags": [
+    "Intl.Segmenter",
+    "Unicode",
+    "строки"
+  ],
+  "aliases": [
+    "посчитать видимые символы",
+    "разбить строку на графемы",
+    "эмодзи как один символ"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

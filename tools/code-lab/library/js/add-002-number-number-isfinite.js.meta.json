@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "id": "add-002-number-number-isfinite",
+  "file": "add-002-number-number-isfinite.js",
+  "title": "Преобразование в число: Number и Number.isFinite",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Числа и простые операции",
+  "desc": "Преобразует ввод в число и отсеивает NaN и бесконечность.",
+  "output": "12.5",
+  "tags": [
+    "преобразование типов",
+    "валидация числа",
+    "конвертация"
+  ],
+  "aliases": [
+    "Number",
+    "Number.isFinite",
+    "строка в число",
+    "NaN"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "преобразование типов",
+      "kind": "concept",
+      "note": "преобразование типов — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "валидация числа",
+      "kind": "concept",
+      "note": "валидация числа — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "конвертация",
+      "kind": "concept",
+      "note": "конвертация — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

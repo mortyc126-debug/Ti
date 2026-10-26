@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-016-snippet",
+  "file": "add-016-snippet.js",
+  "title": "Сравнение строк без учёта регистра",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Строки и текст",
+  "desc": "Нормализует регистр перед сравнением текстовых значений.",
+  "output": "true",
+  "tags": [
+    "нормализация текста",
+    "локаль"
+  ],
+  "aliases": [
+    "сравнить строки без регистра",
+    "case insensitive",
+    "toLowerCase сравнение"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "нормализация текста",
+      "kind": "concept",
+      "note": "нормализация текста — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "локаль",
+      "kind": "concept",
+      "note": "локаль — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

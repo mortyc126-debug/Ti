@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "отладка-console-log-typeof-json-stringif-mvds0h3z",
   "file": "отладка-console-log-typeof-json-stringif-mvds0h3z.js",
-  "title": "отладка-console-log-typeof-json-stringif-mvds0h3z",
+  "title": "Отладка: console.log, typeof, JSON.stringify",
   "lang": "js",
   "group": "Ошибки и отладка / Найти причину сбоя",
   "desc": "Три самых частых способа посмотреть, что внутри: вывести значение, узнать тип, красиво распечатать объект.",
@@ -34,7 +34,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -42,7 +42,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -82,7 +82,7 @@
       "col": 12,
       "text": "typeof",
       "kind": "kw",
-      "note": "определить тип значения в виде строки",
+      "note": "typeof — возвращает тип значения строкой: \"number\", \"string\"…",
       "source": "dict"
     },
     {
@@ -90,7 +90,7 @@
       "col": 25,
       "text": "typeof",
       "kind": "kw",
-      "note": "определить тип значения в виде строки",
+      "note": "typeof — возвращает тип значения строкой: \"number\", \"string\"…",
       "source": "dict"
     },
     {
@@ -107,6 +107,14 @@
       "text": "log",
       "kind": "fn",
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 12,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
       "source": "dict"
     },
     {
@@ -143,6 +151,5 @@
     "template": "отладка-console-log-typeof-json-stringif-mvds0h3z.json",
     "descAt": 1792324974239
   },
-  "enriched": true,
-  "descAt": 1792324974239
+  "enriched": true
 }

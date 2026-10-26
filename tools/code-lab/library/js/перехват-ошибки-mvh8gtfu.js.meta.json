@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "перехват-ошибки-mvh8gtfu",
   "file": "перехват-ошибки-mvh8gtfu.js",
-  "title": "перехват-ошибки-mvh8gtfu",
+  "title": "перехват ошибки",
   "lang": "js",
   "group": "Ошибки и отладка / Найти причину сбоя",
   "desc": "Не даёт программе упасть и показывает причину.",
@@ -33,7 +33,15 @@
       "col": 0,
       "text": "try",
       "kind": "kw",
-      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "note": "try — блок, где может случиться ошибка",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
       "source": "dict"
     },
     {
@@ -49,15 +57,15 @@
       "col": 2,
       "text": "catch",
       "kind": "kw",
-      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
-      "source": "dict"
+      "note": "catch — что делать при ошибке",
+      "source": "custom"
     },
     {
       "line": 2,
       "col": 9,
       "text": "error",
       "kind": "name",
-      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
       "source": "dict"
     },
     {
@@ -73,7 +81,7 @@
       "col": 10,
       "text": "error",
       "kind": "fn",
-      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
       "source": "dict"
     },
     {
@@ -81,7 +89,7 @@
       "col": 41,
       "text": "error",
       "kind": "name",
-      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
       "source": "dict"
     }
   ],
@@ -93,24 +101,5 @@
     "template": "перехват-ошибки-mvh8gtfu.json",
     "descAt": 1792534009098
   },
-  "enriched": true,
-  "descAt": 1792534009098,
-  "orphanNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "try",
-      "kind": "kw",
-      "note": "try — блок, где может случиться ошибка",
-      "source": "custom"
-    },
-    {
-      "line": 2,
-      "col": 2,
-      "text": "catch",
-      "kind": "kw",
-      "note": "catch — что делать при ошибке",
-      "source": "custom"
-    }
-  ]
+  "enriched": true
 }

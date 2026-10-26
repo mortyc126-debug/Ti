@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-005-snippet",
+  "file": "add-005-snippet.js",
+  "title": "Проверка диапазона числа",
+  "lang": "js",
+  "group": "Основы / Логика",
+  "desc": "Проверяет, попадает ли значение в закрытый диапазон.",
+  "output": "true",
+  "tags": [
+    "валидация диапазона",
+    "логическое И"
+  ],
+  "aliases": [
+    "диапазон",
+    "границы числа",
+    "между минимумом и максимумом"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "валидация диапазона",
+      "kind": "concept",
+      "note": "валидация диапазона — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "логическое И",
+      "kind": "concept",
+      "note": "логическое И — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

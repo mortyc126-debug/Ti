@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "data-match-join-two-arrays",
+  "file": "data-match-join-two-arrays.js",
+  "title": "Сопоставить два массива по ключу",
+  "lang": "js",
+  "group": "Данные / Сопоставление наборов",
+  "desc": "Соединяет записи двух наборов по ключу, не выполняя вложенный перебор O(n×m). Поля правой записи перезаписывают одноимённые поля левой.",
+  "output": "[{id:1,name:\"A\",score:9}]",
+  "tags": [
+    "join",
+    "сопоставление",
+    "ключ",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "join двух массивов по id",
+    "соединить таблицы в javascript",
+    "объединить данные по ключу"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

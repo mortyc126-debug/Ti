@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-025-promise-race",
+  "file": "add-025-promise-race.js",
+  "title": "Promise.race — первый завершившийся результат",
+  "lang": "js",
+  "group": "Асинхронность",
+  "desc": "Возвращает результат первого завершившегося Promise, успешного или ошибочного.",
+  "output": "A",
+  "tags": [
+    "тайм-аут",
+    "асинхронность"
+  ],
+  "aliases": [
+    "Promise.race",
+    "первый завершившийся промис",
+    "гонка запросов"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "тайм-аут",
+      "kind": "concept",
+      "note": "тайм-аут — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "асинхронность",
+      "kind": "concept",
+      "note": "асинхронность — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

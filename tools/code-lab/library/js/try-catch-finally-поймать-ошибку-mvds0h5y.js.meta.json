@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "try-catch-finally-поймать-ошибку-mvds0h5y",
   "file": "try-catch-finally-поймать-ошибку-mvds0h5y.js",
-  "title": "try-catch-finally-поймать-ошибку-mvds0h5y",
+  "title": "try / catch / finally — поймать ошибку",
   "lang": "js",
   "group": "Ошибки и отладка / Найти причину сбоя",
   "desc": "Пробуем опасное действие в try; при ошибке управление уходит в catch, а finally выполняется в любом случае.",
@@ -33,7 +33,7 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "объявить функцию",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
       "source": "dict"
     },
     {
@@ -49,7 +49,15 @@
       "col": 4,
       "text": "return",
       "kind": "kw",
-      "note": "вернуть результат из функции и завершить её выполнение",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 11,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
       "source": "dict"
     },
     {
@@ -89,7 +97,7 @@
       "col": 4,
       "text": "return",
       "kind": "kw",
-      "note": "вернуть результат из функции и завершить её выполнение",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
       "source": "dict"
     },
     {
@@ -173,6 +181,5 @@
     "template": "try-catch-finally-поймать-ошибку-mvds0h5y.json",
     "descAt": 1792324974310
   },
-  "enriched": true,
-  "descAt": 1792324974310
+  "enriched": true
 }

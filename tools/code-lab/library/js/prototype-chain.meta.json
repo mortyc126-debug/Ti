@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "prototype-chain",
+  "file": "prototype-chain.js",
+  "title": "Object.getPrototypeOf — посмотреть прототип",
+  "lang": "js",
+  "group": "Объекты, прототипы и классы",
+  "desc": "Возвращает непосредственный прототип объекта; помогает исследовать цепочку наследования.",
+  "output": "true",
+  "tags": [
+    "прототип",
+    "Object.getPrototypeOf",
+    "наследование"
+  ],
+  "aliases": [
+    "узнать прототип объекта",
+    "проверить цепочку прототипов",
+    "как устроено наследование в JS"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

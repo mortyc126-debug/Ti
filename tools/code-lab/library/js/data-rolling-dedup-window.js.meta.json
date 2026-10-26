@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "data-rolling-dedup-window",
+  "file": "data-rolling-dedup-window.js",
+  "title": "Удалять повторяющиеся события в скользящем временном окне",
+  "lang": "js",
+  "group": "Данные / Потоки событий",
+  "desc": "Пропускает только первое событие с ключом в пределах окна времени; очищает просроченные ключи при каждом вызове.",
+  "output": "true для первого события; false для дубля в окне",
+  "tags": [
+    "дедупликация",
+    "временное окно",
+    "события",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "dedupe events time window",
+    "не принимать повтор события 5 секунд",
+    "временная дедупликация событий"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

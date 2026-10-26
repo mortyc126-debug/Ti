@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "sessionstorage-mvh8he7d",
   "file": "sessionstorage-mvh8he7d.js",
-  "title": "sessionstorage-mvh8he7d",
+  "title": "sessionStorage",
   "lang": "js",
   "group": "Файлы, хранение и сервер / Хранение в браузере",
   "desc": "Живёт, пока открыта вкладка.",
@@ -31,6 +31,14 @@
   "wordNotes": [
     {
       "line": 0,
+      "col": 0,
+      "text": "sessionStorage",
+      "kind": "name",
+      "note": "sessionStorage — хранилище до закрытия вкладки",
+      "source": "dict"
+    },
+    {
+      "line": 0,
       "col": 15,
       "text": "setItem",
       "kind": "fn",
@@ -55,6 +63,14 @@
     },
     {
       "line": 1,
+      "col": 12,
+      "text": "sessionStorage",
+      "kind": "name",
+      "note": "sessionStorage — хранилище до закрытия вкладки",
+      "source": "dict"
+    },
+    {
+      "line": 1,
       "col": 27,
       "text": "getItem",
       "kind": "fn",
@@ -70,6 +86,5 @@
     "template": "sessionstorage-mvh8he7d.json",
     "descAt": 1792534036009
   },
-  "enriched": true,
-  "descAt": 1792534036009
+  "enriched": true
 }

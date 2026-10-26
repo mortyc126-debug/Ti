@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "proxy-default-value",
+  "file": "proxy-default-value.js",
+  "title": "Proxy — значение по умолчанию для отсутствующего поля",
+  "lang": "js",
+  "group": "Proxy и Reflect",
+  "desc": "Ловушка get может возвращать значение по умолчанию, если ключ отсутствует.",
+  "output": "ночь\nпо умолчанию",
+  "tags": [
+    "Proxy",
+    "get",
+    "значение по умолчанию"
+  ],
+  "aliases": [
+    "вернуть fallback для отсутствующего свойства",
+    "Proxy с дефолтным значением",
+    "обработка неизвестных ключей"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

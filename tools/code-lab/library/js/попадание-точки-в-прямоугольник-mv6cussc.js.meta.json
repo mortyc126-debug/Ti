@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "попадание-точки-в-прямоугольник-mv6cussc",
   "file": "попадание-точки-в-прямоугольник-mv6cussc.js",
-  "title": "попадание-точки-в-прямоугольник-mv6cussc",
+  "title": "Попадание точки в прямоугольник",
   "lang": "js",
   "group": "Игры и интерактивные проекты / Геометрия и попадания",
   "desc": "Точка попадает в прямоугольник, если её координаты находятся между левой/правой и верхней/нижней границами.",
@@ -35,15 +35,7 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "объявить функцию",
-      "source": "dict"
-    },
-    {
-      "line": 0,
-      "col": 29,
-      "text": "rect",
-      "kind": "name",
-      "note": "rect — прямоугольник",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
       "source": "dict"
     },
     {
@@ -51,63 +43,7 @@
       "col": 2,
       "text": "return",
       "kind": "kw",
-      "note": "вернуть результат из функции и завершить её выполнение",
-      "source": "dict"
-    },
-    {
-      "line": 1,
-      "col": 14,
-      "text": "rect",
-      "kind": "name",
-      "note": "rect — прямоугольник",
-      "source": "dict"
-    },
-    {
-      "line": 2,
-      "col": 9,
-      "text": "rect",
-      "kind": "name",
-      "note": "rect — прямоугольник",
-      "source": "dict"
-    },
-    {
-      "line": 2,
-      "col": 18,
-      "text": "rect",
-      "kind": "name",
-      "note": "rect — прямоугольник",
-      "source": "dict"
-    },
-    {
-      "line": 2,
-      "col": 23,
-      "text": "width",
-      "kind": "name",
-      "note": "width — ширина элемента",
-      "source": "dict"
-    },
-    {
-      "line": 3,
-      "col": 9,
-      "text": "rect",
-      "kind": "name",
-      "note": "rect — прямоугольник",
-      "source": "dict"
-    },
-    {
-      "line": 4,
-      "col": 9,
-      "text": "rect",
-      "kind": "name",
-      "note": "rect — прямоугольник",
-      "source": "dict"
-    },
-    {
-      "line": 4,
-      "col": 18,
-      "text": "rect",
-      "kind": "name",
-      "note": "rect — прямоугольник",
+      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
       "source": "dict"
     },
     {
@@ -115,23 +51,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
-    },
-    {
-      "line": 7,
-      "col": 6,
-      "text": "button",
-      "kind": "name",
-      "note": "button — <button> — кнопка, по клику запускает действие.",
-      "source": "dict"
-    },
-    {
-      "line": 7,
-      "col": 31,
-      "text": "width",
-      "kind": "name",
-      "note": "width — ширина элемента",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -148,14 +68,6 @@
       "text": "log",
       "kind": "fn",
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
-      "source": "dict"
-    },
-    {
-      "line": 8,
-      "col": 34,
-      "text": "button",
-      "kind": "name",
-      "note": "button — <button> — кнопка, по клику запускает действие.",
       "source": "dict"
     }
   ],

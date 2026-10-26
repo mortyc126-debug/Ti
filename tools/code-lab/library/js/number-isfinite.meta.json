@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "number-isfinite",
+  "file": "number-isfinite.js",
+  "title": "Number.isFinite — проверить конечное число",
+  "lang": "js",
+  "group": "Числа, BigInt и точность",
+  "desc": "Не преобразует строку в число и отличает конечные числа от NaN и бесконечностей.",
+  "output": "true\nfalse\nfalse",
+  "tags": [
+    "Number.isFinite",
+    "числа",
+    "валидация"
+  ],
+  "aliases": [
+    "проверить конечность числа",
+    "отличить число от строки",
+    "проверить NaN Infinity"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

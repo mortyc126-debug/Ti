@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "storage-safe-json",
+  "file": "storage-safe-json.js",
+  "title": "Безопасно читать и записывать JSON в localStorage",
+  "lang": "js",
+  "group": "Хранение / Браузерное хранилище",
+  "desc": "Оборачивает JSON.parse/stringify и операции storage в try/catch; возвращает fallback при отсутствии или повреждении значения.",
+  "output": "read возвращает fallback при ошибке; write сообщает boolean",
+  "tags": [
+    "localStorage",
+    "JSON",
+    "хранение",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "localStorage json безопасно",
+    "сохранить объект в localStorage",
+    "обработать битый JSON в хранилище"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

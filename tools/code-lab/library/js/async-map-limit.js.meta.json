@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "async-map-limit",
+  "file": "async-map-limit.js",
+  "title": "Обработать массив асинхронно с ограничением параллельности",
+  "lang": "js",
+  "group": "Асинхронность / Ограничение нагрузки",
+  "desc": "Выполняет обработчик не более чем для limit элементов одновременно и сохраняет порядок результатов.",
+  "output": "не более limit одновременно; порядок исходного массива",
+  "tags": [
+    "асинхронность",
+    "concurrency",
+    "Promise",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "async map с concurrency limit",
+    "ограничить параллельные запросы",
+    "параллельная обработка массива"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

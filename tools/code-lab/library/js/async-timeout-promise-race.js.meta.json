@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "async-timeout-promise-race",
+  "file": "async-timeout-promise-race.js",
+  "title": "Ограничить длительность произвольной Promise-операции",
+  "lang": "js",
+  "group": "Асинхронность / Тайм-ауты",
+  "desc": "Отклоняет обёртку по тайм-ауту, но саму операцию не отменяет; для реальной отмены передавай AbortSignal в поддерживающий его API.",
+  "output": "результат исходной операции или ошибка тайм-аута",
+  "tags": [
+    "Promise",
+    "timeout",
+    "AbortSignal",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "promise timeout",
+    "тайм-аут асинхронной функции",
+    "ограничить время ожидания"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

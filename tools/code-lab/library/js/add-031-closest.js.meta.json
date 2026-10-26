@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-031-closest",
+  "file": "add-031-closest.js",
+  "title": "Делегирование событий с closest",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Реакция на действия пользователя",
+  "desc": "Обрабатывает клики по динамическим кнопкам через общий контейнер.",
+  "output": "Выводит id нажатой кнопки",
+  "tags": [
+    "делегирование событий",
+    "DOM"
+  ],
+  "aliases": [
+    "closest event delegation",
+    "data-id клик",
+    "динамические кнопки"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "делегирование событий",
+      "kind": "concept",
+      "note": "делегирование событий — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "DOM",
+      "kind": "concept",
+      "note": "DOM — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-038-localstorage-json",
+  "file": "add-038-localstorage-json.js",
+  "title": "localStorage: сохранить JSON",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Хранение в браузере",
+  "desc": "Сериализует объект перед сохранением в localStorage и возвращает статус операции.",
+  "output": "true при успешном сохранении",
+  "tags": [
+    "квота хранилища",
+    "обработка исключений"
+  ],
+  "aliases": [
+    "save JSON localStorage",
+    "сохранить объект",
+    "setItem stringify"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "квота хранилища",
+      "kind": "concept",
+      "note": "квота хранилища — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "обработка исключений",
+      "kind": "concept",
+      "note": "обработка исключений — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

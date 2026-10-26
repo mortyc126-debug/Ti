@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "input-type-range-ползунок-mv6cusvy",
   "file": "input-type-range-ползунок-mv6cusvy.js",
-  "title": "input-type-range-ползунок-mv6cusvy",
+  "title": "input type=range — ползунок",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Поля ввода и формы",
   "desc": "Ползунок обычно отправляет input при перемещении. Его value — строка, которую можно преобразовать в число.",
@@ -35,7 +35,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -47,11 +47,19 @@
       "source": "dict"
     },
     {
+      "line": 0,
+      "col": 24,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
       "line": 1,
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -60,6 +68,30 @@
       "text": "document",
       "kind": "fn",
       "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 28,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 13,
+      "text": "textContent",
+      "kind": "name",
+      "note": "textContent — текст внутри элемента; можно прочитать или заменить.",
       "source": "dict"
     }
   ],

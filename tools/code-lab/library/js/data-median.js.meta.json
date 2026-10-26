@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "data-median",
+  "file": "data-median.js",
+  "title": "Рассчитать медиану числового набора",
+  "lang": "js",
+  "group": "Данные / Статистика",
+  "desc": "Считает медиану отсортированной копии массива; пустой набор возвращает null.",
+  "output": "3",
+  "tags": [
+    "медиана",
+    "статистика",
+    "числа",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "медиана массива чисел",
+    "median javascript",
+    "центральное значение выборки"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

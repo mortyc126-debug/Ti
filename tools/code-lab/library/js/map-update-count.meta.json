@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "map-update-count",
+  "file": "map-update-count.js",
+  "title": "Map — безопасно увеличить счётчик",
+  "lang": "js",
+  "group": "Коллекции и итераторы",
+  "desc": "Частый шаблон подсчёта значений в Map с начальным значением ноль.",
+  "output": "Map(2) { \"A\" => 2, \"B\" => 1 }",
+  "tags": [
+    "Map",
+    "счётчик",
+    "nullish coalescing"
+  ],
+  "aliases": [
+    "посчитать частоту через Map",
+    "увеличить значение Map",
+    "группировка количества элементов"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

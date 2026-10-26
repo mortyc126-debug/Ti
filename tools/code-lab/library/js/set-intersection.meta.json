@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "set-intersection",
+  "file": "set-intersection.js",
+  "title": "Set — пересечение двух множеств",
+  "lang": "js",
+  "group": "Коллекции и итераторы",
+  "desc": "Оставляет элементы первого множества, которые присутствуют во втором.",
+  "output": "[2, 3]",
+  "tags": [
+    "Set",
+    "filter",
+    "пересечение"
+  ],
+  "aliases": [
+    "найти общие элементы двух наборов",
+    "пересечение множеств",
+    "сравнить два Set"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

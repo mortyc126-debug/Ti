@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "date-group-by-day",
+  "file": "date-group-by-day.js",
+  "title": "Сгруппировать временные метки по календарному дню",
+  "lang": "js",
+  "group": "Данные / Даты и время",
+  "desc": "Сводит записи по UTC-дню; timezone выбран явно, чтобы результат не зависел от локальной настройки машины.",
+  "output": "ключи групп — YYYY-MM-DD в UTC",
+  "tags": [
+    "даты",
+    "агрегация",
+    "UTC",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "сгруппировать данные по дням",
+    "агрегация временного ряда по дате",
+    "group by date utc"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

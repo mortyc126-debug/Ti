@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "arc-нарисовать-круг-mv6cutd9",
   "file": "arc-нарисовать-круг-mv6cutd9.js",
-  "title": "arc-нарисовать-круг-mv6cutd9",
+  "title": "arc — нарисовать круг",
   "lang": "js",
   "group": "Графика и визуализация / Canvas: рисование",
   "desc": "arc(x, y, radius, startAngle, endAngle) задаёт дугу. Для полного круга используй угол от 0 до Math.PI * 2, затем fill() или stroke().",
@@ -34,7 +34,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -46,11 +46,19 @@
       "source": "dict"
     },
     {
+      "line": 0,
+      "col": 24,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
       "line": 1,
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -83,14 +91,6 @@
       "text": "Math",
       "kind": "fn",
       "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
-      "source": "dict"
-    },
-    {
-      "line": 5,
-      "col": 4,
-      "text": "fillStyle",
-      "kind": "name",
-      "note": "fillStyle — цвет заливки",
       "source": "dict"
     },
     {

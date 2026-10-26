@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "date-parse-iso-strict",
+  "file": "date-parse-iso-strict.js",
+  "title": "Строго проверить ISO-дату перед использованием",
+  "lang": "js",
+  "group": "Данные / Даты и время",
+  "desc": "Проверяет формат и валидность календарной даты; не полагается на неоднозначный парсинг произвольных строк.",
+  "output": "{ok:false,error:\"calendar-date\"}",
+  "tags": [
+    "дата",
+    "ISO",
+    "валидация",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "проверить iso дату",
+    "валидировать YYYY-MM-DD",
+    "строгий парсер даты"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

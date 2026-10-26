@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "object-freeze",
+  "file": "object-freeze.js",
+  "title": "Object.freeze — запретить изменение верхнего уровня",
+  "lang": "js",
+  "group": "Объекты, прототипы и классы",
+  "desc": "Запрещает добавлять, удалять и менять собственные свойства объекта; вложенные объекты автоматически не замораживаются.",
+  "output": "true\nfalse",
+  "tags": [
+    "Object.freeze",
+    "неизменяемость",
+    "объекты"
+  ],
+  "aliases": [
+    "запретить изменение объекта",
+    "заморозить объект",
+    "проверить Object.isFrozen",
+    "почему freeze не глубокий"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

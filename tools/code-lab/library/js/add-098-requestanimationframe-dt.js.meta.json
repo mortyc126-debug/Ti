@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-098-requestanimationframe-dt",
+  "file": "add-098-requestanimationframe-dt.js",
+  "title": "requestAnimationFrame с dt и ограничением скачка",
+  "lang": "js",
+  "group": "Графика и визуализация / Анимация",
+  "desc": "Использует время кадра и ограничивает dt после зависания вкладки.",
+  "output": "Цикл обновляет состояние с ограниченным шагом времени",
+  "tags": [
+    "нужны update и draw",
+    "приостановка вкладки"
+  ],
+  "aliases": [
+    "rAF dt",
+    "ограничить delta time",
+    "анимация после зависания"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "нужны update и draw",
+      "kind": "concept",
+      "note": "нужны update и draw — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "приостановка вкладки",
+      "kind": "concept",
+      "note": "приостановка вкладки — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "id": "add-051-clamp",
+  "file": "add-051-clamp.js",
+  "title": "Ограничить значение диапазоном: clamp",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Числа и простые операции",
+  "desc": "Ограничивает число нижней и верхней границами.",
+  "output": "100",
+  "tags": [
+    "границы",
+    "проверка min <= max"
+  ],
+  "aliases": [
+    "clamp",
+    "ограничить диапазон",
+    "зажать число",
+    "минимум максимум"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "границы",
+      "kind": "concept",
+      "note": "границы — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "проверка min <= max",
+      "kind": "concept",
+      "note": "проверка min <= max — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

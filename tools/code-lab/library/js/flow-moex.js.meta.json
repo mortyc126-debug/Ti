@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "flow-moex",
   "file": "flow-moex.js",
-  "title": "flow-moex",
+  "title": "MOEX: облигации → отбор → таблица",
   "lang": "js",
   "group": "Сеть и запросы / Разобрать ответ и связать данные",
   "desc": "Сквозной с сетью. Два блока ответа (имена и доходности) СКЛЕИВАЕМ по SECID, отбираем доходные, рисуем таблицу. Каждый .map/.filter отдаёт массив следующему.",
@@ -35,16 +35,16 @@
       "col": 0,
       "text": "async",
       "kind": "kw",
-      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
-      "source": "dict"
+      "note": "Функция умеет ждать сеть (await внутри).",
+      "source": "custom"
     },
     {
       "line": 0,
       "col": 6,
       "text": "function",
       "kind": "kw",
-      "note": "объявить функцию",
-      "source": "dict"
+      "note": "Определить функцию (заготовку).",
+      "source": "custom"
     },
     {
       "line": 0,
@@ -59,8 +59,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
     },
     {
       "line": 1,
@@ -75,16 +75,16 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
     },
     {
       "line": 3,
       "col": 16,
       "text": "await",
       "kind": "kw",
-      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
-      "source": "dict"
+      "note": "Подожди результат (сеть) и иди дальше.",
+      "source": "custom"
     },
     {
       "line": 3,
@@ -107,8 +107,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
     },
     {
       "line": 4,
@@ -123,8 +123,8 @@
       "col": 17,
       "text": "await",
       "kind": "kw",
-      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
-      "source": "dict"
+      "note": "Подожди результат (сеть) и иди дальше.",
+      "source": "custom"
     },
     {
       "line": 4,
@@ -139,8 +139,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
     },
     {
       "line": 7,
@@ -168,14 +168,6 @@
     },
     {
       "line": 8,
-      "col": 33,
-      "text": "r",
-      "kind": "name",
-      "note": "r — радиус круга",
-      "source": "dict"
-    },
-    {
-      "line": 8,
       "col": 38,
       "text": "имена",
       "kind": "name",
@@ -183,28 +175,12 @@
       "source": "custom"
     },
     {
-      "line": 8,
-      "col": 44,
-      "text": "r",
-      "kind": "name",
-      "note": "r — радиус круга",
-      "source": "dict"
-    },
-    {
-      "line": 8,
-      "col": 52,
-      "text": "r",
-      "kind": "name",
-      "note": "r — радиус круга",
-      "source": "dict"
-    },
-    {
       "line": 11,
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
     },
     {
       "line": 11,
@@ -232,43 +208,11 @@
     },
     {
       "line": 12,
-      "col": 9,
-      "text": "r",
-      "kind": "name",
-      "note": "r — радиус круга",
-      "source": "dict"
-    },
-    {
-      "line": 12,
-      "col": 24,
-      "text": "r",
-      "kind": "name",
-      "note": "r — радиус круга",
-      "source": "dict"
-    },
-    {
-      "line": 12,
-      "col": 42,
-      "text": "r",
-      "kind": "name",
-      "note": "r — радиус круга",
-      "source": "dict"
-    },
-    {
-      "line": 12,
       "col": 53,
       "text": "имена",
       "kind": "name",
       "note": "Словарь SECID→название (чтобы склеить с доходностями).",
       "source": "custom"
-    },
-    {
-      "line": 12,
-      "col": 59,
-      "text": "r",
-      "kind": "name",
-      "note": "r — радиус круга",
-      "source": "dict"
     },
     {
       "line": 13,
@@ -283,24 +227,8 @@
       "col": 5,
       "text": "sort",
       "kind": "fn",
-      "note": "sort — отсортировать массив (по умолчанию как строки).",
-      "source": "dict"
-    },
-    {
-      "line": 14,
-      "col": 11,
-      "text": "a",
-      "kind": "name",
-      "note": "a — селектор всех ссылок",
-      "source": "dict"
-    },
-    {
-      "line": 14,
-      "col": 35,
-      "text": "a",
-      "kind": "name",
-      "note": "a — селектор всех ссылок",
-      "source": "dict"
+      "note": "Отсортировать.",
+      "source": "custom"
     },
     {
       "line": 16,
@@ -323,8 +251,8 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "объявить функцию",
-      "source": "dict"
+      "note": "Определить функцию (заготовку).",
+      "source": "custom"
     },
     {
       "line": 19,
@@ -347,8 +275,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
     },
     {
       "line": 20,
@@ -386,15 +314,23 @@
       "line": 22,
       "col": 2,
       "text": "document",
-      "kind": "fn",
+      "kind": "name",
       "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 22,
+      "col": 11,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
       "source": "dict"
     },
     {
       "line": 22,
       "col": 33,
       "text": "innerHTML",
-      "kind": "name",
+      "kind": "fn",
       "note": "innerHTML — HTML-содержимое элемента; осторожно с чужими данными.",
       "source": "dict"
     },
@@ -511,103 +447,5 @@
   "legacy": {
     "template": "flow-moex.json"
   },
-  "enriched": true,
-  "orphanNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "async",
-      "kind": "kw",
-      "note": "Функция умеет ждать сеть (await внутри).",
-      "source": "custom"
-    },
-    {
-      "line": 0,
-      "col": 6,
-      "text": "function",
-      "kind": "kw",
-      "note": "Определить функцию (заготовку).",
-      "source": "custom"
-    },
-    {
-      "line": 1,
-      "col": 2,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
-      "source": "custom"
-    },
-    {
-      "line": 3,
-      "col": 2,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
-      "source": "custom"
-    },
-    {
-      "line": 3,
-      "col": 16,
-      "text": "await",
-      "kind": "kw",
-      "note": "Подожди результат (сеть) и иди дальше.",
-      "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 2,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
-      "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 17,
-      "text": "await",
-      "kind": "kw",
-      "note": "Подожди результат (сеть) и иди дальше.",
-      "source": "custom"
-    },
-    {
-      "line": 7,
-      "col": 2,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
-      "source": "custom"
-    },
-    {
-      "line": 11,
-      "col": 2,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
-      "source": "custom"
-    },
-    {
-      "line": 14,
-      "col": 5,
-      "text": "sort",
-      "kind": "fn",
-      "note": "Отсортировать.",
-      "source": "custom"
-    },
-    {
-      "line": 19,
-      "col": 0,
-      "text": "function",
-      "kind": "kw",
-      "note": "Определить функцию (заготовку).",
-      "source": "custom"
-    },
-    {
-      "line": 20,
-      "col": 2,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
-      "source": "custom"
-    }
-  ]
+  "enriched": true
 }

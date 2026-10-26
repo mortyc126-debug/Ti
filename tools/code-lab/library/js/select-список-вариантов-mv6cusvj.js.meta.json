@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "select-список-вариантов-mv6cusvj",
   "file": "select-список-вариантов-mv6cusvj.js",
-  "title": "select-список-вариантов-mv6cusvj",
+  "title": "select — список вариантов",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Поля ввода и формы",
   "desc": "У select свойство value содержит значение выбранного option. Событие change срабатывает при смене выбора.",
@@ -33,7 +33,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -53,11 +53,19 @@
       "source": "dict"
     },
     {
+      "line": 0,
+      "col": 24,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
       "line": 1,
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -69,6 +77,14 @@
       "source": "dict"
     },
     {
+      "line": 1,
+      "col": 22,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
       "line": 3,
       "col": 0,
       "text": "select",
@@ -77,11 +93,27 @@
       "source": "dict"
     },
     {
+      "line": 3,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
+      "source": "dict"
+    },
+    {
       "line": 4,
       "col": 23,
       "text": "select",
       "kind": "name",
       "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 30,
+      "text": "value",
+      "kind": "name",
+      "note": "value — текущее значение поля ввода (input, textarea, select).",
       "source": "dict"
     }
   ],
@@ -140,7 +172,7 @@
         "common_errors": [
           {
             "symptom": "Ошибка при запуске",
-            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от ��римера",
             "solution": "Проверь список требований и сообщение в консоли"
           }
         ]

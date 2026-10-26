@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "draw-canvas",
   "file": "draw-canvas.js",
-  "title": "draw-canvas",
+  "title": "Canvas — нарисовать столбики",
   "lang": "js",
   "group": "Графика и визуализация / Canvas: рисование",
   "desc": "Canvas — холст, на котором рисуешь командами из JS. Тут столбчатая диаграмма: прямоугольник на каждое значение.",
@@ -35,8 +35,8 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная, которую не будем переназначать (константа).",
+      "source": "custom"
     },
     {
       "line": 0,
@@ -51,7 +51,15 @@
       "col": 12,
       "text": "document",
       "kind": "fn",
-      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "note": "Доступ к странице.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 21,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
       "source": "dict"
     },
     {
@@ -59,15 +67,23 @@
       "col": 45,
       "text": "getContext",
       "kind": "fn",
-      "note": "getContext — получить «кисть» canvas: getContext(\"2d\") для рисования.",
-      "source": "dict"
+      "note": "Получить 2D-контекст холста для рисования.",
+      "source": "custom"
     },
     {
       "line": 2,
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "Переменная, которую не будем переназначать (константа).",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 9,
+      "text": "forEach",
+      "kind": "fn",
+      "note": "forEach — выполняет действие для каждого элемента массива.",
       "source": "dict"
     },
     {
@@ -99,8 +115,8 @@
       "col": 6,
       "text": "fillStyle",
       "kind": "name",
-      "note": "fillStyle — цвет заливки",
-      "source": "dict"
+      "note": "Цвет заливки для следующих фигур.",
+      "source": "custom"
     },
     {
       "line": 5,
@@ -115,8 +131,8 @@
       "col": 6,
       "text": "fillRect",
       "kind": "fn",
-      "note": "fillRect — залить прямоугольник.",
-      "source": "dict"
+      "note": "Нарисовать закрашенный прямоугольник: x, y, ширина, высота.",
+      "source": "custom"
     },
     {
       "line": 5,
@@ -228,55 +244,5 @@
   "legacy": {
     "template": "draw-canvas.json"
   },
-  "enriched": true,
-  "orphanNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная, которую не будем переназначать (константа).",
-      "source": "custom"
-    },
-    {
-      "line": 0,
-      "col": 12,
-      "text": "document",
-      "kind": "fn",
-      "note": "Доступ к странице.",
-      "source": "custom"
-    },
-    {
-      "line": 0,
-      "col": 45,
-      "text": "getContext",
-      "kind": "fn",
-      "note": "Получить 2D-контекст холста для рисования.",
-      "source": "custom"
-    },
-    {
-      "line": 2,
-      "col": 0,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная, которую не будем переназначать (константа).",
-      "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 6,
-      "text": "fillStyle",
-      "kind": "name",
-      "note": "Цвет заливки для следующих фигур.",
-      "source": "custom"
-    },
-    {
-      "line": 5,
-      "col": 6,
-      "text": "fillRect",
-      "kind": "fn",
-      "note": "Нарисовать закрашенный прямоугольник: x, y, ширина, высота.",
-      "source": "custom"
-    }
-  ]
+  "enriched": true
 }

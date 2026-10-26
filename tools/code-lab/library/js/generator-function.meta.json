@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "generator-function",
+  "file": "generator-function.js",
+  "title": "function* — генератор последовательности",
+  "lang": "js",
+  "group": "Коллекции и итераторы",
+  "desc": "Генератор приостанавливается на yield и продолжает выполнение при следующем next.",
+  "output": "[2, 3, 4]",
+  "tags": [
+    "generator",
+    "yield",
+    "итератор"
+  ],
+  "aliases": [
+    "создать генератор",
+    "ленивая последовательность",
+    "функция с yield"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

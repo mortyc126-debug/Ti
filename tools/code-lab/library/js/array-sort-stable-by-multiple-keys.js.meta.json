@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "array-sort-stable-by-multiple-keys",
+  "file": "array-sort-stable-by-multiple-keys.js",
+  "title": "Сортировать записи по нескольким полям",
+  "lang": "js",
+  "group": "Данные / Сортировка",
+  "desc": "Сравнивает ключи по приоритету; направление для каждого поля можно задать отдельно.",
+  "output": "rank по возрастанию, затем name",
+  "tags": [
+    "сортировка",
+    "компаратор",
+    "несколько полей",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "сортировка по нескольким колонкам",
+    "сортировать сначала по дате потом по цене",
+    "multi key sort"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

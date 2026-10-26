@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "js-array",
   "file": "js-array.js",
-  "title": "js-array",
+  "title": "Массив (список)",
   "lang": "js",
   "group": "Данные: хранить, находить и преобразовывать / Коллекции и ст",
   "desc": "Массив — упорядоченный список значений. Доступ по индексу (с нуля). Длина — сколько элементов.",
@@ -35,8 +35,8 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная, которую не будем переназначать (константа).",
+      "source": "custom"
     },
     {
       "line": 0,
@@ -59,16 +59,16 @@
       "col": 0,
       "text": "console",
       "kind": "fn",
-      "note": "console — встроенный объект для вывода в консоль (отладки).",
-      "source": "dict"
+      "note": "Встроенный объект вывода в консоль (F12 → Console).",
+      "source": "custom"
     },
     {
       "line": 2,
       "col": 8,
       "text": "log",
       "kind": "fn",
-      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
-      "source": "dict"
+      "note": "Печатает в консоль то, что в скобках.",
+      "source": "custom"
     },
     {
       "line": 2,
@@ -91,24 +91,24 @@
       "col": 0,
       "text": "console",
       "kind": "fn",
-      "note": "console — встроенный объект для вывода в консоль (отладки).",
-      "source": "dict"
+      "note": "Встроенный объект вывода в консоль (F12 → Console).",
+      "source": "custom"
     },
     {
       "line": 3,
       "col": 8,
       "text": "log",
       "kind": "fn",
-      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
-      "source": "dict"
+      "note": "Печатает в консоль то, что в скобках.",
+      "source": "custom"
     },
     {
       "line": 3,
       "col": 17,
       "text": "length",
       "kind": "fn",
-      "note": "length — длина: сколько элементов в массиве или символов в строке.",
-      "source": "dict"
+      "note": "Свойство: сколько элементов в массиве (или символов в строке).",
+      "source": "custom"
     },
     {
       "line": 5,
@@ -200,55 +200,5 @@
   "legacy": {
     "template": "js-array.json"
   },
-  "enriched": true,
-  "orphanNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная, которую не будем переназначать (константа).",
-      "source": "custom"
-    },
-    {
-      "line": 2,
-      "col": 0,
-      "text": "console",
-      "kind": "fn",
-      "note": "Встроенный объект вывода в консоль (F12 → Console).",
-      "source": "custom"
-    },
-    {
-      "line": 2,
-      "col": 8,
-      "text": "log",
-      "kind": "fn",
-      "note": "Печатает в консоль то, что в скобках.",
-      "source": "custom"
-    },
-    {
-      "line": 3,
-      "col": 0,
-      "text": "console",
-      "kind": "fn",
-      "note": "Встроенный объект вывода в консоль (F12 → Console).",
-      "source": "custom"
-    },
-    {
-      "line": 3,
-      "col": 8,
-      "text": "log",
-      "kind": "fn",
-      "note": "Печатает в консоль то, что в скобках.",
-      "source": "custom"
-    },
-    {
-      "line": 3,
-      "col": 17,
-      "text": "length",
-      "kind": "fn",
-      "note": "Свойство: сколько элементов в массиве (или символов в строке).",
-      "source": "custom"
-    }
-  ]
+  "enriched": true
 }

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "draw-svg",
   "file": "draw-svg.js",
-  "title": "draw-svg",
+  "title": "SVG — линия из точек (мини-график)",
   "lang": "js",
   "group": "Графика и визуализация / SVG и графики",
   "desc": "SVG — это картинка из тегов. Линию задаёт атрибут points: пары x,y. Так рисуются sparkline и кривые в проекте.",
@@ -35,16 +35,16 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "объявить функцию",
-      "source": "dict"
+      "note": "Объявляет функцию — кусок кода, вызываемый по имени.",
+      "source": "custom"
     },
     {
       "line": 1,
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная, которую не будем переназначать (константа).",
+      "source": "custom"
     },
     {
       "line": 2,
@@ -91,16 +91,16 @@
       "col": 5,
       "text": "join",
       "kind": "fn",
-      "note": "join — склеить массив в строку через разделитель.",
-      "source": "dict"
+      "note": "Склеить массив в строку через разделитель.",
+      "source": "custom"
     },
     {
       "line": 4,
       "col": 2,
       "text": "return",
       "kind": "kw",
-      "note": "вернуть результат из функции и завершить её выполнение",
-      "source": "dict"
+      "note": "«Вернуть» — отдаёт результат наружу и завершает функцию.",
+      "source": "custom"
     }
   ],
   "component": {
@@ -187,39 +187,5 @@
   "legacy": {
     "template": "draw-svg.json"
   },
-  "enriched": true,
-  "orphanNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "function",
-      "kind": "kw",
-      "note": "Объявляет функцию — кусок кода, вызываемый по имени.",
-      "source": "custom"
-    },
-    {
-      "line": 1,
-      "col": 2,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная, которую не будем переназначать (константа).",
-      "source": "custom"
-    },
-    {
-      "line": 3,
-      "col": 5,
-      "text": "join",
-      "kind": "fn",
-      "note": "Склеить массив в строку через разделитель.",
-      "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 2,
-      "text": "return",
-      "kind": "kw",
-      "note": "«Вернуть» — отдаёт результат наружу и завершает функцию.",
-      "source": "custom"
-    }
-  ]
+  "enriched": true
 }

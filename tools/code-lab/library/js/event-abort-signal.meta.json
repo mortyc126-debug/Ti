@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "event-abort-signal",
+  "file": "event-abort-signal.js",
+  "title": "Удалить группу обработчиков через AbortController",
+  "lang": "js",
+  "group": "Безопасность и совместимость",
+  "desc": "Передача одного signal позволяет удалить несколько обработчиков одним вызовом abort.",
+  "output": "обработчики удаляются по abort",
+  "tags": [
+    "AbortController",
+    "addEventListener",
+    "очистка"
+  ],
+  "aliases": [
+    "удалить несколько слушателей событий",
+    "cleanup event listeners",
+    "signal для addEventListener"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-108-abortcontroller",
+  "file": "add-108-abortcontroller.js",
+  "title": "Отмена обработчика через AbortController",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Реакция на действия пользователя",
+  "desc": "Снимает группу обработчиков событий одним вызовом abort.",
+  "output": "Оба обработчика снимаются после abort",
+  "tags": [
+    "очистка компонентов",
+    "поддержка современных браузеров"
+  ],
+  "aliases": [
+    "AbortController event listener",
+    "снять несколько слушателей",
+    "signal addEventListener"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "очистка компонентов",
+      "kind": "concept",
+      "note": "очистка компонентов — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "поддержка современных браузеров",
+      "kind": "concept",
+      "note": "поддержка современных браузеров — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

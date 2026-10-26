@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "set-unique",
+  "file": "set-unique.js",
+  "title": "Set — удалить дубликаты",
+  "lang": "js",
+  "group": "Коллекции и итераторы",
+  "desc": "Set хранит только уникальные значения; распространённый способ убрать повторы из массива.",
+  "output": "[2, 5, 7]",
+  "tags": [
+    "Set",
+    "массив",
+    "дубликаты"
+  ],
+  "aliases": [
+    "убрать дубликаты массива",
+    "уникальные значения",
+    "дедупликация массива через Set"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

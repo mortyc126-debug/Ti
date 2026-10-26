@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "readable-stream-reader",
+  "file": "readable-stream-reader.js",
+  "title": "ReadableStream — читать поток порциями",
+  "lang": "js",
+  "group": "Асинхронность и потоки данных",
+  "desc": "Читает поток через reader.read до done; важно освобождать reader, когда чтение завершено.",
+  "output": "порции представлены Uint8Array",
+  "tags": [
+    "ReadableStream",
+    "reader",
+    "потоки"
+  ],
+  "aliases": [
+    "читать тело ответа потоком",
+    "получить чанки fetch",
+    "reader.read loop"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

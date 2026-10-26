@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "iterator-manual",
+  "file": "iterator-manual.js",
+  "title": "Итератор — вручную получить следующий элемент",
+  "lang": "js",
+  "group": "Коллекции и итераторы",
+  "desc": "Метод next возвращает объект с полями value и done.",
+  "output": "{ value: \"a\", done: false }\n{ value: \"b\", done: false }\n{ value: undefined, done: true }",
+  "tags": [
+    "итератор",
+    "Symbol.iterator",
+    "next"
+  ],
+  "aliases": [
+    "вручную пройти массив итератором",
+    "как работает next",
+    "объект done value"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "переменные-mvh8gf0i",
   "file": "переменные-mvh8gf0i.js",
-  "title": "переменные-mvh8gf0i",
+  "title": "переменные",
   "lang": "js",
   "group": "CSS: основы / Переменные",
   "desc": "Объявление переменных и констант.",
@@ -21,16 +21,16 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "const — переменная, которую нельзя переприсвоить",
+      "source": "custom"
     },
     {
       "line": 1,
       "col": 0,
       "text": "let",
       "kind": "kw",
-      "note": "объявить переменную с блочной областью видимости",
-      "source": "dict"
+      "note": "let — переменная, которую можно менять",
+      "source": "custom"
     },
     {
       "line": 1,
@@ -74,24 +74,5 @@
     "template": "переменные-mvh8gf0i.json",
     "descAt": 1792533990402
   },
-  "enriched": true,
-  "descAt": 1792533990402,
-  "orphanNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "const",
-      "kind": "kw",
-      "note": "const — переменная, которую нельзя переприсвоить",
-      "source": "custom"
-    },
-    {
-      "line": 1,
-      "col": 0,
-      "text": "let",
-      "kind": "kw",
-      "note": "let — переменная, которую можно менять",
-      "source": "custom"
-    }
-  ]
+  "enriched": true
 }

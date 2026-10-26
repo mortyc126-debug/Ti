@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "weakset-mark-visited",
+  "file": "weakset-mark-visited.js",
+  "title": "WeakSet — отметить посещённые объекты",
+  "lang": "js",
+  "group": "Коллекции и итераторы",
+  "desc": "WeakSet удобно использовать для отметки объектов без создания сильной коллекции ссылок.",
+  "output": "true",
+  "tags": [
+    "WeakSet",
+    "обход",
+    "объекты"
+  ],
+  "aliases": [
+    "отметить объект посещённым",
+    "WeakSet для обхода графа",
+    "проверить обработку объекта"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "requestanimationframe-цикл-анимации-mv6cusg3",
   "file": "requestanimationframe-цикл-анимации-mv6cusg3.js",
-  "title": "requestanimationframe-цикл-анимации-mv6cusg3",
+  "title": "requestAnimationFrame — цикл анимации",
   "lang": "js",
   "group": "Графика и визуализация / Анимация",
   "desc": "requestAnimationFrame планирует следующий кадр перед перерисовкой браузера. Функция должна сама запросить следующий кадр; останавливайте цикл условием или не запрашивайте новый кадр.",
@@ -33,7 +33,7 @@
       "col": 0,
       "text": "let",
       "kind": "kw",
-      "note": "объявить переменную с блочной областью видимости",
+      "note": "let — объявляет переменную, значение которой можно менять позже.",
       "source": "dict"
     },
     {
@@ -41,7 +41,7 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "объявить функцию",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
       "source": "dict"
     },
     {
@@ -66,6 +66,22 @@
       "text": "if",
       "kind": "kw",
       "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "requestAnimationFrame",
+      "kind": "fn",
+      "note": "requestAnimationFrame — вызвать функцию перед следующим кадром (для анимации).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 0,
+      "text": "requestAnimationFrame",
+      "kind": "fn",
+      "note": "requestAnimationFrame — вызвать функцию перед следующим кадром (для анимации).",
       "source": "dict"
     }
   ],

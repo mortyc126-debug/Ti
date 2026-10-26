@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "recovery-rollback-compensating-actions",
+  "file": "recovery-rollback-compensating-actions.js",
+  "title": "Откатить выполненные действия через компенсационные операции",
+  "lang": "js",
+  "group": "Надёжность / Откат",
+  "desc": "Если шаг последовательности падает, выполняет компенсации уже завершённых шагов в обратном порядке; подходит для операций без общей транзакции.",
+  "output": "при сбое запускает компенсации в обратном порядке",
+  "tags": [
+    "rollback",
+    "компенсация",
+    "saga",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "rollback async steps",
+    "saga pattern compensation",
+    "откатить несколько операций"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

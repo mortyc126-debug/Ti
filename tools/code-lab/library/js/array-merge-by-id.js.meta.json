@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "array-merge-by-id",
+  "file": "array-merge-by-id.js",
+  "title": "Объединить обновления с существующими записями по id",
+  "lang": "js",
+  "group": "Данные / Обновление состояния",
+  "desc": "Сохраняет порядок существующих записей, обновляет совпавшие по id и добавляет новые; входные объекты не мутируются.",
+  "output": "[{id:1,x:1,y:2},{id:2,x:3}]",
+  "tags": [
+    "upsert",
+    "merge",
+    "обновление",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "обновить массив объектов по id",
+    "merge массивов записей",
+    "upsert в массив"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

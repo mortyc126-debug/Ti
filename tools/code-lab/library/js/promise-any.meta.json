@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "promise-any",
+  "file": "promise-any.js",
+  "title": "Promise.any — дождаться первого успешного",
+  "lang": "js",
+  "group": "Асинхронность и потоки данных",
+  "desc": "Возвращает первый успешно выполненный промис; отклоняется AggregateError, если отклонились все.",
+  "output": "B",
+  "tags": [
+    "Promise.any",
+    "резервные запросы",
+    "async"
+  ],
+  "aliases": [
+    "первый успешный запрос",
+    "fallback endpoints",
+    "дождаться первого fulfilled"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

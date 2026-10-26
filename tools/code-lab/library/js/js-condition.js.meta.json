@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "js-condition",
   "file": "js-condition.js",
-  "title": "js-condition",
+  "title": "Условие (if / else)",
   "lang": "js",
   "group": "Основы / Синтаксис",
   "desc": "«Если … то … иначе …». Код решает, какую ветку выполнить, в зависимости от того, правда условие или нет.",
@@ -35,8 +35,8 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Создаёт переменную, которую НЕ будем менять (константа).",
+      "source": "custom"
     },
     {
       "line": 0,
@@ -75,8 +75,8 @@
       "col": 0,
       "text": "if",
       "kind": "kw",
-      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
-      "source": "dict"
+      "note": "«Если». За ним в скобках — условие. Если оно истинно, выполняется блок в фигурных скобках ниже.",
+      "source": "custom"
     },
     {
       "line": 2,
@@ -97,7 +97,7 @@
     {
       "line": 2,
       "col": 12,
-      "text": ">",
+      "text": ">=",
       "kind": "op",
       "note": "Сравнение «больше или равно». Возвращает true (правда) или false (ложь).",
       "source": "custom"
@@ -131,16 +131,16 @@
       "col": 2,
       "text": "console",
       "kind": "fn",
-      "note": "console — встроенный объект для вывода в консоль (отладки).",
-      "source": "dict"
+      "note": "Объект вывода в консоль.",
+      "source": "custom"
     },
     {
       "line": 3,
       "col": 10,
       "text": "log",
       "kind": "fn",
-      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
-      "source": "dict"
+      "note": "Печатает в консоль то, что в скобках.",
+      "source": "custom"
     },
     {
       "line": 3,
@@ -163,8 +163,8 @@
       "col": 2,
       "text": "else",
       "kind": "kw",
-      "note": "else — «иначе»: что делать, когда условие if не выполнилось.",
-      "source": "dict"
+      "note": "«Иначе» — блок, который выполнится, если условие было ложным.",
+      "source": "custom"
     },
     {
       "line": 4,
@@ -179,16 +179,16 @@
       "col": 2,
       "text": "console",
       "kind": "fn",
-      "note": "console — встроенный объект для вывода в консоль (отладки).",
-      "source": "dict"
+      "note": "Объект вывода.",
+      "source": "custom"
     },
     {
       "line": 5,
       "col": 10,
       "text": "log",
       "kind": "fn",
-      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
-      "source": "dict"
+      "note": "Печать.",
+      "source": "custom"
     },
     {
       "line": 5,
@@ -279,72 +279,15 @@
       "tests": "not_run",
       "compatibility": "not_verified"
     },
-    "provides": [
+    "provides": [],
+    "requires": [
+      "constвозраст",
       "возраст"
     ],
-    "requires": [],
     "subcat": "Синтаксис"
   },
   "legacy": {
     "template": "js-condition.json"
   },
-  "enriched": true,
-  "orphanNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "const",
-      "kind": "kw",
-      "note": "Создаёт переменную, которую НЕ будем менять (константа).",
-      "source": "custom"
-    },
-    {
-      "line": 2,
-      "col": 0,
-      "text": "if",
-      "kind": "kw",
-      "note": "«Если». За ним в скобках — условие. Если оно истинно, выполняется блок в фигурных скобках ниже.",
-      "source": "custom"
-    },
-    {
-      "line": 3,
-      "col": 2,
-      "text": "console",
-      "kind": "fn",
-      "note": "Объект вывода в консоль.",
-      "source": "custom"
-    },
-    {
-      "line": 3,
-      "col": 10,
-      "text": "log",
-      "kind": "fn",
-      "note": "Печатает в консоль то, что в скобках.",
-      "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 2,
-      "text": "else",
-      "kind": "kw",
-      "note": "«Иначе» — блок, который выполнится, если условие было ложным.",
-      "source": "custom"
-    },
-    {
-      "line": 5,
-      "col": 2,
-      "text": "console",
-      "kind": "fn",
-      "note": "Объект вывода.",
-      "source": "custom"
-    },
-    {
-      "line": 5,
-      "col": 10,
-      "text": "log",
-      "kind": "fn",
-      "note": "Печать.",
-      "source": "custom"
-    }
-  ]
+  "enriched": true
 }

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-101-intersectionobserver",
+  "file": "add-101-intersectionobserver.js",
+  "title": "IntersectionObserver: обнаружить видимость элемента",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Реакция на действия пользователя",
+  "desc": "Вызывает обработчик, когда элемент входит в область видимости.",
+  "output": "Сообщение при появлении элемента в области видимости",
+  "tags": [
+    "disconnect после завершения",
+    "threshold rootMargin"
+  ],
+  "aliases": [
+    "IntersectionObserver",
+    "элемент появился на экране",
+    "lazy loading observer"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "disconnect после завершения",
+      "kind": "concept",
+      "note": "disconnect после завершения — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "threshold rootMargin",
+      "kind": "concept",
+      "note": "threshold rootMargin — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

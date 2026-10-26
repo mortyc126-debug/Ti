@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "workflow-circuit-breaker-basic",
+  "file": "workflow-circuit-breaker-basic.js",
+  "title": "Отключать временно источник после серии ошибок",
+  "lang": "js",
+  "group": "Надёжность / Защита зависимостей",
+  "desc": "Минимальный circuit breaker: после заданного числа ошибок блокирует вызовы на cooldown; затем разрешает пробный вызов. Для распределённой системы нужен общий механизм состояния.",
+  "output": "после порога вызовы блокируются на cooldownMs",
+  "tags": [
+    "circuit breaker",
+    "надёжность",
+    "API",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "circuit breaker javascript",
+    "отключить api после ошибок",
+    "защита от постоянных сетевых ошибок"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

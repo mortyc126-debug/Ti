@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "id": "add-028-http-fetch",
+  "file": "add-028-http-fetch.js",
+  "title": "Проверить HTTP-статус fetch",
+  "lang": "js",
+  "group": "Сеть и запросы / Ошибки сети и диагностика",
+  "desc": "Явно проверяет response.ok, поскольку fetch не отклоняет Promise для HTTP 404/500.",
+  "output": "Возвращает JSON или выбрасывает ошибку HTTP",
+  "tags": [
+    "сетевые ошибки",
+    "HTTP"
+  ],
+  "aliases": [
+    "response.ok",
+    "fetch 404",
+    "HTTP status",
+    "проверить статус ответа"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "сетевые ошибки",
+      "kind": "concept",
+      "note": "сетевые ошибки — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "HTTP",
+      "kind": "concept",
+      "note": "HTTP — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

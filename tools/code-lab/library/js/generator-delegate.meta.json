@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "generator-delegate",
+  "file": "generator-delegate.js",
+  "title": "yield* — делегировать другому итератору",
+  "lang": "js",
+  "group": "Коллекции и итераторы",
+  "desc": "yield* передаёт элементы из другой итерируемой последовательности.",
+  "output": "[\"начало\", 1, 2, \"конец\"]",
+  "tags": [
+    "yield*",
+    "generator",
+    "итератор"
+  ],
+  "aliases": [
+    "объединить генераторы",
+    "делегировать итератор",
+    "yield звёздочка"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-020-json",
+  "file": "add-020-json.js",
+  "title": "Безопасное чтение JSON с обработкой ошибки",
+  "lang": "js",
+  "group": "Ошибки и отладка / Исключения",
+  "desc": "Перехватывает синтаксическую ошибку при разборе некорректного JSON.",
+  "output": "null и сообщение в консоли",
+  "tags": [
+    "исключения",
+    "возврат null"
+  ],
+  "aliases": [
+    "JSON.parse try catch",
+    "невалидный JSON",
+    "безопасный парсер"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "исключения",
+      "kind": "concept",
+      "note": "исключения — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "возврат null",
+      "kind": "concept",
+      "note": "возврат null — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

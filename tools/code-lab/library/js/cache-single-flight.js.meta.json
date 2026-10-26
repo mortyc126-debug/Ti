@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "cache-single-flight",
+  "file": "cache-single-flight.js",
+  "title": "Не выполнять один и тот же запрос параллельно дважды",
+  "lang": "js",
+  "group": "Кэширование / Асинхронные задачи",
+  "desc": "Повторные вызовы с одинаковым ключом получают один общий Promise; запись удаляется после завершения, включая ошибку.",
+  "output": "один активный запуск на ключ",
+  "tags": [
+    "Promise",
+    "дедупликация",
+    "параллельные запросы",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "deduplicate concurrent requests",
+    "single flight promise",
+    "объединить одинаковые запросы"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

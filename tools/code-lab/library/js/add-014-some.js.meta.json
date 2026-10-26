@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-014-some",
+  "file": "add-014-some.js",
+  "title": "Проверить хотя бы один элемент: some",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Перебирать, фильтровать, сортировать",
+  "desc": "Возвращает true, если хотя бы один элемент проходит проверку.",
+  "output": "true",
+  "tags": [
+    "проверка массива",
+    "предикат"
+  ],
+  "aliases": [
+    "some",
+    "хотя бы один элемент",
+    "есть подходящий элемент"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "проверка массива",
+      "kind": "concept",
+      "note": "проверка массива — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "предикат",
+      "kind": "concept",
+      "note": "предикат — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

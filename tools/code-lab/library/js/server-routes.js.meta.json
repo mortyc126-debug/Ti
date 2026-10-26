@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "server-routes",
   "file": "server-routes.js",
-  "title": "server-routes",
+  "title": "Сервер с маршрутами и JSON",
   "lang": "js",
   "group": "Файлы, хранение и сервер / Сервер и API",
   "desc": "Чуть сложнее: разные ответы на разные адреса (роуты) и отдача JSON. По этому принципу сделаны /api/list и /api/add в Лаборатории.",
@@ -34,16 +34,16 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная, которую не будем переназначать (константа).",
+      "source": "custom"
     },
     {
       "line": 0,
       "col": 20,
       "text": "createServer",
       "kind": "fn",
-      "note": "createServer — создаёт сервер, функция вызывается на каждый запрос",
-      "source": "dict"
+      "note": "Обработчик каждого запроса.",
+      "source": "custom"
     },
     {
       "line": 0,
@@ -66,8 +66,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная, которую не будем переназначать (константа).",
+      "source": "custom"
     },
     {
       "line": 1,
@@ -82,7 +82,7 @@
       "col": 14,
       "text": "new",
       "kind": "kw",
-      "note": "создать экземпляр объекта через конструктор",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
       "source": "dict"
     },
     {
@@ -114,8 +114,8 @@
       "col": 2,
       "text": "if",
       "kind": "kw",
-      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
-      "source": "dict"
+      "note": "«Если» — выполнить блок, когда условие истинно.",
+      "source": "custom"
     },
     {
       "line": 2,
@@ -146,8 +146,8 @@
       "col": 4,
       "text": "return",
       "kind": "kw",
-      "note": "вернуть результат из функции и завершить её выполнение",
-      "source": "dict"
+      "note": "«Вернуть» — отдаёт результат наружу и завершает функцию.",
+      "source": "custom"
     },
     {
       "line": 4,
@@ -170,7 +170,15 @@
       "col": 24,
       "text": "stringify",
       "kind": "fn",
-      "note": "JSON.stringify — превратить объект в строку JSON (для хранения/передачи).",
+      "note": "Превратить объект в JSON-текст для ответа.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 42,
+      "text": "Date",
+      "kind": "name",
+      "note": "Date — работа с датой и временем.",
       "source": "dict"
     },
     {
@@ -276,55 +284,5 @@
   "legacy": {
     "template": "server-routes.json"
   },
-  "enriched": true,
-  "orphanNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная, которую не будем переназначать (константа).",
-      "source": "custom"
-    },
-    {
-      "line": 0,
-      "col": 20,
-      "text": "createServer",
-      "kind": "fn",
-      "note": "Обработчик каждого запроса.",
-      "source": "custom"
-    },
-    {
-      "line": 1,
-      "col": 2,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная, которую не будем переназначать (константа).",
-      "source": "custom"
-    },
-    {
-      "line": 2,
-      "col": 2,
-      "text": "if",
-      "kind": "kw",
-      "note": "«Если» — выполнить блок, когда условие истинно.",
-      "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 4,
-      "text": "return",
-      "kind": "kw",
-      "note": "«Вернуть» — отдаёт результат наружу и завершает функцию.",
-      "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 24,
-      "text": "stringify",
-      "kind": "fn",
-      "note": "Превратить объект в JSON-текст для ответа.",
-      "source": "custom"
-    }
-  ]
+  "enriched": true
 }

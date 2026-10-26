@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "array-flatmap",
+  "file": "array-flatmap.js",
+  "title": "flatMap — преобразовать и развернуть на один уровень",
+  "lang": "js",
+  "group": "Безопасность и совместимость",
+  "desc": "Применяет callback и разворачивает возвращаемые массивы на один уровень.",
+  "output": "[\"н\", \"о\", \"ч\", \"ь\", \"к\", \"о\", \"д\"]",
+  "tags": [
+    "flatMap",
+    "массив",
+    "преобразование"
+  ],
+  "aliases": [
+    "map и flat на один уровень",
+    "развернуть результаты map",
+    "flatMap"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

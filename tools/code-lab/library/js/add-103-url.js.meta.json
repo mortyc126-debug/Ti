@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-103-url",
+  "file": "add-103-url.js",
+  "title": "URL: безопасно собрать адрес с параметрами",
+  "lang": "js",
+  "group": "Сеть и запросы / Получить данные",
+  "desc": "Собирает URL и кодирует значения параметров через URLSearchParams.",
+  "output": "URL с корректно закодированными параметрами",
+  "tags": [
+    "не конкатенировать пользовательский ввод",
+    "URLSearchParams"
+  ],
+  "aliases": [
+    "new URL URLSearchParams",
+    "кодировать query параметры",
+    "собрать URL"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "не конкатенировать пользовательский ввод",
+      "kind": "concept",
+      "note": "не конкатенировать пользовательский ввод — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "URLSearchParams",
+      "kind": "concept",
+      "note": "URLSearchParams — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

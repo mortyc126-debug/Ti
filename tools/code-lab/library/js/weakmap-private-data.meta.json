@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "weakmap-private-data",
+  "file": "weakmap-private-data.js",
+  "title": "WeakMap — данные, привязанные к объекту",
+  "lang": "js",
+  "group": "Коллекции и итераторы",
+  "desc": "WeakMap хранит объектные ключи слабыми ссылками; коллекция не удерживает ключ только из-за записи в ней.",
+  "output": "true",
+  "tags": [
+    "WeakMap",
+    "память",
+    "объекты"
+  ],
+  "aliases": [
+    "WeakMap для приватных данных",
+    "данные по объектному ключу",
+    "слабая ссылка на ключ"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

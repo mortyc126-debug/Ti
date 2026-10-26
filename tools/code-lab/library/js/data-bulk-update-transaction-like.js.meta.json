@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "data-bulk-update-transaction-like",
+  "file": "data-bulk-update-transaction-like.js",
+  "title": "Применить пакет обновлений с предварительной проверкой",
+  "lang": "js",
+  "group": "Данные / Пакетные изменения",
+  "desc": "Сначала проверяет все операции, затем строит новый массив; если проверка не проходит, исходное состояние остаётся неизменным.",
+  "output": "все операции проверяются до применения",
+  "tags": [
+    "пакетное обновление",
+    "валидация",
+    "атомарность",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "атомарно обновить массив записей",
+    "пакетное изменение с валидацией",
+    "bulk update validate then apply"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

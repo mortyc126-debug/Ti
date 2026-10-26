@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-068-snippet",
+  "file": "add-068-snippet.js",
+  "title": "Создать неизменяемое обновление массива объектов",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Коллекции и структуры",
+  "desc": "Создаёт новый массив и обновляет только запись с заданным id.",
+  "output": "У записи id 2 active становится true; исходный массив не меняется",
+  "tags": [
+    "spread",
+    "состояние интерфейса"
+  ],
+  "aliases": [
+    "обновить объект в массиве",
+    "immutable map update",
+    "изменить запись по id"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "spread",
+      "kind": "concept",
+      "note": "spread — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "состояние интерфейса",
+      "kind": "concept",
+      "note": "состояние интерфейса — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

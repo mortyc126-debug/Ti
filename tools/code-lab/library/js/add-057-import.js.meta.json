@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-057-import",
+  "file": "add-057-import.js",
+  "title": "Динамический import по условию",
+  "lang": "js",
+  "group": "Основы / Модули и импорты",
+  "desc": "Загружает модуль только тогда, когда он действительно нужен.",
+  "output": "Выполняется start из загруженного модуля",
+  "tags": [
+    "асинхронность",
+    "путь к модулю"
+  ],
+  "aliases": [
+    "dynamic import",
+    "import()",
+    "ленивая загрузка модуля"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "асинхронность",
+      "kind": "concept",
+      "note": "асинхронность — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "путь к модулю",
+      "kind": "concept",
+      "note": "путь к модулю — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

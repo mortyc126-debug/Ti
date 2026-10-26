@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-100-api",
+  "file": "add-100-api.js",
+  "title": "Проверить поддержку API перед использованием",
+  "lang": "js",
+  "group": "Разработка и инструменты / Совместимость",
+  "desc": "Проверяет наличие функции браузерного API и задаёт запасной путь.",
+  "output": "Сообщение зависит от среды",
+  "tags": [
+    "не полагаться только на user-agent",
+    "совместимость"
+  ],
+  "aliases": [
+    "feature detection",
+    "проверка поддержки API",
+    "IntersectionObserver in window"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "не полагаться только на user-agent",
+      "kind": "concept",
+      "note": "не полагаться только на user-agent — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "совместимость",
+      "kind": "concept",
+      "note": "совместимость — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

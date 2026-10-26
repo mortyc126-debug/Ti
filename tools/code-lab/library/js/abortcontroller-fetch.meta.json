@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "abortcontroller-fetch",
+  "file": "abortcontroller-fetch.js",
+  "title": "AbortController — отменить fetch",
+  "lang": "js",
+  "group": "Асинхронность и потоки данных",
+  "desc": "Передаёт сигнал отмены запросу; abort прекращает ожидание сетевой операции, если поддерживается API.",
+  "output": "AbortError",
+  "tags": [
+    "AbortController",
+    "fetch",
+    "отмена"
+  ],
+  "aliases": [
+    "отменить fetch",
+    "прервать сетевой запрос",
+    "AbortSignal"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

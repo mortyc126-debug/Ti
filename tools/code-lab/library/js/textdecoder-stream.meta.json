@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "textdecoder-stream",
+  "file": "textdecoder-stream.js",
+  "title": "TextDecoder — декодировать байтовый поток",
+  "lang": "js",
+  "group": "Асинхронность и потоки данных",
+  "desc": "Декодирует Uint8Array в текст; stream:true сохраняет состояние между частями UTF-8.",
+  "output": "зависит от bytes1 и bytes2",
+  "tags": [
+    "TextDecoder",
+    "UTF-8",
+    "потоки"
+  ],
+  "aliases": [
+    "декодировать поток байтов в текст",
+    "чанки UTF-8",
+    "не ломать символы между чанками"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "workflow-dependency-toposort",
+  "file": "workflow-dependency-toposort.js",
+  "title": "Упорядочить задачи по зависимостям",
+  "lang": "js",
+  "group": "Архитектура / Планирование задач",
+  "desc": "Топологически сортирует ориентированный граф зависимостей; сообщает о цикле, если порядок построить невозможно.",
+  "output": "lint, compile, build",
+  "tags": [
+    "граф",
+    "зависимости",
+    "топологическая сортировка",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "топологическая сортировка задач",
+    "порядок запуска зависимостей",
+    "dependency graph sort"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

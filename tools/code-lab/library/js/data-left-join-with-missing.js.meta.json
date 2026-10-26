@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "data-left-join-with-missing",
+  "file": "data-left-join-with-missing.js",
+  "title": "Сопоставить наборы и сохранить отсутствующие соответствия",
+  "lang": "js",
+  "group": "Данные / Сопоставление наборов",
+  "desc": "Возвращает каждую левую запись вместе с найденной правой или null, не теряя записи без пары.",
+  "output": "для id=1 right=null; для id=2 найден объект",
+  "tags": [
+    "left join",
+    "Map",
+    "сопоставление",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "left join массивов",
+    "найти соответствия и пропуски",
+    "сопоставление с null"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

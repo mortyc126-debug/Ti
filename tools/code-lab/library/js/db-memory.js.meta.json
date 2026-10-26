@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "db-memory",
   "file": "db-memory.js",
-  "title": "db-memory",
+  "title": "Простая база в памяти (CRUD)",
   "lang": "js",
   "group": "Данные: хранить, находить и преобразовывать / Коллекции и ст",
   "desc": "«База» — это хранилище записей + функции добавить/найти/удалить (CRUD). Здесь — массив в памяти. Для сохранения в браузере — localStorage; на сервере — файл или SQL (см. шаблон SQL).",
@@ -21,8 +21,8 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
     },
     {
       "line": 0,
@@ -37,8 +37,8 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "объявить функцию",
-      "source": "dict"
+      "note": "Определить функцию (заготовку).",
+      "source": "custom"
     },
     {
       "line": 3,
@@ -55,6 +55,14 @@
       "kind": "name",
       "note": "Хранилище — массив записей. Это и есть «база».",
       "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 35,
+      "text": "push",
+      "kind": "fn",
+      "note": "push — добавляет элемент в конец массива.",
+      "source": "dict"
     },
     {
       "line": 3,
@@ -85,8 +93,8 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "объявить функцию",
-      "source": "dict"
+      "note": "Определить функцию (заготовку).",
+      "source": "custom"
     },
     {
       "line": 5,
@@ -101,8 +109,8 @@
       "col": 23,
       "text": "return",
       "kind": "kw",
-      "note": "вернуть результат из функции и завершить её выполнение",
-      "source": "dict"
+      "note": "Выход функции — что она отдаёт наружу.",
+      "source": "custom"
     },
     {
       "line": 5,
@@ -133,8 +141,8 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "объявить функцию",
-      "source": "dict"
+      "note": "Определить функцию (заготовку).",
+      "source": "custom"
     },
     {
       "line": 7,
@@ -157,8 +165,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
     },
     {
       "line": 8,
@@ -290,11 +298,19 @@
     },
     {
       "line": 17,
+      "col": 26,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
       "col": 31,
       "text": "stringify",
       "kind": "fn",
-      "note": "JSON.stringify — превратить объект в строку JSON (для хранения/передачи).",
-      "source": "dict"
+      "note": "Объект → текст (чтобы напечатать).",
+      "source": "custom"
     },
     {
       "line": 17,
@@ -330,11 +346,19 @@
     },
     {
       "line": 19,
+      "col": 31,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 19,
       "col": 36,
       "text": "stringify",
       "kind": "fn",
-      "note": "JSON.stringify — превратить объект в строку JSON (для хранения/передачи).",
-      "source": "dict"
+      "note": "Объект → текст (чтобы напечатать).",
+      "source": "custom"
     },
     {
       "line": 19,
@@ -429,71 +453,5 @@
   },
   "legacy": {
     "template": "db-memory.json"
-  },
-  "orphanNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
-      "source": "custom"
-    },
-    {
-      "line": 3,
-      "col": 0,
-      "text": "function",
-      "kind": "kw",
-      "note": "Определить функцию (заготовку).",
-      "source": "custom"
-    },
-    {
-      "line": 5,
-      "col": 0,
-      "text": "function",
-      "kind": "kw",
-      "note": "Определить функцию (заготовку).",
-      "source": "custom"
-    },
-    {
-      "line": 5,
-      "col": 23,
-      "text": "return",
-      "kind": "kw",
-      "note": "Выход функции — что она отдаёт наружу.",
-      "source": "custom"
-    },
-    {
-      "line": 7,
-      "col": 0,
-      "text": "function",
-      "kind": "kw",
-      "note": "Определить функцию (заготовку).",
-      "source": "custom"
-    },
-    {
-      "line": 8,
-      "col": 2,
-      "text": "const",
-      "kind": "kw",
-      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
-      "source": "custom"
-    },
-    {
-      "line": 17,
-      "col": 31,
-      "text": "stringify",
-      "kind": "fn",
-      "note": "Объект → текст (чтобы напечатать).",
-      "source": "custom"
-    },
-    {
-      "line": 19,
-      "col": 36,
-      "text": "stringify",
-      "kind": "fn",
-      "note": "Объект → текст (чтобы напечатать).",
-      "source": "custom"
-    }
-  ]
+  }
 }

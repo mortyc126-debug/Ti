@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "array-partition",
+  "file": "array-partition.js",
+  "title": "Разделить массив на прошедшие и не прошедшие условие",
+  "lang": "js",
+  "group": "Безопасность и совместимость",
+  "desc": "Один проход формирует две группы: элементы, удовлетворяющие предикату, и остальные.",
+  "output": "[[2, 4], [1, 3]]",
+  "tags": [
+    "массив",
+    "filter",
+    "partition"
+  ],
+  "aliases": [
+    "разбить массив по условию",
+    "две группы по предикату",
+    "partition JavaScript"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-026-promise-allsettled",
+  "file": "add-026-promise-allsettled.js",
+  "title": "Promise.allSettled — собрать все исходы",
+  "lang": "js",
+  "group": "Асинхронность",
+  "desc": "Дожидается завершения всех задач и возвращает статус каждой, включая ошибки.",
+  "output": "[\"fulfilled\", \"rejected\"]",
+  "tags": [
+    "параллельные задачи",
+    "частичные сбои"
+  ],
+  "aliases": [
+    "Promise.allSettled",
+    "все результаты включая ошибки",
+    "несколько промисов"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "параллельные задачи",
+      "kind": "concept",
+      "note": "параллельные задачи — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "частичные сбои",
+      "kind": "concept",
+      "note": "частичные сбои — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "async-serial-queue",
+  "file": "async-serial-queue.js",
+  "title": "Выполнять асинхронные задачи строго по очереди",
+  "lang": "js",
+  "group": "Асинхронность / Очереди",
+  "desc": "Сериализует операции: следующая начинается после завершения предыдущей. Ошибка одной задачи не ломает очередь для последующих.",
+  "output": "задачи запускаются по порядку; ошибка возвращается вызывающему для конкретной задачи",
+  "tags": [
+    "очередь",
+    "Promise",
+    "последовательно",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "serial promise queue",
+    "последовательные асинхронные задачи",
+    "очередь без параллельности"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

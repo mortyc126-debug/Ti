@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "запрос-через-then-mvh8gyl6",
   "file": "запрос-через-then-mvh8gyl6.js",
-  "title": "запрос-через-then-mvh8gyl6",
+  "title": "запрос через then",
   "lang": "js",
   "group": "Сеть и запросы / Получить данные",
   "desc": "То же без async и await.",
@@ -31,11 +31,27 @@
   "status": "described",
   "wordNotes": [
     {
+      "line": 0,
+      "col": 0,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "fetch — делает запрос в сеть и возвращает промис с ответом.",
+      "source": "dict"
+    },
+    {
       "line": 1,
       "col": 3,
       "text": "then",
       "kind": "fn",
-      "note": "then — что сделать, когда промис выполнится (получит результат).",
+      "note": "then — что делать, когда результат пришёл",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 29,
+      "text": "json",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
       "source": "dict"
     },
     {
@@ -43,8 +59,8 @@
       "col": 3,
       "text": "then",
       "kind": "fn",
-      "note": "then — что сделать, когда промис выполнится (получит результат).",
-      "source": "dict"
+      "note": "then — что делать, когда результат пришёл",
+      "source": "custom"
     },
     {
       "line": 2,
@@ -71,24 +87,5 @@
     "template": "запрос-через-then-mvh8gyl6.json",
     "descAt": 1792534015770
   },
-  "enriched": true,
-  "descAt": 1792534015770,
-  "orphanNotes": [
-    {
-      "line": 1,
-      "col": 3,
-      "text": "then",
-      "kind": "fn",
-      "note": "then — что делать, когда результат пришёл",
-      "source": "custom"
-    },
-    {
-      "line": 2,
-      "col": 3,
-      "text": "then",
-      "kind": "fn",
-      "note": "then — что делать, когда результат пришёл",
-      "source": "custom"
-    }
-  ]
+  "enriched": true
 }

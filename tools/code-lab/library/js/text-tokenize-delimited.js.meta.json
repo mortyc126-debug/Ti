@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "text-tokenize-delimited",
+  "file": "text-tokenize-delimited.js",
+  "title": "Разобрать строки с разделителем с поддержкой кавычек",
+  "lang": "js",
+  "group": "Данные / Разбор текста",
+  "desc": "Мини-парсер разделённой строки с кавычками и экранированием кавычек; для полноценного CSV с переносами внутри полей используй специализированный CSV-парсер.",
+  "output": "[\"a\",\"b,c\",\"say \\\"hi\\\"\"]",
+  "tags": [
+    "парсер",
+    "CSV",
+    "разделитель",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "разобрать csv строку",
+    "split с кавычками",
+    "парсить разделённые значения"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

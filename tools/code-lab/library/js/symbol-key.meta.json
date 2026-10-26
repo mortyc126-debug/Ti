@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "symbol-key",
+  "file": "symbol-key.js",
+  "title": "Symbol — уникальный ключ объекта",
+  "lang": "js",
+  "group": "Объекты, прототипы и классы",
+  "desc": "Каждый вызов Symbol создаёт уникальное значение; символические ключи не попадают в Object.keys.",
+  "output": "42\n[\"имя\"]",
+  "tags": [
+    "Symbol",
+    "ключ",
+    "объекты"
+  ],
+  "aliases": [
+    "уникальный ключ объекта",
+    "символьное свойство",
+    "почему Symbol не виден в Object.keys"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

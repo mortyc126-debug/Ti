@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "network-query-params-merge",
+  "file": "network-query-params-merge.js",
+  "title": "Объединить query-параметры с существующим URL",
+  "lang": "js",
+  "group": "Сеть / Построение запросов",
+  "desc": "Добавляет или заменяет переданные параметры, сохраняя остальные параметры URL и корректно кодируя значения.",
+  "output": "page заменён на 2; q корректно закодирован",
+  "tags": [
+    "URL",
+    "URLSearchParams",
+    "запрос",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "добавить query параметры к url",
+    "изменить searchParams url",
+    "merge url params"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

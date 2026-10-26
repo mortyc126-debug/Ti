@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "math-percentile-linear",
+  "file": "math-percentile-linear.js",
+  "title": "Рассчитать квантиль числовой выборки линейной интерполяцией",
+  "lang": "js",
+  "group": "Данные / Статистика",
+  "desc": "Сортирует копию массива и вычисляет квантиль для p от 0 до 1; метод интерполяции фиксирован и документирован.",
+  "output": "6",
+  "tags": [
+    "квантиль",
+    "процентиль",
+    "статистика",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "процентиль массива",
+    "quantile linear interpolation",
+    "медиана и квантили"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

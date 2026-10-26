@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "dom-form-to-object",
+  "file": "dom-form-to-object.js",
+  "title": "Преобразовать форму в объект с учётом повторяющихся полей",
+  "lang": "js",
+  "group": "Интерфейс / Формы",
+  "desc": "Собирает значения FormData; повторяющиеся имена становятся массивами, что подходит для чекбоксов и мультивыбора.",
+  "output": "одиночные поля — строка/File; повторяющиеся — массив",
+  "tags": [
+    "FormData",
+    "форма",
+    "сериализация",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "formdata в объект",
+    "собрать форму в JSON",
+    "повторяющиеся поля формы"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

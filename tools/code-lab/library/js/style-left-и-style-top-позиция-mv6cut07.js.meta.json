@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "style-left-и-style-top-позиция-mv6cut07",
   "file": "style-left-и-style-top-позиция-mv6cut07.js",
-  "title": "style-left-и-style-top-позиция-mv6cut07",
+  "title": "style.left и style.top — позиция",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
   "desc": "Для абсолютного позиционирования задайте элементу position: absolute или fixed. Значения координат CSS задаются строками с единицами, например px.",
@@ -35,15 +35,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
-      "source": "dict"
-    },
-    {
-      "line": 0,
-      "col": 6,
-      "text": "label",
-      "kind": "name",
-      "note": "label — подпись к полю",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -55,11 +47,11 @@
       "source": "dict"
     },
     {
-      "line": 1,
-      "col": 0,
-      "text": "label",
-      "kind": "name",
-      "note": "label — подпись к полю",
+      "line": 0,
+      "col": 23,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
       "source": "dict"
     },
     {
@@ -68,22 +60,6 @@
       "text": "style",
       "kind": "name",
       "note": "style — инлайновые стили элемента: element.style.color = \"red\".",
-      "source": "dict"
-    },
-    {
-      "line": 1,
-      "col": 12,
-      "text": "position",
-      "kind": "name",
-      "note": "position: relative — позволяет применять z-index к элементу.",
-      "source": "dict"
-    },
-    {
-      "line": 2,
-      "col": 0,
-      "text": "label",
-      "kind": "name",
-      "note": "label — подпись к полю",
       "source": "dict"
     },
     {
@@ -96,34 +72,18 @@
     },
     {
       "line": 3,
-      "col": 0,
-      "text": "label",
-      "kind": "name",
-      "note": "label — подпись к полю",
-      "source": "dict"
-    },
-    {
-      "line": 3,
       "col": 6,
       "text": "style",
       "kind": "name",
       "note": "style — инлайновые стили элемента: element.style.color = \"red\".",
-      "source": "dict"
-    },
-    {
-      "line": 3,
-      "col": 12,
-      "text": "top",
-      "kind": "name",
-      "note": "top — смещение от верхнего края позиционирующего блока.",
       "source": "dict"
     },
     {
       "line": 4,
-      "col": 0,
-      "text": "label",
+      "col": 6,
+      "text": "textContent",
       "kind": "name",
-      "note": "label — подпись к полю",
+      "note": "textContent — текст внутри элемента; можно прочитать или заменить.",
       "source": "dict"
     }
   ],

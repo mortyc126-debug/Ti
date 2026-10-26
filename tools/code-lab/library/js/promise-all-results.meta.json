@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "promise-all-results",
+  "file": "promise-all-results.js",
+  "title": "Promise.all — дождаться всех результатов",
+  "lang": "js",
+  "group": "Асинхронность и потоки данных",
+  "desc": "Выполняет промисы параллельно и завершается ошибкой, если хотя бы один из них отклонён.",
+  "output": "[2, 4]",
+  "tags": [
+    "Promise.all",
+    "async",
+    "параллельность"
+  ],
+  "aliases": [
+    "дождаться нескольких промисов",
+    "параллельные запросы",
+    "собрать результаты Promise.all"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

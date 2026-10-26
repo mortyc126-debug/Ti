@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "reflect-set",
+  "file": "reflect-set.js",
+  "title": "Reflect.set — установить свойство с результатом boolean",
+  "lang": "js",
+  "group": "Proxy и Reflect",
+  "desc": "Возвращает true или false в зависимости от успешности записи свойства.",
+  "output": "true тест",
+  "tags": [
+    "Reflect.set",
+    "свойства",
+    "Proxy"
+  ],
+  "aliases": [
+    "установить свойство через Reflect",
+    "проверить успешность записи",
+    "Reflect в ловушках Proxy"
+  ],
+  "source": {
+    "title": "stage2 addition",
+    "desc": "stage2 addition",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-048-snippet",
+  "file": "add-048-snippet.js",
+  "title": "Разбиение массива на блоки",
+  "lang": "js",
+  "group": "Данные: хранить, на��одить и преобразовывать / Коллекции и структуры",
+  "desc": "Разделяет массив на блоки заданного размера.",
+  "output": "[[1,2],[3,4],[5]]",
+  "tags": [
+    "батчинг",
+    "валидация размера"
+  ],
+  "aliases": [
+    "chunk array",
+    "разбить массив на части",
+    "пакеты массива"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "батчинг",
+      "kind": "concept",
+      "note": "батчинг — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "валидация размера",
+      "kind": "concept",
+      "note": "валидация размера — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "json-stringify-и-json-parse-mv6cusmi",
   "file": "json-stringify-и-json-parse-mv6cusmi.js",
-  "title": "json-stringify-и-json-parse-mv6cusmi",
+  "title": "JSON.stringify и JSON.parse",
   "lang": "js",
   "group": "Данные: хранить, находить и преобразовывать / Форматы данных",
   "desc": "stringify превращает массив или объект в JSON-строку, parse восстанавливает структуру из строки.",
@@ -21,7 +21,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
       "source": "dict"
     },
     {
@@ -29,7 +29,15 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
       "source": "dict"
     },
     {
@@ -45,7 +53,15 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
       "source": "dict"
     },
     {

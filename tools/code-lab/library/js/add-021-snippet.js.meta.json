@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "id": "add-021-snippet",
+  "file": "add-021-snippet.js",
+  "title": "Создать собственную ошибку с контекстом",
+  "lang": "js",
+  "group": "Ошибки и отладка / Исключения",
+  "desc": "Выбрасывает TypeError с понятным сообщением при неверном аргументе.",
+  "output": "Для неверного ввода возникает описанная ошибка",
+  "tags": [
+    "предусловия функции",
+    "ошибки аргументов"
+  ],
+  "aliases": [
+    "throw TypeError",
+    "RangeError",
+    "своя ошибка",
+    "валидация аргумента"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "предусловия функции",
+      "kind": "concept",
+      "note": "предусловия функции — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "ошибки аргументов",
+      "kind": "concept",
+      "note": "ошибки аргументов — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

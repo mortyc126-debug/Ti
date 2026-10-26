@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-034-snippet",
+  "file": "add-034-snippet.js",
+  "title": "Снять обработчик события",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Реакция на действия пользователя",
+  "desc": "Удаляет ранее установленный обработчик по той же ссылке на функцию.",
+  "output": "Обработчик снят",
+  "tags": [
+    "события",
+    "очистка ресурсов"
+  ],
+  "aliases": [
+    "removeEventListener",
+    "снять слушатель",
+    "удалить обработчик"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "события",
+      "kind": "concept",
+      "note": "события — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "очистка ресурсов",
+      "kind": "concept",
+      "note": "очистка ресурсов — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

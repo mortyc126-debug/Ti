@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "file-import-json-validate",
+  "file": "file-import-json-validate.js",
+  "title": "Загрузить JSON и проверить результат до использования",
+  "lang": "js",
+  "group": "Файлы / Импорт данных",
+  "desc": "Разделяет синтаксический разбор JSON и доменную проверку данных; ошибки не смешиваются с валидным результатом.",
+  "output": "ok=true с value или ok=false с этапом и ошибками",
+  "tags": [
+    "JSON",
+    "импорт",
+    "валидация",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "импорт JSON с валидацией",
+    "parse JSON file and validate",
+    "проверить загруженный json"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "math-random-случайное-число-mv6cusrk",
   "file": "math-random-случайное-число-mv6cusrk.js",
-  "title": "math-random-случайное-число-mv6cusrk",
+  "title": "Math.random — случайное число",
   "lang": "js",
   "group": "Данные: хранить, находить и преобразовывать / Числа и просты",
   "desc": "Math.random() возвращает случайное дробное число от 0 включительно до 1, не включая 1.",
@@ -33,7 +33,15 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "объявить переменную, которой нельзя переназначить значение",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "value",
+      "kind": "name",
+      "note": "value — текущее значение поля ввода (input, textarea, select).",
       "source": "dict"
     },
     {
@@ -66,6 +74,14 @@
       "text": "log",
       "kind": "fn",
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "value",
+      "kind": "name",
+      "note": "value — текущее значение поля ввода (input, textarea, select).",
       "source": "dict"
     }
   ],

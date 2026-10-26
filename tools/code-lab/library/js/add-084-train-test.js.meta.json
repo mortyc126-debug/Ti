@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "add-084-train-test",
+  "file": "add-084-train-test.js",
+  "title": "Разделить временной ряд на train и test по времени",
+  "lang": "js",
+  "group": "Данные и временные ряды / Статистическая проверка",
+  "desc": "Делит ряд без перемешивания, оставляя последние наблюдения для теста.",
+  "output": "train [1,2,3], test [4,5]",
+  "tags": [
+    "walk-forward validation",
+    "подбор testSize"
+  ],
+  "aliases": [
+    "time series train test split",
+    "временное разделение",
+    "не перемешивать временной ряд"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "walk-forward validation",
+      "kind": "concept",
+      "note": "walk-forward validation — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "подбор testSize",
+      "kind": "concept",
+      "note": "подбор testSize — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

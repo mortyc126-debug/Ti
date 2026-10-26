@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "localstorage-removeitem-удалить-mv6cusm4",
   "file": "localstorage-removeitem-удалить-mv6cusm4.js",
-  "title": "localstorage-removeitem-удалить-mv6cusm4",
+  "title": "localStorage.removeItem — удалить",
   "lang": "js",
   "group": "Файлы, хранение и сервер / Хранение в браузере",
   "desc": "removeItem удаляет одну запись по ключу. clear() удаляет все записи этого сайта, поэтому используйте его осторожно.",
@@ -32,6 +32,14 @@
   "wordNotes": [
     {
       "line": 0,
+      "col": 0,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
       "col": 13,
       "text": "setItem",
       "kind": "fn",
@@ -40,10 +48,10 @@
     },
     {
       "line": 1,
-      "col": 13,
-      "text": "removeItem",
-      "kind": "fn",
-      "note": "removeItem — удаляет один ключ",
+      "col": 0,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
       "source": "dict"
     },
     {
@@ -60,6 +68,14 @@
       "text": "log",
       "kind": "fn",
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "localStorage",
+      "kind": "name",
+      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
       "source": "dict"
     },
     {

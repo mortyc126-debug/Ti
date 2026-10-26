@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "break-и-continue-mv6cut6g",
   "file": "break-и-continue-mv6cut6g.js",
-  "title": "break-и-continue-mv6cut6g",
+  "title": "break и continue",
   "lang": "js",
   "group": "Основы / Синтаксис",
   "desc": "break полностью останавливает цикл. continue пропускает оставшуюся часть текущей итерации и переходит к следующей.",
@@ -35,7 +35,7 @@
       "col": 0,
       "text": "for",
       "kind": "kw",
-      "note": "цикл с инициализацией, условием и шагом",
+      "note": "for — цикл: повторять блок заданное число раз.",
       "source": "dict"
     },
     {
@@ -43,31 +43,7 @@
       "col": 5,
       "text": "let",
       "kind": "kw",
-      "note": "объявить переменную с блочной областью видимости",
-      "source": "dict"
-    },
-    {
-      "line": 0,
-      "col": 9,
-      "text": "number",
-      "kind": "name",
-      "note": "Number — превращает значение в число",
-      "source": "dict"
-    },
-    {
-      "line": 0,
-      "col": 21,
-      "text": "number",
-      "kind": "name",
-      "note": "Number — превращает значение в число",
-      "source": "dict"
-    },
-    {
-      "line": 0,
-      "col": 34,
-      "text": "number",
-      "kind": "name",
-      "note": "Number — превращает значение в число",
+      "note": "let — объявляет переменную, значение которой можно менять позже.",
       "source": "dict"
     },
     {
@@ -76,14 +52,6 @@
       "text": "if",
       "kind": "kw",
       "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
-      "source": "dict"
-    },
-    {
-      "line": 1,
-      "col": 6,
-      "text": "number",
-      "kind": "name",
-      "note": "Number — превращает значение в число",
       "source": "dict"
     },
     {
@@ -91,7 +59,7 @@
       "col": 4,
       "text": "continue",
       "kind": "kw",
-      "note": "перейти к следующей итерации цикла",
+      "note": "continue — перейти к следующей итерации цикла.",
       "source": "dict"
     },
     {
@@ -103,19 +71,11 @@
       "source": "dict"
     },
     {
-      "line": 4,
-      "col": 6,
-      "text": "number",
-      "kind": "name",
-      "note": "Number — превращает значение в число",
-      "source": "dict"
-    },
-    {
       "line": 5,
       "col": 4,
       "text": "break",
       "kind": "kw",
-      "note": "досрочно выйти из цикла или конструкции switch",
+      "note": "break — выйти из цикла или switch досрочно.",
       "source": "dict"
     },
     {
@@ -132,14 +92,6 @@
       "text": "log",
       "kind": "fn",
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
-      "source": "dict"
-    },
-    {
-      "line": 7,
-      "col": 14,
-      "text": "number",
-      "kind": "name",
-      "note": "Number — превращает значение в число",
       "source": "dict"
     }
   ],
@@ -219,45 +171,10 @@
       "number"
     ],
     "requires": [],
-    "subcat": "Синтаксис",
-    "contractLocked": true
+    "subcat": "Синтаксис"
   },
   "legacy": {
     "template": "break-и-continue-mv6cut6g.json"
   },
-  "enriched": true,
-  "orphanNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "for",
-      "kind": "kw",
-      "note": "for — цикл: повторять блок заданное число раз.",
-      "source": "custom"
-    },
-    {
-      "line": 0,
-      "col": 5,
-      "text": "let",
-      "kind": "kw",
-      "note": "let — объявляет переменную, значение которой можно менять позже.",
-      "source": "custom"
-    },
-    {
-      "line": 2,
-      "col": 4,
-      "text": "continue",
-      "kind": "kw",
-      "note": "continue — перейти к следующей итерации цикла.",
-      "source": "custom"
-    },
-    {
-      "line": 5,
-      "col": 4,
-      "text": "break",
-      "kind": "kw",
-      "note": "break — выйти из цикла или switch досрочно.",
-      "source": "custom"
-    }
-  ]
+  "enriched": true
 }

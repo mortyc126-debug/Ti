@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "workflow-log-with-correlation-id",
+  "file": "workflow-log-with-correlation-id.js",
+  "title": "Связать логи разных этапов одним идентификатором операции",
+  "lang": "js",
+  "group": "Отладка / Трассировка",
+  "desc": "Создаёт логгер, автоматически добавляющий correlationId и контекст к каждой записи; адаптер вывода можно заменить.",
+  "output": "каждая запись содержит общий correlationId",
+  "tags": [
+    "логирование",
+    "correlationId",
+    "трассировка",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "correlation id logger",
+    "связать логи запроса",
+    "контекстный логгер"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

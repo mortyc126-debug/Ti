@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "cache-ttl-map",
+  "file": "cache-ttl-map.js",
+  "title": "Кэшировать значения с временем жизни TTL",
+  "lang": "js",
+  "group": "Кэширование / Память",
+  "desc": "Хранит значение и срок истечения в Map; просроченные элементы удаляются при чтении.",
+  "output": "42 до истечения TTL",
+  "tags": [
+    "кэш",
+    "TTL",
+    "Map",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "кэш с ttl",
+    "время жизни записи в кэше",
+    "cache expiration"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}
