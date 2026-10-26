@@ -685,6 +685,8 @@ function splitDictLine(line){
 // стороны или это вообще синонимы; (2) много запятых в пояснении — это список синонимов.
 const _hasLatin = s => /[A-Za-z]/.test(s);
 const _isRu = s => /[А-Яа-яЁё]/.test(s);
+// пояснение-предложение (есть « — »/двоеточие или союзы) — это НЕ список синонимов
+const _isSentenceC = s => /[—–:]/.test(String(s)) || /\b(если|когда|иначе|чтобы|потому|котор|это|нужно|значит|добавля|убира|возвраща|созда[её]т|вызыва|позволя|прове|делает)\b/i.test(String(s));
 function parseDict(text){
   const entries = [], errors = [], suspicious = [], synLike = [], seen = new Set();
   String(text).split('\n').forEach((raw, i) => {
@@ -699,7 +701,7 @@ function parseDict(text){
     seen.add(key);
     const e = { word, text: expl, ln };
     if(_isRu(word) && !_hasLatin(word)){ e.why = 'ключ на русском — это код описывают, слева должен быть код, а не фраза. Похоже, перепутаны стороны или это синонимы.'; suspicious.push(e); return; }
-    if((expl.match(/,/g) || []).length >= 3){ e.why = 'в пояснении ' + ((expl.match(/,/g) || []).length) + ' запятых — похоже на список синонимов, а не на пояснение.'; synLike.push(e); return; }
+    if((expl.match(/,/g) || []).length >= 3 && !_isSentenceC(expl)){ e.why = 'в пояснении ' + ((expl.match(/,/g) || []).length) + ' запятых и нет связок — похоже на список синонимов, а не на пояснение.'; synLike.push(e); return; }
     entries.push(e);
   });
   return { entries, errors, suspicious, synLike };
@@ -813,7 +815,7 @@ function openDictViewModal(){
     + '<p class="mh">Всё описанное — из <b>keyword-dict.json</b>. Разделы: общее/код, по языкам (c, cpp, java…), HTML-теги/атрибуты, CSS-свойства/значения. Поиск фильтрует по слову и тексту. «⧉» у раздела копирует его строками «слово: пояснение».</p>'
     + '<input class="inv-search" id="dv-q" placeholder="поиск по слову или пояснению…" style="width:100%;box-sizing:border-box;margin-bottom:8px">'
     + '<div id="dv-groups" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px"></div>'
-    + '<div class="mbtns"><button class="btn" id="dv-close">закрыть</button><button class="btn" id="dv-dups" title="найти ключи, лежащие сразу в нескольких разделах/языках">🔍 дубли</button><button class="btn" id="dv-clean" title="убрать обрывки кода: ключи с несбалансированными скобками — это куски строк, а не термины">🧹 обрывки кода</button><span class="pp-note" id="dv-note" style="margin-left:auto"></span></div>'
+    + '<div class="mbtns"><button class="btn" id="dv-close">закрыть</button><button class="btn" id="dv-audit" title="проверить то, что уже загружено: русские ключи, пояснения-списки (синонимы), куски без кода — и починить на месте">🩺 проверка мест</button><button class="btn" id="dv-dups" title="найти ключи, лежащие сразу в нескольких разделах/языках">🔍 дубли</button><button class="btn" id="dv-clean" title="убрать обрывки кода: ключи с несбалансированными скобками — это куски строк, а не термины">🧹 обрывки кода</button><span class="pp-note" id="dv-note" style="margin-left:auto"></span></div>'
     + '<div class="lp-prev" id="dv-dupbox" style="display:none;max-height:28vh;margin-bottom:8px;border-color:#b45cff"></div>'
     + '<div class="lp-prev" id="dv-body" style="max-height:60vh"></div>';
   bg.appendChild(box); document.body.appendChild(bg);
@@ -900,8 +902,8 @@ function openDictViewModal(){
   // проверка дублей: один и тот же ключ в нескольких разделах/языках (внутри одного раздела дублей быть не может — объект по ключу)
   function showDups(){
     const panel = q('#dv-dupbox');
-    if(panel.style.display !== 'none'){ panel.style.display = 'none'; return; }
-    panel.style.display = ''; panel.innerHTML = '';
+    if(panel.style.display !== 'none' && !panel.__audit){ panel.style.display = 'none'; return; }
+    panel.style.display = ''; panel.__audit = false; panel.innerHTML = '';
     if(!dict){ panel.textContent = 'словарь ещё не загружен'; return; }
     const where = new Map();
     // html-теги/атрибуты и язык html — одно ведро «html» (то же для css), иначе единый раздел HTML светится как «дубль»
@@ -917,9 +919,74 @@ function openDictViewModal(){
     }
   }
   q('#dv-dups').onclick = showDups;
+  // ревизия «на своём ли месте»: проходим по уже загруженному и чиним точечно
+  const reloadDict = () => { dict = null; fetch('/keyword-dict.json', { cache: 'no-store' }).then(x => x.json()).then(d => { dict = d; render(); }).catch(() => {}); };
+  q('#dv-audit').onclick = async () => {
+    const panel = q('#dv-dupbox');
+    if(panel.style.display !== 'none' && panel.__audit){ panel.style.display = 'none'; panel.__audit = false; return; }
+    panel.style.display = ''; panel.__audit = true; panel.innerHTML = 'проверяю загруженное…';
+    const r = await fetch('/api/dict/audit', { method: 'POST', body: JSON.stringify({}) }).then(x => x.json()).catch(() => null);
+    panel.innerHTML = '';
+    if(!r || !r.ok){ panel.textContent = 'не удалось проверить'; return; }
+    const c = r.counts;
+    if(!c.ruKeys && !c.synLike && !c.prosePieces){ panel.appendChild(el2('div', 'lp-sec', 'Всё на своих местах ✓ — перепутанного не нашлось')); return; }
+    panel.appendChild(el2('div', 'lp-sec', 'Кандидаты «не на своём месте»: русских ключей ' + c.ruKeys + ' · пояснений-списков ' + c.synLike + ' · кусков без кода ' + c.prosePieces));
+    const warn = el2('div', 'muted'); warn.style.cssText = 'font-size:11px;margin:0 0 4px 6px'; warn.textContent = 'Это подсказки, а не приговор: часть русских ключей — твой глоссарий понятий/ошибок (так и задумано). Смотри сама, удаляй только лишнее. Ничего не удаляю без подтверждения.'; panel.appendChild(warn);
+    const mk = (txt, cls) => { const d = el2('div', 'lp-row ' + (cls || '')); d.textContent = txt; return d; };
+    const btnrow = () => el2('div', 'mbtns');
+    // 🟡 пояснения-списки = синонимы: переносим в синонимы и убираем из словаря
+    if(r.synLike.length){
+      const s = el2('div', 'lp-sec', '🟡 пояснение — список через запятые (' + r.synLike.length + '): это синонимы, им место в поиске по смыслу'); s.style.color = '#ffb454'; panel.appendChild(s);
+      r.synLike.slice(0, 40).forEach(e => panel.appendChild(mk('[' + e.where + '] ' + e.key + '  →  ' + e.text, 'lp-bad')));
+      if(r.synLike.length > 40) panel.appendChild(mk('…и ещё ' + (r.synLike.length - 40), 'muted'));
+      const row = btnrow();
+      const cps = el2('button', 'btn', '⧉ скопировать');
+      cps.onclick = () => { copy(r.synLike.map(e => e.key + ': ' + e.text).join('\n')); cps.textContent = '✓'; setTimeout(() => cps.textContent = '⧉ скопировать', 1000); };
+      const mv = el2('button', 'btn ok', '🔤 перенести все ' + r.synLike.length + ' в синонимы');
+      mv.onclick = async () => { if(!confirm('Перенести ' + r.synLike.length + ' в синонимы и убрать из словаря? Пояснения станут фразами для поиска по смыслу.')) return;
+        mv.textContent = 'переношу…'; mv.disabled = true;
+        const syn = r.synLike.map(e => [e.key, e.text]);
+        const a = await fetch('/api/dict/synonyms', { method: 'POST', body: JSON.stringify({ entries: syn }) }).then(x => x.json()).catch(() => ({}));
+        if(a && a.ok){ await fetch('/api/dict/remove', { method: 'POST', body: JSON.stringify({ entries: r.synLike.map(e => ({ where: e.where, key: e.key })) }) }).then(x => x.json()).catch(() => ({}));
+          r.synLike = []; reloadDict(); mv.replaceWith(mk('✓ перенесено в синонимы: терминов ' + a.terms + ', фраз ' + a.added, 'lp-ok')); }
+        else { mv.textContent = '🔤 перенести в синонимы'; mv.disabled = false; }
+      };
+      row.append(cps, mv); panel.appendChild(row);
+    }
+    // 🔴 русский ключ: слева фраза, а не код. Чистим из словаря (пояснения грузят с кодом-ключом)
+    if(r.ruKeys.length){
+      const s = el2('div', 'lp-sec', '🔴 ключ на русском (' + r.ruKeys.length + '): слева должен быть код, а не фраза. Перепутаны стороны или это синонимы'); s.style.color = '#ff6b8a'; panel.appendChild(s);
+      r.ruKeys.slice(0, 40).forEach(e => panel.appendChild(mk('[' + e.where + '] ' + e.key + '  →  ' + e.text, 'lp-bad')));
+      if(r.ruKeys.length > 40) panel.appendChild(mk('…и ещё ' + (r.ruKeys.length - 40), 'muted'));
+      const row = btnrow();
+      const cp = el2('button', 'btn', '⧉ скопировать (чтобы перезалить правильно)');
+      cp.onclick = () => { copy(r.ruKeys.map(e => e.key + ': ' + e.text).join('\n')); cp.textContent = '✓ скопировано'; setTimeout(() => cp.textContent = '⧉ скопировать (чтобы перезалить правильно)', 1200); };
+      const del = el2('button', 'btn', '🗑 убрать все ' + r.ruKeys.length + ' из словаря');
+      del.onclick = async () => { if(!confirm('Убрать ' + r.ruKeys.length + ' русских ключей из словаря? Скопируй их сначала, если нужно перезалить.')) return;
+        del.textContent = 'убираю…'; del.disabled = true;
+        const a = await fetch('/api/dict/remove', { method: 'POST', body: JSON.stringify({ entries: r.ruKeys.map(e => ({ where: e.where, key: e.key })) }) }).then(x => x.json()).catch(() => ({}));
+        if(a && a.ok){ r.ruKeys = []; reloadDict(); del.replaceWith(mk('✓ убрано из словаря: ' + a.removed + '. Не забудь синхронизацию.', 'lp-ok')); }
+        else { del.textContent = '🗑 убрать из словаря'; del.disabled = false; }
+      };
+      row.append(cp, del); panel.appendChild(row);
+    }
+    // 🧩 куски без кода: «код» это русский текст
+    if(r.prosePieces.length){
+      const s = el2('div', 'lp-sec', '🧩 куски без кода (' + r.prosePieces.length + '): в коде русский текст — это словарь/синонимы загрузили как кусок'); s.style.color = '#ff6b8a'; panel.appendChild(s);
+      r.prosePieces.forEach(p => panel.appendChild(mk('[' + (p.lang || '?') + '] ' + p.title + '  —  ' + p.code, 'lp-bad')));
+      const row = btnrow();
+      const del = el2('button', 'btn', '🗑 удалить все ' + r.prosePieces.length + ' куска');
+      del.onclick = async () => { if(!confirm('Удалить ' + r.prosePieces.length + ' кусков, где код — русский текст?')) return;
+        del.textContent = 'удаляю…'; del.disabled = true; let n = 0;
+        for(const p of r.prosePieces){ const a = await fetch('/api/delete', { method: 'POST', body: JSON.stringify({ id: p.id }) }).then(x => x.json()).catch(() => null); if(a) n++; }
+        r.prosePieces = []; del.replaceWith(mk('✓ удалено кусков: ' + n + '. Не забудь синхронизацию.', 'lp-ok'));
+      };
+      row.appendChild(del); panel.appendChild(row);
+    }
+  };
   // чистка обрывков кода: показать найденное → подтвердить удаление
   q('#dv-clean').onclick = async () => {
-    const panel = q('#dv-dupbox'); panel.style.display = ''; panel.innerHTML = 'ищу обрывки кода…';
+    const panel = q('#dv-dupbox'); panel.style.display = ''; panel.__audit = false; panel.innerHTML = 'ищу обрывки кода…';
     const r = await fetch('/api/dict/clean', { method: 'POST', body: JSON.stringify({ apply: false }) }).then(x => x.json()).catch(() => null);
     panel.innerHTML = '';
     if(!r || !r.ok){ panel.textContent = 'не удалось проверить'; return; }

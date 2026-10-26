@@ -113,6 +113,17 @@ const SYN_FILE = path.join(DICT_DIR, 'synonyms.json');        // синоним�
 const LANG_ALIAS = { javascript: 'js', typescript: 'ts', py: 'python', python3: 'python', shell: 'bash', sh: 'bash', zsh: 'bash', 'c++': 'cpp', cplusplus: 'cpp', cxx: 'cpp', 'c#': 'csharp', 'c-sharp': 'csharp', cs: 'csharp', golang: 'go', rb: 'ruby', kt: 'kotlin', rs: 'rust', jsx: 'js', tsx: 'ts', htm: 'html', yml: 'yaml' };
 const canonLang = v => { v = String(v || '').trim().toLowerCase(); return LANG_ALIAS[v] || v.replace(/[^a-z0-9_+-]/g, '') || 'other'; };
 let _kwDict = null;
+// эвристики «на своём ли месте»: словарь описывает КОД, слева должен быть код-токен, а не русская фраза.
+const _hasLat = s => /[A-Za-z]/.test(String(s));
+const _isRuS = s => /[А-Яа-яЁё]/.test(String(s));
+const _commas = s => (String(s).match(/,/g) || []).length;
+// это ПОЯСНЕНИЕ (предложение), а не список: есть « — »/двоеточие или союзы/глаголы-связки.
+// Нужно, чтобы не путать нормальное пояснение с запятыми («добавляет класс, если его нет») со списком синонимов.
+const _isSentence = s => { const t = String(s); return /[—–:]/.test(t) || /\b(если|когда|иначе|чтобы|потому|котор|это|нужно|значит|добавля|убира|возвраща|созда[её]т|вызыва|позволя|прове|делает)\b/i.test(t); };
+// это СПИСОК синонимов: ≥3 запятых (4+ пункта), не предложение, и каждый кусок короткий (≤3 слова)
+const _isSynList = s => { const t = String(s).trim(); if(_commas(t) < 3 || _isSentence(t)) return false; return t.split(',').every(p => p.trim().split(/\s+/).filter(Boolean).length <= 3); };
+// «код» — это чисто русский текст без латиницы и код-символов → скорее словарь/синонимы, а не код
+const _looksProse = s => { const t = String(s); if(!_isRuS(t)) return false; if(_hasLat(t)) return false; return !/[{}()\[\];=<>\/\\|&*%#@$`]/.test(t); };
 async function loadExamples(){ try { const o = JSON.parse(await fs.readFile(EXAMPLES_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
 async function loadSynonyms(){ try { const o = JSON.parse(await fs.readFile(SYN_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
 async function loadLangDicts(){
@@ -204,9 +215,8 @@ async function importBundle(b){
   for(const pc of pieces) mergeInto(pc && pc.words, 'words');
   await fs.writeFile(dictPath, JSON.stringify(dict, null, 2), 'utf8'); _kwDict = dict;
   let created = 0, updated = 0, skipped = 0; const warnings = [];
-  // кусок описывает КОД: если «код» — это чисто русский текст без латиницы и без код-символов,
-  // то скорее всего по ошибке грузят словарь/синонимы как кусок. Ловим и не портим библиотеку.
-  const looksProse = s => { const t = String(s); if(!/[А-Яа-яЁё]/.test(t)) return false; if(/[A-Za-z]/.test(t)) return false; return !/[{}()\[\];=<>\/\\|&*%#@$`]/.test(t); };
+  // кусок описывает КОД: если «код» — это чисто русский текст, то грузят словарь как кусок (_looksProse)
+  const looksProse = _looksProse;
   for(const pc of pieces){
     if(!pc || typeof pc !== 'object'){ skipped++; continue; }
     const lang = String(pc.lang || 'js').toLowerCase();
@@ -929,6 +939,46 @@ const server = http.createServer(async (req, res) => {
       for(const fn of langFiles){ const o = langData[fn]; if(!o) continue; let touched = false; for(const k of Object.keys(o)) if(!balanced(k)){ delete o[k]; touched = true; } if(touched){ const sorted = {}; for(const kk of Object.keys(o).sort()) sorted[kk] = o[kk]; await fs.writeFile(path.join(LANGS_DIR, fn), JSON.stringify(sorted, null, 2), 'utf8'); } }
       _kwDict = null;
       return json(res, 200, { ok: true, applied: true, removed });
+    }
+
+    // ревизия «на своём ли месте»: проходим по тому, что УЖЕ загружено, и ищем перепутанное.
+    // read-only — только показать. Чинится точечно через /api/dict/remove + /api/dict/synonyms + /api/delete.
+    if(u.pathname === '/api/dict/audit' && req.method === 'POST'){
+      const ruKeys = [], synLike = [], prosePieces = [];
+      // словарь: база (разделы) + языки (файлы)
+      let base; try { base = JSON.parse(await fs.readFile(DICT_BASE, 'utf8')); } catch(_){ base = {}; }
+      const baseSects = ['words', 'htmlTags', 'htmlAttrs', 'cssProps', 'cssVals'].filter(s => base[s] && typeof base[s] === 'object');
+      // ключ-фраза на русском, и это НЕ пояснение-понятие (нет « — »/союзов) → перепутаны стороны/синонимы.
+      // пояснение-список через запятые (короткие куски, не предложение) у код-ключа → это синонимы.
+      const scan = (where, obj) => { for(const [k, v] of Object.entries(obj)){ const text = String(v || '');
+        if(_isRuS(k) && !_hasLat(k)){ if(!_isSentence(text)) ruKeys.push({ where, key: k, text: text.slice(0, 120) }); }
+        else if(_isSynList(text)) synLike.push({ where, key: k, text: text.slice(0, 120) }); } };
+      for(const s of baseSects) scan(s, base[s]);
+      let langFiles = []; try { langFiles = (await fs.readdir(LANGS_DIR)).filter(n => n.endsWith('.json')); } catch(_){}
+      for(const fn of langFiles){ try { const o = JSON.parse(await fs.readFile(path.join(LANGS_DIR, fn), 'utf8')); if(o && typeof o === 'object') scan(fn.replace(/\.json$/, ''), o); } catch(_){} }
+      // куски: код — чистая русская проза → это не кусок
+      let rows = []; try { rows = await store.rows(); } catch(_){}
+      for(const r of rows){ let obj; try { obj = await store.get(r.id); } catch(_){ continue; }
+        const code = obj && Array.isArray(obj.lines) ? obj.lines.map(ln => (ln || []).map(t => (t && t.v) || '').join('')).join('\n') : '';
+        if(_looksProse(code)) prosePieces.push({ id: r.id, title: obj.title || r.id, lang: obj.lang || '', code: code.slice(0, 120) }); }
+      return json(res, 200, { ok: true, ruKeys, synLike, prosePieces, counts: { ruKeys: ruKeys.length, synLike: synLike.length, prosePieces: prosePieces.length } });
+    }
+
+    // удалить ключи из словаря: {entries:[{where, key}]}. where = раздел базы (words/…) или язык (имя файла).
+    if(u.pathname === '/api/dict/remove' && req.method === 'POST'){
+      const b = await readBody(req);
+      const list = Array.isArray(b.entries) ? b.entries : [];
+      let base = null, baseTouched = false; const baseSects = new Set(['words', 'htmlTags', 'htmlAttrs', 'cssProps', 'cssVals']);
+      try { base = JSON.parse(await fs.readFile(DICT_BASE, 'utf8')); } catch(_){ base = {}; }
+      const langTouched = {}; let removed = 0;
+      for(const e of list){ const where = String(e && e.where || ''), key = String(e && e.key || '').toLowerCase(); if(!where || !key) continue;
+        if(baseSects.has(where)){ if(base[where] && base[where][key] != null){ delete base[where][key]; baseTouched = true; removed++; } }
+        else { const fp = path.join(LANGS_DIR, where + '.json'); let o = langTouched[where]; if(!o){ try { o = JSON.parse(await fs.readFile(fp, 'utf8')); } catch(_){ o = null; } if(o) langTouched[where] = o; }
+          if(o && o[key] != null){ delete o[key]; removed++; } } }
+      if(baseTouched) await fs.writeFile(DICT_BASE, JSON.stringify(base, null, 2), 'utf8');
+      for(const [where, o] of Object.entries(langTouched)){ const sorted = {}; for(const k of Object.keys(o).sort()) sorted[k] = o[k]; await fs.writeFile(path.join(LANGS_DIR, where + '.json'), JSON.stringify(sorted, null, 2), 'utf8'); }
+      _kwDict = null;
+      return json(res, 200, { ok: true, removed });
     }
 
     // синонимы для поиска по смыслу: {entries:[[term, "фраза1, фраза2"], …]}. Объединяем с существующими,
