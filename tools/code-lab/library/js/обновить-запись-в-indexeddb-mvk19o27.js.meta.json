@@ -221,7 +221,7 @@
       "col": 24,
       "text": "error",
       "kind": "fn",
-      "note": "error — console.error печатает сообщение об ошиб��е (красным).",
+      "note": "error — console.error печатает сообщение об ошибке (красным).",
       "source": "dict"
     }
   ]
