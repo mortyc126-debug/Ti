@@ -925,13 +925,20 @@ const server = http.createServer(async (req, res) => {
           return json(res, 200, { ok: false, stage: 'pull', committed: staged, message: 'С сервера пришли изменения, которые конфликтуют с твоими — автослияние не вышло. Я откатила, ничего не испорчено. Нужно слить вручную (git pull) и повторить. ' + (pull.err || pull.out || '').slice(0, 240) });
         }
       }
-      let push = await git(['push'], root);
-      if(push.code !== 0){
-        const br = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], root)).out;
-        push = await git(['push', '-u', 'origin', br], root);
-        if(push.code !== 0) return json(res, 200, { ok: false, stage: 'push', committed: staged, message: push.err || push.out || 'push отклонён' });
+      const curBr = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], root)).out;
+      let push, detNote = '';
+      if(curBr && curBr !== 'HEAD'){
+        push = await git(['push'], root);
+        if(push.code !== 0) push = await git(['push', '-u', 'origin', curBr], root);   // нет upstream — задаём
+      } else {
+        // detached HEAD (не на ветке): пушить «origin HEAD» нельзя (HEAD — не имя ветки).
+        // Отправляем текущий коммит на ветку по умолчанию удалёнки (обычно main).
+        const def = ((await git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], root)).out || '').replace(/^origin\//, '') || 'main';
+        push = await git(['push', 'origin', 'HEAD:refs/heads/' + def], root);
+        detNote = ' Важно: ты была НЕ на ветке (detached HEAD) — отправила на «' + def + '». Чтобы это не повторялось, один раз выполни в терминале: git checkout ' + def;
       }
-      return json(res, 200, { ok: true, committed: staged, message: staged ? ('Отправлено на GitHub: ' + staged + ' файл(ов).') : 'На GitHub уже всё актуально.' });
+      if(push.code !== 0) return json(res, 200, { ok: false, stage: 'push', committed: staged, message: (push.err || push.out || 'push отклонён') + (curBr === 'HEAD' ? '  ·  Ты не на ветке (detached HEAD). В терминале проекта выполни: git checkout main — затем повтори отправку.' : '') });
+      return json(res, 200, { ok: true, committed: staged, message: (staged ? ('Отправлено на GitHub: ' + staged + ' файл(ов).') : 'На GitHub уже всё актуально.') + detNote });
     }
 
     // удалить шаблон
