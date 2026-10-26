@@ -83,7 +83,8 @@
     </details>
     <div class="catline">а ниже — загрузка архивов данных (json/gz/zip) для инспектора</div>
     <div class="drop" id="drop">перетащи сюда архивы (можно пачкой) или нажми — распакуются и сохранятся<input type="file" id="file" accept=".json,.gz,.zip,application/json,application/gzip,application/zip" multiple style="display:none"></div>
-    <div style="margin:8px 0"><button class="btn" id="rescue">Перенести шаблоны кода из Данных в Библиотеку</button></div>
+    <div style="margin:8px 0"><button class="btn" id="rescue">Перенести шаблоны кода из Данных в Библиотеку</button>
+      <button class="btn" id="cleanmeta" title="убрать паспорта библиотеки (.meta.json), случайно загруженные в Данные — им место рядом с кодом, а не здесь">🧹 убрать паспорта из Данных</button></div>
     <div class="saved" id="saved"></div>
     <div class="err" id="err"></div>
 
@@ -128,23 +129,42 @@ drop.addEventListener('drop', e => handle(e.dataTransfer.files));
 
 async function handle(fileList){
   err.textContent = ''; files = [];
+  // сначала собираем ВСЁ сырьё, чтобы спарить файлы кода с их паспортами .meta.json
+  const raw = [];
   for(const f of fileList){
-    try {
-      const got = await extract(f);
-      for(const g of got){
-        try { files.push({ name: g.name, data: JSON.parse(g.text) }); }
-        catch(e){
-          const L = extLang(g.name);   // не JSON, но код по расширению → завернём в кусок
-          if(L) files.push({ name: g.name, data: { lang: L, title: g.name.replace(/\.[^.]+$/, ''), code: g.text } });
-          else err.textContent += '«' + g.name + '» не JSON и не похоже на код: ' + e.message + '\n';
-        }
-      }
-    } catch(e){ err.textContent += '«' + f.name + '»: ' + e.message + '\n'; }
+    try { const got = await extract(f); for(const g of got) raw.push(g); }
+    catch(e){ err.textContent += '«' + f.name + '»: ' + e.message + '\n'; }
   }
-  if(!files.length) return;
+  // индекс паспортов: «имя.js.meta.json» → объект; ключ — имя файла кода «имя.js»
+  const metaBy = {};
+  for(const g of raw){ if(/\.meta\.json$/i.test(g.name)){ try { metaBy[g.name.replace(/\.meta\.json$/i, '')] = JSON.parse(g.text); } catch(_){} } }
+  let metaPaired = 0, metaOrphan = 0;
+  for(const g of raw){
+    if(/\.meta\.json$/i.test(g.name)){   // паспорт сам по себе в «Данные» НЕ кладём
+      if(metaBy[g.name.replace(/\.meta\.json$/i, '')] && raw.some(x => x.name === g.name.replace(/\.meta\.json$/i, ''))) {} else metaOrphan++;
+      continue;
+    }
+    let data;
+    try { data = JSON.parse(g.text); }
+    catch(e){ const L = extLang(g.name); if(L) data = { lang: L, title: g.name.replace(/\.[^.]+$/, ''), code: g.text }; else { err.textContent += '«' + g.name + '» не JSON и не похоже на код: ' + e.message + '\n'; continue; } }
+    // есть паспорт рядом → восстановим нормальное название/раздел/описание куска
+    const m = metaBy[g.name];
+    if(m && looksLikePiece(data)){
+      if(m.title) data.title = m.title;
+      if(m.group) data.group = m.group;
+      if(m.desc) data.desc = m.desc;
+      if(m.lang) data.lang = m.lang;
+      if(m.component && typeof m.component === 'object') data.component = m.component;
+      metaPaired++;
+    }
+    files.push({ name: g.name, data });
+  }
+  if(!files.length){ err.textContent = metaOrphan ? ('Это паспорта кусков (.meta.json) без самих файлов кода — ' + metaOrphan + ' шт. Их грузить не нужно: паспорт создаётся сам рядом с кодом. Грузи файлы кода (.js, .css, .py…).') : (err.textContent || 'нечего загружать'); return; }
   const st = await autostore();   // данные складываем; шаблоны кода уводим в Библиотеку
   const dataFiles = files.filter(f => !looksLikePiece(f.data));
   const note = [];
+  if(metaPaired) note.push('паспортов подхвачено: ' + metaPaired);
+  if(metaOrphan) note.push('паспортов без кода пропущено: ' + metaOrphan);
   if(st.saved) note.push('в данные легло: ' + st.saved);
   if(st.skipped) note.push('уже было: ' + st.skipped);
   if(st.toLib){ note.push('шаблонов кода → в Библиотеку: ' + st.toLib); const g = await syncGh(); if(g) note.push('GitHub: ' + g); }
@@ -197,6 +217,21 @@ $('#rescue').onclick = async () => {
   btn.textContent = (moved ? '✓ ' : '') + msg;
   loadSaved();
   setTimeout(() => btn.textContent = 'Перенести шаблоны кода из Данных в Библиотеку', 5000);
+};
+
+// убрать паспорта библиотеки (.meta.json), случайно попавшие в «Данные»
+$('#cleanmeta').onclick = async () => {
+  const btn = $('#cleanmeta'); const o = btn.textContent; btn.textContent = 'проверяю…'; btn.disabled = true;
+  const r = await fetch('/api/data/clean', { method: 'POST', body: JSON.stringify({ apply: false }) }).then(x => x.json()).catch(() => null);
+  if(!r || !r.ok){ btn.textContent = 'не вышло'; setTimeout(() => { btn.textContent = o; btn.disabled = false; }, 2000); return; }
+  if(!r.count){ btn.textContent = '✓ паспортов в Данных нет'; setTimeout(() => { btn.textContent = o; btn.disabled = false; }, 2500); return; }
+  btn.textContent = o; btn.disabled = false;
+  if(!confirm('Найдено паспортов библиотеки в «Данных»: ' + r.count + '.\n\nЭто .meta.json — внутренности библиотеки, попавшие сюда по ошибке. Сами куски (код) в библиотеке не трогаются. Убрать эти ' + r.count + ' из «Данных»?\n\nНапример: ' + (r.sample || []).slice(0, 5).join(', '))) return;
+  btn.textContent = 'убираю…'; btn.disabled = true;
+  const rr = await fetch('/api/data/clean', { method: 'POST', body: JSON.stringify({ apply: true }) }).then(x => x.json()).catch(() => null);
+  btn.textContent = rr && rr.ok ? ('✓ убрано ' + rr.removed) : 'ошибка';
+  loadSaved();
+  setTimeout(() => { btn.textContent = o; btn.disabled = false; }, 3000);
 };
 
 // отправить шаблоны на GitHub (прямо отсюда, чтобы никуда не ходить)

@@ -837,6 +837,23 @@ const server = http.createServer(async (req, res) => {
       await fs.unlink(abs).catch(() => {});
       return json(res, 200, { ok: true });
     }
+    // убрать из «Данных» паспорта библиотеки (.meta.json), случайно загруженные как объекты.
+    // Паспорт живёт рядом с кодом в библиотеке и создаётся сам; в «Данных» ему не место. {apply:false} — только показать.
+    if(u.pathname === '/api/data/clean' && req.method === 'POST'){
+      const b = await readBody(req);
+      let names = []; try { names = (await fs.readdir(DATA)).filter(n => n.endsWith('.json')); } catch(_){}
+      const junk = [];
+      for(const n of names){ if(n === 'description-jobs.json') continue;
+        try { const j = JSON.parse(await fs.readFile(path.join(DATA, n), 'utf8')); const nm = String(j.name || ''); const d = j.data;
+          const isMetaName = /\.meta\.json$/i.test(nm);
+          const isMetaData = d && typeof d === 'object' && !Array.isArray(d) && d.id != null && d.lang != null && (d.component != null || d.schema != null) && (d.file != null || Array.isArray(d.wordNotes));
+          if(isMetaName || isMetaData) junk.push({ file: n, name: nm });
+        } catch(_){}
+      }
+      if(!b.apply) return json(res, 200, { ok: true, applied: false, count: junk.length, sample: junk.slice(0, 20).map(x => x.name) });
+      let removed = 0; for(const x of junk){ try { await fs.unlink(path.join(DATA, x.file)); removed++; } catch(_){} }
+      return json(res, 200, { ok: true, applied: true, removed });
+    }
 
     // ── синхронизация шаблонов с GitHub ───────────────────────────────────
     if(u.pathname === '/api/git/info'){
