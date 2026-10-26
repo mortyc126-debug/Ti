@@ -4,7 +4,7 @@
   "file": "array-to-sorted-mvox3aq6.js",
   "lang": "js",
   "title": "array-to-sorted",
-  "group": "Мои куски",
+  "group": "Данные / Коллекции",
   "desc": "",
   "output": "",
   "descAt": 1792998631950,
@@ -15,7 +15,13 @@
     ],
     "requires": [
       "a"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Коллекции"
   },
   "tags": [],
   "aliases": [],

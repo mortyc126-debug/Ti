@@ -4,7 +4,7 @@
   "file": "custom-error-class-mvox325p.js",
   "lang": "js",
   "title": "custom-error-class",
-  "group": "Мои куски",
+  "group": "Ошибки и отладка / Исключения",
   "desc": "",
   "output": "",
   "descAt": 1792998620845,
@@ -16,7 +16,13 @@
       "constructor",
       "message",
       "options"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Ошибки и отладка"
+      ]
+    },
+    "subcat": "Исключения"
   },
   "tags": [],
   "aliases": [],
@@ -125,6 +131,14 @@
     }
   ],
   "orphanNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "constructor",
+      "kind": "fn",
+      "note": "function Object() { [native code] }",
+      "source": "custom"
+    },
     {
       "line": 1,
       "col": 2,

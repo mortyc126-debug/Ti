@@ -4,7 +4,7 @@
   "file": "array-to-reversed-mvox3b25.js",
   "lang": "js",
   "title": "array-to-reversed",
-  "group": "Мои куски",
+  "group": "Данные / Коллекции",
   "desc": "",
   "output": "",
   "descAt": 1792998632381,
@@ -12,7 +12,13 @@
     "provides": [
       "исходный"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Коллекции"
   },
   "tags": [],
   "aliases": [],

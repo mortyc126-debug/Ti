@@ -4,7 +4,7 @@
   "file": "object-create-mvox2fth.js",
   "lang": "js",
   "title": "object-create",
-  "group": "Мои куски",
+  "group": "Данные / Работа с объектами",
   "desc": "",
   "output": "",
   "descAt": 1792998591893,
@@ -15,7 +15,13 @@
     ],
     "requires": [
       "приветствие"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Работа с объектами"
   },
   "tags": [],
   "aliases": [],

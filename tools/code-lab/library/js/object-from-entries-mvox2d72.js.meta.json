@@ -4,7 +4,7 @@
   "file": "object-from-entries-mvox2d72.js",
   "lang": "js",
   "title": "object-from-entries",
-  "group": "Мои куски",
+  "group": "Данные / Работа с объектами",
   "desc": "",
   "output": "",
   "descAt": 1792998588494,
@@ -12,7 +12,13 @@
     "provides": [
       "пары"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Работа с объектами"
   },
   "tags": [],
   "aliases": [],

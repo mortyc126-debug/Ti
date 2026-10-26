@@ -4,7 +4,7 @@
   "file": "set-unique-mvox2l25.js",
   "lang": "js",
   "title": "set-unique",
-  "group": "Мои куски",
+  "group": "Данные / Коллекции",
   "desc": "",
   "output": "",
   "descAt": 1792998598685,
@@ -13,7 +13,13 @@
       "числа",
       "уникальные"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Коллекции"
   },
   "tags": [],
   "aliases": [],

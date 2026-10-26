@@ -4,7 +4,7 @@
   "file": "regex-anchors-mvox2soi.js",
   "lang": "js",
   "title": "regex-anchors",
-  "group": "Мои куски",
+  "group": "Данные / Разбор текста",
   "desc": "",
   "output": "",
   "descAt": 1792998608562,
@@ -16,7 +16,13 @@
       "ID",
       "d",
       "$"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Разбор текста"
   },
   "tags": [],
   "aliases": [],

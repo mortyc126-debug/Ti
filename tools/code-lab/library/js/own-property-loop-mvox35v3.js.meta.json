@@ -4,7 +4,7 @@
   "file": "own-property-loop-mvox35v3.js",
   "lang": "js",
   "title": "own-property-loop",
-  "group": "Мои куски",
+  "group": "Данные / Работа с объектами",
   "desc": "",
   "output": "",
   "descAt": 1792998625647,
@@ -15,7 +15,13 @@
     ],
     "requires": [
       "унаследовано"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Работа с объектами"
   },
   "tags": [],
   "aliases": [],

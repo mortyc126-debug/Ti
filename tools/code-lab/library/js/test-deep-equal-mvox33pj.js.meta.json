@@ -4,7 +4,7 @@
   "file": "test-deep-equal-mvox33pj.js",
   "lang": "js",
   "title": "test-deep-equal",
-  "group": "Мои куски",
+  "group": "Тестирование / Проверки функций",
   "desc": "",
   "output": "",
   "descAt": 1792998622855,
@@ -13,7 +13,13 @@
     "requires": [
       "assert",
       "a"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Тестирование"
+      ]
+    },
+    "subcat": "Проверки функций"
   },
   "tags": [],
   "aliases": [],

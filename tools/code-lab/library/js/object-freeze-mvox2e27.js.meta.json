@@ -4,7 +4,7 @@
   "file": "object-freeze-mvox2e27.js",
   "lang": "js",
   "title": "object-freeze",
-  "group": "Мои куски",
+  "group": "Данные / Работа с объектами",
   "desc": "",
   "output": "",
   "descAt": 1792998589615,
@@ -16,7 +16,13 @@
       "лимит",
       "вложено",
       "флаг"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Работа с объектами"
   },
   "tags": [],
   "aliases": [],

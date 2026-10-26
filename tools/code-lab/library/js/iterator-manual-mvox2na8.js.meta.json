@@ -4,7 +4,7 @@
   "file": "iterator-manual-mvox2na8.js",
   "lang": "js",
   "title": "iterator-manual",
-  "group": "Мои куски",
+  "group": "Основы / Итераторы и генераторы",
   "desc": "",
   "output": "",
   "descAt": 1792998601568,
@@ -12,7 +12,13 @@
     "provides": [
       "итератор"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Основы"
+      ]
+    },
+    "subcat": "Итераторы и генераторы"
   },
   "tags": [],
   "aliases": [],

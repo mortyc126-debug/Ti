@@ -4,7 +4,7 @@
   "file": "prototype-own-vs-inherited-mvox2g9g.js",
   "lang": "js",
   "title": "prototype-own-vs-inherited",
-  "group": "Мои куски",
+  "group": "Основы / Объектно-ориентированное программирование",
   "desc": "",
   "output": "",
   "descAt": 1792998592468,
@@ -15,7 +15,13 @@
     ],
     "requires": [
       "роль"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Основы"
+      ]
+    },
+    "subcat": "Объектно-ориентированное программирование"
   },
   "tags": [],
   "aliases": [],

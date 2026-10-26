@@ -4,7 +4,7 @@
   "file": "bigint-json-replacer-mvox39s9.js",
   "lang": "js",
   "title": "bigint-json-replacer",
-  "group": "Мои куски",
+  "group": "Данные / Преобразование форматов",
   "desc": "",
   "output": "",
   "descAt": 1792998630729,
@@ -17,7 +17,13 @@
       "id",
       "n",
       "_"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Преобразование форматов"
   },
   "tags": [],
   "aliases": [],

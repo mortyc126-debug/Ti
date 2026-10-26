@@ -4,7 +4,7 @@
   "file": "string-graphemes-mvox2u1d.js",
   "lang": "js",
   "title": "string-graphemes",
-  "group": "Мои куски",
+  "group": "Данные / Строки и текст",
   "desc": "",
   "output": "",
   "descAt": 1792998610321,
@@ -16,7 +16,13 @@
     "requires": [
       "Intl",
       "granularity"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Строки и текст"
   },
   "tags": [],
   "aliases": [],

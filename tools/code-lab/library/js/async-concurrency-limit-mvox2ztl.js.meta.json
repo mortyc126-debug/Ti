@@ -4,7 +4,7 @@
   "file": "async-concurrency-limit-mvox2ztl.js",
   "lang": "js",
   "title": "async-concurrency-limit",
-  "group": "Мои куски",
+  "group": "Асинхронность / Ограничение нагрузки",
   "desc": "",
   "output": "",
   "descAt": 1792998617817,
@@ -19,7 +19,13 @@
     "requires": [
       "length",
       "рабоч"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ]
+    },
+    "subcat": "Ограничение нагрузки"
   },
   "tags": [],
   "aliases": [],

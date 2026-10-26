@@ -4,7 +4,7 @@
   "file": "regex-escape-literal-mvox2s7y.js",
   "lang": "js",
   "title": "regex-escape-literal",
-  "group": "Мои куски",
+  "group": "Данные / Разбор текста",
   "desc": "",
   "output": "",
   "descAt": 1792998607966,
@@ -13,7 +13,13 @@
       "буквальныйТекст",
       "безопасный"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Разбор текста"
   },
   "tags": [],
   "aliases": [],

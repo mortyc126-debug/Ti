@@ -4,7 +4,7 @@
   "file": "event-listener-once-mvox37w1.js",
   "lang": "js",
   "title": "event-listener-once",
-  "group": "Мои куски",
+  "group": "Интерфейс / Реакция на действия пользователя",
   "desc": "",
   "output": "",
   "descAt": 1792998628273,
@@ -13,7 +13,13 @@
     "requires": [
       "кнопка",
       "once"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ]
+    },
+    "subcat": "Реакция на действия пользователя"
   },
   "tags": [],
   "aliases": [],

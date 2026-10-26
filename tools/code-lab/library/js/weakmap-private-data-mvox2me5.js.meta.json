@@ -4,7 +4,7 @@
   "file": "weakmap-private-data-mvox2me5.js",
   "lang": "js",
   "title": "weakmap-private-data",
-  "group": "Мои куски",
+  "group": "Продвинутые темы / ООП и модели данных",
   "desc": "",
   "output": "",
   "descAt": 1792998600413,
@@ -16,7 +16,13 @@
     "requires": [
       "WeakMap",
       "обработан"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Продвинутые темы"
+      ]
+    },
+    "subcat": "ООП и модели данных"
   },
   "tags": [],
   "aliases": [],

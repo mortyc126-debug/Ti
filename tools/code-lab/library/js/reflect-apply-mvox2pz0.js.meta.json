@@ -4,7 +4,7 @@
   "file": "reflect-apply-mvox2pz0.js",
   "lang": "js",
   "title": "reflect-apply",
-  "group": "Мои куски",
+  "group": "Продвинутые темы / ООП и модели данных",
   "desc": "",
   "output": "",
   "descAt": 1792998605052,
@@ -15,7 +15,13 @@
     "requires": [
       "Reflect",
       "база"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Продвинутые темы"
+      ]
+    },
+    "subcat": "ООП и модели данных"
   },
   "tags": [],
   "aliases": [],

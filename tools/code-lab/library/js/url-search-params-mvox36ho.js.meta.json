@@ -4,7 +4,7 @@
   "file": "url-search-params-mvox36ho.js",
   "lang": "js",
   "title": "url-search-params",
-  "group": "Мои куски",
+  "group": "Сеть / Построение запросов",
   "desc": "",
   "output": "",
   "descAt": 1792998626460,
@@ -15,7 +15,13 @@
     "requires": [
       "поиск",
       "страница"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Сеть"
+      ]
+    },
+    "subcat": "Построение запросов"
   },
   "tags": [],
   "aliases": [],

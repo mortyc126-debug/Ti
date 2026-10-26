@@ -4,7 +4,7 @@
   "file": "url-safe-join-mvox36yd.js",
   "lang": "js",
   "title": "url-safe-join",
-  "group": "Мои куски",
+  "group": "Сеть / Построение запросов",
   "desc": "",
   "output": "",
   "descAt": 1792998627061,
@@ -12,7 +12,13 @@
     "provides": [
       "адрес"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Сеть"
+      ]
+    },
+    "subcat": "Построение запросов"
   },
   "tags": [],
   "aliases": [],

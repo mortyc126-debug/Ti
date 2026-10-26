@@ -4,7 +4,7 @@
   "file": "proxy-get-mvox2omp.js",
   "lang": "js",
   "title": "proxy-get",
-  "group": "Мои куски",
+  "group": "Продвинутые темы / ООП и модели данных",
   "desc": "",
   "output": "",
   "descAt": 1792998603313,
@@ -20,7 +20,13 @@
       "ключ",
       "получатель",
       "Reflect"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Продвинутые темы"
+      ]
+    },
+    "subcat": "ООП и модели данных"
   },
   "tags": [],
   "aliases": [],

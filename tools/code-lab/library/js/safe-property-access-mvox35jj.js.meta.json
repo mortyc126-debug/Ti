@@ -4,7 +4,7 @@
   "file": "safe-property-access-mvox35jj.js",
   "lang": "js",
   "title": "safe-property-access",
-  "group": "Мои куски",
+  "group": "Данные / Работа с объектами",
   "desc": "",
   "output": "",
   "descAt": 1792998625232,
@@ -16,7 +16,13 @@
     "requires": [
       "data",
       "user"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Работа с объектами"
   },
   "tags": [],
   "aliases": [],

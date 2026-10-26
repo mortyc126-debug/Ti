@@ -4,7 +4,7 @@
   "file": "object-assign-copy-mvox2dmj.js",
   "lang": "js",
   "title": "object-assign-copy",
-  "group": "Мои куски",
+  "group": "Данные / Работа с объектами",
   "desc": "",
   "output": "",
   "descAt": 1792998589051,
@@ -17,7 +17,13 @@
       "настройки",
       "тема",
       "размер"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Работа с объектами"
   },
   "tags": [],
   "aliases": [],

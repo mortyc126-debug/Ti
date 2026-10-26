@@ -4,7 +4,7 @@
   "file": "array-flatmap-mvox3cn1.js",
   "lang": "js",
   "title": "array-flatmap",
-  "group": "Мои куски",
+  "group": "Данные / Коллекции",
   "desc": "",
   "output": "",
   "descAt": 1792998634429,
@@ -12,7 +12,13 @@
     "provides": [
       "слова"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Коллекции"
   },
   "tags": [],
   "aliases": [],

@@ -4,7 +4,7 @@
   "file": "class-extends-super-mvox2hzb.js",
   "lang": "js",
   "title": "class-extends-super",
-  "group": "Мои куски",
+  "group": "Основы / Объектно-ориентированное программирование",
   "desc": "",
   "output": "",
   "descAt": 1792998594695,
@@ -18,7 +18,13 @@
       "имя",
       "описание",
       "единица"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Основы"
+      ]
+    },
+    "subcat": "Объектно-ориентированное программирование"
   },
   "tags": [],
   "aliases": [],
@@ -143,6 +149,22 @@
     }
   ],
   "orphanNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "constructor",
+      "kind": "fn",
+      "note": "function Object() { [native code] }",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "constructor",
+      "kind": "fn",
+      "note": "function Object() { [native code] }",
+      "source": "custom"
+    },
     {
       "line": 1,
       "col": 2,

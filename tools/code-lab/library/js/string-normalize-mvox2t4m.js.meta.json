@@ -4,7 +4,7 @@
   "file": "string-normalize-mvox2t4m.js",
   "lang": "js",
   "title": "string-normalize",
-  "group": "Мои куски",
+  "group": "Данные / Строки и текст",
   "desc": "",
   "output": "",
   "descAt": 1792998609142,
@@ -13,7 +13,13 @@
       "a",
       "b"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Строки и текст"
   },
   "tags": [],
   "aliases": [],

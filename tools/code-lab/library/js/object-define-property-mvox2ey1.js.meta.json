@@ -4,7 +4,7 @@
   "file": "object-define-property-mvox2ey1.js",
   "lang": "js",
   "title": "object-define-property",
-  "group": "Мои куски",
+  "group": "Данные / Работа с объектами",
   "desc": "",
   "output": "",
   "descAt": 1792998590761,
@@ -16,7 +16,13 @@
       "value",
       "enumerable",
       "writable"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Работа с объектами"
   },
   "tags": [],
   "aliases": [],

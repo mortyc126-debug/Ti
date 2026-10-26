@@ -4,7 +4,7 @@
   "file": "map-group-by-mvox3a97.js",
   "lang": "js",
   "title": "map-group-by",
-  "group": "Мои куски",
+  "group": "Данные / Коллекции",
   "desc": "",
   "output": "",
   "descAt": 1792998631339,
@@ -16,7 +16,13 @@
     "requires": [
       "тип",
       "id"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Коллекции"
   },
   "tags": [],
   "aliases": [],

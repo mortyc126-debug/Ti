@@ -4,7 +4,7 @@
   "file": "reflect-set-mvox2qfa.js",
   "lang": "js",
   "title": "reflect-set",
-  "group": "Мои куски",
+  "group": "Продвинутые темы / ООП и модели данных",
   "desc": "",
   "output": "",
   "descAt": 1792998605638,
@@ -15,7 +15,13 @@
     ],
     "requires": [
       "Reflect"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Продвинутые темы"
+      ]
+    },
+    "subcat": "ООП и модели данных"
   },
   "tags": [],
   "aliases": [],

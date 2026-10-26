@@ -4,7 +4,7 @@
   "file": "bigint-divide-remainder-mvox2vuz.js",
   "lang": "js",
   "title": "bigint-divide-remainder",
-  "group": "Мои куски",
+  "group": "Данные / Числа и простые операции",
   "desc": "",
   "output": "",
   "descAt": 1792998612683,
@@ -12,7 +12,13 @@
     "provides": [],
     "requires": [
       "n"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Числа и простые операции"
   },
   "tags": [],
   "aliases": [],

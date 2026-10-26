@@ -4,7 +4,7 @@
   "file": "dynamic-import-mvox39be.js",
   "lang": "js",
   "title": "dynamic-import",
-  "group": "Мои куски",
+  "group": "Основы / Модули и импорты",
   "desc": "",
   "output": "",
   "descAt": 1792998630122,
@@ -13,7 +13,13 @@
       "открытьОтчёт",
       "модуль"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Основы"
+      ]
+    },
+    "subcat": "Модули и импорты"
   },
   "tags": [],
   "aliases": [],

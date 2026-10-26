@@ -4,7 +4,7 @@
   "file": "array-chunk-mvox3dkq.js",
   "lang": "js",
   "title": "array-chunk",
-  "group": "Мои куски",
+  "group": "Данные / Коллекции",
   "desc": "",
   "output": "",
   "descAt": 1792998635642,
@@ -16,7 +16,13 @@
     ],
     "requires": [
       "RangeError"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Коллекции"
   },
   "tags": [],
   "aliases": [],

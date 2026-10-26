@@ -4,7 +4,7 @@
   "file": "console-time-mvox346d.js",
   "lang": "js",
   "title": "console-time",
-  "group": "Мои куски",
+  "group": "Повседневная разработка / Производительность",
   "desc": "",
   "output": "",
   "descAt": 1792998623461,
@@ -12,7 +12,13 @@
     "provides": [
       "i"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Повседневная разработка"
+      ]
+    },
+    "subcat": "Производительность"
   },
   "tags": [],
   "aliases": [],

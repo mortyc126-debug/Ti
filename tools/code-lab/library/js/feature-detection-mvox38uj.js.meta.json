@@ -4,13 +4,19 @@
   "file": "feature-detection-mvox38uj.js",
   "lang": "js",
   "title": "feature-detection",
-  "group": "Мои куски",
+  "group": "Разработка и инструменты / Совместимость",
   "desc": "",
   "output": "",
   "descAt": 1792998629515,
   "component": {
     "provides": [],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Разработка и инструменты"
+      ]
+    },
+    "subcat": "Совместимость"
   },
   "tags": [],
   "aliases": [],

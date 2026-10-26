@@ -4,7 +4,7 @@
   "file": "prototype-chain-mvox2fdl.js",
   "lang": "js",
   "title": "prototype-chain",
-  "group": "Мои куски",
+  "group": "Основы / Объектно-ориентированное программирование",
   "desc": "",
   "output": "",
   "descAt": 1792998591321,
@@ -15,7 +15,13 @@
     ],
     "requires": [
       "тип"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Основы"
+      ]
+    },
+    "subcat": "Объектно-ориентированное программирование"
   },
   "tags": [],
   "aliases": [],

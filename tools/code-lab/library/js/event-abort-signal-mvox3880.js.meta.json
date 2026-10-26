@@ -4,7 +4,7 @@
   "file": "event-abort-signal-mvox3880.js",
   "lang": "js",
   "title": "event-abort-signal",
-  "group": "Мои куски",
+  "group": "Асинхронность / Отмена операций",
   "desc": "",
   "output": "",
   "descAt": 1792998628704,
@@ -19,7 +19,13 @@
       "signal",
       "документ",
       "обновитьВидимость"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ]
+    },
+    "subcat": "Отмена операций"
   },
   "tags": [],
   "aliases": [],

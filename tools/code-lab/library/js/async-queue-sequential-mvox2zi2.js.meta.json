@@ -4,7 +4,7 @@
   "file": "async-queue-sequential-mvox2zi2.js",
   "lang": "js",
   "title": "async-queue-sequential",
-  "group": "Мои куски",
+  "group": "Асинхронность / Очереди",
   "desc": "",
   "output": "",
   "descAt": 1792998617402,
@@ -16,7 +16,13 @@
     ],
     "requires": [
       "получитьДанные"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ]
+    },
+    "subcat": "Очереди"
   },
   "tags": [],
   "aliases": [],

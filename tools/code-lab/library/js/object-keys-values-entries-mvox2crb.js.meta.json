@@ -4,7 +4,7 @@
   "file": "object-keys-values-entries-mvox2crb.js",
   "lang": "js",
   "title": "object-keys-values-entries",
-  "group": "Мои куски",
+  "group": "Данные / Работа с объектами",
   "desc": "",
   "output": "",
   "descAt": 1792998587928,
@@ -15,7 +15,13 @@
     "requires": [
       "цена",
       "количество"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Работа с объектами"
   },
   "tags": [],
   "aliases": [],

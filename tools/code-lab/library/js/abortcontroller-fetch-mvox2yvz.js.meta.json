@@ -4,7 +4,7 @@
   "file": "abortcontroller-fetch-mvox2yvz.js",
   "lang": "js",
   "title": "abortcontroller-fetch",
-  "group": "Мои куски",
+  "group": "Асинхронность / Отмена операций",
   "desc": "",
   "output": "",
   "descAt": 1792998616607,
@@ -16,7 +16,13 @@
     "requires": [
       "AbortController",
       "signal"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ]
+    },
+    "subcat": "Отмена операций"
   },
   "tags": [],
   "aliases": [],

@@ -4,7 +4,7 @@
   "file": "map-set-get-mvox2jqj.js",
   "lang": "js",
   "title": "map-set-get",
-  "group": "Мои куски",
+  "group": "Данные / Коллекции",
   "desc": "",
   "output": "",
   "descAt": 1792998596971,
@@ -15,7 +15,13 @@
     ],
     "requires": [
       "id"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Коллекции"
   },
   "tags": [],
   "aliases": [],

@@ -4,7 +4,7 @@
   "file": "object-descriptor-mvox2ei0.js",
   "lang": "js",
   "title": "object-descriptor",
-  "group": "Мои куски",
+  "group": "Данные / Работа с объектами",
   "desc": "",
   "output": "",
   "descAt": 1792998590184,
@@ -14,7 +14,13 @@
     ],
     "requires": [
       "цена"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Работа с объектами"
   },
   "tags": [],
   "aliases": [],

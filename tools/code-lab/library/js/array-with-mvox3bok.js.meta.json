@@ -4,7 +4,7 @@
   "file": "array-with-mvox3bok.js",
   "lang": "js",
   "title": "array-with",
-  "group": "Мои куски",
+  "group": "Данные / Коллекции",
   "desc": "",
   "output": "",
   "descAt": 1792998633188,
@@ -12,7 +12,13 @@
     "provides": [
       "исходный"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Коллекции"
   },
   "tags": [],
   "aliases": [],

@@ -4,7 +4,7 @@
   "file": "promise-race-timeout-mvox2y48.js",
   "lang": "js",
   "title": "promise-race-timeout",
-  "group": "Мои куски",
+  "group": "Асинхронность / Тайм-ауты",
   "desc": "",
   "output": "",
   "descAt": 1792998615608,
@@ -15,7 +15,13 @@
     ],
     "requires": [
       "_"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ]
+    },
+    "subcat": "Тайм-ауты"
   },
   "tags": [],
   "aliases": [],

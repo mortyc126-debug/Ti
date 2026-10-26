@@ -4,7 +4,7 @@
   "file": "object-has-own-mvox2cbd.js",
   "lang": "js",
   "title": "object-has-own",
-  "group": "Мои куски",
+  "group": "Данные / Работа с объектами",
   "desc": "",
   "output": "",
   "descAt": 1792998587353,
@@ -14,7 +14,13 @@
     ],
     "requires": [
       "имя"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Работа с объектами"
   },
   "tags": [],
   "aliases": [],

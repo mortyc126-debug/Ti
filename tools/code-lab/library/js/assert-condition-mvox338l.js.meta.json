@@ -4,7 +4,7 @@
   "file": "assert-condition-mvox338l.js",
   "lang": "js",
   "title": "assert-condition",
-  "group": "Мои куски",
+  "group": "Тестирование / Проверки функций",
   "desc": "",
   "output": "",
   "descAt": 1792998622245,
@@ -12,7 +12,13 @@
     "provides": [
       "assert"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Тестирование"
+      ]
+    },
+    "subcat": "Проверки функций"
   },
   "tags": [],
   "aliases": [],

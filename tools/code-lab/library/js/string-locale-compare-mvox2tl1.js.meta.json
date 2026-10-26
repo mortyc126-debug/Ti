@@ -4,7 +4,7 @@
   "file": "string-locale-compare-mvox2tl1.js",
   "lang": "js",
   "title": "string-locale-compare",
-  "group": "Мои куски",
+  "group": "Данные / Строки и текст",
   "desc": "",
   "output": "",
   "descAt": 1792998609733,
@@ -14,7 +14,13 @@
     ],
     "requires": [
       "a"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Строки и текст"
   },
   "tags": [],
   "aliases": [],

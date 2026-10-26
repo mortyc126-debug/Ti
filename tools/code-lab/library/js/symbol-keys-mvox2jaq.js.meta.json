@@ -4,7 +4,7 @@
   "file": "symbol-keys-mvox2jaq.js",
   "lang": "js",
   "title": "symbol-keys",
-  "group": "Мои куски",
+  "group": "Продвинутые темы / ООП и модели данных",
   "desc": "",
   "output": "",
   "descAt": 1792998596402,
@@ -15,7 +15,13 @@
     ],
     "requires": [
       "обычный"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Продвинутые темы"
+      ]
+    },
+    "subcat": "ООП и модели данных"
   },
   "tags": [],
   "aliases": [],

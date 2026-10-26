@@ -4,7 +4,7 @@
   "file": "class-getter-setter-mvox2h4b.js",
   "lang": "js",
   "title": "class-getter-setter",
-  "group": "Мои куски",
+  "group": "Основы / Объектно-ориентированное программирование",
   "desc": "",
   "output": "",
   "descAt": 1792998593579,
@@ -17,7 +17,13 @@
       "constructor",
       "x",
       "значение"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Основы"
+      ]
+    },
+    "subcat": "Объектно-ориентированное программирование"
   },
   "tags": [],
   "aliases": [],
@@ -126,6 +132,14 @@
     }
   ],
   "orphanNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "constructor",
+      "kind": "fn",
+      "note": "function Object() { [native code] }",
+      "source": "custom"
+    },
     {
       "line": 1,
       "col": 2,

@@ -4,7 +4,7 @@
   "file": "array-findlast-mvox3c5a.js",
   "lang": "js",
   "title": "array-findlast",
-  "group": "Мои куски",
+  "group": "Данные / Коллекции",
   "desc": "",
   "output": "",
   "descAt": 1792998633790,
@@ -12,7 +12,13 @@
     "provides": [
       "значения"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Коллекции"
   },
   "tags": [],
   "aliases": [],

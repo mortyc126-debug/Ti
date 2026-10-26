@@ -4,7 +4,7 @@
   "file": "weakset-mark-visited-mvox2mu7.js",
   "lang": "js",
   "title": "weakset-mark-visited",
-  "group": "Мои куски",
+  "group": "Продвинутые темы / ООП и модели данных",
   "desc": "",
   "output": "",
   "descAt": 1792998600991,
@@ -15,7 +15,13 @@
     ],
     "requires": [
       "WeakSet"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Продвинутые темы"
+      ]
+    },
+    "subcat": "ООП и модели данных"
   },
   "tags": [],
   "aliases": [],

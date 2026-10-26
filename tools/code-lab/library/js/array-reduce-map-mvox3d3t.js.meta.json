@@ -4,7 +4,7 @@
   "file": "array-reduce-map-mvox3d3t.js",
   "lang": "js",
   "title": "array-reduce-map",
-  "group": "Мои куски",
+  "group": "Данные / Коллекции",
   "desc": "",
   "output": "",
   "descAt": 1792998635033,
@@ -17,7 +17,13 @@
       "id",
       "цена",
       "результат"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Коллекции"
   },
   "tags": [],
   "aliases": [],

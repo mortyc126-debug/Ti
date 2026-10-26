@@ -4,7 +4,7 @@
   "file": "readable-stream-reader-mvox31dp.js",
   "lang": "js",
   "title": "readable-stream-reader",
-  "group": "Мои куски",
+  "group": "Сеть и запросы / Получить данные",
   "desc": "",
   "output": "",
   "descAt": 1792998619838,
@@ -17,7 +17,13 @@
       "response",
       "value",
       "done"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Сеть и запросы"
+      ]
+    },
+    "subcat": "Получить данные"
   },
   "tags": [],
   "aliases": [],

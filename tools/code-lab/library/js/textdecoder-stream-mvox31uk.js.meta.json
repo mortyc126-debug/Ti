@@ -4,7 +4,7 @@
   "file": "textdecoder-stream-mvox31uk.js",
   "lang": "js",
   "title": "textdecoder-stream",
-  "group": "Мои куски",
+  "group": "Сеть и запросы / Получить данные",
   "desc": "",
   "output": "",
   "descAt": 1792998620444,
@@ -20,7 +20,13 @@
       "bytes1",
       "stream",
       "bytes2"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Сеть и запросы"
+      ]
+    },
+    "subcat": "Получить данные"
   },
   "tags": [],
   "aliases": [],

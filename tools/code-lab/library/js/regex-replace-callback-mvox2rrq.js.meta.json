@@ -4,7 +4,7 @@
   "file": "regex-replace-callback-mvox2rrq.js",
   "lang": "js",
   "title": "regex-replace-callback",
-  "group": "Мои куски",
+  "group": "Данные / Разбор текста",
   "desc": "",
   "output": "",
   "descAt": 1792998607382,
@@ -16,7 +16,13 @@
     "requires": [
       "d",
       "g"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Разбор текста"
   },
   "tags": [],
   "aliases": [],

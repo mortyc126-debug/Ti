@@ -4,7 +4,7 @@
   "file": "array-partition-mvox3e1k.js",
   "lang": "js",
   "title": "array-partition",
-  "group": "Мои куски",
+  "group": "Данные / Коллекции",
   "desc": "",
   "output": "",
   "descAt": 1792998636248,
@@ -14,7 +14,13 @@
     ],
     "requires": [
       "да"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Коллекции"
   },
   "tags": [],
   "aliases": [],

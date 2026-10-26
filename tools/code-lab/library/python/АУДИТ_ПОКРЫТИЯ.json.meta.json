@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "АУДИТ_ПОКРЫТИЯ",
+  "file": "АУДИТ_ПОКРЫТИЯ.json",
+  "title": "АУДИТ ПОКРЫТИЯ",
+  "lang": "json",
+  "group": "Качество библиотеки / Проверка данных",
+  "desc": "",
+  "output": "",
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": null,
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [],
+  "component": {
+    "tags": {
+      "purpose": [
+        "Качество библиотеки"
+      ]
+    },
+    "subcat": "Проверка данных"
+  }
+}

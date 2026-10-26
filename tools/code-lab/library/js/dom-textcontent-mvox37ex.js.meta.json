@@ -4,7 +4,7 @@
   "file": "dom-textcontent-mvox37ex.js",
   "lang": "js",
   "title": "dom-textcontent",
-  "group": "Мои куски",
+  "group": "Интерфейс / Отрисовка данных",
   "desc": "",
   "output": "",
   "descAt": 1792998627657,
@@ -14,7 +14,13 @@
     ],
     "requires": [
       "пользовательскийТекст"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ]
+    },
+    "subcat": "Отрисовка данных"
   },
   "tags": [],
   "aliases": [],

@@ -4,7 +4,7 @@
   "file": "math-clamp-mvox2wrd.js",
   "lang": "js",
   "title": "math-clamp",
-  "group": "Мои куски",
+  "group": "Данные / Числа и простые операции",
   "desc": "",
   "output": "",
   "descAt": 1792998613849,
@@ -12,7 +12,13 @@
     "provides": [
       "clamp"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Числа и простые операции"
   },
   "tags": [],
   "aliases": [],

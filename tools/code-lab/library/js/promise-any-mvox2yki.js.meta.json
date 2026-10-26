@@ -4,7 +4,7 @@
   "file": "promise-any-mvox2yki.js",
   "lang": "js",
   "title": "promise-any",
-  "group": "Мои куски",
+  "group": "Асинхронность / Пакетная обработка",
   "desc": "",
   "output": "",
   "descAt": 1792998616194,
@@ -12,7 +12,13 @@
     "provides": [
       "первый"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ]
+    },
+    "subcat": "Пакетная обработка"
   },
   "tags": [],
   "aliases": [],

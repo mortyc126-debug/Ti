@@ -4,7 +4,7 @@
   "file": "async-deduplicate-inflight-mvox30r6.js",
   "lang": "js",
   "title": "async-deduplicate-inflight",
-  "group": "Мои куски",
+  "group": "Асинхронность / Надёжность",
   "desc": "",
   "output": "",
   "descAt": 1792998619026,
@@ -14,7 +14,13 @@
       "одинЗапрос",
       "промис"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ]
+    },
+    "subcat": "Надёжность"
   },
   "tags": [],
   "aliases": [],

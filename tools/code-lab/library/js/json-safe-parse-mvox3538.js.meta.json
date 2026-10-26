@@ -4,7 +4,7 @@
   "file": "json-safe-parse-mvox3538.js",
   "lang": "js",
   "title": "json-safe-parse",
-  "group": "Мои куски",
+  "group": "Данные / Преобразование форматов",
   "desc": "",
   "output": "",
   "descAt": 1792998624644,
@@ -16,7 +16,13 @@
       "ok",
       "value",
       "error"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Преобразование форматов"
   },
   "tags": [],
   "aliases": [],

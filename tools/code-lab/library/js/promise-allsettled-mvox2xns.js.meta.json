@@ -4,7 +4,7 @@
   "file": "promise-allsettled-mvox2xns.js",
   "lang": "js",
   "title": "promise-allsettled",
-  "group": "Мои куски",
+  "group": "Асинхронность / Пакетная обработка",
   "desc": "",
   "output": "",
   "descAt": 1792998615016,
@@ -12,7 +12,13 @@
     "provides": [
       "исходы"
     ],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ]
+    },
+    "subcat": "Пакетная обработка"
   },
   "tags": [],
   "aliases": [],

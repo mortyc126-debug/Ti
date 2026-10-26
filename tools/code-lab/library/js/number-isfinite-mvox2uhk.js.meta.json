@@ -4,13 +4,19 @@
   "file": "number-isfinite-mvox2uhk.js",
   "lang": "js",
   "title": "number-isfinite",
-  "group": "Мои куски",
+  "group": "Данные / Числа и простые операции",
   "desc": "",
   "output": "",
   "descAt": 1792998610904,
   "component": {
     "provides": [],
-    "requires": []
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Числа и простые операции"
   },
   "tags": [],
   "aliases": [],

@@ -4,7 +4,7 @@
   "file": "bigint-arithmetic-mvox2ve7.js",
   "lang": "js",
   "title": "bigint-arithmetic",
-  "group": "Мои куски",
+  "group": "Данные / Числа и простые операции",
   "desc": "",
   "output": "",
   "descAt": 1792998612079,
@@ -14,7 +14,13 @@
     ],
     "requires": [
       "n"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Числа и простые операции"
   },
   "tags": [],
   "aliases": [],

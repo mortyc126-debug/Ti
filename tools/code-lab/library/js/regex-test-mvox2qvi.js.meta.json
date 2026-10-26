@@ -4,7 +4,7 @@
   "file": "regex-test-mvox2qvi.js",
   "lang": "js",
   "title": "regex-test",
-  "group": "Мои куски",
+  "group": "Данные / Разбор текста",
   "desc": "",
   "output": "",
   "descAt": 1792998606223,
@@ -17,7 +17,13 @@
       "Z",
       "d",
       "$"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Разбор текста"
   },
   "tags": [],
   "aliases": [],

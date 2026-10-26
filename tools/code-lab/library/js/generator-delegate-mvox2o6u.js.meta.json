@@ -4,7 +4,7 @@
   "file": "generator-delegate-mvox2o6u.js",
   "lang": "js",
   "title": "generator-delegate",
-  "group": "Мои куски",
+  "group": "Основы / Итераторы и генераторы",
   "desc": "",
   "output": "",
   "descAt": 1792998602742,
@@ -12,7 +12,13 @@
     "provides": [],
     "requires": [
       "все"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Основы"
+      ]
+    },
+    "subcat": "Итераторы и генераторы"
   },
   "tags": [],
   "aliases": [],

@@ -4,7 +4,7 @@
   "file": "error-cause-mvox32s5.js",
   "lang": "js",
   "title": "error-cause",
-  "group": "Мои куски",
+  "group": "Ошибки и отладка / Исключения",
   "desc": "",
   "output": "",
   "descAt": 1792998621653,
@@ -12,7 +12,13 @@
     "provides": [],
     "requires": [
       "cause"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Ошибки и отладка"
+      ]
+    },
+    "subcat": "Исключения"
   },
   "tags": [],
   "aliases": [],

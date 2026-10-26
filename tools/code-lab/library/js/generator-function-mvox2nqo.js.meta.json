@@ -4,7 +4,7 @@
   "file": "generator-function-mvox2nqo.js",
   "lang": "js",
   "title": "generator-function",
-  "group": "Мои куски",
+  "group": "Основы / Итераторы и генераторы",
   "desc": "",
   "output": "",
   "descAt": 1792998602160,
@@ -16,7 +16,13 @@
       "диапазон",
       "старт",
       "конец"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Основы"
+      ]
+    },
+    "subcat": "Итераторы и генераторы"
   },
   "tags": [],
   "aliases": [],

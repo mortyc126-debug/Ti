@@ -4,7 +4,7 @@
   "file": "proxy-set-validation-mvox2p2v.js",
   "lang": "js",
   "title": "proxy-set-validation",
-  "group": "Мои куски",
+  "group": "Продвинутые темы / ООП и модели данных",
   "desc": "",
   "output": "",
   "descAt": 1792998603896,
@@ -20,7 +20,13 @@
       "значение",
       "TypeError",
       "Reflect"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Продвинутые темы"
+      ]
+    },
+    "subcat": "ООП и модели данных"
   },
   "tags": [],
   "aliases": [],

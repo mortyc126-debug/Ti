@@ -4,7 +4,7 @@
   "file": "map-entries-loop-mvox2km7.js",
   "lang": "js",
   "title": "map-entries-loop",
-  "group": "Мои куски",
+  "group": "Данные / Коллекции",
   "desc": "",
   "output": "",
   "descAt": 1792998598111,
@@ -15,7 +15,13 @@
     "requires": [
       "товар",
       "цена"
-    ]
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Коллекции"
   },
   "tags": [],
   "aliases": [],
