@@ -1,0 +1,97 @@
+{
+  "schema": 1,
+  "id": "class-private-field-mvox5aw6",
+  "file": "class-private-field-mvox5aw6.js",
+  "lang": "js",
+  "title": "class-private-field",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998725478,
+  "component": {
+    "provides": [
+      "Счёт",
+      "счёт"
+    ],
+    "requires": [
+      "баланс",
+      "пополнить",
+      "сумма",
+      "получитьБаланс"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — описывает «чертёж» объектов: их свойства и методы.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 21,
+      "text": "this",
+      "kind": "kw",
+      "note": "получить контекст вызова функции",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 21,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 28,
+      "text": "this",
+      "kind": "kw",
+      "note": "получить контекст вызова функции",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 13,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

@@ -1,0 +1,145 @@
+{
+  "schema": 1,
+  "id": "class-extends-super-mvox5bbo",
+  "file": "class-extends-super-mvox5bbo.js",
+  "lang": "js",
+  "title": "class-extends-super",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998726036,
+  "component": {
+    "provides": [
+      "Устройство",
+      "Датчик"
+    ],
+    "requires": [
+      "constructor",
+      "имя",
+      "описание",
+      "единица"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — описывает «чертёж» объектов: их свойства и методы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "constructor",
+      "kind": "fn",
+      "note": "function Object() { [native code] }",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 21,
+      "text": "this",
+      "kind": "kw",
+      "note": "получить контекст вызова функции",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 22,
+      "text": "this",
+      "kind": "kw",
+      "note": "получить контекст вызова функции",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — описывает «чертёж» объектов: их свойства и методы.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 13,
+      "text": "extends",
+      "kind": "kw",
+      "note": "extends — класс наследует свойства и методы другого класса.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "constructor",
+      "kind": "fn",
+      "note": "function Object() { [native code] }",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 30,
+      "text": "super",
+      "kind": "kw",
+      "note": "обратиться к конструктору или методам родительского класса",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 42,
+      "text": "this",
+      "kind": "kw",
+      "note": "получить контекст вызова функции",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 15,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 12,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    }
+  ]
+}

@@ -66,7 +66,7 @@
     // не трогаем блок ответа ИИ, если он есть; обновляем только списки
     let lists = out.querySelector('#dgLists'); if(!lists){ lists = document.createElement('div'); lists.id = 'dgLists'; out.appendChild(lists); }
     if(query.length < 2){ lists.innerHTML = ''; return; }
-    const my = ++seq; const d = await loadDict(); if(my !== seq) return;
+    const my = ++seq; const af0 = activeFile(); const d = await (window.codelabKwDict ? window.codelabKwDict((af0 && af0.lang) || '') : loadDict()); if(my !== seq) return;
     lists.innerHTML = '';
     // словарь: термины и синонимы по смыслу
     const terms = []; const seen = new Set();

@@ -319,7 +319,11 @@ function subOf(t, pk){ if(t.comp && t.comp.subcat) return t.comp.subcat; const d
 
 // ── палитра: Базовые блоки + компоненты каталога по иерархии назначений ───────
 let CATALOG = [];
-async function loadCatalog(){ try { CATALOG = await fetch('/api/list').then(r => r.json()); } catch(_){ CATALOG = []; } fillPalLangs(); renderPalette(); }
+async function loadCatalog(){ try { CATALOG = await fetch('/api/list').then(r => r.json()); } catch(_){ CATALOG = []; }
+  // защита: если запомненный фильтр языка не пересекается с тем, что реально есть — сбросить в «все»,
+  // иначе палитра молча пустеет (куски есть, но все скрыты несуществующим языком)
+  if(palLangs){ const all = new Set(allLangs()); if(![...palLangs].some(l => all.has(l))){ palLangs = null; savePalLangs(); } }
+  fillPalLangs(); renderPalette(); }
 
 // ── фильтр языков в палитре: показывать только отмеченные языки ──
 let palLangs = null;   // null = показывать все
@@ -363,6 +367,15 @@ function renderPalette(){
   }
   // каталог — единое дерево по разделу (поле «раздел», через «/»); все языки
   const cat = CATALOG.filter(t => langActive(String(t.lang || '').toLowerCase()) && (!q || (t.title + ' ' + (t.desc || '') + ' ' + (t.lang || '') + ' ' + (t.group || '')).toLowerCase().includes(q)));
+  // счётчик: видно сразу, что куски загружены, и если что-то скрыто фильтром/поиском
+  if(CATALOG.length){
+    const cnt = el('div', 'pal-count');
+    cnt.style.cssText = 'font-size:11px;color:var(--text3);padding:4px 8px 6px;font-family:ui-monospace,monospace';
+    const hidden = CATALOG.length - cat.length;
+    cnt.textContent = 'кусков в каталоге: ' + CATALOG.length + (hidden ? ' · показано ' + cat.length + ' (скрыто фильтром: ' + hidden + ')' : '');
+    if(hidden){ cnt.style.color = 'var(--num,#FF8800)'; const r = el('span', '', ' сброс'); r.style.cssText = 'cursor:pointer;text-decoration:underline;margin-left:6px'; r.onclick = () => { setPalLangs(null); const s = $('#palSearch'); if(s){ s.value = ''; } renderPalette(); }; cnt.appendChild(r); }
+    host.appendChild(cnt);
+  }
   const root = { children: new Map(), items: [] };
   cat.forEach(t => {
     const path = String(t.group || '').split('/').map(s => s.trim()).filter(Boolean);
@@ -589,10 +602,35 @@ function addNode(blockId, extra){
 // контракт узла по его коду: какие имена даёт (provides) и какие берёт (requires)
 const _NC_GLOB = new Set(['console','document','window','globalThis','Math','JSON','Array','Object','Number','String','Boolean','Date','Map','Set','Promise','RegExp','Error','Symbol','fetch','setTimeout','setInterval','clearTimeout','clearInterval','requestAnimationFrame','parseInt','parseFloat','isNaN','isFinite','localStorage','sessionStorage','URL','URLSearchParams','true','false','null','undefined','NaN','Infinity']);
 const _NC_KW = new Set(['const','let','var','function','return','if','else','for','while','of','in','new','await','async','class','extends','super','try','catch','finally','throw','typeof','instanceof','this','break','continue','switch','case','do','yield','delete','void','import','export','from','default','static','get','set']);
-function nodeContract(nd){
-  const txt = String(nodeCode(nd)).replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1 ').replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, ' ');
+// Контракт на ВСЕ языки (зеркало сервера): имена (js/ts/python), DOM-селекторы (html/svg/css/js),
+// CSS-переменные/@keyframes, таблицы SQL. Строки/комменты режем только там, где считаем имена.
+const _NC_HEX = /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+const _NC_PYKW = new Set(['False','True','None','and','as','assert','async','await','break','class','continue','def','del','elif','else','except','finally','for','from','global','if','import','in','is','lambda','nonlocal','not','or','pass','raise','return','try','while','with','yield','match','case','self','cls']);
+const _NC_PYBI = new Set(['print','len','range','int','str','float','list','dict','set','tuple','bool','type','enumerate','zip','map','filter','sum','min','max','abs','open','input','isinstance','issubclass','super','Exception','ValueError','KeyError','TypeError','IndexError','RuntimeError','StopIteration','sorted','reversed','any','all','round','format','repr','id','hash','object','property','staticmethod','classmethod','next','iter','getattr','setattr','hasattr','vars','dir','bytes','bytearray','frozenset','complex','divmod','pow','chr','ord','hex','oct','bin','slice','callable','globals','locals','__name__']);
+function _ncMarkup(t, provides){
+  for(const m of t.matchAll(/\bid\s*=\s*["']([^"']+)["']/g)) provides.add('#' + m[1].trim());
+  for(const m of t.matchAll(/\bclass\s*=\s*["']([^"']+)["']/g)) m[1].trim().split(/\s+/).forEach(c => c && provides.add('.' + c));
+}
+function _ncCss(t, provides, requires){
+  for(const block of t.split('}')){ const sel = block.split('{')[0];
+    for(const m of sel.matchAll(/#([A-Za-z_][\w-]*)/g)) requires.add('#' + m[1]);
+    for(const m of sel.matchAll(/\.([A-Za-z_][\w-]*)/g)) requires.add('.' + m[1]); }
+  for(const m of t.matchAll(/@keyframes\s+([A-Za-z_][\w-]*)/g)) provides.add('@' + m[1]);
+  for(const m of t.matchAll(/(--[A-Za-z_][\w-]*)\s*:/g)) provides.add(m[1]);
+  for(const m of t.matchAll(/var\(\s*(--[A-Za-z_][\w-]*)/g)) requires.add(m[1]);
+  for(const m of t.matchAll(/animation(?:-name)?\s*:\s*([^;}]+)/g)) for(const w of (m[1].match(/[A-Za-z_][\w-]*/g) || [])) requires.add('@' + w);
+}
+function _ncScriptDom(t, provides, requires){
+  for(const m of t.matchAll(/querySelector(?:All)?\(\s*["'`]([^"'`]+)["'`]/g)) for(const s of (m[1].match(/[#.][A-Za-z_][\w-]*/g) || [])) requires.add(s);
+  for(const m of t.matchAll(/getElementById\(\s*["'`]([^"'`]+)["'`]/g)) requires.add('#' + m[1].trim());
+  for(const m of t.matchAll(/getElementsByClassName\(\s*["'`]([^"'`]+)["'`]/g)) m[1].trim().split(/\s+/).forEach(c => c && requires.add('.' + c));
+  for(const m of t.matchAll(/\.id\s*=\s*["'`]([^"'`]+)["'`]/g)) provides.add('#' + m[1].trim());
+  for(const m of t.matchAll(/setAttribute\(\s*["'`]id["'`]\s*,\s*["'`]([^"'`]+)["'`]/g)) provides.add('#' + m[1].trim());
+  for(const m of t.matchAll(/classList\.add\(\s*["'`]([^"'`]+)["'`]/g)) provides.add('.' + m[1].trim());
+}
+function _ncJs(raw, provides, requires){
+  const txt = raw.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1 ').replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, ' ');
   const ID = '[A-Za-zА-Яа-яЁё_$][\\wА-Яа-яЁё$]*';
-  const provides = new Set();
   for(const m of txt.matchAll(new RegExp('(?:const|let|var|function|class)\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
   const local = new Set(provides);
   const addP = s => String(s || '').split(',').forEach(x => { const m = x.trim().match(new RegExp('^(' + ID + ')')); if(m) local.add(m[1]); });
@@ -601,15 +639,52 @@ function nodeContract(nd){
   for(const m of txt.matchAll(new RegExp('(' + ID + ')\\s*=>', 'g'))) local.add(m[1]);
   for(const m of txt.matchAll(new RegExp('catch\\s*\\(\\s*(' + ID + ')', 'g'))) local.add(m[1]);
   for(const m of txt.matchAll(new RegExp('for\\s*\\(\\s*(?:const|let|var)?\\s*(' + ID + ')', 'g'))) local.add(m[1]);
-  const requires = [];
-  const seen = new Set();
   for(const m of txt.matchAll(new RegExp('(' + ID + ')', 'g'))){
     const w = m[1], i = m.index || 0;
     if(i > 0 && txt[i - 1] === '.') continue;
-    if(_NC_KW.has(w) || _NC_GLOB.has(w) || local.has(w) || seen.has(w)) continue;
-    seen.add(w); requires.push(w);
+    if(_NC_KW.has(w) || _NC_GLOB.has(w) || local.has(w)) continue;
+    requires.add(w);
   }
-  return { provides, requires };
+}
+function _ncPy(raw, provides, requires){
+  const t = raw.replace(/'''[\s\S]*?'''/g, ' ').replace(/"""[\s\S]*?"""/g, ' ').replace(/#[^\n]*/g, ' ').replace(/'(?:\\.|[^'\\])*'/g, ' ').replace(/"(?:\\.|[^"\\])*"/g, ' ');
+  const ID = '[A-Za-z_][A-Za-z0-9_]*';
+  for(const m of t.matchAll(new RegExp('(?:^|\\n)\\s*(?:async\\s+)?def\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
+  for(const m of t.matchAll(new RegExp('(?:^|\\n)\\s*class\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
+  for(const m of t.matchAll(new RegExp('(?:^|\\n)(' + ID + ')\\s*=(?!=)', 'g'))) provides.add(m[1]);
+  const local = new Set(provides);
+  for(const m of t.matchAll(new RegExp('import\\s+(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of t.matchAll(new RegExp('\\bas\\s+(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of t.matchAll(new RegExp('from\\s+' + ID + '(?:\\.' + ID + ')*\\s+import\\s+([^\\n]+)', 'g'))) m[1].split(',').forEach(x => { const mm = x.trim().match(new RegExp('^(' + ID + ')')); if(mm) local.add(mm[1]); });
+  for(const m of t.matchAll(new RegExp('(' + ID + ')\\s*=(?!=)', 'g'))) local.add(m[1]);
+  for(const m of t.matchAll(new RegExp('def\\s+' + ID + '\\s*\\(([^)]*)\\)', 'g'))) m[1].split(',').forEach(p => { const mm = p.trim().match(new RegExp('^\\*{0,2}(' + ID + ')')); if(mm) local.add(mm[1]); });
+  for(const m of t.matchAll(new RegExp('lambda\\s+([^:]*):', 'g'))) m[1].split(',').forEach(p => { const mm = p.trim().match(new RegExp('^(' + ID + ')')); if(mm) local.add(mm[1]); });
+  for(const m of t.matchAll(new RegExp('for\\s+(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of t.matchAll(new RegExp('(' + ID + ')', 'g'))){
+    const w = m[1], i = m.index || 0;
+    if(i > 0 && t[i - 1] === '.') continue;
+    if(w.length < 2 || !/[A-Za-z]/.test(w) || _NC_PYKW.has(w) || _NC_PYBI.has(w) || local.has(w)) continue;
+    requires.add(w);
+  }
+}
+function _ncSql(raw, provides, requires){
+  const t = raw.replace(/--[^\n]*/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/'(?:''|[^'])*'/g, ' ');
+  const NAME = '[`"\\[]?([A-Za-z_][A-Za-z0-9_$.]*)[`"\\]]?';
+  for(const m of t.matchAll(new RegExp('create\\s+(?:or\\s+replace\\s+)?(?:global\\s+|local\\s+)?(?:temp(?:orary)?\\s+)?(?:table|view|materialized\\s+view|index|sequence)\\s+(?:if\\s+not\\s+exists\\s+)?' + NAME, 'gi'))) provides.add('tbl:' + m[1].toLowerCase());
+  for(const m of t.matchAll(new RegExp('(?:\\bfrom|\\bjoin|\\binto|\\bupdate|delete\\s+from)\\s+' + NAME, 'gi'))) requires.add('tbl:' + m[1].toLowerCase());
+}
+function nodeContract(nd){
+  const raw = String(nodeCode(nd));
+  const lang = String((typeof nodeLang === 'function' ? nodeLang(nd) : (nd && nd.src && nd.src.lang)) || 'js').toLowerCase();
+  const provides = new Set(), reqSet = new Set();
+  if(lang === 'js' || lang === 'ts'){ _ncJs(raw, provides, reqSet); _ncScriptDom(raw, provides, reqSet); }
+  else if(lang === 'python'){ _ncPy(raw, provides, reqSet); }
+  else if(lang === 'html' || lang === 'svg'){ _ncMarkup(raw, provides); }
+  else if(lang === 'css'){ _ncCss(raw, provides, reqSet); }
+  else if(lang === 'sql'){ _ncSql(raw, provides, reqSet); }
+  for(const s of [...reqSet]){ if(provides.has(s) || _NC_HEX.test(s)) reqSet.delete(s); }
+  for(const s of [...provides]) if(_NC_HEX.test(s)) provides.delete(s);
+  return { provides, requires: [...reqSet] };
 }
 // типизированный контракт узла из шаблона (имя→тип), если он сохранён в src
 function nodeTypes(nd){
@@ -879,8 +954,9 @@ function renderInspector(nd){
   if(inspTab === 'set'){
     body.appendChild(nodeMetaEditor(nd, titleEl));
     body.appendChild(inspFields(nd, b));                  // код (у «своего кода» — сразу открыт и первым) + поля
+    body.appendChild(chainLinksSection(nd));              // «берёт/даёт» → конкретные куски-кандидаты цепочки
     const det = document.createElement('details'); det.style.marginTop = '10px';
-    const sum = document.createElement('summary'); sum.textContent = '🔗 связи и контракт'; sum.style.cssText = 'cursor:pointer;color:var(--text3);font-size:12px;margin-bottom:6px';
+    const sum = document.createElement('summary'); sum.textContent = '🔗 контракт по шаблону (текстом)'; sum.style.cssText = 'cursor:pointer;color:var(--text3);font-size:12px;margin-bottom:6px';
     det.appendChild(sum); det.appendChild(renderBlockContract(nd, b)); body.appendChild(det);
   } else {
     body.appendChild(descEditor(nd, b));                  // описание своими словами
@@ -891,6 +967,39 @@ function renderInspector(nd){
   host.appendChild(body);
 }
 
+// «берёт/даёт» ведёт на КОНКРЕТНЫЕ куски из каталога — кандидаты в соседние звенья цепочки.
+// вход (requires) закрывается куском, который это ОТДАЁТ; выход (provides) — куском, которому это НУЖНО.
+function chainLinksSection(nd){
+  const box = el('section', 'block-contract'); box.style.marginTop = '10px';
+  box.appendChild(el('div', 'bc-heading', 'Чем соединить (куски-кандидаты)'));
+  const myC = nodeContract(nd);
+  const myId = nd && nd.src && nd.src.id;
+  const compOf = t => t.comp || {};
+  const label = t => t.title || t.id;
+  const addBtn = t => { const x = el('button', 'insp-act', '＋ ' + label(t)); x.title = (t.lang ? '[' + t.lang + '] ' : '') + (t.id || ''); x.style.cssText = 'margin:2px 4px 2px 0;font-size:11px'; x.onclick = () => { addFromCatalog(t); setTimeout(() => renderInspector(byId(selectedId)), 60); }; return x; };
+  // для каждого токена — список подходящих кусков (по contract-полю match)
+  const tokenBlock = (title, tokens, pick, hint) => {
+    if(!tokens.length) return;
+    const wrap = el('div', 'bc-section'); wrap.appendChild(el('div', 'bc-heading', title));
+    let any = false;
+    tokens.forEach(tok => {
+      const cands = (CATALOG || []).filter(t => t.id !== myId && (pick(compOf(t)) || []).some(x => String(x) === tok)).slice(0, 8);
+      const row = el('div', ''); row.style.margin = '3px 0';
+      const name = el('span', ''); name.textContent = tok + ' '; name.style.cssText = 'font-family:ui-monospace,monospace;color:var(--name,#cbc2ea);font-size:12px';
+      row.appendChild(name);
+      if(cands.length){ any = true; cands.forEach(t => row.appendChild(addBtn(t))); }
+      else { const no = el('span', 'muted', '— нет готового куска, который ' + hint); no.style.fontSize = '11px'; row.appendChild(no); }
+      wrap.appendChild(row);
+    });
+    box.appendChild(wrap); return any;
+  };
+  const hasReq = myC.requires.length, hasProv = myC.provides.length;
+  if(!hasReq && !hasProv){ box.appendChild(el('div', 'muted', 'У этого куска не видно явных имён/селекторов для стыковки. Свяжи вручную или добавь querySelector/#id.')); return box; }
+  tokenBlock('Берёт на вход — чем закрыть:', myC.requires, c => c.provides, 'это отдаёт');
+  tokenBlock('Даёт на выход — что подключить дальше:', myC.provides, c => c.requires, 'это берёт');
+  const note = el('div', 'muted'); note.style.cssText = 'font-size:11px;margin-top:4px'; note.textContent = 'Клик по куску — добавить на холст; при включённых авто-связях он сам встанет в цепочку по общему имени/#id.'; box.appendChild(note);
+  return box;
+}
 function renderBlockContract(nd, b){
   const guide = BLOCK_GUIDES[nd.blockId] || {
     input:'Определяется кодом блока',

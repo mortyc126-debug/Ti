@@ -1,0 +1,208 @@
+{
+  "schema": 1,
+  "id": "state-reducer-with-actions-mvox5pzw",
+  "file": "state-reducer-with-actions-mvox5pzw.js",
+  "lang": "js",
+  "title": "state-reducer-with-actions",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998745052,
+  "component": {
+    "provides": [
+      "reducer"
+    ],
+    "requires": [
+      "count",
+      "name",
+      "type",
+      "amount"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 17,
+      "text": "state",
+      "kind": "name",
+      "note": "state — состояние: единый объект с данными игры",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "switch",
+      "kind": "kw",
+      "note": "switch — выбрать ветку по значению (замена цепочки if/else).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "case",
+      "kind": "kw",
+      "note": "case — одна ветка внутри switch.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 22,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 34,
+      "text": "state",
+      "kind": "name",
+      "note": "state — состояние: единый объект с данными игры",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 41,
+      "text": "count",
+      "kind": "name",
+      "note": "COUNT — считает строки",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 48,
+      "text": "state",
+      "kind": "name",
+      "note": "state — состояние: единый объект с данными игры",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 54,
+      "text": "count",
+      "kind": "name",
+      "note": "COUNT — считает строки",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "case",
+      "kind": "kw",
+      "note": "case — одна ветка внутри switch.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 21,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 33,
+      "text": "state",
+      "kind": "name",
+      "note": "state — состояние: единый объект с данными игры",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "case",
+      "kind": "kw",
+      "note": "case — одна ветка внутри switch.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 18,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 27,
+      "text": "count",
+      "kind": "name",
+      "note": "COUNT — считает строки",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "default",
+      "kind": "kw",
+      "note": "default — значение/ветка по умолчанию (в export, switch, параметрах).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 13,
+      "text": "throw",
+      "kind": "kw",
+      "note": "выбросить исключение",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 19,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 23,
+      "text": "Error",
+      "kind": "fn",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 21,
+      "text": "count",
+      "kind": "name",
+      "note": "COUNT — считает строки",
+      "source": "dict"
+    }
+  ]
+}

@@ -43,7 +43,7 @@ const DATA = path.join(ROOT, 'data');     // сохранённые JSON-дан�
 const RECIPES = path.join(ROOT, 'recipes'); // рецепты: название + описание + список кусков
 const PORT = Number(process.argv[2]) || 8788;
 // файловое хранилище библиотеки (код — обычные файлы; подсветка и пояснения строятся из текста при загрузке)
-const store = createLibraryStore({ root: LIBRARY, legacyDir: TEMPLATES, dictPath: path.join(PUBLIC, 'keyword-dict.json'), getDict: () => kwDict(), coverage: j => coverage(j) });
+const store = createLibraryStore({ root: LIBRARY, legacyDir: TEMPLATES, dictPath: path.join(PUBLIC, 'keyword-dict.json'), getDict: () => kwDict(), coverage: j => coverage(j), contract: (code, lang) => codeContract(code, lang) });
 // поиск: по названию, описанию, тегам, коду и пояснениям; синонимы лежат в library/_synonyms.json (правятся руками)
 const search = createSearchService({ store, synonymsPath: path.join(LIBRARY, '_synonyms.json'), defaultSynonymsPath: path.join(ROOT, 'lib', 'default-synonyms.json') });
 const aiRuntime = createProviderRuntime({ configPath: path.join(ROOT, 'ai-config.json') });   // выбранный ИИ-сервис (ключей в файле нет)
@@ -113,6 +113,17 @@ const SYN_FILE = path.join(DICT_DIR, 'synonyms.json');        // синоним�
 const LANG_ALIAS = { javascript: 'js', typescript: 'ts', py: 'python', python3: 'python', shell: 'bash', sh: 'bash', zsh: 'bash', 'c++': 'cpp', cplusplus: 'cpp', cxx: 'cpp', 'c#': 'csharp', 'c-sharp': 'csharp', cs: 'csharp', golang: 'go', rb: 'ruby', kt: 'kotlin', rs: 'rust', jsx: 'js', tsx: 'ts', htm: 'html', yml: 'yaml' };
 const canonLang = v => { v = String(v || '').trim().toLowerCase(); return LANG_ALIAS[v] || v.replace(/[^a-z0-9_+-]/g, '') || 'other'; };
 let _kwDict = null;
+// эвристики «на своём ли месте»: словарь описывает КОД, слева должен быть код-токен, а не русская фраза.
+const _hasLat = s => /[A-Za-z]/.test(String(s));
+const _isRuS = s => /[А-Яа-яЁё]/.test(String(s));
+const _commas = s => (String(s).match(/,/g) || []).length;
+// это ПОЯСНЕНИЕ (предложение), а не список: есть « — »/двоеточие или союзы/глаголы-связки.
+// Нужно, чтобы не путать нормальное пояснение с запятыми («добавляет класс, если его нет») со списком синонимов.
+const _isSentence = s => { const t = String(s); return /[—–:]/.test(t) || /\b(если|когда|иначе|чтобы|потому|котор|это|нужно|значит|добавля|убира|возвраща|созда[её]т|вызыва|позволя|прове|делает)\b/i.test(t); };
+// это СПИСОК синонимов: ≥3 запятых (4+ пункта), не предложение, и каждый кусок короткий (≤3 слова)
+const _isSynList = s => { const t = String(s).trim(); if(_commas(t) < 3 || _isSentence(t)) return false; return t.split(',').every(p => p.trim().split(/\s+/).filter(Boolean).length <= 3); };
+// «код» — это чисто русский текст без латиницы и код-символов → скорее словарь/синонимы, а не код
+const _looksProse = s => { const t = String(s); if(!_isRuS(t)) return false; if(_hasLat(t)) return false; return !/[{}()\[\];=<>\/\\|&*%#@$`]/.test(t); };
 async function loadExamples(){ try { const o = JSON.parse(await fs.readFile(EXAMPLES_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
 async function loadSynonyms(){ try { const o = JSON.parse(await fs.readFile(SYN_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
 async function loadLangDicts(){
@@ -203,7 +214,9 @@ async function importBundle(b){
   if(topDict){ mergeInto(topDict.words, 'words'); mergeInto(topDict.htmlTags, 'htmlTags'); mergeInto(topDict.htmlAttrs, 'htmlAttrs'); mergeInto(topDict.cssProps, 'cssProps'); mergeInto(topDict.cssVals, 'cssVals'); }
   for(const pc of pieces) mergeInto(pc && pc.words, 'words');
   await fs.writeFile(dictPath, JSON.stringify(dict, null, 2), 'utf8'); _kwDict = dict;
-  let created = 0, updated = 0, skipped = 0;
+  let created = 0, updated = 0, skipped = 0; const warnings = [];
+  // кусок описывает КОД: если «код» — это чисто русский текст, то грузят словарь как кусок (_looksProse)
+  const looksProse = _looksProse;
   for(const pc of pieces){
     if(!pc || typeof pc !== 'object'){ skipped++; continue; }
     const lang = String(pc.lang || 'js').toLowerCase();
@@ -211,13 +224,14 @@ async function importBundle(b){
     const hasLines = Array.isArray(pc.lines) && pc.lines.length > 0;
     const code = hasLines ? '' : String(pc.code || '');
     if(!hasLines && !code.trim()){ skipped++; continue; }
+    if(!hasLines && looksProse(code)){ skipped++; warnings.push({ title, reason: 'в коде русский текст без кода — похоже на словарь/синонимы, а не кусок' }); continue; }
     const codeForDup = hasLines ? pc.lines.map(ln => (ln || []).map(t => (t && t.v) || '').join('')).join('\n') : code;
     // дубль: сначала точное совпадение (название+код), иначе — тот же КОД под другим названием
     const dup = (await findSameTemplate(title, codeForDup)) || (await findByCode(codeForDup));
     let obj;
     if(dup){ obj = await store.get(dup); obj.lang = lang; obj.title = title; if(pc.group) obj.group = String(pc.group).slice(0, 60); if(pc.desc) obj.desc = String(pc.desc).slice(0, 400); obj.lines = hasLines ? pc.lines : tokenize(code, lang); if(pc.output != null) obj.output = String(pc.output); updated++; }
     else { obj = { id: slug(title || lang), lang, group: (pc.group != null ? String(pc.group) : 'Мои куски').slice(0, 60), title, desc: String(pc.desc || '').slice(0, 400), lines: hasLines ? pc.lines : tokenize(code, lang), output: pc.output != null ? String(pc.output) : '', descAt: Date.now() }; if(pc.component && typeof pc.component === 'object') obj.component = pc.component; created++; }
-    if(lang === 'js' && !hasLines){ const c = codeContract(code); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
+    if(_CONTRACT_LANGS.has(lang) && !hasLines){ const c = codeContract(code, lang); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
     annotateLines(obj.lines, lang, dict);   // автоподпись из словаря (уже с новыми словами); готовые e не трогает
     if(pc.words && typeof pc.words === 'object'){   // ручные пояснения куска — поверх авто
       const low = {}; for(const [k, v] of Object.entries(pc.words)) low[k.toLowerCase()] = v;
@@ -225,34 +239,103 @@ async function importBundle(b){
     }
     await store.save(obj, { origin: 'imported' });
   }
-  return { ok: true, learned, created, updated, skipped, total: pieces.length };
+  return { ok: true, learned, created, updated, skipped, warnings, total: pieces.length };
 }
 
-// контракт куска: что он ОБЪЯВЛЯЕТ наружу (provides) и какие имена БЕРЁТ со стороны (requires)
+// ── контракт куска: что он ОБЪЯВЛЯЕТ наружу (provides) и что БЕРЁТ со стороны (requires) ──────
+// Один механизм на ВСЕ языки, без привилегий: имена (js/ts/python), DOM-селекторы (html/svg/css/js),
+// CSS-переменные и @keyframes, таблицы SQL. autoConnect стыкует куски по общему токену.
 const _GLOBALS = new Set(['console','document','window','globalThis','Math','JSON','Array','Object','Number','String','Boolean','Date','Map','Set','Promise','RegExp','Error','Symbol','fetch','setTimeout','setInterval','clearTimeout','clearInterval','requestAnimationFrame','parseInt','parseFloat','isNaN','isFinite','localStorage','sessionStorage','URL','URLSearchParams','true','false','null','undefined','NaN','Infinity']);
 const _KWSET = new Set(['const','let','var','function','return','if','else','for','while','of','in','new','await','async','class','extends','super','try','catch','finally','throw','typeof','instanceof','this','break','continue','switch','case','do','yield','delete','void','import','export','from','default','static','get','set']);
-function codeContract(code){
+const _PY_KW = new Set(['False','True','None','and','as','assert','async','await','break','class','continue','def','del','elif','else','except','finally','for','from','global','if','import','in','is','lambda','nonlocal','not','or','pass','raise','return','try','while','with','yield','match','case','self','cls']);
+const _PY_BUILTIN = new Set(['print','len','range','int','str','float','list','dict','set','tuple','bool','type','enumerate','zip','map','filter','sum','min','max','abs','open','input','isinstance','issubclass','super','Exception','ValueError','KeyError','TypeError','IndexError','RuntimeError','StopIteration','sorted','reversed','any','all','round','format','repr','id','hash','object','property','staticmethod','classmethod','next','iter','getattr','setattr','hasattr','vars','dir','bytes','bytearray','frozenset','complex','divmod','pow','chr','ord','hex','oct','bin','slice','callable','globals','locals','__name__']);
+const _HEX = /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;   // не путать id-селектор с hex-цветом
+// html/svg: элемент с id/классом — его создаёт эта разметка (provides)
+function markupAnchors(t, provides){
+  for(const m of t.matchAll(/\bid\s*=\s*["']([^"']+)["']/g)) provides.add('#' + m[1].trim());
+  for(const m of t.matchAll(/\bclass\s*=\s*["']([^"']+)["']/g)) m[1].trim().split(/\s+/).forEach(c => c && provides.add('.' + c));
+}
+// css: стилизует селекторы (requires #id/.class), объявляет @keyframes и --переменные (provides), берёт var()/animation (requires)
+function cssAnchors(t, provides, requires){
+  for(const block of t.split('}')){ const sel = block.split('{')[0];   // селекторная часть — без значений (hex-цвета)
+    for(const m of sel.matchAll(/#([A-Za-z_][\w-]*)/g)) requires.add('#' + m[1]);
+    for(const m of sel.matchAll(/\.([A-Za-z_][\w-]*)/g)) requires.add('.' + m[1]); }
+  for(const m of t.matchAll(/@keyframes\s+([A-Za-z_][\w-]*)/g)) provides.add('@' + m[1]);                 // анимация объявлена тут
+  for(const m of t.matchAll(/(--[A-Za-z_][\w-]*)\s*:/g)) provides.add(m[1]);                              // --переменная задана тут
+  for(const m of t.matchAll(/var\(\s*(--[A-Za-z_][\w-]*)/g)) requires.add(m[1]);                          // var(--x) — нужна переменная
+  for(const m of t.matchAll(/animation(?:-name)?\s*:\s*([^;}]+)/g)) for(const w of (m[1].match(/[A-Za-z_][\w-]*/g) || [])) requires.add('@' + w);
+}
+// js/ts: куда пишет (requires #sel), что помечает id/классом (provides), какие @keyframes/--vars трогает
+function scriptDomAnchors(t, provides, requires){
+  for(const m of t.matchAll(/querySelector(?:All)?\(\s*["'`]([^"'`]+)["'`]/g)) for(const s of (m[1].match(/[#.][A-Za-z_][\w-]*/g) || [])) requires.add(s);
+  for(const m of t.matchAll(/getElementById\(\s*["'`]([^"'`]+)["'`]/g)) requires.add('#' + m[1].trim());
+  for(const m of t.matchAll(/getElementsByClassName\(\s*["'`]([^"'`]+)["'`]/g)) m[1].trim().split(/\s+/).forEach(c => c && requires.add('.' + c));
+  for(const m of t.matchAll(/\.id\s*=\s*["'`]([^"'`]+)["'`]/g)) provides.add('#' + m[1].trim());
+  for(const m of t.matchAll(/setAttribute\(\s*["'`]id["'`]\s*,\s*["'`]([^"'`]+)["'`]/g)) provides.add('#' + m[1].trim());
+  for(const m of t.matchAll(/classList\.add\(\s*["'`]([^"'`]+)["'`]/g)) provides.add('.' + m[1].trim());
+}
+// js/ts: имена, объявленные наружу, и имена, взятые со стороны (строки/комменты вырезаны)
+function jsIdents(code, provides, requires){
   const txt = String(code || '').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1 ').replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, ' ');
   const ID = '[A-Za-zА-Яа-яЁё_$][\\wА-Яа-яЁё$]*';
-  const provides = new Set();          // что кусок объявляет наружу
   for(const m of txt.matchAll(new RegExp('(?:const|let|var|function|class)\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
-  // локальные имена, которые НЕ являются внешней зависимостью: объявления + параметры + счётчики циклов
   const local = new Set(provides);
   const addParams = s => String(s || '').split(',').forEach(p => { const m = p.trim().match(new RegExp('^(' + ID + ')')); if(m) local.add(m[1]); });
-  for(const m of txt.matchAll(new RegExp('function\\s*' + ID + '?\\s*\\(([^)]*)\\)', 'g'))) addParams(m[1]);   // function f(a,b)
-  for(const m of txt.matchAll(/\(([^)]*)\)\s*=>/g)) addParams(m[1]);                                            // (a,b)=>
-  for(const m of txt.matchAll(new RegExp('(' + ID + ')\\s*=>', 'g'))) local.add(m[1]);                          // x =>
-  for(const m of txt.matchAll(new RegExp('catch\\s*\\(\\s*(' + ID + ')', 'g'))) local.add(m[1]);                // catch(e)
+  for(const m of txt.matchAll(new RegExp('function\\s*' + ID + '?\\s*\\(([^)]*)\\)', 'g'))) addParams(m[1]);
+  for(const m of txt.matchAll(/\(([^)]*)\)\s*=>/g)) addParams(m[1]);
+  for(const m of txt.matchAll(new RegExp('(' + ID + ')\\s*=>', 'g'))) local.add(m[1]);
+  for(const m of txt.matchAll(new RegExp('catch\\s*\\(\\s*(' + ID + ')', 'g'))) local.add(m[1]);
   for(const m of txt.matchAll(new RegExp('for\\s*\\(\\s*(?:const|let|var)?\\s*(' + ID + ')', 'g'))) local.add(m[1]);
-  const requires = new Set();
   for(const m of txt.matchAll(new RegExp('(' + ID + ')', 'g'))){
     const w = m[1]; const i = m.index || 0;
-    if(i > 0 && txt[i - 1] === '.') continue;           // свойство после точки — не внешняя зависимость
+    if(i > 0 && txt[i - 1] === '.') continue;             // свойство после точки — не внешняя зависимость
     if(_KWSET.has(w) || _GLOBALS.has(w) || local.has(w)) continue;
     requires.add(w);
   }
-  return { provides: [...provides].slice(0, 40), requires: [...requires].slice(0, 40) };
 }
+// python: def/class/присваивание на верхнем уровне → provides; импорты/параметры/локальные → не requires
+function pyIdents(code, provides, requires){
+  const t = String(code || '').replace(/'''[\s\S]*?'''/g, ' ').replace(/"""[\s\S]*?"""/g, ' ').replace(/#[^\n]*/g, ' ').replace(/'(?:\\.|[^'\\])*'/g, ' ').replace(/"(?:\\.|[^"\\])*"/g, ' ');
+  const ID = '[A-Za-z_][A-Za-z0-9_]*';
+  for(const m of t.matchAll(new RegExp('(?:^|\\n)\\s*(?:async\\s+)?def\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
+  for(const m of t.matchAll(new RegExp('(?:^|\\n)\\s*class\\s+(' + ID + ')', 'g'))) provides.add(m[1]);
+  for(const m of t.matchAll(new RegExp('(?:^|\\n)(' + ID + ')\\s*=(?!=)', 'g'))) provides.add(m[1]);   // модульная переменная (с начала строки)
+  const local = new Set(provides);
+  for(const m of t.matchAll(new RegExp('import\\s+(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of t.matchAll(new RegExp('\\bas\\s+(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of t.matchAll(new RegExp('from\\s+' + ID + '(?:\\.' + ID + ')*\\s+import\\s+([^\\n]+)', 'g'))) m[1].split(',').forEach(x => { const mm = x.trim().match(new RegExp('^(' + ID + ')')); if(mm) local.add(mm[1]); });
+  for(const m of t.matchAll(new RegExp('(' + ID + ')\\s*=(?!=)', 'g'))) local.add(m[1]);                // любое присваивание — локальное имя
+  for(const m of t.matchAll(new RegExp('def\\s+' + ID + '\\s*\\(([^)]*)\\)', 'g'))) m[1].split(',').forEach(p => { const mm = p.trim().match(new RegExp('^\\*{0,2}(' + ID + ')')); if(mm) local.add(mm[1]); });
+  for(const m of t.matchAll(new RegExp('lambda\\s+([^:]*):', 'g'))) m[1].split(',').forEach(p => { const mm = p.trim().match(new RegExp('^(' + ID + ')')); if(mm) local.add(mm[1]); });
+  for(const m of t.matchAll(new RegExp('for\\s+(' + ID + ')', 'g'))) local.add(m[1]);
+  for(const m of t.matchAll(new RegExp('(' + ID + ')', 'g'))){
+    const w = m[1]; const i = m.index || 0;
+    if(i > 0 && t[i - 1] === '.') continue;
+    if(w.length < 2 || !/[A-Za-z]/.test(w) || _PY_KW.has(w) || _PY_BUILTIN.has(w) || local.has(w)) continue;   // без букв (напр. _000 из 1_000) — не имя
+    requires.add(w);
+  }
+}
+// sql: CREATE TABLE/VIEW/… → provides tbl:имя; FROM/JOIN/INTO/UPDATE → requires tbl:имя (имена в своём namespace)
+function sqlAnchors(code, provides, requires){
+  const t = String(code || '').replace(/--[^\n]*/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/'(?:''|[^'])*'/g, ' ');
+  const NAME = '[`"\\[]?([A-Za-z_][A-Za-z0-9_$.]*)[`"\\]]?';
+  for(const m of t.matchAll(new RegExp('create\\s+(?:or\\s+replace\\s+)?(?:global\\s+|local\\s+)?(?:temp(?:orary)?\\s+)?(?:table|view|materialized\\s+view|index|sequence)\\s+(?:if\\s+not\\s+exists\\s+)?' + NAME, 'gi'))) provides.add('tbl:' + m[1].toLowerCase());
+  for(const m of t.matchAll(new RegExp('(?:\\bfrom|\\bjoin|\\binto|\\bupdate|delete\\s+from)\\s+' + NAME, 'gi'))) requires.add('tbl:' + m[1].toLowerCase());
+}
+function codeContract(code, lang){
+  lang = String(lang || 'js').toLowerCase();
+  const raw = String(code || '');
+  const provides = new Set(), requires = new Set();
+  if(lang === 'js' || lang === 'ts'){ jsIdents(raw, provides, requires); scriptDomAnchors(raw, provides, requires); }
+  else if(lang === 'python'){ pyIdents(raw, provides, requires); }
+  else if(lang === 'html' || lang === 'svg'){ markupAnchors(raw, provides); }
+  else if(lang === 'css'){ cssAnchors(raw, provides, requires); }
+  else if(lang === 'sql'){ sqlAnchors(raw, provides, requires); }
+  for(const s of [...requires]){ if(provides.has(s) || _HEX.test(s)) requires.delete(s); }   // своё не требуем; hex — не селектор
+  for(const s of [...provides]) if(_HEX.test(s)) provides.delete(s);
+  return { provides: [...provides].slice(0, 60), requires: [...requires].slice(0, 60) };
+}
+const _CONTRACT_LANGS = new Set(['js', 'ts', 'html', 'svg', 'css', 'python', 'sql']);
 
 function slug(s){
   const base = String(s || 'tpl').toLowerCase().replace(/[^\wа-яё]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'tpl';
@@ -436,7 +519,7 @@ const server = http.createServer(async (req, res) => {
             verification: { code_review: 'not_verified', tests: 'not_run', compatibility: 'not_verified' },
           },
         };
-        if(lang === 'js'){ const c = codeContract(code); obj.component.provides = c.provides; obj.component.requires = c.requires; }
+        if(_CONTRACT_LANGS.has(lang)){ const c = codeContract(code, lang); obj.component.provides = c.provides; obj.component.requires = c.requires; }
         annotateLines(obj.lines, lang, dict);
         try { await store.save(obj, { origin: 'ai' }); created.push({ id, title }); }
         catch(e){ skipped.push({ title, reason: String(e?.message || e) }); }
@@ -600,7 +683,7 @@ const server = http.createServer(async (req, res) => {
         descAt: Date.now(),   // когда описание задано/изменено — для авто-сведения по дате
       };
       if(b.component && typeof b.component === 'object') obj.component = b.component;   // метаданные компонента (теги осей, подкатегория, контракт)
-      if(lang === 'js'){ const c = codeContract(code); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
+      if(_CONTRACT_LANGS.has(lang)){ const c = codeContract(code, lang); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
       annotateLines(obj.lines, lang, await kwDict());   // автоподпись ключевых слов из словаря
       await store.save(obj);
       return json(res, 200, { id: obj.id });
@@ -664,7 +747,7 @@ const server = http.createServer(async (req, res) => {
             if(pc.tags) obj.tags = pc.tags;
             if(pc.aliases) obj.aliases = pc.aliases;
             obj.source = { title: 'manual', desc: pc.desc ? 'manual' : null, tags: pc.tags ? 'manual' : null };
-            if(pc.lang === 'js'){ const c = codeContract(pc.code); obj.component = { provides: c.provides, requires: c.requires }; }
+            if(_CONTRACT_LANGS.has(pc.lang)){ const c = codeContract(pc.code, pc.lang); obj.component = { provides: c.provides, requires: c.requires }; }
             annotateLines(obj.lines, pc.lang, dict);
             await store.save(obj, { origin: 'imported' });
             item.id = obj.id;
@@ -677,6 +760,39 @@ const server = http.createServer(async (req, res) => {
 
     if((u.pathname === '/api/import' || u.pathname === '/api/import-collection') && req.method === 'POST'){
       return json(res, 200, await importBundle(await readBody(req)));
+    }
+
+    // восстановление бэкапа библиотеки КАК ЕСТЬ: {files:[{name,text,lang?}]} — пишем код и паспорта
+    // .meta.json прямо в library/<язык>/ байт-в-байт, без токенизации/аннотации/дедупа. Паспорт
+    // (настоящее название, разделы, пояснения) сохраняется ровно как в бэкапе.
+    if(u.pathname === '/api/library/restore' && req.method === 'POST'){
+      const b = await readBody(req);
+      const files = Array.isArray(b.files) ? b.files : [];
+      const EXT2LANG = { js:'js', mjs:'js', cjs:'js', ts:'ts', tsx:'ts', jsx:'js', py:'python', rb:'ruby', php:'php', go:'go', rs:'rust', java:'java', c:'c', h:'c', cpp:'cpp', cs:'csharp', css:'css', html:'html', htm:'html', svg:'svg', sql:'sql', sh:'bash', json:'json' };
+      const safeLang = l => (String(l || 'txt').toLowerCase().replace(/[^a-z0-9_+-]/g, '') || 'txt');
+      const langOfName = n => safeLang(EXT2LANG[String(n).split('.').pop().toLowerCase()] || 'txt');
+      const isMeta = n => /\.meta\.json$/i.test(n);
+      const metas = files.filter(f => f && isMeta(f.name));
+      const codes = files.filter(f => f && !isMeta(f.name));
+      const codeByBase = {}; codes.forEach(c => { codeByBase[path.basename(c.name)] = c; });
+      let wroteCode = 0, wroteMeta = 0, pairs = 0, metaOnly = 0, codeOnly = 0; const consumed = new Set();
+      for(const m of metas){
+        let meta; try { meta = JSON.parse(m.text); } catch(_){ continue; }
+        const base = path.basename(m.name).replace(/\.meta\.json$/i, '');   // «arc-….js»
+        const lang = safeLang(meta.lang) || langOfName(base);
+        const dir = path.join(LIBRARY, lang); await fs.mkdir(dir, { recursive: true });
+        await fs.writeFile(path.join(dir, base + '.meta.json'), m.text.endsWith('\n') ? m.text : m.text + '\n', 'utf8'); wroteMeta++;
+        const code = codeByBase[base];
+        if(code){ await fs.writeFile(path.join(dir, base), String(code.text), 'utf8'); wroteCode++; pairs++; consumed.add(base); }
+        else metaOnly++;
+      }
+      for(const c of codes){ const bn = path.basename(c.name); if(consumed.has(bn)) continue;
+        const lang = safeLang(c.lang) || langOfName(bn);
+        const dir = path.join(LIBRARY, lang); await fs.mkdir(dir, { recursive: true });
+        await fs.writeFile(path.join(dir, bn), String(c.text), 'utf8'); wroteCode++; codeOnly++;
+      }
+      try { await store.refresh(); } catch(_){}
+      return json(res, 200, { ok: true, pairs, metaOnly, codeOnly, wroteCode, wroteMeta });
     }
 
     // правка шаблона целиком: новый код → заново токенизируем, перезаписываем файл
@@ -699,7 +815,7 @@ const server = http.createServer(async (req, res) => {
       if(b.provides !== undefined){ j.component = j.component || {}; j.component.provides = _names(b.provides); j.component.contractLocked = true; }
       if(b.requires !== undefined){ j.component = j.component || {}; j.component.requires = _names(b.requires); j.component.contractLocked = true; }
       if(b.code != null){ j.lines = tokenize(b.code, j.lang);   // код заново раскрашивается
-        if((j.lang || 'js') === 'js' && !(j.component && j.component.contractLocked)){ const c = codeContract(b.code); j.component = j.component || {}; j.component.provides = c.provides; j.component.requires = c.requires; } }
+        if(_CONTRACT_LANGS.has(j.lang || 'js') && !(j.component && j.component.contractLocked)){ const c = codeContract(b.code, j.lang || 'js'); j.component = j.component || {}; j.component.provides = c.provides; j.component.requires = c.requires; } }
       // свои разделы (классификация пользователя) и заметки к словам — хранятся на компоненте
       if(Array.isArray(b.collections)){ j.component = j.component || {}; j.component.collections = b.collections.map(x => String(x).slice(0, 60)).slice(0, 30); }
       if(b.notes && typeof b.notes === 'object'){ j.component = j.component || {}; j.component.notes = b.notes; }
@@ -754,6 +870,23 @@ const server = http.createServer(async (req, res) => {
       await fs.unlink(abs).catch(() => {});
       return json(res, 200, { ok: true });
     }
+    // убрать из «Данных» паспорта библиотеки (.meta.json), случайно загруженные как объекты.
+    // Паспорт живёт рядом с кодом в библиотеке и создаётся сам; в «Данных» ему не место. {apply:false} — только показать.
+    if(u.pathname === '/api/data/clean' && req.method === 'POST'){
+      const b = await readBody(req);
+      let names = []; try { names = (await fs.readdir(DATA)).filter(n => n.endsWith('.json')); } catch(_){}
+      const junk = [];
+      for(const n of names){ if(n === 'description-jobs.json') continue;
+        try { const j = JSON.parse(await fs.readFile(path.join(DATA, n), 'utf8')); const nm = String(j.name || ''); const d = j.data;
+          const isMetaName = /\.meta\.json$/i.test(nm);
+          const isMetaData = d && typeof d === 'object' && !Array.isArray(d) && d.id != null && d.lang != null && (d.component != null || d.schema != null) && (d.file != null || Array.isArray(d.wordNotes));
+          if(isMetaName || isMetaData) junk.push({ file: n, name: nm });
+        } catch(_){}
+      }
+      if(!b.apply) return json(res, 200, { ok: true, applied: false, count: junk.length, sample: junk.slice(0, 20).map(x => x.name) });
+      let removed = 0; for(const x of junk){ try { await fs.unlink(path.join(DATA, x.file)); removed++; } catch(_){} }
+      return json(res, 200, { ok: true, applied: true, removed });
+    }
 
     // ── синхронизация шаблонов с GitHub ───────────────────────────────────
     if(u.pathname === '/api/git/info'){
@@ -792,13 +925,20 @@ const server = http.createServer(async (req, res) => {
           return json(res, 200, { ok: false, stage: 'pull', committed: staged, message: 'С сервера пришли изменения, которые конфликтуют с твоими — автослияние не вышло. Я откатила, ничего не испорчено. Нужно слить вручную (git pull) и повторить. ' + (pull.err || pull.out || '').slice(0, 240) });
         }
       }
-      let push = await git(['push'], root);
-      if(push.code !== 0){
-        const br = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], root)).out;
-        push = await git(['push', '-u', 'origin', br], root);
-        if(push.code !== 0) return json(res, 200, { ok: false, stage: 'push', committed: staged, message: push.err || push.out || 'push отклонён' });
+      const curBr = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], root)).out;
+      let push, detNote = '';
+      if(curBr && curBr !== 'HEAD'){
+        push = await git(['push'], root);
+        if(push.code !== 0) push = await git(['push', '-u', 'origin', curBr], root);   // нет upstream — задаём
+      } else {
+        // detached HEAD (не на ветке): пушить «origin HEAD» нельзя (HEAD — не имя ветки).
+        // Отправляем текущий коммит на ветку по умолчанию удалёнки (обычно main).
+        const def = ((await git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], root)).out || '').replace(/^origin\//, '') || 'main';
+        push = await git(['push', 'origin', 'HEAD:refs/heads/' + def], root);
+        detNote = ' Важно: ты была НЕ на ветке (detached HEAD) — отправила на «' + def + '». Чтобы это не повторялось, один раз выполни в терминале: git checkout ' + def;
       }
-      return json(res, 200, { ok: true, committed: staged, message: staged ? ('Отправлено на GitHub: ' + staged + ' файл(ов).') : 'На GitHub уже всё актуально.' });
+      if(push.code !== 0) return json(res, 200, { ok: false, stage: 'push', committed: staged, message: (push.err || push.out || 'push отклонён') + (curBr === 'HEAD' ? '  ·  Ты не на ветке (detached HEAD). В терминале проекта выполни: git checkout main — затем повтори отправку.' : '') });
+      return json(res, 200, { ok: true, committed: staged, message: (staged ? ('Отправлено на GitHub: ' + staged + ' файл(ов).') : 'На GitHub уже всё актуально.') + detNote });
     }
 
     // удалить шаблон
@@ -927,6 +1067,46 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, applied: true, removed });
     }
 
+    // ревизия «на своём ли месте»: проходим по тому, что УЖЕ загружено, и ищем перепутанное.
+    // read-only — только показать. Чинится точечно через /api/dict/remove + /api/dict/synonyms + /api/delete.
+    if(u.pathname === '/api/dict/audit' && req.method === 'POST'){
+      const ruKeys = [], synLike = [], prosePieces = [];
+      // словарь: база (разделы) + языки (файлы)
+      let base; try { base = JSON.parse(await fs.readFile(DICT_BASE, 'utf8')); } catch(_){ base = {}; }
+      const baseSects = ['words', 'htmlTags', 'htmlAttrs', 'cssProps', 'cssVals'].filter(s => base[s] && typeof base[s] === 'object');
+      // ключ-фраза на русском, и это НЕ пояснение-понятие (нет « — »/союзов) → перепутаны стороны/синонимы.
+      // пояснение-список через запятые (короткие куски, не предложение) у код-ключа → это синонимы.
+      const scan = (where, obj) => { for(const [k, v] of Object.entries(obj)){ const text = String(v || '');
+        if(_isRuS(k) && !_hasLat(k)){ if(!_isSentence(text)) ruKeys.push({ where, key: k, text: text.slice(0, 120) }); }
+        else if(_isSynList(text)) synLike.push({ where, key: k, text: text.slice(0, 120) }); } };
+      for(const s of baseSects) scan(s, base[s]);
+      let langFiles = []; try { langFiles = (await fs.readdir(LANGS_DIR)).filter(n => n.endsWith('.json')); } catch(_){}
+      for(const fn of langFiles){ try { const o = JSON.parse(await fs.readFile(path.join(LANGS_DIR, fn), 'utf8')); if(o && typeof o === 'object') scan(fn.replace(/\.json$/, ''), o); } catch(_){} }
+      // куски: код — чистая русская проза → это не кусок
+      let rows = []; try { rows = await store.rows(); } catch(_){}
+      for(const r of rows){ let obj; try { obj = await store.get(r.id); } catch(_){ continue; }
+        const code = obj && Array.isArray(obj.lines) ? obj.lines.map(ln => (ln || []).map(t => (t && t.v) || '').join('')).join('\n') : '';
+        if(_looksProse(code)) prosePieces.push({ id: r.id, title: obj.title || r.id, lang: obj.lang || '', code: code.slice(0, 120) }); }
+      return json(res, 200, { ok: true, ruKeys, synLike, prosePieces, counts: { ruKeys: ruKeys.length, synLike: synLike.length, prosePieces: prosePieces.length } });
+    }
+
+    // удалить ключи из словаря: {entries:[{where, key}]}. where = раздел базы (words/…) или язык (имя файла).
+    if(u.pathname === '/api/dict/remove' && req.method === 'POST'){
+      const b = await readBody(req);
+      const list = Array.isArray(b.entries) ? b.entries : [];
+      let base = null, baseTouched = false; const baseSects = new Set(['words', 'htmlTags', 'htmlAttrs', 'cssProps', 'cssVals']);
+      try { base = JSON.parse(await fs.readFile(DICT_BASE, 'utf8')); } catch(_){ base = {}; }
+      const langTouched = {}; let removed = 0;
+      for(const e of list){ const where = String(e && e.where || ''), key = String(e && e.key || '').toLowerCase(); if(!where || !key) continue;
+        if(baseSects.has(where)){ if(base[where] && base[where][key] != null){ delete base[where][key]; baseTouched = true; removed++; } }
+        else { const fp = path.join(LANGS_DIR, where + '.json'); let o = langTouched[where]; if(!o){ try { o = JSON.parse(await fs.readFile(fp, 'utf8')); } catch(_){ o = null; } if(o) langTouched[where] = o; }
+          if(o && o[key] != null){ delete o[key]; removed++; } } }
+      if(baseTouched) await fs.writeFile(DICT_BASE, JSON.stringify(base, null, 2), 'utf8');
+      for(const [where, o] of Object.entries(langTouched)){ const sorted = {}; for(const k of Object.keys(o).sort()) sorted[k] = o[k]; await fs.writeFile(path.join(LANGS_DIR, where + '.json'), JSON.stringify(sorted, null, 2), 'utf8'); }
+      _kwDict = null;
+      return json(res, 200, { ok: true, removed });
+    }
+
     // синонимы для поиска по смыслу: {entries:[[term, "фраза1, фраза2"], …]}. Объединяем с существующими,
     // дедуп; пустой список синонимов у термина — снять термин. Хранится в dict/synonyms.json (уезжает с dict/).
     if(u.pathname === '/api/dict/synonyms' && req.method === 'POST'){
@@ -1046,8 +1226,13 @@ const server = http.createServer(async (req, res) => {
     // словарь отдаём собранным (база + файлы языков), а не как статический файл —
     // чтобы песочница и просмотрщик видели и языки из dict/langs/*.json
     if(u.pathname === '/keyword-dict.json'){
+      const d = await kwDict();
+      // ?lang=X — отдать только этот язык (+ база/синонимы/примеры), чтобы клиент не грузил все языки разом
+      const lang = (u.searchParams.get('lang') || '').toLowerCase();
+      let out = d;
+      if(lang){ out = Object.assign({}, d); out.langs = (d.langs && d.langs[lang]) ? { [lang]: d.langs[lang] } : {}; }
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-      return res.end(JSON.stringify(await kwDict()));
+      return res.end(JSON.stringify(out));
     }
 
     const rel = u.pathname === '/' ? 'index.html' : u.pathname;
