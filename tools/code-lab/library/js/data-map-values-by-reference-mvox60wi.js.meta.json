@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "id": "data-map-values-by-reference-mvox60wi",
+  "file": "data-map-values-by-reference-mvox60wi.js",
+  "lang": "js",
+  "title": "data-map-values-by-reference",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998759186,
+  "component": {
+    "provides": [
+      "entriesToRecords"
+    ],
+    "requires": [
+      "key",
+      "a",
+      "b"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 16,
+      "text": "entries",
+      "kind": "fn",
+      "note": "Object.entries — массив пар [ключ, значение].",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 38,
+      "text": "key",
+      "kind": "name",
+      "note": "key — функция, по значению которой идёт сортировка",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 69,
+      "text": "key",
+      "kind": "name",
+      "note": "key — функция, по значению которой идёт сортировка",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 30,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    }
+  ]
+}

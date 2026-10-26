@@ -1,0 +1,250 @@
+{
+  "schema": 1,
+  "id": "async-queue-with-concurrency-mvox601n",
+  "file": "async-queue-with-concurrency-mvox601n.js",
+  "lang": "js",
+  "title": "async-queue-with-concurrency",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998758075,
+  "component": {
+    "provides": [
+      "createTaskQueue",
+      "waiting",
+      "active",
+      "drain",
+      "enqueueTask"
+    ],
+    "requires": [
+      "RangeError",
+      "resolve"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 7,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — превращает значение в число",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 57,
+      "text": "throw",
+      "kind": "kw",
+      "note": "выбросить исключение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 63,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 67,
+      "text": "RangeError",
+      "kind": "fn",
+      "note": "значение вне диапазона, неправильный диапазон, слишком большое число, недопустимая длина",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "let",
+      "kind": "kw",
+      "note": "объявить переменную с блочной областью видимости",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "while",
+      "kind": "kw",
+      "note": "повторять выполнение, пока условие истинно",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 43,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 6,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 20,
+      "text": "resolve",
+      "kind": "name",
+      "note": "resolve — завершить промис успешно с результатом.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 29,
+      "text": "reject",
+      "kind": "name",
+      "note": "reject — завершить промис ошибкой.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 14,
+      "text": "resolve",
+      "kind": "fn",
+      "note": "resolve — завершить промис успешно с результатом.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 24,
+      "text": "then",
+      "kind": "fn",
+      "note": "then — что сделать, когда промис выполнится (получит результат).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 35,
+      "text": "then",
+      "kind": "fn",
+      "note": "then — что сделать, когда промис выполнится (получит результат).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 40,
+      "text": "resolve",
+      "kind": "name",
+      "note": "resolve — завершить промис успешно с результатом.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 49,
+      "text": "reject",
+      "kind": "name",
+      "note": "reject — завершить промис ошибкой.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 57,
+      "text": "finally",
+      "kind": "kw",
+      "note": "finally — выполнится в любом случае, с ошибкой или без.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 17,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 30,
+      "text": "resolve",
+      "kind": "name",
+      "note": "resolve — завершить промис успешно с результатом.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 39,
+      "text": "reject",
+      "kind": "name",
+      "note": "reject — завершить промис ошибкой.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 73,
+      "text": "resolve",
+      "kind": "name",
+      "note": "resolve — завершить промис успешно с результатом.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 82,
+      "text": "reject",
+      "kind": "name",
+      "note": "reject — завершить промис ошибкой.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    }
+  ]
+}

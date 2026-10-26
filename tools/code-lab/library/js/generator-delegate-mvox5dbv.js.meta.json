@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "id": "generator-delegate-mvox5dbv",
+  "file": "generator-delegate-mvox5dbv.js",
+  "lang": "js",
+  "title": "generator-delegate",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998728635,
+  "component": {
+    "provides": [],
+    "requires": [
+      "все"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "yield",
+      "kind": "kw",
+      "note": "yield — в генераторе отдать очередное значение и приостановиться.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "yield",
+      "kind": "kw",
+      "note": "yield — в генераторе отдать очередное значение и приостановиться.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "yield",
+      "kind": "kw",
+      "note": "yield — в генераторе отдать очередное значение и приостановиться.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

@@ -1,0 +1,155 @@
+{
+  "schema": 1,
+  "id": "file-import-parse-lines-mvox5ud1",
+  "file": "file-import-parse-lines-mvox5ud1.js",
+  "lang": "js",
+  "title": "file-import-parse-lines",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998750709,
+  "component": {
+    "provides": [
+      "parseLines",
+      "values"
+    ],
+    "requires": [
+      "errors",
+      "r",
+      "n",
+      "line",
+      "value",
+      "message"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 7,
+      "text": "split",
+      "kind": "fn",
+      "note": "split — разрезать строку на массив по разделителю.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "r",
+      "kind": "name",
+      "note": "r — радиус круга",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 14,
+      "text": "trim",
+      "kind": "fn",
+      "note": "trim — убрать пробелы по краям строки.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 22,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 10,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 11,
+      "text": "error",
+      "kind": "name",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 72,
+      "text": "error",
+      "kind": "name",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 11,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    }
+  ]
+}

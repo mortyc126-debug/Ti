@@ -1,0 +1,128 @@
+{
+  "schema": 1,
+  "id": "data-normalize-nullable-fields-mvox60qb",
+  "file": "data-normalize-nullable-fields-mvox60qb.js",
+  "lang": "js",
+  "title": "data-normalize-nullable-fields",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998758963,
+  "component": {
+    "provides": [
+      "emptyStringsToNull",
+      "next",
+      "field"
+    ],
+    "requires": [
+      "name",
+      "code"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "for",
+      "kind": "kw",
+      "note": "цикл с инициализацией, условием и шагом",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 7,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "of",
+      "kind": "kw",
+      "note": "of — часть цикла for…of: перебрать элементы массива/коллекции.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 30,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 34,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "определить тип значения в виде строки",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 81,
+      "text": "trim",
+      "kind": "fn",
+      "note": "trim — убрать пробелы по краям строки.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 110,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

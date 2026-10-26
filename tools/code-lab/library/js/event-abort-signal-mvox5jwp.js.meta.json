@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "id": "event-abort-signal-mvox5jwp",
+  "file": "event-abort-signal-mvox5jwp.js",
+  "lang": "js",
+  "title": "event-abort-signal",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998737161,
+  "component": {
+    "provides": [
+      "controller"
+    ],
+    "requires": [
+      "AbortController",
+      "окно",
+      "обновитьРазмер",
+      "signal",
+      "документ",
+      "обновитьВидимость"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 19,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 11,
+      "text": "abort",
+      "kind": "fn",
+      "note": "abort — отменяет запрос",
+      "source": "dict"
+    }
+  ]
+}

@@ -1,0 +1,340 @@
+{
+  "schema": 1,
+  "id": "math-rolling-volatility-mvox5vil",
+  "file": "math-rolling-volatility-mvox5vil.js",
+  "lang": "js",
+  "title": "math-rolling-volatility",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998752205,
+  "component": {
+    "provides": [
+      "rollingStdDev",
+      "result",
+      "end",
+      "window",
+      "mean",
+      "variance"
+    ],
+    "requires": [
+      "RangeError",
+      "TypeError",
+      "sum"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 23,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 7,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — превращает значение в число",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 55,
+      "text": "throw",
+      "kind": "kw",
+      "note": "выбросить исключение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 61,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 65,
+      "text": "RangeError",
+      "kind": "fn",
+      "note": "значение вне диапазона, неправильный диапазон, слишком большое число, недопустимая длина",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 17,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 27,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 34,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 42,
+      "text": "fill",
+      "kind": "fn",
+      "note": "fill — залить текущий контур цветом (fillStyle).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 47,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "for",
+      "kind": "kw",
+      "note": "цикл с инициализацией, условием и шагом",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 7,
+      "text": "let",
+      "kind": "kw",
+      "note": "объявить переменную с блочной областью видимости",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 36,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 43,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 10,
+      "text": "window",
+      "kind": "fn",
+      "note": "window — глобальный объект браузера (окно): таймеры, адрес, размеры экрана.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 19,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 9,
+      "text": "window",
+      "kind": "fn",
+      "note": "window — глобальный объект браузера (окно): таймеры, адрес, размеры экрана.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 22,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — превращает значение в число",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 40,
+      "text": "throw",
+      "kind": "kw",
+      "note": "выбросить исключение",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 46,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 50,
+      "text": "TypeError",
+      "kind": "fn",
+      "note": "ошибка типа, неправильный тип данных, метод не подходит типу, нельзя выполнить операцию с этим значением",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 10,
+      "text": "mean",
+      "kind": "name",
+      "note": "mean — среднее арифметическое",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 17,
+      "text": "window",
+      "kind": "fn",
+      "note": "window — глобальный объект браузера (окно): таймеры, адрес, размеры экрана.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 32,
+      "text": "sum",
+      "kind": "name",
+      "note": "SUM — сумма значений",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 47,
+      "text": "sum",
+      "kind": "name",
+      "note": "SUM — сумма значений",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 21,
+      "text": "window",
+      "kind": "fn",
+      "note": "window — глобальный объект браузера (окно): таймеры, адрес, размеры экрана.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 36,
+      "text": "sum",
+      "kind": "name",
+      "note": "SUM — сумма значений",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 51,
+      "text": "sum",
+      "kind": "name",
+      "note": "SUM — сумма значений",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 66,
+      "text": "mean",
+      "kind": "name",
+      "note": "mean — среднее арифметическое",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 22,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    }
+  ]
+}
