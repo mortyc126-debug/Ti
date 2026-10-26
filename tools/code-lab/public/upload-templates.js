@@ -188,18 +188,19 @@
       // архивы (zip/gz) распаковываем в записи; обычные файлы — одна запись
       let entries = [];
       for(const f of files){ try { entries = entries.concat(await extractFile(f)); } catch(_){} }
-      let created = 0, learned = 0, updated = 0, bad = 0;
+      let created = 0, learned = 0, updated = 0, bad = 0; const warns = [];
       for(const e of entries){
         const ext = (e.name.split('.').pop() || '').toLowerCase(); let payload;
         // раздел берём ИЗ файла (поле group). Код-файлы без group — лягут в «без раздела», разложишь в Описи.
         if(ext === 'json'){ try { payload = JSON.parse(e.text); } catch(_){ bad++; continue; } }
         else payload = { lang: EXT_LANG[ext] || 'txt', title: e.name.replace(/\.[^.]+$/, ''), code: e.text, group: '' };
         let r; try { r = await fetch('/api/import', { method: 'POST', body: JSON.stringify(payload) }).then(x => x.json()); } catch(_){ r = null; }
-        if(r && r.ok){ created += r.created || 0; learned += r.learned || 0; updated += r.updated || 0; } else bad++;
+        if(r && r.ok){ created += r.created || 0; learned += r.learned || 0; updated += r.updated || 0; if(Array.isArray(r.warnings)) warns.push(...r.warnings); } else bad++;
       }
       loadBtn.disabled = false; fileIn.value = '';
-      const parts = ['+' + created + ' кусков']; if(updated) parts.push(updated + ' обновл.'); if(learned) parts.push('+' + learned + ' слов'); if(bad) parts.push(bad + ' пропущено');
+      const parts = ['+' + created + ' кусков']; if(updated) parts.push(updated + ' обновл.'); if(learned) parts.push('+' + learned + ' слов'); if(warns.length) parts.push('⚠ ' + warns.length + ' не код'); else if(bad) parts.push(bad + ' пропущено');
       loadBtn.textContent = '✓ ' + parts.join(', ');
+      if(warns.length) alert('Пропущены куски, где «код» — это русский текст без кода (похоже на словарь/синонимы):\n\n' + warns.slice(0, 20).map(w => '• ' + w.title).join('\n') + (warns.length > 20 ? '\n…и ещё ' + (warns.length - 20) : '') + '\n\nЕсли это пояснения — грузи их через «Словарь пояснений», а синонимы — через «Синонимы».');
       setTimeout(() => { loadBtn.textContent = o; }, 3500);
       refreshNav();   // список разделов живой: новый раздел из файла виден сразу
       if(typeof opts.onDone === 'function') opts.onDone();

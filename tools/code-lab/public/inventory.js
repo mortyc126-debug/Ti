@@ -680,8 +680,13 @@ function splitDictLine(line){
   m = line.match(/\s=\s/); if(m && line[m.index + 2] !== '=' && line[m.index + 2] !== '>') return [line.slice(0, m.index), line.slice(m.index + m[0].length)];  // « = », но не ==/=>
   return null;
 }
+// словарь описывает КОД: ключ должен быть код-токеном, а не русской фразой.
+// Ловим две частые ошибки загрузки: (1) русский с каждой стороны — скорее перепутаны
+// стороны или это вообще синонимы; (2) много запятых в пояснении — это список синонимов.
+const _hasLatin = s => /[A-Za-z]/.test(s);
+const _isRu = s => /[А-Яа-яЁё]/.test(s);
 function parseDict(text){
-  const entries = [], errors = [], seen = new Set();
+  const entries = [], errors = [], suspicious = [], synLike = [], seen = new Set();
   String(text).split('\n').forEach((raw, i) => {
     const line = raw.trim(), ln = i + 1;
     if(!line || line.startsWith('#') || line.startsWith('//')) return;
@@ -691,9 +696,13 @@ function parseDict(text){
     if(!word || !expl){ errors.push('строка ' + ln + ': пусто слово или пояснение — «' + line + '»'); return; }
     const key = word.toLowerCase();
     if(seen.has(key)) return;   // в самой вставке повтор — берём первый, молча (дедуп и так будет на сервере)
-    seen.add(key); entries.push({ word, text: expl, ln });
+    seen.add(key);
+    const e = { word, text: expl, ln };
+    if(_isRu(word) && !_hasLatin(word)){ e.why = 'ключ на русском — это код описывают, слева должен быть код, а не фраза. Похоже, перепутаны стороны или это синонимы.'; suspicious.push(e); return; }
+    if((expl.match(/,/g) || []).length >= 3){ e.why = 'в пояснении ' + ((expl.match(/,/g) || []).length) + ' запятых — похоже на список синонимов, а не на пояснение.'; synLike.push(e); return; }
+    entries.push(e);
   });
-  return { entries, errors };
+  return { entries, errors, suspicious, synLike };
 }
 function openDictModal(){
   const bg = el2('div', 'modal-bg');
@@ -745,8 +754,7 @@ function openDictModal(){
   };
   q('#dc-copy').onclick = () => { const t = q('#dc-prompt'); t.select(); try { navigator.clipboard.writeText(t.value); } catch(_){ try { document.execCommand('copy'); } catch(e){} } q('#dc-copy').textContent = '✓ скопировано'; setTimeout(() => q('#dc-copy').textContent = '⧉ скопировать запрос', 1200); };
   let parsed = null;
-  q('#dc-parse').onclick = () => {
-    parsed = parseDict(q('#dc-text').value);
+  const renderDictPrev = () => {
     const prev = q('#dc-prev'); prev.innerHTML = '';
     const line = (txt, cls) => { const d = el2('div', 'lp-row ' + (cls || '')); d.textContent = txt; return d; };
     const hd = el2('div', 'lp-sec', 'разобрано слов: ' + parsed.entries.length + (parsed.errors.length ? '  ·  ⚠ НЕ разобрано: ' + parsed.errors.length + ' (ниже — поправь и вставь снова)' : ''));
@@ -754,9 +762,38 @@ function openDictModal(){
     prev.appendChild(hd);
     parsed.entries.slice(0, 200).forEach(e => prev.appendChild(line('✓ ' + e.word + '  →  ' + e.text.slice(0, 80), 'lp-ok')));
     if(parsed.entries.length > 200) prev.appendChild(line('…и ещё ' + (parsed.entries.length - 200) + ' (все добавятся, тут показаны первые 200)', 'muted'));
+    // 🟡 похоже на синонимы (много запятых) — предлагаем перенос в синонимы
+    if(parsed.synLike.length){
+      const s = el2('div', 'lp-sec', '🟡 похоже на синонимы (' + parsed.synLike.length + ') — пояснение-список через запятые. Это ищется по смыслу, место им в синонимах:');
+      s.style.color = '#ffb454'; prev.appendChild(s);
+      parsed.synLike.forEach(e => prev.appendChild(line('≈ ' + e.word + '  →  ' + e.text.slice(0, 80), 'lp-bad')));
+      const bt = el2('div', 'mbtns');
+      const mv = el2('button', 'btn ok', '🔤 перенести ' + parsed.synLike.length + ' в синонимы');
+      mv.onclick = async () => {
+        mv.textContent = 'переношу…'; mv.disabled = true;
+        const ents = parsed.synLike.map(e => [e.word, e.text]);
+        const r = await fetch('/api/dict/synonyms', { method: 'POST', body: JSON.stringify({ entries: ents }) }).then(x => x.json()).catch(() => ({}));
+        if(r && r.ok){ parsed.synLike = []; renderDictPrev(); const d = el2('div', 'lp-row lp-ok', 'Перенесено в синонимы: терминов ' + r.terms + ', фраз ' + r.added + '. Обнови песочницу (Ctrl+F5).'); prev.appendChild(d); }
+        else { mv.textContent = '🔤 перенести в синонимы'; mv.disabled = false; prev.appendChild(el2('div', 'lp-row lp-bad', 'не удалось перенести')); }
+      };
+      const keep = el2('button', 'btn', 'всё равно в словарь');
+      keep.onclick = () => { parsed.entries = parsed.entries.concat(parsed.synLike); parsed.synLike = []; renderDictPrev(); };
+      bt.appendChild(mv); bt.appendChild(keep); prev.appendChild(bt);
+    }
+    // 🔴 русский с каждой стороны — ключ-фраза. В словарь по умолчанию НЕ кладём
+    if(parsed.suspicious.length){
+      const s = el2('div', 'lp-sec', '🔴 ключ на русском (' + parsed.suspicious.length + ') — слева фраза, а не код. Скорее перепутаны стороны или это синонимы. Не добавлю, пока не подтвердишь:');
+      s.style.color = '#ff6b8a'; prev.appendChild(s);
+      parsed.suspicious.forEach(e => prev.appendChild(line('⚠ ' + e.word + '  →  ' + e.text.slice(0, 80), 'lp-bad')));
+      const bt = el2('div', 'mbtns');
+      const force = el2('button', 'btn', 'всё равно добавить в словарь');
+      force.onclick = () => { parsed.entries = parsed.entries.concat(parsed.suspicious); parsed.suspicious = []; renderDictPrev(); };
+      bt.appendChild(force); prev.appendChild(bt);
+    }
     if(parsed.errors.length){ prev.appendChild(el2('div', 'lp-sec', '⚠ не разобрано (эти строки НЕ добавятся):')); parsed.errors.forEach(x => prev.appendChild(line(x, 'lp-bad'))); }
     q('#dc-apply').style.display = parsed.entries.length ? '' : 'none';
   };
+  q('#dc-parse').onclick = () => { parsed = parseDict(q('#dc-text').value); renderDictPrev(); };
   q('#dc-apply').onclick = async () => {
     if(!parsed || !parsed.entries.length) return;
     q('#dc-apply').textContent = 'добавляю…'; q('#dc-apply').disabled = true;

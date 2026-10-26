@@ -203,7 +203,10 @@ async function importBundle(b){
   if(topDict){ mergeInto(topDict.words, 'words'); mergeInto(topDict.htmlTags, 'htmlTags'); mergeInto(topDict.htmlAttrs, 'htmlAttrs'); mergeInto(topDict.cssProps, 'cssProps'); mergeInto(topDict.cssVals, 'cssVals'); }
   for(const pc of pieces) mergeInto(pc && pc.words, 'words');
   await fs.writeFile(dictPath, JSON.stringify(dict, null, 2), 'utf8'); _kwDict = dict;
-  let created = 0, updated = 0, skipped = 0;
+  let created = 0, updated = 0, skipped = 0; const warnings = [];
+  // кусок описывает КОД: если «код» — это чисто русский текст без латиницы и без код-символов,
+  // то скорее всего по ошибке грузят словарь/синонимы как кусок. Ловим и не портим библиотеку.
+  const looksProse = s => { const t = String(s); if(!/[А-Яа-яЁё]/.test(t)) return false; if(/[A-Za-z]/.test(t)) return false; return !/[{}()\[\];=<>\/\\|&*%#@$`]/.test(t); };
   for(const pc of pieces){
     if(!pc || typeof pc !== 'object'){ skipped++; continue; }
     const lang = String(pc.lang || 'js').toLowerCase();
@@ -211,6 +214,7 @@ async function importBundle(b){
     const hasLines = Array.isArray(pc.lines) && pc.lines.length > 0;
     const code = hasLines ? '' : String(pc.code || '');
     if(!hasLines && !code.trim()){ skipped++; continue; }
+    if(!hasLines && looksProse(code)){ skipped++; warnings.push({ title, reason: 'в коде русский текст без кода — похоже на словарь/синонимы, а не кусок' }); continue; }
     const codeForDup = hasLines ? pc.lines.map(ln => (ln || []).map(t => (t && t.v) || '').join('')).join('\n') : code;
     // дубль: сначала точное совпадение (название+код), иначе — тот же КОД под другим названием
     const dup = (await findSameTemplate(title, codeForDup)) || (await findByCode(codeForDup));
@@ -225,7 +229,7 @@ async function importBundle(b){
     }
     await store.save(obj, { origin: 'imported' });
   }
-  return { ok: true, learned, created, updated, skipped, total: pieces.length };
+  return { ok: true, learned, created, updated, skipped, warnings, total: pieces.length };
 }
 
 // контракт куска: что он ОБЪЯВЛЯЕТ наружу (provides) и какие имена БЕРЁТ со стороны (requires)

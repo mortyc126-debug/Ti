@@ -148,6 +148,7 @@ async function handle(fileList){
   if(st.saved) note.push('в данные легло: ' + st.saved);
   if(st.skipped) note.push('уже было: ' + st.skipped);
   if(st.toLib){ note.push('шаблонов кода → в Библиотеку: ' + st.toLib); const g = await syncGh(); if(g) note.push('GitHub: ' + g); }
+  if(st.warns && st.warns.length){ note.push('⚠ не код: ' + st.warns.length); alert('Пропущены куски, где «код» — это русский текст без кода (похоже на словарь/синонимы, а не кусок):\n\n' + st.warns.slice(0, 20).map(w => '• ' + w.title).join('\n') + (st.warns.length > 20 ? '\n…и ещё ' + (st.warns.length - 20) : '') + '\n\nПояснения грузи через «Словарь пояснений», синонимы — через «Синонимы».'); }
   err.textContent = note.join(' · ');
   if(dataFiles.length) openFiles(dataFiles, 0, null);
   else $('#comp').style.display = 'none';
@@ -377,11 +378,11 @@ function classifyData(d){
 async function autostore(){
   let existing = []; try { existing = await fetch('/api/data/list').then(r => r.json()); } catch(_){}
   const have = new Set(existing.map(x => x.name));
-  let saved = 0, skipped = 0, toLib = 0;
+  let saved = 0, skipped = 0, toLib = 0; const warns = [];
   for(const f of files){
     if(looksLikePiece(f.data)){                   // это кусок/сборник — ему место в Библиотеке
       const r = await importPiece(f.data);
-      if(r && r.ok) toLib += (r.created || 0) + (r.updated || 0) || 1;
+      if(r && r.ok){ toLib += (r.created || 0) + (r.updated || 0) || 1; if(Array.isArray(r.warnings)) warns.push(...r.warnings); }
       continue;
     }
     if(have.has(f.name)){ skipped++; continue; }
@@ -390,7 +391,7 @@ async function autostore(){
     if(r.id){ saved++; have.add(f.name); }
   }
   loadSaved();
-  return { saved, skipped, toLib };
+  return { saved, skipped, toLib, warns };
 }
 
 // список сохранённого (чипы по категориям), клик → открыть в компоненте
