@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "цикл-анимации-mvh8fqa3",
   "file": "цикл-анимации-mvh8fqa3.js",
-  "title": "цикл анимации",
+  "title": "цикл-анимации-mvh8fqa3",
   "lang": "js",
   "group": "Графика и визуализация / Анимация",
   "desc": "Двигает элемент, пока он не доедет до конца.",
@@ -34,7 +34,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -46,19 +46,11 @@
       "source": "dict"
     },
     {
-      "line": 0,
-      "col": 21,
-      "text": "querySelector",
-      "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
-      "source": "dict"
-    },
-    {
       "line": 1,
       "col": 0,
       "text": "let",
       "kind": "kw",
-      "note": "let — объявляет переменную, значение которой можно менять позже.",
+      "note": "объявить переменную с блочной областью видимости",
       "source": "dict"
     },
     {
@@ -66,7 +58,7 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "note": "объявить функцию",
       "source": "dict"
     },
     {
@@ -74,8 +66,8 @@
       "col": 6,
       "text": "style",
       "kind": "name",
-      "note": "style — доступ к CSS-стилям элемента из скрипта",
-      "source": "custom"
+      "note": "style — инлайновые стили элемента: element.style.color = \"red\".",
+      "source": "dict"
     },
     {
       "line": 5,
@@ -122,5 +114,16 @@
     "template": "цикл-анимации-mvh8fqa3.json",
     "descAt": 1792533958347
   },
-  "enriched": true
+  "enriched": true,
+  "descAt": 1792533958347,
+  "orphanNotes": [
+    {
+      "line": 5,
+      "col": 6,
+      "text": "style",
+      "kind": "name",
+      "note": "style — доступ к CSS-стилям элемента из скрипта",
+      "source": "custom"
+    }
+  ]
 }

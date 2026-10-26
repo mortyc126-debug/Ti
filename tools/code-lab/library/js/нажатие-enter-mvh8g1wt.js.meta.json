@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "нажатие-enter-mvh8g1wt",
   "file": "нажатие-enter-mvh8g1wt.js",
-  "title": "нажатие Enter",
+  "title": "нажатие-enter-mvh8g1wt",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Реакция на действия поль",
   "desc": "Срабатывает по нажатию клавиши Enter.",
@@ -34,14 +34,6 @@
       "text": "document",
       "kind": "fn",
       "note": "document — вся загруженная страница; через него находят и меняют элементы.",
-      "source": "dict"
-    },
-    {
-      "line": 0,
-      "col": 9,
-      "text": "addEventListener",
-      "kind": "fn",
-      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
       "source": "dict"
     },
     {
@@ -87,5 +79,6 @@
     "template": "нажатие-enter-mvh8g1wt.json",
     "descAt": 1792533973421
   },
-  "enriched": true
+  "enriched": true,
+  "descAt": 1792533973421
 }

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "object-keys-values-и-entries-mv6cusnr",
   "file": "object-keys-values-и-entries-mv6cusnr.js",
-  "title": "Object.keys, values и entries",
+  "title": "object-keys-values-и-entries-mv6cusnr",
   "lang": "js",
   "group": "Данные: хранить, находить и преобразовывать / Коллекции и ст",
   "desc": "keys возвращает массив ключей, values — значений, entries — пар [ключ, значение] объекта.",
@@ -33,7 +33,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {

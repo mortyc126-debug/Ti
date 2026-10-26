@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "прямоугольник-на-canvas-mvh8frlg",
   "file": "прямоугольник-на-canvas-mvh8frlg.js",
-  "title": "прямоугольник на canvas",
+  "title": "прямоугольник-на-canvas-mvh8frlg",
   "lang": "js",
   "group": "Графика и визуализация / Canvas: рисование",
   "desc": "Закрашенный прямоугольник на холсте.",
@@ -35,7 +35,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -47,19 +47,11 @@
       "source": "dict"
     },
     {
-      "line": 0,
-      "col": 24,
-      "text": "querySelector",
-      "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
-      "source": "dict"
-    },
-    {
       "line": 1,
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -67,8 +59,8 @@
       "col": 19,
       "text": "getContext",
       "kind": "fn",
-      "note": "getContext — получает «кисть» для рисования на холсте",
-      "source": "custom"
+      "note": "getContext — получить «кисть» canvas: getContext(\"2d\") для рисования.",
+      "source": "dict"
     },
     {
       "line": 3,
@@ -83,8 +75,8 @@
       "col": 4,
       "text": "fillRect",
       "kind": "fn",
-      "note": "fillRect — рисует закрашенный прямоугольник: x, y, ширина, высота",
-      "source": "custom"
+      "note": "fillRect — залить прямоугольник.",
+      "source": "dict"
     }
   ],
   "component": {
@@ -98,5 +90,24 @@
     "template": "прямоугольник-на-canvas-mvh8frlg.json",
     "descAt": 1792533960052
   },
-  "enriched": true
+  "enriched": true,
+  "descAt": 1792533960052,
+  "orphanNotes": [
+    {
+      "line": 1,
+      "col": 19,
+      "text": "getContext",
+      "kind": "fn",
+      "note": "getContext — получает «кисть» для рисования на холсте",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "fillRect",
+      "kind": "fn",
+      "note": "fillRect — рисует закрашенный прямоугольник: x, y, ширина, высота",
+      "source": "custom"
+    }
+  ]
 }

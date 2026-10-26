@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "id": "add-093-snippet-mvox25gn",
+  "file": "add-093-snippet-mvox25gn.js",
+  "lang": "js",
+  "title": "add-093-snippet",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998578471,
+  "component": {
+    "provides": [
+      "compose",
+      "clean",
+      "upper"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 27,
+      "text": "trim",
+      "kind": "fn",
+      "note": "trim — убрать пробелы по краям строки.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 27,
+      "text": "toUpperCase",
+      "kind": "fn",
+      "note": "toUpperCase — привести строку к верхнему регистру.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

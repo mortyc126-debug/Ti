@@ -1,0 +1,155 @@
+{
+  "schema": 1,
+  "id": "add-063-switch-default-mvox1ssm",
+  "file": "add-063-switch-default-mvox1ssm.js",
+  "lang": "js",
+  "title": "add-063-switch-default",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998562054,
+  "component": {
+    "provides": [
+      "label"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "label",
+      "kind": "fn",
+      "note": "label — подпись к полю",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "status",
+      "kind": "name",
+      "note": "status — код ответа: 200 успех, 404 не найдено, 500 ошибка сервера",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "switch",
+      "kind": "kw",
+      "note": "switch — выбрать ветку по значению (замена цепочки if/else).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "status",
+      "kind": "name",
+      "note": "status — код ответа: 200 успех, 404 не найдено, 500 ошибка сервера",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "case",
+      "kind": "kw",
+      "note": "case — одна ветка внутри switch.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "case",
+      "kind": "kw",
+      "note": "case — одна ветка внутри switch.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 20,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "case",
+      "kind": "kw",
+      "note": "case — одна ветка внутри switch.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 18,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "default",
+      "kind": "kw",
+      "note": "default — значение/ветка по умолчанию (в export, switch, параметрах).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 13,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 12,
+      "text": "label",
+      "kind": "fn",
+      "note": "label — подпись к полю",
+      "source": "dict"
+    }
+  ]
+}

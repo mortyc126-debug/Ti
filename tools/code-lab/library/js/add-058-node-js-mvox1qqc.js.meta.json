@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "id": "add-058-node-js-mvox1qqc",
+  "file": "add-058-node-js-mvox1qqc.js",
+  "lang": "js",
+  "title": "add-058-node-js",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998559380,
+  "component": {
+    "provides": [
+      "isBrowser",
+      "isNode"
+    ],
+    "requires": [
+      "process"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 18,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "определить тип значения в виде строки",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 25,
+      "text": "window",
+      "kind": "fn",
+      "note": "window — глобальный объект браузера (окно): таймеры, адрес, размеры экрана.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 51,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "определить тип значения в виде строки",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 58,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "определить тип значения в виде строки",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

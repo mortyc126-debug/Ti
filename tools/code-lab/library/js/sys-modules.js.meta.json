@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "sys-modules",
   "file": "sys-modules.js",
-  "title": "Файлы общаются: export / import",
+  "title": "sys-modules",
   "lang": "js",
   "group": "Основы / Как устроена программа",
   "desc": "Как «куча файликов» одного языка образует систему. Один файл ОТДАЁТ (export) функции, другой их БЕРЁТ (import) по пути к соседу. Копируй в два файла рядом — заработает (в проекте со сборкой или type=module).",
@@ -34,16 +34,16 @@
       "col": 0,
       "text": "export",
       "kind": "kw",
-      "note": "«Отдать наружу»: помечаем, что это можно брать в других файлах.",
-      "source": "custom"
+      "note": "export — открывает имя наружу, чтобы его можно было импортировать.",
+      "source": "dict"
     },
     {
       "line": 1,
       "col": 7,
       "text": "function",
       "kind": "kw",
-      "note": "Определение функции.",
-      "source": "custom"
+      "note": "объявить функцию",
+      "source": "dict"
     },
     {
       "line": 1,
@@ -58,7 +58,7 @@
       "col": 2,
       "text": "return",
       "kind": "kw",
-      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "note": "вернуть результат из функции и завершить её выполнение",
       "source": "dict"
     },
     {
@@ -68,6 +68,22 @@
       "kind": "fn",
       "note": "Свернуть массив в сумму.",
       "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 24,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 33,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
     },
     {
       "line": 2,
@@ -82,16 +98,16 @@
       "col": 0,
       "text": "export",
       "kind": "kw",
-      "note": "«Отдать наружу»: помечаем, что это можно брать в других файлах.",
-      "source": "custom"
+      "note": "export — открывает имя наружу, чтобы его можно было импортировать.",
+      "source": "dict"
     },
     {
       "line": 4,
       "col": 7,
       "text": "const",
       "kind": "kw",
-      "note": "Значение.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 4,
@@ -106,8 +122,8 @@
       "col": 0,
       "text": "import",
       "kind": "kw",
-      "note": "«Взять»: подключить то, что отдал другой файл.",
-      "source": "custom"
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
     },
     {
       "line": 7,
@@ -130,8 +146,8 @@
       "col": 27,
       "text": "from",
       "kind": "kw",
-      "note": "Откуда брать — путь к файлу-соседу.",
-      "source": "custom"
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
     },
     {
       "line": 9,
@@ -266,5 +282,55 @@
   "legacy": {
     "template": "sys-modules.json"
   },
-  "enriched": true
+  "enriched": true,
+  "orphanNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "export",
+      "kind": "kw",
+      "note": "«Отдать наружу»: помечаем, что это можно брать в других файлах.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 7,
+      "text": "function",
+      "kind": "kw",
+      "note": "Определение функции.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "export",
+      "kind": "kw",
+      "note": "«Отдать наружу»: помечаем, что это можно брать в других файлах.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 7,
+      "text": "const",
+      "kind": "kw",
+      "note": "Значение.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "«Взять»: подключить то, что отдал другой файл.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 27,
+      "text": "from",
+      "kind": "kw",
+      "note": "Откуда брать — путь к файлу-соседу.",
+      "source": "custom"
+    }
+  ]
 }

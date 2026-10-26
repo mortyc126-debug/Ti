@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "id": "add-095-rest-mvox26bq",
+  "file": "add-095-rest-mvox26bq.js",
+  "lang": "js",
+  "title": "add-095-rest",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998579590,
+  "component": {
+    "provides": [
+      "total"
+    ],
+    "requires": [
+      "values",
+      "sum"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 18,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 24,
+      "text": "sum",
+      "kind": "name",
+      "note": "SUM — сумма значений",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 39,
+      "text": "sum",
+      "kind": "name",
+      "note": "SUM — сумма значений",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

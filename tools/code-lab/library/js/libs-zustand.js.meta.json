@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "libs-zustand",
   "file": "libs-zustand.js",
-  "title": "zustand — общее состояние (в сайте)",
+  "title": "libs-zustand",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
   "desc": "Маленькая библиотека состояния для React. В проекте так хранятся ключевая ставка, настройки. create даёт хук, set меняет и перерисовывает.",
@@ -34,14 +34,14 @@
       "col": 0,
       "text": "import",
       "kind": "kw",
-      "note": "Подключить функцию create из библиотеки.",
-      "source": "custom"
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
     },
     {
       "line": 0,
       "col": 9,
       "text": "create",
-      "kind": "fn",
+      "kind": "name",
       "note": "Создать «стор» — хранилище состояния. Возвращает хук.",
       "source": "custom"
     },
@@ -58,16 +58,16 @@
       "col": 0,
       "text": "export",
       "kind": "kw",
-      "note": "Отдать наружу, чтобы использовать в других файлах.",
-      "source": "custom"
+      "note": "export — открывает имя наружу, чтобы его можно было импортировать.",
+      "source": "dict"
     },
     {
       "line": 2,
       "col": 7,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная, которую не будем переназначать (константа).",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 2,
@@ -200,5 +200,31 @@
       ]
     }
   },
-  "enriched": true
+  "enriched": true,
+  "orphanNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "Подключить функцию create из библиотеки.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "export",
+      "kind": "kw",
+      "note": "Отдать наружу, чтобы использовать в других файлах.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 7,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная, которую не будем переназначать (константа).",
+      "source": "custom"
+    }
+  ]
 }

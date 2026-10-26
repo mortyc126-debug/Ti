@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "touppercase-верхний-регистр-mv6cusim",
   "file": "touppercase-верхний-регистр-mv6cusim.js",
-  "title": "toUpperCase — верхний регистр",
+  "title": "touppercase-верхний-регистр-mv6cusim",
   "lang": "js",
   "group": "Данные: хранить, находить и преобразовывать / Строки и текст",
   "desc": "toUpperCase возвращает строку, в которой буквы преобразованы в верхний регистр.",
@@ -21,7 +21,15 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "label",
+      "kind": "name",
+      "note": "label — подпись к полю",
       "source": "dict"
     },
     {
@@ -38,6 +46,14 @@
       "text": "log",
       "kind": "fn",
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "label",
+      "kind": "name",
+      "note": "label — подпись к полю",
       "source": "dict"
     },
     {

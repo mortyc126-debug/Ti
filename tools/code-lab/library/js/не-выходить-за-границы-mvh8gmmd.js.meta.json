@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "не-выходить-за-границы-mvh8gmmd",
   "file": "не-выходить-за-границы-mvh8gmmd.js",
-  "title": "не выходить за границы",
+  "title": "не-выходить-за-границы-mvh8gmmd",
   "lang": "js",
   "group": "Игры и интерактивные проекты / Движение и отрисовка",
   "desc": "Ограничивает значение между минимумом и максимумом.",
@@ -35,15 +35,7 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
-      "source": "dict"
-    },
-    {
-      "line": 0,
-      "col": 15,
-      "text": "value",
-      "kind": "name",
-      "note": "value — текущее значение поля ввода (input, textarea, select).",
+      "note": "объявить функцию",
       "source": "dict"
     },
     {
@@ -67,7 +59,7 @@
       "col": 2,
       "text": "return",
       "kind": "kw",
-      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
+      "note": "вернуть результат из функции и завершить её выполнение",
       "source": "dict"
     },
     {
@@ -100,14 +92,6 @@
       "text": "max",
       "kind": "fn",
       "note": "Math.max — наибольшее из чисел.",
-      "source": "dict"
-    },
-    {
-      "line": 1,
-      "col": 27,
-      "text": "value",
-      "kind": "name",
-      "note": "value — текущее значение поля ввода (input, textarea, select).",
       "source": "dict"
     },
     {
@@ -148,5 +132,6 @@
     "template": "не-выходить-за-границы-mvh8gmmd.json",
     "descAt": 1792534000261
   },
-  "enriched": true
+  "enriched": true,
+  "descAt": 1792534000261
 }

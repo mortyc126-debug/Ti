@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "break-и-continue-mv6cut6g",
   "file": "break-и-continue-mv6cut6g.js",
-  "title": "break и continue",
+  "title": "break-и-continue-mv6cut6g",
   "lang": "js",
   "group": "Основы / Синтаксис",
   "desc": "break полностью останавливает цикл. continue пропускает оставшуюся часть текущей итерации и переходит к следующей.",
@@ -35,16 +35,16 @@
       "col": 0,
       "text": "for",
       "kind": "kw",
-      "note": "for — цикл: повторять блок заданное число раз.",
-      "source": "custom"
+      "note": "цикл с инициализацией, условием и шагом",
+      "source": "dict"
     },
     {
       "line": 0,
       "col": 5,
       "text": "let",
       "kind": "kw",
-      "note": "let — объявляет переменную, значение которой можно менять позже.",
-      "source": "custom"
+      "note": "объявить переменную с блочной областью видимости",
+      "source": "dict"
     },
     {
       "line": 0,
@@ -91,8 +91,8 @@
       "col": 4,
       "text": "continue",
       "kind": "kw",
-      "note": "continue — перейти к следующей итерации цикла.",
-      "source": "custom"
+      "note": "перейти к следующей итерации цикла",
+      "source": "dict"
     },
     {
       "line": 4,
@@ -115,8 +115,8 @@
       "col": 4,
       "text": "break",
       "kind": "kw",
-      "note": "break — выйти из цикла или switch досрочно.",
-      "source": "custom"
+      "note": "досрочно выйти из цикла или конструкции switch",
+      "source": "dict"
     },
     {
       "line": 7,
@@ -225,5 +225,39 @@
   "legacy": {
     "template": "break-и-continue-mv6cut6g.json"
   },
-  "enriched": true
+  "enriched": true,
+  "orphanNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторять блок заданное число раз.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 5,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять позже.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "continue",
+      "kind": "kw",
+      "note": "continue — перейти к следующей итерации цикла.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "break",
+      "kind": "kw",
+      "note": "break — выйти из цикла или switch досрочно.",
+      "source": "custom"
+    }
+  ]
 }

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "столбчатая-диаграмма-mvh8ftbm",
   "file": "столбчатая-диаграмма-mvh8ftbm.js",
-  "title": "столбчатая диаграмма",
+  "title": "столбчатая-диаграмма-mvh8ftbm",
   "lang": "js",
   "group": "Графика и визуализация / SVG и графики",
   "desc": "Строит столбики SVG из массива чисел.",
@@ -21,7 +21,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -29,7 +29,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -45,8 +45,8 @@
       "col": 2,
       "text": "join",
       "kind": "fn",
-      "note": "join — склеивает массив строк в одну строку",
-      "source": "custom"
+      "note": "join — склеить массив в строку через разделитель.",
+      "source": "dict"
     },
     {
       "line": 6,
@@ -58,19 +58,11 @@
     },
     {
       "line": 6,
-      "col": 9,
-      "text": "querySelector",
-      "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
-      "source": "dict"
-    },
-    {
-      "line": 6,
       "col": 30,
       "text": "innerHTML",
       "kind": "name",
-      "note": "innerHTML — HTML-содержимое элемента",
-      "source": "custom"
+      "note": "innerHTML — HTML-содержимое элемента; осторожно с чужими данными.",
+      "source": "dict"
     }
   ],
   "component": {
@@ -85,5 +77,24 @@
   "legacy": {
     "template": "столбчатая-диаграмма-mvh8ftbm.json",
     "descAt": 1792533962290
-  }
+  },
+  "descAt": 1792533962290,
+  "orphanNotes": [
+    {
+      "line": 4,
+      "col": 2,
+      "text": "join",
+      "kind": "fn",
+      "note": "join — склеивает массив строк в одну строку",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 30,
+      "text": "innerHTML",
+      "kind": "name",
+      "note": "innerHTML — HTML-содержимое элемента",
+      "source": "custom"
+    }
+  ]
 }

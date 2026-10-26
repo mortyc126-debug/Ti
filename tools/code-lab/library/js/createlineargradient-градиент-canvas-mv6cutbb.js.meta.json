@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "createlineargradient-градиент-canvas-mv6cutbb",
   "file": "createlineargradient-градиент-canvas-mv6cutbb.js",
-  "title": "createLinearGradient — градиент Canvas",
+  "title": "createlineargradient-градиент-canvas-mv6cutbb",
   "lang": "js",
   "group": "Графика и визуализация / Canvas: рисование",
   "desc": "createLinearGradient создаёт градиент, addColorStop задаёт цветовые точки от 0 до 1. Назначьте градиент в fillStyle или strokeStyle.",
@@ -35,7 +35,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -47,19 +47,11 @@
       "source": "dict"
     },
     {
-      "line": 0,
-      "col": 24,
-      "text": "querySelector",
-      "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
-      "source": "dict"
-    },
-    {
       "line": 1,
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -75,7 +67,15 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "fillStyle",
+      "kind": "name",
+      "note": "fillStyle — цвет заливки",
       "source": "dict"
     },
     {

@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "id": "add-027-abortcontroller-fetch-mvox1e3y",
+  "file": "add-027-abortcontroller-fetch-mvox1e3y.js",
+  "lang": "js",
+  "title": "add-027-abortcontroller-fetch",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998543022,
+  "component": {
+    "provides": [
+      "controller"
+    ],
+    "requires": [
+      "AbortController",
+      "signal"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 19,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "then",
+      "kind": "fn",
+      "note": "then — что сделать, когда промис выполнится (получит результат).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "r",
+      "kind": "name",
+      "note": "r — радиус круга",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 13,
+      "text": "r",
+      "kind": "name",
+      "note": "r — радиус круга",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 3,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 9,
+      "text": "error",
+      "kind": "name",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 20,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 24,
+      "text": "error",
+      "kind": "name",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 53,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 61,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 11,
+      "text": "abort",
+      "kind": "fn",
+      "note": "abort — отменяет запрос",
+      "source": "dict"
+    }
+  ]
+}

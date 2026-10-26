@@ -1,0 +1,435 @@
+{
+  "schema": 1,
+  "id": "data-aggregate-numeric-mvox3k8g",
+  "file": "data-aggregate-numeric-mvox3k8g.js",
+  "lang": "js",
+  "title": "data-aggregate-numeric",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998644272,
+  "component": {
+    "provides": [
+      "summarizeNumbers",
+      "sum",
+      "value"
+    ],
+    "requires": [
+      "count",
+      "mean",
+      "min",
+      "max",
+      "TypeError"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 26,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 13,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 27,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 36,
+      "text": "count",
+      "kind": "name",
+      "note": "COUNT — считает строки",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 46,
+      "text": "sum",
+      "kind": "name",
+      "note": "SUM — сумма значений",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 54,
+      "text": "mean",
+      "kind": "name",
+      "note": "mean — среднее арифметическое",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 60,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 66,
+      "text": "min",
+      "kind": "name",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 71,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 77,
+      "text": "max",
+      "kind": "name",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 82,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "let",
+      "kind": "kw",
+      "note": "объявить переменную с блочной областью видимости",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "sum",
+      "kind": "name",
+      "note": "SUM — сумма значений",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "min",
+      "kind": "name",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 31,
+      "text": "max",
+      "kind": "name",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "for",
+      "kind": "kw",
+      "note": "цикл с инициализацией, условием и шагом",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 7,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 19,
+      "text": "of",
+      "kind": "kw",
+      "note": "of — часть цикла for…of: перебрать элементы массива/коллекции.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 22,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "определить тип значения в виде строки",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 38,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — превращает значение в число",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 62,
+      "text": "throw",
+      "kind": "kw",
+      "note": "выбросить исключение",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 68,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 72,
+      "text": "TypeError",
+      "kind": "fn",
+      "note": "ошибка типа, неправильный тип данных, метод не подходит типу, нельзя выполнить операцию с этим значением",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "sum",
+      "kind": "name",
+      "note": "SUM — сумма значений",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 18,
+      "text": "min",
+      "kind": "name",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 24,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 29,
+      "text": "min",
+      "kind": "fn",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 33,
+      "text": "min",
+      "kind": "name",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 46,
+      "text": "max",
+      "kind": "name",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 52,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 57,
+      "text": "max",
+      "kind": "fn",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 61,
+      "text": "max",
+      "kind": "name",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 11,
+      "text": "count",
+      "kind": "name",
+      "note": "COUNT — считает строки",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 18,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 25,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 33,
+      "text": "sum",
+      "kind": "name",
+      "note": "SUM — сумма значений",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 38,
+      "text": "mean",
+      "kind": "name",
+      "note": "mean — среднее арифметическое",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 44,
+      "text": "sum",
+      "kind": "name",
+      "note": "SUM — сумма значений",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 50,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 57,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 65,
+      "text": "min",
+      "kind": "name",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 70,
+      "text": "max",
+      "kind": "name",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

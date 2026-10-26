@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "then-и-catch-mv6cuson",
   "file": "then-и-catch-mv6cuson.js",
-  "title": ".then и .catch",
+  "title": "then-и-catch-mv6cuson",
   "lang": "js",
   "group": "Сеть и запросы / Получить данные",
   "desc": "then обрабатывает успешно завершившийся Promise, catch — ошибку в цепочке. Этот стиль можно использовать вместо async/await.",
@@ -31,27 +31,11 @@
   "status": "described",
   "wordNotes": [
     {
-      "line": 0,
-      "col": 0,
-      "text": "fetch",
-      "kind": "fn",
-      "note": "fetch — делает запрос в сеть и возвращает промис с ответом.",
-      "source": "dict"
-    },
-    {
       "line": 1,
       "col": 3,
       "text": "then",
       "kind": "fn",
       "note": "then — что сделать, когда промис выполнится (получит результат).",
-      "source": "dict"
-    },
-    {
-      "line": 1,
-      "col": 29,
-      "text": "json",
-      "kind": "fn",
-      "note": "json() — разбирает ответ сети в объект JavaScript.",
       "source": "dict"
     },
     {
@@ -79,6 +63,14 @@
       "source": "dict"
     },
     {
+      "line": 2,
+      "col": 33,
+      "text": "status",
+      "kind": "name",
+      "note": "status — код ответа: 200 успех, 404 не найдено, 500 ошибка сервера",
+      "source": "dict"
+    },
+    {
       "line": 3,
       "col": 3,
       "text": "catch",
@@ -91,7 +83,7 @@
       "col": 9,
       "text": "error",
       "kind": "name",
-      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
       "source": "dict"
     },
     {
@@ -115,7 +107,7 @@
       "col": 41,
       "text": "error",
       "kind": "name",
-      "note": "error — console.error печатает сообщение об ошибке (красным).",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
       "source": "dict"
     }
   ],

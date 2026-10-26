@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "id": "add-074-svg-viewbox-mvox1xd4",
+  "file": "add-074-svg-viewbox-mvox1xd4.js",
+  "lang": "js",
+  "title": "add-074-svg-viewbox",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998567976,
+  "component": {
+    "provides": [
+      "svg"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    }
+  ]
+}

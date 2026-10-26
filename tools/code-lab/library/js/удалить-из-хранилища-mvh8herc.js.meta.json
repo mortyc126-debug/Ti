@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "удалить-из-хранилища-mvh8herc",
   "file": "удалить-из-хранилища-mvh8herc.js",
-  "title": "удалить из хранилища",
+  "title": "удалить-из-хранилища-mvh8herc",
   "lang": "js",
   "group": "Файлы, хранение и сервер / Хранение в браузере",
   "desc": "Удаляет один ключ или всё.",
@@ -31,26 +31,10 @@
   "wordNotes": [
     {
       "line": 0,
-      "col": 0,
-      "text": "localStorage",
-      "kind": "name",
-      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
-      "source": "dict"
-    },
-    {
-      "line": 0,
       "col": 13,
       "text": "removeItem",
       "kind": "fn",
       "note": "removeItem — удаляет один ключ",
-      "source": "dict"
-    },
-    {
-      "line": 1,
-      "col": 0,
-      "text": "localStorage",
-      "kind": "name",
-      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
       "source": "dict"
     },
     {
@@ -70,5 +54,6 @@
     "template": "удалить-из-хранилища-mvh8herc.json",
     "descAt": 1792534036728
   },
-  "enriched": true
+  "enriched": true,
+  "descAt": 1792534036728
 }

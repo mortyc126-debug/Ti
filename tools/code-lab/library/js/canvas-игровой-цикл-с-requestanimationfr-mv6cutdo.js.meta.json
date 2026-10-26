@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "canvas-игровой-цикл-с-requestanimationfr-mv6cutdo",
   "file": "canvas-игровой-цикл-с-requestanimationfr-mv6cutdo.js",
-  "title": "Canvas: игровой цикл с requestAnimationFrame",
+  "title": "canvas-игровой-цикл-с-requestanimationfr-mv6cutdo",
   "lang": "js",
   "group": "Графика и визуализация / Анимация",
   "desc": "Очищайте кадр, обновляйте состояние и рисуйте заново. Следующий кадр запрашивается в конце функции, чтобы цикл продолжался.",
@@ -21,7 +21,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -33,19 +33,11 @@
       "source": "dict"
     },
     {
-      "line": 0,
-      "col": 24,
-      "text": "querySelector",
-      "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
-      "source": "dict"
-    },
-    {
       "line": 1,
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -61,7 +53,7 @@
       "col": 0,
       "text": "let",
       "kind": "kw",
-      "note": "let — объявляет переменную, значение которой можно менять позже.",
+      "note": "объявить переменную с блочной областью видимости",
       "source": "dict"
     },
     {
@@ -69,7 +61,15 @@
       "col": 0,
       "text": "let",
       "kind": "kw",
-      "note": "let — объявляет переменную, значение которой можно менять позже.",
+      "note": "объявить переменную с блочной областью видимости",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "vx",
+      "kind": "name",
+      "note": "vx — скорость по горизонтали, vy по вертикали",
       "source": "dict"
     },
     {
@@ -77,7 +77,7 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "note": "объявить функцию",
       "source": "dict"
     },
     {
@@ -89,11 +89,43 @@
       "source": "dict"
     },
     {
+      "line": 6,
+      "col": 29,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина элемента",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 7,
+      "text": "vx",
+      "kind": "name",
+      "note": "vx — скорость по горизонтали, vy по вертикали",
+      "source": "dict"
+    },
+    {
       "line": 9,
       "col": 2,
       "text": "if",
       "kind": "kw",
       "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 17,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина элемента",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 4,
+      "text": "vx",
+      "kind": "name",
+      "note": "vx — скорость по горизонтали, vy по вертикали",
       "source": "dict"
     },
     {
@@ -121,27 +153,19 @@
       "source": "dict"
     },
     {
+      "line": 15,
+      "col": 6,
+      "text": "fillStyle",
+      "kind": "name",
+      "note": "fillStyle — цвет заливки",
+      "source": "dict"
+    },
+    {
       "line": 16,
       "col": 6,
       "text": "fill",
       "kind": "fn",
       "note": "fill — залить текущий контур цветом (fillStyle).",
-      "source": "dict"
-    },
-    {
-      "line": 17,
-      "col": 2,
-      "text": "requestAnimationFrame",
-      "kind": "fn",
-      "note": "requestAnimationFrame — вызвать функцию перед следующим кадром (для анимации).",
-      "source": "dict"
-    },
-    {
-      "line": 20,
-      "col": 0,
-      "text": "requestAnimationFrame",
-      "kind": "fn",
-      "note": "requestAnimationFrame — вызвать функцию перед следующим кадром (для анимации).",
       "source": "dict"
     }
   ],

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "server-node",
   "file": "server-node.js",
-  "title": "Как запустить сервер (Node)",
+  "title": "server-node",
   "lang": "js",
   "group": "Файлы, хранение и сервер / Сервер и API",
   "desc": "Минимальный веб-сервер: слушает порт и на каждый запрос отвечает. Запуск: node файл.mjs. Так устроена и Лаборатория кода.",
@@ -35,14 +35,14 @@
       "col": 0,
       "text": "import",
       "kind": "kw",
-      "note": "Подключить встроенный модуль.",
-      "source": "custom"
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
     },
     {
       "line": 0,
       "col": 7,
       "text": "http",
-      "kind": "fn",
+      "kind": "name",
       "note": "Встроенный модуль Node для веб-сервера.",
       "source": "custom"
     },
@@ -59,14 +59,14 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная, которую не будем переназначать (константа).",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 2,
       "col": 15,
       "text": "http",
-      "kind": "fn",
+      "kind": "name",
       "note": "Встроенный модуль Node для веб-сервера.",
       "source": "custom"
     },
@@ -75,8 +75,8 @@
       "col": 20,
       "text": "createServer",
       "kind": "fn",
-      "note": "Создать сервер; функция внутри вызывается на КАЖДЫЙ запрос.",
-      "source": "custom"
+      "note": "createServer — создаёт сервер, функция вызывается на каждый запрос",
+      "source": "dict"
     },
     {
       "line": 2,
@@ -131,24 +131,24 @@
       "col": 7,
       "text": "listen",
       "kind": "fn",
-      "note": "Начать слушать порт. 8788 — номер порта.",
-      "source": "custom"
+      "note": "listen — запускает сервер на порту",
+      "source": "dict"
     },
     {
       "line": 7,
       "col": 26,
       "text": "console",
       "kind": "fn",
-      "note": "Встроенный объект вывода в консоль (F12 → Console).",
-      "source": "custom"
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
     },
     {
       "line": 7,
       "col": 34,
       "text": "log",
       "kind": "fn",
-      "note": "Печатает в консоль то, что в скобках.",
-      "source": "custom"
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
     }
   ],
   "component": {
@@ -235,5 +235,55 @@
   "legacy": {
     "template": "server-node.json"
   },
-  "enriched": true
+  "enriched": true,
+  "orphanNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "Подключить встроенный модуль.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная, которую не будем переназначать (константа).",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 20,
+      "text": "createServer",
+      "kind": "fn",
+      "note": "Создать сервер; функция внутри вызывается на КАЖДЫЙ запрос.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 7,
+      "text": "listen",
+      "kind": "fn",
+      "note": "Начать слушать порт. 8788 — номер порта.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 26,
+      "text": "console",
+      "kind": "fn",
+      "note": "Встроенный объект вывода в консоль (F12 → Console).",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 34,
+      "text": "log",
+      "kind": "fn",
+      "note": "Печатает в консоль то, что в скобках.",
+      "source": "custom"
+    }
+  ]
 }

@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "id": "add-050-localecompare-mvox1nfp",
+  "file": "add-050-localecompare-mvox1nfp.js",
+  "lang": "js",
+  "title": "add-050-localecompare",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998555109,
+  "component": {
+    "provides": [
+      "names"
+    ],
+    "requires": [
+      "a"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "sort",
+      "kind": "fn",
+      "note": "sort — отсортировать массив (по умолчанию как строки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 21,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 23,
+      "text": "localeCompare",
+      "kind": "fn",
+      "note": "localeCompare — сравнение строк с учётом языка",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

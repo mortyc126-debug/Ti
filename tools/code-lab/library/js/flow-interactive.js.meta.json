@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "flow-interactive",
   "file": "flow-interactive.js",
-  "title": "Клик → расчёт → экран (+состояние)",
+  "title": "flow-interactive",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
   "desc": "Связь через СОБЫТИЕ. Нажал → читаем поле (вход) → считаем → обновляем экран. Переменная «всего» — состояние: живёт между кликами и копит результат.",
@@ -34,23 +34,15 @@
       "line": 1,
       "col": 0,
       "text": "document",
-      "kind": "name",
-      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
-      "source": "dict"
-    },
-    {
-      "line": 1,
-      "col": 9,
-      "text": "querySelector",
       "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
       "source": "dict"
     },
     {
       "line": 1,
       "col": 31,
       "text": "innerHTML",
-      "kind": "fn",
+      "kind": "name",
       "note": "innerHTML — HTML-содержимое элемента; осторожно с чужими данными.",
       "source": "dict"
     },
@@ -59,8 +51,8 @@
       "col": 0,
       "text": "let",
       "kind": "kw",
-      "note": "Переменная, которую будем менять (состояние).",
-      "source": "custom"
+      "note": "объявить переменную с блочной областью видимости",
+      "source": "dict"
     },
     {
       "line": 5,
@@ -74,16 +66,8 @@
       "line": 7,
       "col": 0,
       "text": "document",
-      "kind": "name",
-      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
-      "source": "dict"
-    },
-    {
-      "line": 7,
-      "col": 9,
-      "text": "querySelector",
       "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
       "source": "dict"
     },
     {
@@ -99,8 +83,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 8,
@@ -115,30 +99,22 @@
       "col": 12,
       "text": "Number",
       "kind": "fn",
-      "note": "Текст из поля → число (иначе склеит как строки).",
-      "source": "custom"
+      "note": "Number — превращает значение в число",
+      "source": "dict"
     },
     {
       "line": 8,
       "col": 19,
       "text": "document",
-      "kind": "name",
-      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
-      "source": "dict"
-    },
-    {
-      "line": 8,
-      "col": 28,
-      "text": "querySelector",
       "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
       "source": "dict"
     },
     {
       "line": 8,
       "col": 48,
       "text": "value",
-      "kind": "fn",
+      "kind": "name",
       "note": "Текущее значение поля ввода.",
       "source": "custom"
     },
@@ -147,8 +123,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 9,
@@ -194,23 +170,15 @@
       "line": 11,
       "col": 2,
       "text": "document",
-      "kind": "name",
-      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
-      "source": "dict"
-    },
-    {
-      "line": 11,
-      "col": 11,
-      "text": "querySelector",
       "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
       "source": "dict"
     },
     {
       "line": 11,
       "col": 33,
       "text": "textContent",
-      "kind": "fn",
+      "kind": "name",
       "note": "Текст элемента (меняем = обновляем экран).",
       "source": "custom"
     },
@@ -307,5 +275,39 @@
   "legacy": {
     "template": "flow-interactive.json"
   },
-  "enriched": true
+  "enriched": true,
+  "orphanNotes": [
+    {
+      "line": 5,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "Переменная, которую будем менять (состояние).",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 12,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Текст из поля → число (иначе склеит как строки).",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    }
+  ]
 }

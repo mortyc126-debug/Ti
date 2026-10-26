@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "id": "async-timeout-promise-race-mvox3uvc",
+  "file": "async-timeout-promise-race-mvox3uvc.js",
+  "lang": "js",
+  "title": "async-timeout-promise-race",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998658056,
+  "component": {
+    "provides": [
+      "withTimeout",
+      "timer",
+      "timeout"
+    ],
+    "requires": [
+      "_"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 34,
+      "text": "label",
+      "kind": "name",
+      "note": "label — подпись к полю",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "let",
+      "kind": "kw",
+      "note": "объявить переменную с блочной областью видимости",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 18,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 34,
+      "text": "reject",
+      "kind": "name",
+      "note": "reject — завершить промис ошибкой.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 29,
+      "text": "reject",
+      "kind": "fn",
+      "note": "reject — завершить промис ошибкой.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 36,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 40,
+      "text": "Error",
+      "kind": "fn",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 31,
+      "text": "resolve",
+      "kind": "fn",
+      "note": "resolve — завершить промис успешно с результатом.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 59,
+      "text": "finally",
+      "kind": "kw",
+      "note": "finally — выполнится в любом случае, с ошибкой или без.",
+      "source": "dict"
+    }
+  ]
+}

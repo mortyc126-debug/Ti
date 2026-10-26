@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "createelement-и-append-mv6cut1r",
   "file": "createelement-и-append-mv6cut1r.js",
-  "title": "createElement и append",
+  "title": "createelement-и-append-mv6cut1r",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
   "desc": "createElement создаёт новый DOM-элемент, а append добавляет его внутрь выбранного контейнера. Контейнер должен существовать в HTML.",
@@ -33,7 +33,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -45,19 +45,11 @@
       "source": "dict"
     },
     {
-      "line": 0,
-      "col": 22,
-      "text": "querySelector",
-      "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
-      "source": "dict"
-    },
-    {
       "line": 1,
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -74,22 +66,6 @@
       "text": "createElement",
       "kind": "fn",
       "note": "createElement — создаёт новый элемент (например div), который потом можно вставить на страницу.",
-      "source": "dict"
-    },
-    {
-      "line": 2,
-      "col": 5,
-      "text": "textContent",
-      "kind": "name",
-      "note": "textContent — текст внутри элемента; можно прочитать или заменить.",
-      "source": "dict"
-    },
-    {
-      "line": 3,
-      "col": 5,
-      "text": "append",
-      "kind": "fn",
-      "note": "append — добавляет узлы/текст в конец элемента.",
       "source": "dict"
     }
   ],

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "координаты-мыши-относительно-canvas-mv6cutax",
   "file": "координаты-мыши-относительно-canvas-mv6cutax.js",
-  "title": "Координаты мыши относительно Canvas",
+  "title": "координаты-мыши-относительно-canvas-mv6cutax",
   "lang": "js",
   "group": "Графика и визуализация / Canvas: рисование",
   "desc": "clientX/clientY относятся к окну браузера. Вычтите координаты и учтите масштаб canvas, чтобы получить координаты холста.",
@@ -21,7 +21,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -33,27 +33,19 @@
       "source": "dict"
     },
     {
-      "line": 0,
-      "col": 24,
-      "text": "querySelector",
-      "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
-      "source": "dict"
-    },
-    {
-      "line": 2,
-      "col": 7,
-      "text": "addEventListener",
-      "kind": "fn",
-      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
-      "source": "dict"
-    },
-    {
       "line": 3,
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "rect",
+      "kind": "name",
+      "note": "rect — прямоугольник",
       "source": "dict"
     },
     {
@@ -61,7 +53,39 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 29,
+      "text": "rect",
+      "kind": "name",
+      "note": "rect — прямоугольник",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 49,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина элемента",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 57,
+      "text": "rect",
+      "kind": "name",
+      "note": "rect — прямоугольник",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 62,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина элемента",
       "source": "dict"
     },
     {
@@ -69,7 +93,31 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 29,
+      "text": "rect",
+      "kind": "name",
+      "note": "rect — прямоугольник",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 34,
+      "text": "top",
+      "kind": "name",
+      "note": "top — смещение от верхнего края позиционирующего блока.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 57,
+      "text": "rect",
+      "kind": "name",
+      "note": "rect — прямоугольник",
       "source": "dict"
     },
     {
@@ -86,6 +134,22 @@
       "text": "log",
       "kind": "fn",
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 16,
+      "text": "toFixed",
+      "kind": "fn",
+      "note": "toFixed — оставляет нужное число знаков после точки, возвращает строку",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 30,
+      "text": "toFixed",
+      "kind": "fn",
+      "note": "toFixed — оставляет нужное число знаков после точки, возвращает строку",
       "source": "dict"
     }
   ],

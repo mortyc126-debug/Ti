@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "ввод-в-поле-mvh8g1hs",
   "file": "ввод-в-поле-mvh8g1hs.js",
-  "title": "ввод в поле",
+  "title": "ввод-в-поле-mvh8g1hs",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Реакция на действия поль",
   "desc": "Реагирует на каждый введённый символ.",
@@ -35,7 +35,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -55,27 +55,11 @@
       "source": "dict"
     },
     {
-      "line": 0,
-      "col": 23,
-      "text": "querySelector",
-      "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
-      "source": "dict"
-    },
-    {
       "line": 2,
       "col": 0,
       "text": "input",
       "kind": "name",
       "note": "input — событие изменения значения поля",
-      "source": "dict"
-    },
-    {
-      "line": 2,
-      "col": 6,
-      "text": "addEventListener",
-      "kind": "fn",
-      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
       "source": "dict"
     },
     {
@@ -93,22 +77,6 @@
       "kind": "fn",
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
       "source": "dict"
-    },
-    {
-      "line": 3,
-      "col": 20,
-      "text": "target",
-      "kind": "name",
-      "note": "target — элемент, на котором произошло событие.",
-      "source": "dict"
-    },
-    {
-      "line": 3,
-      "col": 27,
-      "text": "value",
-      "kind": "name",
-      "note": "value — текущее значение поля ввода (input, textarea, select).",
-      "source": "dict"
     }
   ],
   "component": {
@@ -123,5 +91,6 @@
     "template": "ввод-в-поле-mvh8g1hs.json",
     "descAt": 1792533972881
   },
-  "enriched": true
+  "enriched": true,
+  "descAt": 1792533972881
 }

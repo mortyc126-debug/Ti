@@ -3,7 +3,7 @@
   "id": "sessionstorage-автоочистка-по-таймеру-mvk17ple",
   "file": "sessionstorage-автоочистка-по-таймеру-mvk17ple.js",
   "lang": "js",
-  "title": "sessionStorage: автоочистка по таймеру",
+  "title": "sessionstorage-автоочистка-по-таймеру-mvk17ple",
   "group": "Файлы, хранение и сервер / Хранение в браузере",
   "desc": "Сохраняет данные в sessionStorage и автоматически удаляет их через заданное время (например, при закрытии вкладки).",
   "output": "Данные сохраняются в sessionStorage и удаляются через 5 минут (или другой интервал).",
@@ -51,7 +51,7 @@
     "временное хранение"
   ],
   "source": {
-    "title": "ai",
+    "title": "imported",
     "desc": "ai",
     "tags": "ai"
   },
@@ -62,7 +62,7 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "note": "объявить функцию",
       "source": "dict"
     },
     {
@@ -71,22 +71,6 @@
       "text": "key",
       "kind": "name",
       "note": "key — функция, по значению которой идёт сортировка",
-      "source": "dict"
-    },
-    {
-      "line": 0,
-      "col": 30,
-      "text": "value",
-      "kind": "name",
-      "note": "value — текущее значение поля ввода (input, textarea, select).",
-      "source": "dict"
-    },
-    {
-      "line": 1,
-      "col": 2,
-      "text": "sessionStorage",
-      "kind": "name",
-      "note": "sessionStorage — хранилище до закрытия вкладки",
       "source": "dict"
     },
     {
@@ -107,42 +91,10 @@
     },
     {
       "line": 1,
-      "col": 30,
-      "text": "JSON",
-      "kind": "fn",
-      "note": "json() — разбирает ответ сети в объект JavaScript.",
-      "source": "dict"
-    },
-    {
-      "line": 1,
       "col": 35,
       "text": "stringify",
       "kind": "fn",
       "note": "JSON.stringify — превратить объект в строку JSON (для хранения/передачи).",
-      "source": "dict"
-    },
-    {
-      "line": 1,
-      "col": 45,
-      "text": "value",
-      "kind": "name",
-      "note": "value — текущее значение поля ввода (input, textarea, select).",
-      "source": "dict"
-    },
-    {
-      "line": 2,
-      "col": 2,
-      "text": "setTimeout",
-      "kind": "fn",
-      "note": "setTimeout — выполнить код один раз через заданную задержку.",
-      "source": "dict"
-    },
-    {
-      "line": 3,
-      "col": 4,
-      "text": "sessionStorage",
-      "kind": "name",
-      "note": "sessionStorage — хранилище до закрытия вкладки",
       "source": "dict"
     },
     {

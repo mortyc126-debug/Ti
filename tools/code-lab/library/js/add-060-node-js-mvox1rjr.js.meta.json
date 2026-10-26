@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "id": "add-060-node-js-mvox1rjr",
+  "file": "add-060-node-js-mvox1rjr.js",
+  "lang": "js",
+  "title": "add-060-node-js",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998560439,
+  "component": {
+    "provides": [
+      "temp"
+    ],
+    "requires": [
+      "writeFile",
+      "rename",
+      "version"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "writeFile",
+      "kind": "name",
+      "note": "writeFile — записывает текст, а старое содержимое стирает",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 29,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "writeFile",
+      "kind": "fn",
+      "note": "writeFile — записывает текст, а старое содержимое стирает",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 27,
+      "text": "stringify",
+      "kind": "fn",
+      "note": "JSON.stringify — превратить объект в строку JSON (для хранения/передачи).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    }
+  ]
+}

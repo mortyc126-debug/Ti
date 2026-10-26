@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "setattribute-задать-атрибут-mv6cut0k",
   "file": "setattribute-задать-атрибут-mv6cut0k.js",
-  "title": "setAttribute — задать атрибут",
+  "title": "setattribute-задать-атрибут-mv6cut0k",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
   "desc": "setAttribute задаёт атрибут HTML-элемента, например title, aria-label или data-id.",
@@ -35,7 +35,15 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "button",
+      "kind": "name",
+      "note": "button — <button> — кнопка, по клику запускает действие.",
       "source": "dict"
     },
     {
@@ -47,27 +55,19 @@
       "source": "dict"
     },
     {
-      "line": 0,
-      "col": 24,
-      "text": "querySelector",
-      "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
-      "source": "dict"
-    },
-    {
       "line": 1,
-      "col": 7,
-      "text": "setAttribute",
-      "kind": "fn",
-      "note": "setAttribute — задать атрибут элемента (например data-id).",
+      "col": 0,
+      "text": "button",
+      "kind": "name",
+      "note": "button — <button> — кнопка, по клику запускает действие.",
       "source": "dict"
     },
     {
       "line": 2,
-      "col": 7,
-      "text": "setAttribute",
-      "kind": "fn",
-      "note": "setAttribute — задать атрибут элемента (например data-id).",
+      "col": 0,
+      "text": "button",
+      "kind": "name",
+      "note": "button — <button> — кнопка, по клику запускает действие.",
       "source": "dict"
     },
     {
@@ -88,10 +88,10 @@
     },
     {
       "line": 3,
-      "col": 19,
-      "text": "getAttribute",
-      "kind": "fn",
-      "note": "getAttribute — прочитать атрибут элемента.",
+      "col": 12,
+      "text": "button",
+      "kind": "name",
+      "note": "button — <button> — кнопка, по клику запускает действие.",
       "source": "dict"
     }
   ],

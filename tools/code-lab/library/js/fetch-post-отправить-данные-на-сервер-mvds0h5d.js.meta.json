@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "fetch-post-отправить-данные-на-сервер-mvds0h5d",
   "file": "fetch-post-отправить-данные-на-сервер-mvds0h5d.js",
-  "title": "fetch POST — отправить данные на сервер",
+  "title": "fetch-post-отправить-данные-на-сервер-mvds0h5d",
   "lang": "js",
   "group": "Сеть и запросы / Отправить данные",
   "desc": "Для отправки данных fetch получает второй аргумент: метод, заголовки и тело. Тело — строка, поэтому объект превращаем в JSON.",
@@ -41,7 +41,7 @@
       "col": 6,
       "text": "function",
       "kind": "kw",
-      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "note": "объявить функцию",
       "source": "dict"
     },
     {
@@ -49,7 +49,7 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -61,19 +61,27 @@
       "source": "dict"
     },
     {
-      "line": 1,
-      "col": 22,
-      "text": "fetch",
-      "kind": "fn",
-      "note": "fetch — делает запрос в сеть и возвращает промис с ответом.",
+      "line": 2,
+      "col": 4,
+      "text": "method",
+      "kind": "name",
+      "note": "method — способ запроса: GET читает, POST отправляет",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "headers",
+      "kind": "name",
+      "note": "headers — служебные заголовки запроса",
       "source": "dict"
     },
     {
       "line": 4,
-      "col": 10,
-      "text": "JSON",
-      "kind": "fn",
-      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "col": 4,
+      "text": "body",
+      "kind": "name",
+      "note": "body — тело запроса",
       "source": "dict"
     },
     {
@@ -89,15 +97,7 @@
       "col": 2,
       "text": "return",
       "kind": "kw",
-      "note": "return — функция отдаёт это значение обратно тому, кто её вызвал, и завершается.",
-      "source": "dict"
-    },
-    {
-      "line": 6,
-      "col": 15,
-      "text": "json",
-      "kind": "fn",
-      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "note": "вернуть результат из функции и завершить её выполнение",
       "source": "dict"
     },
     {
@@ -147,5 +147,6 @@
     "template": "fetch-post-отправить-данные-на-сервер-mvds0h5d.json",
     "descAt": 1792324974289
   },
-  "enriched": true
+  "enriched": true,
+  "descAt": 1792324974289
 }

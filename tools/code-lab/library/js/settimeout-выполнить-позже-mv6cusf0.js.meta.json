@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "settimeout-выполнить-позже-mv6cusf0",
   "file": "settimeout-выполнить-позже-mv6cusf0.js",
-  "title": "setTimeout — выполнить позже",
+  "title": "settimeout-выполнить-позже-mv6cusf0",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Реакция на действия поль",
   "desc": "setTimeout вызывает функцию один раз после задержки в миллисекундах. Задержка задаёт минимальное ожидание, а не точное время запуска.",
@@ -42,14 +42,6 @@
       "text": "log",
       "kind": "fn",
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
-      "source": "dict"
-    },
-    {
-      "line": 2,
-      "col": 0,
-      "text": "setTimeout",
-      "kind": "fn",
-      "note": "setTimeout — выполнить код один раз через заданную задержку.",
       "source": "dict"
     },
     {

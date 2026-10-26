@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "id": "class-static-mvox2hjx",
+  "file": "class-static-mvox2hjx.js",
+  "lang": "js",
+  "title": "class-static",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998594141,
+  "component": {
+    "provides": [
+      "Цена"
+    ],
+    "requires": [
+      "соСкидкой",
+      "значение",
+      "процент"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — описывает «чертёж» объектов: их свойства и методы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 40,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

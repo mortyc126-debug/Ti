@@ -1,0 +1,230 @@
+{
+  "schema": 1,
+  "id": "workflow-state-machine-mvox4fua",
+  "file": "workflow-state-machine-mvox4fua.js",
+  "lang": "js",
+  "title": "workflow-state-machine",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998685234,
+  "component": {
+    "provides": [
+      "createStateMachine",
+      "state",
+      "previous",
+      "machine"
+    ],
+    "requires": [
+      "can",
+      "next",
+      "transition",
+      "current",
+      "idle",
+      "running",
+      "failed"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "let",
+      "kind": "kw",
+      "note": "объявить переменную с блочной областью видимости",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "state",
+      "kind": "name",
+      "note": "state — состояние: единый объект с данными игры",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "state",
+      "kind": "fn",
+      "note": "state — состояние: единый объект с данными игры",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 18,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 25,
+      "text": "state",
+      "kind": "name",
+      "note": "state — состояние: единый объект с данными игры",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 16,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 36,
+      "text": "state",
+      "kind": "name",
+      "note": "state — состояние: единый объект с данными игры",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "transition",
+      "kind": "fn",
+      "note": "transition — плавное изменение свойства за заданное время",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 6,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 11,
+      "text": "this",
+      "kind": "kw",
+      "note": "получить контекст вызова функции",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 27,
+      "text": "throw",
+      "kind": "kw",
+      "note": "выбросить исключение",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 33,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 37,
+      "text": "Error",
+      "kind": "fn",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 6,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 23,
+      "text": "state",
+      "kind": "name",
+      "note": "state — состояние: единый объект с данными игры",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 30,
+      "text": "state",
+      "kind": "name",
+      "note": "state — состояние: единый объект с данными игры",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 6,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 34,
+      "text": "state",
+      "kind": "name",
+      "note": "state — состояние: единый объект с данными игры",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 20,
+      "text": "transition",
+      "kind": "fn",
+      "note": "transition — плавное изменение свойства за заданное время",
+      "source": "dict"
+    }
+  ]
+}

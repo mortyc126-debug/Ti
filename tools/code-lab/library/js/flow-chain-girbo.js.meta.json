@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "flow-chain-girbo",
   "file": "flow-chain-girbo.js",
-  "title": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси)",
+  "title": "flow-chain-girbo",
   "lang": "js",
   "group": "Сеть и запросы / Разобрать ответ и связать данные",
   "desc": "Полная цепочка с рабочим прокси. Прокси обходит запрет CORS: по умолчанию публичный corsproxy.io (бесплатный, без настройки). Свой надёжнее — Cloudflare Worker (код в cf-worker.js репозитория), формат …/?u=. Шаги: имя (как в Т-Инвестициях) → MOEX (ИНН эмитента) → ГИР БО: поиск организации по ИНН → список отчётов → годы в массив. Запусти — работает вживую (если corsproxy доступен).",
@@ -35,8 +35,8 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 1,
@@ -51,7 +51,7 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "note": "объявить функцию",
       "source": "dict"
     },
     {
@@ -61,14 +61,6 @@
       "kind": "fn",
       "note": "Собирает адрес по правилу проекта: …/?u= → кодируем target; …/? → добавляем как есть.",
       "source": "custom"
-    },
-    {
-      "line": 4,
-      "col": 21,
-      "text": "target",
-      "kind": "name",
-      "note": "target — элемент, на котором произошло событие.",
-      "source": "dict"
     },
     {
       "line": 5,
@@ -99,8 +91,8 @@
       "col": 27,
       "text": "return",
       "kind": "kw",
-      "note": "Выход функции.",
-      "source": "custom"
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
     },
     {
       "line": 5,
@@ -119,20 +111,12 @@
       "source": "custom"
     },
     {
-      "line": 5,
-      "col": 62,
-      "text": "target",
-      "kind": "name",
-      "note": "target — элемент, на котором произошло событие.",
-      "source": "dict"
-    },
-    {
       "line": 6,
       "col": 2,
       "text": "return",
       "kind": "kw",
-      "note": "Выход функции.",
-      "source": "custom"
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
     },
     {
       "line": 6,
@@ -143,20 +127,12 @@
       "source": "custom"
     },
     {
-      "line": 6,
-      "col": 18,
-      "text": "target",
-      "kind": "name",
-      "note": "target — элемент, на котором произошло событие.",
-      "source": "dict"
-    },
-    {
       "line": 8,
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 8,
@@ -179,8 +155,8 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 9,
@@ -200,10 +176,34 @@
     },
     {
       "line": 9,
+      "col": 26,
+      "text": "headers",
+      "kind": "name",
+      "note": "headers — служебные заголовки запроса",
+      "source": "dict"
+    },
+    {
+      "line": 9,
       "col": 69,
       "text": "then",
       "kind": "fn",
       "note": "then — что сделать, когда промис выполнится (получит результат).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 74,
+      "text": "r",
+      "kind": "name",
+      "note": "r — радиус круга",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 79,
+      "text": "r",
+      "kind": "name",
+      "note": "r — радиус круга",
       "source": "dict"
     },
     {
@@ -219,15 +219,15 @@
       "col": 0,
       "text": "async",
       "kind": "kw",
-      "note": "Функция умеет ждать (сеть).",
-      "source": "custom"
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
     },
     {
       "line": 12,
       "col": 6,
       "text": "function",
       "kind": "kw",
-      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "note": "объявить функцию",
       "source": "dict"
     },
     {
@@ -243,16 +243,16 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 13,
       "col": 12,
       "text": "await",
       "kind": "kw",
-      "note": "Подожди результат, иди дальше.",
-      "source": "custom"
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
     },
     {
       "line": 13,
@@ -275,16 +275,16 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 15,
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 16,
@@ -299,15 +299,15 @@
       "col": 11,
       "text": "throw",
       "kind": "kw",
-      "note": "Прервать с сообщением об ошибке.",
-      "source": "custom"
+      "note": "выбросить исключение",
+      "source": "dict"
     },
     {
       "line": 16,
       "col": 17,
       "text": "new",
       "kind": "kw",
-      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "note": "создать экземпляр объекта через конструктор",
       "source": "dict"
     },
     {
@@ -315,23 +315,15 @@
       "col": 21,
       "text": "Error",
       "kind": "fn",
-      "note": "Объект ошибки.",
-      "source": "custom"
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
     },
     {
       "line": 17,
       "col": 2,
       "text": "return",
       "kind": "kw",
-      "note": "Выход функции.",
-      "source": "custom"
-    },
-    {
-      "line": 17,
-      "col": 24,
-      "text": "indexOf",
-      "kind": "fn",
-      "note": "indexOf — позиция элемента/подстроки (или -1, если нет).",
+      "note": "вернуть результат из функции и завершить её выполнение",
       "source": "dict"
     },
     {
@@ -339,15 +331,15 @@
       "col": 0,
       "text": "async",
       "kind": "kw",
-      "note": "Функция умеет ждать (сеть).",
-      "source": "custom"
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
     },
     {
       "line": 21,
       "col": 6,
       "text": "function",
       "kind": "kw",
-      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "note": "объявить функцию",
       "source": "dict"
     },
     {
@@ -371,8 +363,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 22,
@@ -387,8 +379,8 @@
       "col": 18,
       "text": "await",
       "kind": "kw",
-      "note": "Подожди результат, иди дальше.",
-      "source": "custom"
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
     },
     {
       "line": 22,
@@ -419,8 +411,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 23,
@@ -451,8 +443,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 24,
@@ -491,15 +483,15 @@
       "col": 11,
       "text": "throw",
       "kind": "kw",
-      "note": "Прервать с сообщением об ошибке.",
-      "source": "custom"
+      "note": "выбросить исключение",
+      "source": "dict"
     },
     {
       "line": 25,
       "col": 17,
       "text": "new",
       "kind": "kw",
-      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "note": "создать экземпляр объекта через конструктор",
       "source": "dict"
     },
     {
@@ -507,8 +499,8 @@
       "col": 21,
       "text": "Error",
       "kind": "fn",
-      "note": "Объект ошибки.",
-      "source": "custom"
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
     },
     {
       "line": 25,
@@ -523,8 +515,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 26,
@@ -539,8 +531,8 @@
       "col": 14,
       "text": "await",
       "kind": "kw",
-      "note": "Подожди результат, иди дальше.",
-      "source": "custom"
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
     },
     {
       "line": 26,
@@ -571,8 +563,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 27,
@@ -603,8 +595,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 28,
@@ -647,20 +639,44 @@
       "source": "custom"
     },
     {
+      "line": 30,
+      "col": 14,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — превращает значение в число",
+      "source": "dict"
+    },
+    {
       "line": 31,
       "col": 5,
       "text": "sort",
       "kind": "fn",
-      "note": "Отсортировать.",
-      "source": "custom"
+      "note": "sort — отсортировать массив (по умолчанию как строки).",
+      "source": "dict"
+    },
+    {
+      "line": 31,
+      "col": 11,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 31,
+      "col": 24,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
     },
     {
       "line": 32,
       "col": 2,
       "text": "return",
       "kind": "kw",
-      "note": "Выход функции.",
-      "source": "custom"
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
     },
     {
       "line": 32,
@@ -683,15 +699,15 @@
       "col": 0,
       "text": "async",
       "kind": "kw",
-      "note": "Функция умеет ждать (сеть).",
-      "source": "custom"
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
     },
     {
       "line": 35,
       "col": 6,
       "text": "function",
       "kind": "kw",
-      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "note": "объявить функцию",
       "source": "dict"
     },
     {
@@ -699,8 +715,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 36,
@@ -715,8 +731,8 @@
       "col": 14,
       "text": "await",
       "kind": "kw",
-      "note": "Подожди результат, иди дальше.",
-      "source": "custom"
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
     },
     {
       "line": 36,
@@ -755,16 +771,24 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 38,
+      "col": 8,
+      "text": "r",
+      "kind": "name",
+      "note": "r — радиус круга",
+      "source": "dict"
     },
     {
       "line": 38,
       "col": 12,
       "text": "await",
       "kind": "kw",
-      "note": "Подожди результат, иди дальше.",
-      "source": "custom"
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
     },
     {
       "line": 38,
@@ -796,6 +820,22 @@
       "text": "log",
       "kind": "fn",
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 39,
+      "col": 24,
+      "text": "r",
+      "kind": "name",
+      "note": "r — радиус круга",
+      "source": "dict"
+    },
+    {
+      "line": 39,
+      "col": 42,
+      "text": "r",
+      "kind": "name",
+      "note": "r — радиус круга",
       "source": "dict"
     },
     {
@@ -912,5 +952,255 @@
   "legacy": {
     "template": "flow-chain-girbo.json"
   },
-  "enriched": true
+  "enriched": true,
+  "orphanNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 27,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "Функция умеет ждать (сеть).",
+      "source": "custom"
+    },
+    {
+      "line": 13,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 13,
+      "col": 12,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат, иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 14,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 15,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 16,
+      "col": 11,
+      "text": "throw",
+      "kind": "kw",
+      "note": "Прервать с сообщением об ошибке.",
+      "source": "custom"
+    },
+    {
+      "line": 16,
+      "col": 21,
+      "text": "Error",
+      "kind": "fn",
+      "note": "Объект ошибки.",
+      "source": "custom"
+    },
+    {
+      "line": 17,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции.",
+      "source": "custom"
+    },
+    {
+      "line": 21,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "Функция умеет ждать (сеть).",
+      "source": "custom"
+    },
+    {
+      "line": 22,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 22,
+      "col": 18,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат, иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 23,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 24,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 25,
+      "col": 11,
+      "text": "throw",
+      "kind": "kw",
+      "note": "Прервать с сообщением об ошибке.",
+      "source": "custom"
+    },
+    {
+      "line": 25,
+      "col": 21,
+      "text": "Error",
+      "kind": "fn",
+      "note": "Объект ошибки.",
+      "source": "custom"
+    },
+    {
+      "line": 26,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 26,
+      "col": 14,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат, иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 27,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 28,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 31,
+      "col": 5,
+      "text": "sort",
+      "kind": "fn",
+      "note": "Отсортировать.",
+      "source": "custom"
+    },
+    {
+      "line": 32,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции.",
+      "source": "custom"
+    },
+    {
+      "line": 35,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "Функция умеет ждать (сеть).",
+      "source": "custom"
+    },
+    {
+      "line": 36,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 36,
+      "col": 14,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат, иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 38,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 38,
+      "col": 12,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат, иди дальше.",
+      "source": "custom"
+    }
+  ]
 }

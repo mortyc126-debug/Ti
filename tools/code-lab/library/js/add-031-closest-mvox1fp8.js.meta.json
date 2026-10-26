@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "id": "add-031-closest-mvox1fp8",
+  "file": "add-031-closest-mvox1fp8.js",
+  "lang": "js",
+  "title": "add-031-closest",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998545084,
+  "component": {
+    "provides": [
+      "button"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "button",
+      "kind": "name",
+      "note": "button — <button> — кнопка, по клику запускает действие.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 30,
+      "text": "closest",
+      "kind": "fn",
+      "note": "closest — ближайший родитель, подходящий под селектор",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 7,
+      "text": "button",
+      "kind": "name",
+      "note": "button — <button> — кнопка, по клику запускает действие.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 14,
+      "text": "button",
+      "kind": "name",
+      "note": "button — <button> — кнопка, по клику запускает действие.",
+      "source": "dict"
+    }
+  ]
+}

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "создать-надпись-в-координатах-экрана-mv6cut1c",
   "file": "создать-надпись-в-координатах-экрана-mv6cut1c.js",
-  "title": "Создать надпись в координатах экрана",
+  "title": "создать-надпись-в-координатах-экрана-mv6cut1c",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
   "desc": "Создайте элемент, задайте ему fixed-позиционирование и координаты в пикселях. Координаты clientX/clientY относятся к видимой области окна.",
@@ -35,7 +35,7 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "note": "объявить функцию",
       "source": "dict"
     },
     {
@@ -43,7 +43,15 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "label",
+      "kind": "name",
+      "note": "label — подпись к полю",
       "source": "dict"
     },
     {
@@ -64,10 +72,18 @@
     },
     {
       "line": 2,
-      "col": 8,
-      "text": "textContent",
+      "col": 2,
+      "text": "label",
       "kind": "name",
-      "note": "textContent — текст внутри элемента; можно прочитать или заменить.",
+      "note": "label — подпись к полю",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "label",
+      "kind": "name",
+      "note": "label — подпись к полю",
       "source": "dict"
     },
     {
@@ -76,6 +92,22 @@
       "text": "style",
       "kind": "name",
       "note": "style — инлайновые стили элемента: element.style.color = \"red\".",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 14,
+      "text": "position",
+      "kind": "name",
+      "note": "position: relative — позволяет применять z-index к элементу.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "label",
+      "kind": "name",
+      "note": "label — подпись к полю",
       "source": "dict"
     },
     {
@@ -88,10 +120,34 @@
     },
     {
       "line": 5,
+      "col": 2,
+      "text": "label",
+      "kind": "name",
+      "note": "label — подпись к полю",
+      "source": "dict"
+    },
+    {
+      "line": 5,
       "col": 8,
       "text": "style",
       "kind": "name",
       "note": "style — инлайновые стили элемента: element.style.color = \"red\".",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 14,
+      "text": "top",
+      "kind": "name",
+      "note": "top — смещение от верхнего края позиционирующего блока.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "label",
+      "kind": "name",
+      "note": "label — подпись к полю",
       "source": "dict"
     },
     {
@@ -112,10 +168,18 @@
     },
     {
       "line": 7,
-      "col": 16,
-      "text": "append",
-      "kind": "fn",
-      "note": "append — добавляет узлы/текст в конец элемента.",
+      "col": 11,
+      "text": "body",
+      "kind": "name",
+      "note": "body — тело запроса",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 23,
+      "text": "label",
+      "kind": "name",
+      "note": "label — подпись к полю",
       "source": "dict"
     }
   ],

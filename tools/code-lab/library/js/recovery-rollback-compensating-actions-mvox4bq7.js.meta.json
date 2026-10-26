@@ -1,0 +1,232 @@
+{
+  "schema": 1,
+  "id": "recovery-rollback-compensating-actions-mvox4bq7",
+  "file": "recovery-rollback-compensating-actions-mvox4bq7.js",
+  "lang": "js",
+  "title": "recovery-rollback-compensating-actions",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998679903,
+  "component": {
+    "provides": [
+      "runWithCompensation",
+      "completed",
+      "step",
+      "result",
+      "rollbackErrors",
+      "item"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "for",
+      "kind": "kw",
+      "note": "цикл с инициализацией, условием и шагом",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 9,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 20,
+      "text": "of",
+      "kind": "kw",
+      "note": "of — часть цикла for…of: перебрать элементы массива/коллекции.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 6,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 21,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 4,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 4,
+      "text": "for",
+      "kind": "kw",
+      "note": "цикл с инициализацией, условием и шагом",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 9,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 20,
+      "text": "of",
+      "kind": "kw",
+      "note": "of — часть цикла for…of: перебрать элементы массива/коллекции.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 33,
+      "text": "reverse",
+      "kind": "fn",
+      "note": "reverse — перевернуть порядок элементов массива.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 6,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 12,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 6,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 13,
+      "text": "error",
+      "kind": "name",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 66,
+      "text": "error",
+      "kind": "name",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 4,
+      "text": "throw",
+      "kind": "kw",
+      "note": "выбросить исключение",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 17,
+      "text": "assign",
+      "kind": "fn",
+      "note": "Object.assign — скопировать свойства из одного объекта в другой.",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 24,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 28,
+      "text": "Error",
+      "kind": "fn",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    }
+  ]
+}

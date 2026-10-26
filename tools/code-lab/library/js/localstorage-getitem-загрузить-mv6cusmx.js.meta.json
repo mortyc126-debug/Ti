@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "localstorage-getitem-загрузить-mv6cusmx",
   "file": "localstorage-getitem-загрузить-mv6cusmx.js",
-  "title": "localStorage.getItem — загрузить",
+  "title": "localstorage-getitem-загрузить-mv6cusmx",
   "lang": "js",
   "group": "Файлы, хранение и сервер / Хранение в браузере",
   "desc": "getItem читает строковое значение по ключу. Если ключа нет, вернётся null.",
@@ -32,14 +32,6 @@
   "wordNotes": [
     {
       "line": 0,
-      "col": 0,
-      "text": "localStorage",
-      "kind": "name",
-      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
-      "source": "dict"
-    },
-    {
-      "line": 0,
       "col": 13,
       "text": "setItem",
       "kind": "fn",
@@ -51,15 +43,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
-      "source": "dict"
-    },
-    {
-      "line": 1,
-      "col": 15,
-      "text": "localStorage",
-      "kind": "name",
-      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {

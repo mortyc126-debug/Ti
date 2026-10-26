@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "localstorage-сохранить-и-прочитать-mvh8hd3x",
   "file": "localstorage-сохранить-и-прочитать-mvh8hd3x.js",
-  "title": "localStorage: сохранить и прочитать",
+  "title": "localstorage-сохранить-и-прочитать-mvh8hd3x",
   "lang": "js",
   "group": "Файлы, хранение и сервер / Хранение в браузере",
   "desc": "Сохраняет строку между визитами.",
@@ -43,8 +43,8 @@
       "col": 13,
       "text": "setItem",
       "kind": "fn",
-      "note": "setItem — записывает значение под ключом",
-      "source": "custom"
+      "note": "setItem — записать значение в localStorage по ключу.",
+      "source": "dict"
     },
     {
       "line": 1,
@@ -75,8 +75,8 @@
       "col": 25,
       "text": "getItem",
       "kind": "fn",
-      "note": "getItem — читает значение, а если нет, вернёт null",
-      "source": "custom"
+      "note": "getItem — прочитать значение из localStorage по ключу.",
+      "source": "dict"
     }
   ],
   "component": {
@@ -87,5 +87,24 @@
     "template": "localstorage-сохранить-и-прочитать-mvh8hd3x.json",
     "descAt": 1792534034590
   },
-  "enriched": true
+  "enriched": true,
+  "descAt": 1792534034590,
+  "orphanNotes": [
+    {
+      "line": 0,
+      "col": 13,
+      "text": "setItem",
+      "kind": "fn",
+      "note": "setItem — записывает значение под ключом",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 25,
+      "text": "getItem",
+      "kind": "fn",
+      "note": "getItem — читает значение, а если нет, вернёт null",
+      "source": "custom"
+    }
+  ]
 }

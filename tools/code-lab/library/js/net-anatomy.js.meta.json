@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "net-anatomy",
   "file": "net-anatomy.js",
-  "title": "Анатомия запроса + если нет шаблона",
+  "title": "net-anatomy",
   "lang": "js",
   "group": "Сеть и запросы / Получить данные",
   "desc": "Из чего состоит запрос и как его СОБРАТЬ самому, когда готового примера нет. Запрос = адрес (база + путь) + параметры после ?. Где взять: 1) документация API; 2) открой сайт, F12 → вкладка Network, сделай действие — увидишь реальные запросы; 3) проверь URL, просто вставив его в адресную строку браузера.",
@@ -35,8 +35,8 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 1,
@@ -51,8 +51,8 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 2,
@@ -67,8 +67,8 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 3,
@@ -83,7 +83,7 @@
       "col": 18,
       "text": "new",
       "kind": "kw",
-      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "note": "создать экземпляр объекта через конструктор",
       "source": "dict"
     },
     {
@@ -99,8 +99,8 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 7,
@@ -139,15 +139,15 @@
       "col": 0,
       "text": "async",
       "kind": "kw",
-      "note": "Функция умеет ждать (сеть).",
-      "source": "custom"
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
     },
     {
       "line": 10,
       "col": 6,
       "text": "function",
       "kind": "kw",
-      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "note": "объявить функцию",
       "source": "dict"
     },
     {
@@ -171,16 +171,24 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 8,
+      "text": "r",
+      "kind": "name",
+      "note": "r — радиус круга",
+      "source": "dict"
     },
     {
       "line": 11,
       "col": 12,
       "text": "await",
       "kind": "kw",
-      "note": "Подожди результат, потом иди дальше.",
-      "source": "custom"
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
     },
     {
       "line": 11,
@@ -203,16 +211,24 @@
       "col": 2,
       "text": "return",
       "kind": "kw",
-      "note": "Выход функции.",
-      "source": "custom"
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
     },
     {
       "line": 12,
       "col": 9,
       "text": "await",
       "kind": "kw",
-      "note": "Подожди результат, потом иди дальше.",
-      "source": "custom"
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 15,
+      "text": "r",
+      "kind": "name",
+      "note": "r — радиус круга",
+      "source": "dict"
     },
     {
       "line": 12,
@@ -243,8 +259,8 @@
       "col": 12,
       "text": "then",
       "kind": "fn",
-      "note": "«Когда промис готов — сделай…».",
-      "source": "custom"
+      "note": "then — что сделать, когда промис выполнится (получит результат).",
+      "source": "dict"
     },
     {
       "line": 14,
@@ -352,5 +368,87 @@
   "legacy": {
     "template": "net-anatomy.json"
   },
-  "enriched": true
+  "enriched": true,
+  "orphanNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "Функция умеет ждать (сеть).",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 12,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат, потом иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции.",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 9,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат, потом иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 14,
+      "col": 12,
+      "text": "then",
+      "kind": "fn",
+      "note": "«Когда промис готов — сделай…».",
+      "source": "custom"
+    }
+  ]
 }

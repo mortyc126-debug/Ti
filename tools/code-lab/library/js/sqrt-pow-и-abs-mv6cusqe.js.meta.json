@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "sqrt-pow-и-abs-mv6cusqe",
   "file": "sqrt-pow-и-abs-mv6cusqe.js",
-  "title": "sqrt, pow и abs",
+  "title": "sqrt-pow-и-abs-mv6cusqe",
   "lang": "js",
   "group": "Данные: хранить, находить и преобразовывать / Числа и просты",
   "desc": "sqrt вычисляет квадратный корень, pow возводит число в степень, abs возвращает абсолютное значение.",

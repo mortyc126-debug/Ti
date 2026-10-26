@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "id": "add-076-web-worker-mvox1y7a",
+  "file": "add-076-web-worker-mvox1y7a.js",
+  "lang": "js",
+  "title": "add-076-web-worker",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998569062,
+  "component": {
+    "provides": [
+      "buffer"
+    ],
+    "requires": [
+      "ArrayBuffer",
+      "worker"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

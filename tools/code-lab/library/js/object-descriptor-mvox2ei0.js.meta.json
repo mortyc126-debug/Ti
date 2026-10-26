@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "id": "object-descriptor-mvox2ei0",
+  "file": "object-descriptor-mvox2ei0.js",
+  "lang": "js",
+  "title": "object-descriptor",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998590184,
+  "component": {
+    "provides": [
+      "объект"
+    ],
+    "requires": [
+      "цена"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

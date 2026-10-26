@@ -1,0 +1,136 @@
+{
+  "schema": 1,
+  "id": "file-download-blob-mvox44q1",
+  "file": "file-download-blob-mvox44q1.js",
+  "lang": "js",
+  "title": "file-download-blob",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998670825,
+  "component": {
+    "provides": [
+      "downloadText",
+      "blob",
+      "url",
+      "link"
+    ],
+    "requires": [
+      "Blob"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт новый элемент (например div), который потом можно вставить на страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 50,
+      "text": "hidden",
+      "kind": "name",
+      "note": "hidden — атрибут, скрывающий элемент со страницы",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 59,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 11,
+      "text": "body",
+      "kind": "name",
+      "note": "body — тело запроса",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 35,
+      "text": "click",
+      "kind": "fn",
+      "note": "click — событие клика мышью или касанием",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 49,
+      "text": "remove",
+      "kind": "fn",
+      "note": "remove — удаляет элемент со страницы.",
+      "source": "dict"
+    }
+  ]
+}

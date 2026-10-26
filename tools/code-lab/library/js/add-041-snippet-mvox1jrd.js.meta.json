@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "id": "add-041-snippet-mvox1jrd",
+  "file": "add-041-snippet-mvox1jrd.js",
+  "lang": "js",
+  "title": "add-041-snippet",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998550345,
+  "component": {
+    "provides": [
+      "formatter"
+    ],
+    "requires": [
+      "Intl",
+      "minimumFractionDigits",
+      "maximumFractionDigits"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 18,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

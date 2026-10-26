@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "net-debug",
   "file": "net-debug.js",
-  "title": "Запрос сломался — где и почему",
+  "title": "net-debug",
   "lang": "js",
   "group": "Сеть и запросы / Ошибки сети и диагностика",
   "desc": "Как понять, ЧТО именно пошло не так. Проверяем по шагам: дошли ли до сети, какой статус вернул сервер (200 ок, 404 нет адреса, 500 упал), это вообще JSON или HTML с ошибкой. Запусти — адрес нарочно битый, увидишь, на каком шаге встало.",
@@ -21,15 +21,15 @@
       "col": 0,
       "text": "async",
       "kind": "kw",
-      "note": "Функция умеет ждать (сеть).",
-      "source": "custom"
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
     },
     {
       "line": 0,
       "col": 6,
       "text": "function",
       "kind": "kw",
-      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "note": "объявить функцию",
       "source": "dict"
     },
     {
@@ -77,7 +77,7 @@
       "col": 2,
       "text": "let",
       "kind": "kw",
-      "note": "let — объявляет переменную, значение которой можно менять позже.",
+      "note": "объявить переменную с блочной областью видимости",
       "source": "dict"
     },
     {
@@ -85,14 +85,14 @@
       "col": 6,
       "text": "r",
       "kind": "name",
-      "note": "Ответ сервера.",
-      "source": "custom"
+      "note": "r — радиус круга",
+      "source": "dict"
     },
     {
       "line": 3,
       "col": 2,
       "text": "try",
-      "kind": "name",
+      "kind": "kw",
       "note": "try — пробуем выполнить код, который может дать ошибку.",
       "source": "dict"
     },
@@ -101,16 +101,16 @@
       "col": 4,
       "text": "r",
       "kind": "name",
-      "note": "Ответ сервера.",
-      "source": "custom"
+      "note": "r — радиус круга",
+      "source": "dict"
     },
     {
       "line": 4,
       "col": 8,
       "text": "await",
       "kind": "kw",
-      "note": "Подожди результат, потом иди дальше.",
-      "source": "custom"
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
     },
     {
       "line": 4,
@@ -132,9 +132,9 @@
       "line": 5,
       "col": 4,
       "text": "catch",
-      "kind": "fn",
-      "note": "«Если упало — сделай…».",
-      "source": "custom"
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
     },
     {
       "line": 6,
@@ -157,8 +157,8 @@
       "col": 4,
       "text": "return",
       "kind": "kw",
-      "note": "Выход функции.",
-      "source": "custom"
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
     },
     {
       "line": 7,
@@ -189,16 +189,16 @@
       "col": 27,
       "text": "r",
       "kind": "name",
-      "note": "Ответ сервера.",
-      "source": "custom"
+      "note": "r — радиус круга",
+      "source": "dict"
     },
     {
       "line": 9,
       "col": 29,
       "text": "status",
       "kind": "name",
-      "note": "Код ответа: 200 ок, 404 нет адреса, 403 запрет, 500 сервер упал.",
-      "source": "custom"
+      "note": "status — код ответа: 200 успех, 404 не найдено, 500 ошибка сервера",
+      "source": "dict"
     },
     {
       "line": 10,
@@ -213,8 +213,8 @@
       "col": 6,
       "text": "r",
       "kind": "name",
-      "note": "Ответ сервера.",
-      "source": "custom"
+      "note": "r — радиус круга",
+      "source": "dict"
     },
     {
       "line": 10,
@@ -245,24 +245,24 @@
       "col": 42,
       "text": "r",
       "kind": "name",
-      "note": "Ответ сервера.",
-      "source": "custom"
+      "note": "r — радиус круга",
+      "source": "dict"
     },
     {
       "line": 11,
       "col": 44,
       "text": "status",
       "kind": "name",
-      "note": "Код ответа: 200 ок, 404 нет адреса, 403 запрет, 500 сервер упал.",
-      "source": "custom"
+      "note": "status — код ответа: 200 успех, 404 не найдено, 500 ошибка сервера",
+      "source": "dict"
     },
     {
       "line": 12,
       "col": 4,
       "text": "return",
       "kind": "kw",
-      "note": "Выход функции.",
-      "source": "custom"
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
     },
     {
       "line": 12,
@@ -277,8 +277,8 @@
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная-провод.",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 14,
@@ -293,16 +293,16 @@
       "col": 16,
       "text": "await",
       "kind": "kw",
-      "note": "Подожди результат, потом иди дальше.",
-      "source": "custom"
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
     },
     {
       "line": 14,
       "col": 22,
       "text": "r",
       "kind": "name",
-      "note": "Ответ сервера.",
-      "source": "custom"
+      "note": "r — радиус круга",
+      "source": "dict"
     },
     {
       "line": 14,
@@ -316,7 +316,7 @@
       "line": 15,
       "col": 2,
       "text": "try",
-      "kind": "name",
+      "kind": "kw",
       "note": "try — пробуем выполнить код, который может дать ошибку.",
       "source": "dict"
     },
@@ -325,15 +325,7 @@
       "col": 4,
       "text": "return",
       "kind": "kw",
-      "note": "Выход функции.",
-      "source": "custom"
-    },
-    {
-      "line": 16,
-      "col": 11,
-      "text": "JSON",
-      "kind": "fn",
-      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "note": "вернуть результат из функции и завершить её выполнение",
       "source": "dict"
     },
     {
@@ -341,8 +333,8 @@
       "col": 16,
       "text": "parse",
       "kind": "fn",
-      "note": "Текст → объект; падает, если это не JSON.",
-      "source": "custom"
+      "note": "JSON.parse — разобрать строку JSON обратно в объект.",
+      "source": "dict"
     },
     {
       "line": 16,
@@ -356,9 +348,9 @@
       "line": 17,
       "col": 4,
       "text": "catch",
-      "kind": "fn",
-      "note": "«Если упало — сделай…».",
-      "source": "custom"
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
     },
     {
       "line": 18,
@@ -397,8 +389,8 @@
       "col": 4,
       "text": "return",
       "kind": "kw",
-      "note": "Выход функции.",
-      "source": "custom"
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
     },
     {
       "line": 19,
@@ -421,8 +413,8 @@
       "col": 3,
       "text": "then",
       "kind": "fn",
-      "note": "«Когда промис готов — сделай…».",
-      "source": "custom"
+      "note": "then — что сделать, когда промис выполнится (получит результат).",
+      "source": "dict"
     },
     {
       "line": 25,
@@ -524,5 +516,167 @@
   },
   "legacy": {
     "template": "net-debug.json"
-  }
+  },
+  "orphanNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "Функция умеет ждать (сеть).",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "r",
+      "kind": "name",
+      "note": "Ответ сервера.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "r",
+      "kind": "name",
+      "note": "Ответ сервера.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат, потом иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "catch",
+      "kind": "fn",
+      "note": "«Если упало — сделай…».",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции.",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 27,
+      "text": "r",
+      "kind": "name",
+      "note": "Ответ сервера.",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 29,
+      "text": "status",
+      "kind": "name",
+      "note": "Код ответа: 200 ок, 404 нет адреса, 403 запрет, 500 сервер упал.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 6,
+      "text": "r",
+      "kind": "name",
+      "note": "Ответ сервера.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 42,
+      "text": "r",
+      "kind": "name",
+      "note": "Ответ сервера.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 44,
+      "text": "status",
+      "kind": "name",
+      "note": "Код ответа: 200 ок, 404 нет адреса, 403 запрет, 500 сервер упал.",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции.",
+      "source": "custom"
+    },
+    {
+      "line": 14,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 14,
+      "col": 16,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат, потом иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 14,
+      "col": 22,
+      "text": "r",
+      "kind": "name",
+      "note": "Ответ сервера.",
+      "source": "custom"
+    },
+    {
+      "line": 16,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции.",
+      "source": "custom"
+    },
+    {
+      "line": 16,
+      "col": 16,
+      "text": "parse",
+      "kind": "fn",
+      "note": "Текст → объект; падает, если это не JSON.",
+      "source": "custom"
+    },
+    {
+      "line": 17,
+      "col": 4,
+      "text": "catch",
+      "kind": "fn",
+      "note": "«Если упало — сделай…».",
+      "source": "custom"
+    },
+    {
+      "line": 19,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции.",
+      "source": "custom"
+    },
+    {
+      "line": 25,
+      "col": 3,
+      "text": "then",
+      "kind": "fn",
+      "note": "«Когда промис готов — сделай…».",
+      "source": "custom"
+    }
+  ]
 }

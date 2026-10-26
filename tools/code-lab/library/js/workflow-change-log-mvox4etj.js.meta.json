@@ -1,0 +1,193 @@
+{
+  "schema": 1,
+  "id": "workflow-change-log-mvox4etj",
+  "file": "workflow-change-log-mvox4etj.js",
+  "lang": "js",
+  "title": "workflow-change-log",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998683911,
+  "component": {
+    "provides": [
+      "createChangeLog",
+      "entries",
+      "entry",
+      "log"
+    ],
+    "requires": [
+      "append",
+      "entityId",
+      "action",
+      "before",
+      "after",
+      "actor",
+      "id",
+      "at",
+      "list",
+      "x"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 37,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "entries",
+      "kind": "name",
+      "note": "Object.entries — массив пар [ключ, значение].",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 40,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 54,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 68,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 6,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 40,
+      "text": "entries",
+      "kind": "name",
+      "note": "Object.entries — массив пар [ключ, значение].",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 48,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 6,
+      "text": "entries",
+      "kind": "name",
+      "note": "Object.entries — массив пар [ключ, значение].",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 6,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 24,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 32,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 39,
+      "text": "entries",
+      "kind": "name",
+      "note": "Object.entries — массив пар [ключ, значение].",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 6,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 31,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

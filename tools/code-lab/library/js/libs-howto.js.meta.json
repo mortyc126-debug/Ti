@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "libs-howto",
   "file": "libs-howto.js",
-  "title": "Как подключать библиотеки",
+  "title": "libs-howto",
   "lang": "js",
   "group": "Основы / Как устроена программа",
   "desc": "Библиотека — чужой готовый код, который подключаешь к себе. Два пути: через npm (в проекте со сборкой) или через CDN (прямо в HTML).",
@@ -35,8 +35,8 @@
       "col": 0,
       "text": "import",
       "kind": "kw",
-      "note": "Подключить библиотеку в код (после npm install).",
-      "source": "custom"
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
     },
     {
       "line": 3,
@@ -59,16 +59,16 @@
       "col": 0,
       "text": "console",
       "kind": "fn",
-      "note": "Встроенный объект вывода в консоль (F12 → Console).",
-      "source": "custom"
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
     },
     {
       "line": 4,
       "col": 8,
       "text": "log",
       "kind": "fn",
-      "note": "Печатает в консоль то, что в скобках.",
-      "source": "custom"
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
     },
     {
       "line": 4,
@@ -168,5 +168,31 @@
   "legacy": {
     "template": "libs-howto.json"
   },
-  "enriched": true
+  "enriched": true,
+  "orphanNotes": [
+    {
+      "line": 3,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "Подключить библиотеку в код (после npm install).",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "Встроенный объект вывода в консоль (F12 → Console).",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "Печатает в консоль то, что в скобках.",
+      "source": "custom"
+    }
+  ]
 }

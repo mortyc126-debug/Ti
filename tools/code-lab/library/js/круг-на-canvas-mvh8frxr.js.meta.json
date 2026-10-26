@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "круг-на-canvas-mvh8frxr",
   "file": "круг-на-canvas-mvh8frxr.js",
-  "title": "круг на canvas",
+  "title": "круг-на-canvas-mvh8frxr",
   "lang": "js",
   "group": "Графика и визуализация / Canvas: рисование",
   "desc": "Круг с заливкой и обводкой.",
@@ -35,16 +35,16 @@
       "col": 4,
       "text": "beginPath",
       "kind": "fn",
-      "note": "beginPath — начинает новый контур",
-      "source": "custom"
+      "note": "beginPath — начать новый контур рисования на canvas.",
+      "source": "dict"
     },
     {
       "line": 1,
       "col": 4,
       "text": "arc",
       "kind": "fn",
-      "note": "arc — дуга окружности: центр x, y, радиус, углы в радианах",
-      "source": "custom"
+      "note": "arc — нарисовать дугу/круг на canvas.",
+      "source": "dict"
     },
     {
       "line": 1,
@@ -89,5 +89,24 @@
     "template": "круг-на-canvas-mvh8frxr.json",
     "descAt": 1792533960496
   },
-  "enriched": true
+  "enriched": true,
+  "descAt": 1792533960496,
+  "orphanNotes": [
+    {
+      "line": 0,
+      "col": 4,
+      "text": "beginPath",
+      "kind": "fn",
+      "note": "beginPath — начинает новый контур",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 4,
+      "text": "arc",
+      "kind": "fn",
+      "note": "arc — дуга окружности: центр x, y, радиус, углы в радианах",
+      "source": "custom"
+    }
+  ]
 }

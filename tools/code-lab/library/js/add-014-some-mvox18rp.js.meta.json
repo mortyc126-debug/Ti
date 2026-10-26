@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "id": "add-014-some-mvox18rp",
+  "file": "add-014-some-mvox18rp.js",
+  "lang": "js",
+  "title": "add-014-some",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998536101,
+  "component": {
+    "provides": [
+      "значения"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

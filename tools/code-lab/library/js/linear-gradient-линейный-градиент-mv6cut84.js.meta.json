@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "linear-gradient-линейный-градиент-mv6cut84",
   "file": "linear-gradient-линейный-градиент-mv6cut84.js",
-  "title": "linear-gradient — линейный градиент",
+  "title": "linear-gradient-линейный-градиент-mv6cut84",
   "lang": "js",
   "group": "Графика и визуализация / Цвета и градиенты",
   "desc": "linear-gradient создаёт переход цветов вдоль направления. Его можно назначить через CSS background или backgroundImage.",
@@ -34,7 +34,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -43,14 +43,6 @@
       "text": "document",
       "kind": "fn",
       "note": "document — вся загруженная страница; через него находят и меняют элементы.",
-      "source": "dict"
-    },
-    {
-      "line": 0,
-      "col": 23,
-      "text": "querySelector",
-      "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
       "source": "dict"
     },
     {

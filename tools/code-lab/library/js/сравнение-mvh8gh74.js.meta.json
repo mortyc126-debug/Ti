@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "сравнение-mvh8gh74",
   "file": "сравнение-mvh8gh74.js",
-  "title": "сравнение",
+  "title": "сравнение-mvh8gh74",
   "lang": "js",
   "group": "Основы / Синтаксис",
   "desc": "Строгое и нестрогое сравнение.",
@@ -70,5 +70,6 @@
     "template": "сравнение-mvh8gh74.json",
     "descAt": 1792533993232
   },
-  "enriched": true
+  "enriched": true,
+  "descAt": 1792533993232
 }

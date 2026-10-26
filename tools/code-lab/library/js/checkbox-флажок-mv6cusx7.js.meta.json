@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "checkbox-флажок-mv6cusx7",
   "file": "checkbox-флажок-mv6cusx7.js",
-  "title": "checkbox — флажок",
+  "title": "checkbox-флажок-mv6cusx7",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Поля ввода и формы",
   "desc": "Для checkbox используйте свойство checked, а не value, чтобы узнать, установлен ли флажок.",
@@ -34,7 +34,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -46,19 +46,11 @@
       "source": "dict"
     },
     {
-      "line": 0,
-      "col": 26,
-      "text": "querySelector",
-      "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
-      "source": "dict"
-    },
-    {
       "line": 1,
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -70,27 +62,19 @@
       "source": "dict"
     },
     {
-      "line": 1,
-      "col": 24,
-      "text": "querySelector",
-      "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
-      "source": "dict"
-    },
-    {
-      "line": 3,
-      "col": 9,
-      "text": "addEventListener",
-      "kind": "fn",
-      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
-      "source": "dict"
-    },
-    {
       "line": 4,
       "col": 9,
       "text": "classList",
       "kind": "name",
       "note": "classList — список CSS-классов элемента: add/remove/toggle/contains.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 19,
+      "text": "toggle",
+      "kind": "fn",
+      "note": "toggle — добавляет класс, если его нет, и убирает, если есть",
       "source": "dict"
     },
     {

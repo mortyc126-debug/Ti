@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "типы-значений-mvh8ggr9",
   "file": "типы-значений-mvh8ggr9.js",
-  "title": "типы значений",
+  "title": "типы-значений-mvh8ggr9",
   "lang": "js",
   "group": "Основы / Синтаксис",
   "desc": "Основные типы в JavaScript.",
@@ -49,8 +49,8 @@
       "col": 12,
       "text": "typeof",
       "kind": "kw",
-      "note": "typeof — показывает тип значения",
-      "source": "custom"
+      "note": "определить тип значения в виде строки",
+      "source": "dict"
     },
     {
       "line": 1,
@@ -73,8 +73,8 @@
       "col": 12,
       "text": "typeof",
       "kind": "kw",
-      "note": "typeof — показывает тип значения",
-      "source": "custom"
+      "note": "определить тип значения в виде строки",
+      "source": "dict"
     },
     {
       "line": 2,
@@ -97,8 +97,8 @@
       "col": 12,
       "text": "typeof",
       "kind": "kw",
-      "note": "typeof — показывает тип значения",
-      "source": "custom"
+      "note": "определить тип значения в виде строки",
+      "source": "dict"
     },
     {
       "line": 2,
@@ -129,8 +129,8 @@
       "col": 12,
       "text": "typeof",
       "kind": "kw",
-      "note": "typeof — показывает тип значения",
-      "source": "custom"
+      "note": "определить тип значения в виде строки",
+      "source": "dict"
     },
     {
       "line": 3,
@@ -161,6 +161,66 @@
       "col": 12,
       "text": "typeof",
       "kind": "kw",
+      "note": "определить тип значения в виде строки",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 19,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "provides": [],
+    "requires": []
+  },
+  "legacy": {
+    "template": "типы-значений-mvh8ggr9.json",
+    "descAt": 1792533992661
+  },
+  "enriched": true,
+  "descAt": 1792533992661,
+  "orphanNotes": [
+    {
+      "line": 0,
+      "col": 12,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — показывает тип значения",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — показывает тип значения",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — показывает тип значения",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 12,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — показывает тип значения",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 12,
+      "text": "typeof",
+      "kind": "kw",
       "note": "typeof — показывает тип значения",
       "source": "custom"
     },
@@ -172,14 +232,5 @@
       "note": "null — «пусто»; typeof null по историческим причинам даёт object",
       "source": "custom"
     }
-  ],
-  "component": {
-    "provides": [],
-    "requires": []
-  },
-  "legacy": {
-    "template": "типы-значений-mvh8ggr9.json",
-    "descAt": 1792533992661
-  },
-  "enriched": true
+  ]
 }

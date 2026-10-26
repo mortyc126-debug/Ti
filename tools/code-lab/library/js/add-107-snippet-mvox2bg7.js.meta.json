@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "id": "add-107-snippet-mvox2bg7",
+  "file": "add-107-snippet-mvox2bg7.js",
+  "lang": "js",
+  "title": "add-107-snippet",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998586231,
+  "component": {
+    "provides": [
+      "button"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "button",
+      "kind": "name",
+      "note": "button — <button> — кнопка, по клику запускает действие.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "button",
+      "kind": "name",
+      "note": "button — <button> — кнопка, по клику запускает действие.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "false",
+      "kind": "kw",
+      "note": "false — логическая «ложь» (нет).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "button",
+      "kind": "name",
+      "note": "button — <button> — кнопка, по клику запускает действие.",
+      "source": "dict"
+    }
+  ]
+}

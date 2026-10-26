@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "js-object",
   "file": "js-object.js",
-  "title": "Объект (ключ → значение)",
+  "title": "js-object",
   "lang": "js",
   "group": "Данные: хранить, находить и преобразовывать / Коллекции и ст",
   "desc": "Объект хранит именованные поля: ключ и его значение. Как карточка с подписями. Доступ через точку.",
@@ -35,8 +35,8 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная, которую не будем переназначать (константа).",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 0,
@@ -59,8 +59,8 @@
       "col": 0,
       "text": "console",
       "kind": "fn",
-      "note": "Встроенный объект вывода в консоль (F12 → Console).",
-      "source": "custom"
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
     },
     {
       "line": 6,
@@ -75,8 +75,8 @@
       "col": 8,
       "text": "log",
       "kind": "fn",
-      "note": "Печатает в консоль то, что в скобках.",
-      "source": "custom"
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
     },
     {
       "line": 6,
@@ -91,8 +91,8 @@
       "col": 0,
       "text": "console",
       "kind": "fn",
-      "note": "Встроенный объект вывода в консоль (F12 → Console).",
-      "source": "custom"
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
     },
     {
       "line": 7,
@@ -107,8 +107,8 @@
       "col": 8,
       "text": "log",
       "kind": "fn",
-      "note": "Печатает в консоль то, что в скобках.",
-      "source": "custom"
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
     },
     {
       "line": 7,
@@ -131,8 +131,8 @@
       "col": 19,
       "text": "keys",
       "kind": "fn",
-      "note": "Вернуть массив всех ключей объекта.",
-      "source": "custom"
+      "note": "Object.keys — массив имён свойств объекта.",
+      "source": "dict"
     }
   ],
   "component": {
@@ -220,5 +220,55 @@
   "legacy": {
     "template": "js-object.json"
   },
-  "enriched": true
+  "enriched": true,
+  "orphanNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная, которую не будем переназначать (константа).",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "Встроенный объект вывода в консоль (F12 → Console).",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "Печатает в консоль то, что в скобках.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "Встроенный объект вывода в консоль (F12 → Console).",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "Печатает в консоль то, что в скобках.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 19,
+      "text": "keys",
+      "kind": "fn",
+      "note": "Вернуть массив всех ключей объекта.",
+      "source": "custom"
+    }
+  ]
 }

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "js-calc-mean",
   "file": "js-calc-mean.js",
-  "title": "Расчёт: среднее и округление",
+  "title": "js-calc-mean",
   "lang": "js",
   "group": "Данные: хранить, находить и преобразовывать / Числа и просты",
   "desc": "Типичный расчёт: сумма через reduce, делим на количество, округляем. Так же считаются доходности, медианы и пр.",
@@ -35,16 +35,16 @@
       "col": 0,
       "text": "function",
       "kind": "kw",
-      "note": "Объявляет функцию — кусок кода, вызываемый по имени.",
-      "source": "custom"
+      "note": "объявить функцию",
+      "source": "dict"
     },
     {
       "line": 1,
       "col": 2,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная, которую не будем переназначать (константа).",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 1,
@@ -59,8 +59,8 @@
       "col": 33,
       "text": "a",
       "kind": "name",
-      "note": "Аккумулятор (сумма пока).",
-      "source": "custom"
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
     },
     {
       "line": 1,
@@ -75,8 +75,8 @@
       "col": 42,
       "text": "a",
       "kind": "name",
-      "note": "Аккумулятор (сумма пока).",
-      "source": "custom"
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
     },
     {
       "line": 1,
@@ -91,8 +91,8 @@
       "col": 2,
       "text": "return",
       "kind": "kw",
-      "note": "«Вернуть» — отдаёт результат наружу и завершает функцию.",
-      "source": "custom"
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
     },
     {
       "line": 2,
@@ -107,40 +107,40 @@
       "col": 26,
       "text": "length",
       "kind": "fn",
-      "note": "Свойство: сколько элементов в массиве (или символов в строке).",
-      "source": "custom"
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
     },
     {
       "line": 5,
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "Переменная, которую не будем переназначать (константа).",
-      "source": "custom"
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
     },
     {
       "line": 6,
       "col": 0,
       "text": "console",
       "kind": "fn",
-      "note": "Встроенный объект вывода в консоль (F12 → Console).",
-      "source": "custom"
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
     },
     {
       "line": 6,
       "col": 8,
       "text": "log",
       "kind": "fn",
-      "note": "Печатает в консоль то, что в скобках.",
-      "source": "custom"
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
     },
     {
       "line": 6,
       "col": 22,
       "text": "toFixed",
       "kind": "fn",
-      "note": "Округлить число до N знаков после запятой (возвращает строку).",
-      "source": "custom"
+      "note": "toFixed — оставляет нужное число знаков после точки, возвращает строку",
+      "source": "dict"
     }
   ],
   "component": {
@@ -228,5 +228,87 @@
   "legacy": {
     "template": "js-calc-mean.json"
   },
-  "enriched": true
+  "enriched": true,
+  "orphanNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "Объявляет функцию — кусок кода, вызываемый по имени.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная, которую не будем переназначать (константа).",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 33,
+      "text": "a",
+      "kind": "name",
+      "note": "Аккумулятор (сумма пока).",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 42,
+      "text": "a",
+      "kind": "name",
+      "note": "Аккумулятор (сумма пока).",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "«Вернуть» — отдаёт результат наружу и завершает функцию.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 26,
+      "text": "length",
+      "kind": "fn",
+      "note": "Свойство: сколько элементов в массиве (или символов в строке).",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная, которую не будем переназначать (константа).",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "Встроенный объект вывода в консоль (F12 → Console).",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "Печатает в консоль то, что в скобках.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 22,
+      "text": "toFixed",
+      "kind": "fn",
+      "note": "Округлить число до N знаков после запятой (возвращает строку).",
+      "source": "custom"
+    }
+  ]
 }

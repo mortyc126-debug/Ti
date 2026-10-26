@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "keydown-и-keyup-клавиатура-mv6cusyc",
   "file": "keydown-и-keyup-клавиатура-mv6cusyc.js",
-  "title": "keydown и keyup — клавиатура",
+  "title": "keydown-и-keyup-клавиатура-mv6cusyc",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Реакция на действия поль",
   "desc": "keydown срабатывает при нажатии клавиши, keyup — при отпускании. Слушатели нужно устанавливать один раз и удалять, если компонент больше не нужен.",
@@ -38,19 +38,19 @@
       "source": "dict"
     },
     {
-      "line": 0,
-      "col": 7,
-      "text": "addEventListener",
-      "kind": "fn",
-      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
-      "source": "dict"
-    },
-    {
       "line": 1,
       "col": 2,
       "text": "if",
       "kind": "kw",
       "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "key",
+      "kind": "name",
+      "note": "key — функция, по значению которой идёт сортировка",
       "source": "dict"
     },
     {
@@ -78,14 +78,6 @@
       "source": "dict"
     },
     {
-      "line": 6,
-      "col": 7,
-      "text": "addEventListener",
-      "kind": "fn",
-      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
-      "source": "dict"
-    },
-    {
       "line": 7,
       "col": 2,
       "text": "console",
@@ -99,6 +91,14 @@
       "text": "log",
       "kind": "fn",
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 42,
+      "text": "key",
+      "kind": "name",
+      "note": "key — функция, по значению которой идёт сортировка",
       "source": "dict"
     }
   ],

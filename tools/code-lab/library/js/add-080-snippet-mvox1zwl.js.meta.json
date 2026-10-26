@@ -1,0 +1,173 @@
+{
+  "schema": 1,
+  "id": "add-080-snippet-mvox1zwl",
+  "file": "add-080-snippet-mvox1zwl.js",
+  "lang": "js",
+  "title": "add-080-snippet",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998571269,
+  "component": {
+    "provides": [
+      "mean"
+    ],
+    "requires": [
+      "sum"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "mean",
+      "kind": "fn",
+      "note": "mean — среднее арифметическое",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 13,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 27,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 34,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 9,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 24,
+      "text": "sum",
+      "kind": "name",
+      "note": "SUM — сумма значений",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 39,
+      "text": "sum",
+      "kind": "name",
+      "note": "SUM — сумма значений",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 57,
+      "text": "values",
+      "kind": "name",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 64,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 12,
+      "text": "mean",
+      "kind": "fn",
+      "note": "mean — среднее арифметическое",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 22,
+      "text": "mean",
+      "kind": "fn",
+      "note": "mean — среднее арифметическое",
+      "source": "dict"
+    }
+  ]
+}

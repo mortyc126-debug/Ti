@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "localstorage-setitem-сохранить-mv6cusla",
   "file": "localstorage-setitem-сохранить-mv6cusla.js",
-  "title": "localStorage.setItem — сохранить",
+  "title": "localstorage-setitem-сохранить-mv6cusla",
   "lang": "js",
   "group": "Файлы, хранение и сервер / Хранение в браузере",
   "desc": "localStorage хранит значения между перезагрузками страницы. Значения записываются как строки, поэтому объекты обычно сначала преобразуют через JSON.stringify.",
@@ -16,14 +16,6 @@
   },
   "status": "described",
   "wordNotes": [
-    {
-      "line": 0,
-      "col": 0,
-      "text": "localStorage",
-      "kind": "name",
-      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
-      "source": "dict"
-    },
     {
       "line": 0,
       "col": 13,

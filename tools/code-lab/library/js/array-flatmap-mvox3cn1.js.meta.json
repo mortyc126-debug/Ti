@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "id": "array-flatmap-mvox3cn1",
+  "file": "array-flatmap-mvox3cn1.js",
+  "lang": "js",
+  "title": "array-flatmap",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1792998634429,
+  "component": {
+    "provides": [
+      "слова"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 41,
+      "text": "split",
+      "kind": "fn",
+      "note": "split — разрезать строку на массив по разделителю.",
+      "source": "dict"
+    }
+  ]
+}

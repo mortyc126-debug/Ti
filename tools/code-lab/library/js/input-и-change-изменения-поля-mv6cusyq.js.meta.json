@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "input-и-change-изменения-поля-mv6cusyq",
   "file": "input-и-change-изменения-поля-mv6cusyq.js",
-  "title": "input и change — изменения поля",
+  "title": "input-и-change-изменения-поля-mv6cusyq",
   "lang": "js",
   "group": "Интерфейс: поля, кнопки и события / Поля ввода и формы",
   "desc": "input срабатывает при каждом изменении значения, change — когда изменение подтверждено (например, после выбора или потери фокуса, в зависимости от типа поля).",
@@ -35,7 +35,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -47,22 +47,6 @@
       "source": "dict"
     },
     {
-      "line": 0,
-      "col": 23,
-      "text": "querySelector",
-      "kind": "fn",
-      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
-      "source": "dict"
-    },
-    {
-      "line": 2,
-      "col": 6,
-      "text": "addEventListener",
-      "kind": "fn",
-      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
-      "source": "dict"
-    },
-    {
       "line": 3,
       "col": 2,
       "text": "console",
@@ -79,30 +63,6 @@
       "source": "dict"
     },
     {
-      "line": 3,
-      "col": 31,
-      "text": "target",
-      "kind": "name",
-      "note": "target — элемент, на котором произошло событие.",
-      "source": "dict"
-    },
-    {
-      "line": 3,
-      "col": 38,
-      "text": "value",
-      "kind": "name",
-      "note": "value — текущее значение поля ввода (input, textarea, select).",
-      "source": "dict"
-    },
-    {
-      "line": 6,
-      "col": 6,
-      "text": "addEventListener",
-      "kind": "fn",
-      "note": "addEventListener — вешает обработчик на событие (клик, ввод и т.д.).",
-      "source": "dict"
-    },
-    {
       "line": 7,
       "col": 2,
       "text": "console",
@@ -116,22 +76,6 @@
       "text": "log",
       "kind": "fn",
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
-      "source": "dict"
-    },
-    {
-      "line": 7,
-      "col": 37,
-      "text": "target",
-      "kind": "name",
-      "note": "target — элемент, на котором произошло событие.",
-      "source": "dict"
-    },
-    {
-      "line": 7,
-      "col": 44,
-      "text": "value",
-      "kind": "name",
-      "note": "value — текущее значение поля ввода (input, textarea, select).",
       "source": "dict"
     }
   ],

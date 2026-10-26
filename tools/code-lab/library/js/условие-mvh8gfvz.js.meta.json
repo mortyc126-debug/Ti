@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "условие-mvh8gfvz",
   "file": "условие-mvh8gfvz.js",
-  "title": "условие",
+  "title": "условие-mvh8gfvz",
   "lang": "js",
   "group": "Основы / Как устроена программа",
   "desc": "Выбор действия по условию.",
@@ -33,7 +33,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -49,8 +49,8 @@
       "col": 0,
       "text": "if",
       "kind": "kw",
-      "note": "if — выполнить, если условие верно",
-      "source": "custom"
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
     },
     {
       "line": 2,
@@ -81,8 +81,8 @@
       "col": 2,
       "text": "else",
       "kind": "kw",
-      "note": "else — иначе",
-      "source": "custom"
+      "note": "else — «иначе»: что делать, когда условие if не выполнилось.",
+      "source": "dict"
     },
     {
       "line": 5,
@@ -111,5 +111,24 @@
     "template": "условие-mvh8gfvz.json",
     "descAt": 1792533991535
   },
-  "enriched": true
+  "enriched": true,
+  "descAt": 1792533991535,
+  "orphanNotes": [
+    {
+      "line": 2,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — выполнить, если условие верно",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "else",
+      "kind": "kw",
+      "note": "else — иначе",
+      "source": "custom"
+    }
+  ]
 }

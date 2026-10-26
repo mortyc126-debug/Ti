@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "объект-в-localstorage-mvh8hdnn",
   "file": "объект-в-localstorage-mvh8hdnn.js",
-  "title": "объект в localStorage",
+  "title": "объект-в-localstorage-mvh8hdnn",
   "lang": "js",
   "group": "Файлы, хранение и сервер / Хранение в браузере",
   "desc": "Хранить можно только строки, поэтому используем JSON.",
@@ -34,15 +34,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
-      "source": "dict"
-    },
-    {
-      "line": 1,
-      "col": 0,
-      "text": "localStorage",
-      "kind": "name",
-      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -51,14 +43,6 @@
       "text": "setItem",
       "kind": "fn",
       "note": "setItem — записать значение в localStorage по ключу.",
-      "source": "dict"
-    },
-    {
-      "line": 1,
-      "col": 33,
-      "text": "JSON",
-      "kind": "fn",
-      "note": "json() — разбирает ответ сети в объект JavaScript.",
       "source": "dict"
     },
     {
@@ -74,15 +58,7 @@
       "col": 0,
       "text": "const",
       "kind": "kw",
-      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
-      "source": "dict"
-    },
-    {
-      "line": 3,
-      "col": 14,
-      "text": "JSON",
-      "kind": "fn",
-      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "note": "объявить переменную, которой нельзя переназначить значение",
       "source": "dict"
     },
     {
@@ -91,14 +67,6 @@
       "text": "parse",
       "kind": "fn",
       "note": "JSON.parse — разобрать строку JSON обратно в объект.",
-      "source": "dict"
-    },
-    {
-      "line": 3,
-      "col": 25,
-      "text": "localStorage",
-      "kind": "name",
-      "note": "localStorage — хранилище в браузере: данные остаются после перезагрузки.",
       "source": "dict"
     },
     {
@@ -124,5 +92,6 @@
     "template": "объект-в-localstorage-mvh8hdnn.json",
     "descAt": 1792534035299
   },
-  "enriched": true
+  "enriched": true,
+  "descAt": 1792534035299
 }
