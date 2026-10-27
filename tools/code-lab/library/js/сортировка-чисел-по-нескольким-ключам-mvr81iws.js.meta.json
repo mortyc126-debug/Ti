@@ -92,6 +92,14 @@
       "kind": "fn",
       "note": "Сортирует массив на месте.",
       "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 7,
+      "text": "sort",
+      "kind": "fn",
+      "note": "Сортирует массив на месте.",
+      "source": "custom"
     }
   ]
 }

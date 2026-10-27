@@ -90,6 +90,14 @@
       "kind": "kw",
       "note": "Удаляет запись из кэша.",
       "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 22,
+      "text": "delete",
+      "kind": "kw",
+      "note": "Удаляет запись из кэша.",
+      "source": "custom"
     }
   ]
 }
