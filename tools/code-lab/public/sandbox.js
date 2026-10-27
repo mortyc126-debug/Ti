@@ -146,6 +146,7 @@
         '<button class="btn" id="sbCopyAll" title="скопировать весь собранный документ (HTML+CSS+JS вместе) — вставить в файл">⧉ копировать итог</button>' +
         '<label class="sb-live"><input type="checkbox" id="sbLive"> живой предпросмотр</label>' +
         '<button class="btn" id="sbAdd">+ файл</button>' +
+        '<button class="btn" id="sbSaveDisk" title="сохранить текущий открытый файл на диск — откроется обычное окно выбора папки и имени">💾 на диск</button>' +
         '<label class="sb-live" title="когда включено — клик по слову в коде показывает пояснение. Редактировать код можно всё равно."><input type="checkbox" id="sbExplain"> 🔍 пояснения по клику</label>' +
         '<button class="btn" id="sbLegend" title="что значат цвета в коде">🎨 цвета</button>' +
         '<span style="flex:1"></span>' +
@@ -665,6 +666,32 @@
   exBtn.onchange = () => setExplain(exBtn.checked);
   let exInit = false; try { exInit = localStorage.getItem('codelab_sandbox_explain') === '1'; } catch(_){}
   setExplain(exInit);
+
+  // «💾 на диск» — сохранить ТЕКУЩИЙ открытый файл в настоящее место на диске через системное окно.
+  // Берём файл, в чьём редакторе сейчас фокус (иначе — активный/первый); текст — свежий из редактора.
+  box.querySelector('#sbSaveDisk').onclick = async () => {
+    let ed = null, f = null;
+    const ae = document.activeElement; if(ae && ae.closest) ed = ae.closest('.sb-ed');
+    if(ed && ed.__f) f = ed.__f;
+    if(!f){ let id = null; try { id = localStorage.getItem('codelab_sb_active'); } catch(_){} f = files.find(x => x.id === id) || files[0]; ed = null; }
+    if(!f){ alert('Нет открытого файла.'); return; }
+    // свежий текст прямо из редактора (CodeMirror/textarea), чтобы не словить устаревшее
+    let text = f.code || '';
+    const host = ed || [...edsEl.querySelectorAll('.sb-ed')].find(e => e.__f && e.__f.id === f.id);
+    if(host){ const ta = host.querySelector('textarea'); if(ta) text = (ta.__cm ? ta.__cm.getValue() : ta.value); }
+    const name = f.name || ('файл.' + (f.lang || 'txt'));
+    // системное окно «Сохранить как» (выбор папки и имени) — современные браузеры
+    if(window.showSaveFilePicker){
+      try {
+        const h = await window.showSaveFilePicker({ suggestedName: name });
+        const w = await h.createWritable(); await w.write(text); await w.close();
+        return;
+      } catch(e){ if(e && e.name === 'AbortError') return; }   // отменила окно — молча выходим
+    }
+    // запасной путь (старый браузер): обычное скачивание в «Загрузки» под именем файла
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 2000);
+  };
 
   // легенда цветов — «где спецификация покраса»
   box.querySelector('#sbLegend').onclick = ev => {
