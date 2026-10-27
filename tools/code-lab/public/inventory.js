@@ -299,6 +299,37 @@ document.getElementById('pcopy').onclick = e => copy(piecesAsText(), e.target);
   else { btn.textContent = 'ошибка'; setTimeout(() => { btn.textContent = o; }, 2000); }
 }; })();
 document.getElementById('fcopy').onclick = e => copy(flowsAsText(), e.target);
+// массово: пройти по ВСЕМ схемам и подтянуть узлы-ящики к ближайшим кускам (записанные связи сохраняются)
+async function fixAllFlows(){
+  const btn = document.getElementById('ffix'); const o = btn.textContent;
+  if(!confirm('Пройти по ВСЕМ схемам и подтянуть узлы-ящики к ближайшим кускам?\nЗаписанные связи сохранятся, ящики станут настоящими кусками.')) return;
+  btn.disabled = true; btn.textContent = 'чиню…';
+  let list = []; try { list = await fetch('/api/flows/list').then(r => r.json()); } catch(_){}
+  let flowsTouched = 0, converted = 0, stillBox = 0; const tplCache = {};
+  for(const f of list){
+    let full; try { full = await fetch('/api/flows/get?id=' + encodeURIComponent(f.id)).then(r => r.json()); } catch(_){ continue; }
+    if(!full || !full.graph || !Array.isArray(full.graph.nodes)) continue;
+    let changed = false;
+    for(const nd of full.graph.nodes){
+      if(nd.src && nd.src.id) continue;                       // уже настоящий кусок
+      const t = resolveSmart(nd.title, true);                  // сводим к ближайшему (массово)
+      if(!t){ stillBox++; continue; }
+      let tpl = tplCache[t.id];
+      if(!tpl){ try { tpl = await fetch('/api/template?id=' + encodeURIComponent(t.id)).then(r => r.json()); tplCache[t.id] = tpl; } catch(_){ continue; } }
+      const code = (tpl.lines || []).map(line => (line || []).map(k => k.v != null ? k.v : '').join('')).join('\n');
+      const comp = tpl.component || {};
+      const contract = { provides: Array.isArray(comp.provides) ? comp.provides : [], requires: Array.isArray(comp.requires) ? comp.requires : [] };
+      nd.blockId = 'raw'; nd.fields = Object.assign({}, nd.fields || {}, { code }); nd.title = t.title; nd.desc = tpl.desc || '';
+      nd.src = { id: t.id, title: t.title, desc: tpl.desc || '', code, lang: tpl.lang || t.lang || 'js', contract };
+      converted++; changed = true;
+    }
+    if(changed){ try { await fetch('/api/flows/save', { method: 'POST', body: JSON.stringify({ id: f.id, name: full.name || f.name, graph: full.graph }) }); flowsTouched++; } catch(_){} }
+  }
+  btn.disabled = false; btn.textContent = o;
+  alert('Готово. Схем затронуто: ' + flowsTouched + ' · ящиков подтянуто к кускам: ' + converted + (stillBox ? ' · осталось ящиком: ' + stillBox + ' (похожего куска нет)' : '') + '.\n\nОткрой любую схему в конструкторе — ящики стали кусками, связи на месте.');
+  try { FLOWS = await fetch('/api/flows/list').then(r => r.json()); } catch(_){} renderFlows();
+}
+document.getElementById('ffix').onclick = fixAllFlows;
 
 // ── импорт связей/контрактов из текста ────────────────────────────────────────
 const el2 = (tag, cls, html) => { const e = document.createElement(tag); if(cls) e.className = cls; if(html != null) e.innerHTML = html; return e; };
@@ -342,11 +373,15 @@ function bestPiece(name){
   let best = null; for(const t of PIECES){ const s = score(t); if(s > 0 && (!best || s > best.score)) best = { piece: t, score: s }; }
   return best;
 }
-// строгое совпадение; при loose=true (режим «сводить») — ближайший уверенный кусок, чтобы не тыкать каждый вручную
+// строгое совпадение; при loose=true (режим «сводить») — ближайший уверенный кусок, чтобы не тыкать каждый вручную.
+// короткие имена (x, ctx, vx, rows) — это обычно ДАННЫЕ, а не кусок: их не сводим наугад.
 function resolveSmart(name, loose){
   const strict = resolveName(name); if(strict) return strict;
   if(!loose) return null;
-  const bp = bestPiece(name); return (bp && bp.score >= 55) ? bp.piece : null;
+  const q = String(name || '').trim(); if(q.length < 3) return null;
+  const bp = bestPiece(name); if(!bp) return null;
+  if(q.length < 4) return bp.score >= 85 ? bp.piece : null;   // коротко — только точное/по началу
+  return bp.score >= 55 ? bp.piece : null;
 }
 // отрезать условие [если ...] и вернуть {text, cond}
 function splitCond(s){ let cond = ''; const text = String(s || '').replace(/\[([^\]]*)\]/g, (_, c) => { cond = (cond ? cond + '; ' : '') + c.trim(); return ' '; }).trim(); return { text, cond }; }
