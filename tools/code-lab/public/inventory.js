@@ -331,6 +331,23 @@ function suggestPieces(name, n){
     const common = tt.split(/\s+/).filter(w => qw.has(w)).length; return common ? 25 + common * 8 : 0; };
   return PIECES.map(t => ({ t, s: score(t) })).filter(x => x.s > 0).sort((a, b) => b.s - a.s).slice(0, n || 2).map(x => x.t.title);
 }
+// лучший кандидат с оценкой (для массового «сводить к ближайшим»)
+function bestPiece(name){
+  const q = String(name || '').trim().toLowerCase(); if(!q) return null;
+  const qw = new Set(q.split(/\s+/).filter(Boolean));
+  const score = t => { const tt = (t.title || '').toLowerCase(); if(!tt) return 0;
+    if(tt === q) return 100; if(tt.startsWith(q) || q.startsWith(tt)) return 85;
+    if(tt.includes(q) || (q.length >= 3 && q.includes(tt))) return 65;
+    const common = tt.split(/\s+/).filter(w => qw.has(w)).length; return common ? 25 + common * 8 : 0; };
+  let best = null; for(const t of PIECES){ const s = score(t); if(s > 0 && (!best || s > best.score)) best = { piece: t, score: s }; }
+  return best;
+}
+// строгое совпадение; при loose=true (режим «сводить») — ближайший уверенный кусок, чтобы не тыкать каждый вручную
+function resolveSmart(name, loose){
+  const strict = resolveName(name); if(strict) return strict;
+  if(!loose) return null;
+  const bp = bestPiece(name); return (bp && bp.score >= 55) ? bp.piece : null;
+}
 // отрезать условие [если ...] и вернуть {text, cond}
 function splitCond(s){ let cond = ''; const text = String(s || '').replace(/\[([^\]]*)\]/g, (_, c) => { cond = (cond ? cond + '; ' : '') + c.trim(); return ' '; }).trim(); return { text, cond }; }
 // имя куска: берём содержимое первых «ёлочек»/кавычек; иначе строку как есть (условие уже убрано)
@@ -487,7 +504,7 @@ async function applyLinks(P){
   };
   // узел по имени: существующий кусок → полный узел; иначе ящик-ярлык (не сохранённый кусок)
   const nodeFor = async name => {
-    const t = resolveName(name); if(t) return ensureNode(t);
+    const t = resolveSmart(name, P.snap !== false); if(t) return ensureNode(t);   // P.snap: сводить к ближайшим кускам (массово)
     if(!createMissing) return null;
     const key = 'label:' + String(name).toLowerCase();
     if(used.has(key)) return used.get(key);
@@ -567,7 +584,7 @@ function openLinksModal(){
     + '<div class="fmt">Многострочно (для длинных имён): Кусок-источник&#10;             -> Кусок-цель&#10;             -> Другая цель&#10;Плоско: A -> B · A зависит от B · A конфликтует с B …&#10;Дерево:  «Кусок A»&#10;             — создаёт → «Кусок B» (пояснение) [условие]&#10;Контракт: Имя:: нужно=x,y; даёт=z; среда=браузер; раздел=Сеть; проверка=…&#10;Разделы: раздел: Сеть / Запросы&#10;             + Имя куска   (подраздел — через «/»)&#10;схема: Название</div>'
     + '<details class="rr"><summary>виды связей, которые понимает парсер (' + (window.CODE_RELATIONS || []).length + ')</summary><div class="rr-box">' + relationsRef() + '</div></details>'
     + '<textarea id="lk-text" placeholder="вставь текст или нажми «пример»"></textarea>'
-    + '<div class="mbtns"><button class="btn" id="lk-sample">пример</button><button class="btn" id="lk-suggest" title="предложить связи автоматически — по контрактам «даёт/нужно» кусков">✨ по контрактам</button><button class="btn" id="lk-aiprompt" title="собрать список кусков в запрос для ИИ (он предложит связи)">📋 куски → ИИ</button><button class="btn ok" id="lk-parse">разобрать</button><button class="btn" id="lk-apply" style="display:none">применить</button><button class="btn" id="lk-close">закрыть</button><label class="inv-chk" style="margin-left:auto"><input type="checkbox" id="lk-missing" checked> создавать узлы для ненайденных (ящики данных)</label></div>'
+    + '<div class="mbtns"><button class="btn" id="lk-sample">пример</button><button class="btn" id="lk-suggest" title="предложить связи автоматически — по контрактам «даёт/нужно» кусков">✨ по контрактам</button><button class="btn" id="lk-aiprompt" title="собрать список кусков в запрос для ИИ (он предложит связи)">📋 куски → ИИ</button><button class="btn ok" id="lk-parse">разобрать</button><button class="btn" id="lk-apply" style="display:none">применить</button><button class="btn" id="lk-close">закрыть</button><label class="inv-chk" style="margin-left:auto"><input type="checkbox" id="lk-snap" checked> 🧲 сводить имена к ближайшим кускам</label><label class="inv-chk"><input type="checkbox" id="lk-missing" checked> создавать ящики для ненайденных</label></div>'
     + '<div class="lp-prev" id="lk-prev"></div>';
   bg.appendChild(box); document.body.appendChild(bg);
   const q = s => bg.querySelector(s);
@@ -579,17 +596,21 @@ function openLinksModal(){
     const prev = q('#lk-prev'); prev.innerHTML = '';
     const line = (txt, cls) => { const d = el2('div', 'lp-row ' + (cls || '')); d.textContent = txt; return d; };
     const mk = !q('#lk-missing') || q('#lk-missing').checked;
+    const snap = !q('#lk-snap') || q('#lk-snap').checked;   // 🧲 массово сводить имена к ближайшим кускам
+    const rs = nm => resolveSmart(nm, snap);
     // сводка: сразу видно, где недопроходит — сколько связей к готовым кускам, сколько в ящики, сколько строк не понято
-    let toReal = 0, toBox = 0;
-    parsed.edges.forEach(e => { (resolveName(e.a) && resolveName(e.b)) ? toReal++ : toBox++; });
-    const sum = el2('div', 'lp-sec', 'связей распознано: ' + parsed.edges.length + ' · к готовым кускам: ' + toReal + (toBox ? ' · в ящики (не нашла куски): ' + toBox : '') + (parsed.errors.length ? ' · строк не понято: ' + parsed.errors.length : ''));
+    let toReal = 0, toBox = 0, snapped = 0;
+    parsed.edges.forEach(e => { (rs(e.a) && rs(e.b)) ? toReal++ : toBox++; [e.a, e.b].forEach(nm => { if(snap && !resolveName(nm) && resolveSmart(nm, true)) snapped++; }); });
+    const sum = el2('div', 'lp-sec', 'связей распознано: ' + parsed.edges.length + ' · к кускам: ' + toReal + (snapped ? ' · из них сведено к ближайшим: ' + snapped : '') + (toBox ? ' · в ящики: ' + toBox : '') + (parsed.errors.length ? ' · строк не понято: ' + parsed.errors.length : ''));
     if(toBox || parsed.errors.length) sum.style.color = '#ffb454';
     prev.appendChild(sum);
     if(!parsed.edges.length) prev.appendChild(line('Ни одной связи не распознано. Для длинных имён пиши многострочно: источник на строке, под ним «-> Цель» (с отступом). Или в одну строку: «A -> B», «A | связь | B», «A зависит от B». Нажми «пример».', 'muted'));
     prev.appendChild(el2('div', 'lp-sec', 'связи (' + parsed.edges.length + ')'));
-    parsed.edges.forEach(e => { const a = resolveName(e.a), b = resolveName(e.b); const ok = a && b; const rel = (window.relationById && window.relationById(e.kind)) || { label: 'связь' }; const miss = [!a ? e.a : '', !b ? e.b : ''].filter(Boolean); const mark = ok ? '✓ ' : (mk ? '◻ ' : '✕ '); const tail = ok ? '' : (mk ? '  (ящик: ' + miss.join(', ') + ')' : '  (не найдено: ' + miss.join(', ') + ')'); prev.appendChild(line(mark + e.a + '  —[' + rel.label + ']→  ' + e.b + tail, ok ? 'lp-ok' : (mk ? '' : 'lp-bad')));
-      // для каждого имени-ящика покажем ближайшие куски — видно, почему не совпало (почти попала / многозначно / нет такого)
-      miss.forEach(nm => { const sg = suggestPieces(nm, 3); prev.appendChild(line('      «' + nm + '» → ' + (sg.length ? 'похоже на: ' + sg.join('  ·  ') : 'похожих кусков нет'), 'muted')); });
+    parsed.edges.forEach(e => { const a = rs(e.a), b = rs(e.b); const ok = a && b; const rel = (window.relationById && window.relationById(e.kind)) || { label: 'связь' }; const miss = [!a ? e.a : '', !b ? e.b : ''].filter(Boolean); const mark = ok ? '✓ ' : (mk ? '◻ ' : '✕ '); const tail = ok ? '' : (mk ? '  (ящик: ' + miss.join(', ') + ')' : '  (не найдено: ' + miss.join(', ') + ')'); prev.appendChild(line(mark + e.a + '  —[' + rel.label + ']→  ' + e.b + tail, ok ? 'lp-ok' : (mk ? '' : 'lp-bad')));
+      // куда свелось имя, которое не совпало точно (режим «🧲 сводить»)
+      [e.a, e.b].forEach(nm => { if(snap && !resolveName(nm)){ const sm = resolveSmart(nm, true); if(sm) prev.appendChild(line('      🧲 «' + nm + '» → свела к: ' + sm.title, 'lp-ok')); } });
+      // для имён, что так и остались ящиком — показать ближайшие (видно, почему: многозначно / нет такого)
+      miss.forEach(nm => { const sg = suggestPieces(nm, 3); prev.appendChild(line('      «' + nm + '» → ' + (sg.length ? 'похоже на: ' + sg.join('  ·  ') + ' (не уверена — оставила ящиком)' : 'похожих кусков нет'), 'muted')); });
       if(e.src && e.src !== (e.a + ' ' + e.b)) prev.appendChild(line('      ↳ ' + e.src, 'muted')); });
     prev.appendChild(el2('div', 'lp-sec', 'контракты (' + parsed.contracts.length + ')'));
     parsed.contracts.forEach(c => { const t = resolveName(c.name); prev.appendChild(line((t ? '✓ ' : '✕ ') + c.name + ': ' + Object.keys(c.fields).join(', ') + (t ? '' : '  (кусок не найден)'), t ? 'lp-ok' : 'lp-bad')); });
@@ -597,6 +618,8 @@ function openLinksModal(){
     q('#lk-apply').style.display = (parsed.edges.length || parsed.contracts.length) ? '' : 'none';
   }
   q('#lk-parse').onclick = () => { parsed = parseLinks(q('#lk-text').value); showPreview(); };
+  // переключатели «сводить»/«ящики» — сразу перерисовать превью, чтобы видеть результат
+  ['#lk-snap', '#lk-missing'].forEach(sel => { const el = q(sel); if(el) el.onchange = () => { if(parsed) showPreview(); }; });
   // ✨ авто-предложение связей по контрактам «даёт/нужно»: A даёт имя X, B требует X → A передаёт данные B
   q('#lk-suggest').onclick = () => {
     const byProv = new Map();
@@ -623,6 +646,7 @@ function openLinksModal(){
     if(!parsed) return;
     q('#lk-apply').textContent = 'применяю…'; q('#lk-apply').disabled = true;
     parsed.createMissing = !q('#lk-missing') || q('#lk-missing').checked;
+    parsed.snap = !q('#lk-snap') || q('#lk-snap').checked;   // 🧲 массово сводить имена к ближайшим кускам
     const r = await applyLinks(parsed);
     try { PIECES = await fetch('/api/list').then(x => x.json()); FLOWS = await fetch('/api/flows/list').then(x => x.json()); } catch(_){}
     fillFilters(); renderPieces(); renderFlows();
