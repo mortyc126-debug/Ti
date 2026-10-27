@@ -331,6 +331,40 @@ async function fixAllFlows(){
 }
 document.getElementById('ffix').onclick = fixAllFlows;
 
+// ── перевод английских названий: найти куски без русского в названии и дописать русский ──────
+function openTranslateModal(){
+  const isEng = t => { t = String(t || '').trim(); return !!t && !/[А-Яа-яЁё]/.test(t) && /[A-Za-z]/.test(t); };
+  const list = (PIECES || []).filter(p => isEng(p.title));
+  const bg = el2('div', 'modal-bg'); const box = el2('div', 'modal'); box.style.maxWidth = '740px';
+  box.innerHTML = '<h3>Перевод английских названий</h3>'
+    + '<p class="mh">Куски без русского в названии (' + list.length + '). Впиши рядом перевод — я допишу его к названию: «abbr» → «abbr — сокращение». Английское остаётся (по нему ищется код). Можно собрать запрос для ИИ и вставить ответ обратно.</p>'
+    + (list.length ? '' : '<div class="lp-row lp-ok">Все названия уже с русским 👍</div>')
+    + (list.length ? '<div class="mbtns"><button class="btn" id="tr-ai">📋 собрать запрос для ИИ</button><button class="btn" id="tr-paste">вставить ответ ИИ</button></div>' : '')
+    + '<div class="lp-prev" id="tr-list" style="max-height:52vh"></div>'
+    + '<div class="mbtns">' + (list.length ? '<button class="btn ok" id="tr-apply">применить</button>' : '') + '<button class="btn" id="tr-close">закрыть</button><span class="pp-note" id="tr-note" style="margin-left:auto"></span></div>';
+  bg.appendChild(box); document.body.appendChild(bg);
+  const q = s => bg.querySelector(s); bg.onclick = e => { if(e.target === bg) bg.remove(); }; q('#tr-close').onclick = () => bg.remove();
+  const body = q('#tr-list');
+  list.forEach(p => { const row = el2('div', 'lp-row'); row.style.cssText = 'display:flex;gap:8px;align-items:center;padding:3px 0';
+    const t = document.createElement('span'); t.textContent = p.title; t.title = p.title; t.style.cssText = 'flex:0 0 250px;font-family:ui-monospace,monospace;color:var(--name,#cbc2ea);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    const inp = document.createElement('input'); inp.className = 'inv-cell-in'; inp.placeholder = 'русский перевод…'; inp.dataset.id = p.id; inp.dataset.eng = p.title; inp.style.flex = '1';
+    row.append(t, inp); body.appendChild(row);
+  });
+  if(!list.length) return;
+  q('#tr-ai').onclick = () => { const txt = 'Переведи на русский названия этих кусков кода — коротко и по смыслу. Формат ответа строго: «английское = русское», по строке. Код-термины (abbr, iframe, canvas) оставляй как есть и добавляй короткое русское пояснение.\n\n' + list.map(p => p.title).join('\n'); copy(txt, q('#tr-ai')); q('#tr-note').textContent = 'запрос скопирован — отдай ИИ, ответ вставь кнопкой «вставить ответ ИИ»'; };
+  q('#tr-paste').onclick = () => { const txt = prompt('Вставь ответ ИИ (строки «английское = русское»):'); if(!txt) return; const map = {}; txt.split('\n').forEach(l => { const i = l.indexOf('='); if(i < 0) return; const e = l.slice(0, i).trim().toLowerCase(), r = l.slice(i + 1).trim(); if(e && r) map[e] = r; }); let n = 0; body.querySelectorAll('input').forEach(inp => { const r = map[inp.dataset.eng.toLowerCase()]; if(r){ inp.value = r; n++; } }); q('#tr-note').textContent = 'подставлено переводов: ' + n; };
+  q('#tr-apply').onclick = async () => {
+    const edits = [...body.querySelectorAll('input')].filter(i => i.value.trim()).map(i => ({ id: i.dataset.id, title: (i.dataset.eng + ' — ' + i.value.trim()).slice(0, 80) }));
+    if(!edits.length){ q('#tr-note').textContent = 'ничего не вписано'; return; }
+    q('#tr-apply').textContent = 'применяю…'; q('#tr-apply').disabled = true;
+    let done = 0; for(const e of edits){ const r = await fetch('/api/edit', { method: 'POST', body: JSON.stringify(e) }).then(x => x.json()).catch(() => ({})); if(r && r.ok) done++; }
+    try { PIECES = await fetch('/api/list').then(x => x.json()); } catch(_){}
+    fillFilters(); renderPieces(); bg.remove();
+    alert('Готово: переведено названий ' + done + ' (из ' + edits.length + '). Не забудь синхронизацию, чтобы уехало в репозиторий.');
+  };
+}
+document.getElementById('ptranslate').onclick = openTranslateModal;
+
 // ── импорт связей/контрактов из текста ────────────────────────────────────────
 const el2 = (tag, cls, html) => { const e = document.createElement(tag); if(cls) e.className = cls; if(html != null) e.innerHTML = html; return e; };
 function split2(s, sep){ const i = s.indexOf(sep); return [s.slice(0, i), s.slice(i + sep.length)]; }
