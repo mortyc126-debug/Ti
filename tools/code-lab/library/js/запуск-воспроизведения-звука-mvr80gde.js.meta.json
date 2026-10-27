@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "id": "запуск-воспроизведения-звука-mvr80gde",
+  "file": "запуск-воспроизведения-звука-mvr80gde.js",
+  "lang": "js",
+  "title": "Запуск воспроизведения звука",
+  "group": "Графика и визуализация / Звук",
+  "desc": "Пробуем включить звук и обрабатываем запрет автозапуска.",
+  "output": "Играет, или NotAllowedError, если браузер запретил автозапуск.",
+  "descAt": 1793137907426,
+  "component": {
+    "provides": [
+      "сигнал"
+    ],
+    "requires": [
+      "Audio"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 15,
+      "text": "play",
+      "kind": "fn",
+      "note": "Запускает воспроизведение; Promise отклоняется при запрете.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 45,
+      "text": "name",
+      "kind": "name",
+      "note": "Ожидаемое имя типа ошибки.",
+      "source": "dict"
+    }
+  ]
+}

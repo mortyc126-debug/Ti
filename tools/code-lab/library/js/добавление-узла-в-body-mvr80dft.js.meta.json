@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "id": "добавление-узла-в-body-mvr80dft",
+  "file": "добавление-узла-в-body-mvr80dft.js",
+  "lang": "js",
+  "title": "Добавление узла в body",
+  "group": "Интерфейс / Работа с DOM",
+  "desc": "Создаём абзац и вставляем его в конец страницы.",
+  "output": "В конце страницы появляется абзац.",
+  "descAt": 1793137903625,
+  "component": {
+    "provides": [
+      "абзац"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 23,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт новый элемент (например div), который потом можно вставить на страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 9,
+      "text": "body",
+      "kind": "name",
+      "note": "body — тело запроса",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 14,
+      "text": "appendChild",
+      "kind": "fn",
+      "note": "Добавляет узел последним потомком родителя.",
+      "source": "custom"
+    }
+  ],
+  "orphanNotes": [
+    {
+      "line": 3,
+      "col": 14,
+      "text": "appendChild",
+      "kind": "fn",
+      "note": "Добавляет узел последним потомком родителя.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 14,
+      "text": "appendChild",
+      "kind": "fn",
+      "note": "Добавляет узел последним потомком родителя.",
+      "source": "custom"
+    }
+  ]
+}

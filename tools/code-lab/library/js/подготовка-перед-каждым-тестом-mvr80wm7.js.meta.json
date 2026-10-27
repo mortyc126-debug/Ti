@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "id": "подготовка-перед-каждым-тестом-mvr80wm7",
+  "file": "подготовка-перед-каждым-тестом-mvr80wm7.js",
+  "lang": "js",
+  "title": "Подготовка перед каждым тестом",
+  "group": "Тестирование / Подготовка и очистка",
+  "desc": "Каждый тест начинает с чистого состояния.",
+  "output": "Оба теста проходят независимо друг от друга.",
+  "descAt": 1793137928479,
+  "component": {
+    "provides": [
+      "корзина"
+    ],
+    "requires": [
+      "beforeEach",
+      "test",
+      "expect"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "beforeEach",
+      "kind": "name",
+      "note": "Запускается перед каждым тестом набора.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 36,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "объявить переменную с блочной областью видимости",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "beforeEach",
+      "kind": "fn",
+      "note": "Запускается перед каждым тестом набора.",
+      "source": "dict"
+    }
+  ]
+}

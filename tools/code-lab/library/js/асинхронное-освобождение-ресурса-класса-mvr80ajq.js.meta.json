@@ -1,0 +1,136 @@
+{
+  "schema": 1,
+  "id": "асинхронное-освобождение-ресурса-класса-mvr80ajq",
+  "file": "асинхронное-освобождение-ресурса-класса-mvr80ajq.js",
+  "lang": "js",
+  "title": "Асинхронное освобождение ресурса класса",
+  "group": "Основы / Управление ресурсами",
+  "desc": "Ресурс закрывается автоматически при выходе из блока.",
+  "output": "работаем\nподключение закрыто",
+  "descAt": 1793137899878,
+  "component": {
+    "provides": [
+      "Подключение",
+      "работа",
+      "acquireAsync"
+    ],
+    "requires": [
+      "using",
+      "связь"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — описывает «чертёж» объектов: их свойства и методы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 26,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 33,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    }
+  ]
+}

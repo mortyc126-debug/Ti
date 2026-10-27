@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "id": "канонический-путь-без-символических-ссыл-mvr80i1d",
+  "file": "канонический-путь-без-символических-ссыл-mvr80i1d.js",
+  "lang": "js",
+  "title": "Канонический путь без символических ссылок",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "Получаем настоящий абсолютный путь, раскрыв ссылки и «..».",
+  "output": "Абсолютный путь к файлу, например /home/user/проект/config.json",
+  "descAt": 1793137909585,
+  "component": {
+    "provides": [
+      "настоящий"
+    ],
+    "requires": [
+      "realpath"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "realpath",
+      "kind": "name",
+      "note": "Возвращает канонический абсолютный путь без символических ссылок.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 20,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 18,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 24,
+      "text": "realpath",
+      "kind": "fn",
+      "note": "Возвращает канонический абсолютный путь без символических ссылок.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

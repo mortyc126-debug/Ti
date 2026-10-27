@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "id": "запись-в-буфер-обмена-с-типом-данных-mvr80ex1",
+  "file": "запись-в-буфер-обмена-с-типом-данных-mvr80ex1.js",
+  "lang": "js",
+  "title": "Запись в буфер обмена с типом данных",
+  "group": "Интерфейс / Буфер обмена",
+  "desc": "Кладём в буфер обмена данные с явно указанным MIME-типом.",
+  "output": "Текст «Привет из буфера» можно вставить в любое приложение.",
+  "descAt": 1793137905542,
+  "component": {
+    "provides": [
+      "данные"
+    ],
+    "requires": [
+      "Blob",
+      "type",
+      "navigator",
+      "ClipboardItem"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 48,
+      "text": "type",
+      "kind": "name",
+      "note": "Указывает Node.js использовать ES-модули.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 26,
+      "text": "write",
+      "kind": "fn",
+      "note": "Записывает данные в поток.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "ClipboardItem",
+      "kind": "fn",
+      "note": "Элемент буфера обмена с данными разных типов.",
+      "source": "dict"
+    }
+  ]
+}

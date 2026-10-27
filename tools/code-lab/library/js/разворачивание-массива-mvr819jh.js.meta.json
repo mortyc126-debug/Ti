@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "id": "разворачивание-массива-mvr819jh",
+  "file": "разворачивание-массива-mvr819jh.js",
+  "lang": "js",
+  "title": "Разворачивание массива",
+  "group": "Данные / Преобразование коллекций",
+  "desc": "Разворачивание массива.",
+  "output": "[1, 2, 3]",
+  "descAt": 1793137945229,
+  "component": {
+    "provides": [],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 26,
+      "text": "flat",
+      "kind": "fn",
+      "note": "Разворачивает вложенные массивы на указанную глубину.",
+      "source": "dict"
+    }
+  ]
+}

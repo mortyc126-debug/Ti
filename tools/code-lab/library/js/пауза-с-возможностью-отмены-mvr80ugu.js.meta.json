@@ -1,0 +1,176 @@
+{
+  "schema": 1,
+  "id": "пауза-с-возможностью-отмены-mvr80ugu",
+  "file": "пауза-с-возможностью-отмены-mvr80ugu.js",
+  "lang": "js",
+  "title": "Пауза с возможностью отмены",
+  "group": "Асинхронность / Отмена операций",
+  "desc": "Ожидание в Node.js, которое можно прервать сигналом.",
+  "output": "AbortError",
+  "descAt": 1793137925694,
+  "component": {
+    "provides": [
+      "контроллер"
+    ],
+    "requires": [
+      "as",
+      "sleep",
+      "AbortController",
+      "signal"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 20,
+      "text": "as",
+      "kind": "name",
+      "note": "AS — даёт имя столбцу результата",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 23,
+      "text": "sleep",
+      "kind": "name",
+      "note": "Асинхронная пауза на заданное число миллисекунд.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 31,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 23,
+      "text": "AbortController",
+      "kind": "fn",
+      "note": "Создаёт сигнал отмены операции.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 28,
+      "text": "abort",
+      "kind": "fn",
+      "note": "abort — отменяет запрос",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "sleep",
+      "kind": "fn",
+      "note": "Асинхронная пауза на заданное число миллисекунд.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 20,
+      "text": "undefined",
+      "kind": "kw",
+      "note": "undefined — значение не задано.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 33,
+      "text": "signal",
+      "kind": "name",
+      "note": "Сигнал, по которому ожидание прерывается.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 52,
+      "text": "signal",
+      "kind": "name",
+      "note": "Сигнал, по которому ожидание прерывается.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 21,
+      "text": "name",
+      "kind": "name",
+      "note": "Ожидаемое имя типа ошибки.",
+      "source": "dict"
+    }
+  ]
+}

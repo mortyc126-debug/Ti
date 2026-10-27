@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "id": "запись-cookie-mvr80epg",
+  "file": "запись-cookie-mvr80epg.js",
+  "lang": "js",
+  "title": "Запись cookie",
+  "group": "Хранение / Браузерное хранилище",
+  "desc": "Запись cookie.",
+  "output": "Cookie записывается в поддерживающих браузерах.",
+  "descAt": 1793137905268,
+  "component": {
+    "provides": [],
+    "requires": [
+      "cookieStore"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 18,
+      "text": "in",
+      "kind": "kw",
+      "note": "проверить наличие свойства в объекте или его цепочке прототипов",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 21,
+      "text": "window",
+      "kind": "fn",
+      "note": "window — глобальный объект браузера (окно): таймеры, адрес, размеры экрана.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 29,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 47,
+      "text": "set",
+      "kind": "fn",
+      "note": "Множество уникальных значений; some проверяет пересечение.",
+      "source": "dict"
+    }
+  ]
+}

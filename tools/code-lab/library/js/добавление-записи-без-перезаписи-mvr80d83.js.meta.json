@@ -1,0 +1,193 @@
+{
+  "schema": 1,
+  "id": "добавление-записи-без-перезаписи-mvr80d83",
+  "file": "добавление-записи-без-перезаписи-mvr80d83.js",
+  "lang": "js",
+  "title": "Добавление записи без перезаписи",
+  "group": "Базы данных / Целостность",
+  "desc": "Метод add отклоняет запись, если такой ключ уже есть.",
+  "output": "ConstraintError",
+  "descAt": 1793137903347,
+  "component": {
+    "provides": [
+      "запрос",
+      "база",
+      "хранилище"
+    ],
+    "requires": [
+      "wrap",
+      "indexedDB",
+      "название"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "wrap",
+      "kind": "name",
+      "note": "Превращает запрос IndexedDB в Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 16,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 25,
+      "text": "open",
+      "kind": "fn",
+      "note": "open — открывает файл",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 13,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 19,
+      "text": "wrap",
+      "kind": "fn",
+      "note": "Превращает запрос IndexedDB в Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 6,
+      "text": "wrap",
+      "kind": "fn",
+      "note": "Превращает запрос IndexedDB в Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 21,
+      "text": "add",
+      "kind": "fn",
+      "note": "Добавляет запись и падает при совпадении ключа.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 8,
+      "text": "wrap",
+      "kind": "fn",
+      "note": "Превращает запрос IndexedDB в Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 23,
+      "text": "add",
+      "kind": "fn",
+      "note": "Добавляет запись и падает при совпадении ключа.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 21,
+      "text": "name",
+      "kind": "name",
+      "note": "Ожидаемое имя типа ошибки.",
+      "source": "dict"
+    }
+  ]
+}

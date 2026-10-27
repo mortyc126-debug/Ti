@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "id": "отмена-анимации-mvr80q8j",
+  "file": "отмена-анимации-mvr80q8j.js",
+  "lang": "js",
+  "title": "Отмена анимации",
+  "group": "Графика и визуализация / Анимация",
+  "desc": "Отмена анимации.",
+  "output": "Анимация отменена.",
+  "descAt": 1793137920211,
+  "component": {
+    "provides": [
+      "блок",
+      "движение"
+    ],
+    "requires": [
+      "opacity",
+      "duration"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 33,
+      "text": "opacity",
+      "kind": "name",
+      "note": "opacity — прозрачность от 0 до 1",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 49,
+      "text": "opacity",
+      "kind": "name",
+      "note": "opacity — прозрачность от 0 до 1",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 9,
+      "text": "cancel",
+      "kind": "fn",
+      "note": "Отменяет анимацию Web Animations API.",
+      "source": "dict"
+    }
+  ]
+}

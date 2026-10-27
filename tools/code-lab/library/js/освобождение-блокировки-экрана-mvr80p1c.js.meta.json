@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "id": "освобождение-блокировки-экрана-mvr80p1c",
+  "file": "освобождение-блокировки-экрана-mvr80p1c.js",
+  "lang": "js",
+  "title": "Освобождение блокировки экрана",
+  "group": "Интерфейс / Системные возможности",
+  "desc": "Запрашиваем блокировку, не дающую экрану гаснуть, и отпускаем её после работы.",
+  "output": "Экран не погаснет: true\nБлокировка снята: true",
+  "descAt": 1793137918657,
+  "component": {
+    "provides": [
+      "замок"
+    ],
+    "requires": [
+      "navigator"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 30,
+      "text": "wakeLock",
+      "kind": "name",
+      "note": "API удержания экрана включённым.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 12,
+      "text": "release",
+      "kind": "fn",
+      "note": "Отпускает блокировку, и экран снова может гаснуть.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

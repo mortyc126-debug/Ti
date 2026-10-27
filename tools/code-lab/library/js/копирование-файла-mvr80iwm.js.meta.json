@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "id": "копирование-файла-mvr80iwm",
+  "file": "копирование-файла-mvr80iwm.js",
+  "lang": "js",
+  "title": "Копирование файла",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "Копирование файла.",
+  "output": "Создана копия файла.",
+  "descAt": 1793137910710,
+  "component": {
+    "provides": [],
+    "requires": [
+      "copyFile"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "copyFile",
+      "kind": "name",
+      "note": "Копирует файл.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 20,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "copyFile",
+      "kind": "fn",
+      "note": "Копирует файл.",
+      "source": "dict"
+    }
+  ]
+}

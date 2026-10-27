@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "id": "изменение-размера-изменяемого-буфера-mvr80he6",
+  "file": "изменение-размера-изменяемого-буфера-mvr80he6.js",
+  "lang": "js",
+  "title": "Изменение размера изменяемого буфера",
+  "group": "Файлы, хранение и сервер / Двоичные данные",
+  "desc": "ArrayBuffer с запасом можно растянуть без копирования данных.",
+  "output": "8\n16",
+  "descAt": 1793137908750,
+  "component": {
+    "provides": [
+      "буфер"
+    ],
+    "requires": [
+      "ArrayBuffer",
+      "maxByteLength"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 35,
+      "text": "maxByteLength",
+      "kind": "name",
+      "note": "Максимально допустимый размер буфера.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 6,
+      "text": "resize",
+      "kind": "fn",
+      "note": "Меняет размер изменяемого ArrayBuffer.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

@@ -1,0 +1,176 @@
+{
+  "schema": 1,
+  "id": "ожидание-остановки-сервера-mvr80ncj",
+  "file": "ожидание-остановки-сервера-mvr80ncj.js",
+  "lang": "js",
+  "title": "Ожидание остановки сервера",
+  "group": "Файлы, хранение и сервер / HTTP-сервер",
+  "desc": "Корректно закрываем сервер и ждём, пока он освободит порт.",
+  "output": "Сервер запущен\nСервер остановлен",
+  "descAt": 1793137916468,
+  "component": {
+    "provides": [
+      "сервер"
+    ],
+    "requires": [
+      "createServer",
+      "запрос"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "createServer",
+      "kind": "name",
+      "note": "createServer — создаёт сервер, функция вызывается на каждый запрос",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "createServer",
+      "kind": "fn",
+      "note": "createServer — создаёт сервер, функция вызывается на каждый запрос",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 6,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Оборачивает событие в ожидаемый результат.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 38,
+      "text": "listen",
+      "kind": "fn",
+      "note": "listen — запускает сервер на порту",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 6,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 10,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Оборачивает событие в ожидаемый результат.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 38,
+      "text": "close",
+      "kind": "fn",
+      "note": "Перестаёт принимать соединения и вызывает колбэк после остановки.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "orphanNotes": [
+    {
+      "line": 6,
+      "col": 38,
+      "text": "close",
+      "kind": "fn",
+      "note": "Перестаёт принимать соединения и вызывает колбэк после остановки.",
+      "source": "custom"
+    }
+  ]
+}

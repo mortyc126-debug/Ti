@@ -1,0 +1,130 @@
+{
+  "schema": 1,
+  "id": "подмена-сетевого-ответа-в-playwright-mvr80wtd",
+  "file": "подмена-сетевого-ответа-в-playwright-mvr80wtd.js",
+  "lang": "js",
+  "title": "Подмена сетевого ответа в Playwright",
+  "group": "Тестирование / Браузерные тесты",
+  "desc": "Перехватываем запросы к API и возвращаем заранее заготовленные данные.",
+  "output": "Страница показывает задачу из подставных данных, настоящий сервер не нужен.",
+  "descAt": 1793137928737,
+  "component": {
+    "provides": [
+      "данные"
+    ],
+    "requires": [
+      "test",
+      "expect",
+      "page",
+      "id",
+      "название",
+      "json"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 42,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 13,
+      "text": "route",
+      "kind": "fn",
+      "note": "Перехватывает запросы, подходящие под шаблон адреса.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 51,
+      "text": "fulfill",
+      "kind": "fn",
+      "note": "Отвечает на перехваченный запрос заданными данными.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 13,
+      "text": "goto",
+      "kind": "fn",
+      "note": "Переходит по адресу и ждёт загрузки страницы.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 20,
+      "text": "getByText",
+      "kind": "fn",
+      "note": "Находит элемент по видимому тексту.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 46,
+      "text": "toBeVisible",
+      "kind": "fn",
+      "note": "Ждёт, пока элемент станет видимым, и проверяет это.",
+      "source": "dict"
+    }
+  ]
+}

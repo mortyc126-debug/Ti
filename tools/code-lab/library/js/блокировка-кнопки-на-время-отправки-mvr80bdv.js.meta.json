@@ -1,0 +1,151 @@
+{
+  "schema": 1,
+  "id": "блокировка-кнопки-на-время-отправки-mvr80bdv",
+  "file": "блокировка-кнопки-на-время-отправки-mvr80bdv.js",
+  "lang": "js",
+  "title": "Блокировка кнопки на время отправки",
+  "group": "Интерфейс / Поля и состояния форм",
+  "desc": "Кнопка недоступна, пока идёт отправка, и снова включается в любом исходе.",
+  "output": "Во время запроса кнопка неактивна, после — снова доступна.",
+  "descAt": 1793137900963,
+  "component": {
+    "provides": [
+      "кнопка"
+    ],
+    "requires": [
+      "method"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "Подписывает обработчик на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 33,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 9,
+      "text": "disabled",
+      "kind": "name",
+      "note": "Делает кнопку недоступной.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 20,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 10,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "Выполняет HTTP-запрос и возвращает Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 36,
+      "text": "method",
+      "kind": "name",
+      "note": "method — способ запроса: GET читает, POST отправляет",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "finally",
+      "kind": "kw",
+      "note": "Выполняется и при успехе, и при ошибке.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 11,
+      "text": "disabled",
+      "kind": "name",
+      "note": "Делает кнопку недоступной.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 22,
+      "text": "false",
+      "kind": "kw",
+      "note": "false — логическая «ложь» (нет).",
+      "source": "dict"
+    }
+  ],
+  "orphanNotes": [
+    {
+      "line": 6,
+      "col": 4,
+      "text": "finally",
+      "kind": "kw",
+      "note": "Выполняется и при успехе, и при ошибке.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "finally",
+      "kind": "kw",
+      "note": "Выполняется и при успехе, и при ошибке.",
+      "source": "custom"
+    }
+  ]
+}

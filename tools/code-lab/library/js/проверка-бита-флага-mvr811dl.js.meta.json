@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "id": "проверка-бита-флага-mvr811dl",
+  "file": "проверка-бита-флага-mvr811dl.js",
+  "lang": "js",
+  "title": "Проверка бита флага",
+  "group": "Основы / Логика",
+  "desc": "Проверка бита флага.",
+  "output": "true",
+  "descAt": 1793137934649,
+  "component": {
+    "provides": [
+      "флаги",
+      "флаг"
+    ],
+    "requires": [
+      "b1010",
+      "b0010"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

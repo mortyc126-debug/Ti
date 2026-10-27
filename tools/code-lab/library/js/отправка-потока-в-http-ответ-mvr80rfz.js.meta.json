@@ -1,0 +1,166 @@
+{
+  "schema": 1,
+  "id": "отправка-потока-в-http-ответ-mvr80rfz",
+  "file": "отправка-потока-в-http-ответ-mvr80rfz.js",
+  "lang": "js",
+  "title": "Отправка потока в HTTP-ответ",
+  "group": "Файлы, хранение и сервер / HTTP-сервер",
+  "desc": "Отдаём файл клиенту потоком; при ошибке соединение закрывается.",
+  "output": "По адресу http://localhost:3000 отдаётся содержимое отчёта.",
+  "descAt": 1793137921775,
+  "component": {
+    "provides": [],
+    "requires": [
+      "createServer",
+      "createReadStream",
+      "pipeline",
+      "запрос"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "createServer",
+      "kind": "name",
+      "note": "createServer — создаёт сервер, функция вызывается на каждый запрос",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "createReadStream",
+      "kind": "name",
+      "note": "Открывает файл для чтения потоком.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 28,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 9,
+      "text": "pipeline",
+      "kind": "name",
+      "note": "Передаёт данные из потока чтения в ответ сервера.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 20,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "createServer",
+      "kind": "fn",
+      "note": "createServer — создаёт сервер, функция вызывается на каждый запрос",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 13,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 10,
+      "text": "pipeline",
+      "kind": "fn",
+      "note": "Передаёт данные из потока чтения в ответ сервера.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 19,
+      "text": "createReadStream",
+      "kind": "fn",
+      "note": "Открывает файл для чтения потоком.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 4,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 3,
+      "text": "listen",
+      "kind": "fn",
+      "note": "listen — запускает сервер на порту",
+      "source": "dict"
+    }
+  ]
+}

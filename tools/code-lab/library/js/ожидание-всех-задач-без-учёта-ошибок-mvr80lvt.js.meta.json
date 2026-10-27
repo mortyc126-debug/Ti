@@ -1,0 +1,182 @@
+{
+  "schema": 1,
+  "id": "ожидание-всех-задач-без-учёта-ошибок-mvr80lvt",
+  "file": "ожидание-всех-задач-без-учёта-ошибок-mvr80lvt.js",
+  "lang": "js",
+  "title": "Ожидание всех задач без учёта ошибок",
+  "group": "Асинхронность / Надёжность",
+  "desc": "Упавшая задача даёт undefined и не обрушивает остальные.",
+  "output": "[ 'a', undefined, 'c' ]",
+  "descAt": 1793137914569,
+  "component": {
+    "provides": [
+      "задачи",
+      "итоги"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "Promise",
+      "kind": "name",
+      "note": "Оборачивает событие в ожидаемый результат.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "resolve",
+      "kind": "fn",
+      "note": "resolve — завершить промис успешно с результатом.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "Promise",
+      "kind": "name",
+      "note": "Оборачивает событие в ожидаемый результат.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 10,
+      "text": "reject",
+      "kind": "fn",
+      "note": "reject — завершить промис ошибкой.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 17,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 21,
+      "text": "Error",
+      "kind": "fn",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "Promise",
+      "kind": "name",
+      "note": "Оборачивает событие в ожидаемый результат.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "resolve",
+      "kind": "fn",
+      "note": "resolve — завершить промис успешно с результатом.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 14,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 20,
+      "text": "Promise",
+      "kind": "name",
+      "note": "Оборачивает событие в ожидаемый результат.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 39,
+      "text": "map",
+      "kind": "fn",
+      "note": "Превращает каждый адрес в запущенную задачу.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 60,
+      "text": "catch",
+      "kind": "kw",
+      "note": "Перехватывает отказ и подставляет другой результат.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 72,
+      "text": "undefined",
+      "kind": "kw",
+      "note": "undefined — значение не задано.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "orphanNotes": [
+    {
+      "line": 6,
+      "col": 60,
+      "text": "catch",
+      "kind": "kw",
+      "note": "Перехватывает отказ и подставляет другой результат.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 60,
+      "text": "catch",
+      "kind": "kw",
+      "note": "Перехватывает отказ и подставляет другой результат.",
+      "source": "custom"
+    }
+  ]
+}

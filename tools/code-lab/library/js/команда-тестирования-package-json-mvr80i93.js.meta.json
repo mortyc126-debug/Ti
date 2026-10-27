@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "id": "команда-тестирования-package-json-mvr80i93",
+  "file": "команда-тестирования-package-json-mvr80i93.js",
+  "lang": "js",
+  "title": "Команда тестирования package.json",
+  "group": "Разработка и инструменты / Упаковка проекта",
+  "desc": "Команда тестирования package.json.",
+  "output": "node --test",
+  "descAt": 1793137909863,
+  "component": {
+    "provides": [
+      "пакет"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "scripts",
+      "kind": "name",
+      "note": "Раздел команд package.json.",
+      "source": "dict"
+    }
+  ]
+}

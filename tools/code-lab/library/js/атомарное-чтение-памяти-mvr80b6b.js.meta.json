@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "id": "атомарное-чтение-памяти-mvr80b6b",
+  "file": "атомарное-чтение-памяти-mvr80b6b.js",
+  "lang": "js",
+  "title": "Атомарное чтение памяти",
+  "group": "Асинхронность / Надёжность",
+  "desc": "Атомарное чтение памяти.",
+  "output": "17",
+  "descAt": 1793137900691,
+  "component": {
+    "provides": [
+      "память",
+      "числа"
+    ],
+    "requires": [
+      "SharedArrayBuffer",
+      "Int32Array",
+      "Atomics"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 20,
+      "text": "load",
+      "kind": "fn",
+      "note": "Событие завершения загрузки ресурса.",
+      "source": "dict"
+    }
+  ]
+}

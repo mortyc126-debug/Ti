@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "id": "перевёрнутая-копия-массива-mvr80v6z",
+  "file": "перевёрнутая-копия-массива-mvr80v6z.js",
+  "lang": "js",
+  "title": "Перевёрнутая копия массива",
+  "group": "Данные / Преобразование коллекций",
+  "desc": "Перевёрнутая копия массива.",
+  "output": "[3, 2, 1] [1, 2, 3]",
+  "descAt": 1793137926635,
+  "component": {
+    "provides": [
+      "исходные"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 21,
+      "text": "toReversed",
+      "kind": "fn",
+      "note": "Создаёт перевёрнутую копию, не меняя исходный массив.",
+      "source": "dict"
+    }
+  ]
+}

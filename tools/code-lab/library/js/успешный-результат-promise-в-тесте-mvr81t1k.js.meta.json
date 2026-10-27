@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "id": "успешный-результат-promise-в-тесте-mvr81t1k",
+  "file": "успешный-результат-promise-в-тесте-mvr81t1k.js",
+  "lang": "js",
+  "title": "Успешный результат Promise в тесте",
+  "group": "Тестирование / Асинхронные проверки",
+  "desc": "Проверяем значение, с которым Promise завершился успешно.",
+  "output": "Тест проходит: результат равен 42.",
+  "descAt": 1793137970504,
+  "component": {
+    "provides": [
+      "удвоить"
+    ],
+    "requires": [
+      "test",
+      "expect"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 16,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 31,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 28,
+      "text": "resolves",
+      "kind": "name",
+      "note": "Разворачивает успешный Promise и передаёт значение проверке.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 37,
+      "text": "toBe",
+      "kind": "fn",
+      "note": "Сравнивает значения строго.",
+      "source": "dict"
+    }
+  ]
+}

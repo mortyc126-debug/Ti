@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "id": "сохранение-ресурсов-в-кэш-mvr81ksb",
+  "file": "сохранение-ресурсов-в-кэш-mvr81ksb.js",
+  "lang": "js",
+  "title": "Сохранение ресурсов в кэш",
+  "group": "Кэширование / Асинхронные задачи",
+  "desc": "Сохранение ресурсов в кэш.",
+  "output": "Ресурсы загружены и сохранены в Cache Storage.",
+  "descAt": 1793137959803,
+  "component": {
+    "provides": [
+      "кэш"
+    ],
+    "requires": [
+      "caches"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 25,
+      "text": "open",
+      "kind": "fn",
+      "note": "open — открывает файл",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "addAll",
+      "kind": "fn",
+      "note": "Загружает и сохраняет набор ресурсов.",
+      "source": "dict"
+    }
+  ]
+}

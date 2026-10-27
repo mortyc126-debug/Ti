@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "id": "приведение-bigint-к-знаковому-целому-mvr80yho",
+  "file": "приведение-bigint-к-знаковому-целому-mvr80yho.js",
+  "lang": "js",
+  "title": "Приведение BigInt к знаковому целому",
+  "group": "Данные / Числа",
+  "desc": "Ограничиваем BigInt заданной разрядностью с учётом знака.",
+  "output": "-9223372036854775808n",
+  "descAt": 1793137930908,
+  "component": {
+    "provides": [
+      "большое",
+      "вЗнаковое"
+    ],
+    "requires": [
+      "n",
+      "BigInt"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

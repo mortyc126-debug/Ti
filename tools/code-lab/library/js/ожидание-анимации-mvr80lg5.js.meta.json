@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "id": "ожидание-анимации-mvr80lg5",
+  "file": "ожидание-анимации-mvr80lg5.js",
+  "lang": "js",
+  "title": "Ожидание анимации",
+  "group": "Графика и визуализация / Анимация",
+  "desc": "Ожидание анимации.",
+  "output": "Готово",
+  "descAt": 1793137914005,
+  "component": {
+    "provides": [
+      "блок",
+      "движение"
+    ],
+    "requires": [
+      "opacity",
+      "duration"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 33,
+      "text": "opacity",
+      "kind": "name",
+      "note": "opacity — прозрачность от 0 до 1",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 49,
+      "text": "opacity",
+      "kind": "name",
+      "note": "opacity — прозрачность от 0 до 1",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "finished",
+      "kind": "name",
+      "note": "Promise, завершающийся после анимации.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

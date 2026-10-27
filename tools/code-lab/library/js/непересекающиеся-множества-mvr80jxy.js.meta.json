@@ -1,0 +1,100 @@
+{
+  "schema": 1,
+  "id": "непересекающиеся-множества-mvr80jxy",
+  "file": "непересекающиеся-множества-mvr80jxy.js",
+  "lang": "js",
+  "title": "Непересекающиеся множества",
+  "group": "Данные / Сопоставление наборов",
+  "desc": "Непересекающиеся множества.",
+  "output": "true",
+  "descAt": 1793137912054,
+  "component": {
+    "provides": [
+      "а",
+      "б"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 10,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "Set",
+      "kind": "fn",
+      "note": "Множество уникальных значений; some проверяет пересечение.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "Set",
+      "kind": "fn",
+      "note": "Множество уникальных значений; some проверяет пересечение.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 32,
+      "text": "has",
+      "kind": "fn",
+      "note": "Проверяет наличие элемента в Set.",
+      "source": "dict"
+    }
+  ]
+}

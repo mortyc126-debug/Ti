@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "id": "добавление-узла-в-dom-mvr80dnf",
+  "file": "добавление-узла-в-dom-mvr80dnf.js",
+  "lang": "js",
+  "title": "Добавление узла в DOM",
+  "group": "Интерфейс / Отрисовка данных",
+  "desc": "Добавление узла в DOM.",
+  "output": "В контейнер добавлен абзац.",
+  "descAt": 1793137903899,
+  "component": {
+    "provides": [
+      "вывод",
+      "абзац"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 23,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт новый элемент (например div), который потом можно вставить на страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 6,
+      "text": "appendChild",
+      "kind": "fn",
+      "note": "Добавляет узел в конец списка дочерних элементов.",
+      "source": "custom"
+    }
+  ],
+  "orphanNotes": [
+    {
+      "line": 3,
+      "col": 6,
+      "text": "appendChild",
+      "kind": "fn",
+      "note": "Добавляет узел в конец списка дочерних элементов.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 6,
+      "text": "appendChild",
+      "kind": "fn",
+      "note": "Добавляет узел в конец списка дочерних элементов.",
+      "source": "custom"
+    }
+  ]
+}

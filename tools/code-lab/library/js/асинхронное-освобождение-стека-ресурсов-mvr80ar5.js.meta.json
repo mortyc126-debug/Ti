@@ -1,0 +1,125 @@
+{
+  "schema": 1,
+  "id": "асинхронное-освобождение-стека-ресурсов-mvr80ar5",
+  "file": "асинхронное-освобождение-стека-ресурсов-mvr80ar5.js",
+  "lang": "js",
+  "title": "Асинхронное освобождение стека ресурсов",
+  "group": "Основы / Управление ресурсами",
+  "desc": "Закрываем все зарегистрированные ресурсы в обратном порядке.",
+  "output": "закрыт файл\nзакрыта база",
+  "descAt": 1793137900145,
+  "component": {
+    "provides": [
+      "стек"
+    ],
+    "requires": [
+      "AsyncDisposableStack"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 5,
+      "text": "defer",
+      "kind": "fn",
+      "note": "Регистрирует действие очистки.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 11,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 23,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 31,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 5,
+      "text": "defer",
+      "kind": "fn",
+      "note": "Регистрирует действие очистки.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 11,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 23,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 31,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 11,
+      "text": "disposeAsync",
+      "kind": "fn",
+      "note": "Освобождает ресурсы стека в порядке, обратном добавлению.",
+      "source": "dict"
+    }
+  ]
+}

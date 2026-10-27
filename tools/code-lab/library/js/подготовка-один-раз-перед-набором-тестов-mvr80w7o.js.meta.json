@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "id": "подготовка-один-раз-перед-набором-тестов-mvr80w7o",
+  "file": "подготовка-один-раз-перед-набором-тестов-mvr80w7o.js",
+  "lang": "js",
+  "title": "Подготовка один раз перед набором тестов",
+  "group": "Тестирование / Подготовка и очистка",
+  "desc": "Дорогая подготовка выполняется единожды для всех тестов.",
+  "output": "Подготовка выполняется один раз до первого теста.",
+  "descAt": 1793137927956,
+  "component": {
+    "provides": [
+      "справочник"
+    ],
+    "requires": [
+      "beforeAll",
+      "test",
+      "expect"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "beforeAll",
+      "kind": "name",
+      "note": "Выполняет подготовку один раз перед всеми тестами набора.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 35,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "объявить переменную с блочной областью видимости",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "beforeAll",
+      "kind": "fn",
+      "note": "Выполняет подготовку один раз перед всеми тестами набора.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 19,
+      "text": "Map",
+      "kind": "fn",
+      "note": "Превращает каждый адрес в запущенную задачу.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 31,
+      "text": "toBe",
+      "kind": "fn",
+      "note": "Сравнивает значения строго.",
+      "source": "dict"
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "schema": 1,
+  "id": "уступка-управления-браузеру-в-длинной-за-mvr81tgr",
+  "file": "уступка-управления-браузеру-в-длинной-за-mvr81tgr.js",
+  "lang": "js",
+  "title": "Уступка управления браузеру в длинной задаче",
+  "group": "Интерфейс / Производительность",
+  "desc": "Обрабатываем большой список и периодически даём странице отрисоваться.",
+  "output": "12497500",
+  "descAt": 1793137971051,
+  "component": {
+    "provides": [
+      "элементы",
+      "сумма"
+    ],
+    "requires": [
+      "length",
+      "_",
+      "номер",
+      "число",
+      "scheduler"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 23,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 30,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "объявить переменную с блочной областью видимости",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "цикл с инициализацией, условием и шагом",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 5,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 26,
+      "text": "of",
+      "kind": "kw",
+      "note": "of — часть цикла for…of: перебрать элементы массива/коллекции.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 38,
+      "text": "entries",
+      "kind": "fn",
+      "note": "Object.entries — массив пар [ключ, значение].",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 49,
+      "text": "yield",
+      "kind": "kw",
+      "note": "yield — в генераторе отдать очередное значение и приостановиться.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 20,
+      "text": "yield",
+      "kind": "kw",
+      "note": "yield — в генераторе отдать очередное значение и приостановиться.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "id": "асинхронная-пагинация-api-mvr80a11",
+  "file": "асинхронная-пагинация-api-mvr80a11.js",
+  "lang": "js",
+  "title": "Асинхронная пагинация API",
+  "group": "Сеть / Пагинация API",
+  "desc": "Асинхронная пагинация API.",
+  "output": "Каждая итерация возвращает items очередной страницы.",
+  "descAt": 1793137899205,
+  "component": {
+    "provides": [
+      "ответ",
+      "данные"
+    ],
+    "requires": [
+      "страницы",
+      "адрес"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "while",
+      "kind": "kw",
+      "note": "повторять выполнение, пока условие истинно",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 18,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 24,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "Выполняет HTTP-запрос и возвращает Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 15,
+      "text": "ok",
+      "kind": "name",
+      "note": "Истина для успешных кодов 200–299.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 19,
+      "text": "throw",
+      "kind": "kw",
+      "note": "выбросить исключение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 25,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 29,
+      "text": "Error",
+      "kind": "fn",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 19,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "yield",
+      "kind": "kw",
+      "note": "Выдаёт порцию данных из генератора.",
+      "source": "custom"
+    }
+  ],
+  "orphanNotes": [
+    {
+      "line": 5,
+      "col": 4,
+      "text": "yield",
+      "kind": "kw",
+      "note": "Выдаёт порцию данных из генератора.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "yield",
+      "kind": "kw",
+      "note": "Выдаёт порцию данных из генератора.",
+      "source": "custom"
+    }
+  ]
+}

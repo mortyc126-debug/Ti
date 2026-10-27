@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "id": "добавление-ice-кандидата-от-собеседника-mvr80cmb",
+  "file": "добавление-ice-кандидата-от-собеседника-mvr80cmb.js",
+  "lang": "js",
+  "title": "Добавление ICE-кандидата от собеседника",
+  "group": "Сеть / WebRTC",
+  "desc": "Принимаем сетевой маршрут, присланный другой стороной через сигнальный канал.",
+  "output": "Каждый полученный кандидат добавляется в соединение.",
+  "descAt": 1793137902564,
+  "component": {
+    "provides": [
+      "соединение",
+      "сообщение"
+    ],
+    "requires": [
+      "RTCPeerConnection",
+      "сигналы"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 19,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "Подписывает обработчик на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 36,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 25,
+      "text": "parse",
+      "kind": "fn",
+      "note": "JSON.parse — разобрать строку JSON обратно в объект.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 21,
+      "text": "addIceCandidate",
+      "kind": "fn",
+      "note": "Добавляет сетевой маршрут, полученный от другой стороны.",
+      "source": "dict"
+    }
+  ]
+}

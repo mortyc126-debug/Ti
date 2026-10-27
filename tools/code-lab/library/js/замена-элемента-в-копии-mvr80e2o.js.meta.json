@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "id": "замена-элемента-в-копии-mvr80e2o",
+  "file": "замена-элемента-в-копии-mvr80e2o.js",
+  "lang": "js",
+  "title": "Замена элемента в копии",
+  "group": "Данные / Пакетные изменения",
+  "desc": "Замена элемента в копии.",
+  "output": "[7, 0, 9]",
+  "descAt": 1793137904448,
+  "component": {
+    "provides": [],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 22,
+      "text": "with",
+      "kind": "fn",
+      "note": "Возвращает копию массива с заменой по индексу.",
+      "source": "custom"
+    }
+  ],
+  "orphanNotes": [
+    {
+      "line": 0,
+      "col": 22,
+      "text": "with",
+      "kind": "fn",
+      "note": "Возвращает копию массива с заменой по индексу.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 22,
+      "text": "with",
+      "kind": "fn",
+      "note": "Возвращает копию массива с заменой по индексу.",
+      "source": "custom"
+    }
+  ]
+}

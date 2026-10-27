@@ -1,0 +1,168 @@
+{
+  "schema": 1,
+  "id": "имитация-клика-пользователя-mvr80hto",
+  "file": "имитация-клика-пользователя-mvr80hto.js",
+  "lang": "js",
+  "title": "Имитация клика пользователя",
+  "group": "Тестирование / Библиотека тестирования",
+  "desc": "Проверяем реакцию кнопки на настоящий клик.",
+  "output": "1",
+  "descAt": 1793137909308,
+  "component": {
+    "provides": [
+      "кнопка",
+      "нажатий"
+    ],
+    "requires": [
+      "userEvent"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "userEvent",
+      "kind": "name",
+      "note": "Имитирует действия пользователя.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 17,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 9,
+      "text": "body",
+      "kind": "name",
+      "note": "body — тело запроса",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 14,
+      "text": "innerHTML",
+      "kind": "name",
+      "note": "innerHTML — HTML-содержимое элемента; осторожно с чужими данными.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "объявить переменную с блочной областью видимости",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "Подписывает обработчик на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 6,
+      "text": "userEvent",
+      "kind": "name",
+      "note": "Имитирует действия пользователя.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 16,
+      "text": "click",
+      "kind": "fn",
+      "note": "Выполняет клик с цепочкой событий мыши.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "orphanNotes": [
+    {
+      "line": 7,
+      "col": 16,
+      "text": "click",
+      "kind": "fn",
+      "note": "Выполняет клик с цепочкой событий мыши.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 16,
+      "text": "click",
+      "kind": "fn",
+      "note": "Выполняет клик с цепочкой событий мыши.",
+      "source": "custom"
+    }
+  ]
+}

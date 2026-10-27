@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "id": "изменение-массива-splice-mvr80h04",
+  "file": "изменение-массива-splice-mvr80h04.js",
+  "lang": "js",
+  "title": "Изменение массива splice",
+  "group": "Данные / Пакетные изменения",
+  "desc": "Изменение массива splice.",
+  "output": "[\"яблоко\", \"персик\", \"слива\"]",
+  "descAt": 1793137908244,
+  "component": {
+    "provides": [
+      "фрукты"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 7,
+      "text": "splice",
+      "kind": "fn",
+      "note": "Удаляет и/или вставляет элементы в исходный массив.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

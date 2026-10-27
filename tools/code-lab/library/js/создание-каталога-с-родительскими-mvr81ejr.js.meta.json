@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "id": "создание-каталога-с-родительскими-mvr81ejr",
+  "file": "создание-каталога-с-родительскими-mvr81ejr.js",
+  "lang": "js",
+  "title": "Создание каталога с родительскими",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "Создаём вложенные каталоги за один вызов; если они уже есть — ошибки не будет.",
+  "output": "Выводится путь первого созданного каталога (или undefined, если всё уже было).",
+  "descAt": 1793137951719,
+  "component": {
+    "provides": [
+      "путь",
+      "созданный"
+    ],
+    "requires": [
+      "mkdir",
+      "recursive"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "mkdir",
+      "kind": "name",
+      "note": "Создаёт каталог.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 17,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 18,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 24,
+      "text": "mkdir",
+      "kind": "fn",
+      "note": "Создаёт каталог.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 38,
+      "text": "recursive",
+      "kind": "name",
+      "note": "Создаёт и недостающие родительские каталоги.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 49,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "id": "изменение-атрибута-собственного-элемента-mvr80gkw",
+  "file": "изменение-атрибута-собственного-элемента-mvr80gkw.js",
+  "lang": "js",
+  "title": "Изменение атрибута собственного элемента",
+  "group": "Интерфейс / Жизненный цикл",
+  "desc": "Изменение атрибута собственного элемента.",
+  "output": "Callback вызывается при изменении наблюдаемого атрибута.",
+  "descAt": 1793137907696,
+  "component": {
+    "provides": [
+      "Индикатор"
+    ],
+    "requires": [
+      "HTMLElement",
+      "observedAttributes",
+      "attributeChangedCallback",
+      "имя",
+      "старое",
+      "новое",
+      "customElements"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — описывает «чертёж» объектов: их свойства и методы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 16,
+      "text": "extends",
+      "kind": "kw",
+      "note": "extends — класс наследует свойства и методы другого класса.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "attributeChangedCallback",
+      "kind": "fn",
+      "note": "Обрабатывает изменение наблюдаемого атрибута.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 49,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 57,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "id": "абстрактный-класс-mvr809tg",
+  "file": "абстрактный-класс-mvr809tg.js",
+  "lang": "js",
+  "title": "Абстрактный класс",
+  "group": "Основы / Объектно-ориентированное программирование",
+  "desc": "Абстрактный класс.",
+  "output": "готово",
+  "descAt": 1793137898932,
+  "component": {
+    "provides": [
+      "Основа",
+      "Задача"
+    ],
+    "requires": [
+      "abstract",
+      "run"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "abstract",
+      "kind": "name",
+      "note": "Требует реализации метода в наследнике; это TypeScript.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — описывает «чертёж» объектов: их свойства и методы.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "abstract",
+      "kind": "name",
+      "note": "Требует реализации метода в наследнике; это TypeScript.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 40,
+      "text": "void",
+      "kind": "kw",
+      "note": "void — вычислить выражение и вернуть undefined.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — описывает «чертёж» объектов: их свойства и методы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 13,
+      "text": "extends",
+      "kind": "kw",
+      "note": "extends — класс наследует свойства и методы другого класса.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 38,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 46,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    }
+  ]
+}

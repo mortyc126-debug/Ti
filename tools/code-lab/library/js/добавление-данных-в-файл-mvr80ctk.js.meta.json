@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "id": "добавление-данных-в-файл-mvr80ctk",
+  "file": "добавление-данных-в-файл-mvr80ctk.js",
+  "lang": "js",
+  "title": "Добавление данных в файл",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "Добавление данных в файл.",
+  "output": "Строка добавлена в конец файла.",
+  "descAt": 1793137902824,
+  "component": {
+    "provides": [],
+    "requires": [
+      "appendFile"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "appendFile",
+      "kind": "name",
+      "note": "Добавляет данные в конец файла.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 22,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "appendFile",
+      "kind": "fn",
+      "note": "Добавляет данные в конец файла.",
+      "source": "dict"
+    }
+  ]
+}

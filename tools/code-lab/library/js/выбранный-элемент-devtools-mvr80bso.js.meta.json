@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "id": "выбранный-элемент-devtools-mvr80bso",
+  "file": "выбранный-элемент-devtools-mvr80bso.js",
+  "lang": "js",
+  "title": "Выбранный элемент DevTools",
+  "group": "Интерфейс / Наблюдение за DOM",
+  "desc": "Выбранный элемент DevTools.",
+  "output": "Например, DIV",
+  "descAt": 1793137901496,
+  "component": {
+    "provides": [],
+    "requires": [
+      "$0"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "$0",
+      "kind": "name",
+      "note": "Ссылка на последний выбранный элемент DevTools.",
+      "source": "dict"
+    }
+  ]
+}

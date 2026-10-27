@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "id": "очистка-после-каждого-теста-mvr80t1v",
+  "file": "очистка-после-каждого-теста-mvr80t1v.js",
+  "lang": "js",
+  "title": "Очистка после каждого теста",
+  "group": "Тестирование / Ресурсы",
+  "desc": "Очистка после каждого теста.",
+  "output": "Очистка теста",
+  "descAt": 1793137923859,
+  "component": {
+    "provides": [],
+    "requires": [
+      "afterEach",
+      "test"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "afterEach",
+      "kind": "name",
+      "note": "Хук, выполняющийся после каждого теста.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 27,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "afterEach",
+      "kind": "fn",
+      "note": "Хук, выполняющийся после каждого теста.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 16,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 24,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

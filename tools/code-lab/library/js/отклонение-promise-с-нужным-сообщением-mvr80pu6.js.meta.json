@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "id": "отклонение-promise-с-нужным-сообщением-mvr80pu6",
+  "file": "отклонение-promise-с-нужным-сообщением-mvr80pu6.js",
+  "lang": "js",
+  "title": "Отклонение Promise с нужным сообщением",
+  "group": "Тестирование / Асинхронные проверки",
+  "desc": "Проверяем не только сам факт ошибки, но и её текст.",
+  "output": "Тест проходит: сообщение ошибки содержит ожидаемый текст.",
+  "descAt": 1793137919694,
+  "component": {
+    "provides": [
+      "списатьДеньги"
+    ],
+    "requires": [
+      "test",
+      "expect"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 19,
+      "text": "throw",
+      "kind": "kw",
+      "note": "выбросить исключение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 25,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 29,
+      "text": "Error",
+      "kind": "fn",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 53,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 35,
+      "text": "rejects",
+      "kind": "name",
+      "note": "Разворачивает отклонённый Promise для дальнейшей проверки.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 43,
+      "text": "toThrow",
+      "kind": "fn",
+      "note": "Сверяет сообщение ошибки с переданной строкой (достаточно вхождения).",
+      "source": "custom"
+    }
+  ],
+  "orphanNotes": [
+    {
+      "line": 8,
+      "col": 43,
+      "text": "toThrow",
+      "kind": "fn",
+      "note": "Сверяет сообщение ошибки с переданной строкой (достаточно вхождения).",
+      "source": "custom"
+    }
+  ]
+}

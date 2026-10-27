@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "id": "режим-es-модулей-mvr81at1",
+  "file": "режим-es-модулей-mvr81at1.js",
+  "lang": "js",
+  "title": "Режим ES-модулей",
+  "group": "Разработка и инструменты / Упаковка проекта",
+  "desc": "Режим ES-модулей.",
+  "output": "module",
+  "descAt": 1793137946869,
+  "component": {
+    "provides": [
+      "пакет"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "type",
+      "kind": "name",
+      "note": "Указывает Node.js использовать ES-модули.",
+      "source": "dict"
+    }
+  ]
+}

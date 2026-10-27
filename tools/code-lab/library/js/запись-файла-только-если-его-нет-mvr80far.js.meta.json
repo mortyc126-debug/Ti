@@ -1,0 +1,124 @@
+{
+  "schema": 1,
+  "id": "запись-файла-только-если-его-нет-mvr80far",
+  "file": "запись-файла-только-если-его-нет-mvr80far.js",
+  "lang": "js",
+  "title": "Запись файла только если его нет",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "Флаг wx не даёт случайно перезаписать существующий файл.",
+  "output": "Создан, а при повторном запуске — EEXIST.",
+  "descAt": 1793137906035,
+  "component": {
+    "provides": [],
+    "requires": [
+      "writeFile",
+      "flag"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "writeFile",
+      "kind": "name",
+      "note": "writeFile — записывает текст, а старое содержимое стирает",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 21,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "writeFile",
+      "kind": "fn",
+      "note": "writeFile — записывает текст, а старое содержимое стирает",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 46,
+      "text": "flag",
+      "kind": "name",
+      "note": "Режим открытия файла.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

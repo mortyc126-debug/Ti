@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "id": "диалоговое-окно-mvr80cep",
+  "file": "диалоговое-окно-mvr80cep.js",
+  "lang": "js",
+  "title": "Диалоговое окно",
+  "group": "Интерфейс / Реакция на действия пользователя",
+  "desc": "Диалоговое окно.",
+  "output": "Браузер показывает диалог.",
+  "descAt": 1793137902289,
+  "component": {
+    "provides": [],
+    "requires": [
+      "alert"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "alert",
+      "kind": "fn",
+      "note": "Показывает блокирующее сообщение в браузере.",
+      "source": "dict"
+    }
+  ]
+}

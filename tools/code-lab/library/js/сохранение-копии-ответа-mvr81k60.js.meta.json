@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "id": "сохранение-копии-ответа-mvr81k60",
+  "file": "сохранение-копии-ответа-mvr81k60.js",
+  "lang": "js",
+  "title": "Сохранение копии ответа",
+  "group": "Кэширование / Асинхронные задачи",
+  "desc": "Сохранение копии ответа.",
+  "output": "Ответ сохранён в Cache Storage.",
+  "descAt": 1793137959000,
+  "component": {
+    "provides": [
+      "кэш",
+      "ответ"
+    ],
+    "requires": [
+      "caches"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 25,
+      "text": "open",
+      "kind": "fn",
+      "note": "open — открывает файл",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "Выполняет HTTP-запрос и возвращает Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 36,
+      "text": "clone",
+      "kind": "fn",
+      "note": "Создаёт копию ответа для сохранения в кэш.",
+      "source": "dict"
+    }
+  ]
+}

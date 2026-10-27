@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "id": "проверка-новой-версии-service-worker-mvr8156w",
+  "file": "проверка-новой-версии-service-worker-mvr8156w.js",
+  "lang": "js",
+  "title": "Проверка новой версии Service Worker",
+  "group": "Кэширование / Service Worker",
+  "desc": "Просим браузер заново проверить, не появился ли обновлённый скрипт.",
+  "output": "Ожидает активации: true, если найдена новая версия.",
+  "descAt": 1793137939592,
+  "component": {
+    "provides": [
+      "регистрация"
+    ],
+    "requires": [
+      "navigator"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 20,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "update",
+      "kind": "fn",
+      "note": "Запрашивает скрипт Service Worker и ищет новую версию.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

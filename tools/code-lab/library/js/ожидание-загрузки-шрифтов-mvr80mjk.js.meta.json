@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "id": "ожидание-загрузки-шрифтов-mvr80mjk",
+  "file": "ожидание-загрузки-шрифтов-mvr80mjk.js",
+  "lang": "js",
+  "title": "Ожидание загрузки шрифтов",
+  "group": "Интерфейс / Жизненный цикл",
+  "desc": "Ожидание загрузки шрифтов.",
+  "output": "Шрифты готовы",
+  "descAt": 1793137915425,
+  "component": {
+    "provides": [],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

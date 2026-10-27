@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "id": "заполнение-поля-по-подписи-в-playwright-mvr80fip",
+  "file": "заполнение-поля-по-подписи-в-playwright-mvr80fip.js",
+  "lang": "js",
+  "title": "Заполнение поля по подписи в Playwright",
+  "group": "Тестирование / Браузерные тесты",
+  "desc": "Находим поле по связанной подписи и вводим в него значение.",
+  "output": "Поле с подписью «email» заполнено.",
+  "descAt": 1793137906321,
+  "component": {
+    "provides": [],
+    "requires": [
+      "test",
+      "page"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 16,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 23,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 13,
+      "text": "goto",
+      "kind": "fn",
+      "note": "Переходит по адресу и ждёт загрузки страницы.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 13,
+      "text": "getByLabel",
+      "kind": "fn",
+      "note": "Находит поле формы по тексту подписи.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 33,
+      "text": "fill",
+      "kind": "fn",
+      "note": "Очищает поле и вводит значение.",
+      "source": "custom"
+    }
+  ],
+  "orphanNotes": [
+    {
+      "line": 4,
+      "col": 33,
+      "text": "fill",
+      "kind": "fn",
+      "note": "Очищает поле и вводит значение.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 33,
+      "text": "fill",
+      "kind": "fn",
+      "note": "Очищает поле и вводит значение.",
+      "source": "custom"
+    }
+  ]
+}

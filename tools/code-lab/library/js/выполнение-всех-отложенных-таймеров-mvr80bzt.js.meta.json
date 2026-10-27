@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "id": "выполнение-всех-отложенных-таймеров-mvr80bzt",
+  "file": "выполнение-всех-отложенных-таймеров-mvr80bzt.js",
+  "lang": "js",
+  "title": "Выполнение всех отложенных таймеров",
+  "group": "Тестирование / Таймеры",
+  "desc": "Мгновенно запускаем все запланированные таймеры, включая цепочки Promise.",
+  "output": "Тест проходит: оба таймера выполнены сразу.",
+  "descAt": 1793137901753,
+  "component": {
+    "provides": [
+      "журнал"
+    ],
+    "requires": [
+      "test",
+      "expect",
+      "vi"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 28,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 31,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 11,
+      "text": "runAllTimersAsync",
+      "kind": "fn",
+      "note": "Запускает все ожидающие таймеры и ждёт связанные Promise.",
+      "source": "dict"
+    }
+  ]
+}

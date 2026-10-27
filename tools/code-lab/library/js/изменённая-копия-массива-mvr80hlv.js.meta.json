@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "id": "изменённая-копия-массива-mvr80hlv",
+  "file": "изменённая-копия-массива-mvr80hlv.js",
+  "lang": "js",
+  "title": "Изменённая копия массива",
+  "group": "Данные / Пакетные изменения",
+  "desc": "Изменённая копия массива.",
+  "output": "[\"а\", \"новое\", \"в\"]",
+  "descAt": 1793137909027,
+  "component": {
+    "provides": [],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 28,
+      "text": "toSpliced",
+      "kind": "fn",
+      "note": "Возвращает копию массива с удалёнными или вставленными элементами.",
+      "source": "dict"
+    }
+  ]
+}

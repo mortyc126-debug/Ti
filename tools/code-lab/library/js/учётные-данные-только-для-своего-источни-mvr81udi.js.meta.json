@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "id": "учётные-данные-только-для-своего-источни-mvr81udi",
+  "file": "учётные-данные-только-для-своего-источни-mvr81udi.js",
+  "lang": "js",
+  "title": "Учётные данные только для своего источника",
+  "group": "Сеть и API / Безопасность запросов",
+  "desc": "Куки и заголовки авторизации отправляются, только если запрос идёт на тот же источник.",
+  "output": "Куки уходят только на свой источник; на чужие запросы — без них.",
+  "descAt": 1793137972230,
+  "component": {
+    "provides": [
+      "ответ",
+      "профиль"
+    ],
+    "requires": [
+      "mode",
+      "credentials"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 20,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "Выполняет HTTP-запрос и возвращает Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "mode",
+      "kind": "name",
+      "note": "Режим междоменного запроса (CORS).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "credentials",
+      "kind": "name",
+      "note": "Режим отправки куки и данных авторизации.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 16,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

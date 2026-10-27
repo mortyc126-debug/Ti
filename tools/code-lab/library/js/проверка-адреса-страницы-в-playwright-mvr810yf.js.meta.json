@@ -1,0 +1,135 @@
+{
+  "schema": 1,
+  "id": "проверка-адреса-страницы-в-playwright-mvr810yf",
+  "file": "проверка-адреса-страницы-в-playwright-mvr810yf.js",
+  "lang": "js",
+  "title": "Проверка адреса страницы в Playwright",
+  "group": "Тестирование / Браузерные тесты",
+  "desc": "После входа проверяем, что браузер перешёл на страницу панели управления.",
+  "output": "Тест проходит, когда адрес страницы содержит «dashboard».",
+  "descAt": 1793137934103,
+  "component": {
+    "provides": [],
+    "requires": [
+      "test",
+      "expect",
+      "page",
+      "name",
+      "dashboard"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 40,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 13,
+      "text": "goto",
+      "kind": "fn",
+      "note": "Переходит по адресу и ждёт загрузки страницы.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 13,
+      "text": "getByLabel",
+      "kind": "fn",
+      "note": "Находит поле формы по тексту подписи.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 34,
+      "text": "fill",
+      "kind": "fn",
+      "note": "fill — залить текущий контур цветом (fillStyle).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 13,
+      "text": "getByRole",
+      "kind": "fn",
+      "note": "Находит элемент по доступной роли и имени.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 52,
+      "text": "click",
+      "kind": "fn",
+      "note": "click — событие клика мышью или касанием",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 21,
+      "text": "toHaveURL",
+      "kind": "fn",
+      "note": "Ждёт и проверяет, что адрес страницы соответствует строке или регулярному выражению.",
+      "source": "dict"
+    }
+  ]
+}

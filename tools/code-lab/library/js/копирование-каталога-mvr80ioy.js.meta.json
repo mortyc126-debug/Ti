@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "id": "копирование-каталога-mvr80ioy",
+  "file": "копирование-каталога-mvr80ioy.js",
+  "lang": "js",
+  "title": "Копирование каталога",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "Копирование каталога.",
+  "output": "Каталог скопирован вместе с содержимым.",
+  "descAt": 1793137910434,
+  "component": {
+    "provides": [],
+    "requires": [
+      "cp",
+      "recursive"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "cp",
+      "kind": "name",
+      "note": "Копирует каталоги и файлы; recursive включает вложенное содержимое.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "cp",
+      "kind": "fn",
+      "note": "Копирует каталоги и файлы; recursive включает вложенное содержимое.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 35,
+      "text": "recursive",
+      "kind": "name",
+      "note": "Создаёт и недостающие родительские каталоги.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 46,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    }
+  ]
+}

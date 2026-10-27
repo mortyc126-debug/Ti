@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "id": "отмена-запроса-mvr80qnh",
+  "file": "отмена-запроса-mvr80qnh.js",
+  "lang": "js",
+  "title": "Отмена запроса",
+  "group": "Асинхронность / Отмена операций",
+  "desc": "Отмена запроса.",
+  "output": "При отмене запроса возникает AbortError.",
+  "descAt": 1793137920749,
+  "component": {
+    "provides": [
+      "отмена"
+    ],
+    "requires": [
+      "AbortController",
+      "signal"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 19,
+      "text": "AbortController",
+      "kind": "fn",
+      "note": "Создаёт сигнал отмены операции.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "Выполняет HTTP-запрос и возвращает Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 23,
+      "text": "signal",
+      "kind": "name",
+      "note": "Сигнал, по которому ожидание прерывается.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 38,
+      "text": "signal",
+      "kind": "name",
+      "note": "Сигнал, по которому ожидание прерывается.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 48,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 64,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 72,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 83,
+      "text": "name",
+      "kind": "name",
+      "note": "Ожидаемое имя типа ошибки.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 7,
+      "text": "abort",
+      "kind": "fn",
+      "note": "abort — отменяет запрос",
+      "source": "dict"
+    }
+  ]
+}

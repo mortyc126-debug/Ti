@@ -1,0 +1,173 @@
+{
+  "schema": 1,
+  "id": "копирование-данных-потоками-mvr80igr",
+  "file": "копирование-данных-потоками-mvr80igr.js",
+  "lang": "js",
+  "title": "Копирование данных потоками",
+  "group": "Файлы, хранение и сервер / Потоки",
+  "desc": "Копируем большой файл по частям с корректной обработкой ошибок.",
+  "output": "Скопировано",
+  "descAt": 1793137910140,
+  "component": {
+    "provides": [],
+    "requires": [
+      "createReadStream",
+      "createWriteStream",
+      "pipeline"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "createReadStream",
+      "kind": "name",
+      "note": "Открывает файл для чтения потоком.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 27,
+      "text": "createWriteStream",
+      "kind": "name",
+      "note": "Открывает файл для записи потоком.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 47,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "pipeline",
+      "kind": "name",
+      "note": "Передаёт данные из потока чтения в ответ сервера.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "pipeline",
+      "kind": "fn",
+      "note": "Передаёт данные из потока чтения в ответ сервера.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "createReadStream",
+      "kind": "fn",
+      "note": "Открывает файл для чтения потоком.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "createWriteStream",
+      "kind": "fn",
+      "note": "Открывает файл для записи потоком.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 10,
+      "text": "error",
+      "kind": "fn",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 44,
+      "text": "message",
+      "kind": "name",
+      "note": "Ожидаемый текст сообщения ошибки.",
+      "source": "dict"
+    }
+  ]
+}

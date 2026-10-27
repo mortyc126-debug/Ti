@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "id": "запрос-без-передачи-реферера-mvr80fqa",
+  "file": "запрос-без-передачи-реферера-mvr80fqa.js",
+  "lang": "js",
+  "title": "Запрос без передачи реферера",
+  "group": "Сеть и API / Безопасность запросов",
+  "desc": "Адрес текущей страницы не раскрывается стороннему серверу.",
+  "output": "Запрос выполняется без заголовка Referer.",
+  "descAt": 1793137906594,
+  "component": {
+    "provides": [
+      "ответ"
+    ],
+    "requires": [
+      "referrerPolicy"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 20,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "Выполняет HTTP-запрос и возвращает Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "referrerPolicy",
+      "kind": "name",
+      "note": "Определяет, какой реферер передать в запросе.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 18,
+      "text": "status",
+      "kind": "name",
+      "note": "status — код ответа: 200 успех, 404 не найдено, 500 ошибка сервера",
+      "source": "dict"
+    }
+  ]
+}

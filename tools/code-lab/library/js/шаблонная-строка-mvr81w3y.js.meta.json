@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "id": "шаблонная-строка-mvr81w3y",
+  "file": "шаблонная-строка-mvr81w3y.js",
+  "lang": "js",
+  "title": "Шаблонная строка",
+  "group": "Данные / Строки и текст",
+  "desc": "Шаблонная строка.",
+  "output": "Привет, Мира!",
+  "descAt": 1793137974478,
+  "component": {
+    "provides": [
+      "имя"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

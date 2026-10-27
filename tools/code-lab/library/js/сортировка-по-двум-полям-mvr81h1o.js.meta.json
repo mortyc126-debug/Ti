@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "id": "сортировка-по-двум-полям-mvr81h1o",
+  "file": "сортировка-по-двум-полям-mvr81h1o.js",
+  "lang": "js",
+  "title": "Сортировка по двум полям",
+  "group": "Данные / Сортировка",
+  "desc": "Сортировка по двум полям.",
+  "output": "[{x:1,y:2},{x:1,y:4},{x:2,y:1}]",
+  "descAt": 1793137954956,
+  "component": {
+    "provides": [
+      "точки"
+    ],
+    "requires": [
+      "x",
+      "y",
+      "a"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "sort",
+      "kind": "fn",
+      "note": "sort — отсортировать массив (по умолчанию как строки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 21,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 34,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

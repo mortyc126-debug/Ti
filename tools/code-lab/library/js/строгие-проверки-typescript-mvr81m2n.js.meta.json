@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "id": "строгие-проверки-typescript-mvr81m2n",
+  "file": "строгие-проверки-typescript-mvr81m2n.js",
+  "lang": "js",
+  "title": "Строгие проверки TypeScript",
+  "group": "Основы / Типизация",
+  "desc": "Строгие проверки TypeScript.",
+  "output": "true",
+  "descAt": 1793137961471,
+  "component": {
+    "provides": [
+      "настройки"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 51,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 38,
+      "text": "strict",
+      "kind": "name",
+      "note": "Включает строгие проверки TypeScript.",
+      "source": "dict"
+    }
+  ]
+}

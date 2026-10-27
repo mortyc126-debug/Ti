@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "id": "строгий-режим-mvr81mot",
+  "file": "строгий-режим-mvr81mot.js",
+  "lang": "js",
+  "title": "Строгий режим",
+  "group": "Основы / Синтаксис",
+  "desc": "Строгий режим.",
+  "output": "5",
+  "descAt": 1793137962269,
+  "component": {
+    "provides": [
+      "сумма"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 23,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

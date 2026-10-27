@@ -1,0 +1,187 @@
+{
+  "schema": 1,
+  "id": "отмена-остальных-запросов-после-первого--mvr80r1h",
+  "file": "отмена-остальных-запросов-после-первого--mvr80r1h.js",
+  "lang": "js",
+  "title": "Отмена остальных запросов после первого ответа",
+  "group": "Асинхронность / Отмена операций",
+  "desc": "Берём ответ самого быстрого зеркала и прерываем остальные запросы.",
+  "output": "Адрес зеркала, ответившего первым.",
+  "descAt": 1793137921254,
+  "component": {
+    "provides": [
+      "зеркала",
+      "контроллер",
+      "запросы",
+      "ответ"
+    ],
+    "requires": [
+      "AbortController",
+      "signal"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 23,
+      "text": "AbortController",
+      "kind": "fn",
+      "note": "Создаёт сигнал отмены операции.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 24,
+      "text": "map",
+      "kind": "fn",
+      "note": "Превращает каждый адрес в запущенную задачу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 37,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "Выполняет HTTP-запрос и возвращает Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 52,
+      "text": "signal",
+      "kind": "name",
+      "note": "Сигнал, по которому ожидание прерывается.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 71,
+      "text": "signal",
+      "kind": "name",
+      "note": "Сигнал, по которому ожидание прерывается.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "forEach",
+      "kind": "fn",
+      "note": "Выполняет функцию для каждого элемента.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 33,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 14,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 20,
+      "text": "Promise",
+      "kind": "name",
+      "note": "Оборачивает событие в ожидаемый результат.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 42,
+      "text": "finally",
+      "kind": "kw",
+      "note": "finally — выполнится в любом случае, с ошибкой или без.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 67,
+      "text": "abort",
+      "kind": "fn",
+      "note": "Отменяет все запросы с этим сигналом.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "orphanNotes": [
+    {
+      "line": 6,
+      "col": 67,
+      "text": "abort",
+      "kind": "fn",
+      "note": "Отменяет все запросы с этим сигналом.",
+      "source": "custom"
+    }
+  ]
+}

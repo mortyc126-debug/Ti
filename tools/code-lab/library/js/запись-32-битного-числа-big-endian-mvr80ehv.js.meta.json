@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "id": "запись-32-битного-числа-big-endian-mvr80ehv",
+  "file": "запись-32-битного-числа-big-endian-mvr80ehv.js",
+  "lang": "js",
+  "title": "Запись 32-битного числа big-endian",
+  "group": "Файлы, хранение и сервер / Двоичные данные",
+  "desc": "Записываем число в буфер, начиная со старшего байта.",
+  "output": "<Buffer 12 34 56 78>",
+  "descAt": 1793137904995,
+  "component": {
+    "provides": [
+      "пакет"
+    ],
+    "requires": [
+      "Buffer"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 21,
+      "text": "alloc",
+      "kind": "fn",
+      "note": "Создаёт буфер, заполненный нулями.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "writeUInt32BE",
+      "kind": "fn",
+      "note": "Записывает беззнаковое 32-битное число big-endian по смещению.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

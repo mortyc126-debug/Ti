@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "id": "сжатие-файла-потоками-mvr81co7",
+  "file": "сжатие-файла-потоками-mvr81co7.js",
+  "lang": "js",
+  "title": "Сжатие файла потоками",
+  "group": "Файлы, хранение и сервер / Потоки",
+  "desc": "Читаем файл, сжимаем gzip и пишем результат, не загружая всё в память.",
+  "output": "Сжато: ./журнал.log.gz",
+  "descAt": 1793137949287,
+  "component": {
+    "provides": [
+      "исходник",
+      "архив"
+    ],
+    "requires": [
+      "createReadStream",
+      "createWriteStream",
+      "createGzip",
+      "pipeline"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "createReadStream",
+      "kind": "name",
+      "note": "Открывает файл для чтения потоком.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 27,
+      "text": "createWriteStream",
+      "kind": "name",
+      "note": "Открывает файл для записи потоком.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 47,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "createGzip",
+      "kind": "name",
+      "note": "Создаёт поток сжатия gzip.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 22,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 9,
+      "text": "pipeline",
+      "kind": "name",
+      "note": "Соединяет потоки и закрывает их при завершении или ошибке.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 20,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 6,
+      "text": "pipeline",
+      "kind": "fn",
+      "note": "Соединяет потоки и закрывает их при завершении или ошибке.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 15,
+      "text": "createReadStream",
+      "kind": "fn",
+      "note": "Открывает файл для чтения потоком.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 43,
+      "text": "createGzip",
+      "kind": "fn",
+      "note": "Создаёт поток сжатия gzip.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 57,
+      "text": "createWriteStream",
+      "kind": "fn",
+      "note": "Открывает файл для записи потоком.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

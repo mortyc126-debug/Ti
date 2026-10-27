@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "id": "повтор-проверки-до-успеха-в-vitest-mvr80vt9",
+  "file": "повтор-проверки-до-успеха-в-vitest-mvr80vt9.js",
+  "lang": "js",
+  "title": "Повтор проверки до успеха в Vitest",
+  "group": "Тестирование / Таймеры",
+  "desc": "Проверку повторяют, пока она не пройдёт или не истечёт время.",
+  "output": "Тест проходит, как только шпион вызван.",
+  "descAt": 1793137927437,
+  "component": {
+    "provides": [
+      "шпион"
+    ],
+    "requires": [
+      "test",
+      "expect",
+      "vi"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 28,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 32,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 11,
+      "text": "waitFor",
+      "kind": "fn",
+      "note": "Повторяет проверку, пока она не пройдёт.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 39,
+      "text": "toHaveBeenCalled",
+      "kind": "fn",
+      "note": "Проверяет, что функция вызывалась.",
+      "source": "dict"
+    }
+  ]
+}

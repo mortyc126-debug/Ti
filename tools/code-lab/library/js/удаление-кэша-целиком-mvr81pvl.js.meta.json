@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "id": "удаление-кэша-целиком-mvr81pvl",
+  "file": "удаление-кэша-целиком-mvr81pvl.js",
+  "lang": "js",
+  "title": "Удаление кэша целиком",
+  "group": "Кэширование / Инвалидация",
+  "desc": "Удаление кэша целиком.",
+  "output": "true, если кэш существовал.",
+  "descAt": 1793137966401,
+  "component": {
+    "provides": [],
+    "requires": [
+      "caches"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 25,
+      "text": "delete",
+      "kind": "kw",
+      "note": "удалить собственное свойство объекта",
+      "source": "dict"
+    }
+  ]
+}

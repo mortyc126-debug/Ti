@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "id": "проверка-регулярного-выражения-mvr8171l",
+  "file": "проверка-регулярного-выражения-mvr8171l.js",
+  "lang": "js",
+  "title": "Проверка регулярного выражения",
+  "group": "Тестирование / Проверки функций",
+  "desc": "Проверка регулярного выражения.",
+  "output": "Совпало",
+  "descAt": 1793137941993,
+  "component": {
+    "provides": [],
+    "requires": [
+      "assert",
+      "заказ",
+      "d"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "assert",
+      "kind": "name",
+      "note": "assert — проверка: если условие ложно, программа остановится",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "assert",
+      "kind": "name",
+      "note": "assert — проверка: если условие ложно, программа остановится",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 7,
+      "text": "match",
+      "kind": "fn",
+      "note": "Проверяет соответствие строки регулярному выражению.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

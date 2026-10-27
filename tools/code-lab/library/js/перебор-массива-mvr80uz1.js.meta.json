@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "id": "перебор-массива-mvr80uz1",
+  "file": "перебор-массива-mvr80uz1.js",
+  "lang": "js",
+  "title": "Перебор массива",
+  "group": "Данные / Перебирать коллекции",
+  "desc": "Перебор массива.",
+  "output": "чай\nкофе",
+  "descAt": 1793137926349,
+  "component": {
+    "provides": [],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 16,
+      "text": "forEach",
+      "kind": "fn",
+      "note": "Выполняет функцию для каждого элемента.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 35,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 43,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "id": "приостановка-аудио-mvr810c2",
+  "file": "приостановка-аудио-mvr810c2.js",
+  "lang": "js",
+  "title": "Приостановка аудио",
+  "group": "Графика и визуализация / Анимация",
+  "desc": "Приостановка аудио.",
+  "output": "suspended",
+  "descAt": 1793137933298,
+  "component": {
+    "provides": [
+      "звук"
+    ],
+    "requires": [
+      "AudioContext"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "suspend",
+      "kind": "fn",
+      "note": "Приостанавливает обработку звука.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 17,
+      "text": "state",
+      "kind": "name",
+      "note": "state — состояние: единый объект с данными игры",
+      "source": "dict"
+    }
+  ]
+}

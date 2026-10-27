@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "id": "изменение-прав-файла-mvr80h72",
+  "file": "изменение-прав-файла-mvr80h72.js",
+  "lang": "js",
+  "title": "Изменение прав файла",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "Изменение прав файла.",
+  "output": "Права доступа изменены в среде с поддержкой POSIX-прав.",
+  "descAt": 1793137908494,
+  "component": {
+    "provides": [],
+    "requires": [
+      "chmod",
+      "o644"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "chmod",
+      "kind": "name",
+      "note": "Изменяет права доступа к файлу.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 17,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "chmod",
+      "kind": "fn",
+      "note": "Изменяет права доступа к файлу.",
+      "source": "dict"
+    }
+  ]
+}

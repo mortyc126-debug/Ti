@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "id": "системное-меню-поделиться-mvr81dam",
+  "file": "системное-меню-поделиться-mvr81dam.js",
+  "lang": "js",
+  "title": "Системное меню «Поделиться»",
+  "group": "Интерфейс / Системные возможности",
+  "desc": "Вызываем нативное меню отправки, если браузер его поддерживает.",
+  "output": "На поддерживающем устройстве открывается системное меню «Поделиться».",
+  "descAt": 1793137950094,
+  "component": {
+    "provides": [
+      "кнопка"
+    ],
+    "requires": [
+      "navigator",
+      "title",
+      "text",
+      "url",
+      "location"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "Подписывает обработчик на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 33,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 24,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    }
+  ]
+}

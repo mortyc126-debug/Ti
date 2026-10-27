@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "id": "ожидание-atomics-асинхронно-mvr80l90",
+  "file": "ожидание-atomics-асинхронно-mvr80l90.js",
+  "lang": "js",
+  "title": "Ожидание Atomics асинхронно",
+  "group": "Асинхронность / Ожидание состояния",
+  "desc": "Ожидание Atomics асинхронно.",
+  "output": "true, если ожидание асинхронное.",
+  "descAt": 1793137913748,
+  "component": {
+    "provides": [
+      "память",
+      "ячейки",
+      "ожидание"
+    ],
+    "requires": [
+      "SharedArrayBuffer",
+      "Int32Array",
+      "Atomics"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 25,
+      "text": "waitAsync",
+      "kind": "fn",
+      "note": "Асинхронно ожидает изменения значения общей памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 21,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    }
+  ]
+}

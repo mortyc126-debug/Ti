@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "id": "копирование-части-массива-mvr80j47",
+  "file": "копирование-части-массива-mvr80j47.js",
+  "lang": "js",
+  "title": "Копирование части массива",
+  "group": "Данные / Пакетные изменения",
+  "desc": "Копирование части массива.",
+  "output": "[1, 4, 5, 4, 5]",
+  "descAt": 1793137910983,
+  "component": {
+    "provides": [
+      "числа"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "copyWithin",
+      "kind": "fn",
+      "note": "Копирует часть массива внутрь него самого.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "id": "поиск-элементов-в-devtools-mvr80xd2",
+  "file": "поиск-элементов-в-devtools-mvr80xd2.js",
+  "lang": "js",
+  "title": "Поиск элементов в DevTools",
+  "group": "Интерфейс / Наблюдение за DOM",
+  "desc": "Поиск элементов в DevTools.",
+  "output": "Количество элементов с классом карточка.",
+  "descAt": 1793137929446,
+  "component": {
+    "provides": [
+      "карточки"
+    ],
+    "requires": [
+      "$$"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 17,
+      "text": "$$",
+      "kind": "fn",
+      "note": "Возвращает массив элементов по CSS-селектору в DevTools.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 21,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    }
+  ]
+}

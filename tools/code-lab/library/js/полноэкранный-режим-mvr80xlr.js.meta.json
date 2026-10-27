@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "id": "полноэкранный-режим-mvr80xlr",
+  "file": "полноэкранный-режим-mvr80xlr.js",
+  "lang": "js",
+  "title": "Полноэкранный режим",
+  "group": "Интерфейс / Реакция на действия пользователя",
+  "desc": "Полноэкранный режим.",
+  "output": "Элемент запрашивает полноэкранный режим.",
+  "descAt": 1793137929759,
+  "component": {
+    "provides": [
+      "панель"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 13,
+      "text": "requestFullscreen",
+      "kind": "fn",
+      "note": "Запрашивает полноэкранный режим элемента.",
+      "source": "dict"
+    }
+  ]
+}

@@ -1,0 +1,153 @@
+{
+  "schema": 1,
+  "id": "ожидание-успешного-ответа-на-запрос-в-pl-mvr80o8d",
+  "file": "ожидание-успешного-ответа-на-запрос-в-pl-mvr80o8d.js",
+  "lang": "js",
+  "title": "Ожидание успешного ответа на запрос в Playwright",
+  "group": "Тестирование / Браузерные тесты",
+  "desc": "Запускаем ожидание ответа до клика, чтобы не пропустить его.",
+  "output": "Тест проходит, когда сервер ответил на запрос к /api кодом 2xx.",
+  "descAt": 1793137917614,
+  "component": {
+    "provides": [
+      "ожидание",
+      "ответ"
+    ],
+    "requires": [
+      "test",
+      "expect",
+      "page",
+      "name"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 36,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 13,
+      "text": "goto",
+      "kind": "fn",
+      "note": "Переходит по адресу и ждёт загрузки страницы.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 24,
+      "text": "waitForResponse",
+      "kind": "fn",
+      "note": "Ждёт ответа, подходящего под условие.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 51,
+      "text": "ok",
+      "kind": "fn",
+      "note": "Истина для успешных кодов 200–299.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 13,
+      "text": "getByRole",
+      "kind": "fn",
+      "note": "Находит элемент по доступной роли и имени.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 35,
+      "text": "name",
+      "kind": "name",
+      "note": "Ожидаемое имя типа ошибки.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 56,
+      "text": "click",
+      "kind": "fn",
+      "note": "click — событие клика мышью или касанием",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 16,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 15,
+      "text": "status",
+      "kind": "fn",
+      "note": "status — код ответа: 200 успех, 404 не найдено, 500 ошибка сервера",
+      "source": "dict"
+    }
+  ]
+}

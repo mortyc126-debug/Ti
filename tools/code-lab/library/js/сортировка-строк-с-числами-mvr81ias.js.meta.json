@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "id": "сортировка-строк-с-числами-mvr81ias",
+  "file": "сортировка-строк-с-числами-mvr81ias.js",
+  "lang": "js",
+  "title": "Сортировка строк с числами",
+  "group": "Данные / Сортировка",
+  "desc": "Сортировка строк с числами.",
+  "output": "[\"файл1\", \"файл2\", \"файл10\"]",
+  "descAt": 1793137956580,
+  "component": {
+    "provides": [
+      "сравнить"
+    ],
+    "requires": [
+      "Intl",
+      "numeric"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 17,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 52,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 41,
+      "text": "sort",
+      "kind": "fn",
+      "note": "sort — отсортировать массив (по умолчанию как строки).",
+      "source": "dict"
+    }
+  ]
+}

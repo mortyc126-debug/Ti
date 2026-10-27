@@ -1,0 +1,116 @@
+{
+  "schema": 1,
+  "id": "проверка-сообщения-ошибки-mvr8183p",
+  "file": "проверка-сообщения-ошибки-mvr8183p.js",
+  "lang": "js",
+  "title": "Проверка сообщения ошибки",
+  "group": "Тестирование / Проверки функций",
+  "desc": "Проверка сообщения ошибки.",
+  "output": "Проверка прошла.",
+  "descAt": 1793137943365,
+  "component": {
+    "provides": [],
+    "requires": [
+      "assert",
+      "message"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "assert",
+      "kind": "name",
+      "note": "assert — проверка: если условие ложно, программа остановится",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "assert",
+      "kind": "name",
+      "note": "assert — проверка: если условие ложно, программа остановится",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 13,
+      "text": "rejects",
+      "kind": "fn",
+      "note": "Разворачивает отклонённый Promise для дальнейшей проверки.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 21,
+      "text": "Promise",
+      "kind": "name",
+      "note": "Оборачивает событие в ожидаемый результат.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 29,
+      "text": "reject",
+      "kind": "fn",
+      "note": "reject — завершить промис ошибкой.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 36,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 40,
+      "text": "Error",
+      "kind": "fn",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 60,
+      "text": "message",
+      "kind": "name",
+      "note": "Ожидаемый текст сообщения ошибки.",
+      "source": "dict"
+    }
+  ]
+}

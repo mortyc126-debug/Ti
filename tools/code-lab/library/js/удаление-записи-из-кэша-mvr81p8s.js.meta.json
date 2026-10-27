@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "id": "удаление-записи-из-кэша-mvr81p8s",
+  "file": "удаление-записи-из-кэша-mvr81p8s.js",
+  "lang": "js",
+  "title": "Удаление записи из кэша",
+  "group": "Кэширование / Инвалидация",
+  "desc": "Удаление записи из кэша.",
+  "output": "true, если запись была удалена.",
+  "descAt": 1793137965580,
+  "component": {
+    "provides": [
+      "кэш"
+    ],
+    "requires": [
+      "caches"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 25,
+      "text": "open",
+      "kind": "fn",
+      "note": "open — открывает файл",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 22,
+      "text": "delete",
+      "kind": "kw",
+      "note": "Удаляет запись из кэша.",
+      "source": "custom"
+    }
+  ]
+}

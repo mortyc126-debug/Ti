@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "id": "ожидание-загрузки-изображения-mvr80mbl",
+  "file": "ожидание-загрузки-изображения-mvr80mbl.js",
+  "lang": "js",
+  "title": "Ожидание загрузки изображения",
+  "group": "Графика и визуализация / Изображения",
+  "desc": "Ждём событие load, чтобы узнать размеры картинки.",
+  "output": "Ширина и высота изображения в пикселях.",
+  "descAt": 1793137915137,
+  "component": {
+    "provides": [
+      "картинка"
+    ],
+    "requires": [
+      "Image",
+      "once"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 17,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 6,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Оборачивает событие в ожидаемый результат.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 11,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "Подписывает обработчик на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 49,
+      "text": "once",
+      "kind": "name",
+      "note": "Возвращает Promise, который выполняется при первом срабатывании события.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 55,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "id": "удаление-файла-mvr81r4u",
+  "file": "удаление-файла-mvr81r4u.js",
+  "lang": "js",
+  "title": "Удаление файла",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "Удаляем один файл по пути.",
+  "output": "Файл удалён",
+  "descAt": 1793137968030,
+  "component": {
+    "provides": [],
+    "requires": [
+      "unlink"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "unlink",
+      "kind": "name",
+      "note": "Удаляет файл или символическую ссылку.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 18,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "unlink",
+      "kind": "fn",
+      "note": "Удаляет файл или символическую ссылку.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

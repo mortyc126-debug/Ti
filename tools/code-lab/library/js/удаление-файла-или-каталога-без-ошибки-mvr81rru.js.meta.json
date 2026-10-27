@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "id": "удаление-файла-или-каталога-без-ошибки-mvr81rru",
+  "file": "удаление-файла-или-каталога-без-ошибки-mvr81rru.js",
+  "lang": "js",
+  "title": "Удаление файла или каталога без ошибки",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "Удаляем путь целиком; если его нет — всё равно без ошибки.",
+  "output": "Очищено",
+  "descAt": 1793137968858,
+  "component": {
+    "provides": [],
+    "requires": [
+      "rm",
+      "recursive",
+      "force"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "rm",
+      "kind": "name",
+      "note": "Удаляет файл или каталог.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "rm",
+      "kind": "fn",
+      "note": "Удаляет файл или каталог.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 26,
+      "text": "recursive",
+      "kind": "name",
+      "note": "Создаёт и недостающие родительские каталоги.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 37,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 43,
+      "text": "force",
+      "kind": "name",
+      "note": "Не считает отсутствие пути ошибкой.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 50,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

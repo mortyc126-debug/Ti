@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "id": "управляемое-поле-react-mvr81seu",
+  "file": "управляемое-поле-react-mvr81seu.js",
+  "lang": "js",
+  "title": "Управляемое поле React",
+  "group": "Интерфейс / Поля и состояния форм",
+  "desc": "Управляемое поле React.",
+  "output": "Поле ввода React синхронизировано с состоянием.",
+  "descAt": 1793137969686,
+  "component": {
+    "provides": [
+      "Поле"
+    ],
+    "requires": [
+      "имя",
+      "setИмя",
+      "React",
+      "input",
+      "value",
+      "onChange"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 10,
+      "text": "input",
+      "kind": "name",
+      "note": "input — событие изменения значения поля",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 16,
+      "text": "value",
+      "kind": "name",
+      "note": "Текущее значение поля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 28,
+      "text": "onChange",
+      "kind": "name",
+      "note": "Обработчик изменения поля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 71,
+      "text": "value",
+      "kind": "name",
+      "note": "Текущее значение поля.",
+      "source": "dict"
+    }
+  ]
+}

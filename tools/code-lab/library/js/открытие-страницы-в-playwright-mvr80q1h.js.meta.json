@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "id": "открытие-страницы-в-playwright-mvr80q1h",
+  "file": "открытие-страницы-в-playwright-mvr80q1h.js",
+  "lang": "js",
+  "title": "Открытие страницы в Playwright",
+  "group": "Тестирование / Браузерные тесты",
+  "desc": "Загружаем страницу и проверяем её заголовок.",
+  "output": "Тест проходит, если заголовок страницы содержит «Example».",
+  "descAt": 1793137919957,
+  "component": {
+    "provides": [],
+    "requires": [
+      "test",
+      "expect",
+      "page",
+      "Example"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 37,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 13,
+      "text": "goto",
+      "kind": "fn",
+      "note": "Переходит по адресу и ждёт загрузки страницы.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    }
+  ]
+}

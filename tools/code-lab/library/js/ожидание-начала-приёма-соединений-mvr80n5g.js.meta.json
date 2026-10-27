@@ -1,0 +1,143 @@
+{
+  "schema": 1,
+  "id": "ожидание-начала-приёма-соединений-mvr80n5g",
+  "file": "ожидание-начала-приёма-соединений-mvr80n5g.js",
+  "lang": "js",
+  "title": "Ожидание начала приёма соединений",
+  "group": "Файлы, хранение и сервер / HTTP-сервер",
+  "desc": "Ждём событие listening и только потом обращаемся к серверу.",
+  "output": "Порт: случайный свободный номер, например 53412",
+  "descAt": 1793137916212,
+  "component": {
+    "provides": [
+      "сервер"
+    ],
+    "requires": [
+      "createServer",
+      "once",
+      "запрос"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "createServer",
+      "kind": "name",
+      "note": "createServer — создаёт сервер, функция вызывается на каждый запрос",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "once",
+      "kind": "name",
+      "note": "Возвращает Promise, который выполняется при первом срабатывании события.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 16,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 15,
+      "text": "createServer",
+      "kind": "fn",
+      "note": "createServer — создаёт сервер, функция вызывается на каждый запрос",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 7,
+      "text": "listen",
+      "kind": "fn",
+      "note": "listen — запускает сервер на порту",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 6,
+      "text": "once",
+      "kind": "fn",
+      "note": "Возвращает Promise, который выполняется при первом срабатывании события.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 7,
+      "text": "close",
+      "kind": "fn",
+      "note": "Закрывает AudioContext и освобождает ресурсы.",
+      "source": "dict"
+    }
+  ]
+}

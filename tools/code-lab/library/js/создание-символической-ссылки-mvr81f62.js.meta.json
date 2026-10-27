@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "id": "создание-символической-ссылки-mvr81f62",
+  "file": "создание-символической-ссылки-mvr81f62.js",
+  "lang": "js",
+  "title": "Создание символической ссылки",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "Создаём ссылку на файл.",
+  "output": "Ссылка создана",
+  "descAt": 1793137952522,
+  "component": {
+    "provides": [],
+    "requires": [
+      "symlink"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "symlink",
+      "kind": "name",
+      "note": "Создаёт символическую ссылку на цель.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 19,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "symlink",
+      "kind": "fn",
+      "note": "Создаёт символическую ссылку на цель.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

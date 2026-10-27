@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "id": "объединение-массивов-mvr80ktk",
+  "file": "объединение-массивов-mvr80ktk.js",
+  "lang": "js",
+  "title": "Объединение массивов",
+  "group": "Данные / Преобразование коллекций",
+  "desc": "Объединение массивов.",
+  "output": "[1, 2, 3, 4]",
+  "descAt": 1793137913192,
+  "component": {
+    "provides": [],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 19,
+      "text": "concat",
+      "kind": "fn",
+      "note": "Возвращает новый массив из нескольких массивов.",
+      "source": "custom"
+    }
+  ],
+  "orphanNotes": [
+    {
+      "line": 0,
+      "col": 19,
+      "text": "concat",
+      "kind": "fn",
+      "note": "Возвращает новый массив из нескольких массивов.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 19,
+      "text": "concat",
+      "kind": "fn",
+      "note": "Возвращает новый массив из нескольких массивов.",
+      "source": "custom"
+    }
+  ]
+}

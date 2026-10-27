@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "id": "свёртка-справа-налево-mvr81bfs",
+  "file": "свёртка-справа-налево-mvr81bfs.js",
+  "lang": "js",
+  "title": "Свёртка справа налево",
+  "group": "Данные / Агрегация",
+  "desc": "Свёртка справа налево.",
+  "output": "привет добрый мир",
+  "descAt": 1793137947688,
+  "component": {
+    "provides": [],
+    "requires": [
+      "итог"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 40,
+      "text": "reduceRight",
+      "kind": "fn",
+      "note": "Сворачивает массив справа налево.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 88,
+      "text": "trim",
+      "kind": "fn",
+      "note": "trim — убрать пробелы по краям строки.",
+      "source": "dict"
+    }
+  ]
+}

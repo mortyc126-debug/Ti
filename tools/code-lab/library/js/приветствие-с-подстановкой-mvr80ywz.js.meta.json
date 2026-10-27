@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "id": "приветствие-с-подстановкой-mvr80ywz",
+  "file": "приветствие-с-подстановкой-mvr80ywz.js",
+  "lang": "js",
+  "title": "Приветствие с подстановкой",
+  "group": "Данные / Шаблонизация текста",
+  "desc": "Приветствие с подстановкой.",
+  "output": "hello, Илья",
+  "descAt": 1793137931459,
+  "component": {
+    "provides": [
+      "имя"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

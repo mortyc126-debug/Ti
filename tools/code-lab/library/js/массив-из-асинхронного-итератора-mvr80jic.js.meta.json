@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "id": "массив-из-асинхронного-итератора-mvr80jic",
+  "file": "массив-из-асинхронного-итератора-mvr80jic.js",
+  "lang": "js",
+  "title": "Массив из асинхронного итератора",
+  "group": "Асинхронность / Пакетная обработка",
+  "desc": "Массив из асинхронного итератора.",
+  "output": "[4, 5]",
+  "descAt": 1793137911493,
+  "component": {
+    "provides": [],
+    "requires": [
+      "числа"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 26,
+      "text": "yield",
+      "kind": "kw",
+      "note": "yield — в генераторе отдать очередное значение и приостановиться.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 35,
+      "text": "yield",
+      "kind": "kw",
+      "note": "yield — в генераторе отдать очередное значение и приостановиться.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    }
+  ]
+}

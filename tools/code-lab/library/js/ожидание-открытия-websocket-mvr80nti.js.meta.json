@@ -1,0 +1,137 @@
+{
+  "schema": 1,
+  "id": "ожидание-открытия-websocket-mvr80nti",
+  "file": "ожидание-открытия-websocket-mvr80nti.js",
+  "lang": "js",
+  "title": "Ожидание открытия WebSocket",
+  "group": "Сеть / WebSocket",
+  "desc": "Превращаем событие открытия соединения в Promise.",
+  "output": "Сообщение отправляется только после открытия соединения.",
+  "descAt": 1793137917078,
+  "component": {
+    "provides": [
+      "сокет"
+    ],
+    "requires": [
+      "WebSocket",
+      "разрешить",
+      "once"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 10,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Оборачивает событие в ожидаемый результат.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "Подписывает обработчик на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 46,
+      "text": "once",
+      "kind": "name",
+      "note": "Обработчик срабатывает один раз и снимается сам.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 52,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "Подписывает обработчик на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 47,
+      "text": "once",
+      "kind": "name",
+      "note": "Обработчик срабатывает один раз и снимается сам.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 53,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    }
+  ],
+  "orphanNotes": [
+    {
+      "line": 3,
+      "col": 46,
+      "text": "once",
+      "kind": "name",
+      "note": "Обработчик срабатывает один раз и снимается сам.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 47,
+      "text": "once",
+      "kind": "name",
+      "note": "Обработчик срабатывает один раз и снимается сам.",
+      "source": "custom"
+    }
+  ]
+}

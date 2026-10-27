@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "id": "отсортированная-копия-mvr80sma",
+  "file": "отсортированная-копия-mvr80sma.js",
+  "lang": "js",
+  "title": "Отсортированная копия",
+  "group": "Данные / Сортировка",
+  "desc": "Отсортированная копия.",
+  "output": "[2, 5, 10]",
+  "descAt": 1793137923298,
+  "component": {
+    "provides": [
+      "числа"
+    ],
+    "requires": [
+      "a"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "toSorted",
+      "kind": "fn",
+      "note": "Сортирует копию массива.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 28,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 37,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    }
+  ]
+}

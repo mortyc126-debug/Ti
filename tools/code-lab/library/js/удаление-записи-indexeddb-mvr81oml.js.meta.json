@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "id": "удаление-записи-indexeddb-mvr81oml",
+  "file": "удаление-записи-indexeddb-mvr81oml.js",
+  "lang": "js",
+  "title": "Удаление записи IndexedDB",
+  "group": "Базы данных / Целостность",
+  "desc": "Удаление записи IndexedDB.",
+  "output": "Запись с указанным ключом удалена.",
+  "descAt": 1793137964781,
+  "component": {
+    "provides": [],
+    "requires": [
+      "db"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "delete",
+      "kind": "kw",
+      "note": "удалить собственное свойство объекта",
+      "source": "dict"
+    }
+  ]
+}

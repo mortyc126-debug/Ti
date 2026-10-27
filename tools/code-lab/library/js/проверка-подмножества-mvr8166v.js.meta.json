@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "id": "проверка-подмножества-mvr8166v",
+  "file": "проверка-подмножества-mvr8166v.js",
+  "lang": "js",
+  "title": "Проверка подмножества",
+  "group": "Данные / Сопоставление наборов",
+  "desc": "Проверка подмножества.",
+  "output": "true",
+  "descAt": 1793137940887,
+  "component": {
+    "provides": [
+      "малое",
+      "большое"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 18,
+      "text": "Set",
+      "kind": "fn",
+      "note": "Множество уникальных значений; some проверяет пересечение.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 16,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "Set",
+      "kind": "fn",
+      "note": "Множество уникальных значений; some проверяет пересечение.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 23,
+      "text": "every",
+      "kind": "fn",
+      "note": "Проверяет, что каждый элемент есть в другом множестве.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 42,
+      "text": "has",
+      "kind": "fn",
+      "note": "Проверяет наличие элемента в Set.",
+      "source": "dict"
+    }
+  ]
+}

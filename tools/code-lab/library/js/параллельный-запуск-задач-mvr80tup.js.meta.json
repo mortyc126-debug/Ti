@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "id": "параллельный-запуск-задач-mvr80tup",
+  "file": "параллельный-запуск-задач-mvr80tup.js",
+  "lang": "js",
+  "title": "Параллельный запуск задач",
+  "group": "Асинхронность / Параллельные задачи",
+  "desc": "Загружаем несколько ресурсов одновременно и ждём все результаты.",
+  "output": "3",
+  "descAt": 1793137924898,
+  "component": {
+    "provides": [
+      "адреса",
+      "ответы"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 21,
+      "text": "Promise",
+      "kind": "name",
+      "note": "Оборачивает событие в ожидаемый результат.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 9,
+      "text": "map",
+      "kind": "fn",
+      "note": "Превращает каждый адрес в запущенную задачу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 22,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "Выполняет HTTP-запрос и возвращает Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 35,
+      "text": "then",
+      "kind": "fn",
+      "note": "then — что сделать, когда промис выполнится (получит результат).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 19,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+{
+  "schema": 1,
+  "id": "повтор-проверки-до-успеха-в-testing-libr-mvr80ves",
+  "file": "повтор-проверки-до-успеха-в-testing-libr-mvr80ves.js",
+  "lang": "js",
+  "title": "Повтор проверки до успеха в Testing Library",
+  "group": "Тестирование / Библиотека тестирования",
+  "desc": "Ждём, пока элемент станет видимым после асинхронного обновления.",
+  "output": "Тест проходит, когда элемент стал видимым до истечения времени.",
+  "descAt": 1793137926916,
+  "component": {
+    "provides": [],
+    "requires": [
+      "render",
+      "screen",
+      "waitFor",
+      "Сообщение",
+      "test",
+      "expect"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 25,
+      "text": "waitFor",
+      "kind": "name",
+      "note": "Повторяет проверку, пока она не пройдёт.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 35,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 21,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 37,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "waitFor",
+      "kind": "fn",
+      "note": "Повторяет проверку, пока она не пройдёт.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 36,
+      "text": "getByText",
+      "kind": "fn",
+      "note": "Находит элемент по видимому тексту.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 57,
+      "text": "toBeVisible",
+      "kind": "fn",
+      "note": "Проверяет, что элемент виден пользователю.",
+      "source": "custom"
+    }
+  ],
+  "orphanNotes": [
+    {
+      "line": 6,
+      "col": 57,
+      "text": "toBeVisible",
+      "kind": "fn",
+      "note": "Проверяет, что элемент виден пользователю.",
+      "source": "custom"
+    }
+  ]
+}

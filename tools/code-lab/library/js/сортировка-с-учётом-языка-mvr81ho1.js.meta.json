@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "id": "сортировка-с-учётом-языка-mvr81ho1",
+  "file": "сортировка-с-учётом-языка-mvr81ho1.js",
+  "lang": "js",
+  "title": "Сортировка с учётом языка",
+  "group": "Данные / Сортировка",
+  "desc": "Сортировка с учётом языка.",
+  "output": "[\"Анна\", \"Борис\", \"Ёлка\"]",
+  "descAt": 1793137955762,
+  "component": {
+    "provides": [
+      "люди"
+    ],
+    "requires": [
+      "имя",
+      "a"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 5,
+      "text": "sort",
+      "kind": "fn",
+      "note": "sort — отсортировать массив (по умолчанию как строки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 26,
+      "text": "localeCompare",
+      "kind": "fn",
+      "note": "Сравнивает строки с учётом языковых правил.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 17,
+      "text": "map",
+      "kind": "fn",
+      "note": "Превращает каждый адрес в запущенную задачу.",
+      "source": "dict"
+    }
+  ]
+}

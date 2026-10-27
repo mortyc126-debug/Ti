@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "id": "сохранение-записи-indexeddb-mvr81jj0",
+  "file": "сохранение-записи-indexeddb-mvr81jj0.js",
+  "lang": "js",
+  "title": "Сохранение записи IndexedDB",
+  "group": "Базы данных / Целостность",
+  "desc": "Сохранение записи IndexedDB.",
+  "output": "Запись добавлена или заменена.",
+  "descAt": 1793137958172,
+  "component": {
+    "provides": [],
+    "requires": [
+      "db",
+      "id",
+      "имя"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    }
+  ]
+}

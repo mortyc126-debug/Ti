@@ -1,0 +1,109 @@
+{
+  "schema": 1,
+  "id": "проверка-свойств-ошибки-promise-mvr817o1",
+  "file": "проверка-свойств-ошибки-promise-mvr817o1.js",
+  "lang": "js",
+  "title": "Проверка свойств ошибки Promise",
+  "group": "Тестирование / Проверки функций",
+  "desc": "Проверка свойств ошибки Promise.",
+  "output": "Тест проходит, если ошибка содержит status: 404.",
+  "descAt": 1793137942801,
+  "component": {
+    "provides": [],
+    "requires": [
+      "expect",
+      "test",
+      "status"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 24,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "Promise",
+      "kind": "name",
+      "note": "Оборачивает событие в ожидаемый результат.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 23,
+      "text": "reject",
+      "kind": "fn",
+      "note": "reject — завершить промис ошибкой.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 32,
+      "text": "status",
+      "kind": "name",
+      "note": "status — код ответа: 200 успех, 404 не найдено, 500 ошибка сервера",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 48,
+      "text": "rejects",
+      "kind": "name",
+      "note": "Разворачивает отклонённый Promise для дальнейшей проверки.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 56,
+      "text": "toMatchObject",
+      "kind": "fn",
+      "note": "Проверяет наличие ожидаемых свойств у объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 72,
+      "text": "status",
+      "kind": "name",
+      "note": "status — код ответа: 200 успех, 404 не найдено, 500 ошибка сервера",
+      "source": "dict"
+    }
+  ]
+}

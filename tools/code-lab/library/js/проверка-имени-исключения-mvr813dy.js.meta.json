@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "id": "проверка-имени-исключения-mvr813dy",
+  "file": "проверка-имени-исключения-mvr813dy.js",
+  "lang": "js",
+  "title": "Проверка имени исключения",
+  "group": "Тестирование / Проверки функций",
+  "desc": "Проверка имени исключения.",
+  "output": "Ошибки нет.",
+  "descAt": 1793137937254,
+  "component": {
+    "provides": [],
+    "requires": [
+      "assert",
+      "TypeError",
+      "name"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 7,
+      "text": "assert",
+      "kind": "name",
+      "note": "assert — проверка: если условие ложно, программа остановится",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "assert",
+      "kind": "name",
+      "note": "assert — проверка: если условие ложно, программа остановится",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 7,
+      "text": "throws",
+      "kind": "fn",
+      "note": "Проверяет, что синхронная функция выбрасывает исключение.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 22,
+      "text": "throw",
+      "kind": "kw",
+      "note": "выбросить исключение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 28,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 32,
+      "text": "TypeError",
+      "kind": "fn",
+      "note": "ошибка типа, неправильный тип данных, метод не подходит типу, нельзя выполнить операцию с этим значением",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 59,
+      "text": "name",
+      "kind": "name",
+      "note": "Ожидаемое имя типа ошибки.",
+      "source": "dict"
+    }
+  ]
+}

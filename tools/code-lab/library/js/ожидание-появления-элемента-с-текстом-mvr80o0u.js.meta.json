@@ -1,0 +1,97 @@
+{
+  "schema": 1,
+  "id": "ожидание-появления-элемента-с-текстом-mvr80o0u",
+  "file": "ожидание-появления-элемента-с-текстом-mvr80o0u.js",
+  "lang": "js",
+  "title": "Ожидание появления элемента с текстом",
+  "group": "Тестирование / Библиотека тестирования",
+  "desc": "Ждём, пока асинхронно появится нужная надпись.",
+  "output": "Тест проходит, когда элемент с текстом «done» появился в документе.",
+  "descAt": 1793137917342,
+  "component": {
+    "provides": [
+      "надпись"
+    ],
+    "requires": [
+      "render",
+      "screen",
+      "Статус",
+      "test",
+      "expect"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 26,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключает код из другого файла/модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 41,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — помечает функцию как асинхронную; внутри можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 18,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 31,
+      "text": "findByText",
+      "kind": "fn",
+      "note": "Асинхронно ищет элемент по тексту и ждёт его появления.",
+      "source": "dict"
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "id": "сортировка-чисел-по-нескольким-ключам-mvr81iws",
+  "file": "сортировка-чисел-по-нескольким-ключам-mvr81iws.js",
+  "lang": "js",
+  "title": "Сортировка чисел по нескольким ключам",
+  "group": "Данные / Сортировка",
+  "desc": "Сортировка чисел по нескольким ключам.",
+  "output": "Сначала сортировка по x, затем по y.",
+  "descAt": 1793137957372,
+  "component": {
+    "provides": [
+      "записи"
+    ],
+    "requires": [
+      "x",
+      "y",
+      "a"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 7,
+      "text": "sort",
+      "kind": "fn",
+      "note": "Сортирует массив на месте.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 13,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 22,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 35,
+      "text": "a",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

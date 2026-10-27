@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "id": "добавление-дочернего-узла-в-контейнер-mvr80d0l",
+  "file": "добавление-дочернего-узла-в-контейнер-mvr80d0l.js",
+  "lang": "js",
+  "title": "Добавление дочернего узла в контейнер",
+  "group": "Интерфейс / Работа с DOM",
+  "desc": "Вставляем новый пункт в конец контейнера.",
+  "output": "Количество дочерних элементов коробки.",
+  "descAt": 1793137903077,
+  "component": {
+    "provides": [
+      "коробка",
+      "пункт"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 16,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 23,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт новый элемент (например div), который потом можно вставить на страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "appendChild",
+      "kind": "fn",
+      "note": "Добавляет дочерний узел в конец контейнера.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 20,
+      "text": "children",
+      "kind": "name",
+      "note": "Список дочерних элементов.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 29,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    }
+  ]
+}

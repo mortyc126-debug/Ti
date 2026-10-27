@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "id": "запасное-значение-при-отказе-promise-mvr80ea8",
+  "file": "запасное-значение-при-отказе-promise-mvr80ea8.js",
+  "lang": "js",
+  "title": "Запасное значение при отказе Promise",
+  "group": "Асинхронность / Надёжность",
+  "desc": "Если запрос не удался, возвращаем значение по умолчанию.",
+  "output": "Настройки сервера или тема «светлая», если запрос не удался.",
+  "descAt": 1793137904721,
+  "component": {
+    "provides": [
+      "настройки"
+    ],
+    "requires": [
+      "тема"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 18,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "Выполняет HTTP-запрос и возвращает Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 3,
+      "text": "then",
+      "kind": "fn",
+      "note": "then — что сделать, когда промис выполнится (получит результат).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "catch",
+      "kind": "kw",
+      "note": "Обрабатывает отказ и возвращает запасной результат.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "orphanNotes": [
+    {
+      "line": 2,
+      "col": 3,
+      "text": "catch",
+      "kind": "kw",
+      "note": "Обрабатывает отказ и возвращает запасной результат.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "catch",
+      "kind": "kw",
+      "note": "Обрабатывает отказ и возвращает запасной результат.",
+      "source": "custom"
+    }
+  ]
+}

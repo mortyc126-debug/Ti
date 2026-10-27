@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "id": "отправка-события-с-данными-mvr80ru0",
+  "file": "отправка-события-с-данными-mvr80ru0.js",
+  "lang": "js",
+  "title": "Отправка события с данными",
+  "group": "Интерфейс / События",
+  "desc": "Передаём подписчикам собственное событие вместе с данными.",
+  "output": "Готово: модуль",
+  "descAt": 1793137922280,
+  "component": {
+    "provides": [
+      "шина"
+    ],
+    "requires": [
+      "EventTarget",
+      "CustomEvent",
+      "detail",
+      "имя"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 5,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "Подписывает обработчик на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 5,
+      "text": "dispatchEvent",
+      "kind": "fn",
+      "note": "Отправляет событие подписчикам.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 19,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 23,
+      "text": "CustomEvent",
+      "kind": "fn",
+      "note": "Событие с произвольными данными в detail.",
+      "source": "dict"
+    }
+  ]
+}
