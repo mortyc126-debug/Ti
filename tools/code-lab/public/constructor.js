@@ -742,7 +742,11 @@ function resolveCatalog(name){
   const byCore = CATALOG.filter(t => core(t) === q); if(byCore.length === 1) return byCore[0];
   const subs = CATALOG.filter(t => { const tt = (t.title || '').toLowerCase(); return tt && (tt.includes(q) || (q.length >= 4 && q.includes(tt))); });
   if(subs.length === 1) return subs[0];
-  return null;
+  // массовое сведение: лучший кандидат с уверенной оценкой (чтобы «починить» подтягивало, а не оставляло ящиком)
+  const qw = new Set(q.split(/\s+/).filter(Boolean));
+  const score = t => { const tt = (t.title || '').toLowerCase(); if(!tt) return 0; if(tt === q) return 100; if(tt.startsWith(q) || q.startsWith(tt)) return 85; if(tt.includes(q) || (q.length >= 3 && q.includes(tt))) return 65; const c = tt.split(/\s+/).filter(w => qw.has(w)).length; return c ? 25 + c * 8 : 0; };
+  let best = null; for(const t of CATALOG){ const s = score(t); if(s >= 55 && (!best || s > best.s)) best = { t, s }; }
+  return best ? best.t : null;
 }
 // починить висящие узлы: ящики (без своего куска) подтянуть к готовым кускам по названию и заново связать
 async function fixDanglingNodes(){
