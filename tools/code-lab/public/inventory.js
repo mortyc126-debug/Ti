@@ -303,7 +303,23 @@ document.getElementById('fcopy').onclick = e => copy(flowsAsText(), e.target);
 // ── импорт связей/контрактов из текста ────────────────────────────────────────
 const el2 = (tag, cls, html) => { const e = document.createElement(tag); if(cls) e.className = cls; if(html != null) e.innerHTML = html; return e; };
 function split2(s, sep){ const i = s.indexOf(sep); return [s.slice(0, i), s.slice(i + sep.length)]; }
-function resolveName(nm){ const q = String(nm || '').trim().toLowerCase(); return PIECES.find(t => (t.title || '').trim().toLowerCase() === q) || PIECES.find(t => t.id === String(nm || '').trim()) || null; }
+// сопоставление имени из связи с куском. Точное имя/id было слишком строгим (длинные названия
+// кусков не совпадали с короткими в связях → всё уходило в «ящики»). Теперь по-человечески:
+// имя → синоним → «ядро» названия (до « — »/«:») → одиночное частичное совпадение.
+function resolveName(nm){
+  const q = String(nm || '').trim().toLowerCase(); if(!q) return null;
+  let hit = PIECES.find(t => (t.title || '').trim().toLowerCase() === q) || PIECES.find(t => t.id === String(nm || '').trim());
+  if(hit) return hit;
+  hit = PIECES.find(t => Array.isArray(t.aliases) && t.aliases.some(a => String(a).trim().toLowerCase() === q));
+  if(hit) return hit;
+  // ядро названия до разделителя: «findLast — найти…» ищется по «findlast»
+  const core = t => (t.title || '').toLowerCase().split(/\s*[—–:]\s*|\s+[-(]\s*/)[0].trim();
+  const byCore = PIECES.filter(t => core(t) === q); if(byCore.length === 1) return byCore[0];
+  // одиночное частичное совпадение (если кандидат ровно один — не угадываем при неоднозначности)
+  const subs = PIECES.filter(t => { const tt = (t.title || '').toLowerCase(); return tt && (tt.includes(q) || (q.length >= 4 && q.includes(tt))); });
+  if(subs.length === 1) return subs[0];
+  return null;
+}
 // отрезать условие [если ...] и вернуть {text, cond}
 function splitCond(s){ let cond = ''; const text = String(s || '').replace(/\[([^\]]*)\]/g, (_, c) => { cond = (cond ? cond + '; ' : '') + c.trim(); return ' '; }).trim(); return { text, cond }; }
 // имя куска: берём содержимое первых «ёлочек»/кавычек; иначе строку как есть (условие уже убрано)
@@ -536,8 +552,15 @@ function openLinksModal(){
   function showPreview(){
     const prev = q('#lk-prev'); prev.innerHTML = '';
     const line = (txt, cls) => { const d = el2('div', 'lp-row ' + (cls || '')); d.textContent = txt; return d; };
-    prev.appendChild(el2('div', 'lp-sec', 'связи (' + parsed.edges.length + ')'));
     const mk = !q('#lk-missing') || q('#lk-missing').checked;
+    // сводка: сразу видно, где недопроходит — сколько связей к готовым кускам, сколько в ящики, сколько строк не понято
+    let toReal = 0, toBox = 0;
+    parsed.edges.forEach(e => { (resolveName(e.a) && resolveName(e.b)) ? toReal++ : toBox++; });
+    const sum = el2('div', 'lp-sec', 'связей распознано: ' + parsed.edges.length + ' · к готовым кускам: ' + toReal + (toBox ? ' · в ящики (не нашла куски): ' + toBox : '') + (parsed.errors.length ? ' · строк не понято: ' + parsed.errors.length : ''));
+    if(toBox || parsed.errors.length) sum.style.color = '#ffb454';
+    prev.appendChild(sum);
+    if(!parsed.edges.length) prev.appendChild(line('Ни одной связи не распознано. Формат строки: «Кусок A -> Кусок B» (стрелка = передаёт данные), или «A | связь | B», или вид словом: «A зависит от B». Нажми «пример».', 'muted'));
+    prev.appendChild(el2('div', 'lp-sec', 'связи (' + parsed.edges.length + ')'));
     parsed.edges.forEach(e => { const a = resolveName(e.a), b = resolveName(e.b); const ok = a && b; const rel = (window.relationById && window.relationById(e.kind)) || { label: 'связь' }; const miss = [!a ? e.a : '', !b ? e.b : ''].filter(Boolean); const mark = ok ? '✓ ' : (mk ? '◻ ' : '✕ '); const tail = ok ? '' : (mk ? '  (ящик: ' + miss.join(', ') + ')' : '  (не найдено: ' + miss.join(', ') + ')'); prev.appendChild(line(mark + e.a + '  —[' + rel.label + ']→  ' + e.b + tail, ok ? 'lp-ok' : (mk ? '' : 'lp-bad'))); if(e.src && e.src !== (e.a + ' ' + e.b)) prev.appendChild(line('      ↳ ' + e.src, 'muted')); });
     prev.appendChild(el2('div', 'lp-sec', 'контракты (' + parsed.contracts.length + ')'));
     parsed.contracts.forEach(c => { const t = resolveName(c.name); prev.appendChild(line((t ? '✓ ' : '✕ ') + c.name + ': ' + Object.keys(c.fields).join(', ') + (t ? '' : '  (кусок не найден)'), t ? 'lp-ok' : 'lp-bad')); });
