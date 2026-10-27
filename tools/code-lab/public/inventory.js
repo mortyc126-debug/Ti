@@ -320,6 +320,17 @@ function resolveName(nm){
   if(subs.length === 1) return subs[0];
   return null;
 }
+// ближайшие куски к имени — для подсказки, когда имя ушло в ящик (видно, что ты почти попала / что оно многозначно)
+function suggestPieces(name, n){
+  const q = String(name || '').trim().toLowerCase(); if(!q) return [];
+  const qw = new Set(q.split(/\s+/).filter(Boolean));
+  const score = t => { const tt = (t.title || '').toLowerCase(); if(!tt) return 0;
+    if(tt === q) return 100;
+    if(tt.startsWith(q) || q.startsWith(tt)) return 85;
+    if(tt.includes(q) || (q.length >= 3 && q.includes(tt))) return 65;
+    const common = tt.split(/\s+/).filter(w => qw.has(w)).length; return common ? 25 + common * 8 : 0; };
+  return PIECES.map(t => ({ t, s: score(t) })).filter(x => x.s > 0).sort((a, b) => b.s - a.s).slice(0, n || 2).map(x => x.t.title);
+}
 // отрезать условие [если ...] и вернуть {text, cond}
 function splitCond(s){ let cond = ''; const text = String(s || '').replace(/\[([^\]]*)\]/g, (_, c) => { cond = (cond ? cond + '; ' : '') + c.trim(); return ' '; }).trim(); return { text, cond }; }
 // имя куска: берём содержимое первых «ёлочек»/кавычек; иначе строку как есть (условие уже убрано)
@@ -576,7 +587,10 @@ function openLinksModal(){
     prev.appendChild(sum);
     if(!parsed.edges.length) prev.appendChild(line('Ни одной связи не распознано. Для длинных имён пиши многострочно: источник на строке, под ним «-> Цель» (с отступом). Или в одну строку: «A -> B», «A | связь | B», «A зависит от B». Нажми «пример».', 'muted'));
     prev.appendChild(el2('div', 'lp-sec', 'связи (' + parsed.edges.length + ')'));
-    parsed.edges.forEach(e => { const a = resolveName(e.a), b = resolveName(e.b); const ok = a && b; const rel = (window.relationById && window.relationById(e.kind)) || { label: 'связь' }; const miss = [!a ? e.a : '', !b ? e.b : ''].filter(Boolean); const mark = ok ? '✓ ' : (mk ? '◻ ' : '✕ '); const tail = ok ? '' : (mk ? '  (ящик: ' + miss.join(', ') + ')' : '  (не найдено: ' + miss.join(', ') + ')'); prev.appendChild(line(mark + e.a + '  —[' + rel.label + ']→  ' + e.b + tail, ok ? 'lp-ok' : (mk ? '' : 'lp-bad'))); if(e.src && e.src !== (e.a + ' ' + e.b)) prev.appendChild(line('      ↳ ' + e.src, 'muted')); });
+    parsed.edges.forEach(e => { const a = resolveName(e.a), b = resolveName(e.b); const ok = a && b; const rel = (window.relationById && window.relationById(e.kind)) || { label: 'связь' }; const miss = [!a ? e.a : '', !b ? e.b : ''].filter(Boolean); const mark = ok ? '✓ ' : (mk ? '◻ ' : '✕ '); const tail = ok ? '' : (mk ? '  (ящик: ' + miss.join(', ') + ')' : '  (не найдено: ' + miss.join(', ') + ')'); prev.appendChild(line(mark + e.a + '  —[' + rel.label + ']→  ' + e.b + tail, ok ? 'lp-ok' : (mk ? '' : 'lp-bad')));
+      // для каждого имени-ящика покажем ближайшие куски — видно, почему не совпало (почти попала / многозначно / нет такого)
+      miss.forEach(nm => { const sg = suggestPieces(nm, 3); prev.appendChild(line('      «' + nm + '» → ' + (sg.length ? 'похоже на: ' + sg.join('  ·  ') : 'похожих кусков нет'), 'muted')); });
+      if(e.src && e.src !== (e.a + ' ' + e.b)) prev.appendChild(line('      ↳ ' + e.src, 'muted')); });
     prev.appendChild(el2('div', 'lp-sec', 'контракты (' + parsed.contracts.length + ')'));
     parsed.contracts.forEach(c => { const t = resolveName(c.name); prev.appendChild(line((t ? '✓ ' : '✕ ') + c.name + ': ' + Object.keys(c.fields).join(', ') + (t ? '' : '  (кусок не найден)'), t ? 'lp-ok' : 'lp-bad')); });
     if(parsed.errors.length){ prev.appendChild(el2('div', 'lp-sec', 'не разобрано')); parsed.errors.forEach(x => prev.appendChild(line(x, 'lp-bad'))); }
