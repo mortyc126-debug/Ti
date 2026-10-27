@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "map-mvxwc4rwz",
   "file": "карта-изображения-mvxwc4rwz.html",
-  "title": "map",
+  "title": "map — карта областей изображения для ссылок",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Карта изображения",
@@ -72,11 +72,21 @@
     "изображения"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "img",
+      "kind": "name",
+      "note": "img — селектор тега: все картинки на странице",
+      "source": "dict"
+    }
+  ],
+  "output": ""
 }

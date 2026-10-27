@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "details-mvxox3x2f",
   "file": "раскрывающийся-блок-mvxox3x2f.html",
-  "title": "details",
+  "title": "details — раскрываемый блок с подробностями",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Details",
@@ -36,11 +36,12 @@
     "корневой элемент"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

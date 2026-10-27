@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "code-mvxzvk39m",
   "file": "фрагмент-кода-mvxzvk39m.html",
-  "title": "code",
+  "title": "code — фрагмент кода",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Код",
@@ -37,11 +37,29 @@
     "корневой элемент"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 11,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 19,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "output": ""
 }

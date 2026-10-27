@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "iframe-mvxrrmd9j",
   "file": "встроенная-страница-mvxrrmd9j.html",
-  "title": "iframe",
+  "title": "iframe — iframe — встроенная веб-страница",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Встраивание",
@@ -41,11 +41,12 @@
     "Встраивание"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

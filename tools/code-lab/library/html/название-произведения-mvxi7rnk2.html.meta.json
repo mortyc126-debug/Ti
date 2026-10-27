@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "cite-mvxi7rnk2",
   "file": "название-произведения-mvxi7rnk2.html",
-  "title": "cite",
+  "title": "cite — ссылка на источник",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Название произведения",
@@ -39,11 +39,12 @@
     "произведения"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

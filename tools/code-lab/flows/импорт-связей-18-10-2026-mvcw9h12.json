@@ -1,7 +1,7 @@
 {
   "id": "импорт-связей-18-10-2026-mvcw9h12",
   "name": "Импорт связей 18.10.2026",
-  "savedAt": 1792271646326,
+  "savedAt": 1793097273323,
   "graph": {
     "nodes": [
       {
@@ -120,34 +120,69 @@
         "id": "kglacg",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<table><caption>Продажи</caption></table>"
         },
-        "title": "table",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "caption",
+        "desc": "Подпись таблицы",
         "x": 60,
-        "y": 400
+        "y": 400,
+        "src": {
+          "id": "caption-mvxjrzbvk",
+          "title": "caption",
+          "desc": "Подпись таблицы",
+          "code": "<table><caption>Продажи</caption></table>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "s6yhdo",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<table><tbody><tr><td>A</td></tr></tbody></table>"
         },
-        "title": "body",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "tbody",
+        "desc": "Тело таблицы",
         "x": 300,
-        "y": 400
+        "y": 400,
+        "src": {
+          "id": "tbody-mvxok6w15",
+          "title": "tbody",
+          "desc": "Тело таблицы",
+          "code": "<table><tbody><tr><td>A</td></tr></tbody></table>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "gjwzt9",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "function делить(a, b) {\n  if (b === 0) {\n    throw new Error(\"деление на ноль\");\n  }\n  return a / b;\n}\n\ntry {\n  console.log(делить(6, 3));\n  console.log(делить(1, 0));\n} catch (e) {\n  console.log(\"поймано:\", e.message);\n}"
         },
-        "title": "row",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "throw — самому выбросить ошибку",
+        "desc": "throw new Error(...) останавливает функцию и передаёт ошибку ближайшему catch. Так функция сообщает, что ей дали плохие данные.",
         "x": 540,
-        "y": 400
+        "y": 400,
+        "src": {
+          "id": "throw-самому-выбросить-ошибку-mvds0h5s",
+          "title": "throw — самому выбросить ошибку",
+          "desc": "throw new Error(...) останавливает функцию и передаёт ошибку ближайшему catch. Так функция сообщает, что ей дали плохие данные.",
+          "code": "function делить(a, b) {\n  if (b === 0) {\n    throw new Error(\"деление на ноль\");\n  }\n  return a / b;\n}\n\ntry {\n  console.log(делить(6, 3));\n  console.log(делить(1, 0));\n} catch (e) {\n  console.log(\"поймано:\", e.message);\n}",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "делить"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "qphbbm",
@@ -175,12 +210,23 @@
         "id": "sixyyn",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<img src=\"map.png\" usemap=\"#m\"><map name=\"m\"><area shape=\"rect\" coords=\"0,0,50,50\" href=\"#\"></map>"
         },
-        "title": "name",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "map",
+        "desc": "Карта изображения",
         "x": 300,
-        "y": 570
+        "y": 570,
+        "src": {
+          "id": "map-mvxwc4rwz",
+          "title": "map",
+          "desc": "Карта изображения",
+          "code": "<img src=\"map.png\" usemap=\"#m\"><map name=\"m\"><area shape=\"rect\" coords=\"0,0,50,50\" href=\"#\"></map>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "xr3gew",
@@ -270,12 +316,23 @@
         "id": "4j6exc",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<fieldset><legend>Данные</legend></fieldset>"
         },
-        "title": "field",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "fieldset",
+        "desc": "Fieldset",
         "x": 60,
-        "y": 910
+        "y": 910,
+        "src": {
+          "id": "fieldset-mvx7az3lg",
+          "title": "fieldset",
+          "desc": "Fieldset",
+          "code": "<fieldset><legend>Данные</legend></fieldset>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "lt5878",
@@ -320,12 +377,23 @@
         "id": "aebcaj",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<form oninput=\"o.value=1\"><output name=\"o\">1</output></form>"
         },
         "title": "output",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "desc": "Output",
         "x": 60,
-        "y": 1080
+        "y": 1080,
+        "src": {
+          "id": "output-mvxa6aq9g",
+          "title": "output",
+          "desc": "Output",
+          "code": "<form oninput=\"o.value=1\"><output name=\"o\">1</output></form>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "5lypb0",
@@ -377,7 +445,7 @@
         "src": {
           "id": "input-type-color-выбор-цвета-mv6cusws",
           "title": "input type=color — выбор цвета",
-          "desc": "Поле color отдаёт выбранный цвет в формате hex, например #ff006e. Значение можно применять к фону или хранить в массиве.",
+          "desc": "Поле color отдаёт выбранный цвет в формате hex, например #ff006e. Значение можно применять к фону или хранить в м��ссиве.",
           "code": "const picker = document.querySelector(\"#colorPicker\");\nconst swatch = document.querySelector(\"#swatch\");\n\npicker.addEventListener(\"input\", () => {\n  swatch.style.backgroundColor = picker.value;\n});"
         },
         "x": 60,
@@ -465,12 +533,23 @@
         "id": "e5uzb3",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<dl><dt>HTML</dt><dd>Разметка</dd></dl>"
         },
-        "title": "список",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "dl",
+        "desc": "Список определений",
         "x": 780,
-        "y": 1420
+        "y": 1420,
+        "src": {
+          "id": "dl-mvxhfgog2",
+          "title": "dl",
+          "desc": "Список определений",
+          "code": "<dl><dt>HTML</dt><dd>Разметка</dd></dl>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "jc5ub8",
@@ -504,12 +583,29 @@
         "id": "vxv6j0",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const state = {\n  score: 0,\n  lives: 3,\n  running: true\n};\n\nstate.score += 10;\nconsole.log(state.score);\nconsole.log(state.lives);"
         },
-        "title": "состояние",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Состояние игры и счёт",
+        "desc": "Объект state собирает связанные данные игры в одном месте. Изменяйте его свойства по событиям и обновляйте отображение.",
         "x": 540,
-        "y": 1590
+        "y": 1590,
+        "src": {
+          "id": "состояние-игры-и-счёт-mv6cust5",
+          "title": "Состояние игры и счёт",
+          "desc": "Объект state собирает связанные данные игры в одном месте. Изменяйте его свойства по событиям и обновляйте отображение.",
+          "code": "const state = {\n  score: 0,\n  lives: 3,\n  running: true\n};\n\nstate.score += 10;\nconsole.log(state.score);\nconsole.log(state.lives);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "state"
+            ],
+            "requires": [
+              "score",
+              "lives",
+              "running"
+            ]
+          }
+        }
       },
       {
         "id": "1ofcll",
@@ -526,12 +622,23 @@
         "id": "g22n8z",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": ".help-button {\n  position: fixed;\n  right: 1rem;\n  bottom: 1rem;\n}\n"
         },
-        "title": "экран",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Фиксированное позиционирование элемента в углу экрана",
+        "desc": "Позиционирует элемент в правом нижнем углу экрана независимо от прокрутки страницы. Используется для всплывающих кнопок помощи, модальных окон или стабильных элементов интерфейса.",
         "x": 60,
-        "y": 1760
+        "y": 1760,
+        "src": {
+          "id": "fixed-кнопка-в-углу",
+          "title": "Фиксированное позиционирование элемента в углу экрана",
+          "desc": "Позиционирует элемент в правом нижнем углу экрана независимо от прокрутки страницы. Используется для всплывающих кнопок помощи, модальных окон или стабильных элементов интерфейса.",
+          "code": ".help-button {\n  position: fixed;\n  right: 1rem;\n  bottom: 1rem;\n}\n",
+          "lang": "css",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "2rlwu6",
@@ -615,12 +722,23 @@
         "id": "ndyzfc",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<ins>Добавлено</ins>"
         },
-        "title": "containsPoint",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "ins",
+        "desc": "Добавленный текст",
         "x": 780,
-        "y": 1930
+        "y": 1930,
+        "src": {
+          "id": "ins-mvxdd9j1z",
+          "title": "ins",
+          "desc": "Добавленный текст",
+          "code": "<ins>Добавлено</ins>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "fwz5hr",
@@ -643,12 +761,23 @@
         "id": "bw8vil",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<select><optgroup label=\"A\"><option>1</option></optgroup></select>"
         },
-        "title": "label",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "optgroup",
+        "desc": "Группы option",
         "x": 300,
-        "y": 2100
+        "y": 2100,
+        "src": {
+          "id": "optgroup-mvxu3qkhr",
+          "title": "optgroup",
+          "desc": "Группы option",
+          "code": "<select><optgroup label=\"A\"><option>1</option></optgroup></select>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "pyyiax",
@@ -704,12 +833,23 @@
         "id": "uvfnks",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<canvas width=\"200\" height=\"100\"></canvas>"
         },
-        "title": "границы canvas",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "canvas",
+        "desc": "Canvas",
         "x": 540,
-        "y": 2270
+        "y": 2270,
+        "src": {
+          "id": "canvas-mvxzqajkk",
+          "title": "canvas",
+          "desc": "Canvas",
+          "code": "<canvas width=\"200\" height=\"100\"></canvas>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "it0osf",
@@ -737,12 +877,26 @@
         "id": "z3ifdg",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\n\nctx.fillStyle = \"#FF006E\";\nctx.fillRect(10, 10, 80, 80);\nctx.clearRect(30, 30, 40, 40);"
         },
-        "title": "rect",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "clearRect — очистить кадр",
+        "desc": "clearRect стирает пиксели заданной области. В анимации обычно очищают весь canvas перед рисованием нового кадра.",
         "x": 300,
-        "y": 2440
+        "y": 2440,
+        "src": {
+          "id": "clearrect-очистить-кадр-mv6cutcv",
+          "title": "clearRect — очистить кадр",
+          "desc": "clearRect стирает пиксели заданной области. В анимации обычно очищают весь canvas перед рисованием нового кадра.",
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\n\nctx.fillStyle = \"#FF006E\";\nctx.fillRect(10, 10, 80, 80);\nctx.clearRect(30, 30, 40, 40);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "canvas",
+              "ctx"
+            ],
+            "requires": []
+          }
+        }
       }
     ],
     "edges": [

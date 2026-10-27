@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "var-mvxcnhory",
   "file": "переменная-mvxcnhory.html",
-  "title": "var",
+  "title": "var — переменная или обозначение переменной",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Переменная",
@@ -37,11 +37,29 @@
     "Переменная"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 4,
+      "text": "var",
+      "kind": "kw",
+      "note": "объявить переменную с функциональной или глобальной областью видимости",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 11,
+      "text": "var",
+      "kind": "kw",
+      "note": "объявить переменную с функциональной или глобальной областью видимости",
+      "source": "dict"
+    }
+  ],
+  "output": ""
 }

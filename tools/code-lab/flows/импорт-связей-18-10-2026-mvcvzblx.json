@@ -1,7 +1,7 @@
 {
   "id": "импорт-связей-18-10-2026-mvcvzblx",
   "name": "Импорт связей 18.10.2026",
-  "savedAt": 1792271172741,
+  "savedAt": 1793097273096,
   "graph": {
     "nodes": [
       {
@@ -93,12 +93,23 @@
         "id": "zmnhwx",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<canvas width=\"200\" height=\"100\"></canvas>"
         },
         "title": "canvas",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "desc": "Canvas",
         "x": 300,
-        "y": 230
+        "y": 230,
+        "src": {
+          "id": "canvas-mvxzqajkk",
+          "title": "canvas",
+          "desc": "Canvas",
+          "code": "<canvas width=\"200\" height=\"100\"></canvas>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "2dnfle",
@@ -137,12 +148,23 @@
         "id": "8d4pwd",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "let last = 0;\nfunction frame(now) {\n  const dt = Math.min((now - last) / 1000 || 0, 0.05);\n  last = now;\n  update(dt);\n  draw();\n  requestAnimationFrame(frame);\n}\nrequestAnimationFrame(frame);\n"
         },
-        "title": "frame",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "requestAnimationFrame с dt и ограничением скачка",
+        "desc": "Использует время кадра и ограничивает dt после зависания вкладки.",
         "x": 300,
-        "y": 400
+        "y": 400,
+        "src": {
+          "id": "add-098-requestanimationframe-dt",
+          "title": "requestAnimationFrame с dt и ограничением скачка",
+          "desc": "Использует время кадра и ограничивает dt после зависания вкладки.",
+          "code": "let last = 0;\nfunction frame(now) {\n  const dt = Math.min((now - last) / 1000 || 0, 0.05);\n  last = now;\n  update(dt);\n  draw();\n  requestAnimationFrame(frame);\n}\nrequestAnimationFrame(frame);\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "w89b74",
@@ -159,23 +181,45 @@
         "id": "0r4p3x",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<canvas width=\"200\" height=\"100\"></canvas>"
         },
-        "title": "содержимое canvas, очищая область рисования",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "canvas",
+        "desc": "Canvas",
         "x": 780,
-        "y": 400
+        "y": 400,
+        "src": {
+          "id": "canvas-mvxzqajkk",
+          "title": "canvas",
+          "desc": "Canvas",
+          "code": "<canvas width=\"200\" height=\"100\"></canvas>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "62g1b6",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<canvas width=\"200\" height=\"100\"></canvas>"
         },
-        "title": "содержимое canvas",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "canvas",
+        "desc": "Canvas",
         "x": 60,
-        "y": 570
+        "y": 570,
+        "src": {
+          "id": "canvas-mvxzqajkk",
+          "title": "canvas",
+          "desc": "Canvas",
+          "code": "<canvas width=\"200\" height=\"100\"></canvas>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "e1id46",
@@ -232,12 +276,25 @@
         "id": "60luhp",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const wheel = document.querySelector(\"#wheel\");\nwheel.style.backgroundImage =\n  \"conic-gradient(red, yellow, lime, cyan, blue, magenta, red)\";"
         },
-        "title": "gradient",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "conic-gradient — спектральный круг",
+        "desc": "conic-gradient распределяет цвета по углу вокруг центра. Можно использовать для спектрального круга и цветового индикатора.",
         "x": 60,
-        "y": 740
+        "y": 740,
+        "src": {
+          "id": "conic-gradient-спектральный-круг-mv6cut8w",
+          "title": "conic-gradient — спектральный круг",
+          "desc": "conic-gradient распределяет цвета по углу вокруг центра. Можно использовать для спектрального круга и цветового индикатора.",
+          "code": "const wheel = document.querySelector(\"#wheel\");\nwheel.style.backgroundImage =\n  \"conic-gradient(red, yellow, lime, cyan, blue, magenta, red)\";",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "wheel"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "y5f2uk",
@@ -260,12 +317,27 @@
         "id": "dunwtc",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\nconst image = document.querySelector(\"#sourceImage\");\n\nimage.addEventListener(\"load\", () => {\n  ctx.drawImage(image, 10, 10, 120, 80);\n});"
         },
-        "title": "image",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "drawImage — нарисовать изображение",
+        "desc": "drawImage помещает загруженное изображение на canvas. Рисовать нужно после события load; для локальной песочницы можно использовать заранее доступный URL или собственный файл.",
         "x": 540,
-        "y": 740
+        "y": 740,
+        "src": {
+          "id": "drawimage-нарисовать-изображение-mv6cutch",
+          "title": "drawImage — нарисовать изображение",
+          "desc": "drawImage помещает загруженное изображение на canvas. Рисовать нужно после события load; для локальной песочницы можно использовать заранее доступный URL или собственный файл.",
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\nconst image = document.querySelector(\"#sourceImage\");\n\nimage.addEventListener(\"load\", () => {\n  ctx.drawImage(image, 10, 10, 120, 80);\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "canvas",
+              "ctx",
+              "image"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "srqygx",
@@ -288,23 +360,47 @@
         "id": "v9eg8b",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<select id=\"city\" name=\"city\">\n  <option value=\"\">Выберите город</option>\n  <option value=\"msk\">Москва</option>\n  <option value=\"kzn\">Казань</option>\n</select>"
         },
-        "title": "значения",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "выпадающий список",
+        "desc": "Выбор одного значения из списка.",
         "x": 60,
-        "y": 910
+        "y": 910,
+        "src": {
+          "id": "выпадающий-список-mvh8g0p1",
+          "title": "выпадающий список",
+          "desc": "Выбор одного значения из списка.",
+          "code": "<select id=\"city\" name=\"city\">\n  <option value=\"\">Выберите город</option>\n  <option value=\"msk\">Москва</option>\n  <option value=\"kzn\">Казань</option>\n</select>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "mkrb6f",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const числа = [40, 70, 30, 90, 55];"
         },
-        "title": "массив числовых значений",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "массив",
+        "desc": "Массив — упорядоченный список значений\nДопустим, у тебя есть не один цвет, а сразу пять. Создавать отдельную переменную для каждого неудобно.\nМожно собрать их в массив:\nconst colors = [\"красный\", \"синий\", \"зелёный\"];\nМассив обозначается квадратными скобками [].\nКак устроен массив\nУ каждого элемента есть позиция — индекс. В JavaScript отсчёт начинается с нуля.\nИндекс 0\nкрасный\n\n\nИндекс 1\nсиний\n\n\nИн",
         "x": 300,
-        "y": 910
+        "y": 910,
+        "src": {
+          "id": "массив-mv9yln2q",
+          "title": "массив",
+          "desc": "Массив — упорядоченный список значений\nДопустим, у тебя есть не один цвет, а сразу пять. Создавать отдельную переменную для каждого неудобно.\nМожно собрать их в массив:\nconst colors = [\"красный\", \"синий\", \"зелёный\"];\nМассив обозначается квадратными скобками [].\nКак устроен массив\nУ каждого элемента есть позиция — индекс. В JavaScript отсчёт начинается с нуля.\nИндекс 0\nкрасный\n\n\nИндекс 1\nсиний\n\n\nИн",
+          "code": "const числа = [40, 70, 30, 90, 55];",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "числа"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "ray7u5",
@@ -327,12 +423,23 @@
         "id": "v88ble",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "from concurrent.futures import ProcessPoolExecutor\n\ndef square(value):\n    return value * value\n\nif __name__ == \"__main__\":\n    with ProcessPoolExecutor(max_workers=2) as pool:\n        print(list(pool.map(square, [1, 2, 3, 4])))\n"
         },
-        "title": "точки",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "multiprocessing — защита точки входа",
+        "desc": "Показывает обязательный main guard для запуска дочерних процессов на Windows и в spawn-режиме.",
         "x": 780,
-        "y": 910
+        "y": 910,
+        "src": {
+          "id": "python-main-guard-py",
+          "title": "multiprocessing — защита точки входа",
+          "desc": "Показывает обязательный main guard для запуска дочерних процессов на Windows и в spawn-режиме.",
+          "code": "from concurrent.futures import ProcessPoolExecutor\n\ndef square(value):\n    return value * value\n\nif __name__ == \"__main__\":\n    with ProcessPoolExecutor(max_workers=2) as pool:\n        print(list(pool.map(square, [1, 2, 3, 4])))\n",
+          "lang": "python",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "ygwo59",
@@ -349,12 +456,28 @@
         "id": "glnng4",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "function график(значения){\n  const точки = значения\n    .map((y, x) => (x * 20) + \",\" + (100 - y))\n    .join(\" \");\n  return '<svg width=\"200\" height=\"100\">'\n    + '<polyline points=\"' + точки + '\" fill=\"none\" stroke=\"#52F2C9\"/>'\n    + '</svg>';\n}"
         },
-        "title": "график",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "SVG — линия из точек (мини-график)",
+        "desc": "SVG — это картинка из тегов. Линию задаёт атрибут points: пары x,y. Так рисуются sparkline и кривые в проекте.",
         "x": 300,
-        "y": 1080
+        "y": 1080,
+        "src": {
+          "id": "draw-svg",
+          "title": "SVG — линия из точек (мини-график)",
+          "desc": "SVG — это картинка из тегов. Линию задаёт атрибут points: пары x,y. Так рисуются sparkline и кривые в проекте.",
+          "code": "function график(значения){\n  const точки = значения\n    .map((y, x) => (x * 20) + \",\" + (100 - y))\n    .join(\" \");\n  return '<svg width=\"200\" height=\"100\">'\n    + '<polyline points=\"' + точки + '\" fill=\"none\" stroke=\"#52F2C9\"/>'\n    + '</svg>';\n}",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "график",
+              "точки"
+            ],
+            "requires": [
+              "y"
+            ]
+          }
+        }
       },
       {
         "id": "vybxcg",
@@ -684,12 +807,23 @@
         "id": "aylnk2",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<ol><li>Первый</li><li>Второй</li></ol>"
         },
-        "title": "columns",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "ol",
+        "desc": "Нумерованный список",
         "x": 540,
-        "y": 2100
+        "y": 2100,
+        "src": {
+          "id": "ol-mvxg3lpmh",
+          "title": "ol",
+          "desc": "Нумерованный список",
+          "code": "<ol><li>Первый</li><li>Второй</li></ol>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "lrpfmi",
@@ -734,12 +868,23 @@
         "id": "vfgbiu",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<ins>Добавлено</ins>"
         },
-        "title": "inside",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "ins",
+        "desc": "Добавленный текст",
         "x": 540,
-        "y": 2270
+        "y": 2270,
+        "src": {
+          "id": "ins-mvxdd9j1z",
+          "title": "ins",
+          "desc": "Добавленный текст",
+          "code": "<ins>Добавлено</ins>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "zducfh",
@@ -936,23 +1081,50 @@
         "id": "snc06j",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const tools = [\"map\", \"filter\", \"reduce\"];\nconsole.log(tools.indexOf(\"filter\"));\nconsole.log(tools.indexOf(\"find\"));"
         },
-        "title": "index",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "indexOf — найти индекс",
+        "desc": "indexOf возвращает индекс первого точного совпадения или -1, если значение не найдено.",
         "x": 60,
-        "y": 2950
+        "y": 2950,
+        "src": {
+          "id": "indexof-найти-индекс-mv6cutfc",
+          "title": "indexOf — найти индекс",
+          "desc": "indexOf возвращает индекс первого точного совпадения или -1, если значение не найдено.",
+          "code": "const tools = [\"map\", \"filter\", \"reduce\"];\nconsole.log(tools.indexOf(\"filter\"));\nconsole.log(tools.indexOf(\"find\"));",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "tools"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "wbwv9v",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const picker = document.querySelector(\"#colorPicker\");\nconst swatch = document.querySelector(\"#swatch\");\n\npicker.addEventListener(\"input\", () => {\n  swatch.style.backgroundColor = picker.value;\n});"
         },
-        "title": "color",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "input type=color — выбор цвета",
+        "desc": "Поле color отдаёт выбранный цвет в формате hex, например #ff006e. Значение можно применять к фону или хранить в массиве.",
         "x": 300,
-        "y": 2950
+        "y": 2950,
+        "src": {
+          "id": "input-type-color-выбор-цвета-mv6cusws",
+          "title": "input type=color — выбор цвета",
+          "desc": "Поле color отдаёт выбранный цвет в формате hex, например #ff006e. Значение можно применять к фону или хранить в массиве.",
+          "code": "const picker = document.querySelector(\"#colorPicker\");\nconst swatch = document.querySelector(\"#swatch\");\n\npicker.addEventListener(\"input\", () => {\n  swatch.style.backgroundColor = picker.value;\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "picker",
+              "swatch"
+            ],
+            "requires": []
+          }
+        }
       }
     ],
     "edges": [

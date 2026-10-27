@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "wbr-mvxtzftgl",
   "file": "место-возможного-переноса-mvxtzftgl.html",
-  "title": "wbr",
+  "title": "wbr — возможное место переноса строки",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Перенос",
@@ -29,11 +29,12 @@
     "Перенос"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

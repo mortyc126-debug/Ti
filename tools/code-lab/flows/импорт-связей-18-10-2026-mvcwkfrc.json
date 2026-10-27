@@ -1,7 +1,7 @@
 {
   "id": "импорт-связей-18-10-2026-mvcwkfrc",
   "name": "Импорт связей 18.10.2026",
-  "savedAt": 1792272157896,
+  "savedAt": 1793097274212,
   "graph": {
     "nodes": [
       {
@@ -138,12 +138,23 @@
         "id": "zg5hbm",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<ul><li>Пункт</li></ul>"
         },
-        "title": "results",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "ul",
+        "desc": "Маркированный список",
         "x": 60,
-        "y": 400
+        "y": 400,
+        "src": {
+          "id": "ul-mvxry7h6z",
+          "title": "ul",
+          "desc": "Маркированный список",
+          "code": "<ul><li>Пункт</li></ul>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "g0v78s",
@@ -166,12 +177,23 @@
         "id": "mo7ioq",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "def main():\n    print(\"программа работает\")\n\nif __name__ == \"__main__\":\n    main()"
         },
-        "title": "main",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "if __name__ == \"__main__\" — запуск только напрямую",
+        "desc": "Код под этой проверкой выполняется, когда файл запущен напрямую, и не выполняется, когда файл импортируют из другого.",
         "x": 540,
-        "y": 400
+        "y": 400,
+        "src": {
+          "id": "if-__name__-__main__-запуск-только-напря-mvdrpurh",
+          "title": "if __name__ == \"__main__\" — запуск только напрямую",
+          "desc": "Код под этой проверкой выполняется, когда файл запущен напрямую, и не выполняется, когда файл импортируют из другого.",
+          "code": "def main():\n    print(\"программа работает\")\n\nif __name__ == \"__main__\":\n    main()",
+          "lang": "python",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "aie9od",
@@ -194,34 +216,119 @@
         "id": "pzj31m",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "// Прокси обходит CORS к bo.nalog.gov.ru. По умолчанию — публичный corsproxy.io.\nconst ПРОКСИ = \"https://corsproxy.io/?\";   // свой CF Worker: \"https://…workers.dev/?u=\"\n\n// собрать адрес через прокси по соглашению проекта\nfunction черезПрокси(target){\n  if(ПРОКСИ.endsWith(\"=\")) return ПРОКСИ + encodeURIComponent(target); // …/?u= → кодируем\n  return ПРОКСИ + target;                                             // …/?   → как есть\n}\nconst гирбо = путь => черезПрокси(\"https://bo.nalog.gov.ru\" + путь);\nconst q = u => fetch(u, { headers: { Accept: \"application/json\" } }).then(r => r.json());\n\n// Шаг 1–2: имя → MOEX → ИНН эмитента\nasync function поИмениИНН(имя){\n  const j = await q(\"https://iss.moex.com/iss/securities.json?iss.meta=off&q=\" + encodeURIComponent(имя));\n  const кол = j.securities.columns;\n  const стр = j.securities.data[0];\n  if(!стр) throw new Error(\"на бирже нет: \" + имя);\n  return String(стр[кол.indexOf(\"emitent_inn\")] || \"\");\n}\n\n// Шаг 3–4: ИНН → ГИР БО → годы отчётов в массив\nasync function отчётность(ИНН){\n  const найдено = await q(гирбо(\"/advanced-search/organizations/search?inn=\" + ИНН));\n  const orgs = найдено.content || найдено;      // список организаций\n  const org = orgs[0];\n  if(!org) throw new Error(\"в ГИР БО нет ИНН \" + ИНН);\n  const bfo = await q(гирбо(\"/nbo/organizations/\" + org.id + \"/bfo/\")); // список отчётов\n  const список = bfo.content || bfo;\n  const годы = список\n    .filter(b => String(b.period).length === 4)   // только годовые\n    .map(b => Number(b.period))\n    .sort((a, b) => b - a);\n  return { orgId: org.id, годы };                 // ответ → массив лет\n}\n\nasync function main(){\n  const ИНН = await поИмениИНН(\"Сбербанк\");       // ← имя из Т-Инвестиций\n  console.log(\"ИНН эмитента:\", ИНН);\n  const r = await отчётность(ИНН);\n  console.log(\"orgId:\", r.orgId, \"годы:\", r.годы);\n  // дальше по каждому году: /nbo/details/balance?id= и /nbo/details/financial_result?id=\n  // → оттуда выручка (код 2110), активы (1600) и т.д. в массивы по годам.\n}\nmain();"
         },
-        "title": "ИНН → поиск организации",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси)",
+        "desc": "Полная цепочка с рабочим прокси. Прокси обходит запрет CORS: по умолчанию публичный corsproxy.io (бесплатный, без настройки). Свой надёжнее — Cloudflare Worker (код в cf-worker.js репозитория), формат …/?u=. Шаги: имя (как в Т-Инвестициях) → MOEX (ИНН эмитента) → ГИР БО: поиск организации по ИНН → список отчётов → годы в массив. Запусти — работает вживую (если corsproxy доступен).",
         "x": 60,
-        "y": 570
+        "y": 570,
+        "src": {
+          "id": "flow-chain-girbo",
+          "title": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси)",
+          "desc": "Полная цепочка с рабочим прокси. Прокси обходит запрет CORS: по умолчанию публичный corsproxy.io (бесплатный, без настройки). Свой надёжнее — Cloudflare Worker (код в cf-worker.js репозитория), формат …/?u=. Шаги: имя (как в Т-Инвестициях) → MOEX (ИНН эмитента) → ГИР БО: поиск организации по ИНН → список отчётов → годы в массив. Запусти — работает вживую (если corsproxy доступен).",
+          "code": "// Прокси обходит CORS к bo.nalog.gov.ru. По умолчанию — публичный corsproxy.io.\nconst ПРОКСИ = \"https://corsproxy.io/?\";   // свой CF Worker: \"https://…workers.dev/?u=\"\n\n// собрать адрес через прокси по соглашению проекта\nfunction черезПрокси(target){\n  if(ПРОКСИ.endsWith(\"=\")) return ПРОКСИ + encodeURIComponent(target); // …/?u= → кодируем\n  return ПРОКСИ + target;                                             // …/?   → как есть\n}\nconst гирбо = путь => черезПрокси(\"https://bo.nalog.gov.ru\" + путь);\nconst q = u => fetch(u, { headers: { Accept: \"application/json\" } }).then(r => r.json());\n\n// Шаг 1–2: имя → MOEX → ИНН эмитента\nasync function поИмениИНН(имя){\n  const j = await q(\"https://iss.moex.com/iss/securities.json?iss.meta=off&q=\" + encodeURIComponent(имя));\n  const кол = j.securities.columns;\n  const стр = j.securities.data[0];\n  if(!стр) throw new Error(\"на бирже нет: \" + имя);\n  return String(стр[кол.indexOf(\"emitent_inn\")] || \"\");\n}\n\n// Шаг 3–4: ИНН → ГИР БО → годы отчётов в массив\nasync function отчётность(ИНН){\n  const найдено = await q(гирбо(\"/advanced-search/organizations/search?inn=\" + ИНН));\n  const orgs = найдено.content || найдено;      // список организаций\n  const org = orgs[0];\n  if(!org) throw new Error(\"в ГИР БО нет ИНН \" + ИНН);\n  const bfo = await q(гирбо(\"/nbo/organizations/\" + org.id + \"/bfo/\")); // список отчётов\n  const список = bfo.content || bfo;\n  const годы = список\n    .filter(b => String(b.period).length === 4)   // только годовые\n    .map(b => Number(b.period))\n    .sort((a, b) => b - a);\n  return { orgId: org.id, годы };                 // ответ → массив лет\n}\n\nasync function main(){\n  const ИНН = await поИмениИНН(\"Сбербанк\");       // ← имя из Т-Инвестиций\n  console.log(\"ИНН эмитента:\", ИНН);\n  const r = await отчётность(ИНН);\n  console.log(\"orgId:\", r.orgId, \"годы:\", r.годы);\n  // дальше по каждому году: /nbo/details/balance?id= и /nbo/details/financial_result?id=\n  // → оттуда выручка (код 2110), активы (1600) и т.д. в массивы по годам.\n}\nmain();",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "ПРОКСИ",
+              "черезПрокси",
+              "гирбо",
+              "q",
+              "поИмениИНН",
+              "j",
+              "кол",
+              "стр",
+              "отчётность",
+              "найдено",
+              "orgs",
+              "org",
+              "bfo",
+              "список",
+              "годы",
+              "main",
+              "ИНН",
+              "r"
+            ],
+            "requires": [
+              "encodeURIComponent",
+              "headers",
+              "Accept",
+              "a",
+              "orgId"
+            ]
+          }
+        }
       },
       {
         "id": "3kxm53",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "// Прокси обходит CORS к bo.nalog.gov.ru. По умолчанию — публичный corsproxy.io.\nconst ПРОКСИ = \"https://corsproxy.io/?\";   // свой CF Worker: \"https://…workers.dev/?u=\"\n\n// собрать адрес через прокси по соглашению проекта\nfunction черезПрокси(target){\n  if(ПРОКСИ.endsWith(\"=\")) return ПРОКСИ + encodeURIComponent(target); // …/?u= → кодируем\n  return ПРОКСИ + target;                                             // …/?   → как есть\n}\nconst гирбо = путь => черезПрокси(\"https://bo.nalog.gov.ru\" + путь);\nconst q = u => fetch(u, { headers: { Accept: \"application/json\" } }).then(r => r.json());\n\n// Шаг 1–2: имя → MOEX → ИНН эмитента\nasync function поИмениИНН(имя){\n  const j = await q(\"https://iss.moex.com/iss/securities.json?iss.meta=off&q=\" + encodeURIComponent(имя));\n  const кол = j.securities.columns;\n  const стр = j.securities.data[0];\n  if(!стр) throw new Error(\"на бирже нет: \" + имя);\n  return String(стр[кол.indexOf(\"emitent_inn\")] || \"\");\n}\n\n// Шаг 3–4: ИНН → ГИР БО → годы отчётов в массив\nasync function отчётность(ИНН){\n  const найдено = await q(гирбо(\"/advanced-search/organizations/search?inn=\" + ИНН));\n  const orgs = найдено.content || найдено;      // список организаций\n  const org = orgs[0];\n  if(!org) throw new Error(\"в ГИР БО нет ИНН \" + ИНН);\n  const bfo = await q(гирбо(\"/nbo/organizations/\" + org.id + \"/bfo/\")); // список отчётов\n  const список = bfo.content || bfo;\n  const годы = список\n    .filter(b => String(b.period).length === 4)   // только годовые\n    .map(b => Number(b.period))\n    .sort((a, b) => b - a);\n  return { orgId: org.id, годы };                 // ответ → массив лет\n}\n\nasync function main(){\n  const ИНН = await поИмениИНН(\"Сбербанк\");       // ← имя из Т-Инвестиций\n  console.log(\"ИНН эмитента:\", ИНН);\n  const r = await отчётность(ИНН);\n  console.log(\"orgId:\", r.orgId, \"годы:\", r.годы);\n  // дальше по каждому году: /nbo/details/balance?id= и /nbo/details/financial_result?id=\n  // → оттуда выручка (код 2110), активы (1600) и т.д. в массивы по годам.\n}\nmain();"
         },
-        "title": "ГИР БО → отчётность",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси)",
+        "desc": "Полная цепочка с рабочим прокси. Прокси обходит запрет CORS: по умолчанию публичный corsproxy.io (бесплатный, без настройки). Свой надёжнее — Cloudflare Worker (код в cf-worker.js репозитория), формат …/?u=. Шаги: имя (как в Т-Инвестициях) → MOEX (ИНН эмитента) → ГИР БО: поиск организации по ИНН → список отчётов → годы в массив. Запусти — работает вживую (если corsproxy доступен).",
         "x": 300,
-        "y": 570
+        "y": 570,
+        "src": {
+          "id": "flow-chain-girbo",
+          "title": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси)",
+          "desc": "Полная цепочка с рабочим прокси. Прокси обходит запрет CORS: по умолчанию публичный corsproxy.io (бесплатный, без настройки). Свой надёжнее — Cloudflare Worker (код в cf-worker.js репозитория), формат …/?u=. Шаги: имя (как в Т-Инвестициях) → MOEX (ИНН эмитента) → ГИР БО: поиск организации по ИНН → список отчётов → годы в массив. Запусти — работает вживую (если corsproxy доступен).",
+          "code": "// Прокси обходит CORS к bo.nalog.gov.ru. По умолчанию — публичный corsproxy.io.\nconst ПРОКСИ = \"https://corsproxy.io/?\";   // свой CF Worker: \"https://…workers.dev/?u=\"\n\n// собрать адрес через прокси по соглашению проекта\nfunction черезПрокси(target){\n  if(ПРОКСИ.endsWith(\"=\")) return ПРОКСИ + encodeURIComponent(target); // …/?u= → кодируем\n  return ПРОКСИ + target;                                             // …/?   → как есть\n}\nconst гирбо = путь => черезПрокси(\"https://bo.nalog.gov.ru\" + путь);\nconst q = u => fetch(u, { headers: { Accept: \"application/json\" } }).then(r => r.json());\n\n// Шаг 1–2: имя → MOEX → ИНН эмитента\nasync function поИмениИНН(имя){\n  const j = await q(\"https://iss.moex.com/iss/securities.json?iss.meta=off&q=\" + encodeURIComponent(имя));\n  const кол = j.securities.columns;\n  const стр = j.securities.data[0];\n  if(!стр) throw new Error(\"на бирже нет: \" + имя);\n  return String(стр[кол.indexOf(\"emitent_inn\")] || \"\");\n}\n\n// Шаг 3–4: ИНН → ГИР БО → годы отчётов в массив\nasync function отчётность(ИНН){\n  const найдено = await q(гирбо(\"/advanced-search/organizations/search?inn=\" + ИНН));\n  const orgs = найдено.content || найдено;      // список организаций\n  const org = orgs[0];\n  if(!org) throw new Error(\"в ГИР БО нет ИНН \" + ИНН);\n  const bfo = await q(гирбо(\"/nbo/organizations/\" + org.id + \"/bfo/\")); // список отчётов\n  const список = bfo.content || bfo;\n  const годы = список\n    .filter(b => String(b.period).length === 4)   // только годовые\n    .map(b => Number(b.period))\n    .sort((a, b) => b - a);\n  return { orgId: org.id, годы };                 // ответ → массив лет\n}\n\nasync function main(){\n  const ИНН = await поИмениИНН(\"Сбербанк\");       // ← имя из Т-Инвестиций\n  console.log(\"ИНН эмитента:\", ИНН);\n  const r = await отчётность(ИНН);\n  console.log(\"orgId:\", r.orgId, \"годы:\", r.годы);\n  // дальше по каждому году: /nbo/details/balance?id= и /nbo/details/financial_result?id=\n  // → оттуда выручка (код 2110), активы (1600) и т.д. в массивы по годам.\n}\nmain();",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "ПРОКСИ",
+              "черезПрокси",
+              "гирбо",
+              "q",
+              "поИмениИНН",
+              "j",
+              "кол",
+              "стр",
+              "отчётность",
+              "найдено",
+              "orgs",
+              "org",
+              "bfo",
+              "список",
+              "годы",
+              "main",
+              "ИНН",
+              "r"
+            ],
+            "requires": [
+              "encodeURIComponent",
+              "headers",
+              "Accept",
+              "a",
+              "orgId"
+            ]
+          }
+        }
       },
       {
         "id": "m84lr4",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const числа = [40, 70, 30, 90, 55];"
         },
-        "title": "массивы организаций и отчётности",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "массив",
+        "desc": "Массив — упорядоченный список значений\nДопустим, у тебя есть не один цвет, а сразу пять. Создавать отдельную переменную для каждого неудобно.\nМожно собрать их в массив:\nconst colors = [\"красный\", \"синий\", \"зелёный\"];\nМассив обозначается квадратными скобками [].\nКак устроен массив\nУ каждого элемента есть позиция — индекс. В JavaScript отсчёт начинается с нуля.\nИндекс 0\nкрасный\n\n\nИндекс 1\nсиний\n\n\nИн",
         "x": 540,
-        "y": 570
+        "y": 570,
+        "src": {
+          "id": "массив-mv9yln2q",
+          "title": "массив",
+          "desc": "Массив — упорядоченный список значений\nДопустим, у тебя есть не один цвет, а сразу пять. Создавать отдельную переменную для каждого неудобно.\nМожно собрать их в массив:\nconst colors = [\"красный\", \"синий\", \"зелёный\"];\nМассив обозначается квадратными скобками [].\nКак устроен массив\nУ каждого элемента есть позиция — индекс. В JavaScript отсчёт начинается с нуля.\nИндекс 0\nкрасный\n\n\nИндекс 1\nсиний\n\n\nИн",
+          "code": "const числа = [40, 70, 30, 90, 55];",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "числа"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "dyxovu",
@@ -238,12 +345,23 @@
         "id": "kgvdcp",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<time datetime=\"2026-10-23\">23 октября</time>"
         },
-        "title": "дата",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "time",
+        "desc": "Дата",
         "x": 60,
-        "y": 740
+        "y": 740,
+        "src": {
+          "id": "time-mvxiki6zd",
+          "title": "time",
+          "desc": "Дата",
+          "code": "<time datetime=\"2026-10-23\">23 октября</time>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "u0mwbt",
@@ -260,12 +378,28 @@
         "id": "hval9c",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const бумага = { имя: \"ОФЗ\", купон: 7.1 };"
         },
-        "title": "объекты записей",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "объект",
+        "desc": "Объект — набор связанных данных\nТеперь представь, что нужно хранить информацию не просто о цвете, а о его названии, коде и цене.\nМожно использовать объект:\nconst color = {\n  name: \"Красный\",\n  hex: \"#ff0000\",\n  price: 100\n};\n\n\nОбъект обозначается фигурными скобками {}. Внутри хранятся пары ключ: значение.\nРазбираем объект\nname\n\n\"Красный\"\nНазвание цвета\n\n\nhex\n\n\"#ff0000\"\nЦветовой код\n\n\nprice\n\n100\nЦе",
         "x": 540,
-        "y": 740
+        "y": 740,
+        "src": {
+          "id": "объект-mv9z7j6w",
+          "title": "объект",
+          "desc": "Объект — набор связанных данных\nТеперь представь, что нужно хранить информацию не просто о цвете, а о его названии, коде и цене.\nМожно использовать объект:\nconst color = {\n  name: \"Красный\",\n  hex: \"#ff0000\",\n  price: 100\n};\n\n\nОбъект обозначается фигурными скобками {}. Внутри хранятся пары ключ: значение.\nРазбираем объект\nname\n\n\"Красный\"\nНазвание цвета\n\n\nhex\n\n\"#ff0000\"\nЦветовой код\n\n\nprice\n\n100\nЦе",
+          "code": "const бумага = { имя: \"ОФЗ\", купон: 7.1 };",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "бумага"
+            ],
+            "requires": [
+              "имя",
+              "купон"
+            ]
+          }
+        }
       },
       {
         "id": "0d00dw",
@@ -305,23 +439,53 @@
         "id": "r2g1e6",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const http = require('http');\n\nhttp.createServer((req, res) => {\n  const data = { name: 'Анна', age: 31 };\n  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });\n  res.end(JSON.stringify(data));\n}).listen(3000);"
         },
-        "title": "ответ",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "ответ в формате JSON",
+        "desc": "Отдаёт данные как API.",
         "x": 300,
-        "y": 910
+        "y": 910,
+        "src": {
+          "id": "ответ-в-формате-json-mvh8h9t1",
+          "title": "ответ в формате JSON",
+          "desc": "Отдаёт данные как API.",
+          "code": "const http = require('http');\n\nhttp.createServer((req, res) => {\n  const data = { name: 'Анна', age: 31 };\n  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });\n  res.end(JSON.stringify(data));\n}).listen(3000);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "http",
+              "data"
+            ],
+            "requires": [
+              "require",
+              "req",
+              "name",
+              "age"
+            ]
+          }
+        }
       },
       {
         "id": "frata2",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "// main.js\nconst worker = new Worker(\"worker.js\", { type: \"module\" });\nworker.postMessage([1, 2, 3]);\nworker.onmessage = event => { console.log(event.data); worker.terminate(); };\n\n// worker.js\nself.onmessage = event => self.postMessage(event.data.map(x => x * 2));\n"
         },
-        "title": "данные",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Web Worker: передать данные и получить результат",
+        "desc": "Передаёт данные рабочему потоку и принимает рассчитанный результат.",
         "x": 540,
-        "y": 910
+        "y": 910,
+        "src": {
+          "id": "add-075-web-worker",
+          "title": "Web Worker: передать данные и получить результат",
+          "desc": "Передаёт данные рабочему потоку и принимает рассчитанный результат.",
+          "code": "// main.js\nconst worker = new Worker(\"worker.js\", { type: \"module\" });\nworker.postMessage([1, 2, 3]);\nworker.onmessage = event => { console.log(event.data); worker.terminate(); };\n\n// worker.js\nself.onmessage = event => self.postMessage(event.data.map(x => x * 2));\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "pqcf9a",
@@ -338,12 +502,23 @@
         "id": "kmwavk",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "table {\n  border-collapse: collapse;\n}\ntd, th {\n  border: 1px solid #ccc;\n  padding: 8px;\n}\n"
         },
-        "title": "таблица",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "таблица - рамки и отступы",
+        "desc": "Оформляет таблицу с объединёнными рамками через `border-collapse` и задаёт рамки и внутренние отступы ячеек.",
         "x": 60,
-        "y": 1080
+        "y": 1080,
+        "src": {
+          "id": "таблица-рамки-и-отступы-mvhteib9",
+          "title": "таблица - рамки и отступы",
+          "desc": "Оформляет таблицу с объединёнными рамками через `border-collapse` и задаёт рамки и внутренние отступы ячеек.",
+          "code": "table {\n  border-collapse: collapse;\n}\ntd, th {\n  border: 1px solid #ccc;\n  padding: 8px;\n}\n",
+          "lang": "css",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "towldq",
@@ -371,12 +546,23 @@
         "id": "gb7mfe",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<img src=\"map.png\" usemap=\"#m\"><map name=\"m\"><area shape=\"rect\" coords=\"0,0,50,50\" href=\"#\"></map>"
         },
-        "title": "name",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "map",
+        "desc": "Карта изображения",
         "x": 780,
-        "y": 1080
+        "y": 1080,
+        "src": {
+          "id": "map-mvxwc4rwz",
+          "title": "map",
+          "desc": "Карта изображения",
+          "code": "<img src=\"map.png\" usemap=\"#m\"><map name=\"m\"><area shape=\"rect\" coords=\"0,0,50,50\" href=\"#\"></map>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "2auha5",
@@ -449,23 +635,45 @@
         "id": "2xtxqv",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<select id=\"city\" name=\"city\">\n  <option value=\"\">Выберите город</option>\n  <option value=\"msk\">Москва</option>\n  <option value=\"kzn\">Казань</option>\n</select>"
         },
-        "title": "значения",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "выпадающий список",
+        "desc": "Выбор одного значения из списка.",
         "x": 300,
-        "y": 1420
+        "y": 1420,
+        "src": {
+          "id": "выпадающий-список-mvh8g0p1",
+          "title": "выпадающий список",
+          "desc": "Выбор одного значения из списка.",
+          "code": "<select id=\"city\" name=\"city\">\n  <option value=\"\">Выберите город</option>\n  <option value=\"msk\">Москва</option>\n  <option value=\"kzn\">Казань</option>\n</select>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "2crvos",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "from concurrent.futures import ProcessPoolExecutor\n\ndef square(value):\n    return value * value\n\nif __name__ == \"__main__\":\n    with ProcessPoolExecutor(max_workers=2) as pool:\n        print(list(pool.map(square, [1, 2, 3, 4])))\n"
         },
-        "title": "точки",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "multiprocessing — защита точки входа",
+        "desc": "Показывает обязательный main guard для запуска дочерних процессов на Windows и в spawn-режиме.",
         "x": 540,
-        "y": 1420
+        "y": 1420,
+        "src": {
+          "id": "python-main-guard-py",
+          "title": "multiprocessing — защита точки входа",
+          "desc": "Показывает обязательный main guard для запуска дочерних процессов на Windows и в spawn-режиме.",
+          "code": "from concurrent.futures import ProcessPoolExecutor\n\ndef square(value):\n    return value * value\n\nif __name__ == \"__main__\":\n    with ProcessPoolExecutor(max_workers=2) as pool:\n        print(list(pool.map(square, [1, 2, 3, 4])))\n",
+          "lang": "python",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "8bbtih",
@@ -499,7 +707,7 @@
         "id": "1ldmo3",
         "blockId": "raw",
         "fields": {
-          "code": "// 1) достать   2) обработать   3) показать\nasync function система(инн){\n  const сырое   = await загрузить(инн);   // источник\n  const чистое  = разобрать(сырое);        // парсер\n  const метрики = посчитать(чистое);       // расчёт\n  показать(метрики);                       // вывод\n}"
+          "code": "// 1) достать   2) обработать   3) показать\nasync function система(инн){\n  const сырое   = await загрузить(инн);   // источник\n  const чистое  = разобрать(сырое);        // парсер\n  const м��трики = посчитать(чистое);       // расчёт\n  показать(метрики);                       // вывод\n}"
         },
         "title": "Конвейер: данные → обработка → вывод",
         "desc": "Большие системы — это маленькие функции, выстроенные в цепочку. Каждая делает одно и передаёт дальше. Легко чинить и наращивать.",
@@ -516,45 +724,91 @@
         "id": "jfp6p4",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "function parseAndValidateJson(text, validate) {\n  let value;\n  try { value = JSON.parse(text); }\n  catch (error) { return { ok: false, stage: 'parse', errors: [error.message] }; }\n  const errors = validate(value);\n  return errors.length ? { ok: false, stage: 'validation', errors } : { ok: true, value };\n}\n// const result = parseAndValidateJson(text, validatePortfolio);\n"
         },
-        "title": "загрузить",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Загрузить JSON и проверить результат до использования",
+        "desc": "Разделяет синтаксический разбор JSON и доменную проверку данных; ошибки не смешиваются с валидным результатом.",
         "x": 540,
-        "y": 1590
+        "y": 1590,
+        "src": {
+          "id": "file-import-json-validate",
+          "title": "Загрузить JSON и проверить результат до использования",
+          "desc": "Разделяет синтаксический разбор JSON и доменную проверку данных; ошибки не смешиваются с валидным результатом.",
+          "code": "function parseAndValidateJson(text, validate) {\n  let value;\n  try { value = JSON.parse(text); }\n  catch (error) { return { ok: false, stage: 'parse', errors: [error.message] }; }\n  const errors = validate(value);\n  return errors.length ? { ok: false, stage: 'validation', errors } : { ok: true, value };\n}\n// const result = parseAndValidateJson(text, validatePortfolio);\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "hf7g8e",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "function parseLines(text, parseLine) {\n  const values = [], errors = [];\n  text.split(/\\r?\\n/).forEach((line, index) => {\n    if (!line.trim()) return;\n    try { values.push({ line: index + 1, value: parseLine(line, index + 1) }); }\n    catch (error) { errors.push({ line: index + 1, text: line, message: error.message }); }\n  });\n  return { values, errors };\n}\n// const result = parseLines(fileText, line => JSON.parse(line));\n"
         },
-        "title": "разобрать",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Разобрать текстовый файл построчно с номерами ошибок",
+        "desc": "Передаёт каждую непустую строку парсеру и собирает ошибки отдельно, чтобы одна плохая строка не останавливала весь импорт.",
         "x": 780,
-        "y": 1590
+        "y": 1590,
+        "src": {
+          "id": "file-import-parse-lines",
+          "title": "Разобрать текстовый файл построчно с номерами ошибок",
+          "desc": "Передаёт каждую непустую строку парсеру и собирает ошибки отдельно, чтобы одна плохая строка не останавливала весь импорт.",
+          "code": "function parseLines(text, parseLine) {\n  const values = [], errors = [];\n  text.split(/\\r?\\n/).forEach((line, index) => {\n    if (!line.trim()) return;\n    try { values.push({ line: index + 1, value: parseLine(line, index + 1) }); }\n    catch (error) { errors.push({ line: index + 1, text: line, message: error.message }); }\n  });\n  return { values, errors };\n}\n// const result = parseLines(fileText, line => JSON.parse(line));\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "9xgrav",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "function summarizeNumbers(values) {\n  if (values.length === 0) return { count: 0, sum: 0, mean: null, min: null, max: null };\n  let sum = 0, min = Infinity, max = -Infinity;\n  for (const value of values) {\n    if (typeof value !== 'number' || !Number.isFinite(value)) throw new TypeError('Ожидались конечные числа');\n    sum += value; min = Math.min(min, value); max = Math.max(max, value);\n  }\n  return { count: values.length, sum, mean: sum / values.length, min, max };\n}\nconsole.log(summarizeNumbers([2, 4, 6]));\n"
         },
-        "title": "посчитать",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Посчитать сумму, среднее, минимум и максимум",
+        "desc": "Возвращает базовую сводку числового массива; для пустого набора явно возвращает null для статистик.",
         "x": 60,
-        "y": 1760
+        "y": 1760,
+        "src": {
+          "id": "data-aggregate-numeric",
+          "title": "Посчитать сумму, среднее, минимум и максимум",
+          "desc": "Возвращает базовую сводку числового массива; для пустого набора явно возвращает null для статистик.",
+          "code": "function summarizeNumbers(values) {\n  if (values.length === 0) return { count: 0, sum: 0, mean: null, min: null, max: null };\n  let sum = 0, min = Infinity, max = -Infinity;\n  for (const value of values) {\n    if (typeof value !== 'number' || !Number.isFinite(value)) throw new TypeError('Ожидались конечные числа');\n    sum += value; min = Math.min(min, value); max = Math.max(max, value);\n  }\n  return { count: values.length, sum, mean: sum / values.length, min, max };\n}\nconsole.log(summarizeNumbers([2, 4, 6]));\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "olyrbt",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const box = document.querySelector('.box');\nbox.hidden = true;\nbox.hidden = false;"
         },
-        "title": "показать",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "показать и скрыть",
+        "desc": "Прячет и показывает блок.",
         "x": 300,
-        "y": 1760
+        "y": 1760,
+        "src": {
+          "id": "показать-и-скрыть-mvh8fz4r",
+          "title": "показать и скрыть",
+          "desc": "Прячет и показывает блок.",
+          "code": "const box = document.querySelector('.box');\nbox.hidden = true;\nbox.hidden = false;",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "box"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "c2bxgp",

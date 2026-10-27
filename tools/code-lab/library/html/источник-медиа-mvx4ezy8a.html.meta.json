@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "source-mvx4ezy8a",
   "file": "источник-медиа-mvx4ezy8a.html",
-  "title": "source",
+  "title": "source — источник медиафайла",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Источник медиа",
@@ -52,11 +52,12 @@
     "медиа"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

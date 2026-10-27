@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "thead-mvxf5zg5o",
   "file": "заголовок-таблицы-mvxf5zg5o.html",
-  "title": "thead",
+  "title": "thead — заголовочная часть таблицы",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Заголовок таблицы",
@@ -51,11 +51,12 @@
     "таблицы"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

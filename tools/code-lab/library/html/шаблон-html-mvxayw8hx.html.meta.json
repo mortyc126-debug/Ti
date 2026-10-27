@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "template-mvxayw8hx",
   "file": "шаблон-html-mvxayw8hx.html",
-  "title": "template",
+  "title": "template — шаблон содержимого",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Template",
@@ -36,11 +36,29 @@
     "корневой элемент"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 11,
+      "text": "div",
+      "kind": "name",
+      "note": "div — <div> — блок-контейнер для группировки.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 23,
+      "text": "div",
+      "kind": "name",
+      "note": "div — <div> — блок-контейнер для группировки.",
+      "source": "dict"
+    }
+  ],
+  "output": ""
 }

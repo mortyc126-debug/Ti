@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "horizontal-scroll-mobile",
   "file": "horizontal-scroll-mobile.css",
-  "title": "horizontal scroll mobile",
+  "title": "horizontal scroll mobile — горизонтальная прокрутка на мобильных устройствах",
   "lang": "css",
   "group": "CSS: отступы и размеры / Переполнение и видимость",
   "desc": "Позволяет широкому содержимому прокручиваться горизонтально вместо того, чтобы ломать мобильную вёрстку. Частый паттерн для таблиц.",
@@ -21,7 +21,7 @@
   ],
   "aliases": [],
   "source": {
-    "title": "catalog extension",
+    "title": "manual",
     "desc": "added for search-oriented coverage",
     "tags": null
   },
@@ -51,5 +51,6 @@
     ],
     "watchFor": "Проверь суммарную ширину с padding/border, длинное содержимое и поведение при изменении ширины окна.",
     "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
-  }
+  },
+  "wordNotes": []
 }

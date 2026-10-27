@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "slot-mvxhysunz",
   "file": "слот-компонента-mvxhysunz.html",
-  "title": "slot",
+  "title": "slot — слот для вставляемого содержимого",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Slot",
@@ -28,11 +28,12 @@
     "корневой элемент"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

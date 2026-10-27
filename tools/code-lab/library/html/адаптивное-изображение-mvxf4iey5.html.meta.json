@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "picture-mvxf4iey5",
   "file": "адаптивное-изображение-mvxf4iey5.html",
-  "title": "picture",
+  "title": "picture — адаптивное изображение",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Адаптивное изображение",
@@ -69,11 +69,21 @@
     "Адаптивное"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 59,
+      "text": "img",
+      "kind": "name",
+      "note": "img — селектор тега: все картинки на странице",
+      "source": "dict"
+    }
+  ],
+  "output": ""
 }

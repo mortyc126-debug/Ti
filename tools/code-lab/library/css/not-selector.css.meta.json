@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "not-selector",
   "file": "not-selector.css",
-  "title": "not selector",
+  "title": "not selector — селектор отрицания",
   "lang": "css",
   "group": "CSS: основы / Псевдоклассы и атрибуты",
   "desc": "Выбирает элементы, которые **не** соответствуют указанному селектору, через `:not()`. Удобно задавать стиль всем элементам кроме активного, последнего или специального.",
@@ -22,7 +22,7 @@
   ],
   "aliases": [],
   "source": {
-    "title": "catalog extension",
+    "title": "manual",
     "desc": "added for search-oriented coverage",
     "tags": null
   },
@@ -52,5 +52,15 @@
     ],
     "watchFor": "Эффект должен помогать считывать иерархию, а не конкурировать с текстом; проверь контраст и интенсивность.",
     "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
-  }
+  },
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "opacity",
+      "kind": "name",
+      "note": "opacity — прозрачность от 0 до 1",
+      "source": "dict"
+    }
+  ]
 }

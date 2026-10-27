@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "datalist-mvxks8mre",
   "file": "список-подсказок-mvxks8mre.html",
-  "title": "datalist",
+  "title": "datalist — список вариантов для ввода",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Подсказки",
@@ -59,11 +59,29 @@
     "Подсказки"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "input",
+      "kind": "name",
+      "note": "input — событие изменения значения поля",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 34,
+      "text": "option",
+      "kind": "name",
+      "note": "option — пункт списка, value уйдёт на сервер",
+      "source": "dict"
+    }
+  ],
+  "output": ""
 }

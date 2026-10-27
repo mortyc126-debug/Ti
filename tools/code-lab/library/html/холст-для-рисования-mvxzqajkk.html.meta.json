@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "canvas-mvxzqajkk",
   "file": "холст-для-рисования-mvxzqajkk.html",
-  "title": "canvas",
+  "title": "canvas — область для рисования и графики",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Canvas",
@@ -39,11 +39,21 @@
     "корневой элемент"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 8,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина элемента",
+      "source": "dict"
+    }
+  ],
+  "output": ""
 }

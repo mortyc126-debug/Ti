@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "grid-auto-fit-minmax",
   "file": "grid-auto-fit-minmax.css",
-  "title": "grid auto fit minmax",
+  "title": "grid auto fit minmax — сетка с автоматическим подбором столбцов и минимальными и",
   "lang": "css",
   "group": "CSS: адаптивность / Экраны разных размеров",
   "desc": "Создаёт автоматически адаптивную сетку: браузер помещает столько колонок, сколько помещается, а `minmax()` задаёт минимальную и максимальную ширину карточки. Часто позволяет обойтись без breakpoint.",
@@ -23,7 +23,7 @@
   ],
   "aliases": [],
   "source": {
-    "title": "catalog extension",
+    "title": "manual",
     "desc": "added for search-oriented coverage",
     "tags": null
   },
@@ -53,5 +53,39 @@
     ],
     "watchFor": "Не задавай фиксированные ширины всем колонкам без необходимости; проверь длинный текст и узкий экран.",
     "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
-  }
+  },
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "display",
+      "kind": "name",
+      "note": "display: grid — включает CSS Grid.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "grid",
+      "kind": "name",
+      "note": "grid — сетка из строк и столбцов",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "grid-template-columns",
+      "kind": "name",
+      "note": "grid-template-columns — задаёт две колонки; вторая занимает оставшееся место.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "gap",
+      "kind": "name",
+      "note": "gap — промежуток между ячейками",
+      "source": "dict"
+    }
+  ]
 }

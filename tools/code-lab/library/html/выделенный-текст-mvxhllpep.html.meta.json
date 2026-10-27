@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "mark-mvxhllpep",
   "file": "выделенный-текст-mvxhllpep.html",
-  "title": "mark",
+  "title": "mark — выделенный текст",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Подсветка",
@@ -30,11 +30,12 @@
     "Подсветка"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

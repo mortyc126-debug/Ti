@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "assert-mvh8gx0h",
   "file": "assert-mvh8gx0h.py",
-  "title": "assert",
+  "title": "assert — проверка утверждения",
   "lang": "python",
   "group": "Ошибки и отладка / Проверить значения и результат",
   "desc": "Проверка условия, при ложном падает с сообщением.",
@@ -24,7 +24,7 @@
     "проверка условия, при ложном падает с сообщением"
   ],
   "source": {
-    "title": "imported",
+    "title": "manual",
     "desc": "imported",
     "tags": "ai",
     "aliases": "ai"
@@ -44,5 +44,6 @@
     "template": "assert-mvh8gx0h.json",
     "descAt": 1792534013729
   },
-  "enriched": true
+  "enriched": true,
+  "descAt": 1792534013729
 }

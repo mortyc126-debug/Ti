@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "abbr-mvxi181i9",
   "file": "аббревиатура-mvxi181i9.html",
-  "title": "abbr",
+  "title": "abbr — сокращённый текст с расшифровкой",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Аббревиатура",
@@ -34,11 +34,12 @@
     "Аббревиатура"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

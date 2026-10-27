@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "track-mvxieujwv",
   "file": "дорожка-субтитров-mvxieujwv.html",
-  "title": "track",
+  "title": "track — дорожка субтитров или текстовых метаданных",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Субтитры",
@@ -47,11 +47,12 @@
     "Субтитры"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

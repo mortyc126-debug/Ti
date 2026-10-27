@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "time-mvxiki6zd",
   "file": "дата-и-время-mvxiki6zd.html",
-  "title": "time",
+  "title": "time — дата или время",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Дата",
@@ -35,11 +35,12 @@
     "Дата"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

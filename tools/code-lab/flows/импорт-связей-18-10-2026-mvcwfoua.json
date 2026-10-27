@@ -1,7 +1,7 @@
 {
   "id": "импорт-связей-18-10-2026-mvcwfoua",
   "name": "Импорт связей 18.10.2026",
-  "savedAt": 1792271936386,
+  "savedAt": 1793097273443,
   "graph": {
     "nodes": [
       {
@@ -25,12 +25,23 @@
         "id": "t3cdt7",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "function loadJSON(key, fallback) {\n  try {\n    const raw = localStorage.getItem(key);\n    return raw === null ? fallback : JSON.parse(raw);\n  } catch { return fallback; }\n}\nconst settings = loadJSON(\"settings\", {});\n"
         },
-        "title": "localStorage",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "localStorage: безопасное чтение JSON",
+        "desc": "Читает и разбирает сохранённое значение с запасным результатом при ошибке.",
         "x": 300,
-        "y": 60
+        "y": 60,
+        "src": {
+          "id": "add-037-localstorage-json",
+          "title": "localStorage: безопасное чтение JSON",
+          "desc": "Читает и разбирает сохранённое значение с запасным результатом при ошибке.",
+          "code": "function loadJSON(key, fallback) {\n  try {\n    const raw = localStorage.getItem(key);\n    return raw === null ? fallback : JSON.parse(raw);\n  } catch { return fallback; }\n}\nconst settings = loadJSON(\"settings\", {});\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "cmw4wf",
@@ -98,23 +109,45 @@
         "id": "kc2lw3",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "window.addEventListener(\"keydown\", event => {\n  if (event.key === \"ArrowLeft\") {\n    console.log(\"Движение влево\");\n  }\n});\n\nwindow.addEventListener(\"keyup\", event => {\n  console.log(\"Клавишу отпустили:\", event.key);\n});"
         },
-        "title": "key",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "keydown и keyup — клавиатура",
+        "desc": "keydown срабатывает при нажатии клавиши, keyup — при отпускании. Слушатели нужно устанавливать один раз и удалять, если компонент больше не нужен.",
         "x": 540,
-        "y": 230
+        "y": 230,
+        "src": {
+          "id": "keydown-и-keyup-клавиатура-mv6cusyc",
+          "title": "keydown и keyup — клавиатура",
+          "desc": "keydown срабатывает при нажатии клавиши, keyup — при отпускании. Слушатели нужно устанавливать один раз и удалять, если компонент больше не нужен.",
+          "code": "window.addEventListener(\"keydown\", event => {\n  if (event.key === \"ArrowLeft\") {\n    console.log(\"Движение влево\");\n  }\n});\n\nwindow.addEventListener(\"keyup\", event => {\n  console.log(\"Клавишу отпустили:\", event.key);\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "2iset2",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<ol><li>Первый</li><li>Второй</li></ol>"
         },
-        "title": "colors",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "ol",
+        "desc": "Нумерованный список",
         "x": 780,
-        "y": 230
+        "y": 230,
+        "src": {
+          "id": "ol-mvxg3lpmh",
+          "title": "ol",
+          "desc": "Нумерованный список",
+          "code": "<ol><li>Первый</li><li>Второй</li></ol>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "hijw5b",
@@ -137,45 +170,89 @@
         "id": "x9r5c2",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<ol><li>Первый</li><li>Второй</li></ol>"
         },
-        "title": "saveColors",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "ol",
+        "desc": "Нумерованный список",
         "x": 300,
-        "y": 400
+        "y": 400,
+        "src": {
+          "id": "ol-mvxg3lpmh",
+          "title": "ol",
+          "desc": "Нумерованный список",
+          "code": "<ol><li>Первый</li><li>Второй</li></ol>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "6lwqhr",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<ol><li>Первый</li><li>Второй</li></ol>"
         },
-        "title": "renderColors",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "ol",
+        "desc": "Нумерованный список",
         "x": 540,
-        "y": 400
+        "y": 400,
+        "src": {
+          "id": "ol-mvxg3lpmh",
+          "title": "ol",
+          "desc": "Нумерованный список",
+          "code": "<ol><li>Первый</li><li>Второй</li></ol>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "x63czk",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<ol><li>Первый</li><li>Второй</li></ol>"
         },
-        "title": "addColor",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "ol",
+        "desc": "Нумерованный список",
         "x": 780,
-        "y": 400
+        "y": 400,
+        "src": {
+          "id": "ol-mvxg3lpmh",
+          "title": "ol",
+          "desc": "Нумерованный список",
+          "code": "<ol><li>Первый</li><li>Второй</li></ol>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "uhcqcg",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "localStorage.setItem(\"temporaryColor\", \"#52F2C9\");\nlocalStorage.removeItem(\"temporaryColor\");\nconsole.log(localStorage.getItem(\"temporaryColor\"));"
         },
-        "title": "remove",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "localStorage.removeItem — удалить",
+        "desc": "removeItem удаляет одну запись по ключу. clear() удаляет все записи этого сайта, поэтому используйте его осторожно.",
         "x": 60,
-        "y": 570
+        "y": 570,
+        "src": {
+          "id": "localstorage-removeitem-удалить-mv6cusm4",
+          "title": "localStorage.removeItem — удалить",
+          "desc": "removeItem удаляет одну запись по ключу. clear() удаляет все записи этого сайта, поэтому используйте его осторожно.",
+          "code": "localStorage.setItem(\"temporaryColor\", \"#52F2C9\");\nlocalStorage.removeItem(\"temporaryColor\");\nconsole.log(localStorage.getItem(\"temporaryColor\"));",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "92zjyv",
@@ -198,12 +275,23 @@
         "id": "uaxa98",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "import numpy as np\n\ntrain = np.array([1.0, 2.0, 3.0, 4.0])\nmean = train.mean()\nstd = train.std(ddof=1)\nz = (train - mean) / std\nassert abs(z.mean()) < 1e-12\nassert abs(z.std(ddof=1) - 1.0) < 1e-12\nprint(z)\n"
         },
-        "title": "score",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Z-score: стандартизация наблюдений",
+        "desc": "Центрирует значения относительно среднего и делит на выборочное стандартное отклонение. Параметры стандартизации на обучающей выборке нельзя оценивать по всему ряду до бэктеста.",
         "x": 540,
-        "y": 570
+        "y": 570,
+        "src": {
+          "id": "статистика-zscore-стандартизация",
+          "title": "Z-score: стандартизация наблюдений",
+          "desc": "Центрирует значения относительно среднего и делит на выборочное стандартное отклонение. Параметры стандартизации на обучающей выборке нельзя оценивать по всему ряду до бэктеста.",
+          "code": "import numpy as np\n\ntrain = np.array([1.0, 2.0, 3.0, 4.0])\nmean = train.mean()\nstd = train.std(ddof=1)\nz = (train - mean) / std\nassert abs(z.mean()) < 1e-12\nassert abs(z.std(ddof=1) - 1.0) < 1e-12\nprint(z)\n",
+          "lang": "python",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "kuzyp3",
@@ -287,12 +375,26 @@
         "id": "u1uvxu",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const list = document.querySelector(\"#list\");\nconst item = document.createElement(\"li\");\nitem.textContent = \"Новый пункт\";\nlist.append(item);"
         },
-        "title": "create",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "createElement и append",
+        "desc": "createElement создаёт новый DOM-элемент, а append добавляет его внутрь выбранного контейнера. Контейнер должен существовать в HTML.",
         "x": 300,
-        "y": 910
+        "y": 910,
+        "src": {
+          "id": "createelement-и-append-mv6cut1r",
+          "title": "createElement и append",
+          "desc": "createElement создаёт новый DOM-элемент, а append добавляет его внутрь выбранного контейнера. Контейнер должен существовать в HTML.",
+          "code": "const list = document.querySelector(\"#list\");\nconst item = document.createElement(\"li\");\nitem.textContent = \"Новый пункт\";\nlist.append(item);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "list",
+              "item"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "f30s33",

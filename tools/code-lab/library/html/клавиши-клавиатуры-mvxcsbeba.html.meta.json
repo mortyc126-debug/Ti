@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "kbd-mvxcsbeba",
   "file": "клавиши-клавиатуры-mvxcsbeba.html",
-  "title": "kbd",
+  "title": "kbd — клавиатурная клавиша или ввод",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Клавиши",
@@ -30,11 +30,12 @@
     "Клавиши"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

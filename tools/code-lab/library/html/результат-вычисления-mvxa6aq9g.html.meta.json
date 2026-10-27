@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "output-mvxa6aq9g",
   "file": "результат-вычисления-mvxa6aq9g.html",
-  "title": "output",
+  "title": "output — результат вычисления",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Output",
@@ -49,11 +49,12 @@
     "корневой элемент"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

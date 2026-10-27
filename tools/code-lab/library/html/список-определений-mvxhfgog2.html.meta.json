@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "dl-mvxhfgog2",
   "file": "список-определений-mvxhfgog2.html",
-  "title": "dl",
+  "title": "dl — список описаний",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Список определений",
@@ -45,11 +45,29 @@
     "определений"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 5,
+      "text": "dt",
+      "kind": "name",
+      "note": "dt — время между кадрами в секундах",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "dt",
+      "kind": "name",
+      "note": "dt — время между кадрами в секундах",
+      "source": "dict"
+    }
+  ],
+  "output": ""
 }

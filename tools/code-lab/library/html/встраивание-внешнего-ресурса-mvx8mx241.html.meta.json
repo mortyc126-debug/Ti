@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "embed-mvx8mx241",
   "file": "встраивание-внешнего-ресурса-mvx8mx241.html",
-  "title": "embed",
+  "title": "embed — встроенный внешний контент",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Встраивание PDF",
@@ -42,11 +42,12 @@
     "Встраивание"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

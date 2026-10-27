@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "small-mvxa0wod1",
   "file": "мелкий-текст-mvxa0wod1.html",
-  "title": "small",
+  "title": "small — мелкий текст",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Мелкий текст",
@@ -39,11 +39,12 @@
     "текст"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "meter-mvx3dv5ms",
   "file": "шкала-значения-mvx3dv5ms.html",
-  "title": "meter",
+  "title": "meter — шкала измеряемого значения",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Шкала",
@@ -35,11 +35,12 @@
     "Шкала"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

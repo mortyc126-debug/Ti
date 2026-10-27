@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "address-mvxqk8rmn",
   "file": "контактная-информация-mvxqk8rmn.html",
-  "title": "address",
+  "title": "address — контактная информация",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Контакты",
@@ -29,11 +29,12 @@
     "Контакты"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

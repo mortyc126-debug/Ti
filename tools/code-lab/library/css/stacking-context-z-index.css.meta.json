@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "stacking-context-z-index",
   "file": "stacking-context-z-index.css",
-  "title": "stacking context z index",
+  "title": "stacking context z index — контекст наложения и порядок слоёв",
   "lang": "css",
   "group": "CSS: положение на странице / position и слои",
   "desc": "Базовый шаблон слоёв для модального окна. Важно помнить, что `z-index` сравнивается внутри stacking context; огромный `z-index` не всегда перекрывает элемент из другого контекста.",
@@ -23,7 +23,7 @@
   ],
   "aliases": [],
   "source": {
-    "title": "catalog extension",
+    "title": "manual",
     "desc": "added for search-oriented coverage",
     "tags": null
   },
@@ -53,5 +53,39 @@
     ],
     "watchFor": "Проверь контекст позиционирования, перекрытие кликабельных элементов и поведение на маленьком экране.",
     "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
-  }
+  },
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "position",
+      "kind": "name",
+      "note": "position: relative — позволяет применять z-index к элементу.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "z-index",
+      "kind": "name",
+      "note": "z-index — задаёт порядок наложения элемента в контексте наложения.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "position",
+      "kind": "name",
+      "note": "position: relative — позволяет применять z-index к элементу.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "z-index",
+      "kind": "name",
+      "note": "z-index — задаёт порядок наложения элемента в контексте наложения.",
+      "source": "dict"
+    }
+  ]
 }

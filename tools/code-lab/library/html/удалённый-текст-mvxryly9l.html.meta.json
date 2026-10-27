@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "del-mvxryly9l",
   "file": "удалённый-текст-mvxryly9l.html",
-  "title": "del",
+  "title": "del — удалённый текст",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Удалённый текст",
@@ -31,11 +31,12 @@
     "текст"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

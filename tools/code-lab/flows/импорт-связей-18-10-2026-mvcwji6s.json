@@ -1,7 +1,7 @@
 {
   "id": "импорт-связей-18-10-2026-mvcwji6s",
   "name": "Импорт связей 18.10.2026",
-  "savedAt": 1792272114388,
+  "savedAt": 1793097274035,
   "graph": {
     "nodes": [
       {
@@ -110,23 +110,52 @@
         "id": "abfikk",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const цена = 75;\nconst допустима = цена >= 0 && цена <= 100;\nconsole.log(допустима);\n"
         },
-        "title": "числа",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Проверка диапазона числа",
+        "desc": "Проверяет, попадает ли значение в закрытый диапазон.",
         "x": 540,
-        "y": 230
+        "y": 230,
+        "src": {
+          "id": "add-005-snippet",
+          "title": "Проверка диапазона числа",
+          "desc": "Проверяет, попадает ли значение в закрытый диапазон.",
+          "code": "const цена = 75;\nconst допустима = цена >= 0 && цена <= 100;\nconsole.log(допустима);\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "6mzmhb",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const сделки = [\n  { бумага: \"А\", сумма: 100 },\n  { бумага: \"Б\", сумма: 50 },\n  { бумага: \"А\", сумма: 30 },\n];\n\nconst поБумагам = сделки.reduce((acc, s) => {\n  acc[s.бумага] = (acc[s.бумага] || 0) + s.сумма;\n  return acc;\n}, {});\n\nconsole.log(JSON.stringify(поБумагам));"
         },
-        "title": "сумма",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "reduce — сумма по ключу (группировка)",
+        "desc": "reduce проходит массив и собирает объект: для каждой записи прибавляет сумму к своему ключу. Типовая задача «итого по категориям».",
         "x": 780,
-        "y": 230
+        "y": 230,
+        "src": {
+          "id": "reduce-сумма-по-ключу-группировка-mvds0h45",
+          "title": "reduce — сумма по ключу (группировка)",
+          "desc": "reduce проходит массив и собирает объект: для каждой записи прибавляет сумму к своему ключу. Типовая задача «итого по категориям».",
+          "code": "const сделки = [\n  { бумага: \"А\", сумма: 100 },\n  { бумага: \"Б\", сумма: 50 },\n  { бумага: \"А\", сумма: 30 },\n];\n\nconst поБумагам = сделки.reduce((acc, s) => {\n  acc[s.бумага] = (acc[s.бумага] || 0) + s.сумма;\n  return acc;\n}, {});\n\nconsole.log(JSON.stringify(поБумагам));",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "сделки",
+              "поБумагам"
+            ],
+            "requires": [
+              "бумага",
+              "сумма",
+              "acc"
+            ]
+          }
+        }
       },
       {
         "id": "6sbf60",
@@ -171,12 +200,23 @@
         "id": "hix441",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<img src=\"map.png\" usemap=\"#m\"><map name=\"m\"><area shape=\"rect\" coords=\"0,0,50,50\" href=\"#\"></map>"
         },
-        "title": "name",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "map",
+        "desc": "Карта изображения",
         "x": 780,
-        "y": 400
+        "y": 400,
+        "src": {
+          "id": "map-mvxwc4rwz",
+          "title": "map",
+          "desc": "Карта изображения",
+          "code": "<img src=\"map.png\" usemap=\"#m\"><map name=\"m\"><area shape=\"rect\" coords=\"0,0,50,50\" href=\"#\"></map>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "5iymjc",
@@ -221,23 +261,45 @@
         "id": "1ygdnp",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<ol><li>Первый</li><li>Второй</li></ol>"
         },
-        "title": "colors",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "ol",
+        "desc": "Нумерованный список",
         "x": 780,
-        "y": 570
+        "y": 570,
+        "src": {
+          "id": "ol-mvxg3lpmh",
+          "title": "ol",
+          "desc": "Нумерованный список",
+          "code": "<ol><li>Первый</li><li>Второй</li></ol>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "c6s8p1",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<ol><li>Первый</li><li>Второй</li></ol>"
         },
-        "title": "действие для каждого color",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "ol",
+        "desc": "Нумерованный список",
         "x": 60,
-        "y": 740
+        "y": 740,
+        "src": {
+          "id": "ol-mvxg3lpmh",
+          "title": "ol",
+          "desc": "Нумерованный список",
+          "code": "<ol><li>Первый</li><li>Второй</li></ol>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "oggnor",
@@ -282,12 +344,23 @@
         "id": "1d0v7c",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<ul><li>Пункт</li></ul>"
         },
-        "title": "calculateTotal",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "ul",
+        "desc": "Маркированный список",
         "x": 60,
-        "y": 910
+        "y": 910,
+        "src": {
+          "id": "ul-mvxry7h6z",
+          "title": "ul",
+          "desc": "Маркированный список",
+          "code": "<ul><li>Пункт</li></ul>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "fxn9jb",
@@ -332,34 +405,73 @@
         "id": "2mnc2p",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<a class=\"btn\" href=\"/buy\" target=\"_blank\" rel=\"noopener noreferrer\">Купить</a>"
         },
-        "title": "a",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "кнопка-ссылка",
+        "desc": "Ссылка, оформленная как кнопка.",
         "x": 60,
-        "y": 1080
+        "y": 1080,
+        "src": {
+          "id": "кнопка-ссылка-mvh8fwit",
+          "title": "кнопка-ссылка",
+          "desc": "Ссылка, оформленная как кнопка.",
+          "code": "<a class=\"btn\" href=\"/buy\" target=\"_blank\" rel=\"noopener noreferrer\">Купить</a>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "cpt06e",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const числа = [10, 20, 30];\nconst сумма = числа.reduce((a, b) => a + b, 0); // складываем вручную\nconst среднее = сумма / числа.length;\nconsole.log(среднее); // 20"
         },
-        "title": "среднее",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Среднее — JavaScript",
+        "desc": "Задача одна: среднее от [10,20,30]. JS: встроенного «среднего» нет — суммируем сами через reduce, делим на длину. Больше ручной работы, зато работает в браузере.",
         "x": 300,
-        "y": 1080
+        "y": 1080,
+        "src": {
+          "id": "same-mean-js",
+          "title": "Среднее — JavaScript",
+          "desc": "Задача одна: среднее от [10,20,30]. JS: встроенного «среднего» нет — суммируем сами через reduce, делим на длину. Больше ручной работы, зато работает в браузере.",
+          "code": "const числа = [10, 20, 30];\nconst сумма = числа.reduce((a, b) => a + b, 0); // складываем вручную\nconst среднее = сумма / числа.length;\nconsole.log(среднее); // 20",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "числа",
+              "сумма",
+              "среднее"
+            ],
+            "requires": [
+              "a"
+            ]
+          }
+        }
       },
       {
         "id": "wkggv7",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const задача = new Promise((resolve, reject) => {\n  const ok = true;\n  if (ok) resolve(\"готово\"); else reject(new Error(\"сбой\"));\n});\nзадача.then(console.log).catch(error => console.error(error.message));\n"
         },
-        "title": "результат",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Promise с результатом и ошибкой",
+        "desc": "Создаёт Promise и показывает обработку успешного и ошибочного исхода.",
         "x": 540,
-        "y": 1080
+        "y": 1080,
+        "src": {
+          "id": "add-024-promise",
+          "title": "Promise с результатом и ошибкой",
+          "desc": "Создаёт Promise и показывает обработку успешного и ошибочного исхода.",
+          "code": "const задача = new Promise((resolve, reject) => {\n  const ok = true;\n  if (ok) resolve(\"готово\"); else reject(new Error(\"сбой\"));\n});\nзадача.then(console.log).catch(error => console.error(error.message));\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "cpt080",
@@ -416,12 +528,28 @@
         "id": "ebbd5f",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const данные = { цена: 120, количество: 3 };\nconsole.log(Object.keys(данные));\nconsole.log(Object.values(данные));\nconsole.log(Object.entries(данные));\n"
         },
-        "title": "values",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Object.keys / values / entries — разобрать объект",
+        "desc": "Получает ключи, значения или пары ключ-значение собственного перечисляемого содержимого объекта.",
         "x": 540,
-        "y": 1250
+        "y": 1250,
+        "src": {
+          "id": "object-keys-values-entries-mvox2crb",
+          "title": "Object.keys / values / entries — разобрать объект",
+          "desc": "Получает ключи, значения или пары ключ-значение собственного перечисляемого содержимого объекта.",
+          "code": "const данные = { цена: 120, количество: 3 };\nconsole.log(Object.keys(данные));\nconsole.log(Object.values(данные));\nconsole.log(Object.entries(данные));\n",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "данные"
+            ],
+            "requires": [
+              "цена",
+              "количество"
+            ]
+          }
+        }
       },
       {
         "id": "7ugp2w",
@@ -444,12 +572,23 @@
         "id": "bmk0zn",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<p><q>Короткая цитата</q></p>"
         },
-        "title": "queue",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "q",
+        "desc": "Встроенная цитата",
         "x": 60,
-        "y": 1420
+        "y": 1420,
+        "src": {
+          "id": "q-mvxmxxd3g",
+          "title": "q",
+          "desc": "Встроенная цитата",
+          "code": "<p><q>Короткая цитата</q></p>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "0n9yid",
@@ -528,12 +667,29 @@
         "id": "06xqb9",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const settings = { theme: \"dark\", accent: \"pink\" };\nconst key = \"accent\";\nconsole.log(settings[key]);\nsettings[key] = \"cyan\";\nconsole.log(settings.accent);"
         },
-        "title": "Доступ по obj",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Доступ по obj[key]",
+        "desc": "Квадратные скобки позволяют читать и менять свойство по имени, которое хранится в переменной.",
         "x": 540,
-        "y": 1590
+        "y": 1590,
+        "src": {
+          "id": "доступ-по-obj-key-mv6cuso8",
+          "title": "Доступ по obj[key]",
+          "desc": "Квадратные скобки позволяют читать и менять свойство по имени, которое хранится в переменной.",
+          "code": "const settings = { theme: \"dark\", accent: \"pink\" };\nconst key = \"accent\";\nconsole.log(settings[key]);\nsettings[key] = \"cyan\";\nconsole.log(settings.accent);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "settings",
+              "key"
+            ],
+            "requires": [
+              "theme",
+              "accent"
+            ]
+          }
+        }
       },
       {
         "id": "fxq0wu",
@@ -550,12 +706,23 @@
         "id": "ky19do",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "window.addEventListener(\"keydown\", event => {\n  if (event.key === \"ArrowLeft\") {\n    console.log(\"Движение влево\");\n  }\n});\n\nwindow.addEventListener(\"keyup\", event => {\n  console.log(\"Клавишу отпустили:\", event.key);\n});"
         },
-        "title": "key",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "keydown и keyup — клавиатура",
+        "desc": "keydown срабатывает при нажатии клавиши, keyup — при отпускании. Слушатели нужно устанавливать один раз и удалять, если компонент больше не нужен.",
         "x": 60,
-        "y": 1760
+        "y": 1760,
+        "src": {
+          "id": "keydown-и-keyup-клавиатура-mv6cusyc",
+          "title": "keydown и keyup — клавиатура",
+          "desc": "keydown срабатывает при нажатии клавиши, keyup — при отпускании. Слушатели нужно устанавливать один раз и удалять, если компонент больше не нужен.",
+          "code": "window.addEventListener(\"keydown\", event => {\n  if (event.key === \"ArrowLeft\") {\n    console.log(\"Движение влево\");\n  }\n});\n\nwindow.addEventListener(\"keyup\", event => {\n  console.log(\"Клавишу отпустили:\", event.key);\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "k0twbc",
@@ -656,23 +823,47 @@
         "id": "z08qjt",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const строка = \"  альфа   бета  гамма \";\nconst слова = строка.trim().split(/\\s+/);\nconsole.log(слова);\n"
         },
-        "title": "строку",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Разделить строку по нескольким пробелам",
+        "desc": "Разбивает строку на слова, игнорируя лишние пробелы по краям и между с��овами.",
         "x": 60,
-        "y": 2100
+        "y": 2100,
+        "src": {
+          "id": "add-018-snippet",
+          "title": "Разделить строку по нескольким пробелам",
+          "desc": "Разбивает строку на слова, игнорируя лишние пробелы по краям и между с��овами.",
+          "code": "const строка = \"  альфа   бета  гамма \";\nconst слова = строка.trim().split(/\\s+/);\nconsole.log(слова);\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "ioxt0z",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const числа = [40, 70, 30, 90, 55];"
         },
-        "title": "массив строк",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "массив",
+        "desc": "Массив — упорядоченный список значений\nДопустим, у тебя есть не один цвет, а сразу пять. Создавать отдельную переменную для каждого неудобно.\nМожно собрать их в массив:\nconst colors = [\"красный\", \"синий\", \"зелёный\"];\nМассив обозначается квадратными скобками [].\nКак устроен массив\nУ каждого элемента есть позиция — индекс. В JavaScript отсчёт начинается с нуля.\nИндекс 0\nкрасный\n\n\nИндекс 1\nсиний\n\n\nИн",
         "x": 300,
-        "y": 2100
+        "y": 2100,
+        "src": {
+          "id": "массив-mv9yln2q",
+          "title": "массив",
+          "desc": "Массив — упорядоченный список значений\nДопустим, у тебя есть не один цвет, а сразу пять. Создавать отдельную переменную для каждого неудобно.\nМожно собрать их в массив:\nconst colors = [\"красный\", \"синий\", \"зелёный\"];\nМассив обозначается квадратными скобками [].\nКак устроен массив\nУ каждого элемента есть позиция — индекс. В JavaScript отсчёт начинается с нуля.\nИндекс 0\nкрасный\n\n\nИндекс 1\nсиний\n\n\nИн",
+          "code": "const числа = [40, 70, 30, 90, 55];",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "числа"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "ekjh3g",
@@ -723,12 +914,23 @@
         "id": "hj5n1k",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<select><optgroup label=\"A\"><option>1</option></optgroup></select>"
         },
-        "title": "label",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "optgroup",
+        "desc": "Группы option",
         "x": 300,
-        "y": 2270
+        "y": 2270,
+        "src": {
+          "id": "optgroup-mvxu3qkhr",
+          "title": "optgroup",
+          "desc": "Группы option",
+          "code": "<select><optgroup label=\"A\"><option>1</option></optgroup></select>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "8xynua",
@@ -824,12 +1026,23 @@
         "id": "x5gmiv",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<data value=\"42\">42</data>"
         },
-        "title": "value",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "data",
+        "desc": "Машинно-читаемое значение",
         "x": 60,
-        "y": 2610
+        "y": 2610,
+        "src": {
+          "id": "data-mvxm0dmpl",
+          "title": "data",
+          "desc": "Машинно-читаемое значение",
+          "code": "<data value=\"42\">42</data>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "ohonn0",
@@ -863,12 +1076,23 @@
         "id": "c2qb3g",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": ".clipped {\n  overflow: hidden;\n}"
         },
-        "title": "low",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Обрезать содержимое через overflow",
+        "desc": "Обрезает содержимое, выходящее за границы элемента, с помощью `overflow: hidden`. Используйте этот приём, когда нужно получить описанное поведение без JavaScript; проверьте результат на узком экране и при длинном содержимом.",
         "x": 780,
-        "y": 2610
+        "y": 2610,
+        "src": {
+          "id": "обрезать-содержимое-через-overflow-mvh8hjr0",
+          "title": "Обрезать содержимое через overflow",
+          "desc": "Обрезает содержимое, выходящее за границы элемента, с помощью `overflow: hidden`. Используйте этот приём, когда нужно получить описанное поведение без JavaScript; проверьте результат на узком экране и при длинном содержимом.",
+          "code": ".clipped {\n  overflow: hidden;\n}",
+          "lang": "css",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "zd1kzz",
@@ -941,12 +1165,23 @@
         "id": "b9blqv",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<progress value=\"60\" max=\"100\"></progress>"
         },
-        "title": "max",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "progress",
+        "desc": "Прогресс",
         "x": 300,
-        "y": 2950
+        "y": 2950,
+        "src": {
+          "id": "progress-mvxc9yyqf",
+          "title": "progress",
+          "desc": "Прогресс",
+          "code": "<progress value=\"60\" max=\"100\"></progress>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "cxrnu9",

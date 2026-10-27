@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "samp-mvxoxvxmq",
   "file": "вывод-программы-mvxoxvxmq.html",
-  "title": "samp",
+  "title": "samp — пример вывода программы",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Вывод программы",
@@ -30,11 +30,12 @@
     "программы"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

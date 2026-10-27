@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "caption-mvxjrzbvk",
   "file": "подпись-таблицы-mvxjrzbvk.html",
-  "title": "caption",
+  "title": "caption — подпись к таблице",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Подпись таблицы",
@@ -38,11 +38,12 @@
     "таблицы"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

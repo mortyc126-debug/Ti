@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "blockquote-mvxikxr80",
   "file": "блочная-цитата-mvxikxr80.html",
-  "title": "blockquote",
+  "title": "blockquote — цитата большим блоком",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Блочная цитата",
@@ -38,11 +38,12 @@
     "цитата"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

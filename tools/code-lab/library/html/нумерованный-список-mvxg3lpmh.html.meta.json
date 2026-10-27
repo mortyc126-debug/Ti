@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "ol-mvxg3lpmh",
   "file": "нумерованный-список-mvxg3lpmh.html",
-  "title": "ol",
+  "title": "ol — нумерованный список",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Нумерованный список",
@@ -38,11 +38,12 @@
     "список"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

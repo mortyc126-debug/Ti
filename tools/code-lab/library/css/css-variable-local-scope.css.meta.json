@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "css-variable-local-scope",
   "file": "css-variable-local-scope.css",
-  "title": "css variable local scope",
+  "title": "css variable local scope — CSS-переменная с локальной областью видимости\\",
   "lang": "css",
   "group": "CSS: основы / Переменные",
   "desc": "Показывает локальную область действия CSS-переменной: переменная может быть задана на компоненте и унаследована его потомками.",
@@ -21,7 +21,7 @@
   ],
   "aliases": [],
   "source": {
-    "title": "catalog extension",
+    "title": "manual",
     "desc": "added for search-oriented coverage",
     "tags": null
   },
@@ -51,5 +51,15 @@
     ],
     "watchFor": "Храни смысловые токены, а не только названия оттенков; избегай расхождения одинаковых ролей по разным файлам.",
     "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
-  }
+  },
+  "wordNotes": [
+    {
+      "line": 5,
+      "col": 9,
+      "text": "var",
+      "kind": "kw",
+      "note": "объявить переменную с функциональной или глобальной областью видимости",
+      "source": "dict"
+    }
+  ]
 }

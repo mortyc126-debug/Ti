@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "dialog-mvxmtigk8",
   "file": "диалоговое-окно-mvxmtigk8.html",
-  "title": "dialog",
+  "title": "dialog — диалоговое окно",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Dialog",
@@ -29,11 +29,21 @@
     "корневой элемент"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 8,
+      "text": "open",
+      "kind": "name",
+      "note": "open — открывает файл",
+      "source": "dict"
+    }
+  ],
+  "output": ""
 }

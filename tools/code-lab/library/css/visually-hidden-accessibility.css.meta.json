@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "visually-hidden-accessibility",
   "file": "visually-hidden-accessibility.css",
-  "title": "visually hidden accessibility",
+  "title": "visually hidden accessibility — визуально скрытый текст для скринридеров",
   "lang": "css",
   "group": "CSS: текст и шрифты / Шрифт и размер",
   "desc": "Скрывает визуальное содержимое, но оставляет его доступным для скринридеров. Подходит для скрытых подписей, доступных названий и дополнительного текста.",
@@ -22,7 +22,7 @@
   ],
   "aliases": [],
   "source": {
-    "title": "catalog extension",
+    "title": "manual",
     "desc": "added for search-oriented coverage",
     "tags": null
   },
@@ -52,5 +52,55 @@
     ],
     "watchFor": "Проверь контекст позиционирования, перекрытие кликабельных элементов и поведение на маленьком экране.",
     "scope": "Локальный приём; сам по себе не задаёт полную архитектуру интерфейса."
-  }
+  },
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "position",
+      "kind": "name",
+      "note": "position: relative — позволяет применять z-index к элементу.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "width",
+      "kind": "name",
+      "note": "width — ширина элемента",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "padding",
+      "kind": "name",
+      "note": "padding — внутренний отступ, от края до содержимого.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "overflow",
+      "kind": "name",
+      "note": "overflow — управляет содержимым за границами элемента; hidden обрезает его и не показывает полосы прокрутки.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 12,
+      "text": "hidden",
+      "kind": "name",
+      "note": "hidden — атрибут, скрывающий элемент со страницы",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "rect",
+      "kind": "fn",
+      "note": "rect — прямоугольник",
+      "source": "dict"
+    }
+  ]
 }

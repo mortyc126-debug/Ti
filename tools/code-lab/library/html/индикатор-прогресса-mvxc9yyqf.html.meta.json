@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "progress-mvxc9yyqf",
   "file": "индикатор-прогресса-mvxc9yyqf.html",
-  "title": "progress",
+  "title": "progress — индикатор выполнения задачи",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Прогресс",
@@ -40,11 +40,21 @@
     "Прогресс"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 21,
+      "text": "max",
+      "kind": "name",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    }
+  ],
+  "output": ""
 }

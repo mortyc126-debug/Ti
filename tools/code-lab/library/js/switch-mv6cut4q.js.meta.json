@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "switch-mv6cut4q",
   "file": "switch-mv6cut4q.js",
-  "title": "switch",
+  "title": "switch — переключатель состояния",
   "lang": "js",
   "group": "Основы / Синтаксис",
   "desc": "Выбирает ветку по точному совпадению значения. break завершает выбранную ветку, default срабатывает, если совпадений нет.",
@@ -10,7 +10,7 @@
   "tags": [],
   "aliases": [],
   "source": {
-    "title": "imported",
+    "title": "manual",
     "desc": "imported",
     "tags": null
   },
@@ -22,7 +22,7 @@
       "text": "const",
       "kind": "kw",
       "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
-      "source": "dict"
+      "source": "custom"
     },
     {
       "line": 1,
@@ -30,7 +30,7 @@
       "text": "let",
       "kind": "kw",
       "note": "let — объявляет переменную, значение которой можно менять позже.",
-      "source": "dict"
+      "source": "custom"
     },
     {
       "line": 3,
@@ -54,7 +54,7 @@
       "text": "break",
       "kind": "kw",
       "note": "break — выйти из цикла или switch досрочно.",
-      "source": "dict"
+      "source": "custom"
     },
     {
       "line": 7,
@@ -70,7 +70,7 @@
       "text": "break",
       "kind": "kw",
       "note": "break — выйти из цикла или switch досрочно.",
-      "source": "dict"
+      "source": "custom"
     },
     {
       "line": 10,

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "bdo-mvxch9tyt",
   "file": "принудительное-направление-текста-mvxch9tyt.html",
-  "title": "bdo",
+  "title": "bdo — принудительное направление текста",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Принудительное направление",
@@ -35,11 +35,12 @@
     "направление"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

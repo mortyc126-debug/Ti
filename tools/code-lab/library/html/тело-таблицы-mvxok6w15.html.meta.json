@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "tbody-mvxok6w15",
   "file": "тело-таблицы-mvxok6w15.html",
-  "title": "tbody",
+  "title": "tbody — тело таблицы",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Тело таблицы",
@@ -51,11 +51,21 @@
     "таблицы"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 22,
+      "text": "A",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    }
+  ],
+  "output": ""
 }

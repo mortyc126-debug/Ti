@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "sub-mvx8nvlqe",
   "file": "нижний-индекс-mvx8nvlqe.html",
-  "title": "sub",
+  "title": "sub — подстрочный текст",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Нижний индекс",
@@ -31,11 +31,12 @@
     "индекс"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

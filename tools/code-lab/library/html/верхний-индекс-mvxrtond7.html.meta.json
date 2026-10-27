@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "sup-mvxrtond7",
   "file": "верхний-индекс-mvxrtond7.html",
-  "title": "sup",
+  "title": "sup — надстрочный текст",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Верхний индекс",
@@ -31,11 +31,12 @@
     "индекс"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

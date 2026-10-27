@@ -1,41 +1,92 @@
 {
   "id": "импорт-связей-18-10-2026-mvdguxwe",
   "name": "Импорт связей 18.10.2026",
-  "savedAt": 1792306240286,
+  "savedAt": 1793097275675,
   "graph": {
     "nodes": [
       {
         "id": "p1v7os",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const база = [];   // хранилище записей\n\n// C — create: добавить запись\nfunction добавить(имя, цена){ база.push({ id: база.length + 1, имя, цена }); }\n// R — read: найти по части имени\nfunction найти(текст){ return база.filter(z => z.имя.includes(текст)); }\n// D — delete: убрать по id\nfunction удалить(id){\n  const i = база.findIndex(z => z.id === id);\n  if(i >= 0) база.splice(i, 1);\n}\n\nдобавить(\"ОФЗ 26238\", 61.2);\nдобавить(\"Сегежа 2P5R\", 88.0);\nдобавить(\"ОФЗ 26241\", 79.5);\n\nconsole.log(\"всего:\", база.length);\nconsole.log(\"поиск ОФЗ:\", JSON.stringify(найти(\"ОФЗ\")));\nудалить(2);\nconsole.log(\"после удаления:\", JSON.stringify(база));"
         },
-        "title": "Простая база в памяти (CRUD) —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Простая база в памяти (CRUD)",
+        "desc": "«База» — это хранилище записей + функции добавить/найти/удалить (CRUD). Здесь — массив в памяти. Для сохранения в браузере — localStorage; на сервере — файл или SQL (см. шаблон SQL).",
         "x": 60,
-        "y": 60
+        "y": 60,
+        "src": {
+          "id": "db-memory",
+          "title": "Простая база в памяти (CRUD)",
+          "desc": "«База» — это хранилище записей + функции добавить/найти/удалить (CRUD). Здесь — массив в памяти. Для сохранения в браузере — localStorage; на сервере — файл или SQL (см. шаблон SQL).",
+          "code": "const база = [];   // хранилище записей\n\n// C — create: добавить запись\nfunction добавить(имя, цена){ база.push({ id: база.length + 1, имя, цена }); }\n// R — read: найти по части имени\nfunction найти(текст){ return база.filter(z => z.имя.includes(текст)); }\n// D — delete: убрать по id\nfunction удалить(id){\n  const i = база.findIndex(z => z.id === id);\n  if(i >= 0) база.splice(i, 1);\n}\n\nдобавить(\"ОФЗ 26238\", 61.2);\nдобавить(\"Сегежа 2P5R\", 88.0);\nдобавить(\"ОФЗ 26241\", 79.5);\n\nconsole.log(\"всего:\", база.length);\nconsole.log(\"поиск ОФЗ:\", JSON.stringify(найти(\"ОФЗ\")));\nудалить(2);\nconsole.log(\"после удаления:\", JSON.stringify(база));",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "база",
+              "добавить",
+              "найти",
+              "удалить",
+              "i"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "bja2eg",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const облигация = {\n  имя: \"ОФЗ 26238\",\n  купон: 7.1,\n  погашение: 2041,\n};\n\nconsole.log(облигация.имя);     // по ключу через точку\nconsole.log(Object.keys(облигация)); // список всех ключей"
         },
-        "title": "Объект (ключ",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Объект (ключ → значение)",
+        "desc": "Объект хранит именованные поля: ключ и его значение. Как карточка с подписями. Доступ через точку.",
         "x": 300,
-        "y": 60
+        "y": 60,
+        "src": {
+          "id": "js-object",
+          "title": "Объект (ключ → значение)",
+          "desc": "Объект хранит именованные поля: ключ и его значение. Как карточка с подписями. Доступ через точку.",
+          "code": "const облигация = {\n  имя: \"ОФЗ 26238\",\n  купон: 7.1,\n  погашение: 2041,\n};\n\nconsole.log(облигация.имя);     // по ключу через точку\nconsole.log(Object.keys(облигация)); // список всех ключей",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "облигация"
+            ],
+            "requires": [
+              "имя",
+              "купон",
+              "погашение"
+            ]
+          }
+        }
       },
       {
         "id": "mwfrkl",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const облигация = {\n  имя: \"ОФЗ 26238\",\n  купон: 7.1,\n  погашение: 2041,\n};\n\nconsole.log(облигация.имя);     // по ключу через точку\nconsole.log(Object.keys(облигация)); // список всех ключей"
         },
-        "title": "значение)",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Объект (ключ → значение)",
+        "desc": "Объект хранит именованные поля: ключ и его значение. Как карточка с подписями. Доступ через точку.",
         "x": 540,
-        "y": 60
+        "y": 60,
+        "src": {
+          "id": "js-object",
+          "title": "Объект (ключ → значение)",
+          "desc": "Объект хранит именованные поля: ключ и его значение. Как карточка с подписями. Доступ через точку.",
+          "code": "const облигация = {\n  имя: \"ОФЗ 26238\",\n  купон: 7.1,\n  погашение: 2041,\n};\n\nconsole.log(облигация.имя);     // по ключу через точку\nconsole.log(Object.keys(облигация)); // список всех ключей",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "облигация"
+            ],
+            "requires": [
+              "имя",
+              "купон",
+              "погашение"
+            ]
+          }
+        }
       },
       {
         "id": "71hbr2",
@@ -109,45 +160,97 @@
         "id": "kymkvz",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const база = [];   // хранилище записей\n\n// C — create: добавить запись\nfunction добавить(имя, цена){ база.push({ id: база.length + 1, имя, цена }); }\n// R — read: найти по части имени\nfunction найти(текст){ return база.filter(z => z.имя.includes(текст)); }\n// D — delete: убрать по id\nfunction удалить(id){\n  const i = база.findIndex(z => z.id === id);\n  if(i >= 0) база.splice(i, 1);\n}\n\nдобавить(\"ОФЗ 26238\", 61.2);\nдобавить(\"Сегежа 2P5R\", 88.0);\nдобавить(\"ОФЗ 26241\", 79.5);\n\nconsole.log(\"всего:\", база.length);\nconsole.log(\"поиск ОФЗ:\", JSON.stringify(найти(\"ОФЗ\")));\nудалить(2);\nconsole.log(\"после удаления:\", JSON.stringify(база));"
         },
-        "title": "база",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Простая база в памяти (CRUD)",
+        "desc": "«База» — это хранилище записей + функции добавить/найти/удалить (CRUD). Здесь — массив в памяти. Для сохранения в браузере — localStorage; на сервере — файл или SQL (см. шаблон SQL).",
         "x": 780,
-        "y": 230
+        "y": 230,
+        "src": {
+          "id": "db-memory",
+          "title": "Простая база в памяти (CRUD)",
+          "desc": "«База» — это хранилище записей + функции добавить/найти/удалить (CRUD). Здесь — массив в памяти. Для сохранения в браузере — localStorage; на сервере — файл или SQL (см. шаблон SQL).",
+          "code": "const база = [];   // хранилище записей\n\n// C — create: добавить запись\nfunction добавить(имя, цена){ база.push({ id: база.length + 1, имя, цена }); }\n// R — read: найти по части имени\nfunction найти(текст){ return база.filter(z => z.имя.includes(текст)); }\n// D — delete: убрать по id\nfunction удалить(id){\n  const i = база.findIndex(z => z.id === id);\n  if(i >= 0) база.splice(i, 1);\n}\n\nдобавить(\"ОФЗ 26238\", 61.2);\nдобавить(\"Сегежа 2P5R\", 88.0);\nдобавить(\"ОФЗ 26241\", 79.5);\n\nconsole.log(\"всего:\", база.length);\nconsole.log(\"поиск ОФЗ:\", JSON.stringify(найти(\"ОФЗ\")));\nудалить(2);\nconsole.log(\"после удаления:\", JSON.stringify(база));",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "база",
+              "добавить",
+              "найти",
+              "удалить",
+              "i"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "w06zis",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const users = [{ id: 4 }, { id: 9 }];\nconst index = users.findIndex(user => user.id === 9);\nconsole.log(index);\n"
         },
-        "title": "найти",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Найти индекс объекта в массиве",
+        "desc": "Ищет позицию объекта по условию; возвращает -1, если совпадения нет.",
         "x": 60,
-        "y": 400
+        "y": 400,
+        "src": {
+          "id": "add-012-snippet",
+          "title": "Найти индекс объекта в массиве",
+          "desc": "Ищет позицию объекта по условию; возвращает -1, если совпадения нет.",
+          "code": "const users = [{ id: 4 }, { id: 9 }];\nconst index = users.findIndex(user => user.id === 9);\nconsole.log(index);\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "755ld6",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "function uniqueBy(items, keyFn) {\n  const seen = new Set();\n  return items.filter(item => {\n    const key = keyFn(item);\n    if (seen.has(key)) return false;\n    seen.add(key);\n    return true;\n  });\n}\nconst result = uniqueBy([{id: 1}, {id: 2}, {id: 1}], x => x.id);\nconsole.log(result);\n"
         },
-        "title": "удалить",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Удалить дубли по ключу, сохранив первый элемент",
+        "desc": "Возвращает новый массив без повторов по выбранному ключу; сохраняет исходный порядок и первый встретившийся объект.",
         "x": 300,
-        "y": 400
+        "y": 400,
+        "src": {
+          "id": "array-unique-by-key",
+          "title": "Удалить дубли по ключу, сохранив первый элемент",
+          "desc": "Возвращает новый массив без повторов по выбранному ключу; сохраняет исходный порядок и первый встретившийся объект.",
+          "code": "function uniqueBy(items, keyFn) {\n  const seen = new Set();\n  return items.filter(item => {\n    const key = keyFn(item);\n    if (seen.has(key)) return false;\n    seen.add(key);\n    return true;\n  });\n}\nconst result = uniqueBy([{id: 1}, {id: 2}, {id: 1}], x => x.id);\nconsole.log(result);\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "nxq6ac",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const цены = [100, 90, 120];\n\nconsole.log(цены[0]);      // первый элемент\nconsole.log(цены.length);  // сколько элементов\n\nцены.push(80);             // добавить в конец"
         },
-        "title": "Массив (список) —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Массив (список)",
+        "desc": "Массив — упорядоченный список значений. Доступ по индексу (с нуля). Длина — сколько элементов.",
         "x": 540,
-        "y": 400
+        "y": 400,
+        "src": {
+          "id": "js-array",
+          "title": "Массив (список)",
+          "desc": "Массив — упорядоченный список значений. Доступ по индексу (с нуля). Длина — сколько элементов.",
+          "code": "const цены = [100, 90, 120];\n\nconsole.log(цены[0]);      // первый элемент\nconsole.log(цены.length);  // сколько элементов\n\nцены.push(80);             // добавить в конец",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "цены"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "u8ika1",
@@ -238,23 +341,55 @@
         "id": "iggjnx",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const colors = [\"розовый\", \"голубой\", \"мятный\"];\ncolors.forEach((color, index) => {\n  console.log(index, color);\n});"
         },
-        "title": "forEach — выполнить действие для каждого —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "forEach — выполнить действие для каждого",
+        "desc": "forEach вызывает функцию для каждого элемента массива. Удобен для вывода и побочных действий; новый массив не возвращает.",
         "x": 60,
-        "y": 740
+        "y": 740,
+        "src": {
+          "id": "foreach-выполнить-действие-для-каждого-mv6cutg7",
+          "title": "forEach — выполнить действие для каждого",
+          "desc": "forEach вызывает функцию для каждого элемента массива. Удобен для вывода и побочных действий; новый массив не возвращает.",
+          "code": "const colors = [\"розовый\", \"голубой\", \"мятный\"];\ncolors.forEach((color, index) => {\n  console.log(index, color);\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "colors"
+            ],
+            "requires": [
+              "color"
+            ]
+          }
+        }
       },
       {
         "id": "g34pgd",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const users = [\n  { name: \"Аня\", active: false },\n  { name: \"Лев\", active: true }\n];\nconst user = users.find(item => item.active);\nconsole.log(user.name);"
         },
-        "title": "find — найти первый элемент —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "find — найти первый элемент",
+        "desc": "find возвращает первый элемент, который подходит под условие, или undefined, если совпадения нет.",
         "x": 300,
-        "y": 740
+        "y": 740,
+        "src": {
+          "id": "find-найти-первый-элемент-mv6cutgl",
+          "title": "find — найти первый элемент",
+          "desc": "find возвращает первый элемент, который подходит под условие, или undefined, если совпадения нет.",
+          "code": "const users = [\n  { name: \"Аня\", active: false },\n  { name: \"Лев\", active: true }\n];\nconst user = users.find(item => item.active);\nconsole.log(user.name);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "users",
+              "user"
+            ],
+            "requires": [
+              "name",
+              "active"
+            ]
+          }
+        }
       },
       {
         "id": "wp3w4t",
@@ -277,67 +412,147 @@
         "id": "umd6xk",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const tools = [\"map\", \"filter\", \"reduce\"];\nconsole.log(tools.indexOf(\"filter\"));\nconsole.log(tools.indexOf(\"find\"));"
         },
-        "title": "indexOf — найти индекс —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "indexOf — найти индекс",
+        "desc": "indexOf возвращает индекс первого точного совпадения или -1, если значение не найдено.",
         "x": 780,
-        "y": 740
+        "y": 740,
+        "src": {
+          "id": "indexof-найти-индекс-mv6cutfc",
+          "title": "indexOf — найти индекс",
+          "desc": "indexOf возвращает индекс первого точного совпадения или -1, если значение не найдено.",
+          "code": "const tools = [\"map\", \"filter\", \"reduce\"];\nconsole.log(tools.indexOf(\"filter\"));\nconsole.log(tools.indexOf(\"find\"));",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "tools"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "kvhc3x",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const allowed = [\"red\", \"blue\", \"green\"];\nconsole.log(allowed.includes(\"blue\"));\nconsole.log(allowed.includes(\"pink\"));"
         },
-        "title": "includes — проверить элемент —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "includes — проверить элемент",
+        "desc": "includes проверяет, есть ли точное значение в массиве. Возвращает true или false.",
         "x": 60,
-        "y": 910
+        "y": 910,
+        "src": {
+          "id": "includes-проверить-элемент-mv6cutfr",
+          "title": "includes — проверить элемент",
+          "desc": "includes проверяет, есть ли точное значение в массиве. Возвращает true или false.",
+          "code": "const allowed = [\"red\", \"blue\", \"green\"];\nconsole.log(allowed.includes(\"blue\"));\nconsole.log(allowed.includes(\"pink\"));",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "allowed"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "uaezm0",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const queue = [\"А\", \"Б\"];\nqueue.push(\"В\");\nconsole.log(queue.pop());\nconsole.log(queue.shift());\nconsole.log(queue);"
         },
-        "title": "push, pop и shift —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "push, pop и shift",
+        "desc": "push добавляет в конец, pop удаляет последний элемент, shift удаляет первый. Эти методы изменяют исходный массив.",
         "x": 300,
-        "y": 910
+        "y": 910,
+        "src": {
+          "id": "push-pop-и-shift-mv6cutex",
+          "title": "push, pop и shift",
+          "desc": "push добавляет в конец, pop удаляет последний элемент, shift удаляет первый. Эти методы изменяют исходный массив.",
+          "code": "const queue = [\"А\", \"Б\"];\nqueue.push(\"В\");\nconsole.log(queue.pop());\nconsole.log(queue.shift());\nconsole.log(queue);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "queue"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "j3hq8a",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const values = [10, 20, 30, 40, 50];\nconst middle = values.slice(1, 4);\nconsole.log(middle);\nconsole.log(values);"
         },
-        "title": "slice — скопировать часть массива —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "slice — скопировать часть массива",
+        "desc": "slice(start, end) возвращает новый массив от start до end, не включая end. Исходный массив остаётся без изменений.",
         "x": 540,
-        "y": 910
+        "y": 910,
+        "src": {
+          "id": "slice-скопировать-часть-массива-mv6cutei",
+          "title": "slice — скопировать часть массива",
+          "desc": "slice(start, end) возвращает новый массив от start до end, не включая end. Исходный массив остаётся без изменений.",
+          "code": "const values = [10, 20, 30, 40, 50];\nconst middle = values.slice(1, 4);\nconsole.log(middle);\nconsole.log(values);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "values",
+              "middle"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "5iwq8y",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const возраст = 20;\n\nif (возраст >= 18) {\n  console.log(\"можно\");\n} else {\n  console.log(\"нельзя\");\n}"
         },
-        "title": "Условие (if / else) —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Условие (if / else)",
+        "desc": "«Если … то … иначе …». Код решает, какую ветку выполнить, в зависимости от того, правда условие или нет.",
         "x": 780,
-        "y": 910
+        "y": 910,
+        "src": {
+          "id": "js-condition",
+          "title": "Условие (if / else)",
+          "desc": "«Если … то … иначе …». Код решает, какую ветку выполнить, в зависимости от того, правда условие или нет.",
+          "code": "const возраст = 20;\n\nif (возраст >= 18) {\n  console.log(\"можно\");\n} else {\n  console.log(\"нельзя\");\n}",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": [
+              "constвозраст",
+              "возраст"
+            ]
+          }
+        }
       },
       {
         "id": "3wk7o6",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const temperature = 18;\n\nif (temperature >= 25) {\n  console.log(\"Жарко\");\n} else if (temperature >= 15) {\n  console.log(\"Комфортно\");\n} else {\n  console.log(\"Холодно\");\n}"
         },
-        "title": "else и else if —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "else и else if",
+        "desc": "Выбирает одну из нескольких веток в зависимости от условий. Условия проверяются сверху вниз.",
         "x": 60,
-        "y": 1080
+        "y": 1080,
+        "src": {
+          "id": "else-и-else-if-mv6cut5l",
+          "title": "else и else if",
+          "desc": "Выбирает одну из нескольких веток в зависимости от условий. Условия проверяются сверху вниз.",
+          "code": "const temperature = 18;\n\nif (temperature >= 25) {\n  console.log(\"Жарко\");\n} else if (temperature >= 15) {\n  console.log(\"Комфортно\");\n} else {\n  console.log(\"Холодно\");\n}",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "temperature"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "huod51",
@@ -360,12 +575,25 @@
         "id": "c99r22",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "for (let number = 1; number <= 6; number += 1) {\n  if (number === 2) {\n    continue;\n  }\n  if (number === 5) {\n    break;\n  }\n  console.log(number);\n}"
         },
-        "title": "break и continue —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "break и continue",
+        "desc": "break полностью останавливает цикл. continue пропускает оставшуюся часть текущей итерации и переходит к следующей.",
         "x": 540,
-        "y": 1080
+        "y": 1080,
+        "src": {
+          "id": "break-и-continue-mv6cut6g",
+          "title": "break и continue",
+          "desc": "break полностью останавливает цикл. continue пропускает оставшуюся часть текущей итерации и переходит к следующей.",
+          "code": "for (let number = 1; number <= 6; number += 1) {\n  if (number === 2) {\n    continue;\n  }\n  if (number === 5) {\n    break;\n  }\n  console.log(number);\n}",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "number"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "o23vwk",
@@ -405,23 +633,51 @@
         "id": "152zhp",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "for (let i = 0; i < 3; i++) {\n  console.log(i);\n}"
         },
-        "title": "Цикл (for) —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Цикл (for)",
+        "desc": "Повторяет блок кода несколько раз. Счётчик идёт от старта до условия, каждый проход меняется на шаг.",
         "x": 300,
-        "y": 1250
+        "y": 1250,
+        "src": {
+          "id": "js-loop",
+          "title": "Цикл (for)",
+          "desc": "Повторяет блок кода несколько раз. Счётчик идёт от старта до условия, каждый проход меняется на шаг.",
+          "code": "for (let i = 0; i < 3; i++) {\n  console.log(i);\n}",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": [
+              "leti"
+            ]
+          }
+        }
       },
       {
         "id": "kzmptn",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "function площадь(ширина, высота) {\n  return ширина * высота;\n}\n\nconsole.log(площадь(4, 5));"
         },
-        "title": "Функция —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Функция",
+        "desc": "Функция — это рецепт: даёшь ей что-то на вход, она возвращает результат. Написал один раз — вызываешь сколько угодно.",
         "x": 540,
-        "y": 1250
+        "y": 1250,
+        "src": {
+          "id": "js-function",
+          "title": "Функция",
+          "desc": "Функция — это рецепт: даёшь ей что-то на вход, она возвращает результат. Написал один раз — вызываешь сколько угодно.",
+          "code": "function площадь(ширина, высота) {\n  return ширина * высота;\n}\n\nconsole.log(площадь(4, 5));",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": [
+              "functionплощадь",
+              "returnширина",
+              "площадь"
+            ]
+          }
+        }
       },
       {
         "id": "diatnr",
@@ -461,12 +717,25 @@
         "id": "7lqvtb",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "let цена = 100;"
         },
-        "title": "Переменная и вывод —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "переменная",
+        "desc": "Переменная — именованное место для значения\nПеременная позволяет сохранить какое-то значение и обращаться к нему по имени.\nlet name = \"Алекс\";\nlet age = 25;\nlet isAdmin = false;\n\n\nЗдесь мы создали три переменные:\n\nname\nХранит текст\n\"Алекс\"\n\n\n\n\nage\nХранит число\n25\n\n\n\n\nisAdmin\nХранит логическое значение\nfalse — нет\n\n\n\nМожно представить переменную как подписанный контейнер. Имя позволяет найти значен",
         "x": 300,
-        "y": 1420
+        "y": 1420,
+        "src": {
+          "id": "js-variable",
+          "title": "переменная",
+          "desc": "Переменная — именованное место для значения\nПеременная позволяет сохранить какое-то значение и обращаться к нему по имени.\nlet name = \"Алекс\";\nlet age = 25;\nlet isAdmin = false;\n\n\nЗдесь мы создали три переменные:\n\nname\nХранит текст\n\"Алекс\"\n\n\n\n\nage\nХранит число\n25\n\n\n\n\nisAdmin\nХранит логическое значение\nfalse — нет\n\n\n\nМожно представить переменную как подписанный контейнер. Имя позволяет найти значен",
+          "code": "let цена = 100;",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "цена"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "jav8hd",
@@ -489,34 +758,77 @@
         "id": "nrhnrh",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const числа = [40, 70, 30, 90, 55];"
         },
-        "title": "массив —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "массив",
+        "desc": "Массив — упорядоченный список значений\nДопустим, у тебя есть не один цвет, а сразу пять. Создавать отдельную переменную для каждого неудобно.\nМожно собрать их в массив:\nconst colors = [\"красный\", \"синий\", \"зелёный\"];\nМассив обозначается квадратными скобками [].\nКак устроен массив\nУ каждого элемента есть позиция — индекс. В JavaScript отсчёт начинается с нуля.\nИндекс 0\nкрасный\n\n\nИндекс 1\nсиний\n\n\nИн",
         "x": 780,
-        "y": 1420
+        "y": 1420,
+        "src": {
+          "id": "массив-mv9yln2q",
+          "title": "массив",
+          "desc": "Массив — упорядоченный список значений\nДопустим, у тебя есть не один цвет, а сразу пять. Создавать отдельную переменную для каждого неудобно.\nМожно собрать их в массив:\nconst colors = [\"красный\", \"синий\", \"зелёный\"];\nМассив обозначается квадратными скобками [].\nКак устроен массив\nУ каждого элемента есть позиция — индекс. В JavaScript отсчёт начинается с нуля.\nИндекс 0\nкрасный\n\n\nИндекс 1\nсиний\n\n\nИн",
+          "code": "const числа = [40, 70, 30, 90, 55];",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "числа"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "9gub37",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const бумага = { имя: \"ОФЗ\", купон: 7.1 };"
         },
-        "title": "объект —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "объект",
+        "desc": "Объект — набор связанных данных\nТеперь представь, что нужно хранить информацию не просто о цвете, а о его названии, коде и цене.\nМожно использовать объект:\nconst color = {\n  name: \"Красный\",\n  hex: \"#ff0000\",\n  price: 100\n};\n\n\nОбъект обозначается фигурными скобками {}. Внутри хранятся пары ключ: значение.\nРазбираем объект\nname\n\n\"Красный\"\nНазвание цвета\n\n\nhex\n\n\"#ff0000\"\nЦветовой код\n\n\nprice\n\n100\nЦе",
         "x": 60,
-        "y": 1590
+        "y": 1590,
+        "src": {
+          "id": "объект-mv9z7j6w",
+          "title": "объект",
+          "desc": "Объект — набор связанных данных\nТеперь представь, что нужно хранить информацию не просто о цвете, а о его названии, коде и цене.\nМожно использовать объект:\nconst color = {\n  name: \"Красный\",\n  hex: \"#ff0000\",\n  price: 100\n};\n\n\nОбъект обозначается фигурными скобками {}. Внутри хранятся пары ключ: значение.\nРазбираем объект\nname\n\n\"Красный\"\nНазвание цвета\n\n\nhex\n\n\"#ff0000\"\nЦветовой код\n\n\nprice\n\n100\nЦе",
+          "code": "const бумага = { имя: \"ОФЗ\", купон: 7.1 };",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "бумага"
+            ],
+            "requires": [
+              "имя",
+              "купон"
+            ]
+          }
+        }
       },
       {
         "id": "rcc4j6",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const checkbox = document.querySelector(\"#showGrid\");\nconst canvas = document.querySelector(\"#previewCanvas\");\n\ncheckbox.addEventListener(\"change\", () => {\n  canvas.classList.toggle(\"show-grid\", checkbox.checked);\n});"
         },
-        "title": "input type=checkbox — флажок —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "checkbox — флажок",
+        "desc": "Для checkbox используйте свойство checked, а не value, чтобы узнать, установлен ли флажок.",
         "x": 300,
-        "y": 1590
+        "y": 1590,
+        "src": {
+          "id": "checkbox-флажок-mv6cusx7",
+          "title": "checkbox — флажок",
+          "desc": "Для checkbox используйте свойство checked, а не value, чтобы узнать, установлен ли флажок.",
+          "code": "const checkbox = document.querySelector(\"#showGrid\");\nconst canvas = document.querySelector(\"#previewCanvas\");\n\ncheckbox.addEventListener(\"change\", () => {\n  canvas.classList.toggle(\"show-grid\", checkbox.checked);\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "checkbox",
+              "canvas"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "o89o1g",
@@ -539,122 +851,278 @@
         "id": "f3i1eh",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const checkbox = document.querySelector(\"#showGrid\");\nconst canvas = document.querySelector(\"#previewCanvas\");\n\ncheckbox.addEventListener(\"change\", () => {\n  canvas.classList.toggle(\"show-grid\", checkbox.checked);\n});"
         },
-        "title": "checkbox",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "checkbox — флажок",
+        "desc": "Для checkbox используйте свойство checked, а не value, чтобы узнать, установлен ли флажок.",
         "x": 780,
-        "y": 1590
+        "y": 1590,
+        "src": {
+          "id": "checkbox-флажок-mv6cusx7",
+          "title": "checkbox — флажок",
+          "desc": "Для checkbox используйте свойство checked, а не value, чтобы узнать, установлен ли флажок.",
+          "code": "const checkbox = document.querySelector(\"#showGrid\");\nconst canvas = document.querySelector(\"#previewCanvas\");\n\ncheckbox.addEventListener(\"change\", () => {\n  canvas.classList.toggle(\"show-grid\", checkbox.checked);\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "checkbox",
+              "canvas"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "mseemy",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const field = document.querySelector(\"#nickname\");\nconst preview = document.querySelector(\"#preview\");\n\nfield.addEventListener(\"input\", () => {\n  preview.textContent = field.value;\n});"
         },
-        "title": "input type=text — текстовое поле —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "input type=text — текстовое поле",
+        "desc": "Событие input позволяет реагировать на каждый ввод. Значение поля читается через value.",
         "x": 60,
-        "y": 1760
+        "y": 1760,
+        "src": {
+          "id": "input-type-text-текстовое-поле-mv6cusv5",
+          "title": "input type=text — текстовое поле",
+          "desc": "Событие input позволяет реагировать на каждый ввод. Значение поля читается через value.",
+          "code": "const field = document.querySelector(\"#nickname\");\nconst preview = document.querySelector(\"#preview\");\n\nfield.addEventListener(\"input\", () => {\n  preview.textContent = field.value;\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "field",
+              "preview"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "yzhar6",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const field = document.querySelector(\"#amount\");\nconst output = document.querySelector(\"#amountOutput\");\n\nfield.addEventListener(\"input\", () => {\n  const amount = Number(field.value);\n  output.textContent = Number.isFinite(amount) ? amount * 2 : \"Введите число\";\n});"
         },
-        "title": "input type=number — число —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "input type=number — число",
+        "desc": "value у input всегда строка. Используйте Number(...) для преобразования и проверяйте, что результат конечный.",
         "x": 300,
-        "y": 1760
+        "y": 1760,
+        "src": {
+          "id": "input-type-number-число-mv6cuswe",
+          "title": "input type=number — число",
+          "desc": "value у input всегда строка. Используйте Number(...) для преобразования и проверяйте, что результат конечный.",
+          "code": "const field = document.querySelector(\"#amount\");\nconst output = document.querySelector(\"#amountOutput\");\n\nfield.addEventListener(\"input\", () => {\n  const amount = Number(field.value);\n  output.textContent = Number.isFinite(amount) ? amount * 2 : \"Введите число\";\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "field",
+              "output",
+              "amount"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "zhuv4v",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const slider = document.querySelector(\"#intensity\");\nconst valueLabel = document.querySelector(\"#intensityValue\");\n\nslider.addEventListener(\"input\", () => {\n  valueLabel.textContent = `${slider.value}%`;\n});"
         },
-        "title": "input type=range — ползунок —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "input type=range — ползунок",
+        "desc": "Ползунок обычно отправляет input при перемещении. Его value — строка, которую можно преобразовать в число.",
         "x": 540,
-        "y": 1760
+        "y": 1760,
+        "src": {
+          "id": "input-type-range-ползунок-mv6cusvy",
+          "title": "input type=range — ползунок",
+          "desc": "Ползунок обычно отправляет input при перемещении. Его value — строка, которую можно преобразовать в число.",
+          "code": "const slider = document.querySelector(\"#intensity\");\nconst valueLabel = document.querySelector(\"#intensityValue\");\n\nslider.addEventListener(\"input\", () => {\n  valueLabel.textContent = `${slider.value}%`;\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "slider",
+              "valueLabel"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "bq7y39",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const picker = document.querySelector(\"#colorPicker\");\nconst swatch = document.querySelector(\"#swatch\");\n\npicker.addEventListener(\"input\", () => {\n  swatch.style.backgroundColor = picker.value;\n});"
         },
-        "title": "input type=color — выбор цвета —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "input type=color — выбор цвета",
+        "desc": "Поле color отдаёт выбранный цвет в формате hex, например #ff006e. Значение можно применять к фону или хранить в массиве.",
         "x": 780,
-        "y": 1760
+        "y": 1760,
+        "src": {
+          "id": "input-type-color-выбор-цвета-mv6cusws",
+          "title": "input type=color — выбор цвета",
+          "desc": "Поле color отдаёт выбранный цвет в формате hex, например #ff006e. Значение можно применять к фону или хранить в массиве.",
+          "code": "const picker = document.querySelector(\"#colorPicker\");\nconst swatch = document.querySelector(\"#swatch\");\n\npicker.addEventListener(\"input\", () => {\n  swatch.style.backgroundColor = picker.value;\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "picker",
+              "swatch"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "mjv58p",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const select = document.querySelector(\"#theme\");\nconst page = document.querySelector(\"body\");\n\nselect.addEventListener(\"change\", () => {\n  page.dataset.theme = select.value;\n});"
         },
-        "title": "select — список вариантов —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "select — список вариантов",
+        "desc": "У select свойство value содержит значение выбранного option. Событие change срабатывает при смене выбора.",
         "x": 60,
-        "y": 1930
+        "y": 1930,
+        "src": {
+          "id": "select-список-вариантов-mv6cusvj",
+          "title": "select — список вариантов",
+          "desc": "У select свойство value содержит значение выбранного option. Событие change срабатывает при смене выбора.",
+          "code": "const select = document.querySelector(\"#theme\");\nconst page = document.querySelector(\"body\");\n\nselect.addEventListener(\"change\", () => {\n  page.dataset.theme = select.value;\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "select",
+              "page"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "piqrc9",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const field = document.querySelector(\"#colorName\");\n\nfield.addEventListener(\"input\", event => {\n  console.log(\"Сейчас:\", event.target.value);\n});\n\nfield.addEventListener(\"change\", event => {\n  console.log(\"Подтверждено:\", event.target.value);\n});"
         },
-        "title": "input и change — изменения поля —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "input и change — изменения поля",
+        "desc": "input срабатывает при каждом изменении значения, change — когда изменение подтверждено (например, после выбора или потери фокуса, в зависимости от типа поля).",
         "x": 300,
-        "y": 1930
+        "y": 1930,
+        "src": {
+          "id": "input-и-change-изменения-поля-mv6cusyq",
+          "title": "input и change — изменения поля",
+          "desc": "input срабатывает при каждом изменении значения, change — когда изменение подтверждено (например, после выбора или потери фокуса, в зависимости от типа поля).",
+          "code": "const field = document.querySelector(\"#colorName\");\n\nfield.addEventListener(\"input\", event => {\n  console.log(\"Сейчас:\", event.target.value);\n});\n\nfield.addEventListener(\"change\", event => {\n  console.log(\"Подтверждено:\", event.target.value);\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "field"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "lbk0qs",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "// рисуем поле, кнопку и место для ответа\ndocument.querySelector(\"#out\").innerHTML =\n  '<input id=\"n\" value=\"10\" style=\"width:60px\"> ' +\n  '<button id=\"go\">+ удвоить</button> <span id=\"res\"></span>';\n\nlet всего = 0;   // состояние: копится между нажатиями\n\ndocument.querySelector(\"#go\").addEventListener(\"click\", () => {\n  const n = Number(document.querySelector(\"#n\").value); // вход: из поля\n  const удвоено = n * 2;                                 // расчёт\n  всего = всего + удвоено;                               // обновляем состояние\n  document.querySelector(\"#res\").textContent = \"итог: \" + всего; // вывод\n});"
         },
-        "title": "Клик",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Клик → расчёт → экран (+состояние)",
+        "desc": "Связь через СОБЫТИЕ. Нажал → читаем поле (вход) → считаем → обновляем экран. Переменная «всего» — состояние: живёт между кликами и копит результат.",
         "x": 540,
-        "y": 1930
+        "y": 1930,
+        "src": {
+          "id": "flow-interactive",
+          "title": "Клик → расчёт → экран (+состояние)",
+          "desc": "Связь через СОБЫТИЕ. Нажал → читаем поле (вход) → считаем → обновляем экран. Переменная «всего» — состояние: живёт между кликами и копит результат.",
+          "code": "// рисуем поле, кнопку и место для ответа\ndocument.querySelector(\"#out\").innerHTML =\n  '<input id=\"n\" value=\"10\" style=\"width:60px\"> ' +\n  '<button id=\"go\">+ удвоить</button> <span id=\"res\"></span>';\n\nlet всего = 0;   // состояние: копится между нажатиями\n\ndocument.querySelector(\"#go\").addEventListener(\"click\", () => {\n  const n = Number(document.querySelector(\"#n\").value); // вход: из поля\n  const удвоено = n * 2;                                 // расчёт\n  всего = всего + удвоено;                               // обновляем состояние\n  document.querySelector(\"#res\").textContent = \"итог: \" + всего; // вывод\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "всего",
+              "n",
+              "удвоено"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "p60bmc",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "function среднее(значения){\n  const сумма = значения.reduce((a, b) => a + b, 0);\n  return сумма / значения.length;\n}\n\nconst результат = среднее([10, 20, 30]);\nconsole.log(результат.toFixed(2)); // \"20.00\""
         },
-        "title": "расчёт",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Расчёт: среднее и округление",
+        "desc": "Типичный расчёт: сумма через reduce, делим на количество, округляем. Так же считаются доходности, медианы и пр.",
         "x": 780,
-        "y": 1930
+        "y": 1930,
+        "src": {
+          "id": "js-calc-mean",
+          "title": "Расчёт: среднее и округление",
+          "desc": "Типичный расчёт: сумма через reduce, делим на количество, округляем. Так же считаются доходности, медианы и пр.",
+          "code": "function среднее(значения){\n  const сумма = значения.reduce((a, b) => a + b, 0);\n  return сумма / значения.length;\n}\n\nconst результат = среднее([10, 20, 30]);\nconsole.log(результат.toFixed(2)); // \"20.00\"",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "среднее",
+              "сумма",
+              "результат"
+            ],
+            "requires": [
+              "a"
+            ]
+          }
+        }
       },
       {
         "id": "nvilzv",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "// рисуем поле, кнопку и место для ответа\ndocument.querySelector(\"#out\").innerHTML =\n  '<input id=\"n\" value=\"10\" style=\"width:60px\"> ' +\n  '<button id=\"go\">+ удвоить</button> <span id=\"res\"></span>';\n\nlet всего = 0;   // состояние: копится между нажатиями\n\ndocument.querySelector(\"#go\").addEventListener(\"click\", () => {\n  const n = Number(document.querySelector(\"#n\").value); // вход: из поля\n  const удвоено = n * 2;                                 // расчёт\n  всего = всего + удвоено;                               // обновляем состояние\n  document.querySelector(\"#res\").textContent = \"итог: \" + всего; // вывод\n});"
         },
-        "title": "экран (+состояние)",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Клик → расчёт → экран (+состояние)",
+        "desc": "Связь через СОБЫТИЕ. Нажал → читаем поле (вход) → считаем → обновляем экран. Переменная «всего» — состояние: живёт между кликами и копит результат.",
         "x": 60,
-        "y": 2100
+        "y": 2100,
+        "src": {
+          "id": "flow-interactive",
+          "title": "Клик → расчёт → экран (+состояние)",
+          "desc": "Связь через СОБЫТИЕ. Нажал → читаем поле (вход) → считаем → обновляем экран. Переменная «всего» — состояние: живёт между кликами и копит результат.",
+          "code": "// рисуем поле, кнопку и место для ответа\ndocument.querySelector(\"#out\").innerHTML =\n  '<input id=\"n\" value=\"10\" style=\"width:60px\"> ' +\n  '<button id=\"go\">+ удвоить</button> <span id=\"res\"></span>';\n\nlet всего = 0;   // состояние: копится между нажатиями\n\ndocument.querySelector(\"#go\").addEventListener(\"click\", () => {\n  const n = Number(document.querySelector(\"#n\").value); // вход: из поля\n  const удвоено = n * 2;                                 // расчёт\n  всего = всего + удвоено;                               // обновляем состояние\n  document.querySelector(\"#res\").textContent = \"итог: \" + всего; // вывод\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "всего",
+              "n",
+              "удвоено"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "4dzmro",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<p><q>Короткая цитата</q></p>"
         },
-        "title": "querySelector — найти элемент —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "q",
+        "desc": "Встроенная цитата",
         "x": 300,
-        "y": 2100
+        "y": 2100,
+        "src": {
+          "id": "q-mvxmxxd3g",
+          "title": "q",
+          "desc": "Встроенная цитата",
+          "code": "<p><q>Короткая цитата</q></p>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "jcxrxs",
@@ -677,12 +1145,25 @@
         "id": "2qp1u4",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const button = document.querySelector(\"#save\");\nbutton.setAttribute(\"aria-label\", \"Сохранить цвет\");\nbutton.setAttribute(\"data-state\", \"ready\");\nconsole.log(button.getAttribute(\"data-state\"));"
         },
-        "title": "setAttribute — задать атрибут —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "setAttribute — задать атрибут",
+        "desc": "setAttribute задаёт атрибут HTML-элемента, например title, aria-label или data-id.",
         "x": 780,
-        "y": 2100
+        "y": 2100,
+        "src": {
+          "id": "setattribute-задать-атрибут-mv6cut0k",
+          "title": "setAttribute — задать атрибут",
+          "desc": "setAttribute задаёт атрибут HTML-элемента, например title, aria-label или data-id.",
+          "code": "const button = document.querySelector(\"#save\");\nbutton.setAttribute(\"aria-label\", \"Сохранить цвет\");\nbutton.setAttribute(\"data-state\", \"ready\");\nconsole.log(button.getAttribute(\"data-state\"));",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "button"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "77zqnb",
@@ -705,45 +1186,99 @@
         "id": "8iv33c",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const card = document.querySelector(\".card\");\ncard.classList.add(\"selected\");\ncard.classList.toggle(\"highlight\");\nconsole.log(card.classList.contains(\"selected\"));"
         },
-        "title": "classList — управлять классами —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "classList — управлять классами",
+        "desc": "classList.add добавляет класс, remove удаляет, toggle переключает, contains проверяет наличие класса.",
         "x": 300,
-        "y": 2270
+        "y": 2270,
+        "src": {
+          "id": "classlist-управлять-классами-mv6cut28",
+          "title": "classList — управлять классами",
+          "desc": "classList.add добавляет класс, remove удаляет, toggle переключает, contains проверяет наличие класса.",
+          "code": "const card = document.querySelector(\".card\");\ncard.classList.add(\"selected\");\ncard.classList.toggle(\"highlight\");\nconsole.log(card.classList.contains(\"selected\"));",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "card"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "yebiuh",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const box = document.querySelector(\"#message\");\nbox.textContent = \"<b>Привет</b>\";\nconsole.log(box.textContent);"
         },
-        "title": "textContent и innerHTML —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "textContent и innerHTML",
+        "desc": "textContent вставляет текст безопасно, не интерпретируя его как HTML. innerHTML разбирает строку как HTML-разметку; не вставляйте туда недоверенные данные.",
         "x": 540,
-        "y": 2270
+        "y": 2270,
+        "src": {
+          "id": "textcontent-и-innerhtml-mv6cusz6",
+          "title": "textContent и innerHTML",
+          "desc": "textContent вставляет текст безопасно, не интерпретируя его как HTML. innerHTML разбирает строку как HTML-разметку; не вставляйте туда недоверенные данные.",
+          "code": "const box = document.querySelector(\"#message\");\nbox.textContent = \"<b>Привет</b>\";\nconsole.log(box.textContent);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "box"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "xcpr3k",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const list = document.querySelector(\"#list\");\nconst item = document.createElement(\"li\");\nitem.textContent = \"Новый пункт\";\nlist.append(item);"
         },
-        "title": "createElement и append —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "createElement и append",
+        "desc": "createElement создаёт новый DOM-элемент, а append добавляет его внутрь выбранного контейнера. Контейнер должен существовать в HTML.",
         "x": 780,
-        "y": 2270
+        "y": 2270,
+        "src": {
+          "id": "createelement-и-append-mv6cut1r",
+          "title": "createElement и append",
+          "desc": "createElement создаёт новый DOM-элемент, а append добавляет его внутрь выбранного контейнера. Контейнер должен существовать в HTML.",
+          "code": "const list = document.querySelector(\"#list\");\nconst item = document.createElement(\"li\");\nitem.textContent = \"Новый пункт\";\nlist.append(item);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "list",
+              "item"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "0eza8x",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const key = \"savedColors\";\nconst colors = JSON.parse(localStorage.getItem(key) || \"[]\");\n\ncolors.push(\"#FF006E\");\nlocalStorage.setItem(key, JSON.stringify(colors));\n\nconsole.log(colors.length);"
         },
-        "title": "Сохранить и загрузить список —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Сохранить и загрузить список",
+        "desc": "Типичный шаблон: безопасно прочитать JSON-массив из localStorage, добавить элемент и сохранить обновлённый массив.",
         "x": 60,
-        "y": 2440
+        "y": 2440,
+        "src": {
+          "id": "сохранить-и-загрузить-список-mv6cuslp",
+          "title": "Сохранить и загрузить список",
+          "desc": "Типичный шаблон: безопасно прочитать JSON-массив из localStorage, добавить элемент и сохранить обновлённый массив.",
+          "code": "const key = \"savedColors\";\nconst colors = JSON.parse(localStorage.getItem(key) || \"[]\");\n\ncolors.push(\"#FF006E\");\nlocalStorage.setItem(key, JSON.stringify(colors));\n\nconsole.log(colors.length);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "key",
+              "colors"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "zqvvk9",
@@ -766,12 +1301,33 @@
         "id": "80xem1",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const storageKey = \"palette\";\nlet colors = JSON.parse(localStorage.getItem(storageKey) || \"[]\");\n\nfunction saveColors() {\n  localStorage.setItem(storageKey, JSON.stringify(colors));\n}\n\nfunction renderColors() {\n  const body = document.querySelector(\"#colors tbody\");\n  body.replaceChildren();\n\n  colors.forEach((color, index) => {\n    const row = document.createElement(\"tr\");\n    const cell = document.createElement(\"td\");\n    const remove = document.createElement(\"button\");\n\n    cell.textContent = color;\n    remove.textContent = \"Удалить\";\n    remove.addEventListener(\"click\", () => {\n      colors.splice(index, 1);\n      saveColors();\n      renderColors();\n    });\n\n    row.append(cell, remove);\n    body.append(row);\n  });\n}\n\nfunction addColor(color) {\n  colors.push(color);\n  saveColors();\n  renderColors();\n}"
         },
-        "title": "Сохранить и удалить цвета в таблице —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Сохранить и удалить цвета в таблице",
+        "desc": "Храните цвета как массив объектов в localStorage. После добавления или удаления перерисуйте таблицу; пользовательский текст вставляйте через textContent.",
         "x": 540,
-        "y": 2440
+        "y": 2440,
+        "src": {
+          "id": "сохранить-и-удалить-цвета-в-таблице-mv6cut6v",
+          "title": "Сохранить и удалить цвета в таблице",
+          "desc": "Храните цвета как массив объектов в localStorage. После добавления или удаления перерисуйте таблицу; пользовательский текст вставляйте через textContent.",
+          "code": "const storageKey = \"palette\";\nlet colors = JSON.parse(localStorage.getItem(storageKey) || \"[]\");\n\nfunction saveColors() {\n  localStorage.setItem(storageKey, JSON.stringify(colors));\n}\n\nfunction renderColors() {\n  const body = document.querySelector(\"#colors tbody\");\n  body.replaceChildren();\n\n  colors.forEach((color, index) => {\n    const row = document.createElement(\"tr\");\n    const cell = document.createElement(\"td\");\n    const remove = document.createElement(\"button\");\n\n    cell.textContent = color;\n    remove.textContent = \"Удалить\";\n    remove.addEventListener(\"click\", () => {\n      colors.splice(index, 1);\n      saveColors();\n      renderColors();\n    });\n\n    row.append(cell, remove);\n    body.append(row);\n  });\n}\n\nfunction addColor(color) {\n  colors.push(color);\n  saveColors();\n  renderColors();\n}",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "storageKey",
+              "colors",
+              "saveColors",
+              "renderColors",
+              "body",
+              "row",
+              "cell",
+              "remove",
+              "addColor"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "nqdztr",
@@ -862,12 +1418,27 @@
         "id": "sil2ch",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const key = \"bestScore\";\nconst best = Number(localStorage.getItem(key) || 0);\nconst score = 125;\n\nif (score > best) {\n  localStorage.setItem(key, String(score));\n}\n\nconsole.log(Math.max(best, score));"
         },
-        "title": "Рекорд в localStorage —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Рекорд в localStorage",
+        "desc": "Загружайте сохранённый рекорд, сравнивайте с текущим счётом и сохраняйте только новый максимум.",
         "x": 60,
-        "y": 2780
+        "y": 2780,
+        "src": {
+          "id": "рекорд-в-localstorage-mv6custk",
+          "title": "Рекорд в localStorage",
+          "desc": "Загружайте сохранённый рекорд, сравнивайте с текущим счётом и сохраняйте только новый максимум.",
+          "code": "const key = \"bestScore\";\nconst best = Number(localStorage.getItem(key) || 0);\nconst score = 125;\n\nif (score > best) {\n  localStorage.setItem(key, String(score));\n}\n\nconsole.log(Math.max(best, score));",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "key",
+              "best",
+              "score"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "rfxxt1",
@@ -890,12 +1461,29 @@
         "id": "qsj3gj",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const score = 120;\nconst achievements = [\n  { title: \"Первый шаг\", unlocked: score >= 10 },\n  { title: \"Сотня очков\", unlocked: score >= 100 },\n  { title: \"Мастер\", unlocked: score >= 500 }\n];\n\nconst unlocked = achievements.filter(item => item.unlocked);\nconsole.log(unlocked.map(item => item.title));"
         },
-        "title": "Достижения по условиям —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Достижения по условиям",
+        "desc": "Каждое достижение — объект с условием. Фильтрация выбирает те достижения, которые уже открыты при текущем состоянии.",
         "x": 540,
-        "y": 2780
+        "y": 2780,
+        "src": {
+          "id": "достижения-по-условиям-mv6cusur",
+          "title": "Достижения по условиям",
+          "desc": "Каждое достижение — объект с условием. Фильтрация выбирает те достижения, которые уже открыты при текущем состоянии.",
+          "code": "const score = 120;\nconst achievements = [\n  { title: \"Первый шаг\", unlocked: score >= 10 },\n  { title: \"Сотня очков\", unlocked: score >= 100 },\n  { title: \"Мастер\", unlocked: score >= 500 }\n];\n\nconst unlocked = achievements.filter(item => item.unlocked);\nconsole.log(unlocked.map(item => item.title));",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "score",
+              "achievements",
+              "unlocked"
+            ],
+            "requires": [
+              "title"
+            ]
+          }
+        }
       },
       {
         "id": "h7fedt",
@@ -918,45 +1506,105 @@
         "id": "md19qd",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const state = { x: 3, y: 0 };\n\nwindow.addEventListener(\"keydown\", event => {\n  if (event.key === \"ArrowLeft\") state.x -= 1;\n  if (event.key === \"ArrowRight\") state.x += 1;\n  if (event.key === \"ArrowDown\") state.y += 1;\n\n  console.log(state.x, state.y);\n});"
         },
-        "title": "Тетрис: управление клавишами —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Тетрис: управление клавишами",
+        "desc": "Храните текущую позицию фигуры в состоянии игры. keydown меняет координаты, после чего вызывается функция отрисовки поля.",
         "x": 60,
-        "y": 2950
+        "y": 2950,
+        "src": {
+          "id": "тетрис-управление-клавишами-mv6cush3",
+          "title": "Тетрис: управление клавишами",
+          "desc": "Храните текущую позицию фигуры в состоянии игры. keydown меняет координаты, после чего вызывается функция отрисовки поля.",
+          "code": "const state = { x: 3, y: 0 };\n\nwindow.addEventListener(\"keydown\", event => {\n  if (event.key === \"ArrowLeft\") state.x -= 1;\n  if (event.key === \"ArrowRight\") state.x += 1;\n  if (event.key === \"ArrowDown\") state.y += 1;\n\n  console.log(state.x, state.y);\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "state"
+            ],
+            "requires": [
+              "x",
+              "y"
+            ]
+          }
+        }
       },
       {
         "id": "vt7tk0",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const hue = 330;\nconst saturation = 90;\nconst lightness = 55;\nconst color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;\n\nconsole.log(color);"
         },
-        "title": "hsl — тон, насыщенность, яркость —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "hsl — тон, насыщенность, яркость",
+        "desc": "hsl(h, s%, l%) задаёт цвет через тон от 0 до 360 градусов, насыщенность и светлоту в процентах.",
         "x": 300,
-        "y": 2950
+        "y": 2950,
+        "src": {
+          "id": "hsl-тон-насыщенность-яркость-mv6cut8j",
+          "title": "hsl — тон, насыщенность, яркость",
+          "desc": "hsl(h, s%, l%) задаёт цвет через тон от 0 до 360 градусов, насыщенность и светлоту в процентах.",
+          "code": "const hue = 330;\nconst saturation = 90;\nconst lightness = 55;\nconst color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;\n\nconsole.log(color);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "hue",
+              "saturation",
+              "lightness",
+              "color"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "gkandp",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const picker = document.querySelector(\"#colorPicker\");\nconst swatch = document.querySelector(\"#swatch\");\n\npicker.addEventListener(\"input\", () => {\n  swatch.style.backgroundColor = picker.value;\n});"
         },
-        "title": "color",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "input type=color — выбор цвета",
+        "desc": "Поле color отдаёт выбранный цвет в формате hex, например #ff006e. Значение можно применять к фону или хранить в массиве.",
         "x": 540,
-        "y": 2950
+        "y": 2950,
+        "src": {
+          "id": "input-type-color-выбор-цвета-mv6cusws",
+          "title": "input type=color — выбор цвета",
+          "desc": "Поле color отдаёт выбранный цвет в формате hex, например #ff006e. Значение можно применять к фону или хранить в массиве.",
+          "code": "const picker = document.querySelector(\"#colorPicker\");\nconst swatch = document.querySelector(\"#swatch\");\n\npicker.addEventListener(\"input\", () => {\n  swatch.style.backgroundColor = picker.value;\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "picker",
+              "swatch"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "pt49mj",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const overlay = \"rgba(255, 0, 110, 0.35)\";\nconst panel = document.querySelector(\"#panel\");\n\npanel.style.backgroundColor = overlay;\nconsole.log(overlay);"
         },
-        "title": "rgba — цвет с прозрачностью —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "rgba — цвет с прозрачностью",
+        "desc": "rgba(r, g, b, a) задаёт красный, зелёный и синий каналы от 0 до 255, а альфа-канал — прозрачность от 0 до 1.",
         "x": 780,
-        "y": 2950
+        "y": 2950,
+        "src": {
+          "id": "rgba-цвет-с-прозрачностью-mv6cut7c",
+          "title": "rgba — цвет с прозрачностью",
+          "desc": "rgba(r, g, b, a) задаёт красный, зелёный и синий каналы от 0 до 255, а альфа-канал — прозрачность от 0 до 1.",
+          "code": "const overlay = \"rgba(255, 0, 110, 0.35)\";\nconst panel = document.querySelector(\"#panel\");\n\npanel.style.backgroundColor = overlay;\nconsole.log(overlay);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "overlay",
+              "panel"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "wqcobe",
@@ -984,23 +1632,49 @@
         "id": "dphxtf",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const panel = document.querySelector(\"#panel\");\npanel.style.backgroundImage =\n  \"linear-gradient(90deg, #FF006E, #3DD9FF)\";"
         },
-        "title": "linear-gradient — линейный градиент —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "linear-gradient — линейный градиент",
+        "desc": "linear-gradient создаёт переход цветов вдоль направления. Его можно назначить через CSS background или backgroundImage.",
         "x": 540,
-        "y": 3120
+        "y": 3120,
+        "src": {
+          "id": "linear-gradient-линейный-градиент-mv6cut84",
+          "title": "linear-gradient — линейный градиент",
+          "desc": "linear-gradient создаёт переход цветов вдоль направления. Его можно назначить через CSS background или backgroundImage.",
+          "code": "const panel = document.querySelector(\"#panel\");\npanel.style.backgroundImage =\n  \"linear-gradient(90deg, #FF006E, #3DD9FF)\";",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "panel"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "vcij0i",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const glow = document.querySelector(\"#glow\");\nglow.style.backgroundImage =\n  \"radial-gradient(circle, #B45CFF 0%, #140A24 70%)\";"
         },
-        "title": "radial-gradient — радиальный градиент —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "radial-gradient — радиальный градиент",
+        "desc": "radial-gradient создаёт цветовой переход из центра наружу. Удобен для свечения и мягких подсветок.",
         "x": 780,
-        "y": 3120
+        "y": 3120,
+        "src": {
+          "id": "radial-gradient-радиальный-градиент-mv6cut7q",
+          "title": "radial-gradient — радиальный градиент",
+          "desc": "radial-gradient создаёт цветовой переход из центра наружу. Удобен для свечения и мягких подсветок.",
+          "code": "const glow = document.querySelector(\"#glow\");\nglow.style.backgroundImage =\n  \"radial-gradient(circle, #B45CFF 0%, #140A24 70%)\";",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "glow"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "ryq9dy",
@@ -1017,12 +1691,25 @@
         "id": "966hk0",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const wheel = document.querySelector(\"#wheel\");\nwheel.style.backgroundImage =\n  \"conic-gradient(red, yellow, lime, cyan, blue, magenta, red)\";"
         },
-        "title": "conic-gradient — спектральный круг —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "conic-gradient — спектральный круг",
+        "desc": "conic-gradient распределяет цвета по углу вокруг центра. Можно использовать для спектрального круга и цветового индикатора.",
         "x": 300,
-        "y": 3290
+        "y": 3290,
+        "src": {
+          "id": "conic-gradient-спектральный-круг-mv6cut8w",
+          "title": "conic-gradient — спектральный круг",
+          "desc": "conic-gradient распределяет цвета по углу вокруг центра. Можно использовать для спектрального круга и цветового индикатора.",
+          "code": "const wheel = document.querySelector(\"#wheel\");\nwheel.style.backgroundImage =\n  \"conic-gradient(red, yellow, lime, cyan, blue, magenta, red)\";",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "wheel"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "v7x2w6",
@@ -1039,12 +1726,23 @@
         "id": "93hvfp",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": ":root {\n  --bg: #140A24;        /* фон */\n  --text: #F6F4FF;      /* основной текст */\n  --acc: #FF006E;       /* акцент */\n  --font: ui-sans-serif, Segoe UI, Roboto, sans-serif;\n}\n\nbody {\n  background: var(--bg);\n  color: var(--text);\n  font-family: var(--font);\n}\n\n.button { color: var(--acc); }  /* тот же акцент, одно место правки */"
         },
-        "title": "Шрифты и цвета через переменные —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Шрифты и цвета через переменные",
+        "desc": "Выносит цвета и семейство шрифтов в CSS-переменные `:root`, после чего подключает их через `var()`. Удобно для темизации и централизованной настройки дизайна.",
         "x": 780,
-        "y": 3290
+        "y": 3290,
+        "src": {
+          "id": "css-tokens",
+          "title": "Шрифты и цвета через переменные",
+          "desc": "Выносит цвета и семейство шрифтов в CSS-переменные `:root`, после чего подключает их через `var()`. Удобно для темизации и централизованной настройки дизайна.",
+          "code": ":root {\n  --bg: #140A24;        /* фон */\n  --text: #F6F4FF;      /* основной текст */\n  --acc: #FF006E;       /* акцент */\n  --font: ui-sans-serif, Segoe UI, Roboto, sans-serif;\n}\n\nbody {\n  background: var(--bg);\n  color: var(--text);\n  font-family: var(--font);\n}\n\n.button { color: var(--acc); }  /* тот же акцент, одно место правки */",
+          "lang": "css",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "q0fx47",
@@ -1084,23 +1782,54 @@
         "id": "3a0vg7",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "function randomColor() {\n  const n = Math.floor(Math.random() * 0xffffff);\n  return '#' + n.toString(16).padStart(6, '0');\n}"
         },
-        "title": "Случайный цвет из палитры —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "случайный цвет",
+        "desc": "Возвращает случайный цвет в формате hex.",
         "x": 540,
-        "y": 3460
+        "y": 3460,
+        "src": {
+          "id": "случайный-цвет-mvh8fr9g",
+          "title": "случайный цвет",
+          "desc": "Возвращает случайный цвет в формате hex.",
+          "code": "function randomColor() {\n  const n = Math.floor(Math.random() * 0xffffff);\n  return '#' + n.toString(16).padStart(6, '0');\n}",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "randomColor",
+              "n"
+            ],
+            "requires": [
+              "xffffff"
+            ]
+          }
+        }
       },
       {
         "id": "5kfrpe",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const min = 3;\nconst max = 8;\nconst value = Math.floor(Math.random() * (max - min + 1)) + min;\n\nconsole.log(value);"
         },
-        "title": "Случайное целое в диапазоне —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Случайное целое в диапазоне",
+        "desc": "Формула Math.floor(Math.random() * (max - min + 1)) + min возвращает целое число от min до max включительно.",
         "x": 780,
-        "y": 3460
+        "y": 3460,
+        "src": {
+          "id": "случайное-целое-в-диапазоне-mv6cusr6",
+          "title": "Случайное целое в диапазоне",
+          "desc": "Формула Math.floor(Math.random() * (max - min + 1)) + min возвращает целое число от min до max включительно.",
+          "code": "const min = 3;\nconst max = 8;\nconst value = Math.floor(Math.random() * (max - min + 1)) + min;\n\nconsole.log(value);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "min",
+              "max",
+              "value"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "q17pkq",
@@ -1123,12 +1852,25 @@
         "id": "5fz6bc",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const value = 4.6;\nconsole.log(Math.round(value));\nconsole.log(Math.floor(value));\nconsole.log(Math.ceil(value));"
         },
-        "title": "round, floor и ceil —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "round, floor и ceil",
+        "desc": "round округляет до ближайшего целого, floor округляет вниз, ceil — вверх.",
         "x": 300,
-        "y": 3630
+        "y": 3630,
+        "src": {
+          "id": "round-floor-и-ceil-mv6cusqs",
+          "title": "round, floor и ceil",
+          "desc": "round округляет до ближайшего целого, floor округляет вниз, ceil — вверх.",
+          "code": "const value = 4.6;\nconsole.log(Math.round(value));\nconsole.log(Math.floor(value));\nconsole.log(Math.ceil(value));",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "value"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "n0b5sa",
@@ -1151,12 +1893,26 @@
         "id": "8jggzg",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const price = 12.5;\nconst formatted = price.toFixed(2);\n\nconsole.log(formatted);"
         },
-        "title": "toFixed(2) — два знака после запятой —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "toFixed(2) — два знака после запятой",
+        "desc": "toFixed(n) форматирует число с n знаками после десятичной точки и возвращает строку.",
         "x": 780,
-        "y": 3630
+        "y": 3630,
+        "src": {
+          "id": "tofixed-2-два-знака-после-запятой-mv6cuspz",
+          "title": "toFixed(2) — два знака после запятой",
+          "desc": "toFixed(n) форматирует число с n знаками после десятичной точки и возвращает строку.",
+          "code": "const price = 12.5;\nconst formatted = price.toFixed(2);\n\nconsole.log(formatted);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "price",
+              "formatted"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "yh440s",
@@ -1173,12 +1929,23 @@
         "id": "x16wsy",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "console.log(Math.sqrt(81));\nconsole.log(Math.pow(3, 2));\nconsole.log(Math.abs(-7));"
         },
-        "title": "sqrt, pow и abs —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "sqrt, pow и abs",
+        "desc": "sqrt вычисляет квадратный корень, pow возводит число в степень, abs возвращает абсолютное значение.",
         "x": 300,
-        "y": 3800
+        "y": 3800,
+        "src": {
+          "id": "sqrt-pow-и-abs-mv6cusqe",
+          "title": "sqrt, pow и abs",
+          "desc": "sqrt вычисляет квадратный корень, pow возводит число в степень, abs возвращает абсолютное значение.",
+          "code": "console.log(Math.sqrt(81));\nconsole.log(Math.pow(3, 2));\nconsole.log(Math.abs(-7));",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "7immyq",
@@ -1201,12 +1968,23 @@
         "id": "whbncn",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "window.addEventListener(\"mousemove\", event => {\n  console.log(event.clientX, event.clientY);\n});"
         },
-        "title": "mousemove — движение мыши —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "mousemove — движение мыши",
+        "desc": "mousemove передаёт координаты указателя. Для canvas обычно удобно преобразовать clientX/clientY в координаты относительно его границ.",
         "x": 780,
-        "y": 3800
+        "y": 3800,
+        "src": {
+          "id": "mousemove-движение-мыши-mv6cusxy",
+          "title": "mousemove — движение мыши",
+          "desc": "mousemove передаёт координаты указателя. Для canvas обычно удобно преобразовать clientX/clientY в координаты относительно его границ.",
+          "code": "window.addEventListener(\"mousemove\", event => {\n  console.log(event.clientX, event.clientY);\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "l2qx6o",
@@ -1229,34 +2007,67 @@
         "id": "9mw984",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "window.addEventListener(\"keydown\", event => {\n  if (event.key === \"ArrowLeft\") {\n    console.log(\"Движение влево\");\n  }\n});\n\nwindow.addEventListener(\"keyup\", event => {\n  console.log(\"Клавишу отпустили:\", event.key);\n});"
         },
-        "title": "keydown и keyup — клавиатура —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "keydown и keyup — клавиатура",
+        "desc": "keydown срабатывает при нажатии клавиши, keyup — при отпускании. Слушатели нужно устанавливать один раз и удалять, если компонент больше не нужен.",
         "x": 300,
-        "y": 3970
+        "y": 3970,
+        "src": {
+          "id": "keydown-и-keyup-клавиатура-mv6cusyc",
+          "title": "keydown и keyup — клавиатура",
+          "desc": "keydown срабатывает при нажатии клавиши, keyup — при отпускании. Слушатели нужно устанавливать один раз и удалять, если компонент больше не нужен.",
+          "code": "window.addEventListener(\"keydown\", event => {\n  if (event.key === \"ArrowLeft\") {\n    console.log(\"Движение влево\");\n  }\n});\n\nwindow.addEventListener(\"keyup\", event => {\n  console.log(\"Клавишу отпустили:\", event.key);\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "5r3jqe",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "window.addEventListener(\"resize\", () => {\n  console.log(window.innerWidth, window.innerHeight);\n});"
         },
-        "title": "resize — изменение размера окна —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "resize — изменение размера окна",
+        "desc": "Событие resize удобно для обновления размеров canvas и пересчёта раскладки. Не забывайте задавать canvas.width и canvas.height с учётом нужного масштаба.",
         "x": 540,
-        "y": 3970
+        "y": 3970,
+        "src": {
+          "id": "resize-изменение-размера-окна-mv6cusxl",
+          "title": "resize — изменение размера окна",
+          "desc": "Событие resize удобно для обновления размеров canvas и пересчёта раскладки. Не забывайте задавать canvas.width и canvas.height с учётом нужного масштаба.",
+          "code": "window.addEventListener(\"resize\", () => {\n  console.log(window.innerWidth, window.innerHeight);\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "qsz1mt",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<canvas width=\"200\" height=\"100\"></canvas>"
         },
-        "title": "размеры canvas",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "canvas",
+        "desc": "Canvas",
         "x": 780,
-        "y": 3970
+        "y": 3970,
+        "src": {
+          "id": "canvas-mvxzqajkk",
+          "title": "canvas",
+          "desc": "Canvas",
+          "code": "<canvas width=\"200\" height=\"100\"></canvas>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "iakeo1",
@@ -1279,12 +2090,26 @@
         "id": "83qgfz",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "let ticks = 0;\nconst timerId = setInterval(() => {\n  ticks += 1;\n  console.log(ticks);\n\n  if (ticks >= 3) {\n    clearInterval(timerId);\n  }\n}, 500);"
         },
-        "title": "setInterval — повторять действие —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "setInterval — повторять действие",
+        "desc": "setInterval повторяет функцию с заданным интервалом. Сохраняйте идентификатор и вызывайте clearInterval, когда повторения больше не нужны.",
         "x": 300,
-        "y": 4140
+        "y": 4140,
+        "src": {
+          "id": "setinterval-повторять-действие-mv6cusfl",
+          "title": "setInterval — повторять действие",
+          "desc": "setInterval повторяет функцию с заданным интервалом. Сохраняйте идентификатор и вызывайте clearInterval, когда повторения больше не нужны.",
+          "code": "let ticks = 0;\nconst timerId = setInterval(() => {\n  ticks += 1;\n  console.log(ticks);\n\n  if (ticks >= 3) {\n    clearInterval(timerId);\n  }\n}, 500);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "ticks",
+              "timerId"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "pcanc6",
@@ -1307,12 +2132,23 @@
         "id": "fy6qaq",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "console.log(\"Старт\");\n\nsetTimeout(() => {\n  console.log(\"Прошла примерно 1 секунда\");\n}, 1000);"
         },
-        "title": "setTimeout — выполнить позже —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "setTimeout — выполнить позже",
+        "desc": "setTimeout вызывает функцию один раз после задержки в миллисекундах. Задержка задаёт минимальное ожидание, а не точное время запуска.",
         "x": 780,
-        "y": 4140
+        "y": 4140,
+        "src": {
+          "id": "settimeout-выполнить-позже-mv6cusf0",
+          "title": "setTimeout — выполнить позже",
+          "desc": "setTimeout вызывает функцию один раз после задержки в миллисекундах. Задержка задаёт минимальное ожидание, а не точное время запуска.",
+          "code": "console.log(\"Старт\");\n\nsetTimeout(() => {\n  console.log(\"Прошла примерно 1 секунда\");\n}, 1000);",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "kib7lm",
@@ -1335,100 +2171,293 @@
         "id": "6cvxff",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "async function loadData() {\n  const response = await fetch(\"/api/colors\");\n  if (!response.ok) {\n    throw new Error(\"Не удалось загрузить данные\");\n  }\n  const data = await response.json();\n  console.log(data);\n}\n\nloadData().catch(error => console.log(error.message));"
         },
-        "title": "fetch + await — получить данные —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "fetch + await — получить данные",
+        "desc": "async-функция может ждать Promise через await. fetch возвращает Response; json() читает тело ответа. В реальном примере обрабатывайте ошибки и проверяйте response.ok.",
         "x": 300,
-        "y": 4310
+        "y": 4310,
+        "src": {
+          "id": "fetch-await-получить-данные-mv6cuspk",
+          "title": "fetch + await — получить данные",
+          "desc": "async-функция может ждать Promise через await. fetch возвращает Response; json() читает тело ответа. В реальном примере обрабатывайте ошибки и проверяйте response.ok.",
+          "code": "async function loadData() {\n  const response = await fetch(\"/api/colors\");\n  if (!response.ok) {\n    throw new Error(\"Не удалось загрузить данные\");\n  }\n  const data = await response.json();\n  console.log(data);\n}\n\nloadData().catch(error => console.log(error.message));",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "loadData",
+              "response",
+              "data"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "x7969y",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "// 1) достать   2) обработать   3) показать\nasync function система(инн){\n  const сырое   = await загрузить(инн);   // источник\n  const чистое  = разобрать(сырое);        // парсер\n  const метрики = посчитать(чистое);       // расчёт\n  показать(метрики);                       // вывод\n}"
         },
-        "title": "Конвейер: данные",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Конвейер: данные → обработка → вывод",
+        "desc": "Большие системы — это маленькие функции, выстроенные в цепочку. Каждая делает одно и передаёт дальше. Легко чинить и наращивать.",
         "x": 540,
-        "y": 4310
+        "y": 4310,
+        "src": {
+          "id": "system-pipeline",
+          "title": "Конвейер: данные → обработка → вывод",
+          "desc": "Большие системы — это маленькие функции, выстроенные в цепочку. Каждая делает одно и передаёт дальше. Легко чинить и наращивать.",
+          "code": "// 1) достать   2) обработать   3) показать\nasync function система(инн){\n  const сырое   = await загрузить(инн);   // источник\n  const чистое  = разобрать(сырое);        // парсер\n  const метрики = посчитать(чистое);       // расчёт\n  показать(метрики);                       // вывод\n}",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "система",
+              "сырое",
+              "чистое",
+              "метрики"
+            ],
+            "requires": [
+              "загрузить",
+              "разобрать",
+              "посчитать",
+              "показать"
+            ]
+          }
+        }
       },
       {
         "id": "1bhgo2",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "function label(status) {\n  switch (status) {\n    case \"ok\": return \"Готово\";\n    case \"pending\": return \"В ожидании\";\n    case \"error\": return \"Ошибка\";\n    default: return \"Неизвестный статус\";\n  }\n}\nconsole.log(label(\"other\"));\n"
         },
-        "title": "обработка",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Обработка неизвестного значения switch с default",
+        "desc": "Обрабатывает известные варианты и явно задаёт поведение по умолчанию.",
         "x": 780,
-        "y": 4310
+        "y": 4310,
+        "src": {
+          "id": "add-063-switch-default",
+          "title": "Обработка неизвестного значения switch с default",
+          "desc": "Обрабатывает известные варианты и явно задаёт поведение по умолчанию.",
+          "code": "function label(status) {\n  switch (status) {\n    case \"ok\": return \"Готово\";\n    case \"pending\": return \"В ожидании\";\n    case \"error\": return \"Ошибка\";\n    default: return \"Неизвестный статус\";\n  }\n}\nconsole.log(label(\"other\"));\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "fmrs0r",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<samp>OK</samp>"
         },
-        "title": "вывод",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "samp",
+        "desc": "Вывод программы",
         "x": 60,
-        "y": 4480
+        "y": 4480,
+        "src": {
+          "id": "samp-mvxoxvxmq",
+          "title": "samp",
+          "desc": "Вывод программы",
+          "code": "<samp>OK</samp>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "8wnm9y",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "function разбор(ответ){\n  const col = имя => ответ.columns.indexOf(имя); // имя колонки → её номер\n  const iД = col(\"TRADEDATE\");\n  const iY = col(\"YIELDCLOSE\");\n  return ответ.data.map(строка => ({\n    дата: строка[iД],\n    доходность: строка[iY],\n  }));\n}"
         },
-        "title": "Парсер ответа API (columns/data) —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Парсер ответа API (columns/data)",
+        "desc": "Реальный приём из этого проекта: биржа MOEX отдаёт колонки и строки отдельно. Собираем массив объектов по индексам колонок.",
         "x": 300,
-        "y": 4480
+        "y": 4480,
+        "src": {
+          "id": "parser-api",
+          "title": "Парсер ответа API (columns/data)",
+          "desc": "Реальный приём из этого проекта: биржа MOEX отдаёт колонки и строки отдельно. Собираем массив объектов по индексам колонок.",
+          "code": "function разбор(ответ){\n  const col = имя => ответ.columns.indexOf(имя); // имя колонки → её номер\n  const iД = col(\"TRADEDATE\");\n  const iY = col(\"YIELDCLOSE\");\n  return ответ.data.map(строка => ({\n    дата: строка[iД],\n    доходность: строка[iY],\n  }));\n}",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "разбор",
+              "col",
+              "iД",
+              "iY"
+            ],
+            "requires": [
+              "дата",
+              "доходность"
+            ]
+          }
+        }
       },
       {
         "id": "tkmbbl",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "function разбор(csv){\n  const строки = csv.trim().split(\"\\n\");\n  const ключи = строки[0].split(\",\");       // заголовки\n  return строки.slice(1).map(строка => {     // остальные строки\n    const поля = строка.split(\",\");\n    const объект = {};\n    ключи.forEach((ключ, i) => объект[ключ] = поля[i]);\n    return объект;\n  });\n}"
         },
-        "title": "Парсер CSV",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Парсер CSV → массив объектов",
+        "desc": "Парсер — превращает сырой текст в структурированные данные. CSV: строки через перенос, поля через запятую. Первая строка — заголовки.",
         "x": 540,
-        "y": 4480
+        "y": 4480,
+        "src": {
+          "id": "parser-csv",
+          "title": "Парсер CSV → массив объектов",
+          "desc": "Парсер — превращает сырой текст в структурированные данные. CSV: строки через перенос, поля через запятую. Первая строка — заголовки.",
+          "code": "function разбор(csv){\n  const строки = csv.trim().split(\"\\n\");\n  const ключи = строки[0].split(\",\");       // заголовки\n  return строки.slice(1).map(строка => {     // остальные строки\n    const поля = строка.split(\",\");\n    const объект = {};\n    ключи.forEach((ключ, i) => объект[ключ] = поля[i]);\n    return объект;\n  });\n}",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "разбор",
+              "строки",
+              "ключи",
+              "поля",
+              "объект"
+            ],
+            "requires": [
+              "ключ"
+            ]
+          }
+        }
       },
       {
         "id": "e6hcke",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const числа = [40, 70, 30, 90, 55];"
         },
-        "title": "массив объектов —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "массив",
+        "desc": "Массив — упорядоченный список значений\nДопустим, у тебя есть не один цвет, а сразу пять. Создавать отдельную переменную для каждого неудобно.\nМожно собрать их в массив:\nconst colors = [\"красный\", \"синий\", \"зелёный\"];\nМассив обозначается квадратными скобками [].\nКак устроен массив\nУ каждого элемента есть позиция — индекс. В JavaScript отсчёт начинается с нуля.\nИндекс 0\nкрасный\n\n\nИндекс 1\nсиний\n\n\nИн",
         "x": 780,
-        "y": 4480
+        "y": 4480,
+        "src": {
+          "id": "массив-mv9yln2q",
+          "title": "массив",
+          "desc": "Массив — упорядоченный список значений\nДопустим, у тебя есть не один цвет, а сразу пять. Создавать отдельную переменную для каждого неудобно.\nМожно собрать их в массив:\nconst colors = [\"красный\", \"синий\", \"зелёный\"];\nМассив обозначается квадратными скобками [].\nКак устроен массив\nУ каждого элемента есть позиция — индекс. В JavaScript отсчёт начинается с нуля.\nИндекс 0\nкрасный\n\n\nИндекс 1\nсиний\n\n\nИн",
+          "code": "const числа = [40, 70, 30, 90, 55];",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "числа"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "4wswfi",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "// ЗАДАЧА: взять погоду с сайта → медианная температура по дням →\n// нарисовать кривую с розовым градиентом и датой при наведении.\n// Читай снизу вверх по смыслу: main() в конце запускает всю цепочку.\n\n// ── Шаг 1. ОТКУДА данные. Асинхронно просим у открытого API (без ключа).\nasync function погода(широта, долгота){\n  const url = \"https://api.open-meteo.com/v1/forecast?latitude=\" + широта +\n    \"&longitude=\" + долгота + \"&hourly=temperature_2m\";\n  const ответ = await fetch(url);   // await = подожди, пока придёт из сети\n  return await ответ.json();        // текст ответа → объект\n}\n\n// ── Шаг 2. ОБРАБОТКА: сгруппировать по дню и взять медиану.\nfunction медианаПоДням(данные){\n  const времена = данные.hourly.time;           // [\"2026-10-11T00:00\", ...]\n  const темпы   = данные.hourly.temperature_2m;  // [12.3, 11.8, ...]\n  const поДням = {};                             // день → список температур\n  времена.forEach((t, i) => {\n    const день = t.slice(0, 10);                 // \"2026-10-11\"\n    поДням[день] = поДням[день] || [];\n    поДням[день].push(темпы[i]);\n  });\n  return Object.entries(поДням).map(пара => ({\n    день: пара[0],\n    медиана: медиана(пара[1]),\n  }));\n}\n\nfunction медиана(список){\n  const s = список.slice().sort((a, b) => a - b);  // копия по возрастанию\n  const m = Math.floor(s.length / 2);\n  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;\n}\n\n// ── Шаг 3. ВЫВОД: кривая (SVG) с розовым градиентом и точками-подсказками.\nfunction нарисовать(дни){\n  const W = 600, H = 200, pad = 30;\n  const значения = дни.map(d => d.медиана);\n  const min = Math.min.apply(null, значения);\n  const max = Math.max.apply(null, значения);\n  const x = i => pad + i * (W - 2 * pad) / (дни.length - 1);\n  const y = v => H - pad - (v - min) / (max - min || 1) * (H - 2 * pad);\n  const линия = дни.map((d, i) => x(i) + \",\" + y(d.медиана)).join(\" \");\n  const точки = дни.map((d, i) =>\n    '<circle cx=\"' + x(i) + '\" cy=\"' + y(d.медиана) + '\" r=\"4\" fill=\"#FF2FAE\">' +\n    '<title>' + d.день + \": \" + d.медиана + \"°</title></circle>\").join(\"\");\n  const градиент = '<defs><linearGradient id=\"g\" x1=\"0\" x2=\"1\">' +\n    '<stop offset=\"0\" stop-color=\"#FF2FAE\"/>' +\n    '<stop offset=\"1\" stop-color=\"#FF006E\"/></linearGradient></defs>';\n  const svg = '<svg width=\"' + W + '\" height=\"' + H + '\">' + градиент +\n    '<polyline points=\"' + линия + '\" fill=\"none\" stroke=\"url(#g)\" stroke-width=\"3\"/>' +\n    точки + \"</svg>\";\n  document.querySelector(\"#out\").innerHTML = svg;   // <title> сам всплывает при наведении\n}\n\n// ── Шаг 4. СВЯЗАТЬ всё: вот он, порядок. Данные → обработка → рисунок.\nasync function main(){\n  const данные = await погода(55.75, 37.62);   // Москва\n  const дни = медианаПоДням(данные);\n  нарисовать(дни);\n}\nmain();"
         },
-        "title": "Погода",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Погода → медиана по дням → кривая с градиентом",
+        "desc": "Полный путь от задачи к коду на твоём примере. 4 шага: источник (fetch) → обработка (медиана по дням) → вывод (SVG с розовым градиентом, дата по наведению) → связка (main). Данные настоящие: open-meteo, без ключа.",
         "x": 60,
-        "y": 4650
+        "y": 4650,
+        "src": {
+          "id": "recipe-weather",
+          "title": "Погода → медиана по дням → кривая с градиентом",
+          "desc": "Полный путь от задачи к коду на твоём примере. 4 шага: источник (fetch) → обработка (медиана по дням) → вывод (SVG с розовым градиентом, дата по наведению) → связка (main). Данные настоящие: open-meteo, без ключа.",
+          "code": "// ЗАДАЧА: взять погоду с сайта → медианная температура по дням →\n// нарисовать кривую с розовым градиентом и датой при наведении.\n// Читай снизу вверх по смыслу: main() в конце запускает всю цепочку.\n\n// ── Шаг 1. ОТКУДА данные. Асинхронно просим у открытого API (без ключа).\nasync function погода(широта, долгота){\n  const url = \"https://api.open-meteo.com/v1/forecast?latitude=\" + широта +\n    \"&longitude=\" + долгота + \"&hourly=temperature_2m\";\n  const ответ = await fetch(url);   // await = подожди, пока придёт из сети\n  return await ответ.json();        // текст ответа → объект\n}\n\n// ── Шаг 2. ОБРАБОТКА: сгруппировать по дню и взять медиану.\nfunction медианаПоДням(данные){\n  const времена = данные.hourly.time;           // [\"2026-10-11T00:00\", ...]\n  const темпы   = данные.hourly.temperature_2m;  // [12.3, 11.8, ...]\n  const поДням = {};                             // день → список температур\n  времена.forEach((t, i) => {\n    const день = t.slice(0, 10);                 // \"2026-10-11\"\n    поДням[день] = поДням[день] || [];\n    поДням[день].push(темпы[i]);\n  });\n  return Object.entries(поДням).map(пара => ({\n    день: пара[0],\n    медиана: медиана(пара[1]),\n  }));\n}\n\nfunction медиана(список){\n  const s = список.slice().sort((a, b) => a - b);  // копия по возрастанию\n  const m = Math.floor(s.length / 2);\n  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;\n}\n\n// ── Шаг 3. ВЫВОД: кривая (SVG) с розовым градиентом и точками-подсказками.\nfunction нарисовать(дни){\n  const W = 600, H = 200, pad = 30;\n  const значения = дни.map(d => d.медиана);\n  const min = Math.min.apply(null, значения);\n  const max = Math.max.apply(null, значения);\n  const x = i => pad + i * (W - 2 * pad) / (дни.length - 1);\n  const y = v => H - pad - (v - min) / (max - min || 1) * (H - 2 * pad);\n  const линия = дни.map((d, i) => x(i) + \",\" + y(d.медиана)).join(\" \");\n  const точки = дни.map((d, i) =>\n    '<circle cx=\"' + x(i) + '\" cy=\"' + y(d.медиана) + '\" r=\"4\" fill=\"#FF2FAE\">' +\n    '<title>' + d.день + \": \" + d.медиана + \"°</title></circle>\").join(\"\");\n  const градиент = '<defs><linearGradient id=\"g\" x1=\"0\" x2=\"1\">' +\n    '<stop offset=\"0\" stop-color=\"#FF2FAE\"/>' +\n    '<stop offset=\"1\" stop-color=\"#FF006E\"/></linearGradient></defs>';\n  const svg = '<svg width=\"' + W + '\" height=\"' + H + '\">' + градиент +\n    '<polyline points=\"' + линия + '\" fill=\"none\" stroke=\"url(#g)\" stroke-width=\"3\"/>' +\n    точки + \"</svg>\";\n  document.querySelector(\"#out\").innerHTML = svg;   // <title> сам всплывает при наведении\n}\n\n// ── Шаг 4. СВЯЗАТЬ всё: вот он, порядок. Данные → обработка → рисунок.\nasync function main(){\n  const данные = await погода(55.75, 37.62);   // Москва\n  const дни = медианаПоДням(данные);\n  нарисовать(дни);\n}\nmain();",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "погода",
+              "url",
+              "ответ",
+              "медианаПоДням",
+              "времена",
+              "темпы",
+              "поДням",
+              "день",
+              "медиана",
+              "s",
+              "m",
+              "нарисовать",
+              "W",
+              "значения",
+              "min",
+              "max",
+              "x",
+              "y",
+              "линия",
+              "точки",
+              "градиент",
+              "svg",
+              "main",
+              "данные",
+              "дни"
+            ],
+            "requires": [
+              "t",
+              "a",
+              "H",
+              "pad"
+            ]
+          }
+        }
       },
       {
         "id": "36w83h",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "// ЗАДАЧА: взять погоду с сайта → медианная температура по дням →\n// нарисовать кривую с розовым градиентом и датой при наведении.\n// Читай снизу вверх по смыслу: main() в конце запускает всю цепочку.\n\n// ── Шаг 1. ОТКУДА данные. Асинхронно просим у открытого API (без ключа).\nasync function погода(широта, долгота){\n  const url = \"https://api.open-meteo.com/v1/forecast?latitude=\" + широта +\n    \"&longitude=\" + долгота + \"&hourly=temperature_2m\";\n  const ответ = await fetch(url);   // await = подожди, пока придёт из сети\n  return await ответ.json();        // текст ответа → объект\n}\n\n// ── Шаг 2. ОБРАБОТКА: сгруппировать по дню и взять медиану.\nfunction медианаПоДням(данные){\n  const времена = данные.hourly.time;           // [\"2026-10-11T00:00\", ...]\n  const темпы   = данные.hourly.temperature_2m;  // [12.3, 11.8, ...]\n  const поДням = {};                             // день → список температур\n  времена.forEach((t, i) => {\n    const день = t.slice(0, 10);                 // \"2026-10-11\"\n    поДням[день] = поДням[день] || [];\n    поДням[день].push(темпы[i]);\n  });\n  return Object.entries(поДням).map(пара => ({\n    день: пара[0],\n    медиана: медиана(пара[1]),\n  }));\n}\n\nfunction медиана(список){\n  const s = список.slice().sort((a, b) => a - b);  // копия по возрастанию\n  const m = Math.floor(s.length / 2);\n  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;\n}\n\n// ── Шаг 3. ВЫВОД: кривая (SVG) с розовым градиентом и точками-подсказками.\nfunction нарисовать(дни){\n  const W = 600, H = 200, pad = 30;\n  const значения = дни.map(d => d.медиана);\n  const min = Math.min.apply(null, значения);\n  const max = Math.max.apply(null, значения);\n  const x = i => pad + i * (W - 2 * pad) / (дни.length - 1);\n  const y = v => H - pad - (v - min) / (max - min || 1) * (H - 2 * pad);\n  const линия = дни.map((d, i) => x(i) + \",\" + y(d.медиана)).join(\" \");\n  const точки = дни.map((d, i) =>\n    '<circle cx=\"' + x(i) + '\" cy=\"' + y(d.медиана) + '\" r=\"4\" fill=\"#FF2FAE\">' +\n    '<title>' + d.день + \": \" + d.медиана + \"°</title></circle>\").join(\"\");\n  const градиент = '<defs><linearGradient id=\"g\" x1=\"0\" x2=\"1\">' +\n    '<stop offset=\"0\" stop-color=\"#FF2FAE\"/>' +\n    '<stop offset=\"1\" stop-color=\"#FF006E\"/></linearGradient></defs>';\n  const svg = '<svg width=\"' + W + '\" height=\"' + H + '\">' + градиент +\n    '<polyline points=\"' + линия + '\" fill=\"none\" stroke=\"url(#g)\" stroke-width=\"3\"/>' +\n    точки + \"</svg>\";\n  document.querySelector(\"#out\").innerHTML = svg;   // <title> сам всплывает при наведении\n}\n\n// ── Шаг 4. СВЯЗАТЬ всё: вот он, порядок. Данные → обработка → рисунок.\nasync function main(){\n  const данные = await погода(55.75, 37.62);   // Москва\n  const дни = медианаПоДням(данные);\n  нарисовать(дни);\n}\nmain();"
         },
-        "title": "медиана по дням",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Погода → медиана по дням → кривая с градиентом",
+        "desc": "Полный путь от задачи к коду на твоём примере. 4 шага: источник (fetch) → обработка (медиана по дням) → вывод (SVG с розовым градиентом, дата по наведению) → связка (main). Данные настоящие: open-meteo, без ключа.",
         "x": 300,
-        "y": 4650
+        "y": 4650,
+        "src": {
+          "id": "recipe-weather",
+          "title": "Погода → медиана по дням → кривая с градиентом",
+          "desc": "Полный путь от задачи к коду на твоём примере. 4 шага: источник (fetch) → обработка (медиана по дням) → вывод (SVG с розовым градиентом, дата по наведению) → связка (main). Данные настоящие: open-meteo, без ключа.",
+          "code": "// ЗАДАЧА: взять погоду с сайта → медианная температура по дням →\n// нарисовать кривую с розовым градиентом и датой при наведении.\n// Читай снизу вверх по смыслу: main() в конце запускает всю цепочку.\n\n// ── Шаг 1. ОТКУДА данные. Асинхронно просим у открытого API (без ключа).\nasync function погода(широта, долгота){\n  const url = \"https://api.open-meteo.com/v1/forecast?latitude=\" + широта +\n    \"&longitude=\" + долгота + \"&hourly=temperature_2m\";\n  const ответ = await fetch(url);   // await = подожди, пока придёт из сети\n  return await ответ.json();        // текст ответа → объект\n}\n\n// ── Шаг 2. ОБРАБОТКА: сгруппировать по дню и взять медиану.\nfunction медианаПоДням(данные){\n  const времена = данные.hourly.time;           // [\"2026-10-11T00:00\", ...]\n  const темпы   = данные.hourly.temperature_2m;  // [12.3, 11.8, ...]\n  const поДням = {};                             // день → список температур\n  времена.forEach((t, i) => {\n    const день = t.slice(0, 10);                 // \"2026-10-11\"\n    поДням[день] = поДням[день] || [];\n    поДням[день].push(темпы[i]);\n  });\n  return Object.entries(поДням).map(пара => ({\n    день: пара[0],\n    медиана: медиана(пара[1]),\n  }));\n}\n\nfunction медиана(список){\n  const s = список.slice().sort((a, b) => a - b);  // копия по возрастанию\n  const m = Math.floor(s.length / 2);\n  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;\n}\n\n// ── Шаг 3. ВЫВОД: кривая (SVG) с розовым градиентом и точками-подсказками.\nfunction нарисовать(дни){\n  const W = 600, H = 200, pad = 30;\n  const значения = дни.map(d => d.медиана);\n  const min = Math.min.apply(null, значения);\n  const max = Math.max.apply(null, значения);\n  const x = i => pad + i * (W - 2 * pad) / (дни.length - 1);\n  const y = v => H - pad - (v - min) / (max - min || 1) * (H - 2 * pad);\n  const линия = дни.map((d, i) => x(i) + \",\" + y(d.медиана)).join(\" \");\n  const точки = дни.map((d, i) =>\n    '<circle cx=\"' + x(i) + '\" cy=\"' + y(d.медиана) + '\" r=\"4\" fill=\"#FF2FAE\">' +\n    '<title>' + d.день + \": \" + d.медиана + \"°</title></circle>\").join(\"\");\n  const градиент = '<defs><linearGradient id=\"g\" x1=\"0\" x2=\"1\">' +\n    '<stop offset=\"0\" stop-color=\"#FF2FAE\"/>' +\n    '<stop offset=\"1\" stop-color=\"#FF006E\"/></linearGradient></defs>';\n  const svg = '<svg width=\"' + W + '\" height=\"' + H + '\">' + градиент +\n    '<polyline points=\"' + линия + '\" fill=\"none\" stroke=\"url(#g)\" stroke-width=\"3\"/>' +\n    точки + \"</svg>\";\n  document.querySelector(\"#out\").innerHTML = svg;   // <title> сам всплывает при наведении\n}\n\n// ── Шаг 4. СВЯЗАТЬ всё: вот он, порядок. Данные → обработка → рисунок.\nasync function main(){\n  const данные = await погода(55.75, 37.62);   // Москва\n  const дни = медианаПоДням(данные);\n  нарисовать(дни);\n}\nmain();",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "погода",
+              "url",
+              "ответ",
+              "медианаПоДням",
+              "времена",
+              "темпы",
+              "поДням",
+              "день",
+              "медиана",
+              "s",
+              "m",
+              "нарисовать",
+              "W",
+              "значения",
+              "min",
+              "max",
+              "x",
+              "y",
+              "линия",
+              "точки",
+              "градиент",
+              "svg",
+              "main",
+              "данные",
+              "дни"
+            ],
+            "requires": [
+              "t",
+              "a",
+              "H",
+              "pad"
+            ]
+          }
+        }
       },
       {
         "id": "1lcfz8",
@@ -1513,23 +2542,73 @@
         "id": "jd2lf0",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "async function main(){\n  const url = \"https://iss.moex.com/iss/engines/stock/markets/bonds/boards/TQCB/securities.json\"\n    + \"?iss.meta=off&securities.columns=SECID,SECNAME&marketdata.columns=SECID,YIELD\";\n  const ответ = await fetch(url);\n  const данные = await ответ.json();\n\n  // имена: {SECID: название}\n  const имена = {};\n  данные.securities.data.forEach(r => имена[r[0]] = r[1]);\n\n  // доходности → объекты → отбор > 20% → сортировка\n  const список = данные.marketdata.data\n    .map(r => ({ secid: r[0], доходность: r[1], имя: имена[r[0]] }))\n    .filter(x => x.доходность > 20)\n    .sort((a, b) => b.доходность - a.доходность);\n\n  таблица(список);\n}\n\nfunction таблица(список){\n  const строки = список.map(x =>\n    \"<tr><td>\" + (x.имя || x.secid) + \"</td><td>\" + x.доходность + \"%</td></tr>\").join(\"\");\n  document.querySelector(\"#out\").innerHTML =\n    \"<table cellpadding='4' style='color:#F6F4FF'>\" + строки + \"</table>\";\n}\nmain();"
         },
-        "title": "MOEX: облигации",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "MOEX: облигации → отбор → таблица",
+        "desc": "Сквозной с сетью. Два блока ответа (имена и доходности) СКЛЕИВАЕМ по SECID, отбираем доходные, рисуем таблицу. Каждый .map/.filter отдаёт массив следующему.",
         "x": 780,
-        "y": 4820
+        "y": 4820,
+        "src": {
+          "id": "flow-moex",
+          "title": "MOEX: облигации → отбор → таблица",
+          "desc": "Сквозной с сетью. Два блока ответа (имена и доходности) СКЛЕИВАЕМ по SECID, отбираем доходные, рисуем таблицу. Каждый .map/.filter отдаёт массив следующему.",
+          "code": "async function main(){\n  const url = \"https://iss.moex.com/iss/engines/stock/markets/bonds/boards/TQCB/securities.json\"\n    + \"?iss.meta=off&securities.columns=SECID,SECNAME&marketdata.columns=SECID,YIELD\";\n  const ответ = await fetch(url);\n  const данные = await ответ.json();\n\n  // имена: {SECID: название}\n  const имена = {};\n  данные.securities.data.forEach(r => имена[r[0]] = r[1]);\n\n  // доходности → объекты → отбор > 20% → сортировка\n  const список = данные.marketdata.data\n    .map(r => ({ secid: r[0], доходность: r[1], имя: имена[r[0]] }))\n    .filter(x => x.доходность > 20)\n    .sort((a, b) => b.доходность - a.доходность);\n\n  таблица(список);\n}\n\nfunction таблица(список){\n  const строки = список.map(x =>\n    \"<tr><td>\" + (x.имя || x.secid) + \"</td><td>\" + x.доходность + \"%</td></tr>\").join(\"\");\n  document.querySelector(\"#out\").innerHTML =\n    \"<table cellpadding='4' style='color:#F6F4FF'>\" + строки + \"</table>\";\n}\nmain();",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "main",
+              "url",
+              "ответ",
+              "данные",
+              "имена",
+              "список",
+              "таблица",
+              "строки"
+            ],
+            "requires": [
+              "secid",
+              "доходность",
+              "имя",
+              "a"
+            ]
+          }
+        }
       },
       {
         "id": "slebea",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "async function main(){\n  const url = \"https://iss.moex.com/iss/engines/stock/markets/bonds/boards/TQCB/securities.json\"\n    + \"?iss.meta=off&securities.columns=SECID,SECNAME&marketdata.columns=SECID,YIELD\";\n  const ответ = await fetch(url);\n  const данные = await ответ.json();\n\n  // имена: {SECID: название}\n  const имена = {};\n  данные.securities.data.forEach(r => имена[r[0]] = r[1]);\n\n  // доходности → объекты → отбор > 20% → сортировка\n  const список = данные.marketdata.data\n    .map(r => ({ secid: r[0], доходность: r[1], имя: имена[r[0]] }))\n    .filter(x => x.доходность > 20)\n    .sort((a, b) => b.доходность - a.доходность);\n\n  таблица(список);\n}\n\nfunction таблица(список){\n  const строки = список.map(x =>\n    \"<tr><td>\" + (x.имя || x.secid) + \"</td><td>\" + x.доходность + \"%</td></tr>\").join(\"\");\n  document.querySelector(\"#out\").innerHTML =\n    \"<table cellpadding='4' style='color:#F6F4FF'>\" + строки + \"</table>\";\n}\nmain();"
         },
-        "title": "отбор",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "MOEX: облигации → отбор → таблица",
+        "desc": "Сквозной с сетью. Два блока ответа (имена и доходности) СКЛЕИВАЕМ по SECID, отбираем доходные, рисуем таблицу. Каждый .map/.filter отдаёт массив следующему.",
         "x": 60,
-        "y": 4990
+        "y": 4990,
+        "src": {
+          "id": "flow-moex",
+          "title": "MOEX: облигации → отбор → таблица",
+          "desc": "Сквозной с сетью. Два блока ответа (имена и доходности) СКЛЕИВАЕМ по SECID, отбираем доходные, рисуем таблицу. Каждый .map/.filter отдаёт массив следующему.",
+          "code": "async function main(){\n  const url = \"https://iss.moex.com/iss/engines/stock/markets/bonds/boards/TQCB/securities.json\"\n    + \"?iss.meta=off&securities.columns=SECID,SECNAME&marketdata.columns=SECID,YIELD\";\n  const ответ = await fetch(url);\n  const данные = await ответ.json();\n\n  // имена: {SECID: название}\n  const имена = {};\n  данные.securities.data.forEach(r => имена[r[0]] = r[1]);\n\n  // доходности → объекты → отбор > 20% → сортировка\n  const список = данные.marketdata.data\n    .map(r => ({ secid: r[0], доходность: r[1], имя: имена[r[0]] }))\n    .filter(x => x.доходность > 20)\n    .sort((a, b) => b.доходность - a.доходность);\n\n  таблица(список);\n}\n\nfunction таблица(список){\n  const строки = список.map(x =>\n    \"<tr><td>\" + (x.имя || x.secid) + \"</td><td>\" + x.доходность + \"%</td></tr>\").join(\"\");\n  document.querySelector(\"#out\").innerHTML =\n    \"<table cellpadding='4' style='color:#F6F4FF'>\" + строки + \"</table>\";\n}\nmain();",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "main",
+              "url",
+              "ответ",
+              "данные",
+              "имена",
+              "список",
+              "таблица",
+              "строки"
+            ],
+            "requires": [
+              "secid",
+              "доходность",
+              "имя",
+              "a"
+            ]
+          }
+        }
       },
       {
         "id": "y13x3c",
@@ -1563,23 +2642,61 @@
         "id": "c251m3",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const bonds = [\n  { name: \"Альфа\", yield: 12.4, years: 2 },\n  { name: \"Бета\", yield: 9.8, years: 1 },\n  { name: \"Гамма\", yield: 13.1, years: 5 }\n];\n\nconst shortlist = bonds\n  .filter(bond => bond.yield >= 10 && bond.years <= 3)\n  .sort((a, b) => b.yield - a.yield);\n\nconsole.log(shortlist.map(bond => bond.name));"
         },
-        "title": "Фильтрация и сортировка облигаций —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Фильтрация и сортировка облигаций",
+        "desc": "filter отбирает записи по нескольким условиям, а sort сортирует подходящие записи. Для числовых полей используйте числовой компаратор.",
         "x": 780,
-        "y": 4990
+        "y": 4990,
+        "src": {
+          "id": "фильтрация-и-сортировка-облигаций-mv6cut3i",
+          "title": "Фильтрация и сортировка облигаций",
+          "desc": "filter отбирает записи по нескольким условиям, а sort сортирует подходящие записи. Для числовых полей используйте числовой компаратор.",
+          "code": "const bonds = [\n  { name: \"Альфа\", yield: 12.4, years: 2 },\n  { name: \"Бета\", yield: 9.8, years: 1 },\n  { name: \"Гамма\", yield: 13.1, years: 5 }\n];\n\nconst shortlist = bonds\n  .filter(bond => bond.yield >= 10 && bond.years <= 3)\n  .sort((a, b) => b.yield - a.yield);\n\nconsole.log(shortlist.map(bond => bond.name));",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "bonds",
+              "shortlist"
+            ],
+            "requires": [
+              "name",
+              "years",
+              "a"
+            ]
+          }
+        }
       },
       {
         "id": "tpkg0p",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const q = u => fetch(u).then(r => r.json());\n\nasync function main(){\n  // — ЦЕПОЧКА: шаг 2 зависит от шага 1 —\n  const поиск = await q(\"https://iss.moex.com/iss/securities.json?q=Сбербанк&iss.meta=off\");\n  const secid = поиск.securities.data[0][1];          // берём код из 1-го ответа\n  const инфо  = await q(\"https://iss.moex.com/iss/securities/\" + secid + \".json?iss.meta=off\");\n  console.log(\"по цепочке, secid:\", secid);\n\n  // — ПАРАЛЛЕЛЬНО: запросы НЕ зависят друг от друга —\n  const [a, b] = await Promise.all([\n    q(\"https://iss.moex.com/iss/engines.json?iss.meta=off\"),\n    q(\"https://iss.moex.com/iss/index.json?iss.meta=off\"),\n  ]);\n  console.log(\"параллельно пришли оба ответа\");\n}\nmain();"
         },
-        "title": "Цепочка и параллельные запросы —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Цепочка и параллельные запросы",
+        "desc": "Два способа нескольких запросов. ЦЕПОЧКА (await, потом await) — когда второй нуждается в результате первого. ПАРАЛЛЕЛЬНО (Promise.all) — когда запросы независимы: так быстрее, ждём все разом.",
         "x": 60,
-        "y": 5160
+        "y": 5160,
+        "src": {
+          "id": "net-chain",
+          "title": "Цепочка и параллельные запросы",
+          "desc": "Два способа нескольких запросов. ЦЕПОЧКА (await, потом await) — когда второй нуждается в результате первого. ПАРАЛЛЕЛЬНО (Promise.all) — когда запросы независимы: так быстрее, ждём все разом.",
+          "code": "const q = u => fetch(u).then(r => r.json());\n\nasync function main(){\n  // — ЦЕПОЧКА: шаг 2 зависит от шага 1 —\n  const поиск = await q(\"https://iss.moex.com/iss/securities.json?q=Сбербанк&iss.meta=off\");\n  const secid = поиск.securities.data[0][1];          // берём код из 1-го ответа\n  const инфо  = await q(\"https://iss.moex.com/iss/securities/\" + secid + \".json?iss.meta=off\");\n  console.log(\"по цепочке, secid:\", secid);\n\n  // — ПАРАЛЛЕЛЬНО: запросы НЕ зависят друг от друга —\n  const [a, b] = await Promise.all([\n    q(\"https://iss.moex.com/iss/engines.json?iss.meta=off\"),\n    q(\"https://iss.moex.com/iss/index.json?iss.meta=off\"),\n  ]);\n  console.log(\"параллельно пришли оба ответа\");\n}\nmain();",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "q",
+              "main",
+              "поиск",
+              "secid",
+              "инфо"
+            ],
+            "requires": [
+              "a",
+              "b"
+            ]
+          }
+        }
       },
       {
         "id": "n9m45e",
@@ -1602,23 +2719,95 @@
         "id": "qnon6t",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "// Прокси обходит CORS к bo.nalog.gov.ru. По умолчанию — публичный corsproxy.io.\nconst ПРОКСИ = \"https://corsproxy.io/?\";   // свой CF Worker: \"https://…workers.dev/?u=\"\n\n// собрать адрес через прокси по соглашению проекта\nfunction черезПрокси(target){\n  if(ПРОКСИ.endsWith(\"=\")) return ПРОКСИ + encodeURIComponent(target); // …/?u= → кодируем\n  return ПРОКСИ + target;                                             // …/?   → как есть\n}\nconst гирбо = путь => черезПрокси(\"https://bo.nalog.gov.ru\" + путь);\nconst q = u => fetch(u, { headers: { Accept: \"application/json\" } }).then(r => r.json());\n\n// Шаг 1–2: имя → MOEX → ИНН эмитента\nasync function поИмениИНН(имя){\n  const j = await q(\"https://iss.moex.com/iss/securities.json?iss.meta=off&q=\" + encodeURIComponent(имя));\n  const кол = j.securities.columns;\n  const стр = j.securities.data[0];\n  if(!стр) throw new Error(\"на бирже нет: \" + имя);\n  return String(стр[кол.indexOf(\"emitent_inn\")] || \"\");\n}\n\n// Шаг 3–4: ИНН → ГИР БО → годы отчётов в массив\nasync function отчётность(ИНН){\n  const найдено = await q(гирбо(\"/advanced-search/organizations/search?inn=\" + ИНН));\n  const orgs = найдено.content || найдено;      // список организаций\n  const org = orgs[0];\n  if(!org) throw new Error(\"в ГИР БО нет ИНН \" + ИНН);\n  const bfo = await q(гирбо(\"/nbo/organizations/\" + org.id + \"/bfo/\")); // список отчётов\n  const список = bfo.content || bfo;\n  const годы = список\n    .filter(b => String(b.period).length === 4)   // только годовые\n    .map(b => Number(b.period))\n    .sort((a, b) => b - a);\n  return { orgId: org.id, годы };                 // ответ → массив лет\n}\n\nasync function main(){\n  const ИНН = await поИмениИНН(\"Сбербанк\");       // ← имя из Т-Инвестиций\n  console.log(\"ИНН эмитента:\", ИНН);\n  const r = await отчётность(ИНН);\n  console.log(\"orgId:\", r.orgId, \"годы:\", r.годы);\n  // дальше по каждому году: /nbo/details/balance?id= и /nbo/details/financial_result?id=\n  // → оттуда выручка (код 2110), активы (1600) и т.д. в массивы по годам.\n}\nmain();"
         },
-        "title": "Имя",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси)",
+        "desc": "Полная цепочка с рабочим прокси. Прокси обходит запрет CORS: по умолчанию публичный corsproxy.io (бесплатный, без настройки). Свой надёжнее — Cloudflare Worker (код в cf-worker.js репозитория), формат …/?u=. Шаги: имя (как в Т-Инвестициях) → MOEX (ИНН эмитента) → ГИР БО: поиск организации по ИНН → список отчётов → годы в массив. Запусти — работает вживую (если corsproxy доступен).",
         "x": 540,
-        "y": 5160
+        "y": 5160,
+        "src": {
+          "id": "flow-chain-girbo",
+          "title": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси)",
+          "desc": "Полная цепочка с рабочим прокси. Прокси обходит запрет CORS: по умолчанию публичный corsproxy.io (бесплатный, без настройки). Свой надёжнее — Cloudflare Worker (код в cf-worker.js репозитория), формат …/?u=. Шаги: имя (как в Т-Инвестициях) → MOEX (ИНН эмитента) → ГИР БО: поиск организации по ИНН → список отчётов → годы в массив. Запусти — работает вживую (если corsproxy доступен).",
+          "code": "// Прокси обходит CORS к bo.nalog.gov.ru. По умолчанию — публичный corsproxy.io.\nconst ПРОКСИ = \"https://corsproxy.io/?\";   // свой CF Worker: \"https://…workers.dev/?u=\"\n\n// собрать адрес через прокси по соглашению проекта\nfunction черезПрокси(target){\n  if(ПРОКСИ.endsWith(\"=\")) return ПРОКСИ + encodeURIComponent(target); // …/?u= → кодируем\n  return ПРОКСИ + target;                                             // …/?   → как есть\n}\nconst гирбо = путь => черезПрокси(\"https://bo.nalog.gov.ru\" + путь);\nconst q = u => fetch(u, { headers: { Accept: \"application/json\" } }).then(r => r.json());\n\n// Шаг 1–2: имя → MOEX → ИНН эмитента\nasync function поИмениИНН(имя){\n  const j = await q(\"https://iss.moex.com/iss/securities.json?iss.meta=off&q=\" + encodeURIComponent(имя));\n  const кол = j.securities.columns;\n  const стр = j.securities.data[0];\n  if(!стр) throw new Error(\"на бирже нет: \" + имя);\n  return String(стр[кол.indexOf(\"emitent_inn\")] || \"\");\n}\n\n// Шаг 3–4: ИНН → ГИР БО → годы отчётов в массив\nasync function отчётность(ИНН){\n  const найдено = await q(гирбо(\"/advanced-search/organizations/search?inn=\" + ИНН));\n  const orgs = найдено.content || найдено;      // список организаций\n  const org = orgs[0];\n  if(!org) throw new Error(\"в ГИР БО нет ИНН \" + ИНН);\n  const bfo = await q(гирбо(\"/nbo/organizations/\" + org.id + \"/bfo/\")); // список отчётов\n  const список = bfo.content || bfo;\n  const годы = список\n    .filter(b => String(b.period).length === 4)   // только годовые\n    .map(b => Number(b.period))\n    .sort((a, b) => b - a);\n  return { orgId: org.id, годы };                 // ответ → массив лет\n}\n\nasync function main(){\n  const ИНН = await поИмениИНН(\"Сбербанк\");       // ← имя из Т-Инвестиций\n  console.log(\"ИНН эмитента:\", ИНН);\n  const r = await отчётность(ИНН);\n  console.log(\"orgId:\", r.orgId, \"годы:\", r.годы);\n  // дальше по каждому году: /nbo/details/balance?id= и /nbo/details/financial_result?id=\n  // → оттуда выручка (код 2110), активы (1600) и т.д. в массивы по годам.\n}\nmain();",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "ПРОКСИ",
+              "черезПрокси",
+              "гирбо",
+              "q",
+              "поИмениИНН",
+              "j",
+              "кол",
+              "стр",
+              "отчётность",
+              "найдено",
+              "orgs",
+              "org",
+              "bfo",
+              "список",
+              "годы",
+              "main",
+              "ИНН",
+              "r"
+            ],
+            "requires": [
+              "encodeURIComponent",
+              "headers",
+              "Accept",
+              "a",
+              "orgId"
+            ]
+          }
+        }
       },
       {
         "id": "599y77",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "// Прокси обходит CORS к bo.nalog.gov.ru. По умолчанию — публичный corsproxy.io.\nconst ПРОКСИ = \"https://corsproxy.io/?\";   // свой CF Worker: \"https://…workers.dev/?u=\"\n\n// собрать адрес через прокси по соглашению проекта\nfunction черезПрокси(target){\n  if(ПРОКСИ.endsWith(\"=\")) return ПРОКСИ + encodeURIComponent(target); // …/?u= → кодируем\n  return ПРОКСИ + target;                                             // …/?   → как есть\n}\nconst гирбо = путь => черезПрокси(\"https://bo.nalog.gov.ru\" + путь);\nconst q = u => fetch(u, { headers: { Accept: \"application/json\" } }).then(r => r.json());\n\n// Шаг 1–2: имя → MOEX → ИНН эмитента\nasync function поИмениИНН(имя){\n  const j = await q(\"https://iss.moex.com/iss/securities.json?iss.meta=off&q=\" + encodeURIComponent(имя));\n  const кол = j.securities.columns;\n  const стр = j.securities.data[0];\n  if(!стр) throw new Error(\"на бирже нет: \" + имя);\n  return String(стр[кол.indexOf(\"emitent_inn\")] || \"\");\n}\n\n// Шаг 3–4: ИНН → ГИР БО → годы отчётов в массив\nasync function отчётность(ИНН){\n  const найдено = await q(гирбо(\"/advanced-search/organizations/search?inn=\" + ИНН));\n  const orgs = найдено.content || найдено;      // список организаций\n  const org = orgs[0];\n  if(!org) throw new Error(\"в ГИР БО нет ИНН \" + ИНН);\n  const bfo = await q(гирбо(\"/nbo/organizations/\" + org.id + \"/bfo/\")); // список отчётов\n  const список = bfo.content || bfo;\n  const годы = список\n    .filter(b => String(b.period).length === 4)   // только годовые\n    .map(b => Number(b.period))\n    .sort((a, b) => b - a);\n  return { orgId: org.id, годы };                 // ответ → массив лет\n}\n\nasync function main(){\n  const ИНН = await поИмениИНН(\"Сбербанк\");       // ← имя из Т-Инвестиций\n  console.log(\"ИНН эмитента:\", ИНН);\n  const r = await отчётность(ИНН);\n  console.log(\"orgId:\", r.orgId, \"годы:\", r.годы);\n  // дальше по каждому году: /nbo/details/balance?id= и /nbo/details/financial_result?id=\n  // → оттуда выручка (код 2110), активы (1600) и т.д. в массивы по годам.\n}\nmain();"
         },
-        "title": "биржа",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси)",
+        "desc": "Полная цепочка с рабочим прокси. Прокси обходит запрет CORS: по умолчанию публичный corsproxy.io (бесплатный, без настройки). Свой надёжнее — Cloudflare Worker (код в cf-worker.js репозитория), формат …/?u=. Шаги: имя (как в Т-Инвестициях) → MOEX (ИНН эмитента) → ГИР БО: поиск организации по ИНН → список отчётов → годы в массив. Запусти — работает вживую (если corsproxy доступен).",
         "x": 780,
-        "y": 5160
+        "y": 5160,
+        "src": {
+          "id": "flow-chain-girbo",
+          "title": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси)",
+          "desc": "Полная цепочка с рабочим прокси. Прокси обходит запрет CORS: по умолчанию публичный corsproxy.io (бесплатный, без настройки). Свой надёжнее — Cloudflare Worker (код в cf-worker.js репозитория), формат …/?u=. Шаги: имя (как в Т-Инвестициях) → MOEX (ИНН эмитента) → ГИР БО: поиск организации по ИНН → список отчётов → годы в массив. Запусти — работает вживую (если corsproxy доступен).",
+          "code": "// Прокси обходит CORS к bo.nalog.gov.ru. По умолчанию — публичный corsproxy.io.\nconst ПРОКСИ = \"https://corsproxy.io/?\";   // свой CF Worker: \"https://…workers.dev/?u=\"\n\n// собрать адрес через прокси по соглашению проекта\nfunction черезПрокси(target){\n  if(ПРОКСИ.endsWith(\"=\")) return ПРОКСИ + encodeURIComponent(target); // …/?u= → кодируем\n  return ПРОКСИ + target;                                             // …/?   → как есть\n}\nconst гирбо = путь => черезПрокси(\"https://bo.nalog.gov.ru\" + путь);\nconst q = u => fetch(u, { headers: { Accept: \"application/json\" } }).then(r => r.json());\n\n// Шаг 1–2: имя → MOEX → ИНН эмитента\nasync function поИмениИНН(имя){\n  const j = await q(\"https://iss.moex.com/iss/securities.json?iss.meta=off&q=\" + encodeURIComponent(имя));\n  const кол = j.securities.columns;\n  const стр = j.securities.data[0];\n  if(!стр) throw new Error(\"на бирже нет: \" + имя);\n  return String(стр[кол.indexOf(\"emitent_inn\")] || \"\");\n}\n\n// Шаг 3–4: ИНН → ГИР БО → годы отчётов в массив\nasync function отчётность(ИНН){\n  const найдено = await q(гирбо(\"/advanced-search/organizations/search?inn=\" + ИНН));\n  const orgs = найдено.content || найдено;      // список организаций\n  const org = orgs[0];\n  if(!org) throw new Error(\"в ГИР БО нет ИНН \" + ИНН);\n  const bfo = await q(гирбо(\"/nbo/organizations/\" + org.id + \"/bfo/\")); // список отчётов\n  const список = bfo.content || bfo;\n  const годы = список\n    .filter(b => String(b.period).length === 4)   // только годовые\n    .map(b => Number(b.period))\n    .sort((a, b) => b - a);\n  return { orgId: org.id, годы };                 // ответ → массив лет\n}\n\nasync function main(){\n  const ИНН = await поИмениИНН(\"Сбербанк\");       // ← имя из Т-Инвестиций\n  console.log(\"ИНН эмитента:\", ИНН);\n  const r = await отчётность(ИНН);\n  console.log(\"orgId:\", r.orgId, \"годы:\", r.годы);\n  // дальше по каждому году: /nbo/details/balance?id= и /nbo/details/financial_result?id=\n  // → оттуда выручка (код 2110), активы (1600) и т.д. в массивы по годам.\n}\nmain();",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "ПРОКСИ",
+              "черезПрокси",
+              "гирбо",
+              "q",
+              "поИмениИНН",
+              "j",
+              "кол",
+              "стр",
+              "отчётность",
+              "найдено",
+              "orgs",
+              "org",
+              "bfo",
+              "список",
+              "годы",
+              "main",
+              "ИНН",
+              "r"
+            ],
+            "requires": [
+              "encodeURIComponent",
+              "headers",
+              "Accept",
+              "a",
+              "orgId"
+            ]
+          }
+        }
       },
       {
         "id": "m2nn37",
@@ -1635,45 +2824,128 @@
         "id": "k5xdia",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "// Прокси обходит CORS к bo.nalog.gov.ru. По умолчанию — публичный corsproxy.io.\nconst ПРОКСИ = \"https://corsproxy.io/?\";   // свой CF Worker: \"https://…workers.dev/?u=\"\n\n// собрать адрес через прокси по соглашению проекта\nfunction черезПрокси(target){\n  if(ПРОКСИ.endsWith(\"=\")) return ПРОКСИ + encodeURIComponent(target); // …/?u= → кодируем\n  return ПРОКСИ + target;                                             // …/?   → как есть\n}\nconst гирбо = путь => черезПрокси(\"https://bo.nalog.gov.ru\" + путь);\nconst q = u => fetch(u, { headers: { Accept: \"application/json\" } }).then(r => r.json());\n\n// Шаг 1–2: имя → MOEX → ИНН эмитента\nasync function поИмениИНН(имя){\n  const j = await q(\"https://iss.moex.com/iss/securities.json?iss.meta=off&q=\" + encodeURIComponent(имя));\n  const кол = j.securities.columns;\n  const стр = j.securities.data[0];\n  if(!стр) throw new Error(\"на бирже нет: \" + имя);\n  return String(стр[кол.indexOf(\"emitent_inn\")] || \"\");\n}\n\n// Шаг 3–4: ИНН → ГИР БО → годы отчётов в массив\nasync function отчётность(ИНН){\n  const найдено = await q(гирбо(\"/advanced-search/organizations/search?inn=\" + ИНН));\n  const orgs = найдено.content || найдено;      // список организаций\n  const org = orgs[0];\n  if(!org) throw new Error(\"в ГИР БО нет ИНН \" + ИНН);\n  const bfo = await q(гирбо(\"/nbo/organizations/\" + org.id + \"/bfo/\")); // список отчётов\n  const список = bfo.content || bfo;\n  const годы = список\n    .filter(b => String(b.period).length === 4)   // только годовые\n    .map(b => Number(b.period))\n    .sort((a, b) => b - a);\n  return { orgId: org.id, годы };                 // ответ → массив лет\n}\n\nasync function main(){\n  const ИНН = await поИмениИНН(\"Сбербанк\");       // ← имя из Т-Инвестиций\n  console.log(\"ИНН эмитента:\", ИНН);\n  const r = await отчётность(ИНН);\n  console.log(\"orgId:\", r.orgId, \"годы:\", r.годы);\n  // дальше по каждому году: /nbo/details/balance?id= и /nbo/details/financial_result?id=\n  // → оттуда выручка (код 2110), активы (1600) и т.д. в массивы по годам.\n}\nmain();"
         },
-        "title": "ГИР БО",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси)",
+        "desc": "Полная цепочка с рабочим прокси. Прокси обходит запрет CORS: по умолчанию публичный corsproxy.io (бесплатный, без настройки). Свой надёжнее — Cloudflare Worker (код в cf-worker.js репозитория), формат …/?u=. Шаги: имя (как в Т-Инвестициях) → MOEX (ИНН эмитента) → ГИР БО: поиск организации по ИНН → список отчётов → годы в массив. Запусти — работает вживую (если corsproxy доступен).",
         "x": 300,
-        "y": 5330
+        "y": 5330,
+        "src": {
+          "id": "flow-chain-girbo",
+          "title": "Имя → биржа → ИНН → ГИР БО → массивы (с прокси)",
+          "desc": "Полная цепочка с рабочим прокси. Прокси обходит запрет CORS: по умолчанию публичный corsproxy.io (бесплатный, без настройки). Свой надёжнее — Cloudflare Worker (код в cf-worker.js репозитория), формат …/?u=. Шаги: имя (как в Т-Инвестициях) → MOEX (ИНН эмитента) → ГИР БО: поиск организации по ИНН → список отчётов → годы в массив. Запусти — работает вживую (если corsproxy доступен).",
+          "code": "// Прокси обходит CORS к bo.nalog.gov.ru. По умолчанию — публичный corsproxy.io.\nconst ПРОКСИ = \"https://corsproxy.io/?\";   // свой CF Worker: \"https://…workers.dev/?u=\"\n\n// собрать адрес через прокси по соглашению проекта\nfunction черезПрокси(target){\n  if(ПРОКСИ.endsWith(\"=\")) return ПРОКСИ + encodeURIComponent(target); // …/?u= → кодируем\n  return ПРОКСИ + target;                                             // …/?   → как есть\n}\nconst гирбо = путь => черезПрокси(\"https://bo.nalog.gov.ru\" + путь);\nconst q = u => fetch(u, { headers: { Accept: \"application/json\" } }).then(r => r.json());\n\n// Шаг 1–2: имя → MOEX → ИНН эмитента\nasync function поИмениИНН(имя){\n  const j = await q(\"https://iss.moex.com/iss/securities.json?iss.meta=off&q=\" + encodeURIComponent(имя));\n  const кол = j.securities.columns;\n  const стр = j.securities.data[0];\n  if(!стр) throw new Error(\"на бирже нет: \" + имя);\n  return String(стр[кол.indexOf(\"emitent_inn\")] || \"\");\n}\n\n// Шаг 3–4: ИНН → ГИР БО → годы отчётов в массив\nasync function отчётность(ИНН){\n  const найдено = await q(гирбо(\"/advanced-search/organizations/search?inn=\" + ИНН));\n  const orgs = найдено.content || найдено;      // список организаций\n  const org = orgs[0];\n  if(!org) throw new Error(\"в ГИР БО нет ИНН \" + ИНН);\n  const bfo = await q(гирбо(\"/nbo/organizations/\" + org.id + \"/bfo/\")); // список отчётов\n  const список = bfo.content || bfo;\n  const годы = список\n    .filter(b => String(b.period).length === 4)   // только годовые\n    .map(b => Number(b.period))\n    .sort((a, b) => b - a);\n  return { orgId: org.id, годы };                 // ответ → массив лет\n}\n\nasync function main(){\n  const ИНН = await поИмениИНН(\"Сбербанк\");       // ← имя из Т-Инвестиций\n  console.log(\"ИНН эмитента:\", ИНН);\n  const r = await отчётность(ИНН);\n  console.log(\"orgId:\", r.orgId, \"годы:\", r.годы);\n  // дальше по каждому году: /nbo/details/balance?id= и /nbo/details/financial_result?id=\n  // → оттуда выручка (код 2110), активы (1600) и т.д. в массивы по годам.\n}\nmain();",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "ПРОКСИ",
+              "черезПрокси",
+              "гирбо",
+              "q",
+              "поИмениИНН",
+              "j",
+              "кол",
+              "стр",
+              "отчётность",
+              "найдено",
+              "orgs",
+              "org",
+              "bfo",
+              "список",
+              "годы",
+              "main",
+              "ИНН",
+              "r"
+            ],
+            "requires": [
+              "encodeURIComponent",
+              "headers",
+              "Accept",
+              "a",
+              "orgId"
+            ]
+          }
+        }
       },
       {
         "id": "8g7ohz",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const числа = [40, 70, 30, 90, 55];"
         },
-        "title": "массивы (с прокси) —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "массив",
+        "desc": "Массив — упорядоченный список значений\nДопустим, у тебя есть не один цвет, а сразу пять. Создавать отдельную переменную для каждого неудобно.\nМожно собрать их в массив:\nconst colors = [\"красный\", \"синий\", \"зелёный\"];\nМассив обозначается квадратными скобками [].\nКак устроен массив\nУ каждого элемента есть позиция — индекс. В JavaScript отсчёт начинается с нуля.\nИндекс 0\nкрасный\n\n\nИндекс 1\nсиний\n\n\nИн",
         "x": 540,
-        "y": 5330
+        "y": 5330,
+        "src": {
+          "id": "массив-mv9yln2q",
+          "title": "массив",
+          "desc": "Массив — упорядоченный список значений\nДопустим, у тебя есть не один цвет, а сразу пять. Создавать отдельную переменную для каждого неудобно.\nМожно собрать их в массив:\nconst colors = [\"красный\", \"синий\", \"зелёный\"];\nМассив обозначается квадратными скобками [].\nКак устроен массив\nУ каждого элемента есть позиция — индекс. В JavaScript отсчёт начинается с нуля.\nИндекс 0\nкрасный\n\n\nИндекс 1\nсиний\n\n\nИн",
+          "code": "const числа = [40, 70, 30, 90, 55];",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "числа"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "obg1zu",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const цены = [100, 102, 101, 105, 103, 108];\n\n// шаг 1: массив цен → массив доходностей\nfunction доходности(цены){\n  const out = [];\n  for(let i = 1; i < цены.length; i++) out.push(цены[i] / цены[i - 1] - 1);\n  return out;\n}\n// шаг 2: массив доходностей → одно число (риск)\nfunction волатильность(дох){\n  const среднее = дох.reduce((a, b) => a + b, 0) / дох.length;\n  const дисп = дох.reduce((a, b) => a + (b - среднее) * (b - среднее), 0) / дох.length;\n  return Math.sqrt(дисп);\n}\n\nconst дох = доходности(цены);       // провод: массив доходностей\nconst риск = волатильность(дох);    // дох ВХОДИТ сюда → число\nconsole.log(\"риск:\", риск.toFixed(4));"
         },
-        "title": "Цены",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Цены → доходности → риск",
+        "desc": "Сквозной расчёт без сети. Видно стыковку по типу: доходности() отдаёт массив, волатильность() его принимает. Выход одного = вход другого.",
         "x": 780,
-        "y": 5330
+        "y": 5330,
+        "src": {
+          "id": "flow-risk",
+          "title": "Цены → доходности → риск",
+          "desc": "Сквозной расчёт без сети. Видно стыковку по типу: доходности() отдаёт массив, волатильность() его принимает. Выход одного = вход другого.",
+          "code": "const цены = [100, 102, 101, 105, 103, 108];\n\n// шаг 1: массив цен → массив доходностей\nfunction доходности(цены){\n  const out = [];\n  for(let i = 1; i < цены.length; i++) out.push(цены[i] / цены[i - 1] - 1);\n  return out;\n}\n// шаг 2: массив доходностей → одно число (риск)\nfunction волатильность(дох){\n  const среднее = дох.reduce((a, b) => a + b, 0) / дох.length;\n  const дисп = дох.reduce((a, b) => a + (b - среднее) * (b - среднее), 0) / дох.length;\n  return Math.sqrt(дисп);\n}\n\nconst дох = доходности(цены);       // провод: массив доходностей\nconst риск = волатильность(дох);    // дох ВХОДИТ сюда → число\nconsole.log(\"риск:\", риск.toFixed(4));",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "цены",
+              "доходности",
+              "out",
+              "i",
+              "волатильность",
+              "среднее",
+              "дисп",
+              "дох",
+              "риск"
+            ],
+            "requires": [
+              "a"
+            ]
+          }
+        }
       },
       {
         "id": "bjiy22",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "function returnsFromPrices(prices) {\n  const out = [];\n  for (let i = 1; i < prices.length; i++) {\n    const prev = prices[i - 1];\n    out.push(prev > 0 ? prices[i] / prev - 1 : null);\n  }\n  return out;\n}\nconsole.log(returnsFromPrices([100, 105, 99]));\n"
         },
-        "title": "доходности",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Доходности из последовательности цен",
+        "desc": "Вычисляет простые доходности между соседними ценами и пропускает деление на ноль.",
         "x": 60,
-        "y": 5500
+        "y": 5500,
+        "src": {
+          "id": "add-082-snippet",
+          "title": "Доходности из последовательности цен",
+          "desc": "Вычисляет простые доходности между соседними ценами и пропускает деление на ноль.",
+          "code": "function returnsFromPrices(prices) {\n  const out = [];\n  for (let i = 1; i < prices.length; i++) {\n    const prev = prices[i - 1];\n    out.push(prev > 0 ? prices[i] / prev - 1 : null);\n  }\n  return out;\n}\nconsole.log(returnsFromPrices([100, 105, 99]));\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "v47pib",
@@ -1707,12 +2979,23 @@
         "id": "rkr0gj",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "import numpy as np\n\n# Матрица доходностей: строки — активы, столбцы — дни.\nдоходности = np.array([\n    [0.01, -0.02, 0.03],   # актив A\n    [0.02, -0.01, 0.025],  # актив B\n], dtype=float)\n\nif доходности.ndim != 2 or доходности.shape[0] < 2 or доходности.shape[1] < 2:\n    raise ValueError(\"Нужны минимум два актива и два наблюдения\")\nif not np.all(np.isfinite(доходности)):\n    raise ValueError(\"Матрица доходностей должна содержать конечные значения\")\nif np.any(np.std(доходности, axis=1, ddof=1) == 0):\n    raise ValueError(\"Корреляция не определена для постоянного ряда\")\n\nкорр = np.corrcoef(доходности)   # корреляционная матрица активов\nprint(корр)\n"
         },
-        "title": "Матрица корреляций (связи активов) —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Матрица корреляций (связи активов)",
+        "desc": "Матрица корреляций доходностей через NumPy: показывает направление и силу линейной связи между рядами, не причинность. Здесь всего три наблюдения, поэтому высокая корреляция служит лишь иллюстрацией и не является надёжным выводом о синхронности активов.",
         "x": 780,
-        "y": 5500
+        "y": 5500,
+        "src": {
+          "id": "math-correlation",
+          "title": "Матрица корреляций (связи активов)",
+          "desc": "Матрица корреляций доходностей через NumPy: показывает направление и силу линейной связи между рядами, не причинность. Здесь всего три наблюдения, поэтому высокая корреляция служит лишь иллюстрацией и не является надёжным выводом о синхронности активов.",
+          "code": "import numpy as np\n\n# Матрица доходностей: строки — активы, столбцы — дни.\nдоходности = np.array([\n    [0.01, -0.02, 0.03],   # актив A\n    [0.02, -0.01, 0.025],  # актив B\n], dtype=float)\n\nif доходности.ndim != 2 or доходности.shape[0] < 2 or доходности.shape[1] < 2:\n    raise ValueError(\"Нужны минимум два актива и два наблюдения\")\nif not np.all(np.isfinite(доходности)):\n    raise ValueError(\"Матрица доходностей должна содержать конечные значения\")\nif np.any(np.std(доходности, axis=1, ddof=1) == 0):\n    raise ValueError(\"Корреляция не определена для постоянного ряда\")\n\nкорр = np.corrcoef(доходности)   # корреляционная матрица активов\nprint(корр)\n",
+          "lang": "python",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "hcginh",
@@ -1735,12 +3018,28 @@
         "id": "3u6b88",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "// w — веса бумаг [0.5, 0.5]; cov — матрица ковариаций N×N\nfunction дисперсияПортфеля(w, cov){\n  let сумма = 0;\n  for(let i = 0; i < w.length; i++){\n    for(let j = 0; j < w.length; j++){\n      сумма += w[i] * w[j] * cov[i][j]; // вклад пары (i,j)\n    }\n  }\n  return сумма;                        // дисперсия; корень = волатильность\n}"
         },
-        "title": "Дисперсия портфеля (ковариация) —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Дисперсия портфеля (ковариация)",
+        "desc": "Риск портфеля — НЕ сумма рисков бумаг. Он зависит от того, как бумаги движутся вместе (ковариация). Формула: wᵀ·Σ·w. w — веса, Σ — матрица ковариаций.",
         "x": 300,
-        "y": 5670
+        "y": 5670,
+        "src": {
+          "id": "risk-portfolio-var",
+          "title": "Дисперсия портфеля (ковариация)",
+          "desc": "Риск портфеля — НЕ сумма рисков бумаг. Он зависит от того, как бумаги движутся вместе (ковариация). Формула: wᵀ·Σ·w. w — веса, Σ — матрица ковариаций.",
+          "code": "// w — веса бумаг [0.5, 0.5]; cov — матрица ковариаций N×N\nfunction дисперсияПортфеля(w, cov){\n  let сумма = 0;\n  for(let i = 0; i < w.length; i++){\n    for(let j = 0; j < w.length; j++){\n      сумма += w[i] * w[j] * cov[i][j]; // вклад пары (i,j)\n    }\n  }\n  return сумма;                        // дисперсия; корень = волатильность\n}",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "дисперсияПортфеля",
+              "сумма",
+              "i",
+              "j"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "xjjxzd",
@@ -1763,12 +3062,37 @@
         "id": "fr890q",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const доходности = цены.map((p, i) =>\n  i === 0 ? 0 : p / цены[i - 1] - 1);   // слой 1: из цен\n\nconst cov = ковариация(матрицаДоходностей); // слой 2: из доходностей\nconst риск = Math.sqrt(дисперсияПортфеля(веса, cov)); // слой 3\nconst sharpe = (средняяДоходность - ставка) / риск;   // слой 4"
         },
-        "title": "Зависимости расчётов (слои) —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Зависимости расчётов (слои)",
+        "desc": "Сложный расчёт — это слои: каждый следующий опирается на предыдущий. Цены → доходности → ковариация → риск портфеля → Sharpe. Меняешь низ — верх пересчитывается сам.",
         "x": 780,
-        "y": 5670
+        "y": 5670,
+        "src": {
+          "id": "risk-dependencies",
+          "title": "Зависимости расчётов (слои)",
+          "desc": "Сложный расчёт — это слои: каждый следующий опирается на предыдущий. Цены → доходности → ковариация → риск портфеля → Sharpe. Меняешь низ — верх пересчитывается сам.",
+          "code": "const доходности = цены.map((p, i) =>\n  i === 0 ? 0 : p / цены[i - 1] - 1);   // слой 1: из цен\n\nconst cov = ковариация(матрицаДоходностей); // слой 2: из доходностей\nconst риск = Math.sqrt(дисперсияПортфеля(веса, cov)); // слой 3\nconst sharpe = (средняяДоходность - ставка) / риск;   // слой 4",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "доходности",
+              "cov",
+              "риск",
+              "sharpe"
+            ],
+            "requires": [
+              "цены",
+              "p",
+              "ковариация",
+              "матрицаДоходностей",
+              "дисперсияПортфеля",
+              "веса",
+              "средняяДоходность",
+              "ставка"
+            ]
+          }
+        }
       },
       {
         "id": "65xx8u",
@@ -1785,23 +3109,57 @@
         "id": "1x9tyg",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "import * as XLSX from \"xlsx\";\n\nconst книга = XLSX.read(данныеФайла, { type: \"array\" });\nconst лист  = книга.Sheets[книга.SheetNames[0]]; // первый лист\nconst строки = XLSX.utils.sheet_to_json(лист, { header: 1 });\n// строки → [[ячейка, ячейка, …], …]"
         },
-        "title": "SheetJS (xlsx) — читать Excel —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "SheetJS (xlsx) — читать Excel",
+        "desc": "Библиотека xlsx (SheetJS) — чтение .xlsx прямо в браузере. Используется в проекте для импорта отчётов ФНС. Лист → массив строк.",
         "x": 300,
-        "y": 5840
+        "y": 5840,
+        "src": {
+          "id": "libs-sheetjs",
+          "title": "SheetJS (xlsx) — читать Excel",
+          "desc": "Библиотека xlsx (SheetJS) — чтение .xlsx прямо в браузере. Используется в проекте для импорта отчётов ФНС. Лист → массив строк.",
+          "code": "import * as XLSX from \"xlsx\";\n\nconst книга = XLSX.read(данныеФайла, { type: \"array\" });\nconst лист  = книга.Sheets[книга.SheetNames[0]]; // первый лист\nconst строки = XLSX.utils.sheet_to_json(лист, { header: 1 });\n// строки → [[ячейка, ячейка, …], …]",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "книга",
+              "лист",
+              "строки"
+            ],
+            "requires": [
+              "as",
+              "XLSX",
+              "данныеФайла",
+              "type",
+              "header"
+            ]
+          }
+        }
       },
       {
         "id": "s0wxwa",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "// 1) В проекте (есть package.json): сначала в терминале\n//    npm install dayjs\n//    затем в коде:\nimport dayjs from \"dayjs\";\nconsole.log(dayjs().format(\"YYYY-MM-DD\"));\n\n// 2) В обычном HTML без сборки — через CDN:\n// <script src=\"https://cdn.jsdelivr.net/npm/dayjs/dayjs.min.js\"></script>"
         },
-        "title": "Как подключать библиотеки —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Как подключать библиотеки",
+        "desc": "Библиотека — чужой готовый код, который подключаешь к себе. Два пути: через npm (в проекте со сборкой) или через CDN (прямо в HTML).",
         "x": 540,
-        "y": 5840
+        "y": 5840,
+        "src": {
+          "id": "libs-howto",
+          "title": "Как подключать библиотеки",
+          "desc": "Библиотека — чужой готовый код, который подключаешь к себе. Два пути: через npm (в проекте со сборкой) или через CDN (прямо в HTML).",
+          "code": "// 1) В проекте (есть package.json): сначала в терминале\n//    npm install dayjs\n//    затем в коде:\nimport dayjs from \"dayjs\";\nconsole.log(dayjs().format(\"YYYY-MM-DD\"));\n\n// 2) В обычном HTML без сборки — через CDN:\n// <script src=\"https://cdn.jsdelivr.net/npm/dayjs/dayjs.min.js\"></script>",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": [
+              "dayjs"
+            ]
+          }
+        }
       },
       {
         "id": "7vuhjq",
@@ -1824,12 +3182,23 @@
         "id": "93p5qd",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "// ДВА СПОСОБА СОБРАТЬ СИСТЕМУ ИЗ ФАЙЛОВ\n\n// 1) ВНУТРИ ОДНОГО ДВИЖКА — файлы одного мира соединяются импортами.\n//    Браузер понимает HTML+CSS+JS сразу, поэтому один .html МОЖЕТ держать\n//    и <style> (стиль), и <script> (логику) — это реальное «вложение».\n//    JS-файлы между собой: export / import. Python-файлы: import.\n//    НО Python внутри JS внутри HTML «в одном запуске» — НЕЛЬЗЯ:\n//    браузер не умеет Python.\n//    (Исключение: PyScript / Pyodide — Python компилируют в WebAssembly,\n//     и он бежит в браузере. Экзотика, медленно, редко нужно.)\n\n// 2) РАЗНЫЕ ЯЗЫКИ / МАШИНЫ — отдельные программы, которые ОБЩАЮТСЯ.\n//    Никто не вложен в другого. Способы общения:\n//    • HTTP + JSON — один шлёт запрос, другой отвечает данными (fetch).\n//    • общий файл — один пишет .json/.csv, другой читает.\n//    • база данных — один кладёт строки, другой забирает.\n//    Главное — ДОГОВОР (формат сообщения), а не общий код.\n\n// ТВОЙ ПРОЕКТ ИМЕННО ТАК И УСТРОЕН:\n//   [браузер: HTML+JS сайт] --HTTP/JSON--> [Cloudflare Worker (JS)] --> ГИР БО\n//   [браузер]               --HTTP------->  [MOEX API]\n//   [Python-бот]            --файлы/JSON-->  общие данные --> [сайт читает]\n//   каждый кусок на своём языке, связаны СООБЩЕНИЯМИ, не общим кодом."
         },
-        "title": "Как файлы собираются в систему —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Как файлы собираются в систему",
+        "desc": "Два способа объединять код. 1) Внутри одного движка — вложение/импорты. 2) Разные языки/машины — отдельные программы, общаются сообщениями. Твой проект — второй способ.",
         "x": 60,
-        "y": 6010
+        "y": 6010,
+        "src": {
+          "id": "sys-architecture",
+          "title": "Как файлы собираются в систему",
+          "desc": "Два способа объединять код. 1) Внутри одного движка — вложение/импорты. 2) Разные языки/машины — отдельные программы, общаются сообщениями. Твой проект — второй способ.",
+          "code": "// ДВА СПОСОБА СОБРАТЬ СИСТЕМУ ИЗ ФАЙЛОВ\n\n// 1) ВНУТРИ ОДНОГО ДВИЖКА — файлы одного мира соединяются импортами.\n//    Браузер понимает HTML+CSS+JS сразу, поэтому один .html МОЖЕТ держать\n//    и <style> (стиль), и <script> (логику) — это реальное «вложение».\n//    JS-файлы между собой: export / import. Python-файлы: import.\n//    НО Python внутри JS внутри HTML «в одном запуске» — НЕЛЬЗЯ:\n//    браузер не умеет Python.\n//    (Исключение: PyScript / Pyodide — Python компилируют в WebAssembly,\n//     и он бежит в браузере. Экзотика, медленно, редко нужно.)\n\n// 2) РАЗНЫЕ ЯЗЫКИ / МАШИНЫ — отдельные программы, которые ОБЩАЮТСЯ.\n//    Никто не вложен в другого. Способы общения:\n//    • HTTP + JSON — один шлёт запрос, другой отвечает данными (fetch).\n//    • общий файл — один пишет .json/.csv, другой читает.\n//    • база данных — один кладёт строки, другой забирает.\n//    Главное — ДОГОВОР (формат сообщения), а не общий код.\n\n// ТВОЙ ПРОЕКТ ИМЕННО ТАК И УСТРОЕН:\n//   [браузер: HTML+JS сайт] --HTTP/JSON--> [Cloudflare Worker (JS)] --> ГИР БО\n//   [браузер]               --HTTP------->  [MOEX API]\n//   [Python-бот]            --файлы/JSON-->  общие данные --> [сайт читает]\n//   каждый кусок на своём языке, связаны СООБЩЕНИЯМИ, не общим кодом.",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "8odatt",
@@ -1852,23 +3221,57 @@
         "id": "uwg6oh",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "// ── файл  math.js  —  отдаёт функции наружу ──\nexport function среднее(список){\n  return список.reduce((a, b) => a + b, 0) / список.length;\n}\nexport const ВЕРСИЯ = \"1.0\";\n\n// ── файл  main.js  —  берёт их у соседа ──\nimport { среднее, ВЕРСИЯ } from \"./math.js\";   // путь к файлу-соседу\n\nconsole.log(среднее([10, 20, 30]));   // 20\nconsole.log(\"версия:\", ВЕРСИЯ);"
         },
-        "title": "Файлы общаются: export / import —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Файлы общаются: export / import",
+        "desc": "Как «куча файликов» одного языка образует систему. Один файл ОТДАЁТ (export) функции, другой их БЕРЁТ (import) по пути к соседу. Копируй в два файла рядом — заработает (в проекте со сборкой или type=module).",
         "x": 540,
-        "y": 6010
+        "y": 6010,
+        "src": {
+          "id": "sys-modules",
+          "title": "Файлы общаются: export / import",
+          "desc": "Как «куча файликов» одного языка образует систему. Один файл ОТДАЁТ (export) функции, другой их БЕРЁТ (import) по пути к соседу. Копируй в два файла рядом — заработает (в проекте со сборкой или type=module).",
+          "code": "// ── файл  math.js  —  отдаёт функции наружу ──\nexport function среднее(список){\n  return список.reduce((a, b) => a + b, 0) / список.length;\n}\nexport const ВЕРСИЯ = \"1.0\";\n\n// ── файл  main.js  —  берёт их у соседа ──\nimport { среднее, ВЕРСИЯ } from \"./math.js\";   // путь к файлу-соседу\n\nconsole.log(среднее([10, 20, 30]));   // 20\nconsole.log(\"версия:\", ВЕРСИЯ);",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "среднее",
+              "ВЕРСИЯ"
+            ],
+            "requires": [
+              "a"
+            ]
+          }
+        }
       },
       {
         "id": "r3m0ab",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const сервер = http.createServer((req, res) => {\n  const url = new URL(req.url, \"http://localhost\");\n  if(url.pathname === \"/api/time\"){\n    res.writeHead(200, { \"Content-Type\": \"application/json\" });\n    return res.end(JSON.stringify({ time: Date.now() }));\n  }\n  res.writeHead(404);\n  res.end(\"not found\");\n});"
         },
-        "title": "Сервер с маршрутами и JSON —",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Сервер с маршрутами и JSON",
+        "desc": "Чуть сложнее: разные ответы на разные адреса (роуты) и отдача JSON. По этому принципу сделаны /api/list и /api/add в Лаборатории.",
         "x": 780,
-        "y": 6010
+        "y": 6010,
+        "src": {
+          "id": "server-routes",
+          "title": "Сервер с маршрутами и JSON",
+          "desc": "Чуть сложнее: разные ответы на разные адреса (роуты) и отдача JSON. По этому принципу сделаны /api/list и /api/add в Лаборатории.",
+          "code": "const сервер = http.createServer((req, res) => {\n  const url = new URL(req.url, \"http://localhost\");\n  if(url.pathname === \"/api/time\"){\n    res.writeHead(200, { \"Content-Type\": \"application/json\" });\n    return res.end(JSON.stringify({ time: Date.now() }));\n  }\n  res.writeHead(404);\n  res.end(\"not found\");\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "сервер",
+              "url"
+            ],
+            "requires": [
+              "http",
+              "req",
+              "time"
+            ]
+          }
+        }
       }
     ],
     "edges": [

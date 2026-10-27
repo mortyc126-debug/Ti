@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "sessionstorage-mvh8he7d",
   "file": "sessionstorage-mvh8he7d.js",
-  "title": "sessionStorage",
+  "title": "sessionStorage — sessionStorage — хранилище данных на время сеанса вкладки",
   "lang": "js",
   "group": "Файлы, хранение и сервер / Хранение в браузере",
   "desc": "Живёт, пока открыта вкладка.",
@@ -22,7 +22,7 @@
     "как сохранить данные на вкладку"
   ],
   "source": {
-    "title": "imported",
+    "title": "manual",
     "desc": "imported",
     "tags": "ai",
     "aliases": "ai"
@@ -35,7 +35,7 @@
       "text": "sessionStorage",
       "kind": "name",
       "note": "sessionStorage — хранилище до закрытия вкладки",
-      "source": "dict"
+      "source": "custom"
     },
     {
       "line": 0,
@@ -67,7 +67,7 @@
       "text": "sessionStorage",
       "kind": "name",
       "note": "sessionStorage — хранилище до закрытия вкладки",
-      "source": "dict"
+      "source": "custom"
     },
     {
       "line": 1,
@@ -86,5 +86,6 @@
     "template": "sessionstorage-mvh8he7d.json",
     "descAt": 1792534036009
   },
-  "enriched": true
+  "enriched": true,
+  "descAt": 1792534036009
 }

@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "optgroup-mvxu3qkhr",
   "file": "группа-вариантов-списка-mvxu3qkhr.html",
-  "title": "optgroup",
+  "title": "optgroup — группа вариантов в выпадающем списке",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Группы option",
@@ -47,11 +47,53 @@
     "Группы"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "select",
+      "kind": "name",
+      "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 18,
+      "text": "label",
+      "kind": "name",
+      "note": "label — подпись к полю",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 29,
+      "text": "option",
+      "kind": "name",
+      "note": "option — пункт списка, value уйдёт на сервер",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 39,
+      "text": "option",
+      "kind": "name",
+      "note": "option — пункт списка, value уйдёт на сервер",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 59,
+      "text": "select",
+      "kind": "name",
+      "note": "SELECT — выбрать данные из таблицы (SQL).",
+      "source": "dict"
+    }
+  ],
+  "output": ""
 }

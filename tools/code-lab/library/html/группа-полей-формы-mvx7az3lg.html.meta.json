@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "fieldset-mvx7az3lg",
   "file": "группа-полей-формы-mvx7az3lg.html",
-  "title": "fieldset",
+  "title": "fieldset — группа связанных полей формы",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Fieldset",
@@ -35,11 +35,12 @@
     "корневой элемент"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

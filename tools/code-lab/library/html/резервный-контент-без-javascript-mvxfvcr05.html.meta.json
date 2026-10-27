@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "noscript-mvxfvcr05",
   "file": "резервный-контент-без-javascript-mvxfvcr05.html",
-  "title": "noscript",
+  "title": "noscript — содержимое при отключённом JavaScript",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Резервный контент",
@@ -39,11 +39,12 @@
     "контент"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

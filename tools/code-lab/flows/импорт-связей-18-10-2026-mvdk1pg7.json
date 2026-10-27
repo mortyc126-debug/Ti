@@ -1,7 +1,7 @@
 {
   "id": "импорт-связей-18-10-2026-mvdk1pg7",
   "name": "Импорт связей 18.10.2026",
-  "savedAt": 1792311594775,
+  "savedAt": 1793097277222,
   "graph": {
     "nodes": [
       {
@@ -53,12 +53,33 @@
         "id": "5awzv5",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "import * as XLSX from \"xlsx\";\n\nconst книга = XLSX.read(данныеФайла, { type: \"array\" });\nconst лист  = книга.Sheets[книга.SheetNames[0]]; // первый лист\nconst строки = XLSX.utils.sheet_to_json(лист, { header: 1 });\n// строки → [[ячейка, ячейка, …], …]"
         },
-        "title": "XLSX",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "SheetJS (xlsx) — читать Excel",
+        "desc": "Библиотека xlsx (SheetJS) — чтение .xlsx прямо в браузере. Используется в проекте для импорта отчётов ФНС. Лист → массив строк.",
         "x": 780,
-        "y": 60
+        "y": 60,
+        "src": {
+          "id": "libs-sheetjs",
+          "title": "SheetJS (xlsx) — читать Excel",
+          "desc": "Библиотека xlsx (SheetJS) — чтение .xlsx прямо в браузере. Используется в проекте для импорта отчётов ФНС. Лист → массив строк.",
+          "code": "import * as XLSX from \"xlsx\";\n\nconst книга = XLSX.read(данныеФайла, { type: \"array\" });\nconst лист  = книга.Sheets[книга.SheetNames[0]]; // первый лист\nconst строки = XLSX.utils.sheet_to_json(лист, { header: 1 });\n// строки → [[ячейка, ячейка, …], …]",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "книга",
+              "лист",
+              "строки"
+            ],
+            "requires": [
+              "as",
+              "XLSX",
+              "данныеФайла",
+              "type",
+              "header"
+            ]
+          }
+        }
       },
       {
         "id": "8vdvgv",
@@ -97,12 +118,23 @@
         "id": "o4h425",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "filename = \"report.final.csv\"\nnormalized = filename.replace(\".final\", \"\")\nassert filename.endswith(\".csv\")\nassert filename.startswith(\"report\")\nassert normalized == \"report.csv\"\nprint(normalized)\n"
         },
-        "title": "строки",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Строки: replace, startswith и endswith",
+        "desc": "Показывает замену подстроки и проверку префикса/суффикса. Строки неизменяемы: replace возвращает новую строку.",
         "x": 780,
-        "y": 230
+        "y": 230,
+        "src": {
+          "id": "строки-replace-startswith",
+          "title": "Строки: replace, startswith и endswith",
+          "desc": "Показывает замену подстроки и проверку префикса/суффикса. Строки неизменяемы: replace возвращает новую строку.",
+          "code": "filename = \"report.final.csv\"\nnormalized = filename.replace(\".final\", \"\")\nassert filename.endswith(\".csv\")\nassert filename.startswith(\"report\")\nassert normalized == \"report.csv\"\nprint(normalized)\n",
+          "lang": "python",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "j5a9xh",
@@ -170,34 +202,74 @@
         "id": "ppdb2p",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "import json\nfrom urllib.request import Request, urlopen\n\n\ndef post_json(url, payload, timeout=5):\n    body = json.dumps(payload).encode(\"utf-8\")\n    request = Request(url, data=body, headers={\"Content-Type\": \"application/json\"}, method=\"POST\")\n    with urlopen(request, timeout=timeout) as response:\n        return json.loads(response.read().decode(\"utf-8\"))\n\n# Пример вызова: post_json(\"https://example.invalid/api\", {\"symbol\": \"SBER\"})\n"
         },
-        "title": "http",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "HTTP JSON через urllib с тайм-аутом",
+        "desc": "Показывает формирование JSON POST-запроса стандартной библиотекой и ограничение времени ожидания. Фактический сетевой вызов вынесен в функцию и не выполняется при импорте.",
         "x": 60,
-        "y": 570
+        "y": 570,
+        "src": {
+          "id": "http-json-запрос-urllib",
+          "title": "HTTP JSON через urllib с тайм-аутом",
+          "desc": "Показывает формирование JSON POST-запроса стандартной библиотекой и ограничение времени ожидания. Фактический сетевой вызов вынесен в функцию и не выполняется при импорте.",
+          "code": "import json\nfrom urllib.request import Request, urlopen\n\n\ndef post_json(url, payload, timeout=5):\n    body = json.dumps(payload).encode(\"utf-8\")\n    request = Request(url, data=body, headers={\"Content-Type\": \"application/json\"}, method=\"POST\")\n    with urlopen(request, timeout=timeout) as response:\n        return json.loads(response.read().decode(\"utf-8\"))\n\n# Пример вызова: post_json(\"https://example.invalid/api\", {\"symbol\": \"SBER\"})\n",
+          "lang": "python",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "mlofx9",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "let last = 0;\nfunction frame(now) {\n  const dt = Math.min((now - last) / 1000 || 0, 0.05);\n  last = now;\n  update(dt);\n  draw();\n  requestAnimationFrame(frame);\n}\nrequestAnimationFrame(frame);\n"
         },
-        "title": "req",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "requestAnimationFrame с dt и ограничением скачка",
+        "desc": "Использует время кадра и ограничивает dt после зависания вкладки.",
         "x": 300,
-        "y": 570
+        "y": 570,
+        "src": {
+          "id": "add-098-requestanimationframe-dt",
+          "title": "requestAnimationFrame с dt и ограничением скачка",
+          "desc": "Использует время кадра и ограничивает dt после зависания вкладки.",
+          "code": "let last = 0;\nfunction frame(now) {\n  const dt = Math.min((now - last) / 1000 || 0, 0.05);\n  last = now;\n  update(dt);\n  draw();\n  requestAnimationFrame(frame);\n}\nrequestAnimationFrame(frame);\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "ll5p65",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const сервер = http.createServer((req, res) => {\n  const url = new URL(req.url, \"http://localhost\");\n  if(url.pathname === \"/api/time\"){\n    res.writeHead(200, { \"Content-Type\": \"application/json\" });\n    return res.end(JSON.stringify({ time: Date.now() }));\n  }\n  res.writeHead(404);\n  res.end(\"not found\");\n});"
         },
-        "title": "сервер",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Сервер с маршрутами и JSON",
+        "desc": "Чуть сложнее: разные ответы на разные адреса (роуты) и отдача JSON. По этому принципу сделаны /api/list и /api/add в Лаборатории.",
         "x": 540,
-        "y": 570
+        "y": 570,
+        "src": {
+          "id": "server-routes",
+          "title": "Сервер с маршрутами и JSON",
+          "desc": "Чуть сложнее: разные ответы на разные адреса (роуты) и отдача JSON. По этому принципу сделаны /api/list и /api/add в Лаборатории.",
+          "code": "const сервер = http.createServer((req, res) => {\n  const url = new URL(req.url, \"http://localhost\");\n  if(url.pathname === \"/api/time\"){\n    res.writeHead(200, { \"Content-Type\": \"application/json\" });\n    return res.end(JSON.stringify({ time: Date.now() }));\n  }\n  res.writeHead(404);\n  res.end(\"not found\");\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "сервер",
+              "url"
+            ],
+            "requires": [
+              "http",
+              "req",
+              "time"
+            ]
+          }
+        }
       },
       {
         "id": "7b56ny",
@@ -220,12 +292,23 @@
         "id": "pxm4ts",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const params = new URLSearchParams(window.location.search);\nconst page = Number(params.get(\"page\") ?? 1);\nconsole.log(page);\n"
         },
-        "title": "url",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "URLSearchParams: прочитать параметры адреса",
+        "desc": "Извлекает параметры текущего URL через стандартный парсер.",
         "x": 60,
-        "y": 740
+        "y": 740,
+        "src": {
+          "id": "add-102-urlsearchparams",
+          "title": "URLSearchParams: прочитать параметры адреса",
+          "desc": "Извлекает параметры текущего URL через стандартный парсер.",
+          "code": "const params = new URLSearchParams(window.location.search);\nconst page = Number(params.get(\"page\") ?? 1);\nconsole.log(page);\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "utzjbh",
@@ -327,12 +410,23 @@
         "id": "l24c20",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<canvas width=\"200\" height=\"100\"></canvas>"
         },
         "title": "canvas",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "desc": "Canvas",
         "x": 780,
-        "y": 910
+        "y": 910,
+        "src": {
+          "id": "canvas-mvxzqajkk",
+          "title": "canvas",
+          "desc": "Canvas",
+          "code": "<canvas width=\"200\" height=\"100\"></canvas>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "24x18d",
@@ -371,12 +465,23 @@
         "id": "kry60x",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "let last = 0;\nfunction frame(now) {\n  const dt = Math.min((now - last) / 1000 || 0, 0.05);\n  last = now;\n  update(dt);\n  draw();\n  requestAnimationFrame(frame);\n}\nrequestAnimationFrame(frame);\n"
         },
-        "title": "frame",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "requestAnimationFrame с dt и ограничением скачка",
+        "desc": "Использует время кадра и ограничивает dt после зависания вкладки.",
         "x": 780,
-        "y": 1080
+        "y": 1080,
+        "src": {
+          "id": "add-098-requestanimationframe-dt",
+          "title": "requestAnimationFrame с dt и ограничением скачка",
+          "desc": "Использует время кадра и ограничивает dt после зависания вкладки.",
+          "code": "let last = 0;\nfunction frame(now) {\n  const dt = Math.min((now - last) / 1000 || 0, 0.05);\n  last = now;\n  update(dt);\n  draw();\n  requestAnimationFrame(frame);\n}\nrequestAnimationFrame(frame);\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "g6lp4j",
@@ -393,23 +498,45 @@
         "id": "id7te2",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<canvas width=\"200\" height=\"100\"></canvas>"
         },
-        "title": "содержимое canvas, очищая область рисования",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "canvas",
+        "desc": "Canvas",
         "x": 300,
-        "y": 1250
+        "y": 1250,
+        "src": {
+          "id": "canvas-mvxzqajkk",
+          "title": "canvas",
+          "desc": "Canvas",
+          "code": "<canvas width=\"200\" height=\"100\"></canvas>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "hitbkf",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<canvas width=\"200\" height=\"100\"></canvas>"
         },
-        "title": "содержимое canvas",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "canvas",
+        "desc": "Canvas",
         "x": 540,
-        "y": 1250
+        "y": 1250,
+        "src": {
+          "id": "canvas-mvxzqajkk",
+          "title": "canvas",
+          "desc": "Canvas",
+          "code": "<canvas width=\"200\" height=\"100\"></canvas>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "pf2qnx",
@@ -466,12 +593,25 @@
         "id": "e41roz",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const wheel = document.querySelector(\"#wheel\");\nwheel.style.backgroundImage =\n  \"conic-gradient(red, yellow, lime, cyan, blue, magenta, red)\";"
         },
-        "title": "gradient",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "conic-gradient — спектральный круг",
+        "desc": "conic-gradient распределяет цвета по углу вокруг центра. Можно использовать для спектрального круга и цветового индикатора.",
         "x": 540,
-        "y": 1420
+        "y": 1420,
+        "src": {
+          "id": "conic-gradient-спектральный-круг-mv6cut8w",
+          "title": "conic-gradient — спектральный круг",
+          "desc": "conic-gradient распределяет цвета по углу вокруг центра. Можно использовать для спектрального круга и цветового индикатора.",
+          "code": "const wheel = document.querySelector(\"#wheel\");\nwheel.style.backgroundImage =\n  \"conic-gradient(red, yellow, lime, cyan, blue, magenta, red)\";",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "wheel"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "8s6tma",
@@ -494,12 +634,27 @@
         "id": "18tqo8",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\nconst image = document.querySelector(\"#sourceImage\");\n\nimage.addEventListener(\"load\", () => {\n  ctx.drawImage(image, 10, 10, 120, 80);\n});"
         },
-        "title": "image",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "drawImage — нарисовать изображение",
+        "desc": "drawImage помещает загруженное изображение на canvas. Рисовать нужно после события load; для локальной песочницы можно использовать заранее доступный URL или собственный файл.",
         "x": 60,
-        "y": 1590
+        "y": 1590,
+        "src": {
+          "id": "drawimage-нарисовать-изображение-mv6cutch",
+          "title": "drawImage — нарисовать изображение",
+          "desc": "drawImage помещает загруженное изображение на canvas. Рисовать нужно после события load; для локальной песочницы можно использовать заранее доступный URL или собственный файл.",
+          "code": "const canvas = document.querySelector(\"#scene\");\nconst ctx = canvas.getContext(\"2d\");\nconst image = document.querySelector(\"#sourceImage\");\n\nimage.addEventListener(\"load\", () => {\n  ctx.drawImage(image, 10, 10, 120, 80);\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "canvas",
+              "ctx",
+              "image"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "wm7484",
@@ -522,23 +677,47 @@
         "id": "26t3q8",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<select id=\"city\" name=\"city\">\n  <option value=\"\">Выберите город</option>\n  <option value=\"msk\">Москва</option>\n  <option value=\"kzn\">Казань</option>\n</select>"
         },
-        "title": "значения",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "выпадающий список",
+        "desc": "Выбор одного значения из списка.",
         "x": 540,
-        "y": 1590
+        "y": 1590,
+        "src": {
+          "id": "выпадающий-список-mvh8g0p1",
+          "title": "выпадающий список",
+          "desc": "Выбор одного значения из списка.",
+          "code": "<select id=\"city\" name=\"city\">\n  <option value=\"\">Выберите город</option>\n  <option value=\"msk\">Москва</option>\n  <option value=\"kzn\">Казань</option>\n</select>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "g3jh3t",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const числа = [40, 70, 30, 90, 55];"
         },
-        "title": "массив числовых значений",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "массив",
+        "desc": "Массив — упорядоченный список значений\nДопустим, у тебя есть не один цвет, а сразу пять. Создавать отдельную переменную для каждого неудобно.\nМожно собрать их в массив:\nconst colors = [\"красный\", \"синий\", \"зелёный\"];\nМассив обозначается квадратными скобками [].\nКак устроен массив\nУ каждого элемента есть позиция — индекс. В JavaScript отсчёт начинается с нуля.\nИндекс 0\nкрасный\n\n\nИндекс 1\nсиний\n\n\nИн",
         "x": 780,
-        "y": 1590
+        "y": 1590,
+        "src": {
+          "id": "массив-mv9yln2q",
+          "title": "массив",
+          "desc": "Массив — упорядоченный список значений\nДопустим, у тебя есть не один цвет, а сразу пять. Создавать отдельную переменную для каждого неудобно.\nМожно собрать их в массив:\nconst colors = [\"красный\", \"синий\", \"зелёный\"];\nМассив обозначается квадратными скобками [].\nКак устроен массив\nУ каждого элемента есть позиция — индекс. В JavaScript отсчёт начинается с нуля.\nИндекс 0\nкрасный\n\n\nИндекс 1\nсиний\n\n\nИн",
+          "code": "const числа = [40, 70, 30, 90, 55];",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "числа"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "jyrd95",
@@ -561,12 +740,23 @@
         "id": "z9xmwj",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "from concurrent.futures import ProcessPoolExecutor\n\ndef square(value):\n    return value * value\n\nif __name__ == \"__main__\":\n    with ProcessPoolExecutor(max_workers=2) as pool:\n        print(list(pool.map(square, [1, 2, 3, 4])))\n"
         },
-        "title": "точки",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "multiprocessing — защита точки входа",
+        "desc": "Показывает обязательный main guard для запуска дочерних процессов на Windows и в spawn-режиме.",
         "x": 300,
-        "y": 1760
+        "y": 1760,
+        "src": {
+          "id": "python-main-guard-py",
+          "title": "multiprocessing — защита точки входа",
+          "desc": "Показывает обязательный main guard для запуска дочерних процессов на Windows и в spawn-режиме.",
+          "code": "from concurrent.futures import ProcessPoolExecutor\n\ndef square(value):\n    return value * value\n\nif __name__ == \"__main__\":\n    with ProcessPoolExecutor(max_workers=2) as pool:\n        print(list(pool.map(square, [1, 2, 3, 4])))\n",
+          "lang": "python",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "dr4bq0",
@@ -583,12 +773,28 @@
         "id": "e7gj7r",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "function график(значения){\n  const точки = значения\n    .map((y, x) => (x * 20) + \",\" + (100 - y))\n    .join(\" \");\n  return '<svg width=\"200\" height=\"100\">'\n    + '<polyline points=\"' + точки + '\" fill=\"none\" stroke=\"#52F2C9\"/>'\n    + '</svg>';\n}"
         },
-        "title": "график",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "SVG — линия из точек (мини-график)",
+        "desc": "SVG — это картинка из тегов. Линию задаёт атрибут points: пары x,y. Так рисуются sparkline и кривые в проекте.",
         "x": 780,
-        "y": 1760
+        "y": 1760,
+        "src": {
+          "id": "draw-svg",
+          "title": "SVG — линия из точек (мини-график)",
+          "desc": "SVG — это картинка из тегов. Линию задаёт атрибут points: пары x,y. Так рисуются sparkline и кривые в проекте.",
+          "code": "function график(значения){\n  const точки = значения\n    .map((y, x) => (x * 20) + \",\" + (100 - y))\n    .join(\" \");\n  return '<svg width=\"200\" height=\"100\">'\n    + '<polyline points=\"' + точки + '\" fill=\"none\" stroke=\"#52F2C9\"/>'\n    + '</svg>';\n}",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "график",
+              "точки"
+            ],
+            "requires": [
+              "y"
+            ]
+          }
+        }
       },
       {
         "id": "3eywis",
@@ -918,12 +1124,23 @@
         "id": "rt5ep0",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<ol><li>Первый</li><li>Второй</li></ol>"
         },
-        "title": "columns",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "ol",
+        "desc": "Нумерованный список",
         "x": 60,
-        "y": 2950
+        "y": 2950,
+        "src": {
+          "id": "ol-mvxg3lpmh",
+          "title": "ol",
+          "desc": "Нумерованный список",
+          "code": "<ol><li>Первый</li><li>Второй</li></ol>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "1iqpsc",
@@ -968,12 +1185,23 @@
         "id": "a14fco",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "<ins>Добавлено</ins>"
         },
-        "title": "inside",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "ins",
+        "desc": "Добавленный текст",
         "x": 60,
-        "y": 3120
+        "y": 3120,
+        "src": {
+          "id": "ins-mvxdd9j1z",
+          "title": "ins",
+          "desc": "Добавленный текст",
+          "code": "<ins>Добавлено</ins>",
+          "lang": "html",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "q58nvd",
@@ -1170,23 +1398,50 @@
         "id": "6uex0y",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const tools = [\"map\", \"filter\", \"reduce\"];\nconsole.log(tools.indexOf(\"filter\"));\nconsole.log(tools.indexOf(\"find\"));"
         },
-        "title": "index",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "indexOf — найти индекс",
+        "desc": "indexOf возвращает индекс первого точного совпадения или -1, если значение не найдено.",
         "x": 540,
-        "y": 3630
+        "y": 3630,
+        "src": {
+          "id": "indexof-найти-индекс-mv6cutfc",
+          "title": "indexOf — найти индекс",
+          "desc": "indexOf возвращает индекс первого точного совпадения или -1, если значение не найдено.",
+          "code": "const tools = [\"map\", \"filter\", \"reduce\"];\nconsole.log(tools.indexOf(\"filter\"));\nconsole.log(tools.indexOf(\"find\"));",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "tools"
+            ],
+            "requires": []
+          }
+        }
       },
       {
         "id": "rc7yfg",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const picker = document.querySelector(\"#colorPicker\");\nconst swatch = document.querySelector(\"#swatch\");\n\npicker.addEventListener(\"input\", () => {\n  swatch.style.backgroundColor = picker.value;\n});"
         },
-        "title": "color",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "input type=color — выбор цвета",
+        "desc": "Поле color отдаёт выбранный цвет в формате hex, например #ff006e. Значение можно применять к фону или хранить в массиве.",
         "x": 780,
-        "y": 3630
+        "y": 3630,
+        "src": {
+          "id": "input-type-color-выбор-цвета-mv6cusws",
+          "title": "input type=color — выбор цвета",
+          "desc": "Поле color отдаёт выбранный цвет в формате hex, например #ff006e. Значение можно применять к фону или хранить в массиве.",
+          "code": "const picker = document.querySelector(\"#colorPicker\");\nconst swatch = document.querySelector(\"#swatch\");\n\npicker.addEventListener(\"input\", () => {\n  swatch.style.backgroundColor = picker.value;\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "picker",
+              "swatch"
+            ],
+            "requires": []
+          }
+        }
       }
     ],
     "edges": [

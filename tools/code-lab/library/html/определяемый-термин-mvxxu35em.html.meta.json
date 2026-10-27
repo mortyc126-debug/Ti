@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "dfn-mvxxu35em",
   "file": "определяемый-термин-mvxxu35em.html",
-  "title": "dfn",
+  "title": "dfn — определяемый термин",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Определяемый термин",
@@ -38,11 +38,12 @@
     "термин"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

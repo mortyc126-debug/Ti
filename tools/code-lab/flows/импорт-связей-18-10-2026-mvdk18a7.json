@@ -1,7 +1,7 @@
 {
   "id": "импорт-связей-18-10-2026-mvdk18a7",
   "name": "Импорт связей 18.10.2026",
-  "savedAt": 1792311572527,
+  "savedAt": 1793097276905,
   "graph": {
     "nodes": [
       {
@@ -53,12 +53,33 @@
         "id": "5awzv5",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "import * as XLSX from \"xlsx\";\n\nconst книга = XLSX.read(данныеФайла, { type: \"array\" });\nconst лист  = книга.Sheets[книга.SheetNames[0]]; // первый лист\nconst строки = XLSX.utils.sheet_to_json(лист, { header: 1 });\n// строки → [[ячейка, ячейка, …], …]"
         },
-        "title": "XLSX",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "SheetJS (xlsx) — читать Excel",
+        "desc": "Библиотека xlsx (SheetJS) — чтение .xlsx прямо в браузере. Используется в проекте для импорта отчётов ФНС. Лист → массив строк.",
         "x": 780,
-        "y": 60
+        "y": 60,
+        "src": {
+          "id": "libs-sheetjs",
+          "title": "SheetJS (xlsx) — читать Excel",
+          "desc": "Библиотека xlsx (SheetJS) — чтение .xlsx прямо в браузере. Используется в проекте для импорта отчётов ФНС. Лист → массив строк.",
+          "code": "import * as XLSX from \"xlsx\";\n\nconst книга = XLSX.read(данныеФайла, { type: \"array\" });\nconst лист  = книга.Sheets[книга.SheetNames[0]]; // первый лист\nconst строки = XLSX.utils.sheet_to_json(лист, { header: 1 });\n// строки → [[ячейка, ячейка, …], …]",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "книга",
+              "лист",
+              "строки"
+            ],
+            "requires": [
+              "as",
+              "XLSX",
+              "данныеФайла",
+              "type",
+              "header"
+            ]
+          }
+        }
       },
       {
         "id": "8vdvgv",
@@ -97,12 +118,23 @@
         "id": "o4h425",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "filename = \"report.final.csv\"\nnormalized = filename.replace(\".final\", \"\")\nassert filename.endswith(\".csv\")\nassert filename.startswith(\"report\")\nassert normalized == \"report.csv\"\nprint(normalized)\n"
         },
-        "title": "строки",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Строки: replace, startswith и endswith",
+        "desc": "Показывает замену подстроки и проверку префикса/суффикса. Строки неизменяемы: replace возвращает новую строку.",
         "x": 780,
-        "y": 230
+        "y": 230,
+        "src": {
+          "id": "строки-replace-startswith",
+          "title": "Строки: replace, startswith и endswith",
+          "desc": "Показывает замену подстроки и проверку префикса/суффикса. Строки неизменяемы: replace возвращает новую строку.",
+          "code": "filename = \"report.final.csv\"\nnormalized = filename.replace(\".final\", \"\")\nassert filename.endswith(\".csv\")\nassert filename.startswith(\"report\")\nassert normalized == \"report.csv\"\nprint(normalized)\n",
+          "lang": "python",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "j5a9xh",
@@ -170,34 +202,74 @@
         "id": "ppdb2p",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "import json\nfrom urllib.request import Request, urlopen\n\n\ndef post_json(url, payload, timeout=5):\n    body = json.dumps(payload).encode(\"utf-8\")\n    request = Request(url, data=body, headers={\"Content-Type\": \"application/json\"}, method=\"POST\")\n    with urlopen(request, timeout=timeout) as response:\n        return json.loads(response.read().decode(\"utf-8\"))\n\n# Пример вызова: post_json(\"https://example.invalid/api\", {\"symbol\": \"SBER\"})\n"
         },
-        "title": "http",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "HTTP JSON через urllib с тайм-аутом",
+        "desc": "Показывает формирование JSON POST-запроса стандартной библиотекой и ограничение времени ожидания. Фактический сетевой вызов вынесен в функцию и не выполняется при импорте.",
         "x": 60,
-        "y": 570
+        "y": 570,
+        "src": {
+          "id": "http-json-запрос-urllib",
+          "title": "HTTP JSON через urllib с тайм-аутом",
+          "desc": "Показывает формирование JSON POST-запроса стандартной библиотекой и ограничение времени ожидания. Фактический сетевой вызов вынесен в функцию и не выполняется при импорте.",
+          "code": "import json\nfrom urllib.request import Request, urlopen\n\n\ndef post_json(url, payload, timeout=5):\n    body = json.dumps(payload).encode(\"utf-8\")\n    request = Request(url, data=body, headers={\"Content-Type\": \"application/json\"}, method=\"POST\")\n    with urlopen(request, timeout=timeout) as response:\n        return json.loads(response.read().decode(\"utf-8\"))\n\n# Пример вызова: post_json(\"https://example.invalid/api\", {\"symbol\": \"SBER\"})\n",
+          "lang": "python",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "mlofx9",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "let last = 0;\nfunction frame(now) {\n  const dt = Math.min((now - last) / 1000 || 0, 0.05);\n  last = now;\n  update(dt);\n  draw();\n  requestAnimationFrame(frame);\n}\nrequestAnimationFrame(frame);\n"
         },
-        "title": "req",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "requestAnimationFrame с dt и ограничением скачка",
+        "desc": "Использует время кадра и ограничивает dt после зависания вкладки.",
         "x": 300,
-        "y": 570
+        "y": 570,
+        "src": {
+          "id": "add-098-requestanimationframe-dt",
+          "title": "requestAnimationFrame с dt и ограничением скачка",
+          "desc": "Использует время кадра и ограничивает dt после зависания вкладки.",
+          "code": "let last = 0;\nfunction frame(now) {\n  const dt = Math.min((now - last) / 1000 || 0, 0.05);\n  last = now;\n  update(dt);\n  draw();\n  requestAnimationFrame(frame);\n}\nrequestAnimationFrame(frame);\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "ll5p65",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const сервер = http.createServer((req, res) => {\n  const url = new URL(req.url, \"http://localhost\");\n  if(url.pathname === \"/api/time\"){\n    res.writeHead(200, { \"Content-Type\": \"application/json\" });\n    return res.end(JSON.stringify({ time: Date.now() }));\n  }\n  res.writeHead(404);\n  res.end(\"not found\");\n});"
         },
-        "title": "сервер",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "Сервер с маршрутами и JSON",
+        "desc": "Чуть сложнее: разные ответы на разные адреса (роуты) и отдача JSON. По этому принципу сделаны /api/list и /api/add в Лаборатории.",
         "x": 540,
-        "y": 570
+        "y": 570,
+        "src": {
+          "id": "server-routes",
+          "title": "Сервер с маршрутами и JSON",
+          "desc": "Чуть сложнее: разные ответы на разные адреса (роуты) и отдача JSON. По этому принципу сделаны /api/list и /api/add в Лаборатории.",
+          "code": "const сервер = http.createServer((req, res) => {\n  const url = new URL(req.url, \"http://localhost\");\n  if(url.pathname === \"/api/time\"){\n    res.writeHead(200, { \"Content-Type\": \"application/json\" });\n    return res.end(JSON.stringify({ time: Date.now() }));\n  }\n  res.writeHead(404);\n  res.end(\"not found\");\n});",
+          "lang": "js",
+          "contract": {
+            "provides": [
+              "сервер",
+              "url"
+            ],
+            "requires": [
+              "http",
+              "req",
+              "time"
+            ]
+          }
+        }
       },
       {
         "id": "7b56ny",
@@ -220,12 +292,23 @@
         "id": "pxm4ts",
         "blockId": "raw",
         "fields": {
-          "code": ""
+          "code": "const params = new URLSearchParams(window.location.search);\nconst page = Number(params.get(\"page\") ?? 1);\nconsole.log(page);\n"
         },
-        "title": "url",
-        "desc": "(ящик данных — не сохранённый кусок)",
+        "title": "URLSearchParams: прочитать параметры адреса",
+        "desc": "Извлекает параметры текущего URL через стандартный парсер.",
         "x": 60,
-        "y": 740
+        "y": 740,
+        "src": {
+          "id": "add-102-urlsearchparams",
+          "title": "URLSearchParams: прочитать параметры адреса",
+          "desc": "Извлекает параметры текущего URL через стандартный парсер.",
+          "code": "const params = new URLSearchParams(window.location.search);\nconst page = Number(params.get(\"page\") ?? 1);\nconsole.log(page);\n",
+          "lang": "js",
+          "contract": {
+            "provides": [],
+            "requires": []
+          }
+        }
       },
       {
         "id": "utzjbh",

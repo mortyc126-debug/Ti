@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "q-mvxmxxd3g",
   "file": "встроенная-цитата-mvxmxxd3g.html",
-  "title": "q",
+  "title": "q — короткая цитата",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Встроенная цитата",
@@ -38,11 +38,12 @@
     "цитата"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }

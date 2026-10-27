@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "colgroup-mvxlbiyia",
   "file": "группа-столбцов-mvxlbiyia.html",
-  "title": "colgroup",
+  "title": "colgroup — группа столбцов таблицы\\",
   "lang": "html",
   "group": "HTML / Элементы стандарта",
   "desc": "Группа столбцов",
@@ -44,11 +44,12 @@
     "столбцов"
   ],
   "source": {
-    "title": "coverage",
+    "title": "manual",
     "desc": "coverage",
     "tags": "ai",
     "aliases": "ai"
   },
   "status": "described",
-  "wordNotes": []
+  "wordNotes": [],
+  "output": ""
 }
