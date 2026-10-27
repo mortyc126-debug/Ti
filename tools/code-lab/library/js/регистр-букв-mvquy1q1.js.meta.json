@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "id": "регистр-букв-mvquy1q1",
+  "file": "регистр-букв-mvquy1q1.js",
+  "lang": "js",
+  "title": "Регистр букв",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1793115960121,
+  "component": {
+    "provides": [
+      "текст"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 5,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 18,
+      "text": "toUpperCase",
+      "kind": "fn",
+      "note": "toUpperCase — привести строку к верхнему регистру.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 18,
+      "text": "toLowerCase",
+      "kind": "fn",
+      "note": "toLowerCase — привести строку к нижнему регистру.",
+      "source": "dict"
+    }
+  ]
+}

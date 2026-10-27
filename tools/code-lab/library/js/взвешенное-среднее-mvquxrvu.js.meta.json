@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "id": "взвешенное-среднее-mvquxrvu",
+  "file": "взвешенное-среднее-mvquxrvu.js",
+  "lang": "js",
+  "title": "Взвешенное среднее",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1793115947370,
+  "component": {
+    "provides": [
+      "значения",
+      "веса",
+      "числитель",
+      "знаменатель"
+    ],
+    "requires": [
+      "s"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 8,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 36,
+      "text": "w",
+      "kind": "name",
+      "note": "w — ширина, h высота прямоугольника",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 46,
+      "text": "w",
+      "kind": "name",
+      "note": "w — ширина, h высота прямоугольника",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

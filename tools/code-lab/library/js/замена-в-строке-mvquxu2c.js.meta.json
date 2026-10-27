@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "id": "замена-в-строке-mvquxu2c",
+  "file": "замена-в-строке-mvquxu2c.js",
+  "lang": "js",
+  "title": "Замена в строке",
+  "group": "Мои куски",
+  "desc": "",
+  "output": "",
+  "descAt": 1793115950196,
+  "component": {
+    "provides": [
+      "текст"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": [
+    {
+      "line": 7,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 18,
+      "text": "replace",
+      "kind": "fn",
+      "note": "replace — заменить часть строки на другую.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 18,
+      "text": "replaceAll",
+      "kind": "fn",
+      "note": "replaceAll — заменяет все совпадения, а не только первое",
+      "source": "dict"
+    }
+  ]
+}
