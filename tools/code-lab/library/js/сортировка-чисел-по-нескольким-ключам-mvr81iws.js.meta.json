@@ -83,5 +83,15 @@
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
       "source": "dict"
     }
+  ],
+  "orphanNotes": [
+    {
+      "line": 1,
+      "col": 7,
+      "text": "sort",
+      "kind": "fn",
+      "note": "Сортирует массив на месте.",
+      "source": "custom"
+    }
   ]
 }

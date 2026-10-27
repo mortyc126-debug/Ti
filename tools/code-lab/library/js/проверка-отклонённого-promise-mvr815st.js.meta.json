@@ -119,5 +119,23 @@
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
       "source": "dict"
     }
+  ],
+  "orphanNotes": [
+    {
+      "line": 1,
+      "col": 13,
+      "text": "rejects",
+      "kind": "fn",
+      "note": "Проверяет отклонение асинхронной операции.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 13,
+      "text": "rejects",
+      "kind": "fn",
+      "note": "Проверяет отклонение асинхронной операции.",
+      "source": "custom"
+    }
   ]
 }

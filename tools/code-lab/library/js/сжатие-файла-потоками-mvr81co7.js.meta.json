@@ -181,5 +181,39 @@
       "note": "log — печатает значение в консоль. console.log(x) — показать x.",
       "source": "dict"
     }
+  ],
+  "orphanNotes": [
+    {
+      "line": 2,
+      "col": 9,
+      "text": "pipeline",
+      "kind": "name",
+      "note": "Соединяет потоки и закрывает их при завершении или ошибке.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 6,
+      "text": "pipeline",
+      "kind": "fn",
+      "note": "Соединяет потоки и закрывает их при завершении или ошибке.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 9,
+      "text": "pipeline",
+      "kind": "name",
+      "note": "Соединяет потоки и закрывает их при завершении или ошибке.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 6,
+      "text": "pipeline",
+      "kind": "fn",
+      "note": "Соединяет потоки и закрывает их при завершении или ошибке.",
+      "source": "custom"
+    }
   ]
 }

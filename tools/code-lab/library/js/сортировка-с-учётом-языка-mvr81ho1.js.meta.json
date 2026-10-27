@@ -90,5 +90,15 @@
       "note": "Превращает каждый адрес в запущенную задачу.",
       "source": "dict"
     }
+  ],
+  "orphanNotes": [
+    {
+      "line": 1,
+      "col": 26,
+      "text": "localeCompare",
+      "kind": "fn",
+      "note": "Сравнивает строки с учётом языковых правил.",
+      "source": "custom"
+    }
   ]
 }

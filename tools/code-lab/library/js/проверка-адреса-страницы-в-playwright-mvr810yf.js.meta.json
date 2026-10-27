@@ -109,6 +109,14 @@
     },
     {
       "line": 5,
+      "col": 35,
+      "text": "name",
+      "kind": "name",
+      "note": "Ожидаемое имя типа ошибки.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
       "col": 52,
       "text": "click",
       "kind": "fn",

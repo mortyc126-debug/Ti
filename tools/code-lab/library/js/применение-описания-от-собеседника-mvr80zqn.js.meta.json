@@ -85,6 +85,14 @@
       "source": "dict"
     },
     {
+      "line": 4,
+      "col": 16,
+      "text": "type",
+      "kind": "name",
+      "note": "Указывает Node.js использовать ES-модули.",
+      "source": "dict"
+    },
+    {
       "line": 5,
       "col": 4,
       "text": "await",

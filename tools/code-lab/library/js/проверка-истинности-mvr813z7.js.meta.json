@@ -63,5 +63,23 @@
       "note": "Проверяет, что выражение истинно.",
       "source": "custom"
     }
+  ],
+  "orphanNotes": [
+    {
+      "line": 1,
+      "col": 7,
+      "text": "ok",
+      "kind": "fn",
+      "note": "Проверяет, что выражение истинно.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 7,
+      "text": "ok",
+      "kind": "fn",
+      "note": "Проверяет, что выражение истинно.",
+      "source": "custom"
+    }
   ]
 }

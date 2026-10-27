@@ -181,6 +181,22 @@
       "kind": "fn",
       "note": "Возвращает число записей.",
       "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 21,
+      "text": "clear",
+      "kind": "fn",
+      "note": "Удаляет все записи хранилища.",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 33,
+      "text": "count",
+      "kind": "fn",
+      "note": "Возвращает число записей.",
+      "source": "custom"
     }
   ]
 }

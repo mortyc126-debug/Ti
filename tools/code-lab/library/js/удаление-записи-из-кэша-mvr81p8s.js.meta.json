@@ -81,5 +81,15 @@
       "note": "Удаляет запись из кэша.",
       "source": "custom"
     }
+  ],
+  "orphanNotes": [
+    {
+      "line": 1,
+      "col": 22,
+      "text": "delete",
+      "kind": "kw",
+      "note": "Удаляет запись из кэша.",
+      "source": "custom"
+    }
   ]
 }
