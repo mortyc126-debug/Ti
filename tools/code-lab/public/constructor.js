@@ -731,6 +731,46 @@ function autoConnect(nd){
   return made;
 }
 
+// найти кусок в каталоге по названию из узла — умно (как в Описи): имя → синоним → ядро → одиночное частичное
+function resolveCatalog(name){
+  const q = String(name || '').trim().toLowerCase(); if(!q) return null;
+  let hit = CATALOG.find(t => (t.title || '').trim().toLowerCase() === q) || CATALOG.find(t => t.id === String(name || '').trim());
+  if(hit) return hit;
+  hit = CATALOG.find(t => Array.isArray(t.aliases) && t.aliases.some(a => String(a).trim().toLowerCase() === q));
+  if(hit) return hit;
+  const core = t => (t.title || '').toLowerCase().split(/\s*[—–:]\s*|\s+[-(]\s*/)[0].trim();
+  const byCore = CATALOG.filter(t => core(t) === q); if(byCore.length === 1) return byCore[0];
+  const subs = CATALOG.filter(t => { const tt = (t.title || '').toLowerCase(); return tt && (tt.includes(q) || (q.length >= 4 && q.includes(tt))); });
+  if(subs.length === 1) return subs[0];
+  return null;
+}
+// починить висящие узлы: ящики (без своего куска) подтянуть к готовым кускам по названию и заново связать
+async function fixDanglingNodes(){
+  if(!graph.nodes.length){ showEdgeMessage('Холст пуст — чинить нечего.', 'warn'); return; }
+  histFlush();
+  let converted = 0, stillBox = 0;
+  for(const nd of graph.nodes){
+    if(nd.src && nd.src.id) continue;                       // уже настоящий кусок — пропускаем
+    const t = resolveCatalog(nd.title);
+    if(!t){ stillBox++; continue; }
+    try {
+      const tpl = await fetch('/api/template?id=' + encodeURIComponent(t.id)).then(r => r.json());
+      const code = (tpl.lines || []).map(line => (line || []).map(k => k.v != null ? k.v : '').join('')).join('\n');
+      const comp = tpl.component || {};
+      const contract = { provides: Array.isArray(comp.provides) ? comp.provides : [], requires: Array.isArray(comp.requires) ? comp.requires : [] };
+      nd.blockId = 'raw'; nd.fields = Object.assign({}, nd.fields, { code }); nd.title = t.title; nd.desc = tpl.desc || '';
+      nd.src = { id: t.id, title: t.title, desc: tpl.desc || '', code, lang: tpl.lang || t.lang || 'js', contract };
+      converted++;
+    } catch(_){ stillBox++; }
+  }
+  // заново построить связи: для узлов без рёбер пробуем авто-соединение по контрактам/#id
+  let made = 0;
+  for(const nd of graph.nodes){ if(!graph.edges.some(e => e.from === nd.id || e.to === nd.id)){ try { made += autoConnect(nd) || 0; } catch(_){} } }
+  renderCanvas(); renderInspector(); renderCode(); persist();
+  showEdgeMessage('Починка: подтянуто к кускам ' + converted + ', новых связей ' + made + (stillBox ? ', осталось висеть ' + stillBox + ' (по названию кусок не нашёлся)' : '') + '.', (converted || made) ? 'ok' : 'warn');
+}
+(function(){ const b = $('#fixnodes'); if(b) b.onclick = fixDanglingNodes; })();
+
 // ── холст ─────────────────────────────────────────────────────────────────────
 function renderCanvas(){
   canvas.querySelectorAll('.gnode').forEach(el => el.remove());
