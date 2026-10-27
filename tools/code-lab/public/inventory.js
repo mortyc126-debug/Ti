@@ -376,6 +376,14 @@ function parseLinks(text){
       });
       contracts.push({ name: cleanName(name), fields, ln }); return;
     }
+    // многострочный формат: источник на своей строке, под ним «-> Цель» (или «→ Цель») на отдельных.
+    // Удобно, когда названия длинные и не влезают в одну строку «A -> B».
+    const arrowLine = line.match(/^(?:->|→|=>)\s*(.+)$/);
+    if(arrowLine){
+      if(!subject){ errors.push('строка ' + ln + ': «→ Цель» без строки-источника выше (впиши сверху название куска-источника) — «' + line + '»'); return; }
+      const target = cleanName(arrowLine[1]);
+      if(target){ addEdge(subject, target, { id: 'data' }, line, ln); return; }
+    }
     // «дерево»: строка с маркером — связь от текущего заголовка (subject)
     const bullet = line.match(/^[—–\-•*·]\s*(.+)$/);
     if(bullet){
@@ -418,10 +426,10 @@ function parseLinks(text){
       if(/(^|\s)(может|могут|могла|могли|мог|можно|возможно|иногда|редко|обычно|наверное|бы)$/i.test(hit.a)){ errors.push('строка ' + ln + ': модальность/неуверенность — ребро пропущено («' + line + '»)'); return; }
       addEdge(cleanName(hit.a), hit.b, hit.r, line, ln); return;
     }
-    // заголовок куска: в «ёлочках»/кавычках или совпал с названием существующего куска
-    const asName = cleanName(line);
-    if(/^[«„"'“]/.test(line) || resolveName(asName)){ subject = asName; return; }
-    errors.push('строка ' + ln + ': не понял — «' + line + '»');
+    // одиночная строка = название куска-источника (заголовок). Под ним пойдут «-> Цель».
+    // Раньше тут была ошибка, если имя не совпало с куском — но в многострочном формате источник
+    // как раз на своей строке, поэтому любую одиночную строку принимаем как заголовок.
+    subject = cleanName(line);
   });
   return { edges, contracts, errors, flowName };
 }
@@ -494,10 +502,17 @@ async function applyLinks(P){
   return { contracts: P.contracts.length, edges: addedE, nodes: addedN, missing, merged: !!existingId, totalEdges: edges.length, flowId };
 }
 const LINKS_SAMPLE = [
-  '# Два формата. 1) плоский: Кусок A <вид> Кусок B (по строке на связь).',
-  '# Стрелка -> (или →) = передаёт данные. Виды — в справочнике ниже.',
+  '# Если названия длинные и не влезают в одну строку — пиши многострочно:',
+  '# источник на своей строке, под ним «-> Цель» на отдельных (стрелка = передаёт данные).',
   '',
-  'схема: Среднее по списку',
+  'схема: Таблица из API',
+  'Загрузить массив из API',
+  '  -> Заполнить таблицу',
+  '  -> Светящаяся шапка',
+  'Заполнить таблицу',
+  '  -> Показать итог',
+  '',
+  '# Короткие можно и в одну строку: Кусок A <вид> Кусок B.',
   'Массив чисел -> Сумма (reduce)',
   'Сумма (reduce) -> Среднее',
   'Среднее зависит от Сумма (reduce)',
@@ -538,7 +553,7 @@ function openLinksModal(){
   const box = el2('div', 'modal');
   box.innerHTML = '<h3>Связи из текста</h3>'
     + '<p class="mh">Вставь правила — приложение разберёт связи и контракты кусков. Куски ищутся по названию. Связи соберутся в схему, контракты («нужно/даёт/среда/ошибка/проверка/вход/выход/<b>раздел</b>») запишутся на куски. Разложить по разделам можно блоком «<b>раздел: X</b>» и списком «<b>+ Имя куска</b>». Отрицания («A <b>не</b> зависит от B») и неуверенность («A <b>может</b> вызывать B») пропускаются.</p>'
-    + '<div class="fmt">Плоско: A -> B · A зависит от B · A конфликтует с B …&#10;Дерево:  «Кусок A»&#10;             — создаёт → «Кусок B» (пояснение) [условие]&#10;Контракт: Имя:: нужно=x,y; даёт=z; среда=браузер; раздел=Сеть; проверка=…&#10;Разделы: раздел: Сеть / Запросы&#10;             + Имя куска   (подраздел — через «/»)&#10;схема: Название</div>'
+    + '<div class="fmt">Многострочно (для длинных имён): Кусок-источник&#10;             -> Кусок-цель&#10;             -> Другая цель&#10;Плоско: A -> B · A зависит от B · A конфликтует с B …&#10;Дерево:  «Кусок A»&#10;             — создаёт → «Кусок B» (пояснение) [условие]&#10;Контракт: Имя:: нужно=x,y; даёт=z; среда=браузер; раздел=Сеть; проверка=…&#10;Разделы: раздел: Сеть / Запросы&#10;             + Имя куска   (подраздел — через «/»)&#10;схема: Название</div>'
     + '<details class="rr"><summary>виды связей, которые понимает парсер (' + (window.CODE_RELATIONS || []).length + ')</summary><div class="rr-box">' + relationsRef() + '</div></details>'
     + '<textarea id="lk-text" placeholder="вставь текст или нажми «пример»"></textarea>'
     + '<div class="mbtns"><button class="btn" id="lk-sample">пример</button><button class="btn" id="lk-suggest" title="предложить связи автоматически — по контрактам «даёт/нужно» кусков">✨ по контрактам</button><button class="btn" id="lk-aiprompt" title="собрать список кусков в запрос для ИИ (он предложит связи)">📋 куски → ИИ</button><button class="btn ok" id="lk-parse">разобрать</button><button class="btn" id="lk-apply" style="display:none">применить</button><button class="btn" id="lk-close">закрыть</button><label class="inv-chk" style="margin-left:auto"><input type="checkbox" id="lk-missing" checked> создавать узлы для ненайденных (ящики данных)</label></div>'
@@ -559,7 +574,7 @@ function openLinksModal(){
     const sum = el2('div', 'lp-sec', 'связей распознано: ' + parsed.edges.length + ' · к готовым кускам: ' + toReal + (toBox ? ' · в ящики (не нашла куски): ' + toBox : '') + (parsed.errors.length ? ' · строк не понято: ' + parsed.errors.length : ''));
     if(toBox || parsed.errors.length) sum.style.color = '#ffb454';
     prev.appendChild(sum);
-    if(!parsed.edges.length) prev.appendChild(line('Ни одной связи не распознано. Формат строки: «Кусок A -> Кусок B» (стрелка = передаёт данные), или «A | связь | B», или вид словом: «A зависит от B». Нажми «пример».', 'muted'));
+    if(!parsed.edges.length) prev.appendChild(line('Ни одной связи не распознано. Для длинных имён пиши многострочно: источник на строке, под ним «-> Цель» (с отступом). Или в одну строку: «A -> B», «A | связь | B», «A зависит от B». Нажми «пример».', 'muted'));
     prev.appendChild(el2('div', 'lp-sec', 'связи (' + parsed.edges.length + ')'));
     parsed.edges.forEach(e => { const a = resolveName(e.a), b = resolveName(e.b); const ok = a && b; const rel = (window.relationById && window.relationById(e.kind)) || { label: 'связь' }; const miss = [!a ? e.a : '', !b ? e.b : ''].filter(Boolean); const mark = ok ? '✓ ' : (mk ? '◻ ' : '✕ '); const tail = ok ? '' : (mk ? '  (ящик: ' + miss.join(', ') + ')' : '  (не найдено: ' + miss.join(', ') + ')'); prev.appendChild(line(mark + e.a + '  —[' + rel.label + ']→  ' + e.b + tail, ok ? 'lp-ok' : (mk ? '' : 'lp-bad'))); if(e.src && e.src !== (e.a + ' ' + e.b)) prev.appendChild(line('      ↳ ' + e.src, 'muted')); });
     prev.appendChild(el2('div', 'lp-sec', 'контракты (' + parsed.contracts.length + ')'));
