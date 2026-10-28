@@ -98,6 +98,11 @@ export function buildIndex(docs, { synonyms = { groups: [] } } = {}){
     }
   });
   const avg = lens.reduce((a, b) => a + b, 0) / Math.max(1, N);
+  // для слоя «понятности»: основы слов названия и синонимов, длина названия в словах, строк кода
+  const titleKeys = raws.map(f => { const s = new Set(); for(const m of norm(f.title || '').matchAll(WORD_RE)) wordKeys(m[0]).forEach(k => s.add(k)); return s; });
+  const aliasKeys = raws.map(f => { const s = new Set(); for(const m of norm(f.aliases || '').matchAll(WORD_RE)) wordKeys(m[0]).forEach(k => s.add(k)); return s; });
+  const titleWords = raws.map(f => (norm(f.title || '').match(WORD_RE) || []).length);
+  const codeLines = docs.map(d => String(d.code || '').split('\n').filter(l => l.trim()).length);
   const vocab = [...postings.keys()];
   const syn = loadSynonymGroups(synonyms);
   const idf = k => { const df = postings.has(k) ? postings.get(k).size : 0; return Math.log(1 + (N - df + 0.5) / (df + 0.5)); };
@@ -143,7 +148,7 @@ export function buildIndex(docs, { synonyms = { groups: [] } } = {}){
     return null;
   }
 
-  function search(query, { limit = 60 } = {}){
+  function search(query, { limit = 60, lang = '', boost = null } = {}){
     const raw = String(query || '').trim();
     if(!raw) return { q: raw, total: 0, hits: [], terms: [] };
     const qn = norm(raw).toLowerCase();
@@ -174,20 +179,43 @@ export function buildIndex(docs, { synonyms = { groups: [] } } = {}){
         r.score += v.s + Math.min(0.35 * v.rest, v.s * 1.5); r.matched++; r.best.push({ gi, alt: v.alt });
       }
     });
+    // слой «понятности»: базовое и понятное — выше специфического. BM25 складывает совпадения по всем полям,
+    // и длинный кусок, где слово мелькает в описании, коде и заметках, обгонял короткий с этим словом в названии.
+    const clarity = (di, r) => {
+      let inTitle = 0;
+      // само слово в названии весит больше, чем его начало или синоним («показать» ≈ «отображается»)
+      const kw = { exact: 1, parts: 1, prefix: 0.8, syn: 0.6, fuzzy: 0.5 };
+      // по каждому слову запроса — лучшая из его форм, найденная в названии (а не та, что дала больше баллов в BM25)
+      for(const g of groups){
+        let best = 0;
+        for(const alt of g.alts){ const w = kw[alt.kind] || 0.6; if(w <= best) continue;
+          if(alt.keys.every(k => titleKeys[di].has(k))) best = w; else if(alt.keys.every(k => aliasKeys[di].has(k))) best = Math.max(best, 0.7 * w); }
+        inTitle += best;
+      }
+      let m = 1 + 1.5 * (inTitle / Math.max(1, groups.length));         // все слова запроса в названии — до ×2,5
+      const tw = titleWords[di]; m *= tw <= 4 ? 1.2 : tw <= 7 ? 1 : tw <= 10 ? 0.85 : 0.7;   // короткое название понятнее
+      const cl = codeLines[di]; m *= cl <= 6 ? 1.15 : cl <= 15 ? 1 : cl <= 30 ? 0.9 : 0.8;  // короткий пример — базовый
+      if(lang){ m *= String(docs[di].lang || '').toLowerCase() === lang ? 1.3 : 0.75; }
+      if(boost && boost.has(docs[di].id)) m *= 1.2;                        // используется в задачах или как пример словаря
+      return m;
+    };
     let ranked = [...scored.entries()].map(([di, r]) => {
       const cover = r.matched / Math.max(1, groups.length);
       let score = r.score * cover * cover;
       const title = norm(docs[di].title || '').toLowerCase();
       if(title.includes(qn)) score *= 1.6;   // запрос целиком в названии — выше всех
-      return { di, score, r };
+      // отсекаем слабое по исходному баллу, а «понятность» меняет только порядок — иначе она выкидывала бы годное
+      // корень сглаживает перевес «слово много раз в описании и коде», чтобы понятность весила сопоставимо
+      return { di, base: score, score: Math.sqrt(score) * clarity(di, r), r };
     });
+    const topBase = ranked.reduce((m, x) => Math.max(m, x.base), 0);
+    ranked = ranked.filter(x => x.base >= topBase * 0.35);
     ranked.sort((a, b) => b.score - a.score);
-    const top = ranked.length ? ranked[0].score : 0;
-    ranked = ranked.filter(x => x.score >= top * 0.35);
+    const top = ranked.length ? ranked[ranked.length - 1].score : 0;
 
     // всё, что находил старый поиск (подстрока в названии/описании), остаётся в выдаче
     const have = new Set(ranked.map(x => x.di));
-    const floor = Math.max(top * 0.35, 0.01);
+    const floor = Math.max(top * 0.5, 0.01);   // подстрочные находки — в хвост выдачи
     docs.forEach((d, di) => {
       if(have.has(di)) return;
       const hay = norm((d.title || '') + ' ' + (d.desc || '')).toLowerCase();

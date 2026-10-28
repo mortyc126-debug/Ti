@@ -78,7 +78,7 @@
       for(const [term, syns] of Object.entries(d.synonyms)){ if(Array.isArray(syns) && syns.some(x => String(x).toLowerCase().includes(query))) addT(term, explOf(term)); } }
     if(terms.length){ lists.appendChild(grp('В словаре — что это')); terms.slice(0, 6).forEach(t => lists.appendChild(item(t.term, t.text, null))); }
     // куски-решения
-    try { const r = await fetch('/api/search?q=' + encodeURIComponent(q('#dgQ').value) + '&limit=6').then(x => x.json()); if(my !== seq) return;
+    try { const r = await fetch('/api/search?q=' + encodeURIComponent(q('#dgQ').value) + '&limit=6&lang=' + encodeURIComponent((activeFile() || {}).lang || '')).then(x => x.json()); if(my !== seq) return;
       const list = await loadPieces(); const byId = {}; list.forEach(p => byId[p.id] = p);
       const hits = ((r && r.hits) || []).slice(0, 5).map(h => byId[h.id]).filter(Boolean);
       if(hits.length){ lists.appendChild(grp('Готовые куски — вставить')); hits.forEach(p => lists.appendChild(item(p.title, (p.lang || '').toUpperCase() + (p.desc ? ' · ' + p.desc : ''), () => openPieceInsert(p.id)))); }

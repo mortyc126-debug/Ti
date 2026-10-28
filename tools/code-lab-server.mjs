@@ -377,6 +377,15 @@ function coverage(j){
 }
 async function listTemplates(){ return store.rows(); }
 const sections = createSections({ file: path.join(LIBRARY, '_sections.json') });   // уезжает в git вместе с library/
+// куски, на которые ссылаются задачи и словарь («пример →»), — в поиске чуть выше; пересчёт раз в минуту
+let _boost = null, _boostAt = 0;
+async function searchBoost(){
+  if(_boost && Date.now() - _boostAt < 60000) return _boost;
+  const set = new Set();
+  try { for(const t of await tasks.list()){ const x = await tasks.get(t.id); if(x) tasks.eachOption(x.steps, o => { if(o.kind === 'piece' && o.id) set.add(o.id); }); } } catch(_){}
+  try { for(const v of Object.values(await loadExamples())) if(v && v.id) set.add(v.id); } catch(_){}
+  _boost = set; _boostAt = Date.now(); return set;
+}
 const taskRanker = createTaskRanker({ entries: () => store.entries() });   // полоска «🧭 пригодится»
 // задачи ссылаются на куски; вариант «свой код» становится куском (повтор по коду не плодится)
 const tasks = createTaskStore({ root: TASKS, rows: () => store.rows(), slug: s => slug(s),
@@ -668,7 +677,9 @@ const server = http.createServer(async (req, res) => {
     if(u.pathname === '/api/search'){
       const q = u.searchParams.get('q') || '';
       const limit = Math.min(200, Number(u.searchParams.get('limit')) || 60);
-      return json(res, 200, await search.search(q, { limit }));
+      // lang — язык открытого файла (свой выше); boost — куски из задач и примеры словаря: проверенная база
+      const lang = String(u.searchParams.get('lang') || '').toLowerCase();
+      return json(res, 200, await search.search(q, { limit, lang, boost: await searchBoost() }));
     }
 
     // «на что похоже»: сравнить присланный код с кусками библиотеки по общим токенам (Жаккар).

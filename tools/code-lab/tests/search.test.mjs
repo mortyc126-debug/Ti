@@ -71,6 +71,20 @@ test('начало слова и опечатки', () => {
   assert.ok(ids('кусив').includes('italic') || ids('курссив').includes('italic'));   // одна опечатка
 });
 
+test('понятное выше: слова в коротком названии важнее частых упоминаний в описании и коде; свой язык выше', () => {
+  const d2 = [
+    { id: 'long', title: 'Проверить видимость узла на странице с учётом стилей и прокрутки', desc: 'Находит элемент, проверяет элемент, элемент виден ли элемент', group: 'DOM', code: Array(25).fill('el.checkVisibility(); // элемент').join('\n'), notes: ['элемент'], tags: ['элемент'], aliases: [], extra: [], output: '', lang: 'js' },
+    { id: 'qs', title: 'querySelector — найти элемент', desc: 'Первый подходящий узел', group: 'DOM', code: 'document.querySelector(".card")', notes: [], tags: [], aliases: [], extra: [], output: '', lang: 'js' },
+    { id: 'py', title: 'найти элемент в списке', desc: '', group: 'Данные', code: 'x in items', notes: [], tags: [], aliases: [], extra: [], output: '', lang: 'python' }
+  ];
+  const ix2 = buildIndex(d2);
+  const order = ix2.search('найти элемент').hits.map(h => h.id);
+  assert.ok(order.indexOf('qs') < order.indexOf('long'), 'короткий со словами в названии выше длинного: ' + order);
+  assert.equal(ix2.search('найти элемент', { lang: 'js' }).hits[0].id, 'qs');
+  assert.equal(ix2.search('найти элемент', { lang: 'python' }).hits[0].id, 'py');
+  assert.ok(ix2.search('найти элемент').hits.some(h => h.id === 'long'), 'длинный не выкидывается, а просто ниже');
+});
+
 test('лишние слова вопроса не ломают выдачу', () => {
   assert.equal(ids('как сделать текст жирным')[0], 'bold');
 });

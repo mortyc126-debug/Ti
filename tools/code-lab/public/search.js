@@ -174,7 +174,7 @@
   async function searchPieces(query){
     if(!enabled.has('pieces') || !query){ piecesIndex = []; return; }
     const seq = ++pieceSeq;
-    try { const r = await fetch('/api/search?q=' + encodeURIComponent(query) + '&limit=40').then(x => x.json());
+    try { const r = await fetch('/api/search?q=' + encodeURIComponent(query) + '&limit=40&lang=' + encodeURIComponent((activeFile() || {}).lang || '')).then(x => x.json());
       if(seq !== pieceSeq) return;
       const hits = (r && r.hits) || [];
       // подтянуть названия (список кусков кэшируем)

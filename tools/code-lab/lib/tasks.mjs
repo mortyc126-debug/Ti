@@ -180,7 +180,7 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
     return { changed };
   }
 
-  return { list, get, save, remove, importText, toText, resolve, usedBy, setGroups, parseText: TaskFormat.parse };
+  return { list, get, save, remove, importText, toText, resolve, usedBy, setGroups, parseText: TaskFormat.parse, eachOption: TaskFormat.eachOption };
 }
 
 // «Что дальше» по контрактам: какие имена код использует, но нигде не получает,

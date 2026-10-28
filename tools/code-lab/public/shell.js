@@ -88,11 +88,18 @@
     // 1) разделы программы
     const sects = PAGES.filter(p => (p.label + ' ' + (p.sect || '')).toLowerCase().includes(q)).slice(0, 5);
     if(sects.length){ grp('Разделы'); sects.forEach(p => item(p.href, p.label, 'раздел')); }
-    // 2) куски
+    // 2) задачи — «как сделать» — раньше кусков
+    const tk = await fetch('/api/tasks/list').then(r => r.json()).catch(() => []); if(seq !== drawSeq) return;
+    const th = (tk || []).filter(t => [t.title, t.group, (t.aliases || []).join(' ')].join(' ').toLowerCase().includes(q)).slice(0, 6);
+    if(th.length){ grp('Задачи'); th.forEach(t => item('/tasks.html?id=' + encodeURIComponent(t.id), t.title, 'задача')); }
+    // 3) куски — серверным поиском (словоформы, синонимы, понятное выше); без сервера — по вхождению строки
     const list = await loadAll(); if(seq !== drawSeq) return;
-    const pieces = list.filter(t => ((t.title || '') + ' ' + (t.group || '') + ' ' + (t.lang || '') + ' ' + (t.desc || '') + ' ' + give(t).join(' ') + ' ' + need(t).join(' ')).toLowerCase().includes(q)).slice(0, 10);
+    let pieces = null;
+    try { const r = await fetch('/api/search?q=' + encodeURIComponent(q) + '&limit=10').then(x => x.json()); if(seq !== drawSeq) return;
+      const by = new Map(list.map(t => [t.id, t])); if(r && Array.isArray(r.hits)) pieces = r.hits.map(h => by.get(h.id)).filter(Boolean); } catch(_){}
+    if(!pieces) pieces = list.filter(t => ((t.title || '') + ' ' + (t.group || '') + ' ' + (t.lang || '') + ' ' + (t.desc || '') + ' ' + give(t).join(' ') + ' ' + need(t).join(' ')).toLowerCase().includes(q)).slice(0, 10);
     if(pieces.length){ grp('Куски'); pieces.forEach(t => item('/component.html?id=' + encodeURIComponent(t.id), codelabTitle(t.title || t.id), (t.group || '').split('/')[0].trim() + ' · ' + (t.lang || '').toUpperCase())); }
-    // 3) словарь (+синонимы) — клик разворачивает пояснение прямо здесь, без перехода
+    // 4) словарь (+синонимы) — клик разворачивает пояснение прямо здесь, без перехода
     const d = await loadDict(); if(seq !== drawSeq) return;
     dictSearch(d, q).forEach((h, i) => { if(i === 0) grp('Словарь');
       const row = document.createElement('div'); row.className = 'ss-item ss-dict'; row.innerHTML = '<span class="ss-t">' + esc2(h.term) + '</span><span class="ss-g">' + esc2(h.where) + '</span>';
@@ -100,10 +107,7 @@
       row.onclick = () => { expl.style.display = expl.style.display === 'none' ? '' : 'none'; };
       sres.appendChild(row); sres.appendChild(expl); any = true;
     });
-    // 4) задачи (поиск и по синонимам), рецепты и схемы
-    const tk = await fetch('/api/tasks/list').then(r => r.json()).catch(() => []); if(seq !== drawSeq) return;
-    const th = (tk || []).filter(t => [t.title, t.group, (t.aliases || []).join(' ')].join(' ').toLowerCase().includes(q)).slice(0, 6);
-    if(th.length){ grp('Задачи'); th.forEach(t => item('/tasks.html?id=' + encodeURIComponent(t.id), t.title, 'задача')); }
+    // 5) рецепты и схемы
     const rc = await fetch('/api/recipes/list').then(r => r.json()).catch(() => []); if(seq !== drawSeq) return;
     const rh = (rc || []).filter(r => (r.name || r.title || '').toLowerCase().includes(q)).slice(0, 5);
     if(rh.length){ grp('Шаблоны'); rh.forEach(r => item('/recipes.html', r.name || r.title || r.id, 'шаблон')); }

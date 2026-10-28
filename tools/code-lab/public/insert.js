@@ -79,7 +79,7 @@
   }
   // куски-код из библиотеки (отдельно, чтобы не ждать сеть ради показа слов)
   async function piecesFor(q){
-    try { const r = await fetch('/api/search?q=' + encodeURIComponent(q) + '&limit=6').then(x => x.json());
+    try { const r = await fetch('/api/search?q=' + encodeURIComponent(q) + '&limit=6&lang=' + encodeURIComponent((curCtx && curCtx.lang) || '')).then(x => x.json());
       const list = await loadPieces(); const byId = {}; list.forEach(p => byId[p.id] = p);
       return ((r && r.hits) || []).slice(0, 5).map(h => { const p = byId[h.id] || {}; return { type: 'piece', id: h.id, label: p.title || h.id, desc: (p.lang || '').toUpperCase() }; });
     } catch(_){ return []; }
