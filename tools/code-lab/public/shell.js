@@ -192,4 +192,34 @@
   new MutationObserver(ms => ms.forEach(m => m.addedNodes && m.addedNodes.forEach(scan))).observe(document.body, { childList:true, subtree:true });
   scan(document.body);
   const ts = document.createElement('script'); ts.src = '/theme.js'; document.head.appendChild(ts);
+
+  // ── окна не закрываются случайно ──
+  // Модалки закрывались одиночным кликом по тёмному фону, и выделение текста, отпущенное за краем окна,
+  // засчитывалось как такой клик — окно пропадало вместе с выделением. Теперь фон закрывает окно только
+  // двойным кликом; кнопки «закрыть»/«×» работают как раньше. Фон узнаём по виду: fixed на весь экран
+  // и заметно затемнён (прозрачные «ловушки клика» у выпадающих меню не трогаем).
+  const isBackdrop = el => {
+    if(!el || el.nodeType !== 1 || el === document.body || el === document.documentElement) return false;
+    const cs = getComputedStyle(el); if(cs.position !== 'fixed') return false;
+    const r = el.getBoundingClientRect(); if(r.width < innerWidth * 0.9 || r.height < innerHeight * 0.9) return false;
+    const m = cs.backgroundColor.match(/rgba?\(([^)]+)\)/); if(!m) return false;
+    const a = m[1].split(',').map(x => parseFloat(x)); return (a.length < 4 ? 1 : a[3]) >= 0.2;
+  };
+  let passClick = false, tipEl = null, tipT = null;
+  const tip = (x, y) => {
+    if(!tipEl){ tipEl = document.createElement('div'); tipEl.style.cssText = 'position:fixed;z-index:2147483000;pointer-events:none;background:var(--bg2,#150a2b);color:var(--text2,#cbc2ea);border:1px solid var(--border,#3a2f55);border-radius:7px;padding:5px 9px;font:12px system-ui,sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.45);transition:opacity .2s'; tipEl.textContent = 'закрыть — кнопкой или двойным кликом по фону'; document.body.appendChild(tipEl); }
+    tipEl.style.left = Math.min(x + 12, innerWidth - 300) + 'px'; tipEl.style.top = Math.min(y + 12, innerHeight - 40) + 'px'; tipEl.style.opacity = '1';
+    clearTimeout(tipT); tipT = setTimeout(() => { tipEl.style.opacity = '0'; }, 1400);
+  };
+  document.addEventListener('click', e => {
+    if(passClick) return;
+    if(!isBackdrop(e.target)) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    if(e.detail < 2) tip(e.clientX, e.clientY);
+  }, true);
+  document.addEventListener('dblclick', e => {
+    if(!isBackdrop(e.target)) return;
+    // окно без своего закрытия по фону — просто ничего; с ним — пропускаем один настоящий клик
+    passClick = true; try { e.target.click(); } finally { passClick = false; }
+  }, true);
 })();
