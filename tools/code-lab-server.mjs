@@ -29,6 +29,7 @@ import { handleWorkspace } from './code-lab/lib/workspace.mjs';
 import { createAiGenerate, LANGS as AI_LANGS } from './code-lab/lib/ai-generate.mjs';   // токенайзер вынесен в модуль — его тестируют отдельно
 import { createVendor } from './code-lab/lib/vendor.mjs';
 import { createTaskStore, suggestNext, createTaskRanker } from './code-lab/lib/tasks.mjs';
+import { explainNames } from './code-lab/lib/contract-labels.mjs';   // подписи к именам «даёт/нужно»
 import { createSections, treeToText, treeFromText, suggestSections, placeInTree } from './code-lab/lib/sections.mjs';   // общее дерево разделов   // задачи: деревья решений поверх кусков   // управляемые обновления CodeMirror (по кнопке)
 
 // сетевые/TLS-ошибки провайдеров ИИ (GigaChat и пр.) не должны ронять весь сервер —
@@ -297,7 +298,11 @@ function jsIdents(code, provides, requires){
   const local = new Set(provides);
   const addParams = s => String(s || '').split(',').forEach(p => { const m = p.trim().match(new RegExp('^(' + ID + ')')); if(m) local.add(m[1]); });
   for(const m of txt.matchAll(new RegExp('function\\s*' + ID + '?\\s*\\(([^)]*)\\)', 'g'))) addParams(m[1]);
-  for(const m of txt.matchAll(/\(([^)]*)\)\s*=>/g)) addParams(m[1]);
+  for(const m of txt.matchAll(/\(\s*([^()]*)\)\s*=>/g)) addParams(m[1]);   // без вложенных скобок: «Promise((готово) =>» тоже ловится
+  // ключи объектов «{ method: …, headers: … }» — не внешние имена
+  for(const m of txt.matchAll(new RegExp('(?:^|[{,]\\s*)(' + ID + ')\\s*:(?!:)', 'gm'))) local.add(m[1]);
+  // деструктуризация параметров и переменных «({ a, b }) =>», «const { a, b } = …»
+  for(const m of txt.matchAll(/\{\s*([^{}()]*)\}\s*(?:\)|=)/g)) m[1].split(',').forEach(p => { const mm = p.trim().match(new RegExp('^(?:\\.\\.\\.)?(' + ID + ')(?:\\s*:\\s*(' + ID + '))?')); if(mm){ local.add(mm[2] || mm[1]); local.add(mm[1]); } });
   for(const m of txt.matchAll(new RegExp('(' + ID + ')\\s*=>', 'g'))) local.add(m[1]);
   for(const m of txt.matchAll(new RegExp('catch\\s*\\(\\s*(' + ID + ')', 'g'))) local.add(m[1]);
   for(const m of txt.matchAll(new RegExp('for\\s*\\(\\s*(?:const|let|var)?\\s*(' + ID + ')', 'g'))) local.add(m[1]);
@@ -375,7 +380,26 @@ function coverage(j){
     check:   !!(v.check && (v.check.expected_result || v.check.how)) || (Array.isArray(c.verification) && c.verification.length > 0)
   };
 }
-async function listTemplates(){ return store.rows(); }
+// к «даёт/нужно» — подписи простыми словами (своя из meta.labels побеждает автоматическую); кэш до правок библиотеки/словаря
+let _lblCache = { v: -1, dict: null, map: new Map() };
+async function labelsFor(entry, names){
+  const dict = await kwDict();
+  if(_lblCache.v !== store.version || _lblCache.dict !== dict) _lblCache = { v: store.version, dict, map: new Map() };
+  let L = _lblCache.map.get(entry.id);
+  if(!L){ L = explainNames(entry.code, entry.lang, names, dict);
+    // старый разбор записал в meta и внутренние имена (ключи объектов, параметры вложенных функций): сверяем
+    // с нынешним разбором кода и такие приглушаем; вписанное вручную с типом («сумма: число») не трогаем
+    if(_CONTRACT_LANGS.has(entry.lang)){ try { const fresh = codeContract(entry.code, entry.lang); const live = new Set(fresh.provides.concat(fresh.requires));
+      for(const raw of names){ const n = String(raw).split(':')[0].trim(); if(!String(raw).includes(':') && L[n] && !live.has(n) && !/^[#.@]|^tbl:|^--/.test(n)) L[n] = { kind: 'внутреннее', text: 'внутреннее имя куска (наружу не нужно)', service: true }; } } catch(_){} }
+    for(const [n, t] of Object.entries((entry.meta && entry.meta.labels) || {})) L[n] = { ...(L[n] || { service: false }), kind: 'своя', text: t, own: true };
+    _lblCache.map.set(entry.id, L); }
+  return L;
+}
+async function listTemplates(){
+  const rows = await store.rows(); const ents = new Map((await store.entries()).map(e => [e.id, e]));
+  for(const r of rows){ const c = r.comp; if(!c || !(c.provides.length || c.requires.length)) continue; const e = ents.get(r.id); if(e) r.comp = { ...c, labels: await labelsFor(e, c.provides.concat(c.requires)) }; }
+  return rows;
+}
 const sections = createSections({ file: path.join(LIBRARY, '_sections.json') });   // уезжает в git вместе с library/
 // куски, на которые ссылаются задачи и словарь («пример →»), — в поиске чуть выше; пересчёт раз в минуту
 let _boost = null, _boostAt = 0;
@@ -707,6 +731,8 @@ const server = http.createServer(async (req, res) => {
     if(u.pathname === '/api/template'){
       const t = await store.get(u.searchParams.get('id'));
       if(!t) return json(res, 404, { error: 'нет такого шаблона' });
+      const row = (await store.rows()).find(r => r.id === t.id); const e = (await store.entries()).find(x => x.id === t.id);
+      if(row && row.comp && e){ t.labels = await labelsFor(e, row.comp.provides.concat(row.comp.requires)); t.contract = { provides: row.comp.provides, requires: row.comp.requires }; }
       return json(res, 200, t);
     }
 
@@ -1265,6 +1291,24 @@ const server = http.createServer(async (req, res) => {
         + 'Без нумерации и лишнего текста. Пропусти случайные имена переменных и незначимое. Эти строки я вставлю в словарь.\n\n'
         + list;
       return json(res, 200, { lang, scanned, count: words.length, words, prompt });
+    }
+
+    // ── свои подписи к «даёт/нужно» ─────────────────────────────────────────────
+    // POST {text}: строки «кусок | имя: подпись» (кусок — название или id:…); dry — только разобрать
+    if(u.pathname === '/api/contract/labels' && req.method === 'POST'){
+      const b = await readBody(req); const rows = await store.rows();
+      const byTitle = new Map(); rows.forEach(r => { const k = String(r.title || '').trim().toLowerCase(); if(!byTitle.has(k)) byTitle.set(k, r); });
+      const map = {}, bad = []; let n = 0;
+      for(const raw of String(b.text || '').split(/\r?\n/)){
+        const line = raw.trim(); if(!line) continue;
+        const m = line.match(/^(.+?)\s*\|\s*([^:|]+?)\s*:\s*(.*)$/); if(!m){ bad.push(line); continue; }
+        const ref = m[1].replace(/^id\s*:\s*/i, '').trim(); const r = rows.find(x => x.id === ref) || byTitle.get(ref.toLowerCase());
+        if(!r){ bad.push(line + '   ← кусок не найден'); continue; }
+        (map[r.id] = map[r.id] || {})[m[2].trim()] = m[3].trim(); n++;
+      }
+      if(b.dry) return json(res, 200, { ok: true, dry: true, labels: n, pieces: Object.keys(map).length, bad });
+      const r = await store.setLabels(map);
+      return json(res, 200, { ok: true, labels: n, pieces: r.changed, bad });
     }
 
     // ── общее дерево разделов ───────────────────────────────────────────────────

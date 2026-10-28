@@ -301,6 +301,25 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
       });
     },
 
+    // Свои подписи к именам «даёт/нужно»: {id: {имя: подпись}}; пустая подпись снимает свою (вернётся автоматическая)
+    async setLabels(map) {
+      return withLock(async () => {
+        await scan();
+        let changed = 0;
+        for (const [id, labels] of Object.entries(map || {})) {
+          const e = byId.get(String(id)); if (!e || !labels || typeof labels !== 'object') continue;
+          const cur = { ...(e.meta.labels || {}) };
+          for (const [n, t] of Object.entries(labels)) { const v = String(t || '').trim().slice(0, 200); if (v) cur[n] = v; else delete cur[n]; }
+          const meta = { ...e.meta, labels: cur };
+          if (!Object.keys(cur).length) delete meta.labels;
+          await writeAtomic(e.metaPath, JSON.stringify(meta, null, 2) + '\n');
+          e.meta = meta; e.metaMtime = await mtime(e.metaPath); e.row = buildRow(e); changed++;
+        }
+        if (changed) { dirty = true; version++; }
+        return { changed };
+      });
+    },
+
     // Массово сменить раздел (перенос в общее дерево разделов): меняется только поле group, остальное как было.
     async setGroups(map) {
       return withLock(async () => {

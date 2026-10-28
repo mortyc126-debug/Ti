@@ -78,8 +78,10 @@ function panel(title, node, ai){
 }
 function elHtml(tag, cls, html){ const e = document.createElement(tag); if(cls) e.className = cls; if(html != null) e.innerHTML = html; return e; }
 // чипы имён с типом («имя: тип» → имя + цветной тег)
+let LABELS = {};   // подписи к именам «даёт/нужно» с сервера (/api/template → labels)
 function nameChips(arr){
   if(!arr || !arr.length) return '<span class="muted">— не указано</span>';
+  if(window.contractLabeledChips) return window.contractLabeledChips(arr, LABELS);
   return arr.map(s => {
     const it = window.contractParseItem ? window.contractParseItem(s) : { name: s, type: '' };
     const ty = it.type ? ' <span class="ct-ty" style="color:' + window.contractTypeColor(it.type) + ';border-color:' + window.contractTypeColor(it.type) + '55">' + esc(it.type) + '</span>' : '';
@@ -93,7 +95,10 @@ function render(t){
   LNOTES = (c && c.lineNotes && typeof c.lineNotes === 'object') ? c.lineNotes : {};
   const codeText = c && c.views && c.views.use && c.views.use.code ? c.views.use.code.content
                  : (t.lines || []).map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n');
-  const provides = (c && c.provides) || [], requires = (c && c.requires) || [];
+  // если в файле контракта нет — берём вычисленный по коду (сервер отдаёт его в t.contract)
+  const provides = (c && c.provides && c.provides.length ? c.provides : (t.contract && t.contract.provides)) || [];
+  const requires = (c && c.requires && c.requires.length ? c.requires : (t.contract && t.contract.requires)) || [];
+  LABELS = t.labels || {};
   const summary = (c && c.summary) || {}, check = (c && c.views && c.views.check) || {};
   root.innerHTML = '';
 

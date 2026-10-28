@@ -172,3 +172,19 @@ test('разделы: самое длинное совпадение, «/ *» о
   assert.deepEqual(placeInTree('Данные / Прочее', tree), { top: true, sub: false });
   assert.deepEqual(placeInTree('Сеть', tree), { top: false, sub: true });
 });
+
+test('подписи к «даёт/нужно»: из кода и словаря, служебное приглушено, общие слова словарём не толкуются', async () => {
+  const { explainNames } = await import('../lib/contract-labels.mjs');
+  const dict = { words: {}, langs: { js: { ctx: 'объект контекста рисования Canvas', 'const ctx = canvas.getcontext("2d")': 'получить двумерный контекст рисования', key: 'функция сортировки', fetch: 'выполнить сетевой запрос', error: 'ошибка, общая ошибка, исключение, сбой' } } };
+  const code = "const canvas = document.querySelector('#scene');\nconst ctx = canvas.getContext('2d');\nfunction draw(x, y) { ctx.fill(); }\nconst http = require('http');\nconst a = [1, 2];\nconst key = 'k';\nconst r = await fetch(url);";
+  const L = explainNames(code, 'js', ['canvas', 'ctx', 'draw', 'http', 'a', 'key', 'url', 'r', '#scene', 'Error'], dict);
+  assert.match(L.canvas.text, /элемент страницы #scene/);
+  assert.match(L.ctx.text, /контекст/);
+  assert.equal(L.draw.kind, 'функция'); assert.match(L.draw.text, /\(x, y\)/);
+  assert.match(L.http.text, /модуль http/);
+  assert.ok(L.a.service, 'однобуквенное — служебное');
+  assert.ok(!/сортировк/.test(L.key.text), 'общее слово не толкуется словарём');
+  assert.equal(L.url.kind, 'снаружи');
+  assert.match(L['#scene'].text, /id="scene"/);
+  assert.ok(!/общая ошибка/.test(L.Error.text), 'список синонимов — не подпись');
+});

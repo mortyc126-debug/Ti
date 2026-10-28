@@ -33,6 +33,31 @@
     return ca === cb;
   }
   window.CONTRACT_TYPES = T.map(x => x.t);
+  // имена «даёт/нужно» с подписью простыми словами (labels — с сервера: {имя: {text, kind, service, own}}).
+  // Главные — первыми, служебные (i, a, результат) — приглушённо в конце; полная подпись — во всплывающей подсказке.
+  var escH = function(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  if(!document.getElementById('ct-lbl-style')){
+    var st = document.createElement('style'); st.id = 'ct-lbl-style';
+    st.textContent = '.ct-l{display:inline-flex;flex-direction:column;vertical-align:top;margin:1px 8px 3px 0;max-width:240px}'
+      + '.ct-l .ct-n{display:inline-flex;align-items:center;gap:4px}'
+      + '.ct-l .ct-s{font-size:11px;line-height:1.35;color:var(--text3,#9c90c4);white-space:normal}'
+      + '.ct-l.own .ct-s{color:var(--str,#52F2C9)}'
+      + '.ct-l.svc{opacity:.5;max-width:160px}.ct-l.svc .ct-s{display:none}.ct-l.svc:hover{opacity:1}.ct-l.svc:hover .ct-s{display:block}';
+    document.head.appendChild(st);
+  }
+  function labeledChips(arr, labels){
+    if(!arr || !arr.length) return '';
+    labels = labels || {};
+    var items = arr.map(function(s){ var it = parseItem(s); var L = labels[it.name] || null; return { it: it, L: L, svc: !!(L && L.service) }; });
+    items.sort(function(a, b){ return (a.svc ? 1 : 0) - (b.svc ? 1 : 0); });
+    return items.map(function(x){
+      var ty = x.it.type ? '<span class="ct-ty" style="color:' + typeColor(x.it.type) + ';border-color:' + typeColor(x.it.type) + '55">' + escH(x.it.type) + '</span>' : '';
+      var txt = x.L && x.L.text ? x.L.text : '';
+      return '<span class="ct-l' + (x.svc ? ' svc' : '') + (x.L && x.L.own ? ' own' : '') + '" title="' + escH(x.it.name + (txt ? ' — ' + txt : '') + (x.L && x.L.own ? '  (своя подпись)' : '')) + '">'
+        + '<span class="ct-n">' + escH(x.it.name) + ty + '</span>' + (txt ? '<span class="ct-s">' + escH(txt) + '</span>' : '') + '</span>';
+    }).join('');
+  }
+  window.contractLabeledChips = labeledChips;
   window.contractParseItem = parseItem;
   window.contractTypeColor = typeColor;
   window.contractTypesCompatible = typesCompatible;

@@ -44,8 +44,9 @@ function covCell(t){
 }
 
 // чипы контракта с типом: «имя: тип» → имя + цветной тег типа
-function contractChips(arr){
+function contractChips(arr, labels){
   if(!arr || !arr.length) return '';
+  if(labels && window.contractLabeledChips) return window.contractLabeledChips(arr, labels);
   return arr.map(s => {
     const it = window.contractParseItem ? window.contractParseItem(s) : { name: s, type: '' };
     const ty = it.type ? '<span class="ct-ty" style="color:' + window.contractTypeColor(it.type) + ';border-color:' + window.contractTypeColor(it.type) + '55">' + esc(it.type) + '</span>' : '';
@@ -59,8 +60,8 @@ function pieceRows(list){
       + '<td class="t-title"><a href="/component.html?id=' + encodeURIComponent(t.id) + '">' + esc(dispTitle(t)) + '</a><div class="t-id">' + esc(t.id) + '</div></td>'
       + '<td>' + esc((t.lang || '').toUpperCase()) + '</td>'
       + '<td class="edit-cell" data-field="group" title="клик — сменить раздел">' + (t.group ? esc(t.group) : '<span class="muted">+ раздел</span>') + '</td>'
-      + '<td class="give edit-cell" data-field="provides" title="клик — изменить (имя: тип)">' + (g.length ? contractChips(g) : '<span class="muted">+ отметить</span>') + '</td>'
-      + '<td class="need edit-cell" data-field="requires" title="клик — изменить (имя: тип)">' + (n.length ? contractChips(n) : '<span class="muted">+ отметить</span>') + '</td>'
+      + '<td class="give edit-cell" data-field="provides" title="клик — изменить (имя: тип)">' + (g.length ? contractChips(g, t.comp && t.comp.labels) : '<span class="muted">+ отметить</span>') + '</td>'
+      + '<td class="need edit-cell" data-field="requires" title="клик — изменить (имя: тип)">' + (n.length ? contractChips(n, t.comp && t.comp.labels) : '<span class="muted">+ отметить</span>') + '</td>'
       + '<td>' + covCell(t) + '</td>'
       + '<td class="pc-act"><button class="mini pc-copy" data-id="' + esc(t.id) + '" title="скопировать как готовый шаблон (JSON) — вставить в сборник или загрузить как новый">⧉</button><button class="mini pc-move" data-id="' + esc(t.id) + '" title="переместить в раздел">📁</button><button class="mini pc-del" data-id="' + esc(t.id) + '" title="удалить кусок">🗑</button></td>'
       + '</tr>';
