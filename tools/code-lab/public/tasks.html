@@ -13,6 +13,10 @@
   .tk-tools{display:flex;gap:6px;flex-wrap:wrap}
   .tk-q{width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:8px 10px}
   .tk-q:focus{outline:none;border-color:var(--name)}
+  .tk-langs{display:flex;gap:5px;flex-wrap:wrap}
+  .tk-lang{background:var(--s2);border:1px solid var(--border);border-radius:14px;color:var(--text3);font:11px ui-monospace,monospace;padding:4px 9px;cursor:pointer}
+  .tk-lang span{opacity:.7}
+  .tk-lang.on{color:var(--text);border-color:var(--name);background:color-mix(in srgb,var(--name) 18%,var(--s2))}
   .tk-list{flex:1;min-height:0;overflow:auto;padding-right:4px}
   .tk-g{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin:10px 0 4px}
   .tk-it{display:block;padding:7px 9px;border-radius:8px;cursor:pointer;border:1px solid transparent}
@@ -82,6 +86,7 @@
         <button class="btn" id="tkPrompt" title="готовый запрос для ИИ: он напишет задачи сразу в нужном формате">⧉ промпт для ИИ</button>
       </div>
       <input class="tk-q" id="tkQ" placeholder="что хочу сделать…  (название, синонимы, раздел)">
+      <div class="tk-langs" id="tkLangs"></div>
       <div class="tk-list" id="tkList"></div>
     </div>
     <div class="tk-main" id="tkMain"></div>

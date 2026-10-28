@@ -39,19 +39,34 @@
     else if(!CUR) renderIntro();
   }
   const norm = s => String(s || '').toLowerCase().replace(/ё/g, 'е');
+  // язык списка: «все» или один; запоминается
+  let LANG = ''; try { LANG = localStorage.getItem('codelab_tasks_lang') || ''; } catch(_){}
+  function renderLangs(){
+    const box = $('#tkLangs'); const cnt = new Map();
+    LIST.forEach(t => cnt.set(t.lang || '', (cnt.get(t.lang || '') || 0) + 1));
+    if(LANG && !cnt.has(LANG)) LANG = '';
+    const chip = (v, label, n) => '<button class="tk-lang' + (LANG === v ? ' on' : '') + '" data-l="' + esc(v) + '">' + esc(label) + ' <span>' + n + '</span></button>';
+    box.innerHTML = cnt.size < 2 && !LANG ? '' : chip('', 'все', LIST.length)
+      + [...cnt.entries()].sort((a, b) => b[1] - a[1]).map(([l, n]) => chip(l, l ? l.toUpperCase() : '?', n)).join('');
+    box.querySelectorAll('.tk-lang').forEach(b => b.onclick = () => { LANG = b.dataset.l; try { localStorage.setItem('codelab_tasks_lang', LANG); } catch(_){} renderList(); });
+  }
   function renderList(){
+    renderLangs();
     const q = norm($('#tkQ').value).split(/\s+/).filter(Boolean);
-    const hits = LIST.filter(t => { const h = norm([t.title, t.group, t.desc, (t.aliases || []).join(' '), t.lang].join(' ')); return q.every(w => h.includes(w)); });
+    const hits = LIST.filter(t => (!LANG || (t.lang || '') === LANG) && (h => q.every(w => h.includes(w)))(norm([t.title, t.group, t.desc, (t.aliases || []).join(' '), t.lang].join(' '))));
     listEl.innerHTML = '';
     if(!LIST.length){ listEl.innerHTML = '<div class="tk-lead">Задач пока нет.</div>'; return; }
     if(!hits.length){ listEl.innerHTML = '<div class="tk-lead">Ничего не нашлось. Можно создать: «＋ новая».</div>'; return; }
+    // при «все» заголовок группы — язык · раздел, иначе только раздел
     const groups = new Map();
-    hits.sort((a, b) => a.title.localeCompare(b.title, 'ru')).forEach(t => { const g = (t.group || 'Без раздела').split('/')[0].trim(); if(!groups.has(g)) groups.set(g, []); groups.get(g).push(t); });
+    hits.sort((a, b) => a.title.localeCompare(b.title, 'ru')).forEach(t => { const sec = (t.group || 'Без раздела').split('/')[0].trim();
+      const g = LANG ? sec : (t.lang || '?').toUpperCase() + ' · ' + sec; if(!groups.has(g)) groups.set(g, []); groups.get(g).push(t); });
     [...groups.keys()].sort((a, b) => a.localeCompare(b, 'ru')).forEach(g => {
       const h = document.createElement('div'); h.className = 'tk-g'; h.textContent = g; listEl.appendChild(h);
       groups.get(g).forEach(t => {
         const a = document.createElement('a'); a.className = 'tk-it' + (CUR === t.id ? ' on' : '');
-        a.innerHTML = '<div class="t">' + esc(t.title) + '</div><div class="m">' + esc((t.lang || '').toUpperCase()) + ' · вопросов ' + t.steps + ' · вариантов ' + t.options
+        const sub = (t.group || '').split('/').slice(1).join('/').trim();
+        a.innerHTML = '<div class="t">' + esc(t.title) + '</div><div class="m">' + (sub ? esc(sub) + ' · ' : '') + 'вопросов ' + t.steps + ' · вариантов ' + t.options
           + (t.unresolved ? ' · <span class="bad">⚠ ' + t.unresolved + ' не найдено</span>' : '') + '</div>';
         a.onclick = () => showTask(t.id);
         listEl.appendChild(a);
@@ -307,26 +322,52 @@
     const m = modal('<h3>Промпт для ИИ</h3>'
       + '<div class="tk-help">Запрос, по которому любой чат напишет задачи сразу в нужном формате. Ответ вставь в «📥 пачкой». Чтобы ИИ ссылался на твои куски, а не писал всё заново, приложи их названия.</div>'
       + '<div class="mfield"><label>Тема: какие задачи нужны</label><input id="prTopic" placeholder="например: формы и проверка ввода; работа со списками; запросы к API"></div>'
-      + '<div style="display:grid;grid-template-columns:1fr 2fr;gap:10px"><div class="mfield"><label>Язык</label><select id="prLang">' + langs.map(l => '<option' + (l === 'js' ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select></div>'
-      + '<div class="mfield"><label>Приложить названия кусков из раздела</label><select id="prGroup"></select></div></div>'
+      + '<div style="display:grid;grid-template-columns:1fr 2fr;gap:10px"><div class="mfield"><label>Язык</label><select id="prLang">' + langs.map(l => '<option' + (l === (LANG || 'js') ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select></div>'
+      + '<div class="mfield"><label>Раздел задач (что в нём уже есть — уйдёт в запрос, чтобы ИИ не повторялся)</label><select id="prTSec"></select>'
+      + '<input id="prTNew" placeholder="новый раздел, например: Браузер / Анимации" style="margin-top:6px;display:none"></div></div>'
+      + '<div class="mfield"><label>Приложить названия кусков из раздела библиотеки</label><select id="prGroup"></select></div>'
       + '<div class="mfield"><label>Сколько задач</label><input id="prN" type="number" value="5" min="1" max="30"></div>'
       + '<div class="mfield"><label>Запрос</label><textarea id="prOut" rows="16" spellcheck="false"></textarea></div>'
       + '<div class="tk-row"><button class="btn ok" id="prCopy">⧉ скопировать</button><button class="btn" id="prX">закрыть</button></div>');
+    // разделы задач этого языка: верхний уровень «Браузер», полный путь «Браузер / Формы»
+    const secOf = t => (t.group || 'Без раздела').split('/')[0].trim();
+    const fillTSec = () => {
+      const l = m.q('#prLang').value; const g = new Map();
+      LIST.filter(t => (t.lang || '') === l).forEach(t => g.set(secOf(t), (g.get(secOf(t)) || 0) + 1));
+      m.q('#prTSec').innerHTML = '<option value="">— любой (приложить только названия всех задач) —</option>'
+        + [...g.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => '<option value="' + esc(k) + '">' + esc(k) + ' (' + n + ')</option>').join('')
+        + '<option value="+">＋ новый раздел…</option>';
+      m.q('#prTNew').style.display = 'none';
+    };
+    const FULL = new Map();   // полные задачи раздела — для перечня вопросов
+    const fullOf = async ids => { await Promise.all(ids.filter(id => !FULL.has(id)).map(id => api('/api/tasks/get?id=' + encodeURIComponent(id)).then(t => FULL.set(id, t)).catch(() => {}))); return ids.map(id => FULL.get(id)).filter(Boolean); };
+    // коротко: название, раздел и вопросы с вариантами — ИИ видит, что уже покрыто
+    const outline = t => { const out = ['• ' + t.title + (t.group ? '  [' + t.group + ']' : '')];
+      const walk = (steps, pad) => (steps || []).forEach(st => { out.push(st.auto && st.options.length === 1 ? pad + '! ' + (st.q || st.options[0].label)
+          : pad + '? ' + (st.q || '') + ' — ' + st.options.map(o => o.label).join(' / '));
+        st.options.forEach(o => walk(o.steps, pad + '    ')); });
+      walk(t.steps, '    '); return out.join('\n'); };
     const fillGroups = () => {
       const l = m.q('#prLang').value; const g = new Map();
       rows.filter(r => r.lang === l).forEach(r => { const k = (r.group || '').split('/')[0].trim() || 'Разное'; g.set(k, (g.get(k) || 0) + 1); });
       m.q('#prGroup').innerHTML = '<option value="">— не прикладывать —</option><option value="*">все разделы (до 400 названий)</option>'
         + [...g.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => '<option value="' + esc(k) + '">' + esc(k) + ' (' + n + ')</option>').join('');
     };
-    const build = () => {
+    let bSeq = 0;
+    const build = async () => {
+      const my = ++bSeq;
       const l = m.q('#prLang').value, grp = m.q('#prGroup').value, n = m.q('#prN').value || 5;
+      const tsec = m.q('#prTSec').value, tnew = m.q('#prTNew').value.trim();
+      const secName = tsec === '+' ? tnew : tsec;
+      const inSec = tsec && tsec !== '+' ? LIST.filter(t => (t.lang || '') === l && secOf(t) === tsec) : [];
+      const secFull = await fullOf(inSec.map(t => t.id)); if(my !== bSeq) return;
+      const others = LIST.filter(t => !inSec.includes(t));
       const topic = m.q('#prTopic').value.trim() || 'самые частые повседневные задачи';
       let titles = [];
       if(grp) titles = rows.filter(r => r.lang === l && (grp === '*' || ((r.group || '').split('/')[0].trim() || 'Разное') === grp)).map(r => r.title).slice(0, 400);
-      const have = LIST.map(t => t.title);
       m.q('#prOut').value = [
         'Ты помогаешь наполнять мою базу «задач» — деревьев решений для программирования. Язык: ' + l + '. Тема: ' + topic + '.',
-        'Напиши ' + n + ' задач. Задача — это то, что человек хочет сделать («Отправить форму без перезагрузки»), а внутри — вопросы-развилки с вариантами. Вопросы задавай так, чтобы понял новичок, а варианты — короткие и конкретные.',
+        (secName ? 'Раздел: ' + secName + ' — в строке «===» пиши его третьим полем (можно с подразделом через « / »).\n' : '') + 'Напиши ' + n + ' задач. Задача — это то, что человек хочет сделать («Отправить форму без перезагрузки»), а внутри — вопросы-развилки с вариантами. Вопросы задавай так, чтобы понял новичок, а варианты — короткие и конкретные.',
         '',
         'Формат строго такой (без markdown вокруг, без пояснений до и после):',
         FORMAT_HELP,
@@ -339,13 +380,16 @@
         '- Добавляй вариант «-> пропустить», если шаг бывает не нужен.',
         '- В коде используй обычные имена; если вариант зависит от имени из прошлого шага — используй то же имя.',
         '',
-        have.length ? 'Мои задачи (не повторяй, но можешь ссылаться):\n' + have.join('\n') : 'Моих задач пока нет.',
+        tsec && tsec !== '+' ? (secFull.length ? 'Что уже есть в разделе «' + tsec + '» (не повторяй эти задачи и их развилки; можно углубить, дополнить или сослаться через «-> задача:»):\n' + secFull.map(outline).join('\n') : 'В разделе «' + tsec + '» задач пока нет.') : '',
+        others.length ? (tsec && tsec !== '+' ? 'Другие мои задачи' : 'Мои задачи') + ' (не повторяй, но можешь ссылаться):\n' + others.map(t => t.title).join('\n') : (inSec.length ? '' : 'Моих задач пока нет.'),
         '',
         titles.length ? 'Мои куски (названия для «-> кусок:»):\n' + titles.join('\n') : 'Готовые куски не прикладываю — пиши код в вариантах.'
       ].join('\n');
     };
-    fillGroups(); build();
-    ['#prLang'].forEach(s => m.q(s).onchange = () => { fillGroups(); build(); });
+    fillGroups(); fillTSec(); build();
+    ['#prLang'].forEach(s => m.q(s).onchange = () => { fillTSec(); fillGroups(); build(); });
+    m.q('#prTSec').onchange = () => { const nw = m.q('#prTSec').value === '+'; m.q('#prTNew').style.display = nw ? '' : 'none'; if(nw) m.q('#prTNew').focus(); build(); };
+    m.q('#prTNew').oninput = build;
     ['#prGroup', '#prN'].forEach(s => m.q(s).onchange = build);
     m.q('#prTopic').oninput = build;
     m.q('#prCopy').onclick = e => copy(m.q('#prOut').value, e.target);
