@@ -81,3 +81,42 @@ export function createSections({ file }){
   }
   return { load, save, plan };
 }
+
+// ── «разложить неразобранное»: раздел для куска по самым похожим разложенным кускам ──
+// Похожесть — общие слова названия/тегов/описания/кода; редкое общее слово весит больше частого (idf).
+const splitWords = s => String(s || '').replace(/([a-zа-яё])([A-ZА-ЯЁ])/g, '$1 $2').toLowerCase().replace(/ё/g, 'е').match(/[a-zа-я][a-zа-я0-9]{2,}/g) || [];
+const STOPW = new Set('the and for with from this that const let var function return new true false null undefined если это для как что или при без над под все его она они'.split(' '));
+function bag(e){
+  const m = e.meta || {}; const out = new Map();
+  const add = (s, w) => { for(const x of splitWords(s)){ if(STOPW.has(x)) continue; out.set(x, (out.get(x) || 0) + w); } };
+  add(m.title || e.title, 3); add((m.tags || []).join(' '), 2); add((m.aliases || []).join(' '), 2); add(m.desc, 1); add(String(e.code || '').slice(0, 4000), 1);
+  return out;
+}
+export function suggestSections({ entries, tree, rules, isUnsorted, k = 7 }){
+  const { rules: rs } = parseRules(rules);
+  const pathOf = e => mapGroup((e.meta && e.meta.group) || '', rs).to;
+  const docs = entries.map(e => ({ e, path: pathOf(e), bag: bag(e) }));
+  const df = new Map(); docs.forEach(d => d.bag.forEach((_, w) => df.set(w, (df.get(w) || 0) + 1)));
+  const N = docs.length || 1, idf = w => Math.log(1 + N / (df.get(w) || 1));
+  const vec = b => { const v = new Map(); let n = 0; b.forEach((c, w) => { const x = Math.min(c, 4) * idf(w); v.set(w, x); n += x * x; }); return { v, n: Math.sqrt(n) || 1 }; };
+  docs.forEach(d => d.vec = vec(d.bag));
+  const sorted = docs.filter(d => !isUnsorted(d.path)), todo = docs.filter(d => isUnsorted(d.path));
+  // одноимённый разложенный кусок — самый сильный довод; тот же код без шапки-комментариев — значит, дубль
+  const tkey = e => String((e.meta && e.meta.title) || e.title || '').trim().toLowerCase().replace(/ё/g, 'е');
+  const body = c => String(c || '').replace(/\r/g, '').replace(/\/\/[^\n]*|#[^\n]*/g, '').replace(/\s+/g, ' ').trim();
+  const byTitle = new Map(); sorted.forEach(o => { const k = tkey(o.e); if(!byTitle.has(k)) byTitle.set(k, []); byTitle.get(k).push(o); });
+  return todo.map(d => {
+    const twins = byTitle.get(tkey(d.e)) || [];
+    const twin = twins.find(o => body(o.e.code) === body(d.e.code)) || twins[0] || null;
+    const near = [];
+    for(const o of sorted){ let s = 0; d.vec.v.forEach((x, w) => { const y = o.vec.v.get(w); if(y) s += x * y; }); if(s > 0) near.push({ o, s: s / (d.vec.n * o.vec.n) }); }
+    near.sort((a, b) => b.s - a.s);
+    const top = near.slice(0, k), votes = new Map(); let total = 0;
+    top.forEach(({ o, s }) => { if(!placeInTree(o.path, tree).top) return; votes.set(o.path, (votes.get(o.path) || 0) + s); total += s; });
+    let opts = [...votes.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([path, v]) => ({ path, share: total ? Math.round(v / total * 100) : 0 }));
+    if(twin && placeInTree(twin.path, tree).top) opts = [{ path: twin.path, share: 100, twin: true }].concat(opts.filter(o => o.path !== twin.path)).slice(0, 3);
+    return { id: d.e.id, title: (d.e.meta && d.e.meta.title) || d.e.title, lang: d.e.lang, from: d.path, options: opts,
+      twin: twin ? { id: twin.e.id, path: twin.path, same: body(twin.e.code) === body(d.e.code) } : null,
+      sim: top.length ? Math.round(top[0].s * 100) : 0, like: top.slice(0, 3).map(({ o }) => o.e.meta.title || o.e.id) };
+  }).sort((a, b) => ((b.options[0] || {}).share || 0) - ((a.options[0] || {}).share || 0));
+}

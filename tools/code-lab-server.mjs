@@ -29,7 +29,7 @@ import { handleWorkspace } from './code-lab/lib/workspace.mjs';
 import { createAiGenerate, LANGS as AI_LANGS } from './code-lab/lib/ai-generate.mjs';   // токенайзер вынесен в модуль — его тестируют отдельно
 import { createVendor } from './code-lab/lib/vendor.mjs';
 import { createTaskStore, suggestNext, createTaskRanker } from './code-lab/lib/tasks.mjs';
-import { createSections, treeToText, treeFromText } from './code-lab/lib/sections.mjs';   // общее дерево разделов   // задачи: деревья решений поверх кусков   // управляемые обновления CodeMirror (по кнопке)
+import { createSections, treeToText, treeFromText, suggestSections, placeInTree } from './code-lab/lib/sections.mjs';   // общее дерево разделов   // задачи: деревья решений поверх кусков   // управляемые обновления CodeMirror (по кнопке)
 
 // сетевые/TLS-ошибки провайдеров ИИ (GigaChat и пр.) не должны ронять весь сервер —
 // логируем и продолжаем работать, чтобы Лаборатория оставалась доступной.
@@ -1264,6 +1264,16 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req); const cur = await sections.load();
       const cfg = { tree: typeof b.treeText === 'string' ? treeFromText(b.treeText) : cur.tree, rules: Array.isArray(b.rules) ? b.rules : (typeof b.rules === 'string' ? b.rules.split(/\r?\n/) : cur.rules) };
       cfg.rules = cfg.rules.map(x => String(x).trim()).filter(Boolean);
+      // неразобранное (раздел «Не разобрано» или вне дерева) → до 3 разделов по похожим разложенным кускам
+      if(u.pathname === '/api/sections/suggest'){
+        const isUnsorted = p => { const top = p.split(' / ')[0]; return /^не разобрано$/i.test(top) || !placeInTree(p, cfg.tree).top; };
+        return json(res, 200, { items: suggestSections({ entries: await store.entries(), tree: cfg.tree, rules: cfg.rules, isUnsorted }), tree: cfg.tree });
+      }
+      // выбранные разделы для отдельных кусков: {map: {id: путь}}
+      if(u.pathname === '/api/sections/assign'){
+        const map = {}; for(const [id, g] of Object.entries(b.map || {})){ const v = String(g || '').trim(); if(v) map[id] = v.slice(0, 120); }
+        return json(res, 200, { ok: true, ...(await store.setGroups(map)) });
+      }
       const items = (await store.rows()).map(r => ({ id: r.id, kind: 'piece', group: r.group }))
         .concat((await tasks.list()).map(t => ({ id: t.id, kind: 'task', group: t.group })));
       const p = sections.plan(items, cfg);

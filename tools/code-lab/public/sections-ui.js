@@ -47,6 +47,7 @@
       + '</div><div><label>Что получится</label><div class="sx-prev" id="sxPrev">считаю…</div></div></div>'
       + '<div class="sx-row"><button class="btn" id="sxSave" title="сохранить дерево и правила, ничего не перенося">💾 сохранить</button>'
       + '<button class="btn ok" id="sxApply" title="сохранить и переписать раздел у кусков и задач по правилам">✅ применить к кускам и задачам</button>'
+      + '<button class="btn" id="sxSort" title="подобрать раздел кускам из «Не разобрано» по самым похожим разложенным кускам">🧭 разложить неразобранное</button>'
       + '<button class="btn" id="sxX">закрыть</button><span class="sx-msg" id="sxMsg"></span></div></div>';
     document.body.appendChild(bg);
     const q = s => bg.querySelector(s);
@@ -104,7 +105,59 @@
       msg('✓ Перенесено: кусков ' + r.pieces + ', задач ' + r.tasks + '. Обнови страницу, чтобы увидеть новые разделы.', 'ok');
       preview();
     };
+    q('#sxSort').onclick = () => sortUnsorted(body());
     preview();
+  }
+
+  // ── «разложить неразобранное»: таблица «кусок → раздел», применяется только отмеченное ──
+  async function sortUnsorted(cfgBody){
+    const bg = document.createElement('div'); bg.className = 'sx-bg';
+    bg.innerHTML = '<div class="sx"><h3>🧭 Разложить неразобранное</h3>'
+      + '<div class="lead">Раздел подобран по самым похожим уже разложенным кускам (название, теги, описание, код). Если есть кусок с тем же названием — первым идёт его раздел. '
+      + '«дубль» — тот же код, что у одноимённого куска (отличается только комментариями): такой можно удалить. Меняется только отмеченное.</div>'
+      + '<div class="sx-row" style="margin:0 0 8px"><button class="btn" id="suConf">отметить уверенные (от 50 %)</button><button class="btn" id="suAll">отметить все</button><button class="btn" id="suNone">снять</button>'
+      + '<button class="btn" id="suDups" title="отметить «удалить» у всех точных дублей">🗑 отметить дубли к удалению</button><span class="sx-msg" id="suInfo">считаю…</span></div>'
+      + '<div class="sx-prev" id="suList" style="max-height:64vh"></div>'
+      + '<div class="sx-row"><button class="btn ok" id="suGo">✅ применить отмеченное</button><button class="btn" id="suX">закрыть</button><span class="sx-msg" id="suMsg"></span></div></div>';
+    document.body.appendChild(bg);
+    const q = s => bg.querySelector(s);
+    q('#suX').onclick = () => bg.remove();
+    const r = await api('/api/sections/suggest', cfgBody).catch(() => null);
+    if(!r){ q('#suInfo').textContent = 'сервер не ответил'; return; }
+    const items = r.items || [];
+    const all = []; (r.tree || []).forEach(t => { all.push(t.name); (t.subs || []).forEach(sb => all.push(t.name + ' / ' + sb)); });
+    q('#suInfo').textContent = items.length ? 'кусков: ' + items.length + ', дублей: ' + items.filter(x => x.twin && x.twin.same).length : 'неразобранных нет 👍';
+    q('#suList').innerHTML = items.map((x, i) => {
+      const best = x.options[0];
+      const opts = x.options.map(o => '<option value="' + esc(o.path) + '">' + esc(o.path) + (o.twin ? '  — как у одноимённого' : '  — ' + o.share + ' %') + '</option>').join('')
+        + '<option disabled>──────────</option>' + all.filter(p => !x.options.some(o => o.path === p)).map(p => '<option value="' + esc(p) + '">' + esc(p) + '</option>').join('');
+      return '<div class="su-it" data-i="' + i + '" style="display:grid;grid-template-columns:24px minmax(0,1.2fr) minmax(0,1.4fr) auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)">'
+        + '<input type="checkbox" class="su-on" title="перенести">'
+        + '<div><a href="/component.html?id=' + encodeURIComponent(x.id) + '" target="_blank" style="color:var(--text);text-decoration:none">' + esc(x.title) + '</a> <span class="n" style="font:11px ui-monospace,monospace;color:var(--text3)">' + esc((x.lang || '').toUpperCase()) + '</span>'
+        + '<div style="font-size:11px;color:var(--text3)">похоже на: ' + esc(x.like.join(' · ')) + '</div></div>'
+        + '<select class="su-to" style="background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:5px;font-size:12px;max-width:100%">' + opts + '</select>'
+        + (x.twin && x.twin.same ? '<label style="font-size:11.5px;color:#ff9b6b;white-space:nowrap" title="тот же код, что у одноимённого куска — удалить этот"><input type="checkbox" class="su-del"> дубль: удалить</label>' : '<span></span>')
+        + '</div>';
+    }).join('');
+    const rows = [...bg.querySelectorAll('.su-it')];
+    const conf = i => { const b = items[i].options[0]; return !!b && (b.twin || b.share >= 50); };
+    q('#suConf').onclick = () => rows.forEach(el => el.querySelector('.su-on').checked = conf(+el.dataset.i));
+    q('#suAll').onclick = () => rows.forEach(el => el.querySelector('.su-on').checked = true);
+    q('#suNone').onclick = () => rows.forEach(el => { el.querySelector('.su-on').checked = false; const d = el.querySelector('.su-del'); if(d) d.checked = false; });
+    q('#suDups').onclick = () => rows.forEach(el => { const d = el.querySelector('.su-del'); if(d) d.checked = true; });
+    q('#suGo').onclick = async () => {
+      const map = {}, del = [];
+      rows.forEach(el => { const x = items[+el.dataset.i]; const d = el.querySelector('.su-del');
+        if(d && d.checked) del.push(x.id); else if(el.querySelector('.su-on').checked) map[x.id] = el.querySelector('.su-to').value; });
+      if(!Object.keys(map).length && !del.length){ q('#suMsg').textContent = 'ничего не отмечено'; return; }
+      if(del.length && !confirm('Удалить ' + del.length + ' дубл(ей)? Одноимённые куски с тем же кодом останутся. Вернуть можно через git.')) return;
+      q('#suMsg').textContent = 'применяю…';
+      const a = Object.keys(map).length ? await api('/api/sections/assign', { map }).catch(() => null) : { changed: 0 };
+      let removed = 0; for(const id of del){ const d = await api('/api/delete', { id }).catch(() => null); if(d && !d.error) removed++; }
+      q('#suMsg').className = 'sx-msg ok';
+      q('#suMsg').textContent = '✓ Перенесено: ' + ((a && a.changed) || 0) + ', удалено дублей: ' + removed + '.';
+      rows.forEach(el => { const x = items[+el.dataset.i]; if(map[x.id] || del.includes(x.id)) el.style.opacity = '.35'; });
+    };
   }
 
   window.codelabSections = { open };
