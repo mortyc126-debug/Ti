@@ -27,7 +27,8 @@ import { createAiAssist } from './code-lab/lib/ai-assist.mjs';
 import { createProviderRuntime } from './code-lab/lib/ai-providers.mjs';
 import { handleWorkspace } from './code-lab/lib/workspace.mjs';
 import { createAiGenerate, LANGS as AI_LANGS } from './code-lab/lib/ai-generate.mjs';   // токенайзер вынесен в модуль — его тестируют отдельно
-import { createVendor } from './code-lab/lib/vendor.mjs';   // управляемые обновления CodeMirror (по кнопке)
+import { createVendor } from './code-lab/lib/vendor.mjs';
+import { createTaskStore, suggestNext } from './code-lab/lib/tasks.mjs';   // задачи: деревья решений поверх кусков   // управляемые обновления CodeMirror (по кнопке)
 
 // сетевые/TLS-ошибки провайдеров ИИ (GigaChat и пр.) не должны ронять весь сервер —
 // логируем и продолжаем работать, чтобы Лаборатория оставалась доступной.
@@ -42,6 +43,7 @@ const LIBRARY = path.join(ROOT, 'library');       // куски кода: обы
 const FLOWS = path.join(ROOT, 'flows');   // сохранённые схемы-сборки (граф со связями)
 const DATA = path.join(ROOT, 'data');     // сохранённые JSON-данные пользователя
 const RECIPES = path.join(ROOT, 'recipes'); // рецепты: название + описание + список кусков
+const TASKS = path.join(ROOT, 'tasks');     // задачи: вопрос → варианты → кусок/задача (деревья решений)
 const PORT = Number(process.argv[2]) || 8788;
 // файловое хранилище библиотеки (код — обычные файлы; подсветка и пояснения строятся из текста при загрузке)
 const store = createLibraryStore({ root: LIBRARY, legacyDir: TEMPLATES, dictPath: path.join(PUBLIC, 'keyword-dict.json'), getDict: () => kwDict(), coverage: j => coverage(j), contract: (code, lang) => codeContract(code, lang) });
@@ -91,9 +93,9 @@ function git(args, cwd){
 }
 async function gitRoot(){ const r = await git(['rev-parse', '--show-toplevel']); return r.code === 0 ? r.out : null; }
 // гарантируем, что папки лаборатории существуют — иначе git add/status по ним даёт «pathspec did not match»
-async function ensureLabDirs(){ for(const d of [LIBRARY, FLOWS, DATA, RECIPES]){ try { await fs.mkdir(d, { recursive: true }); } catch(_){} } }
+async function ensureLabDirs(){ for(const d of [LIBRARY, FLOWS, DATA, RECIPES, TASKS]){ try { await fs.mkdir(d, { recursive: true }); } catch(_){} } }
 // только НЕпустые папки лаборатории — пустую git commit не примет («did not match any file(s) known to git»)
-async function labPaths(){ const out = []; for(const d of [LIBRARY, FLOWS, RECIPES]){ try { if((await fs.readdir(d)).length) out.push(d); } catch(_){} } return out; }
+async function labPaths(){ const out = []; for(const d of [LIBRARY, FLOWS, RECIPES, TASKS]){ try { if((await fs.readdir(d)).length) out.push(d); } catch(_){} } return out; }
 // то же + файл словаря пояснений (keyword-dict.json) — чтобы правки словаря тоже уезжали на GitHub, а не терялись при pull
 async function labTargets(){ const out = await labPaths();
   const dp = path.join(PUBLIC, 'keyword-dict.json'); try { await fs.access(dp); out.push(dp); } catch(_){}
@@ -373,6 +375,16 @@ function coverage(j){
   };
 }
 async function listTemplates(){ return store.rows(); }
+// задачи ссылаются на куски; вариант «свой код» становится куском (повтор по коду не плодится)
+const tasks = createTaskStore({ root: TASKS, rows: () => store.rows(), slug: s => slug(s),
+  createPiece: async ({ title, lang, code, group, desc }) => {
+    const dup = await findByCode(code);
+    if(dup){ const t = await store.get(dup); return { id: dup, title: (t && t.title) || title, created: false }; }
+    const obj = { id: slug(title || lang), lang, group: String(group || 'Задачи').slice(0, 60), title, desc: String(desc || '').slice(0, 400), lines: tokenize(code, lang), output: '' };
+    if(_CONTRACT_LANGS.has(lang)){ const c = codeContract(code, lang); obj.component = { provides: c.provides, requires: c.requires }; }
+    const r = await store.save(obj, { origin: 'imported' });
+    return { id: r.id, title, created: true };
+  } });
 // найти уже существующий кусок с таким же названием и кодом (для дедупа при добавлении) → id или null
 // нормализуем переводы строк (\r\n → \n), иначе «тот же» код из Windows-файла считается другим → дубли
 const _normCode = store.normCode;
@@ -1223,6 +1235,47 @@ const server = http.createServer(async (req, res) => {
         + 'Без нумерации и лишнего текста. Пропусти случайные имена переменных и незначимое. Эти строки я вставлю в словарь.\n\n'
         + list;
       return json(res, 200, { lang, scanned, count: words.length, words, prompt });
+    }
+
+    // ── задачи (деревья решений) ────────────────────────────────────────────────
+    if(u.pathname === '/api/tasks/list'){ return json(res, 200, await tasks.list()); }
+    if(u.pathname === '/api/tasks/get'){
+      const t = await tasks.get(String(u.searchParams.get('id') || ''));
+      if(!t) return json(res, 404, { error: 'нет такой задачи' });
+      if(u.searchParams.get('text')) t.text = await tasks.toText(t);
+      return json(res, 200, t);
+    }
+    // сохранить одну задачу: {text} (текстовый формат) или готовое дерево; id сохраняется при правке
+    if(u.pathname === '/api/tasks/save' && req.method === 'POST'){
+      const b = await readBody(req);
+      let t = b.task;
+      if(typeof b.text === 'string'){
+        const p = tasks.parseText(b.text);
+        if(!p.tasks.length) return json(res, 400, { error: 'нет строки «=== Название | язык | раздел»', warnings: p.warnings });
+        t = p.tasks[0];
+      }
+      if(!t || typeof t !== 'object') return json(res, 400, { error: 'пустая задача' });
+      if(b.id) t.id = String(b.id);
+      const r = await tasks.save(t);
+      return json(res, 200, { ok: true, id: r.task.id, report: r.report });
+    }
+    if(u.pathname === '/api/tasks/import' && req.method === 'POST'){
+      const b = await readBody(req);
+      return json(res, 200, await tasks.importText(String(b.text || ''), { dry: !!b.dry }));
+    }
+    if(u.pathname === '/api/tasks/delete' && req.method === 'POST'){
+      const b = await readBody(req);
+      return json(res, 200, { ok: await tasks.remove(String(b.id || '')) });
+    }
+    if(u.pathname === '/api/tasks/used-by'){ return json(res, 200, await tasks.usedBy(String(u.searchParams.get('id') || ''))); }
+    // «что дальше»: имена, которые код использует, но ни один открытый файл не даёт, + куски/задачи, которые их дают
+    if(u.pathname === '/api/code/next' && req.method === 'POST'){
+      const b = await readBody(req);
+      const files = (Array.isArray(b.files) ? b.files : [{ name: '', lang: b.lang, code: b.code }]).slice(0, 40)
+        .map(f => ({ name: String(f.name || ''), lang: String(f.lang || ''), code: String(f.code || '').slice(0, 400000) }));
+      const full = [];
+      for(const t of await tasks.list()){ const x = await tasks.get(t.id); if(x) full.push(x); }
+      return json(res, 200, suggestNext({ files, contract: codeContract, contractLangs: _CONTRACT_LANGS, rows: await store.rows(), tasks: full }));
     }
 
     // ── рецепты (название + описание + список кусков) ──────────────────────────

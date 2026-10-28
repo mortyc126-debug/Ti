@@ -9,6 +9,7 @@
     { key:'start',       label:'С чего начать', href:'/start.html',      sect:'Старт' },
     { key:'inventory',   label:'Опись',        href:'/inventory.html',  sect:'Кусочки кода' },
     { key:'library',     label:'Библиотека',   href:'/library.html',    sect:'Кусочки кода' },
+    { key:'tasks',       label:'Задачи',       href:'/tasks.html',      sect:'Собирать' },
     { key:'constructor', label:'Конструктор',  href:'/constructor.html',sect:'Собирать' },
     { key:'recipes',     label:'Шаблоны',      href:'/recipes.html',    sect:'Собирать' },
     { key:'data',        label:'Куски кода', href:'/schema-json.html', sect:'Данные' },
@@ -99,7 +100,10 @@
       row.onclick = () => { expl.style.display = expl.style.display === 'none' ? '' : 'none'; };
       sres.appendChild(row); sres.appendChild(expl); any = true;
     });
-    // 4) рецепты и схемы
+    // 4) задачи (поиск и по синонимам), рецепты и схемы
+    const tk = await fetch('/api/tasks/list').then(r => r.json()).catch(() => []); if(seq !== drawSeq) return;
+    const th = (tk || []).filter(t => [t.title, t.group, (t.aliases || []).join(' ')].join(' ').toLowerCase().includes(q)).slice(0, 6);
+    if(th.length){ grp('Задачи'); th.forEach(t => item('/tasks.html?id=' + encodeURIComponent(t.id), t.title, 'задача')); }
     const rc = await fetch('/api/recipes/list').then(r => r.json()).catch(() => []); if(seq !== drawSeq) return;
     const rh = (rc || []).filter(r => (r.name || r.title || '').toLowerCase().includes(q)).slice(0, 5);
     if(rh.length){ grp('Шаблоны'); rh.forEach(r => item('/recipes.html', r.name || r.title || r.id, 'шаблон')); }

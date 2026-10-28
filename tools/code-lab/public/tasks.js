@@ -1,0 +1,315 @@
+// Страница «Задачи»: список, проход по дереву (TaskWalk), правка текстом с живым предпросмотром,
+// загрузка пачкой и готовый промпт для ИИ. Формат текста — tasks-format.js, хранение — /api/tasks/*.
+(function(){
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const $ = s => document.querySelector(s);
+  const main = $('#tkMain'), listEl = $('#tkList');
+  const api = (u, b) => fetch(u, b === undefined ? undefined : { method: 'POST', body: JSON.stringify(b) }).then(r => r.json());
+  const pref = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v === '1'; } catch(_){ return d; } };
+  const setPref = (k, v) => { try { localStorage.setItem(k, v ? '1' : '0'); } catch(_){} };
+  let LIST = [], CUR = null;
+
+  const FORMAT_HELP = [
+    '=== Название задачи | язык | Раздел / Подраздел',
+    '> описание: что получится и зачем (можно несколько строк)',
+    '~ синонимы через запятую: как ещё можно назвать эту задачу',
+    '? Вопрос-развилка',
+    '| подсказка к вопросу простыми словами (необязательно)',
+    '  - вариант -> кусок: точное название куска из библиотеки',
+    '    | зачем этот вариант, когда его выбрать',
+    '  - вариант -> задача: название другой задачи',
+    '  - вариант -> код',
+    '    ```js',
+    '    // свой код варианта — станет куском библиотеки',
+    '    ```',
+    '  - не нужно -> пропустить',
+    '  - вариант со своими вопросами',
+    '    ? вложенный вопрос (только для этого варианта)',
+    '      - ...',
+    '! Шаг без выбора -> кусок: название'
+  ].join('\n');
+
+  // ── список ──
+  async function reload(selectId){
+    LIST = await api('/api/tasks/list').catch(() => []);
+    renderList();
+    const want = selectId || new URLSearchParams(location.search).get('id');
+    if(want && LIST.find(t => t.id === want)) showTask(want);
+    else if(new URLSearchParams(location.search).has('new')) editTask(null);
+    else if(!CUR) renderIntro();
+  }
+  const norm = s => String(s || '').toLowerCase().replace(/ё/g, 'е');
+  function renderList(){
+    const q = norm($('#tkQ').value).split(/\s+/).filter(Boolean);
+    const hits = LIST.filter(t => { const h = norm([t.title, t.group, t.desc, (t.aliases || []).join(' '), t.lang].join(' ')); return q.every(w => h.includes(w)); });
+    listEl.innerHTML = '';
+    if(!LIST.length){ listEl.innerHTML = '<div class="tk-lead">Задач пока нет.</div>'; return; }
+    if(!hits.length){ listEl.innerHTML = '<div class="tk-lead">Ничего не нашлось. Можно создать: «＋ новая».</div>'; return; }
+    const groups = new Map();
+    hits.sort((a, b) => a.title.localeCompare(b.title, 'ru')).forEach(t => { const g = (t.group || 'Без раздела').split('/')[0].trim(); if(!groups.has(g)) groups.set(g, []); groups.get(g).push(t); });
+    [...groups.keys()].sort((a, b) => a.localeCompare(b, 'ru')).forEach(g => {
+      const h = document.createElement('div'); h.className = 'tk-g'; h.textContent = g; listEl.appendChild(h);
+      groups.get(g).forEach(t => {
+        const a = document.createElement('a'); a.className = 'tk-it' + (CUR === t.id ? ' on' : '');
+        a.innerHTML = '<div class="t">' + esc(t.title) + '</div><div class="m">' + esc((t.lang || '').toUpperCase()) + ' · вопросов ' + t.steps + ' · вариантов ' + t.options
+          + (t.unresolved ? ' · <span class="bad">⚠ ' + t.unresolved + ' не найдено</span>' : '') + '</div>';
+        a.onclick = () => showTask(t.id);
+        listEl.appendChild(a);
+      });
+    });
+  }
+  $('#tkQ').oninput = renderList;
+
+  function renderIntro(){
+    CUR = null; renderList();
+    main.innerHTML = '<div class="tk-empty"><h2 style="margin:0 0 8px;font-size:18px">Как это устроено</h2>'
+      + '<p><b>Задача</b> — «что хочу сделать». Внутри вопросы-развилки: «как найти кнопку?», «что делать при клике?». '
+      + 'У каждого вопроса варианты, и каждый ведёт к <b>куску</b> из библиотеки, к другой <b>задаче</b> или к своему <b>коду</b>. '
+      + 'Выбираешь варианты, и справа собирается готовый код.</p>'
+      + '<p>Задачи пишутся текстом, поэтому их удобно и править руками, и получать от ИИ. '
+      + 'Нажми «⧉ промпт для ИИ», отдай запрос любому чату, а ответ вставь в «📥 пачкой». Куски, которых нет в библиотеке, создадутся из кода вариантов.</p>'
+      + '<div class="tk-help"><pre>' + esc(FORMAT_HELP) + '</pre></div></div>';
+  }
+
+  // ── проход по задаче ──
+  async function showTask(id){
+    const t = await api('/api/tasks/get?id=' + encodeURIComponent(id)).catch(() => null);
+    if(!t || t.error){ renderIntro(); return; }
+    CUR = id; renderList();
+    history.replaceState(null, '', '/tasks.html?id=' + encodeURIComponent(id));
+    const stepMode = pref('codelab_tasks_step', true), simple = pref('codelab_tasks_simple', true);
+    main.innerHTML = '<div class="tk-head"><h2>' + esc(t.title) + '</h2>'
+      + '<button class="btn" id="twEdit">✎ править</button><button class="btn danger" id="twDel">🗑</button></div>'
+      + (t.desc ? '<div class="tk-desc">' + esc(t.desc) + '</div>' : '')
+      + '<div class="tk-meta">' + esc((t.lang || '').toUpperCase()) + (t.group ? ' · ' + esc(t.group) : '') + ((t.aliases || []).length ? ' · ' + esc(t.aliases.join(', ')) : '') + '</div>'
+      + '<div class="tk-row"><span class="tk-seg"><button data-m="step">по шагу</button><button data-m="all">всё сразу</button></span>'
+      + '<span class="tk-seg"><button data-s="1">подробно</button><button data-s="0">кратко</button></span>'
+      + '<button class="btn" id="twReset">↺ сначала</button></div>'
+      + '<div class="tk-split"><div class="tk-col"><h3>Вопросы</h3><div id="twWalk"></div></div>'
+      + '<div class="tk-col"><h3>Собранный код</h3><div id="twAsm"><div class="tk-lead">Выбери варианты слева, и здесь появится код.</div></div>'
+      + '<div class="tk-need" id="twNeed"></div></div></div>';
+    const segs = () => { main.querySelectorAll('[data-m]').forEach(b => b.classList.toggle('on', (b.dataset.m === 'step') === stepNow));
+      main.querySelectorAll('[data-s]').forEach(b => b.classList.toggle('on', (b.dataset.s === '1') === simpleNow)); };
+    let stepNow = stepMode, simpleNow = simple; segs();
+    let lastAsm = [];
+    const walk = TaskWalk.mount($('#twWalk'), t, { stepMode, simple, onChange: asm => { lastAsm = asm; drawAsm(asm); } });
+    main.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { stepNow = b.dataset.m === 'step'; setPref('codelab_tasks_step', stepNow); segs(); walk.setMode({ stepMode: stepNow }); });
+    main.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { simpleNow = b.dataset.s === '1'; setPref('codelab_tasks_simple', simpleNow); segs(); walk.setMode({ simple: simpleNow }); });
+    $('#twReset').onclick = () => walk.reset();
+    $('#twEdit').onclick = () => editTask(id);
+    $('#twDel').onclick = async () => { if(!confirm('Удалить задачу «' + t.title + '»? Куски в библиотеке останутся.')) return; await api('/api/tasks/delete', { id }); CUR = null; history.replaceState(null, '', '/tasks.html'); reload(); };
+
+    function drawAsm(asm){
+      const box = $('#twAsm'); const parts = TaskWalk.joinAssembly(asm);
+      $('#twNeed').innerHTML = '';
+      if(!parts.length){ box.innerHTML = '<div class="tk-lead">Выбери варианты слева, и здесь появится код.</div>'; return; }
+      box.innerHTML = '';
+      parts.forEach(p => {
+        const l = document.createElement('div'); l.className = 'tk-asm-l'; l.innerHTML = '<span>' + esc(p.lang.toUpperCase()) + ' · ' + p.list.length + ' кус.</span>';
+        const cp = document.createElement('button'); cp.className = 'btn'; cp.textContent = '⧉'; cp.title = 'скопировать'; cp.onclick = () => copy(p.code, cp); l.appendChild(cp);
+        const pre = document.createElement('pre'); pre.className = 'tk-pre'; pre.textContent = p.code;
+        box.appendChild(l); box.appendChild(pre);
+      });
+      const row = document.createElement('div'); row.className = 'tk-row';
+      row.innerHTML = '<button class="btn ok" id="twOpen" title="открыть собранный код в песочнице Конструктора">▶ в песочницу</button><button class="btn" id="twCheck" title="каких имён коду не хватает и какие куски их дают">🧩 чего не хватает?</button>';
+      box.appendChild(row);
+      $('#twOpen').onclick = () => {
+        const ext = { js: 'js', ts: 'ts', html: 'html', css: 'css', python: 'py', sql: 'sql' };
+        const files = parts.map(p => ({ name: slugName(t.title) + '.' + (ext[p.lang] || 'txt'), lang: p.lang, code: p.code }));
+        try { localStorage.setItem('codelab_open_pending', JSON.stringify(files)); localStorage.setItem('codelab_mode', 'sandbox'); } catch(_){}
+        location.href = '/constructor.html';
+      };
+      $('#twCheck').onclick = () => checkNeeds(parts.map(p => ({ name: p.lang, lang: p.lang, code: p.code })), $('#twNeed'));
+    }
+  }
+  const slugName = s => String(s || 'задача').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 40) || 'задача';
+  function copy(text, btn){ const done = () => { const o = btn.textContent; btn.textContent = '✓'; setTimeout(() => btn.textContent = o, 900); };
+    if(navigator.clipboard) navigator.clipboard.writeText(text).then(done, done); else done(); }
+
+  // «чего не хватает»: имена без источника + куски/задачи, которые их дают
+  async function checkNeeds(files, host){
+    host.innerHTML = '<div class="tk-lead">проверяю…</div>';
+    const r = await api('/api/code/next', { files }).catch(() => null);
+    if(!r){ host.innerHTML = '<div class="tk-msg err">сервер не ответил</div>'; return; }
+    const list = r.unmet.filter(u => !u.generic);
+    if(!list.length){ host.innerHTML = '<div class="tk-msg ok">✓ Все имена, которые использует код, где-то заданы.</div>'; return; }
+    host.innerHTML = '<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin:4px 0">Коду не хватает</h3>';
+    list.forEach(u => {
+      const d = document.createElement('div'); d.className = 'tk-need-it';
+      d.innerHTML = '<b>' + esc(u.name) + '</b> <span class="s">' + esc(window.CodeCheck ? CodeCheck.needText(u.name) : 'используется, но нигде не задано') + '</span><div style="margin-top:4px">'
+        + (u.tasks.length ? u.tasks.map(t => '<a href="/tasks.html?id=' + encodeURIComponent(t.id) + '">🧭 ' + esc(t.title) + '</a>').join('') : '')
+        + (u.pieces.length ? u.pieces.map(p => '<a href="/component.html?id=' + encodeURIComponent(p.id) + '" title="' + (p.needs.length ? 'сам требует: ' + esc(p.needs.join(', ')) : '') + '">▸ ' + esc(p.title) + '</a>').join('') : '')
+        + (!u.tasks.length && !u.pieces.length ? '<span class="s">готового куска для этого в библиотеке нет</span>' : '') + '</div>';
+      host.appendChild(d);
+    });
+  }
+
+  // ── правка текстом ──
+  const NEW_TEXT = '=== Новая задача | js | Раздел\n> что получится в итоге\n~ как ещё это называют\n? Первый вопрос\n  - вариант -> кусок: \n  - не нужно -> пропустить\n';
+  async function editTask(id){
+    let text = NEW_TEXT;
+    if(id){ const t = await api('/api/tasks/get?id=' + encodeURIComponent(id) + '&text=1').catch(() => null); if(t && t.text) text = t.text; }
+    CUR = id; renderList();
+    main.innerHTML = '<div class="tk-head"><h2>' + (id ? 'Правка задачи' : 'Новая задача') + '</h2>'
+      + '<button class="btn ok" id="teSave">💾 сохранить</button>' + (id ? '<button class="btn" id="teBack">к проходу</button>' : '') + '</div>'
+      + '<div class="tk-ed"><div>'
+      + '<div class="tk-row tk-pick"><input class="tk-q" id="tePick" placeholder="найти кусок или задачу и вставить ссылку в место курсора…"><div class="tk-pick-res" id="tePickRes"></div></div>'
+      + '<textarea class="tk-ta" id="teText" spellcheck="false"></textarea>'
+      + '<div class="tk-msg" id="teMsg"></div>'
+      + '<div class="tk-help"><details><summary>шпаргалка формата</summary><pre>' + esc(FORMAT_HELP) + '</pre>'
+      + 'Отступы показывают вложенность: вопрос под вариантом задаётся только тем, кто выбрал этот вариант. Ссылка «кусок:» ищется по точному названию (можно <code>id:…</code>). Вариант «код» при сохранении станет куском библиотеки.</details></div>'
+      + '</div><div><h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin:0 0 8px">Как это будет выглядеть</h3><div id="tePrev"></div></div></div>';
+    const ta = $('#teText'); ta.value = text;
+    if(id) $('#teBack').onclick = () => showTask(id);
+    // Tab вставляет отступ, а не уводит фокус: вложенность здесь — смысл
+    ta.addEventListener('keydown', e => { if(e.key === 'Tab'){ e.preventDefault(); const p = ta.selectionStart; ta.setRangeText('  ', p, ta.selectionEnd, 'end'); schedule(); } });
+    let timer = null, seq = 0;
+    const schedule = () => { clearTimeout(timer); timer = setTimeout(preview, 500); };
+    ta.addEventListener('input', schedule);
+    async function preview(){
+      const my = ++seq; const msg = $('#teMsg');
+      const r = await api('/api/tasks/import', { text: ta.value, dry: true }).catch(() => null);
+      if(my !== seq) return;
+      if(!r || !r.tasks || !r.tasks.length){ msg.className = 'tk-msg err'; msg.textContent = 'Нет строки «=== Название | язык | раздел».'; $('#tePrev').innerHTML = ''; return; }
+      const x = r.tasks[0];
+      const probs = x.report.unresolved.map(u => '⚠ не найден' + (u.kind === 'task' ? 'а задача' : ' кусок') + ': «' + u.ref + '» (вариант «' + u.label + '»)');
+      if(r.tasks.length > 1) probs.push('В тексте ' + r.tasks.length + ' задачи — сохранится только первая. Для нескольких — «📥 пачкой».');
+      (r.warnings || []).forEach(w => probs.push('• ' + w));
+      msg.className = 'tk-msg' + (probs.length ? ' err' : ' ok');
+      msg.textContent = probs.length ? probs.join('\n') : '✓ Вопросов ' + x.stats.steps + ', вариантов ' + x.stats.options + '. Все ссылки найдены.';
+      const host = $('#tePrev'); host.innerHTML = '';
+      const w = document.createElement('div'); host.appendChild(w);
+      TaskWalk.mount(w, x.task, { stepMode: false, simple: true });
+    }
+    preview();
+    $('#teSave').onclick = async () => {
+      const r = await api('/api/tasks/save', { text: ta.value, id: id || undefined }).catch(() => null);
+      const msg = $('#teMsg');
+      if(!r || !r.ok){ msg.className = 'tk-msg err'; msg.textContent = (r && r.error) || 'не сохранилось'; return; }
+      await reload(r.id);
+    };
+    // поиск куска/задачи → вставка «-> кусок: Название»
+    let ps = 0, pt = null;
+    const pick = $('#tePick'), res = $('#tePickRes');
+    pick.oninput = () => { clearTimeout(pt); pt = setTimeout(async () => {
+      const v = pick.value.trim(); const my = ++ps;
+      if(v.length < 2){ res.classList.remove('on'); return; }
+      const [s, rows] = await Promise.all([api('/api/search?q=' + encodeURIComponent(v) + '&limit=10').catch(() => ({ hits: [] })), TaskWalk.rows()]);
+      if(my !== ps) return;
+      const items = [];
+      LIST.filter(t => norm(t.title).includes(norm(v))).slice(0, 4).forEach(t => items.push({ k: 'задача', title: t.title, ins: ' -> задача: ' + t.title }));
+      (s.hits || []).forEach(h => { const r = rows.get(h.id); if(r) items.push({ k: (r.lang || '').toUpperCase(), title: r.title, sub: r.desc, ins: ' -> кусок: ' + r.title }); });
+      res.innerHTML = ''; items.forEach(it => {
+        const d = document.createElement('div'); d.className = 'tk-pick-it';
+        d.innerHTML = '<span class="k">' + esc(it.k) + '</span><span>' + esc(it.title) + (it.sub ? '<br><span style="color:var(--text3);font-size:11px">' + esc(String(it.sub).slice(0, 120)) + '</span>' : '') + '</span>';
+        d.onmousedown = e => { e.preventDefault(); insertRef(it.ins); res.classList.remove('on'); pick.value = ''; };
+        res.appendChild(d);
+      });
+      res.classList.toggle('on', items.length > 0);
+    }, 200); };
+    pick.onblur = () => setTimeout(() => res.classList.remove('on'), 150);
+    // если курсор на строке варианта без цели — дописываем ссылку в конец строки, иначе вставляем новую строку-вариант
+    function insertRef(ins){
+      const v = ta.value, p = ta.selectionStart;
+      const ls = v.lastIndexOf('\n', p - 1) + 1; let le = v.indexOf('\n', p); if(le < 0) le = v.length;
+      const line = v.slice(ls, le);
+      if(/^\s*[-*•!]\s+/.test(line)){
+        const base = line.replace(/\s*(?:->|→|=>).*$/, '').replace(/\s+$/, '');
+        ta.setRangeText(base + ins, ls, le, 'end');
+      } else {
+        const ind = (line.match(/^\s*/) || [''])[0];
+        const label = ins.replace(/^ -> (кусок|задача): /, '');
+        ta.setRangeText((line.trim() ? '\n' : '') + ind + '  - ' + label + ins, le, le, 'end');
+      }
+      ta.focus(); schedule();
+    }
+  }
+
+  // ── пачкой ──
+  function modal(html){
+    const bg = document.createElement('div'); bg.className = 'modal-bg';
+    const box = document.createElement('div'); box.className = 'modal'; box.innerHTML = html;
+    bg.appendChild(box); document.body.appendChild(bg);
+    bg.onclick = e => { if(e.target === bg) bg.remove(); };
+    return { bg, box, q: s => box.querySelector(s), close: () => bg.remove() };
+  }
+  $('#tkBulk').onclick = () => {
+    const m = modal('<h3>Задачи пачкой</h3>'
+      + '<div class="tk-help">Вставь текст с одной или несколькими задачами (каждая начинается с <code>=== Название | язык | раздел</code>). Одноимённые задачи обновятся, новые создадутся. Сначала «проверить», потом «сохранить».</div>'
+      + '<div class="mfield"><textarea id="bkT" rows="16" spellcheck="false" placeholder="=== …"></textarea></div>'
+      + '<div class="tk-row"><button class="btn" id="bkFile">📄 из файла…</button><button class="btn" id="bkDry">🔎 проверить</button><button class="btn ok" id="bkGo">💾 сохранить</button><button class="btn" id="bkX">закрыть</button>'
+      + '<input type="file" id="bkInp" accept=".txt,.md" style="display:none"></div><div id="bkRep"></div>');
+    const run = async dry => {
+      const rep = m.q('#bkRep'); rep.innerHTML = '<div class="tk-lead">' + (dry ? 'проверяю…' : 'сохраняю…') + '</div>';
+      const r = await api('/api/tasks/import', { text: m.q('#bkT').value, dry }).catch(() => null);
+      if(!r){ rep.innerHTML = '<div class="tk-msg err">сервер не ответил</div>'; return; }
+      if(!r.tasks.length){ rep.innerHTML = '<div class="tk-msg err">Не нашла ни одной задачи. Каждая начинается со строки «=== Название | язык | раздел».</div>'; return; }
+      rep.innerHTML = '<div class="rep">' + r.tasks.map(t => '<div>' + (t.isNew ? '＋' : '↻') + ' <b>' + esc(t.title) + '</b> — вопросов ' + t.stats.steps + ', вариантов ' + t.stats.options
+        + (t.report.created ? ', новых кусков ' + t.report.created : '')
+        + (t.report.unresolved.length ? '<div class="bad">⚠ не найдено: ' + t.report.unresolved.map(u => esc(u.ref)).join(' · ') + '</div>' : '') + '</div>').join('')
+        + ((r.warnings || []).length ? '<div class="bad">' + r.warnings.map(esc).join('<br>') + '</div>' : '') + '</div>'
+        + (dry ? '' : '<div class="tk-msg ok">✓ Сохранено.</div>');
+      if(!dry) reload();
+    };
+    m.q('#bkDry').onclick = () => run(true);
+    m.q('#bkGo').onclick = () => run(false);
+    m.q('#bkX').onclick = m.close;
+    m.q('#bkFile').onclick = () => m.q('#bkInp').click();
+    m.q('#bkInp').onchange = async e => { const f = e.target.files[0]; if(f) m.q('#bkT').value = await f.text(); e.target.value = ''; };
+  };
+
+  // ── промпт для ИИ ──
+  $('#tkPrompt').onclick = async () => {
+    const rows = [...(await TaskWalk.rows()).values()];
+    const langs = [...new Set(rows.map(r => r.lang))].sort();
+    const m = modal('<h3>Промпт для ИИ</h3>'
+      + '<div class="tk-help">Запрос, по которому любой чат напишет задачи сразу в нужном формате. Ответ вставь в «📥 пачкой». Чтобы ИИ ссылался на твои куски, а не писал всё заново, приложи их названия.</div>'
+      + '<div class="mfield"><label>Тема: какие задачи нужны</label><input id="prTopic" placeholder="например: формы и проверка ввода; работа со списками; запросы к API"></div>'
+      + '<div style="display:grid;grid-template-columns:1fr 2fr;gap:10px"><div class="mfield"><label>Язык</label><select id="prLang">' + langs.map(l => '<option' + (l === 'js' ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select></div>'
+      + '<div class="mfield"><label>Приложить названия кусков из раздела</label><select id="prGroup"></select></div></div>'
+      + '<div class="mfield"><label>Сколько задач</label><input id="prN" type="number" value="5" min="1" max="30"></div>'
+      + '<div class="mfield"><label>Запрос</label><textarea id="prOut" rows="16" spellcheck="false"></textarea></div>'
+      + '<div class="tk-row"><button class="btn ok" id="prCopy">⧉ скопировать</button><button class="btn" id="prX">закрыть</button></div>');
+    const fillGroups = () => {
+      const l = m.q('#prLang').value; const g = new Map();
+      rows.filter(r => r.lang === l).forEach(r => { const k = (r.group || '').split('/')[0].trim() || 'Разное'; g.set(k, (g.get(k) || 0) + 1); });
+      m.q('#prGroup').innerHTML = '<option value="">— не прикладывать —</option><option value="*">все разделы (до 400 названий)</option>'
+        + [...g.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => '<option value="' + esc(k) + '">' + esc(k) + ' (' + n + ')</option>').join('');
+    };
+    const build = () => {
+      const l = m.q('#prLang').value, grp = m.q('#prGroup').value, n = m.q('#prN').value || 5;
+      const topic = m.q('#prTopic').value.trim() || 'самые частые повседневные задачи';
+      let titles = [];
+      if(grp) titles = rows.filter(r => r.lang === l && (grp === '*' || ((r.group || '').split('/')[0].trim() || 'Разное') === grp)).map(r => r.title).slice(0, 400);
+      const have = LIST.map(t => t.title);
+      m.q('#prOut').value = [
+        'Ты помогаешь наполнять мою базу «задач» — деревьев решений для программирования. Язык: ' + l + '. Тема: ' + topic + '.',
+        'Напиши ' + n + ' задач. Задача — это то, что человек хочет сделать («Отправить форму без перезагрузки»), а внутри — вопросы-развилки с вариантами. Вопросы задавай так, чтобы понял новичок, а варианты — короткие и конкретные.',
+        '',
+        'Формат строго такой (без markdown вокруг, без пояснений до и после):',
+        FORMAT_HELP,
+        '',
+        'Правила:',
+        '- Отступ (2 пробела) задаёт вложенность. Вопрос под вариантом показывается только тому, кто выбрал этот вариант.',
+        '- Строка «|» под вопросом — подсказка простыми словами, под вариантом — когда его выбрать.',
+        '- «-> кусок:» пиши ТОЛЬКО с точным названием из списка ниже. Если подходящего куска нет — пиши «-> код» и короткий рабочий код (3–15 строк) в ```.',
+        '- «-> задача:» — ссылка на другую задачу (из моего списка или из этой же пачки).',
+        '- Добавляй вариант «-> пропустить», если шаг бывает не нужен.',
+        '- В коде используй обычные имена; если вариант зависит от имени из прошлого шага — используй то же имя.',
+        '',
+        have.length ? 'Мои задачи (не повторяй, но можешь ссылаться):\n' + have.join('\n') : 'Моих задач пока нет.',
+        '',
+        titles.length ? 'Мои куски (названия для «-> кусок:»):\n' + titles.join('\n') : 'Готовые куски не прикладываю — пиши код в вариантах.'
+      ].join('\n');
+    };
+    fillGroups(); build();
+    ['#prLang'].forEach(s => m.q(s).onchange = () => { fillGroups(); build(); });
+    ['#prGroup', '#prN'].forEach(s => m.q(s).onchange = build);
+    m.q('#prTopic').oninput = build;
+    m.q('#prCopy').onclick = e => copy(m.q('#prOut').value, e.target);
+    m.q('#prX').onclick = m.close;
+  };
+
+  $('#tkNew').onclick = () => editTask(null);
+  reload();
+})();

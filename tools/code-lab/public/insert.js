@@ -12,6 +12,15 @@
   const taOf = ed => ed && ed.querySelector('textarea');
   let DICT = null, PIECES = null;
   const loadDict = () => DICT ? Promise.resolve(DICT) : fetch('/keyword-dict.json', { cache: 'no-store' }).then(r => r.json()).then(d => (DICT = d || {})).catch(() => (DICT = {}));
+  // задачи (деревья решений) — по названию и синонимам; выбор открывает окно «🧭 задачи» на этой задаче
+  let TASKS = null;
+  const loadTasks = () => TASKS ? Promise.resolve(TASKS) : fetch('/api/tasks/list').then(r => r.json()).then(l => (TASKS = l || [])).catch(() => (TASKS = []));
+  setInterval(() => { TASKS = null; }, 60000);   // новые задачи со страницы «Задачи» подхватываются без перезагрузки
+  function tasksFor(q){
+    const lq = q.toLowerCase().replace(/ё/g, 'е'); if(lq.length < 3 || !TASKS || !window.codelabTaskPanel) return [];
+    const hit = t => [t.title].concat(t.aliases || []).some(x => String(x).toLowerCase().replace(/ё/g, 'е').split(/[^\p{L}\p{N}_]+/u).some(w => w.startsWith(lq)));
+    return TASKS.filter(hit).slice(0, 3).map(t => ({ type: 'task', id: t.id, label: t.title, desc: 'вопросы → код' }));
+  }
   const loadPieces = () => PIECES ? Promise.resolve(PIECES) : fetch('/api/list').then(r => r.json()).then(l => (PIECES = l || [])).catch(() => (PIECES = []));
 
   const st = document.createElement('style');
@@ -23,6 +32,7 @@
   .ac-it .k{font-family:ui-monospace,monospace;flex:0 0 auto}
   .ac-it .tag{font-size:9px;color:#06231c;background:var(--acc,#52F2C9);border-radius:4px;padding:0 4px;flex:0 0 auto}
   .ac-it .tag.code{background:var(--name,#3dd9ff)}
+  .ac-it .tag.task{background:var(--kw,#b45cff);color:#fff}
   .ac-it .d{color:var(--muted,#9a93b5);overflow:hidden;text-overflow:ellipsis;font-size:11px}
   `;
   document.head.appendChild(st);
@@ -78,6 +88,7 @@
   async function accept(it){
     if(!curCtx) return;
     if(it.type === 'term'){ curCtx.put(it.label); hide(); return; }
+    if(it.type === 'task'){ curCtx.put(''); hide(); if(window.codelabTaskPanel) window.codelabTaskPanel.openTask(it.id); return; }   // набранное было поиском, а не кодом
     try { const t = await fetch('/api/template?id=' + encodeURIComponent(it.id)).then(r => r.json());
       const code = t.code != null ? t.code : (Array.isArray(t.lines) ? t.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : '');
       curCtx.put(code);
@@ -90,7 +101,7 @@
     pop.innerHTML = '';
     items.forEach((it, i) => {
       const row = document.createElement('div'); row.className = 'ac-it' + (i === sel ? ' sel' : '');
-      const tag = document.createElement('span'); tag.className = 'tag' + (it.type === 'piece' ? ' code' : ''); tag.textContent = it.type === 'piece' ? 'код' : 'слово'; row.appendChild(tag);
+      const tag = document.createElement('span'); tag.className = 'tag' + (it.type === 'piece' ? ' code' : it.type === 'task' ? ' task' : ''); tag.textContent = it.type === 'piece' ? 'код' : it.type === 'task' ? 'задача' : 'слово'; row.appendChild(tag);
       const k = document.createElement('span'); k.className = 'k'; k.textContent = it.label; row.appendChild(k);
       if(it.desc){ const d = document.createElement('span'); d.className = 'd'; d.textContent = it.desc; row.appendChild(d); }
       row.addEventListener('mousedown', e => { e.preventDefault(); accept(it); });
@@ -103,11 +114,11 @@
   function trigger(ed){
     const ctx = wordCtx(ed); if(!ctx || ctx.word.length < 2){ hide(); return; }
     ctx.lang = ed.__f && ed.__f.lang; curCtx = ctx;
-    const my = ++seq;
+    const my = ++seq; loadTasks();
     const dp = window.codelabKwDict ? window.codelabKwDict(ctx.lang || '') : loadDict();
     dp.then(d => {
       if(my !== seq) return;
-      const terms = termsFrom(ctx.word, d);   // слова — сразу
+      const terms = tasksFor(ctx.word).concat(termsFrom(ctx.word, d));   // задачи и слова — сразу (задачи из кэша)
       items = terms; sel = 0; if(items.length) renderPop(); else hide();
       piecesFor(ctx.word).then(pc => { if(my !== seq || !pc.length) return; items = terms.concat(pc); if(sel >= items.length) sel = 0; renderPop(); });
     });
