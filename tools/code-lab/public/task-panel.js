@@ -53,6 +53,13 @@
   .tp .iss .sg a{color:var(--name,#3dd9ff);cursor:pointer;font-size:11.5px}
   .tp .iss .sg a:hover{text-decoration:underline}
   .tp .asm{margin-top:10px;border-top:1px solid var(--border,#3a2f55);padding-top:8px}
+  .tp-hint{display:none;align-items:center;gap:6px;flex-wrap:wrap;padding:4px 6px;margin:0 0 4px;font-size:12px;color:var(--text3,#9c90c4);background:var(--bg2,#150a2b);border:1px solid var(--border,#3a2f55);border-radius:8px}
+  .tp-hint.on{display:flex}
+  .tp-hint .c{display:inline-flex;align-items:center;gap:5px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--s2,#1a1030);border:1px solid var(--border,#3a2f55);border-radius:7px;padding:3px 4px 3px 8px;cursor:pointer;color:var(--text,#eee)}
+  .tp-hint .c:hover{border-color:var(--kw,#b45cff)}
+  .tp-hint .c i{font-style:normal;color:var(--text3,#9c90c4);font-size:11px}
+  .tp-hint .c .x{background:none;border:0;color:var(--text3,#9c90c4);cursor:pointer;font-size:12px;padding:0 3px}
+  .tp-hint .c .x:hover{color:var(--acc,#ff2fae)}
   .cl-broken{background:rgba(255,80,80,.28);border-radius:2px;outline:1px solid rgba(255,80,80,.7)}
   .cl-unmet{text-decoration:underline wavy rgba(255,170,60,.95);text-decoration-skip-ink:none;text-underline-offset:3px}
   .cl-bad-line{background:rgba(255,80,80,.07)}
@@ -241,5 +248,47 @@
     curTask = await api('/api/tasks/get?id=' + encodeURIComponent(id)).catch(() => null);
     panel.classList.add('on'); setTab('tasks');
   }
+  // ── полоска «🧭 пригодится»: до 3 задач к открытому коду, сама, без кликов ──
+  const hint = document.createElement('div'); hint.className = 'tp-hint';
+  edsEl.before(hint);
+  const hLab = document.createElement('label'); hLab.className = 'sb-live';
+  hLab.title = 'над редактором сами появляются задачи, которые подходят к открытому коду (чего не хватает, что начато)';
+  hLab.innerHTML = '<input type="checkbox"> 🧭 подсказки';
+  const hChk = hLab.querySelector('input');
+  try { hChk.checked = localStorage.getItem('codelab_task_hints') !== '0'; } catch(_){ hChk.checked = true; }
+  lab.after(hLab);
+  const hidden = new Set();   // ✕ — до перезагрузки страницы
+  let hSeq = 0;
+  async function suggest(){
+    const my = ++hSeq;
+    if(!hChk.checked){ hint.classList.remove('on'); return; }
+    const f = activeFile(); if(!f || !String(f.code || '').trim()){ hint.classList.remove('on'); return; }
+    // код у курсора: ±200 строк для похожести, текущая и прошлая строки — для слов
+    const lines = String(f.code).split('\n'); let ln = lines.length - 1;
+    const cm = (taOf(edFor(f.id)) || {}).__cm; if(cm) ln = cm.getCursor().line;
+    const win = lines.slice(Math.max(0, ln - 200), ln + 200).join('\n');
+    const cursor = lines.slice(Math.max(0, ln - 1), ln + 1).join('\n');
+    const r = await api('/api/tasks/suggest', { files: sb.getFiles().map(x => ({ name: x.name, lang: x.lang, code: x.code })), lang: f.lang, window: win, cursor }).catch(() => null);
+    if(my !== hSeq) return;
+    const hits = ((r && r.hits) || []).filter(h => !hidden.has(h.id));
+    if(!hits.length){ hint.classList.remove('on'); return; }
+    hint.innerHTML = '<span>🧭 пригодится:</span>';
+    hits.forEach(h => {
+      const c = document.createElement('span'); c.className = 'c'; c.title = h.why.join(' · ') + '  (балл ' + h.score + ')';
+      c.innerHTML = esc(h.title) + (h.why[0] ? ' <i>' + esc(h.why[0]) + '</i>' : '') + '<button class="x" title="не предлагать до перезагрузки">✕</button>';
+      c.onclick = e => { if(e.target.closest('.x')){ hidden.add(h.id); c.remove(); if(!hint.querySelector('.c')) hint.classList.remove('on'); return; } openTask(h.id); };
+      hint.appendChild(c);
+    });
+    hint.classList.add('on');
+  }
+  let sTimer = null;
+  const scheduleSuggest = () => { clearTimeout(sTimer); sTimer = setTimeout(suggest, 1500); };
+  edsEl.addEventListener('input', scheduleSuggest, true);
+  edsEl.addEventListener('keyup', scheduleSuggest, true);
+  edsEl.addEventListener('mouseup', scheduleSuggest, true);
+  new MutationObserver(scheduleSuggest).observe(edsEl, { childList: true });
+  hChk.onchange = () => { try { localStorage.setItem('codelab_task_hints', hChk.checked ? '1' : '0'); } catch(_){} suggest(); };
+  setTimeout(suggest, 1200);
+
   window.codelabTaskPanel = { open: () => { panel.classList.add('on'); draw(); }, openTask, scanBrackets };
 })();

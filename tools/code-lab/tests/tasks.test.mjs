@@ -6,7 +6,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { createTaskStore, suggestNext, TaskFormat } from '../lib/tasks.mjs';
+import { createTaskStore, suggestNext, createTaskRanker, TaskFormat } from '../lib/tasks.mjs';
 
 const require = createRequire(import.meta.url);
 const CodeCheck = require('../public/code-check.js');
@@ -121,4 +121,40 @@ test('позиции имени: обычное имя, селектор и та
   assert.equal(CodeCheck.namePositions(code, '#save').length, 1);
   assert.equal(CodeCheck.namePositions(code, 'tbl:users').length, 1);
   assert.ok(CodeCheck.needText('#save').includes('id="save"'));
+});
+
+test('кандидаты: только у ненайденных ссылок, найденные привязываются молча', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tasks-'));
+  const rows = [{ id: 'q1', title: 'querySelector — найти элемент', lang: 'js' }];
+  let asked = 0;
+  const store = createTaskStore({ root, rows: async () => rows, slug: s => 'id-' + s.length,
+    similarPieces: async () => { asked++; return rows; } });
+  const r = await store.importText('=== T | js |\n? Q\n  - a -> кусок: querySelector — найти элемент\n  - b -> кусок: найти элемент по селектору\n  - c -> задача: Показать блок', { dry: true });
+  const un = r.tasks[0].report.unresolved;
+  assert.equal(asked, 1, 'поиск похожих только для одной ненайденной ссылки на кусок');
+  assert.deepEqual(un.map(u => u.ref), ['найти элемент по селектору', 'Показать блок']);
+  assert.deepEqual(un[0].candidates.map(c => c.id), ['q1']);
+  assert.deepEqual(un[1].candidates, []);
+  await fs.rm(root, { recursive: true, force: true });
+});
+
+test('пригодится: сигнал от кода обязателен, слова у курсора только усиливают, сделанное не предлагается', async () => {
+  const entries = async () => [
+    { id: 'btn', code: "const btn = document.querySelector('.save');" },
+    { id: 'clk', code: "btn.addEventListener('click', onSave);" },
+    { id: 'frm', code: "const form = document.querySelector('form'); form.addEventListener('submit', send);" }];
+  const rows = [{ id: 'btn', comp: { provides: ['btn'] } }, { id: 'clk', comp: { provides: [] } }, { id: 'frm', comp: { provides: ['form'] } }];
+  const t = (id, title, ids, aliases) => ({ id, title, lang: 'js', aliases: aliases || [], savedAt: 1, steps: ids.map(x => ({ q: '', options: [{ kind: 'piece', id: x, steps: [] }] })) });
+  const tasks = [t('click', 'Реагировать на клик', ['btn', 'clk']), t('form', 'Отправить форму', ['frm'], ['отправка'])];
+  const ranker = createTaskRanker({ entries });
+  // коду не хватает btn → «клик» всплывает
+  let hits = await ranker.rank({ tasks, rows, next: { provided: [], unmet: [{ name: 'btn' }] }, lang: 'js', window: "btn.addEventListener('click', go)", cursor: '' });
+  assert.deepEqual(hits.map(h => h.id), ['click']);
+  assert.ok(hits[0].why[0].includes('btn'));
+  // только слова у курсора («отправка формы») без сигнала от кода — ничего
+  hits = await ranker.rank({ tasks, rows, next: { provided: [], unmet: [] }, lang: 'js', window: 'let x = 1;', cursor: '// отправка формы' });
+  assert.deepEqual(hits, []);
+  // всё, что даёт задача, уже есть в коде — не предлагаем
+  hits = await ranker.rank({ tasks, rows, next: { provided: ['form'], unmet: [] }, lang: 'js', window: "const form = document.querySelector('form'); form.addEventListener('submit', send);", cursor: '' });
+  assert.ok(!hits.find(h => h.id === 'form'));
 });

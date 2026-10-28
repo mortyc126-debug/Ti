@@ -38,7 +38,7 @@ export function cleanTask(t){
   };
 }
 
-export function createTaskStore({ root, rows, slug, createPiece }){
+export function createTaskStore({ root, rows, slug, createPiece, similarPieces }){
   const fileOf = id => path.join(root, id + '.json');
   const okId = id => /^[\p{L}\p{N}_.-]+$/u.test(String(id || '')) && !String(id).includes('..');
 
@@ -75,6 +75,23 @@ export function createTaskStore({ root, rows, slug, createPiece }){
     };
   }
 
+  // кандидаты — только для ненайденных ссылок: ничего не заменяют сами, человек выбирает кликом
+  async function pieceCandidates(ref, lang){
+    if(!similarPieces || !String(ref || '').trim()) return [];
+    try {
+      // одинаковые названия схлопываем: ссылка пишется названием, и выбор между двойниками ничего не меняет
+      const seen = new Set(), out = [];
+      for(const r of await similarPieces(String(ref).replace(/^id\s*:\s*/i, ''), lang)){ const k = String(r.title || '').trim().toLowerCase(); if(seen.has(k)) continue; seen.add(k); out.push({ id: r.id, title: r.title, lang: r.lang }); if(out.length === 3) break; }
+      return out;
+    } catch(_){ return []; }
+  }
+  function taskCandidates(ref, index){
+    const words = norm(ref).split(' ').filter(w => w.length > 2);
+    if(!words.length) return [];
+    return index.map(t => { const tw = norm(t.title).split(' '); const n = words.filter(w => tw.some(x => x.startsWith(w.slice(0, Math.max(4, w.length - 2))))).length; return { t, n }; })
+      .filter(x => x.n > 0).sort((a, b) => b.n - a.n).slice(0, 3).map(x => ({ id: x.t.id, title: x.t.title }));
+  }
+
   // привязать все ссылки дерева; варианты «код» превращаются в куски библиотеки (там контракт и поиск)
   async function resolve(task, { createCode = true, tasksIndex = null } = {}){
     const all = await rows();
@@ -87,11 +104,13 @@ export function createTaskStore({ root, rows, slug, createPiece }){
     for(const o of jobs){
       if(o.kind === 'piece'){
         const hit = (o.id && all.find(r => r.id === o.id)) || findPiece(o.ref);
-        if(hit){ o.id = hit.id; o.ref = hit.title || hit.id; report.linked++; } else { o.id = ''; report.unresolved.push({ kind: 'piece', ref: o.ref, label: o.label }); }
+        if(hit){ o.id = hit.id; o.ref = hit.title || hit.id; report.linked++; }
+        else { o.id = ''; report.unresolved.push({ kind: 'piece', ref: o.ref, label: o.label, candidates: await pieceCandidates(o.ref, task.lang) }); }
       } else if(o.kind === 'task'){
         const s = String(o.ref || '').replace(/^id\s*:\s*/i, '').trim();
         const hit = tById.get(o.id) || tById.get(s) || tByNorm.get(norm(s));
-        if(hit && hit.id !== task.id){ o.id = hit.id; o.ref = hit.title; report.linked++; } else { o.id = ''; report.unresolved.push({ kind: 'task', ref: o.ref, label: o.label }); }
+        if(hit && hit.id !== task.id){ o.id = hit.id; o.ref = hit.title; report.linked++; }
+        else { o.id = ''; report.unresolved.push({ kind: 'task', ref: o.ref, label: o.label, candidates: taskCandidates(s, tIndex.filter(t => t.id !== task.id)) }); }
       } else if(o.kind === 'code' && createCode && String(o.code || '').trim() && createPiece){
         const lang = o.lang || task.lang || 'js';
         const title = (task.title + ': ' + (o.label || 'вариант')).slice(0, 80);
@@ -189,4 +208,64 @@ export function suggestNext({ files, contract, contractLangs, rows, tasks }){
     u.tasks = [...tk.values()].slice(0, 4);
   }
   return { provided: [...provided].slice(0, 200), unmet, files: perFile };
+}
+
+// ── полоска «🧭 пригодится»: какие задачи подходят к открытому коду ──────────
+// Веса подобраны на глаз — когда задач станет 20–30, их стоит подправить по тому, как часто попадает в точку.
+export const SUGGEST_WEIGHTS = {
+  unmet: 3,          // за каждое имя, которого коду не хватает, а кусок задачи его даёт (не больше 3 имён)
+  started: 2,        // × доля уже сделанных кусков задачи (часть есть в коде, часть нет)
+  similar: 2,        // × доля «своих» слов задачи, которые уже встречаются в коде у курсора
+  similarMin: 0.3,   // с какой доли похожесть считается сигналом от кода
+  cursorWord: 0.5,   // за слово текущей/прошлой строки в названии или синонимах — ТОЛЬКО если есть сигнал от кода
+  cursorMax: 1,
+  otherLang: 0.3,    // множитель, если язык задачи не совпадает с языком файла
+  threshold: 1.5, top: 3
+};
+const STOP = new Set(('const let var function return if else for while do switch case break continue new this true false null undefined '
+  + 'typeof instanceof in of class extends import export from default async await try catch finally throw def elif and or not is none '
+  + 'pass self print len range str int list dict the and with').split(' '));
+const tokensOf = code => { const set = new Set(); for(const m of String(code || '').toLowerCase().matchAll(/[a-zа-яё_$][\wа-яё$-]{2,}/g)) if(!STOP.has(m[0])) set.add(m[0]); return set; };
+
+export function createTaskRanker({ entries }){
+  const cache = new Map();   // taskId → {savedAt, pieces:[id], tokens:Set}
+  async function profile(t, byId){
+    const c = cache.get(t.id); if(c && c.savedAt === t.savedAt) return c;
+    const ids = []; TaskFormat.eachOption(t.steps, o => { if(o.kind === 'piece' && o.id && !ids.includes(o.id)) ids.push(o.id); });
+    const tokens = new Set(); for(const id of ids){ const e = byId.get(id); if(e) tokensOf(e.code).forEach(x => tokens.add(x)); }
+    const p = { savedAt: t.savedAt, pieces: ids, tokens }; cache.set(t.id, p); return p;
+  }
+  async function rank({ tasks, rows, next, lang, window: win, cursor }){
+    const W = SUGGEST_WEIGHTS;
+    const all = await entries(); const byId = new Map(all.map(e => [e.id, e]));
+    const rowById = new Map(rows.map(r => [r.id, r]));
+    const provided = new Set(next.provided || []);
+    const unmet = (next.unmet || []).filter(u => !u.generic).map(u => u.name);
+    const codeTok = tokensOf(win);
+    const curWords = String(cursor || '').toLowerCase().replace(/ё/g, 'е').match(/[\p{L}_]{3,}/gu) || [];
+    const out = [];
+    for(const t of tasks){
+      const p = await profile(t, byId); if(!p.pieces.length) continue;
+      const why = []; let score = 0;
+      const gives = new Set(); let withProv = 0, done = 0;
+      for(const id of p.pieces){ const r = rowById.get(id); const prov = (r && r.comp && r.comp.provides) || [];
+        prov.forEach(x => gives.add(x)); if(prov.length){ withProv++; if(prov.every(x => provided.has(x))) done++; } }
+      if(withProv && done === withProv) continue;                         // всё уже есть в коде — не предлагаем
+      const need = unmet.filter(n => gives.has(n)).slice(0, 3);
+      if(need.length){ score += W.unmet * need.length; why.push('не хватает: ' + need.join(', ')); }
+      // «начато» имеет смысл, только если у задачи несколько кусков: один из одного — это «готово»
+      if(done > 0 && withProv > 1){ score += W.started * done / withProv; why.push('начато ' + done + ' из ' + withProv); }
+      let sim = 0; if(p.tokens.size && codeTok.size){ let k = 0; for(const x of p.tokens) if(codeTok.has(x)) k++; sim = k / p.tokens.size; }
+      if(sim >= W.similarMin){ score += W.similar * sim; why.push('похоже на код ' + Math.round(sim * 100) + '%'); }
+      if(score > 0 && curWords.length){
+        const tw = [t.title].concat(t.aliases || []).join(' ').toLowerCase().replace(/ё/g, 'е').split(/[^\p{L}\p{N}_]+/u).filter(Boolean);
+        const hit = [...new Set(curWords)].filter(w => tw.some(x => x.startsWith(w) || w.startsWith(x) && x.length > 3)).length;
+        if(hit) score += Math.min(W.cursorMax, W.cursorWord * hit);
+      }
+      if(t.lang && lang && t.lang !== lang) score *= W.otherLang;
+      if(score >= W.threshold) out.push({ id: t.id, title: t.title, score: Math.round(score * 10) / 10, why });
+    }
+    return out.sort((a, b) => b.score - a.score).slice(0, W.top);
+  }
+  return { rank };
 }

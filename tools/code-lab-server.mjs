@@ -28,7 +28,7 @@ import { createProviderRuntime } from './code-lab/lib/ai-providers.mjs';
 import { handleWorkspace } from './code-lab/lib/workspace.mjs';
 import { createAiGenerate, LANGS as AI_LANGS } from './code-lab/lib/ai-generate.mjs';   // токенайзер вынесен в модуль — его тестируют отдельно
 import { createVendor } from './code-lab/lib/vendor.mjs';
-import { createTaskStore, suggestNext } from './code-lab/lib/tasks.mjs';   // задачи: деревья решений поверх кусков   // управляемые обновления CodeMirror (по кнопке)
+import { createTaskStore, suggestNext, createTaskRanker } from './code-lab/lib/tasks.mjs';   // задачи: деревья решений поверх кусков   // управляемые обновления CodeMirror (по кнопке)
 
 // сетевые/TLS-ошибки провайдеров ИИ (GigaChat и пр.) не должны ронять весь сервер —
 // логируем и продолжаем работать, чтобы Лаборатория оставалась доступной.
@@ -375,8 +375,25 @@ function coverage(j){
   };
 }
 async function listTemplates(){ return store.rows(); }
+const taskRanker = createTaskRanker({ entries: () => store.entries() });   // полоска «🧭 пригодится»
 // задачи ссылаются на куски; вариант «свой код» становится куском (повтор по коду не плодится)
 const tasks = createTaskStore({ root: TASKS, rows: () => store.rows(), slug: s => slug(s),
+  // кандидаты для ненайденной ссылки «кусок: …» — обычный поиск, свой язык первым
+  // ссылка обычно — чуть искажённое название, поэтому сначала сравниваем названия по словам (по началу слова),
+  // а общий поиск (он сильнее смотрит в код) — только добором
+  similarPieces: async (ref, lang) => {
+    const rows = await store.rows(); const by = new Map(rows.map(x => [x.id, x]));
+    const words = s => String(s || '').toLowerCase().replace(/ё/g, 'е').split(/[^\p{L}\p{N}_]+/u).filter(w => w.length > 2);
+    const stem = w => w.slice(0, Math.max(4, Math.min(w.length, w.length - 2)));
+    const want = words(ref);
+    const scored = want.length ? rows.map(x => { const tw = words(x.title); const k = want.filter(w => tw.some(t => t.startsWith(stem(w)) || w.startsWith(stem(t)))).length;
+      return { x, s: k / Math.max(want.length, tw.length * 0.75) + (x.lang === lang ? 0.05 : 0) }; }).filter(o => o.s >= 0.5).sort((a, b) => b.s - a.s).map(o => o.x) : [];
+    const r = await search.search(ref, { limit: 8 });
+    const shares = x => { const tw = words(x.title); return want.some(w => tw.some(t => t.startsWith(stem(w)) || w.startsWith(stem(t)))); };
+    const hits = (r.hits || []).map(h => by.get(h.id)).filter(x => x && shares(x));   // без общего слова в названии — не кандидат, а шум
+    const out = []; for(const x of scored.concat(hits.filter(x => x.lang === lang), hits)) if(!out.includes(x)) out.push(x);
+    return out;
+  },
   createPiece: async ({ title, lang, code, group, desc }) => {
     const dup = await findByCode(code);
     if(dup){ const t = await store.get(dup); return { id: dup, title: (t && t.title) || title, created: false }; }
@@ -1268,6 +1285,18 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: await tasks.remove(String(b.id || '')) });
     }
     if(u.pathname === '/api/tasks/used-by'){ return json(res, 200, await tasks.usedBy(String(u.searchParams.get('id') || ''))); }
+    // «🧭 пригодится»: до 3 задач к открытому коду. files — все открытые, active — имя активного,
+    // window — код вокруг курсора (±200 строк), cursor — текущая и прошлая строки
+    if(u.pathname === '/api/tasks/suggest' && req.method === 'POST'){
+      const b = await readBody(req);
+      const files = (Array.isArray(b.files) ? b.files : []).slice(0, 40).map(f => ({ name: String(f.name || ''), lang: String(f.lang || ''), code: String(f.code || '').slice(0, 400000) }));
+      const full = []; for(const t of await tasks.list()){ const x = await tasks.get(t.id); if(x) full.push(x); }
+      if(!full.length) return json(res, 200, { hits: [] });
+      const rows = await store.rows();
+      const next = suggestNext({ files, contract: codeContract, contractLangs: _CONTRACT_LANGS, rows, tasks: full });
+      const hits = await taskRanker.rank({ tasks: full, rows, next, lang: String(b.lang || ''), window: String(b.window || '').slice(0, 60000), cursor: String(b.cursor || '').slice(0, 2000) });
+      return json(res, 200, { hits });
+    }
     // «что дальше»: имена, которые код использует, но ни один открытый файл не даёт, + куски/задачи, которые их дают
     if(u.pathname === '/api/code/next' && req.method === 'POST'){
       const b = await readBody(req);

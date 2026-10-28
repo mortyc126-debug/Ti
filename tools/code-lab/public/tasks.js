@@ -144,6 +144,44 @@
     });
   }
 
+  // ── ненайденные ссылки: кандидаты по клику ──
+  // Заменяем ссылку только в блоке своей задачи и только по выбору человека; прежнее название — в заметку «было».
+  function applyCandidate(text, taskTitle, u, cand){
+    const lines = text.split('\n');
+    let from = 0, to = lines.length;
+    if(taskTitle){
+      const hs = lines.map((l, i) => /^\s*={3,}/.test(l) ? i : -1).filter(i => i >= 0);
+      const h = hs.find(i => lines[i].replace(/^\s*=+\s*/, '').split('|')[0].trim() === taskTitle);
+      if(h != null){ from = h; const nx = hs.find(i => i > h); to = nx == null ? lines.length : nx; }
+    }
+    const re = /^(.*(?:->|→|=>)\s*)(кусок|piece|задача|task)(\s*:?\s*)(.*?)\s*$/i;
+    for(let i = from; i < to; i++){
+      const m = lines[i].match(re); if(!m || m[4].trim() !== String(u.ref).trim()) continue;
+      const ind = (lines[i].match(/^\s*/) || [''])[0];
+      lines[i] = m[1] + m[2] + ': ' + cand.title;
+      lines.splice(i + 1, 0, ind + '    | было: ' + u.ref);
+      return lines.join('\n');
+    }
+    return null;
+  }
+  // список ненайденного; onPick(u, cand) — выбор кандидата
+  function unresolvedHtml(list, tag){
+    return list.map((u, i) => '<div class="tk-un" data-k="' + tag + ':' + i + '">⚠ не найден' + (u.kind === 'task' ? 'а задача' : ' кусок') + ' «' + esc(u.ref) + '»'
+      + (u.label ? ' <span style="opacity:.7">(вариант «' + esc(u.label) + '»)</span>' : '')
+      + ((u.candidates || []).length
+        ? '<div class="tk-cands">похоже: ' + u.candidates.map((c, j) => '<button class="btn tk-cand" data-c="' + j + '" title="заменить ссылку; прежнее название останется заметкой «было»">' + esc(c.title) + (c.lang ? ' <span style="opacity:.6">' + esc(c.lang) + '</span>' : '') + '</button>').join('')
+          + '<button class="btn tk-keep" title="ничего не менять">оставить</button></div>'
+        : '<div class="tk-cands" style="opacity:.75">похожих нет — останется как есть, подхватится, когда появится с таким названием</div>')
+      + '</div>').join('');
+  }
+  function bindUnresolved(host, lists, onPick){
+    host.querySelectorAll('.tk-un').forEach(el => {
+      const [tag, i] = el.dataset.k.split(':'); const u = lists[tag][+i];
+      el.querySelectorAll('.tk-cand').forEach(b => b.onclick = () => onPick(tag, u, u.candidates[+b.dataset.c]));
+      const k = el.querySelector('.tk-keep'); if(k) k.onclick = () => el.remove();
+    });
+  }
+
   // ── правка текстом ──
   const NEW_TEXT = '=== Новая задача | js | Раздел\n> что получится в итоге\n~ как ещё это называют\n? Первый вопрос\n  - вариант -> кусок: \n  - не нужно -> пропустить\n';
   async function editTask(id){
@@ -172,11 +210,13 @@
       if(my !== seq) return;
       if(!r || !r.tasks || !r.tasks.length){ msg.className = 'tk-msg err'; msg.textContent = 'Нет строки «=== Название | язык | раздел».'; $('#tePrev').innerHTML = ''; return; }
       const x = r.tasks[0];
-      const probs = x.report.unresolved.map(u => '⚠ не найден' + (u.kind === 'task' ? 'а задача' : ' кусок') + ': «' + u.ref + '» (вариант «' + u.label + '»)');
+      const probs = [];
       if(r.tasks.length > 1) probs.push('В тексте ' + r.tasks.length + ' задачи — сохранится только первая. Для нескольких — «📥 пачкой».');
       (r.warnings || []).forEach(w => probs.push('• ' + w));
-      msg.className = 'tk-msg' + (probs.length ? ' err' : ' ok');
-      msg.textContent = probs.length ? probs.join('\n') : '✓ Вопросов ' + x.stats.steps + ', вариантов ' + x.stats.options + '. Все ссылки найдены.';
+      const un = x.report.unresolved;
+      msg.className = 'tk-msg' + (probs.length || un.length ? ' err' : ' ok');
+      msg.innerHTML = probs.length || un.length ? unresolvedHtml(un, '0') + probs.map(esc).join('<br>') : '✓ Вопросов ' + x.stats.steps + ', вариантов ' + x.stats.options + '. Все ссылки найдены.';
+      bindUnresolved(msg, { 0: un }, (tag, u, c) => { const nt = applyCandidate(ta.value, null, u, c); if(nt != null){ ta.value = nt; schedule(); } });
       const host = $('#tePrev'); host.innerHTML = '';
       const w = document.createElement('div'); host.appendChild(w);
       TaskWalk.mount(w, x.task, { stepMode: false, simple: true });
@@ -244,11 +284,13 @@
       const r = await api('/api/tasks/import', { text: m.q('#bkT').value, dry }).catch(() => null);
       if(!r){ rep.innerHTML = '<div class="tk-msg err">сервер не ответил</div>'; return; }
       if(!r.tasks.length){ rep.innerHTML = '<div class="tk-msg err">Не нашла ни одной задачи. Каждая начинается со строки «=== Название | язык | раздел».</div>'; return; }
-      rep.innerHTML = '<div class="rep">' + r.tasks.map(t => '<div>' + (t.isNew ? '＋' : '↻') + ' <b>' + esc(t.title) + '</b> — вопросов ' + t.stats.steps + ', вариантов ' + t.stats.options
+      rep.innerHTML = '<div class="rep">' + r.tasks.map((t, ti) => '<div>' + (t.isNew ? '＋' : '↻') + ' <b>' + esc(t.title) + '</b> — вопросов ' + t.stats.steps + ', вариантов ' + t.stats.options
         + (t.report.created ? ', новых кусков ' + t.report.created : '')
-        + (t.report.unresolved.length ? '<div class="bad">⚠ не найдено: ' + t.report.unresolved.map(u => esc(u.ref)).join(' · ') + '</div>' : '') + '</div>').join('')
+        + (t.report.unresolved.length ? '<div class="bad">' + unresolvedHtml(t.report.unresolved, String(ti)) + '</div>' : '') + '</div>').join('')
         + ((r.warnings || []).length ? '<div class="bad">' + r.warnings.map(esc).join('<br>') + '</div>' : '') + '</div>'
         + (dry ? '' : '<div class="tk-msg ok">✓ Сохранено.</div>');
+      const lists = {}; r.tasks.forEach((t, ti) => lists[ti] = t.report.unresolved);
+      bindUnresolved(rep, lists, (tag, u, c) => { const ta = m.q('#bkT'); const nt = applyCandidate(ta.value, r.tasks[+tag].title, u, c); if(nt != null){ ta.value = nt; run(true); } });
       if(!dry) reload();
     };
     m.q('#bkDry').onclick = () => run(true);
