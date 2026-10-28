@@ -28,7 +28,8 @@ import { createProviderRuntime } from './code-lab/lib/ai-providers.mjs';
 import { handleWorkspace } from './code-lab/lib/workspace.mjs';
 import { createAiGenerate, LANGS as AI_LANGS } from './code-lab/lib/ai-generate.mjs';   // токенайзер вынесен в модуль — его тестируют отдельно
 import { createVendor } from './code-lab/lib/vendor.mjs';
-import { createTaskStore, suggestNext, createTaskRanker } from './code-lab/lib/tasks.mjs';   // задачи: деревья решений поверх кусков   // управляемые обновления CodeMirror (по кнопке)
+import { createTaskStore, suggestNext, createTaskRanker } from './code-lab/lib/tasks.mjs';
+import { createSections, treeToText, treeFromText } from './code-lab/lib/sections.mjs';   // общее дерево разделов   // задачи: деревья решений поверх кусков   // управляемые обновления CodeMirror (по кнопке)
 
 // сетевые/TLS-ошибки провайдеров ИИ (GigaChat и пр.) не должны ронять весь сервер —
 // логируем и продолжаем работать, чтобы Лаборатория оставалась доступной.
@@ -375,6 +376,7 @@ function coverage(j){
   };
 }
 async function listTemplates(){ return store.rows(); }
+const sections = createSections({ file: path.join(LIBRARY, '_sections.json') });   // уезжает в git вместе с library/
 const taskRanker = createTaskRanker({ entries: () => store.entries() });   // полоска «🧭 пригодится»
 // задачи ссылаются на куски; вариант «свой код» становится куском (повтор по коду не плодится)
 const tasks = createTaskStore({ root: TASKS, rows: () => store.rows(), slug: s => slug(s),
@@ -1252,6 +1254,28 @@ const server = http.createServer(async (req, res) => {
         + 'Без нумерации и лишнего текста. Пропусти случайные имена переменных и незначимое. Эти строки я вставлю в словарь.\n\n'
         + list;
       return json(res, 200, { lang, scanned, count: words.length, words, prompt });
+    }
+
+    // ── общее дерево разделов ───────────────────────────────────────────────────
+    // GET → {tree, rules, treeText}; plan — предпросмотр переноса по присланным (ещё не сохранённым) правилам;
+    // save — сохранить дерево/правила; apply — сохранить и переписать group у кусков и задач
+    if(u.pathname === '/api/sections'){ const c = await sections.load(); return json(res, 200, { ...c, treeText: treeToText(c.tree) }); }
+    if(u.pathname.startsWith('/api/sections/') && req.method === 'POST'){
+      const b = await readBody(req); const cur = await sections.load();
+      const cfg = { tree: typeof b.treeText === 'string' ? treeFromText(b.treeText) : cur.tree, rules: Array.isArray(b.rules) ? b.rules : (typeof b.rules === 'string' ? b.rules.split(/\r?\n/) : cur.rules) };
+      cfg.rules = cfg.rules.map(x => String(x).trim()).filter(Boolean);
+      const items = (await store.rows()).map(r => ({ id: r.id, kind: 'piece', group: r.group }))
+        .concat((await tasks.list()).map(t => ({ id: t.id, kind: 'task', group: t.group })));
+      const p = sections.plan(items, cfg);
+      if(u.pathname === '/api/sections/plan') return json(res, 200, { ...p, changes: undefined, changed: p.changes.length });
+      if(u.pathname === '/api/sections/save'){ if(p.bad.length) return json(res, 400, { error: 'непонятные строки правил', bad: p.bad }); await sections.save(cfg); return json(res, 200, { ok: true }); }
+      if(u.pathname === '/api/sections/apply'){
+        if(p.bad.length) return json(res, 400, { error: 'непонятные строки правил', bad: p.bad });
+        await sections.save(cfg);
+        const pm = {}, tm = {}; for(const c of p.changes) (c.kind === 'task' ? tm : pm)[c.id] = c.to;
+        const a = await store.setGroups(pm), t = await tasks.setGroups(tm);
+        return json(res, 200, { ok: true, pieces: a.changed, tasks: t.changed });
+      }
     }
 
     // ── задачи (деревья решений) ────────────────────────────────────────────────

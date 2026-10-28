@@ -158,3 +158,17 @@ test('пригодится: сигнал от кода обязателен, с�
   hits = await ranker.rank({ tasks, rows, next: { provided: ['form'], unmet: [] }, lang: 'js', window: "const form = document.querySelector('form'); form.addEventListener('submit', send);", cursor: '' });
   assert.ok(!hits.find(h => h.id === 'form'));
 });
+
+test('разделы: самое длинное совпадение, «/ *» оставляет подраздел, без правила — как было', async () => {
+  const { parseRules, mapGroup, placeInTree, treeFromText } = await import('../lib/sections.mjs');
+  const { rules, bad } = parseRules(['Данные => Данные / *', 'Данные / Строки и текст => Основы языка / Строки и текст', 'CSS: основы => Вёрстка и стили / Основы CSS', 'плохая строка']);
+  assert.deepEqual(bad, ['плохая строка']);
+  assert.equal(mapGroup('Данные / Сортировка', rules).to, 'Данные / Сортировка');
+  assert.equal(mapGroup('Данные/Строки и текст', rules).to, 'Основы языка / Строки и текст');
+  assert.equal(mapGroup('CSS: основы / Селекторы', rules).to, 'Вёрстка и стили / Основы CSS');
+  assert.equal(mapGroup('Неизвестное / Что-то', rules).rule, null);
+  const tree = treeFromText('Данные: Сортировка; Массивы\nОсновы языка: Строки и текст');
+  assert.deepEqual(placeInTree('Данные / Сортировка', tree), { top: true, sub: true });
+  assert.deepEqual(placeInTree('Данные / Прочее', tree), { top: true, sub: false });
+  assert.deepEqual(placeInTree('Сеть', tree), { top: false, sub: true });
+});

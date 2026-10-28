@@ -197,6 +197,20 @@
     });
   }
 
+  // раздел задачи должен быть из общего дерева — иначе задача потеряется в списках и промптах
+  let TREE = null;
+  async function sectionWarn(group){
+    if(!TREE) TREE = (await api('/api/sections').catch(() => ({ tree: [] }))).tree || [];
+    if(!TREE.length) return '';
+    const k = x => String(x || '').trim().toLowerCase().replace(/ё/g, 'е');
+    const [top, ...rest] = String(group || '').split('/').map(x => x.trim()).filter(Boolean); const sub = rest.join(' / ');
+    const t = TREE.find(x => k(x.name) === k(top));
+    if(!top) return '⚠ Раздел не указан. Разделы: ' + TREE.map(x => x.name).join(', ');
+    if(!t) return '⚠ Раздела «' + top + '» нет в дереве. Есть: ' + TREE.map(x => x.name).join(', ');
+    if(sub && !(t.subs || []).some(x => k(x) === k(sub))) return '⚠ Подраздела «' + sub + '» нет в «' + t.name + '». Есть: ' + (t.subs || []).join(', ');
+    return '';
+  }
+
   // ── правка текстом ──
   const NEW_TEXT = '=== Новая задача | js | Раздел\n> что получится в итоге\n~ как ещё это называют\n? Первый вопрос\n  - вариант -> кусок: \n  - не нужно -> пропустить\n';
   async function editTask(id){
@@ -226,6 +240,7 @@
       if(!r || !r.tasks || !r.tasks.length){ msg.className = 'tk-msg err'; msg.textContent = 'Нет строки «=== Название | язык | раздел».'; $('#tePrev').innerHTML = ''; return; }
       const x = r.tasks[0];
       const probs = [];
+      const sw = await sectionWarn(x.task.group); if(my !== seq) return; if(sw) probs.push(sw);
       if(r.tasks.length > 1) probs.push('В тексте ' + r.tasks.length + ' задачи — сохранится только первая. Для нескольких — «📥 пачкой».');
       (r.warnings || []).forEach(w => probs.push('• ' + w));
       const un = x.report.unresolved;
@@ -299,8 +314,10 @@
       const r = await api('/api/tasks/import', { text: m.q('#bkT').value, dry }).catch(() => null);
       if(!r){ rep.innerHTML = '<div class="tk-msg err">сервер не ответил</div>'; return; }
       if(!r.tasks.length){ rep.innerHTML = '<div class="tk-msg err">Не нашла ни одной задачи. Каждая начинается со строки «=== Название | язык | раздел».</div>'; return; }
+      const sw = await Promise.all(r.tasks.map(t => t.task ? sectionWarn(t.task.group) : ''));
       rep.innerHTML = '<div class="rep">' + r.tasks.map((t, ti) => '<div>' + (t.isNew ? '＋' : '↻') + ' <b>' + esc(t.title) + '</b> — вопросов ' + t.stats.steps + ', вариантов ' + t.stats.options
         + (t.report.created ? ', новых кусков ' + t.report.created : '')
+        + (sw[ti] ? '<div class="bad">' + esc(sw[ti]) + '</div>' : '')
         + (t.report.unresolved.length ? '<div class="bad">' + unresolvedHtml(t.report.unresolved, String(ti)) + '</div>' : '') + '</div>').join('')
         + ((r.warnings || []).length ? '<div class="bad">' + r.warnings.map(esc).join('<br>') + '</div>' : '') + '</div>'
         + (dry ? '' : '<div class="tk-msg ok">✓ Сохранено.</div>');
@@ -316,28 +333,31 @@
   };
 
   // ── промпт для ИИ ──
+  // Раздел берётся из общего дерева (library/_sections.json): по нему в запрос уходят и уже имеющиеся задачи
+  // с их развилками (чтобы ИИ не повторялся), и — по галочке — названия кусков этого раздела для ссылок.
   $('#tkPrompt').onclick = async () => {
     const rows = [...(await TaskWalk.rows()).values()];
-    const langs = [...new Set(rows.map(r => r.lang))].sort();
+    const cfg = await api('/api/sections').catch(() => ({ tree: [] }));
+    const tree = cfg.tree || [];
+    const langs = [...new Set(rows.map(r => r.lang).concat(LIST.map(t => t.lang)).filter(Boolean))].sort();
     const m = modal('<h3>Промпт для ИИ</h3>'
-      + '<div class="tk-help">Запрос, по которому любой чат напишет задачи сразу в нужном формате. Ответ вставь в «📥 пачкой». Чтобы ИИ ссылался на твои куски, а не писал всё заново, приложи их названия.</div>'
+      + '<div class="tk-help">Запрос, по которому любой чат напишет задачи сразу в нужном формате. Ответ вставь в «📥 пачкой». Раздел — из общего дерева (Опись → 🗂 дерево разделов).</div>'
       + '<div class="mfield"><label>Тема: какие задачи нужны</label><input id="prTopic" placeholder="например: формы и проверка ввода; работа со списками; запросы к API"></div>'
-      + '<div style="display:grid;grid-template-columns:1fr 2fr;gap:10px"><div class="mfield"><label>Язык</label><select id="prLang">' + langs.map(l => '<option' + (l === (LANG || 'js') ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select></div>'
-      + '<div class="mfield"><label>Раздел задач (что в нём уже есть — уйдёт в запрос, чтобы ИИ не повторялся)</label><select id="prTSec"></select>'
-      + '<input id="prTNew" placeholder="новый раздел, например: Браузер / Анимации" style="margin-top:6px;display:none"></div></div>'
-      + '<div class="mfield"><label>Приложить названия кусков из раздела библиотеки</label><select id="prGroup"></select></div>'
-      + '<div class="mfield"><label>Сколько задач</label><input id="prN" type="number" value="5" min="1" max="30"></div>'
+      + '<div style="display:grid;grid-template-columns:1fr 3fr 1fr;gap:10px"><div class="mfield"><label>Язык</label><select id="prLang">' + langs.map(l => '<option' + (l === (LANG || 'js') ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select></div>'
+      + '<div class="mfield"><label>Раздел</label><select id="prSec"></select></div>'
+      + '<div class="mfield"><label>Сколько задач</label><input id="prN" type="number" value="5" min="1" max="30"></div></div>'
+      + '<label class="tk-help" style="display:flex;gap:6px;align-items:center;margin:-2px 0 8px"><input type="checkbox" id="prPieces" checked> <span id="prPiecesL">приложить названия кусков раздела</span></label>'
       + '<div class="mfield"><label>Запрос</label><textarea id="prOut" rows="16" spellcheck="false"></textarea></div>'
       + '<div class="tk-row"><button class="btn ok" id="prCopy">⧉ скопировать</button><button class="btn" id="prX">закрыть</button></div>');
-    // разделы задач этого языка: верхний уровень «Браузер», полный путь «Браузер / Формы»
-    const secOf = t => (t.group || 'Без раздела').split('/')[0].trim();
-    const fillTSec = () => {
-      const l = m.q('#prLang').value; const g = new Map();
-      LIST.filter(t => (t.lang || '') === l).forEach(t => g.set(secOf(t), (g.get(secOf(t)) || 0) + 1));
-      m.q('#prTSec').innerHTML = '<option value="">— любой (приложить только названия всех задач) —</option>'
-        + [...g.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => '<option value="' + esc(k) + '">' + esc(k) + ' (' + n + ')</option>').join('')
-        + '<option value="+">＋ новый раздел…</option>';
-      m.q('#prTNew').style.display = 'none';
+    const nk = s => String(s || '').split('/').map(x => x.trim().toLowerCase().replace(/ё/g, 'е')).filter(Boolean).join(' / ');
+    const inSecPath = (group, sec) => { const g = nk(group), k = nk(sec); return !!k && (g === k || g.startsWith(k + ' / ')); };
+    const fillSec = () => {
+      const l = m.q('#prLang').value, cur = m.q('#prSec').value;
+      const n = sec => { const t = LIST.filter(x => (x.lang || '') === l && inSecPath(x.group, sec)).length, p = rows.filter(r => r.lang === l && inSecPath(r.group, sec)).length;
+        return (t || p) ? '  (задач ' + t + ' · кусков ' + p + ')' : ''; };
+      m.q('#prSec').innerHTML = '<option value="">— без раздела —</option>' + tree.map(t => '<option value="' + esc(t.name) + '">' + esc(t.name) + n(t.name) + '</option>'
+        + (t.subs || []).map(sb => { const v = t.name + ' / ' + sb; return '<option value="' + esc(v) + '">   ' + esc(sb) + n(v) + '</option>'; }).join('')).join('');
+      if(cur) m.q('#prSec').value = cur;
     };
     const FULL = new Map();   // полные задачи раздела — для перечня вопросов
     const fullOf = async ids => { await Promise.all(ids.filter(id => !FULL.has(id)).map(id => api('/api/tasks/get?id=' + encodeURIComponent(id)).then(t => FULL.set(id, t)).catch(() => {}))); return ids.map(id => FULL.get(id)).filter(Boolean); };
@@ -347,27 +367,22 @@
           : pad + '? ' + (st.q || '') + ' — ' + st.options.map(o => o.label).join(' / '));
         st.options.forEach(o => walk(o.steps, pad + '    ')); });
       walk(t.steps, '    '); return out.join('\n'); };
-    const fillGroups = () => {
-      const l = m.q('#prLang').value; const g = new Map();
-      rows.filter(r => r.lang === l).forEach(r => { const k = (r.group || '').split('/')[0].trim() || 'Разное'; g.set(k, (g.get(k) || 0) + 1); });
-      m.q('#prGroup').innerHTML = '<option value="">— не прикладывать —</option><option value="*">все разделы (до 400 названий)</option>'
-        + [...g.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => '<option value="' + esc(k) + '">' + esc(k) + ' (' + n + ')</option>').join('');
-    };
     let bSeq = 0;
     const build = async () => {
       const my = ++bSeq;
-      const l = m.q('#prLang').value, grp = m.q('#prGroup').value, n = m.q('#prN').value || 5;
-      const tsec = m.q('#prTSec').value, tnew = m.q('#prTNew').value.trim();
-      const secName = tsec === '+' ? tnew : tsec;
-      const inSec = tsec && tsec !== '+' ? LIST.filter(t => (t.lang || '') === l && secOf(t) === tsec) : [];
+      const l = m.q('#prLang').value, sec = m.q('#prSec').value, n = m.q('#prN').value || 5;
+      const inSec = sec ? LIST.filter(t => (t.lang || '') === l && inSecPath(t.group, sec)) : [];
       const secFull = await fullOf(inSec.map(t => t.id)); if(my !== bSeq) return;
       const others = LIST.filter(t => !inSec.includes(t));
-      const topic = m.q('#prTopic').value.trim() || 'самые частые повседневные задачи';
-      let titles = [];
-      if(grp) titles = rows.filter(r => r.lang === l && (grp === '*' || ((r.group || '').split('/')[0].trim() || 'Разное') === grp)).map(r => r.title).slice(0, 400);
+      const topic = m.q('#prTopic').value.trim() || (sec ? sec : 'самые частые повседневные задачи');
+      const pool = sec ? rows.filter(r => r.lang === l && inSecPath(r.group, sec)) : [];
+      const titles = m.q('#prPieces').checked ? pool.map(r => r.title).slice(0, 400) : [];
+      m.q('#prPiecesL').textContent = sec ? 'приложить названия кусков раздела: ' + Math.min(pool.length, 400) + ' шт., ~' + Math.round(pool.slice(0, 400).reduce((a, r) => a + r.title.length, 0) / 3.5) + ' токенов' : 'приложить названия кусков (выбери раздел)';
+      const sub = sec && sec.includes(' / ') ? sec : '';
       m.q('#prOut').value = [
         'Ты помогаешь наполнять мою базу «задач» — деревьев решений для программирования. Язык: ' + l + '. Тема: ' + topic + '.',
-        (secName ? 'Раздел: ' + secName + ' — в строке «===» пиши его третьим полем (можно с подразделом через « / »).\n' : '') + 'Напиши ' + n + ' задач. Задача — это то, что человек хочет сделать («Отправить форму без перезагрузки»), а внутри — вопросы-развилки с вариантами. Вопросы задавай так, чтобы понял новичок, а варианты — короткие и конкретные.',
+        (sec ? 'Раздел: «' + sec + '». В строке «===» третьим полем пиши ' + (sub ? 'ровно его' : 'его, а через « / » — один из подразделов: ' + ((tree.find(t => t.name === sec) || {}).subs || []).join(', ')) + '.\n' : '')
+          + 'Напиши ' + n + ' задач. Задача — это то, что человек хочет сделать («Отправить форму без перезагрузки»), а внутри — вопросы-развилки с вариантами. Вопросы задавай так, чтобы понял новичок, а варианты — короткие и конкретные.',
         '',
         'Формат строго такой (без markdown вокруг, без пояснений до и после):',
         FORMAT_HELP,
@@ -380,17 +395,15 @@
         '- Добавляй вариант «-> пропустить», если шаг бывает не нужен.',
         '- В коде используй обычные имена; если вариант зависит от имени из прошлого шага — используй то же имя.',
         '',
-        tsec && tsec !== '+' ? (secFull.length ? 'Что уже есть в разделе «' + tsec + '» (не повторяй эти задачи и их развилки; можно углубить, дополнить или сослаться через «-> задача:»):\n' + secFull.map(outline).join('\n') : 'В разделе «' + tsec + '» задач пока нет.') : '',
-        others.length ? (tsec && tsec !== '+' ? 'Другие мои задачи' : 'Мои задачи') + ' (не повторяй, но можешь ссылаться):\n' + others.map(t => t.title).join('\n') : (inSec.length ? '' : 'Моих задач пока нет.'),
+        sec ? (secFull.length ? 'Что уже есть в разделе «' + sec + '» (не повторяй эти задачи и их развилки; можно углубить, дополнить или сослаться через «-> задача:»):\n' + secFull.map(outline).join('\n') : 'В разделе «' + sec + '» задач пока нет.') : '',
+        others.length ? (sec ? 'Другие мои задачи' : 'Мои задачи') + ' (не повторяй, но можешь ссылаться):\n' + others.map(t => t.title).join('\n') : (inSec.length ? '' : 'Моих задач пока нет.'),
         '',
-        titles.length ? 'Мои куски (названия для «-> кусок:»):\n' + titles.join('\n') : 'Готовые куски не прикладываю — пиши код в вариантах.'
+        titles.length ? 'Мои куски этого раздела (названия для «-> кусок:»):\n' + titles.join('\n') : 'Готовые куски не прикладываю — пиши код в вариантах.'
       ].join('\n');
     };
-    fillGroups(); fillTSec(); build();
-    ['#prLang'].forEach(s => m.q(s).onchange = () => { fillTSec(); fillGroups(); build(); });
-    m.q('#prTSec').onchange = () => { const nw = m.q('#prTSec').value === '+'; m.q('#prTNew').style.display = nw ? '' : 'none'; if(nw) m.q('#prTNew').focus(); build(); };
-    m.q('#prTNew').oninput = build;
-    ['#prGroup', '#prN'].forEach(s => m.q(s).onchange = build);
+    fillSec(); build();
+    m.q('#prLang').onchange = () => { fillSec(); build(); };
+    ['#prSec', '#prN', '#prPieces'].forEach(s => m.q(s).onchange = build);
     m.q('#prTopic').oninput = build;
     m.q('#prCopy').onclick = e => copy(m.q('#prOut').value, e.target);
     m.q('#prX').onclick = m.close;

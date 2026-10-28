@@ -173,7 +173,14 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
     return out;
   }
 
-  return { list, get, save, remove, importText, toText, resolve, usedBy, parseText: TaskFormat.parse };
+  // перенос в общее дерево разделов: меняем только group, ссылки и savedAt не трогаем
+  async function setGroups(map){
+    let changed = 0;
+    for(const [id, g] of Object.entries(map || {})){ const t = await get(id); if(!t || !g || t.group === g) continue; t.group = String(g).slice(0, 120); await fs.writeFile(fileOf(t.id), JSON.stringify(t, null, 2), 'utf8'); changed++; }
+    return { changed };
+  }
+
+  return { list, get, save, remove, importText, toText, resolve, usedBy, setGroups, parseText: TaskFormat.parse };
 }
 
 // «Что дальше» по контрактам: какие имена код использует, но нигде не получает,

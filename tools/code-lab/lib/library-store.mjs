@@ -91,7 +91,7 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
     const lang = langForExt(extOf(codePath)) || rel[0] || 'txt';
     return {
       schema: 1, id, file: path.basename(codePath),
-      title: id.replace(/[-_]+/g, ' ').trim() || id, lang, group: rel.length > 1 ? rel.slice(1).join(' / ') : 'Мои файлы',
+      title: id.replace(/[-_]+/g, ' ').trim() || id, lang, group: rel.length > 1 ? rel.slice(1).join(' / ') : 'Не разобрано',   // раздел из общего дерева (_sections.json)
       desc: '', output: '', tags: [], aliases: [],
       source: { title: null, desc: null, tags: null }, status: 'needs_description', wordNotes: []
     };
@@ -298,6 +298,23 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
         await fs.unlink(e.codePath).catch(() => {}); await fs.unlink(e.metaPath).catch(() => {});
         byPath.delete(e.codePath); byId.delete(id); version++; dirty = true;
         return true;
+      });
+    },
+
+    // Массово сменить раздел (перенос в общее дерево разделов): меняется только поле group, остальное как было.
+    async setGroups(map) {
+      return withLock(async () => {
+        await scan();
+        let changed = 0;
+        for (const [id, group] of Object.entries(map || {})) {
+          const e = byId.get(String(id)); const g = String(group || '').trim();
+          if (!e || !g || e.meta.group === g) continue;
+          const meta = { ...e.meta, group: g };
+          await writeAtomic(e.metaPath, JSON.stringify(meta, null, 2) + '\n');
+          e.meta = meta; e.metaMtime = await mtime(e.metaPath); e.row = buildRow(e); changed++;
+        }
+        if (changed) { dirty = true; version++; }
+        return { changed };
       });
     },
 
