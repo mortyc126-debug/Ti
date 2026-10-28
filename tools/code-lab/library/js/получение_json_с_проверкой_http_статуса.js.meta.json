@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "получение_json_с_проверкой_http_статуса",
+  "file": "получение_json_с_проверкой_http_статуса.js",
+  "title": "Получение JSON с проверкой HTTP-статуса",
+  "lang": "js",
+  "group": "Сеть и API / HTTP-клиенты",
+  "desc": "Функция-обёртка над fetch берёт на себя типичную рутину: проверяет код ответа и разбирает JSON. Если сервер вернул ошибку, выбрасывается собственная HttpError с кодом, и вызывающий код может обработать её единообразно. Без такой проверки fetch для кодов 404 и 500 всё равно выполняется успешно, и ошибки сервера остаются незамеченными. Функцию удобно использовать как единственную точку сетевых вызовов.",
+  "output": "{ ok: true }",
+  "tags": [
+    "response.ok",
+    "HttpError",
+    "http-клиенты"
+  ],
+  "aliases": [
+    "получение json с проверкой http-статуса",
+    "response.ok",
+    "HttpError"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "response.ok",
+      "kind": "concept",
+      "note": "Истинно для статусов 200–299."
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "HttpError",
+      "kind": "concept",
+      "note": "Ошибка с кодом ответа сервера."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

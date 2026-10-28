@@ -1,0 +1,251 @@
+{
+  "schema": 1,
+  "id": "смена-рабочего-каталога",
+  "file": "смена-рабочего-каталога.js",
+  "title": "Смена рабочего каталога",
+  "lang": "js",
+  "group": "Node.js: процесс, файлы и сервер / Процесс",
+  "desc": "Меняет рабочий каталог процесса.",
+  "output": "true\ntrue",
+  "tags": [
+    "process.chdir",
+    "рабочий каталог",
+    "cwd",
+    "каталог процесса"
+  ],
+  "aliases": [
+    "как сменить текущую папку в node",
+    "process chdir пример",
+    "изменить рабочий каталог процесса",
+    "перейти в другую папку из кода",
+    "chdir и cwd вместе"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 11,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключает модуль Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 13,
+      "text": "process",
+      "kind": "fn",
+      "note": "process — объект текущего процесса Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 21,
+      "text": "cwd",
+      "kind": "fn",
+      "note": "cwd — текущий рабочий каталог процесса.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "process",
+      "kind": "fn",
+      "note": "process — объект текущего процесса Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "chdir",
+      "kind": "fn",
+      "note": "chdir — меняет рабочий каталог процесса.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 12,
+      "text": "process",
+      "kind": "fn",
+      "note": "process — объект текущего процесса Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 20,
+      "text": "cwd",
+      "kind": "fn",
+      "note": "cwd — текущий рабочий каталог процесса.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "process",
+      "kind": "fn",
+      "note": "process — объект текущего процесса Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "chdir",
+      "kind": "fn",
+      "note": "chdir — меняет рабочий каталог процесса.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 12,
+      "text": "process",
+      "kind": "fn",
+      "note": "process — объект текущего процесса Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 20,
+      "text": "cwd",
+      "kind": "fn",
+      "note": "cwd — текущий рабочий каталог процесса.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Node.js: процесс, файлы и сервер"
+      ],
+      "runtime": [
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "true\ntrue",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js.",
+        "Нужен Node.js той версии, где есть используемые встроенные модули."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const os = require(\"node:os\");\nconst было = process.cwd();\nprocess.chdir(os.tmpdir());\nconsole.log(process.cwd() !== было);\nprocess.chdir(было);\nconsole.log(process.cwd() === было);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "true\ntrue",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "os",
+      "было"
+    ],
+    "requires": [],
+    "subcat": "Процесс"
+  },
+  "enriched": true
+}

@@ -1,0 +1,170 @@
+{
+  "schema": 1,
+  "id": "вызов-apply-через-function-prototype",
+  "file": "вызов-apply-через-function-prototype.js",
+  "title": "Вызвать функцию с указанным this и массивом аргументов: Function.prototype.apply.call",
+  "lang": "js",
+  "group": "Основы / Функции",
+  "desc": "Если у функции переопределили метод apply, надёжный вариант — взять apply у Function.prototype и вызвать его через call.",
+  "output": "Привет, я Мира!",
+  "tags": [
+    "Function.prototype.apply",
+    "call",
+    "безопасный вызов",
+    "this"
+  ],
+  "aliases": [
+    "как вызвать apply если он переопределён",
+    "Function.prototype.apply.call пример",
+    "надёжный вызов функции"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 18,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 12,
+      "text": "Function.prototype.apply.call",
+      "kind": "apply.call — вызывает apply не через саму функцию, а напрямую у Function.prototype.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Привет, я Мира!",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function introduce(greeting, punctuation) {\n  return `${greeting}, я ${this.name}${punctuation}`;\n}\n\nintroduce.apply = null;\n\nconst user = { name: \"Мира\" };\nconsole.log(Function.prototype.apply.call(introduce, user, [\"Привет\", \"!\"]));"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Привет, я Мира!",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "introduce",
+      "user"
+    ],
+    "requires": [],
+    "subcat": "Функции"
+  },
+  "enriched": true
+}

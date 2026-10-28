@@ -1,0 +1,187 @@
+{
+  "schema": 1,
+  "id": "заголовок-content-type-входящего-запроса",
+  "file": "заголовок-content-type-входящего-запроса.js",
+  "title": "Заголовок входящего запроса: request.headers[\"content-type\"]",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / HTTP-сервер",
+  "desc": "Node.js отдаёт имена заголовков входящего запроса в нижнем регистре, поэтому читаем request.headers[\"content-type\"].",
+  "output": "Тип тела: application/json",
+  "tags": [
+    "request.headers",
+    "content-type",
+    "заголовки",
+    "HTTP-сервер",
+    "Node.js"
+  ],
+  "aliases": [
+    "как прочитать заголовок запроса в node",
+    "request.headers пример",
+    "заголовки в нижнем регистре"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 22,
+      "text": "request.headers[\"content-type\"]",
+      "kind": "headers — заголовки запроса; имена всегда в нижнем регистре.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 29,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 37,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Файлы, хранение и сервер"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Тип тела: application/json",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const http = require(\"node:http\");\n\nconst server = http.createServer((request, response) => {\n  const contentType = request.headers[\"content-type\"] ?? \"не указан\";\n  response.end(`Тип тела: ${contentType}`);\n});\n\nserver.listen(0, () => {\n  const options = {\n    port: server.address().port,\n    method: \"POST\",\n    headers: { \"Content-Type\": \"application/json\" },\n  };\n  const outgoing = http.request(options, reply => {\n    reply.setEncoding(\"utf8\");\n    reply.on(\"data\", text => console.log(text));\n    reply.on(\"end\", () => server.close());\n  });\n  outgoing.end(\"{}\");\n});"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Тип тела: application/json",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "http",
+      "server"
+    ],
+    "requires": [],
+    "subcat": "HTTP-сервер"
+  },
+  "enriched": true
+}

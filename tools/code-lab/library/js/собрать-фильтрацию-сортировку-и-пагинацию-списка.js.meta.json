@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "собрать-фильтрацию-сортировку-и-пагинацию-списка",
+  "file": "собрать-фильтрацию-сортировку-и-пагинацию-списка.js",
+  "title": "Собрать фильтрацию, сортировку и пагинацию списка",
+  "lang": "js",
+  "group": "Данные / Запросы к коллекции",
+  "desc": "Чистая функция для клиентской таблицы: фильтр, сортировка по ключу и выдача одной страницы; входной массив не мутируется.",
+  "output": "items=[n=1,n=2], total=3, pages=2",
+  "tags": [
+    "фильтрация",
+    "сортировка",
+    "пагинация",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "фильтр сортировка пагинация массива",
+    "таблица список page limit",
+    "filter sort paginate"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

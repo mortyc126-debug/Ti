@@ -1,0 +1,194 @@
+{
+  "schema": 1,
+  "id": "ширина-содержимого-из-resizeobserver-inlinesize",
+  "file": "ширина-содержимого-из-resizeobserver-inlinesize.js",
+  "title": "Ширина содержимого из записи ResizeObserver: contentBoxSize",
+  "lang": "js",
+  "group": "Интерфейс / Наблюдение за DOM",
+  "desc": "contentBoxSize[0].inlineSize — ширина области содержимого (в горизонтальном письме) из записи ResizeObserver; не зависит от рамок и padding.",
+  "output": "Ширина содержимого: 200",
+  "tags": [
+    "ResizeObserver",
+    "contentBoxSize",
+    "inlineSize",
+    "размер элемента"
+  ],
+  "aliases": [
+    "как узнать ширину элемента через ResizeObserver",
+    "contentBoxSize inlineSize",
+    "наблюдение за размером элемента"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 21,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 17,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторяет блок для каждого элемента или шага.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 7,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 19,
+      "text": "of",
+      "kind": "kw",
+      "note": "of — в цикле for...of: перебрать значения по одному.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 45,
+      "text": "contentBoxSize[0].inlineSize",
+      "kind": "inlineSize — ширина содержимого (в горизонтальном тексте).",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Ширина содержимого: 200",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const box = document.createElement(\"div\");\nObject.assign(box.style, { width: \"200px\", padding: \"10px\", border: \"5px solid\" });\ndocument.body.append(box);\n\nconst observer = new ResizeObserver(entries => {\n  for (const entry of entries) {\n    console.log(`Ширина содержимого: ${entry.contentBoxSize[0].inlineSize}`);\n  }\n});\nobserver.observe(box);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Ширина содержимого: 200",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "box",
+      "observer"
+    ],
+    "requires": [],
+    "subcat": "Наблюдение за DOM"
+  },
+  "enriched": true
+}

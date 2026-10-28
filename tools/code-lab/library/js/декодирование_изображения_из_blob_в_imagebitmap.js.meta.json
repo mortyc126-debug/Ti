@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "декодирование_изображения_из_blob_в_imagebitmap",
+  "file": "декодирование_изображения_из_blob_в_imagebitmap.js",
+  "title": "Декодирование изображения из Blob в ImageBitmap",
+  "lang": "js",
+  "group": "Графика и визуализация / Изображения",
+  "desc": "createImageBitmap принимает Blob и асинхронно декодирует изображение в ImageBitmap — объект, готовый к быстрой отрисовке и передаче в воркеры. Так можно подготовить картинку без элемента img. Источник Blob получают через response.blob() или из файла. Размеры лежат в свойствах width и height; когда битмап больше не нужен, вызывайте close().",
+  "output": "Ширина и высота изображения в пикселях.",
+  "tags": [
+    "createImageBitmap",
+    "blob",
+    "изображения"
+  ],
+  "aliases": [
+    "декодирование изображения из blob в imagebitmap",
+    "createImageBitmap",
+    "blob"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 6,
+      "text": "blob",
+      "kind": "concept",
+      "note": "Читает тело ответа как Blob."
+    },
+    {
+      "line": 2,
+      "col": 21,
+      "text": "createImageBitmap",
+      "kind": "fn",
+      "note": "Декодирует изображение в ImageBitmap."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

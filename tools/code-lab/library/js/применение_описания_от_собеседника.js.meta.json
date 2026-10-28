@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "применение_описания_от_собеседника",
+  "file": "применение_описания_от_собеседника.js",
+  "title": "Применение описания от собеседника",
+  "lang": "js",
+  "group": "Сеть / WebRTC",
+  "desc": "Описание сеанса (SDP) — это набор параметров соединения WebRTC. Получив предложение (offer), вызывают setRemoteDescription, затем createAnswer, затем setLocalDescription и отправляют ответ собеседнику через сигнальный канал. Соблюдайте именно этот порядок: нарушение приводит к ошибкам состояния. Метод выбрасывает исключение, если описание некорректно или пришло не вовремя, поэтому ставьте обработку ошибок.",
+  "output": "Получив предложение, соединение отправляет ответ собеседнику.",
+  "tags": [
+    "setRemoteDescription",
+    "createAnswer",
+    "webrtc"
+  ],
+  "aliases": [
+    "применение описания от собеседника",
+    "setRemoteDescription",
+    "createAnswer"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 5,
+      "col": 21,
+      "text": "setRemoteDescription",
+      "kind": "fn",
+      "note": "Применяет описание сеанса другой стороны."
+    },
+    {
+      "line": 6,
+      "col": 35,
+      "text": "createAnswer",
+      "kind": "fn",
+      "note": "Создаёт ответ на полученное предложение."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

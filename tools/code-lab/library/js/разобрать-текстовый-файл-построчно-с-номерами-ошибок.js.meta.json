@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "разобрать-текстовый-файл-построчно-с-номерами-ошибок",
+  "file": "разобрать-текстовый-файл-построчно-с-номерами-ошибок.js",
+  "title": "Разобрать текстовый файл построчно с номерами ошибок",
+  "lang": "js",
+  "group": "Файлы / Импорт данных",
+  "desc": "Передаёт каждую непустую строку парсеру и собирает ошибки отдельно, чтобы одна плохая строка не останавливала весь импорт.",
+  "output": "успешные строки и ошибки возвращаются отдельно",
+  "tags": [
+    "импорт",
+    "строки",
+    "ошибки",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "импорт текста по строкам",
+    "разобрать файл и собрать ошибки",
+    "parse lines with errors"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "унифицировать-результат-операции-в-формате-успех-или-ошибка",
+  "file": "унифицировать-результат-операции-в-формате-успех-или-ошибка.js",
+  "title": "Унифицировать результат операции в формате успех или ошибка",
+  "lang": "js",
+  "group": "Архитектура / Контракты функций",
+  "desc": "Возвращает единый контракт результата без обязательного выбрасывания ожидаемых ошибок; полезно для импорта и пакетной обработки.",
+  "output": "единый формат успеха и ошибки",
+  "tags": [
+    "Result",
+    "ошибки",
+    "контракт",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "result ok error format",
+    "success failure result object",
+    "единый формат результата функции"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

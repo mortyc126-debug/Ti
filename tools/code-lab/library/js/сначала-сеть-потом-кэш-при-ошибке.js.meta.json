@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "id": "сначала-сеть-потом-кэш-при-ошибке",
+  "file": "сначала-сеть-потом-кэш-при-ошибке.js",
+  "title": "Сначала сеть, при ошибке — данные из кэша",
+  "lang": "js",
+  "group": "Кэширование / Service Worker",
+  "desc": "Стратегия network-first: пока сеть работает, пользователь видит свежие данные; без сети worker отдаёт то, что есть в кэше.",
+  "output": "С сетью — свежие ответы, без сети — последние сохранённые",
+  "tags": [
+    "Service Worker",
+    "network first",
+    "офлайн",
+    "caches.match"
+  ],
+  "aliases": [
+    "как отдавать из кэша если нет сети",
+    "стратегия network first",
+    "офлайн режим service worker"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 5,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "fetch(event.request).catch",
+      "kind": "catch — срабатывает при сбое сети: тогда берём ответ из кэша.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Кэширование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Service Worker"
+      ],
+      "technology": [
+        "JavaScript",
+        "Service Worker"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "С сетью — свежие ответы, без сети — последние сохранённые",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "self.addEventListener(\"fetch\", event => {\n  event.respondWith(\n    fetch(event.request).catch(() => caches.match(event.request))\n  );\n});"
+        },
+        "steps": [
+          "Сохрани код как sw.js в корне сайта и зарегистрируй: navigator.serviceWorker.register(\"/sw.js\").",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "С сетью — свежие ответы, без сети — последние сохранённые",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Первая установка worker",
+            "Обновление worker",
+            "Работа без сети"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Service Worker не регистрируется",
+            "cause": "Страница открыта не по HTTPS или localhost, либо sw.js лежит не в корне сайта",
+            "solution": "Открой сайт по https или http://localhost и проверь вкладку Application → Service Workers"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Service Worker"
+  },
+  "enriched": true
+}

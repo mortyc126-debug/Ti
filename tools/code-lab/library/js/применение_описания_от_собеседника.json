@@ -1,0 +1,12 @@
+{
+  "lang": "js",
+  "title": "Применение описания от собеседника",
+  "group": "Сеть / WebRTC",
+  "desc": "Применяем предложение удалённой стороны и готовим ответ.",
+  "code": "const соединение = new RTCPeerConnection();\n\nсигналы.addEventListener(\"message\", async событие => {\n  const сообщение = JSON.parse(событие.data);\n  if (сообщение.type === \"offer\") {\n    await соединение.setRemoteDescription(сообщение);\n    const ответ = await соединение.createAnswer();\n    await соединение.setLocalDescription(ответ);\n    сигналы.send(JSON.stringify(соединение.localDescription));\n  }\n});",
+  "output": "Получив предложение, соединение отправляет ответ собеседнику.",
+  "words": {
+    "setRemoteDescription": "Применяет описание сеанса другой стороны.",
+    "createAnswer": "Создаёт ответ на полученное предложение."
+  }
+}

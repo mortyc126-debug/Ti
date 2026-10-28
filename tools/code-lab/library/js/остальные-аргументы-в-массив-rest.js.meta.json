@@ -1,0 +1,137 @@
+{
+  "schema": 1,
+  "id": "остальные-аргументы-в-массив-rest",
+  "file": "остальные-аргументы-в-массив-rest.js",
+  "title": "Собрать оставшиеся аргументы в массив: ...args",
+  "lang": "js",
+  "group": "Основы / Функции",
+  "desc": "Rest-параметр забирает все аргументы после перечисленных; в отличие от arguments это настоящий массив.",
+  "output": "[INFO] Сервер запущен на порту 3000",
+  "tags": [
+    "rest параметры",
+    "...args",
+    "аргументы функции",
+    "массив"
+  ],
+  "aliases": [
+    "как принять любое число аргументов js",
+    "rest параметр пример",
+    "собрать аргументы в массив"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "[INFO] Сервер запущен на порту 3000",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function logMessage(level, ...parts) {\n  console.log(`[${level}] ${parts.join(\" \")}`);\n}\n\nlogMessage(\"INFO\", \"Сервер\", \"запущен\", \"на порту\", 3000);"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "[INFO] Сервер запущен на порту 3000",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "logMessage"
+    ],
+    "requires": [],
+    "subcat": "Функции"
+  },
+  "enriched": true
+}

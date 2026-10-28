@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "режим_es_модулей",
+  "file": "режим_es_модулей.js",
+  "title": "Режим ES-модулей",
+  "lang": "js",
+  "group": "Разработка и инструменты / Упаковка проекта",
+  "desc": "Поле \"type\": \"module\" в package.json сообщает Node.js, что файлы .js в этом пакете — современные ES-модули. Тогда в них работают import и export, а также await на верхнем уровне, но недоступны require и __dirname. Для отдельных файлов можно использовать расширения .mjs (модуль) и .cjs (CommonJS). Если поле не задано, .js считается CommonJS.",
+  "output": "module",
+  "tags": [
+    "type",
+    "упаковка проекта"
+  ],
+  "aliases": [
+    "режим es-модулей",
+    "type"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 17,
+      "text": "type",
+      "kind": "concept",
+      "note": "Указывает Node.js использовать ES-модули."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

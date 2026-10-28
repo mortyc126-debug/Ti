@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "создание_ключа_доступа_webauthn",
+  "file": "создание_ключа_доступа_webauthn.js",
+  "title": "Создание ключа доступа WebAuthn",
+  "lang": "js",
+  "group": "Интерфейс / Системные возможности",
+  "desc": "navigator.credentials.create с параметром publicKey регистрирует новый ключ доступа на устройстве пользователя. В параметрах указывают challenge от сервера, сведения о сайте (rp), о пользователе (user) и допустимые алгоритмы подписи (pubKeyCredParams). Результат — публичная часть ключа, которую отправляют на сервер для сохранения. Закрытый ключ никогда не покидает устройство. Работает только на защищённой странице и в ответ на действие пользователя.",
+  "output": "Идентификатор нового ключа; данные затем отправляются на сервер.",
+  "tags": [
+    "navigator.credentials.create",
+    "pubKeyCredParams",
+    "системные возможности"
+  ],
+  "aliases": [
+    "создание ключа доступа webauthn",
+    "navigator.credentials.create",
+    "pubKeyCredParams"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 6,
+      "col": 2,
+      "text": "pubKeyCredParams",
+      "kind": "concept",
+      "note": "Список допустимых алгоритмов подписи."
+    },
+    {
+      "line": 10,
+      "col": 21,
+      "text": "navigator.credentials.create",
+      "kind": "fn",
+      "note": "Регистрирует новые учётные данные на устройстве."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

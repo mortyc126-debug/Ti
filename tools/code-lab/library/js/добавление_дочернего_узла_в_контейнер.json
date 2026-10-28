@@ -1,0 +1,12 @@
+{
+  "lang": "js",
+  "title": "Добавление дочернего узла в контейнер",
+  "group": "Интерфейс / Работа с DOM",
+  "desc": "Вставляем новый пункт в конец контейнера.",
+  "code": "const коробка = document.querySelector(\".коробка\");\nconst пункт = document.createElement(\"span\");\nпункт.textContent = \"Новый пункт\";\n\nкоробка.appendChild(пункт);\nconsole.log(коробка.children.length);",
+  "output": "Количество дочерних элементов коробки.",
+  "words": {
+    "appendChild": "Добавляет дочерний узел в конец контейнера.",
+    "children": "Список дочерних элементов."
+  }
+}

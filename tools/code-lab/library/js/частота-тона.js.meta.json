@@ -1,0 +1,136 @@
+{
+  "schema": 1,
+  "id": "частота-тона",
+  "file": "частота-тона.js",
+  "title": "Частота тона",
+  "lang": "js",
+  "group": "Браузер: страница и документ / Наблюдатели, звук и отладка",
+  "desc": "Задаёт частоту тона в герцах.",
+  "output": "440",
+  "tags": [
+    "Web Audio",
+    "oscillator",
+    "frequency",
+    "герцы"
+  ],
+  "aliases": [
+    "как задать частоту звука web audio",
+    "oscillator frequency value 440",
+    "нота ля в коде"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Браузер: страница и документ"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "440",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const oscillator = { frequency: { value: 0 } }; // вместо OscillatorNode из AudioContext\noscillator.frequency.value = 440;\nconsole.log(oscillator.frequency.value);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "440",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль",
+          "В браузере oscillator создаётся методом createOscillator() у AudioContext"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "oscillator"
+    ],
+    "requires": [],
+    "subcat": "Наблюдатели, звук и отладка"
+  },
+  "enriched": true
+}

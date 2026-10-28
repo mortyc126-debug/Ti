@@ -1,0 +1,283 @@
+{
+  "schema": 1,
+  "id": "отсутствие-файла-enoent",
+  "file": "отсутствие-файла-enoent.js",
+  "title": "Обработать отсутствие файла и пробросить остальные ошибки: ENOENT",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Обработка ошибок",
+  "desc": "Если файла нет, ошибка с кодом ENOENT — ожидаемая ситуация и возвращается null; все остальные ошибки (например, нет прав) пробрасываются дальше.",
+  "output": "null\nstring",
+  "tags": [
+    "readFile",
+    "ENOENT",
+    "обработка ошибок",
+    "файл не найден",
+    "Node.js"
+  ],
+  "aliases": [
+    "как обработать отсутствие файла node",
+    "error.code ENOENT пример",
+    "файл не найден не ошибка"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 21,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — функция, внутри которой можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 11,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — дождаться завершения асинхронной операции и взять её результат.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 11,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "error.code === \"ENOENT\"",
+      "kind": "ENOENT — «файл или каталог не найден».",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 33,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 40,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 10,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — функция, внутри которой можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 14,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — дождаться завершения асинхронной операции и взять её результат.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 18,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — дождаться завершения асинхронной операции и взять её результат.",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Файлы, хранение и сервер"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "null\nstring",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const { readFile } = require(\"node:fs/promises\");\n\nasync function readOptional(filePath) {\n  try {\n    return await readFile(filePath, \"utf8\");\n  } catch (error) {\n    if (error.code === \"ENOENT\") return null;\n    throw error;\n  }\n}\n\nasync function main() {\n  console.log(await readOptional(\"/нет/такого/файла.txt\"));\n  const ownText = await readOptional(__filename);\n  console.log(typeof ownText);\n}\n\nmain();"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "null\nstring",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "readOptional",
+      "main"
+    ],
+    "requires": [],
+    "subcat": "Обработка ошибок"
+  },
+  "enriched": true
+}

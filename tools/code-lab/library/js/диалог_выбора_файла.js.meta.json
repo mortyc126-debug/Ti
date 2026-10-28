@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "диалог_выбора_файла",
+  "file": "диалог_выбора_файла.js",
+  "title": "Диалог выбора файла",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "showOpenFilePicker открывает системный диалог и возвращает массив дескрипторов выбранных файлов. Параметр types ограничивает допустимые типы, а multiple разрешает выбор нескольких. Метод работает в браузерах на основе Chromium, на защищённой странице и только в ответ на действие пользователя. Если человек закрыл диалог, Promise отклоняется ошибкой AbortError — это нужно обработать.",
+  "output": "Имя выбранного файла; при отмене диалога ничего не происходит.",
+  "tags": [
+    "showOpenFilePicker",
+    "AbortError",
+    "файловая система"
+  ],
+  "aliases": [
+    "диалог выбора файла",
+    "showOpenFilePicker",
+    "AbortError"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 36,
+      "text": "showOpenFilePicker",
+      "kind": "fn",
+      "note": "Открывает диалог выбора файлов."
+    },
+    {
+      "line": 6,
+      "col": 23,
+      "text": "AbortError",
+      "kind": "concept",
+      "note": "Ошибка, возникающая при закрытии диалога."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

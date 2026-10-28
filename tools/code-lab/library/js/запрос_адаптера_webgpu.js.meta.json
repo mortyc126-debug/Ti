@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "запрос_адаптера_webgpu",
+  "file": "запрос_адаптера_webgpu.js",
+  "title": "Запрос адаптера WebGPU",
+  "lang": "js",
+  "group": "Графика и визуализация / WebGPU",
+  "desc": "WebGPU — современный API доступа к видеокарте для графики и вычислений. Первый шаг — получить адаптер через navigator.gpu.requestAdapter(): он описывает доступную видеокарту. Оператор ?. защищает от браузеров, где navigator.gpu вообще нет. Если адаптер не найден, метод возвращает null, и нужно предусмотреть запасной вариант (например, WebGL). Из адаптера затем получают логическое устройство через requestDevice().",
+  "output": "Сообщение зависит от поддержки WebGPU в браузере.",
+  "tags": [
+    "requestAdapter",
+    "navigator.gpu",
+    "webgpu"
+  ],
+  "aliases": [
+    "запрос адаптера webgpu",
+    "requestAdapter",
+    "navigator.gpu"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 22,
+      "text": "navigator.gpu",
+      "kind": "concept",
+      "note": "Точка входа WebGPU; есть не везде."
+    },
+    {
+      "line": 0,
+      "col": 37,
+      "text": "requestAdapter",
+      "kind": "fn",
+      "note": "Запрашивает видеоадаптер для WebGPU."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

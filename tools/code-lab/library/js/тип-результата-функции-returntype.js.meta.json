@@ -1,0 +1,171 @@
+{
+  "schema": 1,
+  "id": "тип-результата-функции-returntype",
+  "file": "тип-результата-функции-returntype.js",
+  "title": "Получить тип результата функции: ReturnType<typeof fn>",
+  "lang": "js",
+  "group": "Продвинутые темы / Типизация",
+  "desc": "ReturnType<typeof fn> берёт тип возвращаемого значения прямо из функции, поэтому тип не нужно описывать второй раз. Записан через JSDoc.",
+  "output": "Мира: активен",
+  "tags": [
+    "ReturnType",
+    "typeof",
+    "JSDoc",
+    "типизация",
+    "вывод типов"
+  ],
+  "aliases": [
+    "как получить тип возвращаемого значения функции",
+    "ReturnType<typeof fn> пример",
+    "не дублировать тип результата"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 14,
+      "text": "ReturnType<typeof createUser>",
+      "kind": "ReturnType<typeof fn> — тип того, что возвращает функция fn.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Продвинутые темы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Мира: активен",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function createUser(name) {\n  return { name, active: true };\n}\n\n/** @typedef {ReturnType<typeof createUser>} User */\n\n/** @param {User} user */\nfunction describeUser(user) {\n  return `${user.name}: ${user.active ? \"активен\" : \"неактивен\"}`;\n}\n\nconsole.log(describeUser(createUser(\"Мира\")));"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Мира: активен",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "createUser",
+      "describeUser"
+    ],
+    "requires": [],
+    "subcat": "Типизация"
+  },
+  "enriched": true
+}

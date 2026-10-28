@@ -1,0 +1,266 @@
+{
+  "schema": 1,
+  "id": "вставка-узла-перед-другим",
+  "file": "вставка-узла-перед-другим.js",
+  "title": "Вставка узла перед другим",
+  "lang": "js",
+  "group": "Браузер: страница и документ / Узлы и диапазоны",
+  "desc": "Вставляет узел перед указанным дочерним узлом.",
+  "output": "[ 'начало', 'середина', 'конец' ]",
+  "tags": [
+    "insertBefore",
+    "DOM",
+    "вставка узла",
+    "дочерние элементы"
+  ],
+  "aliases": [
+    "как вставить элемент перед другим в js",
+    "insertbefore javascript",
+    "вставить узел в середину списка",
+    "добавить li перед элементом",
+    "порядок дочерних узлов"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — документ страницы: точка входа в DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт элемент DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — документ страницы: точка входа в DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт элемент DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 14,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — документ страницы: точка входа в DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 23,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт элемент DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 7,
+      "text": "append",
+      "kind": "fn",
+      "note": "append — добавляет узлы, текст или параметр в конец.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 17,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — документ страницы: точка входа в DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 26,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт элемент DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 7,
+      "text": "insertBefore",
+      "kind": "fn",
+      "note": "insertBefore — вставляет узел перед указанным дочерним узлом.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 12,
+      "text": "Array",
+      "kind": "fn",
+      "note": "Array — встроенный объект массивов; Array.from создаёт массив из коллекции.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 18,
+      "text": "from",
+      "kind": "fn",
+      "note": "from — создаёт массив из коллекции, можно сразу преобразовать элементы.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Браузер: страница и документ"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "[ 'начало', 'середина', 'конец' ]",
+      "dependencies": [],
+      "requirements": [
+        "Работает в браузере: нужны объекты страницы (document и другие API браузера).",
+        "Внешние библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const parent = document.createElement(\"ul\");\nconst начало = document.createElement(\"li\");\nначало.textContent = \"начало\";\nconst конец = document.createElement(\"li\");\nконец.textContent = \"конец\";\nparent.append(начало, конец);\n\nconst середина = document.createElement(\"li\");\nсередина.textContent = \"середина\";\nparent.insertBefore(середина, конец);\nconsole.log(Array.from(parent.children, элемент => элемент.textContent));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "[ 'начало', 'середина', 'конец' ]",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          },
+          {
+            "symptom": "ReferenceError: document is not defined",
+            "cause": "Код запущен в Node.js, где нет объектов страницы",
+            "solution": "Запусти код в браузере или в окружении с эмуляцией DOM"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "parent",
+      "начало",
+      "конец",
+      "середина"
+    ],
+    "requires": [],
+    "subcat": "Узлы и диапазоны"
+  },
+  "enriched": true
+}

@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "команда_тестирования_package_json",
+  "file": "команда_тестирования_package_json.js",
+  "title": "Команда тестирования package.json",
+  "lang": "js",
+  "group": "Разработка и инструменты / Упаковка проекта",
+  "desc": "В package.json раздел scripts связывает короткие имена с настоящими командами оболочки. Запись \"test\": \"node --test\" означает, что npm test запустит встроенный в Node.js тестовый раннер, который сам найдёт файлы тестов. Скрипты запускаются командой npm run имя; для test и start слово run можно опустить. Локально установленные утилиты доступны в скриптах без указания пути.",
+  "output": "node --test",
+  "tags": [
+    "scripts",
+    "упаковка проекта"
+  ],
+  "aliases": [
+    "команда тестирования package.json",
+    "scripts"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 17,
+      "text": "scripts",
+      "kind": "concept",
+      "note": "Раздел команд package.json."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

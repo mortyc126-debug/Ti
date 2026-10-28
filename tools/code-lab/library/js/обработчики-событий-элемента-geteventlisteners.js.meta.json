@@ -1,0 +1,217 @@
+{
+  "schema": 1,
+  "id": "обработчики-событий-элемента-geteventlisteners",
+  "file": "обработчики-событий-элемента-geteventlisteners.js",
+  "title": "Получить обработчики событий элемента в консоли DevTools: getEventListeners",
+  "lang": "js",
+  "group": "Повседневная разработка / Процессы и отладка",
+  "desc": "getEventListeners(element) доступна только в консоли DevTools: возвращает объект «тип события → список обработчиков» для элемента.",
+  "output": "click, focus\n1",
+  "tags": [
+    "getEventListeners",
+    "DevTools",
+    "отладка",
+    "обработчики событий"
+  ],
+  "aliases": [
+    "как посмотреть обработчики событий элемента",
+    "getEventListeners пример",
+    "отладка слушателей в devtools"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 39,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 47,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 39,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 47,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 24,
+      "text": "getEventListeners",
+      "kind": "getEventListeners — функция консоли DevTools: обработчики событий элемента.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Повседневная разработка"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "click, focus\n1",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const button = document.createElement(\"button\");\ndocument.body.append(button);\n\nbutton.addEventListener(\"click\", () => console.log(\"клик\"));\nbutton.addEventListener(\"focus\", () => console.log(\"фокус\"));\n\nconsole.log(Object.keys(getEventListeners(button)).join(\", \"));\nconsole.log(getEventListeners(button).click.length);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "click, focus\n1",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "getEventListeners is not defined",
+            "cause": "Функция есть только в консоли DevTools, а не в обычном скрипте страницы",
+            "solution": "Выполни код в консоли DevTools (вкладка Console)"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "button"
+    ],
+    "requires": [],
+    "subcat": "Процессы и отладка"
+  },
+  "enriched": true
+}

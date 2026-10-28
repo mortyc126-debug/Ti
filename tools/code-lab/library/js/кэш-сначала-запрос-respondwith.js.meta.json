@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "id": "кэш-сначала-запрос-respondwith",
+  "file": "кэш-сначала-запрос-respondwith.js",
+  "title": "Отдавать ресурс из кэша, а при отсутствии загружать из сети",
+  "lang": "js",
+  "group": "Кэширование / Service Worker",
+  "desc": "Стратегия cache-first: сначала ищем ответ в кэше, и только если его там нет, идём в сеть; хороша для файлов, которые меняются редко.",
+  "output": "Повторные запросы к одним и тем же файлам обслуживаются из кэша без сети",
+  "tags": [
+    "Service Worker",
+    "cache first",
+    "respondWith",
+    "caches.match"
+  ],
+  "aliases": [
+    "как отдавать из кэша сначала service worker",
+    "стратегия cache first",
+    "caches.match respondWith"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 5,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "event.respondWith",
+      "kind": "respondWith — подставляет ответ: из кэша или из сети.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Кэширование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Service Worker"
+      ],
+      "technology": [
+        "JavaScript",
+        "Service Worker"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Повторные запросы к одним и тем же файлам обслуживаются из кэша без сети",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "self.addEventListener(\"fetch\", event => {\n  event.respondWith(\n    caches.match(event.request).then(cached => cached ?? fetch(event.request))\n  );\n});"
+        },
+        "steps": [
+          "Сохрани код как sw.js в корне сайта и зарегистрируй: navigator.serviceWorker.register(\"/sw.js\").",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Повторные запросы к одним и тем же файлам обслуживаются из кэша без сети",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Первая установка worker",
+            "Обновление worker",
+            "Работа без сети"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Service Worker не регистрируется",
+            "cause": "Страница открыта не по HTTPS или localhost, либо sw.js лежит не в корне сайта",
+            "solution": "Открой сайт по https или http://localhost и проверь вкладку Application → Service Workers"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Service Worker"
+  },
+  "enriched": true
+}

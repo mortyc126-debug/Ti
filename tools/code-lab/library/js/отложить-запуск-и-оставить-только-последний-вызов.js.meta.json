@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "отложить-запуск-и-оставить-только-последний-вызов",
+  "file": "отложить-запуск-и-оставить-только-последний-вызов.js",
+  "title": "Отложить запуск и оставить только последний вызов",
+  "lang": "js",
+  "group": "Асинхронность / Управление частотой",
+  "desc": "Debounce возвращает обёртку, которая запускает функцию после паузы; полезно для поиска по вводу и фильтров.",
+  "output": "выполнится только последний вызов после паузы",
+  "tags": [
+    "debounce",
+    "таймер",
+    "ввод",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "debounce поиск по вводу",
+    "запускать после паузы",
+    "отменять предыдущий таймер"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

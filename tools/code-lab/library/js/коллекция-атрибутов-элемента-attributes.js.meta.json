@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "id": "коллекция-атрибутов-элемента-attributes",
+  "file": "коллекция-атрибутов-элемента-attributes.js",
+  "title": "Коллекция атрибутов элемента: element.attributes",
+  "lang": "js",
+  "group": "Интерфейс / Работа с DOM",
+  "desc": "attributes возвращает все атрибуты элемента; у каждого есть имя (name) и значение (value).",
+  "output": "id = link\nhref = /docs\ntarget = _blank\nrel = noopener\nВсего атрибутов: 4",
+  "tags": [
+    "attributes",
+    "атрибуты",
+    "DOM",
+    "перебор"
+  ],
+  "aliases": [
+    "как перебрать все атрибуты элемента js",
+    "element.attributes пример",
+    "получить список атрибутов"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторяет блок для каждого элемента или шага.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 5,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 21,
+      "text": "of",
+      "kind": "kw",
+      "note": "of — в цикле for...of: перебрать значения по одному.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 24,
+      "text": "link.attributes",
+      "kind": "attributes — коллекция всех атрибутов элемента.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "id = link\nhref = /docs\ntarget = _blank\nrel = noopener\nВсего атрибутов: 4",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "document.body.innerHTML = '<a id=\"link\" href=\"/docs\" target=\"_blank\" rel=\"noopener\">Документация</a>';\nconst link = document.querySelector(\"#link\");\n\nfor (const attribute of link.attributes) {\n  console.log(`${attribute.name} = ${attribute.value}`);\n}\nconsole.log(`Всего атрибутов: ${link.attributes.length}`);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "id = link\nhref = /docs\ntarget = _blank\nrel = noopener\nВсего атрибутов: 4",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "link"
+    ],
+    "requires": [],
+    "subcat": "Работа с DOM"
+  },
+  "enriched": true
+}

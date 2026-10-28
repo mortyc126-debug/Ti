@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "id": "числа-с-плавающей-точкой-с-допуском-tobecloseto",
+  "file": "числа-с-плавающей-точкой-с-допуском-tobecloseto.js",
+  "title": "Сравнить числа с плавающей точкой с допуском: toBeCloseTo",
+  "lang": "js",
+  "group": "Тестирование / Проверки функций",
+  "desc": "0.1 + 0.2 не равно 0.3 из-за двоичного представления; toBeCloseTo сравнивает с заданной точностью.",
+  "output": "✓ 1 тест пройден",
+  "tags": [
+    "Vitest",
+    "toBeCloseTo",
+    "числа с плавающей точкой",
+    "погрешность"
+  ],
+  "aliases": [
+    "как сравнить 0.1+0.2 и 0.3 в тесте",
+    "toBeCloseTo пример",
+    "погрешность вычислений в тесте"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 20,
+      "text": "toBeCloseTo",
+      "kind": "toBeCloseTo(x) — сравнение чисел с допуском на погрешность.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Vitest"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "✓ 1 тест пройден",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import { expect, it } from \"vitest\";\n\nit(\"0.1 + 0.2 близко к 0.3\", () => {\n  expect(0.1 + 0.2).not.toBe(0.3);\n  expect(0.1 + 0.2).toBeCloseTo(0.3);\n  expect(1 / 3).toBeCloseTo(0.333, 3);\n});"
+        },
+        "steps": [
+          "Установи Vitest (npm install -D vitest) и запусти npx vitest run имя-файла.js.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "✓ 1 тест пройден",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Тест проходит",
+            "Тест падает при сломанном коде",
+            "Повторный запуск тестов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Cannot find package 'vitest'",
+            "cause": "Vitest не установлен в проекте",
+            "solution": "Выполни npm install -D vitest"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Проверки функций"
+  },
+  "enriched": true
+}

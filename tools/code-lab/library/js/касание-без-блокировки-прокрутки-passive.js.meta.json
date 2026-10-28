@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "id": "касание-без-блокировки-прокрутки-passive",
+  "file": "касание-без-блокировки-прокрутки-passive.js",
+  "title": "Обработать касание без блокировки прокрутки: { passive: true }",
+  "lang": "js",
+  "group": "Интерфейс / События",
+  "desc": "Флаг passive: true обещает браузеру, что обработчик не вызовет preventDefault, и страница прокручивается плавно, не ожидая его завершения.",
+  "output": "Касаний: 1",
+  "tags": [
+    "touchstart",
+    "passive",
+    "прокрутка",
+    "мобильные"
+  ],
+  "aliases": [
+    "что такое passive в addEventListener",
+    "touchstart passive true",
+    "плавная прокрутка на телефоне"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 22,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 5,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 11,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 19,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "{ passive: true }",
+      "kind": "passive: true — обработчик не отменяет прокрутку, браузер не ждёт его.",
+      "note": "kw",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Касаний: 1",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const list = document.createElement(\"div\");\nlist.textContent = \"Длинный список\";\nlist.style.padding = \"40px\";\ndocument.body.append(list);\n\nlist.addEventListener(\n  \"touchstart\",\n  event => console.log(`Касаний: ${event.touches.length}`),\n  { passive: true }\n);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Касаний: 1",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "list"
+    ],
+    "requires": [],
+    "subcat": "События"
+  },
+  "enriched": true
+}

@@ -1,0 +1,183 @@
+{
+  "schema": 1,
+  "id": "округление-до-двух-знаков",
+  "file": "округление-до-двух-знаков.js",
+  "title": "Округление до двух знаков",
+  "lang": "js",
+  "group": "Числа и вычисления / Математические функции",
+  "desc": "Округляет число до двух знаков после запятой.",
+  "output": "3.14\n2.68",
+  "tags": [
+    "Math.round",
+    "округление",
+    "два знака",
+    "деньги"
+  ],
+  "aliases": [
+    "как округлить до двух знаков js",
+    "math round умножить на сто",
+    "округление до сотых"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математическими функциями.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 17,
+      "text": "round",
+      "kind": "fn",
+      "note": "round — округление до ближайшего целого.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математическими функциями.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 17,
+      "text": "round",
+      "kind": "fn",
+      "note": "round — округление до ближайшего целого.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Числа и вычисления"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "3.14\n2.68",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const value = 3.14159;\nconsole.log(Math.round(value * 100) / 100);\nconsole.log(Math.round(2.675 * 100) / 100);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "3.14\n2.68",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "value"
+    ],
+    "requires": [],
+    "subcat": "Математические функции"
+  },
+  "enriched": true
+}

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "загрузить-все-страницы-программный-интерфейс-по-указатель-страницы-пагинации",
+  "file": "загрузить-все-страницы-программный-интерфейс-по-указатель-страницы-пагинации.js",
+  "title": "Загрузить все страницы программный интерфейс по указатель страницы пагинации",
+  "lang": "js",
+  "group": "Сеть / Пагинация API",
+  "desc": "Последовательно загружает страницы до отсутствия следующего курсора; задаётся адаптер для структуры ответа конкретного API.",
+  "output": "массив всех элементов или ошибка при превышении maxPages",
+  "tags": [
+    "pagination",
+    "cursor",
+    "API",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "получить все страницы api",
+    "cursor pagination loop",
+    "загрузить весь список из API"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

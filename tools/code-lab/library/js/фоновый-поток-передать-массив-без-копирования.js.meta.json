@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "фоновый-поток-передать-массив-без-копирования",
+  "file": "фоновый-поток-передать-массив-без-копирования.js",
+  "title": "Фоновый поток передать массив без копирования",
+  "lang": "js",
+  "group": "Сеть и запросы / Параллельная обработка данных",
+  "desc": "Передаёт владение ArrayBuffer в Worker, избегая копирования содержимого.",
+  "output": "У исходного ArrayBuffer byteLength становится 0",
+  "tags": [
+    "буфер становится detached",
+    "производительность"
+  ],
+  "aliases": [
+    "transferable ArrayBuffer",
+    "передать без копирования",
+    "Worker transfer list"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "буфер становится detached",
+      "kind": "concept",
+      "note": "буфер становится detached — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "производительность",
+      "kind": "concept",
+      "note": "производительность — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

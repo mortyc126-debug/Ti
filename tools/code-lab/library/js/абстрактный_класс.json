@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Абстрактный класс",
+  "group": "Основы / Объектно-ориентированное программирование",
+  "desc": "Абстрактный класс.",
+  "code": "abstract class Основа { abstract run(): void; }\nclass Задача extends Основа { run() { console.log(\"готово\"); } }\nnew Задача().run();",
+  "output": "готово",
+  "words": {
+    "abstract": "Требует реализации метода в наследнике; это TypeScript."
+  }
+}

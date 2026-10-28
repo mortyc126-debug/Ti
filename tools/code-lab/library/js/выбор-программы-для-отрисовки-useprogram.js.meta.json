@@ -1,0 +1,287 @@
+{
+  "schema": 1,
+  "id": "выбор-программы-для-отрисовки-useprogram",
+  "file": "выбор-программы-для-отрисовки-useprogram.js",
+  "title": "Выбрать программу для отрисовки: gl.useProgram",
+  "lang": "js",
+  "group": "Графика и визуализация / Canvas: рисование",
+  "desc": "gl.useProgram делает шейдерную программу текущей; чередуя вызовы, один буфер вершин рисуют разными программами.",
+  "output": "Слева красный треугольник, справа синий",
+  "tags": [
+    "WebGL",
+    "useProgram",
+    "шейдерная программа",
+    "переключение"
+  ],
+  "aliases": [
+    "как переключить шейдеры webgl",
+    "gl.useProgram пример",
+    "две программы на одном холсте"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторяет блок для каждого элемента или шага.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 7,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 28,
+      "text": "of",
+      "kind": "kw",
+      "note": "of — в цикле for...of: перебрать значения по одному.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 26,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 27,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 29,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 31,
+      "col": 31,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 36,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторяет блок для каждого элемента или шага.",
+      "source": "dict"
+    },
+    {
+      "line": 36,
+      "col": 5,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 36,
+      "col": 19,
+      "text": "of",
+      "kind": "kw",
+      "note": "of — в цикле for...of: перебрать значения по одному.",
+      "source": "dict"
+    },
+    {
+      "line": 37,
+      "col": 2,
+      "text": "gl.useProgram",
+      "kind": "useProgram — выбирает шейдерную программу для следующих вызовов рисования.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 38,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Графика и визуализация"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Слева красный треугольник, справа синий",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function makeProgram(gl, vertexSource, fragmentSource) {\n  const program = gl.createProgram();\n  for (const [type, source] of [[gl.VERTEX_SHADER, vertexSource], [gl.FRAGMENT_SHADER, fragmentSource]]) {\n    const shader = gl.createShader(type);\n    gl.shaderSource(shader, source);\n    gl.compileShader(shader);\n    gl.attachShader(program, shader);\n  }\n  gl.linkProgram(program);\n  return program;\n}\n\nconst canvas = document.createElement(\"canvas\");\ncanvas.width = 300;\ncanvas.height = 300;\ndocument.body.append(canvas);\nconst gl = canvas.getContext(\"webgl\");\n\nfunction createProgram(offsetX, color) {\n  return makeProgram(\n    gl,\n    `attribute vec2 position; void main() { gl_Position = vec4(position * 0.4 + vec2(${offsetX}, 0.0), 0.0, 1.0); }`,\n    `precision mediump float; void main() { gl_FragColor = vec4(${color}, 1.0); }`\n  );\n}\n\nconst leftProgram = createProgram(-0.5, \"1.0, 0.3, 0.2\");\nconst rightProgram = createProgram(0.5, \"0.2, 0.5, 1.0\");\n\nconst buffer = gl.createBuffer();\ngl.bindBuffer(gl.ARRAY_BUFFER, buffer);\ngl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-0.8, -0.8, 0.8, -0.8, 0, 0.8]), gl.STATIC_DRAW);\n\ngl.clearColor(0, 0, 0, 1);\ngl.clear(gl.COLOR_BUFFER_BIT);\n\nfor (const program of [leftProgram, rightProgram]) {\n  gl.useProgram(program);\n  const position = gl.getAttribLocation(program, \"position\");\n  gl.enableVertexAttribArray(position);\n  gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);\n  gl.drawArrays(gl.TRIANGLES, 0, 3);\n}"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Слева красный треугольник, справа синий",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Чёрный экран или gl равен null",
+            "cause": "Браузер не поддерживает WebGL или в шейдере ошибка",
+            "solution": "Проверь canvas.getContext(\"webgl\") и gl.getShaderInfoLog(shader)"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Добавляет canvas на страницу"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "makeProgram",
+      "canvas",
+      "gl",
+      "createProgram",
+      "leftProgram",
+      "rightProgram",
+      "buffer"
+    ],
+    "requires": [],
+    "subcat": "Canvas: рисование"
+  },
+  "enriched": true
+}

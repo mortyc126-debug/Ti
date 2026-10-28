@@ -1,0 +1,451 @@
+{
+  "schema": 1,
+  "id": "биржа-облигации-отбор-таблица",
+  "file": "биржа-облигации-отбор-таблица.js",
+  "title": "Биржа облигации отбор таблица",
+  "lang": "js",
+  "group": "Сеть и запросы / Разобрать ответ и связать данные",
+  "desc": "Сквозной с сетью. Два блока ответа (имена и доходности) СКЛЕИВАЕМ по SECID, отбираем доходные, рисуем таблицу. Каждый .map/.filter отдаёт массив следующему.",
+  "output": "таблица облигаций с доходностью > 20%, по убыванию",
+  "tags": [
+    "fetch",
+    "async/await",
+    "API-интеграция",
+    "фильтрация данных",
+    "сортировка массивов",
+    "JavaScript"
+  ],
+  "aliases": [
+    "как объединить данные из разных массивов в объекте",
+    "отбор данных по условию из API",
+    "сортировка и фильтрация данных в JS",
+    "вывод таблицы из массива объектов",
+    "работа с финансовыми API на JavaScript"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "Функция умеет ждать сеть (await внутри).",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "Определить функцию (заготовку).",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "main",
+      "kind": "fn",
+      "note": "Дирижёр: грузит, обрабатывает, рисует. main() внизу запускает.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "url",
+      "kind": "name",
+      "note": "Адрес запроса к бирже (CORS открыт, ключ не нужен).",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 16,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат (сеть) и иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 22,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "Сходить в сеть за данными.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 28,
+      "text": "url",
+      "kind": "name",
+      "note": "Адрес запроса к бирже (CORS открыт, ключ не нужен).",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "данные",
+      "kind": "name",
+      "note": "Весь ответ: блоки securities и marketdata.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 17,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат (сеть) и иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 29,
+      "text": "json",
+      "kind": "fn",
+      "note": "Ответ сети → объект.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "имена",
+      "kind": "name",
+      "note": "Словарь SECID→название (чтобы склеить с доходностями).",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "данные",
+      "kind": "name",
+      "note": "Весь ответ: блоки securities и marketdata.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 25,
+      "text": "forEach",
+      "kind": "fn",
+      "note": "Пройти по каждому.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 38,
+      "text": "имена",
+      "kind": "name",
+      "note": "Словарь SECID→название (чтобы склеить с доходностями).",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 8,
+      "text": "список",
+      "kind": "name",
+      "note": "Готовые строки: после map+filter+sort.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 17,
+      "text": "данные",
+      "kind": "name",
+      "note": "Весь ответ: блоки securities и marketdata.",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 5,
+      "text": "map",
+      "kind": "fn",
+      "note": "Каждый элемент → новый (преобразование).",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 53,
+      "text": "имена",
+      "kind": "name",
+      "note": "Словарь SECID→название (чтобы склеить с доходностями).",
+      "source": "custom"
+    },
+    {
+      "line": 13,
+      "col": 5,
+      "text": "filter",
+      "kind": "fn",
+      "note": "Оставить подходящие (отбор).",
+      "source": "custom"
+    },
+    {
+      "line": 14,
+      "col": 5,
+      "text": "sort",
+      "kind": "fn",
+      "note": "Отсортировать.",
+      "source": "custom"
+    },
+    {
+      "line": 16,
+      "col": 2,
+      "text": "таблица",
+      "kind": "fn",
+      "note": "Шаг вывода: массив → HTML-таблица в #out.",
+      "source": "custom"
+    },
+    {
+      "line": 16,
+      "col": 10,
+      "text": "список",
+      "kind": "name",
+      "note": "Готовые строки: после map+filter+sort.",
+      "source": "custom"
+    },
+    {
+      "line": 19,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "Определить функцию (заготовку).",
+      "source": "custom"
+    },
+    {
+      "line": 19,
+      "col": 9,
+      "text": "таблица",
+      "kind": "fn",
+      "note": "Шаг вывода: массив → HTML-таблица в #out.",
+      "source": "custom"
+    },
+    {
+      "line": 19,
+      "col": 17,
+      "text": "список",
+      "kind": "name",
+      "note": "Готовые строки: после map+filter+sort.",
+      "source": "custom"
+    },
+    {
+      "line": 20,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 20,
+      "col": 8,
+      "text": "строки",
+      "kind": "name",
+      "note": "HTML строк таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 20,
+      "col": 17,
+      "text": "список",
+      "kind": "name",
+      "note": "Готовые строки: после map+filter+sort.",
+      "source": "custom"
+    },
+    {
+      "line": 20,
+      "col": 24,
+      "text": "map",
+      "kind": "fn",
+      "note": "Каждый элемент → новый (преобразование).",
+      "source": "custom"
+    },
+    {
+      "line": 21,
+      "col": 82,
+      "text": "join",
+      "kind": "fn",
+      "note": "join — склеить массив в строку через разделитель.",
+      "source": "dict"
+    },
+    {
+      "line": 22,
+      "col": 2,
+      "text": "document",
+      "kind": "name",
+      "note": "document — вся загруженная страница; через него находят и меняют элементы.",
+      "source": "dict"
+    },
+    {
+      "line": 22,
+      "col": 11,
+      "text": "querySelector",
+      "kind": "fn",
+      "note": "querySelector — находит на странице первый элемент по CSS-селектору.",
+      "source": "dict"
+    },
+    {
+      "line": 22,
+      "col": 33,
+      "text": "innerHTML",
+      "kind": "fn",
+      "note": "innerHTML — HTML-содержимое элемента; осторожно с чужими данными.",
+      "source": "dict"
+    },
+    {
+      "line": 23,
+      "col": 54,
+      "text": "строки",
+      "kind": "name",
+      "note": "HTML строк таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 25,
+      "col": 0,
+      "text": "main",
+      "kind": "fn",
+      "note": "Дирижёр: грузит, обрабатывает, рисует. main() внизу запускает.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Сеть и запросы"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "URL запроса и ответ внешнего API",
+      "output": "таблица облигаций с доходностью > 20%, по убыванию",
+      "dependencies": [],
+      "requirements": [
+        "Запуск в браузере; DOM-элементы должны существовать до выполнения кода.",
+        "HTML должен содержать элемент(ы) с id: out.",
+        "Нужен доступ к сети; сервер должен разрешать запросы через CORS. Проверь HTTP-статус и обработку ошибок.",
+        "Код с await должен выполняться внутри async-функции или другого допустимого async-контекста."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "async function main(){\n  const url = \"https://iss.moex.com/iss/engines/stock/markets/bonds/boards/TQCB/securities.json\"\n    + \"?iss.meta=off&securities.columns=SECID,SECNAME&marketdata.columns=SECID,YIELD\";\n  const ответ = await fetch(url);\n  const данные = await ответ.json();\n\n  // имена: {SECID: название}\n  const имена = {};\n  данные.securities.data.forEach(r => имена[r[0]] = r[1]);\n\n  // доходности → объекты → отбор > 20% → сортировка\n  const список = данные.marketdata.data\n    .map(r => ({ secid: r[0], доходность: r[1], имя: имена[r[0]] }))\n    .filter(x => x.доходность > 20)\n    .sort((a, b) => b.доходность - a.доходность);\n\n  таблица(список);\n}\n\nfunction таблица(список){\n  const строки = список.map(x =>\n    \"<tr><td>\" + (x.имя || x.secid) + \"</td><td>\" + x.доходность + \"%</td></tr>\").join(\"\");\n  document.querySelector(\"#out\").innerHTML =\n    \"<table cellpadding='4' style='color:#F6F4FF'>\" + строки + \"</table>\";\n}\nmain();"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "таблица облигаций с доходностью > 20%, по убыванию",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "main",
+      "url",
+      "ответ",
+      "данные",
+      "имена",
+      "список",
+      "таблица",
+      "строки"
+    ],
+    "requires": [
+      "secid",
+      "доходность",
+      "имя",
+      "a"
+    ],
+    "subcat": "Разобрать ответ и связать данные"
+  },
+  "legacy": {
+    "template": "flow-moex.json"
+  },
+  "enriched": true
+}

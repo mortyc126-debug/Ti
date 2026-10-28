@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "полноэкранный_режим",
+  "file": "полноэкранный_режим.js",
+  "title": "Полноэкранный режим",
+  "lang": "js",
+  "group": "Интерфейс / Реакция на действия пользователя",
+  "desc": "requestFullscreen разворачивает элемент на весь экран и возвращает Promise. Вызывать его можно только в ответ на действие пользователя (клик, нажатие клавиши), иначе браузер откажет. Выйти можно клавишей Esc или вызовом document.exitFullscreen(). Для оформления элемента в этом режиме есть псевдокласс :fullscreen. Оберните вызов в try/catch на случай отказа.",
+  "output": "Элемент запрашивает полноэкранный режим.",
+  "tags": [
+    "requestFullscreen",
+    "реакция на действия пользователя"
+  ],
+  "aliases": [
+    "полноэкранный режим",
+    "requestFullscreen"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 13,
+      "text": "requestFullscreen",
+      "kind": "fn",
+      "note": "Запрашивает полноэкранный режим элемента."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

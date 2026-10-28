@@ -1,0 +1,197 @@
+{
+  "schema": 1,
+  "id": "преобразование-строки-в-число",
+  "file": "преобразование-строки-в-число.js",
+  "title": "Преобразование строки в число",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Строки и текст",
+  "desc": "Переводит строку в число и обратно.",
+  "output": "43\n3.14\n100!",
+  "tags": [
+    "строка в число",
+    "Number",
+    "parseFloat",
+    "преобразование типов",
+    "текст"
+  ],
+  "aliases": [
+    "как превратить строку в число в js",
+    "parsefloat и number javascript",
+    "число в строку",
+    "приведение типов в js",
+    "разобрать число из текста"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — преобразует значение в число; содержит проверки вроде Number.isFinite.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "parseFloat",
+      "kind": "fn",
+      "note": "parseFloat — читает число с начала строки, остальное игнорирует.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 12,
+      "text": "String",
+      "kind": "fn",
+      "note": "String — преобразует значение в строку.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Данные: хранить, находить и преобразовывать"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "43\n3.14\n100!",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в консоли браузера.",
+        "Проверь, что все используемые переменные объявлены и имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const текст = '42';\nconsole.log(Number(текст) + 1);\nconsole.log(parseFloat('3.14abc'));\nconsole.log(String(100) + '!');"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "43\n3.14\n100!",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [
+          "parseFloat — читает число с начала строки, остальное игнорирует."
+        ],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "текст"
+    ],
+    "requires": [],
+    "subcat": "Строки и текст"
+  },
+  "enriched": true
+}

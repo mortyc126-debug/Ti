@@ -1,0 +1,457 @@
+{
+  "schema": 1,
+  "id": "простая-база-в-памяти-создание-чтение-обновление-удаление",
+  "file": "простая-база-в-памяти-создание-чтение-обновление-удаление.js",
+  "title": "Простая база в памяти (создание чтение обновление удаление)",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Коллекции и ст",
+  "desc": "«База» — это хранилище записей + функции добавить/найти/удалить (CRUD). Здесь — массив в памяти. Для сохранения в браузере — localStorage; на сервере — файл или SQL (см. шаблон SQL).",
+  "output": "всего: 3\nпоиск ОФЗ: [{\"id\":1,...},{\"id\":3,...}]\nпосле удаления: [ОФЗ 26238, ОФЗ 26241]",
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "база",
+      "kind": "name",
+      "note": "Хранилище — массив записей. Это и есть «база».",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "Определить функцию (заготовку).",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 9,
+      "text": "добавить",
+      "kind": "fn",
+      "note": "Create: кладём новую запись в массив.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 30,
+      "text": "база",
+      "kind": "name",
+      "note": "Хранилище — массив записей. Это и есть «база».",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 35,
+      "text": "push",
+      "kind": "fn",
+      "note": "push — добавляет элемент в конец массива.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 42,
+      "text": "id",
+      "kind": "name",
+      "note": "Ключ записи — по нему находим и удаляем.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 46,
+      "text": "база",
+      "kind": "name",
+      "note": "Хранилище — массив записей. Это и есть «база».",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 51,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "Определить функцию (заготовку).",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 9,
+      "text": "найти",
+      "kind": "fn",
+      "note": "Read: отбираем записи по условию.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 23,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции — что она отдаёт наружу.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 30,
+      "text": "база",
+      "kind": "name",
+      "note": "Хранилище — массив записей. Это и есть «база».",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 35,
+      "text": "filter",
+      "kind": "fn",
+      "note": "Оставить подходящие (отбор).",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 53,
+      "text": "includes",
+      "kind": "fn",
+      "note": "Проверка: содержит ли строка подстроку.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "Определить функцию (заготовку).",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 9,
+      "text": "удалить",
+      "kind": "fn",
+      "note": "Delete: находим индекс и вырезаем.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 17,
+      "text": "id",
+      "kind": "name",
+      "note": "Ключ записи — по нему находим и удаляем.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-«провод»: держит выход шага, чтобы отдать дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 12,
+      "text": "база",
+      "kind": "name",
+      "note": "Хранилище — массив записей. Это и есть «база».",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 17,
+      "text": "findIndex",
+      "kind": "fn",
+      "note": "Найти позицию первой подходящей записи (−1 если нет).",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 34,
+      "text": "id",
+      "kind": "name",
+      "note": "Ключ записи — по нему находим и удаляем.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 41,
+      "text": "id",
+      "kind": "name",
+      "note": "Ключ записи — по нему находим и удаляем.",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 13,
+      "text": "база",
+      "kind": "name",
+      "note": "Хранилище — массив записей. Это и есть «база».",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 18,
+      "text": "splice",
+      "kind": "fn",
+      "note": "Вырезать элемент(ы) из массива по позиции.",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 0,
+      "text": "добавить",
+      "kind": "fn",
+      "note": "Create: кладём новую запись в массив.",
+      "source": "custom"
+    },
+    {
+      "line": 13,
+      "col": 0,
+      "text": "добавить",
+      "kind": "fn",
+      "note": "Create: кладём новую запись в массив.",
+      "source": "custom"
+    },
+    {
+      "line": 14,
+      "col": 0,
+      "text": "добавить",
+      "kind": "fn",
+      "note": "Create: кладём новую запись в массив.",
+      "source": "custom"
+    },
+    {
+      "line": 16,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 22,
+      "text": "база",
+      "kind": "name",
+      "note": "Хранилище — массив записей. Это и есть «база».",
+      "source": "custom"
+    },
+    {
+      "line": 16,
+      "col": 27,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина: сколько элементов в массиве или символов в строке.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 26,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 31,
+      "text": "stringify",
+      "kind": "fn",
+      "note": "Объект → текст (чтобы напечатать).",
+      "source": "custom"
+    },
+    {
+      "line": 17,
+      "col": 41,
+      "text": "найти",
+      "kind": "fn",
+      "note": "Read: отбираем записи по условию.",
+      "source": "custom"
+    },
+    {
+      "line": 18,
+      "col": 0,
+      "text": "удалить",
+      "kind": "fn",
+      "note": "Delete: находим индекс и вырезаем.",
+      "source": "custom"
+    },
+    {
+      "line": 19,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 31,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 36,
+      "text": "stringify",
+      "kind": "fn",
+      "note": "Объект → текст (чтобы напечатать).",
+      "source": "custom"
+    },
+    {
+      "line": 19,
+      "col": 46,
+      "text": "база",
+      "kind": "name",
+      "note": "Хранилище — массив записей. Это и есть «база».",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Данные: хранить, находить и преобразовывать"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Массив, объявленный в коде",
+      "output": "всего: 3\nпоиск ОФЗ: [{\"id\":1,...},{\"id\":3,...}]\nпосле удаления: [ОФЗ 26238, ОФЗ 26241]",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const база = [];   // хранилище записей\n\n// C — create: добавить запись\nfunction добавить(имя, цена){ база.push({ id: база.length + 1, имя, цена }); }\n// R — read: найти по части имени\nfunction найти(текст){ return база.filter(z => z.имя.includes(текст)); }\n// D — delete: убрать по id\nfunction удалить(id){\n  const i = база.findIndex(z => z.id === id);\n  if(i >= 0) база.splice(i, 1);\n}\n\nдобавить(\"ОФЗ 26238\", 61.2);\nдобавить(\"Сегежа 2P5R\", 88.0);\nдобавить(\"ОФЗ 26241\", 79.5);\n\nconsole.log(\"всего:\", база.length);\nconsole.log(\"поиск ОФЗ:\", JSON.stringify(найти(\"ОФЗ\")));\nудалить(2);\nconsole.log(\"после удаления:\", JSON.stringify(база));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "всего: 3\nпоиск ОФЗ: [{\"id\":1,...},{\"id\":3,...}]\nпосле удаления: [ОФЗ 26238, ОФЗ 26241]",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "база",
+      "добавить",
+      "найти",
+      "удалить",
+      "i"
+    ],
+    "requires": [],
+    "subcat": "Коллекции и ст"
+  },
+  "legacy": {
+    "template": "db-memory.json"
+  }
+}

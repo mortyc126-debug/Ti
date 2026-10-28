@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "чтение_32_битного_числа_big_endian",
+  "file": "чтение_32_битного_числа_big_endian.js",
+  "title": "Чтение 32-битного числа big-endian",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Двоичные данные",
+  "desc": "readUInt32BE читает четыре байта по смещению как беззнаковое число, где старший байт идёт первым (сетевой порядок). Так записаны длины и поля во многих протоколах и форматах файлов. Для порядка «младший байт первым» есть readUInt32LE. Если смещение выходит за границы буфера, возникает ошибка RangeError.",
+  "output": "256",
+  "tags": [
+    "readUInt32BE",
+    "двоичные данные"
+  ],
+  "aliases": [
+    "чтение 32-битного числа big-endian",
+    "readUInt32BE"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 20,
+      "text": "readUInt32BE",
+      "kind": "fn",
+      "note": "Читает беззнаковое 32-битное число big-endian по смещению."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "id": "показ-уведомления-из-service-worker",
+  "file": "показ-уведомления-из-service-worker.js",
+  "title": "Показать системное уведомление из Service Worker",
+  "lang": "js",
+  "group": "Кэширование / Service Worker",
+  "desc": "self.registration.showNotification(title, { body }) показывает уведомление операционной системы; здесь по сообщению от страницы.",
+  "output": "Страница отправляет worker.postMessage({ type: \"REMINDER\", text: \"Позвонить маме\" }) — появляется уведомление «Напоминание»",
+  "tags": [
+    "Service Worker",
+    "showNotification",
+    "уведомление",
+    "registration",
+    "напоминание"
+  ],
+  "aliases": [
+    "как показать уведомление из service worker",
+    "showNotification пример",
+    "напоминание через service worker"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 5,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 39,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "self.registration.showNotification",
+      "kind": "fn",
+      "note": "showNotification — показывает системное уведомление (нужно разрешение пользователя).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Кэширование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Service Worker"
+      ],
+      "technology": [
+        "JavaScript",
+        "Service Worker"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Страница отправляет worker.postMessage({ type: \"REMINDER\", text: \"Позвонить маме\" }) — появляется уведомление «Напоминание»",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "self.addEventListener(\"message\", event => {\n  if (event.data?.type !== \"REMINDER\") return;\n\n  event.waitUntil(\n    self.registration.showNotification(\"Напоминание\", { body: event.data.text })\n  );\n});"
+        },
+        "steps": [
+          "Сохрани код как sw.js в корне сайта и зарегистрируй: navigator.serviceWorker.register(\"/sw.js\").",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Страница отправляет worker.postMessage({ type: \"REMINDER\", text: \"Позвонить маме\" }) — появляется уведомление «Напоминание»",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Первая установка worker",
+            "Обновление worker",
+            "Работа без сети"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Service Worker не регистрируется",
+            "cause": "Страница открыта не по HTTPS или localhost, либо sw.js лежит не в корне сайта",
+            "solution": "Открой сайт по https или http://localhost и проверь вкладку Application → Service Workers"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Service Worker"
+  },
+  "enriched": true
+}

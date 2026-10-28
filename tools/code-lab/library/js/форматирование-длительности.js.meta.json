@@ -1,0 +1,208 @@
+{
+  "schema": 1,
+  "id": "форматирование-длительности",
+  "file": "форматирование-длительности.js",
+  "title": "Форматирование длительности",
+  "lang": "js",
+  "group": "Форматирование и локали / Локали и форматы",
+  "desc": "Форматирует длительность в поддерживающей среде.",
+  "output": "Intl.DurationFormat не поддерживается в этой среде",
+  "tags": [
+    "Intl.DurationFormat",
+    "длительность",
+    "часы и минуты",
+    "локаль"
+  ],
+  "aliases": [
+    "как отформатировать длительность js",
+    "intl durationformat пример",
+    "часы и минуты словами"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 4,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — возвращает название типа значения.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "Intl",
+      "kind": "fn",
+      "note": "Intl — встроенный объект форматирования с учётом локали.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 14,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 18,
+      "text": "Intl",
+      "kind": "fn",
+      "note": "Intl — встроенный объект форматирования с учётом локали.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 65,
+      "text": "format",
+      "kind": "fn",
+      "note": "format — форматирует значение по правилам локали.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "else",
+      "kind": "kw",
+      "note": "else — «иначе»: ветка, которая выполняется, когда условие в if ложно.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Форматирование и локали"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Intl.DurationFormat не поддерживается в этой среде",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const locale = \"ru\";\nif (typeof Intl.DurationFormat === \"function\") {\n  console.log(new Intl.DurationFormat(locale, { style: \"long\" }).format({ hours: 1, minutes: 30 }));\n} else {\n  console.log(\"Intl.DurationFormat не поддерживается в этой среде\");\n}"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Intl.DurationFormat не поддерживается в этой среде",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль",
+          "Вывод зависит от версии среды: старые версии не поддерживают Intl.DurationFormat"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "locale"
+    ],
+    "requires": [],
+    "subcat": "Локали и форматы"
+  },
+  "enriched": true
+}

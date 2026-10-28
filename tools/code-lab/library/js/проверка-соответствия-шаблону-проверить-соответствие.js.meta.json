@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "id": "проверка-соответствия-шаблону-проверить-соответствие",
+  "file": "проверка-соответствия-шаблону-проверить-соответствие.js",
+  "lang": "js",
+  "title": "Проверка соответствия шаблону проверить соответствие",
+  "group": "Данные / Разбор текста",
+  "desc": "Возвращает true, если строка соответствует регулярному выражению.",
+  "output": "true\nfalse",
+  "descAt": 1792998606223,
+  "component": {
+    "provides": [
+      "шаблон"
+    ],
+    "requires": [
+      "A",
+      "Z",
+      "d",
+      "$"
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Разбор текста"
+  },
+  "tags": [
+    "RegExp",
+    "test",
+    "валидация"
+  ],
+  "aliases": [
+    "проверить строку регулярным выражением",
+    "regex test",
+    "валидировать формат кода"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 18,
+      "text": "A",
+      "kind": "name",
+      "note": "a — селектор всех ссылок",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

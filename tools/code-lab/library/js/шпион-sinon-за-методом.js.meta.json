@@ -1,0 +1,215 @@
+{
+  "schema": 1,
+  "id": "шпион-sinon-за-методом",
+  "file": "шпион-sinon-за-методом.js",
+  "title": "Отслеживать вызовы метода: sinon.spy",
+  "lang": "js",
+  "group": "Тестирование и отладка / Mock",
+  "desc": "sinon.spy оборачивает метод объекта: он работает как раньше, но Sinon запоминает вызовы и аргументы.",
+  "output": "300\nвызовов: 1",
+  "tags": [
+    "Sinon",
+    "spy",
+    "шпион",
+    "вызовы метода",
+    "тесты"
+  ],
+  "aliases": [
+    "как отследить вызов метода sinon",
+    "sinon.spy пример",
+    "шпион на метод объекта"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 17,
+      "text": "sinon.spy",
+      "kind": "spy — следит за вызовами метода, не меняя его поведения.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование и отладка"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "300\nвызовов: 1",
+      "dependencies": [
+        "sinon"
+      ],
+      "requirements": [
+        "Нужен пакет sinon."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const sinon = require(\"sinon\");\nconst assert = require(\"node:assert/strict\");\n\nconst cart = {\n  total(prices) {\n    return prices.reduce((sum, price) => sum + price, 0);\n  },\n};\n\nconst totalSpy = sinon.spy(cart, \"total\");\n\nconsole.log(cart.total([100, 200]));\nassert.ok(totalSpy.calledOnceWith([100, 200]));\nconsole.log(\"вызовов:\", totalSpy.callCount);\n\ntotalSpy.restore();"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "300\nвызовов: 1",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "sinon",
+      "assert",
+      "cart",
+      "totalSpy"
+    ],
+    "requires": [],
+    "subcat": "Mock"
+  },
+  "enriched": true
+}

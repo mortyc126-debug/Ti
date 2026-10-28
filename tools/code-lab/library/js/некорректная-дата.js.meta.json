@@ -1,0 +1,239 @@
+{
+  "schema": 1,
+  "id": "некорректная-дата",
+  "file": "некорректная-дата.js",
+  "title": "Некорректная дата",
+  "lang": "js",
+  "group": "Числа и вычисления / Константы и проверки чисел",
+  "desc": "Проверяет, что объект Date содержит некорректную дату.",
+  "output": "true\nfalse",
+  "tags": [
+    "Number.isNaN",
+    "Date",
+    "getTime",
+    "проверка даты"
+  ],
+  "aliases": [
+    "как проверить что дата некорректна js",
+    "number isnan date gettime",
+    "invalid date проверка"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 17,
+      "text": "Date",
+      "kind": "fn",
+      "note": "Date — объект даты и времени.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — преобразует значение в число; содержит проверки вроде Number.isFinite.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "isNaN",
+      "kind": "fn",
+      "note": "isNaN — проверяет, что значение равно NaN.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 30,
+      "text": "getTime",
+      "kind": "fn",
+      "note": "getTime — число миллисекунд с начала эпохи Unix.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — преобразует значение в число; содержит проверки вроде Number.isFinite.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "isNaN",
+      "kind": "fn",
+      "note": "isNaN — проверяет, что значение равно NaN.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 25,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 29,
+      "text": "Date",
+      "kind": "fn",
+      "note": "Date — объект даты и времени.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 34,
+      "text": "Date",
+      "kind": "fn",
+      "note": "Date — объект даты и времени.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 56,
+      "text": "getTime",
+      "kind": "fn",
+      "note": "getTime — число миллисекунд с начала эпохи Unix.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Числа и вычисления"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "true\nfalse",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const date = new Date(\"не дата\");\nconsole.log(Number.isNaN(date.getTime()));\nconsole.log(Number.isNaN(new Date(Date.UTC(2024, 0, 1)).getTime()));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "true\nfalse",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "date"
+    ],
+    "requires": [],
+    "subcat": "Константы и проверки чисел"
+  },
+  "enriched": true
+}

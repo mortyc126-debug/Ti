@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Строгие проверки TypeScript",
+  "group": "Основы / Типизация",
+  "desc": "Строгие проверки TypeScript.",
+  "code": "const настройки = { \"compilerOptions\": { \"strict\": true } };\nconsole.log(настройки.compilerOptions.strict);",
+  "output": "true",
+  "words": {
+    "strict": "Включает строгие проверки TypeScript."
+  }
+}

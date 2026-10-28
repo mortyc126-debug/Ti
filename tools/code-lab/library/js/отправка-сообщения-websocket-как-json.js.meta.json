@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "id": "отправка-сообщения-websocket-как-json",
+  "file": "отправка-сообщения-websocket-как-json.js",
+  "title": "Отправить сообщение серверу в виде JSON: socket.send",
+  "lang": "js",
+  "group": "Сеть / WebSocket",
+  "desc": "socket.send принимает строку, поэтому объект сначала превращают в JSON через JSON.stringify.",
+  "output": "Серверу уходит строка {\"type\":\"chat\",\"text\":\"Привет всем\"}",
+  "tags": [
+    "WebSocket",
+    "send",
+    "JSON.stringify",
+    "отправка данных"
+  ],
+  "aliases": [
+    "как отправить объект через websocket",
+    "socket.send JSON.stringify",
+    "отправка json по websocket"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "socket.send",
+      "kind": "send — отправляет строку или двоичные данные серверу.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Сеть"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Серверу уходит строка {\"type\":\"chat\",\"text\":\"Привет всем\"}",
+      "dependencies": [],
+      "requirements": [
+        "Нужен WebSocket-сервер на ws://localhost:8080 (подойдёт любой эхо-сервер)."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const serverUrl = \"ws://localhost:8080\";\nconst socket = new WebSocket(serverUrl);\n\nsocket.addEventListener(\"open\", () => {\n  const message = { type: \"chat\", text: \"Привет всем\" };\n  socket.send(JSON.stringify(message));\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Серверу уходит строка {\"type\":\"chat\",\"text\":\"Привет всем\"}",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка соединения",
+            "cause": "Не запущен сервер на ws://localhost:8080",
+            "solution": "Запусти сервер WebSocket или поменяй адрес serverUrl"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "serverUrl",
+      "socket"
+    ],
+    "requires": [],
+    "subcat": "WebSocket"
+  },
+  "enriched": true
+}

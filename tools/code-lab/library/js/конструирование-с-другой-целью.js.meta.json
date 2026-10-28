@@ -1,0 +1,254 @@
+{
+  "schema": 1,
+  "id": "конструирование-с-другой-целью",
+  "file": "конструирование-с-другой-целью.js",
+  "title": "Конструирование с другой целью",
+  "lang": "js",
+  "group": "Объекты и метапрограммирование / Операции над объектами и прокси",
+  "desc": "Выполняет операцию конструирования с массивом аргументов и необязательной целью new.",
+  "output": "true\nfalse\nАнна",
+  "tags": [
+    "Reflect.construct",
+    "newTarget",
+    "прототип",
+    "конструирование"
+  ],
+  "aliases": [
+    "что такое newtarget в reflect construct",
+    "создать объект с прототипом другого класса",
+    "reflect construct с тремя аргументами",
+    "подмена прототипа при создании",
+    "инстанс другого класса"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — объявляет класс: шаблон для создания объектов.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 21,
+      "text": "this",
+      "kind": "kw",
+      "note": "this — объект, от имени которого вызвана функция.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — объявляет класс: шаблон для создания объектов.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 15,
+      "text": "Reflect",
+      "kind": "fn",
+      "note": "Reflect — встроенный объект с операциями над объектами в виде функций.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 23,
+      "text": "construct",
+      "kind": "fn",
+      "note": "construct — создаёт экземпляр; третий аргумент задаёт newTarget.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 19,
+      "text": "instanceof",
+      "kind": "kw",
+      "note": "instanceof — проверяет, создан ли объект данным классом.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 19,
+      "text": "instanceof",
+      "kind": "kw",
+      "note": "instanceof — проверяет, создан ли объект данным классом.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Объекты и метапрограммирование"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "true\nfalse\nАнна",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "class Основной {\n  constructor(имя) { this.имя = имя; }\n}\nclass Другой {}\n\nconst target = Основной;\nconst args = [\"Анна\"];\nconst newTarget = Другой;\nconst объект = Reflect.construct(target, args, newTarget);\nconsole.log(объект instanceof Другой);\nconsole.log(объект instanceof Основной);\nconsole.log(объект.имя);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "true\nfalse\nАнна",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "Основной",
+      "Другой",
+      "target",
+      "args",
+      "newTarget",
+      "объект"
+    ],
+    "requires": [],
+    "subcat": "Операции над объектами и прокси"
+  },
+  "enriched": true
+}

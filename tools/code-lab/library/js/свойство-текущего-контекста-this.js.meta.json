@@ -1,0 +1,236 @@
+{
+  "schema": 1,
+  "id": "свойство-текущего-контекста-this",
+  "file": "свойство-текущего-контекста-this.js",
+  "title": "Обратиться к свойству через this и потерять контекст",
+  "lang": "js",
+  "group": "Основы / Объектно-ориентированное программирование",
+  "desc": "this.property читает свойство текущего объекта; если вынуть метод из объекта, this теряется — метод нужно привязать или вызывать через объект.",
+  "output": "1\nПотерян this: TypeError\n2",
+  "tags": [
+    "this",
+    "контекст вызова",
+    "bind",
+    "класс",
+    "потеря контекста"
+  ],
+  "aliases": [
+    "почему this undefined в методе",
+    "this.property пример",
+    "как не потерять this js"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — объявить класс.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "this.count",
+      "kind": "this — текущий объект, у которого вызвали метод.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 16,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 9,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 31,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "1\nПотерян this: TypeError\n2",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "class Counter {\n  count = 0;\n\n  increment() {\n    this.count += 1;\n    return this.count;\n  }\n}\n\nconst counter = new Counter();\nconsole.log(counter.increment());\n\nconst { increment } = counter;\ntry {\n  increment();\n} catch (error) {\n  console.log(\"Потерян this:\", error.name);\n}\n\nconst bound = counter.increment.bind(counter);\nconsole.log(bound());"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "1\nПотерян this: TypeError\n2",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "Counter",
+      "counter",
+      "bound"
+    ],
+    "requires": [],
+    "subcat": "Объектно-ориентированное программирование"
+  },
+  "enriched": true
+}

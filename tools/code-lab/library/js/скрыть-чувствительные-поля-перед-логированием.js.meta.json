@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "скрыть-чувствительные-поля-перед-логированием",
+  "file": "скрыть-чувствительные-поля-перед-логированием.js",
+  "title": "Скрыть чувствительные поля перед логированием",
+  "lang": "js",
+  "group": "Безопасность / Логи",
+  "desc": "Создаёт копию объекта с замаскированными полями; подходит для логов, но не заменяет контроль доступа и безопасное хранение секретов.",
+  "output": "token заменён на [REDACTED]",
+  "tags": [
+    "безопасность",
+    "логирование",
+    "секреты",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "редактировать секреты в логах",
+    "маскировать token password",
+    "redact sensitive fields"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

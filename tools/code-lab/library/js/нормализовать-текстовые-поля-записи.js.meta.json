@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "нормализовать-текстовые-поля-записи",
+  "file": "нормализовать-текстовые-поля-записи.js",
+  "title": "Нормализовать текстовые поля записи",
+  "lang": "js",
+  "group": "Данные / Очистка данных",
+  "desc": "Приводит выбранные строковые поля к единому виду, не меняя входную запись; полезно перед сравнением и поиском.",
+  "output": "{name:\"Anna Lee\",code:4}",
+  "tags": [
+    "нормализация",
+    "строки",
+    "очистка",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "очистить пробелы в полях объекта",
+    "нормализация строковых данных",
+    "trim полей объекта"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

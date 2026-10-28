@@ -1,0 +1,203 @@
+{
+  "schema": 1,
+  "id": "проверка-отказа-асинхронной-функции-в-тесте",
+  "file": "проверка-отказа-асинхронной-функции-в-тесте.js",
+  "title": "Объявить тест, проверяющий отказ промиса",
+  "lang": "js",
+  "group": "Тестирование / Библиотека тестирования",
+  "desc": "В асинхронном тесте assert.rejects проверяет, что промис отклонился с нужной ошибкой; без await проверка бы не дождалась результата.",
+  "output": "✔ ошибка запроса пробрасывается наружу",
+  "tags": [
+    "node:test",
+    "assert.rejects",
+    "ошибка промиса",
+    "асинхронный тест"
+  ],
+  "aliases": [
+    "как проверить что промис отклонён в тесте",
+    "assert.rejects пример",
+    "тест на ошибку async функции"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — функция, внутри которой можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "test(",
+      "kind": "test — объявляет тест.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 45,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — функция, внутри которой можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — дождаться завершения асинхронной операции и взять её результат.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "assert.rejects",
+      "kind": "rejects — проверяет, что промис завершился ошибкой.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "✔ ошибка запроса пробрасывается наружу",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const test = require(\"node:test\");\nconst assert = require(\"node:assert/strict\");\n\nasync function failingRequest() {\n  throw new Error(\"Сервер недоступен\");\n}\n\ntest(\"ошибка запроса пробрасывается наружу\", async () => {\n  await assert.rejects(failingRequest(), { message: \"Сервер недоступен\" });\n});"
+        },
+        "steps": [
+          "Запусти командой node --test имя-файла.js (нужен Node.js 18+).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "✔ ошибка запроса пробрасывается наружу",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Тест проходит",
+            "Тест падает при сломанном коде",
+            "Повторный запуск тестов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Тесты не запускаются",
+            "cause": "Версия Node.js ниже 18 или файл запущен не тем раннером",
+            "solution": "Проверь node --version и запусти node --test имя-файла.js"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "test",
+      "assert",
+      "failingRequest"
+    ],
+    "requires": [],
+    "subcat": "Библиотека тестирования"
+  },
+  "enriched": true
+}

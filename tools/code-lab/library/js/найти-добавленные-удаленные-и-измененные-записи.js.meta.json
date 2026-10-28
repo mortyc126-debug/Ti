@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "найти-добавленные-удаленные-и-измененные-записи",
+  "file": "найти-добавленные-удаленные-и-измененные-записи.js",
+  "title": "Найти добавленные, удалённые и изменённые записи",
+  "lang": "js",
+  "group": "Данные / Сравнение состояний",
+  "desc": "Сопоставляет два снимка по id и возвращает добавленные, удалённые и изменённые записи.",
+  "output": "added id=2; changed id=1; removed=[]",
+  "tags": [
+    "diff",
+    "сравнение",
+    "id",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "сравнить два массива объектов",
+    "diff по id",
+    "найти изменившиеся записи"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

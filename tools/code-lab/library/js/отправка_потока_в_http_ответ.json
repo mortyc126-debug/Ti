@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Отправка потока в HTTP-ответ",
+  "group": "Файлы, хранение и сервер / HTTP-сервер",
+  "desc": "Отдаём файл клиенту потоком; при ошибке соединение закрывается.",
+  "code": "import { createServer } from \"node:http\";\nimport { createReadStream } from \"node:fs\";\nimport { pipeline } from \"node:stream/promises\";\n\ncreateServer(async (запрос, ответ) => {\n  ответ.setHeader(\"Content-Type\", \"text/plain; charset=utf-8\");\n  try {\n    await pipeline(createReadStream(\"./отчёт.txt\"), ответ);\n  } catch {\n    ответ.destroy();\n  }\n}).listen(3000);",
+  "output": "По адресу http://localhost:3000 отдаётся содержимое отчёта.",
+  "words": {
+    "pipeline": "Передаёт данные из потока чтения в ответ сервера."
+  }
+}

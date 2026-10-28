@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "проверить-пустую-строку-и-пустой-массив-отдельно",
+  "file": "проверить-пустую-строку-и-пустой-массив-отдельно.js",
+  "title": "Проверить пустую строку и пустой массив отдельно",
+  "lang": "js",
+  "group": "Основы / Логика",
+  "desc": "Показывает, что пустой массив truthy, а пустая строка falsy в JavaScript.",
+  "output": "true, false, true",
+  "tags": [
+    "truthy falsy",
+    "ошибки условий"
+  ],
+  "aliases": [
+    "пустой массив truthy",
+    "пустая строка falsy",
+    "проверка пустого массива"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "truthy falsy",
+      "kind": "concept",
+      "note": "truthy falsy — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "ошибки условий",
+      "kind": "concept",
+      "note": "ошибки условий — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

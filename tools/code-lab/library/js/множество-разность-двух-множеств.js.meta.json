@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "множество-разность-двух-множеств",
+  "file": "множество-разность-двух-множеств.js",
+  "title": "Множество разность двух множеств",
+  "lang": "js",
+  "group": "Данные / Коллекции",
+  "desc": "Находит элементы первого массива, которых нет во втором множестве.",
+  "output": "[1, 3]",
+  "tags": [
+    "Set",
+    "множества"
+  ],
+  "aliases": [
+    "разность множеств",
+    "Set difference",
+    "элементы только в первом наборе"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "Set",
+      "kind": "concept",
+      "note": "Set — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "множества",
+      "kind": "concept",
+      "note": "множества — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

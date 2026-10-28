@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "рассчитать-скользящее-стандартное-отклонение",
+  "file": "рассчитать-скользящее-стандартное-отклонение.js",
+  "title": "Рассчитать скользящее стандартное отклонение",
+  "lang": "js",
+  "group": "Данные / Временные ряды",
+  "desc": "Считает выборочное стандартное отклонение на каждом полном окне; до заполнения окна возвращает null.",
+  "output": "первые windowSize-1 значений null",
+  "tags": [
+    "волатильность",
+    "стандартное отклонение",
+    "временной ряд",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "rolling standard deviation",
+    "скользящая волатильность ряда",
+    "стандартное отклонение по окну"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

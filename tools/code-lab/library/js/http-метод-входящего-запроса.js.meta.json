@@ -1,0 +1,276 @@
+{
+  "schema": 1,
+  "id": "http-метод-входящего-запроса",
+  "file": "http-метод-входящего-запроса.js",
+  "title": "HTTP-метод входящего запроса: request.method",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / HTTP-сервер",
+  "desc": "request.method содержит метод запроса (GET, POST, DELETE…); по нему сервер выбирает действие или отвечает 405.",
+  "output": "GET: 200 читаем\nPOST: 200 создаём\nDELETE: 405 метод не поддерживается",
+  "tags": [
+    "request.method",
+    "HTTP-метод",
+    "маршрутизация",
+    "405",
+    "Node.js"
+  ],
+  "aliases": [
+    "как узнать метод запроса в node",
+    "request.method пример",
+    "ответ 405 метод не поддерживается"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 6,
+      "text": "request.method",
+      "kind": "method — HTTP-метод запроса: GET, POST, DELETE и т. д.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "else",
+      "kind": "kw",
+      "note": "else — «иначе»: блок выполняется, если условие if ложно.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 9,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "else",
+      "kind": "kw",
+      "note": "else — «иначе»: блок выполняется, если условие if ложно.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 9,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 6,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 23,
+      "col": 17,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — функция, внутри которой можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 24,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 25,
+      "col": 2,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторяет блок для каждого элемента или шага.",
+      "source": "dict"
+    },
+    {
+      "line": 25,
+      "col": 7,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 25,
+      "col": 20,
+      "text": "of",
+      "kind": "kw",
+      "note": "of — в цикле for...of: перебрать значения по одному.",
+      "source": "dict"
+    },
+    {
+      "line": 26,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 26,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 26,
+      "col": 16,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — дождаться завершения асинхронной операции и взять её результат.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Файлы, хранение и сервер"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "GET: 200 читаем\nPOST: 200 создаём\nDELETE: 405 метод не поддерживается",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const http = require(\"node:http\");\n\nconst server = http.createServer((request, response) => {\n  if (request.method === \"GET\") {\n    response.end(\"читаем\");\n  } else if (request.method === \"POST\") {\n    response.end(\"создаём\");\n  } else {\n    response.statusCode = 405;\n    response.end(\"метод не поддерживается\");\n  }\n});\n\nfunction send(method, port) {\n  return new Promise(resolve => {\n    http.request({ port, method }, reply => {\n      let body = \"\";\n      reply.on(\"data\", chunk => (body += chunk));\n      reply.on(\"end\", () => resolve(`${method}: ${reply.statusCode} ${body}`));\n    }).end();\n  });\n}\n\nserver.listen(0, async () => {\n  const { port } = server.address();\n  for (const method of [\"GET\", \"POST\", \"DELETE\"]) {\n    console.log(await send(method, port));\n  }\n  server.close();\n});"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "GET: 200 читаем\nPOST: 200 создаём\nDELETE: 405 метод не поддерживается",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "http",
+      "server",
+      "send"
+    ],
+    "requires": [],
+    "subcat": "HTTP-сервер"
+  },
+  "enriched": true
+}

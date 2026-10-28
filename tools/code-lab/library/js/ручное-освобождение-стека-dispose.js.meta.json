@@ -1,0 +1,201 @@
+{
+  "schema": 1,
+  "id": "ручное-освобождение-стека-dispose",
+  "file": "ручное-освобождение-стека-dispose.js",
+  "title": "Освободить ресурсы стека вручную: stack.dispose()",
+  "lang": "js",
+  "group": "Основы / Управление ресурсами",
+  "desc": "stack.dispose() выполняет все действия очистки синхронно, не дожидаясь выхода из блока; после этого stack.disposed равно true.",
+  "output": "до dispose: false\nвторой ресурс закрыт\nпервый ресурс закрыт\nпосле dispose: true",
+  "tags": [
+    "DisposableStack",
+    "dispose",
+    "освобождение ресурсов",
+    "disposed"
+  ],
+  "aliases": [
+    "как освободить DisposableStack вручную",
+    "stack.dispose пример",
+    "явное освобождение ресурсов js"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 18,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 26,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 18,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 26,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 27,
+      "text": "stack.dispose",
+      "kind": "dispose — выполняет все действия очистки сразу.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "до dispose: false\nвторой ресурс закрыт\nпервый ресурс закрыт\nпосле dispose: true",
+      "dependencies": [],
+      "requirements": [
+        "Нужен Node.js 24 или новее (explicit resource management)."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const stack = new DisposableStack();\n\nstack.defer(() => console.log(\"первый ресурс закрыт\"));\nstack.defer(() => console.log(\"второй ресурс закрыт\"));\n\nconsole.log(\"до dispose:\", stack.disposed);\nstack.dispose();\nconsole.log(\"после dispose:\", stack.disposed);"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "до dispose: false\nвторой ресурс закрыт\nпервый ресурс закрыт\nпосле dispose: true",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "ReferenceError: DisposableStack is not defined",
+            "cause": "Среда не поддерживает DisposableStack (Node.js ниже 24)",
+            "solution": "Обнови Node.js до 24+"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "stack"
+    ],
+    "requires": [],
+    "subcat": "Управление ресурсами"
+  },
+  "enriched": true
+}

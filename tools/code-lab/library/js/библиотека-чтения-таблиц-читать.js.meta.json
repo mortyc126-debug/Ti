@@ -1,0 +1,233 @@
+{
+  "schema": 1,
+  "id": "библиотека-чтения-таблиц-читать",
+  "file": "библиотека-чтения-таблиц-читать.js",
+  "title": "Библиотека чтения таблиц () читать",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Форматы данных",
+  "desc": "Библиотека xlsx (SheetJS) — чтение .xlsx прямо в браузере. Используется в проекте для импорта отчётов ФНС. Лист → массив строк.",
+  "output": "[[\"Год\",\"Выручка\"],[\"2024\",120], …]",
+  "tags": [
+    "xlsx",
+    "parsing",
+    "браузерный парсинг",
+    "табличные данные",
+    "sheetjs",
+    "файловые форматы"
+  ],
+  "aliases": [
+    "как прочитать xlsx в js без сервера",
+    "преобразовать excel в массив строк",
+    "парсинг файлов excel в браузере",
+    "sheetjs чтение таблиц",
+    "импорт excel в json"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "Подключить библиотеку целиком под именем XLSX.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "XLSX",
+      "kind": "name",
+      "note": "Объект библиотеки SheetJS.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 17,
+      "text": "from",
+      "kind": "kw",
+      "note": "from — часть import: откуда берём (import x from \"файл\").",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная, которую не будем переназначать (константа).",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 14,
+      "text": "XLSX",
+      "kind": "name",
+      "note": "Объект библиотеки SheetJS.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "read",
+      "kind": "fn",
+      "note": "Прочитать байты файла в объект книги.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная, которую не будем переназначать (константа).",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 20,
+      "text": "Sheets",
+      "kind": "name",
+      "note": "Коллекция листов по именам.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 33,
+      "text": "SheetNames",
+      "kind": "name",
+      "note": "Массив имён листов по порядку.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная, которую не будем переназначать (константа).",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 15,
+      "text": "XLSX",
+      "kind": "name",
+      "note": "Объект библиотеки SheetJS.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 20,
+      "text": "utils",
+      "kind": "name",
+      "note": "Набор утилит библиотеки.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 26,
+      "text": "sheet_to_json",
+      "kind": "fn",
+      "note": "Превратить лист в массив строк; header:1 → строки как массивы.",
+      "source": "custom"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Данные: хранить, находить и преобразовывать"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "[[\"Год\",\"Выручка\"],[\"2024\",120], …]",
+      "dependencies": [],
+      "requirements": [
+        "Запускай как ES-модуль и проверь наличие импортируемых файлов/пакетов."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import * as XLSX from \"xlsx\";\n\nconst книга = XLSX.read(данныеФайла, { type: \"array\" });\nconst лист  = книга.Sheets[книга.SheetNames[0]]; // первый лист\nconst строки = XLSX.utils.sheet_to_json(лист, { header: 1 });\n// строки → [[ячейка, ячейка, …], …]"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "[[\"Год\",\"Выручка\"],[\"2024\",120], …]",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "книга",
+      "лист",
+      "строки"
+    ],
+    "requires": [
+      "as",
+      "XLSX",
+      "данныеФайла",
+      "type",
+      "header"
+    ],
+    "subcat": "Форматы данных"
+  },
+  "legacy": {
+    "template": "libs-sheetjs.json",
+    "summary": {
+      "dependencies": [
+        "SheetJS (xlsx) — источник/блок: libs-sheetjs"
+      ]
+    }
+  },
+  "enriched": true
+}

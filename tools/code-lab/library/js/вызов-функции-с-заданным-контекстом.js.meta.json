@@ -1,0 +1,196 @@
+{
+  "schema": 1,
+  "id": "вызов-функции-с-заданным-контекстом",
+  "file": "вызов-функции-с-заданным-контекстом.js",
+  "title": "Вызов функции с заданным контекстом",
+  "lang": "js",
+  "group": "Объекты и метапрограммирование / Операции над объектами и прокси",
+  "desc": "Вызывает функцию через Reflect с указанным this и аргументами.",
+  "output": "Привет, я Анна",
+  "tags": [
+    "Reflect.apply",
+    "this",
+    "аргументы",
+    "вызов функции"
+  ],
+  "aliases": [
+    "как вызвать функцию с заданным this",
+    "reflect apply пример",
+    "apply вместо function prototype apply",
+    "передать аргументы массивом",
+    "вызов с контекстом"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 32,
+      "text": "this",
+      "kind": "kw",
+      "note": "this — объект, от имени которого вызвана функция.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 12,
+      "text": "Reflect",
+      "kind": "fn",
+      "note": "Reflect — встроенный объект с операциями над объектами в виде функций.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 20,
+      "text": "apply",
+      "kind": "fn",
+      "note": "apply — вызывает функцию с указанным this и массивом аргументов.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Объекты и метапрограммирование"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Аргументы функции «представиться»",
+      "output": "Привет, я Анна",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function представиться(приветствие) {\n  return приветствие + \", я \" + this.имя;\n}\nconst fn = представиться;\nconst thisArg = { имя: \"Анна\" };\nconst args = [\"Привет\"];\nconsole.log(Reflect.apply(fn, thisArg, args));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные.",
+          "Скопируй функцию «представиться» в подходящую часть проекта.",
+          "Вызови её со своими данными вместо значений из примера.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Привет, я Анна",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "представиться",
+      "fn",
+      "thisArg",
+      "args"
+    ],
+    "requires": [],
+    "subcat": "Операции над объектами и прокси"
+  },
+  "enriched": true
+}

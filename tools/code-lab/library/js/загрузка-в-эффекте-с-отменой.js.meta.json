@@ -1,0 +1,333 @@
+{
+  "schema": 1,
+  "id": "загрузка-в-эффекте-с-отменой",
+  "file": "загрузка-в-эффекте-с-отменой.js",
+  "title": "Загрузка данных в эффекте React с отменой",
+  "lang": "js",
+  "group": "Асинхронность / Отмена операций",
+  "desc": "Эффект запускает fetch с AbortController и отменяет запрос при смене зависимостей или удалении компонента, чтобы старый ответ не перезаписал новый.",
+  "output": "Сначала «Загрузка…», затем имя пользователя; при смене userId прошлый запрос отменяется",
+  "tags": [
+    "React",
+    "useEffect",
+    "AbortController",
+    "fetch",
+    "отмена запроса"
+  ],
+  "aliases": [
+    "отмена fetch при смене props react",
+    "useEffect fetch с abort",
+    "гонка запросов в react",
+    "загрузка данных в эффекте"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "export",
+      "kind": "kw",
+      "note": "export — сделать имя доступным для других модулей.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 35,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 23,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 27,
+      "text": "AbortController",
+      "kind": "fn",
+      "note": "AbortController — объект для отмены операций; его signal передают в fetch.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 13,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 8,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 12,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 54,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 17,
+      "text": "controller.abort()",
+      "kind": "fn",
+      "note": "abort() — отменяет запрос; fetch завершится ошибкой AbortError.",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 17,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 43,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 13,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 20,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 39,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 21,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 21,
+      "col": 9,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 21,
+      "col": 29,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "React"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Сначала «Загрузка…», затем имя пользователя; при смене userId прошлый запрос отменяется",
+      "dependencies": [
+        "react"
+      ],
+      "requirements": [
+        "Нужен пакет react."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import { createElement, useEffect, useState } from \"react\";\n\nexport default function UserCard({ userId }) {\n  const [user, setUser] = useState(null);\n  const [errorText, setErrorText] = useState(\"\");\n\n  useEffect(() => {\n    const controller = new AbortController();\n\n    fetch(`/api/users/${userId}`, { signal: controller.signal })\n      .then(response => response.json())\n      .then(setUser)\n      .catch(error => {\n        if (error.name !== \"AbortError\") setErrorText(error.message);\n      });\n\n    return () => controller.abort();\n  }, [userId]);\n\n  if (errorText) return createElement(\"p\", null, `Ошибка: ${errorText}`);\n  if (!user) return createElement(\"p\", null, \"Загрузка…\");\n  return createElement(\"h2\", null, user.name);\n}"
+        },
+        "steps": [
+          "Подготовь проект с React (npm install react) и импортируй компонент.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Сначала «Загрузка…», затем имя пользователя; при смене userId прошлый запрос отменяется",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Первый рендер компонента",
+            "Смена свойств компонента",
+            "Удаление компонента со страницы"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Cannot find module 'react'",
+            "cause": "В проекте не установлен React",
+            "solution": "Выполни npm install react"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Отправляет запрос к /api/users/…"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "UserCard"
+    ],
+    "requires": [],
+    "subcat": "Отмена операций"
+  },
+  "enriched": true
+}

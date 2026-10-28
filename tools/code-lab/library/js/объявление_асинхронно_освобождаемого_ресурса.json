@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Объявление асинхронно освобождаемого ресурса",
+  "group": "Основы / Управление ресурсами",
+  "desc": "Блок освобождает ресурс даже при ошибке внутри.",
+  "code": "function открытьСессию(имя) {\n  return {\n    имя,\n    async [Symbol.asyncDispose]() {\n      await new Promise(пауза => setTimeout(пауза, 10));\n      console.log(\"закрыта\", имя);\n    },\n  };\n}\n\ntry {\n  await using сессия = открытьСессию(\"A\");\n  throw new Error(\"сбой\");\n} catch (ошибка) {\n  console.log(ошибка.message);\n}",
+  "output": "закрыта A\nсбой",
+  "words": {
+    "await using": "Гарантирует асинхронную очистку даже при исключении."
+  }
+}

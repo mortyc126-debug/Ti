@@ -1,0 +1,231 @@
+{
+  "schema": 1,
+  "id": "примитивное-значение-объекта",
+  "file": "примитивное-значение-объекта.js",
+  "title": "Примитивное значение объекта",
+  "lang": "js",
+  "group": "Объекты и метапрограммирование / Прототипы и типы",
+  "desc": "Получает примитивное значение объекта.",
+  "output": "5\n0\n150\ntrue",
+  "tags": [
+    "valueOf",
+    "примитив",
+    "преобразование",
+    "объект"
+  ],
+  "aliases": [
+    "что делает valueof",
+    "как объект превращается в число",
+    "свой valueof для сравнения"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 16,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — преобразует значение в число; содержит проверки вроде Number.isFinite.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 16,
+      "text": "Date",
+      "kind": "fn",
+      "note": "Date — объект даты и времени.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 41,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 48,
+      "text": "this",
+      "kind": "kw",
+      "note": "this — объект, от имени которого вызвана функция.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Объекты и метапрограммирование"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "5\n0\n150\ntrue",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "console.log(new Number(5).valueOf());\nconsole.log(new Date(0).valueOf());\nconst деньги = { сумма: 100, valueOf() { return this.сумма; } };\nconsole.log(деньги + 50);\nconsole.log(деньги > 80);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "5\n0\n150\ntrue",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "деньги"
+    ],
+    "requires": [],
+    "subcat": "Прототипы и типы"
+  },
+  "enriched": true
+}

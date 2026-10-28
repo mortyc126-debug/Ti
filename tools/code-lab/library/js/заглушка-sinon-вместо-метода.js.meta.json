@@ -1,0 +1,198 @@
+{
+  "schema": 1,
+  "id": "заглушка-sinon-вместо-метода",
+  "file": "заглушка-sinon-вместо-метода.js",
+  "title": "Заменить метод заглушкой: sinon.stub",
+  "lang": "js",
+  "group": "Тестирование и отладка / Mock",
+  "desc": "sinon.stub полностью подменяет метод: настоящий код не выполняется, а возвращается заданное значение.",
+  "output": "18\n1",
+  "tags": [
+    "Sinon",
+    "stub",
+    "заглушка",
+    "подмена метода",
+    "тесты"
+  ],
+  "aliases": [
+    "как заменить метод заглушкой sinon",
+    "sinon.stub returns пример",
+    "подменить функцию в тесте"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 10,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 13,
+      "text": "sinon.stub",
+      "kind": "stub — заменяет метод заглушкой с заданным результатом.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование и отладка"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "18\n1",
+      "dependencies": [
+        "sinon"
+      ],
+      "requirements": [
+        "Нужен пакет sinon."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const sinon = require(\"sinon\");\n\nconst weather = {\n  currentTemperature() {\n    throw new Error(\"Настоящий запрос к сервису погоды\");\n  },\n};\n\nconst stub = sinon.stub(weather, \"currentTemperature\").returns(18);\n\nconsole.log(weather.currentTemperature());\nconsole.log(stub.callCount);\n\nstub.restore();"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "18\n1",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "sinon",
+      "weather",
+      "stub"
+    ],
+    "requires": [],
+    "subcat": "Mock"
+  },
+  "enriched": true
+}

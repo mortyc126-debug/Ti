@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "содержимое_каталога_с_типами_элементов",
+  "file": "содержимое_каталога_с_типами_элементов.js",
+  "title": "Содержимое каталога с типами элементов",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "readdir с параметром withFileTypes: true возвращает не просто имена, а объекты Dirent. У каждого есть метод isDirectory, isFile и isSymbolicLink, так что не нужно делать отдельный запрос stat для каждого элемента. Это быстрее и проще при обходе каталогов. Параметр recursive: true делает обход вложенных каталогов.",
+  "output": "Имена элементов текущего каталога с пометкой «каталог» или «файл».",
+  "tags": [
+    "withFileTypes",
+    "isDirectory",
+    "файловая система"
+  ],
+  "aliases": [
+    "содержимое каталога с типами элементов",
+    "withFileTypes",
+    "isDirectory"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 36,
+      "text": "withFileTypes",
+      "kind": "concept",
+      "note": "Возвращает объекты с типом элемента, а не просто имена."
+    },
+    {
+      "line": 5,
+      "col": 34,
+      "text": "isDirectory",
+      "kind": "fn",
+      "note": "Истинно для каталогов."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

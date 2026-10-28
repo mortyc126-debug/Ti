@@ -1,0 +1,164 @@
+{
+  "schema": 1,
+  "id": "внутренняя-разметка-после-очистки-dompurify",
+  "file": "внутренняя-разметка-после-очистки-dompurify.js",
+  "title": "Вставить разметку после очистки библиотекой DOMPurify",
+  "lang": "js",
+  "group": "Интерфейс / Работа с DOM",
+  "desc": "DOMPurify.sanitize удаляет опасные части (onerror, script), после чего разметку можно безопасно присвоить innerHTML.",
+  "output": "<p>Привет</p><img src=\"x\">",
+  "tags": [
+    "DOMPurify",
+    "sanitize",
+    "innerHTML",
+    "XSS"
+  ],
+  "aliases": [
+    "как безопасно вставить html js",
+    "DOMPurify.sanitize пример",
+    "защита от xss при innerHTML"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 19,
+      "text": "DOMPurify.sanitize",
+      "kind": "sanitize — очищает разметку от опасных элементов и атрибутов.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "<p>Привет</p><img src=\"x\">",
+      "dependencies": [
+        "dompurify"
+      ],
+      "requirements": [
+        "Нужна библиотека DOMPurify: <script src=\"https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js\"></script>."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const dirtyHtml = '<p>Привет</p><img src=\"x\" onerror=\"alert(1)\">';\n\nconst output = document.createElement(\"div\");\noutput.innerHTML = DOMPurify.sanitize(dirtyHtml);\ndocument.body.append(output);\n\nconsole.log(output.innerHTML);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "<p>Привет</p><img src=\"x\">",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "DOMPurify is not defined",
+            "cause": "Библиотека DOMPurify не подключена",
+            "solution": "Подключи purify.min.js перед этим кодом"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "dirtyHtml",
+      "output"
+    ],
+    "requires": [],
+    "subcat": "Работа с DOM"
+  },
+  "enriched": true
+}

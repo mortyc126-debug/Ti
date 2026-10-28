@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "реакция_на_сигнал_отмены",
+  "file": "реакция_на_сигнал_отмены.js",
+  "title": "Реакция на сигнал отмены",
+  "lang": "js",
+  "group": "Асинхронность / Отмена операций",
+  "desc": "У AbortSignal есть событие abort, на которое можно подписаться через addEventListener. Оно срабатывает один раз, когда контроллер вызывает abort(). Причина отмены доступна в signal.reason: по умолчанию это DOMException с именем AbortError. Если сигнал уже отменён к моменту подписки, событие не придёт — проверяйте signal.aborted заранее.",
+  "output": "Отменено: AbortError",
+  "tags": [
+    "addEventListener",
+    "reason",
+    "отмена операций"
+  ],
+  "aliases": [
+    "реакция на сигнал отмены",
+    "addEventListener",
+    "reason"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 68,
+      "text": "reason",
+      "kind": "concept",
+      "note": "Причина отмены сигнала."
+    },
+    {
+      "line": 3,
+      "col": 18,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "Подписывает обработчик на событие abort."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

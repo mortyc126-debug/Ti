@@ -1,0 +1,173 @@
+{
+  "schema": 1,
+  "id": "замена-в-строке",
+  "file": "замена-в-строке.js",
+  "title": "Замена в строке",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Строки и текст",
+  "desc": "Заменяет подстроку на другую.",
+  "output": "собака и кошка\nсобака и собака",
+  "tags": [
+    "замена в строке",
+    "replace",
+    "replaceAll",
+    "подстрока",
+    "текст"
+  ],
+  "aliases": [
+    "как заменить слово в строке js",
+    "заменить все вхождения в строке",
+    "replace и replaceAll javascript",
+    "подмена подстроки",
+    "замена текста в строке"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "replace",
+      "kind": "fn",
+      "note": "replace — заменяет первое вхождение подстроки.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 18,
+      "text": "replaceAll",
+      "kind": "fn",
+      "note": "replaceAll — заменяет все вхождения подстроки.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Данные: хранить, находить и преобразовывать"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "собака и кошка\nсобака и собака",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в консоли браузера.",
+        "Проверь, что все используемые переменные объявлены и имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const текст = 'кошка и кошка';\nconsole.log(текст.replace('кошка', 'собака'));\nconsole.log(текст.replaceAll('кошка', 'собака'));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "собака и кошка\nсобака и собака",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [
+          "replaceAll — заменяет все вхождения, replace — только первое."
+        ],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "текст"
+    ],
+    "requires": [],
+    "subcat": "Строки и текст"
+  },
+  "enriched": true
+}

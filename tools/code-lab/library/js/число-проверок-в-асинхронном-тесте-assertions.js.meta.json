@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "id": "число-проверок-в-асинхронном-тесте-assertions",
+  "file": "число-проверок-в-асинхронном-тесте-assertions.js",
+  "title": "Проверить число выполненных проверок: expect.assertions(1)",
+  "lang": "js",
+  "group": "Тестирование / Проверки функций",
+  "desc": "Если колбэк не вызовется, тест без expect.assertions тихо пройдёт; счётчик проверок гарантирует, что нужная проверка действительно выполнилась.",
+  "output": "✓ 1 тест пройден",
+  "tags": [
+    "Vitest",
+    "expect.assertions",
+    "асинхронный тест",
+    "колбэк"
+  ],
+  "aliases": [
+    "как убедиться что проверка в колбэке выполнилась",
+    "expect.assertions пример",
+    "тест не падает если колбэк не вызван"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "setTimeout",
+      "kind": "fn",
+      "note": "setTimeout — выполнить функцию один раз через заданное число миллисекунд.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "expect.assertions",
+      "kind": "assertions(n) — тест упадёт, если выполнено не ровно n проверок.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 9,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Vitest"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "✓ 1 тест пройден",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import { expect, it } from \"vitest\";\n\nfunction loadName(callback) {\n  setTimeout(() => callback(\"Мира\"), 10);\n}\n\nit(\"колбэк получает имя\", () => {\n  expect.assertions(1);\n\n  return new Promise(resolve => {\n    loadName(name => {\n      expect(name).toBe(\"Мира\");\n      resolve();\n    });\n  });\n});"
+        },
+        "steps": [
+          "Установи Vitest (npm install -D vitest) и запусти npx vitest run имя-файла.js.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "✓ 1 тест пройден",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Тест проходит",
+            "Тест падает при сломанном коде",
+            "Повторный запуск тестов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Cannot find package 'vitest'",
+            "cause": "Vitest не установлен в проекте",
+            "solution": "Выполни npm install -D vitest"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "loadName"
+    ],
+    "requires": [],
+    "subcat": "Проверки функций"
+  },
+  "enriched": true
+}

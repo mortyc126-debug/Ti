@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "список_устройств_ввода_и_вывода",
+  "file": "список_устройств_ввода_и_вывода.js",
+  "title": "Список устройств ввода и вывода",
+  "lang": "js",
+  "group": "Интерфейс / Системные возможности",
+  "desc": "navigator.mediaDevices.enumerateDevices возвращает микрофоны, камеры и аудиовыходы. Каждый элемент имеет kind, deviceId и label. Пока пользователь не дал разрешение на камеру или микрофон, подписи (label) пустые — это защита от отслеживания. Идентификаторы нужны, чтобы выбрать конкретное устройство в getUserMedia. Список можно фильтровать по полю kind.",
+  "output": "Список названий доступных микрофонов.",
+  "tags": [
+    "enumerateDevices",
+    "kind",
+    "системные возможности"
+  ],
+  "aliases": [
+    "список устройств ввода и вывода",
+    "enumerateDevices",
+    "kind"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 48,
+      "text": "enumerateDevices",
+      "kind": "fn",
+      "note": "Возвращает список доступных устройств."
+    },
+    {
+      "line": 1,
+      "col": 61,
+      "text": "kind",
+      "kind": "concept",
+      "note": "Тип устройства: audioinput, videoinput, audiooutput."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

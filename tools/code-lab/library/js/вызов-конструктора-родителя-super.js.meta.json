@@ -1,0 +1,219 @@
+{
+  "schema": 1,
+  "id": "вызов-конструктора-родителя-super",
+  "file": "вызов-конструктора-родителя-super.js",
+  "title": "Вызвать конструктор родителя: super(...args)",
+  "lang": "js",
+  "group": "Основы / Объектно-ориентированное программирование",
+  "desc": "В производном конструкторе super(...args) нужно вызвать до обращения к this; так получаются собственные классы ошибок с теми же аргументами, что у Error.",
+  "output": "AppError Страница не найдена 404\ntrue",
+  "tags": [
+    "super",
+    "конструктор",
+    "наследование",
+    "класс ошибки",
+    "Error"
+  ],
+  "aliases": [
+    "зачем вызывать super в конструкторе",
+    "super(...args) пример",
+    "свой класс ошибки js"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — объявить класс.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "super(...args)",
+      "kind": "super(...args) — вызов конструктора родителя; обязателен до использования this.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 6,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 14,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 12,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 24,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 39,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 12,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "AppError Страница не найдена 404\ntrue",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "class AppError extends Error {\n  constructor(...args) {\n    super(...args);\n    this.name = \"AppError\";\n  }\n}\n\nconst error = new AppError(\"Страница не найдена\", { cause: \"404\" });\n\nconsole.log(error.name, error.message, error.cause);\nconsole.log(error instanceof Error);"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "AppError Страница не найдена 404\ntrue",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "AppError",
+      "error"
+    ],
+    "requires": [],
+    "subcat": "Объектно-ориентированное программирование"
+  },
+  "enriched": true
+}

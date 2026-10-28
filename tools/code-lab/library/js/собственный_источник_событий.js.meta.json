@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "собственный_источник_событий",
+  "file": "собственный_источник_событий.js",
+  "title": "Собственный источник событий",
+  "lang": "js",
+  "group": "Интерфейс / События",
+  "desc": "EventTarget позволяет создать свой источник событий без DOM: он есть и в браузере, и в Node.js. Подписка идёт через addEventListener, отправка — через dispatchEvent, отписка — removeEventListener. Чтобы отписаться, нужно хранить ссылку на функцию-обработчик, а не создавать её заново. Такой объект удобен как лёгкая шина событий между частями приложения.",
+  "output": "готово",
+  "tags": [
+    "EventTarget",
+    "removeEventListener",
+    "события"
+  ],
+  "aliases": [
+    "собственный источник событий",
+    "EventTarget",
+    "removeEventListener"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 17,
+      "text": "EventTarget",
+      "kind": "fn",
+      "note": "Объект, умеющий рассылать события."
+    },
+    {
+      "line": 6,
+      "col": 5,
+      "text": "removeEventListener",
+      "kind": "fn",
+      "note": "Отписывает обработчик от события."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,178 @@
+{
+  "schema": 1,
+  "id": "заменить-элемент-другим-узлом-replacewith",
+  "file": "заменить-элемент-другим-узлом-replacewith.js",
+  "title": "Заменить элемент другим узлом или текстом: replaceWith",
+  "lang": "js",
+  "group": "Интерфейс / Работа с DOM",
+  "desc": "replaceWith встаёт на место элемента и принимает как узлы, так и обычные строки.",
+  "output": "<p>Загрузка <b>готово</b></p>\n<p>Загрузка завершено</p>",
+  "tags": [
+    "replaceWith",
+    "замена элемента",
+    "DOM",
+    "текст"
+  ],
+  "aliases": [
+    "как заменить элемент на другой js",
+    "replaceWith пример",
+    "заменить тег текстом"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 22,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "replaceWith",
+      "kind": "replaceWith — заменяет элемент узлом или текстом.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "<p>Загрузка <b>готово</b></p>\n<p>Загрузка завершено</p>",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "document.body.innerHTML = '<p>Загрузка <span id=\"spinner\">…</span></p>';\nconst spinner = document.querySelector(\"#spinner\");\n\nconst done = document.createElement(\"b\");\ndone.textContent = \"готово\";\nspinner.replaceWith(done);\nconsole.log(document.body.innerHTML);\n\ndone.replaceWith(\"завершено\");\nconsole.log(document.body.innerHTML);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "<p>Загрузка <b>готово</b></p>\n<p>Загрузка завершено</p>",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "spinner",
+      "done"
+    ],
+    "requires": [],
+    "subcat": "Работа с DOM"
+  },
+  "enriched": true
+}

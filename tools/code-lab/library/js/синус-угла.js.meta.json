@@ -1,0 +1,207 @@
+{
+  "schema": 1,
+  "id": "синус-угла",
+  "file": "синус-угла.js",
+  "title": "Синус угла",
+  "lang": "js",
+  "group": "Числа и вычисления / Математические функции",
+  "desc": "Вычисляет синус угла в радианах.",
+  "output": "0.5000\n1",
+  "tags": [
+    "Math.sin",
+    "синус",
+    "радианы",
+    "тригонометрия"
+  ],
+  "aliases": [
+    "как посчитать синус js",
+    "math sin пример",
+    "синус угла в градусах"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 16,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математическими функциями.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математическими функциями.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 17,
+      "text": "sin",
+      "kind": "fn",
+      "note": "sin — синус угла в радианах.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 30,
+      "text": "toFixed",
+      "kind": "fn",
+      "note": "toFixed — возвращает строку с заданным числом знаков после точки.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математическими функциями.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 17,
+      "text": "sin",
+      "kind": "fn",
+      "note": "sin — синус угла в радианах.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 21,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математическими функциями.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Числа и вычисления"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "0.5000\n1",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const radians = Math.PI / 6;\nconsole.log(Math.sin(radians).toFixed(4));\nconsole.log(Math.sin(Math.PI / 2));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "0.5000\n1",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "radians"
+    ],
+    "requires": [],
+    "subcat": "Математические функции"
+  },
+  "enriched": true
+}

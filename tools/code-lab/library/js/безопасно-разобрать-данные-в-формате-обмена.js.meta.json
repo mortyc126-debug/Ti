@@ -1,0 +1,133 @@
+{
+  "schema": 1,
+  "id": "безопасно-разобрать-данные-в-формате-обмена",
+  "file": "безопасно-разобрать-данные-в-формате-обмена.js",
+  "lang": "js",
+  "title": "Безопасно разобрать данные в формате обмена",
+  "group": "Данные / Преобразование форматов",
+  "desc": "Оборачивает JSON.parse в try/catch и возвращает явный результат успеха или ошибки.",
+  "output": "false",
+  "descAt": 1792998624644,
+  "component": {
+    "provides": [
+      "разобратьJSON"
+    ],
+    "requires": [
+      "ok",
+      "value",
+      "error"
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Преобразование форматов"
+  },
+  "tags": [
+    "JSON.parse",
+    "try catch",
+    "валидация"
+  ],
+  "aliases": [
+    "обработать ошибку JSON.parse",
+    "безопасно разобрать JSON",
+    "не падать на битом JSON"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "try",
+      "kind": "kw",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 21,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 39,
+      "text": "parse",
+      "kind": "fn",
+      "note": "JSON.parse — разобрать строку JSON обратно в объект.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "catch",
+      "kind": "kw",
+      "note": "catch — ловит ошибку из try (или промиса) и позволяет её обработать.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 32,
+      "text": "false",
+      "kind": "kw",
+      "note": "false — логическая «ложь» (нет).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 39,
+      "text": "error",
+      "kind": "name",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

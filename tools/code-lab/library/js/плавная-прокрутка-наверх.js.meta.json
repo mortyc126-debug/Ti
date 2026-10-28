@@ -1,0 +1,156 @@
+{
+  "schema": 1,
+  "id": "плавная-прокрутка-наверх",
+  "file": "плавная-прокрутка-наверх.js",
+  "title": "Плавная прокрутка страницы наверх: scrollTo",
+  "lang": "js",
+  "group": "Интерфейс / Работа с DOM",
+  "desc": "window.scrollTo принимает объект с координатой top и поведением smooth, и страница прокручивается плавно, а не прыжком.",
+  "output": "Кнопка «Наверх» в углу экрана плавно возвращает страницу к началу",
+  "tags": [
+    "scrollTo",
+    "плавная прокрутка",
+    "behavior smooth",
+    "кнопка наверх",
+    "прокрутка страницы"
+  ],
+  "aliases": [
+    "как плавно прокрутить страницу наверх js",
+    "window.scrollTo smooth",
+    "кнопка вернуться наверх",
+    "scrollTo с параметрами"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 27,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 10,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "window.scrollTo",
+      "kind": "fn",
+      "note": "scrollTo — прокручивает страницу к указанной координате.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 39,
+      "text": "smooth",
+      "kind": "kw",
+      "note": "smooth — плавная анимация прокрутки вместо мгновенного прыжка.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Кнопка «Наверх» в углу экрана плавно возвращает страницу к началу",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "document.body.style.minHeight = \"3000px\";\n\nconst topButton = document.createElement(\"button\");\ntopButton.textContent = \"Наверх\";\nObject.assign(topButton.style, { position: \"fixed\", right: \"16px\", bottom: \"16px\" });\ndocument.body.append(topButton);\n\ntopButton.addEventListener(\"click\", () => {\n  window.scrollTo({ top: 0, behavior: \"smooth\" });\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Кнопка «Наверх» в углу экрана плавно возвращает страницу к началу",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Добавляет на страницу длинный блок и кнопку",
+          "Прокручивает страницу"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "topButton"
+    ],
+    "requires": [],
+    "subcat": "Работа с DOM"
+  },
+  "enriched": true
+}

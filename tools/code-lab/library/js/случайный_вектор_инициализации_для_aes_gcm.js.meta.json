@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "случайный_вектор_инициализации_для_aes_gcm",
+  "file": "случайный_вектор_инициализации_для_aes_gcm.js",
+  "title": "Случайный вектор инициализации для AES-GCM",
+  "lang": "js",
+  "group": "Безопасность / Криптография",
+  "desc": "Для AES-GCM нужен вектор инициализации (iv) длиной 12 байт, уникальный для каждого шифрования с одним ключом. crypto.getRandomValues заполняет типизированный массив криптографически стойкими случайными байтами. Вектор не секретен и хранится рядом с шифртекстом. Повторное использование iv с тем же ключом полностью ломает безопасность режима GCM.",
+  "output": "12\nfalse",
+  "tags": [
+    "crypto.getRandomValues",
+    "Uint8Array",
+    "криптография"
+  ],
+  "aliases": [
+    "случайный вектор инициализации для aes-gcm",
+    "crypto.getRandomValues",
+    "Uint8Array"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 11,
+      "text": "crypto.getRandomValues",
+      "kind": "fn",
+      "note": "Заполняет массив случайными байтами."
+    },
+    {
+      "line": 0,
+      "col": 38,
+      "text": "Uint8Array",
+      "kind": "fn",
+      "note": "Массив байт длиной 12."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

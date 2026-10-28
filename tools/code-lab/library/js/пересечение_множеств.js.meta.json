@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "пересечение_множеств",
+  "file": "пересечение_множеств.js",
+  "title": "Пересечение множеств",
+  "lang": "js",
+  "group": "Данные / Сопоставление наборов",
+  "desc": "Метод intersection возвращает новое множество из элементов, которые есть в обоих множествах. Исходные множества не изменяются. Метод пришёл на смену ручной фильтрации через has и доступен в современных средах. Родственные методы — union, difference и symmetricDifference.",
+  "output": "[ 2, 3 ]",
+  "tags": [
+    "intersection",
+    "сопоставление наборов"
+  ],
+  "aliases": [
+    "пересечение множеств",
+    "intersection"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 3,
+      "col": 23,
+      "text": "intersection",
+      "kind": "fn",
+      "note": "Возвращает общие элементы двух множеств."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

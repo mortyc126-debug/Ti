@@ -20,6 +20,7 @@ import { annotateLines } from './code-lab/lib/annotate.mjs';
 import { createLibraryStore } from './code-lab/lib/library-store.mjs';
 import { createSearchService } from './code-lab/lib/search.mjs';
 import { tokenize } from './code-lab/lib/tokenizer.mjs';
+import { buildUsage, libraryFingerprint } from './code-lab/lib/dict-usage.mjs';   // dict-usage: связь «слово словаря ↔ куски»
 import { parseSnippets } from './code-lab/lib/ingest.mjs';
 import { createDescriptionQueue } from './code-lab/lib/describe-queue.mjs';
 import { createAiAssist } from './code-lab/lib/ai-assist.mjs';
@@ -147,6 +148,17 @@ async function kwDict(){
   base.synonyms = await loadSynonyms();   // синонимы/фразы для поиска по смыслу
   _kwDict = base;
   return _kwDict;
+}
+// ── dict-usage: индекс «слово/конструкция словаря ↔ куски». Не хранится: считается из кода и словаря, кэш сбрасывается сам ──
+let _usage = null, _usageKey = '';
+async function getUsage(){
+  const dict = await kwDict();
+  const entries = await store.entries();
+  const key = libraryFingerprint(entries);
+  if(_usage && _usage.__dict === dict && _usageKey === key) return _usage;
+  const u = buildUsage(dict, entries.map(e => ({ id: e.id, lang: String(e.lang || (e.meta && e.meta.lang) || 'txt').toLowerCase(), title: e.title, group: e.group, code: String(e.code || '') })));
+  u.__dict = dict; _usage = u; _usageKey = key;
+  return u;
 }
 // записать словарь языка в свой файл dict/langs/<lang>.json (мёрдж с существующим)
 async function saveLangDict(lang, pairs){
@@ -1149,6 +1161,39 @@ const server = http.createServer(async (req, res) => {
       await fs.mkdir(DICT_DIR, { recursive: true });
       await fs.writeFile(EXAMPLES_FILE, JSON.stringify(ex, null, 2), 'utf8'); _kwDict = null;
       return json(res, 200, { ok: true, term, example: ex[term] || null });
+    }
+
+    // ── dict-usage: связь «слово словаря ↔ куски» (только чтение; всё вычисляется из кода и словаря) ──
+    // GET /api/dict/usage[?section=lang:js]  → разделы с покрытием и по каждому термину { n, ids[≤8], kind }
+    if(u.pathname === '/api/dict/usage' && req.method === 'GET'){
+      const us = await getUsage(); const only = u.searchParams.get('section') || '';
+      const terms = {};
+      for(const [sid, m] of Object.entries(us.terms)){ if(only && sid !== only) continue; const o = {}; for(const [k, r] of Object.entries(m)) o[k] = [r.n, r.kind, ...r.ids.slice(0, 3)]; terms[sid] = o; }
+      return json(res, 200, { ok: true, pieces: us.pieceCount, ms: us.ms, sections: us.sections, terms });
+    }
+    // GET /api/dict/pieces?section=&term=  → все куски, где встречается термин
+    if(u.pathname === '/api/dict/pieces' && req.method === 'GET'){
+      const us = await getUsage(); const sid = u.searchParams.get('section') || '', term = u.searchParams.get('term') || '';
+      const list = us.piecesOf(sid, term).map(id => us.pieceInfo(id)).filter(Boolean);
+      return json(res, 200, { ok: true, section: sid, term, count: list.length, pieces: list });
+    }
+    // GET /api/dict/gaps?section=lang:js[&format=text]  → термины без единого куска («чего не хватает»)
+    if(u.pathname === '/api/dict/gaps' && req.method === 'GET'){
+      const us = await getUsage(); const sid = u.searchParams.get('section') || '';
+      const secs = sid ? [sid] : us.sections.map(s => s.id);
+      const items = []; for(const s of secs) for(const g of us.gaps(s)) items.push({ section: s, term: g.term, note: g.note, kind: g.kind });
+      const lang = sid.startsWith('lang:') ? sid.slice(5) : (sid === 'html' || sid === 'css' ? sid : '');
+      const text = items.map(g => g.term + ': ' + g.note).join('\n');
+      const prompt = 'Язык: ' + (lang || 'разные') + '.\nНиже — слова и конструкции из моего словаря, для которых в библиотеке ещё нет ни одного куска кода (формат «термин: пояснение»).\n'
+        + 'Для КАЖДОЙ напиши короткий рабочий кусок (3–10 строк), в котором эта конструкция используется. Выдай строго пачкой в таком формате, без лишнего текста:\n'
+        + '=== Название | ' + (lang || 'язык') + ' | Раздел / Подраздел\nкод\n\nИмена переменных в коде выбирай обычные (не «element», «value» и т. п. из пояснений).\n\n' + items.slice(0, 80).map(g => g.term + ': ' + g.note).join('\n');
+      return json(res, 200, { ok: true, section: sid, count: items.length, items: items.slice(0, 3000), text, prompt });
+    }
+    // GET /api/piece/terms?id=  → слова/конструкции словаря в этом куске и где ещё они встречаются
+    if(u.pathname === '/api/piece/terms' && req.method === 'GET'){
+      const us = await getUsage(); const id = u.searchParams.get('id') || '';
+      const rows = us.termsOfPiece(id).map(r => ({ ...r, others: r.others.map(x => us.pieceInfo(x)).filter(Boolean) }));
+      return json(res, 200, { ok: true, id, count: rows.length, terms: rows });
     }
 
     // сборщик «непонятных слов»: из кода (или из кусков языка) собираем токены, которых НЕТ в словаре,

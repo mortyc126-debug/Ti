@@ -1,0 +1,121 @@
+{
+  "schema": 1,
+  "id": "декодирование-текста-декодировать-байтовый-поток",
+  "file": "декодирование-текста-декодировать-байтовый-поток.js",
+  "lang": "js",
+  "title": "Декодирование текста декодировать байтовый поток",
+  "group": "Сеть и запросы / Получить данные",
+  "desc": "Декодирует Uint8Array в текст; stream:true сохраняет состояние между частями UTF-8.",
+  "output": "зависит от bytes1 и bytes2",
+  "descAt": 1792998620444,
+  "component": {
+    "provides": [
+      "decoder",
+      "часть1",
+      "часть2",
+      "конец"
+    ],
+    "requires": [
+      "TextDecoder",
+      "bytes1",
+      "stream",
+      "bytes2"
+    ],
+    "tags": {
+      "purpose": [
+        "Сеть и запросы"
+      ]
+    },
+    "subcat": "Получить данные"
+  },
+  "tags": [
+    "TextDecoder",
+    "UTF-8",
+    "потоки"
+  ],
+  "aliases": [
+    "декодировать поток байтов в текст",
+    "чанки UTF-8",
+    "не ломать символы между чанками"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 16,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 48,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 48,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическая «истина» (да).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

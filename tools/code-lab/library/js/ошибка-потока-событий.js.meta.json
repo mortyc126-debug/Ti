@@ -1,0 +1,186 @@
+{
+  "schema": 1,
+  "id": "ошибка-потока-событий",
+  "file": "ошибка-потока-событий.js",
+  "title": "Обработать ошибку или обрыв потока событий",
+  "lang": "js",
+  "group": "Состояние / Потоки обновлений",
+  "desc": "onerror срабатывает при обрыве; если readyState равен CLOSED, браузер уже не будет переподключаться, иначе он пробует сам.",
+  "output": "При обрыве: «Связь потеряна, браузер переподключается»",
+  "tags": [
+    "EventSource",
+    "SSE",
+    "onerror",
+    "переподключение",
+    "readyState"
+  ],
+  "aliases": [
+    "как обработать обрыв sse",
+    "source.onerror пример",
+    "EventSource переподключение"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "source.onerror",
+      "kind": "onerror — ошибка или обрыв потока; браузер обычно переподключается сам.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "else",
+      "kind": "kw",
+      "note": "else — «иначе»: блок выполняется, если условие if ложно.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Состояние"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "При обрыве: «Связь потеряна, браузер переподключается»",
+      "dependencies": [],
+      "requirements": [
+        "Нужен сервер, отдающий поток событий по адресу /events."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const source = new EventSource(\"/events\");\n\nsource.onerror = () => {\n  if (source.readyState === EventSource.CLOSED) {\n    console.log(\"Поток закрыт окончательно\");\n  } else {\n    console.log(\"Связь потеряна, браузер переподключается\");\n  }\n};"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "При обрыве: «Связь потеряна, браузер переподключается»",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Сообщения не приходят",
+            "cause": "Сервер не отдаёт text/event-stream по адресу /events",
+            "solution": "Проверь ответ сервера во вкладке Network"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "source"
+    ],
+    "requires": [],
+    "subcat": "Потоки обновлений"
+  },
+  "enriched": true
+}

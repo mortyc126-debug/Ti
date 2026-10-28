@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "id": "перехват-запросов-в-service-worker",
+  "file": "перехват-запросов-в-service-worker.js",
+  "title": "Перехватывать сетевые запросы в Service Worker",
+  "lang": "js",
+  "group": "Кэширование / Service Worker",
+  "desc": "Событие fetch позволяет ответить из кэша, а при его отсутствии сходить в сеть; respondWith подставляет ответ вместо стандартного.",
+  "output": "Запросы GET отдаются из кэша, если ответ там есть, иначе идут в сеть",
+  "tags": [
+    "Service Worker",
+    "fetch",
+    "respondWith",
+    "кэш",
+    "офлайн"
+  ],
+  "aliases": [
+    "как перехватить fetch в service worker",
+    "cache first стратегия",
+    "ответить из кэша или из сети"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 5,
+      "text": "addEventListener(\"fetch\"",
+      "kind": "fetch — событие: страница отправила сетевой запрос, worker может его перехватить.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 38,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "respondWith",
+      "kind": "respondWith — подменяет ответ на запрос.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Кэширование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Service Worker"
+      ],
+      "technology": [
+        "JavaScript",
+        "Service Worker"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Запросы GET отдаются из кэша, если ответ там есть, иначе идут в сеть",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "self.addEventListener(\"fetch\", event => {\n  if (event.request.method !== \"GET\") return;\n\n  event.respondWith(\n    caches.match(event.request).then(cached => cached ?? fetch(event.request))\n  );\n});"
+        },
+        "steps": [
+          "Сохрани код как sw.js в корне сайта и зарегистрируй: navigator.serviceWorker.register(\"/sw.js\").",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Запросы GET отдаются из кэша, если ответ там есть, иначе идут в сеть",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Первая установка worker",
+            "Обновление worker",
+            "Работа без сети"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Service Worker не регистрируется",
+            "cause": "Страница открыта не по HTTPS или localhost, либо sw.js лежит не в корне сайта",
+            "solution": "Открой сайт по https или http://localhost и проверь вкладку Application → Service Workers"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Service Worker"
+  },
+  "enriched": true
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "ограничение-частоты-вызовов-ограничить-частоту-вызовов",
+  "file": "ограничение-частоты-вызовов-ограничить-частоту-вызовов.js",
+  "title": "Ограничение частоты вызовов ограничить частоту вызовов",
+  "lang": "js",
+  "group": "Повседневная разработка / Производительность",
+  "desc": "Пропускает вызов не чаще одного раза за заданный интервал.",
+  "output": "Не чаще одного вызова за 100 мс",
+  "tags": [
+    "leading-only throttle",
+    "временные метки"
+  ],
+  "aliases": [
+    "throttle",
+    "ограничить частоту",
+    "mousemove throttle"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "leading-only throttle",
+      "kind": "concept",
+      "note": "leading-only throttle — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "временные метки",
+      "kind": "concept",
+      "note": "временные метки — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "id": "генератор-выдаёт-значения-по-запросу",
+  "file": "генератор-выдаёт-значения-по-запросу.js",
+  "title": "Объявить функцию-генератор: function* generator() { yield value }",
+  "lang": "js",
+  "group": "Основы / Итераторы и генераторы",
+  "desc": "Генератор выдаёт значения по одному при вызове next() и запоминает своё состояние между вызовами; здесь — бесконечный счётчик идентификаторов.",
+  "output": "1 2 3",
+  "tags": [
+    "function*",
+    "генератор",
+    "next",
+    "идентификаторы"
+  ],
+  "aliases": [
+    "как работает генератор js",
+    "function* пример",
+    "генератор id"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function*",
+      "kind": "function* — генератор: возвращает значения по одному через yield.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "while",
+      "kind": "kw",
+      "note": "while — «пока»: повторять блок, пока условие истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "1 2 3",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function* generator() {\n  let id = 1;\n  while (true) {\n    yield id++;\n  }\n}\n\nconst ids = generator();\nconsole.log(ids.next().value, ids.next().value, ids.next().value);"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "1 2 3",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "generator",
+      "ids"
+    ],
+    "requires": [],
+    "subcat": "Итераторы и генераторы"
+  },
+  "enriched": true
+}

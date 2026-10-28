@@ -1,0 +1,172 @@
+{
+  "schema": 1,
+  "id": "уменьшение-анимации-по-настройке",
+  "file": "уменьшение-анимации-по-настройке.js",
+  "title": "Уважать настройку «уменьшить анимацию»",
+  "lang": "js",
+  "group": "Графика и визуализация / Анимация",
+  "desc": "matchMedia(\"(prefers-reduced-motion: reduce)\").matches показывает, попросил ли пользователь в системе меньше движения; тогда анимацию отключают или упрощают.",
+  "output": "Квадрат плавно едет вправо за 600 мс; если в системе включено «уменьшить движение» — сразу оказывается справа",
+  "tags": [
+    "prefers-reduced-motion",
+    "matchMedia",
+    "анимация",
+    "доступность",
+    "настройки пользователя"
+  ],
+  "aliases": [
+    "как отключить анимацию если пользователь просит",
+    "prefers-reduced-motion в js",
+    "matchMedia reduce",
+    "доступная анимация"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 21,
+      "text": "window.matchMedia",
+      "kind": "fn",
+      "note": "matchMedia — проверяет медиазапрос из JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 41,
+      "text": "prefers-reduced-motion",
+      "kind": "kw",
+      "note": "prefers-reduced-motion — настройка системы «уменьшить движение».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Графика и визуализация"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Квадрат плавно едет вправо за 600 мс; если в системе включено «уменьшить движение» — сразу оказывается справа",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const reduceMotion = window.matchMedia(\"(prefers-reduced-motion: reduce)\").matches;\n\nconst square = document.createElement(\"div\");\nObject.assign(square.style, { width: \"60px\", height: \"60px\", background: \"tomato\" });\ndocument.body.append(square);\n\nsquare.animate(\n  [{ transform: \"translateX(0)\" }, { transform: \"translateX(240px)\" }],\n  { duration: reduceMotion ? 0 : 600, fill: \"forwards\" }\n);\n\nconsole.log(reduceMotion ? \"Анимация отключена\" : \"Анимация включена\");"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Квадрат плавно едет вправо за 600 мс; если в системе включено «уменьшить движение» — сразу оказывается справа",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Добавляет анимированный квадрат на страницу"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "reduceMotion",
+      "square"
+    ],
+    "requires": [],
+    "subcat": "Анимация"
+  },
+  "enriched": true
+}

@@ -1,0 +1,249 @@
+{
+  "schema": 1,
+  "id": "ошибка,-когда-отказали-все-промисы",
+  "file": "ошибка,-когда-отказали-все-промисы.js",
+  "title": "Ошибка, когда отказали все промисы",
+  "lang": "js",
+  "group": "Асинхронность / Промисы",
+  "desc": "Обрабатывает AggregateError, если все Promise завершились отказом.",
+  "output": "true\n[ 'первая ошибка', 'вторая ошибка' ]",
+  "tags": [
+    "Promise.any",
+    "AggregateError",
+    "все отказали",
+    "обработка ошибок"
+  ],
+  "aliases": [
+    "что вернёт promise any если все промисы упали",
+    "aggregateerror пример",
+    "список всех причин отказа",
+    "обработать ошибку any",
+    "errors у aggregateerror"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "reject",
+      "kind": "fn",
+      "note": "reject — создаёт отклонённый Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 17,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 10,
+      "text": "reject",
+      "kind": "fn",
+      "note": "reject — создаёт отклонённый Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 17,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "any",
+      "kind": "fn",
+      "note": "any — первый успешный результат; если все отклонены, ошибка AggregateError.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 19,
+      "text": "catch",
+      "kind": "fn",
+      "note": "catch — обрабатывает отказ Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 20,
+      "text": "instanceof",
+      "kind": "kw",
+      "note": "instanceof — проверяет, создан ли объект данным классом.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 31,
+      "text": "AggregateError",
+      "kind": "fn",
+      "note": "AggregateError — ошибка со списком нескольких причин в свойстве errors.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 27,
+      "text": "map",
+      "kind": "fn",
+      "note": "map — возвращает новый массив, применяя функцию к каждому элементу.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "true\n[ 'первая ошибка', 'вторая ошибка' ]",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const tasks = [\n  Promise.reject(new Error(\"первая ошибка\")),\n  Promise.reject(new Error(\"вторая ошибка\")),\n];\nPromise.any(tasks).catch(error => {\n  console.log(error instanceof AggregateError);\n  console.log(error.errors.map(причина => причина.message));\n});"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "true\n[ 'первая ошибка', 'вторая ошибка' ]",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "tasks"
+    ],
+    "requires": [],
+    "subcat": "Промисы"
+  },
+  "enriched": true
+}

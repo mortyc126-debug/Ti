@@ -1,0 +1,215 @@
+{
+  "schema": 1,
+  "id": "статусы-всех-промисов",
+  "file": "статусы-всех-промисов.js",
+  "title": "Статусы всех промисов",
+  "lang": "js",
+  "group": "Асинхронность / Промисы",
+  "desc": "Дожидается всех Promise и возвращает статус каждого.",
+  "output": "[ 'fulfilled', 'rejected' ]\nсбой",
+  "tags": [
+    "Promise.allSettled",
+    "статусы",
+    "независимые задачи",
+    "fulfilled и rejected"
+  ],
+  "aliases": [
+    "как дождаться всех промисов независимо от ошибок",
+    "promise allsettled пример",
+    "статус каждого промиса",
+    "fulfilled rejected в результатах",
+    "собрать успехи и ошибки"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "allSettled",
+      "kind": "fn",
+      "note": "allSettled — ждёт все Promise и возвращает статус каждого.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "resolve",
+      "kind": "fn",
+      "note": "resolve — создаёт выполненный Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 10,
+      "text": "reject",
+      "kind": "fn",
+      "note": "reject — создаёт отклонённый Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 17,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 3,
+      "text": "then",
+      "kind": "fn",
+      "note": "then — обрабатывает успешный результат Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 25,
+      "text": "map",
+      "kind": "fn",
+      "note": "map — возвращает новый массив, применяя функцию к каждому элементу.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "[ 'fulfilled', 'rejected' ]\nсбой",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "Promise.allSettled([\n  Promise.resolve(\"успех\"),\n  Promise.reject(new Error(\"сбой\")),\n]).then(результаты => {\n  console.log(результаты.map(результат => результат.status));\n  console.log(результаты[1].reason.message);\n});"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "[ 'fulfilled', 'rejected' ]\nсбой",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Промисы"
+  },
+  "enriched": true
+}

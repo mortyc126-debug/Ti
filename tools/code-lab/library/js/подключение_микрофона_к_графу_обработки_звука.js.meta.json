@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "подключение_микрофона_к_графу_обработки_звука",
+  "file": "подключение_микрофона_к_графу_обработки_звука.js",
+  "title": "Подключение микрофона к графу обработки звука",
+  "lang": "js",
+  "group": "Графика и визуализация / Звук",
+  "desc": "createMediaStreamSource превращает поток с микрофона (результат getUserMedia) в узел Web Audio, который можно соединять с анализатором, усилителем и другими узлами. Браузер сначала запросит у пользователя разрешение на микрофон. Чтобы не слышать эхо, не подключайте источник напрямую к destination. Не забудьте останавливать дорожки потока, когда запись закончена.",
+  "output": "Звук с микрофона попадает на анализатор.",
+  "tags": [
+    "createMediaStreamSource",
+    "getUserMedia",
+    "звук"
+  ],
+  "aliases": [
+    "подключение микрофона к графу обработки звука",
+    "createMediaStreamSource",
+    "getUserMedia"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 43,
+      "text": "getUserMedia",
+      "kind": "fn",
+      "note": "Запрашивает доступ к микрофону или камере."
+    },
+    {
+      "line": 3,
+      "col": 22,
+      "text": "createMediaStreamSource",
+      "kind": "fn",
+      "note": "Создаёт узел из потока с микрофона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "id": "ошибка-соединения-websocket",
+  "file": "ошибка-соединения-websocket.js",
+  "title": "Обработать ошибку соединения WebSocket",
+  "lang": "js",
+  "group": "Сеть / WebSocket",
+  "desc": "Событие error срабатывает, когда соединение не удалось установить или оно сломалось; подробностей об ошибке браузер не даёт.",
+  "output": "Если сервер выключен: «Ошибка соединения с сервером»",
+  "tags": [
+    "WebSocket",
+    "error",
+    "ошибка соединения",
+    "обработка ошибок"
+  ],
+  "aliases": [
+    "как поймать ошибку websocket",
+    "socket error event пример",
+    "сервер websocket недоступен"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 7,
+      "text": "addEventListener(\"error\"",
+      "kind": "error — не удалось подключиться или соединение сломалось.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Сеть"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Если сервер выключен: «Ошибка соединения с сервером»",
+      "dependencies": [],
+      "requirements": [
+        "Нужен WebSocket-сервер на ws://localhost:8080 (подойдёт любой эхо-сервер)."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const serverUrl = \"ws://localhost:8080\";\nconst socket = new WebSocket(serverUrl);\n\nsocket.addEventListener(\"error\", () => {\n  console.log(\"Ошибка соединения с сервером\");\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Если сервер выключен: «Ошибка соединения с сервером»",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка соединения",
+            "cause": "Не запущен сервер на ws://localhost:8080",
+            "solution": "Запусти сервер WebSocket или поменяй адрес serverUrl"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "serverUrl",
+      "socket"
+    ],
+    "requires": [],
+    "subcat": "WebSocket"
+  },
+  "enriched": true
+}

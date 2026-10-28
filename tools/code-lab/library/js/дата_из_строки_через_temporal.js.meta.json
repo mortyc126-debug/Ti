@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "дата_из_строки_через_temporal",
+  "file": "дата_из_строки_через_temporal.js",
+  "title": "Дата из строки через Temporal",
+  "lang": "js",
+  "group": "Данные / Дата и время",
+  "desc": "Temporal — современный API дат и времени, который заменяет неудобный Date. Temporal.PlainDate описывает календарную дату без времени и часового пояса; метод from разбирает строку формата ISO. Объекты неизменяемы: add возвращает новую дату, а исходная остаётся прежней. API пока есть не везде, поэтому проверяйте поддержку или подключайте полифил.",
+  "output": "2026-01-31",
+  "tags": [
+    "Temporal.PlainDate",
+    "add",
+    "дата и время"
+  ],
+  "aliases": [
+    "дата из строки через temporal",
+    "Temporal.PlainDate",
+    "add"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 13,
+      "text": "Temporal.PlainDate",
+      "kind": "concept",
+      "note": "Календарная дата без времени."
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "add",
+      "kind": "fn",
+      "note": "Возвращает новую дату со сдвигом."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

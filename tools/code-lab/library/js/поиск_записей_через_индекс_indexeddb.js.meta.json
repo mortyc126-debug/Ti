@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "поиск_записей_через_индекс_indexeddb",
+  "file": "поиск_записей_через_индекс_indexeddb.js",
+  "title": "Поиск записей через индекс IndexedDB",
+  "lang": "js",
+  "group": "Базы данных / Запросы",
+  "desc": "Индекс в IndexedDB позволяет искать записи не только по ключу, но и по другому полю. Его создают при обновлении схемы методом createIndex, а затем запрашивают через store.index(имя). Метод getAll возвращает все записи с заданным значением поля. Функция wrap из библиотеки idb превращает запрос в Promise. Без индекса пришлось бы перебирать всё хранилище.",
+  "output": "Число записей с названием «чай».",
+  "tags": [
+    "createIndex",
+    "getAll",
+    "запросы"
+  ],
+  "aliases": [
+    "поиск записей через индекс indexeddb",
+    "createIndex",
+    "getAll"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 5,
+      "col": 12,
+      "text": "createIndex",
+      "kind": "fn",
+      "note": "Создаёт индекс по полю записей."
+    },
+    {
+      "line": 10,
+      "col": 55,
+      "text": "getAll",
+      "kind": "fn",
+      "note": "Возвращает все подходящие записи."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

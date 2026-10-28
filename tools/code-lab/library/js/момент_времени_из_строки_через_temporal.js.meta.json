@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "момент_времени_из_строки_через_temporal",
+  "file": "момент_времени_из_строки_через_temporal.js",
+  "title": "Момент времени из строки через Temporal",
+  "lang": "js",
+  "group": "Данные / Дата и время",
+  "desc": "Temporal.Instant описывает точный момент на временной шкале без привязки к часовому поясу. Метод from разбирает строку ISO 8601 с указанием часового пояса (Z — UTC). Из момента получают метку времени в миллисекундах (epochMilliseconds) и преобразуют его в локальное время через toZonedDateTimeISO. Объекты Temporal неизменяемы. API пока есть не везде.",
+  "output": "1767225600000",
+  "tags": [
+    "Temporal.Instant",
+    "epochMilliseconds",
+    "дата и время"
+  ],
+  "aliases": [
+    "момент времени из строки через temporal",
+    "Temporal.Instant",
+    "epochMilliseconds"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 15,
+      "text": "Temporal.Instant",
+      "kind": "concept",
+      "note": "Точный момент времени без часового пояса."
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "epochMilliseconds",
+      "kind": "concept",
+      "note": "Число миллисекунд с начала эпохи Unix."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "остаточные-параметры-остаточные-параметры",
+  "file": "остаточные-параметры-остаточные-параметры.js",
+  "title": "Остаточные параметры остаточные параметры",
+  "lang": "js",
+  "group": "Основы / Функции",
+  "desc": "Собирает любое количество переданных аргументов в массив.",
+  "output": "10",
+  "tags": [
+    "rest и spread различаются",
+    "массив аргументов"
+  ],
+  "aliases": [
+    "rest parameters",
+    "...args",
+    "неограниченное число аргументов"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "rest и spread различаются",
+      "kind": "concept",
+      "note": "rest и spread различаются — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "массив аргументов",
+      "kind": "concept",
+      "note": "массив аргументов — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

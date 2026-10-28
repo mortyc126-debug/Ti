@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Атомарное чтение памяти",
+  "group": "Асинхронность / Надёжность",
+  "desc": "Атомарное чтение памяти.",
+  "code": "const память = new SharedArrayBuffer(4);\nconst числа = new Int32Array(память);\nAtomics.store(числа, 0, 17);\nconsole.log(Atomics.load(числа, 0));",
+  "output": "17",
+  "words": {
+    "Atomics.load": "Атомарно читает значение общей памяти."
+  }
+}

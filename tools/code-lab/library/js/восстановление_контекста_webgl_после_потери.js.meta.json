@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "id": "восстановление_контекста_webgl_после_потери",
+  "file": "восстановление_контекста_webgl_после_потери.js",
+  "title": "Восстановление контекста WebGL после потери",
+  "lang": "js",
+  "group": "Графика и визуализация / WebGL",
+  "desc": "Контекст WebGL может быть потерян в любой момент: драйвер перезапустился, видеопамяти не хватило, вкладка долго была в фоне. Событие webglcontextlost по умолчанию окончательно закрывает контекст, а вызов preventDefault сообщает браузеру, что вы готовы к восстановлению. После события webglcontextrestored все ресурсы — буферы, текстуры, шейдеры — нужно создать заново, потому что старые объекты стали недействительными. Пока контекст потерян, цикл отрисовки лучше остановить.",
+  "output": "При сбое графики сцена автоматически перестраивается и снова рисуется.",
+  "tags": [
+    "webglcontextlost",
+    "preventDefault",
+    "webglcontextrestored",
+    "webgl"
+  ],
+  "aliases": [
+    "восстановление контекста webgl после потери",
+    "webglcontextlost",
+    "preventDefault",
+    "webglcontextrestored"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 3,
+      "col": 24,
+      "text": "webglcontextlost",
+      "kind": "concept",
+      "note": "Событие потери контекста WebGL."
+    },
+    {
+      "line": 4,
+      "col": 10,
+      "text": "preventDefault",
+      "kind": "fn",
+      "note": "Разрешает браузеру восстановить контекст."
+    },
+    {
+      "line": 8,
+      "col": 24,
+      "text": "webglcontextrestored",
+      "kind": "concept",
+      "note": "Событие, после которого ресурсы нужно создать заново."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

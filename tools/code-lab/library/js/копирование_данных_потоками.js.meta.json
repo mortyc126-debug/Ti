@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "копирование_данных_потоками",
+  "file": "копирование_данных_потоками.js",
+  "title": "Копирование данных потоками",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Потоки",
+  "desc": "Копирование файла потоками читает и пишет данные порциями, не загружая файл целиком в память. pipeline надёжнее старого метода .pipe: он закрывает все потоки при ошибке и не оставляет «висящих» файловых дескрипторов. Результат — Promise, поэтому ошибки перехватываются обычным try/catch. Для простого копирования небольших файлов подойдёт copyFile.",
+  "output": "Скопировано",
+  "tags": [
+    "createReadStream",
+    "createWriteStream",
+    "потоки"
+  ],
+  "aliases": [
+    "копирование данных потоками",
+    "createReadStream",
+    "createWriteStream"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 9,
+      "text": "createReadStream",
+      "kind": "concept",
+      "note": "Открывает файл для чтения потоком."
+    },
+    {
+      "line": 0,
+      "col": 27,
+      "text": "createWriteStream",
+      "kind": "concept",
+      "note": "Открывает файл для записи потоком."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

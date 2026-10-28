@@ -1,0 +1,178 @@
+{
+  "schema": 1,
+  "id": "захват-указателя-мыши-requestpointerlock",
+  "file": "захват-указателя-мыши-requestpointerlock.js",
+  "title": "Захватить указатель мыши для управления камерой: requestPointerLock",
+  "lang": "js",
+  "group": "Игры и интерактивные проекты / Движение и отрисовка",
+  "desc": "requestPointerLock прячет курсор и отдаёт только смещения мыши (movementX, movementY) — так делают управление взглядом в 3D. Запрашивать можно только из клика.",
+  "output": "После клика по canvas курсор скрывается, при движении мыши: «Поворот: 3, -1»",
+  "tags": [
+    "requestPointerLock",
+    "movementX",
+    "захват мыши",
+    "игры"
+  ],
+  "aliases": [
+    "как захватить мышь в js игре",
+    "requestPointerLock пример",
+    "управление камерой мышью"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 46,
+      "text": "requestPointerLock",
+      "kind": "requestPointerLock — захватывает указатель: курсор скрыт, приходят только смещения.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 9,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Игры и интерактивные проекты"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "После клика по canvas курсор скрывается, при движении мыши: «Поворот: 3, -1»",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const canvas = document.createElement(\"canvas\");\ncanvas.width = 300;\ncanvas.height = 200;\ndocument.body.append(canvas);\n\ncanvas.addEventListener(\"click\", () => canvas.requestPointerLock());\n\ndocument.addEventListener(\"mousemove\", event => {\n  if (document.pointerLockElement === canvas) {\n    console.log(`Поворот: ${event.movementX}, ${event.movementY}`);\n  }\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "После клика по canvas курсор скрывается, при движении мыши: «Поворот: 3, -1»",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Добавляет canvas на страницу",
+          "Скрывает курсор"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "canvas"
+    ],
+    "requires": [],
+    "subcat": "Движение и отрисовка"
+  },
+  "enriched": true
+}

@@ -1,0 +1,153 @@
+{
+  "schema": 1,
+  "id": "вызов-функции-если-она-есть",
+  "file": "вызов-функции-если-она-есть.js",
+  "title": "Вызвать функцию, только если она есть: fn?.()",
+  "lang": "js",
+  "group": "Основы / Функции",
+  "desc": "Оператор ?.() вызывает функцию, если она не null и не undefined; иначе просто возвращает undefined без ошибки.",
+  "output": "Загрузка a.txt\nКолбэк: готово\nЗагрузка b.txt",
+  "tags": [
+    "optional chaining",
+    "?.()",
+    "необязательный колбэк",
+    "вызов функции"
+  ],
+  "aliases": [
+    "как вызвать колбэк если он передан js",
+    "fn?.() пример",
+    "необязательная функция"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "",
+      "kind": "?.() — вызвать, только если функция существует.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 28,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 36,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Загрузка a.txt\nКолбэк: готово\nЗагрузка b.txt",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function download(url, onDone) {\n  console.log(`Загрузка ${url}`);\n  onDone?.(\"готово\");\n}\n\ndownload(\"a.txt\", result => console.log(`Колбэк: ${result}`));\ndownload(\"b.txt\");"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Загрузка a.txt\nКолбэк: готово\nЗагрузка b.txt",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "download"
+    ],
+    "requires": [],
+    "subcat": "Функции"
+  },
+  "enriched": true
+}

@@ -1,0 +1,12 @@
+{
+  "lang": "js",
+  "title": "Изменение размера изменяемого буфера",
+  "group": "Файлы, хранение и сервер / Двоичные данные",
+  "desc": "ArrayBuffer с запасом можно растянуть без копирования данных.",
+  "code": "const буфер = new ArrayBuffer(8, { maxByteLength: 32 });\nconsole.log(буфер.byteLength);\n\nбуфер.resize(16);\nconsole.log(буфер.byteLength);",
+  "output": "8\n16",
+  "words": {
+    "resize": "Меняет размер изменяемого ArrayBuffer.",
+    "maxByteLength": "Максимально допустимый размер буфера."
+  }
+}

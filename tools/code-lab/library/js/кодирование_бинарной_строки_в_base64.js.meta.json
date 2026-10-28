@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "кодирование_бинарной_строки_в_base64",
+  "file": "кодирование_бинарной_строки_в_base64.js",
+  "title": "Кодирование бинарной строки в Base64",
+  "lang": "js",
+  "group": "Данные / Строки и текст",
+  "desc": "btoa кодирует строку в Base64, но принимает только символы с кодами до 255 («бинарную строку»). Любой символ вне этого диапазона, например кириллица, вызывает InvalidCharacterError. Для обычного текста сначала превращают строку в байты UTF-8 через TextEncoder, затем байты — в бинарную строку, и только потом кодируют. Обратные операции выполняет atob.",
+  "output": "SGVsbG8=\nInvalidCharacterError\n0J/RgNC40LLQtdGC",
+  "tags": [
+    "btoa",
+    "String.fromCharCode",
+    "строки и текст"
+  ],
+  "aliases": [
+    "кодирование бинарной строки в base64",
+    "btoa",
+    "String.fromCharCode"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 12,
+      "text": "btoa",
+      "kind": "fn",
+      "note": "Кодирует бинарную строку в Base64."
+    },
+    {
+      "line": 9,
+      "col": 17,
+      "text": "String.fromCharCode",
+      "kind": "fn",
+      "note": "Превращает коды в символы."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

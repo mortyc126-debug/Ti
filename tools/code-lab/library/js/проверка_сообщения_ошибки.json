@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Проверка сообщения ошибки",
+  "group": "Тестирование / Проверки функций",
+  "desc": "Проверка сообщения ошибки.",
+  "code": "import assert from \"node:assert/strict\";\nawait assert.rejects(Promise.reject(new Error(\"Failed\")), { message: \"Failed\" });",
+  "output": "Проверка прошла.",
+  "words": {
+    "message": "Ожидаемый текст сообщения ошибки."
+  }
+}

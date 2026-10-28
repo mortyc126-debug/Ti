@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "хеш_sha_256_через_web_crypto_api",
+  "file": "хеш_sha_256_через_web_crypto_api.js",
+  "title": "Хеш SHA-256 через Web Crypto API",
+  "lang": "js",
+  "group": "Безопасность / Криптография",
+  "desc": "crypto.subtle.digest вычисляет криптографический хеш байтов и возвращает Promise с ArrayBuffer. Для SHA-256 длина результата всегда 32 байта. Хеш не позволяет восстановить исходные данные, но одинаковые данные всегда дают одинаковый хеш. Метод работает в браузерах и в Node.js. Для хранения паролей обычные хеши не подходят — нужны специальные медленные алгоритмы.",
+  "output": "32\n229",
+  "tags": [
+    "crypto.subtle.digest",
+    "SHA-256",
+    "криптография"
+  ],
+  "aliases": [
+    "хеш sha-256 через web crypto api",
+    "crypto.subtle.digest",
+    "SHA-256"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 18,
+      "text": "crypto.subtle.digest",
+      "kind": "fn",
+      "note": "Вычисляет хеш данных."
+    },
+    {
+      "line": 1,
+      "col": 40,
+      "text": "SHA-256",
+      "kind": "concept",
+      "note": "Алгоритм хеширования с результатом 32 байта."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

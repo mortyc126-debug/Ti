@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "диалог_сохранения_файла_с_допустимыми_типами",
+  "file": "диалог_сохранения_файла_с_допустимыми_типами.js",
+  "title": "Диалог сохранения файла с допустимыми типами",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "showSaveFilePicker открывает диалог сохранения и возвращает дескриптор нового или существующего файла. Параметр suggestedName предлагает имя, а types — допустимые расширения. Вызывать можно только по действию пользователя, а отказ пользователя приходит как AbortError. Дескриптор сам ничего не записывает: данные пишут через createWritable.",
+  "output": "Имя выбранного файла; при отмене диалога ничего не происходит.",
+  "tags": [
+    "showSaveFilePicker",
+    "suggestedName",
+    "файловая система"
+  ],
+  "aliases": [
+    "диалог сохранения файла с допустимыми типами",
+    "showSaveFilePicker",
+    "suggestedName"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 34,
+      "text": "showSaveFilePicker",
+      "kind": "fn",
+      "note": "Открывает диалог сохранения файла."
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "suggestedName",
+      "kind": "concept",
+      "note": "Предлагаемое имя файла."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

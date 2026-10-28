@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "id": "проверка-отображения-элемента-checkvisibility",
+  "file": "проверка-отображения-элемента-checkvisibility.js",
+  "title": "Проверить, отображается ли элемент: checkVisibility()",
+  "lang": "js",
+  "group": "Интерфейс / Работа с DOM",
+  "desc": "checkVisibility() возвращает false для display: none и скрытых предков; visibility: hidden учитывается только с параметром visibilityProperty.",
+  "output": "shown true\nremoved false\ninvisible true\ninvisible с visibilityProperty false",
+  "tags": [
+    "checkVisibility",
+    "видимость",
+    "display none",
+    "visibility"
+  ],
+  "aliases": [
+    "как проверить виден ли элемент js",
+    "checkVisibility пример",
+    "элемент скрыт display none"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 5,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторяет блок для каждого элемента или шага.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 5,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 14,
+      "text": "of",
+      "kind": "kw",
+      "note": "of — в цикле for...of: перебрать значения по одному.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 46,
+      "text": "checkVisibility",
+      "kind": "checkVisibility — отображается ли элемент на странице.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "shown true\nremoved false\ninvisible true\ninvisible с visibilityProperty false",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "document.body.innerHTML = `\n  <div id=\"shown\">Виден</div>\n  <div id=\"removed\" style=\"display: none\">Скрыт</div>\n  <div id=\"invisible\" style=\"visibility: hidden\">Невидим</div>`;\n\nfor (const id of [\"shown\", \"removed\", \"invisible\"]) {\n  console.log(id, document.getElementById(id).checkVisibility());\n}\n\nconst invisible = document.getElementById(\"invisible\");\nconsole.log(\"invisible с visibilityProperty\", invisible.checkVisibility({ visibilityProperty: true }));"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "shown true\nremoved false\ninvisible true\ninvisible с visibilityProperty false",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "invisible"
+    ],
+    "requires": [],
+    "subcat": "Работа с DOM"
+  },
+  "enriched": true
+}

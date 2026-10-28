@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Проверка свойств ошибки Promise",
+  "group": "Тестирование / Проверки функций",
+  "desc": "Проверка свойств ошибки Promise.",
+  "code": "import { expect, test } from \"vitest\";\ntest(\"ответ не найден\", async () => {\n  await expect(Promise.reject({ status: 404 })).rejects.toMatchObject({ status: 404 });\n});",
+  "output": "Тест проходит, если ошибка содержит status: 404.",
+  "words": {
+    "toMatchObject": "Проверяет наличие ожидаемых свойств у объекта."
+  }
+}

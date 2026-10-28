@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Запрос без передачи реферера",
+  "group": "Сеть и API / Безопасность запросов",
+  "desc": "Адрес текущей страницы не раскрывается стороннему серверу.",
+  "code": "const ответ = await fetch(\"https://api.example.com/счётчик\", {\n  referrerPolicy: \"no-referrer\",\n});\nconsole.log(ответ.status);",
+  "output": "Запрос выполняется без заголовка Referer.",
+  "words": {
+    "referrerPolicy": "Определяет, какой реферер передать в запросе."
+  }
+}

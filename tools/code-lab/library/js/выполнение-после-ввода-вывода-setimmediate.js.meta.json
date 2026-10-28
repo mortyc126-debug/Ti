@@ -1,0 +1,186 @@
+{
+  "schema": 1,
+  "id": "выполнение-после-ввода-вывода-setimmediate",
+  "file": "выполнение-после-ввода-вывода-setimmediate.js",
+  "title": "Выполнить функцию после фазы ввода-вывода: setImmediate",
+  "lang": "js",
+  "group": "Архитектура / Планирование задач",
+  "desc": "В Node.js setImmediate срабатывает сразу после текущей фазы ввода-вывода; внутри колбэка чтения файла он всегда раньше setTimeout(…, 0).",
+  "output": "setImmediate\nsetTimeout",
+  "tags": [
+    "setImmediate",
+    "event loop",
+    "планирование задач",
+    "Node.js",
+    "setTimeout"
+  ],
+  "aliases": [
+    "чем setImmediate отличается от setTimeout 0",
+    "setImmediate пример",
+    "порядок задач в event loop node"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 11,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "setTimeout",
+      "kind": "fn",
+      "note": "setTimeout — выполнить функцию один раз через заданное число миллисекунд.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 19,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 27,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 32,
+      "text": "setTimeout",
+      "kind": "fn",
+      "note": "setTimeout — выполнить функцию один раз через заданное число миллисекунд.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "setImmediate",
+      "kind": "setImmediate — выполнить после фазы ввода-вывода (только Node.js).",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 21,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 29,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Архитектура"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "setImmediate\nsetTimeout",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const fs = require(\"node:fs\");\n\nfs.readFile(__filename, () => {\n  setTimeout(() => console.log(\"setTimeout\"), 0);\n  setImmediate(() => console.log(\"setImmediate\"));\n});"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "setImmediate\nsetTimeout",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "fs"
+    ],
+    "requires": [],
+    "subcat": "Планирование задач"
+  },
+  "enriched": true
+}

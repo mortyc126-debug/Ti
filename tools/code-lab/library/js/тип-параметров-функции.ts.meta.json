@@ -1,0 +1,186 @@
+{
+  "schema": 1,
+  "id": "тип-параметров-функции",
+  "file": "тип-параметров-функции.ts",
+  "title": "Тип параметров функции",
+  "lang": "ts",
+  "group": "Типы TypeScript / Служебные типы",
+  "desc": "Получает кортеж типов параметров функции.",
+  "output": "5",
+  "tags": [
+    "Parameters",
+    "кортеж параметров",
+    "типизация",
+    "typeof",
+    "TypeScript"
+  ],
+  "aliases": [
+    "как получить типы аргументов функции в typescript",
+    "тип Parameters пример",
+    "кортеж типов параметров",
+    "аргументы функции как тип",
+    "typeof функции в типе"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "type",
+      "kind": "kw",
+      "note": "type — в TypeScript объявляет имя для типа.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 25,
+      "text": "Parameters",
+      "kind": "fn",
+      "note": "Parameters — служебный тип TypeScript: кортеж типов параметров функции.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 36,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — возвращает название типа значения.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Типы TypeScript"
+      ],
+      "runtime": [
+        "Node.js"
+      ],
+      "technology": [
+        "TypeScript"
+      ]
+    },
+    "summary": {
+      "input": "Аргументы функции «сложить»",
+      "output": "5",
+      "dependencies": [],
+      "requirements": [
+        "Нужен TypeScript или Node.js с поддержкой удаления типов; в рантайме типы исчезают, а поведение остаётся обычным.",
+        "Внешние библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "ts",
+          "content": "function сложить(первое: number, второе: number): number {\n  return первое + второе;\n}\ntype ПараметрыСложения = Parameters<typeof сложить>;\nconst аргументы: ПараметрыСложения = [2, 3];\nconsole.log(сложить(...аргументы));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные.",
+          "Скопируй функцию «сложить» в подходящую часть проекта.",
+          "Вызови её со своими данными вместо значений из примера.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "5",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          },
+          {
+            "symptom": "SyntaxError при запуске файла",
+            "cause": "Среда не умеет стирать типы TypeScript",
+            "solution": "Запусти через компилятор TypeScript или Node.js с поддержкой удаления типов"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "сложить",
+      "ПараметрыСложения",
+      "аргументы"
+    ],
+    "requires": [],
+    "subcat": "Служебные типы"
+  },
+  "enriched": true
+}

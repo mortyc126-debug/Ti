@@ -1,0 +1,200 @@
+{
+  "schema": 1,
+  "id": "подключить-поток-к-video",
+  "file": "подключить-поток-к-video.js",
+  "title": "Подключить медиапоток к элементу video: srcObject",
+  "lang": "js",
+  "group": "Сеть / WebRTC",
+  "desc": "Свойство srcObject показывает в video живой MediaStream (камера, экран, canvas). Здесь поток берётся из canvas, поэтому разрешения камеры не нужны.",
+  "output": "На странице появляется видео, цвет которого плавно меняется",
+  "tags": [
+    "video",
+    "srcObject",
+    "MediaStream",
+    "captureStream",
+    "WebRTC"
+  ],
+  "aliases": [
+    "как показать MediaStream в video",
+    "video.srcObject пример",
+    "поток из canvas в video",
+    "подключить поток к плееру"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 22,
+      "text": "captureStream",
+      "kind": "fn",
+      "note": "captureStream — делает из canvas видеопоток с заданной частотой кадров.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 25,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 8,
+      "text": "srcObject",
+      "kind": "fn",
+      "note": "srcObject — источник для video: живой поток вместо ссылки на файл.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Сеть"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "На странице появляется видео, цвет которого плавно меняется",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const canvas = document.createElement(\"canvas\");\ncanvas.width = 320;\ncanvas.height = 180;\nconst context = canvas.getContext(\"2d\");\n\nlet frame = 0;\nfunction drawFrame() {\n  context.fillStyle = `hsl(${frame % 360} 70% 50%)`;\n  context.fillRect(0, 0, canvas.width, canvas.height);\n  frame += 2;\n  requestAnimationFrame(drawFrame);\n}\ndrawFrame();\n\nconst stream = canvas.captureStream(30);\n\nconst preview = document.createElement(\"video\");\npreview.srcObject = stream;\npreview.muted = true;\npreview.autoplay = true;\npreview.playsInline = true;\ndocument.body.append(preview);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "На странице появляется видео, цвет которого плавно меняется",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Добавляет элемент video на страницу"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "canvas",
+      "context",
+      "frame",
+      "drawFrame",
+      "stream",
+      "preview"
+    ],
+    "requires": [],
+    "subcat": "WebRTC"
+  },
+  "enriched": true
+}

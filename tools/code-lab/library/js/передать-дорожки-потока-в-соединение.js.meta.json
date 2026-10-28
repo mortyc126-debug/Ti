@@ -1,0 +1,188 @@
+{
+  "schema": 1,
+  "id": "передать-дорожки-потока-в-соединение",
+  "file": "передать-дорожки-потока-в-соединение.js",
+  "title": "Передать дорожки потока в соединение: peer.addTrack",
+  "lang": "js",
+  "group": "Сеть / WebRTC",
+  "desc": "Каждую дорожку потока добавляют в RTCPeerConnection через addTrack; поток здесь берётся из canvas, поэтому камера не нужна.",
+  "output": "Отправителей: 1",
+  "tags": [
+    "WebRTC",
+    "addTrack",
+    "getTracks",
+    "RTCPeerConnection",
+    "MediaStream"
+  ],
+  "aliases": [
+    "как добавить дорожки в peer connection",
+    "stream.getTracks forEach addTrack",
+    "передать видео по webrtc"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 13,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "stream.getTracks",
+      "kind": "getTracks — все дорожки потока (видео, аудио).",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 36,
+      "text": "peer.addTrack",
+      "kind": "addTrack — добавляет дорожку в соединение для отправки.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Сеть"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Отправителей: 1",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const canvas = document.createElement(\"canvas\");\nconst stream = canvas.captureStream(15);\nconst peer = new RTCPeerConnection();\n\nstream.getTracks().forEach(track => peer.addTrack(track, stream));\n\nconsole.log(`Отправителей: ${peer.getSenders().length}`);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Отправителей: 1",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "canvas",
+      "stream",
+      "peer"
+    ],
+    "requires": [],
+    "subcat": "WebRTC"
+  },
+  "enriched": true
+}

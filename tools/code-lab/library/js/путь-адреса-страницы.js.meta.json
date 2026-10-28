@@ -1,0 +1,180 @@
+{
+  "schema": 1,
+  "id": "путь-адреса-страницы",
+  "file": "путь-адреса-страницы.js",
+  "title": "Путь адреса страницы",
+  "lang": "js",
+  "group": "Браузер: страница и документ / Адрес страницы",
+  "desc": "Получает путь адреса страницы.",
+  "output": "/catalog/page.html\n[ 'catalog', 'page.html' ]",
+  "tags": [
+    "location.pathname",
+    "путь",
+    "адрес",
+    "страница"
+  ],
+  "aliases": [
+    "как получить путь из адреса страницы",
+    "location pathname пример",
+    "часть адреса после домена"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "location",
+      "kind": "fn",
+      "note": "location — адрес текущей страницы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "location",
+      "kind": "fn",
+      "note": "location — адрес текущей страницы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 30,
+      "text": "split",
+      "kind": "fn",
+      "note": "split — разбивает строку на массив по разделителю.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 41,
+      "text": "filter",
+      "kind": "fn",
+      "note": "filter — возвращает новый массив только из подходящих элементов.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Браузер: страница и документ"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "/catalog/page.html\n[ 'catalog', 'page.html' ]",
+      "dependencies": [],
+      "requirements": [
+        "Работает в браузере: нужны объекты страницы (document и другие API браузера).",
+        "Внешние библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "console.log(location.pathname);\nconsole.log(location.pathname.split(\"/\").filter(Boolean));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "/catalog/page.html\n[ 'catalog', 'page.html' ]",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          },
+          {
+            "symptom": "ReferenceError: document is not defined",
+            "cause": "Код запущен в Node.js, где нет объектов страницы",
+            "solution": "Запусти код в браузере или в окружении с эмуляцией DOM"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль",
+          "Проверено в jsdom на адресе https://example.com/catalog/page.html?theme=dark#section"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Адрес страницы"
+  },
+  "enriched": true
+}

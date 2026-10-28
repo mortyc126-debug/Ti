@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "ограничить-кэш-по-размеру-с-вытеснением-давно-использованных",
+  "file": "ограничить-кэш-по-размеру-с-вытеснением-давно-использованных.js",
+  "title": "Ограничить кэш по размеру с вытеснением давно использованных",
+  "lang": "js",
+  "group": "Кэширование / Память",
+  "desc": "Реализует LRU для небольшого кэша: чтение обновляет свежесть, превышение лимита удаляет самый давно использованный ключ.",
+  "output": "false; b вытеснен",
+  "tags": [
+    "LRU",
+    "кэш",
+    "лимит размера",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "LRU cache javascript",
+    "ограниченный кэш Map",
+    "вытеснять старые записи из кэша"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

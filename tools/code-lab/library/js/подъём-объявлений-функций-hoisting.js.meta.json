@@ -1,0 +1,202 @@
+{
+  "schema": 1,
+  "id": "подъём-объявлений-функций-hoisting",
+  "file": "подъём-объявлений-функций-hoisting.js",
+  "title": "Объявления функций поднимаются и доступны до места записи",
+  "lang": "js",
+  "group": "Основы / Функции",
+  "desc": "Function Declaration можно вызвать до строки, где она написана; функциональное выражение, присвоенное const, — нельзя.",
+  "output": "inner вызвана до объявления\nReferenceError",
+  "tags": [
+    "hoisting",
+    "подъём функций",
+    "function declaration",
+    "выражение"
+  ],
+  "aliases": [
+    "что такое подъём функций js",
+    "hoisting function declaration",
+    "вызвать функцию до объявления"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "function inner",
+      "kind": "function inner — объявление поднимается вверх и доступно раньше своей строки.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 9,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 14,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "inner вызвана до объявления\nReferenceError",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function outer() {\n  return inner();\n\n  function inner() {\n    return \"inner вызвана до объявления\";\n  }\n}\n\nconsole.log(outer());\n\ntry {\n  later();\n} catch (error) {\n  console.log(error.name);\n}\n\nconst later = () => \"поздно\";"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "inner вызвана до объявления\nReferenceError",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "outer",
+      "later"
+    ],
+    "requires": [],
+    "subcat": "Функции"
+  },
+  "enriched": true
+}

@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Открытие страницы в Playwright",
+  "group": "Тестирование / Браузерные тесты",
+  "desc": "Загружаем страницу и проверяем её заголовок.",
+  "code": "import { test, expect } from \"@playwright/test\";\n\ntest(\"главная страница открывается\", async ({ page }) => {\n  await page.goto(\"https://example.com/\");\n  await expect(page).toHaveTitle(/Example/);\n});",
+  "output": "Тест проходит, если заголовок страницы содержит «Example».",
+  "words": {
+    "goto": "Переходит по адресу и ждёт загрузки страницы."
+  }
+}

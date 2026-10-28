@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "все_записи_хранилища_indexeddb",
+  "file": "все_записи_хранилища_indexeddb.js",
+  "title": "Все записи хранилища IndexedDB",
+  "lang": "js",
+  "group": "Базы данных / Запросы",
+  "desc": "Метод getAll объекта хранилища возвращает массив всех записей. Функция wrap из библиотеки idb превращает запрос IndexedDB в Promise. Метод удобен для небольших хранилищ; если записей очень много, лучше читать их порциями через курсор или параметр count, чтобы не загружать всё в память. Порядок записей определяется ключами.",
+  "output": "Число записей в хранилище.",
+  "tags": [
+    "getAll",
+    "wrap",
+    "запросы"
+  ],
+  "aliases": [
+    "все записи хранилища indexeddb",
+    "getAll",
+    "wrap"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 9,
+      "text": "wrap",
+      "kind": "concept",
+      "note": "Превращает запрос IndexedDB в Promise."
+    },
+    {
+      "line": 7,
+      "col": 36,
+      "text": "getAll",
+      "kind": "fn",
+      "note": "Возвращает все записи хранилища."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

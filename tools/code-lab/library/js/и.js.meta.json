@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "id": "и",
+  "file": "и.js",
+  "lang": "js",
+  "title": "И",
+  "group": "Основы / Объектно-ориентированное программирование",
+  "desc": "Геттер и сеттер позволяют читать и валидировать значение через синтаксис свойства.",
+  "output": "8",
+  "descAt": 1792998593579,
+  "component": {
+    "provides": [
+      "Позиция",
+      "точка"
+    ],
+    "requires": [
+      "constructor",
+      "x",
+      "значение"
+    ],
+    "tags": {
+      "purpose": [
+        "Основы"
+      ]
+    },
+    "subcat": "Объектно-ориентированное программирование"
+  },
+  "tags": [
+    "getter",
+    "setter",
+    "class",
+    "валидация"
+  ],
+  "aliases": [
+    "геттер и сеттер в JavaScript",
+    "проверять значение при присваивании",
+    "свойство с логикой чтения"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — описывает «чертёж» объектов: их свойства и методы.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "constructor",
+      "kind": "fn",
+      "note": "function Object() { [native code] }",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "this",
+      "kind": "kw",
+      "note": "получить контекст вызова функции",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "this",
+      "kind": "kw",
+      "note": "получить контекст вызова функции",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 20,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 24,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — превращает значение в число",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 51,
+      "text": "this",
+      "kind": "kw",
+      "note": "получить контекст вызова функции",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 14,
+      "text": "new",
+      "kind": "kw",
+      "note": "создать экземпляр объекта через конструктор",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "orphanNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "constructor",
+      "kind": "fn",
+      "note": "function Object() { [native code] }",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "constructor",
+      "kind": "fn",
+      "note": "function Object() { [native code] }",
+      "source": "custom"
+    }
+  ]
+}

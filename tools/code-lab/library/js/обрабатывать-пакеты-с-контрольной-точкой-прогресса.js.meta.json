@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "обрабатывать-пакеты-с-контрольной-точкой-прогресса",
+  "file": "обрабатывать-пакеты-с-контрольной-точкой-прогресса.js",
+  "title": "Обрабатывать пакеты с контрольной точкой прогресса",
+  "lang": "js",
+  "group": "Надёжность / Восстановление",
+  "desc": "Обрабатывает порции и после каждой успешной порции сохраняет checkpoint; позволяет продолжить после сбоя с последней подтверждённой позиции.",
+  "output": "checkpoint сохраняется только после успешной обработки пакета",
+  "tags": [
+    "checkpoint",
+    "восстановление",
+    "пакеты",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "checkpoint batch processing",
+    "сохранить прогресс импорта",
+    "возобновить пакетную обработку"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

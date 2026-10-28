@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Режим ES-модулей",
+  "group": "Разработка и инструменты / Упаковка проекта",
+  "desc": "Режим ES-модулей.",
+  "code": "const пакет = { \"type\": \"module\" };\nconsole.log(пакет.type);",
+  "output": "module",
+  "words": {
+    "type": "Указывает Node.js использовать ES-модули."
+  }
+}

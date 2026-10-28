@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "измерить-длительность-каждого-этапа-конвейера",
+  "file": "измерить-длительность-каждого-этапа-конвейера.js",
+  "title": "Измерить длительность каждого этапа конвейера",
+  "lang": "js",
+  "group": "Отладка / Диагностика конвейера",
+  "desc": "Запускает именованные этапы последовательно и собирает длительность каждого; ошибка сохраняет имя этапа и первопричину.",
+  "output": "итоговое значение и замеры; при сбое ошибка содержит cause и timings",
+  "tags": [
+    "pipeline",
+    "профилирование",
+    "диагностика",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "замерить этапы pipeline",
+    "логировать длительность шагов",
+    "diagnostic pipeline timing"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

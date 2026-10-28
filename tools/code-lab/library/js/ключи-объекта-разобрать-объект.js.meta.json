@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "id": "ключи-объекта-разобрать-объект",
+  "file": "ключи-объекта-разобрать-объект.js",
+  "lang": "js",
+  "title": "Ключи объекта разобрать объект",
+  "group": "Данные / Работа с объектами",
+  "desc": "Получает ключи, значения или пары ключ-значение собственного перечисляемого содержимого объекта.",
+  "output": "[\"цена\", \"количество\"]\n[120, 3]\n[[\"цена\", 120], [\"количество\", 3]]",
+  "descAt": 1792998587928,
+  "component": {
+    "provides": [
+      "данные"
+    ],
+    "requires": [
+      "цена",
+      "количество"
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Работа с объектами"
+  },
+  "tags": [
+    "Object.keys",
+    "Object.values",
+    "Object.entries",
+    "объекты"
+  ],
+  "aliases": [
+    "получить все ключи объекта",
+    "получить значения объекта",
+    "преобразовать объект в пары",
+    "перебрать поля объекта"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "keys",
+      "kind": "fn",
+      "note": "Object.keys — массив имён свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "values",
+      "kind": "fn",
+      "note": "Object.values — массив значений свойств объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 19,
+      "text": "entries",
+      "kind": "fn",
+      "note": "Object.entries — массив пар [ключ, значение].",
+      "source": "dict"
+    }
+  ]
+}

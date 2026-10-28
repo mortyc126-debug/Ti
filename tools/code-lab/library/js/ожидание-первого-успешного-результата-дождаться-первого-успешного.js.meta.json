@@ -1,0 +1,97 @@
+{
+  "schema": 1,
+  "id": "ожидание-первого-успешного-результата-дождаться-первого-успешного",
+  "file": "ожидание-первого-успешного-результата-дождаться-первого-успешного.js",
+  "lang": "js",
+  "title": "Ожидание первого успешного результата дождаться первого успешного",
+  "group": "Асинхронность / Пакетная обработка",
+  "desc": "Возвращает первый успешно выполненный промис; отклоняется AggregateError, если отклонились все.",
+  "output": "B",
+  "descAt": 1792998616194,
+  "component": {
+    "provides": [
+      "первый"
+    ],
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ]
+    },
+    "subcat": "Пакетная обработка"
+  },
+  "tags": [
+    "Promise.any",
+    "резервные запросы",
+    "async"
+  ],
+  "aliases": [
+    "первый успешный запрос",
+    "fallback endpoints",
+    "дождаться первого fulfilled"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт результат промиса (например ответа из сети), не блокируя страницу.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 42,
+      "text": "reject",
+      "kind": "fn",
+      "note": "reject — завершить промис ошибкой.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 63,
+      "text": "resolve",
+      "kind": "fn",
+      "note": "resolve — завершить промис успешно с результатом.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 85,
+      "text": "resolve",
+      "kind": "fn",
+      "note": "resolve — завершить промис успешно с результатом.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

@@ -1,0 +1,235 @@
+{
+  "schema": 1,
+  "id": "замена-прототипа-объекта",
+  "file": "замена-прототипа-объекта.js",
+  "title": "Замена прототипа объекта",
+  "lang": "js",
+  "group": "Объекты и метапрограммирование / Операции над объектами и прокси",
+  "desc": "Пытается изменить прототип объекта через Reflect.",
+  "output": "true\nзвук\nfalse",
+  "tags": [
+    "Reflect.setPrototypeOf",
+    "прототип",
+    "наследование",
+    "логический результат"
+  ],
+  "aliases": [
+    "как сменить прототип объекта",
+    "reflect setprototypeof пример",
+    "установить прототип без исключения",
+    "true или false при смене прототипа",
+    "нерасширяемый объект и прототип"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 29,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 12,
+      "text": "Reflect",
+      "kind": "fn",
+      "note": "Reflect — встроенный объект с операциями над объектами в виде функций.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 20,
+      "text": "setPrototypeOf",
+      "kind": "fn",
+      "note": "setPrototypeOf — меняет прототип и возвращает true или false.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 12,
+      "text": "Reflect",
+      "kind": "fn",
+      "note": "Reflect — встроенный объект с операциями над объектами в виде функций.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 20,
+      "text": "setPrototypeOf",
+      "kind": "fn",
+      "note": "setPrototypeOf — меняет прототип и возвращает true или false.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 35,
+      "text": "Object",
+      "kind": "fn",
+      "note": "Object — встроенный объект с утилитами для работы с объектами.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Объекты и метапрограммирование"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "true\nзвук\nfalse",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const животное = { голос() { return \"звук\"; } };\nconst object = {};\nconst prototype = животное;\nconsole.log(Reflect.setPrototypeOf(object, prototype));\nconsole.log(object.голос());\nconsole.log(Reflect.setPrototypeOf(Object.preventExtensions({}), prototype));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "true\nзвук\nfalse",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "животное",
+      "object",
+      "prototype"
+    ],
+    "requires": [],
+    "subcat": "Операции над объектами и прокси"
+  },
+  "enriched": true
+}

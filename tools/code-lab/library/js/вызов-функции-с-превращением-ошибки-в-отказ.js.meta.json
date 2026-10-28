@@ -1,0 +1,282 @@
+{
+  "schema": 1,
+  "id": "вызов-функции-с-превращением-ошибки-в-отказ",
+  "file": "вызов-функции-с-превращением-ошибки-в-отказ.js",
+  "title": "Вызов функции с превращением ошибки в отказ",
+  "lang": "js",
+  "group": "Асинхронность / Промисы",
+  "desc": "Вызывает функцию и оборачивает её результат или исключение в Promise в поддерживающей среде.",
+  "output": "отказ промиса: синхронный сбой\nобычный результат",
+  "tags": [
+    "Promise.try",
+    "синхронное исключение",
+    "отказ",
+    "запасная реализация"
+  ],
+  "aliases": [
+    "что делает promise try",
+    "как превратить исключение в отказ промиса",
+    "promise try пример",
+    "обернуть вызов функции в promise",
+    "запасной вариант для promise try"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 4,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — возвращает название типа значения.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 11,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 19,
+      "text": "try",
+      "kind": "fn",
+      "note": "try — вызывает функцию и превращает исключение в отказ Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "try",
+      "kind": "fn",
+      "note": "try — вызывает функцию и превращает исключение в отказ Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 43,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 47,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 25,
+      "text": "throw",
+      "kind": "kw",
+      "note": "throw — выбрасывает исключение и прерывает обычное выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 31,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "try",
+      "kind": "fn",
+      "note": "try — вызывает функцию и превращает исключение в отказ Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 3,
+      "text": "catch",
+      "kind": "fn",
+      "note": "catch — обрабатывает отказ Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 19,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 27,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "try",
+      "kind": "fn",
+      "note": "try — вызывает функцию и превращает исключение в отказ Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 3,
+      "text": "then",
+      "kind": "fn",
+      "note": "then — обрабатывает успешный результат Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 20,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 28,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "отказ промиса: синхронный сбой\nобычный результат",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "if (typeof Promise.try !== \"function\") {\n  Promise.try = (функция, ...аргументы) => new Promise(выполнить => выполнить(функция(...аргументы)));\n}\nconst callback = () => { throw new Error(\"синхронный сбой\"); };\nPromise.try(callback)\n  .catch(ошибка => console.log(\"отказ промиса:\", ошибка.message));\nPromise.try(() => \"обычный результат\")\n  .then(значение => console.log(значение));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "отказ промиса: синхронный сбой\nобычный результат",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль",
+          "Если среда не поддерживает Promise.try, подставляется запасная реализация"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "callback"
+    ],
+    "requires": [],
+    "subcat": "Промисы"
+  },
+  "enriched": true
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "расшифровка_данных_aes_gcm_через_web_crypto",
+  "file": "расшифровка_данных_aes_gcm_через_web_crypto.js",
+  "title": "Расшифровка данных AES-GCM через Web Crypto",
+  "lang": "js",
+  "group": "Безопасность / Криптография",
+  "desc": "crypto.subtle.decrypt расшифровывает данные тем же ключом и тем же вектором инициализации (iv), которые использовались при шифровании. В режиме GCM он ещё и проверяет код аутентификации: если данные изменили или ключ неверен, Promise отклонится ошибкой OperationError. Вектор iv хранят рядом с зашифрованными данными, он не секретен, но должен быть уникальным. Результат — ArrayBuffer, который затем декодируют в текст.",
+  "output": "секрет",
+  "tags": [
+    "crypto.subtle.decrypt",
+    "iv",
+    "криптография"
+  ],
+  "aliases": [
+    "расшифровка данных aes-gcm через web crypto",
+    "crypto.subtle.decrypt",
+    "iv"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 6,
+      "text": "iv",
+      "kind": "concept",
+      "note": "Вектор инициализации, использованный при шифровании."
+    },
+    {
+      "line": 4,
+      "col": 29,
+      "text": "crypto.subtle.decrypt",
+      "kind": "fn",
+      "note": "Расшифровывает данные и проверяет их целостность."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

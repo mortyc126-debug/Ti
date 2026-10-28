@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "настройка_поведения_instanceof",
+  "file": "настройка_поведения_instanceof.js",
+  "title": "Настройка поведения instanceof",
+  "lang": "js",
+  "group": "Основы / Классы и наследование",
+  "desc": "Оператор instanceof по умолчанию смотрит на цепочку прототипов, но класс может заменить это правило, определив статический метод [Symbol.hasInstance]. Он получает проверяемое значение и возвращает логический результат. Так можно проверять не происхождение, а свойства значения, например чётность числа или наличие нужных методов. Используйте приём осторожно: он делает поведение instanceof непривычным для читателей кода.",
+  "output": "true\nfalse",
+  "tags": [
+    "Symbol.hasInstance",
+    "instanceof",
+    "классы и наследование"
+  ],
+  "aliases": [
+    "настройка поведения instanceof",
+    "Symbol.hasInstance",
+    "instanceof"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 10,
+      "text": "Symbol.hasInstance",
+      "kind": "concept",
+      "note": "Особый символ, задающий правило работы instanceof."
+    },
+    {
+      "line": 6,
+      "col": 14,
+      "text": "instanceof",
+      "kind": "concept",
+      "note": "Вызывает [Symbol.hasInstance] правого операнда."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

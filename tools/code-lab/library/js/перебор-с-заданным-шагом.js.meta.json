@@ -1,0 +1,170 @@
+{
+  "schema": 1,
+  "id": "перебор-с-заданным-шагом",
+  "file": "перебор-с-заданным-шагом.js",
+  "title": "Перебирать элементы с заданным шагом: i += step",
+  "lang": "js",
+  "group": "Основы / Управление потоком",
+  "desc": "Если увеличивать счётчик не на 1, а на step, цикл берёт каждый step-й элемент.",
+  "output": "0: а\n3: г\n6: ж\n9: к",
+  "tags": [
+    "for",
+    "шаг цикла",
+    "каждый n-й элемент",
+    "массив"
+  ],
+  "aliases": [
+    "как перебрать каждый третий элемент js",
+    "for с шагом пример",
+    "i += step"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторяет блок для каждого элемента или шага.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 5,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 36,
+      "text": "i += step",
+      "kind": "i += step — шаг цикла больше единицы.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "0: а\n3: г\n6: ж\n9: к",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const letters = [\"а\", \"б\", \"в\", \"г\", \"д\", \"е\", \"ж\", \"з\", \"и\", \"к\"];\nconst step = 3;\n\nfor (let i = 0; i < letters.length; i += step) {\n  console.log(`${i}: ${letters[i]}`);\n}"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "0: а\n3: г\n6: ж\n9: к",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "letters",
+      "step"
+    ],
+    "requires": [],
+    "subcat": "Управление потоком"
+  },
+  "enriched": true
+}

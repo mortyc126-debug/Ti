@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "загрузка_webassembly_модуля_в_node_js",
+  "file": "загрузка_webassembly_модуля_в_node_js.js",
+  "title": "Загрузка WebAssembly-модуля в Node.js",
+  "lang": "js",
+  "group": "Разработка и инструменты / WebAssembly",
+  "desc": "В Node.js бинарный файл .wasm читают с диска обычным readFile и передают байты в WebAssembly.instantiate. Это проще, чем в браузере, потому что нет сетевых ограничений и типов ответа. Результат содержит экземпляр модуля, через exports которого вызывают функции. Для модулей с импортами передают второй аргумент — объект с нужными функциями.",
+  "output": "Список функций, экспортируемых модулем.",
+  "tags": [
+    "readFile",
+    "WebAssembly.instantiate",
+    "webassembly"
+  ],
+  "aliases": [
+    "загрузка webassembly-модуля в node.js",
+    "readFile",
+    "WebAssembly.instantiate"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 9,
+      "text": "readFile",
+      "kind": "concept",
+      "note": "Читает файл целиком в Buffer."
+    },
+    {
+      "line": 3,
+      "col": 27,
+      "text": "WebAssembly.instantiate",
+      "kind": "fn",
+      "note": "Создаёт экземпляр модуля из байтов."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

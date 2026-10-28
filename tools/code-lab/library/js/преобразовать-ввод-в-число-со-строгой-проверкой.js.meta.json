@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "преобразовать-ввод-в-число-со-строгой-проверкой",
+  "file": "преобразовать-ввод-в-число-со-строгой-проверкой.js",
+  "title": "Преобразовать ввод в число со строгой проверкой",
+  "lang": "js",
+  "group": "Данные / Валидация",
+  "desc": "Отклоняет пустые строки, Infinity и частично числовые строки; возвращает результат в формате ok/value/error.",
+  "output": "{ok:true,value:12.5}",
+  "tags": [
+    "валидация",
+    "число",
+    "пользовательский ввод",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "строго преобразовать строку в число",
+    "проверить числовой ввод",
+    "parse number strict"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

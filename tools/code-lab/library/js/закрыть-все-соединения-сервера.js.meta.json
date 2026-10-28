@@ -1,0 +1,243 @@
+{
+  "schema": 1,
+  "id": "закрыть-все-соединения-сервера",
+  "file": "закрыть-все-соединения-сервера.js",
+  "title": "Закрыть все соединения сервера: closeAllConnections",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / HTTP-сервер",
+  "desc": "server.closeAllConnections() разрывает даже активные соединения; без него server.close() ждёт, пока клиенты уйдут сами (Node.js 18.2+).",
+  "output": "Получено: часть ответа\nСервер остановлен\nСоединение разорвано\nОтвет закрыт",
+  "tags": [
+    "closeAllConnections",
+    "server.close",
+    "остановка сервера",
+    "соединения",
+    "Node.js"
+  ],
+  "aliases": [
+    "как быстро остановить http сервер node",
+    "closeAllConnections пример",
+    "server.close зависает"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 30,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 38,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 14,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 28,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 36,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 28,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 36,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 15,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 2,
+      "text": "setTimeout",
+      "kind": "fn",
+      "note": "setTimeout — выполнить функцию один раз через заданное число миллисекунд.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 23,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 31,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 4,
+      "text": "server.closeAllConnections",
+      "kind": "closeAllConnections — разрывает все соединения сервера, в том числе активные.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Файлы, хранение и сервер"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Получено: часть ответа\nСервер остановлен\nСоединение разорвано\nОтвет закрыт",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const http = require(\"node:http\");\n\nconst server = http.createServer((request, response) => {\n  response.writeHead(200);\n  response.write(\"часть ответа\");\n});\n\nserver.listen(0, () => {\n  const incoming = http.get({ port: server.address().port }, reply => {\n    reply.on(\"data\", chunk => console.log(\"Получено:\", chunk.toString()));\n    reply.on(\"error\", () => console.log(\"Соединение разорвано\"));\n    reply.on(\"close\", () => console.log(\"Ответ закрыт\"));\n  });\n  incoming.on(\"error\", () => {});\n\n  setTimeout(() => {\n    server.close(() => console.log(\"Сервер остановлен\"));\n    server.closeAllConnections();\n  }, 100);\n});"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Получено: часть ответа\nСервер остановлен\nСоединение разорвано\nОтвет закрыт",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "http",
+      "server"
+    ],
+    "requires": [],
+    "subcat": "HTTP-сервер"
+  },
+  "enriched": true
+}

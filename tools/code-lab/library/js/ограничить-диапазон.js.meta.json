@@ -1,0 +1,145 @@
+{
+  "schema": 1,
+  "id": "ограничить-диапазон",
+  "file": "ограничить-диапазон.js",
+  "lang": "js",
+  "title": "Ограничить диапазон",
+  "group": "Данные / Числа и простые операции",
+  "desc": "Зажимает значение между нижней и верхней границами.",
+  "output": "100\n0",
+  "descAt": 1792998613849,
+  "component": {
+    "provides": [
+      "clamp"
+    ],
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Числа и простые операции"
+  },
+  "tags": [
+    "Math.min",
+    "Math.max",
+    "диапазон"
+  ],
+  "aliases": [
+    "ограничить число диапазоном",
+    "clamp",
+    "зажать значение между минимумом и максимумом"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 18,
+      "text": "min",
+      "kind": "name",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 23,
+      "text": "max",
+      "kind": "name",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 31,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 36,
+      "text": "min",
+      "kind": "fn",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 40,
+      "text": "max",
+      "kind": "name",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 45,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математикой: Math.round, Math.random, Math.max…",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 50,
+      "text": "max",
+      "kind": "fn",
+      "note": "Math.max — наибольшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 54,
+      "text": "min",
+      "kind": "name",
+      "note": "Math.min — наименьшее из чисел.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "id": "объединить-разбор-нормализацию-и-проверку-данных",
+  "file": "объединить-разбор-нормализацию-и-проверку-данных.js",
+  "title": "Объединить разбор, нормализацию и проверку данных",
+  "lang": "js",
+  "group": "Архитектура / Конвейеры обработки",
+  "desc": "Три этапа отделены: parse может упасть синтаксически, normalize преобразует структуру, validate возвращает список ошибок.",
+  "output": "результат содержит stage ошибки или нормализованное value",
+  "tags": [
+    "pipeline",
+    "парсинг",
+    "нормализация",
+    "валидация",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "parse normalize validate pipeline",
+    "обработать сырой JSON",
+    "цепочка очистки данных"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

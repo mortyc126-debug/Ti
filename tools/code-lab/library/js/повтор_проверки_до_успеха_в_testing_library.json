@@ -1,0 +1,12 @@
+{
+  "lang": "js",
+  "title": "Повтор проверки до успеха в Testing Library",
+  "group": "Тестирование / Библиотека тестирования",
+  "desc": "Ждём, пока элемент станет видимым после асинхронного обновления.",
+  "code": "import { render, screen, waitFor } from \"@testing-library/react\";\nimport \"@testing-library/jest-dom\";\nimport { Сообщение } from \"./Сообщение.jsx\";\n\ntest(\"сообщение становится видимым\", async () => {\n  render(<Сообщение />);\n  await waitFor(() => expect(screen.getByText(\"Привет\")).toBeVisible());\n});",
+  "output": "Тест проходит, когда элемент стал видимым до истечения времени.",
+  "words": {
+    "waitFor": "Повторяет проверку, пока она не пройдёт.",
+    "toBeVisible": "Проверяет, что элемент виден пользователю."
+  }
+}

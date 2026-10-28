@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "id": "связать-логи-разных-этапов-одним-идентификатором-операции",
+  "file": "связать-логи-разных-этапов-одним-идентификатором-операции.js",
+  "title": "Связать логи разных этапов одним идентификатором операции",
+  "lang": "js",
+  "group": "Отладка / Трассировка",
+  "desc": "Создаёт логгер, автоматически добавляющий correlationId и контекст к каждой записи; адаптер вывода можно заменить.",
+  "output": "каждая запись содержит общий correlationId",
+  "tags": [
+    "логирование",
+    "correlationId",
+    "трассировка",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "correlation id logger",
+    "связать логи запроса",
+    "контекстный логгер"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 51,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "warn",
+      "kind": "fn",
+      "note": "warn — console.warn печатает предупреждение (жёлтым).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 36,
+      "text": "warn",
+      "kind": "fn",
+      "note": "warn — console.warn печатает предупреждение (жёлтым).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "error",
+      "kind": "fn",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 37,
+      "text": "error",
+      "kind": "fn",
+      "note": "ошибка, общая ошибка, исключение, ошибка выполнения, выбросить ошибку",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "requires": [
+      "info",
+      "message",
+      "data",
+      "level",
+      "warn",
+      "error"
+    ],
+    "contractLocked": true,
+    "tags": {
+      "purpose": [
+        "Отладка"
+      ]
+    },
+    "subcat": "Трассировка"
+  }
+}

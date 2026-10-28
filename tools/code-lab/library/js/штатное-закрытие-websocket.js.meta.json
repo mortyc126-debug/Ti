@@ -1,0 +1,178 @@
+{
+  "schema": 1,
+  "id": "штатное-закрытие-websocket",
+  "file": "штатное-закрытие-websocket.js",
+  "title": "Штатно закрыть соединение WebSocket с кодом и причиной",
+  "lang": "js",
+  "group": "Сеть / WebSocket",
+  "desc": "socket.close(1000, \"done\") закрывает соединение по-хорошему: код 1000 означает нормальное завершение, причина — короткий текст.",
+  "output": "Закрыто: 1000 done",
+  "tags": [
+    "WebSocket",
+    "close",
+    "код 1000",
+    "закрытие соединения"
+  ],
+  "aliases": [
+    "как закрыть websocket правильно",
+    "socket.close 1000 пример",
+    "код закрытия 1000"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "socket.close",
+      "kind": "close(код, причина) — закрывает соединение; 1000 — нормальное завершение.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Сеть"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Закрыто: 1000 done",
+      "dependencies": [],
+      "requirements": [
+        "Нужен WebSocket-сервер на ws://localhost:8080 (подойдёт любой эхо-сервер)."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const serverUrl = \"ws://localhost:8080\";\nconst socket = new WebSocket(serverUrl);\n\nsocket.addEventListener(\"open\", () => {\n  socket.send(\"до свидания\");\n  socket.close(1000, \"done\");\n});\n\nsocket.addEventListener(\"close\", event => {\n  console.log(`Закрыто: ${event.code} ${event.reason}`);\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Закрыто: 1000 done",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка соединения",
+            "cause": "Не запущен сервер на ws://localhost:8080",
+            "solution": "Запусти сервер WebSocket или поменяй адрес serverUrl"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "serverUrl",
+      "socket"
+    ],
+    "requires": [],
+    "subcat": "WebSocket"
+  },
+  "enriched": true
+}

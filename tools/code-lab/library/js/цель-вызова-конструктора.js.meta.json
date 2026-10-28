@@ -1,0 +1,257 @@
+{
+  "schema": 1,
+  "id": "цель-вызова-конструктора",
+  "file": "цель-вызова-конструктора.js",
+  "title": "Цель вызова конструктора",
+  "lang": "js",
+  "group": "Объекты и метапрограммирование / Классы и конструкторы",
+  "desc": "Получает цель вызова конструктора внутри функции или конструктора класса.",
+  "output": "без new\nс new\nПотомок",
+  "tags": [
+    "new.target",
+    "конструктор",
+    "вызов без new",
+    "класс"
+  ],
+  "aliases": [
+    "что такое new target",
+    "как проверить вызов без new",
+    "new target в классе"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 7,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 11,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "this",
+      "kind": "kw",
+      "note": "this — объект, от имени которого вызвана функция.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 12,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — объявляет класс: шаблон для создания объектов.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 18,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 26,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 30,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — объявляет класс: шаблон для создания объектов.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 14,
+      "text": "extends",
+      "kind": "kw",
+      "note": "extends — делает класс наследником другого класса.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 0,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Объекты и метапрограммирование"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Аргументы функции «Точка»",
+      "output": "без new\nс new\nПотомок",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function Точка(имя) {\n  if (!new.target) {\n    return new Точка(имя);\n  }\n  this.имя = имя;\n}\nconsole.log(Точка(\"без new\").имя);\nconsole.log(new Точка(\"с new\").имя);\n\nclass Основа {\n  constructor() { console.log(new.target.name); }\n}\nclass Потомок extends Основа {}\nnew Потомок();"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные.",
+          "Скопируй функцию «Точка» в подходящую часть проекта.",
+          "Вызови её со своими данными вместо значений из примера.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "без new\nс new\nПотомок",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "Точка",
+      "Основа",
+      "Потомок"
+    ],
+    "requires": [],
+    "subcat": "Классы и конструкторы"
+  },
+  "enriched": true
+}

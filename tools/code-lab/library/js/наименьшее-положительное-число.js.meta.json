@@ -1,0 +1,165 @@
+{
+  "schema": 1,
+  "id": "наименьшее-положительное-число",
+  "file": "наименьшее-положительное-число.js",
+  "title": "Наименьшее положительное число",
+  "lang": "js",
+  "group": "Числа и вычисления / Константы и проверки чисел",
+  "desc": "Получает наименьшее положительное число.",
+  "output": "5e-324\ntrue 0",
+  "tags": [
+    "Number.MIN_VALUE",
+    "наименьшее число",
+    "предел",
+    "числа с плавающей точкой"
+  ],
+  "aliases": [
+    "чему равно number min_value",
+    "константа number min_value в js",
+    "наименьшее положительное число javascript"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — преобразует значение в число; содержит проверки вроде Number.isFinite.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — преобразует значение в число; содержит проверки вроде Number.isFinite.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 34,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — преобразует значение в число; содержит проверки вроде Number.isFinite.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Числа и вычисления"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "5e-324\ntrue 0",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "console.log(Number.MIN_VALUE);\nconsole.log(Number.MIN_VALUE > 0, Number.MIN_VALUE / 2);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "5e-324\ntrue 0",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Константы и проверки чисел"
+  },
+  "enriched": true
+}

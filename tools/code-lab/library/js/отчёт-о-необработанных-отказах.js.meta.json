@@ -1,0 +1,179 @@
+{
+  "schema": 1,
+  "id": "отчёт-о-необработанных-отказах",
+  "file": "отчёт-о-необработанных-отказах.js",
+  "title": "Передать причину необработанного отказа в систему отчётов",
+  "lang": "js",
+  "group": "Ошибки и отладка / Найти причину сбоя",
+  "desc": "Обработчик unhandledrejection ловит промисы, у которых нет catch; preventDefault убирает ошибку из консоли браузера, а причина уходит в свою функцию отчёта.",
+  "output": "Отчёт об ошибке: Сервер недоступен",
+  "tags": [
+    "unhandledrejection",
+    "необработанный Promise",
+    "отчёт об ошибках",
+    "глобальный обработчик",
+    "логирование"
+  ],
+  "aliases": [
+    "как поймать все необработанные promise reject",
+    "unhandledrejection пример",
+    "отправить ошибки промисов в логгер",
+    "глобальный catch для промисов"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 10,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 25,
+      "text": "unhandledrejection",
+      "kind": "kw",
+      "note": "unhandledrejection — у отклонённого промиса не оказалось обработчика.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 9,
+      "text": "event.reason",
+      "kind": "fn",
+      "note": "reason — то, чем промис был отклонён (обычно Error).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Ошибки и отладка"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Отчёт об ошибке: Сервер недоступен",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function report(reason) {\n  const text = reason instanceof Error ? reason.message : String(reason);\n  console.error(`Отчёт об ошибке: ${text}`);\n}\n\nwindow.addEventListener(\"unhandledrejection\", event => {\n  event.preventDefault();\n  report(event.reason);\n});\n\nPromise.reject(new Error(\"Сервер недоступен\"));"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Отчёт об ошибке: Сервер недоступен",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит ошибку в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "report"
+    ],
+    "requires": [],
+    "subcat": "Найти причину сбоя"
+  },
+  "enriched": true
+}

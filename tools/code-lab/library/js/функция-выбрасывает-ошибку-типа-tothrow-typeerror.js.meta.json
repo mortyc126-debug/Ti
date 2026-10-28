@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "id": "функция-выбрасывает-ошибку-типа-tothrow-typeerror",
+  "file": "функция-выбрасывает-ошибку-типа-tothrow-typeerror.js",
+  "title": "Проверить, что функция выбрасывает ошибку заданного типа: toThrow(TypeError)",
+  "lang": "js",
+  "group": "Тестирование / Проверки функций",
+  "desc": "toThrow принимает класс ошибки (или текст сообщения): тест упадёт, если выброшена ошибка другого типа.",
+  "output": "✓ 1 тест пройден",
+  "tags": [
+    "Vitest",
+    "toThrow",
+    "TypeError",
+    "тип ошибки"
+  ],
+  "aliases": [
+    "как проверить тип исключения в тесте",
+    "toThrow(TypeError) пример",
+    "проверить сообщение ошибки"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 38,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 28,
+      "text": "toThrow(TypeError)",
+      "kind": "toThrow(Класс) — проверка типа выброшенной ошибки.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Vitest"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "✓ 1 тест пройден",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import { expect, it } from \"vitest\";\n\nfunction toUpper(text) {\n  if (typeof text !== \"string\") throw new TypeError(\"Нужна строка\");\n  return text.toUpperCase();\n}\n\nit(\"число вместо строки — TypeError\", () => {\n  expect(() => toUpper(42)).toThrow(TypeError);\n  expect(() => toUpper(42)).toThrow(\"Нужна строка\");\n});"
+        },
+        "steps": [
+          "Установи Vitest (npm install -D vitest) и запусти npx vitest run имя-файла.js.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "✓ 1 тест пройден",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Тест проходит",
+            "Тест падает при сломанном коде",
+            "Повторный запуск тестов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Cannot find package 'vitest'",
+            "cause": "Vitest не установлен в проекте",
+            "solution": "Выполни npm install -D vitest"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "toUpper"
+    ],
+    "requires": [],
+    "subcat": "Проверки функций"
+  },
+  "enriched": true
+}

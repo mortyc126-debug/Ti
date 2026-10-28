@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "набор_http_заголовков",
+  "file": "набор_http_заголовков.js",
+  "title": "Набор HTTP-заголовков",
+  "lang": "js",
+  "group": "Сеть и API / HTTP-клиенты",
+  "desc": "Объект Headers хранит HTTP-заголовки и работает независимо от регистра имён. Методы set, append, get, has и delete позволяют читать и менять заголовки. Конструктор принимает обычный объект или массив пар. Объект передают в fetch в параметре headers. Имена заголовков могут содержать только ASCII-символы.",
+  "output": "application/json\ntrue",
+  "tags": [
+    "Headers",
+    "append",
+    "http-клиенты"
+  ],
+  "aliases": [
+    "набор http-заголовков",
+    "Headers",
+    "append"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 22,
+      "text": "Headers",
+      "kind": "fn",
+      "note": "Набор HTTP-заголовков."
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "append",
+      "kind": "fn",
+      "note": "Добавляет заголовок, не заменяя прежний."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

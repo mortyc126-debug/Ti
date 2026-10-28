@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "найти-изменившиеся-поля-между-двумя-объектами",
+  "file": "найти-изменившиеся-поля-между-двумя-объектами.js",
+  "title": "Найти изменившиеся поля между двумя объектами",
+  "lang": "js",
+  "group": "Данные / Сравнение состояний",
+  "desc": "Сравнивает только перечисленные поля и возвращает старое и новое значение; сравнение значений по Object.is.",
+  "output": "{b:{before:2,after:3}}",
+  "tags": [
+    "diff",
+    "объект",
+    "изменения",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "diff объекта по полям",
+    "какие поля изменились",
+    "compare selected fields"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "id": "классический-цикл-for-со-счётчиком",
+  "file": "классический-цикл-for-со-счётчиком.js",
+  "title": "Цикл с инициализацией, условием и шагом: for (let i = 0; i < n; i++)",
+  "lang": "js",
+  "group": "Основы / Управление потоком",
+  "desc": "Три части цикла: начальное значение счётчика, условие продолжения и шаг после каждой итерации.",
+  "output": "Сумма от 1 до 5: 15",
+  "tags": [
+    "for",
+    "счётчик",
+    "цикл",
+    "итерация"
+  ],
+  "aliases": [
+    "как работает цикл for js",
+    "for let i = 0 пример",
+    "классический цикл"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторяет блок для каждого элемента или шага.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 5,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Сумма от 1 до 5: 15",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const n = 5;\nlet sum = 0;\n\nfor (let i = 1; i <= n; i++) {\n  sum += i;\n}\n\nconsole.log(`Сумма от 1 до ${n}: ${sum}`);"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Сумма от 1 до 5: 15",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "n",
+      "sum"
+    ],
+    "requires": [],
+    "subcat": "Управление потоком"
+  },
+  "enriched": true
+}

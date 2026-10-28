@@ -1,0 +1,155 @@
+{
+  "schema": 1,
+  "id": "определить-что-код-в-node",
+  "file": "определить-что-код-в-node.js",
+  "title": "Определить, что код выполняется в Node.js",
+  "lang": "js",
+  "group": "Разработка и инструменты / Совместимость",
+  "desc": "Безопасная проверка среды: typeof не падает, даже если глобального process нет (браузер), а versions?.node есть только в Node.js.",
+  "output": "Код выполняется в Node.js",
+  "tags": [
+    "Node.js",
+    "определение среды",
+    "typeof",
+    "process.versions",
+    "совместимость"
+  ],
+  "aliases": [
+    "как понять что код в node а не в браузере",
+    "isNode проверка",
+    "проверка окружения выполнения js",
+    "универсальный код для node и браузера"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "typeof process",
+      "kind": "kw",
+      "note": "typeof — безопасно проверяет имя, даже если переменная не объявлена.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 57,
+      "text": "process.versions?.node",
+      "kind": "fn",
+      "note": "versions.node — версия Node.js; в браузере process.versions отсутствует.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Разработка и инструменты"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Код выполняется в Node.js",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const isNode = typeof process !== \"undefined\" && Boolean(process.versions?.node);\n\nconsole.log(isNode ? \"Код выполняется в Node.js\" : \"Код выполняется не в Node.js\");"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Код выполняется в Node.js",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "isNode"
+    ],
+    "requires": [],
+    "subcat": "Совместимость"
+  },
+  "enriched": true
+}

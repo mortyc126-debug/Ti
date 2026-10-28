@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "кэшировать-завершенные-ответы-и-объединять-активные-запросы",
+  "file": "кэшировать-завершенные-ответы-и-объединять-активные-запросы.js",
+  "title": "Кэшировать завершённые ответы и объединять активные запросы",
+  "lang": "js",
+  "group": "Сеть / Кэш запросов",
+  "desc": "Комбинирует TTL-кэш готовых значений и single-flight для одинаковых ключей; ключ должен учитывать все параметры запроса.",
+  "output": "один loader на ключ одновременно; успешный результат кэшируется на ttlMs",
+  "tags": [
+    "fetch",
+    "TTL",
+    "single-flight",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "кэшировать fetch ответы",
+    "не дублировать одинаковые api запросы",
+    "request cache ttl"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "utf_8_байты_из_строки",
+  "file": "utf_8_байты_из_строки.js",
+  "title": "UTF-8 байты из строки",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Двоичные данные",
+  "desc": "TextEncoder кодирует строку в байты UTF-8 и возвращает Uint8Array. Это нужно для отправки текста по сети, записи в бинарные форматы и работы с криптографией, где алгоритмы принимают именно байты. Длина массива не равна длине строки: кириллическая буква занимает два байта, а эмодзи — четыре. Обратное преобразование выполняет TextDecoder.",
+  "output": "12\ntrue",
+  "tags": [
+    "TextEncoder",
+    "encode",
+    "двоичные данные"
+  ],
+  "aliases": [
+    "utf-8 байты из строки",
+    "TextEncoder",
+    "encode"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 18,
+      "text": "TextEncoder",
+      "kind": "fn",
+      "note": "Кодирует строку в байты UTF-8."
+    },
+    {
+      "line": 0,
+      "col": 32,
+      "text": "encode",
+      "kind": "fn",
+      "note": "Возвращает Uint8Array с байтами строки."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,229 @@
+{
+  "schema": 1,
+  "id": "отложенное-предложение-установки",
+  "file": "отложенное-предложение-установки.js",
+  "title": "Сохранить предложение установки приложения на потом",
+  "lang": "js",
+  "group": "Интерфейс / Системные возможности",
+  "desc": "Событие beforeinstallprompt даёт отложить стандартное предложение установки PWA и показать его по своей кнопке. Работает в браузерах на Chromium.",
+  "output": "Появляется кнопка «Установить приложение»; после клика в консоли «Выбор пользователя: accepted» или «dismissed»",
+  "tags": [
+    "PWA",
+    "beforeinstallprompt",
+    "установка приложения",
+    "preventDefault",
+    "кнопка установки"
+  ],
+  "aliases": [
+    "как показать свою кнопку установки pwa",
+    "beforeinstallprompt пример",
+    "отложить установку приложения",
+    "своя кнопка install"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 20,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 31,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 25,
+      "text": "beforeinstallprompt",
+      "kind": "kw",
+      "note": "beforeinstallprompt — браузер готов предложить установку приложения.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "event.preventDefault",
+      "kind": "fn",
+      "note": "preventDefault — отменяет стандартное окно, чтобы показать предложение позже.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 14,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 40,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — функция, внутри которой можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 22,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — дождаться завершения асинхронной операции и взять её результат.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 18,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Появляется кнопка «Установить приложение»; после клика в консоли «Выбор пользователя: accepted» или «dismissed»",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "let installPrompt = null;\n\nconst installButton = document.createElement(\"button\");\ninstallButton.textContent = \"Установить приложение\";\ninstallButton.hidden = true;\ndocument.body.append(installButton);\n\nwindow.addEventListener(\"beforeinstallprompt\", event => {\n  event.preventDefault();\n  installPrompt = event;\n  installButton.hidden = false;\n});\n\ninstallButton.addEventListener(\"click\", async () => {\n  installPrompt.prompt();\n  const { outcome } = await installPrompt.userChoice;\n  console.log(`Выбор пользователя: ${outcome}`);\n  installPrompt = null;\n  installButton.hidden = true;\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Появляется кнопка «Установить приложение»; после клика в консоли «Выбор пользователя: accepted» или «dismissed»",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Кнопка не появляется",
+            "cause": "Страница не удовлетворяет условиям PWA (манифест, service worker, HTTPS) или браузер не на Chromium",
+            "solution": "Проверь манифест и service worker во вкладке Application"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Добавляет кнопку на страницу",
+          "Выводит выбор пользователя в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "installPrompt",
+      "installButton"
+    ],
+    "requires": [],
+    "subcat": "Системные возможности"
+  },
+  "enriched": true
+}

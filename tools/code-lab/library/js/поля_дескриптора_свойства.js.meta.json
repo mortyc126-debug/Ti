@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "id": "поля_дескриптора_свойства",
+  "file": "поля_дескриптора_свойства.js",
+  "title": "Поля дескриптора свойства",
+  "lang": "js",
+  "group": "Основы / Свойства объектов",
+  "desc": "Дескриптор описывает свойство объекта четырьмя характеристиками: value — значение, writable — можно ли менять, enumerable — виден ли при переборе, configurable — можно ли удалить или переопределить. Деструктуризация извлекает их из объекта-описания. Дескрипторы используют в Object.defineProperty, чтобы создавать свойства с особым поведением, например нередактируемые.",
+  "output": "42 false true false",
+  "tags": [
+    "writable",
+    "enumerable",
+    "configurable",
+    "свойства объектов"
+  ],
+  "aliases": [
+    "поля дескриптора свойства",
+    "writable",
+    "enumerable",
+    "configurable"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 32,
+      "text": "writable",
+      "kind": "concept",
+      "note": "Можно ли изменять значение свойства."
+    },
+    {
+      "line": 0,
+      "col": 49,
+      "text": "enumerable",
+      "kind": "concept",
+      "note": "Виден ли ключ при переборе."
+    },
+    {
+      "line": 0,
+      "col": 67,
+      "text": "configurable",
+      "kind": "concept",
+      "note": "Можно ли удалить или переопределить свойство."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

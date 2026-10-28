@@ -1,0 +1,209 @@
+{
+  "schema": 1,
+  "id": "ошибка-разбора-данных-syntaxerror",
+  "file": "ошибка-разбора-данных-syntaxerror.js",
+  "title": "Сообщить о синтаксической ошибке разбираемых данных: SyntaxError",
+  "lang": "js",
+  "group": "Ошибки и отладка / Исключения",
+  "desc": "Если разбираешь собственный формат, SyntaxError подходит для случаев, когда текст не соответствует правилам формата.",
+  "output": "[ 255, 136, 0 ]\nSyntaxError - Ожидался цвет вида #rrggbb, получено: #12",
+  "tags": [
+    "SyntaxError",
+    "разбор данных",
+    "валидация формата",
+    "исключение"
+  ],
+  "aliases": [
+    "когда выбрасывать SyntaxError",
+    "throw new SyntaxError пример",
+    "разбор цвета из строки"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "new SyntaxError",
+      "kind": "SyntaxError — данные не соответствуют правилам формата.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 9,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 14,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 31,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Ошибки и отладка"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "[ 255, 136, 0 ]\nSyntaxError - Ожидался цвет вида #rrggbb, получено: #12",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function parseColor(text) {\n  const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(text);\n  if (!match) {\n    throw new SyntaxError(`Ожидался цвет вида #rrggbb, получено: ${text}`);\n  }\n  return match.slice(1).map(part => parseInt(part, 16));\n}\n\nconsole.log(parseColor(\"#ff8800\"));\n\ntry {\n  parseColor(\"#12\");\n} catch (error) {\n  console.log(error.name, \"-\", error.message);\n}"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "[ 255, 136, 0 ]\nSyntaxError - Ожидался цвет вида #rrggbb, получено: #12",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "parseColor"
+    ],
+    "requires": [],
+    "subcat": "Исключения"
+  },
+  "enriched": true
+}

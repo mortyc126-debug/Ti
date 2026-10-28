@@ -1,0 +1,252 @@
+{
+  "schema": 1,
+  "id": "остановка-событий-при-отключении-клиента",
+  "file": "остановка-событий-при-отключении-клиента.js",
+  "title": "Остановка событий при отключении клиента",
+  "lang": "js",
+  "group": "Node.js: процесс, файлы и сервер / HTTP-сервер",
+  "desc": "Останавливает отправку событий, когда клиент отключился.",
+  "output": "получено первое событие\nклиент отключился",
+  "tags": [
+    "Server-Sent Events",
+    "close",
+    "clearInterval",
+    "отключение клиента"
+  ],
+  "aliases": [
+    "как остановить отправку событий когда клиент отключился",
+    "request on close пример",
+    "очистка таймера при разрыве соединения",
+    "sse сервер на node",
+    "обнаружить закрытие соединения"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключает модуль Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "createServer",
+      "kind": "fn",
+      "note": "createServer — создаёт HTTP-сервер с обработчиком запросов.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 11,
+      "text": "writeHead",
+      "kind": "fn",
+      "note": "writeHead — задаёт код ответа и заголовки.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 16,
+      "text": "setInterval",
+      "kind": "fn",
+      "note": "setInterval — вызывает функцию повторно через заданный интервал.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 43,
+      "text": "write",
+      "kind": "fn",
+      "note": "write — записывает данные в поток.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 28,
+      "text": "clearInterval",
+      "kind": "fn",
+      "note": "clearInterval — останавливает повторяющийся вызов.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 7,
+      "text": "listen",
+      "kind": "fn",
+      "note": "listen — запускает сервер на порту; порт 0 выбирается автоматически.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 6,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 14,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 13,
+      "text": "destroy",
+      "kind": "fn",
+      "note": "destroy — принудительно закрывает запрос или соединение.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Node.js: процесс, файлы и сервер"
+      ],
+      "runtime": [
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "получено первое событие\nклиент отключился",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js.",
+        "Нужен Node.js той версии, где есть используемые встроенные модули."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const http = require(\"node:http\");\nconst server = http.createServer((request, response) => {\n  response.writeHead(200, { \"Content-Type\": \"text/event-stream\" });\n  const timer = setInterval(() => response.write(\"data: тик\\n\\n\"), 10);\n  request.on(\"close\", () => clearInterval(timer));\n  request.on(\"close\", () => {\n    console.log(\"клиент отключился\");\n    server.close();\n  });\n});\nserver.listen(0, () => {\n  const { port } = server.address();\n  const запрос = http.get(`http://127.0.0.1:${port}`, ответ => {\n    ответ.once(\"data\", () => {\n      console.log(\"получено первое событие\");\n      запрос.destroy();\n    });\n  });\n  запрос.on(\"error\", () => {});\n});"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "получено первое событие\nклиент отключился",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль",
+          "Поднимает временный сервер на свободном порту локального компьютера"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "http",
+      "server"
+    ],
+    "requires": [],
+    "subcat": "HTTP-сервер"
+  },
+  "enriched": true
+}

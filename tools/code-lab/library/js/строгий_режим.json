@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Строгий режим",
+  "group": "Основы / Синтаксис",
+  "desc": "Строгий режим.",
+  "code": "\"use strict\";\nfunction сумма(а, б) { return а + б; }\nconsole.log(сумма(2, 3));",
+  "output": "5",
+  "words": {
+    "use strict": "Включает строгий режим JavaScript."
+  }
+}

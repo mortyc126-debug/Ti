@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "асинхронная-операция-с-результатом-и-ошибкой",
+  "file": "асинхронная-операция-с-результатом-и-ошибкой.js",
+  "title": "Асинхронная операция с результатом и ошибкой",
+  "lang": "js",
+  "group": "Асинхронность",
+  "desc": "Создаёт Promise и показывает обработку успешного и ошибочного исхода.",
+  "output": "готово",
+  "tags": [
+    "асинхронность",
+    "цепочка then catch"
+  ],
+  "aliases": [
+    "new Promise",
+    "resolve reject",
+    "создать промис"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "асинхронность",
+      "kind": "concept",
+      "note": "асинхронность — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "цепочка then catch",
+      "kind": "concept",
+      "note": "цепочка then catch — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

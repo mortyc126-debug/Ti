@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Обрезка файла до заданной длины",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "Оставляем только первые 100 байт файла.",
+  "code": "import { truncate, stat } from \"node:fs/promises\";\n\nawait truncate(\"./журнал.log\", 100);\nconst сведения = await stat(\"./журнал.log\");\nconsole.log(сведения.size);",
+  "output": "100",
+  "words": {
+    "truncate": "Обрезает файл или дополняет нулями до указанной длины."
+  }
+}

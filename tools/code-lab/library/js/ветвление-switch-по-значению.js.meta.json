@@ -1,0 +1,202 @@
+{
+  "schema": 1,
+  "id": "ветвление-switch-по-значению",
+  "file": "ветвление-switch-по-значению.js",
+  "title": "Выбрать ветвь по строгому совпадению значения: switch",
+  "lang": "js",
+  "group": "Основы / Управление потоком",
+  "desc": "switch сравнивает значение с каждым case через ===: «1» и 1 не совпадут; общие ветви объединяют подряд идущими case.",
+  "output": "выходной рабочий день неизвестно\n1 и «1» — разные значения",
+  "tags": [
+    "switch",
+    "case",
+    "break",
+    "строгое сравнение",
+    "управление потоком"
+  ],
+  "aliases": [
+    "как работает switch в js",
+    "switch case пример",
+    "несколько case в одну ветвь"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "switch (day)",
+      "kind": "switch — выбрать ветвь по строгому совпадению значения.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 6,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 6,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 6,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 23,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 23,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "выходной рабочий день неизвестно\n1 и «1» — разные значения",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function dayType(day) {\n  switch (day) {\n    case \"сб\":\n    case \"вс\":\n      return \"выходной\";\n    case \"пн\":\n    case \"вт\":\n    case \"ср\":\n    case \"чт\":\n    case \"пт\":\n      return \"рабочий день\";\n    default:\n      return \"неизвестно\";\n  }\n}\n\nconsole.log(dayType(\"сб\"), dayType(\"пн\"), dayType(\"xx\"));\n\nswitch (1) {\n  case \"1\":\n    console.log(\"строка 1\");\n    break;\n  default:\n    console.log(\"1 и «1» — разные значения\");\n}"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "выходной рабочий день неизвестно\n1 и «1» — разные значения",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "dayType"
+    ],
+    "requires": [],
+    "subcat": "Управление потоком"
+  },
+  "enriched": true
+}

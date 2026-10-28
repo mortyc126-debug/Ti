@@ -1,0 +1,147 @@
+{
+  "schema": 1,
+  "id": "присвоение-если-истинно",
+  "file": "присвоение-если-истинно.js",
+  "title": "Присвоение, только если значение истинно: &&=",
+  "lang": "js",
+  "group": "Основы / Логика",
+  "desc": "Оператор &&= присваивает результат выражения, только когда текущее значение истинно; пустые поля остаются нетронутыми.",
+  "output": "{ name: 'Мира', email: 'mira@example.com' }",
+  "tags": [
+    "&&=",
+    "логическое присваивание",
+    "оператор",
+    "нормализация",
+    "javascript"
+  ],
+  "aliases": [
+    "оператор &&= в js",
+    "присвоить только если значение есть",
+    "логическое И с присваиванием",
+    "обработать поле только если оно заполнено"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 11,
+      "text": "&&=",
+      "kind": "kw",
+      "note": "&&= — выполнить правую часть и присвоить, только если левая часть истинна.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "{ name: 'Мира', email: 'mira@example.com' }",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const user = { name: \"Мира\", email: \"  MIRA@Example.com \" };\n\nuser.email &&= user.email.trim().toLowerCase();\nuser.phone &&= user.phone.trim();\n\nconsole.log(user);"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "{ name: 'Мира', email: 'mira@example.com' }",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "user"
+    ],
+    "requires": [],
+    "subcat": "Логика"
+  },
+  "enriched": true
+}

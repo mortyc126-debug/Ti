@@ -1,0 +1,12 @@
+{
+  "lang": "js",
+  "title": "Управляемое поле React",
+  "group": "Интерфейс / Поля и состояния форм",
+  "desc": "Управляемое поле React.",
+  "code": "function Поле() {\n  const [имя, setИмя] = React.useState(\"\");\n  return <input value={имя} onChange={событие => setИмя(событие.target.value)} />;\n}",
+  "output": "Поле ввода React синхронизировано с состоянием.",
+  "words": {
+    "value": "Текущее значение поля.",
+    "onChange": "Обработчик изменения поля."
+  }
+}

@@ -1,0 +1,186 @@
+{
+  "schema": 1,
+  "id": "закрыть-поток-событий",
+  "file": "закрыть-поток-событий.js",
+  "title": "Закрыть поток событий без переподключений: source.close()",
+  "lang": "js",
+  "group": "Состояние / Потоки обновлений",
+  "desc": "source.close() окончательно закрывает EventSource: браузер перестаёт переподключаться, соединение освобождается.",
+  "output": "Пять сообщений и «Поток закрыт»",
+  "tags": [
+    "EventSource",
+    "SSE",
+    "close",
+    "закрытие потока"
+  ],
+  "aliases": [
+    "как остановить eventsource",
+    "source.close пример",
+    "прекратить получать события"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 4,
+      "text": "source.close",
+      "kind": "close — закрывает поток, автоматических переподключений больше не будет.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Состояние"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Пять сообщений и «Поток закрыт»",
+      "dependencies": [],
+      "requirements": [
+        "Нужен сервер, отдающий поток событий по адресу /events."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const source = new EventSource(\"/events\");\nlet received = 0;\n\nsource.onmessage = event => {\n  received += 1;\n  console.log(`Сообщение ${received}: ${event.data}`);\n\n  if (received === 5) {\n    source.close();\n    console.log(\"Поток закрыт\");\n  }\n};"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Пять сообщений и «Поток закрыт»",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Сообщения не приходят",
+            "cause": "Сервер не отдаёт text/event-stream по адресу /events",
+            "solution": "Проверь ответ сервера во вкладке Network"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "source",
+      "received"
+    ],
+    "requires": [],
+    "subcat": "Потоки обновлений"
+  },
+  "enriched": true
+}

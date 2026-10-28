@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "грубое_копирование_данных_через_json",
+  "file": "грубое_копирование_данных_через_json.js",
+  "title": "Грубое копирование данных через JSON",
+  "lang": "js",
+  "group": "Данные / Копирование данных",
+  "desc": "JSON.parse(JSON.stringify(значение)) создаёт глубокую копию, но только для данных, которые умеет представлять JSON. Даты превращаются в строки, Map и Set — в пустые объекты, undefined, функции и символы пропадают, а циклические ссылки вызывают ошибку. Приём годится для простых конфигураций. Для остальных случаев используйте structuredClone.",
+  "output": "{\n  'имя': 'Мира',\n  'дата': '1970-01-01T00:00:00.000Z',\n  'карта': {},\n  'список': [ 1, 2 ]\n}",
+  "tags": [
+    "JSON.stringify",
+    "JSON.parse",
+    "копирование данных"
+  ],
+  "aliases": [
+    "грубое копирование данных через json",
+    "JSON.stringify",
+    "JSON.parse"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 8,
+      "col": 14,
+      "text": "JSON.parse",
+      "kind": "fn",
+      "note": "Создаёт значение из JSON-строки."
+    },
+    {
+      "line": 8,
+      "col": 25,
+      "text": "JSON.stringify",
+      "kind": "fn",
+      "note": "Превращает значение в JSON-строку."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,171 @@
+{
+  "schema": 1,
+  "id": "синхронный-тест-node-test",
+  "file": "синхронный-тест-node-test.js",
+  "title": "Объявить синхронный тест во встроенном раннере Node.js",
+  "lang": "js",
+  "group": "Тестирование / Библиотека тестирования",
+  "desc": "Модуль node:test запускает тесты без сторонних библиотек; проверки пишутся через node:assert.",
+  "output": "✔ sum складывает числа",
+  "tags": [
+    "node:test",
+    "тест",
+    "assert",
+    "встроенный раннер"
+  ],
+  "aliases": [
+    "как написать тест в node без jest",
+    "node:test пример",
+    "встроенный тестовый раннер"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "test(",
+      "kind": "test — объявляет тест во встроенном раннере Node.js.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "✔ sum складывает числа",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const test = require(\"node:test\");\nconst assert = require(\"node:assert/strict\");\n\nfunction sum(first, second) {\n  return first + second;\n}\n\ntest(\"sum складывает числа\", () => {\n  assert.equal(sum(2, 3), 5);\n});"
+        },
+        "steps": [
+          "Запусти командой node --test имя-файла.js (нужен Node.js 18+).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "✔ sum складывает числа",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Тест проходит",
+            "Тест падает при сломанном коде",
+            "Повторный запуск тестов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Тесты не запускаются",
+            "cause": "Версия Node.js ниже 18 или файл запущен не тем раннером",
+            "solution": "Проверь node --version и запусти node --test имя-файла.js"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "test",
+      "assert",
+      "sum"
+    ],
+    "requires": [],
+    "subcat": "Библиотека тестирования"
+  },
+  "enriched": true
+}

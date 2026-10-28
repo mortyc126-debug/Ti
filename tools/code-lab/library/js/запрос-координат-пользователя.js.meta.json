@@ -1,0 +1,176 @@
+{
+  "schema": 1,
+  "id": "запрос-координат-пользователя",
+  "file": "запрос-координат-пользователя.js",
+  "title": "Запрос координат пользователя",
+  "lang": "js",
+  "group": "Браузер: страница и документ / Навигатор и устройство",
+  "desc": "Запрашивает координаты пользователя после разрешения.",
+  "output": "55.75 37.62",
+  "tags": [
+    "navigator.geolocation",
+    "getCurrentPosition",
+    "координаты",
+    "разрешение"
+  ],
+  "aliases": [
+    "как получить геолокацию js",
+    "getcurrentposition пример",
+    "координаты пользователя",
+    "обработка отказа геолокации"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "navigator",
+      "kind": "fn",
+      "note": "navigator — сведения о браузере и устройстве.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Браузер: страница и документ"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Аргументы функции «onSuccess»",
+      "output": "55.75 37.62",
+      "dependencies": [],
+      "requirements": [
+        "Работает в браузере: нужны объекты страницы (document и другие API браузера).",
+        "Внешние библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function onSuccess(позиция) {\n  console.log(позиция.coords.latitude, позиция.coords.longitude);\n}\nfunction onError(ошибка) {\n  console.log(\"не удалось получить координаты:\", ошибка.message);\n}\nnavigator.geolocation.getCurrentPosition(onSuccess, onError);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные.",
+          "Скопируй функцию «onSuccess» в подходящую часть проекта.",
+          "Вызови её со своими данными вместо значений из примера.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "55.75 37.62",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          },
+          {
+            "symptom": "ReferenceError: document is not defined",
+            "cause": "Код запущен в Node.js, где нет объектов страницы",
+            "solution": "Запусти код в браузере или в окружении с эмуляцией DOM"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль",
+          "Проверено с подставным navigator: в браузере значения даёт сам браузер"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "onSuccess",
+      "onError"
+    ],
+    "requires": [],
+    "subcat": "Навигатор и устройство"
+  },
+  "enriched": true
+}

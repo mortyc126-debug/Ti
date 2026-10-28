@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "ip_адрес_по_имени_хоста",
+  "file": "ip_адрес_по_имени_хоста.js",
+  "title": "IP-адрес по имени хоста",
+  "lang": "js",
+  "group": "Сеть / DNS",
+  "desc": "dns.lookup из node:dns/promises переводит имя хоста в IP-адрес с помощью средств операционной системы, как это делают обычные программы. Возвращает объект с адресом и версией протокола (4 или 6). Метод использует системный резолвер, а не напрямую DNS-серверы, поэтому учитывает файл hosts. При ошибке (хост не найден) Promise отклоняется. Для DNS-запросов других типов используйте resolve.",
+  "output": "127.0.0.1 (или ::1 в зависимости от настроек)",
+  "tags": [
+    "dns.lookup",
+    "address",
+    "dns"
+  ],
+  "aliases": [
+    "ip-адрес по имени хоста",
+    "dns.lookup",
+    "address"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 8,
+      "text": "address",
+      "kind": "concept",
+      "note": "Полученный IP-адрес."
+    },
+    {
+      "line": 2,
+      "col": 26,
+      "text": "dns.lookup",
+      "kind": "fn",
+      "note": "Определяет IP-адрес хоста средствами системы."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

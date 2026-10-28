@@ -1,0 +1,136 @@
+{
+  "schema": 1,
+  "id": "push-сообщение-в-service-worker",
+  "file": "push-сообщение-в-service-worker.js",
+  "title": "Обработать push-сообщение в Service Worker",
+  "lang": "js",
+  "group": "Кэширование / Service Worker",
+  "desc": "Событие push приходит, даже если страница закрыта; worker читает данные и показывает системное уведомление.",
+  "output": "При получении push показывается уведомление с заголовком и текстом из сообщения",
+  "tags": [
+    "Service Worker",
+    "push",
+    "уведомление",
+    "showNotification",
+    "PWA"
+  ],
+  "aliases": [
+    "как принять push в service worker",
+    "push event пример",
+    "показать уведомление по push"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 5,
+      "text": "addEventListener(\"push\"",
+      "kind": "push — на устройство пришло push-сообщение.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "event.data?.json()",
+      "kind": "json() — разобрать данные push как JSON.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Кэширование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Service Worker"
+      ],
+      "technology": [
+        "JavaScript",
+        "Service Worker"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "При получении push показывается уведомление с заголовком и текстом из сообщения",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "self.addEventListener(\"push\", event => {\n  const message = event.data?.json() ?? { title: \"Новое сообщение\", body: \"\" };\n\n  event.waitUntil(\n    self.registration.showNotification(message.title, { body: message.body })\n  );\n});"
+        },
+        "steps": [
+          "Сохрани код как sw.js в корне сайта и зарегистрируй: navigator.serviceWorker.register(\"/sw.js\").",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "При получении push показывается уведомление с заголовком и текстом из сообщения",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Первая установка worker",
+            "Обновление worker",
+            "Работа без сети"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Уведомление не появляется",
+            "cause": "Нет разрешения на уведомления или подписки на push",
+            "solution": "Запроси Notification.requestPermission() и создай подписку через pushManager.subscribe"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Service Worker"
+  },
+  "enriched": true
+}

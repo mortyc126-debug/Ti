@@ -1,0 +1,153 @@
+{
+  "schema": 1,
+  "id": "снимок-в-файле-tomatchsnapshot",
+  "file": "снимок-в-файле-tomatchsnapshot.js",
+  "title": "Сравнить значение с сохранённым снимком: toMatchSnapshot",
+  "lang": "js",
+  "group": "Тестирование / Проверки функций",
+  "desc": "При первом запуске снимок записывается в файл __snapshots__, дальше тест сравнивает с ним; обновить снимок можно командой vitest -u.",
+  "output": "✓ 1 тест пройден (при первом запуске создан файл __snapshots__)",
+  "tags": [
+    "Vitest",
+    "toMatchSnapshot",
+    "снимок",
+    "__snapshots__"
+  ],
+  "aliases": [
+    "как работает snapshot тест",
+    "toMatchSnapshot пример",
+    "обновить снимки vitest -u"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 15,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — объявить класс.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 54,
+      "text": "toMatchSnapshot",
+      "kind": "toMatchSnapshot — сравнение значения со снимком в файле.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Vitest"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "✓ 1 тест пройден (при первом запуске создан файл __snapshots__)",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import { expect, it } from \"vitest\";\n\nfunction renderCard(user) {\n  return `<div class=\"card\"><h2>${user.name}</h2><p>${user.role}</p></div>`;\n}\n\nit(\"разметка карточки не меняется\", () => {\n  expect(renderCard({ name: \"Мира\", role: \"admin\" })).toMatchSnapshot();\n});"
+        },
+        "steps": [
+          "Установи Vitest (npm install -D vitest) и запусти npx vitest run имя-файла.js.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "✓ 1 тест пройден (при первом запуске создан файл __snapshots__)",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Тест проходит",
+            "Тест падает при сломанном коде",
+            "Повторный запуск тестов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Cannot find package 'vitest'",
+            "cause": "Vitest не установлен в проекте",
+            "solution": "Выполни npm install -D vitest"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "renderCard"
+    ],
+    "requires": [],
+    "subcat": "Проверки функций"
+  },
+  "enriched": true
+}

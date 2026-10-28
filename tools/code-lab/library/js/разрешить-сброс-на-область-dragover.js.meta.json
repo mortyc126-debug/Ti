@@ -1,0 +1,170 @@
+{
+  "schema": 1,
+  "id": "разрешить-сброс-на-область-dragover",
+  "file": "разрешить-сброс-на-область-dragover.js",
+  "title": "Разрешить сброс элементов на область: dragover + preventDefault",
+  "lang": "js",
+  "group": "Интерфейс / Реакция на действия пользователя",
+  "desc": "Браузер по умолчанию запрещает бросать файлы и элементы на страницу; preventDefault в обработчике dragover включает область как цель сброса.",
+  "output": "Сброс разрешён: true",
+  "tags": [
+    "drag and drop",
+    "dragover",
+    "preventDefault",
+    "зона сброса"
+  ],
+  "aliases": [
+    "как разрешить drop на элемент js",
+    "dragover preventDefault зачем",
+    "область перетаскивания файлов"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 26,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 9,
+      "text": "addEventListener(\"dragover\"",
+      "kind": "dragover — элемент над областью; без preventDefault событие drop не сработает.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 14,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Сброс разрешён: true",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const dropzone = document.createElement(\"div\");\ndropzone.textContent = \"Перетащите файл сюда\";\nObject.assign(dropzone.style, { padding: \"40px\", border: \"2px dashed gray\" });\ndocument.body.append(dropzone);\n\ndropzone.addEventListener(\"dragover\", event => event.preventDefault());\n\nconst probe = new Event(\"dragover\", { cancelable: true });\ndropzone.dispatchEvent(probe);\nconsole.log(\"Сброс разрешён:\", probe.defaultPrevented);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Сброс разрешён: true",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "dropzone",
+      "probe"
+    ],
+    "requires": [],
+    "subcat": "Реакция на действия пользователя"
+  },
+  "enriched": true
+}

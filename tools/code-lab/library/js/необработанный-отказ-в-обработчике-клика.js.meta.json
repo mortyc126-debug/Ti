@@ -1,0 +1,211 @@
+{
+  "schema": 1,
+  "id": "необработанный-отказ-в-обработчике-клика",
+  "file": "необработанный-отказ-в-обработчике-клика.js",
+  "title": "Не оставлять отклонение Promise необработанным в обработчике события",
+  "lang": "js",
+  "group": "Ошибки и отладка / Исключения",
+  "desc": "Обработчик события не ждёт промис, поэтому ошибку асинхронной функции нужно ловить прямо в обработчике через .catch.",
+  "output": "Не удалось сохранить: Сервер недоступен",
+  "tags": [
+    "Promise",
+    "catch",
+    "обработчик клика",
+    "необработанная ошибка"
+  ],
+  "aliases": [
+    "как поймать ошибку async функции в обработчике клика",
+    "run().catch(handleError)",
+    "unhandled rejection в обработчике"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — функция, внутри которой можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 21,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 39,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 28,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 11,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 2,
+      "text": "run().catch",
+      "kind": "catch — ловит отказ промиса, чтобы он не остался необработанным.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Ошибки и отладка"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Не удалось сохранить: Сервер недоступен",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "async function run() {\n  throw new Error(\"Сервер недоступен\");\n}\n\nfunction handleError(error) {\n  console.log(`Не удалось сохранить: ${error.message}`);\n}\n\nconst saveButton = document.createElement(\"button\");\nsaveButton.textContent = \"Сохранить\";\ndocument.body.append(saveButton);\n\nsaveButton.addEventListener(\"click\", () => {\n  run().catch(handleError);\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Не удалось сохранить: Сервер недоступен",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "run",
+      "handleError",
+      "saveButton"
+    ],
+    "requires": [],
+    "subcat": "Исключения"
+  },
+  "enriched": true
+}

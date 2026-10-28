@@ -1,0 +1,201 @@
+{
+  "schema": 1,
+  "id": "обработка-отказа-промиса",
+  "file": "обработка-отказа-промиса.js",
+  "title": "Обработка отказа промиса",
+  "lang": "js",
+  "group": "Асинхронность / Промисы",
+  "desc": "Обрабатывает отказ Promise.",
+  "output": "ошибка: не удалось загрузить\nзапасное значение",
+  "tags": [
+    "Promise.catch",
+    "обработка ошибок",
+    "цепочка",
+    "отказ"
+  ],
+  "aliases": [
+    "как обработать ошибку промиса",
+    "promise catch пример",
+    "вернуть значение после ошибки",
+    "catch в цепочке then",
+    "запасное значение при отказе"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 16,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "reject",
+      "kind": "fn",
+      "note": "reject — создаёт отклонённый Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 31,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "catch",
+      "kind": "fn",
+      "note": "catch — обрабатывает отказ Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 3,
+      "text": "then",
+      "kind": "fn",
+      "note": "then — обрабатывает успешный результат Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 20,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 28,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "ошибка: не удалось загрузить\nзапасное значение",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const promise = Promise.reject(new Error(\"не удалось загрузить\"));\npromise\n  .catch(error => {\n    console.log(\"ошибка:\", error.message);\n    return \"запасное значение\";\n  })\n  .then(значение => console.log(значение));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "ошибка: не удалось загрузить\nзапасное значение",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "promise"
+    ],
+    "requires": [],
+    "subcat": "Промисы"
+  },
+  "enriched": true
+}

@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "запрос_к_api",
+  "file": "запрос_к_api.js",
+  "title": "Запрос к API",
+  "lang": "js",
+  "group": "Сеть и API / HTTP-клиенты",
+  "desc": "fetch отправляет HTTP-запрос и возвращает Promise с объектом Response. Важная тонкость: fetch не считает коды 404 или 500 ошибкой — Promise отклоняется только при сетевом сбое. Поэтому всегда проверяйте response.ok (или status) и сами выбрасывайте ошибку, как в этой функции. Тело ответа читается отдельным асинхронным вызовом (json(), text() и другие) и только один раз.",
+  "output": "Функция получает и разбирает JSON-ответ.",
+  "tags": [
+    "API",
+    "http-клиенты"
+  ],
+  "aliases": [
+    "запрос к api",
+    "API"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "API",
+      "kind": "concept",
+      "note": "Интерфейс программного взаимодействия."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

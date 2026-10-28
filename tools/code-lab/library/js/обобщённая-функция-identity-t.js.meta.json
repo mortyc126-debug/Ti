@@ -1,0 +1,153 @@
+{
+  "schema": 1,
+  "id": "обобщённая-функция-identity-t",
+  "file": "обобщённая-функция-identity-t.js",
+  "title": "Объявить обобщённую функцию: function identity<T>(value: T): T",
+  "lang": "js",
+  "group": "Продвинутые темы / Типизация",
+  "desc": "Обобщение связывает тип результата с типом аргумента. В TypeScript: function identity<T>(value: T): T. Здесь записано через JSDoc @template.",
+  "output": "42 строка [ 1, 2 ]",
+  "tags": [
+    "дженерики",
+    "@template",
+    "identity",
+    "типизация"
+  ],
+  "aliases": [
+    "как объявить generic функцию",
+    "function identity<T> пример",
+    "JSDoc template"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 3,
+      "text": "@template",
+      "kind": "@template T — параметр типа: результат имеет тот же тип, что и аргумент.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Продвинутые темы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "42 строка [ 1, 2 ]",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "/**\n * @template T\n * @param {T} input\n * @returns {T}\n */\nfunction identity(input) {\n  return input;\n}\n\nconsole.log(identity(42), identity(\"строка\"), identity([1, 2]));"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "42 строка [ 1, 2 ]",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "identity"
+    ],
+    "requires": [],
+    "subcat": "Типизация"
+  },
+  "enriched": true
+}

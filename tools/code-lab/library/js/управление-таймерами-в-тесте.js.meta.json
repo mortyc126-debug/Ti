@@ -1,0 +1,187 @@
+{
+  "schema": 1,
+  "id": "управление-таймерами-в-тесте",
+  "file": "управление-таймерами-в-тесте.js",
+  "title": "Управление таймерами в тесте: fake timers",
+  "lang": "js",
+  "group": "Тестирование / Таймеры",
+  "desc": "Поддельные таймеры позволяют «промотать» время вперёд мгновенно, не дожидаясь настоящих секунд.",
+  "output": "✓ 1 тест пройден",
+  "tags": [
+    "Vitest",
+    "useFakeTimers",
+    "advanceTimersByTime",
+    "debounce",
+    "таймеры"
+  ],
+  "aliases": [
+    "как промотать время в vitest",
+    "тест debounce vitest",
+    "useFakeTimers пример",
+    "не ждать setTimeout в тесте"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 14,
+      "text": "setTimeout",
+      "kind": "fn",
+      "note": "setTimeout — выполнить функцию один раз через заданное число миллисекунд.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "vi.useFakeTimers",
+      "kind": "fn",
+      "note": "useFakeTimers — подменяет setTimeout и setInterval управляемыми.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 2,
+      "text": "vi.advanceTimersByTime",
+      "kind": "fn",
+      "note": "advanceTimersByTime — «прокручивает» время вперёд на заданное число миллисекунд.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Vitest"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "✓ 1 тест пройден",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import { expect, it, vi } from \"vitest\";\n\nfunction debounce(callback, delay) {\n  let timerId;\n  return (...args) => {\n    clearTimeout(timerId);\n    timerId = setTimeout(() => callback(...args), delay);\n  };\n}\n\nit(\"debounce вызывает функцию один раз после паузы\", () => {\n  vi.useFakeTimers();\n\n  const save = vi.fn();\n  const debouncedSave = debounce(save, 1000);\n\n  debouncedSave(\"черновик 1\");\n  debouncedSave(\"черновик 2\");\n\n  vi.advanceTimersByTime(999);\n  expect(save).not.toHaveBeenCalled();\n\n  vi.advanceTimersByTime(1);\n  expect(save).toHaveBeenCalledTimes(1);\n  expect(save).toHaveBeenCalledWith(\"черновик 2\");\n\n  vi.useRealTimers();\n});"
+        },
+        "steps": [
+          "Установи Vitest (npm install -D vitest) и запусти npx vitest run имя-файла.js.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "✓ 1 тест пройден",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Тест проходит",
+            "Тест падает при сломанном коде",
+            "Повторный запуск тестов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Cannot find package 'vitest'",
+            "cause": "Vitest не установлен в проекте",
+            "solution": "Выполни npm install -D vitest"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "debounce"
+    ],
+    "requires": [],
+    "subcat": "Таймеры"
+  },
+  "enriched": true
+}

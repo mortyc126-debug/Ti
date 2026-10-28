@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "тип_результата_асинхронной_функции",
+  "file": "тип_результата_асинхронной_функции.js",
+  "title": "Тип результата асинхронной функции",
+  "lang": "js",
+  "group": "Основы / Типизация",
+  "desc": "Для async-функции ReturnType даёт Promise<T>, а Awaited разворачивает Promise до значения T, в том числе вложенные. Вместе они позволяют получить тип данных, которые вернёт функция, не описывая его вручную. В JavaScript-файлах такие типы указывают в JSDoc-комментариях, а проверку выполняет редактор или TypeScript с checkJs. Типы существуют только при проверке кода и на работу программы не влияют.",
+  "output": "Лев",
+  "tags": [
+    "Awaited",
+    "ReturnType",
+    "типизация"
+  ],
+  "aliases": [
+    "тип результата асинхронной функции",
+    "Awaited",
+    "ReturnType"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 4,
+      "col": 11,
+      "text": "Awaited",
+      "kind": "concept",
+      "note": "Тип результата после ожидания Promise."
+    },
+    {
+      "line": 4,
+      "col": 19,
+      "text": "ReturnType",
+      "kind": "concept",
+      "note": "Тип, который возвращает функция."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

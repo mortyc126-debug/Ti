@@ -1,0 +1,221 @@
+{
+  "schema": 1,
+  "id": "эффект-react-до-отрисовки",
+  "file": "эффект-react-до-отрисовки.js",
+  "title": "Эффект React синхронно до отрисовки",
+  "lang": "js",
+  "group": "Интерфейс / Жизненный цикл",
+  "desc": "useLayoutEffect выполняется после обновления DOM, но до того, как браузер нарисует кадр: подходит для измерений и поправки положения без мигания.",
+  "output": "Подсказка не вылезает за правый край окна и не «прыгает» при показе",
+  "tags": [
+    "React",
+    "useLayoutEffect",
+    "измерение элемента",
+    "положение",
+    "мигание"
+  ],
+  "aliases": [
+    "useLayoutEffect пример",
+    "измерить элемент до отрисовки react",
+    "чем отличается useLayoutEffect от useEffect",
+    "поправить позицию подсказки"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "useLayoutEffect",
+      "kind": "fn",
+      "note": "useLayoutEffect — как useEffect, но срабатывает до отрисовки кадра.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "export",
+      "kind": "kw",
+      "note": "export — сделать имя доступным для других модулей.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 24,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 37,
+      "text": "getBoundingClientRect",
+      "kind": "fn",
+      "note": "getBoundingClientRect — размеры и положение элемента на экране.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 4,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 9,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "React"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Подсказка не вылезает за правый край окна и не «прыгает» при показе",
+      "dependencies": [
+        "react"
+      ],
+      "requirements": [
+        "Нужен пакет react."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import { createElement, useLayoutEffect, useRef, useState } from \"react\";\n\nexport default function Tooltip({ text }) {\n  const boxRef = useRef(null);\n  const [shiftLeft, setShiftLeft] = useState(0);\n\n  useLayoutEffect(() => {\n    const { right } = boxRef.current.getBoundingClientRect();\n    if (right > window.innerWidth) setShiftLeft(window.innerWidth - right);\n  }, [text]);\n\n  return createElement(\n    \"div\",\n    { ref: boxRef, style: { position: \"relative\", left: shiftLeft } },\n    text\n  );\n}"
+        },
+        "steps": [
+          "Подготовь проект с React (npm install react) и импортируй компонент.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Подсказка не вылезает за правый край окна и не «прыгает» при показе",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Первый рендер компонента",
+            "Смена свойств компонента",
+            "Удаление компонента со страницы"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Cannot find module 'react'",
+            "cause": "В проекте не установлен React",
+            "solution": "Выполни npm install react"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Читает размеры элемента и сдвигает его"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "Tooltip"
+    ],
+    "requires": [],
+    "subcat": "Жизненный цикл"
+  },
+  "enriched": true
+}

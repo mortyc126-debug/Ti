@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "элемент_который_сейчас_в_фокусе",
+  "file": "элемент_который_сейчас_в_фокусе.js",
+  "title": "Элемент, который сейчас в фокусе",
+  "lang": "js",
+  "group": "Интерфейс / Доступность",
+  "desc": "document.activeElement — элемент, получивший фокус клавиатуры. Если ничего не выбрано, это body. Свойство полезно для сохранения и восстановления фокуса при открытии и закрытии диалогов, для проверки видимости фокуса и для отладки. Внутри теневого DOM фокус нужно искать через shadowRoot.activeElement. Свойство только для чтения.",
+  "output": "Название тега элемента в фокусе, например INPUT.",
+  "tags": [
+    "document.activeElement",
+    "доступность"
+  ],
+  "aliases": [
+    "элемент, который сейчас в фокусе",
+    "document.activeElement"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 16,
+      "text": "document.activeElement",
+      "kind": "concept",
+      "note": "Элемент, имеющий фокус клавиатуры."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

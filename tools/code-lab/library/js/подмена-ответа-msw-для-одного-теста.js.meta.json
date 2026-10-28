@@ -1,0 +1,198 @@
+{
+  "schema": 1,
+  "id": "подмена-ответа-msw-для-одного-теста",
+  "file": "подмена-ответа-msw-для-одного-теста.js",
+  "title": "Подменить ответ сервера MSW для одного теста: server.use",
+  "lang": "js",
+  "group": "Тестирование и отладка / Mock",
+  "desc": "server.use добавляет временный обработчик поверх стандартных: в этом тесте запрос вернёт 500, а после resetHandlers всё вернётся к норме.",
+  "output": "✓ 1 тест пройден",
+  "tags": [
+    "MSW",
+    "server.use",
+    "HttpResponse",
+    "ошибка 500",
+    "тест ошибки"
+  ],
+  "aliases": [
+    "как в msw вернуть ошибку 500 в одном тесте",
+    "server.use пример",
+    "переопределить обработчик msw"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 33,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — функция, внутри которой можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 2,
+      "text": "server.use",
+      "kind": "use — временно переопределяет обработчик на один тест.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 51,
+      "text": "new HttpResponse",
+      "kind": "HttpResponse — ответ, который отдаёт подмена (тело, статус).",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 68,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 19,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — дождаться завершения асинхронной операции и взять её результат.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование и отладка"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Vitest"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "✓ 1 тест пройден",
+      "dependencies": [
+        "vitest",
+        "msw"
+      ],
+      "requirements": [
+        "Нужен пакет vitest.",
+        "Нужен пакет msw."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import { http, HttpResponse } from \"msw\";\nimport { setupServer } from \"msw/node\";\nimport { afterAll, afterEach, beforeAll, expect, it } from \"vitest\";\n\nconst server = setupServer(\n  http.get(\"https://api.example.com/user\", () => HttpResponse.json({ name: \"Мира\" }))\n);\n\nbeforeAll(() => server.listen());\nafterEach(() => server.resetHandlers());\nafterAll(() => server.close());\n\nit(\"сервер ответил ошибкой 500\", async () => {\n  server.use(\n    http.get(\"https://api.example.com/user\", () => new HttpResponse(null, { status: 500 }))\n  );\n\n  const response = await fetch(\"https://api.example.com/user\");\n\n  expect(response.status).toBe(500);\n});"
+        },
+        "steps": [
+          "Установи Vitest (npm install -D vitest) и запусти npx vitest run имя-файла.js.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "✓ 1 тест пройден",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Тест проходит",
+            "Тест падает при сломанном коде",
+            "Повторный запуск тестов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Cannot find package 'vitest'",
+            "cause": "Vitest не установлен в проекте",
+            "solution": "Выполни npm install -D vitest"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "server"
+    ],
+    "requires": [],
+    "subcat": "Mock"
+  },
+  "enriched": true
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "ожидание_открытия_websocket",
+  "file": "ожидание_открытия_websocket.js",
+  "title": "Ожидание открытия WebSocket",
+  "lang": "js",
+  "group": "Сеть / WebSocket",
+  "desc": "WebSocket сообщает об открытии соединения событием open, а не Promise. Оборачивая его в new Promise, вы получаете возможность написать await и отправлять сообщения только после готовности: вызов send до открытия вызовет ошибку. Параметр once: true снимает обработчик после первого срабатывания. Событие error в WebSocket не содержит подробностей, так что при отказе выводите собственное понятное сообщение.",
+  "output": "Сообщение отправляется только после открытия соединения.",
+  "tags": [
+    "once",
+    "Promise",
+    "websocket"
+  ],
+  "aliases": [
+    "ожидание открытия websocket",
+    "once",
+    "Promise"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 10,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Оборачивает событие в ожидаемый результат."
+    },
+    {
+      "line": 3,
+      "col": 46,
+      "text": "once",
+      "kind": "concept",
+      "note": "Обработчик срабатывает один раз и снимается сам."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,170 @@
+{
+  "schema": 1,
+  "id": "колесо-мыши-с-отменой-прокрутки-passive-false",
+  "file": "колесо-мыши-с-отменой-прокрутки-passive-false.js",
+  "title": "Обработать колесо мыши с возможностью отменить прокрутку: { passive: false }",
+  "lang": "js",
+  "group": "Интерфейс / События",
+  "desc": "Чтобы вызвать preventDefault в обработчике wheel (например, для масштабирования), его нужно зарегистрировать с passive: false.",
+  "output": "Масштаб: 1.1\nМасштаб: 1.0",
+  "tags": [
+    "wheel",
+    "passive false",
+    "масштабирование",
+    "preventDefault"
+  ],
+  "aliases": [
+    "как отменить прокрутку колесом js",
+    "wheel passive false",
+    "масштаб колесом мыши"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 2,
+      "text": "{ passive: false }",
+      "kind": "passive: false — разрешает отменять событие через preventDefault.",
+      "note": "kw",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Масштаб: 1.1\nМасштаб: 1.0",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const viewer = document.createElement(\"div\");\nviewer.textContent = \"Крутите колесо\";\nviewer.style.padding = \"40px\";\ndocument.body.append(viewer);\n\nlet zoom = 1;\nviewer.addEventListener(\n  \"wheel\",\n  event => {\n    event.preventDefault();\n    zoom += event.deltaY < 0 ? 0.1 : -0.1;\n    console.log(`Масштаб: ${zoom.toFixed(1)}`);\n  },\n  { passive: false }\n);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Масштаб: 1.1\nМасштаб: 1.0",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "viewer",
+      "zoom"
+    ],
+    "requires": [],
+    "subcat": "События"
+  },
+  "enriched": true
+}

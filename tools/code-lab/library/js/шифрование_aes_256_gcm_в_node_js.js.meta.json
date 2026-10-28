@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "шифрование_aes_256_gcm_в_node_js",
+  "file": "шифрование_aes_256_gcm_в_node_js.js",
+  "title": "Шифрование AES-256-GCM в Node.js",
+  "lang": "js",
+  "group": "Безопасность / Криптография",
+  "desc": "AES-GCM шифрует данные и одновременно создаёт код аутентификации (тег), по которому при расшифровке проверяется, что данные не изменили. Нужны ключ в 32 байта и уникальный вектор инициализации (iv) в 12 байт: повторять iv с одним ключом нельзя, иначе защита ломается. Результат хранят вместе с iv и тегом. Все эти значения должны быть случайными, поэтому их получают из randomBytes.",
+  "output": "31 16",
+  "tags": [
+    "createCipheriv",
+    "getAuthTag",
+    "криптография"
+  ],
+  "aliases": [
+    "шифрование aes-256-gcm в node.js",
+    "createCipheriv",
+    "getAuthTag"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 9,
+      "text": "createCipheriv",
+      "kind": "concept",
+      "note": "Создаёт шифратор с ключом и вектором инициализации."
+    },
+    {
+      "line": 7,
+      "col": 17,
+      "text": "getAuthTag",
+      "kind": "fn",
+      "note": "Возвращает код аутентификации данных."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

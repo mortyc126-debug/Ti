@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "содержимое_файла_из_дескриптора_как_file",
+  "file": "содержимое_файла_из_дескриптора_как_file.js",
+  "title": "Содержимое файла из дескриптора как File",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "Дескриптор файла (FileSystemFileHandle), полученный из диалога выбора или из файловой системы источника, не содержит данных. Метод getFile возвращает объект File — со свойствами name, size, lastModified и методами text, arrayBuffer, stream. Каждый вызов даёт актуальный снимок файла. Чтобы записать в файл, нужен createWritable.",
+  "output": "Имя, размер и текстовое содержимое выбранного файла.",
+  "tags": [
+    "getFile",
+    "text",
+    "файловая система"
+  ],
+  "aliases": [
+    "содержимое файла из дескриптора как file",
+    "getFile",
+    "text"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 30,
+      "text": "getFile",
+      "kind": "fn",
+      "note": "Возвращает File для чтения содержимого."
+    },
+    {
+      "line": 4,
+      "col": 23,
+      "text": "text",
+      "kind": "fn",
+      "note": "Читает файл как строку."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

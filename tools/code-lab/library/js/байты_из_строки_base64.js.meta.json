@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "байты_из_строки_base64",
+  "file": "байты_из_строки_base64.js",
+  "title": "Байты из строки Base64",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Двоичные данные",
+  "desc": "Uint8Array.fromBase64 разбирает строку Base64 и сразу возвращает байты, без обходных путей через atob и цикл. Метод новый и есть не во всех средах, поэтому проверяйте его наличие и держите запасной вариант. При неверных символах он выбрасывает SyntaxError. Для получения текста из байт используйте TextDecoder.",
+  "output": "Привет",
+  "tags": [
+    "fromBase64",
+    "TextDecoder",
+    "двоичные данные"
+  ],
+  "aliases": [
+    "байты из строки base64",
+    "fromBase64",
+    "TextDecoder"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 25,
+      "text": "fromBase64",
+      "kind": "fn",
+      "note": "Создаёт Uint8Array из строки Base64."
+    },
+    {
+      "line": 2,
+      "col": 16,
+      "text": "TextDecoder",
+      "kind": "fn",
+      "note": "Превращает байты UTF-8 обратно в строку."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

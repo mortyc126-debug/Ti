@@ -1,0 +1,170 @@
+{
+  "schema": 1,
+  "id": "запрет-угадывания-типа-nosniff",
+  "file": "запрет-угадывания-типа-nosniff.js",
+  "title": "Запретить браузеру угадывать тип содержимого: nosniff",
+  "lang": "js",
+  "group": "Безопасность / Конфигурация",
+  "desc": "Заголовок x-content-type-options: nosniff заставляет браузер доверять заявленному content-type и не «додумывать» его по содержимому.",
+  "output": "nosniff",
+  "tags": [
+    "x-content-type-options",
+    "nosniff",
+    "заголовки безопасности",
+    "content-type"
+  ],
+  "aliases": [
+    "что делает nosniff",
+    "x-content-type-options пример",
+    "защита от подмены типа файла"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "response.setHeader(\"x-content-type-options\"",
+      "kind": "x-content-type-options: nosniff — запрет браузеру угадывать тип содержимого.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Безопасность"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "nosniff",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const http = require(\"node:http\");\n\nconst server = http.createServer((request, response) => {\n  response.setHeader(\"content-type\", \"text/plain; charset=utf-8\");\n  response.setHeader(\"x-content-type-options\", \"nosniff\");\n  response.end(\"обычный текст\");\n});\n\nserver.listen(0, () => {\n  const options = { port: server.address().port, headers: { Origin: \"https://app.example.com\" } };\n  http.get(options, reply => {\n    console.log(reply.headers[\"x-content-type-options\"]);\n    reply.resume();\n    reply.on(\"end\", () => server.close());\n  });\n});"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "nosniff",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "http",
+      "server"
+    ],
+    "requires": [],
+    "subcat": "Конфигурация"
+  },
+  "enriched": true
+}

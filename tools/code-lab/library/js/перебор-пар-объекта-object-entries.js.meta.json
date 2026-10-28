@@ -1,0 +1,169 @@
+{
+  "schema": 1,
+  "id": "перебор-пар-объекта-object-entries",
+  "file": "перебор-пар-объекта-object-entries.js",
+  "title": "Перебрать пары ключ-значение объекта: Object.entries",
+  "lang": "js",
+  "group": "Данные / Перебирать коллекции",
+  "desc": "Object.entries превращает объект в массив пар [ключ, значение] — их удобно перебирать в for...of.",
+  "output": "хлеб: 45 ₽\nмолоко: 89 ₽\nсыр: 320 ₽",
+  "tags": [
+    "Object.entries",
+    "перебор объекта",
+    "for of",
+    "пары"
+  ],
+  "aliases": [
+    "как перебрать объект js",
+    "Object.entries пример",
+    "ключ и значение объекта"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторяет блок для каждого элемента или шага.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 5,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 25,
+      "text": "of",
+      "kind": "kw",
+      "note": "of — в цикле for...of: перебрать значения по одному.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 28,
+      "text": "Object.entries",
+      "kind": "Object.entries — массив пар [ключ, значение] собственных свойств.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Данные"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "хлеб: 45 ₽\nмолоко: 89 ₽\nсыр: 320 ₽",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const prices = { хлеб: 45, молоко: 89, сыр: 320 };\n\nfor (const [name, price] of Object.entries(prices)) {\n  console.log(`${name}: ${price} ₽`);\n}"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "хлеб: 45 ₽\nмолоко: 89 ₽\nсыр: 320 ₽",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "prices"
+    ],
+    "requires": [],
+    "subcat": "Перебирать коллекции"
+  },
+  "enriched": true
+}

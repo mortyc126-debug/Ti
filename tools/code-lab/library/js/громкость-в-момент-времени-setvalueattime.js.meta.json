@@ -1,0 +1,178 @@
+{
+  "schema": 1,
+  "id": "громкость-в-момент-времени-setvalueattime",
+  "file": "громкость-в-момент-времени-setvalueattime.js",
+  "title": "Задать громкость в указанный момент времени: setValueAtTime",
+  "lang": "js",
+  "group": "Графика и визуализация / Звук",
+  "desc": "setValueAtTime планирует мгновенную смену значения на точный момент: здесь громкость падает со 1 до 0.2 через 0.3 секунды.",
+  "output": "По клику тон звучит громко 0.3 секунды, затем тише",
+  "tags": [
+    "Web Audio",
+    "GainNode",
+    "setValueAtTime",
+    "громкость"
+  ],
+  "aliases": [
+    "как изменить громкость в заданный момент web audio",
+    "setValueAtTime пример",
+    "планирование параметров звука"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 29,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 12,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 16,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 12,
+      "text": "setValueAtTime",
+      "kind": "setValueAtTime — задаёт значение параметра в точное время.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Графика и визуализация"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "По клику тон звучит громко 0.3 секунды, затем тише",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const startButton = document.createElement(\"button\");\nstartButton.textContent = \"Звук\";\ndocument.body.append(startButton);\n\nstartButton.addEventListener(\"click\", () => {\n  const audio = new AudioContext();\n  const oscillator = audio.createOscillator();\n  const gain = audio.createGain();\n  oscillator.connect(gain).connect(audio.destination);\n\n  gain.gain.setValueAtTime(1, audio.currentTime);\n  gain.gain.setValueAtTime(0.2, audio.currentTime + 0.3);\n\n  oscillator.start();\n  oscillator.stop(audio.currentTime + 0.6);\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "По клику тон звучит громко 0.3 секунды, затем тише",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Добавляет кнопку на страницу",
+          "Воспроизводит звук"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "startButton"
+    ],
+    "requires": [],
+    "subcat": "Звук"
+  },
+  "enriched": true
+}

@@ -1,0 +1,226 @@
+{
+  "schema": 1,
+  "id": "удаление-свойства-с-логическим-результатом",
+  "file": "удаление-свойства-с-логическим-результатом.js",
+  "title": "Удаление свойства с логическим результатом",
+  "lang": "js",
+  "group": "Объекты и метапрограммирование / Операции над объектами и прокси",
+  "desc": "Удаляет свойство и возвращает логический результат.",
+  "output": "true\n{ 'имя': 'Анна' }\nfalse",
+  "tags": [
+    "Reflect.deleteProperty",
+    "удаление свойства",
+    "логический результат",
+    "заморозка"
+  ],
+  "aliases": [
+    "как удалить свойство и узнать результат",
+    "reflect deleteproperty пример",
+    "удаление свойства замороженного объекта",
+    "true или false при удалении",
+    "оператор delete и reflect"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "Reflect",
+      "kind": "fn",
+      "note": "Reflect — встроенный объект с операциями над объектами в виде функций.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "deleteProperty",
+      "kind": "fn",
+      "note": "deleteProperty — удаляет свойство и возвращает true или false.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 18,
+      "text": "Object",
+      "kind": "fn",
+      "note": "Object — встроенный объект с утилитами для работы с объектами.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 25,
+      "text": "freeze",
+      "kind": "fn",
+      "note": "freeze — замораживает объект: свойства нельзя менять, добавлять и удалять.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 12,
+      "text": "Reflect",
+      "kind": "fn",
+      "note": "Reflect — встроенный объект с операциями над объектами в виде функций.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 20,
+      "text": "deleteProperty",
+      "kind": "fn",
+      "note": "deleteProperty — удаляет свойство и возвращает true или false.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Объекты и метапрограммирование"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "true\n{ 'имя': 'Анна' }\nfalse",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const object = { имя: \"Анна\", возраст: 25 };\nconsole.log(Reflect.deleteProperty(object, \"возраст\"));\nconsole.log(object);\n\nconst заморожен = Object.freeze({ имя: \"Анна\" });\nconsole.log(Reflect.deleteProperty(заморожен, \"имя\"));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "true\n{ 'имя': 'Анна' }\nfalse",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "object",
+      "заморожен"
+    ],
+    "requires": [],
+    "subcat": "Операции над объектами и прокси"
+  },
+  "enriched": true
+}

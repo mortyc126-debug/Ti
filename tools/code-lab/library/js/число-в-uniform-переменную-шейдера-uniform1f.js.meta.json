@@ -1,0 +1,264 @@
+{
+  "schema": 1,
+  "id": "число-в-uniform-переменную-шейдера-uniform1f",
+  "file": "число-в-uniform-переменную-шейдера-uniform1f.js",
+  "title": "Передать число в uniform-переменную шейдера: gl.uniform1f",
+  "lang": "js",
+  "group": "Графика и визуализация / Canvas: рисование",
+  "desc": "uniform1f записывает одно число в uniform шейдера; вызывать нужно после useProgram. Здесь время управляет яркостью треугольника.",
+  "output": "Оранжевый треугольник плавно мигает, меняя яркость",
+  "tags": [
+    "WebGL",
+    "uniform1f",
+    "getUniformLocation",
+    "анимация"
+  ],
+  "aliases": [
+    "как передать значение в шейдер webgl",
+    "gl.uniform1f пример",
+    "анимация через uniform time"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторяет блок для каждого элемента или шага.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 7,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 28,
+      "text": "of",
+      "kind": "kw",
+      "note": "of — в цикле for...of: перебрать значения по одному.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 25,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 27,
+      "col": 31,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 29,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 33,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 33,
+      "col": 24,
+      "text": "getUniformLocation",
+      "kind": "getUniformLocation — находит uniform-переменную по имени.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 35,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 38,
+      "col": 2,
+      "text": "gl.uniform1f",
+      "kind": "uniform1f — передаёт одно число в uniform-переменную шейдера.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Графика и визуализация"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Оранжевый треугольник плавно мигает, меняя яркость",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function makeProgram(gl, vertexSource, fragmentSource) {\n  const program = gl.createProgram();\n  for (const [type, source] of [[gl.VERTEX_SHADER, vertexSource], [gl.FRAGMENT_SHADER, fragmentSource]]) {\n    const shader = gl.createShader(type);\n    gl.shaderSource(shader, source);\n    gl.compileShader(shader);\n    gl.attachShader(program, shader);\n  }\n  gl.linkProgram(program);\n  return program;\n}\n\nconst canvas = document.createElement(\"canvas\");\ncanvas.width = 300;\ncanvas.height = 300;\ndocument.body.append(canvas);\nconst gl = canvas.getContext(\"webgl\");\n\nconst program = makeProgram(\n  gl,\n  \"attribute vec2 position; void main() { gl_Position = vec4(position, 0.0, 1.0); }\",\n  \"precision mediump float; uniform float time; void main() { gl_FragColor = vec4(1.0, 0.4, 0.0, 1.0) * (0.5 + 0.5 * sin(time)); }\"\n);\ngl.useProgram(program);\n\nconst buffer = gl.createBuffer();\ngl.bindBuffer(gl.ARRAY_BUFFER, buffer);\ngl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-0.8, -0.8, 0.8, -0.8, 0, 0.8]), gl.STATIC_DRAW);\n\nconst position = gl.getAttribLocation(program, \"position\");\ngl.enableVertexAttribArray(position);\ngl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);\n\nconst timeLocation = gl.getUniformLocation(program, \"time\");\n\nfunction render(milliseconds) {\n  gl.clearColor(0, 0, 0, 1);\n  gl.clear(gl.COLOR_BUFFER_BIT);\n  gl.uniform1f(timeLocation, milliseconds / 500);\n  gl.drawArrays(gl.TRIANGLES, 0, 3);\n  requestAnimationFrame(render);\n}\n\nrequestAnimationFrame(render);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Оранжевый треугольник плавно мигает, меняя яркость",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Чёрный экран или gl равен null",
+            "cause": "Браузер не поддерживает WebGL или в шейдере ошибка",
+            "solution": "Проверь canvas.getContext(\"webgl\") и gl.getShaderInfoLog(shader)"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Добавляет canvas на страницу"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "makeProgram",
+      "canvas",
+      "gl",
+      "program",
+      "buffer",
+      "position",
+      "timeLocation",
+      "render"
+    ],
+    "requires": [],
+    "subcat": "Canvas: рисование"
+  },
+  "enriched": true
+}

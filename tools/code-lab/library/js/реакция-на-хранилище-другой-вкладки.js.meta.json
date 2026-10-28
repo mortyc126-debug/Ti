@@ -1,0 +1,170 @@
+{
+  "schema": 1,
+  "id": "реакция-на-хранилище-другой-вкладки",
+  "file": "реакция-на-хранилище-другой-вкладки.js",
+  "title": "Реакция на изменение хранилища в другой вкладке",
+  "lang": "js",
+  "group": "Хранение / Браузерное хранилище",
+  "desc": "Событие storage приходит во все остальные вкладки того же сайта, когда одна из них меняет localStorage; в самой изменившей вкладке оно не срабатывает.",
+  "output": "Откройте страницу в двух вкладках и выполните во второй localStorage.setItem(\"theme\", \"dark\"): в первой появится «Тема изменена в другой вкладке: null → dark»",
+  "tags": [
+    "storage",
+    "localStorage",
+    "синхронизация вкладок",
+    "браузерное хранилище",
+    "тема"
+  ],
+  "aliases": [
+    "как синхронизировать вкладки через localStorage",
+    "событие storage пример",
+    "реакция на localStorage в другой вкладке",
+    "общая тема между вкладками"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 25,
+      "text": "storage",
+      "kind": "kw",
+      "note": "storage — событие: localStorage изменили в другой вкладке.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 29,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 32,
+      "text": "event.newValue",
+      "kind": "fn",
+      "note": "newValue — новое значение ключа (null, если ключ удалён).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Хранение"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Откройте страницу в двух вкладках и выполните во второй localStorage.setItem(\"theme\", \"dark\"): в первой появится «Тема изменена в другой вкладке: null → dark»",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "document.body.dataset.theme = localStorage.getItem(\"theme\") ?? \"light\";\n\nwindow.addEventListener(\"storage\", event => {\n  if (event.key !== \"theme\") return;\n\n  document.body.dataset.theme = event.newValue ?? \"light\";\n  console.log(`Тема изменена в другой вкладке: ${event.oldValue} → ${event.newValue}`);\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Откройте страницу в двух вкладках и выполните во второй localStorage.setItem(\"theme\", \"dark\"): в первой появится «Тема изменена в другой вкладке: null → dark»",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Меняет атрибут data-theme у body",
+          "Выводит сообщение в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Браузерное хранилище"
+  },
+  "enriched": true
+}

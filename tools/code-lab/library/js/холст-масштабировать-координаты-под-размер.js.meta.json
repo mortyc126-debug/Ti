@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "id": "холст-масштабировать-координаты-под-размер",
+  "file": "холст-масштабировать-координаты-под-размер.js",
+  "title": "Холст масштабировать координаты под размер",
+  "lang": "js",
+  "group": "Графика и визуализация / Canvas: рисование",
+  "desc": "Согласует внутреннее разрешение Canvas с его отображаемым размером.",
+  "output": "Чёткое изображение на экранах с разной плотностью пикселей",
+  "tags": [
+    "повторный resize",
+    "CSS-размер отдельно от bitmap"
+  ],
+  "aliases": [
+    "canvas devicePixelRatio",
+    "canvas retina",
+    "масштабирование canvas",
+    "setTransform"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "повторный resize",
+      "kind": "concept",
+      "note": "повторный resize — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "CSS-размер отдельно от bitmap",
+      "kind": "concept",
+      "note": "CSS-размер отдельно от bitmap — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

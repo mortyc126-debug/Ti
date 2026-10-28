@@ -1,0 +1,247 @@
+{
+  "schema": 1,
+  "id": "проверка-запечатанного-объекта",
+  "file": "проверка-запечатанного-объекта.js",
+  "title": "Проверка запечатанного объекта",
+  "lang": "js",
+  "group": "Объекты и метапрограммирование / Свойства и дескрипторы",
+  "desc": "Проверяет, запечатан ли объект.",
+  "output": "false\ntrue\ntrue",
+  "tags": [
+    "Object.isSealed",
+    "запечатанный объект",
+    "seal",
+    "проверка"
+  ],
+  "aliases": [
+    "как проверить запечатан ли объект",
+    "object issealed пример",
+    "seal и freeze разница"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "Object",
+      "kind": "fn",
+      "note": "Object — встроенный объект с утилитами для работы с объектами.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "isSealed",
+      "kind": "fn",
+      "note": "isSealed — запечатан ли объект.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "Object",
+      "kind": "fn",
+      "note": "Object — встроенный объект с утилитами для работы с объектами.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 7,
+      "text": "seal",
+      "kind": "fn",
+      "note": "seal — запрещает добавлять и удалять свойства.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 12,
+      "text": "Object",
+      "kind": "fn",
+      "note": "Object — встроенный объект с утилитами для работы с объектами.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 19,
+      "text": "isSealed",
+      "kind": "fn",
+      "note": "isSealed — запечатан ли объект.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 12,
+      "text": "Object",
+      "kind": "fn",
+      "note": "Object — встроенный объект с утилитами для работы с объектами.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 19,
+      "text": "isSealed",
+      "kind": "fn",
+      "note": "isSealed — запечатан ли объект.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 28,
+      "text": "Object",
+      "kind": "fn",
+      "note": "Object — встроенный объект с утилитами для работы с объектами.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 35,
+      "text": "freeze",
+      "kind": "fn",
+      "note": "freeze — замораживает верхний уровень объекта.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Объекты и метапрограммирование"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "false\ntrue\ntrue",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const object = { имя: \"Анна\" };\nconsole.log(Object.isSealed(object));\nObject.seal(object);\nconsole.log(Object.isSealed(object));\nconsole.log(Object.isSealed(Object.freeze({ а: 1 })));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "false\ntrue\ntrue",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "object"
+    ],
+    "requires": [],
+    "subcat": "Свойства и дескрипторы"
+  },
+  "enriched": true
+}

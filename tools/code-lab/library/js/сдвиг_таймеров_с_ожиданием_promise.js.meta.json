@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "сдвиг_таймеров_с_ожиданием_promise",
+  "file": "сдвиг_таймеров_с_ожиданием_promise.js",
+  "title": "Сдвиг таймеров с ожиданием Promise",
+  "lang": "js",
+  "group": "Тестирование / Таймеры",
+  "desc": "С фальшивыми таймерами (vi.useFakeTimers) время в тесте не идёт само — его продвигают вручную. advanceTimersByTimeAsync сдвигает время и между срабатываниями таймеров выполняет цепочки Promise, а синхронный advanceTimersByTime этого не делает. Так проверяют задержки, повторы и таймауты без реального ожидания. В конце теста возвращайте настоящие таймеры через vi.useRealTimers.",
+  "output": "Тест проходит без реального ожидания.",
+  "tags": [
+    "advanceTimersByTimeAsync",
+    "useFakeTimers",
+    "таймеры"
+  ],
+  "aliases": [
+    "сдвиг таймеров с ожиданием promise",
+    "advanceTimersByTimeAsync",
+    "useFakeTimers"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 3,
+      "col": 5,
+      "text": "useFakeTimers",
+      "kind": "fn",
+      "note": "Подменяет настоящие таймеры."
+    },
+    {
+      "line": 7,
+      "col": 11,
+      "text": "advanceTimersByTimeAsync",
+      "kind": "fn",
+      "note": "Сдвигает время и выполняет связанные Promise."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

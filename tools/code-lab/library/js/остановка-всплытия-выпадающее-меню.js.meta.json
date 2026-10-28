@@ -1,0 +1,186 @@
+{
+  "schema": 1,
+  "id": "остановка-всплытия-выпадающее-меню",
+  "file": "остановка-всплытия-выпадающее-меню.js",
+  "title": "Закрывать меню кликом вне его: event.stopPropagation",
+  "lang": "js",
+  "group": "Интерфейс / События",
+  "desc": "Документ закрывает меню при любом клике, а клик внутри меню останавливает всплытие, чтобы до документа не дойти.",
+  "output": "клик внутри меню, isOpen = true\nменю закрыто кликом вне его",
+  "tags": [
+    "stopPropagation",
+    "выпадающее меню",
+    "клик вне элемента",
+    "всплытие"
+  ],
+  "aliases": [
+    "закрыть меню по клику снаружи js",
+    "event.stopPropagation меню",
+    "клик вне выпадающего списка"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 9,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 5,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 2,
+      "text": "event.stopPropagation",
+      "kind": "stopPropagation — клик внутри меню не доходит до документа.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "клик внутри меню, isOpen = true\nменю закрыто кликом вне его",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "document.body.innerHTML = '<div id=\"menu\">Меню <button id=\"item\">Пункт</button></div>';\nconst menu = document.querySelector(\"#menu\");\nlet isOpen = true;\n\ndocument.addEventListener(\"click\", () => {\n  isOpen = false;\n  console.log(\"меню закрыто кликом вне его\");\n});\n\nmenu.addEventListener(\"click\", event => {\n  event.stopPropagation();\n  console.log(`клик внутри меню, isOpen = ${isOpen}`);\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "клик внутри меню, isOpen = true\nменю закрыто кликом вне его",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "menu",
+      "isOpen"
+    ],
+    "requires": [],
+    "subcat": "События"
+  },
+  "enriched": true
+}

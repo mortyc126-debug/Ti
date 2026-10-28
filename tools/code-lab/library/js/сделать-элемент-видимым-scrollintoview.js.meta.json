@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "id": "сделать-элемент-видимым-scrollintoview",
+  "file": "сделать-элемент-видимым-scrollintoview.js",
+  "title": "Прокрутить контейнер, чтобы элемент стал видимым: scrollIntoView",
+  "lang": "js",
+  "group": "Интерфейс / Работа с DOM",
+  "desc": "scrollIntoView({ block: \"nearest\" }) прокручивает минимально необходимое, а не выравнивает элемент по краю.",
+  "output": "scrollTop = 750",
+  "tags": [
+    "scrollIntoView",
+    "nearest",
+    "smooth",
+    "прокрутка"
+  ],
+  "aliases": [
+    "как прокрутить к элементу js",
+    "scrollIntoView пример",
+    "минимальная прокрутка до элемента"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 18,
+      "text": "scrollIntoView",
+      "kind": "scrollIntoView — прокручивает контейнер до элемента.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "setTimeout",
+      "kind": "fn",
+      "note": "setTimeout — выполнить функцию один раз через заданное число миллисекунд.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 17,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 25,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "scrollTop = 750",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const rows = Array.from({ length: 50 }, (_, index) => `<div style=\"height: 30px\">Строка ${index + 1}</div>`);\ndocument.body.innerHTML = `<div id=\"list\" style=\"height: 150px; overflow: auto\">${rows.join(\"\")}</div>`;\nconst list = document.querySelector(\"#list\");\n\nlist.children[29].scrollIntoView({ behavior: \"smooth\", block: \"nearest\" });\n\nsetTimeout(() => console.log(`scrollTop = ${list.scrollTop}`), 1500);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "scrollTop = 750",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "rows",
+      "list"
+    ],
+    "requires": [],
+    "subcat": "Работа с DOM"
+  },
+  "enriched": true
+}

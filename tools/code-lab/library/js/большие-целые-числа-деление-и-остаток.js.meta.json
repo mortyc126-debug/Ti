@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "id": "большие-целые-числа-деление-и-остаток",
+  "file": "большие-целые-числа-деление-и-остаток.js",
+  "lang": "js",
+  "title": "Большие целые числа деление и остаток",
+  "group": "Данные / Числа и простые операции",
+  "desc": "Деление BigInt отбрасывает дробную часть, как целочисленное деление.",
+  "output": "3\n2",
+  "descAt": 1792998612683,
+  "component": {
+    "provides": [],
+    "requires": [
+      "n"
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Числа и простые операции"
+  },
+  "tags": [
+    "BigInt",
+    "деление",
+    "остаток"
+  ],
+  "aliases": [
+    "остаток от деления BigInt",
+    "целочисленное деление больших чисел"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

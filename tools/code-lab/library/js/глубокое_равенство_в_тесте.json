@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Глубокое равенство в тесте",
+  "group": "Тестирование / Проверки функций",
+  "desc": "Глубокое равенство в тесте.",
+  "code": "import assert from \"node:assert/strict\";\nassert.deepStrictEqual({ очки: [2, 3] }, { очки: [2, 3] });\nconsole.log(\"Проверено\");",
+  "output": "Проверено",
+  "words": {
+    "deepStrictEqual": "Проверяет глубокое структурное равенство."
+  }
+}

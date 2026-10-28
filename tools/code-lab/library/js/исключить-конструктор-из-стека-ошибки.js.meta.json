@@ -1,0 +1,210 @@
+{
+  "schema": 1,
+  "id": "исключить-конструктор-из-стека-ошибки",
+  "file": "исключить-конструктор-из-стека-ошибки.js",
+  "title": "Исключить конструктор из стека пользовательской ошибки",
+  "lang": "js",
+  "group": "Отладка / Трассировка",
+  "desc": "Error.captureStackTrace(this, this.constructor) убирает из стека кадры конструктора: первой строкой стека оказывается место, где ошибку создали.",
+  "output": "ValidationError: Возраст отрицательный\nat validate",
+  "tags": [
+    "Error.captureStackTrace",
+    "пользовательская ошибка",
+    "стек вызовов",
+    "конструктор"
+  ],
+  "aliases": [
+    "как убрать конструктор из стека ошибки",
+    "captureStackTrace this.constructor",
+    "свой класс ошибки чистый стек"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — объявить класс.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "Error.captureStackTrace",
+      "kind": "captureStackTrace(this, this.constructor) — стек начинается выше конструктора.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 21,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 9,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 30,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Отладка"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "ValidationError: Возраст отрицательный\nat validate",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "class ValidationError extends Error {\n  constructor(message) {\n    super(message);\n    this.name = \"ValidationError\";\n    Error.captureStackTrace(this, this.constructor);\n  }\n}\n\nfunction validate(age) {\n  if (age < 0) throw new ValidationError(\"Возраст отрицательный\");\n}\n\ntry {\n  validate(-1);\n} catch (error) {\n  const [title, firstFrame] = error.stack.split(\"\\n\");\n  console.log(title);\n  console.log(firstFrame.trim().split(\" \").slice(0, 2).join(\" \"));\n}"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "ValidationError: Возраст отрицательный\nat validate",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "ValidationError",
+      "validate"
+    ],
+    "requires": [],
+    "subcat": "Трассировка"
+  },
+  "enriched": true
+}

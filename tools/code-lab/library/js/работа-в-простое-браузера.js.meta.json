@@ -1,0 +1,179 @@
+{
+  "schema": 1,
+  "id": "работа-в-простое-браузера",
+  "file": "работа-в-простое-браузера.js",
+  "title": "Выполнить некритичную работу в простое браузера",
+  "lang": "js",
+  "group": "Интерфейс / Производительность",
+  "desc": "requestIdleCallback вызывает функцию, когда браузеру нечем заняться; deadline.timeRemaining() показывает, сколько времени осталось до следующего кадра.",
+  "output": "Осталось задач: 0 (при загруженной странице — несколько строк с убывающим числом)",
+  "tags": [
+    "requestIdleCallback",
+    "простой браузера",
+    "фоновая работа",
+    "deadline",
+    "производительность"
+  ],
+  "aliases": [
+    "как выполнить задачи в простое браузера",
+    "requestIdleCallback пример",
+    "разбить работу на кусочки без лагов"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "while",
+      "kind": "kw",
+      "note": "while — «пока»: повторять блок, пока условие истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 18,
+      "text": "timeRemaining",
+      "kind": "timeRemaining — сколько миллисекунд осталось в этом простое.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 24,
+      "text": "requestIdleCallback",
+      "kind": "requestIdleCallback — вызвать функцию, когда браузер простаивает.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Осталось задач: 0 (при загруженной странице — несколько строк с убывающим числом)",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const tasks = Array.from({ length: 50 }, (_, index) => index);\n\nfunction doWork(deadline) {\n  while (deadline.timeRemaining() > 1 && tasks.length > 0) {\n    tasks.shift();\n  }\n  console.log(`Осталось задач: ${tasks.length}`);\n  if (tasks.length > 0) requestIdleCallback(doWork);\n}\n\nrequestIdleCallback(doWork);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Осталось задач: 0 (при загруженной странице — несколько строк с убывающим числом)",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "tasks",
+      "doWork"
+    ],
+    "requires": [],
+    "subcat": "Производительность"
+  },
+  "enriched": true
+}

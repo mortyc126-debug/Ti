@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "выполнить-все-задачи-и-собрать-успехи-и-ошибки",
+  "file": "выполнить-все-задачи-и-собрать-успехи-и-ошибки.js",
+  "title": "Выполнить все задачи и собрать успехи и ошибки",
+  "lang": "js",
+  "group": "Асинхронность / Пакетные задачи",
+  "desc": "Не прерывает обработку из-за одного отказа; каждому результату соответствует fulfilled или rejected.",
+  "output": "отдельные списки успешных значений и причин ошибок",
+  "tags": [
+    "Promise.allSettled",
+    "ошибки",
+    "пакетная обработка",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "собрать все ошибки Promise.all",
+    "Promise.allSettled с отчётом",
+    "пакет задач без раннего отказа"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

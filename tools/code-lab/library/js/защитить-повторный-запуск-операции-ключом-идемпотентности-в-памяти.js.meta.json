@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "защитить-повторный-запуск-операции-ключом-идемпотентности-в-памяти",
+  "file": "защитить-повторный-запуск-операции-ключом-идемпотентности-в-памяти.js",
+  "title": "Защитить повторный запуск операции ключом идемпотентности в памяти",
+  "lang": "js",
+  "group": "Надёжность / Идемпотентность",
+  "desc": "Для одного ключа повторные вызовы получают один результат или активный Promise; демонстрация для одного процесса, не замена распределённому хранилищу.",
+  "output": "повторный ключ возвращает сохранённый результат",
+  "tags": [
+    "идемпотентность",
+    "Promise",
+    "ключ операции",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "idempotency key operation",
+    "не выполнять операцию повторно",
+    "dedupe writes by key"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

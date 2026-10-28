@@ -1,0 +1,178 @@
+{
+  "schema": 1,
+  "id": "ветвление-switch-true-по-условиям",
+  "file": "ветвление-switch-true-по-условиям.js",
+  "title": "Выбрать ветвь по набору условий: switch (true)",
+  "lang": "js",
+  "group": "Основы / Управление потоком",
+  "desc": "switch (true) сравнивает true с каждым case по порядку, поэтому в case можно писать произвольные логические условия, например диапазоны.",
+  "output": "отлично хорошо неудовлетворительно",
+  "tags": [
+    "switch true",
+    "ветвление",
+    "диапазоны",
+    "условия",
+    "управление потоком"
+  ],
+  "aliases": [
+    "как сделать switch с диапазонами js",
+    "switch (true) пример",
+    "оценка по баллам"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "switch (true)",
+      "kind": "switch (true) — выбрать первую ветвь, чьё условие истинно.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 6,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 6,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 6,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 6,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "отлично хорошо неудовлетворительно",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function gradeName(score) {\n  switch (true) {\n    case score >= 90:\n      return \"отлично\";\n    case score >= 70:\n      return \"хорошо\";\n    case score >= 50:\n      return \"удовлетворительно\";\n    default:\n      return \"неудовлетворительно\";\n  }\n}\n\nconsole.log(gradeName(95), gradeName(72), gradeName(30));"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "отлично хорошо неудовлетворительно",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "gradeName"
+    ],
+    "requires": [],
+    "subcat": "Управление потоком"
+  },
+  "enriched": true
+}

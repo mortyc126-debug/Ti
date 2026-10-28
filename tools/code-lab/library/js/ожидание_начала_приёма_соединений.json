@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Ожидание начала приёма соединений",
+  "group": "Файлы, хранение и сервер / HTTP-сервер",
+  "desc": "Ждём событие listening и только потом обращаемся к серверу.",
+  "code": "import { createServer } from \"node:http\";\nimport { once } from \"node:events\";\n\nconst сервер = createServer((запрос, ответ) => ответ.end(\"привет\"));\nсервер.listen(0);\nawait once(сервер, \"listening\");\n\nconsole.log(\"Порт:\", сервер.address().port);\nсервер.close();",
+  "output": "Порт: случайный свободный номер, например 53412",
+  "words": {
+    "once": "Возвращает Promise, который выполняется при первом срабатывании события."
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "документ_из_html_строки_для_теста",
+  "file": "документ_из_html_строки_для_теста.js",
+  "title": "Документ из HTML-строки для теста",
+  "lang": "js",
+  "group": "Тестирование / Окружение",
+  "desc": "JSDOM — реализация DOM на JavaScript, работающая в Node.js. Она позволяет разобрать HTML из строки и работать с документом так же, как в браузере: искать элементы, читать и менять текст. Это основа для тестов интерфейса без запуска настоящего браузера. JSDOM не отрисовывает страницу и не поддерживает всё, например расчёт размеров элементов.",
+  "output": "Привет",
+  "tags": [
+    "JSDOM",
+    "window",
+    "окружение"
+  ],
+  "aliases": [
+    "документ из html-строки для теста",
+    "JSDOM",
+    "window"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 9,
+      "text": "JSDOM",
+      "kind": "concept",
+      "note": "Создаёт документ из HTML-строки в Node.js."
+    },
+    {
+      "line": 2,
+      "col": 65,
+      "text": "window",
+      "kind": "concept",
+      "note": "Окно, содержащее document."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

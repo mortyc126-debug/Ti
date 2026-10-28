@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "имитация_клика_пользователя",
+  "file": "имитация_клика_пользователя.js",
+  "title": "Имитация клика пользователя",
+  "lang": "js",
+  "group": "Тестирование / Библиотека тестирования",
+  "desc": "userEvent.click из Testing Library воспроизводит весь набор событий, который происходит при настоящем клике: наведение, нажатие, фокус, отпускание и сам click. Это реалистичнее, чем fireEvent.click, который шлёт одно событие. В версии 14 методы асинхронные, и их нужно ждать через await. Для настройки задержек и общего состояния используйте userEvent.setup().",
+  "output": "1",
+  "tags": [
+    "userEvent",
+    "click",
+    "библиотека тестирования"
+  ],
+  "aliases": [
+    "имитация клика пользователя",
+    "userEvent",
+    "click"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 7,
+      "text": "userEvent",
+      "kind": "concept",
+      "note": "Имитирует действия пользователя."
+    },
+    {
+      "line": 5,
+      "col": 25,
+      "text": "click",
+      "kind": "concept",
+      "note": "Выполняет клик с цепочкой событий мыши."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

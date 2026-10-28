@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "проверить-ожидаемый-результат-в-небольшом-тесте",
+  "file": "проверить-ожидаемый-результат-в-небольшом-тесте.js",
+  "title": "Проверить ожидаемый результат в небольшом тесте",
+  "lang": "js",
+  "group": "Тестирование / Проверки функций",
+  "desc": "Минимальный assert для простых JSON-подобных структур; для полноценного проекта предпочтительнее встроенный тестовый фреймворк.",
+  "output": "не выбрасывает ошибку при совпадении",
+  "tags": [
+    "тест",
+    "assert",
+    "проверка результата",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "проверить результат функции",
+    "assert deep equal без библиотеки",
+    "тестирование небольшого фрагмента"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

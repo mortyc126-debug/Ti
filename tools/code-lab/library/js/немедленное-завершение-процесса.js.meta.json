@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "id": "немедленное-завершение-процесса",
+  "file": "немедленное-завершение-процесса.js",
+  "title": "Немедленное завершение процесса",
+  "lang": "js",
+  "group": "Node.js: процесс, файлы и сервер / Процесс",
+  "desc": "Немедленно завершает процесс; незавершённые операции не дожидаются.",
+  "output": "до выхода",
+  "tags": [
+    "process.exit",
+    "завершение процесса",
+    "код выхода",
+    "незавершённые операции"
+  ],
+  "aliases": [
+    "как завершить программу node сразу",
+    "process exit пример",
+    "код выхода процесса",
+    "что будет с незавершёнными операциями",
+    "выход из скрипта"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "setTimeout",
+      "kind": "fn",
+      "note": "setTimeout — вызывает функцию один раз через заданное число миллисекунд.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 17,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 25,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "process",
+      "kind": "fn",
+      "note": "process — объект текущего процесса Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "exit",
+      "kind": "fn",
+      "note": "exit — немедленно завершает процесс.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Node.js: процесс, файлы и сервер"
+      ],
+      "runtime": [
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "до выхода",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js.",
+        "Нужен Node.js той версии, где есть используемые встроенные модули."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "setTimeout(() => console.log(\"этот текст не появится\"), 100);\nconsole.log(\"до выхода\");\nprocess.exit(0);\nconsole.log(\"после выхода\");"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "до выхода",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль",
+          "Завершает процесс"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Процесс"
+  },
+  "enriched": true
+}

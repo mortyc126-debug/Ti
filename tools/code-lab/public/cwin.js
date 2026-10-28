@@ -12,7 +12,8 @@
     + '.cw-title .cw-rs{background:none;border:0;color:var(--text3);cursor:pointer;font-size:14px;padding:0 4px;border-radius:5px}'
     + '.cw-title .cw-rs:hover{color:var(--acc,#52F2C9)}'
     + '.cw-body{flex:1;min-height:0;border:0!important;border-radius:0!important;background:transparent!important}'
-    + '.center.cw-body{overflow:auto}'   /* окно «Код»: не обрезать песочницу, а прокручивать — иначе кнопки прячутся за край */
+    + '.center.cw-body{overflow:auto}' /* окно «Код»: не обрезать песочницу, а прокручивать — иначе кнопки прячутся за край */
+    + '#inspector.cw-body{overflow-y:auto;overflow-x:hidden}'  
     + '.cwin-on{display:block!important;padding:0!important;height:auto!important}'
     + '.cwin-on .gutter{display:none}';
   document.head.appendChild(st);

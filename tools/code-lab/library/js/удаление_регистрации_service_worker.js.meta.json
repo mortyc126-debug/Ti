@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "удаление_регистрации_service_worker",
+  "file": "удаление_регистрации_service_worker.js",
+  "title": "Удаление регистрации Service Worker",
+  "lang": "js",
+  "group": "Кэширование / Service Worker",
+  "desc": "Метод unregister снимает регистрацию Service Worker и возвращает Promise со значением true при успехе. Уже открытые страницы продолжают работать под управлением старого воркера до перезагрузки. Кэши, которые он создал, автоматически не удаляются: очистите их отдельно через caches.delete. Такой сброс удобен при отладке и при отказе от офлайн-режима.",
+  "output": "Удалён: true",
+  "tags": [
+    "unregister",
+    "service worker"
+  ],
+  "aliases": [
+    "удаление регистрации service worker",
+    "unregister"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 3,
+      "col": 36,
+      "text": "unregister",
+      "kind": "fn",
+      "note": "Удаляет регистрацию Service Worker."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

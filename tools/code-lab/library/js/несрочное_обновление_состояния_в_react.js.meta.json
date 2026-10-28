@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "несрочное_обновление_состояния_в_react",
+  "file": "несрочное_обновление_состояния_в_react.js",
+  "title": "Несрочное обновление состояния в React",
+  "lang": "js",
+  "group": "Интерфейс / Состояние React",
+  "desc": "useTransition позволяет пометить обновление состояния как несрочное: React сначала обработает срочные события (ввод текста), а тяжёлую перерисовку выполнит позже и прервёт её, если появится более важная работа. Хук возвращает флаг ожидания и функцию startTransition. Флаг удобен для показа индикатора. Внутрь transition помещают только обновления состояния, а не асинхронные ожидания.",
+  "output": "Поле ввода остаётся отзывчивым, а список обновляется следом.",
+  "tags": [
+    "useTransition",
+    "startTransition",
+    "состояние react"
+  ],
+  "aliases": [
+    "несрочное обновление состояния в react",
+    "useTransition",
+    "startTransition"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 19,
+      "text": "useTransition",
+      "kind": "concept",
+      "note": "Хук для пометки обновлений как несрочных."
+    },
+    {
+      "line": 5,
+      "col": 19,
+      "text": "startTransition",
+      "kind": "concept",
+      "note": "Запускает несрочное обновление состояния."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

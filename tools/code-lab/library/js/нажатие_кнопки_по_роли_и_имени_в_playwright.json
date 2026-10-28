@@ -1,0 +1,12 @@
+{
+  "lang": "js",
+  "title": "Нажатие кнопки по роли и имени в Playwright",
+  "group": "Тестирование / Браузерные тесты",
+  "desc": "Находим кнопку так, как её воспринимает пользователь, — по роли и названию.",
+  "code": "import { test } from \"@playwright/test\";\n\ntest(\"сохранение профиля\", async ({ page }) => {\n  await page.goto(\"https://example.com/profile\");\n  await page.getByRole(\"button\", { name: \"Save\" }).click();\n});",
+  "output": "Кнопка «Save» нажата.",
+  "words": {
+    "getByRole": "Находит элемент по доступной роли и имени.",
+    "click": "Выполняет клик по элементу."
+  }
+}

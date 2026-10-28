@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "заполнение_поля_по_подписи_в_playwright",
+  "file": "заполнение_поля_по_подписи_в_playwright.js",
+  "title": "Заполнение поля по подписи в Playwright",
+  "lang": "js",
+  "group": "Тестирование / Браузерные тесты",
+  "desc": "getByLabel находит поле формы по тексту связанной подписи (label) или по aria-label. Это самый близкий к пользователю способ найти поле и он устойчив к изменениям вёрстки. Метод fill очищает поле и вводит значение, предварительно дождавшись, пока поле станет доступным для действий. Для посимвольного ввода с событиями клавиатуры используйте pressSequentially.",
+  "output": "Поле с подписью «email» заполнено.",
+  "tags": [
+    "getByLabel",
+    "fill",
+    "браузерные тесты"
+  ],
+  "aliases": [
+    "заполнение поля по подписи в playwright",
+    "getByLabel",
+    "fill"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 4,
+      "col": 13,
+      "text": "getByLabel",
+      "kind": "fn",
+      "note": "Находит поле формы по тексту подписи."
+    },
+    {
+      "line": 4,
+      "col": 33,
+      "text": "fill",
+      "kind": "fn",
+      "note": "Очищает поле и вводит значение."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

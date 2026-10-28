@@ -1,0 +1,199 @@
+{
+  "schema": 1,
+  "id": "десятичный-логарифм",
+  "file": "десятичный-логарифм.js",
+  "title": "Десятичный логарифм",
+  "lang": "js",
+  "group": "Числа и вычисления / Математические функции",
+  "desc": "Вычисляет десятичный логарифм.",
+  "output": "3\n5",
+  "tags": [
+    "Math.log10",
+    "десятичный логарифм",
+    "порядок числа",
+    "логарифм"
+  ],
+  "aliases": [
+    "как посчитать десятичный логарифм js",
+    "math log10 пример",
+    "количество разрядов числа"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математическими функциями.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 17,
+      "text": "log10",
+      "kind": "fn",
+      "note": "log10 — десятичный логарифм.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математическими функциями.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 17,
+      "text": "floor",
+      "kind": "fn",
+      "note": "floor — округление вниз.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 23,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математическими функциями.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 28,
+      "text": "log10",
+      "kind": "fn",
+      "note": "log10 — десятичный логарифм.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Числа и вычисления"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "3\n5",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const value = 1000;\nconsole.log(Math.log10(value));\nconsole.log(Math.floor(Math.log10(12345)) + 1);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "3\n5",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "value"
+    ],
+    "requires": [],
+    "subcat": "Математические функции"
+  },
+  "enriched": true
+}

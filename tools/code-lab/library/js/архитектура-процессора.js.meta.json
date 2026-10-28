@@ -1,0 +1,192 @@
+{
+  "schema": 1,
+  "id": "архитектура-процессора",
+  "file": "архитектура-процессора.js",
+  "title": "Архитектура процессора",
+  "lang": "js",
+  "group": "Node.js: процесс, файлы и сервер / Процесс",
+  "desc": "Получает архитектуру процессора процесса.",
+  "output": "string\ntrue",
+  "tags": [
+    "process.arch",
+    "архитектура",
+    "процессор",
+    "платформа"
+  ],
+  "aliases": [
+    "как узнать архитектуру процессора в node",
+    "process arch пример",
+    "x64 или arm64",
+    "разрядность процессора node",
+    "тип процессора процесса"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — возвращает название типа значения.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 19,
+      "text": "process",
+      "kind": "fn",
+      "note": "process — объект текущего процесса Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 27,
+      "text": "arch",
+      "kind": "fn",
+      "note": "arch — архитектура процессора.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "process",
+      "kind": "fn",
+      "note": "process — объект текущего процесса Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "arch",
+      "kind": "fn",
+      "note": "arch — архитектура процессора.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 25,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина строки или количество элементов массива.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Node.js: процесс, файлы и сервер"
+      ],
+      "runtime": [
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "string\ntrue",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js.",
+        "Нужен Node.js той версии, где есть используемые встроенные модули."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "console.log(typeof process.arch);\nconsole.log(process.arch.length > 0);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "string\ntrue",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Процесс"
+  },
+  "enriched": true
+}

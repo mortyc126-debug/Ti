@@ -1,0 +1,194 @@
+{
+  "schema": 1,
+  "id": "стандартный-ввод",
+  "file": "стандартный-ввод.js",
+  "title": "Стандартный ввод",
+  "lang": "js",
+  "group": "Node.js: процесс, файлы и сервер / Процесс",
+  "desc": "Получает стандартный ввод процесса.",
+  "output": "получено символов: 0",
+  "tags": [
+    "process.stdin",
+    "стандартный ввод",
+    "поток",
+    "чтение"
+  ],
+  "aliases": [
+    "как читать стандартный ввод в node",
+    "process stdin пример",
+    "прочитать данные из pipe",
+    "событие data и end у stdin",
+    "считать весь ввод"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "process",
+      "kind": "fn",
+      "note": "process — объект текущего процесса Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "stdin",
+      "kind": "fn",
+      "note": "stdin — стандартный ввод процесса.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "process",
+      "kind": "fn",
+      "note": "process — объект текущего процесса Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "stdin",
+      "kind": "fn",
+      "note": "stdin — стандартный ввод процесса.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "process",
+      "kind": "fn",
+      "note": "process — объект текущего процесса Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "stdin",
+      "kind": "fn",
+      "note": "stdin — стандартный ввод процесса.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 30,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 38,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 72,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина строки или количество элементов массива.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Node.js: процесс, файлы и сервер"
+      ],
+      "runtime": [
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "получено символов: 0",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js.",
+        "Нужен Node.js той версии, где есть используемые встроенные модули."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "let введено = \"\";\nprocess.stdin.setEncoding(\"utf8\");\nprocess.stdin.on(\"data\", часть => { введено += часть; });\nprocess.stdin.on(\"end\", () => console.log(\"получено символов:\", введено.length));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "получено символов: 0",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "введено"
+    ],
+    "requires": [],
+    "subcat": "Процесс"
+  },
+  "enriched": true
+}

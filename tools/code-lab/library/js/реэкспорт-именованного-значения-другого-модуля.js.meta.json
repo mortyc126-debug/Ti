@@ -1,0 +1,143 @@
+{
+  "schema": 1,
+  "id": "реэкспорт-именованного-значения-другого-модуля",
+  "file": "реэкспорт-именованного-значения-другого-модуля.js",
+  "title": "Реэкспортировать именованный экспорт другого модуля: export { value } from",
+  "lang": "js",
+  "group": "Основы / Модули и импорты",
+  "desc": "Модуль-фасад пересылает нужные имена из других модулей, не импортируя их для себя; потребитель импортирует всё из одного файла.",
+  "output": "папка/файл.txt",
+  "tags": [
+    "export from",
+    "реэкспорт",
+    "фасад",
+    "ES-модули"
+  ],
+  "aliases": [
+    "как реэкспортировать значение из другого модуля",
+    "export { x } from пример",
+    "модуль фасад js"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "export { join } from",
+      "kind": "export { … } from — пересылает именованный экспорт другого модуля.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "папка/файл.txt",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "export { join } from \"node:path\";\n\nimport { join as joinPath } from \"node:path\";\nconsole.log(joinPath(\"папка\", \"файл.txt\"));"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "папка/файл.txt",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Модули и импорты"
+  },
+  "enriched": true
+}

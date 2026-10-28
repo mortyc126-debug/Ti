@@ -1,0 +1,195 @@
+{
+  "schema": 1,
+  "id": "промис-вместе-с-функциями-завершения",
+  "file": "промис-вместе-с-функциями-завершения.js",
+  "title": "Промис вместе с функциями завершения",
+  "lang": "js",
+  "group": "Асинхронность / Промисы",
+  "desc": "Получает промис вместе с функциями resolve и reject в поддерживающей среде.",
+  "output": "function\nвыполнен: данные готовы",
+  "tags": [
+    "Promise.withResolvers",
+    "resolve и reject",
+    "внешнее завершение",
+    "отложенный результат"
+  ],
+  "aliases": [
+    "как получить resolve и reject снаружи промиса",
+    "promise withresolvers пример",
+    "внешнее выполнение промиса",
+    "отложенный промис",
+    "замена конструктора promise"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 37,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 45,
+      "text": "withResolvers",
+      "kind": "fn",
+      "note": "withResolvers — возвращает Promise вместе с функциями resolve и reject.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "then",
+      "kind": "fn",
+      "note": "then — обрабатывает успешный результат Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 25,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 33,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "setTimeout",
+      "kind": "fn",
+      "note": "setTimeout — вызывает функцию один раз через заданное число миллисекунд.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 12,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — возвращает название типа значения.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "function\nвыполнен: данные готовы",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const { promise, resolve, reject } = Promise.withResolvers();\npromise.then(значение => console.log(\"выполнен:\", значение));\nsetTimeout(() => resolve(\"данные готовы\"), 10);\nconsole.log(typeof reject);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "function\nвыполнен: данные готовы",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "promise",
+      "resolve",
+      "reject"
+    ],
+    "requires": [],
+    "subcat": "Промисы"
+  },
+  "enriched": true
+}

@@ -1,0 +1,199 @@
+{
+  "schema": 1,
+  "id": "сообщить-об-ошибке-без-остановки-reportError",
+  "file": "сообщить-об-ошибке-без-остановки-reportError.js",
+  "title": "Сообщить об ошибке, не прерывая выполнение: reportError",
+  "lang": "js",
+  "group": "Ошибки и отладка / Исключения",
+  "desc": "reportError(error) отправляет ошибку в глобальный обработчик (как необработанную), но код продолжает работать дальше.",
+  "output": "Элемент 1 обработан\nПерехвачено: Uncaught Error: Сбой на элементе 2\nЭлемент 3 обработан",
+  "tags": [
+    "reportError",
+    "глобальная ошибка",
+    "window error",
+    "обработка ошибок"
+  ],
+  "aliases": [
+    "как сообщить об ошибке не останавливая цикл js",
+    "reportError пример",
+    "отправить ошибку в window.onerror"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "addEventListener — подписаться на событие.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 25,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 26,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 11,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 4,
+      "text": "reportError",
+      "kind": "reportError — сообщает об ошибке как о необработанной, но не прерывает выполнение.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 16,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Ошибки и отладка"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Элемент 1 обработан\nПерехвачено: Uncaught Error: Сбой на элементе 2\nЭлемент 3 обработан",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "window.addEventListener(\"error\", event => {\n  console.log(`Перехвачено: ${event.message}`);\n});\n\n[1, 2, 3].forEach(item => {\n  try {\n    if (item === 2) throw new Error(\"Сбой на элементе 2\");\n    console.log(`Элемент ${item} обработан`);\n  } catch (error) {\n    reportError(error);\n  }\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Элемент 1 обработан\nПерехвачено: Uncaught Error: Сбой на элементе 2\nЭлемент 3 обработан",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Исключения"
+  },
+  "enriched": true
+}

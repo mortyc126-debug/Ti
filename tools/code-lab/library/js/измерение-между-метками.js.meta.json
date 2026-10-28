@@ -1,0 +1,217 @@
+{
+  "schema": 1,
+  "id": "измерение-между-метками",
+  "file": "измерение-между-метками.js",
+  "title": "Измерение между метками",
+  "lang": "js",
+  "group": "Асинхронность / Измерение времени",
+  "desc": "Измеряет длительность между метками.",
+  "output": "duration\ntrue",
+  "tags": [
+    "performance.measure",
+    "длительность",
+    "метки",
+    "замер"
+  ],
+  "aliases": [
+    "как измерить время между двумя метками",
+    "performance measure пример",
+    "длительность между start и end",
+    "замер участка кода",
+    "duration из measure"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "performance",
+      "kind": "fn",
+      "note": "performance — объект измерения времени и производительности.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "mark",
+      "kind": "fn",
+      "note": "mark — ставит именованную временную метку.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл со счётчиком: повторяет блок, пока выполняется условие.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 5,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "performance",
+      "kind": "fn",
+      "note": "performance — объект измерения времени и производительности.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "mark",
+      "kind": "fn",
+      "note": "mark — ставит именованную временную метку.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 14,
+      "text": "performance",
+      "kind": "fn",
+      "note": "performance — объект измерения времени и производительности.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 26,
+      "text": "measure",
+      "kind": "fn",
+      "note": "measure — измеряет интервал между двумя метками.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "duration\ntrue",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "performance.mark(\"start\");\nfor (let шаг = 0; шаг < 100000; шаг++) { /* нагрузка */ }\nperformance.mark(\"end\");\nconst замер = performance.measure(\"duration\", \"start\", \"end\");\nconsole.log(замер.name);\nconsole.log(замер.duration >= 0);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "duration\ntrue",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "замер"
+    ],
+    "requires": [],
+    "subcat": "Измерение времени"
+  },
+  "enriched": true
+}

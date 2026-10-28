@@ -1,0 +1,217 @@
+{
+  "schema": 1,
+  "id": "число-с-учётом-локали",
+  "file": "число-с-учётом-локали.js",
+  "title": "Число с учётом локали",
+  "lang": "js",
+  "group": "Форматирование и локали / Локали и форматы",
+  "desc": "Форматирует число с учётом локали.",
+  "output": "1 234 567,89\n1,234,567.89",
+  "tags": [
+    "Intl.NumberFormat",
+    "разделители",
+    "знаки после запятой",
+    "локаль"
+  ],
+  "aliases": [
+    "как отформатировать число по локали",
+    "intl numberformat options пример",
+    "разделитель тысяч и дробной части"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 12,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 16,
+      "text": "Intl",
+      "kind": "fn",
+      "note": "Intl — встроенный объект форматирования с учётом локали.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 51,
+      "text": "format",
+      "kind": "fn",
+      "note": "format — форматирует значение по правилам локали.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 12,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 16,
+      "text": "Intl",
+      "kind": "fn",
+      "note": "Intl — встроенный объект форматирования с учётом локали.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 52,
+      "text": "format",
+      "kind": "fn",
+      "note": "format — форматирует значение по правилам локали.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Форматирование и локали"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "1 234 567,89\n1,234,567.89",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const locale = \"ru-RU\";\nconst options = { minimumFractionDigits: 2, maximumFractionDigits: 2 };\nconst value = 1234567.891;\nconsole.log(new Intl.NumberFormat(locale, options).format(value));\nconsole.log(new Intl.NumberFormat(\"en-US\", options).format(value));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "1 234 567,89\n1,234,567.89",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "locale",
+      "options",
+      "value"
+    ],
+    "requires": [],
+    "subcat": "Локали и форматы"
+  },
+  "enriched": true
+}

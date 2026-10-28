@@ -1,0 +1,12 @@
+{
+  "lang": "js",
+  "title": "Копирование данных потоками",
+  "group": "Файлы, хранение и сервер / Потоки",
+  "desc": "Копируем большой файл по частям с корректной обработкой ошибок.",
+  "code": "import { createReadStream, createWriteStream } from \"node:fs\";\nimport { pipeline } from \"node:stream/promises\";\n\ntry {\n  await pipeline(\n    createReadStream(\"./видео.mp4\"),\n    createWriteStream(\"./копия.mp4\")\n  );\n  console.log(\"Скопировано\");\n} catch (ошибка) {\n  console.error(\"Сбой копирования:\", ошибка.message);\n}",
+  "output": "Скопировано",
+  "words": {
+    "createReadStream": "Открывает файл для чтения потоком.",
+    "createWriteStream": "Открывает файл для записи потоком."
+  }
+}

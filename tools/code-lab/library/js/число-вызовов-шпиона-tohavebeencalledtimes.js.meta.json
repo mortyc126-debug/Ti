@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "id": "число-вызовов-шпиона-tohavebeencalledtimes",
+  "file": "число-вызовов-шпиона-tohavebeencalledtimes.js",
+  "title": "Проверить число вызовов функции-шпиона: toHaveBeenCalledTimes(1)",
+  "lang": "js",
+  "group": "Тестирование / Проверки функций",
+  "desc": "toHaveBeenCalledTimes сверяет, сколько раз шпион был вызван — например, что обработчик сработал ровно один раз.",
+  "output": "✓ 1 тест пройден",
+  "tags": [
+    "Vitest",
+    "toHaveBeenCalledTimes",
+    "шпион",
+    "vi.fn"
+  ],
+  "aliases": [
+    "как проверить сколько раз вызвана функция",
+    "toHaveBeenCalledTimes пример",
+    "счётчик вызовов мока"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 18,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 18,
+      "text": "toHaveBeenCalledTimes",
+      "kind": "toHaveBeenCalledTimes(n) — функция вызвана ровно n раз.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Vitest"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "✓ 1 тест пройден",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import { expect, it, vi } from \"vitest\";\n\nfunction onceOnly(callback) {\n  let isCalled = false;\n  return (...args) => {\n    if (isCalled) return;\n    isCalled = true;\n    callback(...args);\n  };\n}\n\nit(\"обработчик вызывается один раз\", () => {\n  const handler = vi.fn();\n  const guarded = onceOnly(handler);\n\n  guarded();\n  guarded();\n\n  expect(handler).toHaveBeenCalledTimes(1);\n});"
+        },
+        "steps": [
+          "Установи Vitest (npm install -D vitest) и запусти npx vitest run имя-файла.js.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "✓ 1 тест пройден",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Тест проходит",
+            "Тест падает при сломанном коде",
+            "Повторный запуск тестов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Cannot find package 'vitest'",
+            "cause": "Vitest не установлен в проекте",
+            "solution": "Выполни npm install -D vitest"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "onceOnly"
+    ],
+    "requires": [],
+    "subcat": "Проверки функций"
+  },
+  "enriched": true
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "дескриптор_свойства_аксессора",
+  "file": "дескриптор_свойства_аксессора.js",
+  "title": "Дескриптор свойства-аксессора",
+  "lang": "js",
+  "group": "Основы / Свойства объектов",
+  "desc": "Object.getOwnPropertyDescriptor возвращает описание собственного свойства. Для обычного свойства в нём есть value и writable, а для геттера и сеттера — функции get и set вместо них. По наличию полей можно отличить данные от вычисляемого свойства. Для унаследованных свойств метод вернёт undefined: смотрите по цепочке прототипов вручную.",
+  "output": "function false",
+  "tags": [
+    "Object.getOwnPropertyDescriptor",
+    "get",
+    "свойства объектов"
+  ],
+  "aliases": [
+    "дескриптор свойства-аксессора",
+    "Object.getOwnPropertyDescriptor",
+    "get"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 2,
+      "text": "get",
+      "kind": "kw",
+      "note": "Функция-геттер свойства-аксессора."
+    },
+    {
+      "line": 6,
+      "col": 19,
+      "text": "Object.getOwnPropertyDescriptor",
+      "kind": "fn",
+      "note": "Возвращает описание собственного свойства."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

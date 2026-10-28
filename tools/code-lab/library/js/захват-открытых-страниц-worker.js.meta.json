@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "id": "захват-открытых-страниц-worker",
+  "file": "захват-открытых-страниц-worker.js",
+  "title": "Взять под управление уже открытые страницы: clients.claim",
+  "lang": "js",
+  "group": "Кэширование / Service Worker",
+  "desc": "self.clients.claim() заставляет только что активированный worker управлять страницами сразу, без перезагрузки.",
+  "output": "После активации уже открытые страницы начинают управляться новым worker без перезагрузки",
+  "tags": [
+    "Service Worker",
+    "clients.claim",
+    "активация",
+    "управление страницами"
+  ],
+  "aliases": [
+    "что делает clients.claim",
+    "как сразу применить service worker без перезагрузки",
+    "clients.claim пример"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 5,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "self.clients.claim",
+      "kind": "fn",
+      "note": "clients.claim — worker берёт под управление все открытые страницы своей области.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Кэширование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Service Worker"
+      ],
+      "technology": [
+        "JavaScript",
+        "Service Worker"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "После активации уже открытые страницы начинают управляться новым worker без перезагрузки",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "self.addEventListener(\"activate\", event => {\n  event.waitUntil(self.clients.claim());\n});"
+        },
+        "steps": [
+          "Сохрани код как sw.js в корне сайта и зарегистрируй: navigator.serviceWorker.register(\"/sw.js\").",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "После активации уже открытые страницы начинают управляться новым worker без перезагрузки",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Первая установка worker",
+            "Обновление worker",
+            "Работа без сети"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Service Worker не регистрируется",
+            "cause": "Страница открыта не по HTTPS или localhost, либо sw.js лежит не в корне сайта",
+            "solution": "Открой сайт по https или http://localhost и проверь вкладку Application → Service Workers"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Service Worker"
+  },
+  "enriched": true
+}

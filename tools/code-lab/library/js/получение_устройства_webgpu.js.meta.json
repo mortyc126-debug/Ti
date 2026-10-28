@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "получение_устройства_webgpu",
+  "file": "получение_устройства_webgpu.js",
+  "title": "Получение устройства WebGPU",
+  "lang": "js",
+  "group": "Графика и визуализация / WebGPU",
+  "desc": "Из адаптера WebGPU получают логическое устройство методом requestDevice: именно оно создаёт буферы, текстуры и конвейеры. Метод возвращает Promise, который может отклониться, если запрошенные возможности недоступны. Свойство lost — Promise, выполняющийся, когда устройство потеряно (сброс драйвера); на него стоит подписаться, чтобы восстановить работу. Не создавайте много устройств: обычно хватает одного.",
+  "output": "Устройство получено, либо выводится «WebGPU недоступен».",
+  "tags": [
+    "requestDevice",
+    "lost",
+    "webgpu"
+  ],
+  "aliases": [
+    "получение устройства webgpu",
+    "requestDevice",
+    "lost"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 34,
+      "text": "requestDevice",
+      "kind": "fn",
+      "note": "Создаёт логическое устройство WebGPU."
+    },
+    {
+      "line": 6,
+      "col": 13,
+      "text": "lost",
+      "kind": "concept",
+      "note": "Promise, выполняющийся при потере устройства."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

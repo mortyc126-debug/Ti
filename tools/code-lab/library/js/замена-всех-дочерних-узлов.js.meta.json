@@ -1,0 +1,296 @@
+{
+  "schema": 1,
+  "id": "замена-всех-дочерних-узлов",
+  "file": "замена-всех-дочерних-узлов.js",
+  "title": "Замена всех дочерних узлов",
+  "lang": "js",
+  "group": "Браузер: страница и документ / Узлы и диапазоны",
+  "desc": "Заменяет все дочерние узлы элемента.",
+  "output": "3\n0",
+  "tags": [
+    "replaceChildren",
+    "DOM",
+    "очистка элемента",
+    "замена содержимого"
+  ],
+  "aliases": [
+    "как заменить всё содержимое элемента js",
+    "replacechildren javascript",
+    "очистить элемент без innerhtml",
+    "заменить дочерние узлы",
+    "быстрая очистка списка"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — документ страницы: точка входа в DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт элемент DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 7,
+      "text": "append",
+      "kind": "fn",
+      "note": "append — добавляет узлы, текст или параметр в конец.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — документ страницы: точка входа в DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 23,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт элемент DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 44,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — документ страницы: точка входа в DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 53,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт элемент DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 43,
+      "text": "map",
+      "kind": "fn",
+      "note": "map — возвращает новый массив, применяя функцию к каждому элементу.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 18,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — документ страницы: точка входа в DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 27,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт элемент DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 7,
+      "text": "replaceChildren",
+      "kind": "fn",
+      "note": "replaceChildren — заменяет все дочерние узлы переданными.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 28,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина строки или количество элементов массива.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 7,
+      "text": "replaceChildren",
+      "kind": "fn",
+      "note": "replaceChildren — заменяет все дочерние узлы переданными.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 28,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина строки или количество элементов массива.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Браузер: страница и документ"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "3\n0",
+      "dependencies": [],
+      "requirements": [
+        "Работает в браузере: нужны объекты страницы (document и другие API браузера).",
+        "Внешние библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const parent = document.createElement(\"ul\");\nparent.append(document.createElement(\"li\"), document.createElement(\"li\"));\n\nconst новые = [\"яблоко\", \"груша\", \"слива\"].map(название => {\n  const элемент = document.createElement(\"li\");\n  элемент.textContent = название;\n  return элемент;\n});\nparent.replaceChildren(...новые);\nconsole.log(parent.children.length);\n\nparent.replaceChildren();\nconsole.log(parent.children.length);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "3\n0",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          },
+          {
+            "symptom": "ReferenceError: document is not defined",
+            "cause": "Код запущен в Node.js, где нет объектов страницы",
+            "solution": "Запусти код в браузере или в окружении с эмуляцией DOM"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "parent",
+      "новые"
+    ],
+    "requires": [],
+    "subcat": "Узлы и диапазоны"
+  },
+  "enriched": true
+}

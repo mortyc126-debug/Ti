@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "каталог_текущего_es_модуля_в_node_js",
+  "file": "каталог_текущего_es_модуля_в_node_js.js",
+  "title": "Каталог текущего ES-модуля в Node.js",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Пути и окружение",
+  "desc": "В ES-модулях нет привычных переменных __dirname и __filename, которые есть в CommonJS. Их получают из import.meta.url — адреса текущего файла: fileURLToPath превращает его в путь, а path.dirname оставляет каталог. После этого от каталога можно строить пути к соседним файлам через path.join. Так путь не зависит от того, откуда запущена программа.",
+  "output": "<каталог скрипта>/данные/config.json",
+  "tags": [
+    "import.meta.url",
+    "fileURLToPath",
+    "пути и окружение"
+  ],
+  "aliases": [
+    "каталог текущего es-модуля в node.js",
+    "import.meta.url",
+    "fileURLToPath"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 9,
+      "text": "fileURLToPath",
+      "kind": "concept",
+      "note": "Превращает file-адрес в путь файловой системы."
+    },
+    {
+      "line": 3,
+      "col": 45,
+      "text": "import.meta.url",
+      "kind": "concept",
+      "note": "Адрес текущего модуля."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

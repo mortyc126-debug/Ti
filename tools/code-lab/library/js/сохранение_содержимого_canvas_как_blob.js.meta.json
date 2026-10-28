@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "сохранение_содержимого_canvas_как_blob",
+  "file": "сохранение_содержимого_canvas_как_blob.js",
+  "title": "Сохранение содержимого Canvas как Blob",
+  "lang": "js",
+  "group": "Графика и визуализация / Canvas",
+  "desc": "Метод toBlob превращает картинку на canvas в бинарный объект Blob в заданном формате (image/png, image/jpeg, image/webp) и вызывает ваш колбэк с результатом. В отличие от toDataURL, он не создаёт огромную строку в памяти, поэтому лучше подходит для больших изображений. Для скачивания создают временный адрес через URL.createObjectURL и освобождают его через revokeObjectURL. Для JPEG и WebP третьим аргументом можно задать качество от 0 до 1.",
+  "output": "Браузер скачивает файл рисунок.png с синим прямоугольником.",
+  "tags": [
+    "toBlob",
+    "createObjectURL",
+    "canvas"
+  ],
+  "aliases": [
+    "сохранение содержимого canvas как blob",
+    "toBlob",
+    "createObjectURL"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 7,
+      "col": 6,
+      "text": "toBlob",
+      "kind": "fn",
+      "note": "Создаёт Blob из содержимого canvas в указанном формате."
+    },
+    {
+      "line": 9,
+      "col": 20,
+      "text": "createObjectURL",
+      "kind": "fn",
+      "note": "Делает временный адрес для Blob."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

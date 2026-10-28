@@ -1,0 +1,356 @@
+{
+  "schema": 1,
+  "id": "анатомия-запроса-если-нет-шаблона",
+  "file": "анатомия-запроса-если-нет-шаблона.js",
+  "title": "Анатомия запроса если нет шаблона",
+  "lang": "js",
+  "group": "Сеть и запросы / Получить данные",
+  "desc": "Из чего состоит запрос и как его СОБРАТЬ самому, когда готового примера нет. Запрос = адрес (база + путь) + параметры после ?. Где взять: 1) документация API; 2) открой сайт, F12 → вкладка Network, сделай действие — увидишь реальные запросы; 3) проверь URL, просто вставив его в адресную строку браузера.",
+  "output": "объект с результатами поиска по бирже",
+  "tags": [
+    "URL-конструирование",
+    "URLSearchParams",
+    "GET-запрос",
+    "API-интеграция",
+    "JavaScript",
+    "параметры запроса"
+  ],
+  "aliases": [
+    "как собрать URL для API",
+    "формирование запроса к API",
+    "конкатенация URL с параметрами",
+    "динамический URL для fetch",
+    "как построить адрес запроса"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "база",
+      "kind": "name",
+      "note": "Сервер (домен). Всегда начало адреса.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "путь",
+      "kind": "name",
+      "note": "Какой ресурс просим у сервера.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 6,
+      "text": "параметры",
+      "kind": "name",
+      "note": "Пары «ключ=значение» после ? — настройки запроса.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 18,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт новый объект по «чертежу» (классу или конструктору).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 22,
+      "text": "URLSearchParams",
+      "kind": "fn",
+      "note": "Помощник: сам соберёт строку a=1&b=2 и экранирует.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 6,
+      "text": "url",
+      "kind": "name",
+      "note": "Готовый адрес из кусочков.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 12,
+      "text": "база",
+      "kind": "name",
+      "note": "Сервер (домен). Всегда начало адреса.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 19,
+      "text": "путь",
+      "kind": "name",
+      "note": "Какой ресурс просим у сервера.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 32,
+      "text": "параметры",
+      "kind": "name",
+      "note": "Пары «ключ=значение» после ? — настройки запроса.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "Функция умеет ждать (сеть).",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 15,
+      "text": "запрос",
+      "kind": "fn",
+      "note": "Универсальный шаблон GET-запроса — копируй под любой API.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 22,
+      "text": "url",
+      "kind": "name",
+      "note": "Готовый адрес из кусочков.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 12,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат, потом иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 18,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "Сходить в сеть по адресу.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 24,
+      "text": "url",
+      "kind": "name",
+      "note": "Готовый адрес из кусочков.",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции.",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 9,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат, потом иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 17,
+      "text": "json",
+      "kind": "fn",
+      "note": "Тело ответа → объект.",
+      "source": "custom"
+    },
+    {
+      "line": 14,
+      "col": 0,
+      "text": "запрос",
+      "kind": "fn",
+      "note": "Универсальный шаблон GET-запроса — копируй под любой API.",
+      "source": "custom"
+    },
+    {
+      "line": 14,
+      "col": 7,
+      "text": "url",
+      "kind": "name",
+      "note": "Готовый адрес из кусочков.",
+      "source": "custom"
+    },
+    {
+      "line": 14,
+      "col": 12,
+      "text": "then",
+      "kind": "fn",
+      "note": "«Когда промис готов — сделай…».",
+      "source": "custom"
+    },
+    {
+      "line": 14,
+      "col": 25,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 33,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Сеть и запросы"
+      ],
+      "runtime": [
+        "Браузер или Node.js с поддержкой fetch"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "URL запроса и ответ внешнего API",
+      "output": "объект с результатами поиска по бирже",
+      "dependencies": [],
+      "requirements": [
+        "Нужен доступ к сети; сервер должен разрешать запросы через CORS. Проверь HTTP-статус и обработку ошибок.",
+        "Код с await должен выполняться внутри async-функции или другого допустимого async-контекста."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "// адрес по кусочкам — так легче собрать и понять\nconst база   = \"https://iss.moex.com\";              // сервер\nconst путь   = \"/iss/securities.json\";               // что просим\nconst параметры = new URLSearchParams({              // настройки после ?\n  q: \"Сбербанк\",        // поиск по тексту\n  \"iss.meta\": \"off\",    // не слать служебные поля\n});\nconst url = база + путь + \"?\" + параметры;           // склеили\n\n// шаблон любого GET-запроса:\nasync function запрос(url){\n  const r = await fetch(url);     // сходили\n  return await r.json();          // разобрали\n}\nзапрос(url).then(data => console.log(data));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "объект с результатами поиска по бирже",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "база",
+      "путь",
+      "параметры",
+      "url",
+      "запрос",
+      "r"
+    ],
+    "requires": [
+      "q"
+    ],
+    "subcat": "Получить данные"
+  },
+  "legacy": {
+    "template": "net-anatomy.json"
+  },
+  "enriched": true
+}

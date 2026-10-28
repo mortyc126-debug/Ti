@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Асинхронная пагинация API",
+  "group": "Сеть / Пагинация API",
+  "desc": "Асинхронная пагинация API.",
+  "code": "async function* страницы(адрес) {\n  while (адрес) {\n    const ответ = await fetch(адрес);\n    if (!ответ.ok) throw new Error(`HTTP ${ответ.status}`);\n    const данные = await ответ.json();\n    yield данные.items;\n    адрес = данные.next;\n  }\n}",
+  "output": "Каждая итерация возвращает items очередной страницы.",
+  "words": {
+    "yield": "Выдаёт порцию данных из генератора."
+  }
+}

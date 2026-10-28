@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Приостановка аудио",
+  "group": "Графика и визуализация / Анимация",
+  "desc": "Приостановка аудио.",
+  "code": "const звук = new AudioContext();\nawait звук.suspend();\nconsole.log(звук.state);",
+  "output": "suspended",
+  "words": {
+    "suspend": "Приостанавливает обработку звука."
+  }
+}

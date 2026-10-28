@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "ограничить-параллельность-и-прекратить-выдачу-новых-задач-после-ошибки",
+  "file": "ограничить-параллельность-и-прекратить-выдачу-новых-задач-после-ошибки.js",
+  "title": "Ограничить параллельность и прекратить выдачу новых задач после ошибки",
+  "lang": "js",
+  "group": "Асинхронность / Управление нагрузкой",
+  "desc": "Запускает до limit обработчиков одновременно; после первой ошибки новые элементы не берутся, уже начатые задачи завершаются.",
+  "output": "возвращает результаты в исходном порядке либо выбрасывает первую ошибку",
+  "tags": [
+    "concurrency",
+    "ошибки",
+    "worker",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "mapLimit stop on error",
+    "остановить очередь при первой ошибке",
+    "concurrency limit fail fast"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

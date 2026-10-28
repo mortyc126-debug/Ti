@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "отмена_запроса",
+  "file": "отмена_запроса.js",
+  "title": "Отмена запроса",
+  "lang": "js",
+  "group": "Асинхронность / Отмена операций",
+  "desc": "AbortController позволяет прервать асинхронную операцию, например fetch. Вы создаёте контроллер, передаёте запросу controller.signal, а когда нужно, вызываете abort(). Запрос завершится ошибкой с именем AbortError; её обычно не считают сбоем и просто игнорируют. Один сигнал можно передать нескольким запросам. Типичные применения — отмена устаревшего запроса при новом вводе и таймаут.",
+  "output": "При отмене запроса возникает AbortError.",
+  "tags": [
+    "AbortController",
+    "отмена операций"
+  ],
+  "aliases": [
+    "отмена запроса",
+    "AbortController"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 19,
+      "text": "AbortController",
+      "kind": "fn",
+      "note": "Создаёт сигнал отмены операции."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

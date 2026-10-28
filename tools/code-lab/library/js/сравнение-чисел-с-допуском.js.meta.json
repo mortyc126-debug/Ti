@@ -1,0 +1,313 @@
+{
+  "schema": 1,
+  "id": "сравнение-чисел-с-допуском",
+  "file": "сравнение-чисел-с-допуском.js",
+  "title": "Сравнение чисел с допуском",
+  "lang": "js",
+  "group": "Числа и вычисления / Математические функции",
+  "desc": "Сравнивает числа с плавающей точкой с допуском; для больших значений нужен относительный допуск.",
+  "output": "false\ntrue\nfalse\ntrue",
+  "tags": [
+    "Number.EPSILON",
+    "допуск",
+    "числа с плавающей точкой",
+    "сравнение"
+  ],
+  "aliases": [
+    "как сравнить дробные числа в js",
+    "number epsilon пример",
+    "почему 0.1 плюс 0.2 не равно 0.3",
+    "относительный допуск"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 12,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математическими функциями.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 17,
+      "text": "abs",
+      "kind": "fn",
+      "note": "abs — модуль числа.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 30,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — преобразует значение в число; содержит проверки вроде Number.isFinite.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 12,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математическими функциями.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 17,
+      "text": "abs",
+      "kind": "fn",
+      "note": "abs — модуль числа.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 30,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — преобразует значение в число; содержит проверки вроде Number.isFinite.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 12,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математическими функциями.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 17,
+      "text": "abs",
+      "kind": "fn",
+      "note": "abs — модуль числа.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 30,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — преобразует значение в число; содержит проверки вроде Number.isFinite.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 47,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математическими функциями.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 52,
+      "text": "max",
+      "kind": "fn",
+      "note": "max — наибольшее из аргументов.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 56,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математическими функциями.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 61,
+      "text": "abs",
+      "kind": "fn",
+      "note": "abs — модуль числа.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 69,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математическими функциями.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 74,
+      "text": "abs",
+      "kind": "fn",
+      "note": "abs — модуль числа.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Числа и вычисления"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "false\ntrue\nfalse\ntrue",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "let a = 0.1 + 0.2;\nlet b = 0.3;\nconsole.log(a === b);\nconsole.log(Math.abs(a - b) < Number.EPSILON);\n\na = 1000000.1 + 0.2;\nb = 1000000.3;\nconsole.log(Math.abs(a - b) < Number.EPSILON);\nconsole.log(Math.abs(a - b) < Number.EPSILON * Math.max(Math.abs(a), Math.abs(b)) * 4);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "false\ntrue\nfalse\ntrue",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "a",
+      "b"
+    ],
+    "requires": [],
+    "subcat": "Математические функции"
+  },
+  "enriched": true
+}

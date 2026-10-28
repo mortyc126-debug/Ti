@@ -1,0 +1,210 @@
+{
+  "schema": 1,
+  "id": "глубина-стека-ошибки-stacktracelimit",
+  "file": "глубина-стека-ошибки-stacktracelimit.js",
+  "title": "Изменить число сохраняемых кадров стека: Error.stackTraceLimit",
+  "lang": "js",
+  "group": "Отладка / Трассировка",
+  "desc": "Error.stackTraceLimit задаёт, сколько кадров попадёт в stack (по умолчанию 10); для глубокой отладки значение увеличивают.",
+  "output": "По умолчанию кадров: 10\nПосле изменения кадров: 50",
+  "tags": [
+    "Error.stackTraceLimit",
+    "стек вызовов",
+    "отладка",
+    "V8"
+  ],
+  "aliases": [
+    "как увеличить глубину стека ошибки",
+    "Error.stackTraceLimit пример",
+    "стек обрезается 10 кадров"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 25,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 11,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 11,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 0,
+      "text": "Error.stackTraceLimit",
+      "kind": "stackTraceLimit — максимальное число кадров в стеке ошибки.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Отладка"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "По умолчанию кадров: 10\nПосле изменения кадров: 50",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function recurse(depth) {\n  if (depth === 0) throw new Error(\"Слишком глубоко\");\n  recurse(depth - 1);\n}\n\nfunction framesCount() {\n  try {\n    recurse(100);\n  } catch (error) {\n    return error.stack.split(\"\\n\").length - 1;\n  }\n}\n\nconsole.log(`По умолчанию кадров: ${framesCount()}`);\n\nError.stackTraceLimit = 50;\nconsole.log(`После изменения кадров: ${framesCount()}`);"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "По умолчанию кадров: 10\nПосле изменения кадров: 50",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "recurse",
+      "framesCount"
+    ],
+    "requires": [],
+    "subcat": "Трассировка"
+  },
+  "enriched": true
+}

@@ -1,0 +1,208 @@
+{
+  "schema": 1,
+  "id": "чтение-файла-как-текста",
+  "file": "чтение-файла-как-текста.js",
+  "title": "Чтение файла как текста",
+  "lang": "js",
+  "group": "Браузер: страница и документ / Файлы и ввод",
+  "desc": "Читает файл как текст через FileReader.",
+  "output": "Привет, мир",
+  "tags": [
+    "FileReader",
+    "readAsText",
+    "чтение файла",
+    "текст"
+  ],
+  "aliases": [
+    "как прочитать текстовый файл в браузере",
+    "readastext пример",
+    "filereader для txt",
+    "текст из выбранного файла",
+    "прочитать файл как строку"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 17,
+      "text": "File",
+      "kind": "fn",
+      "note": "File — объект файла: содержимое, имя и тип.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 55,
+      "text": "type",
+      "kind": "kw",
+      "note": "type — в TypeScript объявляет имя для типа.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "FileReader",
+      "kind": "fn",
+      "note": "FileReader — читает содержимое файла асинхронно.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписывает функцию на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 38,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 46,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 7,
+      "text": "readAsText",
+      "kind": "fn",
+      "note": "readAsText — читает файл как текст.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Браузер: страница и документ"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Привет, мир",
+      "dependencies": [],
+      "requirements": [
+        "Работает в браузере: нужны объекты страницы (document и другие API браузера).",
+        "Внешние библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const file = new File([\"Привет, мир\"], \"привет.txt\", { type: \"text/plain\" });\nconst reader = new FileReader();\nreader.addEventListener(\"load\", () => console.log(reader.result));\nreader.readAsText(file);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Привет, мир",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          },
+          {
+            "symptom": "ReferenceError: document is not defined",
+            "cause": "Код запущен в Node.js, где нет объектов страницы",
+            "solution": "Запусти код в браузере или в окружении с эмуляцией DOM"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "file",
+      "reader"
+    ],
+    "requires": [],
+    "subcat": "Файлы и ввод"
+  },
+  "enriched": true
+}

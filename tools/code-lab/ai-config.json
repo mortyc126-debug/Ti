@@ -1,8 +1,8 @@
 {
-  "type": "mistral",
+  "type": "gigachat",
   "model": "",
-  "baseUrl": "",
-  "scope": "",
+  "baseUrl": "https://api.giga.chat",
+  "scope": "GIGACHAT_API_PERS",
   "authUrl": "",
   "caPath": "",
   "insecureTls": false

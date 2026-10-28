@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "получение_или_создание_файла_в_opfs",
+  "file": "получение_или_создание_файла_в_opfs.js",
+  "title": "Получение или создание файла в OPFS",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "OPFS — приватная файловая система источника: быстрое хранилище, недоступное пользователю напрямую. Корневой каталог получают через navigator.storage.getDirectory(), а getFileHandle с параметром create: true возвращает дескриптор существующего файла или создаёт новый. Для записи используют createWritable. Подходит для кэшей, больших данных и баз вроде SQLite в браузере.",
+  "output": "В приватной файловой системе сайта появляется файл data.txt.",
+  "tags": [
+    "getDirectory",
+    "getFileHandle",
+    "файловая система"
+  ],
+  "aliases": [
+    "получение или создание файла в opfs",
+    "getDirectory",
+    "getFileHandle"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 39,
+      "text": "getDirectory",
+      "kind": "fn",
+      "note": "Возвращает корневой каталог приватной файловой системы."
+    },
+    {
+      "line": 1,
+      "col": 32,
+      "text": "getFileHandle",
+      "kind": "fn",
+      "note": "Получает или создаёт файл."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

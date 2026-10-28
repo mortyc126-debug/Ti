@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "отправка_формы_через_fetch",
+  "file": "отправка_формы_через_fetch.js",
+  "title": "Отправка формы через Fetch",
+  "lang": "js",
+  "group": "Сеть и API / HTTP-клиенты",
+  "desc": "Приём позволяет отправить форму без перезагрузки страницы: событие submit перехватывается, preventDefault отменяет стандартную отправку, а данные берутся через new FormData(форма). Тело в виде FormData уходит как multipart, и заголовок Content-Type с границей браузер выставляет сам, поэтому вручную его задавать не нужно. Для GET-формы тело недопустимо — данные в этом случае передают в адресе. Проверяйте response.ok: fetch не считает коды 4xx и 5xx ошибкой.",
+  "output": "После отправки формы в консоли — код ответа сервера, например 200.",
+  "tags": [
+    "FormData",
+    "fetch",
+    "http-клиенты"
+  ],
+  "aliases": [
+    "отправка формы через fetch",
+    "FormData",
+    "fetch"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 4,
+      "col": 22,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "Выполняет HTTP-запрос и возвращает Promise."
+    },
+    {
+      "line": 6,
+      "col": 14,
+      "text": "FormData",
+      "kind": "fn",
+      "note": "Собирает поля формы в тело запроса."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

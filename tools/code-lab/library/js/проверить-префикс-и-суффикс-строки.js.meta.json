@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "id": "проверить-префикс-и-суффикс-строки",
+  "file": "проверить-префикс-и-суффикс-строки.js",
+  "title": "Проверить префикс и суффикс строки",
+  "lang": "js",
+  "group": "Данные: хранить, находить и преобразовывать / Строки и текст",
+  "desc": "Проверяет начало и окончание строки методами startsWith и endsWith.",
+  "output": "true, true",
+  "tags": [
+    "проверка строки",
+    "файлы"
+  ],
+  "aliases": [
+    "startsWith",
+    "endsWith",
+    "расширение файла",
+    "начинается с"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "проверка строки",
+      "kind": "concept",
+      "note": "проверка строки — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "файлы",
+      "kind": "concept",
+      "note": "файлы — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

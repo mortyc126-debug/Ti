@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "собирать-счетчики-и-тайминги-операций",
+  "file": "собирать-счетчики-и-тайминги-операций.js",
+  "title": "Собирать счётчики и тайминги операций",
+  "lang": "js",
+  "group": "Отладка / Метрики",
+  "desc": "Небольшой агрегатор счётчиков и длительностей без внешней зависимости; не является полноценной системой мониторинга.",
+  "output": "снимок счётчиков, среднего и максимума",
+  "tags": [
+    "метрики",
+    "счётчики",
+    "тайминг",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "счётчик вызовов и ошибок",
+    "собирать метрики операций",
+    "metrics counter timer"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

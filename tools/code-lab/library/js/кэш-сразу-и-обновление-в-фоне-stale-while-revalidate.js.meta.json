@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "id": "кэш-сразу-и-обновление-в-фоне-stale-while-revalidate",
+  "file": "кэш-сразу-и-обновление-в-фоне-stale-while-revalidate.js",
+  "title": "Отдать кэш сразу и обновить его из сети в фоне",
+  "lang": "js",
+  "group": "Кэширование / Service Worker",
+  "desc": "Стратегия stale-while-revalidate: пользователь мгновенно получает кэшированный ответ, а свежая версия параллельно загружается и сохраняется на следующий раз.",
+  "output": "Страница открывается мгновенно из кэша, а новая версия подтягивается в фоне",
+  "tags": [
+    "Service Worker",
+    "stale-while-revalidate",
+    "кэш",
+    "фоновое обновление"
+  ],
+  "aliases": [
+    "как обновлять кэш в фоне service worker",
+    "stale while revalidate пример",
+    "кэш и сеть одновременно"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 5,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 32,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — функция, внутри которой можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 6,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 21,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — дождаться завершения асинхронной операции и взять её результат.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 6,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "cache.put",
+      "kind": "put — сохраняет свежий ответ в кэш.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 6,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Кэширование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Service Worker"
+      ],
+      "technology": [
+        "JavaScript",
+        "Service Worker"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Страница открывается мгновенно из кэша, а новая версия подтягивается в фоне",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const cacheName = \"pages-v1\";\n\nself.addEventListener(\"fetch\", event => {\n  event.respondWith(\n    caches.open(cacheName).then(async cache => {\n      const cached = await cache.match(event.request);\n      const network = fetch(event.request).then(response => {\n        cache.put(event.request, response.clone());\n        return response;\n      });\n      return cached ?? network;\n    })\n  );\n});"
+        },
+        "steps": [
+          "Сохрани код как sw.js в корне сайта и зарегистрируй: navigator.serviceWorker.register(\"/sw.js\").",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Страница открывается мгновенно из кэша, а новая версия подтягивается в фоне",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Первая установка worker",
+            "Обновление worker",
+            "Работа без сети"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Service Worker не регистрируется",
+            "cause": "Страница открыта не по HTTPS или localhost, либо sw.js лежит не в корне сайта",
+            "solution": "Открой сайт по https или http://localhost и проверь вкладку Application → Service Workers"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "cacheName"
+    ],
+    "requires": [],
+    "subcat": "Service Worker"
+  },
+  "enriched": true
+}

@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Ожидание всех задач без учёта ошибок",
+  "group": "Асинхронность / Надёжность",
+  "desc": "Упавшая задача даёт undefined и не обрушивает остальные.",
+  "code": "const задачи = [\n  Promise.resolve(\"a\"),\n  Promise.reject(new Error(\"сбой\")),\n  Promise.resolve(\"c\"),\n];\n\nconst итоги = await Promise.all(задачи.map(задача => задача.catch(() => undefined)));\nconsole.log(итоги);",
+  "output": "[ 'a', undefined, 'c' ]",
+  "words": {
+    "catch": "Перехватывает отказ и подставляет другой результат."
+  }
+}

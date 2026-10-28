@@ -1,0 +1,199 @@
+{
+  "schema": 1,
+  "id": "название-страны-на-языке-локали",
+  "file": "название-страны-на-языке-локали.js",
+  "title": "Название страны на языке локали",
+  "lang": "js",
+  "group": "Форматирование и локали / Локали и форматы",
+  "desc": "Получает название страны на языке локали.",
+  "output": "Германия\nанглийский",
+  "tags": [
+    "Intl.DisplayNames",
+    "страна",
+    "регион",
+    "локаль"
+  ],
+  "aliases": [
+    "как получить название страны по коду js",
+    "intl displaynames пример",
+    "страна на русском"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 16,
+      "text": "Intl",
+      "kind": "fn",
+      "note": "Intl — встроенный объект форматирования с учётом локали.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 44,
+      "text": "type",
+      "kind": "kw",
+      "note": "type — в TypeScript объявляет имя для типа.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 16,
+      "text": "Intl",
+      "kind": "fn",
+      "note": "Intl — встроенный объект форматирования с учётом локали.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 44,
+      "text": "type",
+      "kind": "kw",
+      "note": "type — в TypeScript объявляет имя для типа.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Форматирование и локали"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Германия\nанглийский",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const locale = \"ru\";\nconsole.log(new Intl.DisplayNames(locale, { type: \"region\" }).of(\"DE\"));\nconsole.log(new Intl.DisplayNames(locale, { type: \"language\" }).of(\"en\"));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Германия\nанглийский",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "locale"
+    ],
+    "requires": [],
+    "subcat": "Локали и форматы"
+  },
+  "enriched": true
+}

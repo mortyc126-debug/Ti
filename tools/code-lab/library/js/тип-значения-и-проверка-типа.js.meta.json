@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "id": "тип-значения-и-проверка-типа",
+  "file": "тип-значения-и-проверка-типа.js",
+  "title": "Тип значения и проверка типа",
+  "lang": "js",
+  "group": "Основы / Типы данных",
+  "desc": "Проверяет тип значения перед обработкой.",
+  "output": "number; object",
+  "tags": [
+    "typeof",
+    "типизация",
+    "проверка значения"
+  ],
+  "aliases": [
+    "typeof",
+    "тип данных",
+    "проверить тип",
+    "typeof null"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "typeof",
+      "kind": "concept",
+      "note": "typeof — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "типизация",
+      "kind": "concept",
+      "note": "типизация — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "проверка значения",
+      "kind": "concept",
+      "note": "проверка значения — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "переключить-выбранность-элемента-по-идентификатор",
+  "file": "переключить-выбранность-элемента-по-идентификатор.js",
+  "title": "Переключить выбранность элемента по идентификатор",
+  "lang": "js",
+  "group": "Состояние / Выбор элементов",
+  "desc": "Добавляет id в Set выбранных элементов или удаляет его, сохраняя остальные выборы.",
+  "output": "[1]",
+  "tags": [
+    "выбор",
+    "Set",
+    "состояние",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "toggle selected id",
+    "выбрать или снять выбор записи",
+    "переключить элемент в наборе"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

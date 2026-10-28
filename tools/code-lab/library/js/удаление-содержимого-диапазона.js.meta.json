@@ -1,0 +1,224 @@
+{
+  "schema": 1,
+  "id": "удаление-содержимого-диапазона",
+  "file": "удаление-содержимого-диапазона.js",
+  "title": "Удаление содержимого диапазона",
+  "lang": "js",
+  "group": "Браузер: страница и документ / Узлы и диапазоны",
+  "desc": "Удаляет содержимое диапазона из документа.",
+  "output": "мир",
+  "tags": [
+    "Range",
+    "deleteContents",
+    "выделение",
+    "DOM"
+  ],
+  "aliases": [
+    "как удалить выделенный текст через range",
+    "deletecontents пример",
+    "удалить часть текстового узла",
+    "диапазон выделения js",
+    "очистить содержимое диапазона"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 16,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — документ страницы: точка входа в DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 25,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт элемент DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — документ страницы: точка входа в DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 14,
+      "text": "append",
+      "kind": "fn",
+      "note": "append — добавляет узлы, текст или параметр в конец.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 14,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — документ страницы: точка входа в DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 23,
+      "text": "createRange",
+      "kind": "fn",
+      "note": "createRange — создаёт диапазон для работы с частью документа.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 6,
+      "text": "setStart",
+      "kind": "fn",
+      "note": "setStart — задаёт начало диапазона.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 6,
+      "text": "setEnd",
+      "kind": "fn",
+      "note": "setEnd — задаёт конец диапазона.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 6,
+      "text": "deleteContents",
+      "kind": "fn",
+      "note": "deleteContents — удаляет содержимое диапазона из документа.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Браузер: страница и документ"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "мир",
+      "dependencies": [],
+      "requirements": [
+        "Работает в браузере: нужны объекты страницы (document и другие API браузера).",
+        "Внешние библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const element = document.createElement(\"p\");\nelement.textContent = \"Привет, мир\";\ndocument.body.append(element);\n\nconst range = document.createRange();\nrange.setStart(element.firstChild, 0);\nrange.setEnd(element.firstChild, 8);\nrange.deleteContents();\nconsole.log(element.textContent);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "мир",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          },
+          {
+            "symptom": "ReferenceError: document is not defined",
+            "cause": "Код запущен в Node.js, где нет объектов страницы",
+            "solution": "Запусти код в браузере или в окружении с эмуляцией DOM"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "element",
+      "range"
+    ],
+    "requires": [],
+    "subcat": "Узлы и диапазоны"
+  },
+  "enriched": true
+}

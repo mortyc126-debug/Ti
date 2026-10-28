@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "id": "проверить-поддержку-функции-вместо-браузерного-имени",
+  "file": "проверить-поддержку-функции-вместо-браузерного-имени.js",
+  "lang": "js",
+  "title": "Проверить поддержку функции вместо браузерного имени",
+  "group": "Разработка и инструменты / Совместимость",
+  "desc": "Проверяйте конкретный API через typeof или наличие свойства, а не угадывайте поддержку по user-agent.",
+  "output": "зависит от среды",
+  "descAt": 1792998629515,
+  "component": {
+    "provides": [],
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Разработка и инструменты"
+      ]
+    },
+    "subcat": "Совместимость"
+  },
+  "tags": [
+    "совместимость",
+    "feature detection",
+    "globalThis"
+  ],
+  "aliases": [
+    "проверить поддержку API",
+    "feature detection вместо user agent",
+    "условие совместимости"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 4,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "определить тип значения в виде строки",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "else",
+      "kind": "kw",
+      "note": "else — «иначе»: что делать, когда условие if не выполнилось.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

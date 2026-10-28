@@ -1,0 +1,228 @@
+{
+  "schema": 1,
+  "id": "метод-входящего-запроса",
+  "file": "метод-входящего-запроса.js",
+  "title": "Метод входящего запроса",
+  "lang": "js",
+  "group": "Node.js: процесс, файлы и сервер / HTTP-сервер",
+  "desc": "Получает Метод входящего запроса.",
+  "output": "POST",
+  "tags": [
+    "request.method",
+    "HTTP-сервер",
+    "метод запроса",
+    "Node.js"
+  ],
+  "aliases": [
+    "как узнать http метод запроса в node",
+    "request method пример",
+    "get или post на сервере",
+    "обработчик http сервера",
+    "метод входящего запроса"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключает модуль Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "createServer",
+      "kind": "fn",
+      "note": "createServer — создаёт HTTP-сервер с обработчиком запросов.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 11,
+      "text": "end",
+      "kind": "fn",
+      "note": "end — завершает ответ или поток.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 7,
+      "text": "listen",
+      "kind": "fn",
+      "note": "listen — запускает сервер на порту; порт 0 выбирается автоматически.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 17,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — делает функцию асинхронной: она возвращает Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 16,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт завершения Promise внутри асинхронной функции.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 22,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "fetch — выполняет HTTP-запрос и возвращает Promise с ответом.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 14,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — ждёт завершения Promise внутри асинхронной функции.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Node.js: процесс, файлы и сервер"
+      ],
+      "runtime": [
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "POST",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js.",
+        "Нужен Node.js той версии, где есть используемые встроенные модули."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const http = require(\"node:http\");\nconst server = http.createServer((request, response) => {\n  response.end(request.method);\n});\nserver.listen(0, async () => {\n  const { port } = server.address();\n  const ответ = await fetch(`http://127.0.0.1:${port}`, { method: \"POST\" });\n  console.log(await ответ.text());\n  server.close();\n});"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "POST",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль",
+          "Поднимает временный сервер на свободном порту локального компьютера"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "http",
+      "server"
+    ],
+    "requires": [],
+    "subcat": "HTTP-сервер"
+  },
+  "enriched": true
+}

@@ -1,0 +1,188 @@
+{
+  "schema": 1,
+  "id": "подмена-websocket-в-тесте",
+  "file": "подмена-websocket-в-тесте.js",
+  "title": "Подмена WebSocket тестовой реализацией",
+  "lang": "js",
+  "group": "Тестирование и отладка / Mock",
+  "desc": "vi.stubGlobal заменяет WebSocket простым классом-двойником: тест видит, что было отправлено, и обходится без сервера.",
+  "output": "✓ 1 тест пройден",
+  "tags": [
+    "Vitest",
+    "stubGlobal",
+    "WebSocket",
+    "фальшивый сокет",
+    "мок"
+  ],
+  "aliases": [
+    "как замокать websocket в vitest",
+    "фейковый websocket для теста",
+    "подмена WebSocket",
+    "тест чата без сервера"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — объявить класс.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "FakeSocket",
+      "kind": "kw",
+      "note": "FakeSocket — простой класс, запоминающий отправленные сообщения.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 24,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 17,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 21,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 29,
+      "col": 2,
+      "text": "vi.stubGlobal",
+      "kind": "fn",
+      "note": "stubGlobal — подменяет глобальный WebSocket классом-двойником.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование и отладка"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Vitest"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "✓ 1 тест пройден",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import { afterEach, expect, it, vi } from \"vitest\";\n\nclass FakeSocket {\n  static lastInstance = null;\n\n  constructor(url) {\n    this.url = url;\n    this.sentMessages = [];\n    FakeSocket.lastInstance = this;\n  }\n\n  send(message) {\n    this.sentMessages.push(message);\n  }\n\n  close() {}\n}\n\nfunction joinChat(url, userName) {\n  const socket = new WebSocket(url);\n  socket.send(JSON.stringify({ type: \"join\", userName }));\n  return socket;\n}\n\nafterEach(() => {\n  vi.unstubAllGlobals();\n});\n\nit(\"при входе в чат отправляется сообщение join\", () => {\n  vi.stubGlobal(\"WebSocket\", FakeSocket);\n\n  joinChat(\"wss://chat.example.com\", \"Мира\");\n\n  expect(FakeSocket.lastInstance.url).toBe(\"wss://chat.example.com\");\n  expect(FakeSocket.lastInstance.sentMessages).toEqual([\n    JSON.stringify({ type: \"join\", userName: \"Мира\" }),\n  ]);\n});"
+        },
+        "steps": [
+          "Установи Vitest (npm install -D vitest) и запусти npx vitest run имя-файла.js.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "✓ 1 тест пройден",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Тест проходит",
+            "Тест падает при сломанном коде",
+            "Повторный запуск тестов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Cannot find package 'vitest'",
+            "cause": "Vitest не установлен в проекте",
+            "solution": "Выполни npm install -D vitest"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "FakeSocket",
+      "joinChat"
+    ],
+    "requires": [],
+    "subcat": "Mock"
+  },
+  "enriched": true
+}

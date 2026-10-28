@@ -1,0 +1,12 @@
+{
+  "lang": "js",
+  "title": "Ожидание успешного ответа на запрос в Playwright",
+  "group": "Тестирование / Браузерные тесты",
+  "desc": "Запускаем ожидание ответа до клика, чтобы не пропустить его.",
+  "code": "import { test, expect } from \"@playwright/test\";\n\ntest(\"сохранение уходит на сервер\", async ({ page }) => {\n  await page.goto(\"https://example.com/settings\");\n\n  const ожидание = page.waitForResponse(\n    ответ => ответ.url().includes(\"/api\") && ответ.ok()\n  );\n  await page.getByRole(\"button\", { name: \"Сохранить\" }).click();\n  const ответ = await ожидание;\n\n  expect(ответ.status()).toBe(200);\n});",
+  "output": "Тест проходит, когда сервер ответил на запрос к /api кодом 2xx.",
+  "words": {
+    "waitForResponse": "Ждёт ответа, подходящего под условие.",
+    "ok": "Истина для успешных кодов 200–299."
+  }
+}

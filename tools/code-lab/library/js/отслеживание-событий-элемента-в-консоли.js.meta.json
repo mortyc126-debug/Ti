@@ -1,0 +1,199 @@
+{
+  "schema": 1,
+  "id": "отслеживание-событий-элемента-в-консоли",
+  "file": "отслеживание-событий-элемента-в-консоли.js",
+  "title": "Отслеживание событий элемента в консоли",
+  "lang": "js",
+  "group": "Браузер: страница и документ / Наблюдатели, звук и отладка",
+  "desc": "Выводит события элемента в консоль DevTools.",
+  "output": "monitorEvents есть только в консоли DevTools",
+  "tags": [
+    "monitorEvents",
+    "DevTools",
+    "события",
+    "отладка"
+  ],
+  "aliases": [
+    "как смотреть события элемента в консоли",
+    "monitorevents пример",
+    "отладка событий click",
+    "функция консоли devtools"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 16,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — документ страницы: точка входа в DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 25,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создаёт элемент DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "document",
+      "kind": "fn",
+      "note": "document — документ страницы: точка входа в DOM.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "append",
+      "kind": "fn",
+      "note": "append — добавляет узлы, текст или параметр в конец.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "typeof",
+      "kind": "kw",
+      "note": "typeof — возвращает название типа значения.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "else",
+      "kind": "kw",
+      "note": "else — «иначе»: ветка, которая выполняется, когда условие в if ложно.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Браузер: страница и документ"
+      ],
+      "runtime": [
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "monitorEvents есть только в консоли DevTools",
+      "dependencies": [],
+      "requirements": [
+        "Работает в браузере: нужны объекты страницы (document и другие API браузера).",
+        "Внешние библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const element = document.createElement(\"button\");\ndocument.body.append(element);\n\nif (typeof monitorEvents === \"function\") {\n  monitorEvents(element, \"click\");\n} else {\n  console.log(\"monitorEvents есть только в консоли DevTools\");\n}"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "monitorEvents есть только в консоли DevTools",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          },
+          {
+            "symptom": "ReferenceError: document is not defined",
+            "cause": "Код запущен в Node.js, где нет объектов страницы",
+            "solution": "Запусти код в браузере или в окружении с эмуляцией DOM"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль",
+          "monitorEvents доступна только в консоли DevTools; вне её выводится пояснение"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "element"
+    ],
+    "requires": [],
+    "subcat": "Наблюдатели, звук и отладка"
+  },
+  "enriched": true
+}

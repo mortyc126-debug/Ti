@@ -1,0 +1,163 @@
+{
+  "schema": 1,
+  "id": "закрытие-окна-скриптом",
+  "file": "закрытие-окна-скриптом.js",
+  "title": "Закрыть окно, открытое скриптом: window.close()",
+  "lang": "js",
+  "group": "Интерфейс / Системные возможности",
+  "desc": "Скрипт открывает небольшое окно, а кнопка внутри него закрывает его вызовом window.close(); браузеры позволяют закрывать только окна, открытые скриптом.",
+  "output": "По клику открывается окно с кнопкой «Закрыть», по её нажатию окно закрывается",
+  "tags": [
+    "window.close",
+    "window.open",
+    "окно",
+    "всплывающее окно",
+    "браузер"
+  ],
+  "aliases": [
+    "как закрыть окно через js",
+    "window.close пример",
+    "закрыть popup из самого окна",
+    "почему window.close не работает"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 28,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 11,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 23,
+      "text": "window.open",
+      "kind": "fn",
+      "note": "open — открывает новое окно.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 40,
+      "text": "window.close",
+      "kind": "fn",
+      "note": "close — закрывает окно; сработает только для окон, открытых через window.open.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "По клику открывается окно с кнопкой «Закрыть», по её нажатию окно закрывается",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const openButton = document.createElement(\"button\");\nopenButton.textContent = \"Открыть окно отчёта\";\ndocument.body.append(openButton);\n\nopenButton.addEventListener(\"click\", () => {\n  const reportWindow = window.open(\"\", \"report\", \"width=400,height=200\");\n  reportWindow.document.write(\n    '<p>Отчёт готов</p><button onclick=\"window.close()\">Закрыть</button>'\n  );\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "По клику открывается окно с кнопкой «Закрыть», по её нажатию окно закрывается",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Окно не открывается",
+            "cause": "Браузер заблокировал всплывающее окно (вызов не из клика)",
+            "solution": "Вызывай window.open только из обработчика клика и разреши всплывающие окна"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Открывает всплывающее окно"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "openButton"
+    ],
+    "requires": [],
+    "subcat": "Системные возможности"
+  },
+  "enriched": true
+}

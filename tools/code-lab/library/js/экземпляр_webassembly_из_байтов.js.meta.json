@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "экземпляр_webassembly_из_байтов",
+  "file": "экземпляр_webassembly_из_байтов.js",
+  "title": "Экземпляр WebAssembly из байтов",
+  "lang": "js",
+  "group": "Разработка и инструменты / WebAssembly",
+  "desc": "WebAssembly.instantiate принимает двоичный код модуля и объект импортов и возвращает Promise с результатом: модулем и его экземпляром. Через instance.exports вызывают экспортируемые функции модуля. Модуль — это уже скомпилированный бинарный код, поэтому его обычно получают из файла .wasm. Если модуль нужно только скомпилировать без запуска, используйте WebAssembly.compile.",
+  "output": "5",
+  "tags": [
+    "WebAssembly.instantiate",
+    "exports",
+    "webassembly"
+  ],
+  "aliases": [
+    "экземпляр webassembly из байтов",
+    "WebAssembly.instantiate",
+    "exports"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 8,
+      "col": 27,
+      "text": "WebAssembly.instantiate",
+      "kind": "fn",
+      "note": "Компилирует и создаёт экземпляр модуля WebAssembly."
+    },
+    {
+      "line": 9,
+      "col": 21,
+      "text": "exports",
+      "kind": "concept",
+      "note": "Функции, которые модуль отдаёт наружу."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

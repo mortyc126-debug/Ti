@@ -1,0 +1,12 @@
+{
+  "lang": "js",
+  "title": "Ожидание открытия WebSocket",
+  "group": "Сеть / WebSocket",
+  "desc": "Превращаем событие открытия соединения в Promise.",
+  "code": "const сокет = new WebSocket(\"wss://echo.websocket.org\");\n\nawait new Promise((разрешить, отклонить) => {\n  сокет.addEventListener(\"open\", разрешить, { once: true });\n  сокет.addEventListener(\"error\", отклонить, { once: true });\n});\n\nсокет.send(\"привет\");",
+  "output": "Сообщение отправляется только после открытия соединения.",
+  "words": {
+    "once": "Обработчик срабатывает один раз и снимается сам.",
+    "Promise": "Оборачивает событие в ожидаемый результат."
+  }
+}

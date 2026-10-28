@@ -1,0 +1,114 @@
+{
+  "schema": 1,
+  "id": "устаревшие-зависимости",
+  "file": "устаревшие-зависимости.sh",
+  "title": "Устаревшие зависимости",
+  "lang": "sh",
+  "group": "Инструменты разработчика / Менеджер пакетов npm",
+  "desc": "Показывает устаревшие зависимости пакетов.",
+  "output": "Package    Current  Wanted  Latest  Location                Depended by\nis-number    6.0.0   6.0.0   7.0.0  node_modules/is-number  demo",
+  "tags": [
+    "npm outdated",
+    "обновления",
+    "версии",
+    "зависимости"
+  ],
+  "aliases": [
+    "как узнать какие пакеты устарели",
+    "npm outdated пример",
+    "проверка свежести зависимостей"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Инструменты разработчика"
+      ],
+      "runtime": [
+        "Командная строка"
+      ],
+      "technology": [
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Package    Current  Wanted  Latest  Location                Depended by\nis-number    6.0.0   6.0.0   7.0.0  node_modules/is-number  demo",
+      "dependencies": [],
+      "requirements": [
+        "Нужны Node.js и установленный в проекте prettier.",
+        "Запускай команду из корня проекта."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "sh",
+          "content": "npm outdated"
+        },
+        "steps": [
+          "Проверь, что prettier установлен в проекте.",
+          "Выполни команду в корне проекта.",
+          "Если команда сообщает о неотформатированных файлах, отформатируй их и повтори проверку."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Package    Current  Wanted  Latest  Location                Depended by\nis-number    6.0.0   6.0.0   7.0.0  node_modules/is-number  demo",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          },
+          {
+            "symptom": "prettier: команда не найдена",
+            "cause": "Prettier не установлен в проекте",
+            "solution": "Установи prettier как зависимость проекта и повтори запуск"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат проверки в терминал, файлы не меняет",
+          "Таблица зависит от текущих версий пакетов в реестре npm на момент запуска"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Менеджер пакетов npm"
+  },
+  "enriched": true
+}

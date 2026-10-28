@@ -1,0 +1,171 @@
+{
+  "schema": 1,
+  "id": "вопрос-в-терминале-через-readline",
+  "file": "вопрос-в-терминале-через-readline.js",
+  "title": "Задать вопрос в терминале: rl.question",
+  "lang": "js",
+  "group": "Стандартная библиотека / Командная строка",
+  "desc": "rl.question выводит вопрос и передаёт введённую строку в callback; после ответа интерфейс нужно закрыть.",
+  "output": "Как вас зовут? Мира\nПривет, Мира!",
+  "tags": [
+    "readline",
+    "rl.question",
+    "ввод пользователя",
+    "терминал",
+    "Node.js"
+  ],
+  "aliases": [
+    "как спросить пользователя в консоли node",
+    "readline question пример",
+    "ввод с клавиатуры в node"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 17,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "rl.question",
+      "kind": "question — показывает вопрос и ждёт строку от пользователя.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "rl.close",
+      "kind": "close — закрывает интерфейс ввода, чтобы программа завершилась.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Стандартная библиотека"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Как вас зовут? Мира\nПривет, Мира!",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const readline = require(\"node:readline\");\n\nconst rl = readline.createInterface({\n  input: process.stdin,\n  output: process.stdout,\n});\n\nrl.question(\"Как вас зовут? \", answer => {\n  console.log(`Привет, ${answer}!`);\n  rl.close();\n});"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Как вас зовут? Мира\nПривет, Мира!",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "readline",
+      "rl"
+    ],
+    "requires": [],
+    "subcat": "Командная строка"
+  },
+  "enriched": true
+}

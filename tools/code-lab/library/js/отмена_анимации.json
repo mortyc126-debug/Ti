@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Отмена анимации",
+  "group": "Графика и визуализация / Анимация",
+  "desc": "Отмена анимации.",
+  "code": "const блок = document.querySelector(\".блок\");\nconst движение = блок.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1000 });\nдвижение.cancel();",
+  "output": "Анимация отменена.",
+  "words": {
+    "cancel": "Отменяет анимацию Web Animations API."
+  }
+}

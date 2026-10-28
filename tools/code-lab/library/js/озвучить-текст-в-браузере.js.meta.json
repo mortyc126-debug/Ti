@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "id": "озвучить-текст-в-браузере",
+  "file": "озвучить-текст-в-браузере.js",
+  "title": "Озвучить текст средствами браузера: speechSynthesis.speak",
+  "lang": "js",
+  "group": "Графика и визуализация / Звук",
+  "desc": "speechSynthesis.speak произносит текст голосом системы; язык задаётся свойством lang, начинать нужно по клику.",
+  "output": "По клику браузер произносит «Добро пожаловать!»",
+  "tags": [
+    "speechSynthesis",
+    "SpeechSynthesisUtterance",
+    "озвучка",
+    "синтез речи"
+  ],
+  "aliases": [
+    "как озвучить текст в браузере js",
+    "speechSynthesis.speak пример",
+    "синтез речи web api"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 29,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 12,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 20,
+      "text": "new SpeechSynthesisUtterance",
+      "kind": "SpeechSynthesisUtterance — фраза: текст, язык, скорость.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "speechSynthesis.speak",
+      "kind": "speak — ставит фразу в очередь на озвучивание.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Графика и визуализация"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "По клику браузер произносит «Добро пожаловать!»",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const speakButton = document.createElement(\"button\");\nspeakButton.textContent = \"Озвучить\";\ndocument.body.append(speakButton);\n\nspeakButton.addEventListener(\"click\", () => {\n  const utterance = new SpeechSynthesisUtterance(\"Добро пожаловать!\");\n  utterance.lang = \"ru-RU\";\n  speechSynthesis.speak(utterance);\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "По клику браузер произносит «Добро пожаловать!»",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Добавляет кнопку на страницу",
+          "Воспроизводит речь"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "speakButton"
+    ],
+    "requires": [],
+    "subcat": "Звук"
+  },
+  "enriched": true
+}

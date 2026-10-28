@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Проверка новой версии Service Worker",
+  "group": "Кэширование / Service Worker",
+  "desc": "Просим браузер заново проверить, не появился ли обновлённый скрипт.",
+  "code": "const регистрация = await navigator.serviceWorker.ready;\nawait регистрация.update();\n\nconsole.log(\"Ожидает активации:\", Boolean(регистрация.waiting));",
+  "output": "Ожидает активации: true, если найдена новая версия.",
+  "words": {
+    "update": "Запрашивает скрипт Service Worker и ищет новую версию."
+  }
+}

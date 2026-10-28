@@ -1,0 +1,208 @@
+{
+  "schema": 1,
+  "id": "свойство-с-сеттером",
+  "file": "свойство-с-сеттером.js",
+  "title": "Свойство с сеттером",
+  "lang": "js",
+  "group": "Объекты и метапрограммирование / Свойства и дескрипторы",
+  "desc": "Определяет свойство с сеттером.",
+  "output": "0\n30",
+  "tags": [
+    "Object.defineProperty",
+    "сеттер",
+    "set",
+    "дескриптор"
+  ],
+  "aliases": [
+    "как определить сеттер через defineproperty",
+    "свойство с set",
+    "проверка значения при записи"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "Object",
+      "kind": "fn",
+      "note": "Object — встроенный объект с утилитами для работы с объектами.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 7,
+      "text": "defineProperty",
+      "kind": "fn",
+      "note": "defineProperty — определяет свойство с заданным дескриптором.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 15,
+      "text": "this",
+      "kind": "kw",
+      "note": "this — объект, от имени которого вызвана функция.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 31,
+      "text": "Math",
+      "kind": "fn",
+      "note": "Math — встроенный объект с математическими функциями.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 36,
+      "text": "max",
+      "kind": "fn",
+      "note": "max — наибольшее из аргументов.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 16,
+      "text": "true",
+      "kind": "kw",
+      "note": "true — логическое «истина».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Объекты и метапрограммирование"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "0\n30",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const object = { _возраст: 0 };\nconst key = \"возраст\";\nObject.defineProperty(object, key, {\n  set(value) { this._возраст = Math.max(0, value); },\n  configurable: true\n});\nobject.возраст = -5;\nconsole.log(object._возраст);\nobject.возраст = 30;\nconsole.log(object._возраст);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "0\n30",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "object",
+      "key"
+    ],
+    "requires": [],
+    "subcat": "Свойства и дескрипторы"
+  },
+  "enriched": true
+}

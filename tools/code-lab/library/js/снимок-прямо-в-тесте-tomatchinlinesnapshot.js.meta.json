@@ -1,0 +1,145 @@
+{
+  "schema": 1,
+  "id": "снимок-прямо-в-тесте-tomatchinlinesnapshot",
+  "file": "снимок-прямо-в-тесте-tomatchinlinesnapshot.js",
+  "title": "Сравнить значение со снимком, записанным прямо в тесте: toMatchInlineSnapshot",
+  "lang": "js",
+  "group": "Тестирование / Проверки функций",
+  "desc": "Инлайн-снимок хранится в самом тесте: результат виден рядом с проверкой, а при изменении формата тест покажет разницу.",
+  "output": "✓ 1 тест пройден",
+  "tags": [
+    "Vitest",
+    "toMatchInlineSnapshot",
+    "снимок",
+    "snapshot"
+  ],
+  "aliases": [
+    "как сделать снапшот прямо в тесте",
+    "toMatchInlineSnapshot пример",
+    "inline snapshot vitest"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 29,
+      "text": "toMatchInlineSnapshot",
+      "kind": "toMatchInlineSnapshot — сравнивает значение со снимком, записанным в тесте.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Vitest"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "✓ 1 тест пройден",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import { expect, it } from \"vitest\";\n\nfunction createUser(name) {\n  return { id: 1, name };\n}\n\nit(\"форма объекта пользователя не меняется\", () => {\n  expect(createUser(\"Мира\")).toMatchInlineSnapshot(`\n    {\n      \"id\": 1,\n      \"name\": \"Мира\",\n    }\n  `);\n});"
+        },
+        "steps": [
+          "Установи Vitest (npm install -D vitest) и запусти npx vitest run имя-файла.js.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "✓ 1 тест пройден",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Тест проходит",
+            "Тест падает при сломанном коде",
+            "Повторный запуск тестов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Cannot find package 'vitest'",
+            "cause": "Vitest не установлен в проекте",
+            "solution": "Выполни npm install -D vitest"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "createUser"
+    ],
+    "requires": [],
+    "subcat": "Проверки функций"
+  },
+  "enriched": true
+}

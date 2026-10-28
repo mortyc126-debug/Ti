@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "построить-индекс-где-одному-ключу-соответствует-список-записей",
+  "file": "построить-индекс-где-одному-ключу-соответствует-список-записей.js",
+  "title": "Построить индекс, где одному ключу соответствует список записей",
+  "lang": "js",
+  "group": "Данные / Индексация и поиск",
+  "desc": "В отличие от обычного indexBy, сохраняет все записи для повторяющегося ключа.",
+  "output": "[{s:\"A\",n:1},{s:\"A\",n:2}]",
+  "tags": [
+    "индекс",
+    "Map",
+    "группировка",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "Map key to array",
+    "индексировать дубликаты по ключу",
+    "одному ключу много записей"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

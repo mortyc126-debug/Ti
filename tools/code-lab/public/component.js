@@ -150,6 +150,26 @@ function render(t){
   s5.appendChild(contractEditor(t));
   root.appendChild(panel('⑤ Связи', s5));
 
+  // ⑥ dict-usage: какие слова/конструкции словаря есть в этом куске и где ещё они встречаются
+  { const s6 = document.createElement('div'); s6.appendChild(el('div', 'muted', 'считаю…'));
+    root.appendChild(panel('⑥ Где ещё используется', s6));
+    fetch('/api/piece/terms?id=' + encodeURIComponent(t.id)).then(r => r.json()).then(r => {
+      s6.innerHTML = '';
+      const rows = (r && r.ok ? r.terms : []).filter(x => x.kind !== 'generic');
+      if(!rows.length){ s6.appendChild(el('div', 'muted', 'в этом куске не найдено конструкций из словаря')); return; }
+      rows.sort((a, b) => (b.kind === 'construct') - (a.kind === 'construct') || a.n - b.n || a.term.localeCompare(b.term));
+      s6.appendChild(el('div', 'note-hint', 'Конструкции и слова из словаря, которые есть в этом коде. Справа — другие куски, где они тоже встречаются (редкие — сверху).'));
+      rows.slice(0, 60).forEach(x => {
+        const row = el('div', 'frag'); row.style.cssText = 'display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;padding:3px 0';
+        const nm = el('span', 'fn', x.term); nm.title = x.note || ''; nm.style.flex = 'none'; row.appendChild(nm);
+        const rest = el('span', 'ro'); rest.style.cssText = 'flex:1;min-width:140px';
+        if(!x.others.length) rest.textContent = 'только здесь';
+        else { rest.appendChild(document.createTextNode(x.n - 1 + ': ')); x.others.slice(0, 5).forEach((p, i) => { if(i) rest.appendChild(document.createTextNode(', ')); const a = document.createElement('a'); a.href = '/component.html?id=' + encodeURIComponent(p.id); a.textContent = p.title || p.id; rest.appendChild(a); }); if(x.n - 1 > 5) rest.appendChild(document.createTextNode(' …')); }
+        row.appendChild(rest); s6.appendChild(row);
+      });
+      if(rows.length > 60) s6.appendChild(el('div', 'muted', '…и ещё ' + (rows.length - 60)));
+    }).catch(() => { s6.innerHTML = ''; s6.appendChild(el('div', 'muted', 'не удалось посчитать')); }); }
+
   // проверка результата (если описана)
   if(check.expected_result || (check.common_errors && check.common_errors.length) || check.tests){
     root.appendChild(panel('Проверка результата', viewCheck(c)));

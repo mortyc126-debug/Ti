@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Ожидание загрузки шрифтов",
+  "group": "Интерфейс / Жизненный цикл",
+  "desc": "Ожидание загрузки шрифтов.",
+  "code": "await document.fonts.ready;\nconsole.log(\"Шрифты готовы\");",
+  "output": "Шрифты готовы",
+  "words": {
+    "document.fonts.ready": "Promise готовности используемых шрифтов."
+  }
+}

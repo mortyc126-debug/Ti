@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "создать-простой-механизм-подписки-и-рассылки-событий",
+  "file": "создать-простой-механизм-подписки-и-рассылки-событий.js",
+  "title": "Создать простой механизм подписки и рассылки событий",
+  "lang": "js",
+  "group": "Архитектура / События и сообщения",
+  "desc": "Поддерживает подписки по имени события и возвращает функцию отписки; при emit использует снимок списка обработчиков.",
+  "output": "обработчики получают payload; off снимает подписку",
+  "tags": [
+    "event emitter",
+    "pubsub",
+    "события",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "event bus javascript",
+    "pub sub события",
+    "подписаться и отписаться от события"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

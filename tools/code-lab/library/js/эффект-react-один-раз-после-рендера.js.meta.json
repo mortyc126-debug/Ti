@@ -1,0 +1,221 @@
+{
+  "schema": 1,
+  "id": "эффект-react-один-раз-после-рендера",
+  "file": "эффект-react-один-раз-после-рендера.js",
+  "title": "Эффект React один раз после первого рендера",
+  "lang": "js",
+  "group": "Интерфейс / Жизненный цикл",
+  "desc": "useEffect с пустым массивом зависимостей срабатывает один раз после первого рендера; возвращаемая функция выполнится при удалении компонента.",
+  "output": "На экране «Прошло секунд: 0», затем число растёт каждую секунду",
+  "tags": [
+    "React",
+    "useEffect",
+    "жизненный цикл",
+    "таймер",
+    "очистка эффекта"
+  ],
+  "aliases": [
+    "useEffect только при монтировании",
+    "эффект один раз react",
+    "пустой массив зависимостей useEffect",
+    "таймер в компоненте react"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "useEffect",
+      "kind": "fn",
+      "note": "useEffect — запускает побочное действие после отрисовки компонента.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "export",
+      "kind": "kw",
+      "note": "export — сделать имя доступным для других модулей.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 20,
+      "text": "setInterval",
+      "kind": "fn",
+      "note": "setInterval — повторять функцию через равные промежутки времени.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 5,
+      "text": "[]",
+      "kind": "kw",
+      "note": "[] — пустые зависимости: эффект выполняется один раз после первого рендера.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 9,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 28,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "React"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "На экране «Прошло секунд: 0», затем число растёт каждую секунду",
+      "dependencies": [
+        "react"
+      ],
+      "requirements": [
+        "Нужен пакет react."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import { createElement, useEffect, useState } from \"react\";\n\nexport default function Stopwatch() {\n  const [seconds, setSeconds] = useState(0);\n\n  useEffect(() => {\n    const timerId = setInterval(() => setSeconds(previous => previous + 1), 1000);\n    return () => clearInterval(timerId);\n  }, []);\n\n  return createElement(\"p\", null, `Прошло секунд: ${seconds}`);\n}"
+        },
+        "steps": [
+          "Подготовь проект с React (npm install react) и импортируй компонент.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "На экране «Прошло секунд: 0», затем число растёт каждую секунду",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Первый рендер компонента",
+            "Смена свойств компонента",
+            "Удаление компонента со страницы"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Cannot find module 'react'",
+            "cause": "В проекте не установлен React",
+            "solution": "Выполни npm install react"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Запускает таймер и останавливает его при удалении компонента"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "Stopwatch"
+    ],
+    "requires": [],
+    "subcat": "Жизненный цикл"
+  },
+  "enriched": true
+}

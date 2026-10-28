@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "сжатие_буфера_gzip",
+  "file": "сжатие_буфера_gzip.js",
+  "title": "Сжатие буфера gzip",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Двоичные данные",
+  "desc": "gzip из node:zlib работает на колбэках, а promisify превращает его в функцию, возвращающую Promise. Результат — Buffer со сжатыми данными, который можно сохранить или отправить с заголовком Content-Encoding: gzip. Обратная операция — gunzip. Повторяющиеся данные сжимаются очень хорошо, а случайные почти не меняются. Для больших данных используйте потоки.",
+  "output": "true\ntrue",
+  "tags": [
+    "gzip",
+    "promisify",
+    "двоичные данные"
+  ],
+  "aliases": [
+    "сжатие буфера gzip",
+    "gzip",
+    "promisify"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 9,
+      "text": "gzip",
+      "kind": "concept",
+      "note": "Сжимает данные алгоритмом gzip."
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "promisify",
+      "kind": "concept",
+      "note": "Превращает функцию с колбэком в функцию с Promise."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

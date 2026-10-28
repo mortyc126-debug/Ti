@@ -1,0 +1,219 @@
+{
+  "schema": 1,
+  "id": "прототип-объекта",
+  "file": "прототип-объекта.js",
+  "title": "Прототип объекта",
+  "lang": "js",
+  "group": "Объекты и метапрограммирование / Операции над объектами и прокси",
+  "desc": "Получает прототип объекта через Reflect.",
+  "output": "true\ntrue",
+  "tags": [
+    "Reflect.getPrototypeOf",
+    "прототип",
+    "наследование",
+    "класс"
+  ],
+  "aliases": [
+    "как получить прототип объекта",
+    "reflect getprototypeof пример",
+    "прототип экземпляра класса",
+    "проверить наследование",
+    "getprototypeof и object getprototypeof"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — объявляет класс: шаблон для создания объектов.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — объявляет класс: шаблон для создания объектов.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "extends",
+      "kind": "kw",
+      "note": "extends — делает класс наследником другого класса.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 12,
+      "text": "Reflect",
+      "kind": "fn",
+      "note": "Reflect — встроенный объект с операциями над объектами в виде функций.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 20,
+      "text": "getPrototypeOf",
+      "kind": "fn",
+      "note": "getPrototypeOf — прототип объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 12,
+      "text": "Reflect",
+      "kind": "fn",
+      "note": "Reflect — встроенный объект с операциями над объектами в виде функций.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 20,
+      "text": "getPrototypeOf",
+      "kind": "fn",
+      "note": "getPrototypeOf — прототип объекта.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Объекты и метапрограммирование"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "true\ntrue",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "class Животное {}\nclass Кошка extends Животное {}\n\nconst object = new Кошка();\nconsole.log(Reflect.getPrototypeOf(object) === Кошка.prototype);\nconsole.log(Reflect.getPrototypeOf(Кошка.prototype) === Животное.prototype);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "true\ntrue",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "Животное",
+      "Кошка",
+      "object"
+    ],
+    "requires": [],
+    "subcat": "Операции над объектами и прокси"
+  },
+  "enriched": true
+}

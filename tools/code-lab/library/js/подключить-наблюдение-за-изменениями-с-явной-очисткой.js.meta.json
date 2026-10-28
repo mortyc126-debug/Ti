@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "подключить-наблюдение-за-изменениями-с-явной-очисткой",
+  "file": "подключить-наблюдение-за-изменениями-с-явной-очисткой.js",
+  "title": "Подключить наблюдение за изменениями с явной очисткой",
+  "lang": "js",
+  "group": "Интерфейс / Наблюдение за DOM",
+  "desc": "Создаёт наблюдатель и возвращает функцию остановки; предотвращает утечки при удалении или переинициализации интерфейса.",
+  "output": "возвращённая функция отключает observer",
+  "tags": [
+    "MutationObserver",
+    "DOM",
+    "очистка",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "MutationObserver disconnect",
+    "наблюдать за изменениями DOM и остановить",
+    "cleanup observer"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

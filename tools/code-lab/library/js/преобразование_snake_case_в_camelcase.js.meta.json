@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "преобразование_snake_case_в_camelcase",
+  "file": "преобразование_snake_case_в_camelcase.js",
+  "title": "Преобразование snake_case в camelCase",
+  "lang": "js",
+  "group": "Данные / Строки и текст",
+  "desc": "Регулярное выражение находит символ подчёркивания и следующую за ним букву, а функция замены возвращает эту букву заглавной без подчёркивания. Первый параметр функции — всё найденное совпадение, он здесь не нужен, поэтому его называют _. Выражение рассчитано на латинские буквы a–z; для других алфавитов шаблон придётся расширить. Флаг g заставляет заменять все вхождения, а не только первое.",
+  "output": "userFirstName",
+  "tags": [
+    "replace",
+    "toUpperCase",
+    "строки и текст"
+  ],
+  "aliases": [
+    "преобразование snake_case в camelcase",
+    "replace",
+    "toUpperCase"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 26,
+      "text": "replace",
+      "kind": "fn",
+      "note": "Заменяет совпадения, вычисляя замену функцией."
+    },
+    {
+      "line": 1,
+      "col": 67,
+      "text": "toUpperCase",
+      "kind": "fn",
+      "note": "Делает буквы заглавными."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,211 @@
+{
+  "schema": 1,
+  "id": "ресурс-в-блоке-using",
+  "file": "ресурс-в-блоке-using.js",
+  "title": "Ресурс с автоматическим освобождением в блоке",
+  "lang": "js",
+  "group": "Основы / Управление ресурсами",
+  "desc": "Объявление using внутри блока { } освобождает ресурс сразу при выходе из блока, а не в конце функции. Нужен Node.js 24+.",
+  "output": "замок взят: отчёт\nработа внутри блока\nзамок отпущен: отчёт\nблок закончился",
+  "tags": [
+    "using",
+    "блок",
+    "блокировка",
+    "освобождение ресурса",
+    "Symbol.dispose"
+  ],
+  "aliases": [
+    "using внутри блока js",
+    "освободить ресурс при выходе из блока",
+    "автоматическое освобождение блокировки",
+    "using acquireResource"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 9,
+      "text": "acquireResource",
+      "kind": "fn",
+      "note": "acquireResource — функция, возвращающая объект с методом [Symbol.dispose].",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 6,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 14,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 2,
+      "text": "using",
+      "kind": "kw",
+      "note": "using — ресурс освободится автоматически, когда выполнение выйдет из блока.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "замок взят: отчёт\nработа внутри блока\nзамок отпущен: отчёт\nблок закончился",
+      "dependencies": [],
+      "requirements": [
+        "Нужен Node.js 24 или новее (либо браузер с поддержкой explicit resource management)."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function acquireResource(name) {\n  console.log(`замок взят: ${name}`);\n  return {\n    [Symbol.dispose]() {\n      console.log(`замок отпущен: ${name}`);\n    },\n  };\n}\n\n{\n  using lock = acquireResource(\"отчёт\");\n  console.log(\"работа внутри блока\");\n}\n\nconsole.log(\"блок закончился\");"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "замок взят: отчёт\nработа внутри блока\nзамок отпущен: отчёт\nблок закончился",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "SyntaxError при запуске",
+            "cause": "Версия Node.js ниже 24",
+            "solution": "Обнови Node.js до 24+ или освобождай ресурс в finally"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "acquireResource"
+    ],
+    "requires": [],
+    "subcat": "Управление ресурсами"
+  },
+  "enriched": true
+}

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "игнорировать-устаревшие-ответы-запросов",
+  "file": "игнорировать-устаревшие-ответы-запросов.js",
+  "title": "Игнорировать устаревшие ответы запросов",
+  "lang": "js",
+  "group": "Асинхронность / Состояние интерфейса",
+  "desc": "Маркирует каждый запуск номером и применяет результат только последнего запроса; полезно для быстрого ввода и смены фильтров.",
+  "output": "результат применяется только если за время запроса не стартовал новый",
+  "tags": [
+    "race condition",
+    "запросы",
+    "состояние",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "не применять старый ответ fetch",
+    "race condition в поиске",
+    "игнорировать устаревший запрос"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "id": "скрипты-из-файла-проекта",
+  "file": "скрипты-из-файла-проекта.sh",
+  "title": "Скрипты из файла проекта",
+  "lang": "sh",
+  "group": "Инструменты разработчика / Менеджер пакетов npm",
+  "desc": "Выводит скрипты из package.json.",
+  "output": "{\n  \"build\": \"echo сборка завершена\",\n  \"dev\": \"echo режим разработки запущен\",\n  \"format\": \"echo форматирование выполнено\",\n  \"lint\": \"echo проверка стиля пройдена\",\n  \"typecheck\": \"echo типы проверены\",\n  \"test\": \"echo тесты пройдены\",\n  \"script\": \"echo скрипт выполнен\",\n  \"script-name\": \"echo пользовательский скрипт выполнен\"\n}",
+  "tags": [
+    "npm pkg get",
+    "package.json",
+    "скрипты",
+    "чтение полей"
+  ],
+  "aliases": [
+    "как вывести скрипты из package json",
+    "npm pkg get scripts",
+    "прочитать поле package json из консоли"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Инструменты разработчика"
+      ],
+      "runtime": [
+        "Командная строка"
+      ],
+      "technology": [
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "{\n  \"build\": \"echo сборка завершена\",\n  \"dev\": \"echo режим разработки запущен\",\n  \"format\": \"echo форматирование выполнено\",\n  \"lint\": \"echo проверка стиля пройдена\",\n  \"typecheck\": \"echo типы проверены\",\n  \"test\": \"echo тесты пройдены\",\n  \"script\": \"echo скрипт выполнен\",\n  \"script-name\": \"echo пользовательский скрипт выполнен\"\n}",
+      "dependencies": [],
+      "requirements": [
+        "Нужны Node.js и установленный в проекте prettier.",
+        "Запускай команду из корня проекта."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "sh",
+          "content": "npm pkg get scripts"
+        },
+        "steps": [
+          "Проверь, что prettier установлен в проекте.",
+          "Выполни команду в корне проекта.",
+          "Если команда сообщает о неотформатированных файлах, отформатируй их и повтори проверку."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "{\n  \"build\": \"echo сборка завершена\",\n  \"dev\": \"echo режим разработки запущен\",\n  \"format\": \"echo форматирование выполнено\",\n  \"lint\": \"echo проверка стиля пройдена\",\n  \"typecheck\": \"echo типы проверены\",\n  \"test\": \"echo тесты пройдены\",\n  \"script\": \"echo скрипт выполнен\",\n  \"script-name\": \"echo пользовательский скрипт выполнен\"\n}",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          },
+          {
+            "symptom": "prettier: команда не найдена",
+            "cause": "Prettier не установлен в проекте",
+            "solution": "Установи prettier как зависимость проекта и повтори запуск"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат проверки в терминал, файлы не меняет"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Менеджер пакетов npm"
+  },
+  "enriched": true
+}

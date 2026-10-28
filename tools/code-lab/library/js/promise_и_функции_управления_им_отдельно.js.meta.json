@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "promise_и_функции_управления_им_отдельно",
+  "file": "promise_и_функции_управления_им_отдельно.js",
+  "title": "Promise и функции управления им отдельно",
+  "lang": "js",
+  "group": "Асинхронность / Управление Promise",
+  "desc": "Promise.withResolvers возвращает объект с тремя полями: сам Promise и функции resolve и reject. Раньше для этого приходилось объявлять переменные снаружи и присваивать их внутри конструктора. Теперь результат можно завершить из любого места — обработчика события, колбэка, таймера. Метод относительно новый, поддержка зависит от среды.",
+  "output": "готово",
+  "tags": [
+    "Promise.withResolvers",
+    "resolve",
+    "управление promise"
+  ],
+  "aliases": [
+    "promise и функции управления им отдельно",
+    "Promise.withResolvers",
+    "resolve"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 17,
+      "text": "resolve",
+      "kind": "concept",
+      "note": "Завершает Promise успешно."
+    },
+    {
+      "line": 0,
+      "col": 37,
+      "text": "Promise.withResolvers",
+      "kind": "fn",
+      "note": "Создаёт Promise вместе с функциями resolve и reject."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

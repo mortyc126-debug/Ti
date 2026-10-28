@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Копирование файла",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "Копирование файла.",
+  "code": "import { copyFile } from \"node:fs/promises\";\nawait copyFile(\"./источник.txt\", \"./копия.txt\");",
+  "output": "Создана копия файла.",
+  "words": {
+    "copyFile": "Копирует файл."
+  }
+}

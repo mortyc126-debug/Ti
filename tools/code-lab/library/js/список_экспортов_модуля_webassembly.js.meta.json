@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "список_экспортов_модуля_webassembly",
+  "file": "список_экспортов_модуля_webassembly.js",
+  "title": "Список экспортов модуля WebAssembly",
+  "lang": "js",
+  "group": "Разработка и инструменты / WebAssembly",
+  "desc": "WebAssembly.Module.exports(модуль) возвращает массив описаний всего, что модуль отдаёт наружу: имя и вид (function, memory, table, global). Это позволяет проверить модуль до создания экземпляра и убедиться, что в нём есть нужные функции. Парный метод imports показывает, какие импорты модуль требует от окружения.",
+  "output": "[ { name: 'add', kind: 'function' } ]",
+  "tags": [
+    "WebAssembly.Module.exports",
+    "webassembly"
+  ],
+  "aliases": [
+    "список экспортов модуля webassembly",
+    "WebAssembly.Module.exports"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 9,
+      "col": 12,
+      "text": "WebAssembly.Module.exports",
+      "kind": "fn",
+      "note": "Возвращает список экспортов модуля."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

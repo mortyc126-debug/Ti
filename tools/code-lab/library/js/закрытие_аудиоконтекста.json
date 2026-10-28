@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Закрытие аудиоконтекста",
+  "group": "Графика и визуализация / Анимация",
+  "desc": "Закрытие аудиоконтекста.",
+  "code": "const звук = new AudioContext();\nawait звук.close();\nconsole.log(звук.state);",
+  "output": "closed",
+  "words": {
+    "close": "Закрывает AudioContext и освобождает ресурсы."
+  }
+}

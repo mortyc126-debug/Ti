@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "согласовать-локальные-и-внешние-записи-по-идентификатор",
+  "file": "согласовать-локальные-и-внешние-записи-по-идентификатор.js",
+  "title": "Согласовать локальные и внешние записи по идентификатор",
+  "lang": "js",
+  "group": "Данные / Синхронизация",
+  "desc": "Определяет действия insert/update/delete/unchanged при сравнении локального и внешнего снимка; не выполняет сами записи.",
+  "output": "план действий без побочных эффектов",
+  "tags": [
+    "синхронизация",
+    "reconcile",
+    "diff",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "синхронизировать два снимка",
+    "reconcile records by id",
+    "определить что вставить обновить удалить"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

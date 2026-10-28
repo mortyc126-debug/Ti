@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "нормализовать-массив-записей-в-таблицу-записи-идентификаторы",
+  "file": "нормализовать-массив-записей-в-таблицу-записи-идентификаторы.js",
+  "title": "Нормализовать массив записей в таблицу записи идентификаторы",
+  "lang": "js",
+  "group": "Данные / Нормализованное хранение",
+  "desc": "Разделяет список на порядок id и объект записей; удобно для состояния приложения и быстрых обновлений.",
+  "output": "ids и entities; повтор id вызывает ошибку",
+  "tags": [
+    "нормализация",
+    "entities",
+    "ids",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "нормализовать массив по id",
+    "entities ids state",
+    "массив в нормализованную структуру"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

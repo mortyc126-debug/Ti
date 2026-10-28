@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Удаление регистрации Service Worker",
+  "group": "Кэширование / Service Worker",
+  "desc": "Отключаем Service Worker для текущей страницы.",
+  "code": "const регистрация = await navigator.serviceWorker.getRegistration();\n\nif (регистрация) {\n  const удалена = await регистрация.unregister();\n  console.log(\"Удалён:\", удалена);\n}",
+  "output": "Удалён: true",
+  "words": {
+    "unregister": "Удаляет регистрацию Service Worker."
+  }
+}

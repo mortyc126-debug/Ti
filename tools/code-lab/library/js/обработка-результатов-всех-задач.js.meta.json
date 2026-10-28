@@ -1,0 +1,281 @@
+{
+  "schema": 1,
+  "id": "обработка-результатов-всех-задач",
+  "file": "обработка-результатов-всех-задач.js",
+  "title": "Обработка результатов всех задач",
+  "lang": "js",
+  "group": "Асинхронность / Промисы",
+  "desc": "Обрабатывает результаты всех задач независимо от их успешности.",
+  "output": "[ 'первая', 'третья' ]\n1",
+  "tags": [
+    "Promise.allSettled",
+    "фильтрация результатов",
+    "успешные и неудачные",
+    "задачи"
+  ],
+  "aliases": [
+    "как разделить успешные и неудачные промисы",
+    "allsettled then results пример",
+    "подсчитать ошибки среди задач",
+    "обработка пачки запросов",
+    "результаты независимо от успешности"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "resolve",
+      "kind": "fn",
+      "note": "resolve — создаёт выполненный Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 10,
+      "text": "reject",
+      "kind": "fn",
+      "note": "reject — создаёт отклонённый Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 17,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "resolve",
+      "kind": "fn",
+      "note": "resolve — создаёт выполненный Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "allSettled",
+      "kind": "fn",
+      "note": "allSettled — ждёт все Promise и возвращает статус каждого.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 26,
+      "text": "then",
+      "kind": "fn",
+      "note": "then — обрабатывает успешный результат Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 27,
+      "text": "filter",
+      "kind": "fn",
+      "note": "filter — возвращает новый массив только из подходящих элементов.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 28,
+      "text": "filter",
+      "kind": "fn",
+      "note": "filter — возвращает новый массив только из подходящих элементов.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 23,
+      "text": "map",
+      "kind": "fn",
+      "note": "map — возвращает новый массив, применяя функцию к каждому элементу.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 24,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина строки или количество элементов массива.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Асинхронность"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "[ 'первая', 'третья' ]\n1",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const tasks = [\n  Promise.resolve(\"первая\"),\n  Promise.reject(new Error(\"вторая упала\")),\n  Promise.resolve(\"третья\"),\n];\nPromise.allSettled(tasks).then(results => {\n  const успешные = results.filter(результат => результат.status === \"fulfilled\");\n  const неудачные = results.filter(результат => результат.status === \"rejected\");\n  console.log(успешные.map(результат => результат.value));\n  console.log(неудачные.length);\n});"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "[ 'первая', 'третья' ]\n1",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "tasks"
+    ],
+    "requires": [],
+    "subcat": "Промисы"
+  },
+  "enriched": true
+}

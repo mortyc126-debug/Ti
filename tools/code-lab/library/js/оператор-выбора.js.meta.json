@@ -1,0 +1,219 @@
+{
+  "schema": 1,
+  "id": "оператор-выбора",
+  "file": "оператор-выбора.js",
+  "title": "Оператор выбора",
+  "lang": "js",
+  "group": "Основы языка: логика и повторения / Условия и ветвления",
+  "desc": "Выбирает ветку по значению.",
+  "output": "Среда",
+  "tags": [
+    "оператор выбора",
+    "switch",
+    "ветвление",
+    "case",
+    "условия"
+  ],
+  "aliases": [
+    "как использовать switch в js",
+    "выбор по значению javascript",
+    "оператор switch case break",
+    "несколько вариантов вместо if",
+    "ветка по умолчанию"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "switch",
+      "kind": "kw",
+      "note": "switch — выбирает ветку case по значению выражения.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "case",
+      "kind": "kw",
+      "note": "case — одна из веток switch: выполняется, если значение совпало.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 10,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 18,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 38,
+      "text": "break",
+      "kind": "kw",
+      "note": "break — выйти из switch или цикла.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "case",
+      "kind": "kw",
+      "note": "case — одна из веток switch: выполняется, если значение совпало.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 18,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 32,
+      "text": "break",
+      "kind": "kw",
+      "note": "break — выйти из switch или цикла.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "default",
+      "kind": "kw",
+      "note": "default — ветка switch, которая выполняется, если ни один case не подошёл.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 11,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 19,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы языка: логика и повторения"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Среда",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в консоли браузера.",
+        "Проверь, что все используемые переменные объявлены и имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const день = 3;\nswitch (день) {\n  case 1: console.log('Понедельник'); break;\n  case 3: console.log('Среда'); break;\n  default: console.log('Другой день');\n}"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Среда",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "день"
+    ],
+    "requires": [],
+    "subcat": "Условия и ветвления"
+  },
+  "enriched": true
+}

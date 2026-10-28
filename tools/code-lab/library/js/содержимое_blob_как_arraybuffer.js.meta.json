@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "содержимое_blob_как_arraybuffer",
+  "file": "содержимое_blob_как_arraybuffer.js",
+  "title": "Содержимое Blob как ArrayBuffer",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Двоичные данные",
+  "desc": "Метод arrayBuffer объекта Blob асинхронно читает его содержимое и возвращает ArrayBuffer — «сырые» байты. Для работы с отдельными байтами оборачивают результат в Uint8Array. Так можно прочитать файл, выбранный пользователем, или данные, собранные из частей. Для текста есть метод text(), а для потокового чтения — stream().",
+  "output": "12",
+  "tags": [
+    "arrayBuffer",
+    "Uint8Array",
+    "двоичные данные"
+  ],
+  "aliases": [
+    "содержимое blob как arraybuffer",
+    "arrayBuffer",
+    "Uint8Array"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 18,
+      "text": "Uint8Array",
+      "kind": "fn",
+      "note": "Представление буфера в виде отдельных байтов."
+    },
+    {
+      "line": 1,
+      "col": 40,
+      "text": "arrayBuffer",
+      "kind": "fn",
+      "note": "Читает содержимое Blob как массив байт."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

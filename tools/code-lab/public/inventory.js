@@ -988,6 +988,24 @@ function openDictViewModal(){
     rowEl.after(pre);
   }
 
+  // dict-usage: счётчики «в скольких кусках встречается» и фильтр «без кусков»
+  let usage = null, useFilter = 'all';   // all | none | some
+  const secId = title => title === 'html' ? 'html' : title === 'css' ? 'css' : title === 'Общее / код' ? 'common' : 'lang:' + title.replace('Язык: ', '');
+  const loadUsage = () => fetch('/api/dict/usage', { cache: 'no-store' }).then(x => x.json()).then(r => { usage = r && r.ok ? r : null; render(); }).catch(() => {});
+  async function showPieces(rowEl, sid, term){
+    const nx = rowEl.nextSibling; if(nx && nx.__pieces){ nx.remove(); return; }
+    const r = await fetch('/api/dict/pieces?section=' + encodeURIComponent(sid) + '&term=' + encodeURIComponent(term)).then(x => x.json()).catch(() => null);
+    const box = document.createElement('div'); box.__pieces = true; box.style.cssText = 'margin:2px 0 6px 14px;font-size:12px;display:flex;flex-wrap:wrap;gap:4px 10px';
+    if(!r || !r.ok || !r.pieces.length) box.textContent = 'кусков нет';
+    else r.pieces.forEach(p => { const a = document.createElement('a'); a.href = '/component.html?id=' + encodeURIComponent(p.id); a.textContent = p.title || p.id; a.title = p.group || ''; a.target = '_blank'; box.appendChild(a); });
+    rowEl.after(box);
+  }
+  async function copyGaps(sid, btn){
+    const r = await fetch('/api/dict/gaps?section=' + encodeURIComponent(sid)).then(x => x.json()).catch(() => null);
+    if(!r || !r.ok) { alert('не удалось получить список'); return; }
+    if(!r.count) { btn.textContent = 'пробелов нет ✓'; return; }
+    copy(r.prompt); btn.textContent = '✓ запрос для ИИ скопирован (' + Math.min(r.count, 80) + ' из ' + r.count + ')'; setTimeout(() => btn.textContent = '🕳 пробелы → запрос для ИИ', 2500);
+  }
   let activeGroup = null;   // null = показывать все разделы; иначе — только выбранный (клик по чипу)
   function render(){
     const body = q('#dv-body'); body.innerHTML = '';
@@ -1007,16 +1025,27 @@ function openDictViewModal(){
     const chip = (label, on, onClick) => { const b = el2('button', 'btn'); b.textContent = label; b.style.cssText = 'padding:2px 10px;border-radius:12px;font-size:11.5px' + (on ? ';background:var(--acc,#52F2C9);color:#06231c' : ''); b.onclick = onClick; return b; };
     chips.appendChild(chip('всё (' + groups.reduce((s, [, o]) => s + Object.keys(o).length, 0) + ')', !activeGroup, () => { activeGroup = null; render(); }));
     groups.forEach(([title, obj]) => chips.appendChild(chip(title.replace('Язык: ', '') + ' (' + Object.keys(obj).length + ')', activeGroup === title, () => { activeGroup = title; render(); })));
+    // dict-usage: фильтр по наличию кусков
+    { const bar = el2('div', ''); bar.style.cssText = 'display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:6px;font-size:11.5px';
+      bar.appendChild(document.createTextNode('куски: '));
+      [['all', 'все'], ['none', '🕳 без кусков'], ['some', 'с кусками']].forEach(([v, t]) => bar.appendChild(chip(t, useFilter === v, () => { useFilter = v; render(); })));
+      const note = el2('span', 'muted'); note.textContent = usage ? ' связь считается из кода при каждом открытии (' + usage.pieces + ' кусков, ' + usage.ms + ' мс)' : ' считаю связи…'; bar.appendChild(note);
+      chips.after(bar); const old = body.parentNode.querySelector('.dv-usebar'); if(old) old.remove(); bar.className = 'dv-usebar'; }
     let total = 0, shown = 0;
     groups.forEach(([title, obj]) => {
       if(activeGroup && title !== activeGroup){ total += Object.keys(obj).length; return; }   // показываем только выбранный раздел, но «всего» считаем по всем
       const rows = Object.entries(obj).filter(([w, t]) => !flt || w.toLowerCase().includes(flt) || String(t).toLowerCase().includes(flt));
+      const ut = usage && usage.terms[secId(title)];   // dict-usage
+      if(ut && useFilter !== 'all'){ const keep = rows.filter(([w]) => { const u = ut[w]; const n = u ? u[0] : 0; return useFilter === 'none' ? (n === 0 && u && u[1] !== 'prose' && u[1] !== 'weak') : n > 0; }); rows.length = 0; keep.forEach(r => rows.push(r)); }
       total += Object.keys(obj).length; shown += rows.length;
       if(!rows.length) return;
       const head = el2('div', 'lp-sec'); head.style.display = 'flex'; head.style.alignItems = 'center'; head.style.gap = '8px';
       head.appendChild(document.createTextNode(title + ' (' + rows.length + (flt ? ' из ' + Object.keys(obj).length : '') + ')'));
       const cp = el2('button', 'btn'); cp.textContent = '⧉'; cp.title = 'скопировать раздел строками «слово: пояснение»'; cp.style.marginLeft = 'auto'; cp.style.padding = '1px 8px';
       cp.onclick = () => { copy(rows.map(([w, t]) => w + ': ' + t).join('\n')); cp.textContent = '✓'; setTimeout(() => cp.textContent = '⧉', 1000); };
+      { const us = usage && usage.sections.find(s => s.id === secId(title));   // dict-usage
+        if(us){ const cv = document.createElement('span'); cv.className = 'muted'; cv.style.cssText = 'font-size:11px;font-weight:400'; cv.textContent = 'покрыто ' + us.covered + ' из ' + us.checkable + (us.prose ? ' · не код: ' + us.prose : ''); head.appendChild(cv);
+          const gb = el2('button', 'btn'); gb.textContent = '🕳 пробелы → запрос для ИИ'; gb.title = 'скопировать запрос: «напиши куски для этих конструкций» — ответ вставь в пакетную загрузку'; gb.style.padding = '1px 8px'; gb.onclick = () => copyGaps(secId(title), gb); head.appendChild(gb); } }
       head.appendChild(cp); body.appendChild(head);
       // внутри раздела делим на конструкции (многословные ключи) и одиночные слова
       const isCon = k => !/^[a-z0-9_$-]+$/i.test(k);
@@ -1036,6 +1065,8 @@ function openDictViewModal(){
           const add = el2('button', 'btn'); add.style.padding = '0 6px'; add.textContent = '＋ пример'; add.title = 'привязать кусок-пример'; add.onclick = () => { const p = prompt('Название или id куска-примера для «' + w + '»:'); if(p && p.trim()) setExample(w, p.trim()); };
           ctl.appendChild(add);
         }
+        { const u = usage && usage.terms[secId(title)] && usage.terms[secId(title)][w];   // dict-usage
+          if(u && u[1] !== 'prose' && u[1] !== 'weak'){ const cnt = el2('button', 'btn'); cnt.style.cssText = 'padding:0 6px;margin-right:4px' + (u[0] ? '' : ';color:#ff9aa8'); cnt.textContent = u[0] ? ('в ' + u[0] + ' ' + (u[0] % 10 === 1 && u[0] % 100 !== 11 ? 'куске' : 'кусках')) : '🕳 нет кусков'; cnt.title = u[0] ? 'показать, где ещё используется' : 'ни один кусок библиотеки этого не использует'; if(u[0]) cnt.onclick = () => showPieces(d, secId(title), w); ctl.prepend(cnt); } }
         d.appendChild(ctl); body.appendChild(d);
       };
       if(cons.length){ const sub = el2('div', 'muted'); sub.style.cssText = 'font-size:11px;margin:3px 0 1px 6px'; sub.textContent = '— конструкции (' + cons.length + ')'; body.appendChild(sub); cons.forEach(renderRow); }
@@ -1065,7 +1096,7 @@ function openDictViewModal(){
   }
   q('#dv-dups').onclick = showDups;
   // ревизия «на своём ли месте»: проходим по уже загруженному и чиним точечно
-  const reloadDict = () => { dict = null; fetch('/keyword-dict.json', { cache: 'no-store' }).then(x => x.json()).then(d => { dict = d; render(); }).catch(() => {}); };
+  const reloadDict = () => { dict = null; loadUsage(); fetch('/keyword-dict.json', { cache: 'no-store' }).then(x => x.json()).then(d => { dict = d; render(); }).catch(() => {}); };
   q('#dv-audit').onclick = async () => {
     const panel = q('#dv-dupbox');
     if(panel.style.display !== 'none' && panel.__audit){ panel.style.display = 'none'; panel.__audit = false; return; }
@@ -1145,6 +1176,7 @@ function openDictViewModal(){
   };
   q('#dv-q').addEventListener('input', render);
   render();
+  loadUsage();   // dict-usage
   fetch('/keyword-dict.json', { cache: 'no-store' }).then(r => r.json()).then(d => { dict = d; render(); }).catch(() => { q('#dv-body').textContent = 'не удалось загрузить словарь'; });
 }
 document.getElementById('pdictview').onclick = openDictViewModal;

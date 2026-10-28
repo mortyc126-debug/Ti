@@ -1,0 +1,169 @@
+{
+  "schema": 1,
+  "id": "своё-контекстное-меню-contextmenu",
+  "file": "своё-контекстное-меню-contextmenu.js",
+  "title": "Заменить стандартное контекстное меню: contextmenu",
+  "lang": "js",
+  "group": "Интерфейс / Реакция на действия пользователя",
+  "desc": "preventDefault в обработчике contextmenu отменяет системное меню; в событии есть координаты, где показать своё.",
+  "output": "Своё меню в точке 30, 40",
+  "tags": [
+    "contextmenu",
+    "правая кнопка",
+    "preventDefault",
+    "своё меню"
+  ],
+  "aliases": [
+    "как сделать своё контекстное меню js",
+    "contextmenu preventDefault",
+    "меню по правой кнопке мыши"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 22,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 5,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 22,
+      "text": "\"contextmenu\"",
+      "kind": "contextmenu — вызов контекстного меню (правая кнопка, долгое касание).",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 5,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Своё меню в точке 30, 40",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const area = document.createElement(\"div\");\narea.textContent = \"Нажмите правой кнопкой\";\narea.style.padding = \"40px\";\ndocument.body.append(area);\n\narea.addEventListener(\"contextmenu\", event => event.preventDefault());\narea.addEventListener(\"contextmenu\", event => {\n  console.log(`Своё меню в точке ${event.clientX}, ${event.clientY}`);\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Своё меню в точке 30, 40",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "area"
+    ],
+    "requires": [],
+    "subcat": "Реакция на действия пользователя"
+  },
+  "enriched": true
+}

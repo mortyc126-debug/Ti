@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "ожидание_загрузки_изображения",
+  "file": "ожидание_загрузки_изображения.js",
+  "title": "Ожидание загрузки изображения",
+  "lang": "js",
+  "group": "Графика и визуализация / Изображения",
+  "desc": "Событие load срабатывает, когда изображение загружено, и после этого можно читать naturalWidth и naturalHeight. Оборачивание в Promise позволяет использовать await. Надёжнее подписываться на событие до присвоения src; для надёжной проверки есть и decode(). Не забудьте и о событии error — иначе при ошибке загрузки Promise будет ждать вечно.",
+  "output": "Ширина и высота изображения в пикселях.",
+  "tags": [
+    "addEventListener",
+    "load",
+    "изображения"
+  ],
+  "aliases": [
+    "ожидание загрузки изображения",
+    "addEventListener",
+    "load"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 4,
+      "col": 11,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "Подписывает обработчик на событие."
+    },
+    {
+      "line": 4,
+      "col": 29,
+      "text": "load",
+      "kind": "concept",
+      "note": "Событие завершения загрузки ресурса."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

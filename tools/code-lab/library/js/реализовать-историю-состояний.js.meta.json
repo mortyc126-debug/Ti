@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "реализовать-историю-состояний",
+  "file": "реализовать-историю-состояний.js",
+  "title": "Реализовать историю состояний",
+  "lang": "js",
+  "group": "Состояние / История изменений",
+  "desc": "Хранит снимки состояний и указатель текущей позиции; новое изменение после undo отбрасывает ветку redo.",
+  "output": "{count:0}",
+  "tags": [
+    "undo",
+    "redo",
+    "история",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "undo redo для состояния",
+    "история отмены изменений",
+    "снимки состояния"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

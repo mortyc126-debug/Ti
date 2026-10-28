@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "гарантировать-очистку-тестовых-ресурсов",
+  "file": "гарантировать-очистку-тестовых-ресурсов.js",
+  "title": "Гарантировать очистку тестовых ресурсов",
+  "lang": "js",
+  "group": "Тестирование / Ресурсы",
+  "desc": "Запускает тестовый сценарий и выполняет очистку даже при ошибке; полезно для временных файлов, слушателей и моков.",
+  "output": "cleanup выполняется и при успехе, и при ошибке",
+  "tags": [
+    "тестирование",
+    "finally",
+    "очистка",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "test teardown finally",
+    "очистка после теста",
+    "гарантированно удалить временные ресурсы"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

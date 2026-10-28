@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "id": "безопасное-сохранение-в-localstorage",
+  "file": "безопасное-сохранение-в-localstorage.js",
+  "title": "Безопасно сохранить значение при ошибках квоты и запретах доступа",
+  "lang": "js",
+  "group": "Хранение / Браузерное хранилище",
+  "desc": "localStorage.setItem может бросить исключение (хранилище переполнено, режим приватности, запрет доступа); пустой catch превращает сбой в безобидный false.",
+  "output": "true (false — если хранилище переполнено или доступ запрещён)",
+  "tags": [
+    "localStorage",
+    "setItem",
+    "квота хранилища",
+    "try catch",
+    "JSON.stringify"
+  ],
+  "aliases": [
+    "как безопасно записать в localStorage",
+    "localStorage переполнено ошибка",
+    "setItem try catch"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "localStorage.setItem",
+      "kind": "setItem — записывает значение; может бросить ошибку при нехватке места или запрете.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Хранение"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "true (false — если хранилище переполнено или доступ запрещён)",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function saveSafely(key, data) {\n  try {\n    localStorage.setItem(key, JSON.stringify(data));\n    return true;\n  } catch {\n    return false;\n  }\n}\n\nconsole.log(saveSafely(\"draft\", { text: \"Черновик письма\" }));"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "true (false — если хранилище переполнено или доступ запрещён)",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "saveSafely"
+    ],
+    "requires": [],
+    "subcat": "Браузерное хранилище"
+  },
+  "enriched": true
+}

@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "id": "трассировка-необработанных-исключений",
+  "file": "трассировка-необработанных-исключений.sh",
+  "title": "Трассировка необработанных исключений",
+  "lang": "sh",
+  "group": "Инструменты разработчика / Запуск Node.js",
+  "desc": "Выводит трассировку необработанных исключений в Node.js.",
+  "output": "/проект/app.js:1\nthrow new Error(\"необработанный сбой\");\n^\n\nError: необработанный сбой\n    at Object.<anonymous> (/проект/app.js:1:7)\n    ...\nThrown at:\n    at /проект/app.js:1:7\n    ...\n\nNode.js (версия)",
+  "tags": [
+    "node --trace-uncaught",
+    "необработанное исключение",
+    "стек",
+    "отладка"
+  ],
+  "aliases": [
+    "как увидеть откуда брошено исключение node",
+    "trace uncaught пример",
+    "стек для необработанной ошибки"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Инструменты разработчика"
+      ],
+      "runtime": [
+        "Командная строка"
+      ],
+      "technology": [
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "/проект/app.js:1\nthrow new Error(\"необработанный сбой\");\n^\n\nError: необработанный сбой\n    at Object.<anonymous> (/проект/app.js:1:7)\n    ...\nThrown at:\n    at /проект/app.js:1:7\n    ...\n\nNode.js (версия)",
+      "dependencies": [],
+      "requirements": [
+        "Нужны Node.js и установленный в проекте prettier.",
+        "Запускай команду из корня проекта."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "sh",
+          "content": "node --trace-uncaught app.js"
+        },
+        "steps": [
+          "Проверь, что prettier установлен в проекте.",
+          "Выполни команду в корне проекта.",
+          "Если команда сообщает о неотформатированных файлах, отформатируй их и повтори проверку."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "/проект/app.js:1\nthrow new Error(\"необработанный сбой\");\n^\n\nError: необработанный сбой\n    at Object.<anonymous> (/проект/app.js:1:7)\n    ...\nThrown at:\n    at /проект/app.js:1:7\n    ...\n\nNode.js (версия)",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          },
+          {
+            "symptom": "prettier: команда не найдена",
+            "cause": "Prettier не установлен в проекте",
+            "solution": "Установи prettier как зависимость проекта и повтори запуск"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат проверки в терминал, файлы не меняет"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Запуск Node.js"
+  },
+  "enriched": true
+}

@@ -1,0 +1,528 @@
+{
+  "schema": 1,
+  "id": "запрос-сломался-где-и-почему",
+  "file": "запрос-сломался-где-и-почему.js",
+  "title": "Запрос сломался где и почему",
+  "lang": "js",
+  "group": "Сеть и запросы / Ошибки сети и диагностика",
+  "desc": "Как понять, ЧТО именно пошло не так. Проверяем по шагам: дошли ли до сети, какой статус вернул сервер (200 ок, 404 нет адреса, 500 упал), это вообще JSON или HTML с ошибкой. Запусти — адрес нарочно битый, увидишь, на каком шаге встало.",
+  "output": "→ идём на: …НЕТУ.json\n← статус: 404\n⛔ сервер вернул ошибку 404\nитог: null",
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "async",
+      "kind": "kw",
+      "note": "Функция умеет ждать (сеть).",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявляет функцию: кусок кода, который можно вызывать по имени.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "безопасныйЗапрос",
+      "kind": "fn",
+      "note": "Запрос с проверками на каждом шаге — понятно, где сломалось.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 32,
+      "text": "url",
+      "kind": "name",
+      "note": "Адрес. Первое, что печатаем — вдруг опечатка.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 28,
+      "text": "url",
+      "kind": "name",
+      "note": "Адрес. Первое, что печатаем — вдруг опечатка.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять позже.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 6,
+      "text": "r",
+      "kind": "name",
+      "note": "Ответ сервера.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "try",
+      "kind": "name",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "r",
+      "kind": "name",
+      "note": "Ответ сервера.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат, потом иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 14,
+      "text": "fetch",
+      "kind": "fn",
+      "note": "Сходить в сеть по адресу.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 20,
+      "text": "url",
+      "kind": "name",
+      "note": "Адрес. Первое, что печатаем — вдруг опечатка.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 4,
+      "text": "catch",
+      "kind": "fn",
+      "note": "«Если упало — сделай…».",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 11,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 27,
+      "text": "r",
+      "kind": "name",
+      "note": "Ответ сервера.",
+      "source": "custom"
+    },
+    {
+      "line": 9,
+      "col": 29,
+      "text": "status",
+      "kind": "name",
+      "note": "Код ответа: 200 ок, 404 нет адреса, 403 запрет, 500 сервер упал.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 6,
+      "text": "r",
+      "kind": "name",
+      "note": "Ответ сервера.",
+      "source": "custom"
+    },
+    {
+      "line": 10,
+      "col": 8,
+      "text": "ok",
+      "kind": "name",
+      "note": "true, если статус 200–299 (успех).",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 42,
+      "text": "r",
+      "kind": "name",
+      "note": "Ответ сервера.",
+      "source": "custom"
+    },
+    {
+      "line": 11,
+      "col": 44,
+      "text": "status",
+      "kind": "name",
+      "note": "Код ответа: 200 ок, 404 нет адреса, 403 запрет, 500 сервер упал.",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции.",
+      "source": "custom"
+    },
+    {
+      "line": 12,
+      "col": 11,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "Переменная-провод.",
+      "source": "custom"
+    },
+    {
+      "line": 14,
+      "col": 8,
+      "text": "текст",
+      "kind": "name",
+      "note": "Сырое тело ответа. Берём текстом, чтобы увидеть даже не-JSON (напр. HTML-ошибку).",
+      "source": "custom"
+    },
+    {
+      "line": 14,
+      "col": 16,
+      "text": "await",
+      "kind": "kw",
+      "note": "Подожди результат, потом иди дальше.",
+      "source": "custom"
+    },
+    {
+      "line": 14,
+      "col": 22,
+      "text": "r",
+      "kind": "name",
+      "note": "Ответ сервера.",
+      "source": "custom"
+    },
+    {
+      "line": 14,
+      "col": 24,
+      "text": "text",
+      "kind": "fn",
+      "note": "Тело ответа как сырой текст.",
+      "source": "custom"
+    },
+    {
+      "line": 15,
+      "col": 2,
+      "text": "try",
+      "kind": "name",
+      "note": "try — пробуем выполнить код, который может дать ошибку.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции.",
+      "source": "custom"
+    },
+    {
+      "line": 16,
+      "col": 11,
+      "text": "JSON",
+      "kind": "fn",
+      "note": "json() — разбирает ответ сети в объект JavaScript.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 16,
+      "text": "parse",
+      "kind": "fn",
+      "note": "Текст → объект; падает, если это не JSON.",
+      "source": "custom"
+    },
+    {
+      "line": 16,
+      "col": 22,
+      "text": "текст",
+      "kind": "name",
+      "note": "Сырое тело ответа. Берём текстом, чтобы увидеть даже не-JSON (напр. HTML-ошибку).",
+      "source": "custom"
+    },
+    {
+      "line": 17,
+      "col": 4,
+      "text": "catch",
+      "kind": "fn",
+      "note": "«Если упало — сделай…».",
+      "source": "custom"
+    },
+    {
+      "line": 18,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 49,
+      "text": "текст",
+      "kind": "name",
+      "note": "Сырое тело ответа. Берём текстом, чтобы увидеть даже не-JSON (напр. HTML-ошибку).",
+      "source": "custom"
+    },
+    {
+      "line": 18,
+      "col": 55,
+      "text": "slice",
+      "kind": "fn",
+      "note": "Показать начало ответа для диагностики.",
+      "source": "custom"
+    },
+    {
+      "line": 19,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "Выход функции.",
+      "source": "custom"
+    },
+    {
+      "line": 19,
+      "col": 11,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 24,
+      "col": 0,
+      "text": "безопасныйЗапрос",
+      "kind": "fn",
+      "note": "Запрос с проверками на каждом шаге — понятно, где сломалось.",
+      "source": "custom"
+    },
+    {
+      "line": 25,
+      "col": 3,
+      "text": "then",
+      "kind": "fn",
+      "note": "«Когда промис готов — сделай…».",
+      "source": "custom"
+    },
+    {
+      "line": 25,
+      "col": 13,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 25,
+      "col": 21,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Сеть и запросы"
+      ],
+      "runtime": [
+        "Браузер или Node.js с поддержкой fetch"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "URL запроса и ответ внешнего API",
+      "output": "→ идём на: …НЕТУ.json\n← статус: 404\n⛔ сервер вернул ошибку 404\nитог: null",
+      "dependencies": [],
+      "requirements": [
+        "Нужен доступ к сети; сервер должен разрешать запросы через CORS. Проверь HTTP-статус и обработку ошибок.",
+        "Код с await должен выполняться внутри async-функции или другого допустимого async-контекста."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "async function безопасныйЗапрос(url){\n  console.log(\"→ идём на:\", url);          // 1) видно, КУДА\n  let r;\n  try {\n    r = await fetch(url);                   // нет связи/сбой → в catch\n  } catch(e){\n    console.log(\"⛔ сеть не ответила:\", e.message);\n    return null;\n  }\n  console.log(\"← статус:\", r.status);       // 2) 200 ок · 404 нет · 500 сервер упал\n  if(!r.ok){\n    console.log(\"⛔ сервер вернул ошибку\", r.status);\n    return null;\n  }\n  const текст = await r.text();             // 3) сначала как ТЕКСТ\n  try {\n    return JSON.parse(текст);               // 4) пробуем разобрать\n  } catch(e){\n    console.log(\"⛔ это не JSON. Начало ответа:\", текст.slice(0, 100));\n    return null;\n  }\n}\n\n// проба с заведомо битым адресом:\nбезопасныйЗапрос(\"https://iss.moex.com/iss/НЕТУ.json\")\n  .then(d => console.log(\"итог:\", d));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "→ идём на: …НЕТУ.json\n← статус: 404\n⛔ сервер вернул ошибку 404\nитог: null",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "безопасныйЗапрос",
+      "r",
+      "текст"
+    ],
+    "requires": [],
+    "subcat": "Ошибки сети и диагностика"
+  },
+  "legacy": {
+    "template": "net-debug.json"
+  }
+}

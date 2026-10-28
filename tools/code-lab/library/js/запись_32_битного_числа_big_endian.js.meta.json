@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "запись_32_битного_числа_big_endian",
+  "file": "запись_32_битного_числа_big_endian.js",
+  "title": "Запись 32-битного числа big-endian",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Двоичные данные",
+  "desc": "writeUInt32BE записывает беззнаковое 32-битное число в четыре байта по смещению, старшим байтом вперёд. Допустимы значения от 0 до 4294967295; иначе возникает RangeError. Метод возвращает смещение за последним записанным байтом, что удобно для последовательной записи полей. Для порядка «младший байт первым» используйте writeUInt32LE.",
+  "output": "<Buffer 12 34 56 78>",
+  "tags": [
+    "writeUInt32BE",
+    "alloc",
+    "двоичные данные"
+  ],
+  "aliases": [
+    "запись 32-битного числа big-endian",
+    "writeUInt32BE",
+    "alloc"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 21,
+      "text": "alloc",
+      "kind": "fn",
+      "note": "Создаёт буфер, заполненный нулями."
+    },
+    {
+      "line": 1,
+      "col": 6,
+      "text": "writeUInt32BE",
+      "kind": "fn",
+      "note": "Записывает беззнаковое 32-битное число big-endian по смещению."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "поиск_сохранённого_ответа_в_cache_storage",
+  "file": "поиск_сохранённого_ответа_в_cache_storage.js",
+  "title": "Поиск сохранённого ответа в Cache Storage",
+  "lang": "js",
+  "group": "Кэширование / Service Worker",
+  "desc": "cache.match ищет в кэше ответ для переданного запроса и возвращает Promise с найденным Response или undefined. Типичная стратегия «сначала кэш, потом сеть» в Service Worker: если ответ найден, отдаём его, иначе делаем настоящий запрос. Совпадение зависит от адреса и метода запроса, а по умолчанию учитывает и строку параметров. Ответ из кэша можно отдать повторно, потому что в кэше хранится его копия.",
+  "output": "Страницы из кэша открываются без сети, остальные запрашиваются с сервера.",
+  "tags": [
+    "match",
+    "respondWith",
+    "service worker"
+  ],
+  "aliases": [
+    "поиск сохранённого ответа в cache storage",
+    "match",
+    "respondWith"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 10,
+      "text": "respondWith",
+      "kind": "fn",
+      "note": "Подменяет ответ на перехваченный запрос."
+    },
+    {
+      "line": 3,
+      "col": 34,
+      "text": "match",
+      "kind": "fn",
+      "note": "Находит в кэше ответ на запрос."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

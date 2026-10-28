@@ -1,0 +1,111 @@
+{
+  "schema": 1,
+  "id": "проверка-конечного-числа-проверить-конечное-число",
+  "file": "проверка-конечного-числа-проверить-конечное-число.js",
+  "lang": "js",
+  "title": "Проверка конечного числа проверить конечное число",
+  "group": "Данные / Числа и простые операции",
+  "desc": "Не преобразует строку в число и отличает конечные числа от NaN и бесконечностей.",
+  "output": "true\nfalse\nfalse",
+  "descAt": 1792998610904,
+  "component": {
+    "provides": [],
+    "requires": [],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Числа и простые операции"
+  },
+  "tags": [
+    "Number.isFinite",
+    "числа",
+    "валидация"
+  ],
+  "aliases": [
+    "проверить конечность числа",
+    "отличить число от строки",
+    "проверить NaN Infinity"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — превращает значение в число",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — превращает значение в число",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — превращает значение в число",
+      "source": "dict"
+    }
+  ]
+}

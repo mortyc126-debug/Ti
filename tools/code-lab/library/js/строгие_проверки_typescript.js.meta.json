@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "строгие_проверки_typescript",
+  "file": "строгие_проверки_typescript.js",
+  "title": "Строгие проверки TypeScript",
+  "lang": "js",
+  "group": "Основы / Типизация",
+  "desc": "В tsconfig.json параметр strict: true включает набор строгих проверок TypeScript: запрет неявного any, проверку null и undefined, строгие типы функций и другие. Это самый эффективный способ ловить ошибки на этапе компиляции. В новых проектах включайте его сразу; в старых переходите постепенно, отключая отдельные флаги.",
+  "output": "true",
+  "tags": [
+    "strict",
+    "типизация"
+  ],
+  "aliases": [
+    "строгие проверки typescript",
+    "strict"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 42,
+      "text": "strict",
+      "kind": "concept",
+      "note": "Включает строгие проверки TypeScript."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

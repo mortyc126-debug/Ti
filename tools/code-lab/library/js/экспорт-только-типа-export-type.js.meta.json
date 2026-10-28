@@ -1,0 +1,159 @@
+{
+  "schema": 1,
+  "id": "экспорт-только-типа-export-type",
+  "file": "экспорт-только-типа-export-type.js",
+  "title": "Экспортировать только тип: export type { User }",
+  "lang": "js",
+  "group": "Основы / Модули и импорты",
+  "desc": "В TypeScript: export type { User }. В JavaScript тип описывают JSDoc-тегом @typedef, и редакторы подхватывают его при импорте.",
+  "output": "1: Мира",
+  "tags": [
+    "export type",
+    "typedef",
+    "JSDoc",
+    "тип User"
+  ],
+  "aliases": [
+    "как экспортировать тип в js",
+    "export type аналог в jsdoc",
+    "typedef экспорт"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 4,
+      "text": "@typedef",
+      "kind": "@typedef — JSDoc-описание типа, доступное другим файлам.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "export",
+      "kind": "kw",
+      "note": "export — сделать имя доступным для других модулей.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 7,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "1: Мира",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "/** @typedef {{ id: number, name: string }} User */\n\n/** @param {User} user */\nexport function describeUser(user) {\n  return `${user.id}: ${user.name}`;\n}\n\nconsole.log(describeUser({ id: 1, name: \"Мира\" }));"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "1: Мира",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Модули и импорты"
+  },
+  "enriched": true
+}

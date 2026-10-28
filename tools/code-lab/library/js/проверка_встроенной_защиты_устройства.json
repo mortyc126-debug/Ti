@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Проверка встроенной защиты устройства",
+  "group": "Интерфейс / Системные возможности",
+  "desc": "Узнаём, можно ли предложить вход по отпечатку или лицу.",
+  "code": "const доступно = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();\n\nconsole.log(доступно ? \"Можно войти по биометрии\" : \"Используем пароль\");",
+  "output": "Сообщение зависит от возможностей устройства.",
+  "words": {
+    "isUserVerifyingPlatformAuthenticatorAvailable": "Проверяет наличие встроенной проверки личности на устройстве."
+  }
+}

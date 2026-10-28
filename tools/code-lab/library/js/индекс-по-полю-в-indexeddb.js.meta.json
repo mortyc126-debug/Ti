@@ -1,0 +1,178 @@
+{
+  "schema": 1,
+  "id": "индекс-по-полю-в-indexeddb",
+  "file": "индекс-по-полю-в-indexeddb.js",
+  "title": "Создать индекс по полю для быстрого поиска: createIndex",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Хранение в браузере",
+  "desc": "store.createIndex создаёт индекс, и записи можно искать по полю name, а не только по ключу; создавать индекс можно только при обновлении схемы.",
+  "output": "{ id: 1, name: \"Мира\" }",
+  "tags": [
+    "IndexedDB",
+    "createIndex",
+    "индекс",
+    "поиск по полю",
+    "хранилище"
+  ],
+  "aliases": [
+    "как искать по полю в indexeddb",
+    "createIndex пример",
+    "индекс в indexeddb"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "store.createIndex",
+      "kind": "createIndex — индекс для быстрого поиска записей по полю.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 29,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 37,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Файлы, хранение и сервер"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "{ id: 1, name: \"Мира\" }",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const request = indexedDB.open(\"contacts\", 1);\n\nrequest.onupgradeneeded = () => {\n  const store = request.result.createObjectStore(\"people\", { keyPath: \"id\" });\n  store.createIndex(\"byname\", \"name\", { unique: false });\n};\n\nrequest.onsuccess = () => {\n  const db = request.result;\n  const writing = db.transaction(\"people\", \"readwrite\");\n  writing.objectStore(\"people\").put({ id: 1, name: \"Мира\" });\n  writing.objectStore(\"people\").put({ id: 2, name: \"Олег\" });\n\n  writing.oncomplete = () => {\n    const search = db.transaction(\"people\").objectStore(\"people\").index(\"byname\").get(\"Мира\");\n    search.onsuccess = () => console.log(search.result);\n  };\n};"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "{ id: 1, name: \"Мира\" }",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "request"
+    ],
+    "requires": [],
+    "subcat": "Хранение в браузере"
+  },
+  "enriched": true
+}

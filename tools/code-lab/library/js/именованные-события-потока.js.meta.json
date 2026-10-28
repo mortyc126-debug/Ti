@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "id": "именованные-события-потока",
+  "file": "именованные-события-потока.js",
+  "title": "Получать сообщения с указанным именем события",
+  "lang": "js",
+  "group": "Состояние / Потоки обновлений",
+  "desc": "Сервер может помечать сообщения строкой «event: update»; такие сообщения ловятся через addEventListener с этим именем, а не через onmessage.",
+  "output": "Для сообщения «event: update / data: {\"title\":\"Новая версия\"}» — «Обновление: Новая версия»",
+  "tags": [
+    "EventSource",
+    "SSE",
+    "именованное событие",
+    "addEventListener"
+  ],
+  "aliases": [
+    "как принять именованное событие sse",
+    "EventSource addEventListener пример",
+    "event: update server-sent events"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "source.addEventListener",
+      "kind": "addEventListener(\"update\") — принять сообщения с именем события update.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Состояние"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Для сообщения «event: update / data: {\"title\":\"Новая версия\"}» — «Обновление: Новая версия»",
+      "dependencies": [],
+      "requirements": [
+        "Нужен сервер, отдающий поток событий по адресу /events."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const source = new EventSource(\"/events\");\n\nsource.addEventListener(\"update\", event => {\n  const data = JSON.parse(event.data);\n  console.log(`Обновление: ${data.title}`);\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Для сообщения «event: update / data: {\"title\":\"Новая версия\"}» — «Обновление: Новая версия»",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Сообщения не приходят",
+            "cause": "Сервер не отдаёт text/event-stream по адресу /events",
+            "solution": "Проверь ответ сервера во вкладке Network"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "source"
+    ],
+    "requires": [],
+    "subcat": "Потоки обновлений"
+  },
+  "enriched": true
+}

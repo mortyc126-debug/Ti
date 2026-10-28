@@ -1,0 +1,283 @@
+{
+  "schema": 1,
+  "id": "размеченное-объединение-результата",
+  "file": "размеченное-объединение-результата.js",
+  "title": "Размеченное объединение для результата операции",
+  "lang": "js",
+  "group": "Продвинутые темы / Типизация",
+  "desc": "Тип Result<T> описывает успех { ok: true, value } или ошибку { ok: false, error }; здесь записан через JSDoc, чтобы работал в обычном .js. В TypeScript: type Result<T> = { ok: true; value: T } | { ok: false; error: Error }.",
+  "output": "Возраст: 42\nОшибка: Некорректный возраст: abc",
+  "tags": [
+    "Result",
+    "размеченное объединение",
+    "JSDoc",
+    "типизация",
+    "обработка ошибок"
+  ],
+  "aliases": [
+    "тип результата с ok и error",
+    "discriminated union js",
+    "type Result<T> typescript",
+    "возвращать ошибку вместо исключения"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 3,
+      "text": "@typedef",
+      "kind": "kw",
+      "note": "@typedef — JSDoc-тег: объявляет тип; редакторы и tsc --checkJs его понимают.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 51,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 24,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 31,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторяет блок для каждого элемента или шага.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 5,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 17,
+      "text": "of",
+      "kind": "kw",
+      "note": "of — в цикле for...of: перебрать значения по одному.",
+      "source": "dict"
+    },
+    {
+      "line": 18,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 19,
+      "col": 6,
+      "text": "result.ok",
+      "kind": "kw",
+      "note": "ok — признак-метка: по нему проверка типов понимает, какая из двух форм результата перед нами.",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 21,
+      "col": 4,
+      "text": "else",
+      "kind": "kw",
+      "note": "else — «иначе»: блок выполняется, если условие if ложно.",
+      "source": "dict"
+    },
+    {
+      "line": 22,
+      "col": 4,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 22,
+      "col": 12,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 22,
+      "col": 34,
+      "text": "error",
+      "kind": "fn",
+      "note": "error — печатает сообщение об ошибке в консоль.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Продвинутые темы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Возраст: 42\nОшибка: Некорректный возраст: abc",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "/**\n * @template T\n * @typedef {{ ok: true, value: T } | { ok: false, error: Error }} Result\n */\n\n/**\n * @param {string} text\n * @returns {Result<number>}\n */\nfunction parseAge(text) {\n  const age = Number(text);\n  if (!Number.isInteger(age) || age < 0) {\n    return { ok: false, error: new Error(`Некорректный возраст: ${text}`) };\n  }\n  return { ok: true, value: age };\n}\n\nfor (const input of [\"42\", \"abc\"]) {\n  const result = parseAge(input);\n  if (result.ok) {\n    console.log(\"Возраст:\", result.value);\n  } else {\n    console.log(\"Ошибка:\", result.error.message);\n  }\n}"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Возраст: 42\nОшибка: Некорректный возраст: abc",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "parseAge"
+    ],
+    "requires": [],
+    "subcat": "Типизация"
+  },
+  "enriched": true
+}

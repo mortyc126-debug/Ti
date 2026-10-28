@@ -1,0 +1,199 @@
+{
+  "schema": 1,
+  "id": "заморозка-верхнего-уровня-объекта",
+  "file": "заморозка-верхнего-уровня-объекта.js",
+  "title": "Заморозка верхнего уровня объекта",
+  "lang": "js",
+  "group": "Объекты и метапрограммирование / Свойства и дескрипторы",
+  "desc": "Замораживает верхний уровень объекта, не делая вложенные объекты автоматически неизменяемыми.",
+  "output": "светлая\n16\nfalse",
+  "tags": [
+    "Object.freeze",
+    "заморозка",
+    "неизменяемость",
+    "вложенные объекты"
+  ],
+  "aliases": [
+    "как заморозить объект js",
+    "object freeze пример",
+    "вложенные объекты остаются изменяемыми"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 18,
+      "text": "Object",
+      "kind": "fn",
+      "note": "Object — встроенный объект с утилитами для работы с объектами.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 25,
+      "text": "freeze",
+      "kind": "fn",
+      "note": "freeze — замораживает верхний уровень объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 12,
+      "text": "Object",
+      "kind": "fn",
+      "note": "Object — встроенный объект с утилитами для работы с объектами.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 19,
+      "text": "isFrozen",
+      "kind": "fn",
+      "note": "isFrozen — заморожен ли объект.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Объекты и метапрограммирование"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "светлая\n16\nfalse",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const настройки = Object.freeze({ тема: \"светлая\", вложенные: { размер: 14 } });\nнастройки.тема = \"тёмная\";\nнастройки.вложенные.размер = 16;\nconsole.log(настройки.тема);\nconsole.log(настройки.вложенные.размер);\nconsole.log(Object.isFrozen(настройки.вложенные));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "светлая\n16\nfalse",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "настройки"
+    ],
+    "requires": [],
+    "subcat": "Свойства и дескрипторы"
+  },
+  "enriched": true
+}

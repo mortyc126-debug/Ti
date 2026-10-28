@@ -1,0 +1,150 @@
+{
+  "schema": 1,
+  "id": "поиск-элемента-по-роли-и-имени",
+  "file": "поиск-элемента-по-роли-и-имени.js",
+  "title": "Найти элемент по роли и доступному имени: screen.getByRole",
+  "lang": "js",
+  "group": "Тестирование / Браузерные тесты",
+  "desc": "getByRole находит элемент так, как его воспринимает пользователь и программа чтения с экрана: по роли (button) и имени (Save).",
+  "output": "✓ 1 тест пройден",
+  "tags": [
+    "Testing Library",
+    "getByRole",
+    "доступность",
+    "DOM-тесты",
+    "jsdom"
+  ],
+  "aliases": [
+    "как найти кнопку по тексту в testing library",
+    "screen.getByRole пример",
+    "поиск элемента по роли"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 21,
+      "text": "screen.getByRole",
+      "kind": "getByRole — найти элемент по ARIA-роли и доступному имени.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Vitest"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "✓ 1 тест пройден",
+      "dependencies": [
+        "vitest",
+        "jsdom",
+        "@testing-library/dom"
+      ],
+      "requirements": [
+        "Нужен пакет vitest.",
+        "Нужен пакет jsdom.",
+        "Нужен пакет @testing-library/dom."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "// @vitest-environment jsdom\nimport { expect, it } from \"vitest\";\nimport { screen } from \"@testing-library/dom\";\n\nit(\"находит кнопку по роли и имени\", () => {\n  document.body.innerHTML = \"<button>Cancel</button><button>Save</button>\";\n\n  const saveButton = screen.getByRole(\"button\", { name: \"Save\" });\n\n  expect(saveButton.textContent).toBe(\"Save\");\n});"
+        },
+        "steps": [
+          "Установи Vitest (npm install -D vitest) и запусти npx vitest run имя-файла.js.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "✓ 1 тест пройден",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Тест проходит",
+            "Тест падает при сломанном коде",
+            "Повторный запуск тестов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Cannot find package 'vitest'",
+            "cause": "Vitest не установлен в проекте",
+            "solution": "Выполни npm install -D vitest"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Браузерные тесты"
+  },
+  "enriched": true
+}

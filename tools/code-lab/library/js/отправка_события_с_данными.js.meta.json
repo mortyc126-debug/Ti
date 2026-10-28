@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "отправка_события_с_данными",
+  "file": "отправка_события_с_данными.js",
+  "title": "Отправка события с данными",
+  "lang": "js",
+  "group": "Интерфейс / События",
+  "desc": "EventTarget — простая шина событий, доступная и в браузере, и в Node.js. CustomEvent позволяет передать произвольные данные в свойстве detail. dispatchEvent вызывает обработчики синхронно, то есть они выполнятся до возврата из вызова. Имя события — любая строка; чтобы избежать конфликтов, давайте ему понятное название.",
+  "output": "Готово: модуль",
+  "tags": [
+    "CustomEvent",
+    "dispatchEvent",
+    "события"
+  ],
+  "aliases": [
+    "отправка события с данными",
+    "CustomEvent",
+    "dispatchEvent"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 6,
+      "col": 5,
+      "text": "dispatchEvent",
+      "kind": "fn",
+      "note": "Отправляет событие подписчикам."
+    },
+    {
+      "line": 6,
+      "col": 23,
+      "text": "CustomEvent",
+      "kind": "fn",
+      "note": "Событие с произвольными данными в detail."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

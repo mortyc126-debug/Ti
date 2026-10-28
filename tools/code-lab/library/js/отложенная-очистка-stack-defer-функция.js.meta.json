@@ -1,0 +1,203 @@
+{
+  "schema": 1,
+  "id": "отложенная-очистка-stack-defer-функция",
+  "file": "отложенная-очистка-stack-defer-функция.js",
+  "title": "Зарегистрировать функцию очистки: stack.defer(callback)",
+  "lang": "js",
+  "group": "Основы / Управление ресурсами",
+  "desc": "stack.defer принимает и готовую именованную функцию: удобно, когда очистка уже описана отдельно.",
+  "output": "запись начата\nнастройки записаны\nжурнал закрыт",
+  "tags": [
+    "DisposableStack",
+    "defer",
+    "callback",
+    "очистка",
+    "ресурсы"
+  ],
+  "aliases": [
+    "как передать готовую функцию в stack.defer",
+    "DisposableStack defer callback",
+    "порядок выполнения defer"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 16,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "stack.defer",
+      "kind": "defer(callback) — вызвать callback при освобождении стека (в обратном порядке).",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 20,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 28,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "запись начата\nнастройки записаны\nжурнал закрыт",
+      "dependencies": [],
+      "requirements": [
+        "Нужен Node.js 24 или новее (explicit resource management)."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function closeLog() {\n  console.log(\"журнал закрыт\");\n}\n\nfunction saveSettings() {\n  const stack = new DisposableStack();\n  stack.defer(closeLog);\n  stack.defer(() => console.log(\"настройки записаны\"));\n\n  console.log(\"запись начата\");\n  stack.dispose();\n}\n\nsaveSettings();"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "запись начата\nнастройки записаны\nжурнал закрыт",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "ReferenceError: DisposableStack is not defined",
+            "cause": "Среда не поддерживает DisposableStack (Node.js ниже 24)",
+            "solution": "Обнови Node.js до 24+"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "closeLog",
+      "saveSettings"
+    ],
+    "requires": [],
+    "subcat": "Управление ресурсами"
+  },
+  "enriched": true
+}

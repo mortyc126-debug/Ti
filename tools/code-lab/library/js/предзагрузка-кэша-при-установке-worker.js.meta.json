@@ -1,0 +1,155 @@
+{
+  "schema": 1,
+  "id": "предзагрузка-кэша-при-установке-worker",
+  "file": "предзагрузка-кэша-при-установке-worker.js",
+  "title": "Предварительно закэшировать ресурсы при установке Service Worker",
+  "lang": "js",
+  "group": "Кэширование / Service Worker",
+  "desc": "В событии install worker открывает кэш и складывает туда список файлов; пока waitUntil не завершится, установка не считается готовой.",
+  "output": "При установке worker в кэше app-v1 появляются 4 файла из списка",
+  "tags": [
+    "Service Worker",
+    "install",
+    "cache.addAll",
+    "предзагрузка",
+    "офлайн"
+  ],
+  "aliases": [
+    "как закэшировать файлы при установке service worker",
+    "cache.addAll пример",
+    "офлайн приложение кэш при установке"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 5,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 23,
+      "text": "install",
+      "kind": "install — worker устанавливается: время подготовить кэш.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 44,
+      "text": "cache.addAll",
+      "kind": "addAll — скачивает и кладёт в кэш список адресов.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Кэширование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Service Worker"
+      ],
+      "technology": [
+        "JavaScript",
+        "Service Worker"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "При установке worker в кэше app-v1 появляются 4 файла из списка",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const currentCache = \"app-v1\";\nconst assets = [\"/\", \"/styles.css\", \"/app.js\", \"/logo.svg\"];\n\nself.addEventListener(\"install\", event => {\n  event.waitUntil(\n    caches.open(currentCache).then(cache => cache.addAll(assets))\n  );\n});"
+        },
+        "steps": [
+          "Сохрани код как sw.js в корне сайта и зарегистрируй: navigator.serviceWorker.register(\"/sw.js\").",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "При установке worker в кэше app-v1 появляются 4 файла из списка",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Первая установка worker",
+            "Обновление worker",
+            "Работа без сети"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Service Worker не регистрируется",
+            "cause": "Страница открыта не по HTTPS или localhost, либо sw.js лежит не в корне сайта",
+            "solution": "Открой сайт по https или http://localhost и проверь вкладку Application → Service Workers"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Создаёт кэш app-v1"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "currentCache",
+      "assets"
+    ],
+    "requires": [],
+    "subcat": "Service Worker"
+  },
+  "enriched": true
+}

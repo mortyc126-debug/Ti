@@ -1,0 +1,175 @@
+{
+  "schema": 1,
+  "id": "новая-версия-service-worker",
+  "file": "новая-версия-service-worker.js",
+  "title": "Обработать появление новой версии Service Worker",
+  "lang": "js",
+  "group": "Кэширование / Service Worker",
+  "desc": "Событие updatefound срабатывает у регистрации, когда браузер нашёл новый sw.js; по состоянию installed можно сообщить, что версия готова.",
+  "output": "При выходе новой версии sw.js в консоли: «Доступна новая версия приложения»",
+  "tags": [
+    "Service Worker",
+    "updatefound",
+    "обновление приложения",
+    "PWA"
+  ],
+  "aliases": [
+    "как узнать что вышла новая версия service worker",
+    "updatefound пример",
+    "уведомить об обновлении pwa"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 15,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 33,
+      "text": "updatefound",
+      "kind": "updatefound — браузер нашёл новую версию Service Worker и начал её установку.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 4,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 22,
+      "text": "registration.installing",
+      "kind": "installing — устанавливаемая сейчас новая версия worker.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 14,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 6,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 16,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Кэширование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "При выходе новой версии sw.js в консоли: «Доступна новая версия приложения»",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "navigator.serviceWorker.register(\"/sw.js\").then(registration => {\n  registration.addEventListener(\"updatefound\", () => {\n    const newWorker = registration.installing;\n\n    newWorker.addEventListener(\"statechange\", () => {\n      if (newWorker.state === \"installed\" && navigator.serviceWorker.controller) {\n        console.log(\"Доступна новая версия приложения\");\n      }\n    });\n  });\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "При выходе новой версии sw.js в консоли: «Доступна новая версия приложения»",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит",
+            "cause": "Файл sw.js не менялся или страница открыта не по HTTPS/localhost",
+            "solution": "Измени sw.js, обнови страницу и смотри вкладку Application → Service Workers"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Service Worker"
+  },
+  "enriched": true
+}

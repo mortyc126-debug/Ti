@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "выбрать-разрешенные-поля-или-исключить-лишние",
+  "file": "выбрать-разрешенные-поля-или-исключить-лишние.js",
+  "title": "Выбрать разрешённые поля или исключить лишние",
+  "lang": "js",
+  "group": "Данные / Работа с объектами",
+  "desc": "Создаёт новый объект с указанными ключами; удобно для подготовки DTO и безопасного ответа API.",
+  "output": "{id:1,name:\"A\"}",
+  "tags": [
+    "объект",
+    "DTO",
+    "поля",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "оставить только нужные поля объекта",
+    "удалить поля из объекта без мутации",
+    "pick omit object"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

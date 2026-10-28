@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "криптостойкие_случайные_байты",
+  "file": "криптостойкие_случайные_байты.js",
+  "title": "Криптостойкие случайные байты",
+  "lang": "js",
+  "group": "Данные / Случайные значения",
+  "desc": "crypto.getRandomValues заполняет типизированный массив случайными байтами, пригодными для безопасности: токенов, ключей, идентификаторов. В отличие от Math.random, его результат невозможно предсказать. Функция изменяет переданный массив и возвращает его же. Размер массива ограничен (65536 байт за вызов). Для случайных идентификаторов в виде строки есть crypto.randomUUID().",
+  "output": "16\n32",
+  "tags": [
+    "crypto.getRandomValues",
+    "Uint8Array",
+    "случайные значения"
+  ],
+  "aliases": [
+    "криптостойкие случайные байты",
+    "crypto.getRandomValues",
+    "Uint8Array"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 14,
+      "text": "crypto.getRandomValues",
+      "kind": "fn",
+      "note": "Заполняет массив криптографически стойкими случайными байтами."
+    },
+    {
+      "line": 0,
+      "col": 41,
+      "text": "Uint8Array",
+      "kind": "fn",
+      "note": "Массив байт."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

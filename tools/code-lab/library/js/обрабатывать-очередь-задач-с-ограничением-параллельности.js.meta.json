@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "обрабатывать-очередь-задач-с-ограничением-параллельности",
+  "file": "обрабатывать-очередь-задач-с-ограничением-параллельности.js",
+  "title": "Обрабатывать очередь задач с ограничением параллельности",
+  "lang": "js",
+  "group": "Асинхронность / Очереди",
+  "desc": "Принимает задачи в очередь и запускает не больше заданного числа обработчиков одновременно; результат каждой задачи возвращается через Promise.",
+  "output": "одновременно выполняется не больше concurrency задач",
+  "tags": [
+    "очередь",
+    "concurrency",
+    "worker pool",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "queue concurrency javascript",
+    "очередь с лимитом одновременных задач",
+    "worker pool tasks"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "загрузка_и_декодирование_аудиофайла",
+  "file": "загрузка_и_декодирование_аудиофайла.js",
+  "title": "Загрузка и декодирование аудиофайла",
+  "lang": "js",
+  "group": "Графика и визуализация / Звук",
+  "desc": "Чтобы проиграть звук через Web Audio API, файл нужно загрузить, получить его как ArrayBuffer и декодировать методом decodeAudioData. Результат — AudioBuffer с готовыми аудиоданными. Из него создают источник, подключают его к выходу и запускают. Один буфер можно использовать многократно. Если формат не поддерживается, Promise отклоняется.",
+  "output": "Звук удара проигрывается один раз.",
+  "tags": [
+    "decodeAudioData",
+    "arrayBuffer",
+    "звук"
+  ],
+  "aliases": [
+    "загрузка и декодирование аудиофайла",
+    "decodeAudioData",
+    "arrayBuffer"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 29,
+      "text": "decodeAudioData",
+      "kind": "fn",
+      "note": "Декодирует аудиоданные в AudioBuffer."
+    },
+    {
+      "line": 2,
+      "col": 57,
+      "text": "arrayBuffer",
+      "kind": "fn",
+      "note": "Читает тело ответа как байты."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

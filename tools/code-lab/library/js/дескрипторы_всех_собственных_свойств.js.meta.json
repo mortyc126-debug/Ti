@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "дескрипторы_всех_собственных_свойств",
+  "file": "дескрипторы_всех_собственных_свойств.js",
+  "title": "Дескрипторы всех собственных свойств",
+  "lang": "js",
+  "group": "Основы / Свойства объектов",
+  "desc": "Object.getOwnPropertyDescriptors возвращает дескрипторы сразу всех собственных свойств: значения, геттеры и сеттеры, а также флаги. Вместе с Object.defineProperties это даёт точное копирование объекта. Оператор расширения и Object.assign так не умеют: они вызывают геттеры и записывают в копию обычные значения, а флаги сбрасывают. Копия по-прежнему поверхностная.",
+  "output": "function\nundefined",
+  "tags": [
+    "Object.getOwnPropertyDescriptors",
+    "defineProperties",
+    "свойства объектов"
+  ],
+  "aliases": [
+    "дескрипторы всех собственных свойств",
+    "Object.getOwnPropertyDescriptors",
+    "defineProperties"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 7,
+      "col": 22,
+      "text": "defineProperties",
+      "kind": "fn",
+      "note": "Создаёт сразу несколько свойств по их дескрипторам."
+    },
+    {
+      "line": 7,
+      "col": 43,
+      "text": "Object.getOwnPropertyDescriptors",
+      "kind": "fn",
+      "note": "Возвращает дескрипторы всех собственных свойств."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,195 @@
+{
+  "schema": 1,
+  "id": "стек-ресурсов-disposablestack",
+  "file": "стек-ресурсов-disposablestack.js",
+  "title": "Стек синхронных ресурсов: DisposableStack",
+  "lang": "js",
+  "group": "Основы / Управление ресурсами",
+  "desc": "DisposableStack собирает действия очистки и выполняет их в обратном порядке при выходе из области видимости. Нужен Node.js 24+.",
+  "output": "работа выполняется\nсоединение закрыто\nвременная папка удалена",
+  "tags": [
+    "DisposableStack",
+    "defer",
+    "очистка",
+    "управление ресурсами",
+    "using"
+  ],
+  "aliases": [
+    "DisposableStack пример",
+    "отложить очистку в js",
+    "аналог defer из go в javascript",
+    "стек освобождения ресурсов"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 18,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 22,
+      "text": "DisposableStack",
+      "kind": "fn",
+      "note": "DisposableStack — стек очистки: действия выполняются в обратном порядке.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "defer",
+      "kind": "fn",
+      "note": "defer — добавляет действие, которое выполнится при освобождении стека.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 22,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 30,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 22,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 30,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "работа выполняется\nсоединение закрыто\nвременная папка удалена",
+      "dependencies": [],
+      "requirements": [
+        "Нужен Node.js 24 или новее (либо браузер с поддержкой explicit resource management)."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function runJob() {\n  using cleanup = new DisposableStack();\n\n  cleanup.defer(() => console.log(\"временная папка удалена\"));\n  cleanup.defer(() => console.log(\"соединение закрыто\"));\n\n  console.log(\"работа выполняется\");\n}\n\nrunJob();"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "работа выполняется\nсоединение закрыто\nвременная папка удалена",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "ReferenceError: DisposableStack is not defined",
+            "cause": "Среда не поддерживает управление ресурсами (Node.js ниже 24)",
+            "solution": "Обнови Node.js до 24+"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "runJob"
+    ],
+    "requires": [],
+    "subcat": "Управление ресурсами"
+  },
+  "enriched": true
+}

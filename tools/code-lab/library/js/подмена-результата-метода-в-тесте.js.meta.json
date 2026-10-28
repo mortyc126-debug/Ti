@@ -1,0 +1,172 @@
+{
+  "schema": 1,
+  "id": "подмена-результата-метода-в-тесте",
+  "file": "подмена-результата-метода-в-тесте.js",
+  "title": "Подмена результата метода: mockReturnValue",
+  "lang": "js",
+  "group": "Тестирование и отладка / Mock",
+  "desc": "Цепочка vi.spyOn(...).mockReturnValue(...) заставляет метод вернуть заданное значение, не выполняя настоящий код.",
+  "output": "✓ 1 тест пройден",
+  "tags": [
+    "Vitest",
+    "spyOn",
+    "mockReturnValue",
+    "подмена метода",
+    "мок"
+  ],
+  "aliases": [
+    "подменить возвращаемое значение метода vitest",
+    "mockReturnValue пример",
+    "заглушка метода в тесте",
+    "spyOn mockReturnValue"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 4,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 11,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 33,
+      "text": "mockReturnValue",
+      "kind": "fn",
+      "note": "mockReturnValue — заставляет шпиона возвращать заданное значение.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование и отладка"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Vitest"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "✓ 1 тест пройден",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import { expect, it, vi } from \"vitest\";\n\nconst clock = {\n  currentHour() {\n    return new Date().getHours();\n  },\n};\n\nfunction greeting() {\n  return clock.currentHour() < 12 ? \"Доброе утро\" : \"Добрый день\";\n}\n\nit(\"утром здоровается по-утреннему\", () => {\n  vi.spyOn(clock, \"currentHour\").mockReturnValue(9);\n  expect(greeting()).toBe(\"Доброе утро\");\n});\n\nit(\"днём здоровается по-дневному\", () => {\n  vi.spyOn(clock, \"currentHour\").mockReturnValue(15);\n  expect(greeting()).toBe(\"Добрый день\");\n});"
+        },
+        "steps": [
+          "Установи Vitest (npm install -D vitest) и запусти npx vitest run имя-файла.js.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "✓ 1 тест пройден",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Тест проходит",
+            "Тест падает при сломанном коде",
+            "Повторный запуск тестов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Cannot find package 'vitest'",
+            "cause": "Vitest не установлен в проекте",
+            "solution": "Выполни npm install -D vitest"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "clock",
+      "greeting"
+    ],
+    "requires": [],
+    "subcat": "Mock"
+  },
+  "enriched": true
+}

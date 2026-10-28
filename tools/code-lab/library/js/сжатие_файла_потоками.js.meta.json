@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "сжатие_файла_потоками",
+  "file": "сжатие_файла_потоками.js",
+  "title": "Сжатие файла потоками",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Потоки",
+  "desc": "pipeline из node:stream/promises соединяет потоки в цепочку: чтение файла, сжатие gzip, запись результата. Данные идут частями, поэтому память почти не расходуется даже на огромных файлах. При ошибке на любом шаге pipeline закрывает все потоки и отклоняет Promise. Для обратной операции используйте createGunzip.",
+  "output": "Сжато: ./журнал.log.gz",
+  "tags": [
+    "pipeline",
+    "createGzip",
+    "потоки"
+  ],
+  "aliases": [
+    "сжатие файла потоками",
+    "pipeline",
+    "createGzip"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 9,
+      "text": "createGzip",
+      "kind": "concept",
+      "note": "Создаёт поток сжатия gzip."
+    },
+    {
+      "line": 2,
+      "col": 9,
+      "text": "pipeline",
+      "kind": "concept",
+      "note": "Соединяет потоки и закрывает их при завершении или ошибке."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

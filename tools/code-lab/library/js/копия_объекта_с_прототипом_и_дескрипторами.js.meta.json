@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "копия_объекта_с_прототипом_и_дескрипторами",
+  "file": "копия_объекта_с_прототипом_и_дескрипторами.js",
+  "title": "Копия объекта с прототипом и дескрипторами",
+  "lang": "js",
+  "group": "Основы / Свойства объектов",
+  "desc": "Простое копирование через spread или Object.assign теряет прототип объекта, превращает геттеры в обычные значения и сбрасывает флаги свойств. Чтобы получить точную копию, создают новый объект с тем же прототипом (Object.create) и переносят все дескрипторы свойств (getOwnPropertyDescriptors). Копия остаётся «поверхностной»: вложенные объекты по-прежнему общие.",
+  "output": "привет 3\ntrue",
+  "tags": [
+    "Object.create",
+    "getOwnPropertyDescriptors",
+    "свойства объектов"
+  ],
+  "aliases": [
+    "копия объекта с прототипом и дескрипторами",
+    "Object.create",
+    "getOwnPropertyDescriptors"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 17,
+      "text": "Object.create",
+      "kind": "fn",
+      "note": "Создаёт объект с заданным прототипом и свойствами."
+    },
+    {
+      "line": 3,
+      "col": 9,
+      "text": "getOwnPropertyDescriptors",
+      "kind": "fn",
+      "note": "Возвращает дескрипторы всех собственных свойств."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

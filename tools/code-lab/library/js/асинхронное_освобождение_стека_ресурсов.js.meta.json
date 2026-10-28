@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "асинхронное_освобождение_стека_ресурсов",
+  "file": "асинхронное_освобождение_стека_ресурсов.js",
+  "title": "Асинхронное освобождение стека ресурсов",
+  "lang": "js",
+  "group": "Основы / Управление ресурсами",
+  "desc": "AsyncDisposableStack хранит набор действий очистки. Метод defer добавляет действие, а disposeAsync выполняет их в порядке, обратном добавлению, дожидаясь каждого. Если несколько действий завершились ошибкой, ошибки собираются в SuppressedError. Повторный вызов disposeAsync безвреден. Объект относится к Explicit Resource Management, поддержка зависит от среды.",
+  "output": "закрыт файл\nзакрыта база",
+  "tags": [
+    "disposeAsync",
+    "defer",
+    "управление ресурсами"
+  ],
+  "aliases": [
+    "асинхронное освобождение стека ресурсов",
+    "disposeAsync",
+    "defer"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 5,
+      "text": "defer",
+      "kind": "fn",
+      "note": "Регистрирует действие очистки."
+    },
+    {
+      "line": 5,
+      "col": 11,
+      "text": "disposeAsync",
+      "kind": "fn",
+      "note": "Освобождает ресурсы стека в порядке, обратном добавлению."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

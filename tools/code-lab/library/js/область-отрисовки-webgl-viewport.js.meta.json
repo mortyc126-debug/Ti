@@ -1,0 +1,163 @@
+{
+  "schema": 1,
+  "id": "область-отрисовки-webgl-viewport",
+  "file": "область-отрисовки-webgl-viewport.js",
+  "title": "Задать область отрисовки: gl.viewport",
+  "lang": "js",
+  "group": "Графика и визуализация / Canvas: рисование",
+  "desc": "gl.viewport сообщает WebGL, в какой части холста рисовать; после изменения размера canvas его вызывают заново.",
+  "output": "Холст на всю ширину окна закрашен синим и перерисовывается при изменении размера окна",
+  "tags": [
+    "WebGL",
+    "viewport",
+    "размер canvas",
+    "область отрисовки"
+  ],
+  "aliases": [
+    "как изменить размер canvas webgl",
+    "gl.viewport пример",
+    "растянуть рисунок на весь холст"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 2,
+      "text": "gl.viewport",
+      "kind": "viewport — прямоугольник холста, в который попадает рисунок.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 15,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Графика и визуализация"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Холст на всю ширину окна закрашен синим и перерисовывается при изменении размера окна",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const canvas = document.createElement(\"canvas\");\ncanvas.width = 300;\ncanvas.height = 300;\ndocument.body.append(canvas);\nconst gl = canvas.getContext(\"webgl\");\n\nfunction resize() {\n  canvas.width = window.innerWidth;\n  canvas.height = 300;\n  gl.viewport(0, 0, canvas.width, canvas.height);\n  gl.clearColor(0.1, 0.4, 0.8, 1);\n  gl.clear(gl.COLOR_BUFFER_BIT);\n}\n\nresize();\nwindow.addEventListener(\"resize\", resize);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Холст на всю ширину окна закрашен синим и перерисовывается при изменении размера окна",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Чёрный экран или gl равен null",
+            "cause": "Браузер не поддерживает WebGL или в шейдере ошибка",
+            "solution": "Проверь canvas.getContext(\"webgl\") и gl.getShaderInfoLog(shader)"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Добавляет canvas на страницу"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "canvas",
+      "gl",
+      "resize"
+    ],
+    "requires": [],
+    "subcat": "Canvas: рисование"
+  },
+  "enriched": true
+}

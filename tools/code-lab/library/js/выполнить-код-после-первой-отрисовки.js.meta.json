@@ -1,0 +1,137 @@
+{
+  "schema": 1,
+  "id": "выполнить-код-после-первой-отрисовки",
+  "file": "выполнить-код-после-первой-отрисовки.js",
+  "title": "Выполнить код после применения стилей и первой отрисовки",
+  "lang": "js",
+  "group": "Интерфейс / Производительность",
+  "desc": "Два вложенных requestAnimationFrame гарантируют, что браузер уже применил начальные стили, и только потом запускается изменение: переход сработает.",
+  "output": "Надпись «Привет» плавно проявляется за секунду",
+  "tags": [
+    "requestAnimationFrame",
+    "двойной rAF",
+    "переход CSS",
+    "отрисовка"
+  ],
+  "aliases": [
+    "как запустить css transition сразу после создания элемента",
+    "двойной requestAnimationFrame",
+    "код после первого кадра"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 21,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "requestAnimationFrame(() => requestAnimationFrame",
+      "kind": "requestAnimationFrame — вызвать функцию перед следующей перерисовкой; вложенный вызов — после неё.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Надпись «Привет» плавно проявляется за секунду",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const box = document.createElement(\"div\");\nbox.textContent = \"Привет\";\nbox.style.transition = \"opacity 1s\";\nbox.style.opacity = \"0\";\ndocument.body.append(box);\n\nrequestAnimationFrame(() => requestAnimationFrame(() => {\n  box.style.opacity = \"1\";\n}));"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Надпись «Привет» плавно проявляется за секунду",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Добавляет элемент на страницу"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "box"
+    ],
+    "requires": [],
+    "subcat": "Производительность"
+  },
+  "enriched": true
+}

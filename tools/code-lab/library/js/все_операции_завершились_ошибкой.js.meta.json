@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "все_операции_завершились_ошибкой",
+  "file": "все_операции_завершились_ошибкой.js",
+  "title": "Все операции завершились ошибкой",
+  "lang": "js",
+  "group": "Основы / Обработка ошибок",
+  "desc": "Когда несколько независимых попыток (зеркала, резервные серверы) все закончились неудачей, удобно сообщить об этом одной ошибкой, в которой сохранены все причины. AggregateError принимает причины и текст. Ту же ошибку по умолчанию создаёт Promise.any, если ни один Promise не выполнился. Собирая её сами, добавляйте понятное сообщение.",
+  "output": "all failed [ 'таймаут', 'отказ сервера' ]\ntrue",
+  "tags": [
+    "AggregateError",
+    "Promise.any",
+    "обработка ошибок"
+  ],
+  "aliases": [
+    "все операции завершились ошибкой",
+    "AggregateError",
+    "Promise.any"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 19,
+      "text": "AggregateError",
+      "kind": "fn",
+      "note": "Хранит все причины отказа."
+    },
+    {
+      "line": 6,
+      "col": 8,
+      "text": "Promise.any",
+      "kind": "fn",
+      "note": "Возвращает первый успех или AggregateError."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

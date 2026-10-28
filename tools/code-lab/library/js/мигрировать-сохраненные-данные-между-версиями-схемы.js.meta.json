@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "мигрировать-сохраненные-данные-между-версиями-схемы",
+  "file": "мигрировать-сохраненные-данные-между-версиями-схемы.js",
+  "title": "Мигрировать сохранённые данные между версиями схемы",
+  "lang": "js",
+  "group": "Хранение / Миграции данных",
+  "desc": "Применяет последовательные миграции по версии; неизвестная будущая версия отклоняется вместо молчаливой порчи данных.",
+  "output": "версия повышается после каждой успешной миграции",
+  "tags": [
+    "миграция",
+    "версия схемы",
+    "хранение",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "миграция localStorage schema version",
+    "обновить формат сохранённых данных",
+    "versioned data migration"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

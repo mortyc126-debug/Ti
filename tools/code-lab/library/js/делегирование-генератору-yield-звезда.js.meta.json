@@ -1,0 +1,172 @@
+{
+  "schema": 1,
+  "id": "делегирование-генератору-yield-звезда",
+  "file": "делегирование-генератору-yield-звезда.js",
+  "title": "Делегирование другому генератору: yield*",
+  "lang": "js",
+  "group": "Основы / Итераторы и генераторы",
+  "desc": "yield* отдаёт по очереди все значения другого генератора или итерируемого объекта, словно они выданы самим генератором.",
+  "output": "[ 'старт', 0, 2, 4, 6, 'a', 'b', 'финиш' ]",
+  "tags": [
+    "yield*",
+    "генератор",
+    "делегирование",
+    "итерируемый объект",
+    "function*"
+  ],
+  "aliases": [
+    "что делает yield* в js",
+    "делегировать генератору",
+    "объединить генераторы",
+    "yield* с массивом"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function*",
+      "kind": "kw",
+      "note": "function* — функция-генератор: выдаёт значения по одному через yield.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл: повторяет блок для каждого элемента или шага.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 7,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "yield*",
+      "kind": "kw",
+      "note": "yield* — отдать все значения другого генератора или итерируемого объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "[ 'старт', 0, 2, 4, 6, 'a', 'b', 'финиш' ]",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function* evenNumbers(limit) {\n  for (let number = 0; number <= limit; number += 2) {\n    yield number;\n  }\n}\n\nfunction* sequence() {\n  yield \"старт\";\n  yield* evenNumbers(6);\n  yield* [\"a\", \"b\"];\n  yield \"финиш\";\n}\n\nconsole.log([...sequence()]);"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "[ 'старт', 0, 2, 4, 6, 'a', 'b', 'финиш' ]",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "evenNumbers",
+      "sequence"
+    ],
+    "requires": [],
+    "subcat": "Итераторы и генераторы"
+  },
+  "enriched": true
+}

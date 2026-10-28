@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "нормализовать-пустые-значения-в-выбранных-полях",
+  "file": "нормализовать-пустые-значения-в-выбранных-полях.js",
+  "title": "Нормализовать пустые значения в выбранных полях",
+  "lang": "js",
+  "group": "Данные / Очистка данных",
+  "desc": "Приводит пустые строки к null только в перечисленных полях; не затрагивает остальные поля и исходный объект.",
+  "output": "{name:null,code:\"A\"}",
+  "tags": [
+    "нормализация",
+    "null",
+    "поля",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "пустая строка в null для полей",
+    "нормализовать пустые значения",
+    "empty string to null"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

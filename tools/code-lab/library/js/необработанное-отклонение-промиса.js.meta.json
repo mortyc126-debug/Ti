@@ -1,0 +1,178 @@
+{
+  "schema": 1,
+  "id": "необработанное-отклонение-промиса",
+  "file": "необработанное-отклонение-промиса.js",
+  "title": "Необработанное отклонение промиса",
+  "lang": "js",
+  "group": "Node.js: процесс, файлы и сервер / Процесс",
+  "desc": "Регистрирует обработчик необработанного отклонения Promise в Node.js.",
+  "output": "необработанный отказ: промис без обработчика",
+  "tags": [
+    "unhandledRejection",
+    "отклонённый промис",
+    "process.on",
+    "диагностика"
+  ],
+  "aliases": [
+    "как поймать unhandled rejection в node",
+    "process on unhandledrejection пример",
+    "промис без catch",
+    "журнал отклонённых промисов",
+    "обработчик необработанного отказа"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "process",
+      "kind": "fn",
+      "note": "process — объект текущего процесса Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "on",
+      "kind": "fn",
+      "note": "on — подписывается на событие или сигнал процесса.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "Promise",
+      "kind": "fn",
+      "note": "Promise — объект отложенного результата: выполнен или отклонён.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "reject",
+      "kind": "fn",
+      "note": "reject — создаёт отклонённый Promise.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Node.js: процесс, файлы и сервер"
+      ],
+      "runtime": [
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Аргументы функции «handler»",
+      "output": "необработанный отказ: промис без обработчика",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js.",
+        "Нужен Node.js той версии, где есть используемые встроенные модули."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function handler(причина) {\n  console.log(\"необработанный отказ:\", причина.message);\n}\nprocess.on(\"unhandledRejection\", handler);\nPromise.reject(new Error(\"промис без обработчика\"));"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные.",
+          "Скопируй функцию «handler» в подходящую часть проекта.",
+          "Вызови её со своими данными вместо значений из примера.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "необработанный отказ: промис без обработчика",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "handler"
+    ],
+    "requires": [],
+    "subcat": "Процесс"
+  },
+  "enriched": true
+}

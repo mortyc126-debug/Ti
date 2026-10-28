@@ -1,0 +1,146 @@
+{
+  "schema": 1,
+  "id": "очистка-буфера-цвета-webgl",
+  "file": "очистка-буфера-цвета-webgl.js",
+  "title": "Очистить буфер цвета: gl.clearColor и gl.clear",
+  "lang": "js",
+  "group": "Графика и визуализация / Canvas: рисование",
+  "desc": "clearColor задаёт цвет очистки (R, G, B, A от 0 до 1), а clear(gl.COLOR_BUFFER_BIT) закрашивает им весь холст.",
+  "output": "Холст закрашен чёрным цветом",
+  "tags": [
+    "WebGL",
+    "clearColor",
+    "clear",
+    "холст"
+  ],
+  "aliases": [
+    "как закрасить canvas в webgl",
+    "gl.clearColor пример",
+    "очистить буфер цвета"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "gl.clearColor",
+      "kind": "clearColor — цвет, которым gl.clear закрасит холст.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Графика и визуализация"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Холст закрашен чёрным цветом",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const canvas = document.createElement(\"canvas\");\ncanvas.width = 300;\ncanvas.height = 300;\ndocument.body.append(canvas);\nconst gl = canvas.getContext(\"webgl\");\n\ngl.clearColor(0, 0, 0, 1);\ngl.clear(gl.COLOR_BUFFER_BIT);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Холст закрашен чёрным цветом",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Чёрный экран или gl равен null",
+            "cause": "Браузер не поддерживает WebGL или в шейдере ошибка",
+            "solution": "Проверь canvas.getContext(\"webgl\") и gl.getShaderInfoLog(shader)"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Добавляет canvas на страницу"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "canvas",
+      "gl"
+    ],
+    "requires": [],
+    "subcat": "Canvas: рисование"
+  },
+  "enriched": true
+}

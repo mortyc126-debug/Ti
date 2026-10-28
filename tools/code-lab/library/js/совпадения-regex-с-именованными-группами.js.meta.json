@@ -1,0 +1,171 @@
+{
+  "schema": 1,
+  "id": "совпадения-regex-с-именованными-группами",
+  "file": "совпадения-regex-с-именованными-группами.js",
+  "title": "Итератор совпадений регулярки с флагом g: text.matchAll(regex)",
+  "lang": "js",
+  "group": "Данные / Строки и текст",
+  "desc": "matchAll требует регулярку с флагом g и отдаёт совпадения вместе с именованными группами; из итератора легко собрать массив объектов.",
+  "output": "[\n  { date: '2026-01-05', message: 'disk full' },\n  { date: '2026-01-07', message: 'timeout' }\n]",
+  "tags": [
+    "matchAll",
+    "именованные группы",
+    "регулярные выражения",
+    "разбор журнала"
+  ],
+  "aliases": [
+    "как разобрать лог регуляркой js",
+    "matchAll groups пример",
+    "все совпадения с именованными группами"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 19,
+      "text": "text.matchAll",
+      "kind": "matchAll — итератор совпадений; регулярка обязана быть с флагом g.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 8,
+      "text": "match.groups",
+      "kind": "groups — значения именованных групп захвата.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Данные"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "[\n  { date: '2026-01-05', message: 'disk full' },\n  { date: '2026-01-07', message: 'timeout' }\n]",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const text = \"2026-01-05 ERROR disk full\\n2026-01-06 INFO ok\\n2026-01-07 ERROR timeout\";\nconst regex = /(?<date>\\d{4}-\\d{2}-\\d{2}) ERROR (?<message>.+)/g;\n\nconst errors = [...text.matchAll(regex)].map(match => ({\n  date: match.groups.date,\n  message: match.groups.message,\n}));\n\nconsole.log(errors);"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "[\n  { date: '2026-01-05', message: 'disk full' },\n  { date: '2026-01-07', message: 'timeout' }\n]",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "text",
+      "regex",
+      "errors"
+    ],
+    "requires": [],
+    "subcat": "Строки и текст"
+  },
+  "enriched": true
+}

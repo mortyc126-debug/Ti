@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "проверка_свойств_ошибки_promise",
+  "file": "проверка_свойств_ошибки_promise.js",
+  "title": "Проверка свойств ошибки Promise",
+  "lang": "js",
+  "group": "Тестирование / Проверки функций",
+  "desc": "toMatchObject проверяет, что объект содержит указанные поля, а остальные игнорирует. В связке с rejects тест проверяет значения, с которыми отклонился Promise, например HTTP-статус. Это мягче, чем полное сравнение toEqual, и удобно, когда в ошибке есть лишние служебные данные. Проверку нужно ждать через await.",
+  "output": "Тест проходит, если ошибка содержит status: 404.",
+  "tags": [
+    "toMatchObject",
+    "проверки функций"
+  ],
+  "aliases": [
+    "проверка свойств ошибки promise",
+    "toMatchObject"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 56,
+      "text": "toMatchObject",
+      "kind": "fn",
+      "note": "Проверяет наличие ожидаемых свойств у объекта."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

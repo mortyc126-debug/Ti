@@ -1,0 +1,154 @@
+{
+  "schema": 1,
+  "id": "пропуск-теста-node-test",
+  "file": "пропуск-теста-node-test.js",
+  "title": "Пропустить тест: { skip: true }",
+  "lang": "js",
+  "group": "Тестирование / Библиотека тестирования",
+  "desc": "Параметр skip: true помечает тест пропущенным: он виден в отчёте, но не выполняется.",
+  "output": "﹣ загрузка с реального сервера # SKIP\n✔ обычный тест выполняется",
+  "tags": [
+    "node:test",
+    "skip",
+    "пропуск теста",
+    "параметры теста"
+  ],
+  "aliases": [
+    "как пропустить тест в node:test",
+    "test skip true",
+    "временно отключить тест"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 37,
+      "text": "{ skip: true }",
+      "kind": "skip: true — тест пропускается, но остаётся в отчёте.",
+      "note": "kw",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "﹣ загрузка с реального сервера # SKIP\n✔ обычный тест выполняется",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const test = require(\"node:test\");\nconst assert = require(\"node:assert/strict\");\n\ntest(\"загрузка с реального сервера\", { skip: true }, () => {\n  assert.fail(\"не должен выполняться\");\n});\n\ntest(\"обычный тест выполняется\", () => {\n  assert.equal(1 + 1, 2);\n});"
+        },
+        "steps": [
+          "Запусти командой node --test имя-файла.js (нужен Node.js 18+).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "﹣ загрузка с реального сервера # SKIP\n✔ обычный тест выполняется",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Тест проходит",
+            "Тест падает при сломанном коде",
+            "Повторный запуск тестов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Тесты не запускаются",
+            "cause": "Версия Node.js ниже 18 или файл запущен не тем раннером",
+            "solution": "Проверь node --version и запусти node --test имя-файла.js"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "test",
+      "assert"
+    ],
+    "requires": [],
+    "subcat": "Библиотека тестирования"
+  },
+  "enriched": true
+}

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "сформировать-и-скачать-файл-из-текста-или-данные-в-формате-обмена",
+  "file": "сформировать-и-скачать-файл-из-текста-или-данные-в-формате-обмена.js",
+  "title": "Сформировать и скачать файл из текста или данные в формате обмена",
+  "lang": "js",
+  "group": "Файлы / Экспорт данных",
+  "desc": "Создаёт Blob и временную ссылку для скачивания в браузере; удаляет ссылку после клика.",
+  "output": "браузер инициирует скачивание файла",
+  "tags": [
+    "Blob",
+    "download",
+    "экспорт",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "скачать json файл из javascript",
+    "download blob text",
+    "экспорт данных в файл"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

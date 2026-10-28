@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "запись_cookie",
+  "file": "запись_cookie.js",
+  "title": "Запись cookie",
+  "lang": "js",
+  "group": "Хранение / Браузерное хранилище",
+  "desc": "cookieStore — асинхронный API для работы с cookie, альтернатива document.cookie: он возвращает Promise и принимает имя и значение отдельными аргументами, без ручной склейки строки. Поддерживается не везде, поэтому перед использованием проверьте наличие через \"cookieStore\" in window и предусмотрите запасной вариант. Работает только в защищённом контексте (HTTPS). Для чувствительных данных по-прежнему нужны флаги Secure и HttpOnly, которые выставляет сервер.",
+  "output": "Cookie записывается в поддерживающих браузерах.",
+  "tags": [
+    "cookieStore.set",
+    "браузерное хранилище"
+  ],
+  "aliases": [
+    "запись cookie",
+    "cookieStore.set"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 35,
+      "text": "cookieStore.set",
+      "kind": "fn",
+      "note": "Асинхронно записывает cookie."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

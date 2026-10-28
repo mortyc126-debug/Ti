@@ -1,0 +1,182 @@
+{
+  "schema": 1,
+  "id": "печать-страницы",
+  "file": "печать-страницы.js",
+  "title": "Открыть диалог печати: window.print()",
+  "lang": "js",
+  "group": "Интерфейс / Системные возможности",
+  "desc": "window.print() открывает системное окно печати; стили в @media print скрывают при печати лишнее, например саму кнопку.",
+  "output": "По клику открывается окно печати, кнопки «Распечатать» на бумаге нет",
+  "tags": [
+    "window.print",
+    "печать",
+    "@media print",
+    "диалог печати",
+    "отчёт"
+  ],
+  "aliases": [
+    "как вызвать печать страницы js",
+    "window.print пример",
+    "скрыть кнопку при печати",
+    "кнопка распечатать"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 28,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 24,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 29,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 12,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 44,
+      "text": "window.print",
+      "kind": "fn",
+      "note": "print — открывает диалог печати текущей страницы.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "По клику открывается окно печати, кнопки «Распечатать» на бумаге нет",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const printStyle = document.createElement(\"style\");\nprintStyle.textContent = \"@media print { .no-print { display: none; } }\";\ndocument.head.append(printStyle);\n\nconst report = document.createElement(\"article\");\nreport.innerHTML = \"<h1>Отчёт за неделю</h1><p>Продажи выросли на 12%.</p>\";\n\nconst printButton = document.createElement(\"button\");\nprintButton.textContent = \"Распечатать\";\nprintButton.className = \"no-print\";\nprintButton.addEventListener(\"click\", () => window.print());\n\ndocument.body.append(report, printButton);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "По клику открывается окно печати, кнопки «Распечатать» на бумаге нет",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Добавляет на страницу отчёт и кнопку",
+          "Открывает диалог печати"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "printStyle",
+      "report",
+      "printButton"
+    ],
+    "requires": [],
+    "subcat": "Системные возможности"
+  },
+  "enriched": true
+}

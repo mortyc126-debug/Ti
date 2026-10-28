@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Системное меню «Поделиться»",
+  "group": "Интерфейс / Системные возможности",
+  "desc": "Вызываем нативное меню отправки, если браузер его поддерживает.",
+  "code": "const кнопка = document.querySelector(\"#поделиться\");\n\nкнопка.addEventListener(\"click\", async () => {\n  if (!navigator.share) return;\n  await navigator.share({\n    title: \"Статья\",\n    text: \"Посмотри, что я нашёл\",\n    url: location.href,\n  });\n});",
+  "output": "На поддерживающем устройстве открывается системное меню «Поделиться».",
+  "words": {
+    "navigator.share": "Открывает системное меню отправки данных."
+  }
+}

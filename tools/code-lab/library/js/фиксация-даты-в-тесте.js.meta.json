@@ -1,0 +1,179 @@
+{
+  "schema": 1,
+  "id": "фиксация-даты-в-тесте",
+  "file": "фиксация-даты-в-тесте.js",
+  "title": "Зафиксировать текущую дату в тесте: vi.setSystemTime",
+  "lang": "js",
+  "group": "Тестирование / Таймеры",
+  "desc": "vi.setSystemTime подменяет «сейчас» в тесте, поэтому код, зависящий от даты, даёт одинаковый результат при каждом запуске.",
+  "output": "✓ 2 теста пройдено",
+  "tags": [
+    "Vitest",
+    "setSystemTime",
+    "фиксация даты",
+    "fake timers",
+    "тесты времени"
+  ],
+  "aliases": [
+    "как зафиксировать дату в vitest",
+    "подменить new Date в тесте",
+    "setSystemTime пример",
+    "тест с фиксированным временем"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 28,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 4,
+      "text": "vi.setSystemTime",
+      "kind": "fn",
+      "note": "setSystemTime — задаёт текущую дату и время для new Date() и Date.now() в тесте.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 21,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 4,
+      "text": "vi.useRealTimers",
+      "kind": "fn",
+      "note": "useRealTimers — возвращает настоящее время после теста.",
+      "source": "dict"
+    },
+    {
+      "line": 17,
+      "col": 11,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Vitest"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "✓ 2 теста пройдено",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import { afterEach, beforeEach, describe, expect, it, vi } from \"vitest\";\n\nfunction isNewYearDay(now = new Date()) {\n  return now.getUTCMonth() === 0 && now.getUTCDate() === 1;\n}\n\ndescribe(\"isNewYearDay\", () => {\n  beforeEach(() => {\n    vi.useFakeTimers();\n    vi.setSystemTime(new Date(\"2026-01-01T00:00:00Z\"));\n  });\n\n  afterEach(() => {\n    vi.useRealTimers();\n  });\n\n  it(\"текущая дата зафиксирована\", () => {\n    expect(new Date().toISOString()).toBe(\"2026-01-01T00:00:00.000Z\");\n  });\n\n  it(\"в первый день года возвращает true\", () => {\n    expect(isNewYearDay()).toBe(true);\n  });\n});"
+        },
+        "steps": [
+          "Установи Vitest (npm install -D vitest) и запусти npx vitest run имя-файла.js.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "✓ 2 теста пройдено",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Тест проходит",
+            "Тест падает при сломанном коде",
+            "Повторный запуск тестов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Cannot find package 'vitest'",
+            "cause": "Vitest не установлен в проекте",
+            "solution": "Выполни npm install -D vitest"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "isNewYearDay"
+    ],
+    "requires": [],
+    "subcat": "Таймеры"
+  },
+  "enriched": true
+}

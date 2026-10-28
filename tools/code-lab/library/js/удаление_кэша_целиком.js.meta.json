@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "удаление_кэша_целиком",
+  "file": "удаление_кэша_целиком.js",
+  "title": "Удаление кэша целиком",
+  "lang": "js",
+  "group": "Кэширование / Инвалидация",
+  "desc": "caches.delete удаляет Cache Storage целиком по имени и возвращает true, если такой кэш существовал. Типичный сценарий — активация нового Service Worker: он перебирает названия кэшей через caches.keys() и удаляет те, что не совпадают с текущей версией. Так не накапливается устаревший мусор.",
+  "output": "true, если кэш существовал.",
+  "tags": [
+    "caches.delete",
+    "инвалидация"
+  ],
+  "aliases": [
+    "удаление кэша целиком",
+    "caches.delete"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 18,
+      "text": "caches.delete",
+      "kind": "fn",
+      "note": "Удаляет кэш по имени."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

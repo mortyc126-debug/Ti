@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "id": "переменная",
+  "file": "переменная.js",
+  "title": "Переменная",
+  "lang": "js",
+  "group": "Основы / Синтаксис",
+  "desc": "Переменная — именованное место для значения\nПеременная позволяет сохранить какое-то значение и обращаться к нему по имени.\nlet name = \"Алекс\";\nlet age = 25;\nlet isAdmin = false;\n\n\nЗдесь мы создали три переменные:\n\nname\nХранит текст\n\"Алекс\"\n\n\n\n\nage\nХранит число\n25\n\n\n\n\nisAdmin\nХранит логическое значение\nfalse — нет\n\n\n\nМожно представить переменную как подписанный контейнер. Имя позволяет найти значен",
+  "output": "100",
+  "tags": [
+    "переменные",
+    "числа",
+    "синтаксис",
+    "javascript",
+    "основы"
+  ],
+  "aliases": [
+    "как создать переменную с числом",
+    "хранение числовых данных в js",
+    "переменная для цены",
+    "let с числовым значением"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять позже.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "component",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "technology": [
+        "JavaScript"
+      ],
+      "runtime": []
+    },
+    "subcat": "Синтаксис",
+    "summary": {
+      "input": "Входные данные и переменные из примера",
+      "output": "100",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки по коду не определены; проверь, что все используемые переменные объявлены и входные данные имеют ожидаемый формат."
+      ]
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "let цена = 100;"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные.",
+          "Скопируй код в проект и запусти."
+        ]
+      }
+    },
+    "provides": [
+      "цена"
+    ],
+    "requires": []
+  },
+  "legacy": {
+    "template": "js-variable.json"
+  },
+  "enriched": true
+}

@@ -1,0 +1,186 @@
+{
+  "schema": 1,
+  "id": "бинарные-сообщения-websocket-arraybuffer",
+  "file": "бинарные-сообщения-websocket-arraybuffer.js",
+  "title": "Получать бинарные сообщения как ArrayBuffer",
+  "lang": "js",
+  "group": "Сеть / WebSocket",
+  "desc": "socket.binaryType = \"arraybuffer\" заставляет браузер отдавать двоичные данные как ArrayBuffer (по умолчанию — Blob).",
+  "output": "При двоичном сообщении из 4 байт: «Получено байт: 4»",
+  "tags": [
+    "WebSocket",
+    "binaryType",
+    "ArrayBuffer",
+    "двоичные данные"
+  ],
+  "aliases": [
+    "как получить бинарные данные websocket",
+    "binaryType arraybuffer пример",
+    "ArrayBuffer вместо Blob"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "socket.binaryType",
+      "kind": "binaryType — формат двоичных сообщений: \"blob\" или \"arraybuffer\".",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 16,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Сеть"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "При двоичном сообщении из 4 байт: «Получено байт: 4»",
+      "dependencies": [],
+      "requirements": [
+        "Нужен WebSocket-сервер на ws://localhost:8080 (подойдёт любой эхо-сервер)."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const serverUrl = \"ws://localhost:8080\";\nconst socket = new WebSocket(serverUrl);\nsocket.binaryType = \"arraybuffer\";\n\nsocket.addEventListener(\"message\", event => {\n  const bytes = new Uint8Array(event.data);\n  console.log(`Получено байт: ${bytes.length}`);\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "При двоичном сообщении из 4 байт: «Получено байт: 4»",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка соединения",
+            "cause": "Не запущен сервер на ws://localhost:8080",
+            "solution": "Запусти сервер WebSocket или поменяй адрес serverUrl"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "serverUrl",
+      "socket"
+    ],
+    "requires": [],
+    "subcat": "WebSocket"
+  },
+  "enriched": true
+}

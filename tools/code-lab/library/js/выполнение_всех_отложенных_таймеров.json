@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Выполнение всех отложенных таймеров",
+  "group": "Тестирование / Таймеры",
+  "desc": "Мгновенно запускаем все запланированные таймеры, включая цепочки Promise.",
+  "code": "import { test, expect, vi } from \"vitest\";\n\ntest(\"все таймеры отработали\", async () => {\n  vi.useFakeTimers();\n  const журнал = [];\n  setTimeout(() => журнал.push(\"первый\"), 500);\n  setTimeout(() => журнал.push(\"второй\"), 5000);\n\n  await vi.runAllTimersAsync();\n  expect(журнал).toEqual([\"первый\", \"второй\"]);\n  vi.useRealTimers();\n});",
+  "output": "Тест проходит: оба таймера выполнены сразу.",
+  "words": {
+    "runAllTimersAsync": "Запускает все ожидающие таймеры и ждёт связанные Promise."
+  }
+}

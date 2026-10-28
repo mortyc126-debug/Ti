@@ -1,0 +1,213 @@
+{
+  "schema": 1,
+  "id": "сообщения-только-от-доверенного-источника",
+  "file": "сообщения-только-от-доверенного-источника.js",
+  "title": "Принимать сообщения только от доверенного источника",
+  "lang": "js",
+  "group": "Безопасность / Границы данных",
+  "desc": "В обработчике message всегда сверяй event.origin с ожидаемым адресом: сообщения от других страниц нужно игнорировать.",
+  "output": "В консоли «Сообщение принято» только для доверенного источника; чужие сообщения молча отбрасываются",
+  "tags": [
+    "postMessage",
+    "message",
+    "origin",
+    "безопасность",
+    "iframe"
+  ],
+  "aliases": [
+    "как проверить origin в postMessage",
+    "безопасный обмен сообщениями между окнами",
+    "window message event.origin",
+    "принимать сообщения от iframe"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 29,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 25,
+      "text": "message",
+      "kind": "kw",
+      "note": "message — событие, которое срабатывает при получении postMessage.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 6,
+      "text": "event.origin",
+      "kind": "kw",
+      "note": "origin — адрес страницы, приславшей сообщение; ему нельзя доверять без проверки.",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 38,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "if",
+      "kind": "kw",
+      "note": "if — «если»: выполнить блок, только когда условие в скобках истинно.",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 46,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Безопасность"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "В консоли «Сообщение принято» только для доверенного источника; чужие сообщения молча отбрасываются",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const trustedOrigin = \"https://widgets.example.com\";\n\nconst widgetFrame = document.createElement(\"iframe\");\nwidgetFrame.src = `${trustedOrigin}/calendar`;\ndocument.body.append(widgetFrame);\n\nwindow.addEventListener(\"message\", event => {\n  if (event.origin !== trustedOrigin) return;\n  if (typeof event.data?.height !== \"number\") return;\n\n  widgetFrame.style.height = `${event.data.height}px`;\n  console.log(\"Сообщение принято\");\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "В консоли «Сообщение принято» только для доверенного источника; чужие сообщения молча отбрасываются",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Добавляет iframe на страницу",
+          "Меняет высоту iframe"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "trustedOrigin",
+      "widgetFrame"
+    ],
+    "requires": [],
+    "subcat": "Границы данных"
+  },
+  "enriched": true
+}

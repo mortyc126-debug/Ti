@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "ручное_получение_асинхронного_итератора",
+  "file": "ручное_получение_асинхронного_итератора.js",
+  "title": "Ручное получение асинхронного итератора",
+  "lang": "js",
+  "group": "Основы / Итераторы и генераторы",
+  "desc": "Цикл for await...of скрывает работу итератора, но его можно получить и вручную: у асинхронно итерируемого объекта вызывают метод [Symbol.asyncIterator](). Затем многократно вызывают next(), каждый раз ожидая результат. Ручной обход нужен, когда перебор нужно прерывать, продолжать позже или читать значения по одному в разные моменты времени.",
+  "output": "{ value: 'первое', done: false }\n{ value: 'второе', done: false }\n{ value: undefined, done: true }",
+  "tags": [
+    "Symbol.asyncIterator",
+    "next",
+    "итераторы и генераторы"
+  ],
+  "aliases": [
+    "ручное получение асинхронного итератора",
+    "Symbol.asyncIterator",
+    "next"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 5,
+      "col": 29,
+      "text": "Symbol.asyncIterator",
+      "kind": "concept",
+      "note": "Метод, возвращающий асинхронный итератор."
+    },
+    {
+      "line": 7,
+      "col": 27,
+      "text": "next",
+      "kind": "fn",
+      "note": "Запрашивает следующее значение."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

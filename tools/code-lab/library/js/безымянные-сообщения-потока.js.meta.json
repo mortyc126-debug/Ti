@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "id": "безымянные-сообщения-потока",
+  "file": "безымянные-сообщения-потока.js",
+  "title": "Получать сообщения потока без имени события: onmessage",
+  "lang": "js",
+  "group": "Состояние / Потоки обновлений",
+  "desc": "onmessage принимает обычные сообщения (без строки event:); данные приходят строкой, JSON разбирают через JSON.parse.",
+  "output": "Для сообщения data: {\"rate\":92.5} — «Курс: 92.5»",
+  "tags": [
+    "EventSource",
+    "SSE",
+    "onmessage",
+    "JSON.parse"
+  ],
+  "aliases": [
+    "как получить данные из sse js",
+    "source.onmessage пример",
+    "server-sent events клиент"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "source.onmessage",
+      "kind": "onmessage — обработчик обычных сообщений потока.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Состояние"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Для сообщения data: {\"rate\":92.5} — «Курс: 92.5»",
+      "dependencies": [],
+      "requirements": [
+        "Нужен сервер, отдающий поток событий по адресу /events."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const source = new EventSource(\"/events\");\n\nsource.onmessage = event => {\n  const data = JSON.parse(event.data);\n  console.log(`Курс: ${data.rate}`);\n};"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Для сообщения data: {\"rate\":92.5} — «Курс: 92.5»",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Сообщения не приходят",
+            "cause": "Сервер не отдаёт text/event-stream по адресу /events",
+            "solution": "Проверь ответ сервера во вкладке Network"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": true,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "source"
+    ],
+    "requires": [],
+    "subcat": "Потоки обновлений"
+  },
+  "enriched": true
+}

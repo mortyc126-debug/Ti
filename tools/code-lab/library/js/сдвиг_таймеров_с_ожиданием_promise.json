@@ -1,0 +1,12 @@
+{
+  "lang": "js",
+  "title": "Сдвиг таймеров с ожиданием Promise",
+  "group": "Тестирование / Таймеры",
+  "desc": "Продвигаем фальшивое время так, чтобы выполнились и таймеры, и связанные с ними Promise.",
+  "code": "import { test, expect, vi } from \"vitest\";\n\ntest(\"задача выполняется через секунду\", async () => {\n  vi.useFakeTimers();\n  const сделано = vi.fn();\n  setTimeout(async () => { await Promise.resolve(); сделано(); }, 1000);\n\n  await vi.advanceTimersByTimeAsync(1000);\n  expect(сделано).toHaveBeenCalled();\n  vi.useRealTimers();\n});",
+  "output": "Тест проходит без реального ожидания.",
+  "words": {
+    "advanceTimersByTimeAsync": "Сдвигает время и выполняет связанные Promise.",
+    "useFakeTimers": "Подменяет настоящие таймеры."
+  }
+}

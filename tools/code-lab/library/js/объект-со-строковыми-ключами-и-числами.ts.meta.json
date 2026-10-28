@@ -1,0 +1,191 @@
+{
+  "schema": 1,
+  "id": "объект-со-строковыми-ключами-и-числами",
+  "file": "объект-со-строковыми-ключами-и-числами.ts",
+  "title": "Объект со строковыми ключами и числами",
+  "lang": "ts",
+  "group": "Типы TypeScript / Служебные типы",
+  "desc": "Описывает объект со строковыми ключами и числовыми значениями.",
+  "output": "{ 'математика': 5, 'физика': 4, 'химия': 3 }\n3",
+  "tags": [
+    "Record",
+    "словарь",
+    "TypeScript",
+    "строковые ключи"
+  ],
+  "aliases": [
+    "как описать словарь в typescript",
+    "тип record пример",
+    "объект ключ строка значение число",
+    "оценки по предметам",
+    "record string number"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "Record",
+      "kind": "fn",
+      "note": "Record — служебный тип TypeScript: объект с заданными типами ключей и значений.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 12,
+      "text": "Object",
+      "kind": "fn",
+      "note": "Object — встроенный объект с утилитами для работы с объектами.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 19,
+      "text": "keys",
+      "kind": "fn",
+      "note": "keys — возвращает массив собственных перечислимых ключей объекта.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 32,
+      "text": "length",
+      "kind": "fn",
+      "note": "length — длина строки или количество элементов массива.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Типы TypeScript"
+      ],
+      "runtime": [
+        "Node.js"
+      ],
+      "technology": [
+        "TypeScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "{ 'математика': 5, 'физика': 4, 'химия': 3 }\n3",
+      "dependencies": [],
+      "requirements": [
+        "Нужен TypeScript или Node.js с поддержкой удаления типов; в рантайме типы исчезают, а поведение остаётся обычным.",
+        "Внешние библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "ts",
+          "content": "const оценки: Record<string, number> = { математика: 5, физика: 4 };\nоценки[\"химия\"] = 3;\nconsole.log(оценки);\nconsole.log(Object.keys(оценки).length);"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "{ 'математика': 5, 'физика': 4, 'химия': 3 }\n3",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          },
+          {
+            "symptom": "SyntaxError при запуске файла",
+            "cause": "Среда не умеет стирать типы TypeScript",
+            "solution": "Запусти через компилятор TypeScript или Node.js с поддержкой удаления типов"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "оценки"
+    ],
+    "requires": [],
+    "subcat": "Служебные типы"
+  },
+  "enriched": true
+}

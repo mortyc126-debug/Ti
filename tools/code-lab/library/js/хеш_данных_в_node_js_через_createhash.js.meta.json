@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "хеш_данных_в_node_js_через_createhash",
+  "file": "хеш_данных_в_node_js_через_createhash.js",
+  "title": "Хеш данных в Node.js через createHash",
+  "lang": "js",
+  "group": "Безопасность / Криптография",
+  "desc": "createHash из node:crypto создаёт объект хеширования: update добавляет данные (можно вызывать несколько раз, например для потока), а digest завершает вычисление и возвращает результат в нужном виде — hex, base64 или Buffer. После digest объект использовать повторно нельзя. Для паролей используйте scrypt или argon2, а не простой хеш.",
+  "output": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+  "tags": [
+    "createHash",
+    "digest",
+    "криптография"
+  ],
+  "aliases": [
+    "хеш данных в node.js через createhash",
+    "createHash",
+    "digest"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 9,
+      "text": "createHash",
+      "kind": "concept",
+      "note": "Создаёт объект хеширования."
+    },
+    {
+      "line": 2,
+      "col": 47,
+      "text": "digest",
+      "kind": "fn",
+      "note": "Завершает вычисление и возвращает хеш."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

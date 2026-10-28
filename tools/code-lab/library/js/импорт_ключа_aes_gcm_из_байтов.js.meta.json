@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "импорт_ключа_aes_gcm_из_байтов",
+  "file": "импорт_ключа_aes_gcm_из_байтов.js",
+  "title": "Импорт ключа AES-GCM из байтов",
+  "lang": "js",
+  "group": "Безопасность / Криптография",
+  "desc": "Если ключ хранится как массив байт, его нужно импортировать в Web Crypto методом importKey с форматом raw. Указывают алгоритм, признак extractable (false — ключ нельзя экспортировать обратно) и список допустимых операций. Для AES-256 нужны ровно 32 байта. После импорта ключ используют в encrypt и decrypt.",
+  "output": "AES-GCM false",
+  "tags": [
+    "importKey",
+    "raw",
+    "криптография"
+  ],
+  "aliases": [
+    "импорт ключа aes-gcm из байтов",
+    "importKey",
+    "raw"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 33,
+      "text": "importKey",
+      "kind": "fn",
+      "note": "Импортирует ключ из заданного формата."
+    },
+    {
+      "line": 3,
+      "col": 3,
+      "text": "raw",
+      "kind": "concept",
+      "note": "Формат: ключ как обычные байты."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

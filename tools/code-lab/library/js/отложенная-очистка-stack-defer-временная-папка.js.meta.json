@@ -1,0 +1,220 @@
+{
+  "schema": 1,
+  "id": "отложенная-очистка-stack-defer-временная-папка",
+  "file": "отложенная-очистка-stack-defer-временная-папка.js",
+  "title": "Добавить действие очистки в стек: stack.defer(() => cleanup())",
+  "lang": "js",
+  "group": "Основы / Управление ресурсами",
+  "desc": "stack.defer регистрирует функцию очистки сразу после создания ресурса; при выходе из функции стек выполнит её сам, даже если произошла ошибка.",
+  "output": "временная папка создана\nотчёт собирается\nпапка /tmp/report-work удалена",
+  "tags": [
+    "DisposableStack",
+    "defer",
+    "очистка",
+    "временные файлы",
+    "using"
+  ],
+  "aliases": [
+    "как отложить очистку в js",
+    "stack.defer пример",
+    "аналог defer в javascript"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "return",
+      "kind": "kw",
+      "note": "return — вернуть результат из функции и завершить её выполнение.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 16,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 11,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 2,
+      "text": "stack.defer",
+      "kind": "defer — добавляет действие очистки, которое выполнится при освобождении стека.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Основы"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "временная папка создана\nотчёт собирается\nпапка /tmp/report-work удалена",
+      "dependencies": [],
+      "requirements": [
+        "Нужен Node.js 24 или новее (explicit resource management)."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "function createTempDir() {\n  console.log(\"временная папка создана\");\n  return \"/tmp/report-work\";\n}\n\nfunction removeTempDir(path) {\n  console.log(`папка ${path} удалена`);\n}\n\nfunction buildReport() {\n  using stack = new DisposableStack();\n  const tempDir = createTempDir();\n  stack.defer(() => removeTempDir(tempDir));\n\n  console.log(\"отчёт собирается\");\n}\n\nbuildReport();"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "временная папка создана\nотчёт собирается\nпапка /tmp/report-work удалена",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "ReferenceError: DisposableStack is not defined",
+            "cause": "Среда не поддерживает DisposableStack (Node.js ниже 24)",
+            "solution": "Обнови Node.js до 24+"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "createTempDir",
+      "removeTempDir",
+      "buildReport"
+    ],
+    "requires": [],
+    "subcat": "Управление ресурсами"
+  },
+  "enriched": true
+}

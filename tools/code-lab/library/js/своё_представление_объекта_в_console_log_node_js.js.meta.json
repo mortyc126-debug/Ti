@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "своё_представление_объекта_в_console_log_node_js",
+  "file": "своё_представление_объекта_в_console_log_node_js.js",
+  "title": "Своё представление объекта в console.log Node.js",
+  "lang": "js",
+  "group": "Основы / Классы и наследование",
+  "desc": "В Node.js console.log использует util.inspect для вывода объектов. Если у класса есть метод с ключом util.inspect.custom, он определяет, как объект будет выглядеть в консоли. Это удобно для скрытия служебных полей или для краткого представления сложных объектов. Метод возвращает строку или другое значение, которое Node.js выведет само. Только Node.js поддерживает такой ключ: в браузере он будет проигнорирован.",
+  "output": "Пользователь<Мира>",
+  "tags": [
+    "util.inspect.custom",
+    "классы и наследование"
+  ],
+  "aliases": [
+    "своё представление объекта в console.log node.js",
+    "util.inspect.custom"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 6,
+      "col": 3,
+      "text": "util.inspect.custom",
+      "kind": "concept",
+      "note": "Символ, позволяющий задать свой вид объекта при выводе в Node.js."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,153 @@
+{
+  "schema": 1,
+  "id": "смещение-указателя-movementx",
+  "file": "смещение-указателя-movementx.js",
+  "title": "Смещение указателя по горизонтали с прошлого события: movementX",
+  "lang": "js",
+  "group": "Интерфейс / Реакция на действия пользователя",
+  "desc": "movementX — на сколько пикселей сдвинулся указатель с прошлого mousemove; сумма таких смещений даёт перемещение без координат окна.",
+  "output": "Сдвиг: 5, всего: 5\nСдвиг: -2, всего: 3",
+  "tags": [
+    "movementX",
+    "mousemove",
+    "смещение мыши",
+    "события мыши"
+  ],
+  "aliases": [
+    "как получить смещение мыши js",
+    "event.movementX пример",
+    "движение мыши без координат"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "let",
+      "kind": "kw",
+      "note": "let — объявляет переменную, значение которой можно менять.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 9,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 16,
+      "text": "event.movementX",
+      "kind": "movementX — смещение указателя по горизонтали с прошлого события.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Сдвиг: 5, всего: 5\nСдвиг: -2, всего: 3",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "let totalShift = 0;\n\ndocument.addEventListener(\"mousemove\", event => {\n  totalShift += event.movementX;\n  console.log(`Сдвиг: ${event.movementX}, всего: ${totalShift}`);\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Сдвиг: 5, всего: 5\nСдвиг: -2, всего: 3",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "totalShift"
+    ],
+    "requires": [],
+    "subcat": "Реакция на действия пользователя"
+  },
+  "enriched": true
+}

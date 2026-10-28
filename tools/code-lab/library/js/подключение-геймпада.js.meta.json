@@ -1,0 +1,193 @@
+{
+  "schema": 1,
+  "id": "подключение-геймпада",
+  "file": "подключение-геймпада.js",
+  "title": "Реакция на подключение геймпада",
+  "lang": "js",
+  "group": "Интерфейс / Системные возможности",
+  "desc": "Событие gamepadconnected срабатывает, когда браузер увидел геймпад (после нажатия любой его кнопки); в событии лежит описание устройства.",
+  "output": "После нажатия кнопки на геймпаде: «Геймпад подключён: …» и число кнопок",
+  "tags": [
+    "Gamepad API",
+    "gamepadconnected",
+    "геймпад",
+    "события окна",
+    "игры"
+  ],
+  "aliases": [
+    "как определить подключение геймпада js",
+    "gamepadconnected пример",
+    "Gamepad API событие",
+    "подключённый контроллер в браузере"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 25,
+      "text": "gamepadconnected",
+      "kind": "kw",
+      "note": "gamepadconnected — браузер обнаружил подключённый геймпад.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 36,
+      "text": "event.gamepad",
+      "kind": "fn",
+      "note": "gamepad — описание устройства: id, кнопки, оси.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 7,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "После нажатия кнопки на геймпаде: «Геймпад подключён: …» и число кнопок",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "window.addEventListener(\"gamepadconnected\", event => {\n  console.log(`Геймпад подключён: ${event.gamepad.id}`);\n  console.log(`Кнопок: ${event.gamepad.buttons.length}`);\n});\n\nwindow.addEventListener(\"gamepaddisconnected\", event => {\n  console.log(`Геймпад отключён: ${event.gamepad.id}`);\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "После нажатия кнопки на геймпаде: «Геймпад подключён: …» и число кнопок",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Системные возможности"
+  },
+  "enriched": true
+}

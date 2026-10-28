@@ -1,0 +1,172 @@
+{
+  "schema": 1,
+  "id": "подробный-вывод-объекта-inspect",
+  "file": "подробный-вывод-объекта-inspect.js",
+  "title": "Подробный вывод значения: util.inspect",
+  "lang": "js",
+  "group": "Повседневная разработка / Процессы и отладка",
+  "desc": "util.inspect превращает значение в строку; depth: null раскрывает вложенность целиком, colors: true подсвечивает типы цветом в терминале.",
+  "output": "{\n  id: 7,\n  customer: {\n    name: 'Мира',\n    address: { city: 'Лиссабон', geo: { lat: 38.72, lon: -9.14 } }\n  }\n}",
+  "tags": [
+    "util.inspect",
+    "отладка",
+    "вложенные объекты",
+    "вывод в консоль",
+    "colors"
+  ],
+  "aliases": [
+    "как вывести вложенный объект целиком в node",
+    "console.log Object depth null",
+    "inspect с цветами",
+    "раскрыть вложенные объекты в консоли"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 13,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 12,
+      "text": "util.inspect",
+      "kind": "fn",
+      "note": "inspect — строковое представление значения для отладки.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 34,
+      "text": "depth: null",
+      "kind": "kw",
+      "note": "depth: null — раскрывать вложенность без ограничения (по умолчанию глубина 2).",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Повседневная разработка"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "{\n  id: 7,\n  customer: {\n    name: 'Мира',\n    address: { city: 'Лиссабон', geo: { lat: 38.72, lon: -9.14 } }\n  }\n}",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const util = require(\"node:util\");\n\nconst order = {\n  id: 7,\n  customer: {\n    name: \"Мира\",\n    address: { city: \"Лиссабон\", geo: { lat: 38.72, lon: -9.14 } },\n  },\n};\n\nconsole.log(util.inspect(order, { depth: null, colors: true }));"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "{\n  id: 7,\n  customer: {\n    name: 'Мира',\n    address: { city: 'Лиссабон', geo: { lat: 38.72, lon: -9.14 } }\n  }\n}",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "util",
+      "order"
+    ],
+    "requires": [],
+    "subcat": "Процессы и отладка"
+  },
+  "enriched": true
+}

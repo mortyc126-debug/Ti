@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "сохранение_записи_indexeddb",
+  "file": "сохранение_записи_indexeddb.js",
+  "title": "Сохранение записи IndexedDB",
+  "lang": "js",
+  "group": "Базы данных / Целостность",
+  "desc": "put записывает объект в хранилище IndexedDB: если запись с таким ключом уже есть, она заменяется, если нет — создаётся. Пример использует обёртку idb, которая превращает колбэки IndexedDB в Promise, поэтому код выглядит как обычный await. Ключ берётся из поля id, если хранилище создано с keyPath. Если нужно запретить перезапись, используйте add.",
+  "output": "Запись добавлена или заменена.",
+  "tags": [
+    "db.put",
+    "целостность"
+  ],
+  "aliases": [
+    "сохранение записи indexeddb",
+    "db.put"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 6,
+      "text": "db.put",
+      "kind": "fn",
+      "note": "Добавляет или заменяет запись через библиотеку idb."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "очистка_хранилища_indexeddb",
+  "file": "очистка_хранилища_indexeddb.js",
+  "title": "Очистка хранилища IndexedDB",
+  "lang": "js",
+  "group": "Базы данных / Целостность",
+  "desc": "Метод clear удаляет все записи из хранилища, но оставляет само хранилище и его индексы. Операция необратима и выполняется только в транзакции для записи. Чтобы убедиться в результате, вызывают count: он вернёт 0. Если нужно убрать только часть записей, используйте delete с ключом или диапазоном.",
+  "output": "0",
+  "tags": [
+    "clear",
+    "count",
+    "целостность"
+  ],
+  "aliases": [
+    "очистка хранилища indexeddb",
+    "clear",
+    "count"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 7,
+      "col": 21,
+      "text": "clear",
+      "kind": "fn",
+      "note": "Удаляет все записи хранилища."
+    },
+    {
+      "line": 9,
+      "col": 33,
+      "text": "count",
+      "kind": "fn",
+      "note": "Возвращает число записей."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

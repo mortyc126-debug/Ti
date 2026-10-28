@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "проверка_новой_версии_service_worker",
+  "file": "проверка_новой_версии_service_worker.js",
+  "title": "Проверка новой версии Service Worker",
+  "lang": "js",
+  "group": "Кэширование / Service Worker",
+  "desc": "Метод update просит браузер заново запросить скрипт Service Worker и сравнить его с установленным. Если файл изменился, новая версия устанавливается и переходит в состояние waiting до закрытия старых вкладок или вызова skipWaiting. Браузер и сам проверяет обновления при навигации, но вручную полезно делать это в долгоживущих приложениях. Обычно рядом показывают пользователю кнопку «Обновить».",
+  "output": "Ожидает активации: true, если найдена новая версия.",
+  "tags": [
+    "update",
+    "service worker"
+  ],
+  "aliases": [
+    "проверка новой версии service worker",
+    "update"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 18,
+      "text": "update",
+      "kind": "fn",
+      "note": "Запрашивает скрипт Service Worker и ищет новую версию."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

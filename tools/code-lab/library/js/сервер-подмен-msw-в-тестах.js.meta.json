@@ -1,0 +1,214 @@
+{
+  "schema": 1,
+  "id": "сервер-подмен-msw-в-тестах",
+  "file": "сервер-подмен-msw-в-тестах.js",
+  "title": "Запустить, сбросить и остановить сервер подмен MSW",
+  "lang": "js",
+  "group": "Тестирование и отладка / Mock",
+  "desc": "setupServer из MSW перехватывает сетевые запросы в тестах: server.listen() перед всеми тестами, resetHandlers() после каждого, close() в конце.",
+  "output": "✓ 1 тест пройден",
+  "tags": [
+    "MSW",
+    "setupServer",
+    "мок API",
+    "жизненный цикл тестов",
+    "Vitest"
+  ],
+  "aliases": [
+    "как подключить msw к vitest",
+    "server.listen resetHandlers close",
+    "подмена запросов без реальной сети"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "import",
+      "kind": "kw",
+      "note": "import — подключить имена из другого модуля.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 16,
+      "text": "server.listen",
+      "kind": "listen — включает перехват запросов.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 16,
+      "text": "server.resetHandlers",
+      "kind": "resetHandlers — убирает подмены, добавленные в отдельном тесте.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 15,
+      "text": "server.close",
+      "kind": "close — выключает перехват.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 48,
+      "text": "async",
+      "kind": "kw",
+      "note": "async — функция, внутри которой можно использовать await.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 19,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — дождаться завершения асинхронной операции и взять её результат.",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 15,
+      "text": "await",
+      "kind": "kw",
+      "note": "await — дождаться завершения асинхронной операции и взять её результат.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Тестирование и отладка"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Vitest"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "✓ 1 тест пройден",
+      "dependencies": [
+        "vitest",
+        "msw"
+      ],
+      "requirements": [
+        "Нужен пакет vitest.",
+        "Нужен пакет msw."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "import { http, HttpResponse } from \"msw\";\nimport { setupServer } from \"msw/node\";\nimport { afterAll, afterEach, beforeAll, expect, it } from \"vitest\";\n\nconst server = setupServer(\n  http.get(\"https://api.example.com/user\", () => HttpResponse.json({ name: \"Мира\" }))\n);\n\nbeforeAll(() => server.listen());\nafterEach(() => server.resetHandlers());\nafterAll(() => server.close());\n\nit(\"получает пользователя из подменённого API\", async () => {\n  const response = await fetch(\"https://api.example.com/user\");\n  const user = await response.json();\n\n  expect(user.name).toBe(\"Мира\");\n});"
+        },
+        "steps": [
+          "Установи Vitest (npm install -D vitest) и запусти npx vitest run имя-файла.js.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "✓ 1 тест пройден",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Тест проходит",
+            "Тест падает при сломанном коде",
+            "Повторный запуск тестов"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Cannot find package 'vitest'",
+            "cause": "Vitest не установлен в проекте",
+            "solution": "Выполни npm install -D vitest"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "server"
+    ],
+    "requires": [],
+    "subcat": "Mock"
+  },
+  "enriched": true
+}

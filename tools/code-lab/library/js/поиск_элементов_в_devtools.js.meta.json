@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "поиск_элементов_в_devtools",
+  "file": "поиск_элементов_в_devtools.js",
+  "title": "Поиск элементов в DevTools",
+  "lang": "js",
+  "group": "Интерфейс / Наблюдение за DOM",
+  "desc": "$$(селектор) — сокращение консоли DevTools, которое возвращает настоящий массив всех элементов, подходящих под CSS-селектор. В отличие от document.querySelectorAll, результат сразу можно обрабатывать методами массива: map, filter и другими. Работает только в консоли браузера. В коде страницы используйте document.querySelectorAll.",
+  "output": "Количество элементов с классом карточка.",
+  "tags": [
+    "$$",
+    "наблюдение за dom"
+  ],
+  "aliases": [
+    "поиск элементов в devtools",
+    "$$"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 17,
+      "text": "$$",
+      "kind": "fn",
+      "note": "Возвращает массив элементов по CSS-селектору в DevTools."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

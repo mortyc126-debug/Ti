@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "проверка_встроенной_валидации_поля",
+  "file": "проверка_встроенной_валидации_поля.js",
+  "title": "Проверка встроенной валидации поля",
+  "lang": "js",
+  "group": "Интерфейс / Поля и состояния форм",
+  "desc": "checkValidity проверяет ограничения HTML-поля: required, pattern, min, max, type=email и другие. Метод возвращает логическое значение и вызывает событие invalid. Текст причины лежит в validationMessage, а подробности — в validity. Для показа стандартных сообщений браузера есть reportValidity. Встроенная валидация удобна, но не заменяет проверку данных на сервере.",
+  "output": "Если поле заполнено неверно, выводится сообщение браузера.",
+  "tags": [
+    "checkValidity",
+    "validationMessage",
+    "поля и состояния форм"
+  ],
+  "aliases": [
+    "проверка встроенной валидации поля",
+    "checkValidity",
+    "validationMessage"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 10,
+      "text": "checkValidity",
+      "kind": "fn",
+      "note": "Проверяет ограничения поля и возвращает true или false."
+    },
+    {
+      "line": 3,
+      "col": 19,
+      "text": "validationMessage",
+      "kind": "concept",
+      "note": "Текст причины ошибки валидации."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

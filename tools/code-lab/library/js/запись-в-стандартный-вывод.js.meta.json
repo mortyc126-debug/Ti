@@ -1,0 +1,182 @@
+{
+  "schema": 1,
+  "id": "запись-в-стандартный-вывод",
+  "file": "запись-в-стандартный-вывод.js",
+  "title": "Запись в стандартный вывод",
+  "lang": "js",
+  "group": "Node.js: процесс, файлы и сервер / Процесс",
+  "desc": "Записывает текст в стандартный вывод без перевода строки.",
+  "output": "без перевода строки",
+  "tags": [
+    "process.stdout",
+    "вывод без перевода строки",
+    "запись",
+    "поток"
+  ],
+  "aliases": [
+    "как вывести текст без перевода строки в node",
+    "process stdout write пример",
+    "вывод частями в одну строку",
+    "разница с console log",
+    "прогресс в одной строке"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "process",
+      "kind": "fn",
+      "note": "process — объект текущего процесса Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "stdout",
+      "kind": "fn",
+      "note": "stdout — стандартный вывод процесса.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 15,
+      "text": "write",
+      "kind": "fn",
+      "note": "write — записывает данные в поток.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "process",
+      "kind": "fn",
+      "note": "process — объект текущего процесса Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "stdout",
+      "kind": "fn",
+      "note": "stdout — стандартный вывод процесса.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 15,
+      "text": "write",
+      "kind": "fn",
+      "note": "write — записывает данные в поток.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "process",
+      "kind": "fn",
+      "note": "process — объект текущего процесса Node.js.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "stdout",
+      "kind": "fn",
+      "note": "stdout — стандартный вывод процесса.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 15,
+      "text": "write",
+      "kind": "fn",
+      "note": "write — записывает данные в поток.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Node.js: процесс, файлы и сервер"
+      ],
+      "runtime": [
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "без перевода строки",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js.",
+        "Нужен Node.js той версии, где есть используемые встроенные модули."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "process.stdout.write(\"без перевода\");\nprocess.stdout.write(\" строки\");\nprocess.stdout.write(\"\\n\");"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "без перевода строки",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Процесс"
+  },
+  "enriched": true
+}

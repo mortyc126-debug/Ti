@@ -1,0 +1,178 @@
+{
+  "schema": 1,
+  "id": "принудительный-пересчёт-раскладки-offsetheight",
+  "file": "принудительный-пересчёт-раскладки-offsetheight.js",
+  "title": "Высота элемента и принудительный пересчёт раскладки: offsetHeight",
+  "lang": "js",
+  "group": "Интерфейс / Производительность",
+  "desc": "Чтение offsetHeight заставляет браузер сразу пересчитать раскладку: это пригождается для перезапуска CSS-анимации, но в циклах замедляет страницу.",
+  "output": "104\npulse",
+  "tags": [
+    "offsetHeight",
+    "reflow",
+    "перезапуск анимации",
+    "производительность"
+  ],
+  "aliases": [
+    "что такое принудительный reflow",
+    "offsetHeight пример",
+    "перезапустить css анимацию"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 41,
+      "text": "class",
+      "kind": "kw",
+      "note": "class — объявить класс.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 16,
+      "text": "offsetHeight",
+      "kind": "offsetHeight — высота элемента с рамками; чтение вызывает пересчёт раскладки.",
+      "note": "fn",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Интерфейс"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "104\npulse",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "document.body.innerHTML = '<div id=\"box\" class=\"pulse\" style=\"height: 80px; padding: 10px; border: 2px solid\">Блок</div>';\nconst box = document.querySelector(\"#box\");\n\nconsole.log(box.offsetHeight);\n\nfunction restartAnimation(target) {\n  target.classList.remove(\"pulse\");\n  void target.offsetHeight;\n  target.classList.add(\"pulse\");\n}\n\nrestartAnimation(box);\nconsole.log(box.className);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "104\npulse",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "box",
+      "restartAnimation"
+    ],
+    "requires": [],
+    "subcat": "Производительность"
+  },
+  "enriched": true
+}

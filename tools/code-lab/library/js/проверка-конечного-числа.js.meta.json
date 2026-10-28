@@ -1,0 +1,268 @@
+{
+  "schema": 1,
+  "id": "проверка-конечного-числа",
+  "file": "проверка-конечного-числа.js",
+  "title": "Проверка конечного числа",
+  "lang": "js",
+  "group": "Числа и вычисления / Округление и проверка чисел",
+  "desc": "Проверяет, что значение является конечным числом.",
+  "output": "true\nfalse\nfalse\ntrue",
+  "tags": [
+    "конечное число",
+    "isFinite",
+    "NaN",
+    "бесконечность",
+    "проверка числа"
+  ],
+  "aliases": [
+    "как проверить что это число в js",
+    "number isfinite javascript",
+    "проверка на nan",
+    "проверка на бесконечность",
+    "является ли значение конечным числом"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 12,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — преобразует значение в число; содержит проверки вроде Number.isFinite.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 19,
+      "text": "isFinite",
+      "kind": "fn",
+      "note": "isFinite — true только для конечных чисел типа number.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — преобразует значение в число; содержит проверки вроде Number.isFinite.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 19,
+      "text": "isFinite",
+      "kind": "fn",
+      "note": "isFinite — true только для конечных чисел типа number.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 28,
+      "text": "Infinity",
+      "kind": "kw",
+      "note": "Infinity — бесконечность.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — преобразует значение в число; содержит проверки вроде Number.isFinite.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 19,
+      "text": "isFinite",
+      "kind": "fn",
+      "note": "isFinite — true только для конечных чисел типа number.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 28,
+      "text": "NaN",
+      "kind": "kw",
+      "note": "NaN — специальное значение «не число», результат неудачной числовой операции.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 12,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — преобразует значение в число; содержит проверки вроде Number.isFinite.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 19,
+      "text": "isNaN",
+      "kind": "fn",
+      "note": "isNaN — проверяет, что значение равно NaN.",
+      "source": "dict"
+    },
+    {
+      "line": 3,
+      "col": 25,
+      "text": "NaN",
+      "kind": "kw",
+      "note": "NaN — специальное значение «не число», результат неудачной числовой операции.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Числа и вычисления"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "true\nfalse\nfalse\ntrue",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в консоли браузера.",
+        "Проверь, что все используемые переменные объявлены и имеют ожидаемый формат."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "console.log(Number.isFinite(12.5)); // true\nconsole.log(Number.isFinite(Infinity)); // false\nconsole.log(Number.isFinite(NaN)); // false\nconsole.log(Number.isNaN(NaN)); // true"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "true\nfalse\nfalse\ntrue",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [
+          "Number.isFinite — true только для конечных чисел типа number.",
+          "NaN — специальное значение, обозначающее нечисловой результат."
+        ],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Округление и проверка чисел"
+  },
+  "enriched": true
+}

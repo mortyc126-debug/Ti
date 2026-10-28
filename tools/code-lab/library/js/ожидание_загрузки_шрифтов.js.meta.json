@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "id": "ожидание_загрузки_шрифтов",
+  "file": "ожидание_загрузки_шрифтов.js",
+  "title": "Ожидание загрузки шрифтов",
+  "lang": "js",
+  "group": "Интерфейс / Жизненный цикл",
+  "desc": "document.fonts.ready — Promise, который выполняется, когда страница закончила загрузку всех используемых шрифтов. Дождитесь его, прежде чем измерять размеры текста или рисовать надписи на canvas: до загрузки браузер подставляет запасной шрифт, и размеры окажутся неверными. Для конкретного шрифта есть document.fonts.load и document.fonts.check.",
+  "output": "Шрифты готовы",
+  "tags": [
+    "document.fonts.ready",
+    "жизненный цикл"
+  ],
+  "aliases": [
+    "ожидание загрузки шрифтов",
+    "document.fonts.ready"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 6,
+      "text": "document.fonts.ready",
+      "kind": "concept",
+      "note": "Promise готовности используемых шрифтов."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

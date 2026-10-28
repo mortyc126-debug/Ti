@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Выбранный элемент DevTools",
+  "group": "Интерфейс / Наблюдение за DOM",
+  "desc": "Выбранный элемент DevTools.",
+  "code": "// После выбора элемента во вкладке Elements:\nconsole.log($0.tagName);",
+  "output": "Например, DIV",
+  "words": {
+    "$0": "Ссылка на последний выбранный элемент DevTools."
+  }
+}

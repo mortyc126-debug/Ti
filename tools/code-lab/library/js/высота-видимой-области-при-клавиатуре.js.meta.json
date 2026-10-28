@@ -1,0 +1,197 @@
+{
+  "schema": 1,
+  "id": "высота-видимой-области-при-клавиатуре",
+  "file": "высота-видимой-области-при-клавиатуре.js",
+  "title": "Высота видимой области при экранной клавиатуре",
+  "lang": "js",
+  "group": "CSS: адаптивность / Экраны разных размеров",
+  "desc": "window.visualViewport.height показывает высоту реально видимой области: на телефоне она уменьшается, когда открывается экранная клавиатура, и панель можно поднять над ней.",
+  "output": "В консоли «Высота видимой области: …px», при открытии клавиатуры число уменьшается, а панель остаётся над клавиатурой",
+  "tags": [
+    "visualViewport",
+    "экранная клавиатура",
+    "видимая область",
+    "адаптивность",
+    "мобильные"
+  ],
+  "aliases": [
+    "как поднять поле ввода над клавиатурой js",
+    "visualViewport.height пример",
+    "высота экрана без клавиатуры",
+    "узнать видимую область на телефоне"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 23,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 12,
+      "col": 0,
+      "text": "function",
+      "kind": "kw",
+      "note": "function — объявить функцию.",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 13,
+      "col": 19,
+      "text": "window.visualViewport",
+      "kind": "fn",
+      "note": "visualViewport — видимая часть страницы; уменьшается при появлении клавиатуры.",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 2,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 14,
+      "col": 57,
+      "text": "height",
+      "kind": "kw",
+      "note": "height — высота видимой области в пикселях.",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 16,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 20,
+      "col": 22,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "CSS: адаптивность"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "В консоли «Высота видимой области: …px», при открытии клавиатуры число уменьшается, а панель остаётся над клавиатурой",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const panel = document.createElement(\"div\");\npanel.textContent = \"Панель над клавиатурой\";\nObject.assign(panel.style, {\n  position: \"fixed\",\n  left: \"0\",\n  right: \"0\",\n  bottom: \"0\",\n  padding: \"12px\",\n  background: \"#eee\",\n});\ndocument.body.append(panel);\n\nfunction placePanel() {\n  const viewport = window.visualViewport;\n  const hiddenByKeyboard = window.innerHeight - viewport.height - viewport.offsetTop;\n  panel.style.bottom = `${Math.max(0, hiddenByKeyboard)}px`;\n  console.log(`Высота видимой области: ${Math.round(window.visualViewport.height)}px`);\n}\n\nplacePanel();\nwindow.visualViewport.addEventListener(\"resize\", placePanel);"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "В консоли «Высота видимой области: …px», при открытии клавиатуры число уменьшается, а панель остаётся над клавиатурой",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ничего не происходит или document/window не определены",
+            "cause": "Код запущен в Node.js, а не в браузере",
+            "solution": "Вставь код в консоль браузера или подключи через <script>"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Добавляет панель, закреплённую внизу экрана",
+          "Выводит высоту в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "panel",
+      "placePanel"
+    ],
+    "requires": [],
+    "subcat": "Экраны разных размеров"
+  },
+  "enriched": true
+}

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "рассчитать-процентное-изменение-с-проверкой-базы",
+  "file": "рассчитать-процентное-изменение-с-проверкой-базы.js",
+  "title": "Рассчитать процентное изменение с проверкой базы",
+  "lang": "js",
+  "group": "Математика / Метрики",
+  "desc": "Возвращает процент изменения и отдельно обрабатывает нулевую базу, чтобы не маскировать деление на ноль.",
+  "output": "25",
+  "tags": [
+    "процент",
+    "изменение",
+    "деление на ноль",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "процентное изменение значения",
+    "изменение в процентах от прошлого",
+    "percent change"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

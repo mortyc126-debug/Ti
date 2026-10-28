@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "id": "заменить-совпадения-функцией",
+  "file": "заменить-совпадения-функцией.js",
+  "lang": "js",
+  "title": "Заменить совпадения функцией",
+  "group": "Данные / Разбор текста",
+  "desc": "Функция-замена получает совпадение и может вычислять результат для каждого найденного фрагмента.",
+  "output": "цена=20; цена=50",
+  "descAt": 1792998607382,
+  "component": {
+    "provides": [
+      "строка",
+      "результат"
+    ],
+    "requires": [
+      "d",
+      "g"
+    ],
+    "tags": {
+      "purpose": [
+        "Данные"
+      ]
+    },
+    "subcat": "Разбор текста"
+  },
+  "tags": [
+    "replace",
+    "RegExp",
+    "callback"
+  ],
+  "aliases": [
+    "заменить числа в строке",
+    "replace с функцией",
+    "динамическая замена совпадений"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "объявить переменную, которой нельзя переназначить значение",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 25,
+      "text": "replace",
+      "kind": "fn",
+      "note": "replace — заменить часть строки на другую.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 57,
+      "text": "Number",
+      "kind": "fn",
+      "note": "Number — превращает значение в число",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ]
+}

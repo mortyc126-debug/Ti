@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "id": "загрузка_вершин_в_буфер_видеопамяти_webgl",
+  "file": "загрузка_вершин_в_буфер_видеопамяти_webgl.js",
+  "title": "Загрузка вершин в буфер видеопамяти WebGL",
+  "lang": "js",
+  "group": "Графика и визуализация / WebGL",
+  "desc": "В WebGL данные для рисования хранятся в буферах видеопамяти. Порядок такой: создать буфер (createBuffer), сделать его текущим (bindBuffer) и загрузить данные (bufferData). Данные передаются типизированным массивом Float32Array. Последний аргумент подсказывает видеокарте, как часто данные будут меняться: STATIC_DRAW — почти никогда. После загрузки буфер подключают к атрибуту шейдера.",
+  "output": "Координаты треугольника загружены в видеопамять.",
+  "tags": [
+    "createBuffer",
+    "bufferData",
+    "STATIC_DRAW",
+    "webgl"
+  ],
+  "aliases": [
+    "загрузка вершин в буфер видеопамяти webgl",
+    "createBuffer",
+    "bufferData",
+    "STATIC_DRAW"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 4,
+      "col": 23,
+      "text": "createBuffer",
+      "kind": "fn",
+      "note": "Создаёт буфер в видеопамяти."
+    },
+    {
+      "line": 6,
+      "col": 9,
+      "text": "bufferData",
+      "kind": "fn",
+      "note": "Загружает данные в текущий буфер."
+    },
+    {
+      "line": 6,
+      "col": 79,
+      "text": "STATIC_DRAW",
+      "kind": "concept",
+      "note": "Подсказка: данные меняются редко."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

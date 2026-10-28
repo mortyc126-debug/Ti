@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "собрать-конвейер-преобразований-с-проверкой-каждого-этапа",
+  "file": "собрать-конвейер-преобразований-с-проверкой-каждого-этапа.js",
+  "title": "Собрать конвейер преобразований с проверкой каждого этапа",
+  "lang": "js",
+  "group": "Архитектура / Конвейеры обработки",
+  "desc": "Последовательно применяет функции и после каждого шага проверяет инвариант; сбой сообщает имя этапа.",
+  "output": "{name:\"A\"}",
+  "tags": [
+    "pipeline",
+    "валидация",
+    "преобразование",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "pipeline transform validate",
+    "цепочка обработки данных",
+    "проверить результат каждого шага"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

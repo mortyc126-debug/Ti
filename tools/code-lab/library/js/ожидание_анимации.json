@@ -1,0 +1,11 @@
+{
+  "lang": "js",
+  "title": "Ожидание анимации",
+  "group": "Графика и визуализация / Анимация",
+  "desc": "Ожидание анимации.",
+  "code": "const блок = document.querySelector(\".блок\");\nconst движение = блок.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });\nawait движение.finished;\nconsole.log(\"Готово\");",
+  "output": "Готово",
+  "words": {
+    "finished": "Promise, завершающийся после анимации."
+  }
+}

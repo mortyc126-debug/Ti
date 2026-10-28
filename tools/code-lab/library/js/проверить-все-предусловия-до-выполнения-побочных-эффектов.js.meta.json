@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "проверить-все-предусловия-до-выполнения-побочных-эффектов",
+  "file": "проверить-все-предусловия-до-выполнения-побочных-эффектов.js",
+  "title": "Проверить все предусловия до выполнения побочных эффектов",
+  "lang": "js",
+  "group": "Архитектура / Безопасные операции",
+  "desc": "Отделяет проверку входа от исполнения; исполнитель вызывается только если все проверки прошли.",
+  "output": "execute не вызывается при ошибках валидации",
+  "tags": [
+    "валидация",
+    "побочные эффекты",
+    "предусловия",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "validate before save",
+    "проверить перед записью",
+    "preconditions before side effects"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

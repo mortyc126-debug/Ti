@@ -1,0 +1,146 @@
+{
+  "schema": 1,
+  "id": "удаление-устаревших-кэшей-при-активации",
+  "file": "удаление-устаревших-кэшей-при-активации.js",
+  "title": "Удалить устаревшие кэши при активации Service Worker",
+  "lang": "js",
+  "group": "Кэширование / Service Worker",
+  "desc": "В событии activate worker перебирает имена кэшей и удаляет все, кроме текущей версии; waitUntil не даёт завершить активацию раньше.",
+  "output": "После активации остаётся только кэш app-v2, старые (например app-v1) удаляются",
+  "tags": [
+    "Service Worker",
+    "activate",
+    "caches.delete",
+    "очистка кэша",
+    "версия кэша"
+  ],
+  "aliases": [
+    "как удалить старый кэш service worker",
+    "activate caches.keys пример",
+    "очистка кэша при обновлении"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 5,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 23,
+      "text": "activate",
+      "kind": "activate — worker стал активным: удобный момент для очистки старых кэшей.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 60,
+      "text": "caches.delete",
+      "kind": "delete — удаляет кэш по имени.",
+      "note": "fn",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Кэширование"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Service Worker"
+      ],
+      "technology": [
+        "JavaScript",
+        "Service Worker"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "После активации остаётся только кэш app-v2, старые (например app-v1) удаляются",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const currentCache = \"app-v2\";\n\nself.addEventListener(\"activate\", event => {\n  event.waitUntil(\n    caches.keys().then(keys =>\n      Promise.all(\n        keys.filter(key => key !== currentCache).map(key => caches.delete(key))\n      )\n    )\n  );\n});"
+        },
+        "steps": [
+          "Сохрани код как sw.js в корне сайта и зарегистрируй: navigator.serviceWorker.register(\"/sw.js\").",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "После активации остаётся только кэш app-v2, старые (например app-v1) удаляются",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Первая установка worker",
+            "Обновление worker",
+            "Работа без сети"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Service Worker не регистрируется",
+            "cause": "Страница открыта не по HTTPS или localhost, либо sw.js лежит не в корне сайта",
+            "solution": "Открой сайт по https или http://localhost и проверь вкладку Application → Service Workers"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Удаляет старые кэши"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "currentCache"
+    ],
+    "requires": [],
+    "subcat": "Service Worker"
+  },
+  "enriched": true
+}

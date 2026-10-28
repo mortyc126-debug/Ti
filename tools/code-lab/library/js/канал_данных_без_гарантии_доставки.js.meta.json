@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "канал_данных_без_гарантии_доставки",
+  "file": "канал_данных_без_гарантии_доставки.js",
+  "title": "Канал данных без гарантии доставки",
+  "lang": "js",
+  "group": "Сеть / WebRTC",
+  "desc": "createDataChannel принимает необязательные параметры. Для быстрых игр и потоков измерений подходит режим ordered: false и maxRetransmits: 0: сообщения могут приходить в другом порядке и теряться, зато без задержек на повторные отправки. Для чатов и файлов, наоборот, оставляют надёжный упорядоченный режим по умолчанию. Параметры нужно задавать при создании канала, потом изменить нельзя.",
+  "output": "chat false",
+  "tags": [
+    "createDataChannel",
+    "maxRetransmits",
+    "webrtc"
+  ],
+  "aliases": [
+    "канал данных без гарантии доставки",
+    "createDataChannel",
+    "maxRetransmits"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 25,
+      "text": "createDataChannel",
+      "kind": "fn",
+      "note": "Создаёт канал передачи данных между участниками."
+    },
+    {
+      "line": 1,
+      "col": 69,
+      "text": "maxRetransmits",
+      "kind": "concept",
+      "note": "Число повторных попыток доставки; 0 — без повторов."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

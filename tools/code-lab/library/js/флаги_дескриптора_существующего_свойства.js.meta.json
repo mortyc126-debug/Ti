@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "флаги_дескриптора_существующего_свойства",
+  "file": "флаги_дескриптора_существующего_свойства.js",
+  "title": "Флаги дескриптора существующего свойства",
+  "lang": "js",
+  "group": "Основы / Свойства объектов",
+  "desc": "Object.getOwnPropertyDescriptor возвращает дескриптор собственного свойства: значение и три флага. Для свойства, созданного через defineProperty без указания флагов, все они равны false — свойство нельзя менять, перебирать и удалять. Так можно проверить, защищено ли свойство, и скопировать его настройки в другой объект. Для аксессоров вместо value есть get и set.",
+  "output": "7 false false false",
+  "tags": [
+    "Object.getOwnPropertyDescriptor",
+    "defineProperty",
+    "свойства объектов"
+  ],
+  "aliases": [
+    "флаги дескриптора существующего свойства",
+    "Object.getOwnPropertyDescriptor",
+    "defineProperty"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 7,
+      "text": "defineProperty",
+      "kind": "fn",
+      "note": "Создаёт свойство с заданными флагами."
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "Object.getOwnPropertyDescriptor",
+      "kind": "fn",
+      "note": "Возвращает дескриптор собственного свойства."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

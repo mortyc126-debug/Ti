@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "создать-элемент-и-вставить-текст-безопасно",
+  "file": "создать-элемент-и-вставить-текст-безопасно.js",
+  "title": "Создать элемент и вставить текст безопасно",
+  "lang": "js",
+  "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и элементы",
+  "desc": "Создаёт DOM-элемент и помещает пользовательский текст через textContent.",
+  "output": "В список добавляется текст без интерпретации HTML",
+  "tags": [
+    "XSS",
+    "DOM безопасность"
+  ],
+  "aliases": [
+    "textContent безопасно",
+    "защита innerHTML",
+    "создать DOM элемент"
+  ],
+  "source": {
+    "title": "coverage-expansion",
+    "desc": "Новый шаблон для покрытия типовых задач JavaScript",
+    "tags": "curated",
+    "aliases": "curated"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "XSS",
+      "kind": "concept",
+      "note": "XSS — ключевое понятие этого шаблона."
+    },
+    {
+      "line": 0,
+      "col": 0,
+      "text": "DOM безопасность",
+      "kind": "concept",
+      "note": "DOM безопасность — ключевое понятие этого шаблона."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

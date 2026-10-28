@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "безопасно-читать-и-записывать-данные-в-формате-обмена-в-локальное-хранилище",
+  "file": "безопасно-читать-и-записывать-данные-в-формате-обмена-в-локальное-хранилище.js",
+  "title": "Безопасно читать и записывать данные в формате обмена в локальное хранилище",
+  "lang": "js",
+  "group": "Хранение / Браузерное хранилище",
+  "desc": "Оборачивает JSON.parse/stringify и операции storage в try/catch; возвращает fallback при отсутствии или повреждении значения.",
+  "output": "read возвращает fallback при ошибке; write сообщает boolean",
+  "tags": [
+    "localStorage",
+    "JSON",
+    "хранение",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "localStorage json безопасно",
+    "сохранить объект в localStorage",
+    "обработать битый JSON в хранилище"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

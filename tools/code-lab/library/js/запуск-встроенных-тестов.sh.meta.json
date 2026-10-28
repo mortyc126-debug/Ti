@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "id": "запуск-встроенных-тестов",
+  "file": "запуск-встроенных-тестов.sh",
+  "title": "Запуск встроенных тестов",
+  "lang": "sh",
+  "group": "Node.js: процесс, файлы и сервер / Тесты и подмены",
+  "desc": "Запускает встроенный тестовый раннер Node.js.",
+  "output": "TAP version 13\n# Subtest: сложение работает\nok 1 - сложение работает\n  ---\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0",
+  "tags": [
+    "node --test",
+    "тестовый раннер",
+    "тесты",
+    "node:test"
+  ],
+  "aliases": [
+    "как запустить тесты в node без библиотек",
+    "node test пример",
+    "встроенный тестовый раннер"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Node.js: процесс, файлы и сервер"
+      ],
+      "runtime": [
+        "Командная строка"
+      ],
+      "technology": [
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "TAP version 13\n# Subtest: сложение работает\nok 1 - сложение работает\n  ---\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0",
+      "dependencies": [],
+      "requirements": [
+        "Нужны Node.js и установленный в проекте prettier.",
+        "Запускай команду из корня проекта."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "sh",
+          "content": "# найдёт и выполнит файлы с тестами в проекте\nnode --test"
+        },
+        "steps": [
+          "Проверь, что prettier установлен в проекте.",
+          "Выполни команду в корне проекта.",
+          "Если команда сообщает о неотформатированных файлах, отформатируй их и повтори проверку."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "TAP version 13\n# Subtest: сложение работает\nok 1 - сложение работает\n  ---\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          },
+          {
+            "symptom": "prettier: команда не найдена",
+            "cause": "Prettier не установлен в проекте",
+            "solution": "Установи prettier как зависимость проекта и повтори запуск"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат проверки в терминал, файлы не меняет"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Тесты и подмены"
+  },
+  "enriched": true
+}

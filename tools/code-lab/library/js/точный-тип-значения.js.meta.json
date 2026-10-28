@@ -1,0 +1,189 @@
+{
+  "schema": 1,
+  "id": "точный-тип-значения",
+  "file": "точный-тип-значения.js",
+  "title": "Точный тип значения",
+  "lang": "js",
+  "group": "Объекты и метапрограммирование / Прототипы и типы",
+  "desc": "Получает строковое представление типа через встроенный метод объекта.",
+  "output": "[object Array]\n[object Object]\n[object Null]\n[object Date]\n[object RegExp]\n[object Number]\n[object String]",
+  "tags": [
+    "Object.prototype.toString",
+    "тип значения",
+    "тег класса",
+    "проверка типа"
+  ],
+  "aliases": [
+    "как точно определить тип значения js",
+    "object prototype tostring call",
+    "отличить массив от объекта и даты"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "for",
+      "kind": "kw",
+      "note": "for — цикл со счётчиком: повторяет блок, пока выполняется условие.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 5,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 17,
+      "text": "of",
+      "kind": "kw",
+      "note": "of — в цикле for...of: перебирает сами элементы коллекции.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 29,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 35,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создаёт экземпляр класса или объект через конструктор.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 39,
+      "text": "Date",
+      "kind": "fn",
+      "note": "Date — объект даты и времени.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "Object",
+      "kind": "fn",
+      "note": "Object — встроенный объект с утилитами для работы с объектами.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 31,
+      "text": "toString",
+      "kind": "fn",
+      "note": "toString — превращает значение в строку.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Объекты и метапрограммирование"
+      ],
+      "runtime": [
+        "JavaScript"
+      ],
+      "technology": [
+        "JavaScript"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "[object Array]\n[object Object]\n[object Null]\n[object Date]\n[object RegExp]\n[object Number]\n[object String]",
+      "dependencies": [],
+      "requirements": [
+        "Внешние библиотеки не нужны: код работает в Node.js и в современных браузерах."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "for (const value of [[], {}, null, new Date(0), /а/, 42, \"строка\"]) {\n  console.log(Object.prototype.toString.call(value));\n}"
+        },
+        "steps": [
+          "Проверь требования и подготовь входные данные/окружение.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена переменных, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "[object Array]\n[object Object]\n[object Null]\n[object Date]\n[object RegExp]\n[object Number]\n[object String]",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Отсутствует требуемая переменная/элемент/сеть"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Не выполнено одно из требований или входные данные отличаются от примера",
+            "solution": "Проверь список требований и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Выводит результат в консоль"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [],
+    "requires": [],
+    "subcat": "Прототипы и типы"
+  },
+  "enriched": true
+}

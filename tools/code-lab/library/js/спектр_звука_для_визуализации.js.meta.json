@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "id": "спектр_звука_для_визуализации",
+  "file": "спектр_звука_для_визуализации.js",
+  "title": "Спектр звука для визуализации",
+  "lang": "js",
+  "group": "Графика и визуализация / Звук",
+  "desc": "AnalyserNode в Web Audio API анализирует звук в реальном времени. Метод getByteFrequencyData заполняет массив значениями от 0 до 255 — громкость в каждой полосе частот. Размер массива равен frequencyBinCount, то есть половине fftSize. Вызывайте метод в каждом кадре анимации и рисуйте столбики или волны. Контекст должен быть запущен после действия пользователя, иначе звука не будет.",
+  "output": "128 (половина fftSize); значения массива отражают громкость частот.",
+  "tags": [
+    "createAnalyser",
+    "getByteFrequencyData",
+    "звук"
+  ],
+  "aliases": [
+    "спектр звука для визуализации",
+    "createAnalyser",
+    "getByteFrequencyData"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 28,
+      "text": "createAnalyser",
+      "kind": "fn",
+      "note": "Создаёт узел анализа звука."
+    },
+    {
+      "line": 5,
+      "col": 11,
+      "text": "getByteFrequencyData",
+      "kind": "fn",
+      "note": "Заполняет массив значениями громкости по частотам."
+    }
+  ],
+  "component": null,
+  "legacy": false,
+  "enriched": true
+}

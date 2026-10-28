@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "запустить-параллельные-задачи-и-вернуть-результаты-по-ключу",
+  "file": "запустить-параллельные-задачи-и-вернуть-результаты-по-ключу.js",
+  "title": "Запустить параллельные задачи и вернуть результаты по ключу",
+  "lang": "js",
+  "group": "Асинхронность / Пакетные задачи",
+  "desc": "Запускает задачи параллельно и собирает результаты в Map по ключу; ошибки можно собирать отдельно через allSettled.",
+  "output": "Map с результатами по ключу; при ошибке Promise.all отклоняется",
+  "tags": [
+    "Promise.all",
+    "Map",
+    "пакетная обработка",
+    "javascript",
+    "функциональный блок"
+  ],
+  "aliases": [
+    "Promise.all результаты по id",
+    "параллельно загрузить записи и индексировать",
+    "map async results by key"
+  ],
+  "source": {
+    "title": "functional coverage expansion",
+    "desc": "added as reusable functional block; syntax-only snippets intentionally excluded",
+    "tags": "functional-blocks",
+    "aliases": "reviewed"
+  },
+  "status": "described",
+  "wordNotes": []
+}

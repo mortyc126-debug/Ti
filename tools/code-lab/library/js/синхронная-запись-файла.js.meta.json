@@ -1,0 +1,222 @@
+{
+  "schema": 1,
+  "id": "синхронная-запись-файла",
+  "file": "синхронная-запись-файла.js",
+  "title": "Синхронная запись файла: writeFileSync",
+  "lang": "js",
+  "group": "Файлы, хранение и сервер / Файловая система",
+  "desc": "writeFileSync(path, data) записывает данные в файл и блокирует выполнение до конца записи; подходит для коротких скриптов и запуска программы.",
+  "output": "{\n  \"theme\": \"dark\",\n  \"fontSize\": 14\n}",
+  "tags": [
+    "writeFileSync",
+    "fs",
+    "запись файла",
+    "Node.js",
+    "файловая система"
+  ],
+  "aliases": [
+    "как записать файл в node синхронно",
+    "writeFileSync пример",
+    "сохранить json в файл node",
+    "записать настройки в файл"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "writeFileSync",
+      "kind": "fn",
+      "note": "writeFileSync — синхронно записывает данные в файл, создавая или перезаписывая его.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 23,
+      "text": "readFileSync",
+      "kind": "fn",
+      "note": "readFileSync — синхронно читает файл целиком.",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 40,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 1,
+      "col": 11,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 13,
+      "text": "require",
+      "kind": "fn",
+      "note": "require — подключить модуль в стиле CommonJS.",
+      "source": "dict"
+    },
+    {
+      "line": 4,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 5,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 7,
+      "col": 49,
+      "text": "null",
+      "kind": "kw",
+      "note": "null — «пусто намеренно»: значения нет.",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 0,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 9,
+      "col": 8,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Файлы, хранение и сервер"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Node.js"
+      ],
+      "technology": [
+        "JavaScript",
+        "Node.js"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "{\n  \"theme\": \"dark\",\n  \"fontSize\": 14\n}",
+      "dependencies": [],
+      "requirements": [
+        "Отдельные библиотеки не нужны."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const { writeFileSync, readFileSync } = require(\"node:fs\");\nconst os = require(\"node:os\");\nconst path = require(\"node:path\");\n\nconst filePath = path.join(os.tmpdir(), \"settings-demo.json\");\nconst settings = { theme: \"dark\", fontSize: 14 };\n\nwriteFileSync(filePath, JSON.stringify(settings, null, 2));\n\nconsole.log(readFileSync(filePath, \"utf8\"));"
+        },
+        "steps": [
+          "Запусти файл командой node имя-файла.js (нужен установленный Node.js).",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "{\n  \"theme\": \"dark\",\n  \"fontSize\": 14\n}",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычные входные данные",
+            "Пустые или граничные данные",
+            "Версия Node.js ниже, чем нужно"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Ошибка при запуске",
+            "cause": "Версия Node.js не подходит или не хватает модуля",
+            "solution": "Проверь node --version и сообщение в консоли"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Создаёт файл settings-demo.json во временной папке"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "os",
+      "path",
+      "filePath",
+      "settings"
+    ],
+    "requires": [],
+    "subcat": "Файловая система"
+  },
+  "enriched": true
+}

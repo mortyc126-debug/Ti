@@ -1,0 +1,179 @@
+{
+  "schema": 1,
+  "id": "громкость-звука",
+  "file": "громкость-звука.js",
+  "title": "Задать громкость звука: sound.volume",
+  "lang": "js",
+  "group": "Графика и визуализация / Звук",
+  "desc": "volume принимает число от 0 (тишина) до 1 (максимум); значения вне диапазона вызывают ошибку.",
+  "output": "Звук играет вполсилы, в консоли «Громкость: 0.5»",
+  "tags": [
+    "Audio",
+    "volume",
+    "громкость",
+    "звук"
+  ],
+  "aliases": [
+    "как изменить громкость аудио js",
+    "sound.volume 0.5",
+    "громкость от 0 до 1"
+  ],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": "ai",
+    "aliases": "ai"
+  },
+  "status": "described",
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 0,
+      "col": 14,
+      "text": "new",
+      "kind": "kw",
+      "note": "new — создать новый объект из конструктора или класса.",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 0,
+      "text": "const",
+      "kind": "kw",
+      "note": "const — объявляет имя, значение которого не будут переназначать. Читается как «постоянная».",
+      "source": "dict"
+    },
+    {
+      "line": 2,
+      "col": 28,
+      "text": "createElement",
+      "kind": "fn",
+      "note": "createElement — создать элемент страницы в памяти.",
+      "source": "dict"
+    },
+    {
+      "line": 6,
+      "col": 0,
+      "text": "sound.volume",
+      "kind": "volume — громкость от 0 до 1.",
+      "note": "kw",
+      "source": "dict"
+    },
+    {
+      "line": 8,
+      "col": 11,
+      "text": "addEventListener",
+      "kind": "fn",
+      "note": "addEventListener — подписаться на событие.",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 2,
+      "text": "console",
+      "kind": "fn",
+      "note": "console — встроенный объект для вывода в консоль (отладки).",
+      "source": "dict"
+    },
+    {
+      "line": 10,
+      "col": 10,
+      "text": "log",
+      "kind": "fn",
+      "note": "log — печатает значение в консоль. console.log(x) — показать x.",
+      "source": "dict"
+    }
+  ],
+  "component": {
+    "type": "fragment",
+    "tags": {
+      "purpose": [
+        "Графика и визуализация"
+      ],
+      "runtime": [
+        "JavaScript",
+        "Браузер"
+      ],
+      "technology": [
+        "JavaScript",
+        "Браузер"
+      ]
+    },
+    "summary": {
+      "input": "Данные и переменные, указанные в примере",
+      "output": "Звук играет вполсилы, в консоли «Громкость: 0.5»",
+      "dependencies": [],
+      "requirements": [
+        "Нужен звуковой файл sounds/click.mp3 рядом со страницей."
+      ]
+    },
+    "actions": [
+      "use",
+      "run",
+      "add_to_project"
+    ],
+    "views": {
+      "use": {
+        "title": "Применение",
+        "code": {
+          "language": "js",
+          "content": "const sound = new Audio(\"sounds/click.mp3\");\n\nconst playButton = document.createElement(\"button\");\nplayButton.textContent = \"Играть\";\ndocument.body.append(playButton);\n\nsound.volume = 0.5;\n\nplayButton.addEventListener(\"click\", () => {\n  sound.play();\n  console.log(`Громкость: ${sound.volume}`);\n});"
+        },
+        "steps": [
+          "Вставь код в консоль браузера или подключи файлом через <script>.",
+          "Скопируй код в подходящую часть проекта.",
+          "Подставь свои значения и имена элементов, если они отличаются.",
+          "Запусти и сравни результат с примером."
+        ]
+      },
+      "check": {
+        "title": "Проверка",
+        "expected_result": "Звук играет вполсилы, в консоли «Громкость: 0.5»",
+        "tests": {
+          "status": "not_run",
+          "cases": [
+            "Обычное действие пользователя",
+            "Браузер без нужной возможности",
+            "Повторный запуск кода на той же странице"
+          ]
+        },
+        "common_errors": [
+          {
+            "symptom": "Звук не играет",
+            "cause": "Нет файла sounds/click.mp3 или воспроизведение начато не по клику",
+            "solution": "Положи mp3 рядом со страницей и запускай play() из обработчика клика"
+          }
+        ]
+      },
+      "about": {
+        "title": "Устройство",
+        "fragments": [],
+        "effects": [
+          "Добавляет кнопку на страницу",
+          "Воспроизводит звук"
+        ],
+        "network": false,
+        "connections": []
+      }
+    },
+    "verification": {
+      "code_review": "not_verified",
+      "tests": "not_run",
+      "compatibility": "not_verified"
+    },
+    "provides": [
+      "sound",
+      "playButton"
+    ],
+    "requires": [],
+    "subcat": "Звук"
+  },
+  "enriched": true
+}
