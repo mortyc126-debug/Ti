@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "отправить-форму-без-перезагрузки-страниц-mvsikb52",
+  "file": "отправить-форму-без-перезагрузки-страниц-mvsikb52.js",
+  "lang": "js",
+  "title": "Отправить форму без перезагрузки страницы: Показать сообщение",
+  "group": "Браузер / Формы",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [],
+    "requires": [
+      "response",
+      "#error"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

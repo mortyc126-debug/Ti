@@ -1,0 +1,1 @@
+const updated = { ...original, name: 'Новое имя' };

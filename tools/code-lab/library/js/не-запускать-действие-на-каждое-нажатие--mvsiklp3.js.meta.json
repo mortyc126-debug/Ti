@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "не-запускать-действие-на-каждое-нажатие--mvsiklp3",
+  "file": "не-запускать-действие-на-каждое-нажатие--mvsiklp3.js",
+  "lang": "js",
+  "title": "Не запускать действие на каждое нажатие клавиши (debounce): Запрос на поиск при ",
+  "group": "Браузер / События",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [
+      "input"
+    ],
+    "requires": [
+      "#search"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "скопировать-объект-и-изменить-копию-доба-mvsikswf",
+  "file": "скопировать-объект-и-изменить-копию-доба-mvsikswf.js",
+  "lang": "js",
+  "title": "Скопировать объект и изменить копию: Добавить значение в массив внутри",
+  "group": "Данные / Объекты",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [
+      "updated"
+    ],
+    "requires": [
+      "tags"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

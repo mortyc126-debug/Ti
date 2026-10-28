@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "не-запускать-действие-на-каждое-нажатие--mvsikmkj",
+  "file": "не-запускать-действие-на-каждое-нажатие--mvsikmkj.js",
+  "lang": "js",
+  "title": "Не запускать действие на каждое нажатие клавиши (debounce): Своей функцией",
+  "group": "Браузер / События",
+  "desc": "Не нужны библиотеки, работает везде.",
+  "output": "",
+  "component": {
+    "provides": [
+      "debounce",
+      "timer"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

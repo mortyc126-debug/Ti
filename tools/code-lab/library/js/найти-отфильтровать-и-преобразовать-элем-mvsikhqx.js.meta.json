@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "найти-отфильтровать-и-преобразовать-элем-mvsikhqx",
+  "file": "найти-отфильтровать-и-преобразовать-элем-mvsikhqx.js",
+  "lang": "js",
+  "title": "Найти, отфильтровать и преобразовать элементы массива: Проверить, есть ли хоть о",
+  "group": "Данные / Массивы",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [
+      "hasAdmin"
+    ],
+    "requires": [
+      "users"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

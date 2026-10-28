@@ -1,0 +1,1 @@
+const response = await fetch(form.action, { method: 'POST', body: data });

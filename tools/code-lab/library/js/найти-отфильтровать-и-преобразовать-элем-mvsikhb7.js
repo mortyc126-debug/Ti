@@ -1,0 +1,1 @@
+const names = users.map(user => user.name);

@@ -1,0 +1,1 @@
+const found = users.find(user => user.id === id);

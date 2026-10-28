@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "найти-отфильтровать-и-преобразовать-элем-mvsikhb7",
+  "file": "найти-отфильтровать-и-преобразовать-элем-mvsikhb7.js",
+  "lang": "js",
+  "title": "Найти, отфильтровать и преобразовать элементы массива: Получить из каждого элеме",
+  "group": "Данные / Массивы",
+  "desc": "Когда из списка объектов нужен список имён, цен и т. п.",
+  "output": "",
+  "component": {
+    "provides": [
+      "names"
+    ],
+    "requires": [
+      "users"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

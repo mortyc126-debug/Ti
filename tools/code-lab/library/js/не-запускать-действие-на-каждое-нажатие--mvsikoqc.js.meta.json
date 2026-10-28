@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "не-запускать-действие-на-каждое-нажатие--mvsikoqc",
+  "file": "не-запускать-действие-на-каждое-нажатие--mvsikoqc.js",
+  "lang": "js",
+  "title": "Не запускать действие на каждое нажатие клавиши (debounce): Подписка на событие",
+  "group": "Браузер / События",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [
+      "onInput"
+    ],
+    "requires": [
+      "debounce",
+      "delay",
+      "input"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

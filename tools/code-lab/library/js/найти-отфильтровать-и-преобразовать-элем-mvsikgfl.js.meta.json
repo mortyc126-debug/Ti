@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "найти-отфильтровать-и-преобразовать-элем-mvsikgfl",
+  "file": "найти-отфильтровать-и-преобразовать-элем-mvsikgfl.js",
+  "lang": "js",
+  "title": "Найти, отфильтровать и преобразовать элементы массива: Найти один элемент",
+  "group": "Данные / Массивы",
+  "desc": "Когда нужен первый подходящий (например, пользователь по id).",
+  "output": "",
+  "component": {
+    "provides": [
+      "found"
+    ],
+    "requires": [
+      "users",
+      "id"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

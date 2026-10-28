@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "загрузить-данные-с-сервера-и-показать-на-mvsikf3c",
+  "file": "загрузить-данные-с-сервера-и-показать-на-mvsikf3c.js",
+  "lang": "js",
+  "title": "Загрузить данные с сервера и показать на странице: Создавать элементы по одному",
+  "group": "Браузер / Запросы",
+  "desc": "Безопасно: textContent не исполняет HTML.",
+  "output": "",
+  "component": {
+    "provides": [
+      "list",
+      "item",
+      "li"
+    ],
+    "requires": [
+      "items",
+      "#list"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

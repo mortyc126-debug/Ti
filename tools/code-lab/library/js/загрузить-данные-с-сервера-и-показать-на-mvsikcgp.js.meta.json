@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "загрузить-данные-с-сервера-и-показать-на-mvsikcgp",
+  "file": "загрузить-данные-с-сервера-и-показать-на-mvsikcgp.js",
+  "lang": "js",
+  "title": "Загрузить данные с сервера и показать на странице: Свой адрес",
+  "group": "Браузер / Запросы",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [
+      "response"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

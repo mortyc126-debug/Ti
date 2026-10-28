@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "загрузить-данные-с-сервера-и-показать-на-mvsikfza",
+  "file": "загрузить-данные-с-сервера-и-показать-на-mvsikfza.js",
+  "lang": "js",
+  "title": "Загрузить данные с сервера и показать на странице: Только при успехе",
+  "group": "Браузер / Запросы",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [],
+    "requires": [
+      "status"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "сохранить-данные-в-браузере-localstorage-mvsikjy2",
+  "file": "сохранить-данные-в-браузере-localstorage-mvsikjy2.js",
+  "lang": "js",
+  "title": "Сохранить данные в браузере (localStorage): Объект",
+  "group": "Браузер / Хранение данных",
+  "desc": "Если значения нет, getItem вернёт null, и JSON.parse упадёт без проверки.",
+  "output": "",
+  "component": {
+    "provides": [
+      "raw",
+      "settings"
+    ],
+    "requires": [
+      "theme",
+      "fontSize"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

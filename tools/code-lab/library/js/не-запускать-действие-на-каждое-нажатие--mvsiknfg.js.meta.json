@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "не-запускать-действие-на-каждое-нажатие--mvsiknfg",
+  "file": "не-запускать-действие-на-каждое-нажатие--mvsiknfg.js",
+  "lang": "js",
+  "title": "Не запускать действие на каждое нажатие клавиши (debounce): 300 мс",
+  "group": "Браузер / События",
+  "desc": "Хороший вариант для поиска при вводе.",
+  "output": "",
+  "component": {
+    "provides": [
+      "delay"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

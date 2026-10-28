@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "сохранить-данные-в-браузере-localstorage-mvsikkt9",
+  "file": "сохранить-данные-в-браузере-localstorage-mvsikkt9.js",
+  "lang": "js",
+  "title": "Сохранить данные в браузере (localStorage): Одно значение",
+  "group": "Браузер / Хранение данных",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

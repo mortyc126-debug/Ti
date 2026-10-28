@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "сохранить-данные-в-браузере-localstorage-mvsikimq",
+  "file": "сохранить-данные-в-браузере-localstorage-mvsikimq.js",
+  "lang": "js",
+  "title": "Сохранить данные в браузере (localStorage): Простую строку или число",
+  "group": "Браузер / Хранение данных",
+  "desc": "Тема, язык, имя пользователя.",
+  "output": "",
+  "component": {
+    "provides": [],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

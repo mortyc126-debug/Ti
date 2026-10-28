@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "загрузить-данные-с-сервера-и-показать-на-mvsikdbx",
+  "file": "загрузить-данные-с-сервера-и-показать-на-mvsikdbx.js",
+  "lang": "js",
+  "title": "Загрузить данные с сервера и показать на странице: Прервать и показать сообщение",
+  "group": "Браузер / Запросы",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [],
+    "requires": [
+      "response"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

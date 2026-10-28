@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "сохранить-данные-в-браузере-localstorage-mvsikj2l",
+  "file": "сохранить-данные-в-браузере-localstorage-mvsikj2l.js",
+  "lang": "js",
+  "title": "Сохранить данные в браузере (localStorage): Объект или массив",
+  "group": "Браузер / Хранение данных",
+  "desc": "localStorage хранит только строки, поэтому объект превращаем в JSON.",
+  "output": "",
+  "component": {
+    "provides": [
+      "settings"
+    ],
+    "requires": [
+      "theme",
+      "fontSize"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

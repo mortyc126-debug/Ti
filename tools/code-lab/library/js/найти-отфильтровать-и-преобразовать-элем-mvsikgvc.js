@@ -1,0 +1,1 @@
+const active = users.filter(user => user.active);

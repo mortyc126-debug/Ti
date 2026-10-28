@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "найти-отфильтровать-и-преобразовать-элем-mvsiki6a",
+  "file": "найти-отфильтровать-и-преобразовать-элем-mvsiki6a.js",
+  "lang": "js",
+  "title": "Найти, отфильтровать и преобразовать элементы массива: Посчитать сумму",
+  "group": "Данные / Массивы",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [
+      "total"
+    ],
+    "requires": [
+      "items",
+      "sum"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}
