@@ -10,11 +10,37 @@
     + '.cw-drag{cursor:move;user-select:none;touch-action:none}';
   document.head.appendChild(st);
 
+  // общий порядок слоёв: клик по окну или его открытие поднимает его над остальными окнами.
+  // Окна живут в 51…59: выше страницы и кнопки ☰ (50), но ниже модалок (60), меню панели (70), окна тем (300)
+  // и всплывашек (9999) — те должны оставаться над любым окном. Окон немного, потолок разруливает перекладка.
+  var Z_BASE = 51, Z_MAX = 59, zTop = Z_BASE - 1, wins = [];
+  function raise(el){
+    if(!el || +el.style.zIndex === zTop) return;
+    if(wins.indexOf(el) < 0) wins.push(el);
+    if(zTop >= Z_MAX){   // счётчик дошёл до потолка — переложить по текущему порядку, сохранив его
+      wins.slice().sort(function(a, b){ return (+a.style.zIndex || 0) - (+b.style.zIndex || 0); })
+        .forEach(function(w, i){ w.style.zIndex = Z_BASE + i; });
+      zTop = Z_BASE + wins.length - 1;
+    }
+    el.style.zIndex = ++zTop;
+  }
+  // окно, у которого своё перетаскивание (не через make), тоже встаёт в общий порядок
+  function track(el){
+    if(!el || el.__cwTracked) return; el.__cwTracked = true;
+    if(wins.indexOf(el) < 0) wins.push(el);
+    el.addEventListener('pointerdown', function(){ raise(el); }, true);
+    var shown = false;
+    var check = function(){ var on = el.isConnected && getComputedStyle(el).display !== 'none'; if(on && !shown) raise(el); shown = on; };
+    new MutationObserver(check).observe(el, { attributes: true, attributeFilter: ['class', 'style'] });
+    check();
+  }
+
   function num(v){ v = parseInt(v, 10); return isNaN(v) ? 0 : v; }
 
   function make(el, opts){
     opts = opts || {};
     el.classList.add('cw-win');
+    track(el);
     var key = opts.key, d = opts.defaultGeo || {}, minW = opts.minW || 240, minH = opts.minH || 160;
 
     function save(){ if(!key) return; try { localStorage.setItem(key, JSON.stringify({ x: num(el.style.left), y: num(el.style.top), w: num(el.style.width), h: num(el.style.height) })); } catch(e){} }
@@ -55,5 +81,5 @@
     return { save: save, clamp: clamp, applyGeo: applyGeo, reset: function(){ try { key && localStorage.removeItem(key); } catch(_){} applyGeo(null); } };
   }
 
-  window.codelabWindow = { make: make };
+  window.codelabWindow = { make: make, raise: raise, track: track };
 })();

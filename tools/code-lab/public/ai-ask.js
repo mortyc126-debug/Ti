@@ -71,6 +71,7 @@
     + '<button class="aa-copy" id="aa-copy" style="display:none">⧉ копировать ответ</button>'
     + '</div><div class="aa-grip" id="aa-grip" title="потяни — изменить размер"></div>';
   document.body.appendChild(panel);
+  if(window.codelabWindow && window.codelabWindow.track) window.codelabWindow.track(panel);   // клик — поверх других окон
   const q = s => panel.querySelector(s);
 
   // ── геометрия: позиция и размер запоминаются ──
