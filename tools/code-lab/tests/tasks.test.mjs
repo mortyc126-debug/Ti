@@ -267,3 +267,15 @@ test('варианты: куски из библиотеки по смыслу �
   assert.deepEqual(g.children.map(c => c.piece), ['b', 'a']);
   assert.equal(buildVariants({ q: 'адаптивный', lang: 'css', dict: { langs: {} }, rows: [], synonyms: {} }).roots.length, 0);
 });
+
+test('раскладка: смесь букв, русская и английская раскладка, строки не трогаем', () => {
+  const L = require('../public/layout-check.js');
+  const known = new Set(['const', 'document', 'queryselector', 'console', 'log', 'напитки', 'display', 'color', 'class', 'div']);
+  const js = "сщтые btn = dщcument.querySelector('.go'); // комментарий\nсonsole.log(yfgbnrb, 'текст');\nlet тест = 1;";
+  const r = L.check(js, 'js', known).map(x => x.word + '>' + x.fix);
+  assert.deepEqual(r, ['сщтые>const', 'dщcument>document', 'сonsole>console', 'yfgbnrb>напитки']);
+  assert.deepEqual(L.check('.a { вшыздфн: flex; сolor: red; }', 'css', known).map(x => x.fix), ['display', 'color']);
+  // в HTML русский текст между тегами — норма
+  assert.deepEqual(L.check('<вшм сlass="Привет">текст</div>', 'html', known).map(x => x.fix), ['div', 'class']);
+  assert.equal(L.ruToEn('сщтые'), 'const');
+});

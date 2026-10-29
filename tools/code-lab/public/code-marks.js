@@ -2,6 +2,7 @@
 //  1) пока пишешь (через паузу): незакрытые и лишние скобки/кавычки (CodeCheck.scanBrackets) и имена-опечатки
 //     (/api/code/names) — подчёркнуты, подсказка при наведении;
 //  2) после запуска: ошибка браузера или Python — красным то место, где упало, и под строкой объяснение по-русски;
+//     и слова не в той раскладке (layout-check.js: соnst, сщтые → const) — с кнопкой «исправить» у курсора;
 //  3) парные скобки и совпадения слова у курсора — опции CodeMirror (sandbox.js).
 // Надстройка песочницы; события codelab-error / codelab-run-start шлёт sandbox.js.
 (function(){
@@ -14,6 +15,12 @@
   st.textContent = `
   .cm-bad{background:rgba(255,92,122,.22);border-bottom:2px solid #ff5c7a}
   .cm-typo{text-decoration:underline wavy #ffb454;text-underline-offset:3px}
+  .cm-layout{background:rgba(255,180,84,.16);border-bottom:2px dotted #ffb454}
+  .cm-fix-bub{z-index:30;margin-top:4px;padding:3px 6px 3px 8px;border:1px solid #ffb454;border-radius:7px;background:var(--bg2,#150a2b);
+    font:12px system-ui,sans-serif;color:var(--text2,#cbc2ea);white-space:nowrap;display:flex;gap:6px;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.45)}
+  .cm-fix-bub b{color:#ffb454;font-family:ui-monospace,monospace}
+  .cm-fix-bub button{background:none;border:1px solid var(--border,#3a2f55);border-radius:6px;color:var(--text,#eee);font-size:11.5px;padding:1px 7px;cursor:pointer}
+  .cm-fix-bub span{color:var(--text3,#9c90c4);font-size:10.5px}
   .cm-err-at{background:rgba(255,92,122,.28);border-bottom:2px solid #ff5c7a;border-radius:2px}
   .cm-err-line{background:rgba(255,92,122,.07)}
   .cm-err-box{box-sizing:border-box;width:calc(100% - 12px);min-width:260px;margin:3px 0 6px 4px;padding:6px 9px;border-left:3px solid #ff5c7a;border-radius:0 7px 7px 0;background:rgba(255,92,122,.10);
@@ -37,8 +44,9 @@
     const marks = [];
     if(window.CodeCheck) for(const b of window.CodeCheck.scanBrackets(code, lang).slice(0, 20))
       marks.push({ from: b.from, to: b.to, cls: 'cm-bad', title: b.msg });
+    let r = null;
     if(/^(js|ts|javascript|typescript|python|py)$/.test(lang) && code.length < 200000){
-      const r = await fetch('/api/code/names', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code, lang: /^py/.test(lang) ? 'python' : 'js' }) }).then(x => x.ok ? x.json() : null).catch(() => null);
+      r = await fetch('/api/code/names', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code, lang: /^py/.test(lang) ? 'python' : 'js' }) }).then(x => x.ok ? x.json() : null).catch(() => null);
       if(ver !== st.ver) return;   // пока ждали — код уже поменялся
       for(const t of (r && r.typos) || []){
         const line = cm.getLine(t.line) || ''; const re = new RegExp('(^|[^\\wА-Яа-яЁё$])' + t.name.replace(/[$]/g, '\\$') + '(?![\\wА-Яа-яЁё$])', 'g'); let m;
@@ -46,13 +54,50 @@
           marks.push({ from: a, to: a + t.name.length, cls: 'cm-typo', title: (t.kind === 'метод' ? 'такого метода нет — может, ' : 'имя нигде не объявлено — может, ') + t.maybe + '?' }); }
       }
     }
+    // раскладка: известные слова — словарь языка, ключевые слова и свои имена файла
+    if(window.LayoutCheck && code.length < 200000){
+      const known = await knownWords(lang); if(ver !== st.ver) return;
+      const all = new Set(known); Object.keys((r && r.names) || {}).forEach(n => all.add(n.toLowerCase()));
+      for(const x of window.LayoutCheck.check(code, lang, all)) if(!marks.some(o => o.from < x.to && o.to > x.from))
+        marks.push({ from: x.from, to: x.to, cls: 'cm-layout', title: x.why + (x.fix ? ' → ' + x.fix + ' (Alt+Enter — исправить)' : ''), fix: x.fix });
+    }
     if(ver !== st.ver) return;
     st.marks.forEach(m => m.clear());
-    st.marks = marks.map(k => cm.markText(cm.posFromIndex(k.from), cm.posFromIndex(k.to), { className: k.cls, attributes: { title: k.title } }));
+    st.marks = marks.map(k => { const mk = cm.markText(cm.posFromIndex(k.from), cm.posFromIndex(k.to), { className: k.cls, attributes: { title: k.title } }); if(k.fix) mk.__fix = k.fix; return mk; });
+    bubble(cm);
+  }
+  // известные слова языка для проверки раскладки — один раз на язык
+  const KW = 'break case catch class const continue default delete do else export extends finally for function if import in instanceof let new return super switch this throw try typeof var void while yield async await of static get set from as true false null undefined def elif except lambda pass raise with global nonlocal assert is not and or none print self cls len range str int float list dict'.split(' ');
+  const knownCache = {};
+  function knownWords(lang){
+    const l = /^py/.test(lang) ? 'python' : /^(ts|typescript|javascript)$/.test(lang) ? 'js' : lang;
+    return knownCache[l] || (knownCache[l] = (window.codelabKwDict ? window.codelabKwDict(l) : Promise.resolve({})).then(d => {
+      const set = new Set(KW); const add = o => { if(o) for(const key of Object.keys(o)) for(const m of key.matchAll(/[A-Za-z_$][\w$-]*/g)) set.add(m[0].toLowerCase()); };
+      d = d || {}; add(d.words); add(d.langs && d.langs[l]);
+      if(l === 'css' || l === 'html'){ add(d.cssProps); add(d.cssVals); add(d.htmlTags); add(d.htmlAttrs); }
+      return set;
+    }).catch(() => new Set(KW)));
+  }
+  // курсор в слове не той раскладки — рядом кнопка «→ const»; Alt+Enter — то же
+  const fixAt = cm => { const c = cm.getCursor(); return cm.findMarksAt(c).find(m => m.__fix); };
+  function applyFix(cm, mk){ const r = mk && mk.find(); if(!r) return false; cm.replaceRange(mk.__fix, r.from, r.to); return true; }
+  function bubble(cm){
+    const st = live.get(cm); if(!st) return;
+    if(st.bub){ st.bub.remove(); st.bub = null; }
+    const mk = fixAt(cm); if(!mk || !cm.hasFocus()) return;
+    const r = mk.find(); if(!r) return;
+    const el = document.createElement('div'); el.className = 'cm-fix-bub';
+    el.innerHTML = 'раскладка → <b>' + esc(mk.__fix) + '</b> <button>исправить</button><span>Alt+Enter</span>';
+    el.onmousedown = e => e.preventDefault();
+    el.querySelector('button').onclick = () => applyFix(cm, mk);
+    cm.addWidget(r.to, el, false); st.bub = el;
   }
   function attach(ed){
     const cm = cmOf(ed); if(!cm || live.has(cm)) return;
     const st = { marks: [], timer: null, ver: 0 }; live.set(cm, st);
+    cm.on('cursorActivity', () => bubble(cm));
+    cm.on('blur', () => { if(st.bub){ st.bub.remove(); st.bub = null; } });
+    cm.on('keydown', (c, e) => { if(e.altKey && e.key === 'Enter'){ const mk = fixAt(c); if(mk){ e.preventDefault(); applyFix(c, mk); } } });
     cm.on('change', () => { clearTimeout(st.timer); st.timer = setTimeout(() => check(ed), 700); clearErr(cm); });
     check(ed);
   }
