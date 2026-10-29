@@ -22,12 +22,19 @@
   /* подписи не раздвигают код: стоят над ним абсолютно, в два ряда по очереди — соседние не налезают */
   .se-line{font:14px/1.3 ui-monospace,monospace;color:var(--text2,#cbc2ea);white-space:pre;padding-top:40px;margin-bottom:4px;position:relative}
   .se-seg{position:relative;display:inline}
-  .se-lbl{position:absolute;left:0;bottom:calc(100% + 8px);font:11px/1.2 system-ui,sans-serif;color:var(--text,#f6f4ff);white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
-  .se-seg.up .se-lbl{bottom:calc(100% + 23px)}
+  .se-lbl{position:absolute;left:0;bottom:calc(100% + 8px);font:11px/1.2 system-ui,sans-serif;color:var(--text,#f6f4ff);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+  
   .se-br{position:absolute;left:0;right:0;bottom:calc(100% + 1px);height:6px;border:1.5px solid var(--name,#3dd9ff);border-bottom:0;border-radius:4px 4px 0 0}
-  .se-seg.up .se-br::before{content:'';position:absolute;left:3px;bottom:100%;height:16px;border-left:1px dashed var(--text3,#9c90c4)}
+  .se-seg.up .se-br::before{content:'';position:absolute;left:3px;bottom:100%;height:calc(var(--lift,15px) + 1px);border-left:1px dashed var(--text3,#9c90c4)}
   .se-code{color:var(--text,#f6f4ff)}
   .cm-se-flash{background:rgba(61,217,255,.18)}
+  .se-lbl i{font-style:normal;font-weight:700;color:var(--acc,#ff2fae);margin-right:4px}
+  .se-seg.rel .se-br{border-width:2px;border-color:var(--acc,#ff2fae)}
+  .se-flow{margin-top:10px;border-top:1px solid var(--border,#3a2f55);padding-top:8px;font-size:12.5px;line-height:1.55}
+  .se-flow div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:1px solid var(--border,#3a2f55);padding-left:8px}
+  .se-flow b{color:var(--acc,#ff2fae);font-weight:700;display:inline-block;min-width:92px}
+  .se-flow code{font:12.5px ui-monospace,monospace;color:var(--name,#3dd9ff);margin-right:6px}
+  .se-flow span{color:var(--text3,#9c90c4)}
   .se-seg.own{cursor:pointer} .se-seg.own .se-br{border-style:dashed}
   .se-seg.typo .se-br{border-color:var(--err,#ff5c7a)!important;border-style:solid} .se-seg.typo .se-lbl{color:var(--err,#ff5c7a)}
   .se-seg.typo .se-code{text-decoration:underline wavy var(--err,#ff5c7a)}
@@ -65,6 +72,9 @@
   }
 
   // разбить строку на узнанные куски: конструкции словаря (длинные) и слова
+  // связь куска (когда/если/…): общий модуль code-links.js; пустая правка «нет» — связи нет
+  const relOf = (term, lang, d, note) => { const L = window.codelabLinks; const r = L && L.relationOf(term, lang, d, note); return (r && r.rel) || ''; };
+  const OPENS = new Set(['когда', 'если', 'иначе', 'для каждого', 'при ошибке', 'потом']);
   const inStrAt = (line, i) => { const before = line.slice(0, i); return ((before.match(/'/g) || []).length % 2) || ((before.match(/"/g) || []).length % 2) || ((before.match(/`/g) || []).length % 2); };
   function segments(line, lang, d, own, ln){
     const out = []; const re = lang === 'css' || lang === 'html' ? /[#.]?[\w-]+(?:\([^)]*\))?/g : /[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*/g;
@@ -77,14 +87,14 @@
       if(ty){ taken.push([from, to]); out.push({ from, to, text: w[0], typo: ty, label: 'опечатка? → ' + ty.maybe,
         note: ty.kind === 'метод' ? 'такого нет в словаре, похоже на ' + ty.maybe : 'имя нигде не объявлено, похоже на ' + ty.maybe + (ty.declLine != null ? ' (строка ' + (ty.declLine + 1) + ')' : '') }); continue; }
       const nm = own.names[w[0]];
-      if(nm && line[from - 1] !== '.'){ taken.push([from, to]); out.push({ from, to, text: w[0], own: nm, label: nm.text || 'своё имя',
+      if(nm && line[from - 1] !== '.'){ taken.push([from, to]); out.push({ from, to, text: w[0], own: nm, label: nm.text || 'своё имя', rel: line[to] === '[' ? 'откуда' : '',
         note: (nm.text ? nm.text + '; ' : '') + (nm.line === ln ? 'объявлено здесь' : 'объявлено в строке ' + (nm.line + 1)) }); }
     }
     // конструкции: пробуем в начале каждого слова, берём, если накрывают 2+ слова
     if(window.codelabExplainAt) for(const w of line.matchAll(/[A-Za-z_$#.@][\w$-]*/g)){
       if(taken.some(([a, b]) => w.index >= a && w.index < b)) continue;
       const hit = window.codelabExplainAt(line, w.index + 1, lang);
-      if(hit && hit.term && hit.to - hit.from > w[0].length + 1){ taken.push([hit.from, hit.to]); out.push({ from: hit.from, to: hit.to, text: line.slice(hit.from, hit.to), label: shortOf(hit.text), note: hit.text, path: '' }); }
+      if(hit && hit.term && hit.to - hit.from > w[0].length + 1){ taken.push([hit.from, hit.to]); out.push({ from: hit.from, to: hit.to, text: line.slice(hit.from, hit.to), label: shortOf(hit.text), note: hit.text, path: '', rel: relOf(hit.term, lang, d, hit.text) }); }
     }
     const free = [];
     while((m = re.exec(line))){
@@ -102,12 +112,30 @@
       // цепочка obj.method — пробуем целиком, потом последнее звено (document.querySelector → querySelector)
       let term = m[0].replace(/\(.*$/, ''), info = meaning(term, lang, d);
       if(!info.note && !info.path && term.includes('.')){ const last = term.split('.').pop(); const i2 = meaning(last, lang, d); if(i2.note || i2.path) info = i2; }
-      if(!info.note && !info.path) continue;
-      out.push({ from, to, text: m[0], ...info });
+      // связь: ядро языка / правка / начало пояснения; запись «obj.prop =» — всегда «куда», в любом языке
+      // (свойство после своего имени приходит без точки: img.src → «src», точка стоит перед ним)
+      let rel = relOf(term, lang, d, info.note);
+      if(lang !== 'css' && lang !== 'html' && (term.includes('.') || line[from - 1] === '.') && /^\s*[-+*/]?=(?!=)/.test(line.slice(to))) rel = 'куда';
+      if(!info.note && !info.path && !rel) continue;
+      out.push({ from, to, text: m[0], ...info, rel, label: info.label || (rel === 'куда' ? 'записать сюда' : '') });
     }
     return out.sort((a, b) => a.from - b.from);
   }
 
+  // подписи раскладываем по рядам после отрисовки: подпись идёт в первый ряд, где не налезает на соседнюю
+  function layout(root){
+    for(const ln of root.querySelectorAll('.se-line')){
+      const rows = []; let max = 0;
+      for(const seg of ln.querySelectorAll('.se-seg')){
+        const lb = seg.querySelector('.se-lbl'); const a = seg.getBoundingClientRect().left, w = lb.offsetWidth;
+        let r = rows.findIndex(end => end + 6 <= a); if(r < 0){ r = rows.length; rows.push(0); }
+        rows[r] = a + w; max = Math.max(max, r);
+        lb.style.bottom = 'calc(100% + ' + (8 + r * 15) + 'px)';
+        const br = seg.querySelector('.se-br'); br.style.setProperty('--lift', (r * 15) + 'px'); seg.classList.toggle('up', r > 0);
+      }
+      ln.style.paddingTop = (26 + max * 15) + 'px';
+    }
+  }
   let btn = null, panel = null;
   const hideBtn = () => { if(btn){ btn.remove(); btn = null; } };
   function showBtn(x, y){
@@ -133,19 +161,30 @@
       const segs = segments(line, lang, d, own, base + i); let pos = 0, h = '';
       for(const s of segs){ if(s.from < pos) continue; h += esc(line.slice(pos, s.from));
         const go = s.own ? ' data-go="' + s.own.line + '"' : s.typo && s.typo.declLine != null ? ' data-go="' + s.typo.declLine + '"' : '';
-        h += '<span class="se-seg k' + (1 + (k % 4)) + (k % 2 ? ' up' : '') + (s.own ? ' own' : '') + (s.typo ? ' typo' : '') + '"' + go + ' title="' + esc(s.note) + '"><span class="se-lbl">' + esc(s.label || '…') + '</span><span class="se-br"></span><span class="se-code">' + esc(s.text) + '</span></span>';
+        h += '<span class="se-seg k' + (1 + (k % 4)) + '' + (s.own ? ' own' : '') + (s.typo ? ' typo' : '') + (s.rel && !s.typo ? ' rel' : '') + '"' + go + ' title="' + esc((s.rel ? s.rel + ': ' : '') + (s.note || '')) + '"><span class="se-lbl">' + (s.rel && !s.typo ? '<i>' + esc(s.rel) + '</i>' : '') + esc(s.rel && !s.label ? '' : (s.label || '…')) + '</span><span class="se-br"></span><span class="se-code">' + esc(s.text) + '</span></span>';
         k++;
-        pos = s.to; all.push(s); }
+        pos = s.to; s.ln = i; all.push(s); }
       return '<div class="se-line">' + h + esc(line.slice(pos)) + '</div>';
     }).join('');
+    // лесенка связей: вложенность по скобкам/отступам; в той же строке после «если/когда…» — ещё на ступень
+    const L = window.codelabLinks, dep = L ? L.depths(lines.join('\n'), lang) : lines.map(() => 0);
+    const stack = []; const lineLvl = [];
+    lines.forEach((_, i) => { while(stack.length && stack[stack.length - 1].d >= dep[i]) stack.pop(); lineLvl[i] = stack.filter(x => x.rel).length;
+      const op = all.find(s => s.ln === i && OPENS.has(s.rel)); stack.push({ d: dep[i], rel: op ? op.rel : '' }); });
+    let lastLn = -1, bump = 0;
+    const flowRows = all.filter(s => s.rel && !s.typo).map(s => { if(s.ln !== lastLn){ lastLn = s.ln; bump = 0; }
+      const lvl = lineLvl[s.ln] + bump; if(OPENS.has(s.rel)) bump = 1;
+      return '<div style="margin-left:' + (lvl * 16) + 'px"><b>' + esc(s.rel) + '</b><code>' + esc(s.text) + '</code><span>' + esc(s.label && s.label !== 'записать сюда' ? s.label : '') + '</span></div>'; });
+    const flow = flowRows.length > 1 ? '<div class="se-flow">' + flowRows.join('') + '</div>' : '';
     const seen = new Set();
     const list = all.filter(s => { const key = s.text.toLowerCase(); if(seen.has(key)) return false; seen.add(key); return true; })
-      .map(s => '<div class="se-it' + (s.typo ? ' typo' : '') + '"><code>' + esc(s.text) + '</code>' + (s.path ? '<span class="p">' + esc(s.path) + '</span> — ' : '') + esc(s.note || s.label)
+      .map(s => '<div class="se-it' + (s.typo ? ' typo' : '') + '"><code>' + esc(s.text) + '</code>' + (s.path ? '<span class="p">' + esc(s.path) + '</span> — ' : '') + esc(s.note || s.label || s.rel)
         + (s.typo && cm ? '<a data-fix="' + esc(s.text) + '" data-to="' + esc(s.typo.maybe) + '">исправить</a>' : '')
         + (s.own && cm ? '<a data-go="' + s.own.line + '">к объявлению</a>' : '') + '</div>').join('');
     panel.innerHTML = '<div class="se-h"><b>что здесь</b><span>' + esc(lang.toUpperCase()) + '</span><button title="закрыть (Esc)">×</button></div>'
-      + '<div class="se-b">' + (all.length ? body + '<div class="se-list">' + list + '</div>' : '<div class="se-none">в выделенном нет слов из словаря — выдели кусок побольше или добавь пояснения в словарь</div>') + '</div>';
+      + '<div class="se-b">' + (all.length ? body + flow + '<div class="se-list">' + list + '</div>' : '<div class="se-none">в выделенном нет слов из словаря — выдели кусок побольше или добавь пояснения в словарь</div>') + '</div>';
     document.body.appendChild(panel);
+    layout(panel);
     panel.querySelector('.se-h button').onclick = () => { panel.remove(); panel = null; };
     panel.querySelector('.se-b').addEventListener('click', e => {
       if(!cm) return;

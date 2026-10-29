@@ -1258,3 +1258,50 @@ function openSynModal(){
 }
 document.getElementById('pdictsyn').onclick = openSynModal;
 
+// связи слов: ядро языка и сортировка по пояснению работают сами; здесь — сводка, правки «слово: связь» и промпт для ИИ на неразобранные
+function openRelModal(){
+  const bg = el2('div', 'modal-bg');
+  const box = el2('div', 'modal');
+  box.innerHTML = '<h3>Связи слов</h3>'
+    + '<p class="mh">Какую связь между частями программы выражает слово. Большинство расставлено само: ключевые слова языка и начало пояснения («получить…» — откуда, «вывести…» — куда). Здесь — поправить или дописать. Строка: <b>слово: связь</b>; связь — одна из: <span id="rl-allowed"></span>, <b>нет</b> (слово ничего не связывает) или <b>авто</b> (снять правку).</p>'
+    + '<div class="mbtns"><select class="inv-sel" id="rl-lang"><option>js</option><option>python</option><option>css</option><option>html</option></select><button class="btn" id="rl-view">сводка</button><button class="btn" id="rl-prompt">промпт для ИИ</button></div>'
+    + '<textarea id="rl-text" placeholder="слово: связь" style="min-height:120px"></textarea>'
+    + '<div class="mbtns"><button class="btn ok" id="rl-apply">сохранить</button><button class="btn" id="rl-close">закрыть</button></div>'
+    + '<div class="lp-prev" id="rl-prev"></div>';
+  bg.appendChild(box); document.body.appendChild(bg);
+  const q = s => bg.querySelector(s);
+  q('#rl-close').onclick = () => bg.remove();
+  const L = window.codelabLinks; q('#rl-allowed').textContent = L ? L.RELS.join(', ') : '';
+  const lang = () => q('#rl-lang').value;
+  const row = (cls, t) => { const d = el2('div', 'lp-row ' + cls); d.textContent = t; return d; };
+  q('#rl-view').onclick = async () => {
+    const prev = q('#rl-prev'); prev.innerHTML = 'считаю…';
+    const r = await fetch('/api/dict/relations?lang=' + encodeURIComponent(lang())).then(x => x.json()).catch(() => null);
+    prev.innerHTML = ''; if(!r){ prev.appendChild(row('lp-bad', 'нет ответа сервера')); return; }
+    for(const rel of r.rels){ const g = r.by[rel]; if(!g) continue;
+      prev.appendChild(row('lp-ok', rel + ': ' + g.n + '  (' + Object.entries(g.from).map(([k, v]) => k + ' ' + v).join(', ') + ')  — ' + g.sample.join(', '))); }
+    prev.appendChild(row('muted', 'без связи по пояснению: ' + r.unclassified + ' — обычно это значения и названия; спорные можно отдать ИИ («промпт для ИИ»)'));
+  };
+  q('#rl-prompt').onclick = async () => {
+    const r = await fetch('/api/dict/relations?lang=' + encodeURIComponent(lang())).then(x => x.json()).catch(() => null);
+    if(!r) return;
+    try { await navigator.clipboard.writeText(r.prompt); } catch(_){}
+    const prev = q('#rl-prev'); prev.innerHTML = '';
+    prev.appendChild(row('lp-ok', 'Промпт скопирован (' + r.shown + ' слов из ' + r.unclassified + '). Ответ ИИ вставь в поле выше и нажми «сохранить».'));
+  };
+  q('#rl-apply').onclick = async () => {
+    const entries = [], bad = [];
+    String(q('#rl-text').value).split('\n').forEach((raw, i) => {
+      const line = raw.trim(); if(!line || line.startsWith('#')) return;
+      const k = line.lastIndexOf(':'); if(k < 1){ bad.push('строка ' + (i + 1) + ': нет «:»'); return; }
+      entries.push([line.slice(0, k).trim(), line.slice(k + 1).trim()]);
+    });
+    const r = await fetch('/api/dict/relations', { method: 'POST', body: JSON.stringify({ lang: lang(), entries }) }).then(x => x.json()).catch(() => null);
+    const prev = q('#rl-prev'); prev.innerHTML = '';
+    prev.appendChild(row(r && r.ok ? 'lp-ok' : 'lp-bad', r && r.ok ? 'Сохранено: ' + r.set + '. Обнови песочницу (Ctrl+F5).' : 'Ошибка сохранения'));
+    bad.concat((r && r.bad) || []).forEach(x => prev.appendChild(row('lp-bad', 'не понято: ' + x)));
+    if(window.codelabKwDictReset) window.codelabKwDictReset();
+  };
+}
+document.getElementById('pdictrel').onclick = openRelModal;
+

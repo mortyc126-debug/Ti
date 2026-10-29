@@ -239,3 +239,21 @@ test('свои имена: что внутри, где объявлено, оп�
   assert.equal(r.typos.filter(t => t.name === 'btnn').length, 1);
   assert.ok(!by.btn && !by.length);
 });
+
+test('связи слов: ядро, начало пояснения, правки, вложенность', () => {
+  const L = require('../public/code-links.js');
+  assert.equal(L.relationOf('btn.addEventListener', 'js', {}).rel, 'когда');
+  assert.equal(L.relationOf('elif', 'python', {}).rel, 'если');
+  assert.equal(L.relationOf('hover', 'css', {}).rel, 'когда');           // :hover — по слову без двоеточия
+  assert.equal(L.relationOf('fetch', 'js', {}, 'fetch — получить ответ сервера').rel, 'откуда');
+  assert.equal(L.relationOf('console.log', 'js', {}, 'вывести данные в консоль').rel, 'куда');
+  assert.equal(L.relationOf('length', 'js', {}, 'длина массива'), null);
+  // «задать отступ» в CSS — оформление, а не поток данных
+  assert.equal(L.relationOf('margin', 'css', {}, 'задать внешний отступ'), null);
+  // правка пользователя важнее ядра; пустая — «связи нет»
+  const dict = { relations: { js: { map: 'куда', then: '' } } };
+  assert.equal(L.relationOf('arr.map', 'js', dict).rel, 'куда');
+  assert.equal(L.relationOf('then', 'js', dict).rel, '');
+  assert.deepEqual(L.depths("a(() => {\n  if (x) {\n    y();\n  }\n});", 'js'), [0, 2, 3, 2, 0]);
+  assert.deepEqual(L.depths('for a in b:\n    if a:\n        f()\nprint(1)', 'python'), [0, 1, 2, 0]);
+});

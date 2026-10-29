@@ -66,6 +66,8 @@ function explainExpr(expr, D){
   if((m = x.match(/^new\s+([A-Za-z_$][\w$.]*)/))) { const n = D.word(m[1].split('.').pop()); return { kind: 'объект', text: 'новый ' + m[1] + (n ? ': ' + short(n, 60) : '') }; }
   if((m = x.match(/^(?:async\s*)?(?:\(([^)]*)\)|([A-Za-z_$][\w$]*))\s*=>/)) || (m = x.match(/^(?:async\s+)?function\b\s*[\w$]*\s*\(([^)]*)\)/))) return { kind: 'функция', text: 'функция (' + (m[1] != null ? m[1] : m[2] || '').replace(/\s+/g, ' ').trim() + ')' };
   const lit = literalKind(x); if(lit) return { kind: 'значение', text: literalPreview(x, lit) };
+  // взять из списка: набор[i] — «элемент из набор», с random — «случайный элемент из набор» (иначе подпись уйдёт в random())
+  if((m = x.match(/^([A-Za-zА-Яа-яЁё_$][\wА-Яа-яЁё$.]*)\[([\s\S]+)\]$/))) return { kind: 'значение', text: (/random/i.test(m[2]) ? 'случайный элемент из ' : 'элемент из ') + m[1] + (/^\d+$/.test(m[2].trim()) ? ' (№' + m[2].trim() + ')' : '') };
   // последний вызов в выражении: obj.method(…) или func(…)
   // метод через точку — по идиомам словаря (obj.getContext(…)); просто функция — по слову словаря (fetch(…))
   const calls = [...x.matchAll(/(\.)?([A-Za-z_$][\w$]*)\s*\(/g)].map(c => ({ name: c[2], member: !!c[1] })).filter(c => !/^(await|function|return)$/.test(c.name));

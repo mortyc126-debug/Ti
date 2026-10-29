@@ -31,7 +31,9 @@ import { createVendor } from './code-lab/lib/vendor.mjs';
 import { createTaskStore, suggestNext, createTaskRanker } from './code-lab/lib/tasks.mjs';
 import { explainNames } from './code-lab/lib/contract-labels.mjs';
 import { buildVariants, caseMapFrom, recase } from './code-lab/lib/variant-tree.mjs';
-import { analyzeNames } from './code-lab/lib/code-names.mjs';   // свои имена файла: что внутри, где объявлены, опечатки   // дерево вариантов «смысл → термины → разновидности»   // подписи к именам «даёт/нужно»
+import { analyzeNames } from './code-lab/lib/code-names.mjs';
+import { createRequire } from 'node:module';
+const Links = createRequire(import.meta.url)('./code-lab/public/code-links.js');   // связи «когда/если/…» — общий модуль со страницей   // свои имена файла: что внутри, где объявлены, опечатки   // дерево вариантов «смысл → термины → разновидности»   // подписи к именам «даёт/нужно»
 import { createSections, treeToText, treeFromText, suggestSections, placeInTree } from './code-lab/lib/sections.mjs';   // общее дерево разделов   // задачи: деревья решений поверх кусков   // управляемые обновления CodeMirror (по кнопке)
 
 // сетевые/TLS-ошибки провайдеров ИИ (GigaChat и пр.) не должны ронять весь сервер —
@@ -115,7 +117,8 @@ const DICT_BASE = path.join(PUBLIC, 'keyword-dict.json');
 const DICT_DIR = path.join(PUBLIC, 'dict');
 const LANGS_DIR = path.join(DICT_DIR, 'langs');
 const EXAMPLES_FILE = path.join(DICT_DIR, 'examples.json');   // привязка «слово/конструкция → кусок-пример» {term:{id,title}}
-const SYN_FILE = path.join(DICT_DIR, 'synonyms.json');        // синонимы для поиска по смыслу: {term:[фраза,…]} — найти, не помня имени
+const SYN_FILE = path.join(DICT_DIR, 'synonyms.json');
+const REL_FILE = path.join(DICT_DIR, 'relations.json');        // правки связей «слово → когда/если/…»: {язык|*:{слово:связь}}; '' — «связи нет»        // синонимы для поиска по смыслу: {term:[фраза,…]} — найти, не помня имени
 // алиасы языка → канон: чтобы «javascript»/«py»/«c++» не плодили файл-двойник рядом с js/python/cpp
 const LANG_ALIAS = { javascript: 'js', typescript: 'ts', py: 'python', python3: 'python', shell: 'bash', sh: 'bash', zsh: 'bash', 'c++': 'cpp', cplusplus: 'cpp', cxx: 'cpp', 'c#': 'csharp', 'c-sharp': 'csharp', cs: 'csharp', golang: 'go', rb: 'ruby', kt: 'kotlin', rs: 'rust', jsx: 'js', tsx: 'ts', htm: 'html', yml: 'yaml' };
 const canonLang = v => { v = String(v || '').trim().toLowerCase(); return LANG_ALIAS[v] || v.replace(/[^a-z0-9_+-]/g, '') || 'other'; };
@@ -132,6 +135,7 @@ const _isSynList = s => { const t = String(s).trim(); if(_commas(t) < 3 || _isSe
 // «код» — это чисто русский текст без латиницы и код-символов → скорее словарь/синонимы, а не код
 const _looksProse = s => { const t = String(s); if(!_isRuS(t)) return false; if(_hasLat(t)) return false; return !/[{}()\[\];=<>\/\\|&*%#@$`]/.test(t); };
 async function loadExamples(){ try { const o = JSON.parse(await fs.readFile(EXAMPLES_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
+async function loadRelations(){ try { const o = JSON.parse(await fs.readFile(REL_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
 async function loadSynonyms(){ try { const o = JSON.parse(await fs.readFile(SYN_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
 let _dictRawKeys = [];   // ключи словаря как записаны (с регистром) — для показа кода в подсказках
 async function loadLangDicts(){
@@ -154,6 +158,7 @@ async function kwDict(){
   for(const [lang, m] of Object.entries(fromFiles)){ base.langs[lang] = Object.assign({}, base.langs[lang] || {}, m); }
   base.examples = await loadExamples();   // привязки «термин → кусок-пример»
   base.synonyms = await loadSynonyms();   // синонимы/фразы для поиска по смыслу
+  base.relations = await loadRelations();   // правки связей частей кода (ядро и сортировка по пояснению — в public/code-links.js)
   _kwDict = base;
   return _kwDict;
 }
@@ -1217,6 +1222,48 @@ const server = http.createServer(async (req, res) => {
       await fs.mkdir(DICT_DIR, { recursive: true });
       await fs.writeFile(SYN_FILE, JSON.stringify(sorted, null, 2), 'utf8'); _kwDict = null;
       return json(res, 200, { ok: true, terms, added, totalTerms: Object.keys(sorted).length });
+    }
+
+    // связи частей кода: правки «слово: связь». POST {lang, entries:[[слово, связь]]}; связь '' или «нет» — у слова связи нет,
+    // «авто» — снять правку. GET ?lang= — сводка: сколько слов в какой связи и откуда, неразобранные + промпт для ИИ.
+    if(u.pathname === '/api/dict/relations' && req.method === 'POST'){
+      const b = await readBody(req); const lang = String(b.lang || '*').toLowerCase() === '*' ? '*' : canonLang(b.lang);
+      const all = await loadRelations(); const m = all[lang] = all[lang] || {};
+      let set = 0, bad = [];
+      for(const e of (Array.isArray(b.entries) ? b.entries : [])){
+        const term = String(e && e[0] || '').trim().toLowerCase(); let rel = String(e && e[1] || '').trim().toLowerCase();
+        if(!term) continue;
+        if(rel === 'авто'){ if(term in m){ delete m[term]; set++; } continue; }
+        if(rel === 'нет' || rel === '-') rel = '';
+        if(rel && !Links.RELS.includes(rel)){ bad.push(term + ': ' + rel); continue; }
+        m[term] = rel; set++;
+      }
+      if(!Object.keys(m).length) delete all[lang];
+      await fs.mkdir(DICT_DIR, { recursive: true });
+      await fs.writeFile(REL_FILE, JSON.stringify(all, null, 2), 'utf8'); _kwDict = null;
+      return json(res, 200, { ok: true, set, bad, allowed: Links.RELS });
+    }
+    if(u.pathname === '/api/dict/relations'){
+      const lang = canonLang(u.searchParams.get('lang') || 'js'); const d = await kwDict();
+      const src = Object.assign({}, lang === 'css' ? d.cssProps : lang === 'html' ? Object.assign({}, d.htmlTags, d.htmlAttrs) : {}, (d.langs && d.langs[lang]) || {});
+      const by = {}, none = [];
+      for(const [w, note] of Object.entries(src)){
+        if(/^ошибка /.test(w)) continue;   // каталог ошибок — не слова кода
+        const r = Links.relationOf(w, lang, d, note);
+        if(r && r.rel){ const g = by[r.rel] = by[r.rel] || { n: 0, from: {}, sample: [] }; g.n++; g.from[r.from] = (g.from[r.from] || 0) + 1; if(g.sample.length < 12) g.sample.push(w); }
+        else if(!r) none.push([w, String(note || '').slice(0, 90)]);
+      }
+      // неразобранные — короткие слова вперёд: они чаще встречаются в коде
+      none.sort((a, b) => a[0].length - b[0].length);
+      const lim = Math.min(Number(u.searchParams.get('limit')) || 150, 400), part = none.slice(0, lim);
+      const prompt = 'Для каждого слова языка ' + lang + ' укажи, какую связь между частями программы оно выражает. Варианты: '
+        + Links.RELS.join(', ') + ', нет.\n'
+        + 'когда — от чего запускается (событие, таймер); если/иначе — условие; для каждого — повтор, перебор; потом — порядок, ожидание; '
+        + 'при ошибке — обработка ошибок; откуда — откуда берутся данные; куда — куда идёт результат (вывод, запись, изменение); '
+        + 'результат — что отдаёт функция; нет — слово не связывает части (просто значение, оформление, название).\n'
+        + 'Ответ строго по одному на строку: слово: связь. Без пояснений.\n\n'
+        + part.map(([w, n]) => w + ' — ' + n).join('\n');
+      return json(res, 200, { lang, rels: Links.RELS, by, unclassified: none.length, prompt, shown: part.length });
     }
 
     // привязать к термину (слову/конструкции) кусок-пример: {term, piece: название|id|''(снять)}
