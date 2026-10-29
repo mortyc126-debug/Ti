@@ -294,3 +294,19 @@ test('правила структуры: разбор, HTML-вложенност
   assert.deepEqual(msgs('def f():\n    return 1\nreturn 2\nif a:\n    pass\nelif b:\n    pass\nx = 1\nelif c:\n    pass', 'python'), ['return работает только внутри def', 'elif идёт только после if / elif']);
   assert.equal(S.templateFor('if', R('js')), 'if (…) {\n  …\n}');
 });
+
+test('атрибуты тегов: обязательные, необязательные, общие, значения, опечатки', async () => {
+  const S = require('../public/structure-rules.js');
+  const rules = S.parse(require('../public/dict/structure.json').html.join('\n')).rules;
+  const A = S.attrsFor('img', rules);
+  assert.deepEqual(A.required.map(x => x.name), ['src', 'alt']);
+  assert.ok(A.optional.some(x => x.name === 'loading') && A.global.some(x => x.name === 'class'));
+  assert.deepEqual(A.values('loading').list, ['lazy', 'eager']);
+  const msgs = S.check('<img alt="x">\n<button tpye="button" type="sbmit">ok</button>\n<a href="/" data-x="1" onclick="f()" class="b">x</a>', 'html', rules).map(x => x.msg.split(' — ')[0]);
+  assert.deepEqual(msgs, ['<img> без src', 'у <button> нет атрибута «tpye»', 'type="sbmit"']);
+  const { buildVariants } = await import('../lib/variant-tree.mjs');
+  const d = { langs: { html: { img: '<img> — картинка' } }, structure: require('../public/dict/structure.json') };
+  const r = buildVariants({ q: 'картинка', lang: 'html', dict: d, rows: [], synonyms: { '<img>': ['картинка'] } });
+  assert.equal(r.roots[0].code, '<img src="…" alt="…">');
+  assert.match(r.roots[0].note, /обязательно: src, alt/);
+});

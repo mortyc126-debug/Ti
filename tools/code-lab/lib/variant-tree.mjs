@@ -56,7 +56,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   // синонимы и словарь записаны по-разному (.settimeout / settimeout, for / «for (const item of items)»):
   // точное совпадение → общее слово (js) → термин, у которого есть только конструкции с ним
   const resolve = (term, D, L) => {
-    const t = String(term).toLowerCase().trim().replace(/^\.(?=[a-z])/, '');
+    const t = String(term).toLowerCase().trim().replace(/^\.(?=[a-z])/, '').replace(/^<([a-z][\w-]*)>$/, (L === 'html' || L === 'svg') ? '$1' : '<$1>');   // синоним «<img>» ↔ запись словаря «img»
     if(D[t]) return { key: t, rank: 1 };
     if((L === 'js' || L === 'ts') && W[t]) return { key: t, rank: 1.5 };   // for, while — базовые слова языка
     if(t.length < 2 || /\s/.test(t)) return null;
@@ -81,6 +81,11 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   const top = roots.filter(r => !roots.some(o => o !== r && o.lang === r.lang && r.term.startsWith(o.term + '-')))
     .sort((a, b) => b.score - a.score || a.term.length - b.term.length).slice(0, MAX_ROOTS);
 
+  // шаблон «пишется» из правил структуры (dict.structure): <img src="…" alt="…">, if (…) { … } — вместо голого имени
+  const tplOf = (L, term) => { const lines = (dict && dict.structure && dict.structure[L]) || []; const pre = String(term).toLowerCase().replace(/^<|>$/g, '') + ': пишется ';
+    const l = lines.find(x => x.toLowerCase().startsWith(pre)); return l ? l.slice(pre.length).trim().replace(/\\n/g, '\n').replace(/\\t/g, '  ') : ''; };
+  const needOf = (L, term) => { const lines = (dict && dict.structure && dict.structure[L]) || []; const pre = String(term).toLowerCase().replace(/^<|>$/g, '') + ': обязательно ';
+    return lines.filter(x => x.toLowerCase().startsWith(pre)).map(x => x.slice(pre.length).split(' — ')[0].trim()); };
   const synLabel = term => { const p = synonyms[term]; return Array.isArray(p) && p.length ? p[0] : ''; };
   const node = (term, L, label) => {
     const D = langs[L] || {}; const own = D[term] || ((L === 'js' || L === 'ts') ? W[term] : '');
@@ -88,7 +93,9 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     // у термина нет своей записи — показываем самую короткую конструкцию с ним («array.sort((a, b) => a - b)»)
     let code = codeFor(term, L, ex, caseMap);
     if(!own && L !== 'css' && L !== 'html'){ const re = tokRe(term); const k = Object.keys(D).filter(x => isIdiom(x) && balanced(x) && re.test(x)).sort((a, b) => a.length - b.length)[0]; if(k) code = recase(k, caseMap); }
-    return { term, lang: L, code, note: note || (own ? '' : ''), label: label || synLabel(term), children: [] };
+    const tpl = tplOf(L, term); if(tpl) code = tpl;
+    const need = needOf(L, term);
+    return { term, lang: L, code, note: (note || '') + (need.length ? (note ? '; ' : '') + 'обязательно: ' + need.join(', ') : ''), label: label || synLabel(term), children: [] };
   };
   const out = top.map(r => {
     const D = langs[r.lang] || {}; const root = node(r.term, r.lang, r.label);

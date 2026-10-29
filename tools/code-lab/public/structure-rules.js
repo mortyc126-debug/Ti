@@ -2,11 +2,13 @@
 //   li: внутри ul, ol                     p: не содержит div, ul        summary: первым в details
 //   elif: после if, elif                  gap: требует display: flex | grid
 //   if: пишется if (…) {\n  …\n}         id: связывает css #*, js getElementById('*')
+//   img: обязательно src                  img: можно alt, width, loading     *: можно id, class, title (общие)
+//   button[type]: значения button, submit, reset
 // После « — » можно оставить пояснение. Правила лежат в dict/structure.json по языкам и правятся в Описи.
 // parse — разбор текста; check — нарушения в коде; templateFor — шаблон «пишется». Общий для страницы и тестов.
 (function(root){
   'use strict';
-  const VERBS = ['не внутри', 'внутри', 'не содержит', 'содержит', 'первым в', 'после', 'требует', 'пишется', 'связывает', 'читает'];
+  const VERBS = ['не внутри', 'внутри', 'не содержит', 'содержит', 'первым в', 'после', 'требует', 'пишется', 'связывает', 'читает', 'обязательно', 'можно', 'значения'];
   const VOID = new Set('area base br col embed hr img input link meta source track wbr'.split(' '));
 
   function parse(text){
@@ -54,6 +56,7 @@
         for(let j = stack.length - 1; j > i; j--) if(!VOID.has(stack[j].name)) out.push({ from: stack[j].from, to: stack[j].from + stack[j].name.length, msg: '<' + stack[j].name + '> не закрыт до </' + name + '>', level: 'bad' });
         stack.length = i; continue;
       }
+      checkAttrs(name, m[0], m.index, rules, out);
       const parent = stack[stack.length - 1], anc = stack.map(x => x.name);
       for(const r of IN.get(name) || []) if(!parent || !r.args.map(x => x.toLowerCase()).includes(parent.name)) out.push({ from, to, msg: '<' + name + '> должен быть внутри ' + listText(r.args) + (r.note ? ' — ' + r.note : ''), level: 'bad' });
       for(const r of NOTIN.get(name) || []){ const hit = anc.find(a => r.args.map(x => x.toLowerCase()).includes(a)); if(hit) out.push({ from, to, msg: '<' + name + '> нельзя внутри <' + hit + '>' + (r.note ? ' — ' + r.note : ''), level: 'bad' }); }
@@ -64,6 +67,32 @@
     }
     for(const s of stack) if(!/^(html|head|body|p|li|td|th|tr|option|dt|dd)$/.test(s.name)) out.push({ from: s.from, to: s.from + s.name.length, msg: '<' + s.name + '> не закрыт — нет </' + s.name + '>', level: 'bad' });
     return out;
+  }
+
+  // атрибуты тега по правилам: обязательно / можно / общие (* : можно …) / значения (тег[атрибут] или *[атрибут])
+  function attrsFor(tag, rules){
+    const t = String(tag).toLowerCase(), pick = (term, verb) => (rules || []).filter(r => r.verb === verb && r.term.toLowerCase() === term).flatMap(r => r.args.map(a => ({ name: a, note: r.note })));
+    const required = pick(t, 'обязательно'), optional = pick(t, 'можно'), global = pick('*', 'можно');
+    const values = attr => { const a = String(attr).toLowerCase(); const r = (rules || []).find(x => x.verb === 'значения' && (x.term.toLowerCase() === t + '[' + a + ']')) || (rules || []).find(x => x.verb === 'значения' && x.term.toLowerCase() === '*[' + a + ']'); return r ? { list: r.args, note: r.note } : null; };
+    return { required, optional, global, values, known: required.length + optional.length > 0 };
+  }
+  const near1 = (a, b) => { if(Math.abs(a.length - b.length) > 1) return false; let i = 0, j = 0, e = 0; while(i < a.length && j < b.length){ if(a[i] === b[j]){ i++; j++; continue; } if(++e > 1) return false;
+    if(a[i + 1] === b[j] && a[i] === b[j + 1]){ i += 2; j += 2; continue; } if(a.length > b.length) i++; else if(b.length > a.length) j++; else { i++; j++; } } return e + (a.length - i) + (b.length - j) <= 1; };
+  function checkAttrs(tag, text, at, rules, out){
+    const A = attrsFor(tag, rules); if(!A.known && !A.global.length) return;
+    const attrs = [...text.matchAll(/\s([^\s=\/>"']+)(?:\s*=\s*("[^"]*"|'[^']*'|[^\s>]+))?/g)].map(m => ({ name: m[1].toLowerCase(), raw: m[1], val: m[2] ? m[2].replace(/^["']|["']$/g, '') : null, from: at + m.index + 1 }));
+    const tagFrom = at + 1, tagTo = tagFrom + tag.length;
+    for(const r of A.required) if(!attrs.some(x => x.name === r.name.toLowerCase())) out.push({ from: tagFrom, to: tagTo, msg: '<' + tag + '> без ' + r.name + (r.note ? ' — ' + r.note : ' не заработает'), level: 'warn' });
+    const okNames = A.required.concat(A.optional, A.global).map(x => x.name.toLowerCase());
+    for(const x of attrs){
+      if(/^(data-|aria-|on)/.test(x.name) || okNames.includes(x.name)){
+        const v = x.val != null && A.values(x.name);
+        if(v && x.val !== '' && !v.list.map(y => y.toLowerCase()).includes(x.val.toLowerCase()) && !/[…{}$]/.test(x.val)) out.push({ from: x.from, to: x.from + x.raw.length, msg: x.raw + '="' + x.val + '" — бывает: ' + v.list.join(', ') + (v.note ? ' — ' + v.note : ''), level: 'warn' });
+        continue;
+      }
+      // незнакомое имя, похожее на известное, — скорее опечатка (srс, atl, tpye); просто незнакомое не трогаем
+      const like = okNames.find(n => near1(x.name, n)); if(like && A.known) out.push({ from: x.from, to: x.from + x.raw.length, msg: 'у <' + tag + '> нет атрибута «' + x.raw + '» — может, ' + like + '?', level: 'bad' });
+    }
   }
 
   // CSS: «требует» — в том же правиле (или в другом правиле с тем же селектором) должно быть нужное свойство
@@ -159,7 +188,7 @@
     return out;
   }
 
-  const api = { VERBS, parse, check, templateFor, describe, blank };
+  const api = { VERBS, parse, check, templateFor, describe, blank, attrsFor };
   if(typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.StructureRules = api;
 })(typeof self !== 'undefined' ? self : this);

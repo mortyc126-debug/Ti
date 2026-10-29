@@ -49,14 +49,14 @@
     const ta = taOf(ed), cm = ta && ta.__cm; const lang = (ed && ed.__f && ed.__f.lang) || '';
     if(cm){
       if(cm.somethingSelected()){ if(!force) return null; const from = cm.getCursor('from'), to = cm.getCursor('to'); const c = cm.cursorCoords(true, 'window');
-        return { lang, word: cm.getSelection().trim(), x: c.left, y: c.bottom + 4, put: t => { cm.replaceRange(t, from, to); cm.focus(); } }; }
+        return { lang, word: cm.getSelection().trim(), x: c.left, y: c.bottom + 4, put: t => { cm.replaceRange(t, from, to); slot(cm, from, t); cm.focus(); } }; }
       const cur = cm.getCursor(), line = cm.getLine(cur.line); const re = /[\wА-Яа-яЁё$.-]/;
       let a = cur.ch; while(a > 0 && re.test(line[a - 1])) a--;
       if(!force && cur.ch < line.length && re.test(line[cur.ch])) return null;   // курсор посреди слова — не мешаем
       // «найти элемент» — смысл из нескольких русских слов подряд
       const ph = line.slice(0, cur.ch).match(/([А-Яа-яЁё]+(?:\s+[А-Яа-яЁё]+){1,3})$/); if(ph) a = cur.ch - ph[1].length;
       const from = { line: cur.line, ch: a }, to = { line: cur.line, ch: cur.ch }; const c = cm.cursorCoords(true, 'window');
-      return { lang, word: line.slice(a, cur.ch).replace(/^\.+/, '').trim(), x: c.left, y: c.bottom + 4, put: t => { cm.replaceRange(t, from, to); cm.focus(); } };
+      return { lang, word: line.slice(a, cur.ch).replace(/^\.+/, '').trim(), x: c.left, y: c.bottom + 4, put: t => { cm.replaceRange(t, from, to); slot(cm, from, t); cm.focus(); } };
     }
     if(ta){ const v = ta.value, p = ta.selectionStart; const re = /[\wА-Яа-яЁё$.-]/; let a = p; while(a > 0 && re.test(v[a - 1])) a--;
       const r = ta.getBoundingClientRect();
@@ -77,6 +77,49 @@
       + (desc ? '<span class="ac-d">' + desc + '</span>' : '') + '</span></div>'
       + (has ? '<div class="ac-kids" hidden>' + n.children.map(k => rowHtml(k)).join('') + '</div>' : '') + '</div>';
   }
+  // вставили шаблон с «…» — выделяем первое: сразу печатаешь своё
+  function slot(cm, from, t){ if(!String(t).includes('…')) return; const end = cm.posFromIndex(cm.indexFromPos(from) + t.length);
+    for(let l = from.line; l <= end.line; l++){ const s = cm.getLine(l); const i = s.indexOf('…', l === from.line ? from.ch : 0); if(i >= 0 && (l < end.line || i < end.ch)){ cm.setSelection({ line: l, ch: i }, { line: l, ch: i + 1 }); return; } } }
+
+  // ── атрибуты внутри HTML-тега ──
+  // курсор внутри открывающего тега: <img |  <img sr|  <button type="|  → режим «имя атрибута» или «значение»
+  function tagCtx(ed){
+    const ta = taOf(ed), cm = ta && ta.__cm; if(!cm) return null;
+    // выделено «…» из шаблона — подсказываем, чем его заменить
+    const ph = cm.somethingSelected() && cm.getSelection() === '…'; if(cm.somethingSelected() && !ph) return null;
+    const cur = cm.getCursor('from'), curTo = cm.getCursor('to'), before = cm.getRange({ line: Math.max(0, cur.line - 6), ch: 0 }, cur);
+    const m = before.match(/<([a-zA-Z][\w-]*)(\s[^<>]*)$/); if(!m) return null;
+    const tail = m[2], tag = m[1].toLowerCase(), c = cm.cursorCoords(true, 'window');
+    const mk = prefix => { const from = { line: cur.line, ch: cur.ch - prefix.length }; return t => { cm.replaceRange(t, from, curTo); slot(cm, from, t); cm.focus(); }; };
+    const vm = tail.match(/([^\s=]+)\s*=\s*(["'])([^"']*)$/);
+    if(vm) return { mode: 'value', tag, attr: vm[1].toLowerCase(), prefix: vm[3], x: c.left, y: c.bottom + 4, put: mk(vm[3]) };
+    if(((tail.match(/"/g) || []).length % 2) || ((tail.match(/'/g) || []).length % 2)) return null;   // внутри значения без «=» рядом
+    const prefix = (tail.match(/([^\s="'\/]*)$/) || ['', ''])[1];
+    if(/=\s*$/.test(tail)) return null;
+    const have = [...tail.matchAll(/\s([^\s=\/>"']+)/g)].map(x => x[1].toLowerCase());
+    return { mode: 'name', tag, prefix, have, x: c.left, y: c.bottom + 4, put: mk(prefix) };
+  }
+  const BOOL = new Set('hidden disabled required readonly checked multiple selected autoplay muted loop controls playsinline defer async novalidate open reversed allowfullscreen inert autofocus ismap default nomodule formnovalidate'.split(' '));
+  let htmlRules = null;
+  async function tagRoots(tc){
+    if(!window.StructureRules) return [];
+    if(!htmlRules) htmlRules = (window.codelabKwDict ? window.codelabKwDict('html') : Promise.resolve({})).then(d => window.StructureRules.parse(((d && d.structure && d.structure.html) || []).join('\n')).rules).catch(() => []);
+    const A = window.StructureRules.attrsFor(tc.tag, await htmlRules);
+    const note = (n, extra) => { const e = window.codelabExplain ? window.codelabExplain(n, 'html') : ''; return String(e || extra || '').replace(/^[^—]{1,40}—\s*/, ''); };
+    const pre = tc.prefix.toLowerCase(), fit = n => n.toLowerCase().startsWith(pre);
+    if(tc.mode === 'value'){
+      const v = A.values(tc.attr); if(!v) return [];
+      return v.list.filter(fit).map((x, i) => ({ code: x, lang: 'html', note: i === 0 && v.note ? v.note : '', label: '', children: [] }));
+    }
+    const node = (r, label) => ({ code: BOOL.has(r.name) ? r.name : r.name + '="…"', lang: 'html', label, note: note(r.name, r.note), children: [] });
+    const fresh = r => !tc.have.includes(r.name.toLowerCase()) && fit(r.name);
+    const out = A.required.filter(fresh).map(r => node(r, 'обязательно')).concat(A.optional.filter(fresh).map(r => node(r, '')));
+    const glob = A.global.filter(fresh).map(r => node(r, ''));
+    // общие атрибуты — свёрнутой веткой, пока ничего не набрано; набрал начало — вперемешку со своими
+    if(glob.length) pre ? out.push(...glob) : out.push({ group: true, label: 'общие атрибуты', note: 'есть у любого тега: ' + glob.length, lang: 'html', children: glob });
+    return out;
+  }
+
   // запасной путь: слова словаря по началу («quer» → querySelector), если дерева нет
   function flatFallback(word, d, lang){
     const lq = word.toLowerCase(); const out = []; const seen = new Set();
@@ -95,11 +138,18 @@
     let code = row.dataset.code;
     if(row.dataset.piece){ const t = await fetch('/api/template?id=' + encodeURIComponent(row.dataset.piece)).then(r => r.json()).catch(() => ({}));
       code = t.code != null ? t.code : (Array.isArray(t.lines) ? t.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : ''); }
+    const ed = ctx.ed;
     if(code) ctx.put(code); hide();
+    // вставили атрибут со значением — сразу варианты значения (type="…" → button, submit, reset)
+    if(ed && /="…"/.test(code || '')) setTimeout(() => show(ed, false), 30);
   }
 
   async function show(ed, force){
-    const c = wordCtx(ed, force); if(!c || (!force && c.word.length < 2)){ hide(); return; }
+    const c = wordCtx(ed, force);
+    // внутри HTML-тега — его атрибуты и их значения (правила структуры), даже без набранных букв
+    const tc = /^(html|htm|svg|xml)$/i.test((ed && ed.__f && ed.__f.lang) || '') && tagCtx(ed);   // при выделенном «…» wordCtx пуст — тег смотрим сами
+    if(tc){ const my0 = ++seq; const tr = await tagRoots(tc); if(my0 !== seq) return; if(tr.length){ ctx = Object.assign({}, c || {}, { x: tc.x, y: tc.y, put: tc.put, ed }); render(ctx, tr); return; } }
+    if(!c || (!force && c.word.length < 2)){ hide(); return; }
     const my = ++seq;
     let roots = [];
     if(c.word){ const r = await fetch('/api/variants?q=' + encodeURIComponent(c.word) + '&lang=' + encodeURIComponent(c.lang)).then(x => x.json()).catch(() => null); roots = (r && r.roots) || []; }
