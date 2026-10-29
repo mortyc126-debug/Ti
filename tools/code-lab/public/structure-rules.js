@@ -240,7 +240,8 @@
     const lc = x => String(x).toLowerCase();
     for(const r of rules){
       const cur = lines.map(l => ({ l, r: parse(l).rules[0] })).filter(x => x.r);
-      const mine = cur.filter(x => lc(x.r.term) === lc(r.term) && (r.verb === 'удалить' || x.r.verb === r.verb));
+      // «img: удалить» снимает и значения его атрибутов (img[loading]: …)
+      const mine = cur.filter(x => r.verb === 'удалить' ? (lc(x.r.term) === lc(r.term) || lc(x.r.term).startsWith(lc(r.term) + '[')) : lc(x.r.term) === lc(r.term) && x.r.verb === r.verb);
       if(r.verb === 'удалить'){ lines = lines.filter(l => !mine.some(x => x.l === l)); removed += mine.length; continue; }
       if(LIST.has(r.verb)){
         const have = new Set(mine.flatMap(x => x.r.args.map(lc)));
