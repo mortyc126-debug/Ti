@@ -1,0 +1,1 @@
+button.removeEventListener('click', onClick);

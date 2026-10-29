@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "выбрать-нужные-элементы-на-странице-и-об-mvt1kgdd",
+  "file": "выбрать-нужные-элементы-на-странице-и-об-mvt1kgdd.js",
+  "lang": "js",
+  "title": "Выбрать нужные элементы на странице и обработать событие нажатия: да",
+  "group": "Браузер / События",
+  "desc": "Работает, только если передан тот же объект функции, что и при подписке.",
+  "output": "",
+  "component": {
+    "provides": [],
+    "requires": [
+      "button",
+      "onClick"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

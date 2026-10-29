@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "подождать-перед-действием-и-повторять-де-mvt1k60d",
+  "file": "подождать-перед-действием-и-повторять-де-mvt1k60d.js",
+  "lang": "js",
+  "title": "Подождать перед действием и повторять действие по таймеру: Да, по кнопке",
+  "group": "Браузер / Время",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [],
+    "requires": [
+      "intervalId",
+      "timerId",
+      "#stop"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

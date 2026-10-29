@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "подождать-перед-действием-и-повторять-де-mvt1k3t9",
+  "file": "подождать-перед-действием-и-повторять-де-mvt1k3t9.js",
+  "lang": "js",
+  "title": "Подождать перед действием и повторять действие по таймеру: Один раз после паузы",
+  "group": "Браузер / Время",
+  "desc": "Например, скрыть сообщение «Сохранено» через пару секунд.",
+  "output": "",
+  "component": {
+    "provides": [
+      "timerId"
+    ],
+    "requires": [
+      "#message"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

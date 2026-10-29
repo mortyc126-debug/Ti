@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "выбрать-нужные-элементы-на-странице-и-об-mvt1kapj",
+  "file": "выбрать-нужные-элементы-на-странице-и-об-mvt1kapj.js",
+  "lang": "js",
+  "title": "Выбрать нужные элементы на странице и обработать событие нажатия: Сразу нескольк",
+  "group": "Браузер / События",
+  "desc": "Вернётся список; пройти по нему можно циклом.",
+  "output": "",
+  "component": {
+    "provides": [
+      "buttons"
+    ],
+    "requires": [
+      ".card"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

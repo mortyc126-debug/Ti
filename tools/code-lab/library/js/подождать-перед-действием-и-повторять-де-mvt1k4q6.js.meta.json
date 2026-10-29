@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "подождать-перед-действием-и-повторять-де-mvt1k4q6",
+  "file": "подождать-перед-действием-и-повторять-де-mvt1k4q6.js",
+  "lang": "js",
+  "title": "Подождать перед действием и повторять действие по таймеру: Обратный отсчёт до ну",
+  "group": "Браузер / Время",
+  "desc": "Таймер сам останавливается, когда число дошло до нуля.",
+  "output": "",
+  "component": {
+    "provides": [
+      "left",
+      "countdownId"
+    ],
+    "requires": [
+      "#counter"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}
