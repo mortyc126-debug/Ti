@@ -4,7 +4,7 @@
   "file": "modules-import-patterns.py",
   "title": "import и from … import — подключение модулей",
   "lang": "python",
-  "group": "Основы / Модули и импорты",
+  "group": "Основы языка / Модули",
   "desc": "Импортируйте конкретные имена или модуль с псевдонимом. Не называйте собственные файлы именами стандартных модулей вроде json.py, statistics.py или random.py.",
   "output": "0.03",
   "tags": [

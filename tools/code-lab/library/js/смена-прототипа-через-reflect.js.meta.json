@@ -4,7 +4,7 @@
   "file": "смена-прототипа-через-reflect.js",
   "title": "Сменить прототип объекта: Reflect.setPrototypeOf",
   "lang": "js",
-  "group": "Данные / Работа с объектами",
+  "group": "Данные / Объекты и словари",
   "desc": "Reflect.setPrototypeOf пытается заменить прототип и возвращает true или false: у закрытого для расширения объекта вернёт false.",
   "output": "true\nлетит\nfalse",
   "tags": [

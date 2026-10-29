@@ -4,7 +4,7 @@
   "file": "штатное-закрытие-websocket.js",
   "title": "Штатно закрыть соединение WebSocket с кодом и причиной",
   "lang": "js",
-  "group": "Сеть / WebSocket",
+  "group": "Сеть и API / WebSocket и WebRTC",
   "desc": "socket.close(1000, \"done\") закрывает соединение по-хорошему: код 1000 означает нормальное завершение, причина — короткий текст.",
   "output": "Закрыто: 1000 done",
   "tags": [

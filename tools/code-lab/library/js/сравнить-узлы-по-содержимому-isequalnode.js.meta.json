@@ -4,7 +4,7 @@
   "file": "сравнить-узлы-по-содержимому-isequalnode.js",
   "title": "Сравнить узлы по содержимому: isEqualNode",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "isEqualNode сравнивает теги, атрибуты и содержимое, а оператор === — сами объекты.",
   "output": "false true\nfalse",
   "tags": [

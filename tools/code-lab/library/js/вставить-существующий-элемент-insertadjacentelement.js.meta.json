@@ -4,7 +4,7 @@
   "file": "вставить-существующий-элемент-insertadjacentelement.js",
   "title": "Вставить существующий элемент рядом с другим: insertAdjacentElement",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "insertAdjacentElement(position, other) вставляет готовый элемент в одну из четырёх позиций: beforebegin, afterbegin, beforeend, afterend.",
   "output": "<p id=\"text\">Текст</p><small>Подсказка</small>",
   "tags": [

@@ -4,7 +4,7 @@
   "file": "createlineargradient-градиент-canvas-mv6cutbb.js",
   "title": "createLinearGradient — градиент Canvas",
   "lang": "js",
-  "group": "Графика и визуализация / Canvas: рисование",
+  "group": "Графика, анимация и игры / Canvas",
   "desc": "createLinearGradient создаёт градиент, addColorStop задаёт цветовые точки от 0 до 1. Назначьте градиент в fillStyle или strokeStyle.",
   "output": "Прямоугольник с переходом от розового к голубому",
   "tags": [

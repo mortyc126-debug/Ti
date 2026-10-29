@@ -4,7 +4,7 @@
   "file": "описание-символа-symbol-description.js",
   "title": "Описание символа: Symbol.description",
   "lang": "js",
-  "group": "Основы / Типы данных",
+  "group": "Основы языка / Переменные и типы",
   "desc": "Свойство description возвращает текст, с которым создан Symbol, или undefined, если описания не было.",
   "output": "userId\nundefined\nSymbol(userId)",
   "tags": [

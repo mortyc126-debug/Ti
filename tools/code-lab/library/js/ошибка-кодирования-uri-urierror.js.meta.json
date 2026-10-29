@@ -4,7 +4,7 @@
   "file": "ошибка-кодирования-uri-urierror.js",
   "title": "Сообщить об ошибке кодирования или декодирования URI: URIError",
   "lang": "js",
-  "group": "Ошибки и отладка / Исключения",
+  "group": "Ошибки, отладка и тесты / Исключения",
   "desc": "URIError бросают встроенные decodeURIComponent и encodeURIComponent на некорректных данных; такую же ошибку можно выбросить и в своём коде.",
   "output": "Привет\nURIError\nURIError",
   "tags": [

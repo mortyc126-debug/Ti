@@ -1,0 +1,1 @@
+form.elements.email.classList.add('invalid');

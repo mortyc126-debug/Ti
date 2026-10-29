@@ -4,7 +4,7 @@
   "file": "flexbox-расположить-элементы-в-колонку-mvh8hqqm.css",
   "title": "Flexbox: расположить элементы в колонку",
   "lang": "css",
-  "group": "CSS: раскладка / Flexbox",
+  "group": "Вёрстка и стили / Раскладка: Flex и Grid",
   "desc": "Располагает элементы вертикально через Flexbox с `display: flex`, `flex-direction: column` и `gap`.",
   "output": "Располагает элементы вертикально через Flexbox с `display: flex`, `flex-direction: column` и `gap`",
   "tags": [

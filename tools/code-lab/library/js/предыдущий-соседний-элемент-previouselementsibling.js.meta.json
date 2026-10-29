@@ -4,7 +4,7 @@
   "file": "предыдущий-соседний-элемент-previouselementsibling.js",
   "title": "Предыдущий соседний элемент: previousElementSibling",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "previousElementSibling возвращает предыдущий элемент на том же уровне или null, если элемент первый.",
   "output": "a\nnull",
   "tags": [

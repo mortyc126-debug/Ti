@@ -4,7 +4,7 @@
   "file": "подключить-поток-к-video.js",
   "title": "Подключить медиапоток к элементу video: srcObject",
   "lang": "js",
-  "group": "Сеть / WebRTC",
+  "group": "Сеть и API / WebSocket и WebRTC",
   "desc": "Свойство srcObject показывает в video живой MediaStream (камера, экран, canvas). Здесь поток берётся из canvas, поэтому разрешения камеры не нужны.",
   "output": "На странице появляется видео, цвет которого плавно меняется",
   "tags": [

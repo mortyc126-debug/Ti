@@ -1,0 +1,2 @@
+input.value = '';
+input.focus();

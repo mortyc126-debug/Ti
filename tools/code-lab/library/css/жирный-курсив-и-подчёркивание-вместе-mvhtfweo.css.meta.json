@@ -4,7 +4,7 @@
   "file": "жирный-курсив-и-подчёркивание-вместе-mvhtfweo.css",
   "title": "жирный, курсив и подчёркивание вместе",
   "lang": "css",
-  "group": "CSS: текст и шрифты / Начертание",
+  "group": "Вёрстка и стили / Текст и шрифты",
   "desc": "Одновременно задаёт три визуальных признака текста: `font-weight: 700`, `font-style: italic` и `text-decoration: underline`.",
   "output": "Одновременно задаёт три визуальных признака текста: `font-weight: 700`, `font-style: italic` и `text-decoration: underline`",
   "tags": [

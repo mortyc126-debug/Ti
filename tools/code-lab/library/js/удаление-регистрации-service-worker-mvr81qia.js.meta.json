@@ -4,7 +4,7 @@
   "file": "удаление-регистрации-service-worker-mvr81qia.js",
   "lang": "js",
   "title": "Удаление регистрации Service Worker",
-  "group": "Кэширование / Service Worker",
+  "group": "Страница и браузер / Service Worker и кэш",
   "desc": "Отключаем Service Worker для текущей страницы.",
   "output": "Удалён: true",
   "descAt": 1793137967218,

@@ -4,7 +4,7 @@
   "file": "текущий-элемент-обработчика-currenttarget.js",
   "title": "Элемент, на котором зарегистрирован обработчик: currentTarget",
   "lang": "js",
-  "group": "Интерфейс / События",
+  "group": "Страница и браузер / События",
   "desc": "event.target — где событие началось, а event.currentTarget — где висит обработчик; при делегировании они различаются.",
   "output": "target: BUTTON, currentTarget: menu",
   "tags": [

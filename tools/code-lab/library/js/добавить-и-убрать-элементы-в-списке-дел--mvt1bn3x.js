@@ -1,0 +1,1 @@
+li.style.textDecoration = li.classList.contains('done') ? 'line-through' : '';

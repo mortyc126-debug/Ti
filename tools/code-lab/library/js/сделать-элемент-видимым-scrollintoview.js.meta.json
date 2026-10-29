@@ -4,7 +4,7 @@
   "file": "сделать-элемент-видимым-scrollintoview.js",
   "title": "Прокрутить контейнер, чтобы элемент стал видимым: scrollIntoView",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "scrollIntoView({ block: \"nearest\" }) прокручивает минимально необходимое, а не выравнивает элемент по краю.",
   "output": "scrollTop = 750",
   "tags": [

@@ -4,7 +4,7 @@
   "file": "атрибут-data-через-dataset.js",
   "title": "Прочитать или изменить атрибут data-name: dataset",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "dataset даёт доступ к data-атрибутам; имя data-product-id превращается в dataset.productId.",
   "output": "42 199\nyes",
   "tags": [

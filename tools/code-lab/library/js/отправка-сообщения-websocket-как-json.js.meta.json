@@ -4,7 +4,7 @@
   "file": "отправка-сообщения-websocket-как-json.js",
   "title": "Отправить сообщение серверу в виде JSON: socket.send",
   "lang": "js",
-  "group": "Сеть / WebSocket",
+  "group": "Сеть и API / WebSocket и WebRTC",
   "desc": "socket.send принимает строку, поэтому объект сначала превращают в JSON через JSON.stringify.",
   "output": "Серверу уходит строка {\"type\":\"chat\",\"text\":\"Привет всем\"}",
   "tags": [

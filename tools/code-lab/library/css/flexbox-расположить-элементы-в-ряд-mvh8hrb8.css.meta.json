@@ -4,7 +4,7 @@
   "file": "flexbox-расположить-элементы-в-ряд-mvh8hrb8.css",
   "title": "Flexbox: расположить элементы в ряд",
   "lang": "css",
-  "group": "CSS: раскладка / Flexbox",
+  "group": "Вёрстка и стили / Раскладка: Flex и Grid",
   "desc": "Располагает элементы горизонтально через Flexbox с `display: flex`, `flex-direction: row` и `gap`.",
   "output": "Располагает элементы горизонтально через Flexbox с `display: flex`, `flex-direction: row` и `gap`",
   "tags": [

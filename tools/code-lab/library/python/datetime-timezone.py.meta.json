@@ -4,7 +4,7 @@
   "file": "datetime-timezone.py",
   "title": "datetime — время с часовым поясом",
   "lang": "python",
-  "group": "Стандартная библиотека / Дата и время",
+  "group": "Данные / Даты и время",
   "desc": "Для временных меток рыночных событий храните однозначное время с часовым поясом. datetime.now(timezone.utc) возвращает aware datetime в UTC; naive datetime нельзя бездумно сравнивать с aware datetime.",
   "output": "True",
   "tags": [

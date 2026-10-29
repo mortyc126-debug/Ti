@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "проверить-поле-формы-перед-отправкой-что-mvt1bvrz",
+  "file": "проверить-поле-формы-перед-отправкой-что-mvt1bvrz.js",
+  "lang": "js",
+  "title": "Проверить поле формы перед отправкой: Что пароль достаточно длинный",
+  "group": "Браузер / Формы",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [
+      "isStrongPassword"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

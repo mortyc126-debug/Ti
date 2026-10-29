@@ -4,7 +4,7 @@
   "file": "экспорт-только-типа-export-type.js",
   "title": "Экспортировать только тип: export type { User }",
   "lang": "js",
-  "group": "Основы / Модули и импорты",
+  "group": "Основы языка / Модули",
   "desc": "В TypeScript: export type { User }. В JavaScript тип описывают JSDoc-тегом @typedef, и редакторы подхватывают его при импорте.",
   "output": "1: Мира",
   "tags": [

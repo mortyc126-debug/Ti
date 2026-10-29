@@ -4,7 +4,7 @@
   "file": "classlist-управлять-классами-mv6cut28.js",
   "title": "classList — управлять классами",
   "lang": "js",
-  "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "classList.add добавляет класс, remove удаляет, toggle переключает, contains проверяет наличие класса.",
   "output": "true",
   "tags": [

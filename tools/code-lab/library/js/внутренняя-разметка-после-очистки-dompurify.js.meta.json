@@ -4,7 +4,7 @@
   "file": "внутренняя-разметка-после-очистки-dompurify.js",
   "title": "Вставить разметку после очистки библиотекой DOMPurify",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "DOMPurify.sanitize удаляет опасные части (onerror, script), после чего разметку можно безопасно присвоить innerHTML.",
   "output": "<p>Привет</p><img src=\"x\">",
   "tags": [

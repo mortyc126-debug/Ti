@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "показать-и-скрыть-элемент-на-странице-ст-mvt1az0x",
+  "file": "показать-и-скрыть-элемент-на-странице-ст-mvt1az0x.js",
+  "lang": "js",
+  "title": "Показать и скрыть элемент на странице: Стилем напрямую",
+  "group": "Браузер / DOM",
+  "desc": "Когда класса нет и нужно быстро проверить идею.",
+  "output": "",
+  "component": {
+    "provides": [
+      "toggle"
+    ],
+    "requires": [
+      "box"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

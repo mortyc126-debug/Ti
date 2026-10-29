@@ -4,7 +4,7 @@
   "file": "имя-узла-nodename.js",
   "title": "Имя узла: nodeName",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "nodeName у элементов — имя тега в верхнем регистре, а у текста и комментариев — служебные имена #text и #comment.",
   "output": "P\n#text\n#comment\n#document",
   "tags": [

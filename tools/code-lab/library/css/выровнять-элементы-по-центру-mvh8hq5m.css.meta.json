@@ -4,7 +4,7 @@
   "file": "выровнять-элементы-по-центру-mvh8hq5m.css",
   "title": "Выровнять элементы по центру",
   "lang": "css",
-  "group": "CSS: положение на странице / Центрирование",
+  "group": "Вёрстка и стили / Положение и слои",
   "desc": "Центрирует дочерние элементы по двум осям через Flexbox с `justify-content: center` и `align-items: center`.",
   "output": "Центрирует дочерние элементы по двум осям через Flexbox с `justify-content: center` и `align-items: center`",
   "tags": [

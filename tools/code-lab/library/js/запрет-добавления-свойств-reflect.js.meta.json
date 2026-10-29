@@ -4,7 +4,7 @@
   "file": "запрет-добавления-свойств-reflect.js",
   "title": "Запретить добавление новых свойств: Reflect.preventExtensions",
   "lang": "js",
-  "group": "Данные / Работа с объектами",
+  "group": "Данные / Объекты и словари",
   "desc": "Reflect.preventExtensions закрывает объект для новых свойств и возвращает true или false, а не бросает ошибку.",
   "output": "true\nfalse\nfalse\n{ theme: 'light' }",
   "tags": [

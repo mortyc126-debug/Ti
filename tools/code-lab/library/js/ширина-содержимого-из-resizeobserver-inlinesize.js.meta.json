@@ -4,7 +4,7 @@
   "file": "ширина-содержимого-из-resizeobserver-inlinesize.js",
   "title": "Ширина содержимого из записи ResizeObserver: contentBoxSize",
   "lang": "js",
-  "group": "Интерфейс / Наблюдение за DOM",
+  "group": "Страница и браузер / Наблюдатели",
   "desc": "contentBoxSize[0].inlineSize — ширина области содержимого (в горизонтальном письме) из записи ResizeObserver; не зависит от рамок и padding.",
   "output": "Ширина содержимого: 200",
   "tags": [

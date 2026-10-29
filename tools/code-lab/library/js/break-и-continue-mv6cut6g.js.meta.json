@@ -4,7 +4,7 @@
   "file": "break-и-continue-mv6cut6g.js",
   "title": "break и continue",
   "lang": "js",
-  "group": "Основы / Синтаксис",
+  "group": "Основы языка / Синтаксис",
   "desc": "break полностью останавливает цикл. continue пропускает оставшуюся часть текущей итерации и переходит к следующей.",
   "output": "1\n3\n4",
   "tags": [

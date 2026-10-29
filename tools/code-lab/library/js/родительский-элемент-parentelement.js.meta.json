@@ -4,7 +4,7 @@
   "file": "родительский-элемент-parentelement.js",
   "title": "Родительский элемент: parentElement",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "parentElement возвращает родителя только если он элемент; у корневого <html> родитель — документ, поэтому parentElement даёт null.",
   "output": "menu\nnull",
   "tags": [

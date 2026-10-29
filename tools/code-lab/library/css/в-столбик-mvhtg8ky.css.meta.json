@@ -4,7 +4,7 @@
   "file": "в-столбик-mvhtg8ky.css",
   "title": "в столбик",
   "lang": "css",
-  "group": "CSS: раскладка / Flexbox",
+  "group": "Вёрстка и стили / Раскладка: Flex и Grid",
   "desc": "Располагает дочерние элементы вертикально с помощью Flexbox и `flex-direction: column`, добавляя одинаковые промежутки через `gap`.",
   "output": "Располагает дочерние элементы вертикально с помощью Flexbox и `flex-direction: column`, добавляя одинаковые промежутки через `gap`",
   "tags": [

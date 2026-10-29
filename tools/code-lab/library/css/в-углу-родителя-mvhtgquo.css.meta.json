@@ -4,7 +4,7 @@
   "file": "в-углу-родителя-mvhtgquo.css",
   "title": "в углу родителя",
   "lang": "css",
-  "group": "CSS: положение на странице / position и слои",
+  "group": "Вёрстка и стили / Положение и слои",
   "desc": "Размещает дочерний элемент в углу родителя через связку `position: relative` у родителя и `position: absolute` с `top`/`right` у дочернего.",
   "output": "Размещает дочерний элемент в углу родителя через связку `position: relative` у родителя и `position: absolute` с `top`/`right` у дочернего",
   "tags": [

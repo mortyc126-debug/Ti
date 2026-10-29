@@ -4,7 +4,7 @@
   "file": "вызов-call-через-function-prototype.js",
   "title": "Вызвать функцию с указанным this и аргументом: Function.prototype.call.call",
   "lang": "js",
-  "group": "Основы / Функции",
+  "group": "Основы языка / Функции",
   "desc": "Function.prototype.call.call(fn, thisArg, arg) вызывает функцию, даже если её собственный call отсутствует или подменён.",
   "output": "подмена\nПривет, Мира!",
   "tags": [

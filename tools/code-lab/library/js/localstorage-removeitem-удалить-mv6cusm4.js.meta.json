@@ -4,7 +4,7 @@
   "file": "localstorage-removeitem-удалить-mv6cusm4.js",
   "title": "localStorage.removeItem — удалить",
   "lang": "js",
-  "group": "Файлы, хранение и сервер / Хранение в браузере",
+  "group": "Страница и браузер / Хранение в браузере",
   "desc": "removeItem удаляет одну запись по ключу. clear() удаляет все записи этого сайта, поэтому используйте его осторожно.",
   "output": "null",
   "tags": [

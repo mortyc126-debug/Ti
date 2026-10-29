@@ -4,7 +4,7 @@
   "file": "select-where-order-by-выбрать-и-отсортир-mvds0h5n.sql",
   "title": "SELECT … WHERE … ORDER BY — выбрать и отсортировать",
   "lang": "sql",
-  "group": "SQL: запросы и таблицы / Выбрать и сгруппировать данные",
+  "group": "Базы данных и SQL / Запросы",
   "desc": "SELECT выбирает колонки, FROM — таблицу, WHERE — фильтрует строки, ORDER BY — сортирует (DESC — по убыванию).",
   "output": "Б|12.4\nА|9.1",
   "tags": [

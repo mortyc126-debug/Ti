@@ -4,7 +4,7 @@
   "file": "необработанные-отказы-в-глобальной-среде-globalthis.js",
   "title": "Слушать необработанные отказы в глобальной среде: globalThis.addEventListener",
   "lang": "js",
-  "group": "Ошибки и отладка / Найти причину сбоя",
+  "group": "Ошибки, отладка и тесты / Найти причину сбоя",
   "desc": "globalThis — общее имя глобального объекта: код с globalThis.addEventListener работает и в окне браузера, и в Web Worker, и в Service Worker.",
   "output": "Необработанный отказ: Сервер недоступен",
   "tags": [

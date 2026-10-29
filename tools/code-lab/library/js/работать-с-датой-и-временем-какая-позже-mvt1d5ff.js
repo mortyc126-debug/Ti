@@ -1,0 +1,1 @@
+const isLater = dateA.getTime() > dateB.getTime();

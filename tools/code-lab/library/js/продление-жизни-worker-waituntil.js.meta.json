@@ -4,7 +4,7 @@
   "file": "продление-жизни-worker-waituntil.js",
   "title": "Продлить жизнь Service Worker до завершения операции: waitUntil",
   "lang": "js",
-  "group": "Кэширование / Service Worker",
+  "group": "Страница и браузер / Service Worker и кэш",
   "desc": "Без waitUntil браузер может остановить worker, не дождавшись асинхронной работы; промис, переданный в waitUntil, удерживает его живым.",
   "output": "Активация завершится только после записи версии данных в кэш data-v2",
   "tags": [

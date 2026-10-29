@@ -4,7 +4,7 @@
   "file": "ожидание-открытия-websocket-mvr80nti.js",
   "lang": "js",
   "title": "Ожидание открытия WebSocket",
-  "group": "Сеть / WebSocket",
+  "group": "Сеть и API / WebSocket и WebRTC",
   "desc": "Превращаем событие открытия соединения в Promise.",
   "output": "Сообщение отправляется только после открытия соединения.",
   "descAt": 1793137917078,

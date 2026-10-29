@@ -4,7 +4,7 @@
   "file": "дата-и-время-datetime.py",
   "title": "datetime — даты и интервалы времени",
   "lang": "python",
-  "group": "Стандартная библиотека / Дата и время",
+  "group": "Данные / Даты и время",
   "desc": "datetime.date и datetime.datetime представляют даты и моменты времени; timedelta задаёт интервал. Для временных зон используйте timezone-aware значения.",
   "output": "",
   "tags": [

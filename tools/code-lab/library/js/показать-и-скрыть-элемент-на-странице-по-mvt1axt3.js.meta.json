@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "показать-и-скрыть-элемент-на-странице-по-mvt1axt3",
+  "file": "показать-и-скрыть-элемент-на-странице-по-mvt1axt3.js",
+  "lang": "js",
+  "title": "Показать и скрыть элемент на странице: По селектору",
+  "group": "Браузер / DOM",
+  "desc": "Когда нужно найти по классу или сложному пути.",
+  "output": "",
+  "component": {
+    "provides": [
+      "box",
+      "button"
+    ],
+    "requires": [
+      ".box",
+      ".toggle-button"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

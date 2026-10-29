@@ -4,7 +4,7 @@
   "file": "прототип-объекта-через-reflect.js",
   "title": "Получить прототип объекта: Reflect.getPrototypeOf",
   "lang": "js",
-  "group": "Данные / Работа с объектами",
+  "group": "Данные / Объекты и словари",
   "desc": "Reflect.getPrototypeOf(object) возвращает прототип объекта; для объекта без прототипа вернёт null.",
   "output": "true\ntrue\nnull",
   "tags": [

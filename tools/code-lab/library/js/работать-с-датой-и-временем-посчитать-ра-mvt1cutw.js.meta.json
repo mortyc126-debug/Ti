@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "работать-с-датой-и-временем-посчитать-ра-mvt1cutw",
+  "file": "работать-с-датой-и-временем-посчитать-ра-mvt1cutw.js",
+  "lang": "js",
+  "title": "Работать с датой и временем: Посчитать разницу между датами",
+  "group": "Данные / Дата и время",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [
+      "msPerDay",
+      "diffDays"
+    ],
+    "requires": [
+      "dateB",
+      "dateA"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

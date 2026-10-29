@@ -4,7 +4,7 @@
   "file": "первый-дочерний-элемент-firstelementchild.js",
   "title": "Первый дочерний элемент: firstElementChild",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "firstElementChild пропускает пробельные текстовые узлы, а firstChild может вернуть именно их.",
   "output": "#text\nГлавная",
   "tags": [

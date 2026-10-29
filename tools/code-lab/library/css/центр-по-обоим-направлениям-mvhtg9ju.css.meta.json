@@ -4,7 +4,7 @@
   "file": "центр-по-обоим-направлениям-mvhtg9ju.css",
   "title": "центр по обоим направлениям",
   "lang": "css",
-  "group": "CSS: положение на странице / Центрирование",
+  "group": "Вёрстка и стили / Положение и слои",
   "desc": "Центрирует дочерние элементы по горизонтали и вертикали через `display: flex`, `justify-content: center` и `align-items: center`.",
   "output": "Центрирует дочерние элементы по горизонтали и вертикали через `display: flex`, `justify-content: center` и `align-items: center`",
   "tags": [

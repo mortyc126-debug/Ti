@@ -4,7 +4,7 @@
   "file": "значение-css-переменной-getpropertyvalue.js",
   "title": "Значение CSS-переменной элемента: style.getPropertyValue",
   "lang": "js",
-  "group": "CSS: основы / Переменные",
+  "group": "Вёрстка и стили / Основы CSS",
   "desc": "style.getPropertyValue(\"--name\") читает переменную, заданную в атрибуте style элемента; для пустого значения возвращается пустая строка.",
   "output": "#ff6600\n\"\"",
   "tags": [

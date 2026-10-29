@@ -4,7 +4,7 @@
   "file": "элемент-в-документе-isconnected.js",
   "title": "Проверить, находится ли элемент в документе: isConnected",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "isConnected равно true только пока элемент вставлен в документ; созданный, но не добавленный элемент — false.",
   "output": "false\ntrue\nfalse",
   "tags": [

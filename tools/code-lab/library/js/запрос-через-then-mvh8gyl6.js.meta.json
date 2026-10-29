@@ -4,7 +4,7 @@
   "file": "запрос-через-then-mvh8gyl6.js",
   "title": "запрос через then",
   "lang": "js",
-  "group": "Сеть и запросы / Получить данные",
+  "group": "Сеть и API / Получить данные",
   "desc": "То же без async и await.",
   "output": "",
   "tags": [

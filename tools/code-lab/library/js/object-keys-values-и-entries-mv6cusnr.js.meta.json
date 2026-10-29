@@ -4,7 +4,7 @@
   "file": "object-keys-values-и-entries-mv6cusnr.js",
   "title": "Object.keys, values и entries",
   "lang": "js",
-  "group": "Данные: хранить, находить и преобразовывать / Коллекции и ст",
+  "group": "Данные / Массивы и коллекции",
   "desc": "keys возвращает массив ключей, values — значений, entries — пар [ключ, значение] объекта.",
   "output": "[Аня, Лев]\n[8, 10]\n[[Аня, 8], [Лев, 10]]",
   "tags": [

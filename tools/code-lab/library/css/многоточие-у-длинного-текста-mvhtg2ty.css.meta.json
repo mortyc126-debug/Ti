@@ -4,7 +4,7 @@
   "file": "многоточие-у-длинного-текста-mvhtg2ty.css",
   "title": "многоточие у длинного текста",
   "lang": "css",
-  "group": "CSS: текст и шрифты / Выравнивание и перенос",
+  "group": "Вёрстка и стили / Текст и шрифты",
   "desc": "Обрезает однострочный длинный текст и показывает многоточие через `white-space: nowrap`, `overflow: hidden` и `text-overflow: ellipsis`.",
   "output": "Обрезает однострочный длинный текст и показывает многоточие через `white-space: nowrap`, `overflow: hidden` и `text-overflow: ellipsis`",
   "tags": [

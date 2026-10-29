@@ -4,7 +4,7 @@
   "file": "надёжное-undefined-через-void.js",
   "title": "Надёжное undefined через void 0",
   "lang": "js",
-  "group": "Основы / Типы данных",
+  "group": "Основы языка / Переменные и типы",
   "desc": "Выражение void 0 всегда даёт undefined, даже если имя undefined кто-то переопределил в локальной области.",
   "output": "true\nfalse\nподмена undefined",
   "tags": [

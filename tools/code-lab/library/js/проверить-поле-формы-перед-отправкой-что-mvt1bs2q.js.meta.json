@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "проверить-поле-формы-перед-отправкой-что-mvt1bs2q",
+  "file": "проверить-поле-формы-перед-отправкой-что-mvt1bs2q.js",
+  "lang": "js",
+  "title": "Проверить поле формы перед отправкой: Что поле не пустое",
+  "group": "Браузер / Формы",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [
+      "isFilled"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

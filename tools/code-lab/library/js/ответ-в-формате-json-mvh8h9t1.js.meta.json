@@ -4,7 +4,7 @@
   "file": "ответ-в-формате-json-mvh8h9t1.js",
   "title": "ответ в формате JSON",
   "lang": "js",
-  "group": "Файлы, хранение и сервер / Сервер и API",
+  "group": "Файлы, сервер и Node.js / HTTP-сервер",
   "desc": "Отдаёт данные как API.",
   "output": "",
   "tags": [

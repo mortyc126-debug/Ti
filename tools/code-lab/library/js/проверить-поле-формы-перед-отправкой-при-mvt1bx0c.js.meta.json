@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "проверить-поле-формы-перед-отправкой-при-mvt1bx0c",
+  "file": "проверить-поле-формы-перед-отправкой-при-mvt1bx0c.js",
+  "lang": "js",
+  "title": "Проверить поле формы перед отправкой: При отправке формы",
+  "group": "Браузер / Формы",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [],
+    "requires": [
+      "form",
+      "isEmail"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

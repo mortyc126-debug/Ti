@@ -4,7 +4,7 @@
   "file": "ширина-элемента-с-рамками-offsetwidth.js",
   "title": "Ширина элемента с рамками и полосой прокрутки: offsetWidth",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "offsetWidth — целая ширина элемента, как он занимает место на странице; getBoundingClientRect().width даёт то же число с дробной частью.",
   "output": "offsetWidth = 200\nclientWidth = 190\ngetBoundingClientRect = 200",
   "tags": [

@@ -4,7 +4,7 @@
   "file": "показ-уведомления-из-service-worker.js",
   "title": "Показать системное уведомление из Service Worker",
   "lang": "js",
-  "group": "Кэширование / Service Worker",
+  "group": "Страница и браузер / Service Worker и кэш",
   "desc": "self.registration.showNotification(title, { body }) показывает уведомление операционной системы; здесь по сообщению от страницы.",
   "output": "Страница отправляет worker.postMessage({ type: \"REMINDER\", text: \"Позвонить маме\" }) — появляется уведомление «Напоминание»",
   "tags": [

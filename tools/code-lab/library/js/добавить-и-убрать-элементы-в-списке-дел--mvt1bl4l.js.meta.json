@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "добавить-и-убрать-элементы-в-списке-дел--mvt1bl4l",
+  "file": "добавить-и-убрать-элементы-в-списке-дел--mvt1bl4l.js",
+  "lang": "js",
+  "title": "Добавить и убрать элементы в списке дел: да",
+  "group": "Браузер / DOM",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [],
+    "requires": [
+      "li"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

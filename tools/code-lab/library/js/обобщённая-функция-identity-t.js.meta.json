@@ -4,7 +4,7 @@
   "file": "обобщённая-функция-identity-t.js",
   "title": "Объявить обобщённую функцию: function identity<T>(value: T): T",
   "lang": "js",
-  "group": "Продвинутые темы / Типизация",
+  "group": "Архитектура и надёжность / Типизация",
   "desc": "Обобщение связывает тип результата с типом аргумента. В TypeScript: function identity<T>(value: T): T. Здесь записано через JSDoc @template.",
   "output": "42 строка [ 1, 2 ]",
   "tags": [

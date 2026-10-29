@@ -4,7 +4,7 @@
   "file": "замена-некорректных-суррогатов-towellformed-uri.js",
   "title": "Исправить некорректные суррогаты перед кодированием: toWellFormed()",
   "lang": "js",
-  "group": "Данные / Строки и текст",
+  "group": "Основы языка / Строки и текст",
   "desc": "toWellFormed() заменяет одиночные суррогаты на символ замены U+FFFD; без этого encodeURIComponent бросает URIError.",
   "output": "URIError\nabc%EF%BF%BDdef",
   "tags": [

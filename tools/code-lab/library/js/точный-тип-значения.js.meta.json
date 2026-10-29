@@ -4,7 +4,7 @@
   "file": "точный-тип-значения.js",
   "title": "Точный тип значения",
   "lang": "js",
-  "group": "Объекты и метапрограммирование / Прототипы и типы",
+  "group": "Основы языка / Классы и объекты",
   "desc": "Получает строковое представление типа через встроенный метод объекта.",
   "output": "[object Array]\n[object Object]\n[object Null]\n[object Date]\n[object RegExp]\n[object Number]\n[object String]",
   "tags": [

@@ -4,7 +4,7 @@
   "file": "сообщение-websocket-как-json.js",
   "title": "Получить и разобрать сообщение сервера WebSocket",
   "lang": "js",
-  "group": "Сеть / WebSocket",
+  "group": "Сеть и API / WebSocket и WebRTC",
   "desc": "Событие message отдаёт данные в event.data; если сервер шлёт JSON, их разбирают через JSON.parse.",
   "output": "Для сообщения {\"type\":\"greeting\"}: «Получено: greeting»",
   "tags": [

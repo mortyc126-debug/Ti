@@ -4,7 +4,7 @@
   "file": "html-элемента-вместе-с-тегом-outerhtml.js",
   "title": "HTML элемента вместе с его тегом: outerHTML",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "outerHTML включает сам тег элемента, а innerHTML — только содержимое; присвоение outerHTML заменяет элемент целиком.",
   "output": "<p id=\"title\" class=\"big\">Привет</p>\nПривет\n<h2 id=\"title\">Заголовок</h2>",
   "tags": [

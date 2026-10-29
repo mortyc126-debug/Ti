@@ -1,0 +1,1 @@
+const isFilled = value => value.trim().length > 0;

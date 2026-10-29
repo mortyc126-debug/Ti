@@ -4,7 +4,7 @@
   "file": "передать-дорожки-потока-в-соединение.js",
   "title": "Передать дорожки потока в соединение: peer.addTrack",
   "lang": "js",
-  "group": "Сеть / WebRTC",
+  "group": "Сеть и API / WebSocket и WebRTC",
   "desc": "Каждую дорожку потока добавляют в RTCPeerConnection через addTrack; поток здесь берётся из canvas, поэтому камера не нужна.",
   "output": "Отправителей: 1",
   "tags": [

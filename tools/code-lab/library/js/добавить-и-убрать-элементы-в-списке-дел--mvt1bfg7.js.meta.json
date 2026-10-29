@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "добавить-и-убрать-элементы-в-списке-дел--mvt1bfg7",
+  "file": "добавить-и-убрать-элементы-в-списке-дел--mvt1bfg7.js",
+  "lang": "js",
+  "title": "Добавить и убрать элементы в списке дел: Очищаем поле после добавления",
+  "group": "Браузер / DOM",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [],
+    "requires": [
+      "input"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

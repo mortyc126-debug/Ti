@@ -1,0 +1,1 @@
+list.insertAdjacentHTML('beforeend', `<li>${text}</li>`);

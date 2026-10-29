@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "работать-с-датой-и-временем-да-mvt1d8vk",
+  "file": "работать-с-датой-и-временем-да-mvt1d8vk.js",
+  "lang": "js",
+  "title": "Работать с датой и временем: да",
+  "group": "Данные / Дата и время",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [],
+    "requires": [
+      "#clock"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

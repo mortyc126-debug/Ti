@@ -4,7 +4,7 @@
   "file": "заголовок-content-type-входящего-запроса.js",
   "title": "Заголовок входящего запроса: request.headers[\"content-type\"]",
   "lang": "js",
-  "group": "Файлы, хранение и сервер / HTTP-сервер",
+  "group": "Файлы, сервер и Node.js / HTTP-сервер",
   "desc": "Node.js отдаёт имена заголовков входящего запроса в нижнем регистре, поэтому читаем request.headers[\"content-type\"].",
   "output": "Тип тела: application/json",
   "tags": [

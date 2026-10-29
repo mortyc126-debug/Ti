@@ -4,7 +4,7 @@
   "file": "отступ-с-каждой-стороны-отдельно-mvhtevjq.css",
   "title": "отступ с каждой стороны отдельно",
   "lang": "css",
-  "group": "CSS: отступы и размеры / Отступы",
+  "group": "Вёрстка и стили / Отступы и размеры",
   "desc": "Задаёт `margin-top`, `margin-right`, `margin-bottom` и `margin-left` независимо, когда сторонам нужны разные значения.",
   "output": "Задаёт `margin-top`, `margin-right`, `margin-bottom` и `margin-left` независимо, когда сторонам нужны разные значения",
   "tags": [

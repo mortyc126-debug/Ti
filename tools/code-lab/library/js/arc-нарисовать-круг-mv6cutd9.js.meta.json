@@ -4,7 +4,7 @@
   "file": "arc-нарисовать-круг-mv6cutd9.js",
   "title": "arc — нарисовать круг",
   "lang": "js",
-  "group": "Графика и визуализация / Canvas: рисование",
+  "group": "Графика, анимация и игры / Canvas",
   "desc": "arc(x, y, radius, startAngle, endAngle) задаёт дугу. Для полного круга используй угол от 0 до Math.PI * 2, затем fill() или stroke().",
   "output": "Мятный круг с центром (80, 70) и радиусом 35",
   "tags": [

@@ -4,7 +4,7 @@
   "file": "createelement-и-append-mv6cut1r.js",
   "title": "createElement и append",
   "lang": "js",
-  "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "createElement создаёт новый DOM-элемент, а append добавляет его внутрь выбранного контейнера. Контейнер должен существовать в HTML.",
   "output": "В списке #list появляется пункт «Новый пункт»",
   "tags": [

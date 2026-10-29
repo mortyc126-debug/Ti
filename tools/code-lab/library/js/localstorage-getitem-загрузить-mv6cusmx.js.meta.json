@@ -4,7 +4,7 @@
   "file": "localstorage-getitem-загрузить-mv6cusmx.js",
   "title": "localStorage.getItem — загрузить",
   "lang": "js",
-  "group": "Файлы, хранение и сервер / Хранение в браузере",
+  "group": "Страница и браузер / Хранение в браузере",
   "desc": "getItem читает строковое значение по ключу. Если ключа нет, вернётся null.",
   "output": "120",
   "tags": [

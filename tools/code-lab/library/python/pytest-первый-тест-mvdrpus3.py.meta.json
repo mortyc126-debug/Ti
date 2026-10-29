@@ -4,7 +4,7 @@
   "file": "pytest-первый-тест-mvdrpus3.py",
   "title": "pytest — первый тест",
   "lang": "python",
-  "group": "Тесты (Python) / Написать тест",
+  "group": "Ошибки, отладка и тесты / pytest",
   "desc": "Тест — функция с именем test_..., внутри которой assert. Файл тоже должен называться test_*.py. Запуск — командой pytest.",
   "output": "1 passed",
   "tags": [

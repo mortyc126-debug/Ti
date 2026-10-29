@@ -4,7 +4,7 @@
   "file": "имя-хоста-из-url.js",
   "title": "Имя хоста из адреса: url.hostname",
   "lang": "js",
-  "group": "Сеть / Построение запросов",
+  "group": "Сеть и API / HTTP-клиенты",
   "desc": "Свойство hostname объекта URL возвращает домен без протокола, порта и пути.",
   "output": "shop.example.com\nlocalhost",
   "tags": [

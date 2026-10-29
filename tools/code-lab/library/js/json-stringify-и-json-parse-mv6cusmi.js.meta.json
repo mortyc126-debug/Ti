@@ -4,7 +4,7 @@
   "file": "json-stringify-и-json-parse-mv6cusmi.js",
   "title": "JSON.stringify и JSON.parse",
   "lang": "js",
-  "group": "Данные: хранить, находить и преобразовывать / Форматы данных",
+  "group": "Данные / Преобразование и форматы",
   "desc": "stringify превращает массив или объект в JSON-строку, parse восстанавливает структуру из строки.",
   "output": "#FF006E\n2",
   "tags": [],

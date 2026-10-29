@@ -4,7 +4,7 @@
   "file": "быстрая-активация-service-worker.js",
   "title": "Активировать новый Service Worker без ожидания: skipWaiting",
   "lang": "js",
-  "group": "Кэширование / Service Worker",
+  "group": "Страница и браузер / Service Worker и кэш",
   "desc": "self.skipWaiting() пропускает ожидание закрытия всех вкладок: новая версия worker становится активной сразу после установки.",
   "output": "После установки новый worker сразу становится активным",
   "tags": [

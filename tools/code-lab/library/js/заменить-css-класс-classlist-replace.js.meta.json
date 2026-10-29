@@ -4,7 +4,7 @@
   "file": "заменить-css-класс-classlist-replace.js",
   "title": "Заменить один CSS-класс другим: classList.replace",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "classList.replace(old, new) заменяет класс и возвращает true; если старого класса нет, ничего не меняет и возвращает false.",
   "output": "true\nbtn btn-done\nfalse",
   "tags": [

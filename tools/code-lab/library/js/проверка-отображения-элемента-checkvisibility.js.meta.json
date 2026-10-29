@@ -4,7 +4,7 @@
   "file": "проверка-отображения-элемента-checkvisibility.js",
   "title": "Проверить, отображается ли элемент: checkVisibility()",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "checkVisibility() возвращает false для display: none и скрытых предков; visibility: hidden учитывается только с параметром visibilityProperty.",
   "output": "shown true\nremoved false\ninvisible true\ninvisible с visibilityProperty false",
   "tags": [

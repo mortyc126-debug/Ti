@@ -4,7 +4,7 @@
   "file": "стек-ошибки-capturestacktrace.js",
   "title": "Сформировать стек ошибки: Error.captureStackTrace(error)",
   "lang": "js",
-  "group": "Отладка / Трассировка",
+  "group": "Ошибки, отладка и тесты / Найти причину сбоя",
   "desc": "Error.captureStackTrace записывает в объект свойство stack с текущим местом вызова (V8 и Node.js); работает и для обычных объектов.",
   "output": "string\nError: Нет данных",
   "tags": [

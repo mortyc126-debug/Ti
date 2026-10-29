@@ -4,7 +4,7 @@
   "file": "заменить-все-вхождения-replaceall.js",
   "title": "Заменить все вхождения строки: text.replaceAll",
   "lang": "js",
-  "group": "Данные / Строки и текст",
+  "group": "Основы языка / Строки и текст",
   "desc": "replaceAll заменяет каждое вхождение подстроки, а replace — только первое; регулярка для этого не нужна.",
   "output": "C:/Users\\Мира\\Documents\nC:/Users/Мира/Documents",
   "tags": [

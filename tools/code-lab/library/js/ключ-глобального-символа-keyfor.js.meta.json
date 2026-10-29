@@ -4,7 +4,7 @@
   "file": "ключ-глобального-символа-keyfor.js",
   "title": "Ключ глобального символа: Symbol.keyFor",
   "lang": "js",
-  "group": "Основы / Типы данных",
+  "group": "Основы языка / Переменные и типы",
   "desc": "Symbol.for создаёт общий символ по ключу, а Symbol.keyFor возвращает этот ключ; у обычного Symbol() ключа нет.",
   "output": "app.userId\nundefined\ntrue",
   "tags": [

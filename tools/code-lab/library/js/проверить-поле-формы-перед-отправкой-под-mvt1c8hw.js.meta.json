@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "проверить-поле-формы-перед-отправкой-под-mvt1c8hw",
+  "file": "проверить-поле-формы-перед-отправкой-под-mvt1c8hw.js",
+  "lang": "js",
+  "title": "Проверить поле формы перед отправкой: Подсветить поле красной рамкой",
+  "group": "Браузер / Формы",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [
+      ".invalid"
+    ],
+    "requires": [
+      "form"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

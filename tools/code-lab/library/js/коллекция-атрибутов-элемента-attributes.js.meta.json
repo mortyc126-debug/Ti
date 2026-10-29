@@ -4,7 +4,7 @@
   "file": "коллекция-атрибутов-элемента-attributes.js",
   "title": "Коллекция атрибутов элемента: element.attributes",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "attributes возвращает все атрибуты элемента; у каждого есть имя (name) и значение (value).",
   "output": "id = link\nhref = /docs\ntarget = _blank\nrel = noopener\nВсего атрибутов: 4",
   "tags": [

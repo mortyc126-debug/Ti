@@ -4,7 +4,7 @@
   "file": "редактируемое-содержимое-contenteditable.js",
   "title": "Сделать содержимое элемента редактируемым: contentEditable",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "contentEditable = \"true\" позволяет редактировать текст прямо на странице, без textarea.",
   "output": "true\ntrue",
   "tags": [

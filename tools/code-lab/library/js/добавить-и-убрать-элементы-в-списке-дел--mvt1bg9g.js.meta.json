@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "добавить-и-убрать-элементы-в-списке-дел--mvt1bg9g",
+  "file": "добавить-и-убрать-элементы-в-списке-дел--mvt1bg9g.js",
+  "lang": "js",
+  "title": "Добавить и убрать элементы в списке дел: Один обработчик на весь список",
+  "group": "Браузер / DOM",
+  "desc": "Работает и для пунктов, которые появятся позже.",
+  "output": "",
+  "component": {
+    "provides": [],
+    "requires": [
+      "list"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

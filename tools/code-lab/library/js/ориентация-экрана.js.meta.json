@@ -4,7 +4,7 @@
   "file": "ориентация-экрана.js",
   "title": "Узнать ориентацию экрана: screen.orientation.type",
   "lang": "js",
-  "group": "Интерфейс / Системные возможности",
+  "group": "Страница и браузер / Устройство и системные возможности",
   "desc": "screen.orientation.type возвращает строку вроде portrait-primary или landscape-primary; на смену ориентации можно подписаться.",
   "output": "Ориентация: landscape-primary (после поворота телефона — portrait-primary)",
   "tags": [

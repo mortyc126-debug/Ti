@@ -4,7 +4,7 @@
   "file": "фокус-без-прокрутки-preventscroll.js",
   "title": "Перевести фокус без прокрутки страницы: focus({ preventScroll: true })",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "focus() по умолчанию прокручивает страницу к элементу; preventScroll: true оставляет прокрутку на месте.",
   "output": "true\n0",
   "tags": [

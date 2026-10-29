@@ -4,7 +4,7 @@
   "file": "setattribute-задать-атрибут-mv6cut0k.js",
   "title": "setAttribute — задать атрибут",
   "lang": "js",
-  "group": "Интерфейс: поля, кнопки и события / Обновлять страницу и эле",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "setAttribute задаёт атрибут HTML-элемента, например title, aria-label или data-id.",
   "output": "ready",
   "tags": [

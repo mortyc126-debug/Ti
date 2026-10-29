@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "работать-с-датой-и-временем-в-виде-строк-mvt1d2vb",
+  "file": "работать-с-датой-и-временем-в-виде-строк-mvt1d2vb.js",
+  "lang": "js",
+  "title": "Работать с датой и временем: В виде строки для передачи на сервер",
+  "group": "Данные / Дата и время",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [
+      "text"
+    ],
+    "requires": [
+      "date"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

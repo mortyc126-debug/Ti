@@ -4,7 +4,7 @@
   "file": "строка-из-значения-string.js",
   "title": "Преобразовать значение в строку: String(value)",
   "lang": "js",
-  "group": "Данные / Строки и текст",
+  "group": "Основы языка / Строки и текст",
   "desc": "String(x) превращает любое значение в строку и, в отличие от x.toString(), не падает на null и undefined; работает и с Symbol.",
   "output": "42\ntrue\nnull\nundefined\n1,2\n[object Object]\nSymbol(id)",
   "tags": [

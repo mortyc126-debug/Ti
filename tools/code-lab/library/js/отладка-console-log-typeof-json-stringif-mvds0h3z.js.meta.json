@@ -4,7 +4,7 @@
   "file": "отладка-console-log-typeof-json-stringif-mvds0h3z.js",
   "title": "Отладка: console.log, typeof, JSON.stringify",
   "lang": "js",
-  "group": "Ошибки и отладка / Найти причину сбоя",
+  "group": "Ошибки, отладка и тесты / Найти причину сбоя",
   "desc": "Три самых частых способа посмотреть, что внутри: вывести значение, узнать тип, красиво распечатать объект.",
   "output": "цена = 100\nnumber object true\n{\n  \"цена\": 100\n}",
   "tags": [

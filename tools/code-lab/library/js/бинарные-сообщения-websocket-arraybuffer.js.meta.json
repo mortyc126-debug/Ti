@@ -4,7 +4,7 @@
   "file": "бинарные-сообщения-websocket-arraybuffer.js",
   "title": "Получать бинарные сообщения как ArrayBuffer",
   "lang": "js",
-  "group": "Сеть / WebSocket",
+  "group": "Сеть и API / WebSocket и WebRTC",
   "desc": "socket.binaryType = \"arraybuffer\" заставляет браузер отдавать двоичные данные как ArrayBuffer (по умолчанию — Blob).",
   "output": "При двоичном сообщении из 4 байт: «Получено байт: 4»",
   "tags": [

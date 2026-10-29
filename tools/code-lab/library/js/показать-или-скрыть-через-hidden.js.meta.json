@@ -4,7 +4,7 @@
   "file": "показать-или-скрыть-через-hidden.js",
   "title": "Показать или скрыть элемент через атрибут hidden",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "Свойство hidden включает и выключает атрибут hidden; присвоение !visible скрывает элемент, когда visible ложно.",
   "output": "true none\nfalse block",
   "tags": [

@@ -4,7 +4,7 @@
   "file": "безопасная-cookie-httponly.js",
   "title": "Выдать cookie, недоступную скриптам страницы",
   "lang": "js",
-  "group": "Безопасность / Конфигурация",
+  "group": "Архитектура и надёжность / Безопасность и криптография",
   "desc": "Атрибуты HttpOnly, Secure и SameSite=Lax защищают cookie сессии: скрипт её не прочитает, а отправляется она только по HTTPS и с безопасных переходов.",
   "output": "[ 'id=abc123; HttpOnly; Secure; SameSite=Lax; Path=/' ]",
   "tags": [

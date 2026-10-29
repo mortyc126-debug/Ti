@@ -4,7 +4,7 @@
   "file": "позиционированный-предок-offsetparent.js",
   "title": "Ближайший позиционированный предок: offsetParent",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "offsetParent — предок, относительно которого считаются offsetTop и offsetLeft; у скрытого через display: none элемента он равен null.",
   "output": "wrapper\ntrue\nnull",
   "tags": [

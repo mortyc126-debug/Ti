@@ -4,7 +4,7 @@
   "file": "grid-именованные-области-макета-mvh8hn7j.css",
   "title": "Grid: именованные области макета",
   "lang": "css",
-  "group": "CSS: раскладка / Grid",
+  "group": "Вёрстка и стили / Раскладка: Flex и Grid",
   "desc": "Строит макет страницы через CSS Grid с именованными областями `grid-template-areas`: header, sidebar, main и footer легко переставлять и адаптировать.",
   "output": "Строит макет страницы через CSS Grid с именованными областями `grid-template-areas`: header, sidebar, main и footer легко переставлять и адаптировать",
   "tags": [

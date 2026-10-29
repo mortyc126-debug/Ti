@@ -4,7 +4,7 @@
   "file": "ширина-области-содержимого-clientwidth.js",
   "title": "Ширина области содержимого с отступами: clientWidth",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "clientWidth включает ширину содержимого и padding, но без рамок и полосы прокрутки; offsetWidth — вместе с рамками.",
   "output": "clientWidth = 220\noffsetWidth = 230",
   "tags": [

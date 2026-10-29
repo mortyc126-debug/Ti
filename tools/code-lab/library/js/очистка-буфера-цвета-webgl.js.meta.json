@@ -4,7 +4,7 @@
   "file": "очистка-буфера-цвета-webgl.js",
   "title": "Очистить буфер цвета: gl.clearColor и gl.clear",
   "lang": "js",
-  "group": "Графика и визуализация / Canvas: рисование",
+  "group": "Графика, анимация и игры / Canvas",
   "desc": "clearColor задаёт цвет очистки (R, G, B, A от 0 до 1), а clear(gl.COLOR_BUFFER_BIT) закрашивает им весь холст.",
   "output": "Холст закрашен чёрным цветом",
   "tags": [

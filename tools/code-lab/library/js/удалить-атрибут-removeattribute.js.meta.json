@@ -4,7 +4,7 @@
   "file": "удалить-атрибут-removeattribute.js",
   "title": "Удалить атрибут: removeAttribute",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "removeAttribute(\"disabled\") убирает атрибут целиком, и кнопка снова становится доступной.",
   "output": "true\nfalse false",
   "tags": [

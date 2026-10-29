@@ -4,7 +4,7 @@
   "file": "получение-параметров-свойства-узнать-параметры-свойства.js",
   "lang": "js",
   "title": "Получение параметров свойства узнать параметры свойства",
-  "group": "Данные / Работа с объектами",
+  "group": "Данные / Объекты и словари",
   "desc": "Возвращает дескриптор свойства: value, writable, enumerable, configurable или get/set.",
   "output": "{ value: 50, writable: true, enumerable: true, configurable: true }",
   "descAt": 1792998590184,

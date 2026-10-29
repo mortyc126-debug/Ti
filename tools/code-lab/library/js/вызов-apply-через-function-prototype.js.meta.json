@@ -4,7 +4,7 @@
   "file": "вызов-apply-через-function-prototype.js",
   "title": "Вызвать функцию с указанным this и массивом аргументов: Function.prototype.apply.call",
   "lang": "js",
-  "group": "Основы / Функции",
+  "group": "Основы языка / Функции",
   "desc": "Если у функции переопределили метод apply, надёжный вариант — взять apply у Function.prototype и вызвать его через call.",
   "output": "Привет, я Мира!",
   "tags": [

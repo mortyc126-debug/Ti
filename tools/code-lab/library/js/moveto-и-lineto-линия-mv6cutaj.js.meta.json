@@ -4,7 +4,7 @@
   "file": "moveto-и-lineto-линия-mv6cutaj.js",
   "title": "moveTo и lineTo — линия",
   "lang": "js",
-  "group": "Графика и визуализация / Canvas: рисование",
+  "group": "Графика, анимация и игры / Canvas",
   "desc": "moveTo переносит перо без рисования, lineTo добавляет отрезок. stroke() отображает построенный контур.",
   "output": "Фиолетовая ломаная линия",
   "tags": [

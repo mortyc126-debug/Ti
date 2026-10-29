@@ -4,7 +4,7 @@
   "file": "bytes-bytearray-и-кодировки.py",
   "title": "bytes, bytearray и кодирование текста",
   "lang": "python",
-  "group": "Python — основы / Строки и бинарные данные",
+  "group": "Основы языка / Строки и текст",
   "desc": "str хранит текст, bytes — неизменяемую последовательность байтов, bytearray — изменяемую. encode переводит текст в байты, decode восстанавливает текст с той же кодировкой.",
   "output": "b'\\xd0\\x9f\\xd1\\x80\\xd0\\xb8\\xd0\\xb2\\xd0\\xb5\\xd1\\x82'\nПривет\n65\nTrue True",
   "tags": [

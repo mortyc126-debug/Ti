@@ -1,0 +1,1 @@
+const text = date.toLocaleString('ru-RU');

@@ -4,7 +4,7 @@
   "file": "верхний-регистр-по-правилам-языка.js",
   "title": "Верхний регистр по правилам языка: toLocaleUpperCase",
   "lang": "js",
-  "group": "Данные / Строки и текст",
+  "group": "Основы языка / Строки и текст",
   "desc": "toLocaleUpperCase(locale) учитывает особенности языка: в турецком «i» превращается в «İ» с точкой, а обычный toUpperCase даёт «I».",
   "output": "ISTANBUL\nİSTANBUL",
   "tags": [

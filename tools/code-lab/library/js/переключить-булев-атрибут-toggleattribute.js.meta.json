@@ -4,7 +4,7 @@
   "file": "переключить-булев-атрибут-toggleattribute.js",
   "title": "Добавить или убрать булев атрибут по условию: toggleAttribute",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "toggleAttribute(name, condition) добавляет атрибут, если условие истинно, и убирает, если ложно; возвращает итоговое состояние.",
   "output": "isLoading = true, disabled = true\nisLoading = false, disabled = false",
   "tags": [

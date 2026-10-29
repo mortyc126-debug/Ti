@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "работать-с-датой-и-временем-по-русски-с--mvt1cxtg",
+  "file": "работать-с-датой-и-временем-по-русски-с--mvt1cxtg.js",
+  "lang": "js",
+  "title": "Работать с датой и временем: По-русски, с названием месяца",
+  "group": "Данные / Дата и время",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [
+      "text"
+    ],
+    "requires": [
+      "date"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

@@ -4,7 +4,7 @@
   "file": "collections-defaultdict.py",
   "title": "defaultdict — группировка без проверки ключа",
   "lang": "python",
-  "group": "Данные / Коллекции",
+  "group": "Данные / Массивы и коллекции",
   "desc": "defaultdict(list) создаёт пустой список при первом обращении к отсутствующему ключу. Удобен для группировки записей.",
   "output": "{'MOEX': ['Si', 'RI'], 'NYSE': ['AAPL']}",
   "tags": [

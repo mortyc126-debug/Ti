@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "показать-и-скрыть-элемент-на-странице-да-mvt1b09w",
+  "file": "показать-и-скрыть-элемент-на-странице-да-mvt1b09w.js",
+  "lang": "js",
+  "title": "Показать и скрыть элемент на странице: да",
+  "group": "Браузер / DOM",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [],
+    "requires": [
+      "box"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

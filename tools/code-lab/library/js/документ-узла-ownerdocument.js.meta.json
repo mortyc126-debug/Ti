@@ -4,7 +4,7 @@
   "file": "документ-узла-ownerdocument.js",
   "title": "Документ, которому принадлежит узел: ownerDocument",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "ownerDocument у узла из iframe указывает на документ iframe, а не на основной документ страницы.",
   "output": "true\nfalse\ntrue",
   "tags": [

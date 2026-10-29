@@ -4,7 +4,7 @@
   "file": "localstorage-синхронизация-с-sessionstor-mvk17pp5.js",
   "lang": "js",
   "title": "localStorage: синхронизация с sessionStorage",
-  "group": "Файлы, хранение и сервер / Хранение в браузере",
+  "group": "Страница и браузер / Хранение в браузере",
   "desc": "Копирует данные из localStorage в sessionStorage при открытии страницы, чтобы данные были доступны даже если они не были загружены из localStorage.",
   "output": "Данные из localStorage дублируются в sessionStorage при загрузке страницы.",
   "descAt": 1792703225561,

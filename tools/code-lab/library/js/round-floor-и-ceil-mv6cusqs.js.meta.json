@@ -4,7 +4,7 @@
   "file": "round-floor-и-ceil-mv6cusqs.js",
   "title": "round, floor и ceil",
   "lang": "js",
-  "group": "Данные: хранить, находить и преобразовывать / Числа и просты",
+  "group": "Числа и математика / Арифметика и округление",
   "desc": "round округляет до ближайшего целого, floor округляет вниз, ceil — вверх.",
   "output": "5\n4\n5",
   "tags": [

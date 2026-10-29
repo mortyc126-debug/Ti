@@ -4,7 +4,7 @@
   "file": "py-function.py",
   "title": "Функция (def)",
   "lang": "python",
-  "group": "Основы / Синтаксис",
+  "group": "Основы языка / Синтаксис",
   "desc": "Функция в Python начинается с def. Тело — с отступом. return отдаёт результат наружу.",
   "output": "20",
   "tags": [

@@ -4,7 +4,7 @@
   "file": "заголовок-ответа-content-type-json.js",
   "title": "Задать тип ответа: content-type application/json",
   "lang": "js",
-  "group": "Файлы, хранение и сервер / HTTP-сервер",
+  "group": "Файлы, сервер и Node.js / HTTP-сервер",
   "desc": "Заголовок content-type сообщает клиенту, что в теле лежит JSON в кодировке UTF-8.",
   "output": "application/json; charset=utf-8",
   "tags": [

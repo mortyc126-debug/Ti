@@ -4,7 +4,7 @@
   "file": "живая-коллекция-по-тегу-getelementsbytagname.js",
   "title": "Живая коллекция элементов по имени тега: getElementsByTagName",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "getElementsByTagName(\"div\") возвращает живую коллекцию: после добавления нового div она сама пополняется.",
   "output": "2\n3\nDIV DIV DIV",
   "tags": [

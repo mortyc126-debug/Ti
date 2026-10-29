@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "добавить-и-убрать-элементы-в-списке-дел--mvt1b9w5",
+  "file": "добавить-и-убрать-элементы-в-списке-дел--mvt1b9w5.js",
+  "lang": "js",
+  "title": "Добавить и убрать элементы в списке дел: Через строку HTML",
+  "group": "Браузер / DOM",
+  "desc": "Короче, но опасно, если текст приходит от пользователя.",
+  "output": "",
+  "component": {
+    "provides": [],
+    "requires": [
+      "list"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

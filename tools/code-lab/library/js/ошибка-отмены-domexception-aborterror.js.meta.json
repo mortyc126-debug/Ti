@@ -4,7 +4,7 @@
   "file": "ошибка-отмены-domexception-aborterror.js",
   "title": "Создать ошибку с именем из веб-платформы: DOMException AbortError",
   "lang": "js",
-  "group": "Ошибки и отладка / Исключения",
+  "group": "Ошибки, отладка и тесты / Исключения",
   "desc": "new DOMException(message, \"AbortError\") даёт стандартную ошибку отмены: по имени её отличают от настоящих сбоев.",
   "output": "AbortError - Операция отменена",
   "tags": [

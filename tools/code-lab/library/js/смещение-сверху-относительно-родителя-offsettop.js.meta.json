@@ -4,7 +4,7 @@
   "file": "смещение-сверху-относительно-родителя-offsettop.js",
   "title": "Смещение сверху относительно offsetParent: offsetTop",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "offsetTop показывает расстояние от верхнего края элемента до верха его offsetParent, учитывая padding родителя.",
   "output": "50\ncontainer",
   "tags": [

@@ -4,7 +4,7 @@
   "file": "отправить-json-mvh8gznx.js",
   "title": "отправить JSON",
   "lang": "js",
-  "group": "Сеть и запросы / Отправить данные",
+  "group": "Сеть и API / Отправить данные",
   "desc": "POST-запрос с телом в формате JSON.",
   "output": "",
   "tags": [

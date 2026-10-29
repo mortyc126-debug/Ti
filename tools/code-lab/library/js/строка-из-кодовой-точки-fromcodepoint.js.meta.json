@@ -4,7 +4,7 @@
   "file": "строка-из-кодовой-точки-fromcodepoint.js",
   "title": "Строка из кодовой точки Unicode: String.fromCodePoint",
   "lang": "js",
-  "group": "Данные / Строки и текст",
+  "group": "Основы языка / Строки и текст",
   "desc": "String.fromCodePoint понимает кодовые точки за пределами U+FFFF (эмодзи), где fromCharCode даёт неверный результат.",
   "output": "😀 2\nfalse",
   "tags": [

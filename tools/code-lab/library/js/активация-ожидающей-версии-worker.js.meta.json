@@ -4,7 +4,7 @@
   "file": "активация-ожидающей-версии-worker.js",
   "title": "Попросить ожидающую версию Service Worker активироваться",
   "lang": "js",
-  "group": "Кэширование / Service Worker",
+  "group": "Страница и браузер / Service Worker и кэш",
   "desc": "registration.waiting?.postMessage отправляет ожидающему worker команду SKIP_WAITING; после смены controller страницу перезагружают.",
   "output": "По клику на кнопку новая версия worker активируется и страница перезагружается",
   "tags": [

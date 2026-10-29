@@ -4,7 +4,7 @@
   "file": "удалить-css-класс-classlist-remove.js",
   "title": "Удалить CSS-класс элемента: classList.remove",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "classList.remove убирает класс и не трогает остальные; если класса нет, ошибки не будет.",
   "output": "card active\ncard active",
   "tags": [

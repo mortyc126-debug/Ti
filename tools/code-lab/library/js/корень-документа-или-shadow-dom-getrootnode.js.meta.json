@@ -4,7 +4,7 @@
   "file": "корень-документа-или-shadow-dom-getrootnode.js",
   "title": "Корень документа или Shadow DOM: getRootNode()",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "getRootNode() поднимается до корня: для обычного элемента это document, а для элемента внутри Shadow DOM — его shadowRoot.",
   "output": "true\ntrue",
   "tags": [

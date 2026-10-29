@@ -4,7 +4,7 @@
   "file": "последний-дочерний-элемент-lastelementchild.js",
   "title": "Последний дочерний элемент: lastElementChild",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "lastElementChild возвращает последний элемент-потомок, пропуская текстовые узлы.",
   "output": "#text\nФиниш",
   "tags": [

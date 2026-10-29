@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "показать-и-скрыть-элемент-на-странице-кл-mvt1ay7u",
+  "file": "показать-и-скрыть-элемент-на-странице-кл-mvt1ay7u.js",
+  "lang": "js",
+  "title": "Показать и скрыть элемент на странице: Классом в CSS",
+  "group": "Браузер / DOM",
+  "desc": "Удобно, если в стилях уже есть класс вроде .hidden { display: none }.",
+  "output": "",
+  "component": {
+    "provides": [
+      "toggle"
+    ],
+    "requires": [
+      "box"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

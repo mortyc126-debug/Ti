@@ -4,7 +4,7 @@
   "file": "следующий-соседний-элемент-nextelementsibling.js",
   "title": "Следующий соседний элемент: nextElementSibling",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "nextElementSibling возвращает следующий элемент на том же уровне или null, если элемент последний.",
   "output": "b\nnull",
   "tags": [

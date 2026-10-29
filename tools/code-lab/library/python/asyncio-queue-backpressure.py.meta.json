@@ -4,7 +4,7 @@
   "file": "asyncio-queue-backpressure.py",
   "title": "asyncio.Queue — очередь и backpressure",
   "lang": "python",
-  "group": "Продвинутый Python / Асинхронность",
+  "group": "Асинхронность / Потоки и процессы",
   "desc": "Очередь с maxsize ограничивает количество элементов в памяти. Когда очередь заполнена, await put() приостанавливает производителя, создавая backpressure. Для реального сервиса нужно также обрабатывать sentinel, ошибки workers и отмену задач.",
   "output": "first second 0",
   "inputs": "Асинхронная очередь с ограниченной вместимостью.",

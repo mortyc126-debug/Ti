@@ -4,7 +4,7 @@
   "file": "открытый-shadow-dom-shadowroot.js",
   "title": "Открытый Shadow DOM элемента: shadowRoot",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "shadowRoot возвращает корень открытого Shadow DOM; у закрытого (mode: \"closed\") он равен null.",
   "output": "<p>Внутри</p>\nnull",
   "tags": [

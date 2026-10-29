@@ -4,7 +4,7 @@
   "file": "json-в-python-mvh8gb71.py",
   "title": "JSON в Python",
   "lang": "python",
-  "group": "Данные / Форматы и валидация",
+  "group": "Данные / Преобразование и форматы",
   "desc": "JSON: преобразование между строкой и объектом Python. loads/dumps работают со строками, load/dump — с файловыми потоками.",
   "output": "Печатает объект JSON с полями name и age в читаемом многострочном виде.",
   "tags": [

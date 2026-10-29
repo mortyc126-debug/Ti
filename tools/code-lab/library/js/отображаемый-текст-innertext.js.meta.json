@@ -4,7 +4,7 @@
   "file": "отображаемый-текст-innertext.js",
   "title": "Отображаемый текст с учётом стилей: innerText",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "innerText возвращает только видимый текст (без display: none), а textContent — весь текст узла.",
   "output": "Видимый\nВидимыйСкрытый",
   "tags": [

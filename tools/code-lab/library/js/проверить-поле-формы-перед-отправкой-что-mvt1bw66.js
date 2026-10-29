@@ -1,0 +1,1 @@
+const isStrongPassword = value => value.length >= 8;

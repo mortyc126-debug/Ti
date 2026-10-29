@@ -4,7 +4,7 @@
   "file": "устаревшие-зависимости.sh",
   "title": "Устаревшие зависимости",
   "lang": "sh",
-  "group": "Инструменты разработчика / Менеджер пакетов npm",
+  "group": "Инструменты разработки / npm и пакеты",
   "desc": "Показывает устаревшие зависимости пакетов.",
   "output": "Package    Current  Wanted  Latest  Location                Depended by\nis-number    6.0.0   6.0.0   7.0.0  node_modules/is-number  demo",
   "tags": [

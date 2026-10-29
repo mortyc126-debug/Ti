@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "проверить-поле-формы-перед-отправкой-пок-mvt1bymv",
+  "file": "проверить-поле-формы-перед-отправкой-пок-mvt1bymv.js",
+  "lang": "js",
+  "title": "Проверить поле формы перед отправкой: Пока человек вводит",
+  "group": "Браузер / Формы",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [
+      "ok"
+    ],
+    "requires": [
+      "form",
+      "isEmail"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

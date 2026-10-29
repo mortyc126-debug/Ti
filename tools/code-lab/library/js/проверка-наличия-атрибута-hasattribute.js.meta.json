@@ -4,7 +4,7 @@
   "file": "проверка-наличия-атрибута-hasattribute.js",
   "title": "Проверить наличие атрибута: hasAttribute(\"disabled\")",
   "lang": "js",
-  "group": "Интерфейс / Работа с DOM",
+  "group": "Страница и браузер / Работа с DOM",
   "desc": "hasAttribute возвращает true, если атрибут есть, независимо от его значения.",
   "output": "true\nfalse",
   "tags": [
