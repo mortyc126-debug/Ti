@@ -1313,7 +1313,7 @@ function openStructModal(){
   box.style.maxWidth = '860px';
   box.innerHTML = '<h3>Правила структуры</h3>'
     + '<p class="mh">Где слово или тег может стоять, чего требует и как записывается. Строка: <b>слово: правило</b>, после « — » можно пояснить почему. '
-    + 'Виды: <b>внутри</b>, <b>не внутри</b>, <b>содержит</b>, <b>не содержит</b>, <b>первым в</b>, <b>после</b>, <b>требует</b>, <b>пишется</b> (шаблон: \\n — перенос, … — своё место), <b>связывает</b> / <b>читает</b>, <b>обязательно</b> / <b>можно</b> (атрибуты; «*: можно …» — общие для всех тегов), <b>значения</b> («button[type]: значения button, submit, reset»). '
+    + 'Виды: <b>внутри</b>, <b>не внутри</b>, <b>содержит</b>, <b>не содержит</b>, <b>первым в</b>, <b>после</b>, <b>требует</b>, <b>пишется</b> (шаблон: \\n — перенос, … — своё место), <b>связывает</b> / <b>читает</b>, <b>обязательно</b> / <b>можно</b> (атрибуты; «*: можно …» — общие для всех тегов), <b>значения</b> («button[type]: значения button, submit, reset»), <b>заметка</b> (просто пояснение, без проверки; строка «слово: обычный текст» тоже сохранится заметкой). '
     + '<b>слово: удалить</b> — снять все правила слова. Нарушения подчёркиваются в песочнице, шаблон «пишется» раскрывается по Tab после слова.</p>'
     + '<div class="fmt">img: обязательно src — путь до файла картинки&#10;img: можно alt, width, loading&#10;button[type]: значения button, submit, reset&#10;li: внутри ul, ol — пункт живёт только в списке&#10;gap: требует display: flex | grid&#10;elif: после if, elif&#10;if: пишется if (…) {\\n  …\\n}</div>'
     + '<div class="mbtns"><input class="inv-search" id="st-lang" list="st-langs" placeholder="язык: html, css, js, python, sql…" style="width:200px"><datalist id="st-langs"></datalist>'
@@ -1329,7 +1329,7 @@ function openStructModal(){
   const row = (cls, t) => { const d = el2('div', 'lp-row ' + cls); d.textContent = t; return d; };
   const get = () => fetch('/api/dict/structure?lang=' + encodeURIComponent(lang())).then(x => x.json()).catch(() => null);
   get().then(r => { if(r) q('#st-langs').innerHTML = r.langs.map(l => '<option value="' + l + '">').join(''); });
-  const VORDER = ['обязательно', 'можно', 'значения', 'внутри', 'не внутри', 'первым в', 'содержит', 'не содержит', 'после', 'требует', 'пишется', 'связывает', 'читает'];
+  const VORDER = ['обязательно', 'можно', 'значения', 'внутри', 'не внутри', 'первым в', 'содержит', 'не содержит', 'после', 'требует', 'пишется', 'связывает', 'читает', 'заметка'];
   q('#st-view').onclick = async () => {
     const prev = q('#st-prev'); prev.innerHTML = 'загрузка…'; const r = await get(); prev.innerHTML = '';
     if(!r){ prev.appendChild(row('lp-bad', 'нет ответа сервера')); return; }
@@ -1361,7 +1361,7 @@ function openStructModal(){
     const P = window.StructureRules; const prev = q('#st-prev'); prev.innerHTML = ''; if(!P) return;
     const { rules, bad } = P.parse(q('#st-text').value);
     prev.appendChild(el2('div', 'lp-sec', 'правил: ' + rules.length + (bad.length ? ' · не понято: ' + bad.length : '')));
-    rules.forEach(x => prev.appendChild(row('lp-ok', '✓ ' + x.term + ' — ' + x.verb + ' ' + (x.verb === 'пишется' ? x.args[0].replace(/\\n/g, ' ⏎ ') : x.args.join(', ')))));
+    rules.forEach(x => prev.appendChild(row('lp-ok', '✓ ' + x.term + ' — ' + x.verb + ' ' + (x.verb === 'пишется' ? x.args[0].replace(/\\n/g, ' ⏎ ') : x.args.join(', ')) + (x.guessed ? '   (не правило — сохранится заметкой)' : ''))));
     bad.forEach(x => prev.appendChild(row('lp-bad', 'строка ' + x.line + ': ' + x.why + ' — «' + x.text + '»')));
   };
   const save = async mode => {

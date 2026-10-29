@@ -285,7 +285,8 @@ test('правила структуры: разбор, HTML-вложенност
   const all = require('../public/dict/structure.json');
   for(const l of Object.keys(all)) assert.equal(S.parse(all[l].join('\n')).bad.length, 0, 'правила ' + l + ' разбираются');
   const p = S.parse('li: внутри ul, ol — пояснение\nкривая строка\nx: странно что-то');
-  assert.equal(p.rules.length, 1); assert.equal(p.rules[0].note, 'пояснение'); assert.equal(p.bad.length, 2);
+  assert.equal(p.rules.length, 2); assert.equal(p.rules[0].note, 'пояснение'); assert.equal(p.bad.length, 1);
+  assert.equal(p.rules[1].verb, 'заметка'); assert.ok(p.rules[1].guessed);   // «x: странно что-то» — не правило, а заметка
   const R = l => S.parse(all[l].join('\n')).rules;
   const msgs = (c, l) => S.check(c, l, R(l)).map(x => x.msg.split(' — ')[0]);
   assert.deepEqual(msgs('<ul><li>a</li></ul>\n<li>b</li>\n<p><div>x</div></p>', 'html'), ['<li> должен быть внутри <ul>, <ol>, <menu>', '<p> не может содержать <div>']);
@@ -343,6 +344,6 @@ test('правила структуры: повторная запись не д
 test('правила структуры: синонимы видов, «:» в имени, разметка ответа ИИ', () => {
   const S = require('../public/structure-rules.js');
   const r = S.parse(['a:hover: требует cursor: pointer', '::before: требует content', '- li: только внутри ul, ol', '1. p: не может содержать div, p', '`img`: обязательные атрибуты: src, alt', 'img: необязательные: width; height', 'button[type]: допустимые значения button | submit | reset.', 'summary: должен быть первым в details', 'gap: нужно display: flex | grid', 'что-то: странное правило'].join('\n'));
-  assert.deepEqual(r.rules.map(x => x.raw), ['a:hover: требует cursor: pointer', '::before: требует content', 'li: внутри ul, ol', 'p: не содержит div, p', 'img: обязательно src, alt', 'img: можно width, height', 'button[type]: значения button, submit, reset', 'summary: первым в details', 'gap: требует display: flex | grid']);
-  assert.equal(r.bad.length, 1); assert.equal(r.bad[0].text, 'что-то: странное правило');
+  assert.deepEqual(r.rules.filter(x => x.verb !== 'заметка').map(x => x.raw), ['a:hover: требует cursor: pointer', '::before: требует content', 'li: внутри ul, ol', 'p: не содержит div, p', 'img: обязательно src, alt', 'img: можно width, height', 'button[type]: значения button, submit, reset', 'summary: первым в details', 'gap: требует display: flex | grid']);
+  assert.equal(r.bad.length, 0); assert.equal(r.rules[r.rules.length - 1].verb, 'заметка');
 });
