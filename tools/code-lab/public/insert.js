@@ -134,7 +134,8 @@
       const m = cm.getLine(cur.line).slice(0, cur.ch).match(/^\s*([a-z-]+)\s*:\s*([\w-]*)$/i); if(!m) return null;
       return { kind: 'css', lang, fn: m[1].toLowerCase(), prefix: m[2], x: c.left, y: c.bottom + 4, put: mk(m[2]) };
     }
-    if(lang !== 'js' && lang !== 'python') return null;
+    // скобки вызова есть почти в любом языке; разметка и данные — не про вызовы
+    if(/^(html|svg|xml|md|markdown|txt|text|json|yaml|)$/.test(lang)) return null;
     const st = []; let q = '', qAt = -1;
     for(let i = 0; i < before.length; i++){ const ch = before[i];
       if(q){ if(ch === '\\'){ i++; continue; } if(ch === q){ q = ''; } continue; }

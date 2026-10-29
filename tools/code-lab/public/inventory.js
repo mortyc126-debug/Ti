@@ -1334,7 +1334,12 @@ function openStructModal(){
     const prev = q('#st-prev'); prev.innerHTML = 'загрузка…'; const r = await get(); prev.innerHTML = '';
     if(!r){ prev.appendChild(row('lp-bad', 'нет ответа сервера')); return; }
     prev.appendChild(el2('div', 'lp-sec', r.lang + ': правил ' + r.count + (r.free ? ' · слов словаря без правил: ' + r.free : '')));
-    if(!r.count){ prev.appendChild(row('muted', 'пока пусто — впиши правила или возьми «промпт для ИИ»')); return; }
+    // слова словаря без правил — клик добавляет заготовку «слово: » в поле
+    const freeBlock = () => { if(!r.freeWords || !r.freeWords.length) return;
+      prev.appendChild(el2('div', 'lp-sec', 'без правил: ' + r.free + (r.free > r.freeWords.length ? ' (первые ' + r.freeWords.length + ', короткие вперёд)' : '') + ' — клик добавит заготовку в поле'));
+      const wrap = el2('div', 'lp-row'); r.freeWords.forEach(w => { const b = document.createElement('span'); b.textContent = w; b.style.cssText = 'display:inline-block;margin:2px 6px 2px 0;padding:1px 6px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:ui-monospace,monospace;font-size:11.5px';
+        b.onclick = () => { const t = q('#st-text'); t.value += (t.value && !t.value.endsWith('\n') ? '\n' : '') + w + ': '; t.focus(); }; wrap.appendChild(b); }); prev.appendChild(wrap); };
+    if(!r.count){ prev.appendChild(row('muted', 'пока пусто — впиши правила или возьми «промпт для ИИ»')); freeBlock(); return; }
     const P = window.StructureRules; const rules = P ? P.parse(r.lines.join('\n')).rules : [];
     for(const v of VORDER){ const list = rules.filter(x => x.verb === v); if(!list.length) continue;
       prev.appendChild(el2('div', 'lp-sec', v + ' (' + list.length + ')'));
@@ -1342,6 +1347,7 @@ function openStructModal(){
         d.appendChild(b); d.appendChild(document.createTextNode('  ' + (v === 'пишется' ? x.args[0].replace(/\\n/g, ' ⏎ ') : x.args.join(', ')) + (x.note ? '  — ' + x.note : '')));
         d.style.cursor = 'pointer'; d.title = 'в поле для правки'; d.onclick = () => { q('#st-text').value += (q('#st-text').value && !q('#st-text').value.endsWith('\n') ? '\n' : '') + x.raw + '\n'; };
         prev.appendChild(d); }); }
+    freeBlock();
   };
   q('#st-edit').onclick = async () => { const r = await get(); if(r) q('#st-text').value = r.lines.join('\n') + '\n'; };
   q('#st-prompt').onclick = async () => {
