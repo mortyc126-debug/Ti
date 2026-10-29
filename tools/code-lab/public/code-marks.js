@@ -183,6 +183,11 @@
     if(errs.has(cm)) return;   // первая ошибка — главная, остальные часто её следствие
     const x = explain(msg); const text = cm.getLine(line);
     // что подсветить: слово из сообщения ближе всего к столбцу ошибки; иначе слово под столбцом; иначе всю строку
+    // браузер говорит только строку и столбец, а подсветить хочется слово. ищем так:
+    // 1) в сообщении часто есть имя («btnn is not defined», «reading 'addEventListener'») — ищем его в строке,
+    //    из нескольких вхождений берём ближайшее к столбцу ошибки;
+    // 2) имени нет — берём слово, на которое указывает столбец;
+    // 3) и этого нет (столбец мимо) — подсвечиваем всю строку без отступа.
     let a = -1, b = -1;
     if(x.tok){ let best = -1, i = -1; while((i = text.indexOf(x.tok, i + 1)) >= 0){ if(best < 0 || Math.abs(i - col) < Math.abs(best - col)) best = i; } if(best >= 0){ a = best; b = best + x.tok.length; } }
     if(a < 0 && col >= 0 && col < text.length){ a = col; b = col; const re = /[\wА-Яа-яЁё$]/; while(a > 0 && re.test(text[a - 1])) a--; while(b < text.length && re.test(text[b])) b++; if(a === b) b = a + 1; }

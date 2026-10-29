@@ -15,6 +15,10 @@ const isIdiom = k => /[\s(=.:]/.test(k.replace(/^[.#@]/, ''));
 const balanced = k => { let d = 0; for(const ch of k){ if('({['.includes(ch)) d++; else if(')}]'.includes(ch)) d--; if(d < 0) return false; } return d === 0; };
 
 // словарь хранит ключи строчными, а в коде регистр важен: берём самое частое написание имени из библиотеки
+// регистр восстанавливаем голосованием по коду библиотеки.
+// для каждого слова считаем, как его пишут: queryselector → { querySelector: 40, QuerySelector: 1 }.
+// побеждает самое частое написание, но только если оно встречается чаще, чем слово целиком строчными —
+// иначе какое-нибудь «name», которое почти всегда строчное, превратилось бы в «Name» из-за одного класса.
 export function caseMapFrom(codes){
   const cnt = new Map();
   for(const c of codes) for(const m of String(c || '').matchAll(/[A-Za-z_$][\w$]*/g)){ const w = m[0], lw = w.toLowerCase(); if(w === lw) continue;
@@ -101,6 +105,10 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   const out = top.map(r => {
     const D = langs[r.lang] || {}; const root = node(r.term, r.lang, r.label);
     // разновидности по имени: каждая — под самым длинным уже существующим предком
+    // разновидности по имени: margin → margin-inline → margin-inline-start.
+    // сортируем по длине, чтобы родитель всегда шёл раньше детей. для каждого слова отрезаем хвост по дефису
+    // (margin-inline-start → margin-inline → margin) и вешаем под первого найденного предка.
+    // так margin-inline-start окажется внутри margin-inline, а не рядом с ним под margin.
     const kin = Object.keys(D).filter(k => k.startsWith(r.term + '-') && !isIdiom(k)).sort((a, b) => a.length - b.length);
     const byTerm = new Map([[r.term, root]]);
     for(const k of kin.slice(0, 60)){
