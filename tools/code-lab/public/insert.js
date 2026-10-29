@@ -31,6 +31,7 @@
   .ac-c .k{color:var(--name,#3dd9ff)} .ac-c .v{color:var(--str,#52F2C9)}
   .ac-d{font-size:11.5px;line-height:1.35;color:var(--text3,#9c90c4)}
   .ac-d b{color:var(--text2,#cbc2ea);font-weight:600}
+  .ac-grp .ac-c{color:var(--acc,#ff2fae);font-family:system-ui,sans-serif;font-weight:600}
   .ac-p .ac-c{color:var(--text2,#cbc2ea);font-family:system-ui,sans-serif}
   .ac-kids{margin-left:13px;border-left:1px solid var(--border,#3a2f55);padding-left:3px}
   .ac-g{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3,#9c90c4);margin:6px 7px 1px}
@@ -65,14 +66,16 @@
   }
 
   const paint = (code, lang) => lang === 'css' ? esc(code).replace(/^([\w-]+)(:\s*)(.*?)(;?)$/, '<span class="k">$1</span>$2<span class="v">$3</span>$4') : esc(code);
-  function rowHtml(n){
+  function rowHtml(n, inGroup){
     const has = n.children && n.children.length;
-    const desc = n.piece ? 'кусок из библиотеки' : (n.label ? '<b>' + esc(n.label) + '</b>' + (n.note ? ' — ' : '') : '') + esc(n.note || '');
+    if(n.group) return '<div class="ac-n"><div class="ac-r ac-grp" data-code=""><span class="ac-t">▸</span><span class="ac-m"><span class="ac-c">' + esc(n.label) + '</span><span class="ac-d">' + esc(n.note) + '</span></span></div>'
+      + '<div class="ac-kids" hidden>' + n.children.map(k => rowHtml(k, true)).join('') + '</div></div>';
+    const desc = n.piece ? (inGroup ? '' : 'кусок из библиотеки') : (n.label ? '<b>' + esc(n.label) + '</b>' + (n.note ? ' — ' : '') : '') + esc(n.note || '');
     return '<div class="ac-n"><div class="ac-r' + (n.piece ? ' ac-p' : '') + '" data-code="' + esc(n.code || '') + '" data-piece="' + esc(n.piece || '') + '">'
       + '<span class="ac-t">' + (has ? '▸' : '') + '</span>'
       + '<span class="ac-m' + (order === 'note' ? ' nf' : '') + '"><span class="ac-c">' + (n.piece ? esc(n.note) : paint(n.code, n.lang)) + '</span>'
       + (desc ? '<span class="ac-d">' + desc + '</span>' : '') + '</span></div>'
-      + (has ? '<div class="ac-kids" hidden>' + n.children.map(rowHtml).join('') + '</div>' : '') + '</div>';
+      + (has ? '<div class="ac-kids" hidden>' + n.children.map(k => rowHtml(k)).join('') + '</div>' : '') + '</div>';
   }
   // запасной путь: слова словаря по началу («quer» → querySelector), если дерева нет
   function flatFallback(word, d, lang){
@@ -88,6 +91,7 @@
     kids.hidden = open == null ? !kids.hidden : !open; row.querySelector('.ac-t').textContent = kids.hidden ? '▸' : '▾'; return true; }
   async function accept(row){
     if(!row || !ctx) return;
+    if(row.classList.contains('ac-grp')){ toggle(row); mark(); return; }
     let code = row.dataset.code;
     if(row.dataset.piece){ const t = await fetch('/api/template?id=' + encodeURIComponent(row.dataset.piece)).then(r => r.json()).catch(() => ({}));
       code = t.code != null ? t.code : (Array.isArray(t.lines) ? t.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : ''); }
@@ -101,7 +105,9 @@
     if(c.word){ const r = await fetch('/api/variants?q=' + encodeURIComponent(c.word) + '&lang=' + encodeURIComponent(c.lang)).then(x => x.json()).catch(() => null); roots = (r && r.roots) || []; }
     if(my !== seq) return;
     // в языке файла пусто (или файл без языка) — показываем другие языки, сгруппированно по языку
-    if(!roots.length && c.word && /[А-Яа-яЁё]/.test(c.word)){ const r = await fetch('/api/variants?q=' + encodeURIComponent(c.word)).then(x => x.json()).catch(() => null); if(my !== seq) return; roots = (r && r.roots) || []; }
+    // (только куски по названию — тоже «пусто»: термины другого языка ставим перед ними)
+    if(!roots.some(n => !n.group) && c.word && /[А-Яа-яЁё]/.test(c.word)){ const r = await fetch('/api/variants?q=' + encodeURIComponent(c.word)).then(x => x.json()).catch(() => null); if(my !== seq) return;
+      roots = ((r && r.roots) || []).filter(n => !n.group).concat(roots.length ? roots : ((r && r.roots) || []).filter(n => n.group)); }
     if(!roots.length && c.word && /^[\w$.-]+$/.test(c.word)){ const d = await (window.codelabKwDict ? window.codelabKwDict(c.lang) : Promise.resolve({})); if(my !== seq) return; roots = flatFallback(c.word, d || {}, c.lang); }
     if(!roots.length){ if(force){ ctx = c; render(c, [], true); } else hide(); return; }
     ctx = c; render(c, roots);
@@ -113,7 +119,7 @@
     }
     const byLang = new Map(); roots.forEach(n => { const l = n.lang || ''; if(!byLang.has(l)) byLang.set(l, []); byLang.get(l).push(n); });
     pop.innerHTML = '<div class="ac-b">' + (empty ? '<div class="ac-d" style="padding:8px">для «' + esc(c.word) + '» вариантов нет — напиши смысл: «отступ», «цикл», «найти элемент»</div>'
-      : [...byLang.entries()].map(([l, list]) => (byLang.size > 1 ? '<div class="ac-g">' + esc(l.toUpperCase()) + '</div>' : '') + list.map(rowHtml).join('')).join(''))
+      : [...byLang.entries()].map(([l, list]) => (byLang.size > 1 ? '<div class="ac-g">' + esc(l.toUpperCase()) + '</div>' : '') + list.map(n => rowHtml(n)).join('')).join(''))
       + '</div><div class="ac-f">↑↓ выбрать · → раскрыть · Enter вставить · Esc<button title="что показывать первым">' + (order === 'code' ? 'код ↑' : 'смысл ↑') + '</button></div>';
     pop.querySelector('.ac-f button').onclick = e => { order = order === 'code' ? 'note' : 'code'; try { localStorage.setItem('codelab_var_order', order); } catch(_){}
       e.target.textContent = order === 'code' ? 'код ↑' : 'смысл ↑'; pop.querySelectorAll('.ac-m').forEach(m => m.classList.toggle('nf', order === 'note')); };
@@ -128,6 +134,11 @@
     if(!acOn || e.ctrlKey || e.metaKey || e.altKey) return;
     if(['ArrowDown','ArrowUp','ArrowLeft','ArrowRight','Enter','Tab','Escape','Home','End','Shift','Control','Alt','Meta','PageUp','PageDown'].includes(e.key)) return;
     const ed = e.target.closest && e.target.closest('.sb-ed'); if(!ed){ hide(); return; }
+    clearTimeout(timer); timer = setTimeout(() => show(ed, false), 200);
+  }, true);
+  // ввод через раскладку/IME/телефон может прийти без keyup — ловим и сам ввод текста (таймер общий, двойного запроса нет)
+  edsEl.addEventListener('input', e => {
+    if(!acOn) return; const ed = e.target.closest && e.target.closest('.sb-ed'); if(!ed) return;
     clearTimeout(timer); timer = setTimeout(() => show(ed, false), 200);
   }, true);
   edsEl.addEventListener('keydown', e => {

@@ -257,3 +257,13 @@ test('связи слов: ядро, начало пояснения, правк
   assert.deepEqual(L.depths("a(() => {\n  if (x) {\n    y();\n  }\n});", 'js'), [0, 2, 3, 2, 0]);
   assert.deepEqual(L.depths('for a in b:\n    if a:\n        f()\nprint(1)', 'python'), [0, 1, 2, 0]);
 });
+
+test('варианты: куски из библиотеки по смыслу названия, язык файла первым', async () => {
+  const { buildVariants } = await import('../lib/variant-tree.mjs');
+  const rows = [{ id: 'a', lang: 'js', title: 'Адаптивный размер холста' }, { id: 'b', lang: 'css', title: 'Адаптивная сетка карточек' }, { id: 'c', lang: 'css', title: 'Тень у кнопки' }];
+  const r = buildVariants({ q: 'адаптивный', lang: 'css', dict: { langs: { css: {} } }, rows, synonyms: {} });
+  const g = r.roots.find(n => n.group);
+  assert.ok(g, 'есть ветка кусков');
+  assert.deepEqual(g.children.map(c => c.piece), ['b', 'a']);
+  assert.equal(buildVariants({ q: 'адаптивный', lang: 'css', dict: { langs: {} }, rows: [], synonyms: {} }).roots.length, 0);
+});

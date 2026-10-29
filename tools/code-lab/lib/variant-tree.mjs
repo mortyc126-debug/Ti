@@ -33,6 +33,7 @@ function splitNote(v){
   return { ex: '', note: s.replace(/^[^—]{1,40}—\s*/, '').trim() };
 }
 function codeFor(term, lang, ex, cm){
+  if(lang === 'css' && term[0] === '@') return term + ' (…) { }';   // @media, @supports — правило с условием, не свойство
   if(lang === 'css') return term + ': ' + (ex || '…') + ';';
   // в HTML-словаре и теги, и атрибуты: тег — в угловых скобках, атрибут — как пишется внутри тега
   if(lang === 'html') return /^</.test(term) ? term : HTML_TAGS.has(term) ? '<' + term + '>' : (/=/.test(term) ? term : term + (ex && !/[а-яё]/i.test(ex) ? '="' + ex.replace(/^["']|["']$/g, '') + '"' : ''));
@@ -111,5 +112,15 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     pieces.forEach(x => root.children.push({ term: x.title, lang: x.lang, code: '', note: x.title, label: '', children: [], piece: x.id }));
     return root;
   });
+  // куски библиотеки, у которых смысл запроса в названии («адаптивный» → «Адаптивная сетка карточек»):
+  // отдельной веткой, язык файла первым; для HTML подходят и CSS/JS-куски — страница собирается из всех трёх
+  if(/[а-я]/.test(qn)){
+    const near = lang === 'html' ? ['html', 'css', 'js'] : lang ? [lang] : [];
+    const rank = x => { const i = near.indexOf(x.lang); return i < 0 ? 9 : i; };
+    const hits = rows.filter(x => hasQ(x.title)).sort((a, b) => rank(a) - rank(b) || String(a.title).length - String(b.title).length);
+    const pick = hits.slice(0, MAX_KIDS);
+    if(pick.length) out.push({ term: '', lang: pick[0].lang, code: '', label: 'куски из библиотеки', note: hits.length + ' по названию', group: true,
+      children: pick.map(x => ({ term: x.title, lang: x.lang, code: '', note: x.title + (near.length && x.lang !== near[0] ? ' · ' + x.lang.toUpperCase() : ''), label: '', children: [], piece: x.id })) });
+  }
   return { q, lang, roots: out };
 }
