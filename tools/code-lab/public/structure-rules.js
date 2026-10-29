@@ -75,7 +75,19 @@
     });
     return { rules, bad };
   }
-  const byTerm = (rules, verb) => { const m = new Map(); for(const r of rules || []) if(r.verb === verb){ const k = r.term.toLowerCase(); m.set(k, (m.get(k) || []).concat(r)); } return m; };
+  // описательное правило — сохраняется и показывается, но не проверяется: ИИ пишет «внутри потокового содержимого»,
+  // «обязательно один элемент на документ», «значения: совпадает с id…»; а «внутри body, div, main…» — это обычные
+  // места, а не ограничение (настоящее — li: внутри ul, ol; td: внутри tr)
+  const prose = a => /[А-Яа-яЁё]/.test(a) || /\s/.test(String(a).trim());
+  const FLOW = new Set(['body', 'div', 'main', 'section', 'article', 'p', 'span', 'form', 'li', 'td']);
+  function inert(r){
+    if(['заметка', 'пишется', 'связывает', 'читает', 'удалить'].includes(r.verb)) return false;
+    if(r.verb === 'требует') return /[А-Яа-яЁё]/.test(r.args[0] || '');
+    // «внутри A, где угодно ещё» — список неполный, проверять нечего; в остальных списках описание просто отбрасывается
+    if(r.verb === 'внутри') return r.args.some(prose) || r.args.some(a => FLOW.has(String(a).toLowerCase()));
+    return r.args.every(prose);
+  }
+  const byTerm = (rules, verb) => { const m = new Map(); for(const r of rules || []) if(r.verb === verb && !inert(r)){ const k = r.term.toLowerCase(); const x = r.verb === 'требует' ? r : Object.assign({}, r, { args: r.args.filter(a => !prose(a)) }); m.set(k, (m.get(k) || []).concat(x)); } return m; };
 
   // строки и комментарии — пробелами (позиции сохраняются)
   function blank(code, lang){
@@ -117,9 +129,9 @@
 
   // атрибуты тега по правилам: обязательно / можно / общие (* : можно …) / значения (тег[атрибут] или *[атрибут])
   function attrsFor(tag, rules){
-    const t = String(tag).toLowerCase(), pick = (term, verb) => (rules || []).filter(r => r.verb === verb && r.term.toLowerCase() === term).flatMap(r => r.args.map(a => ({ name: a, note: r.note })));
+    const t = String(tag).toLowerCase(), pick = (term, verb) => (rules || []).filter(r => r.verb === verb && r.term.toLowerCase() === term).flatMap(r => r.args.filter(a => !prose(a)).map(a => ({ name: a, note: r.note })));
     const required = pick(t, 'обязательно'), optional = pick(t, 'можно'), global = pick('*', 'можно');
-    const values = attr => { const a = String(attr).toLowerCase(); if(a === '') { const own = (rules || []).find(x => x.verb === 'значения' && x.term.toLowerCase() === t); return own ? { list: own.args, note: own.note } : null; } const r = (rules || []).find(x => x.verb === 'значения' && (x.term.toLowerCase() === t + '[' + a + ']')) || (rules || []).find(x => x.verb === 'значения' && x.term.toLowerCase() === '*[' + a + ']'); return r ? { list: r.args, note: r.note } : null; };
+    const values = attr => { const a = String(attr).toLowerCase(); if(a === '') { const own = (rules || []).find(x => x.verb === 'значения' && x.term.toLowerCase() === t && !x.args.some(prose)); return own ? { list: own.args, note: own.note } : null; } const r = (rules || []).find(x => x.verb === 'значения' && !x.args.some(prose) && (x.term.toLowerCase() === t + '[' + a + ']')) || (rules || []).find(x => x.verb === 'значения' && !x.args.some(prose) && x.term.toLowerCase() === '*[' + a + ']'); return r ? { list: r.args, note: r.note } : null; };
     return { required, optional, global, values, known: required.length + optional.length > 0 };
   }
   const near1 = (a, b) => { if(Math.abs(a.length - b.length) > 1) return false; let i = 0, j = 0, e = 0; while(i < a.length && j < b.length){ if(a[i] === b[j]){ i++; j++; continue; } if(++e > 1) return false;
@@ -311,7 +323,7 @@
     return { lines, added, replaced, removed, same, bad };
   }
 
-  const api = { VERBS, parse, check, templateFor, describe, blank, attrsFor, merge };
+  const api = { VERBS, parse, check, templateFor, describe, blank, attrsFor, merge, inert };
   if(typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.StructureRules = api;
 })(typeof self !== 'undefined' ? self : this);

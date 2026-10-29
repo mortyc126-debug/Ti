@@ -347,3 +347,11 @@ test('правила структуры: синонимы видов, «:» в �
   assert.deepEqual(r.rules.filter(x => x.verb !== 'заметка').map(x => x.raw), ['a:hover: требует cursor: pointer', '::before: требует content', 'li: внутри ul, ol', 'p: не содержит div, p', 'img: обязательно src, alt', 'img: можно width, height', 'button[type]: значения button, submit, reset', 'summary: первым в details', 'gap: требует display: flex | grid']);
   assert.equal(r.bad.length, 0); assert.equal(r.rules[r.rules.length - 1].verb, 'заметка');
 });
+
+test('правила структуры: описания вместо имён не проверяются, имена в той же строке — да', () => {
+  const S = require('../public/structure-rules.js');
+  const rules = S.parse(['a: внутри потокового содержимого', 'div: внутри body, main, li', 'li: внутри ul, ol', 'a: не содержит a, button, другие интерактивные элементы', 'title: обязательно один элемент title на документ', 'label[for]: значения совпадает с id элемента'].join('\n')).rules;
+  assert.deepEqual(rules.map(S.inert), [true, true, false, false, true, true]);
+  const m = S.check('<div><div><a href="/"><button>b</button></a></div></div>\n<title>t</title>\n<label for="x">y</label>\n<li>z</li>', 'html', rules).map(x => x.msg.split(' — ')[0]);
+  assert.deepEqual(m, ['<a> не может содержать <button>', '<li> должен быть внутри <ul>, <ol>']);
+});

@@ -1377,7 +1377,7 @@ function openStructModal(){
     const P = window.StructureRules; const prev = q('#st-prev'); prev.innerHTML = ''; if(!P) return;
     const { rules, bad } = P.parse(q('#st-text').value);
     prev.appendChild(el2('div', 'lp-sec', 'правил: ' + rules.length + (bad.length ? ' · не понято: ' + bad.length : '')));
-    rules.forEach(x => prev.appendChild(row('lp-ok', '✓ ' + x.term + ' — ' + x.verb + ' ' + (x.verb === 'пишется' ? x.args[0].replace(/\\n/g, ' ⏎ ') : x.args.join(', ')) + (x.guessed ? '   (не правило — сохранится заметкой)' : ''))));
+    rules.forEach(x => prev.appendChild(row('lp-ok', '✓ ' + x.term + ' — ' + x.verb + ' ' + (x.verb === 'пишется' ? x.args[0].replace(/\\n/g, ' ⏎ ') : x.args.join(', ')) + (x.guessed ? '   (не правило — сохранится заметкой)' : P.inert && P.inert(x) ? '   (описание вместо имён — сохранится, но проверять не будет)' : ''))));
     bad.forEach(x => prev.appendChild(row('lp-bad', 'строка ' + x.line + ': ' + x.why + ' — «' + x.text + '»')));
   };
   const save = async mode => {
