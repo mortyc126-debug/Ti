@@ -44,6 +44,7 @@
   const outline = rename(byId('sbOutlineBtn'), 'структура файла'), preview = byText('превью'), consoleClr = rename(byId('sbClr'), '× очистить консоль');
   const legend = rename(byId('sbLegend'), 'что значат цвета в коде');
   // подсказки — галочки
+  const wrap = byId('sbWrap');
   const live = byId('sbLive'), explain = byId('sbExplain'), links = byText('связи по клику'), ac = byId('sbAc');
   const spacer = take(el => el.tagName === 'SPAN' && !txt(el));
   const hidden = kids.filter(el => !el.__sbt && (el.tagName === 'INPUT' || getComputedStyle(el).display === 'none'));
@@ -69,7 +70,7 @@
   const row = [
     run,
     dd('Файл', [add, open, save, sep(), project, upload, sep(), copyAll, clear]),
-    dd('Вид', [find, outline, preview, consoleClr, sep(), legend]),
+    dd('Вид', [find, outline, preview, consoleClr, sep(), wrap && wrap.closest('label') || wrap, sep(), legend]),
     dd('Подсказки', [head('в коде'), ac, explain && explain.closest('label') || explain, links, sep(), head('превью'), live && live.closest('label') || live, sep(), ask], true),
     rest.length ? dd('⋯ ещё', rest, true) : null
   ].filter(Boolean);

@@ -170,7 +170,7 @@ tools/
 
 | Файл | Что |
 |---|---|
-| `sandbox.js` | редакторы, сборка предпросмотра (каждый JS-файл — свой `<script>` с меткой, `docMap` → «файл, строка»), консоль, `/api/run`, события `codelab-run-start` / `codelab-error`, `codelabExplain`/`codelabExplainAt`, опции CodeMirror: автозакрытие скобок и тегов, парная скобка, подсветка таких же слов |
+| `sandbox.js` | редакторы (перенос длинных строк по умолчанию, `codelab_wrap`, переключатель в «Вид»), сборка предпросмотра (каждый JS-файл — свой `<script>` с меткой, `docMap` → «файл, строка»; файлы для node — .mjs/.cjs, `node:`, `require(` — в превью не берутся), консоль, `/api/run`, события `codelab-run-start` / `codelab-error`, `codelabExplain`/`codelabExplainAt`, опции CodeMirror: автозакрытие скобок и тегов, парная скобка, подсветка таких же слов |
 | `workspace.js`, `tabs.js`, `fileio.js` | папка проекта; вкладки (`codelabTabs`); открыть/сохранить файл с диска |
 | `search.js` | единый поиск: текст, приёмы, структура, словарь, куски |
 | `navigate.js` | клик по имени — определение и использования |

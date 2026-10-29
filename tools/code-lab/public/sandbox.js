@@ -145,6 +145,7 @@
         '<button class="btn ok" id="sbRun">запустить</button>' +
         '<button class="btn" id="sbCopyAll" title="скопировать весь собранный документ (HTML+CSS+JS вместе) — вставить в файл">⧉ копировать итог</button>' +
         '<label class="sb-live"><input type="checkbox" id="sbLive"> живой предпросмотр</label>' +
+        '<label class="sb-live" title="длинные строки переносятся, а не уходят за край — листать вбок не нужно"><input type="checkbox" id="sbWrap"> переносить длинные строки</label>' +
         '<button class="btn" id="sbAdd">+ файл</button>' +
         '<button class="btn" id="sbSaveDisk" title="сохранить текущий открытый файл на диск — откроется обычное окно выбора папки и имени">на диск</button>' +
         '<label class="sb-live" title="когда включено — клик по слову в коде показывает пояснение. Редактировать код можно всё равно."><input type="checkbox" id="sbExplain"> пояснения по клику</label>' +
@@ -166,7 +167,9 @@
     const css = files.filter(f => f.lang === 'css').map(f => f.code).join('\n');
     // каждый JS-файл — своим скриптом с меткой: по ней находим, с какой строки документа он начинается,
     // и ошибку «строка 57 документа» переводим в «app.js, строка 4» (docMap, см. ниже)
-    const jsFiles = files.filter(f => f.lang === 'js' || f.lang === 'ts');
+    // файл для node (.mjs/.cjs, import 'node:…', require(…)) в браузере не запустится — в превью его не берём
+    const nodeOnly = f => /\.(mjs|cjs)$/i.test(f.name || '') || /from\s+['"]node:|\brequire\s*\(\s*['"]/.test(f.code || '');
+    const jsFiles = files.filter(f => (f.lang === 'js' || f.lang === 'ts') && !nodeOnly(f));
     const cap = '<scr' + 'ipt>(function(){function s(t,a){try{parent.postMessage({__sb:1,t:t,m:a},"*")}catch(e){}}' +
       '["log","error","warn","info"].forEach(function(k){var o=console[k]?console[k].bind(console):function(){};console[k]=function(){o.apply(null,arguments);s(k,Array.prototype.map.call(arguments,function(x){try{return typeof x==="object"?JSON.stringify(x):String(x)}catch(e){return String(x)}}).join(" "))}});' +
       'window.addEventListener("error",function(e){try{parent.postMessage({__sb:1,t:"error",m:e.message,line:e.lineno||0,col:e.colno||0},"*")}catch(x){}});' +
@@ -491,10 +494,12 @@
     }).catch(() => false);
     return cmReady;
   }
+  function wrapOn(){ try { return localStorage.getItem('codelab_wrap') !== '0'; } catch(_){ return true; } }
   function cmOptions(){
     const any = window.CodeMirror && window.CodeMirror.hint && window.CodeMirror.hint.anyword;
     return {
       autoCloseBrackets: true, autoCloseTags: true, styleActiveLine: true,
+      lineWrapping: wrapOn(),   // узкий редактор: строка переносится, а не обрезается за краем
       // парная скобка у курсора и все такие же слова, как под курсором (без выделения — по слову)
       matchBrackets: true, highlightSelectionMatches: { showToken: /[\wА-Яа-яЁё$]/, minChars: 2, delay: 120 },
       hintOptions: { hint: any, completeSingle: false },
@@ -679,6 +684,10 @@
     // плюс запускаем все не-frontend файлы на сервере
     files.filter(f => !isFront(f.lang)).forEach(runServer);
   };
+  // перенос длинных строк — по умолчанию включён; переключается во всех открытых редакторах сразу
+  const wrapIn = box.querySelector('#sbWrap'); wrapIn.checked = wrapOn();
+  wrapIn.onchange = () => { try { localStorage.setItem('codelab_wrap', wrapIn.checked ? '1' : '0'); } catch(_){}
+    for(const ed of edsEl.children){ const ta = ed.querySelector('textarea'); if(ta && ta.__cm) ta.__cm.setOption('lineWrapping', wrapIn.checked); } };
   liveIn.onchange = () => { live = liveIn.checked; try { localStorage.setItem('codelab_sandbox_live', live ? '1' : '0'); } catch(_){} if(live) renderPreview(); };
   const exBtn = box.querySelector('#sbExplain');
   const setExplain = on => {
