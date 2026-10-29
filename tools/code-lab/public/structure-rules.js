@@ -73,7 +73,7 @@
   function attrsFor(tag, rules){
     const t = String(tag).toLowerCase(), pick = (term, verb) => (rules || []).filter(r => r.verb === verb && r.term.toLowerCase() === term).flatMap(r => r.args.map(a => ({ name: a, note: r.note })));
     const required = pick(t, 'обязательно'), optional = pick(t, 'можно'), global = pick('*', 'можно');
-    const values = attr => { const a = String(attr).toLowerCase(); const r = (rules || []).find(x => x.verb === 'значения' && (x.term.toLowerCase() === t + '[' + a + ']')) || (rules || []).find(x => x.verb === 'значения' && x.term.toLowerCase() === '*[' + a + ']'); return r ? { list: r.args, note: r.note } : null; };
+    const values = attr => { const a = String(attr).toLowerCase(); if(a === '') { const own = (rules || []).find(x => x.verb === 'значения' && x.term.toLowerCase() === t); return own ? { list: own.args, note: own.note } : null; } const r = (rules || []).find(x => x.verb === 'значения' && (x.term.toLowerCase() === t + '[' + a + ']')) || (rules || []).find(x => x.verb === 'значения' && x.term.toLowerCase() === '*[' + a + ']'); return r ? { list: r.args, note: r.note } : null; };
     return { required, optional, global, values, known: required.length + optional.length > 0 };
   }
   const near1 = (a, b) => { if(Math.abs(a.length - b.length) > 1) return false; let i = 0, j = 0, e = 0; while(i < a.length && j < b.length){ if(a[i] === b[j]){ i++; j++; continue; } if(++e > 1) return false;
@@ -97,13 +97,19 @@
 
   // CSS: «требует» — в том же правиле (или в другом правиле с тем же селектором) должно быть нужное свойство
   function checkCss(code, rules){
-    const b = blank(code, 'css'), out = [], REQ = byTerm(rules, 'требует');
-    if(!REQ.size) return out;
+    const b = blank(code, 'css'), out = [], REQ = byTerm(rules, 'требует'), VAL = byTerm(rules, 'значения');
+    cssShape(b, out);
     const blocks = [];
     for(const m of b.matchAll(/([^{}]*)\{([^{}]*)\}/g)){
       const sel = m[1].trim().replace(/\s+/g, ' '), body = m[2], at = m.index + m[1].length + 1;
       const decls = [...body.matchAll(/([\w-]+)\s*:\s*([^;]*)/g)].map(d => ({ prop: d[1].toLowerCase(), val: d[2].trim().toLowerCase(), from: at + d.index }));
       blocks.push({ sel, decls });
+    }
+    // значение-слово, на одну правку похожее на допустимое, — опечатка (flx → flex); прочие значения (длины, var()) не трогаем
+    for(const bl of blocks) for(const d of bl.decls) for(const r of VAL.get(d.prop) || []){
+      const v = d.val.replace(/\s*!important$/, ''); if(!/^[a-z-]+$/.test(v)) continue;
+      const list = r.args.map(x => x.toLowerCase()); if(list.includes(v)) continue;
+      const like = list.find(x => near1(v, x)); if(like){ const at = d.from + b.slice(d.from).indexOf(d.val, d.prop.length); out.push({ from: at, to: at + v.length, msg: d.prop + ': «' + v + '» — может, ' + like + '?', level: 'bad' }); }
     }
     for(const bl of blocks) for(const d of bl.decls) for(const r of REQ.get(d.prop) || []){
       const need = r.args[0].match(/^([\w-]+)\s*(?::\s*(.+))?$/); if(!need) continue;
@@ -114,12 +120,47 @@
     return out;
   }
 
+  // форма CSS внутри { }: свойство без «:», объявление без «;» перед следующим (они склеятся в одно)
+  function cssShape(b, out){
+    let depth = 0, pos = 0; const lines = b.split('\n');
+    lines.forEach((line, i) => {
+      const t = line.trim();
+      if(depth > 0 && t && !/[{}]/.test(t) && !t.startsWith('@')){
+        const m = line.match(/^(\s*)([a-z-]+)(\s+)([^:;]+);?\s*$/i);
+        if(m && !/^--/.test(m[2]) && !/[&>+~.#\[]/.test(m[4])) out.push({ from: pos + m[1].length + m[2].length, to: pos + m[1].length + m[2].length + m[3].length, msg: 'после «' + m[2] + '» нужно «:» — свойство: значение;', level: 'bad' });
+        const next = lines.slice(i + 1).find(x => x.trim());
+        if(/^\s*[a-z-]+\s*:[^;{}]*[^;{}\s,]\s*$/i.test(line) && next && /^\s*[a-z-]+\s*:/i.test(next)){ const e = pos + line.replace(/\s+$/, '').length; out.push({ from: e - 1, to: e, msg: 'в конце нет «;» — следующее свойство склеится с этим', level: 'bad' }); }
+      }
+      for(const c of line){ if(c === '{') depth++; else if(c === '}') depth = Math.max(0, depth - 1); }
+      pos += line.length + 1;
+    });
+  }
+
+  // форма из шаблона «пишется»: «if (…) {» → после if нужны круглые скобки; «if …:» (Python) → строка кончается «:»
+  function codeShape(b, lang, rules, out){
+    const py = /^(python|py)$/.test(lang); let pos = 0;
+    const tpl = new Map(); for(const r of rules) if(r.verb === 'пишется'){ const first = r.args[0].split('\\n')[0].trim(); tpl.set(r.term.toLowerCase(), first); }
+    for(const line of b.split('\n')){
+      const m = line.match(/^(\s*\}?\s*)([A-Za-z_]+)\b(.*)$/);
+      if(m){ const w = m[2].toLowerCase(), t = tpl.get(w), rest = m[3];
+        if(t && t.toLowerCase().startsWith(w)){
+          const after = t.slice(w.length);
+          const from = pos + m[1].length, to = from + m[2].length;
+          if(!py && /^\s*\(/.test(after) && rest.trim() && !/^\s*\(/.test(rest) && !/^\s*[.=:,;)]/.test(rest) && !/^\s*await\b/.test(rest)) out.push({ from, to, msg: 'после ' + m[2] + ' нужны круглые скобки: ' + t.replace(/\s*\{.*$/, ''), level: 'bad' });
+          if(py && /:\s*$/.test(t) && !rest.includes(':') && !/[\\(\[{,]\s*$/.test(line.trimEnd()) && !/^\s*[.=(\[]/.test(rest)) out.push({ from, to, msg: 'в конце строки с ' + m[2] + ' нужно «:» — ' + t, level: 'bad' });
+        }
+      }
+      pos += line.length + 1;
+    }
+  }
+
   // JS/Python и прочий код: «внутри» — среди заголовков блоков вокруг есть нужное слово; «после» — предыдущий
   // блок того же уровня начинался с нужного слова. Блоки — по { } или по отступам (Python)
   function checkCode(code, lang, rules){
     const IN = byTerm(rules, 'внутри'), NOTIN = byTerm(rules, 'не внутри'), AFTER = byTerm(rules, 'после');
-    if(!IN.size && !AFTER.size && !NOTIN.size) return [];
     const b = blank(code, lang), lines = b.split('\n'), out = [];
+    codeShape(b, lang, rules, out);
+    if(!IN.size && !AFTER.size && !NOTIN.size) return out;
     const py = /^(python|py)$/.test(lang);
     const words = s => (String(s).match(/[A-Za-zА-Яа-яЁё_$][\wА-Яа-яЁё$]*/g) || []).map(w => w.toLowerCase());
     const first = s => words(s.replace(/^[\s}]*/, ''))[0] || '';

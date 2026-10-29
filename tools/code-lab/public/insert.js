@@ -73,7 +73,7 @@
     const desc = n.piece ? (inGroup ? '' : 'кусок из библиотеки') : (n.label ? '<b>' + esc(n.label) + '</b>' + (n.note ? ' — ' : '') : '') + esc(n.note || '');
     return '<div class="ac-n"><div class="ac-r' + (n.piece ? ' ac-p' : '') + '" data-code="' + esc(n.code || '') + '" data-piece="' + esc(n.piece || '') + '">'
       + '<span class="ac-t">' + (has ? '▸' : '') + '</span>'
-      + '<span class="ac-m' + (order === 'note' ? ' nf' : '') + '"><span class="ac-c">' + (n.piece ? esc(n.note) : paint(n.code, n.lang)) + '</span>'
+      + '<span class="ac-m' + (order === 'note' ? ' nf' : '') + '"><span class="ac-c">' + (n.piece ? esc(n.note) : paint(n.show || n.code, n.lang)) + '</span>'
       + (desc ? '<span class="ac-d">' + desc + '</span>' : '') + '</span></div>'
       + (has ? '<div class="ac-kids" hidden>' + n.children.map(k => rowHtml(k)).join('') + '</div>' : '') + '</div>';
   }
@@ -100,11 +100,13 @@
     return { mode: 'name', tag, prefix, have, x: c.left, y: c.bottom + 4, put: mk(prefix) };
   }
   const BOOL = new Set('hidden disabled required readonly checked multiple selected autoplay muted loop controls playsinline defer async novalidate open reversed allowfullscreen inert autofocus ismap default nomodule formnovalidate'.split(' '));
-  let htmlRules = null;
+  const rulesCache = {};
+  const canonL = l => { l = String(l || '').toLowerCase(); return /^py/.test(l) ? 'python' : /^(ts|typescript|javascript|jsx)$/.test(l) ? 'js' : /^(htm|xml)$/.test(l) ? 'html' : l; };
+  function rulesFor(lang){ const l = canonL(lang);
+    return rulesCache[l] || (rulesCache[l] = (window.codelabKwDict ? window.codelabKwDict(l) : Promise.resolve({})).then(d => window.StructureRules.parse(((d && d.structure && d.structure[l]) || []).join('\n')).rules).catch(() => [])); }
   async function tagRoots(tc){
     if(!window.StructureRules) return [];
-    if(!htmlRules) htmlRules = (window.codelabKwDict ? window.codelabKwDict('html') : Promise.resolve({})).then(d => window.StructureRules.parse(((d && d.structure && d.structure.html) || []).join('\n')).rules).catch(() => []);
-    const A = window.StructureRules.attrsFor(tc.tag, await htmlRules);
+    const A = window.StructureRules.attrsFor(tc.tag, await rulesFor('html'));
     const note = (n, extra) => { const e = window.codelabExplain ? window.codelabExplain(n, 'html') : ''; return String(e || extra || '').replace(/^[^—]{1,40}—\s*/, ''); };
     const pre = tc.prefix.toLowerCase(), fit = n => n.toLowerCase().startsWith(pre);
     if(tc.mode === 'value'){
@@ -117,6 +119,50 @@
     const glob = A.global.filter(fresh).map(r => node(r, ''));
     // общие атрибуты — свёрнутой веткой, пока ничего не набрано; набрал начало — вперемешку со своими
     if(glob.length) pre ? out.push(...glob) : out.push({ group: true, label: 'общие атрибуты', note: 'есть у любого тега: ' + glob.length, lang: 'html', children: glob });
+    return out;
+  }
+
+  // ── параметры вызова (JS/Python) и значения свойства (CSS) ──
+  // курсор в скобках вызова: какая функция, какой по счёту аргумент, в кавычках ли
+  function callCtx(ed){
+    const ta = taOf(ed), cm = ta && ta.__cm; if(!cm) return null;
+    const ph = cm.somethingSelected() && cm.getSelection() === '…'; if(cm.somethingSelected() && !ph) return null;
+    const cur = cm.getCursor('from'), curTo = cm.getCursor('to'), lang = canonL(ed.__f && ed.__f.lang);
+    const before = cm.getRange({ line: Math.max(0, cur.line - 5), ch: 0 }, cur), c = cm.cursorCoords(true, 'window');
+    const mk = prefix => { const from = { line: cur.line, ch: cur.ch - prefix.length }; return t => { cm.replaceRange(t, from, curTo); slot(cm, from, t); cm.focus(); }; };
+    if(lang === 'css'){
+      const m = cm.getLine(cur.line).slice(0, cur.ch).match(/^\s*([a-z-]+)\s*:\s*([\w-]*)$/i); if(!m) return null;
+      return { kind: 'css', lang, fn: m[1].toLowerCase(), prefix: m[2], x: c.left, y: c.bottom + 4, put: mk(m[2]) };
+    }
+    if(lang !== 'js' && lang !== 'python') return null;
+    const st = []; let q = '', qAt = -1;
+    for(let i = 0; i < before.length; i++){ const ch = before[i];
+      if(q){ if(ch === '\\'){ i++; continue; } if(ch === q){ q = ''; } continue; }
+      if(ch === '"' || ch === "'" || ch === '`'){ q = ch; qAt = i; continue; }
+      if(ch === '(' || ch === '[' || ch === '{') st.push({ ch, at: i, commas: 0 });
+      else if(ch === ')' || ch === ']' || ch === '}') st.pop();
+      else if(ch === ',' && st.length) st[st.length - 1].commas++;
+      else if(ch === '\n' && lang === 'python' && !st.length) st.length = 0; }
+    const top = st[st.length - 1]; if(!top || top.ch !== '(') return null;
+    const fm = before.slice(0, top.at).match(/([A-Za-z_$][\w$]*)\s*$/); if(!fm || /^(if|for|while|switch|catch|function|return|def|elif|with)$/.test(fm[1])) return null;
+    const prefix = q ? before.slice(qAt + 1) : (before.match(/[\w$]*$/) || [''])[0];
+    return { kind: 'call', lang, fn: fm[1], arg: top.commas, inQuote: !!q, prefix, x: c.left, y: c.bottom + 4, put: mk(prefix) };
+  }
+  async function callRoots(cc){
+    if(!window.StructureRules) return [];
+    const rules = await rulesFor(cc.lang), A = window.StructureRules.attrsFor(cc.fn, rules);
+    const pre = cc.prefix.toLowerCase(), fit = x => String(x).toLowerCase().startsWith(pre);
+    if(cc.kind === 'css'){ const v = A.values(''); return v ? v.list.filter(fit).map((x, i) => ({ code: x, lang: 'css', note: i === 0 && v.note ? v.note : '', label: '', children: [] })) : []; }
+    const params = A.required.map(p => Object.assign({ req: true }, p)).concat(A.optional);
+    if(!params.length) return [];
+    const p = params[cc.arg];
+    if(cc.inQuote){ const v = p && A.values(p.name); return v ? v.list.filter(fit).map((x, i) => ({ code: x, lang: cc.lang, note: i === 0 && v.note ? v.note : '', label: '', children: [] })) : []; }
+    const out = [];
+    // подпись вызова — что куда передать (вставлять нечего, это справка)
+    if(!pre){ const sig = cc.fn + '(' + params.map((x, i) => (i === cc.arg ? '›' : '') + x.name + (x.req ? '' : '?')).join(', ') + ')';
+      out.push({ show: sig, code: '', lang: cc.lang, label: p ? (p.req ? 'обязательно: ' : 'можно: ') + p.name : '', note: [...new Set(params.map(x => x.note).filter(Boolean))].join('; '), children: [] }); }
+    // Python: необязательные — именованными (encoding='…'); значения из правил сразу в кавычках
+    if(cc.lang === 'python') A.optional.filter(x => fit(x.name)).forEach(x => out.push({ code: x.name + '=' + (A.values(x.name) ? "'…'" : '…'), lang: 'python', label: 'можно', note: x.note || '', children: [] }));
     return out;
   }
 
@@ -149,6 +195,9 @@
     // внутри HTML-тега — его атрибуты и их значения (правила структуры), даже без набранных букв
     const tc = /^(html|htm|svg|xml)$/i.test((ed && ed.__f && ed.__f.lang) || '') && tagCtx(ed);   // при выделенном «…» wordCtx пуст — тег смотрим сами
     if(tc){ const my0 = ++seq; const tr = await tagRoots(tc); if(my0 !== seq) return; if(tr.length){ ctx = Object.assign({}, c || {}, { x: tc.x, y: tc.y, put: tc.put, ed }); render(ctx, tr); return; } }
+    // в скобках вызова — параметры и значения; после «свойство:» в CSS — значения свойства
+    const cc = !tc && callCtx(ed);
+    if(cc){ const my1 = ++seq; const cr = await callRoots(cc); if(my1 !== seq) return; if(cr.length){ ctx = Object.assign({}, c || {}, { x: cc.x, y: cc.y, put: cc.put, ed }); render(ctx, cr); return; } }
     if(!c || (!force && c.word.length < 2)){ hide(); return; }
     const my = ++seq;
     let roots = [];
@@ -201,7 +250,10 @@
     else if(e.key === 'ArrowLeft' && rs[sel]){ const own = rs[sel]; const parentKids = own.closest('.ac-kids');
       if(own.nextElementSibling && own.nextElementSibling.classList.contains('ac-kids') && !own.nextElementSibling.hidden){ e.preventDefault(); toggle(own, false); mark(); }
       else if(parentKids){ e.preventDefault(); const pr = parentKids.previousElementSibling; toggle(pr, false); sel = rows().indexOf(pr); mark(); } }
-    else if(e.key === 'Enter' || e.key === 'Tab'){ if(rs[sel]){ e.preventDefault(); accept(rs[sel]); } }
+    else if(e.key === 'Enter' || e.key === 'Tab'){
+      // строка-справка (подпись вызова) — вставлять нечего: Enter/Tab работают как обычно
+      if(rs[sel] && !rs[sel].dataset.code && !rs[sel].dataset.piece && !rs[sel].classList.contains('ac-grp')){ hide(); return; }
+      if(rs[sel]){ e.preventDefault(); accept(rs[sel]); } }
     else if(e.key === 'Escape'){ e.preventDefault(); hide(); }
   }, true);
   edsEl.addEventListener('scroll', hide, true);

@@ -310,3 +310,17 @@ test('атрибуты тегов: обязательные, необязате�
   assert.equal(r.roots[0].code, '<img src="…" alt="…">');
   assert.match(r.roots[0].note, /обязательно: src, alt/);
 });
+
+test('форма кода и параметры: скобки после if, «:» в Python, «:»/«;» и значения в CSS, параметры функций', () => {
+  const S = require('../public/structure-rules.js'); const d = require('../public/dict/structure.json');
+  const R = l => S.parse(d[l].join('\n')).rules;
+  const m = (c, l) => S.check(c, l, R(l)).map(x => x.msg.split(' — ')[0]);
+  assert.deepEqual(m('if x > 1 {\n}\nif (y) {\n} else {\n}\nwhile(true){}', 'js'), ['после if нужны круглые скобки: if (…)']);
+  assert.deepEqual(m('if x > 1\n    pass\nif y: z()\nelse\n    pass\ndef f(a,\n      b):\n    pass', 'python'), ['в конце строки с if нужно «:»', 'в конце строки с else нужно «:»']);
+  assert.deepEqual(m('.a {\n  display flex;\n  color: red\n  margin: 0;\n  position: relativ;\n  width: var(--w);\n}', 'css'), ['после «display» нужно «:»', 'в конце нет «;»', 'position: «relativ»']);
+  const A = S.attrsFor('addEventListener', R('js'));
+  assert.deepEqual(A.required.map(x => x.name), ['type', 'listener']);
+  assert.ok(A.values('type').list.includes('click'));
+  assert.ok(S.attrsFor('display', R('css')).values('').list.includes('flex'));
+  assert.deepEqual(S.attrsFor('open', R('python')).values('mode').list.slice(0, 3), ['r', 'w', 'a']);
+});
