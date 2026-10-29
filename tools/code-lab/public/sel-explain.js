@@ -22,7 +22,7 @@
   /* подписи не раздвигают код: стоят над ним абсолютно, в два ряда по очереди — соседние не налезают */
   .se-line{font:14px/1.3 ui-monospace,monospace;color:var(--text2,#cbc2ea);white-space:pre;padding-top:40px;margin-bottom:4px;position:relative}
   .se-seg{position:relative;display:inline}
-  .se-lbl{position:absolute;left:0;bottom:calc(100% + 8px);font:11px/1.2 system-ui,sans-serif;color:var(--text,#f6f4ff);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+  .se-lbl{position:absolute;left:0;bottom:calc(100% + 8px);font:11px/1.2 system-ui,sans-serif;color:var(--text,#f6f4ff);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   
   .se-br{position:absolute;left:0;right:0;bottom:calc(100% + 1px);height:6px;border:1.5px solid var(--name,#3dd9ff);border-bottom:0;border-radius:4px 4px 0 0}
   .se-seg.up .se-br::before{content:'';position:absolute;left:3px;bottom:100%;height:calc(var(--lift,15px) + 1px);border-left:1px dashed var(--text3,#9c90c4)}
@@ -60,14 +60,16 @@
   const activeCM = () => { const ed = [...edsEl.children].find(e => e.__f && e.__f.id === (localStorage.getItem('codelab_sb_active') || '')) || edsEl.firstElementChild; const ta = ed && ed.querySelector('textarea'); return { cm: ta && ta.__cm, ta, lang: (ed && ed.__f && ed.__f.lang) || '' }; };
 
   // короткая подпись над скобкой: синоним («внешний отступ»), иначе первые слова пояснения
-  const shortOf = t => { const s = String(t || '').replace(/^[^—]{1,40}—\s*/, '').replace(/^[^:а-яё]{1,40}:\s+/i, ''); const w = s.split(/\s+/).slice(0, 4).join(' '); return w.length < s.length ? w + '…' : w; };
+  const shortOf = t => { const s = String(t || '').replace(/^[^—]{1,40}—\s*/, '').replace(/^[^:а-яё]{1,40}:\s+/i, ''); // первая часть пояснения до «;»/«(» целиком, а не первые 4 слова — «включает режим flex для…» ничего не объясняет
+    const c = s.split(/\s*[;(]\s*|\s+—\s+/)[0].trim(); return c.length > 70 ? c.slice(0, 68).replace(/\s+\S*$/, '') + '…' : c; };
   function meaning(term, lang, d){
     const syn = d.synonyms || {}; const lt = term.toLowerCase();
     const label = Array.isArray(syn[lt]) && syn[lt][0] ? syn[lt][0] : '';
     // разновидность: margin-trim → смысл предка margin («внешний отступ»)
     let path = '';
-    if(!label && lt.includes('-')) for(let p = lt.lastIndexOf('-'); p > 0; p = lt.lastIndexOf('-', p - 1)){ const pre = lt.slice(0, p); if(Array.isArray(syn[pre]) && syn[pre][0]){ path = syn[pre][0] + ' › ' + term; break; } }
     const note = window.codelabExplain(term, lang) || '';
+    // у своей записи предка не берём: color-scheme — не «цвет букв», хоть и начинается с color
+    if(!label && !note && lt.includes('-')) for(let p = lt.lastIndexOf('-'); p > 0; p = lt.lastIndexOf('-', p - 1)){ const pre = lt.slice(0, p); if(Array.isArray(syn[pre]) && syn[pre][0]){ path = syn[pre][0] + ' › ' + term; break; } }
     return { label: label || (path ? path.split(' › ')[0] : '') || shortOf(note), path, note };
   }
 
@@ -127,13 +129,18 @@
     for(const ln of root.querySelectorAll('.se-line')){
       const rows = []; let max = 0;
       for(const seg of ln.querySelectorAll('.se-seg')){
-        const lb = seg.querySelector('.se-lbl'); const a = seg.getBoundingClientRect().left, w = lb.offsetWidth;
+        // подпись целиком: не влезает до правого края — сдвигаем влево (скобка остаётся на месте), режем только шире окна
+        const lb = seg.querySelector('.se-lbl'); const box = ln.getBoundingClientRect(); const x0 = seg.getBoundingClientRect().left;
+        lb.style.maxWidth = (box.width - 8) + 'px'; const w = lb.offsetWidth;
+        const shift = Math.max(0, Math.min(x0 + w - (box.right - 4), x0 - box.left)); lb.style.left = -shift + 'px';
+        const a = x0 - shift;
         let r = rows.findIndex(end => end + 6 <= a); if(r < 0){ r = rows.length; rows.push(0); }
         rows[r] = a + w; max = Math.max(max, r);
         lb.style.bottom = 'calc(100% + ' + (8 + r * 15) + 'px)';
         const br = seg.querySelector('.se-br'); br.style.setProperty('--lift', (r * 15) + 'px'); seg.classList.toggle('up', r > 0);
       }
-      ln.style.paddingTop = (26 + max * 15) + 'px';
+      // строка без подписей (пустая, «}») не раздувается
+      ln.style.paddingTop = ln.querySelector('.se-seg') ? (26 + max * 15) + 'px' : '2px';
     }
   }
   let btn = null, panel = null;
@@ -199,6 +206,9 @@
         const h = cm.addLineClass(ln, 'background', 'cm-se-flash'); setTimeout(() => cm.removeLineClass(h, 'background', 'cm-se-flash'), 1200); }
     });
     if(window.codelabWindow) window.codelabWindow.make(panel, { handle: panel.querySelector('.se-h'), key: 'codelab_win_se', defaultGeo: { w: 640, h: 380 }, minW: 320, minH: 180 });
+    // окно получает свой размер (и меняет его при растягивании) уже после первой раскладки — подписи пересчитываем
+    const me = panel; let rt = null;
+    if(window.ResizeObserver) new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(() => { if(me.isConnected) layout(me); }, 60); }).observe(me);
   }
 
   // выделение в CodeMirror → кнопка у конца выделения; снял выделение — кнопка ушла
