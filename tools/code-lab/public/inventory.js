@@ -1369,7 +1369,7 @@ function openStructModal(){
     const r = await fetch('/api/dict/structure', { method: 'POST', body: JSON.stringify({ lang: lang(), text: q('#st-text').value, mode }) }).then(x => x.json()).catch(() => null);
     const prev = q('#st-prev'); prev.innerHTML = '';
     prev.appendChild(row(r && r.ok ? 'lp-ok' : 'lp-bad', r && r.ok ? (r.lang + ': добавлено ' + r.added + ', заменено ' + r.replaced + ', снято ' + r.removed + (r.same ? ', уже было ' + r.same : '') + ' · всего ' + r.total + '. Обнови песочницу (Ctrl+F5).') : 'Ошибка сохранения'));
-    ((r && r.bad) || []).forEach(x => prev.appendChild(row('lp-bad', 'не понято, строка ' + x.line + ': ' + x.why)));
+    ((r && r.bad) || []).forEach(x => prev.appendChild(row('lp-bad', 'не понято, строка ' + x.line + ': «' + x.text + '» — ' + x.why)));
     if(window.codelabKwDictReset) window.codelabKwDictReset();
   };
   q('#st-add').onclick = () => save('merge');

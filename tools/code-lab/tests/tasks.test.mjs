@@ -339,3 +339,10 @@ test('правила структуры: повторная запись не д
   assert.equal(r.lines.length, base.length + 2);
   assert.equal(S.merge(r.lines, 'img: удалить').lines.filter(l => /^img[:[]/.test(l)).length, 0);
 });
+
+test('правила структуры: синонимы видов, «:» в имени, разметка ответа ИИ', () => {
+  const S = require('../public/structure-rules.js');
+  const r = S.parse(['a:hover: требует cursor: pointer', '::before: требует content', '- li: только внутри ul, ol', '1. p: не может содержать div, p', '`img`: обязательные атрибуты: src, alt', 'img: необязательные: width; height', 'button[type]: допустимые значения button | submit | reset.', 'summary: должен быть первым в details', 'gap: нужно display: flex | grid', 'что-то: странное правило'].join('\n'));
+  assert.deepEqual(r.rules.map(x => x.raw), ['a:hover: требует cursor: pointer', '::before: требует content', 'li: внутри ul, ol', 'p: не содержит div, p', 'img: обязательно src, alt', 'img: можно width, height', 'button[type]: значения button, submit, reset', 'summary: первым в details', 'gap: требует display: flex | grid']);
+  assert.equal(r.bad.length, 1); assert.equal(r.bad[0].text, 'что-то: странное правило');
+});
