@@ -78,13 +78,13 @@
   </header>
   <div class="wrap">
     <details class="dl-tpl" open>
-      <summary>📥 загрузить куски кода (пачкой) + образцы форматов по языкам</summary>
+      <summary>загрузить куски кода (пачкой) + образцы форматов по языкам</summary>
       <div id="uploader"></div>
     </details>
     <div class="catline">а ниже — загрузка архивов данных (json/gz/zip) для инспектора</div>
     <div class="drop" id="drop">перетащи сюда бэкап библиотеки (код + .meta.json) или архивы — восстановятся как есть, без переработки<input type="file" id="file" multiple style="display:none"></div>
     <div style="margin:8px 0"><button class="btn" id="rescue">Перенести шаблоны кода из Данных в Библиотеку</button>
-      <button class="btn" id="cleanmeta" title="убрать паспорта библиотеки (.meta.json), случайно загруженные в Данные — им место рядом с кодом, а не здесь">🧹 убрать паспорта из Данных</button></div>
+      <button class="btn" id="cleanmeta" title="убрать паспорта библиотеки (.meta.json), случайно загруженные в Данные — им место рядом с кодом, а не здесь">убрать паспорта из Данных</button></div>
     <div class="saved" id="saved"></div>
     <div class="err" id="err"></div>
 
@@ -171,7 +171,7 @@ async function handle(fileList){
     if(st.saved) note.push('в данные легло: ' + st.saved);
     if(st.skipped) note.push('уже было: ' + st.skipped);
     if(st.toLib){ note.push('кусков → в библиотеку: ' + st.toLib); const g = await syncGh(); if(g) note.push('GitHub: ' + g); }
-    if(st.warns && st.warns.length){ note.push('⚠ не код: ' + st.warns.length); alert('Пропущены куски, где «код» — это русский текст без кода (похоже на словарь/синонимы, а не кусок):\n\n' + st.warns.slice(0, 20).map(w => '• ' + w.title).join('\n') + (st.warns.length > 20 ? '\n…и ещё ' + (st.warns.length - 20) : '')); }
+    if(st.warns && st.warns.length){ note.push('не код: ' + st.warns.length); alert('Пропущены куски, где «код» — это русский текст без кода (похоже на словарь/синонимы, а не кусок):\n\n' + st.warns.slice(0, 20).map(w => '• ' + w.title).join('\n') + (st.warns.length > 20 ? '\n…и ещё ' + (st.warns.length - 20) : '')); }
     dataFiles = files.filter(f => !looksLikePiece(f.data));
   }
   err.textContent = note.join(' · ') || err.textContent;

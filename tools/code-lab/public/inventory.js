@@ -63,7 +63,7 @@ function pieceRows(list){
       + '<td class="give edit-cell" data-field="provides" title="клик — изменить (имя: тип)">' + (g.length ? contractChips(g, t.comp && t.comp.labels) : '<span class="muted">+ отметить</span>') + '</td>'
       + '<td class="need edit-cell" data-field="requires" title="клик — изменить (имя: тип)">' + (n.length ? contractChips(n, t.comp && t.comp.labels) : '<span class="muted">+ отметить</span>') + '</td>'
       + '<td>' + covCell(t) + '</td>'
-      + '<td class="pc-act"><button class="mini pc-copy" data-id="' + esc(t.id) + '" title="скопировать как готовый шаблон (JSON) — вставить в сборник или загрузить как новый">⧉</button><button class="mini pc-move" data-id="' + esc(t.id) + '" title="переместить в раздел">📁</button><button class="mini pc-del" data-id="' + esc(t.id) + '" title="удалить кусок">🗑</button></td>'
+      + '<td class="pc-act"><button class="mini pc-copy" data-id="' + esc(t.id) + '" title="скопировать как готовый шаблон (JSON) — вставить в сборник или загрузить как новый">⧉</button><button class="mini pc-move" data-id="' + esc(t.id) + '" title="переместить в раздел">папка</button><button class="mini pc-del" data-id="' + esc(t.id) + '" title="удалить кусок">удалить</button></td>'
       + '</tr>';
   }).join('');
 }
@@ -111,7 +111,7 @@ async function deletePiece(id){
 // скопировать кусок как готовый шаблон (JSON) — вставить в сборник или загрузить как новый кусок
 async function copyPiece(id, btn){
   let tpl; try { tpl = await fetch('/api/template?id=' + encodeURIComponent(id)).then(r => r.json()); } catch(_){ return; }
-  // чистый переиспользуемый кусок: с разметкой lines (и пояснениями e), как принимает «📥 загрузить куски»
+  // чистый переиспользуемый кусок: с разметкой lines (и пояснениями e), как принимает «загрузить куски»
   const piece = { lang: tpl.lang || 'js', title: tpl.title || id, group: tpl.group || '', desc: tpl.desc || '', output: tpl.output || '', lines: tpl.lines || [] };
   const text = JSON.stringify(piece, null, 2);
   const done = () => { if(!btn) return; const o = btn.textContent; btn.textContent = '✓'; setTimeout(() => { btn.textContent = o; }, 900); };
@@ -147,7 +147,7 @@ function fillFilters(){
   const opt = (v, label) => '<option value="' + esc(v) + '">' + esc(label) + '</option>';
   const pl = document.getElementById('plang'); if(pl) pl.innerHTML = opt('', 'язык: все') + langs.map(l => opt(l, l.toUpperCase())).join('');
   const nUnsorted = PIECES.filter(isUnsorted).length;
-  const pg = document.getElementById('pgroup'); if(pg) pg.innerHTML = opt('', 'раздел: все') + (nUnsorted ? opt('__unsorted__', '⚠ без раздела (' + nUnsorted + ')') : '') + groups.map(g => opt(g, g)).join('');
+  const pg = document.getElementById('pgroup'); if(pg) pg.innerHTML = opt('', 'раздел: все') + (nUnsorted ? opt('__unsorted__', 'без раздела (' + nUnsorted + ')') : '') + groups.map(g => opt(g, g)).join('');
   const pf = document.getElementById('pfacet'); if(pf) pf.innerHTML = opt('', 'не хватает: —') + FACETS.map(f => opt(f[0], 'нет: ' + f[2])).join('');
 }
 // дерево разделов: group «Сеть / Запросы» → вложенность по «/»
@@ -174,15 +174,15 @@ function gpPieceRow(t){
     + (n.length ? '<span class="gp-cr need">нужно: ' + contractChips(n) + '</span>' : '')
     + '<span class="gp-sp"></span>' + covCell(t)
     + '<button class="mini pc-copy" data-id="' + esc(t.id) + '" title="скопировать как готовый шаблон (JSON)">⧉</button>'
-    + '<button class="mini pc-move" data-id="' + esc(t.id) + '" title="переместить в раздел">📁</button>'
-    + '<button class="mini pc-del" data-id="' + esc(t.id) + '" title="удалить кусок">🗑</button></div>';
+    + '<button class="mini pc-move" data-id="' + esc(t.id) + '" title="переместить в раздел">папка</button>'
+    + '<button class="mini pc-del" data-id="' + esc(t.id) + '" title="удалить кусок">удалить</button></div>';
 }
 function renderNode(node, depth){
   let html = '';
   // подразделы (сортировка по алфавиту), потом куски прямо в этом разделе
   const kids = [...node.children.values()].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
   kids.forEach(ch => {
-    html += '<details class="tsec" open><summary><span class="tri">▶</span>'
+    html += '<details class="tsec" open><summary><span class="tri">запустить</span>'
       + '<span class="tname">' + esc(ch.name) + '</span><span class="tcnt">' + treeCount(ch) + '</span></summary>'
       + '<div class="tbody">' + renderNode(ch, depth + 1) + '</div></details>';
   });
@@ -253,7 +253,7 @@ async function loadFlowEdges(f){
 async function renderFlows(){
   const host = document.getElementById('flows');
   document.getElementById('fcnt').textContent = FLOWS.length;
-  if(!FLOWS.length){ host.innerHTML = '<div class="empty">Сохранённых схем пока нет. Собери граф в Конструкторе и нажми «🗂 схемы».</div>'; return; }
+  if(!FLOWS.length){ host.innerHTML = '<div class="empty">Сохранённых схем пока нет. Собери граф в Конструкторе и нажми «схемы».</div>'; return; }
   host.innerHTML = '';
   for(const f of FLOWS.slice().sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))){
     const { edges, nodeLabels } = await loadFlowEdges(f);
@@ -346,8 +346,8 @@ function openTranslateModal(){
   const bg = el2('div', 'modal-bg'); const box = el2('div', 'modal'); box.style.maxWidth = '740px';
   box.innerHTML = '<h3>Перевод английских названий</h3>'
     + '<p class="mh">Куски без русского в названии (' + list.length + '). Впиши рядом перевод — я допишу его к названию: «abbr» → «abbr — сокращение». Английское остаётся (по нему ищется код). Можно собрать запрос для ИИ и вставить ответ обратно.</p>'
-    + (list.length ? '' : '<div class="lp-row lp-ok">Все названия уже с русским 👍</div>')
-    + (list.length ? '<div class="mbtns"><button class="btn" id="tr-ai">📋 собрать запрос для ИИ</button><button class="btn" id="tr-paste">вставить ответ ИИ</button></div>' : '')
+    + (list.length ? '' : '<div class="lp-row lp-ok">Все названия уже с русским</div>')
+    + (list.length ? '<div class="mbtns"><button class="btn" id="tr-ai">собрать запрос для ИИ</button><button class="btn" id="tr-paste">вставить ответ ИИ</button></div>' : '')
     + '<div class="lp-prev" id="tr-list" style="max-height:52vh"></div>'
     + '<div class="mbtns">' + (list.length ? '<button class="btn ok" id="tr-apply">применить</button>' : '') + '<button class="btn" id="tr-close">закрыть</button><span class="pp-note" id="tr-note" style="margin-left:auto"></span></div>';
   bg.appendChild(box); document.body.appendChild(bg);
@@ -661,7 +661,7 @@ function openLinksModal(){
     + '<div class="fmt">Многострочно (для длинных имён): Кусок-источник&#10;             -> Кусок-цель&#10;             -> Другая цель&#10;Плоско: A -> B · A зависит от B · A конфликтует с B …&#10;Дерево:  «Кусок A»&#10;             — создаёт → «Кусок B» (пояснение) [условие]&#10;Контракт: Имя:: нужно=x,y; даёт=z; среда=браузер; раздел=Сеть; проверка=…&#10;Разделы: раздел: Сеть / Запросы&#10;             + Имя куска   (подраздел — через «/»)&#10;схема: Название</div>'
     + '<details class="rr"><summary>виды связей, которые понимает парсер (' + (window.CODE_RELATIONS || []).length + ')</summary><div class="rr-box">' + relationsRef() + '</div></details>'
     + '<textarea id="lk-text" placeholder="вставь текст или нажми «пример»"></textarea>'
-    + '<div class="mbtns"><button class="btn" id="lk-sample">пример</button><button class="btn" id="lk-suggest" title="предложить связи автоматически — по контрактам «даёт/нужно» кусков">✨ по контрактам</button><button class="btn" id="lk-aiprompt" title="собрать список кусков в запрос для ИИ (он предложит связи)">📋 куски → ИИ</button><button class="btn ok" id="lk-parse">разобрать</button><button class="btn" id="lk-apply" style="display:none">применить</button><button class="btn" id="lk-close">закрыть</button><label class="inv-chk" style="margin-left:auto"><input type="checkbox" id="lk-snap" checked> 🧲 сводить имена к ближайшим кускам</label><label class="inv-chk"><input type="checkbox" id="lk-missing" checked> создавать ящики для ненайденных</label></div>'
+    + '<div class="mbtns"><button class="btn" id="lk-sample">пример</button><button class="btn" id="lk-suggest" title="предложить связи автоматически — по контрактам «даёт/нужно» кусков">по контрактам</button><button class="btn" id="lk-aiprompt" title="собрать список кусков в запрос для ИИ (он предложит связи)">куски → ИИ</button><button class="btn ok" id="lk-parse">разобрать</button><button class="btn" id="lk-apply" style="display:none">применить</button><button class="btn" id="lk-close">закрыть</button><label class="inv-chk" style="margin-left:auto"><input type="checkbox" id="lk-snap" checked> сводить имена к ближайшим кускам</label><label class="inv-chk"><input type="checkbox" id="lk-missing" checked> создавать ящики для ненайденных</label></div>'
     + '<div class="lp-prev" id="lk-prev"></div>';
   bg.appendChild(box); document.body.appendChild(bg);
   const q = s => bg.querySelector(s);
@@ -673,7 +673,7 @@ function openLinksModal(){
     const prev = q('#lk-prev'); prev.innerHTML = '';
     const line = (txt, cls) => { const d = el2('div', 'lp-row ' + (cls || '')); d.textContent = txt; return d; };
     const mk = !q('#lk-missing') || q('#lk-missing').checked;
-    const snap = !q('#lk-snap') || q('#lk-snap').checked;   // 🧲 массово сводить имена к ближайшим кускам
+    const snap = !q('#lk-snap') || q('#lk-snap').checked;   // массово сводить имена к ближайшим кускам
     const rs = nm => resolveSmart(nm, snap);
     // сводка: сразу видно, где недопроходит — сколько связей к готовым кускам, сколько в ящики, сколько строк не понято
     let toReal = 0, toBox = 0, snapped = 0;
@@ -684,8 +684,8 @@ function openLinksModal(){
     if(!parsed.edges.length) prev.appendChild(line('Ни одной связи не распознано. Для длинных имён пиши многострочно: источник на строке, под ним «-> Цель» (с отступом). Или в одну строку: «A -> B», «A | связь | B», «A зависит от B». Нажми «пример».', 'muted'));
     prev.appendChild(el2('div', 'lp-sec', 'связи (' + parsed.edges.length + ')'));
     parsed.edges.forEach(e => { const a = rs(e.a), b = rs(e.b); const ok = a && b; const rel = (window.relationById && window.relationById(e.kind)) || { label: 'связь' }; const miss = [!a ? e.a : '', !b ? e.b : ''].filter(Boolean); const mark = ok ? '✓ ' : (mk ? '◻ ' : '✕ '); const tail = ok ? '' : (mk ? '  (ящик: ' + miss.join(', ') + ')' : '  (не найдено: ' + miss.join(', ') + ')'); prev.appendChild(line(mark + e.a + '  —[' + rel.label + ']→  ' + e.b + tail, ok ? 'lp-ok' : (mk ? '' : 'lp-bad')));
-      // куда свелось имя, которое не совпало точно (режим «🧲 сводить»)
-      [e.a, e.b].forEach(nm => { if(snap && !resolveName(nm)){ const sm = resolveSmart(nm, true); if(sm) prev.appendChild(line('      🧲 «' + nm + '» → свела к: ' + sm.title, 'lp-ok')); } });
+      // куда свелось имя, которое не совпало точно (режим «сводить»)
+      [e.a, e.b].forEach(nm => { if(snap && !resolveName(nm)){ const sm = resolveSmart(nm, true); if(sm) prev.appendChild(line('      «' + nm + '» → свела к: ' + sm.title, 'lp-ok')); } });
       // для имён, что так и остались ящиком — показать ближайшие (видно, почему: многозначно / нет такого)
       miss.forEach(nm => { const sg = suggestPieces(nm, 3); prev.appendChild(line('      «' + nm + '» → ' + (sg.length ? 'похоже на: ' + sg.join('  ·  ') + ' (не уверена — оставила ящиком)' : 'похожих кусков нет'), 'muted')); });
       if(e.src && e.src !== (e.a + ' ' + e.b)) prev.appendChild(line('      ↳ ' + e.src, 'muted')); });
@@ -697,7 +697,7 @@ function openLinksModal(){
   q('#lk-parse').onclick = () => { parsed = parseLinks(q('#lk-text').value); showPreview(); };
   // переключатели «сводить»/«ящики» — сразу перерисовать превью, чтобы видеть результат
   ['#lk-snap', '#lk-missing'].forEach(sel => { const el = q(sel); if(el) el.onchange = () => { if(parsed) showPreview(); }; });
-  // ✨ авто-предложение связей по контрактам «даёт/нужно»: A даёт имя X, B требует X → A передаёт данные B
+  // авто-предложение связей по контрактам «даёт/нужно»: A даёт имя X, B требует X → A передаёт данные B
   q('#lk-suggest').onclick = () => {
     const byProv = new Map();
     (PIECES || []).forEach(p => { const pr = (p.comp && p.comp.provides) || []; pr.forEach(n => { const k = String(n).toLowerCase(); if(!byProv.has(k)) byProv.set(k, []); byProv.get(k).push(p); }); });
@@ -708,7 +708,7 @@ function openLinksModal(){
     if(!edges.length){ prev.innerHTML = '<div class="lp-row muted">по контрактам ничего не нашлось — у кусков должны быть заполнены «даёт/нужно» (provides/requires)</div>'; q('#lk-apply').style.display = 'none'; return; }
     showPreview();
   };
-  // 📋 собрать список кусков в запрос для ИИ (он предложит связи в формате «A | связь | B»)
+  // собрать список кусков в запрос для ИИ (он предложит связи в формате «A | связь | B»)
   q('#lk-aiprompt').onclick = () => {
     const list = (PIECES || []).map(p => { const c = p.comp || {}; const pr = (c.provides || []).join(', '), rq = (c.requires || []).join(', '); return '• ' + p.title + (pr ? ('  [даёт: ' + pr + ']') : '') + (rq ? ('  [нужно: ' + rq + ']') : ''); }).join('\n');
     const rels = (window.CODE_RELATIONS || []).map(r => r.label).join(', ');
@@ -723,7 +723,7 @@ function openLinksModal(){
     if(!parsed) return;
     q('#lk-apply').textContent = 'применяю…'; q('#lk-apply').disabled = true;
     parsed.createMissing = !q('#lk-missing') || q('#lk-missing').checked;
-    parsed.snap = !q('#lk-snap') || q('#lk-snap').checked;   // 🧲 массово сводить имена к ближайшим кускам
+    parsed.snap = !q('#lk-snap') || q('#lk-snap').checked;   // массово сводить имена к ближайшим кускам
     const r = await applyLinks(parsed);
     try { PIECES = await fetch('/api/list?labels=1').then(x => x.json()); FLOWS = await fetch('/api/flows/list').then(x => x.json()); } catch(_){}
     fillFilters(); renderPieces(); renderFlows();
@@ -828,7 +828,7 @@ const DICT_SAMPLE = [
 // Ключ — код, пояснение — по-русски. Режем по ПОСЛЕДНЕМУ разделителю перед первым русским словом:
 // «body { margin: 0 }: базовые стили» → «body { margin: 0 }» | «базовые стили». Раньше резали по первому
 // двоеточию и получали обрывок «body { margin». CSS «margin: 1.5em: пояснение» оставляем как было
-// (ключ — свойство, в пояснении пример значения): на нём строятся «🌳 варианты».
+// (ключ — свойство, в пояснении пример значения): на нём строятся «варианты».
 function splitDictLine(line){
   const ru = line.search(/[А-Яа-яЁё]/);
   if(ru > 0){
@@ -878,13 +878,13 @@ function openDictModal(){
   const bg = el2('div', 'modal-bg');
   const box = el2('div', 'modal');
   box.innerHTML = '<h3>Словарь пояснений</h3>'
-    + '<p class="mh">Бесконечно пополняй пояснения к особым словам <b>любого языка</b>. Укажи язык (c, cpp, java, python, rust, go…) — слова лягут в словарь этого языка и будут показываться, когда открыт файл на нём (в приоритете над общим). Пусто — общий словарь (для слов, общих всем языкам). Строка: <b>слово: пояснение</b> (или «=», или «|»). Всё попадает в <b>keyword-dict.json</b> — его читают песочница («пояснения», «🧩», «🔗»), автоподпись и бэкофилл.</p>'
+    + '<p class="mh">Бесконечно пополняй пояснения к особым словам <b>любого языка</b>. Укажи язык (c, cpp, java, python, rust, go…) — слова лягут в словарь этого языка и будут показываться, когда открыт файл на нём (в приоритете над общим). Пусто — общий словарь (для слов, общих всем языкам). Строка: <b>слово: пояснение</b> (или «=», или «|»). Всё попадает в <b>keyword-dict.json</b> — его читают песочница («пояснения», «», «»), автоподпись и бэкофилл.</p>'
     + '<div class="mbtns" style="margin-bottom:6px"><label class="inv-chk">язык: <input class="inv-search" id="dc-lang" list="dc-langs" placeholder="css, html, js, python, c, cpp… (пусто — общий, для всех языков)" style="width:260px"></label></div>'
     + '<datalist id="dc-langs">' + ((window.CODELAB_LANGS && window.CODELAB_LANGS.length) ? window.CODELAB_LANGS.map(l => l.v) : ['css','html','js','python']).filter(v => v !== 'txt').map(v => '<option value="' + v + '">').join('') + '</datalist>'
     + '<div class="lp-sec" style="margin:2px 0 4px">Шаг 1 (необязательно): собрать непонятные слова</div>'
     + '<p class="mh" style="margin:0 0 4px">Вставь код на этом языке (или оставь пусто — возьму куски этого языка из библиотеки). Соберу слова и устойчивые конструкции, которых ещё нет в словаре, склею повторы и дам готовый запрос — отдай его мне или GPT, ответ вставь в Шаг 2.</p>'
     + '<textarea id="dc-code" placeholder="код на этом языке (или выбери файл / оставь пусто — из библиотеки)" style="min-height:64px"></textarea>'
-    + '<div class="mbtns"><button class="btn" id="dc-file">📄 из файла…</button><button class="btn" id="dc-scan">🔍 собрать непонятные слова</button><span class="pp-note" id="dc-scan-note"></span>'
+    + '<div class="mbtns"><button class="btn" id="dc-file">из файла…</button><button class="btn" id="dc-scan">собрать непонятные слова</button><span class="pp-note" id="dc-scan-note"></span>'
     + '<input type="file" id="dc-fileinp" multiple style="display:none"></div>'
     + '<textarea id="dc-prompt" placeholder="сюда ляжет готовый запрос для ИИ" readonly style="min-height:64px;display:none"></textarea>'
     + '<div class="mbtns" id="dc-prompt-btns" style="display:none"><button class="btn" id="dc-copy">⧉ скопировать запрос</button></div>'
@@ -916,51 +916,51 @@ function openDictModal(){
     const lang = q('#dc-lang').value.trim(), code = q('#dc-code').value;
     q('#dc-scan').textContent = 'собираю…'; q('#dc-scan').disabled = true; q('#dc-scan-note').textContent = '';
     const r = await fetch('/api/dict/unknown', { method: 'POST', body: JSON.stringify({ lang, code }) }).then(x => x.json()).catch(() => null);
-    q('#dc-scan').textContent = '🔍 собрать непонятные слова'; q('#dc-scan').disabled = false;
+    q('#dc-scan').textContent = 'собрать непонятные слова'; q('#dc-scan').disabled = false;
     if(!r){ q('#dc-scan-note').textContent = 'ошибка'; return; }
     q('#dc-scan-note').textContent = 'непонятных: ' + r.count + (code ? '' : ' (просмотрено кусков: ' + r.scanned + ')');
     if(r.count){ q('#dc-prompt').value = r.prompt; q('#dc-prompt').style.display = ''; q('#dc-prompt-btns').style.display = ''; }
-    else { q('#dc-prompt').style.display = 'none'; q('#dc-prompt-btns').style.display = 'none'; q('#dc-scan-note').textContent += ' — всё уже в словаре 👍'; }
+    else { q('#dc-prompt').style.display = 'none'; q('#dc-prompt-btns').style.display = 'none'; q('#dc-scan-note').textContent += ' — всё уже в словаре'; }
   };
   q('#dc-copy').onclick = () => { const t = q('#dc-prompt'); t.select(); try { navigator.clipboard.writeText(t.value); } catch(_){ try { document.execCommand('copy'); } catch(e){} } q('#dc-copy').textContent = '✓ скопировано'; setTimeout(() => q('#dc-copy').textContent = '⧉ скопировать запрос', 1200); };
   let parsed = null;
   const renderDictPrev = () => {
     const prev = q('#dc-prev'); prev.innerHTML = '';
     const line = (txt, cls) => { const d = el2('div', 'lp-row ' + (cls || '')); d.textContent = txt; return d; };
-    const hd = el2('div', 'lp-sec', 'разобрано слов: ' + parsed.entries.length + (parsed.errors.length ? '  ·  ⚠ НЕ разобрано: ' + parsed.errors.length + ' (ниже — поправь и вставь снова)' : ''));
+    const hd = el2('div', 'lp-sec', 'разобрано слов: ' + parsed.entries.length + (parsed.errors.length ? '  ·  НЕ разобрано: ' + parsed.errors.length + ' (ниже — поправь и вставь снова)' : ''));
     if(parsed.errors.length) hd.style.color = '#ffb454';
     prev.appendChild(hd);
     parsed.entries.slice(0, 200).forEach(e => prev.appendChild(line('✓ ' + e.word + '  →  ' + e.text.slice(0, 80), 'lp-ok')));
     if(parsed.entries.length > 200) prev.appendChild(line('…и ещё ' + (parsed.entries.length - 200) + ' (все добавятся, тут показаны первые 200)', 'muted'));
-    // 🟡 похоже на синонимы (много запятых) — предлагаем перенос в синонимы
+    // похоже на синонимы (много запятых) — предлагаем перенос в синонимы
     if(parsed.synLike.length){
-      const s = el2('div', 'lp-sec', '🟡 похоже на синонимы (' + parsed.synLike.length + ') — пояснение-список через запятые. Это ищется по смыслу, место им в синонимах:');
+      const s = el2('div', 'lp-sec', 'похоже на синонимы (' + parsed.synLike.length + ') — пояснение-список через запятые. Это ищется по смыслу, место им в синонимах:');
       s.style.color = '#ffb454'; prev.appendChild(s);
       parsed.synLike.forEach(e => prev.appendChild(line('≈ ' + e.word + '  →  ' + e.text.slice(0, 80), 'lp-bad')));
       const bt = el2('div', 'mbtns');
-      const mv = el2('button', 'btn ok', '🔤 перенести ' + parsed.synLike.length + ' в синонимы');
+      const mv = el2('button', 'btn ok', 'перенести ' + parsed.synLike.length + ' в синонимы');
       mv.onclick = async () => {
         mv.textContent = 'переношу…'; mv.disabled = true;
         const ents = parsed.synLike.map(e => [e.word, e.text]);
         const r = await fetch('/api/dict/synonyms', { method: 'POST', body: JSON.stringify({ entries: ents }) }).then(x => x.json()).catch(() => ({}));
         if(r && r.ok){ parsed.synLike = []; renderDictPrev(); const d = el2('div', 'lp-row lp-ok', 'Перенесено в синонимы: терминов ' + r.terms + ', фраз ' + r.added + '. Обнови песочницу (Ctrl+F5).'); prev.appendChild(d); }
-        else { mv.textContent = '🔤 перенести в синонимы'; mv.disabled = false; prev.appendChild(el2('div', 'lp-row lp-bad', 'не удалось перенести')); }
+        else { mv.textContent = 'перенести в синонимы'; mv.disabled = false; prev.appendChild(el2('div', 'lp-row lp-bad', 'не удалось перенести')); }
       };
       const keep = el2('button', 'btn', 'всё равно в словарь');
       keep.onclick = () => { parsed.entries = parsed.entries.concat(parsed.synLike); parsed.synLike = []; renderDictPrev(); };
       bt.appendChild(mv); bt.appendChild(keep); prev.appendChild(bt);
     }
-    // 🔴 русский с каждой стороны — ключ-фраза. В словарь по умолчанию НЕ кладём
+    // русский с каждой стороны — ключ-фраза. В словарь по умолчанию НЕ кладём
     if(parsed.suspicious.length){
-      const s = el2('div', 'lp-sec', '🔴 ключ на русском (' + parsed.suspicious.length + ') — слева фраза, а не код. Скорее перепутаны стороны или это синонимы. Не добавлю, пока не подтвердишь:');
+      const s = el2('div', 'lp-sec', 'ключ на русском (' + parsed.suspicious.length + ') — слева фраза, а не код. Скорее перепутаны стороны или это синонимы. Не добавлю, пока не подтвердишь:');
       s.style.color = '#ff6b8a'; prev.appendChild(s);
-      parsed.suspicious.forEach(e => prev.appendChild(line('⚠ ' + e.word + '  →  ' + e.text.slice(0, 80), 'lp-bad')));
+      parsed.suspicious.forEach(e => prev.appendChild(line('' + e.word + '  →  ' + e.text.slice(0, 80), 'lp-bad')));
       const bt = el2('div', 'mbtns');
       const force = el2('button', 'btn', 'всё равно добавить в словарь');
       force.onclick = () => { parsed.entries = parsed.entries.concat(parsed.suspicious); parsed.suspicious = []; renderDictPrev(); };
       bt.appendChild(force); prev.appendChild(bt);
     }
-    if(parsed.errors.length){ prev.appendChild(el2('div', 'lp-sec', '⚠ не разобрано (эти строки НЕ добавятся):')); parsed.errors.forEach(x => prev.appendChild(line(x, 'lp-bad'))); }
+    if(parsed.errors.length){ prev.appendChild(el2('div', 'lp-sec', 'не разобрано (эти строки НЕ добавятся):')); parsed.errors.forEach(x => prev.appendChild(line(x, 'lp-bad'))); }
     q('#dc-apply').style.display = parsed.entries.length ? '' : 'none';
   };
   q('#dc-parse').onclick = () => { parsed = parseDict(q('#dc-text').value); renderDictPrev(); };
@@ -983,7 +983,7 @@ function openDictViewModal(){
     + '<p class="mh">Всё описанное — из <b>keyword-dict.json</b>. Разделы: общее/код, по языкам (c, cpp, java…), HTML-теги/атрибуты, CSS-свойства/значения. Поиск фильтрует по слову и тексту. «⧉» у раздела копирует его строками «слово: пояснение».</p>'
     + '<input class="inv-search" id="dv-q" placeholder="поиск по слову или пояснению…" style="width:100%;box-sizing:border-box;margin-bottom:8px">'
     + '<div id="dv-groups" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px"></div>'
-    + '<div class="mbtns"><button class="btn" id="dv-close">закрыть</button><button class="btn" id="dv-audit" title="проверить то, что уже загружено: русские ключи, пояснения-списки (синонимы), куски без кода — и починить на месте">🩺 проверка мест</button><button class="btn" id="dv-dups" title="найти ключи, лежащие сразу в нескольких разделах/языках">🔍 дубли</button><button class="btn" id="dv-clean" title="убрать обрывки кода: ключи с несбалансированными скобками — это куски строк, а не термины">🧹 обрывки кода</button><span class="pp-note" id="dv-note" style="margin-left:auto"></span></div>'
+    + '<div class="mbtns"><button class="btn" id="dv-close">закрыть</button><button class="btn" id="dv-audit" title="проверить то, что уже загружено: русские ключи, пояснения-списки (синонимы), куски без кода — и починить на месте">проверка мест</button><button class="btn" id="dv-dups" title="найти ключи, лежащие сразу в нескольких разделах/языках">дубли</button><button class="btn" id="dv-clean" title="убрать обрывки кода: ключи с несбалансированными скобками — это куски строк, а не термины">обрывки кода</button><span class="pp-note" id="dv-note" style="margin-left:auto"></span></div>'
     + '<div class="lp-prev" id="dv-dupbox" style="display:none;max-height:28vh;margin-bottom:8px;border-color:#b45cff"></div>'
     + '<div class="lp-prev" id="dv-body" style="max-height:60vh"></div>';
   bg.appendChild(box); document.body.appendChild(bg);
@@ -1027,7 +1027,7 @@ function openDictViewModal(){
     const r = await fetch('/api/dict/gaps?section=' + encodeURIComponent(sid)).then(x => x.json()).catch(() => null);
     if(!r || !r.ok) { alert('не удалось получить список'); return; }
     if(!r.count) { btn.textContent = 'пробелов нет ✓'; return; }
-    copy(r.prompt); btn.textContent = '✓ запрос для ИИ скопирован (' + Math.min(r.count, 80) + ' из ' + r.count + ')'; setTimeout(() => btn.textContent = '🕳 пробелы → запрос для ИИ', 2500);
+    copy(r.prompt); btn.textContent = '✓ запрос для ИИ скопирован (' + Math.min(r.count, 80) + ' из ' + r.count + ')'; setTimeout(() => btn.textContent = 'пробелы → запрос для ИИ', 2500);
   }
   let activeGroup = null;   // null = показывать все разделы; иначе — только выбранный (клик по чипу)
   function render(){
@@ -1051,7 +1051,7 @@ function openDictViewModal(){
     // dict-usage: фильтр по наличию кусков
     { const bar = el2('div', ''); bar.style.cssText = 'display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:6px;font-size:11.5px';
       bar.appendChild(document.createTextNode('куски: '));
-      [['all', 'все'], ['none', '🕳 без кусков'], ['some', 'с кусками']].forEach(([v, t]) => bar.appendChild(chip(t, useFilter === v, () => { useFilter = v; render(); })));
+      [['all', 'все'], ['none', 'без кусков'], ['some', 'с кусками']].forEach(([v, t]) => bar.appendChild(chip(t, useFilter === v, () => { useFilter = v; render(); })));
       const note = el2('span', 'muted'); note.textContent = usage ? ' связь считается из кода при каждом открытии (' + usage.pieces + ' кусков, ' + usage.ms + ' мс)' : ' считаю связи…'; bar.appendChild(note);
       chips.after(bar); const old = body.parentNode.querySelector('.dv-usebar'); if(old) old.remove(); bar.className = 'dv-usebar'; }
     let total = 0, shown = 0;
@@ -1068,7 +1068,7 @@ function openDictViewModal(){
       cp.onclick = () => { copy(rows.map(([w, t]) => w + ': ' + t).join('\n')); cp.textContent = '✓'; setTimeout(() => cp.textContent = '⧉', 1000); };
       { const us = usage && usage.sections.find(s => s.id === secId(title));   // dict-usage
         if(us){ const cv = document.createElement('span'); cv.className = 'muted'; cv.style.cssText = 'font-size:11px;font-weight:400'; cv.textContent = 'покрыто ' + us.covered + ' из ' + us.checkable + (us.prose ? ' · не код: ' + us.prose : ''); head.appendChild(cv);
-          const gb = el2('button', 'btn'); gb.textContent = '🕳 пробелы → запрос для ИИ'; gb.title = 'скопировать запрос: «напиши куски для этих конструкций» — ответ вставь в пакетную загрузку'; gb.style.padding = '1px 8px'; gb.onclick = () => copyGaps(secId(title), gb); head.appendChild(gb); } }
+          const gb = el2('button', 'btn'); gb.textContent = 'пробелы → запрос для ИИ'; gb.title = 'скопировать запрос: «напиши куски для этих конструкций» — ответ вставь в пакетную загрузку'; gb.style.padding = '1px 8px'; gb.onclick = () => copyGaps(secId(title), gb); head.appendChild(gb); } }
       head.appendChild(cp); body.appendChild(head);
       // внутри раздела делим на конструкции (многословные ключи) и одиночные слова
       const isCon = k => !/^[a-z0-9_$-]+$/i.test(k);
@@ -1081,7 +1081,7 @@ function openDictViewModal(){
         const ctl = document.createElement('span'); ctl.style.cssText = 'font-size:11px;white-space:nowrap';
         const ex = dict.examples && dict.examples[w];
         if(ex){
-          const lnk = el2('button', 'btn'); lnk.style.padding = '0 6px'; lnk.textContent = '▶ ' + (ex.title || ex.id); lnk.title = 'показать код примера'; lnk.onclick = () => toggleCode(d, ex.id);
+          const lnk = el2('button', 'btn'); lnk.style.padding = '0 6px'; lnk.textContent = '' + (ex.title || ex.id); lnk.title = 'показать код примера'; lnk.onclick = () => toggleCode(d, ex.id);
           const rm = el2('button', 'btn'); rm.style.padding = '0 6px'; rm.textContent = '✕'; rm.title = 'снять пример'; rm.onclick = () => setExample(w, '');
           ctl.append(lnk, rm);
         } else {
@@ -1089,7 +1089,7 @@ function openDictViewModal(){
           ctl.appendChild(add);
         }
         { const u = usage && usage.terms[secId(title)] && usage.terms[secId(title)][w];   // dict-usage
-          if(u && u[1] !== 'prose' && u[1] !== 'weak'){ const cnt = el2('button', 'btn'); cnt.style.cssText = 'padding:0 6px;margin-right:4px' + (u[0] ? '' : ';color:#ff9aa8'); cnt.textContent = u[0] ? ('в ' + u[0] + ' ' + (u[0] % 10 === 1 && u[0] % 100 !== 11 ? 'куске' : 'кусках')) : '🕳 нет кусков'; cnt.title = u[0] ? 'показать, где ещё используется' : 'ни один кусок библиотеки этого не использует'; if(u[0]) cnt.onclick = () => showPieces(d, secId(title), w); ctl.prepend(cnt); } }
+          if(u && u[1] !== 'prose' && u[1] !== 'weak'){ const cnt = el2('button', 'btn'); cnt.style.cssText = 'padding:0 6px;margin-right:4px' + (u[0] ? '' : ';color:#ff9aa8'); cnt.textContent = u[0] ? ('в ' + u[0] + ' ' + (u[0] % 10 === 1 && u[0] % 100 !== 11 ? 'куске' : 'кусках')) : 'нет кусков'; cnt.title = u[0] ? 'показать, где ещё используется' : 'ни один кусок библиотеки этого не использует'; if(u[0]) cnt.onclick = () => showPieces(d, secId(title), w); ctl.prepend(cnt); } }
         d.appendChild(ctl); body.appendChild(d);
       };
       if(cons.length){ const sub = el2('div', 'muted'); sub.style.cssText = 'font-size:11px;margin:3px 0 1px 6px'; sub.textContent = '— конструкции (' + cons.length + ')'; body.appendChild(sub); cons.forEach(renderRow); }
@@ -1133,48 +1133,48 @@ function openDictViewModal(){
     const warn = el2('div', 'muted'); warn.style.cssText = 'font-size:11px;margin:0 0 4px 6px'; warn.textContent = 'Это подсказки, а не приговор: часть русских ключей — твой глоссарий понятий/ошибок (так и задумано). Смотри сама, удаляй только лишнее. Ничего не удаляю без подтверждения.'; panel.appendChild(warn);
     const mk = (txt, cls) => { const d = el2('div', 'lp-row ' + (cls || '')); d.textContent = txt; return d; };
     const btnrow = () => el2('div', 'mbtns');
-    // 🟡 пояснения-списки = синонимы: переносим в синонимы и убираем из словаря
+    // пояснения-списки = синонимы: переносим в синонимы и убираем из словаря
     if(r.synLike.length){
-      const s = el2('div', 'lp-sec', '🟡 пояснение — список через запятые (' + r.synLike.length + '): это синонимы, им место в поиске по смыслу'); s.style.color = '#ffb454'; panel.appendChild(s);
+      const s = el2('div', 'lp-sec', 'пояснение — список через запятые (' + r.synLike.length + '): это синонимы, им место в поиске по смыслу'); s.style.color = '#ffb454'; panel.appendChild(s);
       r.synLike.slice(0, 40).forEach(e => panel.appendChild(mk('[' + e.where + '] ' + e.key + '  →  ' + e.text, 'lp-bad')));
       if(r.synLike.length > 40) panel.appendChild(mk('…и ещё ' + (r.synLike.length - 40), 'muted'));
       const row = btnrow();
       const cps = el2('button', 'btn', '⧉ скопировать');
       cps.onclick = () => { copy(r.synLike.map(e => e.key + ': ' + e.text).join('\n')); cps.textContent = '✓'; setTimeout(() => cps.textContent = '⧉ скопировать', 1000); };
-      const mv = el2('button', 'btn ok', '🔤 перенести все ' + r.synLike.length + ' в синонимы');
+      const mv = el2('button', 'btn ok', 'перенести все ' + r.synLike.length + ' в синонимы');
       mv.onclick = async () => { if(!confirm('Перенести ' + r.synLike.length + ' в синонимы и убрать из словаря? Пояснения станут фразами для поиска по смыслу.')) return;
         mv.textContent = 'переношу…'; mv.disabled = true;
         const syn = r.synLike.map(e => [e.key, e.text]);
         const a = await fetch('/api/dict/synonyms', { method: 'POST', body: JSON.stringify({ entries: syn }) }).then(x => x.json()).catch(() => ({}));
         if(a && a.ok){ await fetch('/api/dict/remove', { method: 'POST', body: JSON.stringify({ entries: r.synLike.map(e => ({ where: e.where, key: e.key })) }) }).then(x => x.json()).catch(() => ({}));
           r.synLike = []; reloadDict(); mv.replaceWith(mk('✓ перенесено в синонимы: терминов ' + a.terms + ', фраз ' + a.added, 'lp-ok')); }
-        else { mv.textContent = '🔤 перенести в синонимы'; mv.disabled = false; }
+        else { mv.textContent = 'перенести в синонимы'; mv.disabled = false; }
       };
       row.append(cps, mv); panel.appendChild(row);
     }
-    // 🔴 русский ключ: слева фраза, а не код. Чистим из словаря (пояснения грузят с кодом-ключом)
+    // русский ключ: слева фраза, а не код. Чистим из словаря (пояснения грузят с кодом-ключом)
     if(r.ruKeys.length){
-      const s = el2('div', 'lp-sec', '🔴 ключ на русском (' + r.ruKeys.length + '): слева должен быть код, а не фраза. Перепутаны стороны или это синонимы'); s.style.color = '#ff6b8a'; panel.appendChild(s);
+      const s = el2('div', 'lp-sec', 'ключ на русском (' + r.ruKeys.length + '): слева должен быть код, а не фраза. Перепутаны стороны или это синонимы'); s.style.color = '#ff6b8a'; panel.appendChild(s);
       r.ruKeys.slice(0, 40).forEach(e => panel.appendChild(mk('[' + e.where + '] ' + e.key + '  →  ' + e.text, 'lp-bad')));
       if(r.ruKeys.length > 40) panel.appendChild(mk('…и ещё ' + (r.ruKeys.length - 40), 'muted'));
       const row = btnrow();
       const cp = el2('button', 'btn', '⧉ скопировать (чтобы перезалить правильно)');
       cp.onclick = () => { copy(r.ruKeys.map(e => e.key + ': ' + e.text).join('\n')); cp.textContent = '✓ скопировано'; setTimeout(() => cp.textContent = '⧉ скопировать (чтобы перезалить правильно)', 1200); };
-      const del = el2('button', 'btn', '🗑 убрать все ' + r.ruKeys.length + ' из словаря');
+      const del = el2('button', 'btn', 'убрать все ' + r.ruKeys.length + ' из словаря');
       del.onclick = async () => { if(!confirm('Убрать ' + r.ruKeys.length + ' русских ключей из словаря? Скопируй их сначала, если нужно перезалить.')) return;
         del.textContent = 'убираю…'; del.disabled = true;
         const a = await fetch('/api/dict/remove', { method: 'POST', body: JSON.stringify({ entries: r.ruKeys.map(e => ({ where: e.where, key: e.key })) }) }).then(x => x.json()).catch(() => ({}));
         if(a && a.ok){ r.ruKeys = []; reloadDict(); del.replaceWith(mk('✓ убрано из словаря: ' + a.removed + '. Не забудь синхронизацию.', 'lp-ok')); }
-        else { del.textContent = '🗑 убрать из словаря'; del.disabled = false; }
+        else { del.textContent = 'убрать из словаря'; del.disabled = false; }
       };
       row.append(cp, del); panel.appendChild(row);
     }
-    // 🧩 куски без кода: «код» это русский текст
+    // куски без кода: «код» это русский текст
     if(r.prosePieces.length){
-      const s = el2('div', 'lp-sec', '🧩 куски без кода (' + r.prosePieces.length + '): в коде русский текст — это словарь/синонимы загрузили как кусок'); s.style.color = '#ff6b8a'; panel.appendChild(s);
+      const s = el2('div', 'lp-sec', 'куски без кода (' + r.prosePieces.length + '): в коде русский текст — это словарь/синонимы загрузили как кусок'); s.style.color = '#ff6b8a'; panel.appendChild(s);
       r.prosePieces.forEach(p => panel.appendChild(mk('[' + (p.lang || '?') + '] ' + p.title + '  —  ' + p.code, 'lp-bad')));
       const row = btnrow();
-      const del = el2('button', 'btn', '🗑 удалить все ' + r.prosePieces.length + ' куска');
+      const del = el2('button', 'btn', 'удалить все ' + r.prosePieces.length + ' куска');
       del.onclick = async () => { if(!confirm('Удалить ' + r.prosePieces.length + ' кусков, где код — русский текст?')) return;
         del.textContent = 'удаляю…'; del.disabled = true; let n = 0;
         for(const p of r.prosePieces){ const a = await fetch('/api/delete', { method: 'POST', body: JSON.stringify({ id: p.id }) }).then(x => x.json()).catch(() => null); if(a) n++; }
@@ -1234,7 +1234,7 @@ function openSynModal(){
     });
     parsed = { entries, errors };
     const prev = q('#sy-prev'); prev.innerHTML = '';
-    const hd = el2('div', 'lp-sec', 'терминов: ' + entries.length + (errors.length ? '  ·  ⚠ не разобрано: ' + errors.length : '')); if(errors.length) hd.style.color = '#ffb454'; prev.appendChild(hd);
+    const hd = el2('div', 'lp-sec', 'терминов: ' + entries.length + (errors.length ? '  ·  не разобрано: ' + errors.length : '')); if(errors.length) hd.style.color = '#ffb454'; prev.appendChild(hd);
     entries.slice(0, 200).forEach(([t, r]) => { const d = el2('div', 'lp-row lp-ok'); d.textContent = '✓ ' + t + '  →  ' + r; prev.appendChild(d); });
     errors.forEach(x => prev.appendChild(el2('div', 'lp-row lp-bad', x)));
     q('#sy-apply').style.display = entries.length ? '' : 'none';

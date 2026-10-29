@@ -208,7 +208,7 @@
   box.addEventListener('keydown', e => { if((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F') && box.style.display !== 'none'){ e.preventDefault(); findBar.classList.contains('on') ? q.select() : open(); } }, true);
 
   const bar = box.querySelector('.sb-bar'), legend = bar && bar.querySelector('#sbLegend');
-  if(bar){ const b = document.createElement('button'); b.className = 'btn'; b.id = 'sbFindBtn'; b.textContent = '🔎 поиск'; b.title = 'единый поиск с фильтрами (Ctrl+F): текст, структура, приёмы, словарь, куски';
+  if(bar){ const b = document.createElement('button'); b.className = 'btn'; b.id = 'sbFindBtn'; b.textContent = 'поиск'; b.title = 'единый поиск с фильтрами (Ctrl+F): текст, структура, приёмы, словарь, куски';
     b.onclick = () => findBar.classList.contains('on') ? close() : open();
     if(legend) legend.after(b); else bar.appendChild(b); }
 

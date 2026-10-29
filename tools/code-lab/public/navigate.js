@@ -108,13 +108,13 @@
     // пример: живой кусок, демонстрирующий этот термин → открыть в редакторе
     const exm = window.codelabExample ? window.codelabExample(term) : null;
     if(exm){ const b = document.createElement('button'); b.className = 'ref def'; b.style.marginTop = '4px';
-      b.textContent = '▶ пример → ' + (exm.title || 'кусок');
+      b.textContent = 'пример → ' + (exm.title || 'кусок');
       b.onclick = () => { if(window.codelabOpenExample) window.codelabOpenExample(exm); hide(); };
       pop.appendChild(b); }
 
     if(onlyExpl){
       // для разметки/конструкций код-«определение/использования» не нужны — только пояснение + сколько раз встречается
-      if(!expl){ const n = document.createElement('div'); n.className = 'none'; n.textContent = 'нет пояснения в словаре (можно добавить через «📖 словарь пояснений»)'; pop.appendChild(n); }
+      if(!expl){ const n = document.createElement('div'); n.className = 'none'; n.textContent = 'нет пояснения в словаре (можно добавить через «словарь пояснений»)'; pop.appendChild(n); }
       const g = document.createElement('div'); g.className = 'grp'; g.textContent = 'В этом файле'; pop.appendChild(g);
       const cnt = document.createElement('div'); cnt.className = 'none'; cnt.textContent = 'встречается ' + uses.length + ' раз(а)'; pop.appendChild(cnt);
     } else {
@@ -181,7 +181,7 @@
   lab.title = 'клик по имени показывает, где оно задано и где используется (в т. ч. в других файлах)';
   const cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = 'sbNav';
   cb.onchange = () => { navOn = cb.checked; center.classList.toggle('nav-on', navOn); if(!navOn) hide(); };
-  lab.appendChild(cb); lab.appendChild(document.createTextNode(' 🔗 связи по клику'));
+  lab.appendChild(cb); lab.appendChild(document.createTextNode(' связи по клику'));
   const explain = bar && bar.querySelector('#sbExplain'); const explainLab = explain && explain.closest('label');
   if(explainLab){ explainLab.after(lab); } else if(bar){ bar.appendChild(lab); }
 

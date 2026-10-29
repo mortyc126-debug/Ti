@@ -116,17 +116,17 @@
       <label class="inv-chk"><input type="checkbox" id="pgroupview"> по разделам</label>
       <label class="inv-chk"><input type="checkbox" id="pincomplete"> только с пробелами</label>
       <input class="inv-search" id="pq" placeholder="фильтр по названию/коду…">
-      <button class="btn" id="pdict">📖 словарь пояснений</button>
-      <button class="btn" id="pdictview">📚 весь словарь</button>
-      <button class="btn" id="pdictsyn">🔤 синонимы</button>
-      <button class="btn" id="psectree" title="общее дерево разделов и перенос старых разделов в него" onclick="window.codelabSections && codelabSections.open()">🗂 дерево разделов</button>
+      <button class="btn" id="pdict">словарь пояснений</button>
+      <button class="btn" id="pdictview">весь словарь</button>
+      <button class="btn" id="pdictsyn">синонимы</button>
+      <button class="btn" id="psectree" title="общее дерево разделов и перенос старых разделов в него" onclick="window.codelabSections && codelabSections.open()">дерево разделов</button>
       <div class="inv-more"><button class="btn" type="button" onclick="this.parentNode.classList.toggle('on');event.stopPropagation()">⋯ ещё ▾</button><div class="inv-pop">
-        <button class="btn" id="psections">📂 разделы из текста</button>
-        <button class="btn" id="plabels" title="подписи простыми словами к именам «даёт/нужно»: свои пачкой и промпт для ИИ" onclick="window.codelabLabels && codelabLabels.open()">🏷 подписи</button>
-        <button class="btn" id="plinks">📥 связи из текста</button>
+        <button class="btn" id="psections">разделы из текста</button>
+        <button class="btn" id="plabels" title="подписи простыми словами к именам «даёт/нужно»: свои пачкой и промпт для ИИ" onclick="window.codelabLabels && codelabLabels.open()">подписи</button>
+        <button class="btn" id="plinks">связи из текста</button>
         <button class="btn" id="pcopy">⧉ скопировать список</button>
-        <button class="btn" id="pdedup" title="схлопнуть куски с одинаковым кодом в один (оставляется самый полный)">🧹 убрать дубли</button>
-        <button class="btn" id="pmoveall" title="переместить ВСЕ показанные (с учётом фильтров) в один раздел">📁 показанные → раздел</button>
+        <button class="btn" id="pdedup" title="схлопнуть куски с одинаковым кодом в один (оставляется самый полный)">убрать дубли</button>
+        <button class="btn" id="pmoveall" title="переместить ВСЕ показанные (с учётом фильтров) в один раздел">показанные → раздел</button>
         <button class="btn" id="ptranslate" title="найти куски с английскими названиями и дописать к ним русский перевод">🇷🇺 перевести названия</button>
       </div></div>
     </div>
@@ -141,7 +141,7 @@
     <div class="inv-head">
       <h2>Схемы и связи</h2><span class="cnt" id="fcnt"></span>
       <span class="sp"></span>
-      <button class="btn" id="ffix" title="во ВСЕХ схемах подтянуть узлы-ящики к ближайшим кускам и сохранить — массово">🔧 починить ящики во всех схемах</button>
+      <button class="btn" id="ffix" title="во ВСЕХ схемах подтянуть узлы-ящики к ближайшим кускам и сохранить — массово">починить ящики во всех схемах</button>
       <button class="btn" id="fcopy">⧉ скопировать связи</button>
     </div>
     <div id="flows"></div>

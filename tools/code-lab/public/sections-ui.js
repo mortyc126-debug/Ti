@@ -1,4 +1,4 @@
-// Окно «🗂 дерево разделов»: общее дерево (library/_sections.json) и правила переноса старых разделов.
+// Окно «дерево разделов»: общее дерево (library/_sections.json) и правила переноса старых разделов.
 // Слева правишь дерево и правила текстом, справа сразу видно «было → станет» и что останется вне дерева.
 // Ничего не меняется в кусках и задачах, пока не нажата «применить». window.codelabSections.open()
 (function(){
@@ -37,7 +37,7 @@
     const cfg = await api('/api/sections').catch(() => null);
     if(!cfg){ alert('сервер не ответил'); return; }
     const bg = document.createElement('div'); bg.className = 'sx-bg';
-    bg.innerHTML = '<div class="sx"><h3>🗂 Дерево разделов</h3>'
+    bg.innerHTML = '<div class="sx"><h3>Дерево разделов</h3>'
       + '<div class="lead">Одно дерево на всё: библиотеку, задачи, промпты. Язык в название раздела не пишем — он отдельный фильтр. '
       + 'Правила переносят старые разделы: <code>старый путь =&gt; новый путь</code>, побеждает самое длинное совпадение, <code>/ *</code> в конце — оставить прежний подраздел. '
       + 'Пока не нажата «применить», куски и задачи не меняются; откатить применённое можно через git.</div>'
@@ -45,9 +45,9 @@
       + '<label>Дерево: «Раздел: подраздел; подраздел»</label><textarea id="sxTree" rows="12" spellcheck="false"></textarea>'
       + '<label>Правила переноса</label><textarea id="sxRules" rows="18" spellcheck="false"></textarea>'
       + '</div><div><label>Что получится</label><div class="sx-prev" id="sxPrev">считаю…</div></div></div>'
-      + '<div class="sx-row"><button class="btn" id="sxSave" title="сохранить дерево и правила, ничего не перенося">💾 сохранить</button>'
-      + '<button class="btn ok" id="sxApply" title="сохранить и переписать раздел у кусков и задач по правилам">✅ применить к кускам и задачам</button>'
-      + '<button class="btn" id="sxSort" title="подобрать раздел кускам из «Не разобрано» по самым похожим разложенным кускам">🧭 разложить неразобранное</button>'
+      + '<div class="sx-row"><button class="btn" id="sxSave" title="сохранить дерево и правила, ничего не перенося">сохранить</button>'
+      + '<button class="btn ok" id="sxApply" title="сохранить и переписать раздел у кусков и задач по правилам">применить к кускам и задачам</button>'
+      + '<button class="btn" id="sxSort" title="подобрать раздел кускам из «Не разобрано» по самым похожим разложенным кускам">разложить неразобранное</button>'
       + '<button class="btn" id="sxX">закрыть</button><span class="sx-msg" id="sxMsg"></span></div></div>';
     document.body.appendChild(bg);
     const q = s => bg.querySelector(s);
@@ -69,7 +69,7 @@
       if(p.bad.length) h += '<div class="sx-h">Непонятные строки правил</div>' + p.bad.map(b => '<div class="sx-msg err">' + esc(b) + '</div>').join('');
       if(p.outside.length){
         h += '<div class="sx-h">Останется вне дерева — клик добавит заготовку правила</div>'
-          + p.outside.map(o => '<div class="sx-out" data-p="' + esc(o.path) + '">⚠ ' + esc(o.path) + ' <span class="n">' + cnt(o) + (o.top ? ' · подраздела нет в дереве' : ' · раздела нет в дереве') + '</span></div>').join('');
+          + p.outside.map(o => '<div class="sx-out" data-p="' + esc(o.path) + '">' + esc(o.path) + ' <span class="n">' + cnt(o) + (o.top ? ' · подраздела нет в дереве' : ' · раздела нет в дереве') + '</span></div>').join('');
       }
       // итог по дереву: разделы в порядке дерева, внутри подразделы с числами
       const tree = treeFrom(q('#sxTree').value); const byTop = new Map();
@@ -112,13 +112,13 @@
   // ── «разложить неразобранное»: таблица «кусок → раздел», применяется только отмеченное ──
   async function sortUnsorted(cfgBody){
     const bg = document.createElement('div'); bg.className = 'sx-bg';
-    bg.innerHTML = '<div class="sx"><h3>🧭 Разложить неразобранное</h3>'
+    bg.innerHTML = '<div class="sx"><h3>Разложить неразобранное</h3>'
       + '<div class="lead">Раздел подобран по самым похожим уже разложенным кускам (название, теги, описание, код). Если есть кусок с тем же названием — первым идёт его раздел. '
       + '«дубль» — тот же код, что у одноимённого куска (отличается только комментариями): такой можно удалить. Меняется только отмеченное.</div>'
       + '<div class="sx-row" style="margin:0 0 8px"><button class="btn" id="suConf">отметить уверенные (от 50 %)</button><button class="btn" id="suAll">отметить все</button><button class="btn" id="suNone">снять</button>'
-      + '<button class="btn" id="suDups" title="отметить «удалить» у всех точных дублей">🗑 отметить дубли к удалению</button><span class="sx-msg" id="suInfo">считаю…</span></div>'
+      + '<button class="btn" id="suDups" title="отметить «удалить» у всех точных дублей">отметить дубли к удалению</button><span class="sx-msg" id="suInfo">считаю…</span></div>'
       + '<div class="sx-prev" id="suList" style="max-height:64vh"></div>'
-      + '<div class="sx-row"><button class="btn ok" id="suGo">✅ применить отмеченное</button><button class="btn" id="suX">закрыть</button><span class="sx-msg" id="suMsg"></span></div></div>';
+      + '<div class="sx-row"><button class="btn ok" id="suGo">применить отмеченное</button><button class="btn" id="suX">закрыть</button><span class="sx-msg" id="suMsg"></span></div></div>';
     document.body.appendChild(bg);
     const q = s => bg.querySelector(s);
     q('#suX').onclick = () => bg.remove();
@@ -126,7 +126,7 @@
     if(!r){ q('#suInfo').textContent = 'сервер не ответил'; return; }
     const items = r.items || [];
     const all = []; (r.tree || []).forEach(t => { all.push(t.name); (t.subs || []).forEach(sb => all.push(t.name + ' / ' + sb)); });
-    q('#suInfo').textContent = items.length ? 'кусков: ' + items.length + ', дублей: ' + items.filter(x => x.twin && x.twin.same).length : 'неразобранных нет 👍';
+    q('#suInfo').textContent = items.length ? 'кусков: ' + items.length + ', дублей: ' + items.filter(x => x.twin && x.twin.same).length : 'неразобранных нет';
     q('#suList').innerHTML = items.map((x, i) => {
       const best = x.options[0];
       const opts = x.options.map(o => '<option value="' + esc(o.path) + '">' + esc(o.path) + (o.twin ? '  — как у одноимённого' : '  — ' + o.share + ' %') + '</option>').join('')

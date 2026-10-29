@@ -1,6 +1,6 @@
-// Окно «🧭 задачи» в песочнице: выбрать задачу → пройти вопросы → вставить собранный код в редактор;
-// вкладка «🩹 проверка» — что в открытых файлах оборвано (незакрытые скобки/кавычки, имена без источника)
-// и какие куски/задачи это закрывают. Галочка «🩹 оборванное» подсвечивает это прямо в коде.
+// Окно «задачи» в песочнице: выбрать задачу → пройти вопросы → вставить собранный код в редактор;
+// вкладка «проверка» — что в открытых файлах оборвано (незакрытые скобки/кавычки, имена без источника)
+// и какие куски/задачи это закрывают. Галочка «оборванное» подсвечивает это прямо в коде.
 // Надстройка песочницы; после tabs.js и win.js. Подключён на constructor.html.
 (function(){
   const sb = window.codelabSandbox;
@@ -8,7 +8,7 @@
   const edsEl = box && box.querySelector('#sbEds');
   const bar = box && box.querySelector('.sb-bar');
 
-  // задачи со страницы «Задачи» → «▶ в песочницу»: файлы ждут в localStorage до открытия конструктора
+  // задачи со страницы «Задачи» → «в песочницу»: файлы ждут в localStorage до открытия конструктора
   try {
     const pend = JSON.parse(localStorage.getItem('codelab_open_pending') || 'null');
     if(Array.isArray(pend) && pend.length && window.codelabOpenInEditor){
@@ -67,7 +67,7 @@
   document.head.appendChild(st);
 
   const panel = document.createElement('div'); panel.className = 'tp';
-  panel.innerHTML = '<div class="th"><b>🧭</b><span class="tabs"><button data-t="tasks" class="on">задачи</button><button data-t="check">🩹 проверка</button></span><span style="flex:1"></span><button class="x" title="закрыть">×</button></div>'
+  panel.innerHTML = '<div class="th"><b>задачи</b><span class="tabs"><button data-t="tasks" class="on">задачи</button><button data-t="check">проверка</button></span><span style="flex:1"></span><button class="x" title="закрыть">×</button></div>'
     + '<div class="tb" id="tpBody"></div>';
   document.body.appendChild(panel);
   const body = panel.querySelector('#tpBody');
@@ -76,12 +76,12 @@
   let tab = 'tasks';
   panel.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { tab = b.dataset.t; panel.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b)); draw(); });
 
-  const btn = document.createElement('button'); btn.className = 'btn'; btn.textContent = '🧭 задачи';
+  const btn = document.createElement('button'); btn.className = 'btn'; btn.textContent = 'задачи';
   btn.title = 'задачи: выбрать, что хочешь сделать, ответить на вопросы и вставить код; проверка оборванного';
   btn.onclick = () => { const on = !panel.classList.contains('on'); panel.classList.toggle('on', on); if(on) draw(); };
   const lab = document.createElement('label'); lab.className = 'sb-live';
   lab.title = 'подсвечивать в коде незакрытые скобки/кавычки (красным) и имена, которые нигде не заданы (волнистым)';
-  lab.innerHTML = '<input type="checkbox"> 🩹 оборванное';
+  lab.innerHTML = '<input type="checkbox"> оборванное';
   const chk = lab.querySelector('input');
   try { chk.checked = localStorage.getItem('codelab_broken') === '1'; } catch(_){}
   const legend = bar.querySelector('#sbLegend'); if(legend){ legend.after(lab); legend.after(btn); } else { bar.appendChild(btn); bar.appendChild(lab); }
@@ -147,7 +147,7 @@
     parts.forEach(p => {
       const r = document.createElement('div'); r.className = 'row';
       r.innerHTML = '<span class="muted" style="flex:1">' + esc(p.lang.toUpperCase()) + ' · ' + p.list.map(a => esc(a.title)).join(', ') + '</span>';
-      const b = document.createElement('button'); b.className = 'btn ok'; b.textContent = '⤵ вставить';
+      const b = document.createElement('button'); b.className = 'btn ok'; b.textContent = 'вставить';
       b.title = 'вставить в место курсора открытого ' + p.lang.toUpperCase() + '-файла (или новой вкладкой)';
       b.onclick = () => { insertCode(p.lang, p.code, 'задача.' + p.lang); setTimeout(refreshHave, 300); };
       r.appendChild(b); host.appendChild(r);
@@ -188,8 +188,8 @@
         d.innerHTML = '<span class="w"><b>' + esc(u.name) + '</b> — ' + esc(u.file) + '</span><div class="muted">' + esc(needText(u.name)) + '</div><div class="sg"></div>';
         d.querySelector('.w').onclick = () => { if(f){ const p = window.CodeCheck.namePositions(f.code, u.name)[0]; if(p) jump(f, p.from, p.to); } };
         const sg = d.querySelector('.sg');
-        u.tasks.forEach(t => { const a = document.createElement('a'); a.textContent = '🧭 ' + t.title; a.onclick = async () => { curTask = await api('/api/tasks/get?id=' + encodeURIComponent(t.id)).catch(() => null); setTab('tasks'); }; sg.appendChild(a); });
-        u.pieces.slice(0, 4).forEach(p => { const a = document.createElement('a'); a.textContent = '⤵ ' + p.title + (p.needs.length ? '  (сам требует: ' + p.needs.slice(0, 3).join(', ') + ')' : '');
+        u.tasks.forEach(t => { const a = document.createElement('a'); a.textContent = '' + t.title; a.onclick = async () => { curTask = await api('/api/tasks/get?id=' + encodeURIComponent(t.id)).catch(() => null); setTab('tasks'); }; sg.appendChild(a); });
+        u.pieces.slice(0, 4).forEach(p => { const a = document.createElement('a'); a.textContent = '' + p.title + (p.needs.length ? '  (сам требует: ' + p.needs.slice(0, 3).join(', ') + ')' : '');
           a.title = 'вставить этот кусок в место курсора'; a.onclick = async () => { insertCode(p.lang, await TaskWalk.codeOf(p.id), p.title + '.' + p.lang); setTimeout(drawCheck, 300); }; sg.appendChild(a); });
         if(!u.tasks.length && !u.pieces.length) sg.innerHTML = '<span class="muted">готового куска для этого в библиотеке нет</span>';
         body.appendChild(d);
@@ -231,7 +231,7 @@
           const h = cm.addLineClass(x.line, 'background', 'cl-bad-line'); arr.push({ line: h });
         }
         if(next) for(const u of next.unmet){ if(u.generic || u.file !== f.name) continue;
-          const hint = needText(u.name) + (u.pieces.length ? ' — даёт кусок «' + u.pieces[0].title + '» (🧭 → проверка)' : '');
+          const hint = needText(u.name) + (u.pieces.length ? ' — даёт кусок «' + u.pieces[0].title + '» (→ проверка)' : '');
           for(const p of window.CodeCheck.namePositions(f.code, u.name)) arr.push(cm.markText(cm.posFromIndex(p.from), cm.posFromIndex(p.to), { className: 'cl-unmet', title: hint })); }
       });
     }
@@ -248,12 +248,12 @@
     curTask = await api('/api/tasks/get?id=' + encodeURIComponent(id)).catch(() => null);
     panel.classList.add('on'); setTab('tasks');
   }
-  // ── полоска «🧭 пригодится»: до 3 задач к открытому коду, сама, без кликов ──
+  // ── полоска «пригодится»: до 3 задач к открытому коду, сама, без кликов ──
   const hint = document.createElement('div'); hint.className = 'tp-hint';
   edsEl.before(hint);
   const hLab = document.createElement('label'); hLab.className = 'sb-live';
   hLab.title = 'над редактором сами появляются задачи, которые подходят к открытому коду (чего не хватает, что начато)';
-  hLab.innerHTML = '<input type="checkbox"> 🧭 подсказки';
+  hLab.innerHTML = '<input type="checkbox"> подсказки';
   const hChk = hLab.querySelector('input');
   try { hChk.checked = localStorage.getItem('codelab_task_hints') !== '0'; } catch(_){ hChk.checked = true; }
   lab.after(hLab);
@@ -272,7 +272,7 @@
     if(my !== hSeq) return;
     const hits = ((r && r.hits) || []).filter(h => !hidden.has(h.id));
     if(!hits.length){ hint.classList.remove('on'); return; }
-    hint.innerHTML = '<span>🧭 пригодится:</span>';
+    hint.innerHTML = '<span>пригодится:</span>';
     hits.forEach(h => {
       const c = document.createElement('span'); c.className = 'c'; c.title = h.why.join(' · ') + '  (балл ' + h.score + ')';
       c.innerHTML = esc(h.title) + (h.why[0] ? ' <i>' + esc(h.why[0]) + '</i>' : '') + '<button class="x" title="не предлагать до перезагрузки">✕</button>';

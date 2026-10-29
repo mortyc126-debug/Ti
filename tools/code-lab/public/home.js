@@ -20,7 +20,7 @@
   // проектов пока нет — покажем шаблоны (запасной вариант)
   let list = [];
   try { list = await fetch('/api/list').then(r => r.json()); } catch(_){ box.innerHTML = '<div class="muted">сервер недоступен</div>'; return; }
-  if(!list.length){ box.innerHTML = '<div class="muted">Пока нет проектов. Создай первый в Конструкторе и сохрани (кнопка «🗂 схемы»).</div>'; return; }
+  if(!list.length){ box.innerHTML = '<div class="muted">Пока нет проектов. Создай первый в Конструкторе и сохрани (кнопка «схемы»).</div>'; return; }
   box.innerHTML = '<div class="muted" style="grid-column:1/-1;margin-bottom:6px">Проектов пока нет — вот шаблоны для старта:</div>';
   list.slice(0, 8).forEach(t => {
     const a = document.createElement('a'); a.className = 'pop'; a.href = '/library.html#' + encodeURIComponent(t.id);

@@ -82,25 +82,25 @@
   }
 
   // ── кнопки в панели песочницы (рядом с «+ файл») ──
-  const bOpen = document.createElement('button'); bOpen.className = 'btn'; bOpen.textContent = '📂 открыть…';
+  const bOpen = document.createElement('button'); bOpen.className = 'btn'; bOpen.textContent = 'открыть…';
   bOpen.title = hasFS ? 'открыть файл с диска (можно сохранить обратно в тот же файл)' : 'открыть файл с диска';
   bOpen.onclick = openFromDisk;
-  const bSave = document.createElement('button'); bSave.className = 'btn'; bSave.textContent = '💾 на диск…';
+  const bSave = document.createElement('button'); bSave.className = 'btn'; bSave.textContent = 'на диск…';
   bSave.title = hasFS ? 'сохранить активный файл на диск: в тот же файл, если открыт с диска, иначе выбрать куда' : 'скачать активный файл';
   bSave.onclick = saveToDisk;
-  // «🧹 очистить» — убрать все файлы песочницы (в т. ч. стартовые демо), оставить один пустой
-  const bClear = document.createElement('button'); bClear.className = 'btn'; bClear.textContent = '🧹 очистить';
+  // «очистить» — убрать все файлы песочницы (в т. ч. стартовые демо), оставить один пустой
+  const bClear = document.createElement('button'); bClear.className = 'btn'; bClear.textContent = 'очистить';
   bClear.title = 'убрать все файлы песочницы (включая стартовые демо index.html/style.css/script.js) — останется один пустой';
   bClear.onclick = () => { if(sb.clearAll && confirm('Убрать все файлы песочницы? Останется один пустой.')) { sb.clearAll(); toast('песочница очищена'); } };
   const addBtn = bar.querySelector('#sbAdd');
   if(addBtn){ addBtn.after(bClear); addBtn.after(bSave); addBtn.after(bOpen); } else { bar.appendChild(bOpen); bar.appendChild(bSave); bar.appendChild(bClear); }
   bar.appendChild(inp);
 
-  // «🚫 превью» — спрятать окно предпросмотра (и обнулить его, чтобы не висело старое)
+  // «превью» — спрятать окно предпросмотра (и обнулить его, чтобы не висело старое)
   const frame = box.querySelector('#sbFrame');
   let pvOff = false; try { pvOff = localStorage.getItem('codelab_sb_pv_off') === '1'; } catch(_){}
   const bPv = document.createElement('button'); bPv.className = 'btn';
-  const applyPv = () => { if(frame) frame.style.display = pvOff ? 'none' : ''; bPv.textContent = pvOff ? '👁 превью' : '🚫 превью'; bPv.title = pvOff ? 'показать окно предпросмотра' : 'спрятать окно предпросмотра'; };
+  const applyPv = () => { if(frame) frame.style.display = pvOff ? 'none' : ''; bPv.textContent = pvOff ? 'превью' : 'превью'; bPv.title = pvOff ? 'показать окно предпросмотра' : 'спрятать окно предпросмотра'; };
   bPv.onclick = () => { pvOff = !pvOff; try { localStorage.setItem('codelab_sb_pv_off', pvOff ? '1' : '0'); } catch(_){} if(pvOff && frame){ try { frame.srcdoc = ''; } catch(_){} } applyPv(); };
   const clrBtn = bar.querySelector('#sbClr'); if(clrBtn){ clrBtn.before(bPv); } else { bar.appendChild(bPv); }
   applyPv();

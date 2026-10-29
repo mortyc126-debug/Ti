@@ -49,7 +49,7 @@
     },
     python: {
       _label: 'Один кусок — Python',
-      _desc: 'Кусок на Python. Запускается на компьютере через локальный сервер (кнопка ▶).',
+      _desc: 'Кусок на Python. Запускается на компьютере через локальный сервер (кнопка ).',
       lang: 'python', title: 'среднее по списку', group: 'Основы / Python',
       desc: 'Считает среднее арифметическое списка чисел.',
       code: 'числа = [4, 8, 15, 16]\nсреднее = sum(числа) / len(числа)\nprint(среднее)',
@@ -109,12 +109,12 @@
     host.innerHTML =
       '<div class="up-box">' +
         '<div class="up-row">' +
-          '<button class="btn ok up-load">📥 загрузить куски</button>' +
+          '<button class="btn ok up-load">загрузить куски</button>' +
           '<input type="file" class="up-file" accept=".zip,.gz,.json,.js,.mjs,.jsx,.ts,.tsx,.py,.rb,.php,.go,.lua,.sh,.bash,.ps1,.r,.sql,.html,.htm,.css,.txt" multiple style="display:none">' +
           '<span class="up-note muted">код-файлы (.js/.py/.css/.html…), архив (.zip/.gz), полный кусок JSON или сборник — можно несколько сразу</span>' +
         '</div>' +
         '<div class="up-nav">' +
-          '<div class="up-nav-head">📂 актуальные разделы и подразделы. Клик по строке — скопировать её, чтобы вписать в поле <code>group</code> своего файла. Новый раздел — просто впиши новый путь (через « / » — подраздел), он создастся при загрузке:</div>' +
+          '<div class="up-nav-head">актуальные разделы и подразделы. Клик по строке — скопировать её, чтобы вписать в поле <code>group</code> своего файла. Новый раздел — просто впиши новый путь (через « / » — подраздел), он создастся при загрузке:</div>' +
           '<div class="up-nav-tree">загрузка…</div>' +
           '<div class="up-row">' +
             '<button class="btn up-navcopy">⧉ копировать весь список</button>' +
@@ -127,7 +127,7 @@
           '<pre class="up-code"></pre>' +
           '<div class="up-row">' +
             '<button class="btn up-copy">⧉ копировать образец</button>' +
-            '<button class="btn up-dl">⬇ скачать образец</button>' +
+            '<button class="btn up-dl">скачать образец</button>' +
             '<span class="up-what muted"></span>' +
           '</div>' +
         '</div>' +
@@ -198,7 +198,7 @@
         if(r && r.ok){ created += r.created || 0; learned += r.learned || 0; updated += r.updated || 0; if(Array.isArray(r.warnings)) warns.push(...r.warnings); } else bad++;
       }
       loadBtn.disabled = false; fileIn.value = '';
-      const parts = ['+' + created + ' кусков']; if(updated) parts.push(updated + ' обновл.'); if(learned) parts.push('+' + learned + ' слов'); if(warns.length) parts.push('⚠ ' + warns.length + ' не код'); else if(bad) parts.push(bad + ' пропущено');
+      const parts = ['+' + created + ' кусков']; if(updated) parts.push(updated + ' обновл.'); if(learned) parts.push('+' + learned + ' слов'); if(warns.length) parts.push('' + warns.length + ' не код'); else if(bad) parts.push(bad + ' пропущено');
       loadBtn.textContent = '✓ ' + parts.join(', ');
       if(warns.length) alert('Пропущены куски, где «код» — это русский текст без кода (похоже на словарь/синонимы):\n\n' + warns.slice(0, 20).map(w => '• ' + w.title).join('\n') + (warns.length > 20 ? '\n…и ещё ' + (warns.length - 20) : '') + '\n\nЕсли это пояснения — грузи их через «Словарь пояснений», а синонимы — через «Синонимы».');
       setTimeout(() => { loadBtn.textContent = o; }, 3500);

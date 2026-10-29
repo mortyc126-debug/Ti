@@ -1,4 +1,4 @@
-// «🗂 структура»: оглавление активного файла — функции, классы, константы, методы и
+// «структура»: оглавление активного файла — функции, классы, константы, методы и
 // смысловые секции-комментарии (баннеры «// ── Имя ──»). Фильтр + прыжок к месту.
 // Для навигации по большим файлам: разбор эффективный (префиксные массивы глубины и строк).
 // Надстройка над window.codelabSandbox; левая панель в песочнице.
@@ -89,7 +89,7 @@
   document.head.appendChild(st);
 
   const panel = document.createElement('div'); panel.className = 'sb-outline';
-  panel.innerHTML = '<div class="oh"><b>🗂 Структура</b><button id="olRef" title="обновить">⟳</button><button id="olX" title="закрыть">×</button></div>'
+  panel.innerHTML = '<div class="oh"><b>Структура</b><button id="olRef" title="обновить">⟳</button><button id="olX" title="закрыть">×</button></div>'
     + '<input class="of" id="olFilter" placeholder="фильтр по имени…"><div class="olist" id="olList"></div>';
   const edcol = box.querySelector('.sb-edcol') || edsEl;
   box.insertBefore(panel, edcol.parentNode === box ? edcol : edsEl);
@@ -121,7 +121,7 @@
   }
   function rebuild(force){
     const f = activeFile();
-    nameEl.textContent = '🗂 ' + (f ? (f.name || 'файл') : 'файл');
+    nameEl.textContent = '' + (f ? (f.name || 'файл') : 'файл');
     if(!f){ items = []; listEl.innerHTML = '<div class="none">нет открытого файла</div>'; return; }
     if(!force && f.id === lastId && f.code === lastCode) return;   // не пересобирать зря
     lastId = f.id; lastCode = f.code;
@@ -134,7 +134,7 @@
   panel.querySelector('#olX').onclick = () => { open = false; panel.classList.remove('on'); };
 
   // кнопка в панели песочницы
-  const b = document.createElement('button'); b.className = 'btn'; b.id = 'sbOutlineBtn'; b.textContent = '🗂 структура';
+  const b = document.createElement('button'); b.className = 'btn'; b.id = 'sbOutlineBtn'; b.textContent = 'структура';
   b.title = 'оглавление файла: функции, классы, константы, секции — фильтр и прыжок';
   b.onclick = () => { open = !open; panel.classList.toggle('on', open); if(open) rebuild(true); };
   const legend = bar.querySelector('#sbLegend'); if(legend) legend.after(b); else bar.appendChild(b);

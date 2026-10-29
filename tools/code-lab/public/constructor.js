@@ -127,7 +127,7 @@ function runtimeCheckDocument(doc, code){
   if(a.external.length)warnings.push(`Возможные внешние переменные/библиотеки: ${a.external.join(', ')}.`);
   return {errors,warnings,analysis:a,dependencies};
 }
-function setRuntimeState(status, errors=[], warnings=[]){ runtimeState.status=status; runtimeState.errors=[...new Set(errors)]; runtimeState.warnings=[...new Set(warnings)]; runtimeState.checkedAt=Date.now(); const el=document.getElementById('runtimeStatus'); if(el){ el.className='runtime-status '+status; el.textContent=status==='ready'?'✓ окружение готово':status==='error'?'⛔ есть ошибки':status==='checking'?'… проверка':'Preview не запускался'; } }
+function setRuntimeState(status, errors=[], warnings=[]){ runtimeState.status=status; runtimeState.errors=[...new Set(errors)]; runtimeState.warnings=[...new Set(warnings)]; runtimeState.checkedAt=Date.now(); const el=document.getElementById('runtimeStatus'); if(el){ el.className='runtime-status '+status; el.textContent=status==='ready'?'✓ окружение готово':status==='error'?'есть ошибки':status==='checking'?'… проверка':'Preview не запускался'; } }
 
 // Формальный контракт соединений. Это уже не только текстовая подсказка:
 // addEdge() использует эти данные и не создаёт заведомо несовместимую связь.
@@ -387,7 +387,7 @@ function renderPalette(){
   const mkItem = t => {
     const it = palItem(window.codelabTitle ? window.codelabTitle(t.title) : t.title, t.desc); it.onclick = () => addFromCatalog(t);
     if(t.lang){ const lg = el('span', 'pi-lang', String(t.lang).toUpperCase()); it.appendChild(lg); }
-    const del = el('span', 'pi-del', '🗑'); del.title = 'удалить шаблон насовсем';
+    const del = el('span', 'pi-del', 'удалить'); del.title = 'удалить шаблон насовсем';
     del.onclick = e => { e.stopPropagation(); delTemplate(t); };
     it.appendChild(del); return it;
   };
@@ -403,7 +403,7 @@ function activeSbFile(){ const sb = window.codelabSandbox; if(!sb) return null; 
 function palCatItem(t){
   const it = palItem(window.codelabTitle ? window.codelabTitle(t.title) : t.title, t.desc); it.onclick = () => addFromCatalog(t);
   if(t.lang){ const lg = el('span', 'pi-lang', String(t.lang).toUpperCase()); it.appendChild(lg); }
-  const del = el('span', 'pi-del', '🗑'); del.title = 'удалить шаблон насовсем';
+  const del = el('span', 'pi-del', 'удалить'); del.title = 'удалить шаблон насовсем';
   del.onclick = e => { e.stopPropagation(); delTemplate(t); };
   it.appendChild(del); return it;
 }
@@ -418,7 +418,7 @@ async function renderSimilar(){
   const q = ($('#palSearch').value || '').toLowerCase();
   const items = hits.map(h => ({ t: byId[h.id], score: h.score })).filter(x => x.t && (!q || (x.t.title + ' ' + (x.t.desc || '')).toLowerCase().includes(q)));
   host.innerHTML = '';
-  const d = palDetails('🫧 Похожие на: ' + (f.name || 'файл'), items.length, true);
+  const d = palDetails('Похожие на: ' + (f.name || 'файл'), items.length, true);
   if(!items.length){ d.appendChild(el('div', 'muted', 'похожих компонентов не нашлось')); }
   items.forEach(({ t, score }) => { const it = palCatItem(t); const pc = el('span', 'pi-lang', score + '%'); pc.style.color = 'var(--acc)'; const del = it.querySelector('.pi-del'); it.insertBefore(pc, del); d.appendChild(it); });
   host.appendChild(d);
@@ -465,11 +465,11 @@ async function addFromCatalog(t){
   } catch(_){}
 }
 $('#palSearch').oninput = renderPalette;
-// «🗂 схемы» — сохранить текущий граф со связями в файл / открыть сохранённый
+// «схемы» — сохранить текущий граф со связями в файл / открыть сохранённый
 (function(){ const btn = $('#flows'); if(!btn) return; btn.onclick = openFlowModal; })();
-// «🔗 авто-связи» — переключатель авто-разводки
+// «авто-связи» — переключатель авто-разводки
 (function(){ const btn = $('#autowire'); if(!btn) return;
-  const upd = () => { btn.textContent = autoWire ? '🔗 авто-связи' : '🔗 авто-связи off'; btn.style.opacity = autoWire ? '1' : '.5'; };
+  const upd = () => { btn.textContent = autoWire ? 'авто-связи' : 'авто-связи off'; btn.style.opacity = autoWire ? '1' : '.5'; };
   upd();
   btn.onclick = () => { autoWire = !autoWire; try { localStorage.setItem('codelab_autowire', autoWire ? 'on' : 'off'); } catch(_){} upd(); showEdgeMessage(autoWire ? 'Авто-связи включены.' : 'Авто-связи выключены.', 'warn'); };
 })();
@@ -478,7 +478,7 @@ async function openFlowModal(){
     '<div class="modal" style="max-width:620px"><h3>Схемы (сборки со связями)</h3>'
     + '<p class="mh">Сохрани текущий холст как схему — узлы и связи лягут в файл, их можно открыть позже и отправить на GitHub.</p>'
     + '<div class="mrow"><div class="mfield" style="flex:2"><label>Название схемы</label><input id="fl-name" placeholder="например: расчёт среднего по списку"></div>'
-    + '<div class="mfield" style="flex:0 0 auto;display:flex;align-items:flex-end"><button class="btn ok" id="fl-save">💾 сохранить текущую</button></div></div>'
+    + '<div class="mfield" style="flex:0 0 auto;display:flex;align-items:flex-end"><button class="btn ok" id="fl-save">сохранить текущую</button></div></div>'
     + '<div class="fl-err merr" id="fl-err"></div>'
     + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin:10px 0 6px">сохранённые схемы</div>'
     + '<div id="fl-list" class="fl-list"><div class="muted">загрузка…</div></div>'
@@ -499,7 +499,7 @@ async function openFlowModal(){
         const full = await fetch('/api/flows/get?id=' + encodeURIComponent(f.id)).then(r => r.json()).catch(() => null);
         if(full && full.graph){ histFlush(); graph = { nodes: full.graph.nodes || [], edges: full.graph.edges || [] }; selectedId = null; multi.clear(); renderCanvas(); renderInspector(); renderCode(); persist(); bg.remove(); showEdgeMessage('Схема «' + f.name + '» открыта.', 'ok'); }
       };
-      const del = el('button', 'btn', '🗑'); del.title = 'удалить схему'; del.onclick = async () => { if(!confirm('Удалить схему «' + f.name + '»?')) return; await fetch('/api/flows/delete', { method:'POST', body: JSON.stringify({ id: f.id }) }); reload(); };
+      const del = el('button', 'btn', 'удалить'); del.title = 'удалить схему'; del.onclick = async () => { if(!confirm('Удалить схему «' + f.name + '»?')) return; await fetch('/api/flows/delete', { method:'POST', body: JSON.stringify({ id: f.id }) }); reload(); };
       const acts = el('div', 'fl-acts'); acts.append(open, del); row.appendChild(acts);
       box.appendChild(row);
     });
@@ -510,7 +510,7 @@ async function openFlowModal(){
     if(!graph.nodes.length){ q('#fl-err').textContent = 'холст пустой — нечего сохранять'; return; }
     q('#fl-save').textContent = 'сохраняю…';
     const r = await fetch('/api/flows/save', { method:'POST', body: JSON.stringify({ name, graph }) }).then(r => r.json()).catch(() => ({}));
-    q('#fl-save').textContent = '💾 сохранить текущую';
+    q('#fl-save').textContent = 'сохранить текущую';
     if(r.ok){ q('#fl-err').textContent = ''; q('#fl-name').value = ''; reload(); } else q('#fl-err').textContent = 'не сохранилось';
   };
   reload();
@@ -556,7 +556,7 @@ async function openBigTplModal(){
     list.forEach(r => {
       const row = el('div', 'fl-row'); row.innerHTML = '<span class="fl-n"></span><span class="fl-meta">' + (r.items || 0) + ' кусок(ов)</span>';
       row.querySelector('.fl-n').textContent = r.title;
-      const go = el('button', 'btn ok', '📋 развернуть'); go.onclick = () => { bg.remove(); unpackRecipe(r.id, r.title); };
+      const go = el('button', 'btn ok', 'развернуть'); go.onclick = () => { bg.remove(); unpackRecipe(r.id, r.title); };
       const acts = el('div', 'fl-acts'); acts.append(go); row.appendChild(acts); box.appendChild(row);
     });
   };
@@ -596,7 +596,7 @@ function addNode(blockId, extra){
   graph.nodes.push(nd);
   const made = autoWire ? autoConnect(nd) : 0;
   renderCanvas(); select(nd); persist(); renderCode();
-  if(made) showEdgeMessage('Авто-связи: ' + made + ' (по совпадению имён). Отключить — кнопка 🔗.', 'ok');
+  if(made) showEdgeMessage('Авто-связи: ' + made + ' (по совпадению имён). Отключить — кнопка .', 'ok');
   return nd;
 }
 // контракт узла по его коду: какие имена даёт (provides) и какие берёт (requires)
@@ -881,7 +881,7 @@ function addEdge(from, to){
   graph.edges.push({ from, to });
   if(!result.ok){ try { bindEdge(a, b); } catch(_){} }   // всё равно пробуем подставить имя
   drawEdges(); persist(); renderCode(); renderInspector(b); markNeeds();
-  showEdgeMessage(result.ok ? result.text : ('⚠ ' + result.reason + ' Связь создана — проверь вход.'), result.ok ? (result.level === 'info' ? 'warn' : 'ok') : 'warn');
+  showEdgeMessage(result.ok ? result.text : ('' + result.reason + ' Связь создана — проверь вход.'), result.ok ? (result.level === 'info' ? 'warn' : 'ok') : 'warn');
 }
 function removeNode(id){
   graph.nodes = graph.nodes.filter(n => n.id !== id);
@@ -992,22 +992,22 @@ function renderInspector(nd){
   // компактный ряд действий иконками вместо крупных кнопок, которые громоздили панель
   const acts = el('div', 'insp-acts');
   const mkAct = (txt, title, fn, color) => { const x = el('button', 'insp-act', txt); x.title = title; if(color) x.style.color = color; x.onclick = fn; return x; };
-  acts.appendChild(mkAct('💾 в каталог', 'сохранить этот кусок в каталог', () => saveToCatalog(nd)));
+  acts.appendChild(mkAct('в каталог', 'сохранить этот кусок в каталог', () => saveToCatalog(nd)));
   const lx = nodeLang(nd);
-  acts.appendChild(mkAct('⬇ файл', 'скачать код как .' + (LANG_EXT[lx] || 'txt'), () => { const ext = LANG_EXT[lx] || 'txt'; const nm = (nodeLabel(nd) || 'кусок').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 60) + '.' + ext; download(nm, nodeCode(nd), MIME[ext] || 'text/plain'); }));
-  if(nd.blockId === 'raw'){ const parts = breakdownText(String((nd.fields || {}).code || ''), 'auto').parts; if(parts.length > 1) acts.appendChild(mkAct('🧩 разложить (' + parts.length + ')', 'разбить этот файл на отдельные блоки', () => explodeNode(nd), '#3DD9FF')); }
+  acts.appendChild(mkAct('файл', 'скачать код как .' + (LANG_EXT[lx] || 'txt'), () => { const ext = LANG_EXT[lx] || 'txt'; const nm = (nodeLabel(nd) || 'кусок').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 60) + '.' + ext; download(nm, nodeCode(nd), MIME[ext] || 'text/plain'); }));
+  if(nd.blockId === 'raw'){ const parts = breakdownText(String((nd.fields || {}).code || ''), 'auto').parts; if(parts.length > 1) acts.appendChild(mkAct('разложить (' + parts.length + ')', 'разбить этот файл на отдельные блоки', () => explodeNode(nd), '#3DD9FF')); }
   body.appendChild(acts);
   if(inspTab === 'set'){
     body.appendChild(nodeMetaEditor(nd, titleEl));
     body.appendChild(inspFields(nd, b));                  // код (у «своего кода» — сразу открыт и первым) + поля
     body.appendChild(chainLinksSection(nd));              // «берёт/даёт» → конкретные куски-кандидаты цепочки
     const det = document.createElement('details'); det.style.marginTop = '10px';
-    const sum = document.createElement('summary'); sum.textContent = '🔗 контракт по шаблону (текстом)'; sum.style.cssText = 'cursor:pointer;color:var(--text3);font-size:12px;margin-bottom:6px';
+    const sum = document.createElement('summary'); sum.textContent = 'контракт по шаблону (текстом)'; sum.style.cssText = 'cursor:pointer;color:var(--text3);font-size:12px;margin-bottom:6px';
     det.appendChild(sum); det.appendChild(renderBlockContract(nd, b)); body.appendChild(det);
   } else {
     body.appendChild(descEditor(nd, b));                  // описание своими словами
     const det = document.createElement('details'); det.style.marginTop = '10px';
-    const sum = document.createElement('summary'); sum.textContent = '🔍 почему это работает'; sum.style.cssText = 'cursor:pointer;color:var(--text3);font-size:12px;margin-bottom:6px';
+    const sum = document.createElement('summary'); sum.textContent = 'почему это работает'; sum.style.cssText = 'cursor:pointer;color:var(--text3);font-size:12px;margin-bottom:6px';
     det.appendChild(sum); det.appendChild(inspWhy(nd, b)); body.appendChild(det);
   }
   host.appendChild(body);
@@ -1076,8 +1076,8 @@ function renderBlockContract(nd, b){
     const depBox=el('div','bc-section'); depBox.appendChild(el('div','bc-heading','Зависимости'));
     const ul=document.createElement('ul');
     depStatus.ready.forEach(d=>ul.appendChild(el('li','',`✓ ${d.name} — доступна.`)));
-    depStatus.missing.forEach(d=>ul.appendChild(el('li','bc-alert',`⛔ ${d.name} — не подключена. ${dependencyAdvice(d)}`)));
-    depStatus.manual.forEach(d=>ul.appendChild(el('li','bc-alert',`⚠ ${d.name} — требуется ESM/npm. ${dependencyAdvice(d)}`)));
+    depStatus.missing.forEach(d=>ul.appendChild(el('li','bc-alert',`${d.name} — не подключена. ${dependencyAdvice(d)}`)));
+    depStatus.manual.forEach(d=>ul.appendChild(el('li','bc-alert',`${d.name} — требуется ESM/npm. ${dependencyAdvice(d)}`)));
     depBox.appendChild(ul); box.appendChild(depBox);
   }
   if(guide.risks && guide.risks.length){
@@ -1302,8 +1302,8 @@ function descEditor(nd, b){
   const tools = el('div', 'desc-tools');
   const chip = el('button', 'btn', '⟨⟩ код в плашку'); chip.type = 'button'; chip.onclick = () => { wrapBackticks(ta); nd.desc = ta.value; nd.descAt = Date.now(); persist(); draw(); drawSync(); };
   tools.appendChild(chip); tools.appendChild(el('span', 'desc-hint', '`код` — плашка, блок — в тройных ```'));
-  // ✨ дополнить описание через Mistral: показывает предложение, в узел пишется только после выбора
-  const aiB = el('button', 'btn', '✨ дополнить через ИИ'); aiB.type = 'button';
+  // дополнить описание через Mistral: показывает предложение, в узел пишется только после выбора
+  const aiB = el('button', 'btn', 'дополнить через ИИ'); aiB.type = 'button';
   aiB.title = 'Mistral допишет описание по коду узла. Ключ — тот же, что в «Настройках» каталога.';
   const aiOut = el('div', 'desc-sync'); aiOut.style.display = 'none';
   aiB.onclick = async () => {
@@ -1330,8 +1330,8 @@ function descEditor(nd, b){
         const no = el('button', 'btn', 'отмена'); no.type = 'button'; no.onclick = () => { aiOut.style.display = 'none'; };
         row.append(rep, app, no); aiOut.appendChild(row);
       }
-    } catch(e){ aiOut.appendChild(el('div', 'desc-hint', '⛔ ' + e.message)); }
-    aiB.disabled = false; aiB.textContent = '✨ дополнить через ИИ';
+    } catch(e){ aiOut.appendChild(el('div', 'desc-hint', '' + e.message)); }
+    aiB.disabled = false; aiB.textContent = 'дополнить через ИИ';
   };
   tools.appendChild(aiB);
   box.appendChild(tools);
@@ -1381,7 +1381,7 @@ function nodeMetaEditor(nd, titleEl){
   function renderScope(){
     scope.innerHTML = '';
     if(!nd.src){
-      scope.appendChild(el('div', 'scope-note', 'Этот узел не связан с шаблоном. Правки живут только в этой схеме. Чтобы сохранить насовсем — «💾 сохранить в каталог» выше.'));
+      scope.appendChild(el('div', 'scope-note', 'Этот узел не связан с шаблоном. Правки живут только в этой схеме. Чтобы сохранить насовсем — «сохранить в каталог» выше.'));
       return;
     }
     const dirty = nodeDirty(nd);
@@ -1506,7 +1506,7 @@ function componentPreflight(nd, code){
 }
 function renderPreflight(host, result){
   host.innerHTML = '';
-  const title = el('div','preflight-title', result.errors.length ? '⛔ Сохранение заблокировано' : result.warnings.length ? '⚠ Можно сохранить, но есть предупреждения' : '✓ Компонент прошёл самопроверку');
+  const title = el('div','preflight-title', result.errors.length ? 'Сохранение заблокировано' : result.warnings.length ? 'Можно сохранить, но есть предупреждения' : '✓ Компонент прошёл самопроверку');
   host.appendChild(title);
   if(result.errors.length){ const ul=document.createElement('ul'); result.errors.forEach(x=>ul.appendChild(el('li','preflight-error',x))); host.appendChild(ul); }
   if(result.warnings.length){ const ul=document.createElement('ul'); result.warnings.forEach(x=>ul.appendChild(el('li','preflight-warning',x))); host.appendChild(ul); }
@@ -1659,8 +1659,8 @@ var log=document.getElementById('log');
 var _p=function(){ log.textContent += Array.prototype.join.call(arguments,' ')+'\\n'; };
 var console={log:_p,error:_p,warn:_p,info:_p};
 var _report=function(prefix,e){ var msg=e && e.stack ? e.stack : (e && e.message ? e.message : String(e)); _p(prefix + msg); try{ parent.postMessage({type:'codeforge-preview-error',runId:'${safeRunId}',message:String(msg)}, '*'); }catch(_){} };
-window.addEventListener('error',function(e){ _report('⛔ ', e.error || e.message); });
-window.addEventListener('unhandledrejection',function(e){ _report('⛔ Promise: ', e.reason); e.preventDefault(); });
+window.addEventListener('error',function(e){ _report('', e.error || e.message); });
+window.addEventListener('unhandledrejection',function(e){ _report('Promise: ', e.reason); e.preventDefault(); });
 (async function(){
   try{
     const deps=${JSON.stringify(deps)};
@@ -1669,8 +1669,8 @@ window.addEventListener('unhandledrejection',function(e){ _report('⛔ Promise: 
       await new Promise((resolve,reject)=>{const sc=document.createElement('script');sc.src=dep.url;sc.onload=resolve;sc.onerror=()=>reject(new Error('Не удалось загрузить '+dep.name+' из '+dep.url));document.head.appendChild(sc);});
     }
 ${String(code).split('\\n').map(l => '    '+l).join('\\n')}
-  }catch(e){ _report('⛔ ', e); }
-})().then(function(){ try{ parent.postMessage({type:'codeforge-preview-ready',runId:'${safeRunId}'}, '*'); }catch(_){} }).catch(function(e){ _report('⛔ async: ', e); });
+  }catch(e){ _report('', e); }
+})().then(function(){ try{ parent.postMessage({type:'codeforge-preview-ready',runId:'${safeRunId}'}, '*'); }catch(_){} }).catch(function(e){ _report('async: ', e); });
 <\\/script></body>`;
 }
 
@@ -1690,7 +1690,7 @@ window.addEventListener('message', e => {
   const d=e.data||{}; if(!d || !d.type || d.runId !== preview.dataset.runId) return;
   if(d.type==='codeforge-preview-error'){
     setRuntimeState('error', [...runtimeState.errors, 'Preview: '+d.message], runtimeState.warnings);
-    showEdgeMessage('⛔ Preview: '+d.message, 'error'); renderInspector();
+    showEdgeMessage('Preview: '+d.message, 'error'); renderInspector();
   } else if(d.type==='codeforge-preview-ready'){
     // код отработал без исключения — это успех. Недостающие селекторы/библиотеки
     // не блокируют, а показываются тихой подсказкой (многие куски создают DOM сами).
@@ -1704,7 +1704,7 @@ window.addEventListener('message', e => {
 });
 $('#copy').onclick = () => { navigator.clipboard.writeText(currentCode()); flash($('#copy'), '✓'); };
 $('#run').onclick = run;
-// «🔌 собрать и проверить»: что не стыкуется + чего не хватает + запуск
+// «собрать и проверить»: что не стыкуется + чего не хватает + запуск
 function nodeLang(nd){ return (nd && nd.src && nd.src.lang) ? String(nd.src.lang).toLowerCase() : 'js'; }
 // язык → расширение файла и mime (для «скачать файл» в родном формате)
 const LANG_EXT = { js:'js', javascript:'js', ts:'ts', typescript:'ts', python:'py', py:'py', ruby:'rb', php:'php', go:'go', lua:'lua', bash:'sh', sh:'sh', powershell:'ps1', r:'R', sql:'sql', css:'css', html:'html', htm:'html', json:'json', txt:'txt' };
@@ -1736,18 +1736,18 @@ async function buildCheck(){
     html += '<p class="mh" style="color:var(--str)">✓ Всё стыкуется: входы закрыты, типы совпадают. Можно запускать.</p>';
   } else {
     html += '<p class="mh">Вот что помешает запуску — почини это, и «почти готово» станет готово:</p>';
-    if(mixed) html += '<div class="bc-sec">🚫 <b>Разные языки</b> на холсте (' + _escH(langs.join(', ')) + ') — в одну программу не собрать. Раздели по языку или передай данные через JSON (файл/stdout).</div>';
+    if(mixed) html += '<div class="bc-sec"><b>Разные языки</b> на холсте (' + _escH(langs.join(', ')) + ') — в одну программу не собрать. Раздели по языку или передай данные через JSON (файл/stdout).</div>';
     if(missing.length){
-      html += '<div class="bc-sec"><b>⚠ Не хватает входов</b> (связь не дотянута или имя не объявлено):<ul>'
+      html += '<div class="bc-sec"><b>Не хватает входов</b> (связь не дотянута или имя не объявлено):<ul>'
         + missing.map(m => '<li>куску «<b>' + _escH(m.node) + '</b>» нужно <code>' + _escH(m.name) + '</code> — его никто не даёт раньше</li>').join('') + '</ul></div>';
     }
     if(bad.length){
-      html += '<div class="bc-sec"><b>⛔ Типы не сходятся</b> (красный пунктир на холсте):<ul>'
+      html += '<div class="bc-sec"><b>Типы не сходятся</b> (красный пунктир на холсте):<ul>'
         + bad.map(e => '<li>«' + _escH(e.from) + '» → «' + _escH(e.to) + '»: тип выхода не подходит ко входу</li>').join('') + '</ul></div>';
     }
   }
   html += '<div id="bc-out" class="bc-out" style="display:none"></div>';
-  html += '<div class="mbtns" style="margin-top:12px"><button class="btn ok" id="bc-run">▶ всё равно запустить</button><button class="btn" id="bc-close">закрыть</button></div></div>';
+  html += '<div class="mbtns" style="margin-top:12px"><button class="btn ok" id="bc-run">всё равно запустить</button><button class="btn" id="bc-close">закрыть</button></div></div>';
   bg.innerHTML = html; document.body.appendChild(bg);
   const q = s => bg.querySelector(s);
   bg.onclick = e => { if(e.target === bg) bg.remove(); };
@@ -1759,8 +1759,8 @@ async function buildCheck(){
     const outBox = q('#bc-out'); outBox.style.display = ''; outBox.textContent = 'запускаю на ПК…';
     const code = orderedNodes().map(nodeCode).join('\n');
     const r = await fetch('/api/run', { method:'POST', body: JSON.stringify({ lang, code }) }).then(x => x.json()).catch(() => ({ ok:false, error:'сервер недоступен' }));
-    if(!r.ok){ outBox.textContent = '⛔ ' + (r.error || 'ошибка'); return; }
-    let out = r.stdout || ''; if(r.stderr) out += (out ? '\n' : '') + '⚠ ' + r.stderr; if(r.timedOut) out += '\n⏱ таймаут'; if(!out.trim()) out = '(код отработал, вывода нет · ' + r.code + ')';
+    if(!r.ok){ outBox.textContent = '' + (r.error || 'ошибка'); return; }
+    let out = r.stdout || ''; if(r.stderr) out += (out ? '\n' : '') + '' + r.stderr; if(r.timedOut) out += '\nтаймаут'; if(!out.trim()) out = '(код отработал, вывода нет · ' + r.code + ')';
     outBox.textContent = out;
   };
 }
@@ -1954,7 +1954,7 @@ $('#clear').onclick = () => { graph = { nodes: [], edges: [] }; selectedId = nul
   const center = document.querySelector('.center'), btn = $('#collapseCanvas'); if(!center || !btn) return;
   const set = on => {
     center.classList.toggle('canvas-collapsed', on);
-    btn.textContent = on ? '🔼 развернуть холст' : '🔽 свернуть холст';
+    btn.textContent = on ? 'развернуть холст' : 'свернуть холст';
     btn.title = on ? 'показать визуальный холст со связями' : 'свернуть визуальный холст — больше места коду и предпросмотру';
     try { localStorage.setItem('codelab_canvas_collapsed', on ? '1' : '0'); } catch(_){}
     if(!on && typeof drawEdges === 'function') drawEdges();

@@ -142,13 +142,13 @@
     '<div class="sb-gut" id="sbGut" title="потяни — шире редактор или превью"></div>' +
     '<div class="sb-right">' +
       '<div class="sb-bar">' +
-        '<button class="btn ok" id="sbRun">▶ запустить</button>' +
+        '<button class="btn ok" id="sbRun">запустить</button>' +
         '<button class="btn" id="sbCopyAll" title="скопировать весь собранный документ (HTML+CSS+JS вместе) — вставить в файл">⧉ копировать итог</button>' +
         '<label class="sb-live"><input type="checkbox" id="sbLive"> живой предпросмотр</label>' +
         '<button class="btn" id="sbAdd">+ файл</button>' +
-        '<button class="btn" id="sbSaveDisk" title="сохранить текущий открытый файл на диск — откроется обычное окно выбора папки и имени">💾 на диск</button>' +
-        '<label class="sb-live" title="когда включено — клик по слову в коде показывает пояснение. Редактировать код можно всё равно."><input type="checkbox" id="sbExplain"> 🔍 пояснения по клику</label>' +
-        '<button class="btn" id="sbLegend" title="что значат цвета в коде">🎨 цвета</button>' +
+        '<button class="btn" id="sbSaveDisk" title="сохранить текущий открытый файл на диск — откроется обычное окно выбора папки и имени">на диск</button>' +
+        '<label class="sb-live" title="когда включено — клик по слову в коде показывает пояснение. Редактировать код можно всё равно."><input type="checkbox" id="sbExplain"> пояснения по клику</label>' +
+        '<button class="btn" id="sbLegend" title="что значат цвета в коде">цвета</button>' +
         '<span style="flex:1"></span>' +
         '<button class="btn" id="sbClr">× консоль</button>' +
       '</div>' +
@@ -190,23 +190,23 @@
 
   window.addEventListener('message', e => {
     const d = e.data; if(!d || !d.__sb) return;
-    const mark = d.t === 'error' ? '🔴' : d.t === 'warn' ? '🟡' : '·';
+    const mark = d.t === 'error' ? 'ошибка:' : d.t === 'warn' ? 'внимание:' : '·';
     conEl.textContent += mark + ' ' + d.m + '\n';
     conEl.scrollTop = conEl.scrollHeight;
   });
 
   // ── запуск одного файла на сервере (python и пр.) ──
   async function runServer(f){
-    conEl.textContent += '▶ ' + f.name + ' (' + langName(f.lang) + ')…\n';
+    conEl.textContent += 'запуск: ' + f.name + ' (' + langName(f.lang) + ')…\n';
     conEl.scrollTop = conEl.scrollHeight;
     let r;
     try { r = await fetch('/api/run', { method:'POST', body: JSON.stringify({ lang: f.lang, code: f.code }) }).then(x => x.json()); }
     catch(_){ r = { ok:false, error:'сервер недоступен — запусти node tools/code-lab-server.mjs' }; }
-    if(!r.ok){ conEl.textContent += '🔴 ' + (r.error || 'ошибка') + '\n'; }
+    if(!r.ok){ conEl.textContent += '' + (r.error || 'ошибка') + '\n'; }
     else {
       if(r.stdout) conEl.textContent += r.stdout + (r.stdout.endsWith('\n') ? '' : '\n');
-      if(r.stderr) conEl.textContent += '🟡 ' + r.stderr + (r.stderr.endsWith('\n') ? '' : '\n');
-      if(r.timedOut) conEl.textContent += '🔴 превышено время (10с)\n';
+      if(r.stderr) conEl.textContent += '' + r.stderr + (r.stderr.endsWith('\n') ? '' : '\n');
+      if(r.timedOut) conEl.textContent += 'превышено время (10с)\n';
       if(!r.stdout && !r.stderr) conEl.textContent += '(без вывода, код выхода ' + r.code + ')\n';
     }
     conEl.scrollTop = conEl.scrollHeight;
@@ -424,7 +424,7 @@
     showPop(word, role, body, ev);
   }
 
-  // пояснение слова по языку — из тех же словарей (включая keyword-dict.json). Для панели «🧩 разобрать» и др.
+  // пояснение слова по языку — из тех же словарей (включая keyword-dict.json). Для панели «разобрать» и др.
   window.codelabExplain = function(word, lang){
     if(!word) return null;
     const w = String(word), lw = w.toLowerCase(), l = String(lang || '').toLowerCase();
@@ -578,7 +578,7 @@
       head.appendChild(name); head.appendChild(sel);
 
       if(!isFront(f.lang)){
-        const run1 = document.createElement('button'); run1.className = 'btn sb-run1'; run1.textContent = '▶'; run1.title = 'запустить этот файл на компьютере';
+        const run1 = document.createElement('button'); run1.className = 'btn sb-run1'; run1.textContent = 'запустить'; run1.title = 'запустить этот файл на компьютере';
         run1.onclick = () => runServer(f);
         head.appendChild(run1);
       }
@@ -587,7 +587,7 @@
       cp.onclick = () => copyText(f.code, cp);
       head.appendChild(cp);
 
-      const del = document.createElement('button'); del.className = 'sb-ed-del'; del.textContent = '🗑'; del.title = 'удалить файл';
+      const del = document.createElement('button'); del.className = 'sb-ed-del'; del.textContent = 'удалить'; del.title = 'удалить файл';
       del.onclick = () => { files = files.filter(x => x !== f); if(!files.length) files = [{ id:uid(), name:'index.html', lang:'html', code:'' }]; save(); renderEds(); schedulePreview(); };
       head.appendChild(del);
 
@@ -667,7 +667,7 @@
   let exInit = false; try { exInit = localStorage.getItem('codelab_sandbox_explain') === '1'; } catch(_){}
   setExplain(exInit);
 
-  // «💾 на диск» — сохранить ТЕКУЩИЙ открытый файл в настоящее место на диске через системное окно.
+  // «на диск» — сохранить ТЕКУЩИЙ открытый файл в настоящее место на диске через системное окно.
   // Берём файл, в чьём редакторе сейчас фокус (иначе — активный/первый); текст — свежий из редактора.
   box.querySelector('#sbSaveDisk').onclick = async () => {
     let ed = null, f = null;
@@ -699,7 +699,7 @@
     const lg = document.createElement('div'); lg.className = 'sb-legend';
     lg.innerHTML = '<div class="sb-lg-h">Что значат цвета</div>' + LEGEND.map(x =>
       '<div class="sb-lg-row"><span class="sb-lg-sw" style="background:' + x.c + '"></span><span class="sb-lg-n">' + x.n + '</span><span class="sb-lg-d">' + x.d + '</span></div>').join('') +
-      '<div class="sb-lg-foot">Включи «🔍 разбор» и кликай по словам — расскажу про каждое.</div>';
+      '<div class="sb-lg-foot">Включи «разбор» и кликай по словам — расскажу про каждое.</div>';
     document.body.appendChild(lg);
     const b = ev.target.getBoundingClientRect();
     lg.style.left = Math.max(8, Math.min(b.left, innerWidth - lg.offsetWidth - 12)) + 'px';
@@ -741,7 +741,7 @@
   function setMode(sb){
     center.classList.toggle('sandbox-on', sb);
     box.style.display = sb ? 'flex' : 'none';
-    if(btn){ btn.textContent = sb ? '🧩 к визуалу' : '🧪 песочница'; btn.title = sb ? 'вернуться к визуальному холсту со связями' : 'песочница: панели кода (HTML/CSS/JS и др.) + живой предпросмотр'; }
+    if(btn){ btn.textContent = sb ? 'к визуалу' : 'песочница'; btn.title = sb ? 'вернуться к визуальному холсту со связями' : 'песочница: панели кода (HTML/CSS/JS и др.) + живой предпросмотр'; }
     try { localStorage.setItem('codelab_mode', sb ? 'sandbox' : 'visual'); } catch(_){}
     if(sb){ renderPreview(); }
   }

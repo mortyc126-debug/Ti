@@ -1,4 +1,4 @@
-// Окно «🏷 подписи»: свои подписи к именам «даёт/нужно» пачкой и промпт для ИИ по разделу.
+// Окно «подписи»: свои подписи к именам «даёт/нужно» пачкой и промпт для ИИ по разделу.
 // Строка: «кусок | имя: подпись» (кусок — название или id:…). Пустая подпись снимает свою — вернётся автоматическая.
 // В промпт уходят только имена, которым автоподпись не помогла, и строка кода, где имя объявлено. window.codelabLabels.open()
 (function(){
@@ -15,12 +15,12 @@
     const tree = sec.tree || [];
     const langs = [...new Set(rows.map(r => r.lang))].sort();
     const bg = document.createElement('div'); bg.className = 'sx-bg';
-    bg.innerHTML = '<div class="sx"><h3>🏷 Подписи к «даёт / нужно»</h3>'
+    bg.innerHTML = '<div class="sx"><h3>Подписи к «даёт / нужно»</h3>'
       + '<div class="lead">Подписи к именам собираются сами — из кода и словаря. Где не вышло, можно дописать свою: строкой <code>кусок | имя: подпись</code>. '
       + 'Своя подпись побеждает автоматическую; пустая — снимает свою. Промпт ниже собирает для ИИ только имена без нормальной подписи — с той строкой кода, где имя объявлено.</div>'
       + '<div class="sx-cols"><div>'
       + '<label>Свои подписи</label><textarea id="lbT" rows="16" spellcheck="false" placeholder="querySelector — найти элемент | el: найденный элемент страницы"></textarea>'
-      + '<div class="sx-row"><button class="btn" id="lbDry">🔎 проверить</button><button class="btn ok" id="lbGo">💾 сохранить</button><span class="sx-msg" id="lbMsg"></span></div>'
+      + '<div class="sx-row"><button class="btn" id="lbDry">проверить</button><button class="btn ok" id="lbGo">сохранить</button><span class="sx-msg" id="lbMsg"></span></div>'
       + '</div><div>'
       + '<div style="display:grid;grid-template-columns:1fr 3fr;gap:8px"><div><label>Язык</label><select id="lbLang">' + langs.map(l => '<option' + (l === 'js' ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select></div>'
       + '<div><label>Раздел</label><select id="lbSec"><option value="">— все —</option>' + tree.map(t => '<option>' + esc(t.name) + '</option>' + (t.subs || []).map(s => '<option value="' + esc(t.name + ' / ' + s) + '">   ' + esc(s) + '</option>').join('')).join('') + '</select></div></div>'
@@ -54,7 +54,7 @@
         'После «←» — строка кода, где имя встречается; её в ответ не переписывай. Формат ответа строго: «название куска | имя: подпись», по строке на имя, без нумерации и пояснений.',
         'Пример: «Нарисовать круг | ctx: кисть для рисования на холсте».', '',
         lines.join('\n')
-      ].join('\n') : 'Здесь у всех имён уже есть подписи 👍';
+      ].join('\n') : 'Здесь у всех имён уже есть подписи';
     };
     q('#lbLang').onchange = build; q('#lbSec').onchange = build;
     q('#lbCopy').onclick = e => { navigator.clipboard && navigator.clipboard.writeText(q('#lbP').value); e.target.textContent = '✓ скопировано'; };

@@ -307,8 +307,8 @@
       <div class="pal-top">
         <input class="pal-search" id="palSearch" placeholder="поиск компонента…">
         <button class="pal-btn" id="fromtpl">+ компонент из каталога</button>
-        <button class="pal-btn" id="palsort" title="разово проставить раздел по смыслу там, где он пуст">✨ авто-разложить</button>
-        <button class="pal-btn" id="palsim" style="display:none" title="показать компоненты, похожие на открытый в редакторе файл">🫧 похожие на файл</button>
+        <button class="pal-btn" id="palsort" title="разово проставить раздел по смыслу там, где он пуст">авто-разложить</button>
+        <button class="pal-btn" id="palsim" style="display:none" title="показать компоненты, похожие на открытый в редакторе файл">похожие на файл</button>
       </div>
       <div class="pal-langs" id="palLangs"></div>
       <div class="pal-list" id="palList"></div>
@@ -326,44 +326,44 @@
             <button class="btn" id="zoomReset" title="100%"><span id="zoomLbl">100%</span></button>
             <button class="btn" id="zoomIn" title="крупнее">+</button>
           </span>
-          <button class="btn" id="collapseCanvas" title="свернуть визуальный холст — больше места коду и предпросмотру">🔽 свернуть холст</button>
-          <button class="btn" id="sandboxToggle" title="песочница: панели кода (HTML/CSS/JS и др.) + живой предпросмотр">🧪 песочница</button>
+          <button class="btn" id="collapseCanvas" title="свернуть визуальный холст — больше места коду и предпросмотру">свернуть холст</button>
+          <button class="btn" id="sandboxToggle" title="песочница: панели кода (HTML/CSS/JS и др.) + живой предпросмотр">песочница</button>
         </div>
         <div class="tb-grp tb-right">
           <div class="tb-menu">
             <button class="btn tb-menu-btn" type="button" aria-haspopup="true" aria-expanded="false">＋ добавить ▾</button>
             <div class="tb-pop">
               <button class="btn" id="paste">✎ вставить код</button>
-              <button class="btn" id="imp">⬆ разобрать файл</button>
-              <button class="btn" id="openEditor" title="открыть готовый файл целиком в редакторе песочницы — править как код, с номерами строк (не режет на блоки)">📝 файл в редактор</button>
-              <button class="btn" id="flows" title="сохранить эту схему со связями в файл или открыть сохранённую">🗂 схемы</button>
-              <button class="btn" id="bigtpl" title="развернуть большой шаблон на холст — в связанные блоки по смыслу">📋 большой шаблон…</button>
+              <button class="btn" id="imp">разобрать файл</button>
+              <button class="btn" id="openEditor" title="открыть готовый файл целиком в редакторе песочницы — править как код, с номерами строк (не режет на блоки)">файл в редактор</button>
+              <button class="btn" id="flows" title="сохранить эту схему со связями в файл или открыть сохранённую">схемы</button>
+              <button class="btn" id="bigtpl" title="развернуть большой шаблон на холст — в связанные блоки по смыслу">большой шаблон…</button>
               <button class="btn" id="example">пример</button>
             </div>
           </div>
           <div class="tb-menu">
-            <button class="btn tb-menu-btn" type="button" aria-haspopup="true" aria-expanded="false">✨ авто ▾</button>
+            <button class="btn tb-menu-btn" type="button" aria-haspopup="true" aria-expanded="false">авто ▾</button>
             <div class="tb-pop">
-              <button class="btn" id="autowire" title="авто-связи: соединять новые куски с совместимыми по именам">🔗 авто-связи</button>
-              <button class="btn" id="fixnodes" title="починить висящие узлы: подтянуть узлы-ящики к готовым кускам по названию и заново построить связи">🔧 починить узлы</button>
+              <button class="btn" id="autowire" title="авто-связи: соединять новые куски с совместимыми по именам">авто-связи</button>
+              <button class="btn" id="fixnodes" title="починить висящие узлы: подтянуть узлы-ящики к готовым кускам по названию и заново построить связи">починить узлы</button>
               <button class="btn" id="reconcile" title="свести описания узлов и каталога — автоматически берётся самое свежее по дате">⇅ свести описания</button>
             </div>
           </div>
           <input type="file" id="impfile" accept=".js,.mjs,.jsx,.ts,.html,.htm,.css,.py,.sql,.json,.txt" style="display:none">
           <input type="file" id="openfile" accept=".js,.mjs,.jsx,.ts,.html,.htm,.css,.py,.sql,.json,.txt,.md" style="display:none">
           <button class="btn" id="copy" title="скопировать весь собранный код">⧉ код</button>
-          <button class="btn" id="buildcheck" title="проверить стыковку по типам и запустить собранное">🔌 собрать и проверить</button>
+          <button class="btn" id="buildcheck" title="проверить стыковку по типам и запустить собранное">собрать и проверить</button>
           <span class="tb-run">
-            <button class="btn ok" id="run">▶ запустить</button>
+            <button class="btn ok" id="run">запустить</button>
             <select id="fmt" class="btn" title="формат файла"><option value="html">.html</option><option value="js">.js</option><option value="txt">.txt</option></select>
           </span>
           <div class="tb-menu">
             <button class="btn tb-menu-btn" type="button" aria-haspopup="true" aria-expanded="false" title="ещё">⋯</button>
             <div class="tb-pop">
               <button class="btn" id="editCode" title="открыть собранный код в редакторе песочницы — править целиком, с номерами строк">✎ править код в редакторе</button>
-              <button class="btn" id="winmode" title="сделать панели (куски / код / отображение) перетаскиваемыми окнами; ещё раз — вернуть обычную раскладку">🪟 окна (панели)</button>
-              <button class="btn" id="dl">⬇ скачать</button>
-              <button class="btn" id="save">💾 в шаблоны</button>
+              <button class="btn" id="winmode" title="сделать панели (куски / код / отображение) перетаскиваемыми окнами; ещё раз — вернуть обычную раскладку">окна (панели)</button>
+              <button class="btn" id="dl">скачать</button>
+              <button class="btn" id="save">в шаблоны</button>
               <div class="tb-sep"></div>
               <button class="btn tb-danger" id="clear">× очистить</button>
             </div>
@@ -381,7 +381,7 @@
         <textarea id="pasteCode" spellcheck="false" placeholder="сюда — свой код (HTML или JS), потом «разобрать на блоки»"></textarea>
         <div class="pp-btns">
           <button class="btn ok" id="pasteGo">разобрать на блоки</button>
-          <button class="btn" id="pasteEdit" title="не резать на блоки — открыть этот код целиком в редакторе песочницы">📝 править как код</button>
+          <button class="btn" id="pasteEdit" title="не резать на блоки — открыть этот код целиком в редакторе песочницы">править как код</button>
           <select id="pasteKind" class="btn" title="как разбирать"><option value="auto">определить само</option><option value="html">как HTML</option><option value="js">как JS</option></select>
           <button class="btn" id="pasteCancel">отмена</button>
           <span class="pp-note" id="pasteNote"></span>
@@ -413,6 +413,7 @@
   <script src="/outline.js"></script>
   <script src="/insert.js"></script>
   <script src="/ai-ask.js"></script>
+  <script src="/sel-explain.js"></script>
   <script src="/sb-toolbar.js"></script>
   <script>
   // меню панели инструментов: открыть/закрыть, Esc и клик мимо закрывают

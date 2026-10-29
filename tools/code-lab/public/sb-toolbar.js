@@ -34,15 +34,15 @@
 
   // на виду — только запуск; остальное — в трёх меню по смыслу
   const run = byId('sbRun');
-  const find = rename(byId('sbFindBtn'), '🔎 найти в файле (Ctrl+F)'), ask = rename(byId('sbAskBtn'), '🤖 спросить ИИ про код');
-  // файл: «💾 на диск…» помнит файл и сохраняет туда же — второй «💾 на диск» (всегда спрашивает место) лишний
-  const add = rename(byId('sbAdd'), '＋ новый файл'), open = rename(byText('открыть…'), '📂 открыть с диска…'), save = rename(byText('на диск…'), '💾 сохранить на диск');
+  const find = rename(byId('sbFindBtn'), 'найти в файле (Ctrl+F)'), ask = rename(byId('sbAskBtn'), 'спросить ИИ про код');
+  // файл: «на диск…» помнит файл и сохраняет туда же — второй «на диск» (всегда спрашивает место) лишний
+  const add = rename(byId('sbAdd'), '＋ новый файл'), open = rename(byText('открыть…'), 'открыть с диска…'), save = rename(byText('на диск…'), 'сохранить на диск');
   const saveDup = byId('sbSaveDisk'); if(saveDup) saveDup.style.display = 'none';
-  const project = rename(byId('sbProject'), '🗂 папка проекта…'), upload = rename(byText('⬆ файлы'), '⬆ загрузить файлы…');
-  const copyAll = rename(byId('sbCopyAll'), '⧉ скопировать итог (HTML+CSS+JS)'), clear = rename(byText('🧹 очистить'), '🧹 очистить всё');
+  const project = rename(byId('sbProject'), 'папка проекта…'), upload = rename(byText('файлы'), 'загрузить файлы…');
+  const copyAll = rename(byId('sbCopyAll'), '⧉ скопировать итог (HTML+CSS+JS)'), clear = rename(byText('очистить'), 'очистить всё');
   // вид
-  const outline = rename(byId('sbOutlineBtn'), '🗂 структура файла'), preview = byText('превью'), consoleClr = rename(byId('sbClr'), '× очистить консоль');
-  const legend = rename(byId('sbLegend'), '🎨 что значат цвета в коде');
+  const outline = rename(byId('sbOutlineBtn'), 'структура файла'), preview = byText('превью'), consoleClr = rename(byId('sbClr'), '× очистить консоль');
+  const legend = rename(byId('sbLegend'), 'что значат цвета в коде');
   // подсказки — галочки
   const live = byId('sbLive'), explain = byId('sbExplain'), links = byText('связи по клику'), ac = byId('sbAc');
   const spacer = take(el => el.tagName === 'SPAN' && !txt(el));
@@ -68,9 +68,9 @@
 
   const row = [
     run,
-    dd('📁 Файл', [add, open, save, sep(), project, upload, sep(), copyAll, clear]),
-    dd('👁 Вид', [find, outline, preview, consoleClr, sep(), legend]),
-    dd('⚙ Подсказки', [head('в коде'), ac, explain && explain.closest('label') || explain, links, sep(), head('превью'), live && live.closest('label') || live, sep(), ask], true),
+    dd('Файл', [add, open, save, sep(), project, upload, sep(), copyAll, clear]),
+    dd('Вид', [find, outline, preview, consoleClr, sep(), legend]),
+    dd('Подсказки', [head('в коде'), ac, explain && explain.closest('label') || explain, links, sep(), head('превью'), live && live.closest('label') || live, sep(), ask], true),
     rest.length ? dd('⋯ ещё', rest, true) : null
   ].filter(Boolean);
   bar.innerHTML = '';

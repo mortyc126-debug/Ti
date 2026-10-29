@@ -14,7 +14,7 @@ async function reload(){
 function renderList(){
   const host = document.getElementById('list');
   document.getElementById('cnt').textContent = RECIPES.length;
-  if(!RECIPES.length){ host.innerHTML = '<div class="empty">Больших шаблонов пока нет. Шаблон — это название, описание и список кусков по порядку: «чтобы собрать X, нужны такие куски». Нажми «📥 загрузить пачкой» или «＋ новый шаблон».</div>'; return; }
+  if(!RECIPES.length){ host.innerHTML = '<div class="empty">Больших шаблонов пока нет. Шаблон — это название, описание и список кусков по порядку: «чтобы собрать X, нужны такие куски». Нажми «загрузить пачкой» или «＋ новый шаблон».</div>'; return; }
   host.innerHTML = '';
   RECIPES.slice().sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0)).forEach(r => {
     const card = el('div', 'rc');
@@ -60,7 +60,7 @@ function editRecipe(id){
     + '<div class="mfield"><label>Куски по порядку</label><div id="r-items" class="r-items"></div></div>'
     + '<div class="r-add"><input id="r-search" placeholder="найти кусок: по названию, теме или коду…"><div id="r-results" class="r-results"></div></div>'
     + '<div class="merr" id="r-err"></div>'
-    + '<div class="mbtns"><button class="btn ok" id="r-save">💾 сохранить</button><button class="btn" id="r-close">отмена</button></div>';
+    + '<div class="mbtns"><button class="btn ok" id="r-save">сохранить</button><button class="btn" id="r-close">отмена</button></div>';
   bg.appendChild(box); document.body.appendChild(bg);
   const q = s => box.querySelector(s);
   let items = [];   // {id,title,note}
@@ -199,7 +199,7 @@ function openBulkModal(){
       + '<div style="margin-top:6px;opacity:.85">Куски одного шаблона стыкуются сами: JS — по общим именам переменных, HTML/JS/CSS — по общему <code>#id</code>/классу. JSON-формат (<code>[{title,desc,pieces:[…]}]</code>) тоже принимается.</div>'
     + '</div>'
     + '<div class="mfield"><label>Шаблоны (Markdown или JSON)</label><textarea id="bk-text" rows="13" placeholder="вставь сюда (или нажми «пример»)" style="font-family:ui-monospace,monospace;font-size:12px"></textarea></div>'
-    + '<div class="mbtns"><button class="btn" id="bk-file">📄 из файла…</button><button class="btn" id="bk-sample">пример</button><button class="btn ok" id="bk-load">📥 загрузить</button><button class="btn" id="bk-close">закрыть</button><input type="file" id="bk-fileinp" accept=".md,.markdown,.txt,.json" style="display:none"></div>'
+    + '<div class="mbtns"><button class="btn" id="bk-file">из файла…</button><button class="btn" id="bk-sample">пример</button><button class="btn ok" id="bk-load">загрузить</button><button class="btn" id="bk-close">закрыть</button><input type="file" id="bk-fileinp" accept=".md,.markdown,.txt,.json" style="display:none"></div>'
     + '<div class="merr" id="bk-err" style="margin-top:10px"></div>';
   bg.appendChild(box); document.body.appendChild(bg);
   const q = s => box.querySelector(s);
@@ -216,7 +216,7 @@ function openBulkModal(){
     else { data = parseTemplatesMarkdown(t); if(!data.length){ err.textContent = 'Не нашла ни одного шаблона. Начни строку с «# Название».'; return; } }
     q('#bk-load').disabled = true; q('#bk-load').textContent = 'граблю…';
     const r = await fetch('/api/recipes/import', { method: 'POST', body: JSON.stringify(data) }).then(x => x.json()).catch(() => null);
-    q('#bk-load').disabled = false; q('#bk-load').textContent = '📥 загрузить';
+    q('#bk-load').disabled = false; q('#bk-load').textContent = 'загрузить';
     if(!r || !r.ok){ err.textContent = 'Не вышло загрузить (сервер не ответил или формат не тот).'; return; }
     err.style.color = 'var(--str,#52F2C9)';
     err.textContent = '✓ Готово. Больших шаблонов: ' + r.recipes + ' · новых кусков в библиотеку: ' + r.piecesAdded + ' · переиспользовано: ' + r.piecesReused + (r.itemsUnresolved ? ' · без кода/не найдено: ' + r.itemsUnresolved : '');

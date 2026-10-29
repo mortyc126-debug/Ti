@@ -67,7 +67,7 @@
         const a = document.createElement('a'); a.className = 'tk-it' + (CUR === t.id ? ' on' : '');
         const sub = (t.group || '').split('/').slice(1).join('/').trim();
         a.innerHTML = '<div class="t">' + esc(t.title) + '</div><div class="m">' + (sub ? esc(sub) + ' · ' : '') + 'вопросов ' + t.steps + ' · вариантов ' + t.options
-          + (t.unresolved ? ' · <span class="bad">⚠ ' + t.unresolved + ' не найдено</span>' : '') + '</div>';
+          + (t.unresolved ? ' · <span class="bad">' + t.unresolved + ' не найдено</span>' : '') + '</div>';
         a.onclick = () => showTask(t.id);
         listEl.appendChild(a);
       });
@@ -82,7 +82,7 @@
       + 'У каждого вопроса варианты, и каждый ведёт к <b>куску</b> из библиотеки, к другой <b>задаче</b> или к своему <b>коду</b>. '
       + 'Выбираешь варианты, и справа собирается готовый код.</p>'
       + '<p>Задачи пишутся текстом, поэтому их удобно и править руками, и получать от ИИ. '
-      + 'Нажми «⧉ промпт для ИИ», отдай запрос любому чату, а ответ вставь в «📥 пачкой». Код вариантов живёт внутри задачи и библиотеку не засоряет.</p>'
+      + 'Нажми «⧉ промпт для ИИ», отдай запрос любому чату, а ответ вставь в «пачкой». Код вариантов живёт внутри задачи и библиотеку не засоряет.</p>'
       + '<div class="tk-help"><pre>' + esc(FORMAT_HELP) + '</pre></div></div>';
   }
 
@@ -94,7 +94,7 @@
     history.replaceState(null, '', '/tasks.html?id=' + encodeURIComponent(id));
     const stepMode = pref('codelab_tasks_step', true), simple = pref('codelab_tasks_simple', true);
     main.innerHTML = '<div class="tk-head"><h2>' + esc(t.title) + '</h2>'
-      + '<button class="btn" id="twEdit">✎ править</button><button class="btn danger" id="twDel">🗑</button></div>'
+      + '<button class="btn" id="twEdit">✎ править</button><button class="btn danger" id="twDel">удалить</button></div>'
       + (t.desc ? '<div class="tk-desc">' + esc(t.desc) + '</div>' : '')
       + '<div class="tk-meta">' + esc((t.lang || '').toUpperCase()) + (t.group ? ' · ' + esc(t.group) : '') + ((t.aliases || []).length ? ' · ' + esc(t.aliases.join(', ')) : '') + '</div>'
       + '<div class="tk-row"><span class="tk-seg"><button data-m="step">по шагу</button><button data-m="all">всё сразу</button></span>'
@@ -126,7 +126,7 @@
         box.appendChild(l); box.appendChild(pre);
       });
       const row = document.createElement('div'); row.className = 'tk-row';
-      row.innerHTML = '<button class="btn ok" id="twOpen" title="открыть собранный код в песочнице Конструктора">▶ в песочницу</button><button class="btn" id="twCheck" title="каких имён коду не хватает и какие куски их дают">🧩 чего не хватает?</button>';
+      row.innerHTML = '<button class="btn ok" id="twOpen" title="открыть собранный код в песочнице Конструктора">в песочницу</button><button class="btn" id="twCheck" title="каких имён коду не хватает и какие куски их дают">чего не хватает?</button>';
       box.appendChild(row);
       $('#twOpen').onclick = () => {
         const ext = { js: 'js', ts: 'ts', html: 'html', css: 'css', python: 'py', sql: 'sql' };
@@ -152,7 +152,7 @@
     list.forEach(u => {
       const d = document.createElement('div'); d.className = 'tk-need-it';
       d.innerHTML = '<b>' + esc(u.name) + '</b> <span class="s">' + esc(window.CodeCheck ? CodeCheck.needText(u.name) : 'используется, но нигде не задано') + '</span><div style="margin-top:4px">'
-        + (u.tasks.length ? u.tasks.map(t => '<a href="/tasks.html?id=' + encodeURIComponent(t.id) + '">🧭 ' + esc(t.title) + '</a>').join('') : '')
+        + (u.tasks.length ? u.tasks.map(t => '<a href="/tasks.html?id=' + encodeURIComponent(t.id) + '">' + esc(t.title) + '</a>').join('') : '')
         + (u.pieces.length ? u.pieces.map(p => '<a href="/component.html?id=' + encodeURIComponent(p.id) + '" title="' + (p.needs.length ? 'сам требует: ' + esc(p.needs.join(', ')) : '') + '">▸ ' + esc(p.title) + '</a>').join('') : '')
         + (!u.tasks.length && !u.pieces.length ? '<span class="s">готового куска для этого в библиотеке нет</span>' : '') + '</div>';
       host.appendChild(d);
@@ -182,10 +182,10 @@
   }
   // список ненайденного; onPick(u, cand) — выбор кандидата
   function unresolvedHtml(list, tag){
-    return list.map((u, i) => '<div class="tk-un" data-k="' + tag + ':' + i + '">⚠ не найден' + (u.kind === 'task' ? 'а задача' : ' кусок') + ' «' + esc(u.ref) + '»'
+    return list.map((u, i) => '<div class="tk-un" data-k="' + tag + ':' + i + '">не найден' + (u.kind === 'task' ? 'а задача' : ' кусок') + ' «' + esc(u.ref) + '»'
       + (u.label ? ' <span style="opacity:.7">(вариант «' + esc(u.label) + '»)</span>' : '')
       + ((u.candidates || []).length
-        ? '<div class="tk-cands">похоже: ' + u.candidates.map((c, j) => '<button class="btn tk-cand" data-c="' + j + '" title="заменить ссылку; прежнее название останется заметкой «было»">' + (c.kind === 'task' ? '🧭 задача: ' : '') + esc(c.title) + (c.lang ? ' <span style="opacity:.6">' + esc(c.lang) + '</span>' : '') + '</button>').join('')
+        ? '<div class="tk-cands">похоже: ' + u.candidates.map((c, j) => '<button class="btn tk-cand" data-c="' + j + '" title="заменить ссылку; прежнее название останется заметкой «было»">' + (c.kind === 'task' ? 'задача: ' : '') + esc(c.title) + (c.lang ? ' <span style="opacity:.6">' + esc(c.lang) + '</span>' : '') + '</button>').join('')
           + '<button class="btn tk-keep" title="ничего не менять">оставить</button></div>'
         : '<div class="tk-cands" style="opacity:.75">похожих нет — останется как есть, подхватится, когда появится с таким названием</div>')
       + '</div>').join('');
@@ -206,9 +206,9 @@
     const k = x => String(x || '').trim().toLowerCase().replace(/ё/g, 'е');
     const [top, ...rest] = String(group || '').split('/').map(x => x.trim()).filter(Boolean); const sub = rest.join(' / ');
     const t = TREE.find(x => k(x.name) === k(top));
-    if(!top) return '⚠ Раздел не указан. Разделы: ' + TREE.map(x => x.name).join(', ');
-    if(!t) return '⚠ Раздела «' + top + '» нет в дереве. Есть: ' + TREE.map(x => x.name).join(', ');
-    if(sub && !(t.subs || []).some(x => k(x) === k(sub))) return '⚠ Подраздела «' + sub + '» нет в «' + t.name + '». Есть: ' + (t.subs || []).join(', ');
+    if(!top) return 'Раздел не указан. Разделы: ' + TREE.map(x => x.name).join(', ');
+    if(!t) return 'Раздела «' + top + '» нет в дереве. Есть: ' + TREE.map(x => x.name).join(', ');
+    if(sub && !(t.subs || []).some(x => k(x) === k(sub))) return 'Подраздела «' + sub + '» нет в «' + t.name + '». Есть: ' + (t.subs || []).join(', ');
     return '';
   }
 
@@ -219,7 +219,7 @@
     if(id){ const t = await api('/api/tasks/get?id=' + encodeURIComponent(id) + '&text=1').catch(() => null); if(t && t.text) text = t.text; }
     CUR = id; renderList();
     main.innerHTML = '<div class="tk-head"><h2>' + (id ? 'Правка задачи' : 'Новая задача') + '</h2>'
-      + '<button class="btn ok" id="teSave">💾 сохранить</button>' + (id ? '<button class="btn" id="teBack">к проходу</button>' : '') + '</div>'
+      + '<button class="btn ok" id="teSave">сохранить</button>' + (id ? '<button class="btn" id="teBack">к проходу</button>' : '') + '</div>'
       + '<div class="tk-ed"><div>'
       + '<div class="tk-row tk-pick"><input class="tk-q" id="tePick" placeholder="найти кусок или задачу и вставить ссылку в место курсора…"><div class="tk-pick-res" id="tePickRes"></div></div>'
       + '<textarea class="tk-ta" id="teText" spellcheck="false"></textarea>'
@@ -242,7 +242,7 @@
       const x = r.tasks[0];
       const probs = [];
       const sw = await sectionWarn(x.task.group); if(my !== seq) return; if(sw) probs.push(sw);
-      if(r.tasks.length > 1) probs.push('В тексте ' + r.tasks.length + ' задачи — сохранится только первая. Для нескольких — «📥 пачкой».');
+      if(r.tasks.length > 1) probs.push('В тексте ' + r.tasks.length + ' задачи — сохранится только первая. Для нескольких — «пачкой».');
       (r.warnings || []).forEach(w => probs.push('• ' + w));
       const un = x.report.unresolved;
       msg.className = 'tk-msg' + (probs.length || un.length ? ' err' : ' ok');
@@ -310,7 +310,7 @@
     const m = modal('<h3>Задачи пачкой</h3>'
       + '<div class="tk-help">Вставь текст с одной или несколькими задачами (каждая начинается с <code>=== Название | язык | раздел</code>). Одноимённые задачи обновятся, новые создадутся. Сначала «проверить», потом «сохранить».</div>'
       + '<div class="mfield"><textarea id="bkT" rows="16" spellcheck="false" placeholder="=== …"></textarea></div>'
-      + '<div class="tk-row"><button class="btn" id="bkFile">📄 из файла…</button><button class="btn" id="bkDry">🔎 проверить</button><button class="btn ok" id="bkGo">💾 сохранить</button><button class="btn" id="bkX">закрыть</button>'
+      + '<div class="tk-row"><button class="btn" id="bkFile">из файла…</button><button class="btn" id="bkDry">проверить</button><button class="btn ok" id="bkGo">сохранить</button><button class="btn" id="bkX">закрыть</button>'
       + '<input type="file" id="bkInp" accept=".txt,.md" style="display:none"></div><div id="bkRep"></div>');
     let busy = false;
     const run = async dry => {
@@ -348,7 +348,7 @@
     const tree = cfg.tree || [];
     const langs = [...new Set(rows.map(r => r.lang).concat(LIST.map(t => t.lang)).filter(Boolean))].sort();
     const m = modal('<h3>Промпт для ИИ</h3>'
-      + '<div class="tk-help">Запрос, по которому любой чат напишет задачи сразу в нужном формате. Ответ вставь в «📥 пачкой». Раздел — из общего дерева (Опись → 🗂 дерево разделов).</div>'
+      + '<div class="tk-help">Запрос, по которому любой чат напишет задачи сразу в нужном формате. Ответ вставь в «пачкой». Раздел — из общего дерева (Опись → дерево разделов).</div>'
       + '<div class="mfield"><label>Тема: какие задачи нужны</label><input id="prTopic" placeholder="например: формы и проверка ввода; работа со списками; запросы к API"></div>'
       + '<div style="display:grid;grid-template-columns:1fr 3fr 1fr;gap:10px"><div class="mfield"><label>Язык</label><select id="prLang">' + langs.map(l => '<option' + (l === (LANG || 'js') ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select></div>'
       + '<div class="mfield"><label>Раздел</label><select id="prSec"></select></div>'

@@ -1,5 +1,5 @@
 // Режим «окна»: три панели конструктора (куски / код / отображение) превращаются в перетаскиваемые
-// и масштабируемые окна (через win.js), лежащие на дефолтных местах. Переключатель «🪟 окна» в меню «⋯».
+// и масштабируемые окна (через win.js), лежащие на дефолтных местах. Переключатель «окна» в меню «⋯».
 // По умолчанию выключено — обычная сеточная раскладка не трогается, пока не включишь.
 (function(){
   var gwrap = document.querySelector('.gwrap');
@@ -19,9 +19,9 @@
   document.head.appendChild(st);
 
   var defs = [
-    { sel: '.palette',   key: 'cwin_pal',  name: '📦 Куски' },
-    { sel: '.center',    key: 'cwin_code', name: '🖊 Код' },
-    { sel: '#inspector', key: 'cwin_insp', name: '🔎 Отображение' }
+    { sel: '.palette',   key: 'cwin_pal',  name: 'Куски' },
+    { sel: '.center',    key: 'cwin_code', name: 'Код' },
+    { sel: '#inspector', key: 'cwin_insp', name: 'Отображение' }
   ];
   function vp(){ var pad = 10, h = innerHeight - 2 * pad, palW = 250, inspW = 330;
     return { pad: pad, h: h, palW: palW, inspW: inspW, codeX: pad + palW + pad, codeW: Math.max(360, innerWidth - palW - inspW - 4 * pad), inspX: innerWidth - inspW - pad }; }

@@ -18,7 +18,7 @@
 
   const setStatus = (t, bad) => { status.textContent = t || ''; status.style.color = bad ? '#FFB18A' : ''; };
   const open = async () => {
-    modal.classList.add('open'); list.innerHTML = ''; add.style.display = 'none'; setStatus(key() ? '' : 'Нет ключа Mistral: сохраните его в ⚙ Настройки.', !key());
+    modal.classList.add('open'); list.innerHTML = ''; add.style.display = 'none'; setStatus(key() ? '' : 'Нет ключа Mistral: сохраните его в Настройки.', !key());
     try {
       const r = await fetch('/api/ai-langs', { cache: 'no-store' }).then(x => x.json());
       const cur = sel.value || 'python'; sel.innerHTML = '';
@@ -55,10 +55,10 @@
   }
 
   go.onclick = async () => {
-    if (!key()) { setStatus('Нет ключа Mistral: сохраните его в ⚙ Настройки.', true); return; }
+    if (!key()) { setStatus('Нет ключа Mistral: сохраните его в Настройки.', true); return; }
     go.disabled = true; go.textContent = 'думаю…'; list.innerHTML = ''; add.style.display = 'none'; setStatus('ИИ пишет куски…');
     try { draw(await post('/api/ai-generate', { lang: sel.value, topic: topic.value, count: Number(count.value) || 4 })); }
-    catch (e) { setStatus('⛔ ' + e.message, true); }
+    catch (e) { setStatus('' + e.message, true); }
     go.disabled = false; go.textContent = 'предложить';
   };
 
@@ -71,7 +71,7 @@
       const skipped = r.skipped.map(s => s.title + ' — ' + s.reason).join('; ');
       setStatus('Добавлено: ' + r.created.length + (skipped ? '. Пропущено: ' + skipped : '.'), !r.created.length);
       if (r.created.length) { list.innerHTML = ''; add.style.display = 'none'; if (typeof loadAll === 'function') loadAll(); }
-    } catch (e) { setStatus('⛔ ' + e.message, true); }
+    } catch (e) { setStatus('' + e.message, true); }
     add.disabled = false; add.textContent = 'добавить отмеченные';
   };
 
@@ -79,7 +79,7 @@
   const gapsBtn = $('genGaps'), chips = $('genChips'), gapsHint = $('genGapsHint');
   sel.addEventListener('change', () => { chips.innerHTML = ''; gapsHint.textContent = ''; });
   gapsBtn.onclick = async () => {
-    if (!key()) { setStatus('Нет ключа Mistral: сохраните его в ⚙ Настройки.', true); return; }
+    if (!key()) { setStatus('Нет ключа Mistral: сохраните его в Настройки.', true); return; }
     gapsBtn.disabled = true; chips.innerHTML = ''; gapsHint.textContent = 'смотрю, что уже есть…';
     try {
       const r = await post('/api/ai-gaps', { lang: sel.value });
@@ -93,7 +93,7 @@
         };
         chips.appendChild(c);
       });
-    } catch (e) { gapsHint.textContent = '⛔ ' + e.message; }
+    } catch (e) { gapsHint.textContent = '' + e.message; }
     gapsBtn.disabled = false;
   };
 

@@ -126,7 +126,7 @@ function render(t){
   const codeHost = el('div', 'code-host'); codeHost.appendChild(noteCode(CODE)); codeWrap.appendChild(codeHost);
   setTimeout(markVariants, 0);   // подчеркнуть изменяемые свойства (если словарь уже загружен)
   if(runnable){
-    const rb = btn('▶ запустить', 'primary'); rb.style.marginTop = '6px';
+    const rb = btn('запустить', 'primary'); rb.style.marginTop = '6px';
     const box = el('div', 'preview'); rb.onclick = () => runDemo(box, c, codeText);
     const h = document.createElement('div'); h.append(rb, box); codeWrap.appendChild(h);
   }
@@ -203,7 +203,7 @@ function viewUse(c, codeText, runnable, t){
     wrap.appendChild(step(n++, 'Пример данных и вызов', ex));
   }
   if(runnable){
-    const rb = btn('▶ запустить пример', 'primary'); rb.style.marginTop = '4px';
+    const rb = btn('запустить пример', 'primary'); rb.style.marginTop = '4px';
     const box = document.createElement('div'); box.className = 'preview';
     rb.onclick = () => runDemo(box, c, codeText);
     const holder = document.createElement('div'); holder.append(rb, box);
@@ -271,7 +271,7 @@ function runDemo(box, c, codeText){
   let frame = box.querySelector('iframe'); if(!frame){ frame = document.createElement('iframe'); box.appendChild(frame); }
   frame.srcdoc = '<!doctype html><meta charset="utf-8"><body style="margin:8px;font:13px system-ui">' + html
     + '<pre id="__err" style="color:#c00;white-space:pre-wrap"></pre>'
-    + '<script>try{\n' + js + '\n}catch(e){document.getElementById("__err").textContent="⛔ "+e.message;}<\/script></body>';
+    + '<script>try{\n' + js + '\n}catch(e){document.getElementById("__err").textContent=""+e.message;}<\/script></body>';
 }
 
 // ── «в конструктор» ──
@@ -447,14 +447,14 @@ function descFmt(s){
 
 
 // ═══ ИИ-дополнение раздела (Mistral) ═══════════════════════════════════════
-// Порядок: «✨ дополнить» → (пожелание) → «предложить» → правишь текст → «применить».
+// Порядок: «дополнить» → (пожелание) → «предложить» → правишь текст → «применить».
 // Пока не нажал «применить», в кусок ничего не пишется. Код куска ИИ не меняет.
 const AI_KEY_LS = 'codeLab.mistralApiKey';
 const AI_LABEL = { desc: 'описание', notes: 'пояснения', requirements: 'требования', limits: 'можно/нельзя', errors: 'ошибки' };
 function aiKey(){ try { return localStorage.getItem(AI_KEY_LS) || ''; } catch(_){ return ''; } }
 
 function aiButton(section, slot){
-  const b = el('button', 'ai-btn', '✨ ' + AI_LABEL[section]);
+  const b = el('button', 'ai-btn', '' + AI_LABEL[section]);
   b.type = 'button'; b.title = 'Дополнить этот раздел через Mistral (сначала покажет предложение, ничего не запишет без твоего «применить»)';
   b.onclick = () => { slot.innerHTML = ''; slot.appendChild(aiBox(section, () => { slot.innerHTML = ''; })); };
   return b;
@@ -495,7 +495,7 @@ function aiBox(section, close){
     try {
       const r = await aiPost('/api/ai-complete', { id: ID, section, instruction: instr.value });
       renderSuggestion(section, r, out, close);
-    } catch(e){ out.appendChild(el('div', 'ai-err', '⛔ ' + e.message)); }
+    } catch(e){ out.appendChild(el('div', 'ai-err', '' + e.message)); }
     go.disabled = false; go.textContent = 'ещё вариант';
   };
   go.onclick = run;
@@ -560,7 +560,7 @@ function renderSuggestion(section, r, out, close){
     try {
       await aiPost('/api/ai-apply', { id: ID, section, value: getValue() });
       location.reload();
-    } catch(e){ out.appendChild(el('div', 'ai-err', '⛔ не сохранилось: ' + e.message)); ok.disabled = false; ok.textContent = 'применить'; }
+    } catch(e){ out.appendChild(el('div', 'ai-err', 'не сохранилось: ' + e.message)); ok.disabled = false; ok.textContent = 'применить'; }
   };
   out.appendChild(ok);
 }

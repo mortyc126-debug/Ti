@@ -1,5 +1,5 @@
 // Проход по дереву задачи: вопросы → выбор варианта → собранный код. Общий для страницы «Задачи»
-// и окна «🧭 задачи» в песочнице. window.TaskWalk.mount(host, task, opts) → { assembly(), reset(), setHave(set) }.
+// и окна «задачи» в песочнице. window.TaskWalk.mount(host, task, opts) → { assembly(), reset(), setHave(set) }.
 //   opts.onChange(assembly)   — после каждого выбора; assembly = [{lang, title, code, id}] в порядке дерева
 //   opts.stepMode             — true: показывать вопросы по одному (новичку), false: всё дерево сразу
 //   opts.simple               — true: подписи и заметки подробно, false: только подписи вариантов
@@ -48,7 +48,7 @@
   function mount(host, task, opts){
     opts = opts || {};
     const choice = new Map();          // шаг → индекс варианта (ключ — объект шага, общий для всех вхождений)
-    const peek = new Set();            // открытые «👁 код» у вариантов
+    const peek = new Set();            // открытые «код» у вариантов
     let have = new Set();              // имена, которые уже есть в коде редактора (для пометки «уже есть»)
     let seq = 0, loadedRows = null;
 
@@ -104,7 +104,7 @@
       const b = document.createElement('div'); b.className = 'tw-opt' + (ci === i ? ' on' : (ci >= 0 ? ' off' : ''));
       const r = o.kind === 'piece' && o.id ? loadedRows.get(o.id) : null;
       const broken = (o.kind === 'piece' || o.kind === 'task') && !o.id;
-      const k = o.kind ? '<span class="tw-k ' + o.kind + (broken ? ' bad' : '') + '" title="' + (broken ? 'ссылка не найдена: ' + esc(o.ref) : '') + '">' + (broken ? '⚠ ' : '') + KIND[o.kind] + '</span>' : '<span class="tw-k">→</span>';
+      const k = o.kind ? '<span class="tw-k ' + o.kind + (broken ? ' bad' : '') + '" title="' + (broken ? 'ссылка не найдена: ' + esc(o.ref) : '') + '">' + (broken ? '' : '') + KIND[o.kind] + '</span>' : '<span class="tw-k">→</span>';
       // «уже есть в коде»: всё, что даёт кусок, в редакторе уже объявлено
       const prov = r && r.comp && r.comp.provides || [];
       const already = prov.length && prov.every(p => have.has(p));
@@ -116,7 +116,7 @@
       if(r && opts.simple !== false && r.title && r.title !== o.label) d = (d ? d + '\n' : '') + '▸ ' + r.title;
       b.innerHTML = k + '<span class="b"><span class="t">' + esc(o.label) + (already ? '<span class="tw-have">✓ уже есть в коде</span>' : '') + '</span>'
         + (d ? '<span class="d">' + esc(d) + '</span>' : '') + '</span>'
-        + ((o.kind === 'piece' && o.id) || o.kind === 'code' ? '<button class="tw-peek" title="показать код">👁</button>' : '');
+        + ((o.kind === 'piece' && o.id) || o.kind === 'code' ? '<button class="tw-peek" title="показать код">показать</button>' : '');
       b.onclick = e => {
         if(e.target.closest('.tw-peek')) return;
         if(choice.get(stp) === i && !stp.auto) choice.delete(stp); else choice.set(stp, i);

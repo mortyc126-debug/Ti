@@ -252,7 +252,7 @@ function windowMatch(piece, anchors, window) {
 const SECTION_LABEL = { common: 'Общее / код', html: 'HTML', css: 'CSS' };
 const sectionLabel = sid => SECTION_LABEL[sid] || (sid.startsWith('lang:') ? 'Язык: ' + sid.slice(5) : sid);
 
-// слить базовые секции словаря в разделы так же, как это делает окно «📚 весь словарь»
+// слить базовые секции словаря в разделы так же, как это делает окно «весь словарь»
 export function dictSections(dict) {
   const d = dict || {};
   const out = {};

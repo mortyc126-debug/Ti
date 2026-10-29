@@ -273,7 +273,7 @@ function card(t){
   const tags = '<div class="ctags">'
     + '<span class="tg">'+esc(t._places[0]||'')+'</span>'
     + '<span class="tg">'+esc((t._techs[0]||''))+'</span>'
-    + (warn?'<span class="tg warnflag">⚠ риск</span>':'')
+    + (warn?'<span class="tg warnflag">риск</span>':'')
     + ((!String(t.desc || '').trim() || t.status === 'needs_description')?'<span class="tg needs-desc">нужно описание</span>':'')
     + '</div>';
   const prov = (t.comp && t.comp.provides) || [], req = (t.comp && t.comp.requires) || [];
@@ -284,7 +284,7 @@ function card(t){
       + '</div>' : '';
   a.innerHTML = top + '<div class="cdesc"></div>' + io + contract + tags + '<div class="ccols"></div>'
     + '<div class="cact"><span class="cbtn" data-x="use">Открыть</span><span class="cbtn" data-x="ctor">→ в конструктор</span>'
-    + '<span class="cbtn" data-x="col" title="в мой раздел">🏷</span><span class="cbtn" data-x="desc" title="описание">📝</span><span class="cbtn" data-x="ren" title="переименовать">✎</span><span class="cbtn del" data-x="del" title="удалить">🗑</span></div>';
+    + '<span class="cbtn" data-x="col" title="в мой раздел">подписи</span><span class="cbtn" data-x="desc" title="описание">править</span><span class="cbtn" data-x="ren" title="переименовать">✎</span><span class="cbtn del" data-x="del" title="удалить">удалить</span></div>';
   a.querySelector('.ctitle').textContent = window.codelabTitle ? window.codelabTitle(t.title || t.id) : (t.title || t.id);
   a.querySelector('.cdesc').innerHTML = descFmt(t.desc || '');
   fillCols(a, t);
@@ -449,17 +449,17 @@ function renderColCats(box){
     d.onclick = () => { activeCol = name; fPlace = ''; fTech = ''; query = ''; const q = document.getElementById('q'); if(q) q.value = ''; renderCats(); renderFilters(); render(); };
     box.appendChild(d);
   });
-  if(!allCollections().length){ const h = document.createElement('div'); h.className = 'cat-hint'; h.style.padding = '8px 6px'; h.textContent = 'Пока нет своих разделов. На карточке жми 🏷 → «новый раздел».'; box.appendChild(h); }
+  if(!allCollections().length){ const h = document.createElement('div'); h.className = 'cat-hint'; h.style.padding = '8px 6px'; h.textContent = 'Пока нет своих разделов. На карточке жми → «новый раздел».'; box.appendChild(h); }
 }
 function renderCustom(){
   document.getElementById('cName').textContent = 'Моя классификация · ' + (activeCol || '');
-  document.getElementById('cLead').textContent = 'Твои разделы. Назначай карточки через 🏷. «Без раздела» — ещё не разложенное. Delete — удалить выделенную.';
+  document.getElementById('cLead').textContent = 'Твои разделы. Назначай карточки через . «Без раздела» — ещё не разложенное. Delete — удалить выделенную.';
   let items = activeCol === 'Без раздела' ? ALL.filter(t => !collectionsOf(t).length) : ALL.filter(t => collectionsOf(t).includes(activeCol));
   if(fPlace) items = items.filter(t => t._places.includes(fPlace));
   if(fTech) items = items.filter(t => t._techs.includes(fTech));
   if(query) items = items.filter(t => ((t.title || '') + ' ' + (t.desc || '')).toLowerCase().includes(query));
   const host = document.getElementById('sections'); host.innerHTML = '';
-  if(!items.length){ host.innerHTML = '<div class="empty">здесь пусто — разложи карточки сюда через 🏷</div>'; return; }
+  if(!items.length){ host.innerHTML = '<div class="empty">здесь пусто — разложи карточки сюда через</div>'; return; }
   items.sort((a, b) => TYPE_RANK[a._type] - TYPE_RANK[b._type]);
   const grid = document.createElement('div'); grid.className = 'cards'; items.forEach(t => grid.appendChild(card(t))); host.appendChild(grid);
 }
@@ -542,7 +542,7 @@ function setDescribeStatus(message, kind){
 async function startDescriptionJobs(ids){
   const key = typeof window.codeLabMistralKey === 'function' ? window.codeLabMistralKey() : '';
   if(!key){
-    setDescribeStatus('Нет ключа Mistral. Откройте ⚙ Настройки и сохраните ключ.', 'error');
+    setDescribeStatus('Нет ключа Mistral. Откройте Настройки и сохраните ключ.', 'error');
     document.getElementById('labSettingsBtn')?.click();
     return;
   }
@@ -570,7 +570,7 @@ async function refreshDescriptionJobs(){
     } else if(data.total){
       setDescribeStatus('Последняя очередь — ' + bits.join(' · ') + (data.failed ? '. Проверьте ошибки в статусе задания.' : '.'), data.failed ? 'error' : 'good');
     } else {
-      setDescribeStatus('Очередь не запускалась. Сохраните ключ Mistral в ⚙ Настройки.', '');
+      setDescribeStatus('Очередь не запускалась. Сохраните ключ Mistral в Настройки.', '');
     }
     const completed = data.completed || 0;
     if(lastDescriptionCompleted >= 0 && completed !== lastDescriptionCompleted) await loadAll();

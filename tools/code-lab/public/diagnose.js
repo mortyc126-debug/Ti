@@ -1,6 +1,6 @@
-// «🩺 решить»: вводишь краткое описание проблемы → пути решения. Простое (синтаксис, мелочи) — списком из
+// «решить»: вводишь краткое описание проблемы → пути решения. Простое (синтаксис, мелочи) — списком из
 // словаря/синонимов и готовых кусков; сложное — диагноз от ИИ (вероятные причины + что делать) по коду файла.
-// Надстройка песочницы; после tabs.js. ИИ — через /api/ai-ask (ключ из Настроек), как «🤖 спросить ИИ».
+// Надстройка песочницы; после tabs.js. ИИ — через /api/ai-ask (ключ из Настроек), как «спросить ИИ».
 (function(){
   const sb = window.codelabSandbox;
   const box = document.getElementById('sandbox');
@@ -40,10 +40,10 @@
   document.head.appendChild(st);
 
   const panel = document.createElement('div'); panel.className = 'dg';
-  panel.innerHTML = '<div class="dh"><b>🩺 Решить проблему</b><button id="dgX" title="закрыть">×</button></div>'
+  panel.innerHTML = '<div class="dh"><b>Решить проблему</b><button id="dgX" title="закрыть">×</button></div>'
     + '<div class="db">'
     + '<textarea id="dgQ" placeholder="опиши проблему: что не так, что ожидала, текст ошибки…"></textarea>'
-    + '<div class="row"><button class="btn ok" id="dgAi" style="flex:1">✨ диагноз (ИИ)</button></div>'
+    + '<div class="row"><button class="btn ok" id="dgAi" style="flex:1">диагноз (ИИ)</button></div>'
     + '<div class="note" id="dgNote"></div>'
     + '<div id="dgOut"></div></div>';
   document.body.appendChild(panel);
@@ -96,7 +96,7 @@
   async function diagnose(){
     if(busy) return; const problem = q('#dgQ').value.trim(); const key = apiKey();
     if(!problem){ note('Опиши проблему.', true); return; }
-    if(!key){ note('Нет ключа ИИ. Открой «⚙ Настройки» и сохрани API-ключ.', true); return; }
+    if(!key){ note('Нет ключа ИИ. Открой «Настройки» и сохрани API-ключ.', true); return; }
     const f = activeFile();
     busy = true; q('#dgAi').disabled = true; note('думаю…');
     let ansBox = q('#dgAns'); if(!ansBox){ ansBox = el('div', 'ans'); ansBox.id = 'dgAns'; q('#dgOut').insertBefore(ansBox, q('#dgOut').firstChild); }
@@ -115,7 +115,7 @@
   q('#dgQ').addEventListener('input', () => { clearTimeout(qt); qt = setTimeout(quick, 250); });
   q('#dgAi').onclick = diagnose;
 
-  const b = document.createElement('button'); b.className = 'btn'; b.id = 'sbDgBtn'; b.textContent = '🩺 решить';
+  const b = document.createElement('button'); b.className = 'btn'; b.id = 'sbDgBtn'; b.textContent = 'решить';
   b.title = 'опиши проблему — подскажу пути решения: словарь, готовые куски и диагноз от ИИ';
   b.onclick = () => { const on = !panel.classList.contains('on'); panel.classList.toggle('on', on); if(on){ if(win) win.clamp(); const sel = (function(){ const ed = edFor(activeId()); const ta = ed && ed.querySelector('textarea'); const cm = ta && ta.__cm; try { return cm ? cm.getSelection() : (ta ? ta.value.slice(ta.selectionStart, ta.selectionEnd) : ''); } catch(_){ return ''; } })(); if(sel && !q('#dgQ').value) q('#dgQ').value = sel; q('#dgQ').focus(); quick(); } };
   const legend = bar.querySelector('#sbLegend'); if(legend) legend.after(b); else bar.appendChild(b);

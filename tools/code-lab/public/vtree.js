@@ -1,6 +1,6 @@
-// «🌳 варианты»: слово-смысл → дерево вариантов прямо у курсора. Сначала код (ярко), потом описание —
+// «варианты»: слово-смысл → дерево вариантов прямо у курсора. Сначала код (ярко), потом описание —
 // или наоборот (переключатель). ▸ раскрывает разновидности, клик по строке вставляет код вместо слова.
-// Ctrl+Пробел в редакторе, строка «🌳 варианты» в автодополнении, кнопка на панели. Данные — /api/variants.
+// Ctrl+Пробел в редакторе, строка «варианты» в автодополнении, кнопка на панели. Данные — /api/variants.
 (function(){
   const sb = window.codelabSandbox;
   const box = document.getElementById('sandbox');
@@ -120,7 +120,7 @@
   // Ctrl+Пробел в редакторе
   edsEl.addEventListener('keydown', e => { if((e.ctrlKey || e.metaKey) && e.code === 'Space'){ e.preventDefault(); e.stopPropagation(); open(); } }, true);
   // кнопка на панели — рядом с поиском
-  const b = document.createElement('button'); b.className = 'btn'; b.id = 'sbVarBtn'; b.textContent = '🌳 варианты';
+  const b = document.createElement('button'); b.className = 'btn'; b.id = 'sbVarBtn'; b.textContent = 'варианты';
   b.title = 'дерево вариантов для слова у курсора: «отступ» → внешний / внутренний → … (Ctrl+Пробел)';
   b.onmousedown = e => e.preventDefault();   // не уводить фокус из редактора — иначе потеряется слово под курсором
   b.onclick = open;

@@ -48,8 +48,8 @@
   const bar = el('div', 'ai-bar');
   const bGen = el('button', 'primary', '✦ Создать куски через ИИ');
   const bDesc = el('button', '', '✦ Описать все без описания');
-  const bKey = el('button', '', '⚙ Ключ Mistral');
-  const stat = el('span', 'ai-st', key() ? '' : 'Для работы ИИ сохраните ключ Mistral (⚙).');
+  const bKey = el('button', '', 'Ключ Mistral');
+  const stat = el('span', 'ai-st', key() ? '' : 'Для работы ИИ сохраните ключ Mistral ().');
   [bGen, bDesc, bKey].forEach(b => b.type = 'button');
   bar.append(bGen, bDesc, bKey, stat);
   host.after(bar);
@@ -72,9 +72,9 @@
   const openKey = () => { kin.value = key(); kst.textContent = key() ? 'Ключ сохранён в этом браузере.' : 'Ключ не задан.'; km.open(); kin.focus(); };
   bKey.onclick = openKey;
   km.p.querySelector('#aiKeyNo').onclick = km.close;
-  km.p.querySelector('#aiKeyOk').onclick = () => { const v = kin.value.trim(); try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); kst.textContent = v ? 'Сохранено.' : 'Ключ удалён.'; setStat(v ? '' : 'Для работы ИИ сохраните ключ Mistral (⚙).', !v); setTimeout(km.close, 500); } catch (_) { kst.textContent = 'Браузер не разрешил сохранить ключ.'; } };
-  km.p.querySelector('#aiKeyDel').onclick = () => { try { localStorage.removeItem(KEY); } catch (_) {} kin.value = ''; kst.textContent = 'Ключ удалён.'; setStat('Для работы ИИ сохраните ключ Mistral (⚙).', true); };
-  const needKey = () => { setStat('Нет ключа Mistral — нажмите «⚙ Ключ Mistral».', true); openKey(); };
+  km.p.querySelector('#aiKeyOk').onclick = () => { const v = kin.value.trim(); try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); kst.textContent = v ? 'Сохранено.' : 'Ключ удалён.'; setStat(v ? '' : 'Для работы ИИ сохраните ключ Mistral ().', !v); setTimeout(km.close, 500); } catch (_) { kst.textContent = 'Браузер не разрешил сохранить ключ.'; } };
+  km.p.querySelector('#aiKeyDel').onclick = () => { try { localStorage.removeItem(KEY); } catch (_) {} kin.value = ''; kst.textContent = 'Ключ удалён.'; setStat('Для работы ИИ сохраните ключ Mistral ().', true); };
+  const needKey = () => { setStat('Нет ключа Mistral — нажмите «Ключ Mistral».', true); openKey(); };
 
   // ── описать все без описания (очередь на сервере) ──
   async function poll() {
@@ -89,14 +89,14 @@
     if (!key()) return needKey();
     bDesc.disabled = true; setStat('Ставлю в очередь…');
     try { const r = await post('/api/describe', {}); setStat(r.added ? 'В очереди: ' + r.added : 'Всё уже описано.'); poll(); }
-    catch (e) { setStat('⛔ ' + e.message, true); bDesc.disabled = false; }
+    catch (e) { setStat('' + e.message, true); bDesc.disabled = false; }
   };
 
   // ── создать куски ──
   const gm = modal(`<h2>Создать куски через ИИ</h2>
     <p class="gen-lead">Выберите язык и напишите, что дополнить. ИИ предложит новые куски, которых ещё нет в библиотеке. В библиотеку попадёт только то, что вы отметите. Код не запускается — проверьте его сами.</p>
     <div class="gen-form"><select id="genLang" class="gen-in"></select><input id="genCount" class="gen-in gen-n" type="number" min="1" max="8" value="4" title="сколько кусков предложить"></div>
-    <div class="gen-gaps"><button id="genGaps" type="button" title="ИИ посмотрит названия уже имеющихся кусков этого языка и предложит темы, которых не хватает">🔍 что тут не хватает?</button><span id="genGapsHint" class="ai-st"></span></div>
+    <div class="gen-gaps"><button id="genGaps" type="button" title="ИИ посмотрит названия уже имеющихся кусков этого языка и предложит темы, которых не хватает">что тут не хватает?</button><span id="genGapsHint" class="ai-st"></span></div>
     <div id="genChips" class="gen-chips"></div>
     <textarea id="genTopic" class="gen-in" rows="2" placeholder="что дополнить: «работа со строками», «чтение и запись файлов», «JOIN между таблицами»… (можно оставить пустым)"></textarea>
     <div class="gen-bar"><button id="genGo" class="primary" type="button">предложить</button><span id="genStatus" class="ai-st"></span></div>
@@ -109,7 +109,7 @@
   const gSet = (t, bad) => { gst.textContent = t || ''; gst.className = 'ai-st' + (bad ? ' bad' : ''); };
 
   bGen.onclick = async () => {
-    list.innerHTML = ''; chips.innerHTML = ''; gapsHint.textContent = ''; add.style.display = 'none'; gSet(key() ? '' : 'Нет ключа Mistral — закройте окно и нажмите «⚙ Ключ Mistral».', !key());
+    list.innerHTML = ''; chips.innerHTML = ''; gapsHint.textContent = ''; add.style.display = 'none'; gSet(key() ? '' : 'Нет ключа Mistral — закройте окно и нажмите «Ключ Mistral».', !key());
     gm.open();
     try {
       const r = await fetch('/api/ai-langs', { cache: 'no-store' }).then(x => x.json());
@@ -137,7 +137,7 @@
         };
         chips.appendChild(c);
       });
-    } catch (e) { gapsHint.textContent = '⛔ ' + e.message; }
+    } catch (e) { gapsHint.textContent = '' + e.message; }
     gapsBtn.disabled = false;
   };
 
@@ -167,7 +167,7 @@
     if (!key()) { gSet('Нет ключа Mistral.', true); return; }
     go.disabled = true; go.textContent = 'думаю…'; list.innerHTML = ''; add.style.display = 'none'; gSet('ИИ пишет куски…');
     try { draw(await post('/api/ai-generate', { lang: sel.value, topic: topic.value, count: Number(count.value) || 4 })); }
-    catch (e) { gSet('⛔ ' + e.message, true); }
+    catch (e) { gSet('' + e.message, true); }
     go.disabled = false; go.textContent = 'предложить';
   };
   add.onclick = async () => {
@@ -179,7 +179,7 @@
       const skipped = r.skipped.map(s => s.title + ' — ' + s.reason).join('; ');
       gSet('Добавлено: ' + r.created.length + (skipped ? '. Пропущено: ' + skipped : '.') + (r.created.length ? ' Обновляю список…' : ''), !r.created.length);
       if (r.created.length) setTimeout(() => location.reload(), 1200);
-    } catch (e) { gSet('⛔ ' + e.message, true); }
+    } catch (e) { gSet('' + e.message, true); }
     add.disabled = false; add.textContent = 'добавить отмеченные';
   };
 })();

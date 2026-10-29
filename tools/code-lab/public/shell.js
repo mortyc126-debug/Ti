@@ -53,10 +53,10 @@
 
   // общий поиск по всем кускам — из любого раздела
   const sbox = document.createElement('div'); sbox.className = 'side-search';
-  const sin = document.createElement('input'); sin.className = 'ss-in'; sin.placeholder = '🔎 найти кусок…'; sin.spellcheck = false;
+  const sin = document.createElement('input'); sin.className = 'ss-in'; sin.placeholder = 'найти кусок…'; sin.spellcheck = false;
   const sres = document.createElement('div'); sres.className = 'ss-res'; sres.style.display = 'none';
   sbox.append(sin, sres); side.appendChild(sbox);
-  sin.placeholder = '🔎 найти что угодно…';
+  sin.placeholder = 'найти что угодно…';
   let ALL = null, DICT = null;
   const esc2 = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
   const loadAll = () => ALL || (ALL = fetch('/api/list').then(r => r.json()).catch(() => []));

@@ -2,7 +2,7 @@
 // вариантов: сначала код (ярко), потом смысл; ▸ раскрывает разновидности. ↑↓ — выбор, → / ← — раскрыть/свернуть,
 // Enter/Tab — вставить вместо слова, Esc — закрыть. Ctrl+Пробел — открыть для слова под курсором.
 // Деревья — /api/variants (синонимы → термины → разновидности); нет дерева — слова словаря по началу.
-// Галочка «✨ подсказки» в панели (по умолчанию вкл). Надстройка песочницы; после tabs.js.
+// Галочка «подсказки» в панели (по умолчанию вкл). Надстройка песочницы; после tabs.js.
 (function(){
   const sb = window.codelabSandbox;
   const box = document.getElementById('sandbox');
@@ -100,6 +100,8 @@
     let roots = [];
     if(c.word){ const r = await fetch('/api/variants?q=' + encodeURIComponent(c.word) + '&lang=' + encodeURIComponent(c.lang)).then(x => x.json()).catch(() => null); roots = (r && r.roots) || []; }
     if(my !== seq) return;
+    // в языке файла пусто (или файл без языка) — показываем другие языки, сгруппированно по языку
+    if(!roots.length && c.word && /[А-Яа-яЁё]/.test(c.word)){ const r = await fetch('/api/variants?q=' + encodeURIComponent(c.word)).then(x => x.json()).catch(() => null); if(my !== seq) return; roots = (r && r.roots) || []; }
     if(!roots.length && c.word && /^[\w$.-]+$/.test(c.word)){ const d = await (window.codelabKwDict ? window.codelabKwDict(c.lang) : Promise.resolve({})); if(my !== seq) return; roots = flatFallback(c.word, d || {}, c.lang); }
     if(!roots.length){ if(force){ ctx = c; render(c, [], true); } else hide(); return; }
     ctx = c; render(c, roots);
@@ -144,11 +146,11 @@
   edsEl.addEventListener('scroll', hide, true);
   document.addEventListener('mousedown', e => { if(pop && !pop.contains(e.target)) hide(); }, true);
 
-  // галочка — в меню «⚙ Подсказки» (sb-toolbar.js)
+  // галочка — в меню «Подсказки» (sb-toolbar.js)
   const lab = document.createElement('label'); lab.className = 'sb-live'; lab.title = 'подсказки-деревья по мере набора (Ctrl+Пробел — всегда)';
   const cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = 'sbAc'; cb.checked = acOn;
   cb.onchange = () => { acOn = cb.checked; try { localStorage.setItem('codelab_ac', acOn ? 'on' : 'off'); } catch(_){} if(!acOn) hide(); };
-  lab.appendChild(cb); lab.appendChild(document.createTextNode(' ✨ подсказки при наборе'));
+  lab.appendChild(cb); lab.appendChild(document.createTextNode(' подсказки при наборе'));
   bar.appendChild(lab);
   window.codelabVariants = { open: () => { const ed = edFor(activeId()) || edsEl.firstElementChild; if(ed) show(ed, true); } };
 })();

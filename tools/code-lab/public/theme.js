@@ -157,11 +157,11 @@
   function build(host){
     box = host;
     box.innerHTML = '<div class="th-box"><div class="th-top"><b>Темы и цвета</b><select class="th-sel"></select>'
-      + '<button class="th-b" data-a="new">＋ новая</button><button class="th-b" data-a="del">🗑 удалить</button><button class="th-b" data-a="reset">↺ сбросить</button><span style="flex:1"></span><button class="th-b" data-a="x">✕</button></div>'
+      + '<button class="th-b" data-a="new">＋ новая</button><button class="th-b" data-a="del">удалить</button><button class="th-b" data-a="reset">↺ сбросить</button><span style="flex:1"></span><button class="th-b" data-a="x">✕</button></div>'
       + '<div class="th-main"><div class="th-slots"></div><div><div class="th-pk"></div>'
       + '<div class="th-pal-h">сохранённые цвета <button class="th-b" data-a="padd">＋ текущий</button></div><div class="th-pal"></div>'
       + '<div class="th-hint">клик — применить к выбранному · двойной клик — заменить текущим · правый клик — удалить</div></div></div>'
-      + '<div class="th-img"><button class="th-b" data-a="img">🖼 фон-картинка…</button><button class="th-b" data-a="imgx">убрать картинку</button><input type="file" class="th-file" accept="image/*" hidden></div><div class="th-sl"></div></div>';
+      + '<div class="th-img"><button class="th-b" data-a="img">фон-картинка…</button><button class="th-b" data-a="imgx">убрать картинку</button><input type="file" class="th-file" accept="image/*" hidden></div><div class="th-sl"></div></div>';
     picker = Picker($('.th-pk'), function(hex){
       setc(sel, hex); apply(); save();
       var sw = $('.th-slot[data-k="' + sel + '"] i'); if(sw) sw.style.background = hex;
@@ -188,7 +188,7 @@
     refresh();
   }
 
-  // ── вкладки «API» / «Стиль» внутри окна «⚙ Настройки», которое встраивает сервер ──
+  // ── вкладки «API» / «Стиль» внутри окна «Настройки», которое встраивает сервер ──
   function tabify(){
     var m = document.getElementById('lab-mistral-settings'), panel = m && m.querySelector('.panel');
     if(!panel) return null;
@@ -207,7 +207,7 @@
       lb.className = 'svc-sr'; lb.parentNode.insertBefore(card, lb); card.appendChild(hd); card.appendChild(lb); card.appendChild(inp);
     }
     panel.appendChild(bar); panel.appendChild(api); panel.appendChild(sty);
-    // «⚙ Настройки» всегда открываются на вкладке «Стиль»
+    // «Настройки» всегда открываются на вкладке «Стиль»
     var op = document.getElementById('lab-mistral-open'); if(op) op.addEventListener('click', function(){ show('style'); });
     // всё, что позже добавит другой скрипт (ai-settings.js), тоже попадает во вкладку API
     new MutationObserver(function(ms){ ms.forEach(function(r){ [].forEach.call(r.addedNodes, function(n){ if(n.parentNode === panel && n !== bar && n !== api && n !== sty) api.appendChild(n); }); }); }).observe(panel, { childList:true });

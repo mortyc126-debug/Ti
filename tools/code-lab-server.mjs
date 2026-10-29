@@ -421,7 +421,7 @@ async function searchBoost(){
   try { for(const v of Object.values(await loadExamples())) if(v && v.id) set.add(v.id); } catch(_){}
   _boost = set; _boostAt = Date.now(); return set;
 }
-const taskRanker = createTaskRanker({ entries: () => store.entries(), contract: codeContract, contractLangs: _CONTRACT_LANGS });   // полоска «🧭 пригодится»
+const taskRanker = createTaskRanker({ entries: () => store.entries(), contract: codeContract, contractLangs: _CONTRACT_LANGS });   // полоска «пригодится»
 // задачи ссылаются на куски; вариант «свой код» становится куском (повтор по коду не плодится)
 const tasks = createTaskStore({ root: TASKS, rows: () => store.rows(), slug: s => slug(s),
   // кандидаты для ненайденной ссылки «кусок: …» — обычный поиск, свой язык первым
@@ -1391,7 +1391,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: await tasks.remove(String(b.id || '')) });
     }
     if(u.pathname === '/api/tasks/used-by'){ return json(res, 200, await tasks.usedBy(String(u.searchParams.get('id') || ''))); }
-    // «🧭 пригодится»: до 3 задач к открытому коду. files — все открытые, active — имя активного,
+    // «пригодится»: до 3 задач к открытому коду. files — все открытые, active — имя активного,
     // window — код вокруг курсора (±200 строк), cursor — текущая и прошлая строки
     if(u.pathname === '/api/tasks/suggest' && req.method === 'POST'){
       const b = await readBody(req);
@@ -1538,7 +1538,7 @@ const server = http.createServer(async (req, res) => {
 #lab-mistral-settings button{border:1px solid #51336e;border-radius:8px;background:#2a1740;color:#fff;padding:9px 12px;cursor:pointer;margin:3px 4px 3px 0}#lab-mistral-settings .primary{background:#6934a0}
 #lab-mistral-status{min-height:20px;color:#c9b7e5}
 </style>
-<button id="lab-mistral-open" type="button">⚙ Настройки</button>
+<button id="lab-mistral-open" type="button">Настройки</button>
 <div id="lab-mistral-settings" role="dialog" aria-modal="true" aria-labelledby="lab-mistral-title"><div class="panel"><h2 id="lab-mistral-title">Настройки Mistral</h2><p>Ключ хранится в этом браузере. Он отправляется локальному серверу только при запуске ИИ-описаний.</p><label for="lab-mistral-key">API-ключ</label><input id="lab-mistral-key" type="password" autocomplete="off" placeholder="Вставь ключ Mistral"><div><button class="primary" id="lab-mistral-save">Сохранить</button><button id="lab-mistral-test">Проверить подключение</button><button id="lab-mistral-delete">Удалить ключ</button><button id="lab-mistral-close">Закрыть</button><a href="/vendor.html" style="color:#c9a8ff;margin-left:10px;font-size:13px">Редактор кода…</a></div><p id="lab-mistral-status" aria-live="polite"></p></div></div>
 <script>
 (()=>{const $=id=>document.getElementById(id),keyName='codeLab.mistralApiKey',modal=$('lab-mistral-settings'),input=$('lab-mistral-key'),status=$('lab-mistral-status');if(!modal||!input)return;

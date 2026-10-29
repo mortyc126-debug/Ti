@@ -37,7 +37,7 @@ async function loadList(openId){
   nav.innerHTML = '';
   const add = document.createElement('div'); add.className = 'addbtn'; add.textContent = '+ новый шаблон (вставить код)';
   add.onclick = showAddForm; nav.appendChild(add);
-  const imp = document.createElement('div'); imp.className = 'addbtn'; imp.textContent = '⬆ загрузить файлы кода (.js/.py/.sql)';
+  const imp = document.createElement('div'); imp.className = 'addbtn'; imp.textContent = 'загрузить файлы кода (.js/.py/.sql)';
   imp.onclick = () => {
     const inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true;
     inp.accept = '.js,.mjs,.jsx,.ts,.py,.sql,.txt';
@@ -73,7 +73,7 @@ async function loadList(openId){
   gh.onclick = async () => {
     gh.textContent = 'отправляю на GitHub…';
     const r = await fetch('/api/git/sync', { method: 'POST' }).then(r => r.json()).catch(() => ({ ok: false, message: 'сервер недоступен' }));
-    gh.textContent = (r.ok ? '✓ ' : '⚠ ') + (r.message || (r.ok ? 'готово' : 'не удалось'));
+    gh.textContent = (r.ok ? '✓ ' : '') + (r.message || (r.ok ? 'готово' : 'не удалось'));
     setTimeout(refreshGh, 3500);
   };
   nav.appendChild(gh); refreshGh();
@@ -141,10 +141,10 @@ function render(tpl){
   const copy = mkBtn('⧉ копировать код');
   const reset = mkBtn('↺ сброс имён');
   const edit = mkBtn('✎ править');
-  const dsc = mkBtn('✨ описание');
-  const del = mkBtn('🗑 удалить'); del.classList.add('danger');
+  const dsc = mkBtn('описание');
+  const del = mkBtn('удалить'); del.classList.add('danger');
   const webRun = (tpl.lang || '').toLowerCase() === 'js';
-  const run = mkBtn(webRun ? '▶ запустить' : '▶ запустить на ПК');
+  const run = mkBtn(webRun ? 'запустить' : 'запустить на ПК');
   run.classList.add('ok');
   bar.append(copy, reset, edit, dsc, run, del); work.appendChild(bar);
   edit.onclick = () => showEditForm(tpl);
@@ -196,10 +196,10 @@ function render(tpl){
       box.style.display = ''; outPre.textContent = 'запускаю…'; run.disabled = true;
       const r = await fetch('/api/run', { method: 'POST', body: JSON.stringify({ lang: tpl.lang, code: codeText() }) }).then(x => x.json()).catch(() => ({ ok: false, error: 'сервер недоступен' }));
       run.disabled = false;
-      if(!r.ok){ outPre.textContent = '⚠ ' + (r.error || 'ошибка'); return; }
+      if(!r.ok){ outPre.textContent = '' + (r.error || 'ошибка'); return; }
       let t = r.stdout || '';
-      if(r.stderr) t += (t ? '\n' : '') + '⚠ ' + r.stderr;
-      if(r.timedOut) t += '\n⏱ прервано по таймауту (10 секунд)';
+      if(r.stderr) t += (t ? '\n' : '') + '' + r.stderr;
+      if(r.timedOut) t += '\nпрервано по таймауту (10 секунд)';
       if(!t.trim()) t = '(код отработал, вывода нет · завершился с кодом ' + r.code + ')';
       outPre.textContent = t;
     };

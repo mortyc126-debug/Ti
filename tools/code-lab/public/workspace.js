@@ -52,7 +52,7 @@
       '<button class="btn" id="wsRefresh" title="обновить дерево">⟳</button>' +
       '<button class="btn" id="wsNewFile" title="новый файл в проекте">+ файл</button>' +
       '<button class="btn" id="wsNewDir" title="новая папка">+ папка</button>' +
-      '<button class="btn" id="wsSaveAll" title="сохранить все изменённые файлы (Ctrl+S — текущий)">💾 все</button>' +
+      '<button class="btn" id="wsSaveAll" title="сохранить все изменённые файлы (Ctrl+S — текущий)">все</button>' +
     '</div>' +
     '<div class="ws-root" id="wsRoot" title="нажми, чтобы выбрать другую папку проекта">…</div>' +
     '<div class="ws-tree" id="wsTree"></div>' +
@@ -62,8 +62,8 @@
   const msg = (t, kind) => { const m = $('#wsMsg'); m.textContent = t || ''; m.className = 'ws-msg' + (kind ? ' ' + kind : ''); if(t) clearTimeout(msg.t), msg.t = setTimeout(() => { if(m.textContent === t) m.textContent = ''; }, 6000); };
 
   // кнопки в панели песочницы
-  const bProj = document.createElement('button'); bProj.className = 'btn'; bProj.id = 'sbProject'; bProj.textContent = '📂 проект'; bProj.title = 'файлы проекта на диске: открыть, править, сохранять';
-  const bPick = document.createElement('button'); bPick.className = 'btn'; bPick.textContent = '⬆ файлы'; bPick.title = 'открыть файлы с компьютера в панели (можно и перетащить их в окно редакторов)';
+  const bProj = document.createElement('button'); bProj.className = 'btn'; bProj.id = 'sbProject'; bProj.textContent = 'проект'; bProj.title = 'файлы проекта на диске: открыть, править, сохранять';
+  const bPick = document.createElement('button'); bPick.className = 'btn'; bPick.textContent = 'файлы'; bPick.title = 'открыть файлы с компьютера в панели (можно и перетащить их в окно редакторов)';
   const picker = document.createElement('input'); picker.type = 'file'; picker.multiple = true; picker.style.display = 'none';
   const addBtn = bar.querySelector('#sbAdd');
   if(addBtn){ addBtn.before(bProj); addBtn.before(bPick); } else { bar.prepend(bProj, bPick); }
@@ -101,7 +101,7 @@
       const ren = document.createElement('span'); ren.textContent = '✎'; ren.title = 'переименовать';
       ren.onclick = async ev => { ev.stopPropagation(); const to = prompt('Новое имя (путь внутри проекта):', en.path); if(!to || to === en.path) return;
         try { await api('/api/ws/rename', { from: en.path, to }); files().forEach(f => { if(f.path === en.path){ f.path = to; f.name = base(to); } else if(f.path && f.path.startsWith(en.path + '/')) f.path = to + f.path.slice(en.path.length); }); sb.refresh(); msg('переименовано', 'ok'); await load(); } catch(e){ msg(e.message, 'err'); } };
-      const del = document.createElement('span'); del.textContent = '🗑'; del.title = 'удалить (уйдёт в папку .codelab-trash проекта)';
+      const del = document.createElement('span'); del.textContent = 'удалить'; del.title = 'удалить (уйдёт в папку .codelab-trash проекта)';
       del.onclick = async ev => { ev.stopPropagation(); if(!confirm('Удалить «' + en.path + '»?\nФайл переместится в .codelab-trash внутри проекта.')) return;
         try { await api('/api/ws/delete', { path: en.path }); msg('удалено в .codelab-trash', 'ok'); await load(); } catch(e){ msg(e.message, 'err'); } };
       act.append(ren, del);
@@ -177,8 +177,8 @@
     eds.forEach((ed, i) => {
       const f = list[i], head = ed.querySelector('.sb-ed-head'); if(!f || !head) return;
       head.querySelectorAll('.ws-badge,.ws-save').forEach(x => x.remove());
-      const badge = document.createElement('span'); badge.className = 'ws-badge'; badge.textContent = f.path ? '📁' : ''; badge.title = f.path ? 'файл проекта: ' + f.path : '';
-      const sv = document.createElement('button'); sv.className = 'btn sb-run1 ws-save'; sv.textContent = '💾'; sv.title = f.path ? 'сохранить в ' + f.path + ' (Ctrl+S)' : 'сохранить в проект как файл';
+      const badge = document.createElement('span'); badge.className = 'ws-badge'; badge.textContent = f.path ? 'папка' : ''; badge.title = f.path ? 'файл проекта: ' + f.path : '';
+      const sv = document.createElement('button'); sv.className = 'btn sb-run1 ws-save'; sv.textContent = 'сохранить'; sv.title = f.path ? 'сохранить в ' + f.path + ' (Ctrl+S)' : 'сохранить в проект как файл';
       sv.onclick = () => saveFile(f);
       head.insertBefore(sv, head.querySelector('.sb-ed-del'));
       if(f.path) head.insertBefore(badge, head.querySelector('.sb-lang'));
@@ -215,7 +215,7 @@
     let cur = files();
     if(cur.length && cur.every(x => !x.path) && cur.length <= 3 && cur.every(x => /^f[1-3]$/.test(x.id))) cur = [];   // стартовые файлы уступают место
     sb.setFiles([...cur, ...added]);
-    msg('открыто файлов: ' + added.length + ' (сохранить в проект — кнопкой 💾 у файла)', 'ok');
+    msg('открыто файлов: ' + added.length + ' (сохранить в проект — кнопкой у файла)', 'ok');
   }
   bPick.onclick = () => picker.click();
   picker.onchange = () => { openLocal(picker.files); picker.value = ''; };
