@@ -33,7 +33,7 @@
   const rename = (el, label) => { if(!el) return el; if(el.tagName === 'BUTTON') el.textContent = label; return el; };
 
   // главное — на виду
-  const run = byId('sbRun'), find = byId('sbFindBtn'), tasks = byText('🧭 задачи');
+  const run = byId('sbRun'), find = byId('sbFindBtn'), variants = byId('sbVarBtn'), tasks = byText('🧭 задачи');
   // ИИ
   const ask = rename(byId('sbAskBtn'), '🤖 спросить про код'), diag = rename(byId('sbDgBtn'), '🩺 решить проблему');
   // файл: «💾 на диск…» помнит файл и сохраняет туда же — второй «💾 на диск» (всегда спрашивает место) лишний
@@ -68,7 +68,7 @@
   document.addEventListener('click', e => { if(!e.target.closest('.sbt-dd')) document.querySelectorAll('.sbt-dd.on').forEach(x => x.classList.remove('on')); });
 
   const row = [
-    run, find, tasks,
+    run, find, variants, tasks,
     dd('🤖 ИИ', [ask, diag]),
     dd('📁 Файл', [add, open, save, sep(), project, upload, sep(), copyAll, clear]),
     dd('👁 Вид', [outline, preview, consoleClr, sep(), legend]),

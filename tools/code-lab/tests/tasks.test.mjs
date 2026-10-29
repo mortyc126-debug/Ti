@@ -204,3 +204,21 @@ test('«кусок:» с названием задачи становится с
   assert.equal((await store.list()).filter(t => t.title === 'Повтор').length, 1, 'одноимённые внутри пачки — одна задача');
   await fs.rm(root, { recursive: true, force: true });
 });
+
+test('дерево вариантов: смысл → термины по синонимам → разновидности по имени; регистр — из библиотеки', async () => {
+  const { buildVariants, caseMapFrom } = await import('../lib/variant-tree.mjs');
+  const dict = { langs: {
+    css: { margin: '1.5em: внешний', 'margin-inline': 'auto: по строке', 'margin-inline-start': '1rem: в начале строки', 'margin-top': '1rem: сверху', padding: '1rem: внутренний', 'body { margin': 'обрывок' },
+    js: { 'document.queryselector': 'найти первый элемент', 'document.queryselector(selector)': 'вызов' } } };
+  const synonyms = { margin: ['внешний отступ'], padding: ['внутренний отступ'], 'document.queryselector': ['найти элемент по селектору'] };
+  const r = buildVariants({ q: 'отступ', lang: 'css', dict, synonyms });
+  assert.deepEqual(r.roots.map(n => n.term), ['margin', 'padding']);
+  const m = r.roots[0];
+  assert.equal(m.code, 'margin: 1.5em;'); assert.equal(m.label, 'внешний отступ');
+  const mi = m.children.find(c => c.term === 'margin-inline');
+  assert.ok(mi && mi.children.some(c => c.term === 'margin-inline-start'), 'margin-inline-start — внутри margin-inline');
+  assert.ok(!m.children.some(c => c.term === 'body { margin'), 'обрывки не показываются');
+  const cm = caseMapFrom(['document.querySelector(".a"); document.querySelector("b")']);
+  const j = buildVariants({ q: 'найти элемент', lang: 'js', dict, synonyms, caseMap: cm });
+  assert.equal(j.roots[0].code, 'document.querySelector(selector)');
+});

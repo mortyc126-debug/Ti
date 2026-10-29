@@ -29,7 +29,8 @@ import { handleWorkspace } from './code-lab/lib/workspace.mjs';
 import { createAiGenerate, LANGS as AI_LANGS } from './code-lab/lib/ai-generate.mjs';   // токенайзер вынесен в модуль — его тестируют отдельно
 import { createVendor } from './code-lab/lib/vendor.mjs';
 import { createTaskStore, suggestNext, createTaskRanker } from './code-lab/lib/tasks.mjs';
-import { explainNames } from './code-lab/lib/contract-labels.mjs';   // подписи к именам «даёт/нужно»
+import { explainNames } from './code-lab/lib/contract-labels.mjs';
+import { buildVariants, caseMapFrom } from './code-lab/lib/variant-tree.mjs';   // дерево вариантов «смысл → термины → разновидности»   // подписи к именам «даёт/нужно»
 import { createSections, treeToText, treeFromText, suggestSections, placeInTree } from './code-lab/lib/sections.mjs';   // общее дерево разделов   // задачи: деревья решений поверх кусков   // управляемые обновления CodeMirror (по кнопке)
 
 // сетевые/TLS-ошибки провайдеров ИИ (GigaChat и пр.) не должны ронять весь сервер —
@@ -382,6 +383,7 @@ function coverage(j){
 }
 // к «даёт/нужно» — подписи простыми словами (своя из meta.labels побеждает автоматическую); кэш до правок библиотеки/словаря
 let _lblCache = { v: -1, dict: null, map: new Map() };
+let _caseMap = { v: -1, map: null };   // регистр имён из библиотеки (queryselector → querySelector) для дерева вариантов
 async function labelsFor(entry, names){
   const dict = await kwDict();
   if(_lblCache.v !== store.version || _lblCache.dict !== dict) _lblCache = { v: store.version, dict, map: new Map() };
@@ -1287,6 +1289,16 @@ const server = http.createServer(async (req, res) => {
         + 'Без нумерации и лишнего текста. Пропусти случайные имена переменных и незначимое. Эти строки я вставлю в словарь.\n\n'
         + list;
       return json(res, 200, { lang, scanned, count: words.length, words, prompt });
+    }
+
+    // ── дерево вариантов: «отступ» → margin / padding → margin-top… → конструкции и куски ──
+    if(u.pathname === '/api/variants'){
+      const q = String(u.searchParams.get('q') || '').slice(0, 80), lang = String(u.searchParams.get('lang') || '').toLowerCase();
+      const dict = await kwDict(); const ents = await store.entries();
+      if(_caseMap.v !== store.version) _caseMap = { v: store.version, map: caseMapFrom(ents.map(e => e.code)) };
+      const nl = new Map((await store.rows()).map(r => [r.id, r.nlines]));
+      const rows = ents.map(e => ({ id: e.id, lang: e.lang, title: e.title, code: e.code, nlines: nl.get(e.id) }));
+      return json(res, 200, buildVariants({ q, lang, dict, rows, synonyms: dict.synonyms || {}, caseMap: _caseMap.map }));
     }
 
     // ── свои подписи к «даёт/нужно» ─────────────────────────────────────────────

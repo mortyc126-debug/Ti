@@ -88,6 +88,7 @@
   async function accept(it){
     if(!curCtx) return;
     if(it.type === 'term'){ curCtx.put(it.label); hide(); return; }
+    if(it.type === 'vtree'){ hide(); if(window.codelabVariants) window.codelabVariants.open(); return; }
     if(it.type === 'task'){ curCtx.put(''); hide(); if(window.codelabTaskPanel) window.codelabTaskPanel.openTask(it.id); return; }   // набранное было поиском, а не кодом
     try { const t = await fetch('/api/template?id=' + encodeURIComponent(it.id)).then(r => r.json());
       const code = t.code != null ? t.code : (Array.isArray(t.lines) ? t.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : '');
@@ -101,7 +102,7 @@
     pop.innerHTML = '';
     items.forEach((it, i) => {
       const row = document.createElement('div'); row.className = 'ac-it' + (i === sel ? ' sel' : '');
-      const tag = document.createElement('span'); tag.className = 'tag' + (it.type === 'piece' ? ' code' : it.type === 'task' ? ' task' : ''); tag.textContent = it.type === 'piece' ? 'код' : it.type === 'task' ? 'задача' : 'слово'; row.appendChild(tag);
+      const tag = document.createElement('span'); tag.className = 'tag' + (it.type === 'piece' ? ' code' : it.type === 'task' || it.type === 'vtree' ? ' task' : ''); tag.textContent = it.type === 'piece' ? 'код' : it.type === 'task' ? 'задача' : it.type === 'vtree' ? '🌳 варианты' : 'слово'; row.appendChild(tag);
       const k = document.createElement('span'); k.className = 'k'; k.textContent = it.label; row.appendChild(k);
       if(it.desc){ const d = document.createElement('span'); d.className = 'd'; d.textContent = it.desc; row.appendChild(d); }
       row.addEventListener('mousedown', e => { e.preventDefault(); accept(it); });
@@ -118,7 +119,9 @@
     const dp = window.codelabKwDict ? window.codelabKwDict(ctx.lang || '') : loadDict();
     dp.then(d => {
       if(my !== seq) return;
-      const terms = tasksFor(ctx.word).concat(termsFrom(ctx.word, d));   // задачи и слова — сразу (задачи из кэша)
+      // русское слово — это смысл: первой строкой предлагаем дерево вариантов («отступ» → margin / padding…)
+      const vt = /[А-Яа-яЁё]{3,}/.test(ctx.word) && window.codelabVariants ? [{ type: 'vtree', label: ctx.word, desc: 'варианты: Ctrl+Пробел' }] : [];
+      const terms = vt.concat(tasksFor(ctx.word), termsFrom(ctx.word, d));   // задачи и слова — сразу (задачи из кэша)
       items = terms; sel = 0; if(items.length) renderPop(); else hide();
       piecesFor(ctx.word).then(pc => { if(my !== seq || !pc.length) return; items = terms.concat(pc); if(sel >= items.length) sel = 0; renderPop(); });
     });
