@@ -384,8 +384,21 @@ function renderPalette(){
     node.items.push(t);
   });
   const count = n => { let c = n.items.length; n.children.forEach(x => c += count(x)); return c; };
-  const mkItem = t => {
+  // одинаковые названия в одном разделе — под названием отличие: первая фраза описания (или номер варианта)
+  const subOf = items => { const by = new Map(); items.forEach(t => { const k = String(t.title || '').trim().toLowerCase(); by.set(k, (by.get(k) || []).concat(t)); });
+    const sub = new Map(); for(const list of by.values()) if(list.length > 1){ const seen = new Set();
+      list.forEach((t, i) => { let s = String(t.desc || '').trim().split(/(?<=[.!?])\s/)[0].replace(/\.$/, ''); if(s.length > 80) s = s.slice(0, 78) + '…';
+        if(!s || seen.has(s.toLowerCase()) || s.toLowerCase() === String(t.title).toLowerCase()) s = 'вариант ' + (i + 1); seen.add(s.toLowerCase()); sub.set(t, s); }); }
+    return sub; };
+  const mkItem = (t, sub) => {
     const it = palItem(window.codelabTitle ? window.codelabTitle(t.title) : t.title, t.desc); it.onclick = () => addFromCatalog(t);
+    if(sub){ const tt = it.querySelector('.pi-t'), w = el('span', 'pi-w'); it.replaceChild(w, tt); w.appendChild(tt); w.appendChild(el('span', 'pi-sub', sub));
+      // описание не различает — различает код: первая содержательная строка
+      if(/^вариант \d/.test(sub)) fetch('/api/template?id=' + encodeURIComponent(t.id)).then(r => r.json()).then(tp => {
+        const code = tp.code != null ? tp.code : (Array.isArray(tp.lines) ? tp.lines.map(l => (l || []).map(k => k.v != null ? k.v : '').join('')).join('\n') : '');
+        const ln = String(code).split('\n').map(x => x.trim()).find(x => x && !/^(\/\/|#|\/\*|\*|<!--)/.test(x));
+        if(ln){ const sp = w.querySelector('.pi-sub'); sp.textContent = ln.length > 60 ? ln.slice(0, 58) + '…' : ln; sp.style.fontFamily = 'ui-monospace,monospace'; }
+      }).catch(() => {}); }
     if(t.lang){ const lg = el('span', 'pi-lang', String(t.lang).toUpperCase()); it.appendChild(lg); }
     const del = el('span', 'pi-del', 'удалить'); del.title = 'удалить шаблон насовсем';
     del.onclick = e => { e.stopPropagation(); delTemplate(t); };
@@ -393,7 +406,7 @@ function renderPalette(){
   };
   const renderBranch = (node, into) => {
     const names = [...node.children.keys()].sort((a, b) => (a === 'Без раздела') - (b === 'Без раздела') || a.localeCompare(b, 'ru'));
-    names.forEach(nm => { const ch = node.children.get(nm); const d = palDetails(nm, count(ch), !!q); renderBranch(ch, d); ch.items.forEach(t => d.appendChild(mkItem(t))); into.appendChild(d); });
+    names.forEach(nm => { const ch = node.children.get(nm); const d = palDetails(nm, count(ch), !!q); renderBranch(ch, d); const sub = subOf(ch.items); ch.items.forEach(t => d.appendChild(mkItem(t, sub.get(t)))); into.appendChild(d); });
   };
   renderBranch(root, host);
 }
