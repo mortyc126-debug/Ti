@@ -5,6 +5,7 @@
 //   node = { term, lang, code, note, label, children:[node], piece? }
 
 const MAX_ROOTS = 8, MAX_KIDS = 14;
+const HTML_TAGS = new Set('a abbr address article aside audio b blockquote body br button canvas caption code col datalist dd details dialog div dl dt em fieldset figure footer form h1 h2 h3 h4 h5 h6 head header hr html i iframe img input label legend li link main menu meta nav ol optgroup option output p picture pre progress script section select slot small source span strong style sub summary sup svg table tbody td template textarea tfoot th thead time title tr ul video'.split(' '));
 const norm = s => String(s || '').toLowerCase().replace(/ё/g, 'е').trim();
 const stem = w => w.length > 5 ? w.slice(0, w.length - 2) : w;   // отступы/отступ/отступов → «отсту…»
 const words = s => norm(s).split(/[^\p{L}\p{N}_-]+/u).filter(w => w.length > 1);
@@ -33,7 +34,8 @@ function splitNote(v){
 }
 function codeFor(term, lang, ex, cm){
   if(lang === 'css') return term + ': ' + (ex || '…') + ';';
-  if(lang === 'html') return '<' + term + '>';
+  // в HTML-словаре и теги, и атрибуты: тег — в угловых скобках, атрибут — как пишется внутри тега
+  if(lang === 'html') return /^</.test(term) ? term : HTML_TAGS.has(term) ? '<' + term + '>' : (/=/.test(term) ? term : term + (ex && !/[а-яё]/i.test(ex) ? '="' + ex.replace(/^["']|["']$/g, '') + '"' : ''));
   return recase(term, cm);
 }
 
@@ -48,11 +50,25 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   const roots = [];
   const seen = new Set();
   const add = (term, L, label, score) => { const k = L + '\u0000' + term; if(seen.has(k)) return; seen.add(k); roots.push({ term, lang: L, label, score }); };
+  const W = (dict && dict.words) || {};
+  const tokRe = t => new RegExp('(^|[^\\w-])' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w-])');
+  // синонимы и словарь записаны по-разному (.settimeout / settimeout, for / «for (const item of items)»):
+  // точное совпадение → общее слово (js) → термин, у которого есть только конструкции с ним
+  const resolve = (term, D, L) => {
+    const t = String(term).toLowerCase().trim().replace(/^\.(?=[a-z])/, '');
+    if(D[t]) return { key: t, rank: 1 };
+    if((L === 'js' || L === 'ts') && W[t]) return { key: t, rank: 1.5 };   // for, while — базовые слова языка
+    if(t.length < 2 || /\s/.test(t)) return null;
+    const re = tokRe(t); for(const k of Object.keys(D)) if(isIdiom(k) && balanced(k) && re.test(k)) return { key: t, rank: 0.5 };
+    return null;
+  };
   for(const L of want){
     const D = langs[L] || {};
     for(const [term, phrases] of Object.entries(synonyms || {})){
-      if(!D[term.toLowerCase()] || !Array.isArray(phrases)) continue;
-      const hit = phrases.find(p => hasQ(p)); if(hit) add(term.toLowerCase(), L, hit, 3 - Math.min(2, words(hit).length - qw.length));
+      if(!Array.isArray(phrases)) continue;
+      const hit = phrases.find(p => hasQ(p)); if(!hit) continue;
+      const res = resolve(term, D, L); if(!res) continue;
+      add(res.key, L, hit, 3 - Math.min(2, words(hit).length - qw.length) + res.rank);
     }
     if(D[qn]) add(qn, L, '', 4);
     if(/^[a-z]/.test(qn)) for(const k of Object.keys(D)) if(k.startsWith(qn) && !k.includes(' ') && k !== qn && !roots.some(r => k.startsWith(r.term + '-'))) add(k, L, '', 1);
@@ -63,8 +79,12 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
 
   const synLabel = term => { const p = synonyms[term]; return Array.isArray(p) && p.length ? p[0] : ''; };
   const node = (term, L, label) => {
-    const D = langs[L] || {}; const { ex, note } = splitNote(D[term]);
-    return { term, lang: L, code: codeFor(term, L, ex, caseMap), note, label: label || synLabel(term), children: [] };
+    const D = langs[L] || {}; const own = D[term] || ((L === 'js' || L === 'ts') ? W[term] : '');
+    const { ex, note } = splitNote(own);
+    // у термина нет своей записи — показываем самую короткую конструкцию с ним («array.sort((a, b) => a - b)»)
+    let code = codeFor(term, L, ex, caseMap);
+    if(!own && L !== 'css' && L !== 'html'){ const re = tokRe(term); const k = Object.keys(D).filter(x => isIdiom(x) && balanced(x) && re.test(x)).sort((a, b) => a.length - b.length)[0]; if(k) code = recase(k, caseMap); }
+    return { term, lang: L, code, note: note || (own ? '' : ''), label: label || synLabel(term), children: [] };
   };
   const out = top.map(r => {
     const D = langs[r.lang] || {}; const root = node(r.term, r.lang, r.label);
