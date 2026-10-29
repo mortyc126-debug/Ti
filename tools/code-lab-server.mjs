@@ -33,7 +33,8 @@ import { explainNames } from './code-lab/lib/contract-labels.mjs';
 import { buildVariants, caseMapFrom, recase } from './code-lab/lib/variant-tree.mjs';
 import { analyzeNames } from './code-lab/lib/code-names.mjs';
 import { createRequire } from 'node:module';
-const Links = createRequire(import.meta.url)('./code-lab/public/code-links.js');   // связи «когда/если/…» — общий модуль со страницей   // свои имена файла: что внутри, где объявлены, опечатки   // дерево вариантов «смысл → термины → разновидности»   // подписи к именам «даёт/нужно»
+const Links = createRequire(import.meta.url)('./code-lab/public/code-links.js');
+const Struct = createRequire(import.meta.url)('./code-lab/public/structure-rules.js');   // правила структуры — тот же разбор, что на странице   // связи «когда/если/…» — общий модуль со страницей   // свои имена файла: что внутри, где объявлены, опечатки   // дерево вариантов «смысл → термины → разновидности»   // подписи к именам «даёт/нужно»
 import { createSections, treeToText, treeFromText, suggestSections, placeInTree } from './code-lab/lib/sections.mjs';   // общее дерево разделов   // задачи: деревья решений поверх кусков   // управляемые обновления CodeMirror (по кнопке)
 
 // сетевые/TLS-ошибки провайдеров ИИ (GigaChat и пр.) не должны ронять весь сервер —
@@ -118,7 +119,8 @@ const DICT_DIR = path.join(PUBLIC, 'dict');
 const LANGS_DIR = path.join(DICT_DIR, 'langs');
 const EXAMPLES_FILE = path.join(DICT_DIR, 'examples.json');   // привязка «слово/конструкция → кусок-пример» {term:{id,title}}
 const SYN_FILE = path.join(DICT_DIR, 'synonyms.json');
-const REL_FILE = path.join(DICT_DIR, 'relations.json');        // правки связей «слово → когда/если/…»: {язык|*:{слово:связь}}; '' — «связи нет»        // синонимы для поиска по смыслу: {term:[фраза,…]} — найти, не помня имени
+const REL_FILE = path.join(DICT_DIR, 'relations.json');
+const STRUCT_FILE = path.join(DICT_DIR, 'structure.json');     // правила структуры по языкам: {язык: [«li: внутри ul, ol», …]}        // правки связей «слово → когда/если/…»: {язык|*:{слово:связь}}; '' — «связи нет»        // синонимы для поиска по смыслу: {term:[фраза,…]} — найти, не помня имени
 // алиасы языка → канон: чтобы «javascript»/«py»/«c++» не плодили файл-двойник рядом с js/python/cpp
 const LANG_ALIAS = { javascript: 'js', typescript: 'ts', py: 'python', python3: 'python', shell: 'bash', sh: 'bash', zsh: 'bash', 'c++': 'cpp', cplusplus: 'cpp', cxx: 'cpp', 'c#': 'csharp', 'c-sharp': 'csharp', cs: 'csharp', golang: 'go', rb: 'ruby', kt: 'kotlin', rs: 'rust', jsx: 'js', tsx: 'ts', htm: 'html', yml: 'yaml' };
 const canonLang = v => { v = String(v || '').trim().toLowerCase(); return LANG_ALIAS[v] || v.replace(/[^a-z0-9_+-]/g, '') || 'other'; };
@@ -136,6 +138,7 @@ const _isSynList = s => { const t = String(s).trim(); if(_commas(t) < 3 || _isSe
 const _looksProse = s => { const t = String(s); if(!_isRuS(t)) return false; if(_hasLat(t)) return false; return !/[{}()\[\];=<>\/\\|&*%#@$`]/.test(t); };
 async function loadExamples(){ try { const o = JSON.parse(await fs.readFile(EXAMPLES_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
 async function loadRelations(){ try { const o = JSON.parse(await fs.readFile(REL_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
+async function loadStructure(){ try { const o = JSON.parse(await fs.readFile(STRUCT_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
 async function loadSynonyms(){ try { const o = JSON.parse(await fs.readFile(SYN_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
 let _dictRawKeys = [];   // ключи словаря как записаны (с регистром) — для показа кода в подсказках
 async function loadLangDicts(){
@@ -158,6 +161,7 @@ async function kwDict(){
   for(const [lang, m] of Object.entries(fromFiles)){ base.langs[lang] = Object.assign({}, base.langs[lang] || {}, m); }
   base.examples = await loadExamples();   // привязки «термин → кусок-пример»
   base.synonyms = await loadSynonyms();   // синонимы/фразы для поиска по смыслу
+  base.structure = await loadStructure();   // правила структуры: внутри / после / требует / пишется (public/structure-rules.js)
   base.relations = await loadRelations();   // правки связей частей кода (ядро и сортировка по пояснению — в public/code-links.js)
   _kwDict = base;
   return _kwDict;
@@ -1264,6 +1268,49 @@ const server = http.createServer(async (req, res) => {
         + 'Ответ строго по одному на строку: слово: связь. Без пояснений.\n\n'
         + part.map(([w, n]) => w + ' — ' + n).join('\n');
       return json(res, 200, { lang, rels: Links.RELS, by, unclassified: none.length, prompt, shown: part.length });
+    }
+
+    // правила структуры по языкам. GET ?lang= — правила, сводка, слова без правил и промпт для ИИ.
+    // POST {lang, text, mode}: mode 'merge' — правило с тем же словом и видом заменяется, «слово: удалить» снимает все его правила;
+    // 'replace' — правила языка целиком из text.
+    if(u.pathname === '/api/dict/structure' && req.method === 'POST'){
+      const b = await readBody(req); const lang = canonLang(b.lang);
+      const { rules, bad } = Struct.parse(b.text);
+      const all = await loadStructure(); let lines = b.mode === 'replace' ? [] : (all[lang] || []).slice();
+      const key = r => r.term.toLowerCase() + '\u0000' + r.verb;
+      let added = 0, replaced = 0, removed = 0;
+      for(const r of rules){
+        const old = Struct.parse(lines.join('\n')).rules;
+        if(r.verb === 'удалить'){ const n = lines.length; lines = lines.filter((l, i) => { const o = Struct.parse(l).rules[0]; return !o || o.term.toLowerCase() !== r.term.toLowerCase(); }); removed += n - lines.length; continue; }
+        const i = old.findIndex(o => key(o) === key(r));
+        if(i >= 0){ const idx = lines.findIndex(l => l.trim() === old[i].raw); if(idx >= 0){ lines[idx] = r.raw; replaced++; continue; } }
+        lines.push(r.raw); added++;
+      }
+      if(lines.length) all[lang] = lines; else delete all[lang];
+      await fs.mkdir(DICT_DIR, { recursive: true });
+      await fs.writeFile(STRUCT_FILE, JSON.stringify(all, null, 2), 'utf8'); _kwDict = null;
+      return json(res, 200, { ok: true, lang, added, replaced, removed, total: lines.length, bad });
+    }
+    if(u.pathname === '/api/dict/structure'){
+      const d = await kwDict(); const all = d.structure || {};
+      const lang = canonLang(u.searchParams.get('lang') || 'html');
+      const lines = all[lang] || []; const { rules, bad } = Struct.parse(lines.join('\n'));
+      const byVerb = {}; rules.forEach(r => { byVerb[r.verb] = (byVerb[r.verb] || 0) + 1; });
+      // слова словаря без правил — короткие (слова языка, а не конструкции) вперёд
+      const has = new Set(rules.map(r => r.term.toLowerCase()));
+      const src = Object.assign({}, lang === 'css' ? d.cssProps : lang === 'html' ? Object.assign({}, d.htmlTags, d.htmlAttrs) : {}, (d.langs && d.langs[lang]) || {});
+      const free = Object.entries(src).filter(([w]) => /^[@:]?[A-Za-z_$][\w$-]*\*?$/.test(w) && !has.has(w.toLowerCase())).sort((a, b) => a[0].length - b[0].length);
+      const lim = Math.min(Number(u.searchParams.get('limit')) || 120, 300), part = free.slice(0, lim);
+      const sample = rules.slice(0, 8).map(r => r.raw).join('\n') || 'li: внутри ul, ol\ngap: требует display: flex | grid\nelif: после if, elif\nif: пишется if (…) {\\n  …\\n}';
+      const prompt = 'Составь правила структуры для языка ' + lang + ': где слово может стоять, чего требует и как пишется. Одна строка — одно правило, формат «слово: правило». Виды правил:\n'
+        + 'внутри A, B — слово/тег работает только внутри A или B\nне внутри A — нельзя внутри A\nсодержит A, B — внутри обычно лежат A, B\nне содержит A — внутри нельзя A\n'
+        + 'первым в A — должен идти первым внутри A\nпосле A, B — идёт сразу после блока A или B\nтребует свойство: значение1 | значение2 — без этого не сработает\n'
+        + 'пишется шаблон — как это записывают, с отступами; перенос строки — \\n, место для своего — …\nсвязывает / читает — с чем связано по имени в других файлах (html, css, js), * — имя\n'
+        + 'После « — » можно коротко пояснить почему. Только правила, без нумерации и лишнего текста. Пропусти слова, для которых правила нет.\n\nПримеры:\n' + sample
+        + (part.length ? '\n\nСлова языка, для которых правил пока нет:\n' + part.map(([w, n]) => w + ' — ' + String(n || '').replace(/\s+/g, ' ').slice(0, 70)).join('\n')
+          : '\n\nСловаря этого языка у меня нет — возьми основные слова и конструкции языка сам: 30–60 правил, самое частое и то, на чём чаще ошибаются.'
+            + (rules.length ? ' Эти уже есть, их не повторяй: ' + [...has].join(', ') + '.' : ''));
+      return json(res, 200, { lang, langs: [...new Set(Object.keys(all).concat(Object.keys(d.langs || {})))].sort(), lines, count: rules.length, byVerb, bad, free: free.length, shown: part.length, prompt });
     }
 
     // привязать к термину (слову/конструкции) кусок-пример: {term, piece: название|id|''(снять)}

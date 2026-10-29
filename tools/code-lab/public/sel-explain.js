@@ -43,6 +43,7 @@
   .se-list{margin-top:10px;border-top:1px solid var(--border,#3a2f55);padding-top:8px;display:flex;flex-direction:column;gap:5px}
   .se-it{font-size:12.5px;line-height:1.45;color:var(--text3,#9c90c4)}
   .se-it code{font:12.5px ui-monospace,monospace;color:var(--name,#3dd9ff);margin-right:6px}
+  .se-it .r{font:11.5px ui-monospace,monospace;color:var(--str,#52F2C9);margin:1px 0 0 14px;white-space:pre-wrap}
   .se-it .p{color:var(--text2,#cbc2ea)}
   .se-none{color:var(--text3,#9c90c4);font-size:12.5px}
   `;
@@ -160,6 +161,10 @@
     if(cm && cm.somethingSelected()){ const f = cm.getCursor('from'); text = cm.getLine(f.line).slice(0, f.ch).replace(/\S/g, ' ') + text; }
     text = text.slice(0, MAX_CHARS);
     const [d, own] = await Promise.all([dict(), ownNames(cm ? cm.getValue() : (ta ? ta.value : ''), lang)]);
+    // правила структуры языка: «внутри ul, ol», «требует display: flex», «пишется …» — в расшифровку
+    const SL = /^py/.test(lang) ? 'python' : /^(ts|typescript|javascript|jsx)$/.test(lang) ? 'js' : lang;
+    const srules = window.StructureRules ? window.StructureRules.parse(((d.structure || {})[SL] || []).join('\n')).rules : [];
+    const ruleOf = t => window.StructureRules ? window.StructureRules.describe(String(t).replace(/^[.#<\/]+/, '').split('.').pop().replace(/\(.*$/, ''), srules) : [];
     if(panel) panel.remove();
     panel = document.createElement('div'); panel.className = 'se';
     const lines = text.split('\n').slice(0, MAX_LINES);
@@ -187,7 +192,8 @@
     const list = all.filter(s => { const key = s.text.toLowerCase(); if(seen.has(key)) return false; seen.add(key); return true; })
       .map(s => '<div class="se-it' + (s.typo ? ' typo' : '') + '"><code>' + esc(s.text) + '</code>' + (s.path ? '<span class="p">' + esc(s.path) + '</span> — ' : '') + esc(s.note || s.label || s.rel)
         + (s.typo && cm ? '<a data-fix="' + esc(s.text) + '" data-to="' + esc(s.typo.maybe) + '">исправить</a>' : '')
-        + (s.own && cm ? '<a data-go="' + s.own.line + '">к объявлению</a>' : '') + '</div>').join('');
+        + (s.own && cm ? '<a data-go="' + s.own.line + '">к объявлению</a>' : '')
+        + ruleOf(s.text).map(x => '<div class="r">' + esc(x) + '</div>').join('') + '</div>').join('');
     panel.innerHTML = '<div class="se-h"><b>что здесь</b><span>' + esc(lang.toUpperCase()) + '</span><button title="закрыть (Esc)">×</button></div>'
       + '<div class="se-b">' + (all.length ? body + flow + '<div class="se-list">' + list + '</div>' : '<div class="se-none">в выделенном нет слов из словаря — выдели кусок побольше или добавь пояснения в словарь</div>') + '</div>';
     document.body.appendChild(panel);

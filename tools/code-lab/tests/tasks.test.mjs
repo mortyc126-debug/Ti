@@ -279,3 +279,18 @@ test('раскладка: смесь букв, русская и английс�
   assert.deepEqual(L.check('<вшм сlass="Привет">текст</div>', 'html', known).map(x => x.fix), ['div', 'class']);
   assert.equal(L.ruToEn('сщтые'), 'const');
 });
+
+test('правила структуры: разбор, HTML-вложенность, CSS «требует», JS/Python «внутри/после», шаблон', () => {
+  const S = require('../public/structure-rules.js');
+  const all = require('../public/dict/structure.json');
+  for(const l of Object.keys(all)) assert.equal(S.parse(all[l].join('\n')).bad.length, 0, 'правила ' + l + ' разбираются');
+  const p = S.parse('li: внутри ul, ol — пояснение\nкривая строка\nx: странно что-то');
+  assert.equal(p.rules.length, 1); assert.equal(p.rules[0].note, 'пояснение'); assert.equal(p.bad.length, 2);
+  const R = l => S.parse(all[l].join('\n')).rules;
+  const msgs = (c, l) => S.check(c, l, R(l)).map(x => x.msg.split(' — ')[0]);
+  assert.deepEqual(msgs('<ul><li>a</li></ul>\n<li>b</li>\n<p><div>x</div></p>', 'html'), ['<li> должен быть внутри <ul>, <ol>, <menu>', '<p> не может содержать <div>']);
+  assert.deepEqual(msgs('.a { gap: 1px }\n.b { display: grid; gap: 1px }', 'css').length, 1);
+  assert.deepEqual(msgs('async function h(){ await g(); }\nif (a) {\n} else {\n}\nfoo();\nelse {\n}\nawait z();', 'js'), ['else идёт только после if', 'await работает только внутри async']);
+  assert.deepEqual(msgs('def f():\n    return 1\nreturn 2\nif a:\n    pass\nelif b:\n    pass\nx = 1\nelif c:\n    pass', 'python'), ['return работает только внутри def', 'elif идёт только после if / elif']);
+  assert.equal(S.templateFor('if', R('js')), 'if (…) {\n  …\n}');
+});

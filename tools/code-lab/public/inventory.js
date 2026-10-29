@@ -1305,3 +1305,69 @@ function openRelModal(){
 }
 document.getElementById('pdictrel').onclick = openRelModal;
 
+// правила структуры: что внутри чего, после чего, чего требует, как пишется. Любой язык: выбрать из списка или вписать.
+// Смотреть текущие, дописать руками («слово: правило»), заменить целиком, получить промпт для ИИ на слова без правил.
+function openStructModal(){
+  const bg = el2('div', 'modal-bg');
+  const box = el2('div', 'modal');
+  box.style.maxWidth = '860px';
+  box.innerHTML = '<h3>Правила структуры</h3>'
+    + '<p class="mh">Где слово или тег может стоять, чего требует и как записывается. Строка: <b>слово: правило</b>, после « — » можно пояснить почему. '
+    + 'Виды: <b>внутри</b>, <b>не внутри</b>, <b>содержит</b>, <b>не содержит</b>, <b>первым в</b>, <b>после</b>, <b>требует</b>, <b>пишется</b> (шаблон: \\n — перенос, … — своё место), <b>связывает</b> / <b>читает</b>. '
+    + '<b>слово: удалить</b> — снять все правила слова. Нарушения подчёркиваются в песочнице, шаблон «пишется» раскрывается по Tab после слова.</p>'
+    + '<div class="fmt">li: внутри ul, ol — пункт живёт только в списке&#10;gap: требует display: flex | grid&#10;elif: после if, elif&#10;if: пишется if (…) {\\n  …\\n}</div>'
+    + '<div class="mbtns"><input class="inv-search" id="st-lang" list="st-langs" placeholder="язык: html, css, js, python, sql…" style="width:200px"><datalist id="st-langs"></datalist>'
+    + '<button class="btn" id="st-view">показать текущие</button><button class="btn" id="st-edit">все в поле</button><button class="btn" id="st-prompt">промпт для ИИ</button></div>'
+    + '<textarea id="st-text" placeholder="слово: правило" style="min-height:150px;font-family:ui-monospace,monospace"></textarea>'
+    + '<div class="mbtns"><button class="btn" id="st-parse">разобрать</button><button class="btn ok" id="st-add">добавить</button><button class="btn" id="st-replace" title="правила языка станут ровно такими, как в поле">заменить все</button><button class="btn" id="st-close">закрыть</button></div>'
+    + '<div class="lp-prev" id="st-prev"></div>';
+  bg.appendChild(box); document.body.appendChild(bg);
+  const q = s => bg.querySelector(s);
+  q('#st-close').onclick = () => bg.remove();
+  q('#st-lang').value = 'html';
+  const lang = () => String(q('#st-lang').value || '').trim().toLowerCase() || 'html';
+  const row = (cls, t) => { const d = el2('div', 'lp-row ' + cls); d.textContent = t; return d; };
+  const get = () => fetch('/api/dict/structure?lang=' + encodeURIComponent(lang())).then(x => x.json()).catch(() => null);
+  get().then(r => { if(r) q('#st-langs').innerHTML = r.langs.map(l => '<option value="' + l + '">').join(''); });
+  const VORDER = ['внутри', 'не внутри', 'первым в', 'содержит', 'не содержит', 'после', 'требует', 'пишется', 'связывает', 'читает'];
+  q('#st-view').onclick = async () => {
+    const prev = q('#st-prev'); prev.innerHTML = 'загрузка…'; const r = await get(); prev.innerHTML = '';
+    if(!r){ prev.appendChild(row('lp-bad', 'нет ответа сервера')); return; }
+    prev.appendChild(el2('div', 'lp-sec', r.lang + ': правил ' + r.count + (r.free ? ' · слов словаря без правил: ' + r.free : '')));
+    if(!r.count){ prev.appendChild(row('muted', 'пока пусто — впиши правила или возьми «промпт для ИИ»')); return; }
+    const P = window.StructureRules; const rules = P ? P.parse(r.lines.join('\n')).rules : [];
+    for(const v of VORDER){ const list = rules.filter(x => x.verb === v); if(!list.length) continue;
+      prev.appendChild(el2('div', 'lp-sec', v + ' (' + list.length + ')'));
+      list.forEach(x => { const d = el2('div', 'lp-row'); const b = document.createElement('b'); b.textContent = x.term; b.style.color = 'var(--name,#cbc2ea)';
+        d.appendChild(b); d.appendChild(document.createTextNode('  ' + (v === 'пишется' ? x.args[0].replace(/\\n/g, ' ⏎ ') : x.args.join(', ')) + (x.note ? '  — ' + x.note : '')));
+        d.style.cursor = 'pointer'; d.title = 'в поле для правки'; d.onclick = () => { q('#st-text').value += (q('#st-text').value && !q('#st-text').value.endsWith('\n') ? '\n' : '') + x.raw + '\n'; };
+        prev.appendChild(d); }); }
+  };
+  q('#st-edit').onclick = async () => { const r = await get(); if(r) q('#st-text').value = r.lines.join('\n') + '\n'; };
+  q('#st-prompt').onclick = async () => {
+    const r = await get(); if(!r) return;
+    try { await navigator.clipboard.writeText(r.prompt); } catch(_){}
+    const prev = q('#st-prev'); prev.innerHTML = '';
+    prev.appendChild(row('lp-ok', 'Промпт скопирован (' + r.lang + ': ' + r.shown + ' слов из ' + r.free + ' без правил). Ответ ИИ вставь в поле, «разобрать», потом «добавить».'));
+    const pre = document.createElement('pre'); pre.textContent = r.prompt; pre.style.cssText = 'white-space:pre-wrap;font-size:11.5px;max-height:220px;overflow:auto;color:var(--text3)'; prev.appendChild(pre);
+  };
+  q('#st-parse').onclick = () => {
+    const P = window.StructureRules; const prev = q('#st-prev'); prev.innerHTML = ''; if(!P) return;
+    const { rules, bad } = P.parse(q('#st-text').value);
+    prev.appendChild(el2('div', 'lp-sec', 'правил: ' + rules.length + (bad.length ? ' · не понято: ' + bad.length : '')));
+    rules.forEach(x => prev.appendChild(row('lp-ok', '✓ ' + x.term + ' — ' + x.verb + ' ' + (x.verb === 'пишется' ? x.args[0].replace(/\\n/g, ' ⏎ ') : x.args.join(', ')))));
+    bad.forEach(x => prev.appendChild(row('lp-bad', 'строка ' + x.line + ': ' + x.why + ' — «' + x.text + '»')));
+  };
+  const save = async mode => {
+    if(mode === 'replace' && !confirm('Заменить все правила языка «' + lang() + '» тем, что в поле?')) return;
+    const r = await fetch('/api/dict/structure', { method: 'POST', body: JSON.stringify({ lang: lang(), text: q('#st-text').value, mode }) }).then(x => x.json()).catch(() => null);
+    const prev = q('#st-prev'); prev.innerHTML = '';
+    prev.appendChild(row(r && r.ok ? 'lp-ok' : 'lp-bad', r && r.ok ? (r.lang + ': добавлено ' + r.added + ', заменено ' + r.replaced + ', снято ' + r.removed + ' · всего ' + r.total + '. Обнови песочницу (Ctrl+F5).') : 'Ошибка сохранения'));
+    ((r && r.bad) || []).forEach(x => prev.appendChild(row('lp-bad', 'не понято, строка ' + x.line + ': ' + x.why)));
+    if(window.codelabKwDictReset) window.codelabKwDictReset();
+  };
+  q('#st-add').onclick = () => save('merge');
+  q('#st-replace').onclick = () => save('replace');
+}
+document.getElementById('pdictstruct').onclick = openStructModal;
+

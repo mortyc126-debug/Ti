@@ -21,6 +21,7 @@
   .cm-fix-bub b{color:#ffb454;font-family:ui-monospace,monospace}
   .cm-fix-bub button{background:none;border:1px solid var(--border,#3a2f55);border-radius:6px;color:var(--text,#eee);font-size:11.5px;padding:1px 7px;cursor:pointer}
   .cm-fix-bub span{color:var(--text3,#9c90c4);font-size:10.5px}
+  .cm-warn{text-decoration:underline dotted #ffb454;text-decoration-thickness:2px;text-underline-offset:3px}
   .cm-err-at{background:rgba(255,92,122,.28);border-bottom:2px solid #ff5c7a;border-radius:2px}
   .cm-err-line{background:rgba(255,92,122,.07)}
   .cm-err-box{box-sizing:border-box;width:calc(100% - 12px);min-width:260px;margin:3px 0 6px 4px;padding:6px 9px;border-left:3px solid #ff5c7a;border-radius:0 7px 7px 0;background:rgba(255,92,122,.10);
@@ -61,6 +62,12 @@
       for(const x of window.LayoutCheck.check(code, lang, all)) if(!marks.some(o => o.from < x.to && o.to > x.from))
         marks.push({ from: x.from, to: x.to, cls: 'cm-layout', title: x.why + (x.fix ? ' → ' + x.fix + ' (Alt+Enter — исправить)' : ''), fix: x.fix });
     }
+    // правила структуры языка: что внутри чего, что после чего, чего требует (dict/structure.json)
+    if(window.StructureRules && code.length < 200000){
+      const rules = await structRules(lang); if(ver !== st.ver) return;
+      for(const x of window.StructureRules.check(code, lang, rules).slice(0, 40)) if(!marks.some(o => o.from < x.to && o.to > x.from))
+        marks.push({ from: x.from, to: x.to, cls: x.level === 'warn' ? 'cm-warn' : 'cm-bad', title: x.msg });
+    }
     if(ver !== st.ver) return;
     st.marks.forEach(m => m.clear());
     st.marks = marks.map(k => { const mk = cm.markText(cm.posFromIndex(k.from), cm.posFromIndex(k.to), { className: k.cls, attributes: { title: k.title } }); if(k.fix) mk.__fix = k.fix; return mk; });
@@ -77,6 +84,39 @@
       if(l === 'css' || l === 'html'){ add(d.cssProps); add(d.cssVals); add(d.htmlTags); add(d.htmlAttrs); }
       return set;
     }).catch(() => new Set(KW)));
+  }
+  const canon = lang => /^py/.test(lang) ? 'python' : /^(ts|typescript|javascript|jsx)$/.test(lang) ? 'js' : lang;
+  const structCache = {};
+  function structRules(lang){
+    const l = canon(lang);
+    return structCache[l] || (structCache[l] = (window.codelabKwDict ? window.codelabKwDict(l) : Promise.resolve({}))
+      .then(d => window.StructureRules.parse(((d && d.structure && d.structure[l]) || []).join('\n')).rules).catch(() => []));
+  }
+  // Tab после слова с шаблоном «пишется» — раскрыть шаблон с отступом строки; «…» — места для своего:
+  // первое выделено, следующий Tab переходит к следующему
+  // следующее «…» после курсора в пределах последнего раскрытого шаблона (tpl — {to: номер последней строки})
+  function nextSlot(cm, tpl){
+    const from = cm.getCursor('to'); if(!tpl || from.line > tpl.to) return false;
+    for(let l = from.line; l <= Math.min(tpl.to, cm.lastLine()); l++){ const t = cm.getLine(l); const i = t.indexOf('…', l === from.line ? from.ch : 0); if(i >= 0){ cm.setSelection({ line: l, ch: i }, { line: l, ch: i + 1 }); return true; } }
+    return false;
+  }
+  async function tabTemplate(cm, ed){
+    const st = live.get(cm) || {};
+    if(cm.somethingSelected()){
+      if(cm.getSelection() !== '…') return false;
+      if(!nextSlot(cm, st.tpl || { to: cm.getCursor().line + 30 })){ cm.setCursor(cm.getCursor('to')); st.tpl = null; }
+      return true;
+    }
+    const c = cm.getCursor(), line = cm.getLine(c.line), m = line.slice(0, c.ch).match(/[@\wА-Яа-яЁё$-]+$/);
+    const rules = m ? await structRules(langOf(ed)) : []; const tpl = m && window.StructureRules.templateFor(m[0], rules);
+    // своё уже вписано — Tab ведёт к следующему «…» шаблона
+    if(!tpl){ if(nextSlot(cm, st.tpl)) return true; st.tpl = null; return false; }
+    const ind = (line.match(/^\s*/) || [''])[0], from = { line: c.line, ch: c.ch - m[0].length };
+    cm.replaceRange(tpl.split('\n').map((x, i) => i ? ind + x : x).join('\n'), from, c);
+    st.tpl = { to: from.line + tpl.split('\n').length - 1 };
+    // первое «…» после начала вставки
+    for(let l = from.line; l <= from.line + tpl.split('\n').length; l++){ const t = cm.getLine(l) || ''; const i = t.indexOf('…', l === from.line ? from.ch : 0); if(i >= 0){ cm.setSelection({ line: l, ch: i }, { line: l, ch: i + 1 }); break; } }
+    return true;
   }
   // курсор в слове не той раскладки — рядом кнопка «→ const»; Alt+Enter — то же
   const fixAt = cm => { const c = cm.getCursor(); return cm.findMarksAt(c).find(m => m.__fix); };
@@ -97,7 +137,11 @@
     const st = { marks: [], timer: null, ver: 0 }; live.set(cm, st);
     cm.on('cursorActivity', () => bubble(cm));
     cm.on('blur', () => { if(st.bub){ st.bub.remove(); st.bub = null; } });
-    cm.on('keydown', (c, e) => { if(e.altKey && e.key === 'Enter'){ const mk = fixAt(c); if(mk){ e.preventDefault(); applyFix(c, mk); } } });
+    cm.on('keydown', (c, e) => {
+      // Tab: шаблон не нашёлся — обычный отступ (повторяем то, что делает Tab в песочнице)
+      if(e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.defaultPrevented && window.StructureRules){
+        e.preventDefault(); tabTemplate(c, ed).then(done => { if(!done){ if(c.somethingSelected()) c.execCommand('indentMore'); else c.execCommand('insertSoftTab'); } }); return; }
+      if(e.altKey && e.key === 'Enter'){ const mk = fixAt(c); if(mk){ e.preventDefault(); applyFix(c, mk); } } });
     cm.on('change', () => { clearTimeout(st.timer); st.timer = setTimeout(() => check(ed), 700); clearErr(cm); });
     check(ed);
   }
