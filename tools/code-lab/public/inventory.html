@@ -42,6 +42,11 @@
   .cov-legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--text3);margin:0 0 8px}
   .cov-legend b{color:var(--str)}
   /* импорт связей из текста */
+  .inv-more{position:relative;display:inline-flex}
+  .inv-pop{position:absolute;top:calc(100% + 5px);right:0;z-index:40;display:none;flex-direction:column;gap:2px;min-width:240px;padding:5px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.5)}
+  .inv-more.on .inv-pop{display:flex}
+  .inv-pop .btn{text-align:left;border:0;background:none;padding:8px 10px}
+  .inv-pop .btn:hover{background:var(--s2)}
   .modal-bg{position:fixed;inset:0;background:rgba(5,2,14,.72);display:flex;align-items:flex-start;justify-content:center;z-index:60;overflow:auto;padding:28px 16px}
   .modal{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;max-width:760px;padding:20px 22px}
   .modal h3{margin:0 0 4px;font-size:17px}
@@ -111,17 +116,19 @@
       <label class="inv-chk"><input type="checkbox" id="pgroupview"> по разделам</label>
       <label class="inv-chk"><input type="checkbox" id="pincomplete"> только с пробелами</label>
       <input class="inv-search" id="pq" placeholder="фильтр по названию/коду…">
-      <button class="btn" id="psectree" title="общее дерево разделов и перенос старых разделов в него" onclick="window.codelabSections && codelabSections.open()">🗂 дерево разделов</button>
-      <button class="btn" id="psections">📂 разделы из текста</button>
-      <button class="btn" id="plabels" title="подписи простыми словами к именам «даёт/нужно»: свои пачкой и промпт для ИИ" onclick="window.codelabLabels && codelabLabels.open()">🏷 подписи</button>
-      <button class="btn" id="plinks">📥 связи из текста</button>
       <button class="btn" id="pdict">📖 словарь пояснений</button>
       <button class="btn" id="pdictview">📚 весь словарь</button>
       <button class="btn" id="pdictsyn">🔤 синонимы</button>
-      <button class="btn" id="pcopy">⧉ скопировать список</button>
-      <button class="btn" id="pdedup" title="схлопнуть куски с одинаковым кодом в один (оставляется самый полный)">🧹 убрать дубли</button>
-      <button class="btn" id="pmoveall" title="переместить ВСЕ показанные (с учётом фильтров) в один раздел">📁 показанные → раздел</button>
-      <button class="btn" id="ptranslate" title="найти куски с английскими названиями и дописать к ним русский перевод">🇷🇺 перевести названия</button>
+      <button class="btn" id="psectree" title="общее дерево разделов и перенос старых разделов в него" onclick="window.codelabSections && codelabSections.open()">🗂 дерево разделов</button>
+      <div class="inv-more"><button class="btn" type="button" onclick="this.parentNode.classList.toggle('on');event.stopPropagation()">⋯ ещё ▾</button><div class="inv-pop">
+        <button class="btn" id="psections">📂 разделы из текста</button>
+        <button class="btn" id="plabels" title="подписи простыми словами к именам «даёт/нужно»: свои пачкой и промпт для ИИ" onclick="window.codelabLabels && codelabLabels.open()">🏷 подписи</button>
+        <button class="btn" id="plinks">📥 связи из текста</button>
+        <button class="btn" id="pcopy">⧉ скопировать список</button>
+        <button class="btn" id="pdedup" title="схлопнуть куски с одинаковым кодом в один (оставляется самый полный)">🧹 убрать дубли</button>
+        <button class="btn" id="pmoveall" title="переместить ВСЕ показанные (с учётом фильтров) в один раздел">📁 показанные → раздел</button>
+        <button class="btn" id="ptranslate" title="найти куски с английскими названиями и дописать к ним русский перевод">🇷🇺 перевести названия</button>
+      </div></div>
     </div>
     <div class="cov-legend" id="covLegend"></div>
     <div class="tbl-wrap">
@@ -148,5 +155,6 @@
   <script src="/sections-ui.js"></script>
   <script src="/labels-ui.js"></script>
   <script src="/ai-tools.js"></script>
+  <script>document.addEventListener('click', e => { if(!e.target.closest('.inv-more')) document.querySelectorAll('.inv-more.on').forEach(x => x.classList.remove('on')); else if(e.target.closest('.inv-pop .btn')) e.target.closest('.inv-more').classList.remove('on'); });</script>
 </body>
 </html>

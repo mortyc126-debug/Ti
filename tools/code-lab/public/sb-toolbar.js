@@ -32,10 +32,9 @@
   const byText = s => take(el => txt(el).toLowerCase().includes(s.toLowerCase()));
   const rename = (el, label) => { if(!el) return el; if(el.tagName === 'BUTTON') el.textContent = label; return el; };
 
-  // главное — на виду
-  const run = byId('sbRun'), find = byId('sbFindBtn'), variants = byId('sbVarBtn'), tasks = byText('🧭 задачи');
-  // ИИ
-  const ask = rename(byId('sbAskBtn'), '🤖 спросить про код'), diag = rename(byId('sbDgBtn'), '🩺 решить проблему');
+  // на виду — только запуск; остальное — в трёх меню по смыслу
+  const run = byId('sbRun');
+  const find = rename(byId('sbFindBtn'), '🔎 найти в файле (Ctrl+F)'), ask = rename(byId('sbAskBtn'), '🤖 спросить ИИ про код');
   // файл: «💾 на диск…» помнит файл и сохраняет туда же — второй «💾 на диск» (всегда спрашивает место) лишний
   const add = rename(byId('sbAdd'), '＋ новый файл'), open = rename(byText('открыть…'), '📂 открыть с диска…'), save = rename(byText('на диск…'), '💾 сохранить на диск');
   const saveDup = byId('sbSaveDisk'); if(saveDup) saveDup.style.display = 'none';
@@ -45,7 +44,7 @@
   const outline = rename(byId('sbOutlineBtn'), '🗂 структура файла'), preview = byText('превью'), consoleClr = rename(byId('sbClr'), '× очистить консоль');
   const legend = rename(byId('sbLegend'), '🎨 что значат цвета в коде');
   // подсказки — галочки
-  const live = byId('sbLive'), explain = byId('sbExplain'), links = byText('связи по клику'), ac = byText('автодополнение'), broken = byText('оборванное'), hints = byText('🧭 подсказки');
+  const live = byId('sbLive'), explain = byId('sbExplain'), links = byText('связи по клику'), ac = byId('sbAc');
   const spacer = take(el => el.tagName === 'SPAN' && !txt(el));
   const hidden = kids.filter(el => !el.__sbt && (el.tagName === 'INPUT' || getComputedStyle(el).display === 'none'));
   hidden.forEach(el => el.__sbt = true);
@@ -68,11 +67,10 @@
   document.addEventListener('click', e => { if(!e.target.closest('.sbt-dd')) document.querySelectorAll('.sbt-dd.on').forEach(x => x.classList.remove('on')); });
 
   const row = [
-    run, find, variants, tasks,
-    dd('🤖 ИИ', [ask, diag]),
+    run,
     dd('📁 Файл', [add, open, save, sep(), project, upload, sep(), copyAll, clear]),
-    dd('👁 Вид', [outline, preview, consoleClr, sep(), legend]),
-    dd('⚙ Подсказки', [head('в коде'), explain && explain.closest('label') || explain, links, ac, broken, hints, sep(), head('превью'), live && live.closest('label') || live], true),
+    dd('👁 Вид', [find, outline, preview, consoleClr, sep(), legend]),
+    dd('⚙ Подсказки', [head('в коде'), ac, explain && explain.closest('label') || explain, links, sep(), head('превью'), live && live.closest('label') || live, sep(), ask], true),
     rest.length ? dd('⋯ ещё', rest, true) : null
   ].filter(Boolean);
   bar.innerHTML = '';

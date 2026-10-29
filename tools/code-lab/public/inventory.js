@@ -201,6 +201,8 @@ function renderGrouped(list){
 }
 function renderPieces(){
   const list = filteredPieces();
+  const sig = JSON.stringify([document.getElementById('pq') && document.getElementById('pq').value, document.getElementById('plang') && document.getElementById('plang').value, document.getElementById('pgroup') && document.getElementById('pgroup').value]);
+  if(window.__invSig !== sig){ window.__invSig = sig; window.__invLimit = 300; }   // новый фильтр — снова первые 300
   const grouped = document.getElementById('pgroupview') && document.getElementById('pgroupview').checked;
   const table = document.getElementById('prows').closest('table');
   const tree = document.getElementById('ptree');
@@ -208,7 +210,12 @@ function renderPieces(){
   else {
     if(tree) tree.style.display = 'none';
     if(table) table.style.display = '';
-    document.getElementById('prows').innerHTML = list.length ? pieceRows(list) : '<tr><td colspan="7" class="empty">ничего не нашлось</td></tr>';
+    // сразу рисуем только первые строки: все 2000+ с подписями браузер рисовал несколько секунд; фильтры ищут по всем
+    const lim = window.__invLimit || 300;
+    document.getElementById('prows').innerHTML = list.length ? pieceRows(list.slice(0, lim))
+      + (list.length > lim ? '<tr><td colspan="7" class="empty"><button class="btn" id="pmorerows">показать ещё ' + Math.min(500, list.length - lim) + ' из ' + (list.length - lim) + '</button></td></tr>' : '')
+      : '<tr><td colspan="7" class="empty">ничего не нашлось</td></tr>';
+    const more = document.getElementById('pmorerows'); if(more) more.onclick = () => { window.__invLimit = lim + 500; renderPieces(); };
   }
   document.getElementById('pcnt').textContent = list.length + (list.length === PIECES.length ? '' : ' из ' + PIECES.length);
 }
@@ -818,7 +825,22 @@ const DICT_SAMPLE = [
 // разобрать строки «слово: пояснение» → [{word, text}]
 // разбить строку «слово РАЗДЕЛИТЕЛЬ пояснение». Терпим к формату, чтобы большие списки не теряли строки:
 // порядок разделителей — | , одиночное : (НЕ часть ::, иначе ломался std::cout), таб, « — »/« – », « = » (не ==/=>).
+// Ключ — код, пояснение — по-русски. Режем по ПОСЛЕДНЕМУ разделителю перед первым русским словом:
+// «body { margin: 0 }: базовые стили» → «body { margin: 0 }» | «базовые стили». Раньше резали по первому
+// двоеточию и получали обрывок «body { margin». CSS «margin: 1.5em: пояснение» оставляем как было
+// (ключ — свойство, в пояснении пример значения): на нём строятся «🌳 варианты».
 function splitDictLine(line){
+  const ru = line.search(/[А-Яа-яЁё]/);
+  if(ru > 0){
+    const head = line.slice(0, ru);
+    const m = head.match(/^(.*\S)\s*(?:\s\|\s|:(?!:)|\t|\s[—–]\s|\s=\s)\s*$/s);
+    if(m && m[1].trim()){
+      const key = m[1].trim(), val = line.slice(ru);
+      const css = key.match(/^([a-z-]+):\s*([^:{};]+)$/i);   // «свойство: значение» — старый формат CSS-строк
+      if(css && !/[(]/.test(key)) return [css[1], css[2].trim() + ': ' + val];
+      return [key, val];
+    }
+  }
   let k = line.indexOf('|'); if(k > 0) return [line.slice(0, k), line.slice(k + 1)];
   for(let i = 1; i < line.length; i++){ if(line[i] === ':' && line[i - 1] !== ':' && line[i + 1] !== ':') return [line.slice(0, i), line.slice(i + 1)]; }  // одиночное двоеточие
   k = line.indexOf('\t'); if(k > 0) return [line.slice(0, k), line.slice(k + 1)];

@@ -70,9 +70,12 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
       const res = resolve(term, D, L); if(!res) continue;
       add(res.key, L, hit, 3 - Math.min(2, words(hit).length - qw.length) + res.rank);
     }
-    if(D[qn]) add(qn, L, '', 4);
-    if(/^[a-z]/.test(qn)) for(const k of Object.keys(D)) if(k.startsWith(qn) && !k.includes(' ') && k !== qn && !roots.some(r => k.startsWith(r.term + '-'))) add(k, L, '', 1);
+    // латиницей пишут начало имени («quer») — совпадение по началу важнее смысла по синонимам
+    const latin = /^[a-z]/.test(qn);
+    if(D[qn]) add(qn, L, '', latin ? 9 : 4);
+    if(latin) for(const k of Object.keys(D)) if((k.startsWith(qn) || k.includes('.' + qn)) && !/[\s(=]/.test(k) && k !== qn && !roots.some(r => k.startsWith(r.term + '-'))) add(k, L, '', 8 - Math.min(3, k.length / 12));
   }
+  if(/^[a-z]/.test(qn) && roots.some(r => r.score >= 5)) for(let i = roots.length - 1; i >= 0; i--) if(roots[i].score < 5) roots.splice(i, 1);
   // корень, который сам — разновидность другого корня (margin-top при margin), уходит внутрь
   const top = roots.filter(r => !roots.some(o => o !== r && o.lang === r.lang && r.term.startsWith(o.term + '-')))
     .sort((a, b) => b.score - a.score || a.term.length - b.term.length).slice(0, MAX_ROOTS);

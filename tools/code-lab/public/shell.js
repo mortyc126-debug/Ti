@@ -9,9 +9,7 @@
     { key:'start',       label:'С чего начать', href:'/start.html',      sect:'Старт' },
     { key:'inventory',   label:'Опись',        href:'/inventory.html',  sect:'Кусочки кода' },
     { key:'library',     label:'Библиотека',   href:'/library.html',    sect:'Кусочки кода' },
-    { key:'tasks',       label:'Задачи',       href:'/tasks.html',      sect:'Собирать' },
     { key:'constructor', label:'Конструктор',  href:'/constructor.html',sect:'Собирать' },
-    { key:'recipes',     label:'Шаблоны',      href:'/recipes.html',    sect:'Собирать' },
     { key:'data',        label:'Куски кода', href:'/schema-json.html', sect:'Данные' },
   ];
   const cur = document.body.dataset.page || '';
@@ -88,10 +86,6 @@
     // 1) разделы программы
     const sects = PAGES.filter(p => (p.label + ' ' + (p.sect || '')).toLowerCase().includes(q)).slice(0, 5);
     if(sects.length){ grp('Разделы'); sects.forEach(p => item(p.href, p.label, 'раздел')); }
-    // 2) задачи — «как сделать» — раньше кусков
-    const tk = await fetch('/api/tasks/list').then(r => r.json()).catch(() => []); if(seq !== drawSeq) return;
-    const th = (tk || []).filter(t => [t.title, t.group, (t.aliases || []).join(' ')].join(' ').toLowerCase().includes(q)).slice(0, 6);
-    if(th.length){ grp('Задачи'); th.forEach(t => item('/tasks.html?id=' + encodeURIComponent(t.id), t.title, 'задача')); }
     // 3) куски — серверным поиском (словоформы, синонимы, понятное выше); без сервера — по вхождению строки
     const list = await loadAll(); if(seq !== drawSeq) return;
     let pieces = null;
@@ -107,10 +101,7 @@
       row.onclick = () => { expl.style.display = expl.style.display === 'none' ? '' : 'none'; };
       sres.appendChild(row); sres.appendChild(expl); any = true;
     });
-    // 5) рецепты и схемы
-    const rc = await fetch('/api/recipes/list').then(r => r.json()).catch(() => []); if(seq !== drawSeq) return;
-    const rh = (rc || []).filter(r => (r.name || r.title || '').toLowerCase().includes(q)).slice(0, 5);
-    if(rh.length){ grp('Шаблоны'); rh.forEach(r => item('/recipes.html', r.name || r.title || r.id, 'шаблон')); }
+    // схемы
     const fl = await fetch('/api/flows/list').then(r => r.json()).catch(() => []); if(seq !== drawSeq) return;
     const fh = (fl || []).filter(f => (f.name || '').toLowerCase().includes(q)).slice(0, 5);
     if(fh.length){ grp('Схемы'); fh.forEach(f => item('/constructor.html', f.name || f.id, 'схема')); }

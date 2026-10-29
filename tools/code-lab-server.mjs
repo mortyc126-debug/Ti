@@ -132,12 +132,14 @@ const _isSynList = s => { const t = String(s).trim(); if(_commas(t) < 3 || _isSe
 const _looksProse = s => { const t = String(s); if(!_isRuS(t)) return false; if(_hasLat(t)) return false; return !/[{}()\[\];=<>\/\\|&*%#@$`]/.test(t); };
 async function loadExamples(){ try { const o = JSON.parse(await fs.readFile(EXAMPLES_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
 async function loadSynonyms(){ try { const o = JSON.parse(await fs.readFile(SYN_FILE, 'utf8')); return (o && typeof o === 'object') ? o : {}; } catch(_){ return {}; } }
+let _dictRawKeys = [];   // ключи словаря как записаны (с регистром) — для показа кода в подсказках
 async function loadLangDicts(){
-  const out = {};
+  const out = {}; const raw = [];
   let files = []; try { files = (await fs.readdir(LANGS_DIR)).filter(n => n.endsWith('.json')); } catch(_){ return out; }
   for(const fn of files){ const lang = fn.replace(/\.json$/, '').toLowerCase();
-    try { const o = JSON.parse(await fs.readFile(path.join(LANGS_DIR, fn), 'utf8')); if(o && typeof o === 'object'){ const m = {}; for(const [w, t] of Object.entries(o)) if(typeof t === 'string') m[w.toLowerCase()] = t; out[lang] = m; } } catch(_){}
+    try { const o = JSON.parse(await fs.readFile(path.join(LANGS_DIR, fn), 'utf8')); if(o && typeof o === 'object'){ const m = {}; for(const [w, t] of Object.entries(o)) if(typeof t === 'string'){ m[w.toLowerCase()] = t; if(w !== w.toLowerCase()) raw.push(w); } out[lang] = m; } } catch(_){}
   }
+  _dictRawKeys = raw;
   return out;
 }
 async function kwDict(){
@@ -173,7 +175,11 @@ async function saveLangDict(lang, pairs){
   let cur = {}; try { cur = JSON.parse(await fs.readFile(fp, 'utf8')); } catch(_){}
   if(!cur || typeof cur !== 'object') cur = {};
   let added = 0;
-  for(let [w, t] of pairs){ w = String(w || '').trim().toLowerCase(); t = String(t || '').trim(); if(!w || !t) continue; cur[w] = t.slice(0, 600); added++; }
+  // регистр ключа сохраняем (querySelector, а не queryselector — для показа кода он важен);
+  // ищется словарь всё равно без учёта регистра, поэтому прежнюю запись с тем же словом в другом регистре заменяем
+  const lowerKey = new Map(Object.keys(cur).map(k => [k.toLowerCase(), k]));
+  for(let [w, t] of pairs){ w = String(w || '').trim(); t = String(t || '').trim(); if(!w || !t) continue;
+    const old = lowerKey.get(w.toLowerCase()); if(old && old !== w) delete cur[old]; cur[w] = t.slice(0, 600); lowerKey.set(w.toLowerCase(), w); added++; }
   // ключи по алфавиту — файл стабилен в git
   const sorted = {}; for(const k of Object.keys(cur).sort()) sorted[k] = cur[k];
   await fs.writeFile(fp, JSON.stringify(sorted, null, 2), 'utf8');
@@ -1118,7 +1124,9 @@ const server = http.createServer(async (req, res) => {
       const section = SECTIONS.includes(b.section) ? b.section : 'words';
       const target = dict[section];
       let added = 0;
-      for(let [w, t] of pairs){ w = String(w || '').trim().toLowerCase(); t = String(t || '').trim(); if(!w || !t) continue; target[w] = t.slice(0, 600); added++; }
+      const lowerKey = new Map(Object.keys(target).map(k => [k.toLowerCase(), k]));
+      for(let [w, t] of pairs){ w = String(w || '').trim(); t = String(t || '').trim(); if(!w || !t) continue;
+        const old = lowerKey.get(w.toLowerCase()); if(old && old !== w) delete target[old]; target[w] = t.slice(0, 600); lowerKey.set(w.toLowerCase(), w); added++; }
       await fs.writeFile(DICT_BASE, JSON.stringify(dict, null, 2), 'utf8'); _kwDict = null;
       return json(res, 200, { ok: true, added, where: section, total: Object.keys(target).length });
     }
@@ -1295,7 +1303,8 @@ const server = http.createServer(async (req, res) => {
     if(u.pathname === '/api/variants'){
       const q = String(u.searchParams.get('q') || '').slice(0, 80), lang = String(u.searchParams.get('lang') || '').toLowerCase();
       const dict = await kwDict(); const ents = await store.entries();
-      if(_caseMap.v !== store.version) _caseMap = { v: store.version, map: caseMapFrom(ents.map(e => e.code)) };
+      // регистр: из словаря (новые записи хранят его) и из кода библиотеки
+      if(_caseMap.v !== store.version || _caseMap.dict !== dict) _caseMap = { v: store.version, dict, map: caseMapFrom(ents.map(e => e.code).concat(_dictRawKeys)) };
       const nl = new Map((await store.rows()).map(r => [r.id, r.nlines]));
       const rows = ents.map(e => ({ id: e.id, lang: e.lang, title: e.title, code: e.code, nlines: nl.get(e.id) }));
       return json(res, 200, buildVariants({ q, lang, dict, rows, synonyms: dict.synonyms || {}, caseMap: _caseMap.map }));
@@ -1558,6 +1567,8 @@ $('lab-mistral-test').addEventListener('click',async()=>{const k=input.value.tri
   if(r.migrated && r.migrated.created) console.log(`Из templates/ перенесено в library/: ${r.migrated.created} (старые карточки не тронуты)`);
 }
 server.listen(PORT, '127.0.0.1', () => {
+  // подписи к «даёт/нужно» считаются секунды — прогреваем кэш сразу, чтобы Опись открывалась без ожидания
+  setTimeout(() => { listTemplates(true).catch(() => {}); }, 300);
   console.log(`Лаборатория кода: http://localhost:${PORT}/`);
   console.log(`Библиотека: ${LIBRARY}  (куски кода — обычные файлы; положите файл сюда — он появится в списке)`);
 });
