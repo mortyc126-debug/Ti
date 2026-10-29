@@ -362,7 +362,7 @@ function renderPalette(){
   const base = Object.entries(BLOCKS).filter(([id, b]) => !q || (b.label + ' ' + (b.hint || '')).toLowerCase().includes(q));
   if(base.length){
     const d = palDetails('Базовые блоки', base.length, !!q || !CATALOG.length);
-    base.forEach(([id, b]) => { const it = palItem(b.label, b.hint); it.onclick = () => addNode(id); d.appendChild(it); });
+    base.forEach(([id, b]) => { const it = palItem(b.label, b.hint); it.onclick = () => pickBlock(id); d.appendChild(it); });
     host.appendChild(d);
   }
   // каталог — единое дерево по разделу (поле «раздел», через «/»); все языки
@@ -467,10 +467,39 @@ async function delTemplate(t){
   const r = await fetch('/api/delete', { method:'POST', body: JSON.stringify({ id: t.id }) }).then(r => r.json()).catch(() => ({}));
   if(r && r.ok) loadCatalog(); else alert('не вышло удалить');
 }
+// в режиме песочницы холст скрыт — клик в палитре вставляет код в открытый файл у курсора, а не добавляет невидимый узел.
+// Кусок другого языка (CSS при открытом JS) — в открытый файл этого языка, если такой есть.
+const sandboxOn = () => !!document.querySelector('.sandbox-on');
+function insertToSandbox(code, lang){
+  const sb = window.codelabSandbox, eds = document.getElementById('sbEds'); if(!sb || !eds || !code) return false;
+  let id = null; try { id = localStorage.getItem('codelab_sb_active'); } catch(_){}
+  const files = sb.getFiles(); let f = files.find(x => x.id === id) || files[0]; if(!f) return false;
+  const L = String(lang || '').toLowerCase();
+  if(L && f.lang !== L){ const other = files.find(x => x.lang === L); if(other){ f = other; if(window.codelabTabs) window.codelabTabs.setActive(other.id); } }
+  const ed = [...eds.children].find(e => e.__f && e.__f.id === f.id); const ta = ed && ed.querySelector('textarea'); const cm = ta && ta.__cm;
+  if(!cm) return false;
+  const cur = cm.getCursor(), line = cm.getLine(cur.line) || '', ind = (line.match(/^\s*/) || [''])[0];
+  const text = String(code).replace(/\s+$/, '').split('\n').map((x, i) => i ? ind + x : x).join('\n');
+  // в непустую строку не врезаемся — с новой строки после неё, с тем же отступом
+  const at = line.trim() ? { line: cur.line, ch: line.length } : cur, ins = line.trim() ? '\n' + ind + text : text;
+  cm.replaceRange(ins, at);
+  // курсор — в конец вставленного: следующий блок встанет после этого, а не перед ним
+  cm.setCursor(cm.posFromIndex(cm.indexFromPos(at) + ins.length)); cm.focus();
+  if(window.codelabTabs && window.codelabTabs.active() !== f.id) window.codelabTabs.setActive(f.id);
+  return true;
+}
+// код базового блока со значениями полей по умолчанию
+function blockCode(id){
+  const b = BLOCKS[id]; if(!b) return '';
+  const f = {}; (b.fields || []).forEach(x => { f[x.k] = x.def; });
+  const c = b.code(f); return b.type === 'container' ? c.open + '\n  \n' + c.close : String(c);
+}
+function pickBlock(id){ if(sandboxOn() && insertToSandbox(blockCode(id), 'js')) return; addNode(id); }
 async function addFromCatalog(t){
   try {
     const tpl = await fetch('/api/template?id=' + encodeURIComponent(t.id)).then(r => r.json());
     const code = (tpl.lines || []).map(line => (line || []).map(k => k.v != null ? k.v : '').join('')).join('\n');
+    if(sandboxOn() && insertToSandbox(tpl.code != null ? tpl.code : code, tpl.lang || t.lang)) return;
     // запоминаем, из какого шаблона узел + типизированный контракт (для проверки стыковки)
     const comp = tpl.component || {};
     const contract = { provides: Array.isArray(comp.provides) ? comp.provides : [], requires: Array.isArray(comp.requires) ? comp.requires : [] };
