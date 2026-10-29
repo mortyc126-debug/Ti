@@ -54,8 +54,16 @@
       if(hit.verb === 'удалить'){ rules.push({ term, verb: 'удалить', args: [], raw: term + ': удалить' }); return; }
       const verb = hit.verb; rest = rest.slice(hit.len).replace(/^\s*:?\s*/, '');
       // пояснение после « — » (в шаблоне тире может быть частью кода — там не режем)
-      let note = ''; if(verb !== 'пишется'){ const k = rest.search(/\s[—–]\s|\s-\s/); if(k >= 0){ note = rest.slice(k).replace(/^\s*[—–-]\s*/, '').trim(); rest = rest.slice(0, k).trim(); } }
-      rest = rest.replace(/\.$/, '').replace(/`/g, '');
+      let note = '';
+      if(verb === 'пишется'){
+        // шаблон в `обратных кавычках` — берём код из первых кавычек, остальное (« — пояснение», «или …») в пояснение
+        const bq = rest.match(/^`([^`]+)`\s*(.*)$/);
+        if(bq){ rest = bq[1]; note = bq[2].replace(/^[—–-]\s*/, '').trim(); }
+        else { const k = rest.search(/\s[—–]\s+[А-Яа-яЁё]/); if(k >= 0){ note = rest.slice(k).replace(/^\s*[—–]\s*/, '').trim(); rest = rest.slice(0, k).trim(); } }
+      } else {
+        const k = rest.search(/\s[—–]\s|\s-\s/); if(k >= 0){ note = rest.slice(k).replace(/^\s*[—–-]\s*/, '').trim(); rest = rest.slice(0, k).trim(); }
+        rest = rest.replace(/\.$/, '').replace(/`/g, '');
+      }
       if(!rest){ bad.push({ line: i + 1, text: line, why: 'после «' + verb + '» ничего не указано' }); return; }
       const args = verb === 'пишется' ? [rest] : verb === 'требует' ? [rest] : rest.split(/\s*[,|;]\s*|\s+или\s+/).map(s => s.trim()).filter(Boolean);
       // строка храним в своём виде: синонимы и разметка ИИ не попадают в файл
