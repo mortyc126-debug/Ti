@@ -324,3 +324,18 @@ test('форма кода и параметры: скобки после if, «:
   assert.ok(S.attrsFor('display', R('css')).values('').list.includes('flex'));
   assert.deepEqual(S.attrsFor('open', R('python')).values('mode').list.slice(0, 3), ['r', 'w', 'a']);
 });
+
+test('правила структуры: повторная запись не дублирует и не стирает', () => {
+  const S = require('../public/structure-rules.js');
+  const base = ['img: обязательно src — путь', 'img: обязательно alt', 'img: можно width, height', 'img[loading]: значения lazy, eager', 'li: внутри ul, ol', 'if: пишется if (…) {\\n  …\\n}'];
+  let r = S.merge(base, base.join('\n'));
+  assert.deepEqual(r.lines, base); assert.equal(r.same, 6); assert.equal(r.added + r.replaced, 0);
+  r = S.merge(base, 'img: обязательно alt\nimg: можно title, width\nimg[loading]: значения auto\nli: внутри menu\nif: пишется if (…) { … }\nx: пишется y');
+  assert.ok(r.lines.includes('img: обязательно src — путь'), 'src не стёрт');
+  assert.ok(r.lines.includes('img: можно title'));
+  assert.ok(r.lines.includes('img[loading]: значения lazy, eager, auto'));
+  assert.ok(r.lines.includes('li: внутри ul, ol, menu'));
+  assert.ok(r.lines.includes('if: пишется if (…) { … }'));
+  assert.equal(r.lines.length, base.length + 2);
+  assert.equal(S.merge(r.lines, 'img: удалить').lines.filter(l => /^img[:[]/.test(l)).length, 0);
+});

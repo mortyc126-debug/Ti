@@ -229,7 +229,42 @@
     return out;
   }
 
-  const api = { VERBS, parse, check, templateFor, describe, blank, attrsFor };
+  // дописать правила к строкам языка. Повтор того же ничего не меняет. «обязательно»/«можно» — новые пункты отдельной
+  // строкой (у каждой своё пояснение); прочие списки (внутри, после, значения…) — новые пункты в ту же строку; ничего
+  // не стирается. «пишется» и «требует» — одно значение, заменяется. «слово: удалить» снимает все правила слова.
+  const LIST = new Set(['обязательно', 'можно']);
+  const UNION = new Set(['внутри', 'не внутри', 'содержит', 'не содержит', 'первым в', 'после', 'значения', 'связывает', 'читает']);
+  function merge(lines, text){
+    const { rules, bad } = parse(text); lines = (lines || []).slice();
+    let added = 0, replaced = 0, removed = 0, same = 0;
+    const lc = x => String(x).toLowerCase();
+    for(const r of rules){
+      const cur = lines.map(l => ({ l, r: parse(l).rules[0] })).filter(x => x.r);
+      const mine = cur.filter(x => lc(x.r.term) === lc(r.term) && (r.verb === 'удалить' || x.r.verb === r.verb));
+      if(r.verb === 'удалить'){ lines = lines.filter(l => !mine.some(x => x.l === l)); removed += mine.length; continue; }
+      if(LIST.has(r.verb)){
+        const have = new Set(mine.flatMap(x => x.r.args.map(lc)));
+        const fresh = r.args.filter(a => !have.has(lc(a)));
+        if(!fresh.length){ same++; continue; }
+        lines.push(r.term + ': ' + r.verb + ' ' + fresh.join(', ') + (r.note ? ' — ' + r.note : '')); added++; continue;
+      }
+      // остальные списки (внутри, после, значения…) — новые пункты дописываются в ту же строку: проверка читает строку целиком
+      if(UNION.has(r.verb) && mine.length){
+        const x = mine[0], have = new Set(x.r.args.map(lc)), fresh = r.args.filter(a => !have.has(lc(a)));
+        if(!fresh.length && (!r.note || r.note === x.r.note)){ same++; continue; }
+        const args = x.r.args.concat(fresh), note = r.note || x.r.note || '';
+        lines[lines.indexOf(x.l)] = x.r.term + ': ' + x.r.verb + ' ' + args.join(', ') + (note ? ' — ' + note : ''); replaced++; continue;
+      }
+      if(mine.length){
+        if(mine.some(x => x.r.args.map(lc).join('\u0000') === r.args.map(lc).join('\u0000') && (x.r.note || '') === (r.note || ''))){ same++; continue; }
+        lines[lines.indexOf(mine[0].l)] = r.raw; replaced++; continue;
+      }
+      lines.push(r.raw); added++;
+    }
+    return { lines, added, replaced, removed, same, bad };
+  }
+
+  const api = { VERBS, parse, check, templateFor, describe, blank, attrsFor, merge };
   if(typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.StructureRules = api;
 })(typeof self !== 'undefined' ? self : this);

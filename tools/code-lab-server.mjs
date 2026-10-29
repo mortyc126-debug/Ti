@@ -1275,21 +1275,12 @@ const server = http.createServer(async (req, res) => {
     // 'replace' — правила языка целиком из text.
     if(u.pathname === '/api/dict/structure' && req.method === 'POST'){
       const b = await readBody(req); const lang = canonLang(b.lang);
-      const { rules, bad } = Struct.parse(b.text);
-      const all = await loadStructure(); let lines = b.mode === 'replace' ? [] : (all[lang] || []).slice();
-      const key = r => r.term.toLowerCase() + '\u0000' + r.verb;
-      let added = 0, replaced = 0, removed = 0;
-      for(const r of rules){
-        const old = Struct.parse(lines.join('\n')).rules;
-        if(r.verb === 'удалить'){ const n = lines.length; lines = lines.filter((l, i) => { const o = Struct.parse(l).rules[0]; return !o || o.term.toLowerCase() !== r.term.toLowerCase(); }); removed += n - lines.length; continue; }
-        const i = old.findIndex(o => key(o) === key(r));
-        if(i >= 0){ const idx = lines.findIndex(l => l.trim() === old[i].raw); if(idx >= 0){ lines[idx] = r.raw; replaced++; continue; } }
-        lines.push(r.raw); added++;
-      }
+      const all = await loadStructure();
+      const { lines, added, replaced, removed, same, bad } = Struct.merge(b.mode === 'replace' ? [] : (all[lang] || []), b.text);
       if(lines.length) all[lang] = lines; else delete all[lang];
       await fs.mkdir(DICT_DIR, { recursive: true });
       await fs.writeFile(STRUCT_FILE, JSON.stringify(all, null, 2), 'utf8'); _kwDict = null;
-      return json(res, 200, { ok: true, lang, added, replaced, removed, total: lines.length, bad });
+      return json(res, 200, { ok: true, lang, added, replaced, removed, same, total: lines.length, bad });
     }
     if(u.pathname === '/api/dict/structure'){
       const d = await kwDict(); const all = d.structure || {};
