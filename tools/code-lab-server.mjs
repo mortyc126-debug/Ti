@@ -30,7 +30,8 @@ import { createAiGenerate, LANGS as AI_LANGS } from './code-lab/lib/ai-generate.
 import { createVendor } from './code-lab/lib/vendor.mjs';
 import { createTaskStore, suggestNext, createTaskRanker } from './code-lab/lib/tasks.mjs';
 import { explainNames } from './code-lab/lib/contract-labels.mjs';
-import { buildVariants, caseMapFrom } from './code-lab/lib/variant-tree.mjs';   // дерево вариантов «смысл → термины → разновидности»   // подписи к именам «даёт/нужно»
+import { buildVariants, caseMapFrom, recase } from './code-lab/lib/variant-tree.mjs';
+import { analyzeNames } from './code-lab/lib/code-names.mjs';   // свои имена файла: что внутри, где объявлены, опечатки   // дерево вариантов «смысл → термины → разновидности»   // подписи к именам «даёт/нужно»
 import { createSections, treeToText, treeFromText, suggestSections, placeInTree } from './code-lab/lib/sections.mjs';   // общее дерево разделов   // задачи: деревья решений поверх кусков   // управляемые обновления CodeMirror (по кнопке)
 
 // сетевые/TLS-ошибки провайдеров ИИ (GigaChat и пр.) не должны ронять весь сервер —
@@ -1308,6 +1309,20 @@ const server = http.createServer(async (req, res) => {
       const nl = new Map((await store.rows()).map(r => [r.id, r.nlines]));
       const rows = ents.map(e => ({ id: e.id, lang: e.lang, title: e.title, code: e.code, nlines: nl.get(e.id) }));
       return json(res, 200, buildVariants({ q, lang, dict, rows, synonyms: dict.synonyms || {}, caseMap: _caseMap.map }));
+    }
+
+    // ── свои имена в коде песочницы: что внутри, где объявлено, похожие на опечатку ──
+    // POST {code, lang} → {names:{имя:{kind,text,line}}, typos:[{name, maybe, line, kind, declLine?}]}
+    if(u.pathname === '/api/code/names' && req.method === 'POST'){
+      const b = await readBody(req); const dict = await kwDict();
+      const code = String(b.code || '').slice(0, 200000), lang = String(b.lang || 'js').toLowerCase();
+      const r = analyzeNames(code, lang, { dict, globals: _GLOBALS, explain: (c, l, n) => explainNames(c, l, n, dict) });
+      // словарь хранит методы строчными — подсказку показываем как пишут (addEventListener)
+      if(r.typos.some(t => t.kind === 'метод')){
+        if(_caseMap.v !== store.version || _caseMap.dict !== dict){ const ents = await store.entries(); _caseMap = { v: store.version, dict, map: caseMapFrom(ents.map(e => e.code).concat(_dictRawKeys)) }; }
+        r.typos.forEach(t => { if(t.kind === 'метод') t.maybe = recase(t.maybe, _caseMap.map); });
+      }
+      return json(res, 200, r);
     }
 
     // ── свои подписи к «даёт/нужно» ─────────────────────────────────────────────

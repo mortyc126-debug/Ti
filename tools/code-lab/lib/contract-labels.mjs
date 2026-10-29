@@ -39,6 +39,24 @@ function literalKind(expr){
   return '';
 }
 
+// что внутри значения: «список: ['чай', 'кофе'] (2)», «объект: { name, age }», «число: 42»
+function literalPreview(expr, kind){
+  const x = expr.trim().replace(/\s+/g, ' ');
+  const cut = (t, n) => t.length > n ? t.slice(0, n - 1) + '…' : t;
+  if(kind === 'список'){
+    // элементы верхнего уровня: запятые вне вложенных скобок и строк
+    let d = 0, q = '', n = 0, end = -1;
+    for(let i = 1; i < x.length; i++){ const c = x[i];
+      if(q){ if(c === '\\'){ i++; continue; } if(c === q) q = ''; continue; }
+      if('\'"`'.includes(c)){ q = c; continue; }
+      if('([{'.includes(c)) d++; else if(')]}'.includes(c)){ if(d === 0){ end = i; break; } d--; } else if(c === ',' && d === 0) n++; }
+    const body = end > 0 ? x.slice(0, end + 1) : x; const count = end > 0 ? (body.slice(1, -1).trim() ? n + 1 : 0) : null;
+    return 'список: ' + cut(body, 48) + (count != null ? ' (' + count + ')' : '');
+  }
+  if(kind === 'объект'){ const keys = [...x.matchAll(/[{,]\s*["']?([\wА-Яа-яЁё$]+)["']?\s*:/g)].map(m => m[1]); return 'объект' + (keys.length ? ': { ' + cut(keys.slice(0, 6).join(', '), 48) + (keys.length > 6 ? ', …' : '') + ' }' : ''); }
+  return kind + ': ' + cut(x.replace(/;$/, ''), 40);
+}
+
 // что за выражение справа от «=»: модуль, элемент, новый объект, результат вызова
 function explainExpr(expr, D){
   const x = expr.trim();
@@ -47,7 +65,7 @@ function explainExpr(expr, D){
   if((m = x.match(/(?:querySelector(?:All)?|getElementById|getElementsByClassName)\(\s*['"`]([^'"`]+)['"`]/))) return { kind: 'элемент', text: (/All|ClassName/.test(x) ? 'элементы страницы ' : 'элемент страницы ') + m[1] };
   if((m = x.match(/^new\s+([A-Za-z_$][\w$.]*)/))) { const n = D.word(m[1].split('.').pop()); return { kind: 'объект', text: 'новый ' + m[1] + (n ? ': ' + short(n, 60) : '') }; }
   if((m = x.match(/^(?:async\s*)?(?:\(([^)]*)\)|([A-Za-z_$][\w$]*))\s*=>/)) || (m = x.match(/^(?:async\s+)?function\b\s*[\w$]*\s*\(([^)]*)\)/))) return { kind: 'функция', text: 'функция (' + (m[1] != null ? m[1] : m[2] || '').replace(/\s+/g, ' ').trim() + ')' };
-  const lit = literalKind(x); if(lit) return { kind: 'значение', text: lit };
+  const lit = literalKind(x); if(lit) return { kind: 'значение', text: literalPreview(x, lit) };
   // последний вызов в выражении: obj.method(…) или func(…)
   // метод через точку — по идиомам словаря (obj.getContext(…)); просто функция — по слову словаря (fetch(…))
   const calls = [...x.matchAll(/(\.)?([A-Za-z_$][\w$]*)\s*\(/g)].map(c => ({ name: c[2], member: !!c[1] })).filter(c => !/^(await|function|return)$/.test(c.name));

@@ -222,3 +222,20 @@ test('дерево вариантов: смысл → термины по син
   const j = buildVariants({ q: 'найти элемент', lang: 'js', dict, synonyms, caseMap: cm });
   assert.equal(j.roots[0].code, 'document.querySelector(selector)');
 });
+
+test('свои имена: что внутри, где объявлено, опечатки имени и метода', async () => {
+  const { analyzeNames } = await import('../lib/code-names.mjs');
+  const { explainNames } = await import('../lib/contract-labels.mjs');
+  const dict = { words: { 'el.addEventListener': 'подписаться на событие', 'classList.toggle': 'переключить класс' }, langs: { js: {} } };
+  const code = "const btn = document.querySelector('.save');\nconst напитки = ['чай', 'кофе'];\nbtnn.addEventListner('click', f);\nconsole.log(напиткии.length, 'btnn');";
+  const r = analyzeNames(code, 'js', { dict, globals: new Set(['document', 'console', 'f']), explain: (c, l, n) => explainNames(c, l, n, dict) });
+  assert.equal(r.names.btn.line, 0);
+  assert.match(r.names['напитки'].text, /список.*чай.*\(2\)/);
+  const by = Object.fromEntries(r.typos.map(t => [t.name, t]));
+  assert.equal(by.btnn.maybe, 'btn'); assert.equal(by.btnn.declLine, 0); assert.equal(by.btnn.kind, 'имя');
+  assert.equal(by['напиткии'].maybe, 'напитки');
+  assert.equal(by.addEventListner.kind, 'метод'); assert.equal(by.addEventListner.maybe.toLowerCase(), 'addeventlistener');
+  // в строках и у объявленных имён опечаток нет
+  assert.equal(r.typos.filter(t => t.name === 'btnn').length, 1);
+  assert.ok(!by.btn && !by.length);
+});

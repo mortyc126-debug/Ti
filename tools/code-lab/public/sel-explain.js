@@ -1,6 +1,7 @@
 // «что это?»: выделяешь код — рядом кнопка; по ней (или Alt+Q) — схемка: над каждым узнанным куском скобка
 // с короткой подписью («внешний отступ», «найти элемент»), ниже — расшифровка. Подписи — из синонимов и словаря,
-// у разновидности — путь к смыслу («внешний отступ › margin-trim»). Надстройка песочницы; после sandbox.js.
+// у разновидности — путь к смыслу («внешний отступ › margin-trim»). Свои имена файла — что внутри и где объявлены
+// (/api/code/names), похожие на опечатку — красной скобкой с подсказкой. Надстройка песочницы; после sandbox.js.
 (function(){
   const box = document.getElementById('sandbox');
   const edsEl = box && box.querySelector('#sbEds');
@@ -26,6 +27,11 @@
   .se-br{position:absolute;left:0;right:0;bottom:calc(100% + 1px);height:6px;border:1.5px solid var(--name,#3dd9ff);border-bottom:0;border-radius:4px 4px 0 0}
   .se-seg.up .se-br::before{content:'';position:absolute;left:3px;bottom:100%;height:16px;border-left:1px dashed var(--text3,#9c90c4)}
   .se-code{color:var(--text,#f6f4ff)}
+  .cm-se-flash{background:rgba(61,217,255,.18)}
+  .se-seg.own{cursor:pointer} .se-seg.own .se-br{border-style:dashed}
+  .se-seg.typo .se-br{border-color:var(--err,#ff5c7a)!important;border-style:solid} .se-seg.typo .se-lbl{color:var(--err,#ff5c7a)}
+  .se-seg.typo .se-code{text-decoration:underline wavy var(--err,#ff5c7a)}
+  .se-it.typo code{color:var(--err,#ff5c7a)} .se-it a{color:var(--name,#3dd9ff);cursor:pointer;margin-left:6px}
   .se-seg.k2 .se-br{border-color:var(--str,#52F2C9)} .se-seg.k3 .se-br{border-color:var(--kw,#b45cff)} .se-seg.k4 .se-br{border-color:var(--fn,#ff2fae)}
   .se-list{margin-top:10px;border-top:1px solid var(--border,#3a2f55);padding-top:8px;display:flex;flex-direction:column;gap:5px}
   .se-it{font-size:12.5px;line-height:1.45;color:var(--text3,#9c90c4)}
@@ -35,6 +41,13 @@
   `;
   document.head.appendChild(st);
 
+  // свои имена файла — один запрос на весь код; только там, где разбор умеет объявления
+  async function ownNames(code, lang){
+    if(!/^(js|javascript|ts|typescript|jsx|python|py)$/i.test(lang) || !code.trim()) return null;
+    const l = /^py/i.test(lang) ? 'python' : 'js';
+    return fetch('/api/code/names', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: code.slice(0, 200000), lang: l }) })
+      .then(r => r.ok ? r.json() : null).catch(() => null);
+  }
   let DICT = null;
   const dict = async () => DICT || (DICT = await (window.codelabKwDict ? window.codelabKwDict() : fetch('/keyword-dict.json').then(r => r.json())).catch(() => ({})));
   const activeCM = () => { const ed = [...edsEl.children].find(e => e.__f && e.__f.id === (localStorage.getItem('codelab_sb_active') || '')) || edsEl.firstElementChild; const ta = ed && ed.querySelector('textarea'); return { cm: ta && ta.__cm, ta, lang: (ed && ed.__f && ed.__f.lang) || '' }; };
@@ -52,19 +65,39 @@
   }
 
   // разбить строку на узнанные куски: конструкции словаря (длинные) и слова
-  function segments(line, lang, d){
+  const inStrAt = (line, i) => { const before = line.slice(0, i); return ((before.match(/'/g) || []).length % 2) || ((before.match(/"/g) || []).length % 2) || ((before.match(/`/g) || []).length % 2); };
+  function segments(line, lang, d, own, ln){
     const out = []; const re = lang === 'css' || lang === 'html' ? /[#.]?[\w-]+(?:\([^)]*\))?/g : /[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*/g;
     let m; const taken = [];
+    // свои имена и опечатки — раньше словаря: «что внутри btn» важнее, чем «btn — непонятное слово»
+    if(own) for(const w of line.matchAll(/[A-Za-zА-Яа-яЁё_$][\wА-Яа-яЁё$]*/g)){
+      if(inStrAt(line, w.index)) continue;
+      const from = w.index, to = from + w[0].length;
+      const ty = own.typos.find(t => t.name === w[0] && t.line === ln);
+      if(ty){ taken.push([from, to]); out.push({ from, to, text: w[0], typo: ty, label: 'опечатка? → ' + ty.maybe,
+        note: ty.kind === 'метод' ? 'такого нет в словаре, похоже на ' + ty.maybe : 'имя нигде не объявлено, похоже на ' + ty.maybe + (ty.declLine != null ? ' (строка ' + (ty.declLine + 1) + ')' : '') }); continue; }
+      const nm = own.names[w[0]];
+      if(nm && line[from - 1] !== '.'){ taken.push([from, to]); out.push({ from, to, text: w[0], own: nm, label: nm.text || 'своё имя',
+        note: (nm.text ? nm.text + '; ' : '') + (nm.line === ln ? 'объявлено здесь' : 'объявлено в строке ' + (nm.line + 1)) }); }
+    }
     // конструкции: пробуем в начале каждого слова, берём, если накрывают 2+ слова
     if(window.codelabExplainAt) for(const w of line.matchAll(/[A-Za-z_$#.@][\w$-]*/g)){
       if(taken.some(([a, b]) => w.index >= a && w.index < b)) continue;
       const hit = window.codelabExplainAt(line, w.index + 1, lang);
       if(hit && hit.term && hit.to - hit.from > w[0].length + 1){ taken.push([hit.from, hit.to]); out.push({ from: hit.from, to: hit.to, text: line.slice(hit.from, hit.to), label: shortOf(hit.text), note: hit.text, path: '' }); }
     }
+    const free = [];
     while((m = re.exec(line))){
-      const from = m.index, to = from + m[0].length; if(taken.some(([a, b]) => from < b && to > a)) continue;
+      // цепочку режем занятыми кусками: btn.classList.togle → classList (btn — своё имя, togle — опечатка)
+      let a = m.index; const end = a + m[0].length;
+      for(const [x, y] of taken.filter(([x, y]) => x < end && y > a).sort((p, q) => p[0] - q[0])){ if(x > a) free.push([a, x]); a = Math.max(a, y); }
+      if(a < end) free.push([a, end]);
+    }
+    for(let [from, to] of free){
+      while(line[from] === '.' && lang !== 'css' && lang !== 'html') from++; while(to > from && line[to - 1] === '.') to--;
+      if(to <= from) continue; m = [line.slice(from, to)];
       // внутри строки короткое слово — скорее данные ('on', 'id'), чем термин: не толкуем
-      const before = line.slice(0, from); const inStr = ((before.match(/'/g) || []).length % 2) || ((before.match(/"/g) || []).length % 2);
+      const inStr = inStrAt(line, from);
       if(inStr && m[0].length < 4) continue;
       // цепочка obj.method — пробуем целиком, потом последнее звено (document.querySelector → querySelector)
       let term = m[0].replace(/\(.*$/, ''), info = meaning(term, lang, d);
@@ -86,28 +119,46 @@
     hideBtn();
     const { cm, ta, lang } = activeCM();
     let text = cm ? cm.getSelection() : (ta ? ta.value.slice(ta.selectionStart, ta.selectionEnd) : '');
-    if(!text.trim() && cm){ const c = cm.getCursor(); text = cm.getLine(c.line); }   // без выделения — текущая строка
+    let base = cm ? cm.getCursor('from').line : 0;
+    if(!text.trim() && cm){ const c = cm.getCursor(); text = cm.getLine(c.line); base = c.line; }   // без выделения — текущая строка
+    // выделение с середины строки: дописываем начало, иначе номера и позиции съедут
+    if(cm && cm.somethingSelected()){ const f = cm.getCursor('from'); text = cm.getLine(f.line).slice(0, f.ch).replace(/\S/g, ' ') + text; }
     text = text.slice(0, MAX_CHARS);
-    const d = await dict();
+    const [d, own] = await Promise.all([dict(), ownNames(cm ? cm.getValue() : (ta ? ta.value : ''), lang)]);
     if(panel) panel.remove();
     panel = document.createElement('div'); panel.className = 'se';
     const lines = text.split('\n').slice(0, MAX_LINES);
     let k = 0; const all = [];
-    const body = lines.map(line => {
-      const segs = segments(line, lang, d); let pos = 0, h = '';
+    const body = lines.map((line, i) => {
+      const segs = segments(line, lang, d, own, base + i); let pos = 0, h = '';
       for(const s of segs){ if(s.from < pos) continue; h += esc(line.slice(pos, s.from));
-        h += '<span class="se-seg k' + (1 + (k % 4)) + (k % 2 ? ' up' : '') + '" title="' + esc(s.note) + '"><span class="se-lbl">' + esc(s.label || '…') + '</span><span class="se-br"></span><span class="se-code">' + esc(s.text) + '</span></span>';
+        const go = s.own ? ' data-go="' + s.own.line + '"' : s.typo && s.typo.declLine != null ? ' data-go="' + s.typo.declLine + '"' : '';
+        h += '<span class="se-seg k' + (1 + (k % 4)) + (k % 2 ? ' up' : '') + (s.own ? ' own' : '') + (s.typo ? ' typo' : '') + '"' + go + ' title="' + esc(s.note) + '"><span class="se-lbl">' + esc(s.label || '…') + '</span><span class="se-br"></span><span class="se-code">' + esc(s.text) + '</span></span>';
         k++;
         pos = s.to; all.push(s); }
       return '<div class="se-line">' + h + esc(line.slice(pos)) + '</div>';
     }).join('');
     const seen = new Set();
     const list = all.filter(s => { const key = s.text.toLowerCase(); if(seen.has(key)) return false; seen.add(key); return true; })
-      .map(s => '<div class="se-it"><code>' + esc(s.text) + '</code>' + (s.path ? '<span class="p">' + esc(s.path) + '</span> — ' : '') + esc(s.note || s.label) + '</div>').join('');
+      .map(s => '<div class="se-it' + (s.typo ? ' typo' : '') + '"><code>' + esc(s.text) + '</code>' + (s.path ? '<span class="p">' + esc(s.path) + '</span> — ' : '') + esc(s.note || s.label)
+        + (s.typo && cm ? '<a data-fix="' + esc(s.text) + '" data-to="' + esc(s.typo.maybe) + '">исправить</a>' : '')
+        + (s.own && cm ? '<a data-go="' + s.own.line + '">к объявлению</a>' : '') + '</div>').join('');
     panel.innerHTML = '<div class="se-h"><b>что здесь</b><span>' + esc(lang.toUpperCase()) + '</span><button title="закрыть (Esc)">×</button></div>'
       + '<div class="se-b">' + (all.length ? body + '<div class="se-list">' + list + '</div>' : '<div class="se-none">в выделенном нет слов из словаря — выдели кусок побольше или добавь пояснения в словарь</div>') + '</div>';
     document.body.appendChild(panel);
     panel.querySelector('.se-h button').onclick = () => { panel.remove(); panel = null; };
+    panel.querySelector('.se-b').addEventListener('click', e => {
+      if(!cm) return;
+      const fix = e.target.closest('[data-fix]');
+      // исправить — все вхождения в файле как отдельного слова (после точки — только методы, иначе только имена)
+      if(fix){ const w = fix.dataset.fix, to = fix.dataset.to, src = cm.getValue();
+        const re = new RegExp('(^|[^\\wА-Яа-яЁё$])' + w.replace(/[$]/g, '\\$&') + '(?![\\wА-Яа-яЁё$])', 'g');
+        cm.operation(() => { for(let i = cm.lineCount() - 1; i >= 0; i--){ const l = cm.getLine(i); const nl = l.replace(re, (m0, p) => p + to); if(nl !== l) cm.replaceRange(nl, { line: i, ch: 0 }, { line: i, ch: l.length }); } });
+        fix.closest('.se-it').style.opacity = '.45'; fix.remove(); return; }
+      const go = e.target.closest('[data-go]');
+      if(go){ const ln = +go.dataset.go; cm.focus(); cm.setCursor({ line: ln, ch: 0 }); cm.scrollIntoView({ line: ln, ch: 0 }, 80);
+        const h = cm.addLineClass(ln, 'background', 'cm-se-flash'); setTimeout(() => cm.removeLineClass(h, 'background', 'cm-se-flash'), 1200); }
+    });
     if(window.codelabWindow) window.codelabWindow.make(panel, { handle: panel.querySelector('.se-h'), key: 'codelab_win_se', defaultGeo: { w: 640, h: 380 }, minW: 320, minH: 180 });
   }
 
