@@ -1316,7 +1316,7 @@ function openStructModal(){
     + 'Виды: <b>внутри</b>, <b>не внутри</b>, <b>содержит</b>, <b>не содержит</b>, <b>первым в</b>, <b>после</b>, <b>требует</b>, <b>пишется</b> (шаблон: \\n — перенос, … — своё место), <b>связывает</b> / <b>читает</b>, <b>обязательно</b> / <b>можно</b> (атрибуты; «*: можно …» — общие для всех тегов), <b>значения</b> («button[type]: значения button, submit, reset»), <b>заметка</b> (просто пояснение, без проверки; строка «слово: обычный текст» тоже сохранится заметкой). '
     + '<b>слово: удалить</b> — снять все правила слова. Нарушения подчёркиваются в песочнице, шаблон «пишется» раскрывается по Tab после слова.</p>'
     + '<div class="fmt">img: обязательно src — путь до файла картинки&#10;img: можно alt, width, loading&#10;button[type]: значения button, submit, reset&#10;li: внутри ul, ol — пункт живёт только в списке&#10;gap: требует display: flex | grid&#10;elif: после if, elif&#10;if: пишется if (…) {\\n  …\\n}</div>'
-    + '<div class="mbtns"><input class="inv-search" id="st-lang" list="st-langs" placeholder="язык: html, css, js, python, sql…" style="width:200px"><datalist id="st-langs"></datalist>'
+    + '<div class="mbtns"><select class="inv-sel" id="st-lang" title="язык правил" style="min-width:200px"></select>'
     + '<button class="btn" id="st-view">показать текущие</button><button class="btn" id="st-edit">все в поле</button><button class="btn" id="st-prompt">промпт для ИИ</button></div>'
     + '<textarea id="st-text" placeholder="слово: правило" style="min-height:150px;font-family:ui-monospace,monospace"></textarea>'
     + '<div class="mbtns"><button class="btn" id="st-parse">разобрать</button><button class="btn ok" id="st-add">добавить</button><button class="btn" id="st-replace" title="правила языка станут ровно такими, как в поле">заменить все</button><button class="btn" id="st-close">закрыть</button></div>'
@@ -1324,11 +1324,27 @@ function openStructModal(){
   bg.appendChild(box); document.body.appendChild(bg);
   const q = s => bg.querySelector(s);
   q('#st-close').onclick = () => bg.remove();
-  q('#st-lang').value = 'html';
-  const lang = () => String(q('#st-lang').value || '').trim().toLowerCase() || 'html';
+  // язык — выбор из списка (опечатка в имени завела бы отдельный пустой язык); новый — пунктом «другой язык…»
+  const sel = q('#st-lang'); let counts = {}, curLang = 'html';
+  const known = () => [...new Set((window.CODELAB_LANGS || []).map(x => x.v).filter(v => v !== 'txt').concat(Object.keys(counts)))];
+  const label = v => (window.langLabel ? window.langLabel(v) : v) + (counts[v] ? ' · правил ' + counts[v] : ' · пусто');
+  const fillLangs = () => { const ls = known().sort((a, b) => (counts[b] ? 1 : 0) - (counts[a] ? 1 : 0) || a.localeCompare(b));
+    sel.innerHTML = ls.map(v => '<option value="' + v + '">' + label(v) + '</option>').join('') + '<option value="__new">другой язык…</option>'; sel.value = curLang; };
+  const dist = (a, b) => { const d = Array.from({ length: a.length + 1 }, (_, i) => [i]); for(let j = 1; j <= b.length; j++) d[0][j] = j;
+    for(let i = 1; i <= a.length; i++) for(let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; };
+  sel.onchange = () => {
+    if(sel.value !== '__new'){ curLang = sel.value; q('#st-view').onclick(); return; }
+    let v = String(prompt('Имя нового языка латиницей (как у файлов: go, php, rust, kotlin…):', '') || '').trim().toLowerCase().replace(/[^a-z0-9_+#-]/g, '');
+    if(!v){ sel.value = curLang; return; }
+    // похоже на уже известный — скорее опечатка
+    const like = known().find(k => k !== v && dist(k, v) <= (v.length > 4 ? 2 : 1));
+    if(like && confirm('Есть язык «' + like + '». Это он?')) v = like;
+    curLang = v; if(!known().includes(v)) counts[v] = 0; fillLangs(); sel.value = v; q('#st-view').onclick();
+  };
+  const lang = () => curLang;
   const row = (cls, t) => { const d = el2('div', 'lp-row ' + cls); d.textContent = t; return d; };
   const get = () => fetch('/api/dict/structure?lang=' + encodeURIComponent(lang())).then(x => x.json()).catch(() => null);
-  get().then(r => { if(r) q('#st-langs').innerHTML = r.langs.map(l => '<option value="' + l + '">').join(''); });
+  fillLangs(); get().then(r => { if(r){ counts = r.counts || {}; fillLangs(); } });
   const VORDER = ['обязательно', 'можно', 'значения', 'внутри', 'не внутри', 'первым в', 'содержит', 'не содержит', 'после', 'требует', 'пишется', 'связывает', 'читает', 'заметка'];
   q('#st-view').onclick = async () => {
     const prev = q('#st-prev'); prev.innerHTML = 'загрузка…'; const r = await get(); prev.innerHTML = '';
@@ -1371,6 +1387,7 @@ function openStructModal(){
     prev.appendChild(row(r && r.ok ? 'lp-ok' : 'lp-bad', r && r.ok ? (r.lang + ': добавлено ' + r.added + ', заменено ' + r.replaced + ', снято ' + r.removed + (r.same ? ', уже было ' + r.same : '') + ' · всего ' + r.total + '. Обнови песочницу (Ctrl+F5).') : 'Ошибка сохранения'));
     ((r && r.bad) || []).forEach(x => prev.appendChild(row('lp-bad', 'не понято, строка ' + x.line + ': «' + x.text + '» — ' + x.why)));
     if(window.codelabKwDictReset) window.codelabKwDictReset();
+    if(r && r.ok){ counts[r.lang] = r.total; fillLangs(); }
   };
   q('#st-add').onclick = () => save('merge');
   q('#st-replace').onclick = () => save('replace');

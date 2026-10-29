@@ -1305,7 +1305,7 @@ const server = http.createServer(async (req, res) => {
         + (part.length ? '\n\nСлова языка, для которых правил пока нет:\n' + part.map(([w, n]) => w + ' — ' + String(n || '').replace(/\s+/g, ' ').slice(0, 70)).join('\n')
           : '\n\nСловаря этого языка у меня нет — возьми основные слова и конструкции языка сам: 30–60 правил, самое частое и то, на чём чаще ошибаются.'
             + (rules.length ? ' Эти уже есть, их не повторяй: ' + [...has].join(', ') + '.' : ''));
-      return json(res, 200, { lang, langs: [...new Set(Object.keys(all).concat(Object.keys(d.langs || {})))].sort(), lines, count: rules.length, byVerb, bad, free: free.length, shown: part.length, freeWords: part.map(([w]) => w), prompt });
+      return json(res, 200, { lang, langs: [...new Set(Object.keys(all).concat(Object.keys(d.langs || {})))].sort(), lines, count: rules.length, byVerb, bad, counts: Object.fromEntries(Object.entries(all).map(([k, v]) => [k, (v || []).length])), free: free.length, shown: part.length, freeWords: part.map(([w]) => w), prompt });
     }
 
     // привязать к термину (слову/конструкции) кусок-пример: {term, piece: название|id|''(снять)}
