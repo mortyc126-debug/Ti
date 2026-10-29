@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "выбрать-нужные-элементы-на-странице-и-об-mvt1kcfk",
+  "file": "выбрать-нужные-элементы-на-странице-и-об-mvt1kcfk.js",
+  "lang": "js",
+  "title": "Выбрать нужные элементы на странице и обработать событие нажатия: На изменение т",
+  "group": "Браузер / События",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [],
+    "requires": [
+      "input"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

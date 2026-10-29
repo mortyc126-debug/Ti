@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "выбрать-нужные-элементы-на-странице-и-об-mvt1kbzp",
+  "file": "выбрать-нужные-элементы-на-странице-и-об-mvt1kbzp.js",
+  "lang": "js",
+  "title": "Выбрать нужные элементы на странице и обработать событие нажатия: На нажатие кла",
+  "group": "Браузер / События",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

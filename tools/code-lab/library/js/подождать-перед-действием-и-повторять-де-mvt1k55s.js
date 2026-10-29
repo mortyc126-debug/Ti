@@ -1,0 +1,1 @@
+const delay = 2000;

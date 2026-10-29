@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "выбрать-нужные-элементы-на-странице-и-об-mvt1k9t9",
+  "file": "выбрать-нужные-элементы-на-странице-и-об-mvt1k9t9.js",
+  "lang": "js",
+  "title": "Выбрать нужные элементы на странице и обработать событие нажатия: По id",
+  "group": "Браузер / События",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [
+      "button"
+    ],
+    "requires": [
+      "#save"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}

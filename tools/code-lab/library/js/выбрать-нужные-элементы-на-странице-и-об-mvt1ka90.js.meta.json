@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "выбрать-нужные-элементы-на-странице-и-об-mvt1ka90",
+  "file": "выбрать-нужные-элементы-на-странице-и-об-mvt1ka90.js",
+  "lang": "js",
+  "title": "Выбрать нужные элементы на странице и обработать событие нажатия: По селектору (",
+  "group": "Браузер / События",
+  "desc": "Самый универсальный способ: подходит любой CSS-селектор.",
+  "output": "",
+  "component": {
+    "provides": [
+      "button"
+    ],
+    "requires": [
+      ".save-button"
+    ]
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": "imported",
+    "tags": null
+  },
+  "status": "described",
+  "wordNotes": []
+}

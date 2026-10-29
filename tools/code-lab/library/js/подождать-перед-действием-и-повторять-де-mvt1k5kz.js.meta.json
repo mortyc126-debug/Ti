@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "подождать-перед-действием-и-повторять-де-mvt1k5kz",
+  "file": "подождать-перед-действием-и-повторять-де-mvt1k5kz.js",
+  "lang": "js",
+  "title": "Подождать перед действием и повторять действие по таймеру: Из секунд, чтобы было",
+  "group": "Браузер / Время",
+  "desc": "",
+  "output": "",
+  "component": {
+    "provides": [
+      "seconds",
+      "delay"
+    ],
+    "requires": []
+  },
+  "tags": [],
+  "aliases": [],
+  "source": {
+    "title": "imported",
+    "desc": null,
+    "tags": null
+  },
+  "status": "needs_description",
+  "wordNotes": []
+}
