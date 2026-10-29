@@ -608,6 +608,7 @@ function addNode(blockId, extra){
   const nd = makeNode(blockId, Object.assign({ x: p.x, y: p.y }, extra || {}));
   graph.nodes.push(nd);
   const made = autoWire ? autoConnect(nd) : 0;
+  inspTab = 'set';   // новый блок — сначала он сам (код и поля), пояснение — второй вкладкой
   renderCanvas(); select(nd); persist(); renderCode();
   if(made) showEdgeMessage('Авто-связи: ' + made + ' (по совпадению имён). Отключить — кнопка .', 'ok');
   return nd;
@@ -1018,6 +1019,10 @@ function renderInspector(nd){
     const sum = document.createElement('summary'); sum.textContent = 'контракт по шаблону (текстом)'; sum.style.cssText = 'cursor:pointer;color:var(--text3);font-size:12px;margin-bottom:6px';
     det.appendChild(sum); det.appendChild(renderBlockContract(nd, b)); body.appendChild(det);
   } else {
+    // и на вкладке пояснений сверху — сам код: о чём речь, видно сразу, без переключения
+    const pre = el('pre', 'insp-code-peek'); pre.textContent = nodeCode(nd).split('\n').slice(0, 12).join('\n');
+    pre.title = 'код блока — править на вкладке «Код»'; pre.onclick = () => { inspTab = 'set'; renderInspector(nd); };
+    body.appendChild(pre);
     body.appendChild(descEditor(nd, b));                  // описание своими словами
     const det = document.createElement('details'); det.style.marginTop = '10px';
     const sum = document.createElement('summary'); sum.textContent = 'почему это работает'; sum.style.cssText = 'cursor:pointer;color:var(--text3);font-size:12px;margin-bottom:6px';
