@@ -2,7 +2,7 @@
 let PIECES = [], FLOWS = [];
 
 (async function(){
-  try { PIECES = await fetch('/api/list').then(r => r.json()); } catch(_){ PIECES = []; }
+  try { PIECES = await fetch('/api/list?labels=1').then(r => r.json()); } catch(_){ PIECES = []; }
   try { FLOWS = await fetch('/api/flows/list').then(r => r.json()); } catch(_){ FLOWS = []; }
   const leg = document.getElementById('covLegend');
   if(leg) leg.innerHTML = 'Описано: ' + [['inputs','Вх','Входы'],['outputs','Вых','Выходы'],['env','Ср','Среда'],['pre','Пр','Предусловия'],['effects','Эф','Побочные эффекты'],['errors','Ош','Ошибки'],['links','Св','Связи'],['check','Пв','Проверка']].map(f => '<span><b>' + f[1] + '</b> — ' + f[2] + '</span>').join('')
@@ -105,7 +105,7 @@ async function deletePiece(id){
   const t = PIECES.find(x => x.id === id); if(!t) return;
   if(!confirm('Удалить кусок «' + (t.title || id) + '»? Файл удалится без возврата.')) return;
   await fetch('/api/delete', { method:'POST', body: JSON.stringify({ id }) }).catch(() => {});
-  try { PIECES = await fetch('/api/list').then(r => r.json()); } catch(_){ PIECES = PIECES.filter(x => x.id !== id); }
+  try { PIECES = await fetch('/api/list?labels=1').then(r => r.json()); } catch(_){ PIECES = PIECES.filter(x => x.id !== id); }
   fillFilters(); renderPieces();
 }
 // скопировать кусок как готовый шаблон (JSON) — вставить в сборник или загрузить как новый кусок
@@ -296,7 +296,7 @@ document.getElementById('pcopy').onclick = e => copy(piecesAsText(), e.target);
   const o = btn.textContent; btn.disabled = true; btn.textContent = 'чищу…';
   let r; try { r = await fetch('/api/dedup', { method:'POST' }).then(x => x.json()); } catch(_){ r = null; }
   btn.disabled = false;
-  if(r && r.ok){ btn.textContent = r.removed ? ('✓ удалено ' + r.removed + ' дублей') : 'дублей не нашлось'; try { PIECES = await fetch('/api/list').then(x => x.json()); } catch(_){} fillFilters(); renderPieces(); setTimeout(() => { btn.textContent = o; }, 3000); }
+  if(r && r.ok){ btn.textContent = r.removed ? ('✓ удалено ' + r.removed + ' дублей') : 'дублей не нашлось'; try { PIECES = await fetch('/api/list?labels=1').then(x => x.json()); } catch(_){} fillFilters(); renderPieces(); setTimeout(() => { btn.textContent = o; }, 3000); }
   else { btn.textContent = 'ошибка'; setTimeout(() => { btn.textContent = o; }, 2000); }
 }; })();
 document.getElementById('fcopy').onclick = e => copy(flowsAsText(), e.target);
@@ -359,7 +359,7 @@ function openTranslateModal(){
     if(!edits.length){ q('#tr-note').textContent = 'ничего не вписано'; return; }
     q('#tr-apply').textContent = 'применяю…'; q('#tr-apply').disabled = true;
     let done = 0; for(const e of edits){ const r = await fetch('/api/edit', { method: 'POST', body: JSON.stringify(e) }).then(x => x.json()).catch(() => ({})); if(r && r.ok) done++; }
-    try { PIECES = await fetch('/api/list').then(x => x.json()); } catch(_){}
+    try { PIECES = await fetch('/api/list?labels=1').then(x => x.json()); } catch(_){}
     fillFilters(); renderPieces(); bg.remove();
     alert('Готово: переведено названий ' + done + ' (из ' + edits.length + '). Не забудь синхронизацию, чтобы уехало в репозиторий.');
   };
@@ -718,7 +718,7 @@ function openLinksModal(){
     parsed.createMissing = !q('#lk-missing') || q('#lk-missing').checked;
     parsed.snap = !q('#lk-snap') || q('#lk-snap').checked;   // 🧲 массово сводить имена к ближайшим кускам
     const r = await applyLinks(parsed);
-    try { PIECES = await fetch('/api/list').then(x => x.json()); FLOWS = await fetch('/api/flows/list').then(x => x.json()); } catch(_){}
+    try { PIECES = await fetch('/api/list?labels=1').then(x => x.json()); FLOWS = await fetch('/api/flows/list').then(x => x.json()); } catch(_){}
     fillFilters(); renderPieces(); renderFlows();
     q('#lk-prev').innerHTML = '<div class="lp-row lp-ok">Готово: контрактов обновлено ' + r.contracts + ', ' + (r.merged ? 'дописано связей ' : 'связей ') + r.edges + (r.missing ? ', новых ящиков ' + r.missing : '') + (r.merged ? ' (в схеме всего ' + r.totalEdges + ')' : '') + (r.flowId ? ', схема сохранена' : '') + '.</div>';
     q('#lk-apply').style.display = 'none';
@@ -794,7 +794,7 @@ function openSectionsModal(){
       const r = await fetch('/api/edit', { method:'POST', body: JSON.stringify({ id: t.id, group: it.group }) }).then(r => r.json()).catch(() => ({}));
       if(r && r.ok){ t.group = it.group; done++; }
     }
-    try { PIECES = await fetch('/api/list').then(x => x.json()); } catch(_){}
+    try { PIECES = await fetch('/api/list?labels=1').then(x => x.json()); } catch(_){}
     fillFilters(); renderPieces();
     q('#sc-prev').innerHTML = '<div class="lp-row lp-ok">Готово: разложено кусков ' + done + '.</div>';
     q('#sc-apply').style.display = 'none';

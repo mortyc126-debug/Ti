@@ -395,8 +395,11 @@ async function labelsFor(entry, names){
     _lblCache.map.set(entry.id, L); }
   return L;
 }
-async function listTemplates(){
-  const rows = await store.rows(); const ents = new Map((await store.entries()).map(e => [e.id, e]));
+// подписи — только по запросу (?labels=1: Опись, окно подписей): их подсчёт после запуска занимает секунды,
+// а остальным страницам (задачи, конструктор, поиск) нужен лёгкий список сразу
+async function listTemplates(withLabels){
+  const rows = await store.rows();
+  if(!withLabels) return rows; const ents = new Map((await store.entries()).map(e => [e.id, e]));
   for(const r of rows){ const c = r.comp; if(!c || !(c.provides.length || c.requires.length)) continue; const e = ents.get(r.id); if(e) r.comp = { ...c, labels: await labelsFor(e, c.provides.concat(c.requires)) }; }
   return rows;
 }
@@ -695,7 +698,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, await describeQueue.get());
     }
 
-    if(u.pathname === '/api/list'){ return json(res, 200, await listTemplates()); }
+    if(u.pathname === '/api/list'){ return json(res, 200, await listTemplates(u.searchParams.get('labels') === '1')); }
 
     // поиск по всей библиотеке: ?q=слова&limit=60 → { hits:[{id, score, why:[…]}], total, terms }
     if(u.pathname === '/api/search'){

@@ -104,13 +104,17 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
     for(const o of jobs){
       if(o.kind === 'piece'){
         const hit = (o.id && all.find(r => r.id === o.id)) || findPiece(o.ref);
+        // ИИ часто пишет «кусок:» с названием ЗАДАЧИ — точное совпадение с задачей превращаем в ссылку на неё
+        const asTask = !hit && tByNorm.get(norm(String(o.ref || '').replace(/^id\s*:\s*/i, '')));
         if(hit){ o.id = hit.id; o.ref = hit.title || hit.id; report.linked++; }
-        else { o.id = ''; report.unresolved.push({ kind: 'piece', ref: o.ref, label: o.label, candidates: await pieceCandidates(o.ref, task.lang) }); }
+        else if(asTask && asTask.id !== task.id){ o.kind = 'task'; o.id = asTask.id; o.ref = asTask.title; report.linked++; report.converted = (report.converted || 0) + 1; }
+        else { o.id = ''; report.unresolved.push({ kind: 'piece', ref: o.ref, label: o.label,
+          candidates: taskCandidates(o.ref, tIndex.filter(t => t.id !== task.id)).map(c => ({ ...c, kind: 'task' })).slice(0, 2).concat(await pieceCandidates(o.ref, task.lang)).slice(0, 4) }); }
       } else if(o.kind === 'task'){
         const s = String(o.ref || '').replace(/^id\s*:\s*/i, '').trim();
         const hit = tById.get(o.id) || tById.get(s) || tByNorm.get(norm(s));
         if(hit && hit.id !== task.id){ o.id = hit.id; o.ref = hit.title; report.linked++; }
-        else { o.id = ''; report.unresolved.push({ kind: 'task', ref: o.ref, label: o.label, candidates: taskCandidates(s, tIndex.filter(t => t.id !== task.id)) }); }
+        else { o.id = ''; report.unresolved.push({ kind: 'task', ref: o.ref, label: o.label, candidates: taskCandidates(s, tIndex.filter(t => t.id !== task.id)).map(c => ({ ...c, kind: 'task' })) }); }
       } else if(o.kind === 'code' && createCode && String(o.code || '').trim() && createPiece){
         const lang = o.lang || task.lang || 'js';
         const title = (task.title + ': ' + (o.label || 'вариант')).slice(0, 80);
@@ -121,9 +125,15 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
     return report;
   }
 
-  async function save(input, opts = {}){
+  // записи строго по очереди: двойной клик «сохранить» раньше успевал создать копии одной задачи
+  let chain = Promise.resolve();
+  const queued = fn => { const p = chain.then(fn, fn); chain = p.catch(() => {}); return p; };
+
+  async function save(input, opts = {}){ return queued(() => saveNow(input, opts)); }
+  async function saveNow(input, opts = {}){
     const t = cleanTask(input);
-    if(!t.id || !okId(t.id)) t.id = slug(t.title || 'задача');
+    // новая задача с уже существующим названием — обновляет её, а не плодит копию
+    if(!t.id || !okId(t.id)){ const same = (await list()).find(x => norm(x.title) === norm(t.title)); t.id = same ? same.id : slug(t.title || 'задача'); }
     const report = await resolve(t, opts);
     t.savedAt = Date.now();
     await fs.mkdir(root, { recursive: true });
@@ -132,18 +142,20 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
   }
 
   // пачка текстом: одноимённая задача обновляется (не плодим двойники), остальные создаются
-  async function importText(text, { dry = false } = {}){
+  async function importText(text, opts = {}){ return opts.dry ? importNow(text, opts) : queued(() => importNow(text, opts)); }
+  async function importNow(text, { dry = false } = {}){
     const { tasks, warnings } = TaskFormat.parse(text);
     const existing = await list();
     const byNorm = new Map(existing.map(t => [norm(t.title), t]));
     const out = [];
     // сначала id всем — чтобы задачи пачки могли ссылаться друг на друга
-    for(const t of tasks){ const old = byNorm.get(norm(t.title)); t.id = old ? old.id : slug(t.title); t._new = !old; }
-    const index = existing.concat(tasks.filter(t => t._new).map(t => ({ id: t.id, title: t.title })));
+    // одноимённые внутри самой пачки тоже получают один id — последняя версия перезапишет предыдущую
+    for(const t of tasks){ const k = norm(t.title); const old = byNorm.get(k); t.id = old ? old.id : slug(t.title); t._new = !old; if(!old) byNorm.set(k, { id: t.id, title: t.title, _fromPack: true }); }
+    const index = existing.concat([...new Map(tasks.filter(t => t._new).map(t => [t.id, { id: t.id, title: t.title }])).values()]);
     for(const t of tasks){
       const isNew = t._new; delete t._new;
       if(dry){ const c = cleanTask(t); const report = await resolve(c, { createCode: false, tasksIndex: index }); out.push({ id: c.id, title: c.title, isNew, report, stats: TaskFormat.stats(c), task: c }); continue; }
-      const { task, report } = await save(t, { tasksIndex: index });
+      const { task, report } = await saveNow(t, { tasksIndex: index });
       out.push({ id: task.id, title: task.title, isNew, report, stats: TaskFormat.stats(task) });
     }
     return { ok: true, dry, tasks: out, warnings };

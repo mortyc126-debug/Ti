@@ -188,3 +188,21 @@ test('подписи к «даёт/нужно»: из кода и словаря
   assert.match(L['#scene'].text, /id="scene"/);
   assert.ok(!/общая ошибка/.test(L.Error.text), 'список синонимов — не подпись');
 });
+
+test('«кусок:» с названием задачи становится ссылкой на задачу; одновременные сохранения не плодят копии', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tasks-'));
+  let n = 0;
+  const store = createTaskStore({ root, rows: async () => [], slug: s => 'id' + (++n), similarPieces: async () => [] });
+  await store.importText('=== Отправить форму | js |\n? Q\n  - a -> пропустить');
+  const r = await store.importText('=== Проверить поле | js |\n? Q\n  - ок -> кусок: Отправить форму', { dry: true });
+  assert.equal(r.tasks[0].report.unresolved.length, 0);
+  assert.equal(r.tasks[0].report.converted, 1);
+  assert.equal(r.tasks[0].task.steps[0].options[0].kind, 'task');
+  const text = '=== Двойной клик | js |\n? Q\n  - a -> пропустить';
+  await Promise.all([store.importText(text), store.importText(text), store.importText(text)]);
+  await store.save({ title: 'Двойной клик', steps: [] });
+  assert.equal((await store.list()).filter(t => t.title === 'Двойной клик').length, 1);
+  await store.importText('=== Повтор | js |\n? Q\n  - a -> пропустить\n=== Повтор | js |\n? Q2\n  - b -> пропустить');
+  assert.equal((await store.list()).filter(t => t.title === 'Повтор').length, 1, 'одноимённые внутри пачки — одна задача');
+  await fs.rm(root, { recursive: true, force: true });
+});

@@ -173,7 +173,8 @@
     for(let i = from; i < to; i++){
       const m = lines[i].match(re); if(!m || m[4].trim() !== String(u.ref).trim()) continue;
       const ind = (lines[i].match(/^\s*/) || [''])[0];
-      lines[i] = m[1] + m[2] + ': ' + cand.title;
+      // кандидат может быть другого вида: ИИ написал «кусок:» с названием задачи — тогда и слово меняем
+      lines[i] = m[1] + (cand.kind === 'task' ? 'задача' : 'кусок') + ': ' + cand.title;
       lines.splice(i + 1, 0, ind + '    | было: ' + u.ref);
       return lines.join('\n');
     }
@@ -184,7 +185,7 @@
     return list.map((u, i) => '<div class="tk-un" data-k="' + tag + ':' + i + '">⚠ не найден' + (u.kind === 'task' ? 'а задача' : ' кусок') + ' «' + esc(u.ref) + '»'
       + (u.label ? ' <span style="opacity:.7">(вариант «' + esc(u.label) + '»)</span>' : '')
       + ((u.candidates || []).length
-        ? '<div class="tk-cands">похоже: ' + u.candidates.map((c, j) => '<button class="btn tk-cand" data-c="' + j + '" title="заменить ссылку; прежнее название останется заметкой «было»">' + esc(c.title) + (c.lang ? ' <span style="opacity:.6">' + esc(c.lang) + '</span>' : '') + '</button>').join('')
+        ? '<div class="tk-cands">похоже: ' + u.candidates.map((c, j) => '<button class="btn tk-cand" data-c="' + j + '" title="заменить ссылку; прежнее название останется заметкой «было»">' + (c.kind === 'task' ? '🧭 задача: ' : '') + esc(c.title) + (c.lang ? ' <span style="opacity:.6">' + esc(c.lang) + '</span>' : '') + '</button>').join('')
           + '<button class="btn tk-keep" title="ничего не менять">оставить</button></div>'
         : '<div class="tk-cands" style="opacity:.75">похожих нет — останется как есть, подхватится, когда появится с таким названием</div>')
       + '</div>').join('');
@@ -253,7 +254,9 @@
     }
     preview();
     $('#teSave').onclick = async () => {
+      const btn = $('#teSave'); if(btn.disabled) return; btn.disabled = true;
       const r = await api('/api/tasks/save', { text: ta.value, id: id || undefined }).catch(() => null);
+      btn.disabled = false;
       const msg = $('#teMsg');
       if(!r || !r.ok){ msg.className = 'tk-msg err'; msg.textContent = (r && r.error) || 'не сохранилось'; return; }
       await reload(r.id);
@@ -309,14 +312,18 @@
       + '<div class="mfield"><textarea id="bkT" rows="16" spellcheck="false" placeholder="=== …"></textarea></div>'
       + '<div class="tk-row"><button class="btn" id="bkFile">📄 из файла…</button><button class="btn" id="bkDry">🔎 проверить</button><button class="btn ok" id="bkGo">💾 сохранить</button><button class="btn" id="bkX">закрыть</button>'
       + '<input type="file" id="bkInp" accept=".txt,.md" style="display:none"></div><div id="bkRep"></div>');
+    let busy = false;
     const run = async dry => {
+      if(busy) return; busy = true; m.q('#bkGo').disabled = m.q('#bkDry').disabled = true;   // двойной клик раньше плодил копии
       const rep = m.q('#bkRep'); rep.innerHTML = '<div class="tk-lead">' + (dry ? 'проверяю…' : 'сохраняю…') + '</div>';
       const r = await api('/api/tasks/import', { text: m.q('#bkT').value, dry }).catch(() => null);
+      busy = false; m.q('#bkGo').disabled = m.q('#bkDry').disabled = false;
       if(!r){ rep.innerHTML = '<div class="tk-msg err">сервер не ответил</div>'; return; }
       if(!r.tasks.length){ rep.innerHTML = '<div class="tk-msg err">Не нашла ни одной задачи. Каждая начинается со строки «=== Название | язык | раздел».</div>'; return; }
       const sw = await Promise.all(r.tasks.map(t => t.task ? sectionWarn(t.task.group) : ''));
       rep.innerHTML = '<div class="rep">' + r.tasks.map((t, ti) => '<div>' + (t.isNew ? '＋' : '↻') + ' <b>' + esc(t.title) + '</b> — вопросов ' + t.stats.steps + ', вариантов ' + t.stats.options
         + (t.report.created ? ', новых кусков ' + t.report.created : '')
+        + (t.report.converted ? ', «кусок:» → ссылка на задачу: ' + t.report.converted : '')
         + (sw[ti] ? '<div class="bad">' + esc(sw[ti]) + '</div>' : '')
         + (t.report.unresolved.length ? '<div class="bad">' + unresolvedHtml(t.report.unresolved, String(ti)) + '</div>' : '') + '</div>').join('')
         + ((r.warnings || []).length ? '<div class="bad">' + r.warnings.map(esc).join('<br>') + '</div>' : '') + '</div>'

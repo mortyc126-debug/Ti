@@ -54,6 +54,7 @@
 
     async function render(){
       const my = ++seq;
+      if(!host.firstChild) host.innerHTML = '<div style="color:var(--text3,#9c90c4);font-size:12.5px">загружаю вопросы…</div>';   // пустая панель выглядела сломанной
       loadedRows = await rows();
       const frag = document.createElement('div');
       const asm = [];

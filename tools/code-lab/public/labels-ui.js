@@ -11,7 +11,7 @@
   const inSec = (g, sec) => { const a = nk(g), b = nk(sec); return !b || a === b || a.startsWith(b + ' / '); };
 
   async function open(){
-    const [rows, sec] = await Promise.all([api('/api/list').catch(() => []), api('/api/sections').catch(() => ({ tree: [] }))]);
+    const [rows, sec] = await Promise.all([api('/api/list?labels=1').catch(() => []), api('/api/sections').catch(() => ({ tree: [] }))]);
     const tree = sec.tree || [];
     const langs = [...new Set(rows.map(r => r.lang))].sort();
     const bg = document.createElement('div'); bg.className = 'sx-bg';
