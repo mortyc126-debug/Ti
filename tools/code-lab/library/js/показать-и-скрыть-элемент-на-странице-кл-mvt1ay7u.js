@@ -1,1 +1,0 @@
-const toggle = () => box.classList.toggle('hidden');

@@ -1,1 +1,0 @@
-if (!response.ok) button.disabled = false;

@@ -20,22 +20,22 @@
       "options": [
         {
           "label": "Получить текущую дату и время",
-          "kind": "piece",
-          "ref": "Работать с датой и временем: Получить текущую дату и время",
-          "id": "работать-с-датой-и-временем-получить-тек-mvt1cbhe",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const now = new Date();",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Создать дату из строки",
-          "kind": "piece",
-          "ref": "Работать с датой и временем: Создать дату из строки",
-          "id": "работать-с-датой-и-временем-создать-дату-mvt1cm2y",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Строка в формате ISO (год-месяц-день) читается одинаково везде.",
-          "code": "",
-          "lang": "",
+          "code": "const date = new Date('2025-03-15');",
+          "lang": "js",
           "steps": [
             {
               "q": "Что, если строка может быть неправильной?",
@@ -44,12 +44,12 @@
               "options": [
                 {
                   "label": "Проверить результат",
-                  "kind": "piece",
-                  "ref": "Работать с датой и временем: Проверить результат",
-                  "id": "работать-с-датой-и-временем-проверить-ре-mvt1cnqp",
+                  "kind": "code",
+                  "ref": "",
+                  "id": "",
                   "note": "",
-                  "code": "",
-                  "lang": "",
+                  "code": "if (Number.isNaN(date.getTime())) {\n  throw new Error('Неверная дата');\n}",
+                  "lang": "js",
                   "steps": []
                 },
                 {
@@ -78,32 +78,32 @@
         },
         {
           "label": "Узнать год, месяц, день",
-          "kind": "piece",
-          "ref": "Работать с датой и временем: Узнать год, месяц, день",
-          "id": "работать-с-датой-и-временем-узнать-год-м-mvt1cptd",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Месяцы считаются с нуля: январь — 0, декабрь — 11.",
-          "code": "",
-          "lang": "",
+          "code": "const year = date.getFullYear();\nconst month = date.getMonth() + 1;\nconst day = date.getDate();",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Прибавить дни",
-          "kind": "piece",
-          "ref": "Работать с датой и временем: Прибавить дни",
-          "id": "работать-с-датой-и-временем-прибавить-дн-mvt1crwc",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Прибавь число дней, нужное тебе: setDate сам перейдёт в следующий месяц.",
-          "code": "",
-          "lang": "",
+          "code": "const result = new Date(date);\nresult.setDate(result.getDate() + 7);",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Посчитать разницу между датами",
-          "kind": "piece",
-          "ref": "Работать с датой и временем: Посчитать разницу между датами",
-          "id": "работать-с-датой-и-временем-посчитать-ра-mvt1ctzr",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const msPerDay = 24 * 60 * 60 * 1000;\nconst diffDays = Math.round((dateB - dateA) / msPerDay);",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -115,42 +115,42 @@
       "options": [
         {
           "label": "По-русски, с названием месяца",
-          "kind": "piece",
-          "ref": "Работать с датой и временем: По-русски, с названием месяца",
-          "id": "работать-с-датой-и-временем-по-русски-с--mvt1cw3g",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const text = date.toLocaleDateString('ru-RU', {\n  day: 'numeric',\n  month: 'long',\n  year: 'numeric',\n});",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Коротко, цифрами",
-          "kind": "piece",
-          "ref": "Работать с датой и временем: Коротко, цифрами",
-          "id": "работать-с-датой-и-временем-коротко-цифр-mvt1cy8e",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const text = date.toLocaleDateString('ru-RU');",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "С временем",
-          "kind": "piece",
-          "ref": "Работать с датой и временем: С временем",
-          "id": "работать-с-датой-и-временем-с-временем-mvt1d0cf",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const text = date.toLocaleString('ru-RU');",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "В виде строки для передачи на сервер",
-          "kind": "piece",
-          "ref": "Работать с датой и временем: В виде строки для передачи на сервер",
-          "id": "работать-с-датой-и-временем-в-виде-строк-mvt1d2fu",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const text = date.toISOString();",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -162,22 +162,22 @@
       "options": [
         {
           "label": "Какая позже",
-          "kind": "piece",
-          "ref": "Работать с датой и временем: Какая позже",
-          "id": "работать-с-датой-и-временем-какая-позже-mvt1d4kh",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const isLater = dateA.getTime() > dateB.getTime();",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Одинаковы ли",
-          "kind": "piece",
-          "ref": "Работать с датой и временем: Одинаковы ли",
-          "id": "работать-с-датой-и-временем-одинаковы-ли-mvt1d6p9",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Опираемся на время в миллисекундах, а не на ссылку.",
-          "code": "",
-          "lang": "",
+          "code": "const isSame = dateA.getTime() === dateB.getTime();",
+          "lang": "js",
           "steps": [
             {
               "q": "Почему нельзя через ===?",
@@ -227,12 +227,12 @@
       "options": [
         {
           "label": "да",
-          "kind": "piece",
-          "ref": "Работать с датой и временем: да",
-          "id": "работать-с-датой-и-временем-да-mvt1d8vk",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "setInterval(() => {\n  document.querySelector('#clock').textContent = new Date().toLocaleTimeString('ru-RU');\n}, 1000);",
+          "lang": "js",
           "steps": []
         },
         {

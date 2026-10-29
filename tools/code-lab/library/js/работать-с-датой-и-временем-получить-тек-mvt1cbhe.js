@@ -1,1 +1,0 @@
-const now = new Date();

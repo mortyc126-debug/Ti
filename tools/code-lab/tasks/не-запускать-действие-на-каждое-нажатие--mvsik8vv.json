@@ -19,22 +19,22 @@
       "options": [
         {
           "label": "Запрос на поиск при вводе",
-          "kind": "piece",
-          "ref": "Не запускать действие на каждое нажатие клавиши (debounce): Запрос на поиск при ",
-          "id": "не-запускать-действие-на-каждое-нажатие--mvsiklp3",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const input = document.querySelector('#search');",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Реакцию на изменение размера окна",
-          "kind": "piece",
-          "ref": "Не запускать действие на каждое нажатие клавиши (debounce): Реакцию на изменение",
-          "id": "не-запускать-действие-на-каждое-нажатие--mvsikm5a",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const input = window;",
+          "lang": "js",
           "steps": []
         },
         {
@@ -73,22 +73,22 @@
       "options": [
         {
           "label": "Своей функцией",
-          "kind": "piece",
-          "ref": "Не запускать действие на каждое нажатие клавиши (debounce): Своей функцией",
-          "id": "не-запускать-действие-на-каждое-нажатие--mvsikmkj",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Не нужны библиотеки, работает везде.",
-          "code": "",
-          "lang": "",
+          "code": "function debounce(fn, delay = 300) {\n  let timer;\n  return (...args) => {\n    clearTimeout(timer);\n    timer = setTimeout(() => fn(...args), delay);\n  };\n}",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Подключить из библиотеки lodash",
-          "kind": "piece",
-          "ref": "Не запускать действие на каждое нажатие клавиши (debounce): Подключить из библио",
-          "id": "не-запускать-действие-на-каждое-нажатие--mvsikn07",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Когда lodash уже есть в проекте.",
-          "code": "",
-          "lang": "",
+          "code": "import debounce from 'lodash/debounce';",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -100,32 +100,32 @@
       "options": [
         {
           "label": "300 мс",
-          "kind": "piece",
-          "ref": "Не запускать действие на каждое нажатие клавиши (debounce): 300 мс",
-          "id": "не-запускать-действие-на-каждое-нажатие--mvsiknfg",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Хороший вариант для поиска при вводе.",
-          "code": "",
-          "lang": "",
+          "code": "const delay = 300;",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "100 мс",
-          "kind": "piece",
-          "ref": "Не запускать действие на каждое нажатие клавиши (debounce): 100 мс",
-          "id": "не-запускать-действие-на-каждое-нажатие--mvsiknv7",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Для быстрых реакций, например подсказок.",
-          "code": "",
-          "lang": "",
+          "code": "const delay = 100;",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "1000 мс",
-          "kind": "piece",
-          "ref": "Не запускать действие на каждое нажатие клавиши (debounce): 1000 мс",
-          "id": "не-запускать-действие-на-каждое-нажатие--mvsikoaq",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Для тяжёлых действий, например автосохранения.",
-          "code": "",
-          "lang": "",
+          "code": "const delay = 1000;",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -137,12 +137,12 @@
       "options": [
         {
           "label": "Подписка на событие",
-          "kind": "piece",
-          "ref": "Не запускать действие на каждое нажатие клавиши (debounce): Подписка на событие",
-          "id": "не-запускать-действие-на-каждое-нажатие--mvsikoqc",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const onInput = debounce(event => {\n  console.log('Ищем:', event.target.value);\n}, delay);\ninput.addEventListener('input', onInput);",
+          "lang": "js",
           "steps": []
         }
       ]

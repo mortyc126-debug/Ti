@@ -1,1 +1,0 @@
-li.addEventListener('click', () => li.classList.toggle('done'));

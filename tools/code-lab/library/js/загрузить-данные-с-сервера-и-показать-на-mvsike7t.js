@@ -1,1 +1,0 @@
-const items = await response.json();

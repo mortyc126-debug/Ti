@@ -115,12 +115,8 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
         const hit = tById.get(o.id) || tById.get(s) || tByNorm.get(norm(s));
         if(hit && hit.id !== task.id){ o.id = hit.id; o.ref = hit.title; report.linked++; }
         else { o.id = ''; report.unresolved.push({ kind: 'task', ref: o.ref, label: o.label, candidates: taskCandidates(s, tIndex.filter(t => t.id !== task.id)).map(c => ({ ...c, kind: 'task' })) }); }
-      } else if(o.kind === 'code' && createCode && String(o.code || '').trim() && createPiece){
-        const lang = o.lang || task.lang || 'js';
-        const title = (task.title + ': ' + (o.label || 'вариант')).slice(0, 80);
-        const r = await createPiece({ title, lang, code: o.code, group: task.group || 'Задачи', desc: o.note || '' });
-        if(r && r.id){ o.kind = 'piece'; o.id = r.id; o.ref = r.title || title; o.code = ''; o.lang = ''; if(r.created) report.created++; else report.linked++; }
       }
+      // вариант «код» остаётся внутри задачи: раньше он становился куском «Задача: вариант» и засорял библиотеку
     }
     return report;
   }
@@ -246,13 +242,17 @@ const STOP = new Set(('const let var function return if else for while do switch
   + 'pass self print len range str int list dict the and with').split(' '));
 const tokensOf = code => { const set = new Set(); for(const m of String(code || '').toLowerCase().matchAll(/[a-zа-яё_$][\wа-яё$-]{2,}/g)) if(!STOP.has(m[0])) set.add(m[0]); return set; };
 
-export function createTaskRanker({ entries }){
-  const cache = new Map();   // taskId → {savedAt, pieces:[id], tokens:Set}
+export function createTaskRanker({ entries, contract, contractLangs }){
+  const cache = new Map();   // taskId → {savedAt, pieces:[id], parts:[{provides}], tokens:Set}
+  // части задачи: куски по ссылке и код, живущий внутри задачи (у него контракт считаем сами)
   async function profile(t, byId){
     const c = cache.get(t.id); if(c && c.savedAt === t.savedAt) return c;
-    const ids = []; TaskFormat.eachOption(t.steps, o => { if(o.kind === 'piece' && o.id && !ids.includes(o.id)) ids.push(o.id); });
+    const ids = [], inline = [];
+    TaskFormat.eachOption(t.steps, o => { if(o.kind === 'piece' && o.id && !ids.includes(o.id)) ids.push(o.id); if(o.kind === 'code' && String(o.code || '').trim()) inline.push(o); });
     const tokens = new Set(); for(const id of ids){ const e = byId.get(id); if(e) tokensOf(e.code).forEach(x => tokens.add(x)); }
-    const p = { savedAt: t.savedAt, pieces: ids, tokens }; cache.set(t.id, p); return p;
+    inline.forEach(o => tokensOf(o.code).forEach(x => tokens.add(x)));
+    const parts = inline.map(o => { const lang = o.lang || t.lang || 'js'; let prov = []; try { if(contract && contractLangs.has(lang)) prov = contract(o.code, lang).provides; } catch(_){} return { provides: prov }; });
+    const p = { savedAt: t.savedAt, pieces: ids, parts, tokens }; cache.set(t.id, p); return p;
   }
   async function rank({ tasks, rows, next, lang, window: win, cursor }){
     const W = SUGGEST_WEIGHTS;
@@ -264,11 +264,11 @@ export function createTaskRanker({ entries }){
     const curWords = String(cursor || '').toLowerCase().replace(/ё/g, 'е').match(/[\p{L}_]{3,}/gu) || [];
     const out = [];
     for(const t of tasks){
-      const p = await profile(t, byId); if(!p.pieces.length) continue;
+      const p = await profile(t, byId); if(!p.pieces.length && !p.parts.length) continue;
       const why = []; let score = 0;
       const gives = new Set(); let withProv = 0, done = 0;
-      for(const id of p.pieces){ const r = rowById.get(id); const prov = (r && r.comp && r.comp.provides) || [];
-        prov.forEach(x => gives.add(x)); if(prov.length){ withProv++; if(prov.every(x => provided.has(x))) done++; } }
+      const provs = p.pieces.map(id => { const r = rowById.get(id); return (r && r.comp && r.comp.provides) || []; }).concat(p.parts.map(x => x.provides));
+      for(const prov of provs){ prov.forEach(x => gives.add(x)); if(prov.length){ withProv++; if(prov.every(x => provided.has(x))) done++; } }
       if(withProv && done === withProv) continue;                         // всё уже есть в коде — не предлагаем
       const need = unmet.filter(n => gives.has(n)).slice(0, 3);
       if(need.length){ score += W.unmet * need.length; why.push('не хватает: ' + need.join(', ')); }

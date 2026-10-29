@@ -20,32 +20,32 @@
       "options": [
         {
           "label": "Что поле не пустое",
-          "kind": "piece",
-          "ref": "Проверить поле формы перед отправкой: Что поле не пустое",
-          "id": "проверить-поле-формы-перед-отправкой-что-mvt1bs2q",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const isFilled = value => value.trim().length > 0;",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Что это похоже на e-mail",
-          "kind": "piece",
-          "ref": "Проверить поле формы перед отправкой: Что это похоже на e-mail",
-          "id": "проверить-поле-формы-перед-отправкой-что-mvt1bu45",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Простая проверка формы, а не гарантия, что адрес существует.",
-          "code": "",
-          "lang": "",
+          "code": "const isEmail = value => /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value);",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Что пароль достаточно длинный",
-          "kind": "piece",
-          "ref": "Проверить поле формы перед отправкой: Что пароль достаточно длинный",
-          "id": "проверить-поле-формы-перед-отправкой-что-mvt1bw66",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const isStrongPassword = value => value.length >= 8;",
+          "lang": "js",
           "steps": []
         },
         {
@@ -104,32 +104,32 @@
       "options": [
         {
           "label": "При отправке формы",
-          "kind": "piece",
-          "ref": "Проверить поле формы перед отправкой: При отправке формы",
-          "id": "проверить-поле-формы-перед-отправкой-при-mvt1by8i",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "form.addEventListener('submit', event => {\n  if (!isEmail(form.elements.email.value)) {\n    event.preventDefault();\n  }\n});",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Пока человек вводит",
-          "kind": "piece",
-          "ref": "Проверить поле формы перед отправкой: Пока человек вводит",
-          "id": "проверить-поле-формы-перед-отправкой-пок-mvt1c0a4",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "form.elements.email.addEventListener('input', event => {\n  const ok = isEmail(event.target.value);\n  event.target.classList.toggle('invalid', !ok);\n});",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Когда поле потеряло фокус",
-          "kind": "piece",
-          "ref": "Проверить поле формы перед отправкой: Когда поле потеряло фокус",
-          "id": "проверить-поле-формы-перед-отправкой-ког-mvt1c2bf",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "form.elements.email.addEventListener('blur', event => {\n  event.target.classList.toggle('invalid', !isEmail(event.target.value));\n});",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -141,32 +141,32 @@
       "options": [
         {
           "label": "Текстом рядом с полем",
-          "kind": "piece",
-          "ref": "Проверить поле формы перед отправкой: Текстом рядом с полем",
-          "id": "проверить-поле-формы-перед-отправкой-тек-mvt1c4ea",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const error = document.querySelector('#email-error');\nerror.textContent = 'Введите правильный e-mail';",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Стандартной подсказкой браузера",
-          "kind": "piece",
-          "ref": "Проверить поле формы перед отправкой: Стандартной подсказкой браузера",
-          "id": "проверить-поле-формы-перед-отправкой-ста-mvt1c6g0",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "form.elements.email.setCustomValidity('Введите правильный e-mail');\nform.reportValidity();",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Подсветить поле красной рамкой",
-          "kind": "piece",
-          "ref": "Проверить поле формы перед отправкой: Подсветить поле красной рамкой",
-          "id": "проверить-поле-формы-перед-отправкой-под-mvt1c8hw",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "form.elements.email.classList.add('invalid');",
+          "lang": "js",
           "steps": []
         }
       ]

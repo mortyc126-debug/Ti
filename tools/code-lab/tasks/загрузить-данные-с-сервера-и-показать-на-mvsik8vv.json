@@ -36,22 +36,22 @@
       "options": [
         {
           "label": "Свой адрес",
-          "kind": "piece",
-          "ref": "Загрузить данные с сервера и показать на странице: Свой адрес",
-          "id": "загрузить-данные-с-сервера-и-показать-на-mvsikcgp",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const response = await fetch('/api/items');",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Адрес с параметрами поиска",
-          "kind": "piece",
-          "ref": "Загрузить данные с сервера и показать на странице: Адрес с параметрами поиска",
-          "id": "загрузить-данные-с-сервера-и-показать-на-mvsikcw1",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const params = new URLSearchParams({ q: 'книги', page: 1 });\nconst response = await fetch(`/api/items?${params}`);",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -63,22 +63,22 @@
       "options": [
         {
           "label": "Прервать и показать сообщение",
-          "kind": "piece",
-          "ref": "Загрузить данные с сервера и показать на странице: Прервать и показать сообщение",
-          "id": "загрузить-данные-с-сервера-и-показать-на-mvsikdbx",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "if (!response.ok) {\n  throw new Error(`Сервер ответил ${response.status}`);\n}",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Вернуть пустой список",
-          "kind": "piece",
-          "ref": "Загрузить данные с сервера и показать на странице: Вернуть пустой список",
-          "id": "загрузить-данные-с-сервера-и-показать-на-mvsikds0",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "if (!response.ok) return [];",
+          "lang": "js",
           "steps": []
         },
         {
@@ -100,12 +100,12 @@
       "options": [
         {
           "label": "Разобрать ответ",
-          "kind": "piece",
-          "ref": "Загрузить данные с сервера и показать на странице: Разобрать ответ",
-          "id": "загрузить-данные-с-сервера-и-показать-на-mvsike7t",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const items = await response.json();",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -117,22 +117,22 @@
       "options": [
         {
           "label": "Собрать из массива HTML-строку",
-          "kind": "piece",
-          "ref": "Загрузить данные с сервера и показать на странице: Собрать из массива HTML-строк",
-          "id": "загрузить-данные-с-сервера-и-показать-на-mvsikenl",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Быстро, но не подставляй сюда чужой текст без экранирования.",
-          "code": "",
-          "lang": "",
+          "code": "const list = document.querySelector('#list');\nlist.innerHTML = items.map(item => `<li>${item.title}</li>`).join('');",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Создавать элементы по одному",
-          "kind": "piece",
-          "ref": "Загрузить данные с сервера и показать на странице: Создавать элементы по одному",
-          "id": "загрузить-данные-с-сервера-и-показать-на-mvsikf3c",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Безопасно: textContent не исполняет HTML.",
-          "code": "",
-          "lang": "",
+          "code": "const list = document.querySelector('#list');\nfor (const item of items) {\n  const li = document.createElement('li');\n  li.textContent = item.title;\n  list.append(li);\n}",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -144,12 +144,12 @@
       "options": [
         {
           "label": "да",
-          "kind": "piece",
-          "ref": "Загрузить данные с сервера и показать на странице: да",
-          "id": "загрузить-данные-с-сервера-и-показать-на-mvsikfjc",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const status = document.querySelector('#status');\nstatus.textContent = 'Загрузка…';",
+          "lang": "js",
           "steps": [
             {
               "q": "Когда убрать надпись?",
@@ -168,12 +168,12 @@
                 },
                 {
                   "label": "Только при успехе",
-                  "kind": "piece",
-                  "ref": "Загрузить данные с сервера и показать на странице: Только при успехе",
-                  "id": "загрузить-данные-с-сервера-и-показать-на-mvsikfza",
+                  "kind": "code",
+                  "ref": "",
+                  "id": "",
                   "note": "",
-                  "code": "",
-                  "lang": "",
+                  "code": "status.textContent = '';",
+                  "lang": "js",
                   "steps": []
                 }
               ]

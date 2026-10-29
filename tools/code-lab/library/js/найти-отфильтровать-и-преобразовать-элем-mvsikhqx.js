@@ -1,1 +1,0 @@
-const hasAdmin = users.some(user => user.role === 'admin');

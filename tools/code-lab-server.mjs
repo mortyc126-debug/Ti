@@ -413,7 +413,7 @@ async function searchBoost(){
   try { for(const v of Object.values(await loadExamples())) if(v && v.id) set.add(v.id); } catch(_){}
   _boost = set; _boostAt = Date.now(); return set;
 }
-const taskRanker = createTaskRanker({ entries: () => store.entries() });   // полоска «🧭 пригодится»
+const taskRanker = createTaskRanker({ entries: () => store.entries(), contract: codeContract, contractLangs: _CONTRACT_LANGS });   // полоска «🧭 пригодится»
 // задачи ссылаются на куски; вариант «свой код» становится куском (повтор по коду не плодится)
 const tasks = createTaskStore({ root: TASKS, rows: () => store.rows(), slug: s => slug(s),
   // кандидаты для ненайденной ссылки «кусок: …» — обычный поиск, свой язык первым
@@ -432,14 +432,7 @@ const tasks = createTaskStore({ root: TASKS, rows: () => store.rows(), slug: s =
     const out = []; for(const x of scored.concat(hits.filter(x => x.lang === lang), hits)) if(!out.includes(x)) out.push(x);
     return out;
   },
-  createPiece: async ({ title, lang, code, group, desc }) => {
-    const dup = await findByCode(code);
-    if(dup){ const t = await store.get(dup); return { id: dup, title: (t && t.title) || title, created: false }; }
-    const obj = { id: slug(title || lang), lang, group: String(group || 'Задачи').slice(0, 60), title, desc: String(desc || '').slice(0, 400), lines: tokenize(code, lang), output: '' };
-    if(_CONTRACT_LANGS.has(lang)){ const c = codeContract(code, lang); obj.component = { provides: c.provides, requires: c.requires }; }
-    const r = await store.save(obj, { origin: 'imported' });
-    return { id: r.id, title, created: true };
-  } });
+});
 // найти уже существующий кусок с таким же названием и кодом (для дедупа при добавлении) → id или null
 // нормализуем переводы строк (\r\n → \n), иначе «тот же» код из Windows-файла считается другим → дубли
 const _normCode = store.normCode;

@@ -1,1 +1,0 @@
-const updated = { ...original, tags: [...original.tags, 'новый'] };

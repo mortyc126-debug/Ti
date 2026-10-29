@@ -19,22 +19,22 @@
       "options": [
         {
           "label": "Простую строку или число",
-          "kind": "piece",
-          "ref": "Сохранить данные в браузере (localStorage): Простую строку или число",
-          "id": "сохранить-данные-в-браузере-localstorage-mvsikimq",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Тема, язык, имя пользователя.",
-          "code": "",
-          "lang": "",
+          "code": "localStorage.setItem('theme', 'dark');",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Объект или массив",
-          "kind": "piece",
-          "ref": "Сохранить данные в браузере (localStorage): Объект или массив",
-          "id": "сохранить-данные-в-браузере-localstorage-mvsikj2l",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "localStorage хранит только строки, поэтому объект превращаем в JSON.",
-          "code": "",
-          "lang": "",
+          "code": "const settings = { theme: 'dark', fontSize: 16 };\nlocalStorage.setItem('settings', JSON.stringify(settings));",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -46,12 +46,12 @@
       "options": [
         {
           "label": "Строку",
-          "kind": "piece",
-          "ref": "Сохранить данные в браузере (localStorage): Строку",
-          "id": "сохранить-данные-в-браузере-localstorage-mvsikji4",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const theme = localStorage.getItem('theme');",
+          "lang": "js",
           "steps": [
             {
               "q": "Что, если там пусто?",
@@ -84,12 +84,12 @@
         },
         {
           "label": "Объект",
-          "kind": "piece",
-          "ref": "Сохранить данные в браузере (localStorage): Объект",
-          "id": "сохранить-данные-в-браузере-localstorage-mvsikjy2",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Если значения нет, getItem вернёт null, и JSON.parse упадёт без проверки.",
-          "code": "",
-          "lang": "",
+          "code": "const raw = localStorage.getItem('settings');\nconst settings = raw ? JSON.parse(raw) : { theme: 'light', fontSize: 14 };",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -101,12 +101,12 @@
       "options": [
         {
           "label": "да",
-          "kind": "piece",
-          "ref": "Сохранить данные в браузере (localStorage): да",
-          "id": "сохранить-данные-в-браузере-localstorage-mvsikkdk",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "let settings;\ntry {\n  settings = JSON.parse(localStorage.getItem('settings'));\n} catch {\n  settings = null;\n}",
+          "lang": "js",
           "steps": []
         },
         {
@@ -128,22 +128,22 @@
       "options": [
         {
           "label": "Одно значение",
-          "kind": "piece",
-          "ref": "Сохранить данные в браузере (localStorage): Одно значение",
-          "id": "сохранить-данные-в-браузере-localstorage-mvsikkt9",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "localStorage.removeItem('theme');",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Всё сразу",
-          "kind": "piece",
-          "ref": "Сохранить данные в браузере (localStorage): Всё сразу",
-          "id": "сохранить-данные-в-браузере-localstorage-mvsikl8z",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "localStorage.clear();",
+          "lang": "js",
           "steps": []
         },
         {

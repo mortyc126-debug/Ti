@@ -1,1 +1,0 @@
-const theme = localStorage.getItem('theme');

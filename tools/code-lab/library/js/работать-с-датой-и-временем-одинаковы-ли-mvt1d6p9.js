@@ -1,1 +1,0 @@
-const isSame = dateA.getTime() === dateB.getTime();

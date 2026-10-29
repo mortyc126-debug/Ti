@@ -18,22 +18,22 @@
       "options": [
         {
           "label": "Все поля сразу",
-          "kind": "piece",
-          "ref": "Отправить форму без перезагрузки страницы: Все поля сразу",
-          "id": "отправить-форму-без-перезагрузки-страниц-mvsik9cm",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Когда у полей есть атрибут name и не хочется читать их по одному.",
-          "code": "",
-          "lang": "",
+          "code": "const form = document.querySelector('form');\nconst data = new FormData(form);",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Только некоторые поля",
-          "kind": "piece",
-          "ref": "Отправить форму без перезагрузки страницы: Только некоторые поля",
-          "id": "отправить-форму-без-перезагрузки-страниц-mvsik9su",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Когда нужно взять два-три значения и проверить их.",
-          "code": "",
-          "lang": "",
+          "code": "const form = document.querySelector('form');\nconst data = new FormData();\ndata.append('email', form.elements.email.value);\ndata.append('name', form.elements.name.value);",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -62,22 +62,22 @@
       "options": [
         {
           "label": "Как форму (multipart)",
-          "kind": "piece",
-          "ref": "Отправить форму без перезагрузки страницы: Как форму (multipart)",
-          "id": "отправить-форму-без-перезагрузки-страниц-mvsika97",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Когда в форме есть файлы или сервер принимает обычную форму.",
-          "code": "",
-          "lang": "",
+          "code": "const response = await fetch(form.action, { method: 'POST', body: data });",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Как JSON",
-          "kind": "piece",
-          "ref": "Отправить форму без перезагрузки страницы: Как JSON",
-          "id": "отправить-форму-без-перезагрузки-страниц-mvsikap1",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Когда сервер — API и ждёт JSON.",
-          "code": "",
-          "lang": "",
+          "code": "const response = await fetch(form.action, {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify(Object.fromEntries(data)),\n});",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -89,12 +89,12 @@
       "options": [
         {
           "label": "Показать сообщение",
-          "kind": "piece",
-          "ref": "Отправить форму без перезагрузки страницы: Показать сообщение",
-          "id": "отправить-форму-без-перезагрузки-страниц-mvsikb52",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "if (!response.ok) {\n  document.querySelector('#error').textContent = 'Не удалось отправить форму';\n  return;\n}",
+          "lang": "js",
           "steps": []
         },
         {
@@ -126,12 +126,12 @@
       "options": [
         {
           "label": "да",
-          "kind": "piece",
-          "ref": "Отправить форму без перезагрузки страницы: да",
-          "id": "отправить-форму-без-перезагрузки-страниц-mvsikbko",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const button = form.querySelector('button');\nbutton.disabled = true;",
+          "lang": "js",
           "steps": [
             {
               "q": "Когда включить кнопку обратно?",
@@ -150,12 +150,12 @@
                 },
                 {
                   "label": "Только при ошибке",
-                  "kind": "piece",
-                  "ref": "Отправить форму без перезагрузки страницы: Только при ошибке",
-                  "id": "отправить-форму-без-перезагрузки-страниц-mvsikc0c",
+                  "kind": "code",
+                  "ref": "",
+                  "id": "",
                   "note": "",
-                  "code": "",
-                  "lang": "",
+                  "code": "if (!response.ok) button.disabled = false;",
+                  "lang": "js",
                   "steps": []
                 }
               ]

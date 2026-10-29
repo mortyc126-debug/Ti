@@ -1,1 +1,0 @@
-const date = new Date('2025-03-15');

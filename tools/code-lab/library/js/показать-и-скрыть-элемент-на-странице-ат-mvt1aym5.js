@@ -1,1 +1,0 @@
-const toggle = () => { box.hidden = !box.hidden; };

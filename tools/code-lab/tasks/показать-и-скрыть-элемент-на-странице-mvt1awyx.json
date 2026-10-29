@@ -20,22 +20,22 @@
       "options": [
         {
           "label": "По id",
-          "kind": "piece",
-          "ref": "Показать и скрыть элемент на странице: По id",
-          "id": "показать-и-скрыть-элемент-на-странице-по-mvt1axe3",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Когда у элемента есть id, это самый короткий путь.",
-          "code": "",
-          "lang": "",
+          "code": "const box = document.getElementById('box');\nconst button = document.getElementById('toggle');",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "По селектору",
-          "kind": "piece",
-          "ref": "Показать и скрыть элемент на странице: По селектору",
-          "id": "показать-и-скрыть-элемент-на-странице-по-mvt1axt3",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Когда нужно найти по классу или сложному пути.",
-          "code": "",
-          "lang": "",
+          "code": "const box = document.querySelector('.box');\nconst button = document.querySelector('.toggle-button');",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -47,32 +47,32 @@
       "options": [
         {
           "label": "Классом в CSS",
-          "kind": "piece",
-          "ref": "Показать и скрыть элемент на странице: Классом в CSS",
-          "id": "показать-и-скрыть-элемент-на-странице-кл-mvt1ay7u",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Удобно, если в стилях уже есть класс вроде .hidden { display: none }.",
-          "code": "",
-          "lang": "",
+          "code": "const toggle = () => box.classList.toggle('hidden');",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Атрибутом hidden",
-          "kind": "piece",
-          "ref": "Показать и скрыть элемент на странице: Атрибутом hidden",
-          "id": "показать-и-скрыть-элемент-на-странице-ат-mvt1aym5",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Не нужен CSS: браузер сам скрывает элемент.",
-          "code": "",
-          "lang": "",
+          "code": "const toggle = () => { box.hidden = !box.hidden; };",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Стилем напрямую",
-          "kind": "piece",
-          "ref": "Показать и скрыть элемент на странице: Стилем напрямую",
-          "id": "показать-и-скрыть-элемент-на-странице-ст-mvt1az0x",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Когда класса нет и нужно быстро проверить идею.",
-          "code": "",
-          "lang": "",
+          "code": "const toggle = () => {\n  box.style.display = box.style.display === 'none' ? '' : 'none';\n};",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -84,12 +84,12 @@
       "options": [
         {
           "label": "Подписка на нажатие",
-          "kind": "piece",
-          "ref": "Показать и скрыть элемент на странице: Подписка на нажатие",
-          "id": "показать-и-скрыть-элемент-на-странице-по-mvt1azfy",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "button.addEventListener('click', toggle);",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -101,12 +101,12 @@
       "options": [
         {
           "label": "да",
-          "kind": "piece",
-          "ref": "Показать и скрыть элемент на странице: да",
-          "id": "показать-и-скрыть-элемент-на-странице-да-mvt1azuy",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Этот вариант работает, если прятали атрибутом hidden. Для класса проверяй box.classList.contains('hidden').",
-          "code": "",
-          "lang": "",
+          "code": "button.addEventListener('click', () => {\n  button.textContent = box.hidden ? 'Показать' : 'Скрыть';\n});",
+          "lang": "js",
           "steps": []
         },
         {
@@ -128,12 +128,12 @@
       "options": [
         {
           "label": "да",
-          "kind": "piece",
-          "ref": "Показать и скрыть элемент на странице: да",
-          "id": "показать-и-скрыть-элемент-на-странице-да-mvt1b09w",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "document.addEventListener('keydown', event => {\n  if (event.key === 'Escape') box.hidden = true;\n});",
+          "lang": "js",
           "steps": []
         },
         {

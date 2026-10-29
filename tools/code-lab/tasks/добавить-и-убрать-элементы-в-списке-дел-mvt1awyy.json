@@ -20,12 +20,12 @@
       "options": [
         {
           "label": "Только на странице",
-          "kind": "piece",
-          "ref": "Добавить и убрать элементы в списке дел: Только на странице",
-          "id": "добавить-и-убрать-элементы-в-списке-дел--mvt1b0pm",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Просто и быстро, но после перезагрузки всё пропадёт.",
-          "code": "",
-          "lang": "",
+          "code": "const todos = [];",
+          "lang": "js",
           "steps": []
         },
         {
@@ -47,12 +47,12 @@
       "options": [
         {
           "label": "Читаем текст из поля ввода",
-          "kind": "piece",
-          "ref": "Добавить и убрать элементы в списке дел: Читаем текст из поля ввода",
-          "id": "добавить-и-убрать-элементы-в-списке-дел--mvt1b3mj",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const input = document.querySelector('#todo-input');\nconst text = input.value.trim();",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -74,12 +74,12 @@
         },
         {
           "label": "Показать сообщение",
-          "kind": "piece",
-          "ref": "Добавить и убрать элементы в списке дел: Показать сообщение",
-          "id": "добавить-и-убрать-элементы-в-списке-дел--mvt1b41w",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "if (!text) {\n  document.querySelector('#error').textContent = 'Введите текст задачи';\n  return;\n}",
+          "lang": "js",
           "steps": []
         },
         {
@@ -101,22 +101,22 @@
       "options": [
         {
           "label": "Элементами по одному",
-          "kind": "piece",
-          "ref": "Добавить и убрать элементы в списке дел: Элементами по одному",
-          "id": "добавить-и-убрать-элементы-в-списке-дел--mvt1b6qb",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Безопасно: текст пользователя не станет разметкой.",
-          "code": "",
-          "lang": "",
+          "code": "const list = document.querySelector('#todo-list');\nconst li = document.createElement('li');\nli.textContent = text;\nlist.append(li);",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Через строку HTML",
-          "kind": "piece",
-          "ref": "Добавить и убрать элементы в списке дел: Через строку HTML",
-          "id": "добавить-и-убрать-элементы-в-списке-дел--mvt1b9w5",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Короче, но опасно, если текст приходит от пользователя.",
-          "code": "",
-          "lang": "",
+          "code": "list.insertAdjacentHTML('beforeend', `<li>${text}</li>`);",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -128,12 +128,12 @@
       "options": [
         {
           "label": "Очищаем поле после добавления",
-          "kind": "piece",
-          "ref": "Добавить и убрать элементы в списке дел: Очищаем поле после добавления",
-          "id": "добавить-и-убрать-элементы-в-списке-дел--mvt1bfvh",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "input.value = '';\ninput.focus();",
+          "lang": "js",
           "steps": []
         }
       ]
@@ -145,22 +145,22 @@
       "options": [
         {
           "label": "Один обработчик на весь список",
-          "kind": "piece",
-          "ref": "Добавить и убрать элементы в списке дел: Один обработчик на весь список",
-          "id": "добавить-и-убрать-элементы-в-списке-дел--mvt1bhw1",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "Работает и для пунктов, которые появятся позже.",
-          "code": "",
-          "lang": "",
+          "code": "list.addEventListener('click', event => {\n  if (event.target.matches('.delete')) {\n    event.target.closest('li').remove();\n  }\n});",
+          "lang": "js",
           "steps": []
         },
         {
           "label": "Отдельный обработчик на каждую кнопку",
-          "kind": "piece",
-          "ref": "Добавить и убрать элементы в списке дел: Отдельный обработчик на каждую кнопку",
-          "id": "добавить-и-убрать-элементы-в-списке-дел--mvt1bjxs",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "const button = document.createElement('button');\nbutton.textContent = '×';\nbutton.addEventListener('click', () => li.remove());\nli.append(button);",
+          "lang": "js",
           "steps": []
         },
         {
@@ -182,12 +182,12 @@
       "options": [
         {
           "label": "да",
-          "kind": "piece",
-          "ref": "Добавить и убрать элементы в списке дел: да",
-          "id": "добавить-и-убрать-элементы-в-списке-дел--mvt1blwa",
+          "kind": "code",
+          "ref": "",
+          "id": "",
           "note": "",
-          "code": "",
-          "lang": "",
+          "code": "li.addEventListener('click', () => li.classList.toggle('done'));",
+          "lang": "js",
           "steps": [
             {
               "q": "Как показать выполненные?",
@@ -196,22 +196,22 @@
               "options": [
                 {
                   "label": "Зачёркнутым текстом через CSS-класс",
-                  "kind": "piece",
-                  "ref": "Добавить и убрать элементы в списке дел: Зачёркнутым текстом через CSS-класс",
-                  "id": "добавить-и-убрать-элементы-в-списке-дел--mvt1bnxb",
+                  "kind": "code",
+                  "ref": "",
+                  "id": "",
                   "note": "",
-                  "code": "",
-                  "lang": "",
+                  "code": "li.style.textDecoration = li.classList.contains('done') ? 'line-through' : '';",
+                  "lang": "js",
                   "steps": []
                 },
                 {
                   "label": "Перенести в отдельный список",
-                  "kind": "piece",
-                  "ref": "Добавить и убрать элементы в списке дел: Перенести в отдельный список",
-                  "id": "добавить-и-убрать-элементы-в-списке-дел--mvt1bpyc",
+                  "kind": "code",
+                  "ref": "",
+                  "id": "",
                   "note": "",
-                  "code": "",
-                  "lang": "",
+                  "code": "document.querySelector('#done-list').append(li);",
+                  "lang": "js",
                   "steps": []
                 }
               ]

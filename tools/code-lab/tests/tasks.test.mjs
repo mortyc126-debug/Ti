@@ -63,23 +63,21 @@ test('формат: терпит варианты без отступа и не�
   assert.equal(tasks[1].steps[0].options[0].code, 'print(1)');
 });
 
-test('хранилище: ссылки на куски и задачи привязываются, «код» становится куском, повторный импорт не плодит двойники', async () => {
+test('хранилище: ссылки на куски и задачи привязываются, «код» остаётся в задаче, повторный импорт не плодит двойники', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tasks-'));
   const rows = [{ id: 'el-1', title: 'Найти элемент', lang: 'js', comp: { provides: ['el'], requires: [] } },
                 { id: 'click-1', title: 'Клик', lang: 'js', comp: { provides: [], requires: ['btn'] } }];
-  let n = 0; const created = [];
-  const store = createTaskStore({ root, rows: async () => rows, slug: s => s.replace(/\s+/g, '-') + '-' + (++n),
-    createPiece: async p => { const id = 'new-' + created.length; created.push(p); rows.push({ id, title: p.title, lang: p.lang, comp: { provides: ['btn'], requires: [] } }); return { id, title: p.title, created: true }; } });
+  let n = 0;
+  const store = createTaskStore({ root, rows: async () => rows, slug: s => s.replace(/\s+/g, '-') + '-' + (++n) });
   const text = SAMPLE + '\n=== Показать блок | js | Интерфейс\n? Как?\n  - классом -> кусок: нет такого';
   const dry = await store.importText(text, { dry: true });
-  assert.equal(dry.tasks.length, 2); assert.equal(created.length, 0, 'проверка ничего не создаёт');
+  assert.equal(dry.tasks.length, 2);
   const r = await store.importText(text);
-  assert.equal(created.length, 1);
-  assert.equal(created[0].code.includes('getElementById'), true);
+  assert.equal(rows.length, 2, 'библиотека не пополняется кодом вариантов');
   const list = await store.list(); assert.equal(list.length, 2);
   const main = await store.get(list.find(t => t.title === 'Реагировать на клик').id);
   const o = main.steps[0].options;
-  assert.equal(o[0].id, 'el-1'); assert.equal(o[1].kind, 'piece'); assert.equal(o[1].id, 'new-0');
+  assert.equal(o[0].id, 'el-1'); assert.equal(o[1].kind, 'code'); assert.ok(o[1].code.includes('getElementById'));
   assert.equal(o[2].steps[0].options[0].id, list.find(t => t.title === 'Показать блок').id, 'ссылка на задачу из той же пачки');
   assert.equal(main.steps[1].options[0].id, 'click-1', 'ссылка id:…');
   assert.deepEqual(r.tasks.find(t => t.title === 'Показать блок').report.unresolved.map(u => u.ref), ['нет такого']);

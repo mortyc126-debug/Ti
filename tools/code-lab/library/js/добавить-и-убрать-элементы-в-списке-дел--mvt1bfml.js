@@ -1,2 +1,0 @@
-input.value = '';
-input.focus();
