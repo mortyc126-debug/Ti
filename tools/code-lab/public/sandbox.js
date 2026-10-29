@@ -164,13 +164,15 @@
   function buildDoc(){
     const html = files.filter(f => f.lang === 'html').map(f => f.code).join('\n');
     const css = files.filter(f => f.lang === 'css').map(f => f.code).join('\n');
-    const js = files.filter(f => f.lang === 'js' || f.lang === 'ts').map(f => f.code).join('\n;\n');
+    // каждый JS-файл — своим скриптом с меткой: по ней находим, с какой строки документа он начинается,
+    // и ошибку «строка 57 документа» переводим в «app.js, строка 4» (docMap, см. ниже)
+    const jsFiles = files.filter(f => f.lang === 'js' || f.lang === 'ts');
     const cap = '<scr' + 'ipt>(function(){function s(t,a){try{parent.postMessage({__sb:1,t:t,m:a},"*")}catch(e){}}' +
       '["log","error","warn","info"].forEach(function(k){var o=console[k]?console[k].bind(console):function(){};console[k]=function(){o.apply(null,arguments);s(k,Array.prototype.map.call(arguments,function(x){try{return typeof x==="object"?JSON.stringify(x):String(x)}catch(e){return String(x)}}).join(" "))}});' +
-      'window.addEventListener("error",function(e){s("error",e.message+(e.lineno?" (строка "+e.lineno+")":""))});' +
+      'window.addEventListener("error",function(e){try{parent.postMessage({__sb:1,t:"error",m:e.message,line:e.lineno||0,col:e.colno||0},"*")}catch(x){}});' +
       'window.addEventListener("unhandledrejection",function(e){s("error","Promise: "+(e.reason&&e.reason.message||e.reason))});})();<\/scr' + 'ipt>';
     const style = css ? '<style>\n' + css + '\n</style>' : '';
-    const script = js ? '<scr' + 'ipt>\n' + js + '\n<\/scr' + 'ipt>' : '';
+    const script = jsFiles.map(f => '<scr' + 'ipt>/*sbf:' + f.id + '*/\n' + f.code + '\n<\/scr' + 'ipt>').join('\n');
     if(/<html[\s>]/i.test(html)){
       // уже целый документ — дописываем стиль в <head>, скрипт и захват консоли перед </body>
       let doc = html.replace(/<\/head>/i, style + '</head>');
@@ -183,20 +185,34 @@
   }
 
   let t = null;
+  let docMap = [];   // [{id, start}] — строка документа (с 1), с которой начинается код файла
   function renderPreview(){
-    frame.srcdoc = buildDoc();
+    const doc = buildDoc(); docMap = [];
+    for(const f of files){ const i = doc.indexOf('/*sbf:' + f.id + '*/'); if(i >= 0) docMap.push({ id: f.id, start: doc.slice(0, i).split('\n').length + 1 }); }
+    window.dispatchEvent(new CustomEvent('codelab-run-start'));
+    frame.srcdoc = doc;
+  }
+  // строка документа → файл и строка в нём (с 0)
+  function whereIs(line){
+    let best = null; for(const m of docMap) if(line >= m.start && (!best || m.start > best.start)) best = m;
+    if(!best) return null; const f = files.find(x => x.id === best.id); if(!f) return null;
+    const ln = line - best.start; return ln < f.code.split('\n').length ? { id: f.id, name: f.name, line: ln } : null;
   }
   function schedulePreview(){ if(!live) return; clearTimeout(t); t = setTimeout(renderPreview, 350); }
 
   window.addEventListener('message', e => {
     const d = e.data; if(!d || !d.__sb) return;
     const mark = d.t === 'error' ? 'ошибка:' : d.t === 'warn' ? 'внимание:' : '·';
-    conEl.textContent += mark + ' ' + d.m + '\n';
+    const at = d.t === 'error' && d.line ? whereIs(d.line) : null;
+    conEl.textContent += mark + ' ' + d.m + (at ? ' (' + at.name + ', строка ' + (at.line + 1) + ')' : d.line ? ' (строка ' + d.line + ')' : '') + '\n';
+    // где именно — подсветка в редакторе (code-marks.js)
+    if(at) window.dispatchEvent(new CustomEvent('codelab-error', { detail: { id: at.id, line: at.line, col: Math.max(0, (d.col || 1) - 1), msg: d.m } }));
     conEl.scrollTop = conEl.scrollHeight;
   });
 
   // ── запуск одного файла на сервере (python и пр.) ──
   async function runServer(f){
+    window.dispatchEvent(new CustomEvent('codelab-run-start'));
     conEl.textContent += 'запуск: ' + f.name + ' (' + langName(f.lang) + ')…\n';
     conEl.scrollTop = conEl.scrollHeight;
     let r;
@@ -206,6 +222,9 @@
     else {
       if(r.stdout) conEl.textContent += r.stdout + (r.stdout.endsWith('\n') ? '' : '\n');
       if(r.stderr) conEl.textContent += '' + r.stderr + (r.stderr.endsWith('\n') ? '' : '\n');
+      // Python и др.: строка ошибки — последняя «line N» в трейсбэке; сообщение — последняя строка
+      if(r.stderr){ const ls = [...String(r.stderr).matchAll(/line (\d+)/g)]; const last = String(r.stderr).trim().split('\n').pop();
+        if(ls.length) window.dispatchEvent(new CustomEvent('codelab-error', { detail: { id: f.id, line: +ls[ls.length - 1][1] - 1, col: -1, msg: last } })); }
       if(r.timedOut) conEl.textContent += 'превышено время (10с)\n';
       if(!r.stdout && !r.stderr) conEl.textContent += '(без вывода, код выхода ' + r.code + ')\n';
     }
@@ -458,7 +477,7 @@
   };
 
   // ── редактор CodeMirror поверх прежнего поля (если CodeMirror установлен; иначе всё как раньше) ──
-  const CM_ADDONS = ['fold/xml-fold', 'edit/closetag', 'edit/closebrackets', 'comment/comment', 'selection/active-line', 'hint/show-hint', 'hint/anyword-hint'];
+  const CM_ADDONS = ['fold/xml-fold', 'edit/closetag', 'edit/closebrackets', 'edit/matchbrackets', 'search/match-highlighter', 'comment/comment', 'selection/active-line', 'hint/show-hint', 'hint/anyword-hint'];
   let cmReady = null;
   function loadCM(){
     if(cmReady) return cmReady;
@@ -476,6 +495,8 @@
     const any = window.CodeMirror && window.CodeMirror.hint && window.CodeMirror.hint.anyword;
     return {
       autoCloseBrackets: true, autoCloseTags: true, styleActiveLine: true,
+      // парная скобка у курсора и все такие же слова, как под курсором (без выделения — по слову)
+      matchBrackets: true, highlightSelectionMatches: { showToken: /[\wА-Яа-яЁё$]/, minChars: 2, delay: 120 },
       hintOptions: { hint: any, completeSingle: false },
       extraKeys: {
         Tab: c => { if(c.somethingSelected()) c.execCommand('indentMore'); else c.execCommand('insertSoftTab'); },
@@ -492,7 +513,10 @@
       '.sb-ed.cm-on .CodeMirror{position:absolute;top:0;right:0;bottom:0;left:0;height:auto;border:0;border-radius:0;background:var(--code-bg,#0E0720);font-size:12.5px}',
       '.sb-ed.cm-on .CodeMirror-scroll{min-height:0;max-height:none}',
       '.sb-ed.cm-on .CodeMirror-activeline-background{background:rgba(255,255,255,.04)}',
-      '.CodeMirror-hints{z-index:2147483002}'
+      '.CodeMirror-hints{z-index:2147483002}',
+      '.sb-ed.cm-on .cm-matchhighlight{background:rgba(61,217,255,.16);border-radius:2px}',
+      '.sb-ed.cm-on .CodeMirror-matchingbracket{color:#52F2C9!important;background:rgba(82,242,201,.18);outline:1px solid rgba(82,242,201,.5)}',
+      '.sb-ed.cm-on .CodeMirror-nonmatchingbracket{color:#ff5c7a!important;background:rgba(255,92,122,.2)}'
     ].join('\n');
     document.head.appendChild(st);
   }
