@@ -1,5 +1,6 @@
-// Задачи (деревья решений): текстовый формат, хранилище с привязкой ссылок, «что дальше», проверка скобок.
-// Запуск: node --test tools/code-lab/tests/tasks.test.mjs
+// название историческое: когда-то тут были только задачи. теперь — почти всё новое:
+// задачи, разделы, дерево вариантов, свои имена и опечатки, связи, раскладка, правила структуры.
+// запуск: node --test tools/code-lab/tests/tasks.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';

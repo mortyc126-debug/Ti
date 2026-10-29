@@ -1,12 +1,14 @@
-// Свои имена в файле: где объявлены, что внутри, и похожие на опечатку.
+// свои имена в файле: где объявлены, что в них лежит и не опечатка ли.
+//
 //   analyzeNames(code, lang, { dict, explain, globals }) → { names: {имя: {kind, text, line}}, typos: [{name, maybe, line, kind}] }
-// Опечатка имени — используется, но нигде не объявлено, а объявленное очень похоже (btnn → btn).
-// Опечатка метода — после точки стоит то, чего нет ни в словаре, ни в файле, но похоже на известное (addEventListner).
+//
+// опечатка имени — имя используется, но нигде не объявлено, а объявленное очень похоже (btnn → btn).
+// опечатка метода — после точки стоит то, чего нет ни в словаре, ни в файле, но похоже на известное (addEventListner).
 
 const KW = new Set(('break case catch class const continue debugger default delete do else export extends finally for function if import in instanceof let new return super switch this throw try typeof var void while with yield async await of static get set from as true false null undefined '
   + 'def elif except lambda pass raise with global nonlocal assert is not and or None True False print self cls').split(' '));
 
-// строки и комментарии гасим пробелами той же длины — позиции и номера строк сохраняются
+// строки и комментарии заменяем пробелами той же длины: так они не мешают, а позиции не съезжают
 function blank(code, lang){
   const hash = /^(python|bash|ruby|r|perl|powershell)$/.test(lang);
   return String(code || '').replace(hash ? /#[^\n]*|'''[\s\S]*?'''|"""[\s\S]*?"""|'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"/g

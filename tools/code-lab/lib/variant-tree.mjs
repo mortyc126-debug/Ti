@@ -1,8 +1,9 @@
-// Дерево вариантов: слово-смысл («отступ») → термины («margin» внешний, «padding» внутренний) →
-// их разновидности по имени (margin → margin-inline → margin-inline-start) → конструкции и куски-примеры.
-// Ничего не прописывается руками: всё выводится из синонимов, словаря и библиотеки.
-//   buildVariants({ q, lang, dict, rows, codeOf }) → { q, lang, roots:[node] }
-//   node = { term, lang, code, note, label, children:[node], piece? }
+// дерево вариантов для подсказок: смысл («отступ») → термины (margin — внешний, padding — внутренний)
+// → их разновидности по имени (margin → margin-inline → margin-inline-start) → конструкции и куски-примеры.
+// ничего не прописано вручную: всё берётся из синонимов, словаря и библиотеки.
+//
+//   buildVariants({ q, lang, dict, rows, synonyms, caseMap }) → { q, lang, roots: [узел] }
+//   узел = { term, lang, code, note, label, children: [узел], piece? }
 
 const MAX_ROOTS = 8, MAX_KIDS = 14;
 const HTML_TAGS = new Set('a abbr address article aside audio b blockquote body br button canvas caption code col datalist dd details dialog div dl dt em fieldset figure footer form h1 h2 h3 h4 h5 h6 head header hr html i iframe img input label legend li link main menu meta nav ol optgroup option output p picture pre progress script section select slot small source span strong style sub summary sup svg table tbody td template textarea tfoot th thead time title tr ul video'.split(' '));
@@ -77,7 +78,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     if(latin) for(const k of Object.keys(D)) if((k.startsWith(qn) || k.includes('.' + qn)) && !/[\s(=]/.test(k) && k !== qn && !roots.some(r => k.startsWith(r.term + '-'))) add(k, L, '', 8 - Math.min(3, k.length / 12));
   }
   if(/^[a-z]/.test(qn) && roots.some(r => r.score >= 5)) for(let i = roots.length - 1; i >= 0; i--) if(roots[i].score < 5) roots.splice(i, 1);
-  // корень, который сам — разновидность другого корня (margin-top при margin), уходит внутрь
+  // если корень — разновидность другого корня (margin-top при margin), прячем его внутрь
   const top = roots.filter(r => !roots.some(o => o !== r && o.lang === r.lang && r.term.startsWith(o.term + '-')))
     .sort((a, b) => b.score - a.score || a.term.length - b.term.length).slice(0, MAX_ROOTS);
 

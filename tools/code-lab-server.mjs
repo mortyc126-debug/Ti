@@ -1,14 +1,10 @@
-// Локальный сервер «Лаборатории кода» — отдельная от сайта штука, чтобы могла
-// расти без риска для основного приложения. Каждый шаблон — отдельный JSON-файл
-// в templates/. Добавлять можно прямо со страницы: вставил/загрузил код — он
-// раскрашивается и сохраняется новым файлом; клик по слову → вписываешь, что
-// оно значит, и это пишется в тот же файл. Ничего не пересобирается.
+// локальный сервер лаборатории. живёт отдельно от основного сайта, чтобы спокойно расти и ничего там не сломать.
+// только встроенные модули node, никаких зависимостей.
+// куски лежат в library/: код обычным файлом, рядом .meta.json с описанием.
+// /api/list отдаёт только описания, сам код — по запросу конкретного куска.
 //
-// stdlib node (http/fs/path), без зависимостей. Ленивость: /api/list отдаёт
-// только мету; полный шаблон — при выборе.
-//
-// Запуск:  node tools/code-lab-server.mjs            (порт 8788)
-// Открыть: http://localhost:8788/
+// запуск:  node tools/code-lab-server.mjs        (порт 8788)
+// открыть: http://localhost:8788/
 
 import http from 'node:http';
 import { promises as fs } from 'node:fs';
@@ -19,26 +15,27 @@ import { execFile } from 'node:child_process';
 import { annotateLines } from './code-lab/lib/annotate.mjs';
 import { createLibraryStore } from './code-lab/lib/library-store.mjs';
 import { createSearchService } from './code-lab/lib/search.mjs';
-import { tokenize } from './code-lab/lib/tokenizer.mjs';
+import { tokenize } from './code-lab/lib/tokenizer.mjs';   // токенайзер отдельно — его удобнее тестировать
 import { buildUsage, libraryFingerprint } from './code-lab/lib/dict-usage.mjs';   // dict-usage: связь «слово словаря ↔ куски»
 import { parseSnippets } from './code-lab/lib/ingest.mjs';
 import { createDescriptionQueue } from './code-lab/lib/describe-queue.mjs';
 import { createAiAssist } from './code-lab/lib/ai-assist.mjs';
 import { createProviderRuntime } from './code-lab/lib/ai-providers.mjs';
 import { handleWorkspace } from './code-lab/lib/workspace.mjs';
-import { createAiGenerate, LANGS as AI_LANGS } from './code-lab/lib/ai-generate.mjs';   // токенайзер вынесен в модуль — его тестируют отдельно
+import { createAiGenerate, LANGS as AI_LANGS } from './code-lab/lib/ai-generate.mjs';
 import { createVendor } from './code-lab/lib/vendor.mjs';
-import { createTaskStore, suggestNext, createTaskRanker } from './code-lab/lib/tasks.mjs';
-import { explainNames } from './code-lab/lib/contract-labels.mjs';
-import { buildVariants, caseMapFrom, recase } from './code-lab/lib/variant-tree.mjs';
-import { analyzeNames } from './code-lab/lib/code-names.mjs';
+import { createTaskStore, suggestNext, createTaskRanker } from './code-lab/lib/tasks.mjs';   // задачи (в интерфейсе выключены)
+import { explainNames } from './code-lab/lib/contract-labels.mjs';   // подписи «что лежит в имени»
+import { buildVariants, caseMapFrom, recase } from './code-lab/lib/variant-tree.mjs';   // подсказки: «отступ» → margin / padding → …
+import { analyzeNames } from './code-lab/lib/code-names.mjs';   // свои имена файла и опечатки
 import { createRequire } from 'node:module';
-const Links = createRequire(import.meta.url)('./code-lab/public/code-links.js');
-const Struct = createRequire(import.meta.url)('./code-lab/public/structure-rules.js');   // правила структуры — тот же разбор, что на странице   // связи «когда/если/…» — общий модуль со страницей   // свои имена файла: что внутри, где объявлены, опечатки   // дерево вариантов «смысл → термины → разновидности»   // подписи к именам «даёт/нужно»
-import { createSections, treeToText, treeFromText, suggestSections, placeInTree } from './code-lab/lib/sections.mjs';   // общее дерево разделов   // задачи: деревья решений поверх кусков   // управляемые обновления CodeMirror (по кнопке)
+// эти два файла общие со страницей: правила разбираются одним и тем же кодом и тут, и в браузере
+const Links = createRequire(import.meta.url)('./code-lab/public/code-links.js');   // связи: когда, если, откуда…
+const Struct = createRequire(import.meta.url)('./code-lab/public/structure-rules.js');   // правила структуры
+import { createSections, treeToText, treeFromText, suggestSections, placeInTree } from './code-lab/lib/sections.mjs';   // дерево разделов
 
-// сетевые/TLS-ошибки провайдеров ИИ (GigaChat и пр.) не должны ронять весь сервер —
-// логируем и продолжаем работать, чтобы Лаборатория оставалась доступной.
+// если у провайдера ии отвалилась сеть или сертификат (gigachat это умеет), сервер не должен падать целиком —
+// пишем в лог и живём дальше
 process.on('uncaughtException', e => { console.error('[code-lab] uncaughtException:', (e && e.stack) || e); });
 process.on('unhandledRejection', e => { console.error('[code-lab] unhandledRejection:', (e && e.stack) || e); });
 
@@ -54,7 +51,7 @@ const TASKS = path.join(ROOT, 'tasks');     // задачи: вопрос → в
 const PORT = Number(process.argv[2]) || 8788;
 // файловое хранилище библиотеки (код — обычные файлы; подсветка и пояснения строятся из текста при загрузке)
 const store = createLibraryStore({ root: LIBRARY, legacyDir: TEMPLATES, dictPath: path.join(PUBLIC, 'keyword-dict.json'), getDict: () => kwDict(), coverage: j => coverage(j), contract: (code, lang) => codeContract(code, lang) });
-// поиск: по названию, описанию, тегам, коду и пояснениям; синонимы лежат в library/_synonyms.json (правятся руками)
+// поиск: по названию, описанию, тегам, коду и пояснениям; синонимы лежат в library/_synonyms.json (это обычный файл, его можно править в любом редакторе)
 const search = createSearchService({ store, synonymsPath: path.join(LIBRARY, '_synonyms.json'), defaultSynonymsPath: path.join(ROOT, 'lib', 'default-synonyms.json') });
 const aiRuntime = createProviderRuntime({ configPath: path.join(ROOT, 'ai-config.json') });   // выбранный ИИ-сервис (ключей в файле нет)
 // настройки ИИ меняют только запросы со своей страницы: проверяем Host и Origin
@@ -118,9 +115,9 @@ const DICT_BASE = path.join(PUBLIC, 'keyword-dict.json');
 const DICT_DIR = path.join(PUBLIC, 'dict');
 const LANGS_DIR = path.join(DICT_DIR, 'langs');
 const EXAMPLES_FILE = path.join(DICT_DIR, 'examples.json');   // привязка «слово/конструкция → кусок-пример» {term:{id,title}}
-const SYN_FILE = path.join(DICT_DIR, 'synonyms.json');
-const REL_FILE = path.join(DICT_DIR, 'relations.json');
-const STRUCT_FILE = path.join(DICT_DIR, 'structure.json');     // правила структуры по языкам: {язык: [«li: внутри ul, ol», …]}        // правки связей «слово → когда/если/…»: {язык|*:{слово:связь}}; '' — «связи нет»        // синонимы для поиска по смыслу: {term:[фраза,…]} — найти, не помня имени
+const SYN_FILE = path.join(DICT_DIR, 'synonyms.json');   // синонимы: термин → фразы-смыслы, для поиска по смыслу
+const REL_FILE = path.join(DICT_DIR, 'relations.json');   // мои правки связей: {язык: {слово: связь}}
+const STRUCT_FILE = path.join(DICT_DIR, 'structure.json');   // правила структуры: {язык: [«li: внутри ul, ol», …]}
 // алиасы языка → канон: чтобы «javascript»/«py»/«c++» не плодили файл-двойник рядом с js/python/cpp
 const LANG_ALIAS = { javascript: 'js', typescript: 'ts', py: 'python', python3: 'python', shell: 'bash', sh: 'bash', zsh: 'bash', 'c++': 'cpp', cplusplus: 'cpp', cxx: 'cpp', 'c#': 'csharp', 'c-sharp': 'csharp', cs: 'csharp', golang: 'go', rb: 'ruby', kt: 'kotlin', rs: 'rust', jsx: 'js', tsx: 'ts', htm: 'html', yml: 'yaml' };
 const canonLang = v => { v = String(v || '').trim().toLowerCase(); return LANG_ALIAS[v] || v.replace(/[^a-z0-9_+-]/g, '') || 'other'; };
@@ -397,7 +394,7 @@ function coverage(j){
     check:   !!(v.check && (v.check.expected_result || v.check.how)) || (Array.isArray(c.verification) && c.verification.length > 0)
   };
 }
-// к «даёт/нужно» — подписи простыми словами (своя из meta.labels побеждает автоматическую); кэш до правок библиотеки/словаря
+// к «даёт/нужно» — подписи по-человечески (своя из meta.labels побеждает автоматическую); кэш до правок библиотеки/словаря
 let _lblCache = { v: -1, dict: null, map: new Map() };
 let _caseMap = { v: -1, map: null };   // регистр имён из библиотеки (queryselector → querySelector) для дерева вариантов
 async function labelsFor(entry, names){

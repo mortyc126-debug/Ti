@@ -1,4 +1,5 @@
-// Тесты поиска. Запуск: node tools/code-lab/tests/search.test.mjs
+// тесты поиска: что должно находиться и в каком порядке.
+// запуск: node tools/code-lab/tests/search.test.mjs
 import assert from 'node:assert/strict';
 import { stemRu, stemEn } from '../lib/ru-stem.mjs';
 import { buildIndex, terms } from '../lib/search.mjs';
