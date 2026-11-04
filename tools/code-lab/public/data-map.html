@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Карта данных — Лаборатория кода</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .data-map{max-width:1100px;padding:24px clamp(16px,3vw,34px);margin:0 auto}
+  .data-map h1{font-size:24px;margin:0 0 6px}
+  .map-lead{max-width:780px;color:var(--text2);line-height:1.6;margin:0 0 20px}
+  .map-section{margin:22px 0}
+  .map-section h2{font-size:17px;margin:0 0 9px}
+  .map-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+  .map-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:15px 16px}
+  .map-card h3{font-size:14px;margin:0 0 8px}
+  .map-flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:8px 0 12px;color:var(--text2);font-size:12px}
+  .map-flow a,.map-links a{color:var(--name);text-decoration:none;border:1px solid var(--border);border-radius:7px;padding:4px 7px;background:var(--bg)}
+  .map-flow a:hover,.map-links a:hover{border-color:var(--name);color:var(--text)}
+  .map-arrow{color:var(--acc)}
+  .map-card dl{display:grid;grid-template-columns:100px 1fr;gap:5px 10px;margin:0;font-size:12px;line-height:1.5}
+  .map-card dt{color:var(--text3)}.map-card dd{margin:0;color:var(--text2)}
+  .map-links{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+  .map-note{color:var(--text3);font-size:12px;line-height:1.55;margin:9px 0 0}
+  .map-steps{counter-reset:step;display:grid;gap:8px}
+  .map-step{counter-increment:step;display:grid;grid-template-columns:28px 1fr;gap:10px;padding:11px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;color:var(--text2);font-size:12.5px;line-height:1.55}
+  .map-step:before{content:counter(step);width:24px;height:24px;display:grid;place-items:center;border-radius:50%;background:var(--s2);color:var(--acc);font-family:ui-monospace,monospace}
+  .map-step b{color:var(--text)}
+  .map-foot{padding:12px 14px;border-left:3px solid var(--str);background:var(--bg2);border-radius:8px;color:var(--text2);font-size:12px;line-height:1.55}
+</style>
+</head>
+<body data-page="data-map">
+  <main class="data-map">
+    <h1>Карта данных</h1>
+    <p class="map-lead">Куда идти, если нужно понять, откуда берутся данные, чего не хватает, куда вставить готовый ответ и где он появится. Схемы ниже — навигация: нажми на любой шаг, чтобы перейти к месту работы.</p>
+
+    <section class="map-section">
+      <h2>Пополнить словарь пояснений</h2>
+      <article class="map-card">
+        <div class="map-flow">
+          <a href="/inventory.html?open=dict">Опись: словарь</a><span class="map-arrow">→</span>
+          <a href="/inventory.html?open=dict&amp;step=scan">найти непонятные слова</a><span class="map-arrow">→</span>
+          <a href="/inventory.html?open=dict&amp;step=paste">вставить ответ</a><span class="map-arrow">→</span>
+          <a href="/inventory.html?open=dict&amp;step=review">разобрать и проверить</a><span class="map-arrow">→</span>
+          <a href="/inventory.html?open=dict&amp;step=save">добавить</a>
+        </div>
+        <dl>
+          <dt>Что берём</dt><dd>Неизвестные слова из выбранного файла или кусков библиотеки выбранного языка.</dd>
+          <dt>Готовый ответ</dt><dd>Строки вида <code>слово: пояснение</code>. Вставь их во второе поле формы «Словарь пояснений».</dd>
+          <dt>Проверка</dt><dd>Нажми «Разобрать», просмотри предупреждения и ошибки, затем «Добавить».</dd>
+          <dt>Результат</dt><dd>Пояснения сохраняются в словарь языка и используются подсказками. Правка через форму обновляет кэш автоматически.</dd>
+        </dl>
+        <div class="map-links"><a href="/inventory.html?open=dict">Открыть форму словаря</a><a href="/inventory.html?open=dict&amp;step=scan">Сразу к сбору пробелов</a></div>
+        <p class="map-note">Если вставить перечень синонимов или русскую фразу в поле пояснений, форма покажет предупреждение и предложит правильное место.</p>
+      </article>
+    </section>
+
+    <section class="map-section">
+      <h2>Добавить правила структуры</h2>
+      <article class="map-card">
+        <div class="map-flow">
+          <a href="/inventory.html?open=structure">Опись: правила структуры</a><span class="map-arrow">→</span>
+          <a href="/inventory.html?open=structure&amp;step=missing">слова без правил</a><span class="map-arrow">→</span>
+          <a href="/inventory.html?open=structure&amp;step=paste">вставить правила</a><span class="map-arrow">→</span>
+          <a href="/inventory.html?open=structure&amp;step=review">разобрать</a><span class="map-arrow">→</span>
+          <a href="/inventory.html?open=structure&amp;step=save">добавить</a>
+        </div>
+        <dl>
+          <dt>Что берём</dt><dd>Слова выбранного языка из словаря, для которых ещё нет правил.</dd>
+          <dt>Готовый ответ</dt><dd>Строки вида <code>слово: правило</code>, например <code>img: обязательно src</code>.</dd>
+          <dt>Проверка</dt><dd>«Разобрать» показывает понятые правила и строки, которые не распознаны. «Добавить» дополняет правила; «Заменить все» перезаписывает правила выбранного языка.</dd>
+          <dt>Результат</dt><dd>Правила используются подсказками и проверками в редакторе. Изменения через форму подхватываются без перезапуска.</dd>
+        </dl>
+        <div class="map-links"><a href="/inventory.html?open=structure">Открыть правила структуры</a><a href="/inventory.html?open=structure&amp;step=missing">Показать слова без правил</a></div>
+      </article>
+    </section>
+
+    <section class="map-section">
+      <h2>Разобраться со связями</h2>
+      <div class="map-grid">
+        <article class="map-card">
+          <h3>Связи слов языка</h3>
+          <div class="map-flow"><a href="/inventory.html?open=word-relations">Опись: связи слов</a><span class="map-arrow">→</span><a href="/inventory.html?open=word-relations&amp;step=unclassified">неразобранные слова</a><span class="map-arrow">→</span><a href="/inventory.html?open=word-relations&amp;step=paste">вставить ответ</a></div>
+          <dl><dt>Что берём</dt><dd>Слова словаря выбранного языка, которым автоматическая классификация не назначила связь.</dd><dt>Формат</dt><dd><code>слово: связь</code>, например <code>fetch: откуда</code>.</dd><dt>После сохранения</dt><dd>Связи влияют на смысловые подписи в редакторе. Форма сообщает, что нужно обновить песочницу сочетанием Ctrl+F5.</dd></dl>
+          <div class="map-links"><a href="/inventory.html?open=word-relations">Настроить связи слов</a></div>
+        </article>
+        <article class="map-card">
+          <h3>Потоки между кусками приложения</h3>
+          <div class="map-flow"><a href="/inventory.html?open=piece-links">Опись: связи из текста</a><span class="map-arrow">→</span><a href="/inventory.html?open=piece-links&amp;step=source">вставить описание потока</a><span class="map-arrow">→</span><a href="/inventory.html?open=piece-links&amp;step=preview">проверить сопоставления</a><span class="map-arrow">→</span><a href="/inventory.html?open=piece-links&amp;step=save">сохранить схему</a></div>
+          <dl><dt>Что берём</dt><dd>Названия кусков и их поля «даёт / нужно» из Описи.</dd><dt>Формат</dt><dd>Текстовые связи или предложение по контрактам. Перед сохранением проверь, какие имена найдены, а какие станут незаполненными узлами.</dd><dt>После сохранения</dt><dd>Граф хранится как схема и показывается в Описи и Конструкторе.</dd></dl>
+          <div class="map-links"><a href="/inventory.html?open=piece-links">Импортировать связи между кусками</a><a href="/constructor.html">Открыть Конструктор</a></div>
+        </article>
+      </div>
+      <p class="map-note">«Связи слов» описывают роль слов вроде «когда» и «откуда». «Связи из текста» описывают отношения между кусками приложения. Это разные задачи.</p>
+    </section>
+
+    <section class="map-section">
+      <h2>Общий цикл для готового ответа</h2>
+      <div class="map-steps">
+        <div class="map-step"><div><b>Открой нужный маршрут на карте.</b> Он ведёт в форму и задаёт область работы: язык, раздел или тип данных.</div></div>
+        <div class="map-step"><div><b>Сначала получи список пробелов внутри формы.</b> Не проси ИИ описывать всё подряд: используй «без правил», «неразобранные» или «собрать неизвестные слова».</div></div>
+        <div class="map-step"><div><b>Скопируй сформированный промпт и отдай его ИИ.</b> Он уже содержит формат и список, который надо заполнить.</div></div>
+        <div class="map-step"><div><b>Вставь ответ в поле этой же формы.</b> Не в исходный JSON и не в другой раздел. На карте ссылка «вставить ответ» возвращает к нужному окну.</div></div>
+        <div class="map-step"><div><b>Разбери, проверь предварительный просмотр и только потом сохрани.</b> Нераспознанные строки не должны пропасть незамеченными.</div></div>
+        <div class="map-step"><div><b>Убедись, куда записалось.</b> Форма показывает количество добавленного и место хранения; если нужен GitHub, отдельно запусти синхронизацию в Библиотеке.</div></div>
+      </div>
+    </section>
+    <p class="map-foot">Ссылки на конкретные шаги используют адресные параметры. Если форма не откроется автоматически, откроется Опись; выбери указанную кнопку вручную. Существующие формы остаются источником истины для формата и записи данных.</p>
+  </main>
+  <script src="/shell.js"></script>
+  <script src="/data-map.js"></script>
+</body>
+</html>
