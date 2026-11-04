@@ -1,0 +1,12 @@
+{
+  "lang": "html",
+  "title": "Выпадающий список",
+  "group": "Вёрстка и стили / HTML-элементы",
+  "desc": "Создаёт выпадающий список с тремя вариантами.",
+  "code": "<label for=\"asset\">Инструмент</label>\n<select id=\"asset\" name=\"asset\">\n  <option value=\"stock\">Акция</option>\n  <option value=\"bond\">Облигация</option>\n  <option value=\"future\">Фьючерс</option>\n</select>",
+  "output": "Пользователь выбирает один вариант из списка.",
+  "words": {
+    "select": "Создаёт раскрывающийся список вариантов.",
+    "option": "Задаёт отдельный вариант выбора."
+  }
+}
