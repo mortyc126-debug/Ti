@@ -32,9 +32,9 @@ function positions(code,token){
 await walk(root);
 const set=new Set(files);
 const records=[],missingMeta=[],invalidMeta=[],duplicateIds=new Map(),rawHashes=new Map(),normalizedHashes=new Map();
-const noteStats={total:0,orphanTotal:0,swapped:0,invalid:0,anchored:0,uniqueToken:0,multipleTokens:0,composite:0,absent:0,empty:0};
-const noteCases=[];
-const extLang={js:'js',mjs:'js',cjs:'js',jsx:'js',ts:'ts',tsx:'ts',py:'python',html:'html',htm:'html',css:'css',svg:'svg',json:'json',sql:'sql',rb:'ruby',php:'php',go:'go',lua:'lua',sh:'bash',bash:'bash',ps1:'powershell',r:'r',pl:'perl',txt:'txt'};
+const noteStats={total:0,orphanTotal:0,concept:0,orphanAlreadyInWordNotes:0,swapped:0,invalid:0,anchored:0,uniqueToken:0,multipleTokens:0,composite:0,absent:0,empty:0};
+const noteCases=[],conceptNotes=[];
+const extLang={js:'js',mjs:'js',cjs:'js',jsx:'js',ts:'ts',tsx:'ts',py:'python',html:'html',htm:'html',css:'css',svg:'svg',json:'json',sql:'sql',rb:'ruby',php:'php',go:'go',lua:'lua',sh:'sh',bash:'bash',ps1:'powershell',r:'r',pl:'perl',txt:'txt'};
 for(const file of files){
   if(file.endsWith('.meta.json')||file.endsWith('.bak')||file.endsWith('.tmp')) continue;
   const ext=path.extname(file).slice(1).toLowerCase();
@@ -65,9 +65,9 @@ for(const file of files){
   const notes=Array.isArray(meta.wordNotes)?meta.wordNotes:[];
   const orphans=Array.isArray(meta.orphanNotes)?meta.orphanNotes:[];
   noteStats.total+=notes.length;noteStats.orphanTotal+=orphans.length;
-  function inspect(note,isOrphan){
+  const noteKey=n=>JSON.stringify([n?.text,n?.line,n?.col,n?.note,n?.kind,n?.source]);\n  const wordNoteKeys=new Set(notes.map(noteKey));\n  function inspect(note,isOrphan){
     if(!note||typeof note!=='object'||typeof note.text!=='string'){noteStats.invalid++;return;}
-    const swapped=tokenKinds.has(note.note)&&typeof note.kind==='string'&&!tokenKinds.has(note.kind);
+    if(note.kind==='concept'){noteStats.concept++;conceptNotes.push({file:rel,id,text:note.text,explanation:note.note||'',source:note.source||''});return;}\n    if(isOrphan&&wordNoteKeys.has(noteKey(note))) noteStats.orphanAlreadyInWordNotes++;\n    const swapped=tokenKinds.has(note.note)&&typeof note.kind==='string'&&!tokenKinds.has(note.kind);
     if(swapped) noteStats.swapped++;
     const explanation=swapped?note.kind:note.note;
     if(typeof explanation!=='string'||!explanation.trim()){noteStats.empty++;return;}
@@ -91,7 +91,7 @@ for(const file of files){
     file:rel,id,hasOwnId,lang,expectedLang:expected||null,langMismatch:!!(expected&&lang!==expected),
     group:meta.group||'',title:meta.title||'',emptyDesc:!String(meta.desc||'').trim(),
     status:meta.status||'',hasMeta:set.has(metaPath),metaError:invalidMeta.some(x=>x.file===path.relative(root,metaPath)),
-    notes:notes.length,orphans:orphans.length,rawHash:exact,normalizedHash:formatted
+    notes:notes.length,orphans:orphans.length,rawHash:exact,normalizedHash:formatted,\n    metaSummary:{title:meta.title||'',group:meta.group||'',desc:meta.desc||'',tags:meta.tags||[],aliases:meta.aliases||[],status:meta.status||'',component:meta.component||null}
   });
 }
 const groups=map=>[...map.values()].filter(v=>v.length>1).map(files=>({count:files.length,files}));
@@ -102,7 +102,7 @@ const report={
     duplicateIdGroups:[...duplicateIds.values()].filter(v=>v.length>1).length,
     emptyDesc:records.filter(x=>x.emptyDesc).length,langMismatch:records.filter(x=>x.langMismatch).length},
   duplicateIds:groups(duplicateIds),exactCodeDuplicates:groups(rawHashes),
-  formatNormalizedCandidates:groups(normalizedHashes),missingMeta,invalidMeta,records,notes:noteStats,noteCases
+  formatNormalizedCandidates:groups(normalizedHashes),duplicateReview,missingMeta,invalidMeta,records,notes:noteStats,noteCases,conceptNotes
 };
 await fs.writeFile(output,JSON.stringify(report,null,2)+'\n','utf8');
 console.log(JSON.stringify({
@@ -110,5 +110,5 @@ console.log(JSON.stringify({
   exactDuplicateGroups:report.exactCodeDuplicates.length,
   formatNormalizedCandidateGroups:report.formatNormalizedCandidates.length,
   noteStats:report.notes,
-  sampleAmbiguousNotes:report.noteCases.slice(0,30)
+  sampleAmbiguousNotes:report.noteCases.slice(0,30),conceptSamples:report.conceptNotes.slice(0,20)
 },null,2));
