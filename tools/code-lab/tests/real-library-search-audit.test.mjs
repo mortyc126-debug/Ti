@@ -63,10 +63,10 @@ async function main() {
     const shadowHits = [];
     for (const [index, hit] of shadow.hits.slice(0, 20).entries()) {
       const pieces = [];
-      for (const piece of (hit.pieces || []).slice(0, 3)) {
+      for (const [pieceIndex, piece] of (hit.pieces || []).slice(0, 3).entries()) {
         try {
           const full = await readTemplate(piece.id);
-          pieces.push({ ...full, legacyPosition: legacyPositions.get(piece.id) ?? null });
+          pieces.push({ ...full, shadowTargetPosition: index + 1, piecePositionWithinTarget: pieceIndex + 1, legacyPosition: legacyPositions.get(piece.id) ?? null });
         } catch (error) {
           pieces.push({ id: piece.id, title: piece.title, fetchError: String(error) });
         }
@@ -78,7 +78,10 @@ async function main() {
     }
     results.push({
       query, legacyTotal: legacy.total ?? legacyHits.length,
-      legacyTop10: legacyHits,
+      legacyTop10: await Promise.all(legacyHits.map(async hit => {
+        try { return { ...hit, fragment: await readTemplate(hit.id) }; }
+        catch (error) { return { ...hit, fetchError: String(error) }; }
+      })),
       shadowTotal: shadow.total ?? shadow.hits.length,
       shadowAmbiguous: shadow.ambiguous,
       shadowTop20: shadowHits,
@@ -93,6 +96,8 @@ async function main() {
     branch: 'audit/fixes-2026-11-06',
     commit: process.env.GITHUB_SHA || null,
     libraryMode: 'real repository checkout; no synthetic fixture',
+    shadowRanking: 'target-level; pieces inside each target are alphabetically ordered and do not have independent shadow scores',
+    comparisonNote: 'legacy positions are fragment ranks; shadow positions are target ranks, so they are not directly equivalent',
     queryCount: queries.length,
     phraseCount: (await get('/api/search/shadow?q=' + encodeURIComponent(queries[0]) + '&limit=1')).shadowPhraseCount,
     templateCount: templateCache.size,
