@@ -28,3 +28,14 @@ test('индекс находит составные конструкции по
   assert.ok(root);
   assert.ok(root.children.some(x => x.term === 'document.queryselector(selector)'));
 });
+
+test('составные имена с точкой сохраняют готовый вызов', () => {
+  const dict = { langs: { js: {
+    'object.keys(obj)': 'получить список ключей объекта'
+  } } };
+  const synonyms = { 'object.keys': ['получить ключи объекта'] };
+  const result = buildVariants({ q: 'получить ключи объекта', lang: 'js', dict, rows: [], synonyms });
+  const root = result.roots.find(x => x.term === 'object.keys');
+  assert.ok(root);
+  assert.equal(root.code, 'object.keys(obj)');
+});
