@@ -127,9 +127,10 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     const groups = [];
     if(continuations.size) groups.push({ group:true, label:'Варианты продолжения', note:'Что может следовать за конструкцией или входить в неё', lang:L,
       children:[...continuations.values()].map(item => {
-        const child = node(item.term, L, [...item.relations].join(' · '));
+        const after = item.relations.has('после');
+        const child = node(item.term, L, after ? 'после' : 'часть конструкции');
         const extra = item.notes.length ? [...new Set(item.notes)].join(' — ')
-          : [...item.relations].includes('после') ? 'Допустимо после: ' + term : 'Допустимая часть конструкции «' + term + '»';
+          : after ? 'Допустимо после: ' + term : 'Допустимая часть конструкции «' + term + '»';
         child.note = [child.note, extra].filter(Boolean).join(' — ');
         return child;
       }) });
