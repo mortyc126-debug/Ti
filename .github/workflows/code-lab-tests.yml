@@ -29,15 +29,22 @@ jobs:
       - name: Run Code Lab regression tests
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           shopt -s nullglob
           tests=(tools/code-lab/tests/*.test.mjs tools/code-lab/tests/*.test.js)
           if (( ${#tests[@]} == 0 )); then
             echo "::error::Тестовые файлы не найдены"
             exit 1
           fi
+          failed=0
           for test_file in "${tests[@]}"; do
             echo "::group::${test_file}"
-            node "${test_file}"
+            if node "${test_file}"; then
+              echo "PASS: ${test_file}"
+            else
+              echo "::error::FAIL: ${test_file}"
+              failed=1
+            fi
             echo "::endgroup::"
           done
+          exit "$failed"
