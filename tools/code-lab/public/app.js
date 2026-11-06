@@ -213,7 +213,7 @@ function render(tpl){
   del.onclick = async () => {
     if(!confirm(`Удалить шаблон «${tpl.title}»? Файл будет удалён.`)) return;
     const result = await fetch('/api/delete', { method: 'POST', body: JSON.stringify({ id: curId }) }).then(r => r.json()).catch(() => null);
-    if(!result || !result.ok){ const refs = (result && result.references || []).map(x => x.type + ': ' + (x.title || x.term || x.id)).join('\\n'); alert((result && result.error) || 'Не удалось удалить кусок.' + (refs ? '\\n' + refs : '')); return; }
+    if(!result || !result.ok){ const refs = (result && result.references || []).map(x => x.type + ': ' + (x.title || x.term || x.id)).join('\n'); const message = (result && result.error) || 'Не удалось удалить кусок.'; alert(message + (refs ? '\n' + refs : '')); return; }
     curId = null; curTpl = null; loadList();
   };
 }
