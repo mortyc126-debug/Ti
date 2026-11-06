@@ -55,7 +55,15 @@ test('библиотека: пары кода и паспортов, JSON и ID 
     if(ids.has(id)){ id=id+'~'+row.lang; let k=2; while(ids.has(id)) id=row.id+'~'+row.lang+k++; }
     ids.set(id,row.file);
   }
-  console.log('library-integrity:',JSON.stringify({languages:langs,codeCount,metaCount,effectiveIds:ids.size,missingIds:missingIds.length,folderLanguageMismatches:languageMismatches.length,duplicateCodeGroups:dupGroups.length,problems:problems.length,languageMismatchSamples:languageMismatches.slice(0,8),missingIdSamples:missingIds.slice(0,5)}));
+  const idGroups = new Map();
+  for(const row of rows){ if(!idGroups.has(row.id)) idGroups.set(row.id,[]); idGroups.get(row.id).push(row.file); }
+  const duplicateIdGroups = [...idGroups.values()].filter(group => group.length > 1);
+  console.log('library-integrity:',JSON.stringify({
+    languages:langs,codeCount,metaCount,effectiveIds:ids.size,missingIds:missingIds.length,
+    folderLanguageMismatches:languageMismatches.length,duplicateCodeGroups:dupGroups.length,
+    duplicateCodeSamples:dupGroups.slice(0,40),duplicateIdGroups,missingIdFiles:missingIds,
+    problems:problems.length,languageMismatchSamples:languageMismatches.slice(0,8)
+  }));
   assert.deepEqual(problems,[]);
   assert.equal(codeCount,metaCount,'число файлов кода и паспортов должно совпадать');
   assert.equal(ids.size,codeCount,'все элементы должны получать уникальный ID после разрешения совпадений');
