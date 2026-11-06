@@ -1,5 +1,5 @@
-// Модель пользовательских конструкций. Независима от паспортов фрагментов и словарей поиска.
-export const CONCEPT_SCHEMA_VERSION = 1;
+// Модель пользовательских конструкций. Независима от паспортов фрагментов и legacy-словарей.
+export const CONCEPT_SCHEMA_VERSION = 2;
 
 export const CONCEPT_RELATIONS = Object.freeze({
   equivalent: { label: 'эквивалентно', directed: false, searchable: true },
@@ -23,8 +23,19 @@ const text = v => typeof v === 'string' ? v.trim() : '';
 const list = v => Array.isArray(v) ? v : [];
 const norm = v => text(v).toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\s+/g, ' ');
 
+export function migrateConceptStore(input){
+  if(!input || typeof input !== 'object' || Array.isArray(input)) return input;
+  if(input.schemaVersion === 1){
+    return { ...input, schemaVersion: CONCEPT_SCHEMA_VERSION, queryPhrases: [] };
+  }
+  if(input.schemaVersion === CONCEPT_SCHEMA_VERSION && !Array.isArray(input.queryPhrases)){
+    return { ...input, queryPhrases: [] };
+  }
+  return input;
+}
+
 export function createEmptyConceptStore(){
-  return { schemaVersion: CONCEPT_SCHEMA_VERSION, concepts: [], relations: [] };
+  return { schemaVersion: CONCEPT_SCHEMA_VERSION, concepts: [], relations: [], queryPhrases: [] };
 }
 
 export function validateConceptStore(input, { pieceIds } = {}){
@@ -34,7 +45,8 @@ export function validateConceptStore(input, { pieceIds } = {}){
   if(input.schemaVersion !== CONCEPT_SCHEMA_VERSION) fail('schemaVersion', 'Неизвестная версия схемы');
   if(!Array.isArray(input.concepts)) fail('concepts', 'Ожидается массив понятий');
   if(!Array.isArray(input.relations)) fail('relations', 'Ожидается массив связей');
-  const concepts = list(input.concepts), relations = list(input.relations);
+  if(!Array.isArray(input.queryPhrases)) fail('queryPhrases', 'Ожидается массив поисковых фраз');
+  const concepts = list(input.concepts), relations = list(input.relations), queryPhrases = list(input.queryPhrases);
   const byId = new Map(), aliasOwners = new Map();
   concepts.forEach((c, i) => {
     const p = 'concepts[' + i + ']';
@@ -45,10 +57,7 @@ export function validateConceptStore(input, { pieceIds } = {}){
     else byId.set(id, c);
     if(!name) fail(p + '.name', 'Название не может быть пустым');
     if(typeof c.definition !== 'string') fail(p + '.definition', 'Значение должно быть строкой');
-    if(!Array.isArray(c.aliases)) fail(p + '.aliases', 'Варианты названия должны быть массивом');
-    if(!Array.isArray(c.forms)) fail(p + '.forms', 'Варианты записи должны быть массивом');
-    if(!Array.isArray(c.tags)) fail(p + '.tags', 'Теги должны быть массивом');
-    if(!Array.isArray(c.examples)) fail(p + '.examples', 'Примеры должны быть массивом');
+    for(const field of ['aliases','forms','tags','examples']) if(!Array.isArray(c[field])) fail(p + '.' + field, 'Ожидается массив');
     const localAliases = new Set();
     list(c.aliases).forEach((a, j) => {
       const value = typeof a === 'string' ? a : a && a.value;
@@ -96,5 +105,28 @@ export function validateConceptStore(input, { pieceIds } = {}){
     if(r.origin != null && !['manual','import','inferred'].includes(r.origin)) fail(p + '.origin', 'Неизвестный источник связи');
     if(r.confidence != null && (!Number.isFinite(r.confidence) || r.confidence < 0 || r.confidence > 1)) fail(p + '.confidence', 'Уверенность должна быть числом от 0 до 1');
   });
+  const phraseIds = new Set(), phraseKeys = new Set(), phraseOwners = new Map();
+  queryPhrases.forEach((q, i) => {
+    const p = 'queryPhrases[' + i + ']';
+    if(!q || typeof q !== 'object' || Array.isArray(q)){ fail(p, 'Поисковая фраза должна быть объектом'); return; }
+    const id = text(q.id), phrase = text(q.phrase), target = text(q.targetConceptId);
+    if(!id) fail(p + '.id', 'Нужен постоянный ID поисковой фразы');
+    else if(phraseIds.has(id)) fail(p + '.id', 'ID поисковой фразы уже используется');
+    else phraseIds.add(id);
+    if(!phrase) fail(p + '.phrase', 'Поисковая фраза не может быть пустой');
+    if(!byId.has(target)) fail(p + '.targetConceptId', 'Целевое понятие не найдено');
+    for(const field of ['language','scope','note']) if(q[field] != null && typeof q[field] !== 'string') fail(p + '.' + field, 'Поле должно быть строкой');
+    if(text(q.language).length > 80) fail(p + '.language', 'Язык слишком длинный');
+    if(text(q.scope).length > 120) fail(p + '.scope', 'Контекст слишком длинный');
+    if(q.origin != null && !['manual','import','inferred'].includes(q.origin)) fail(p + '.origin', 'Неизвестный источник поисковой фразы');
+    if(q.confidence != null && (!Number.isFinite(q.confidence) || q.confidence < 0 || q.confidence > 1)) fail(p + '.confidence', 'Уверенность должна быть числом от 0 до 1');
+    if(q.source != null && (!q.source || typeof q.source !== 'object' || Array.isArray(q.source))) fail(p + '.source', 'Источник должен быть объектом');
+    if(q.source && Object.entries(q.source).some(([k,v]) => !['file','key','group','index'].includes(k) || typeof v !== 'string' && typeof v !== 'number')) fail(p + '.source', 'Источник содержит неизвестные или некорректные поля');
+    const key = [norm(phrase), target, norm(q.language), norm(q.scope)].join('|');
+    if(phrase && target && phraseKeys.has(key)) fail(p, 'Такая поисковая фраза уже связана с понятием в этом контексте');
+    phraseKeys.add(key);
+    if(phrase){ if(!phraseOwners.has(norm(phrase))) phraseOwners.set(norm(phrase), new Set()); phraseOwners.get(norm(phrase)).add(target); }
+  });
+  for(const [phrase, owners] of phraseOwners) if(owners.size > 1) warnings.push({ path: 'queryPhrases', message: 'Фраза «' + phrase + '» ведёт к нескольким понятиям; неоднозначность сохранена' });
   return { valid: errors.length === 0, errors, warnings };
 }
