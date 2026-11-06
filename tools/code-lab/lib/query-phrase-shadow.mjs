@@ -1,5 +1,5 @@
-// Теневой индекс направленных поисковых фраз legacy-словаря.
-// Не меняет ни словари, ни рабочий поиск: строит кандидатов и связывает их с проверяемыми фрагментами.
+// Теневой индекс направленных поисковых фраз legacy-словаря и отдельного хранилища понятий.
+// Не меняет рабочий поиск: строит кандидатов и связывает их с проверяемыми фрагментами.
 const normalize = value => String(value == null ? '' : value)
   .trim().toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\s+/g, ' ');
 
@@ -128,6 +128,7 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
           if (hit.pieces.some(piece => piece.id === id)) continue;
           const piece = usage.pieceInfo(id);
           if (!piece) continue;
+          if (language && normalize(piece.lang) !== normalize(language)) continue;
           const relevant = hit.phrases.some(record =>
             pieceMatchesTarget(hit.targetKey, record.phrase, piece, usage)
           );
