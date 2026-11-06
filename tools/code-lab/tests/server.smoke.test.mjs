@@ -370,6 +370,24 @@ try {
     await fs.unlink(backupDir);
   });
 
+  await test('экспорт полного бэкапа отклоняет символьную ссылку вместо корня хранилища', async () => {
+    const workspace = path.join(L, 'workspace');
+    const moved = path.join(L, 'workspace-original');
+    const outside = path.join(tmp, 'outside-workspace');
+    await fs.mkdir(outside, { recursive: true });
+    await fs.rm(path.join(workspace, 'linked'), { recursive: true, force: true });
+    await fs.rename(workspace, moved);
+    try {
+      await fs.symlink(outside, workspace, 'dir');
+      const response = await fetch(base + '/api/backup/export');
+      assert.equal(response.status, 500, 'экспорт не должен читать содержимое внешней папки через ссылку');
+      assert.deepEqual(await fs.readdir(outside), []);
+    } finally {
+      await fs.unlink(workspace).catch(() => {});
+      await fs.rename(moved, workspace);
+    }
+  });
+
   await test('удаление убирает файлы', async () => {
     assert.ok((await post('/api/delete', { id: newId })).ok);
     await assert.rejects(fs.access(path.join(L, 'library', 'python', newId + '.py')));
