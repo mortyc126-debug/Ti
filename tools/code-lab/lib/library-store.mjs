@@ -298,13 +298,15 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
         meta.output = String(incomingValue('output') != null ? incomingValue('output') : (old.output || ''));
         const descAt = incomingValue('descAt');
         if(descAt != null) meta.descAt = descAt;
-        if(obj.component && typeof obj.component === 'object') meta.component = { ...(meta.component || {}), ...obj.component };
-        else if(incomingMeta.component && typeof incomingMeta.component === 'object') meta.component = { ...(meta.component || {}), ...incomingMeta.component };
+        if(obj.component && typeof obj.component === 'object') meta.component = origin === 'manual' ? { ...(meta.component || {}), ...obj.component } : { ...obj.component, ...(old.component || {}) };
+        else if(incomingMeta.component && typeof incomingMeta.component === 'object') meta.component = { ...(incomingMeta.component), ...(old.component || {}) };
         const tags = incomingValue('tags');
-        if(Array.isArray(tags) && canUpdate('tags')) meta.tags = tags.map(String);
-        else if(!Array.isArray(meta.tags)) meta.tags = [];
+        if(Array.isArray(tags)){
+          if(canUpdate('tags')) meta.tags = tags.map(String);
+          else if(Array.isArray(old.tags)) meta.tags = old.tags;
+        } else if(!Array.isArray(meta.tags)) meta.tags = [];
         const aliases = incomingValue('aliases');
-        if(Array.isArray(aliases)) meta.aliases = aliases.map(String);
+        if(Array.isArray(aliases)) meta.aliases = origin === 'manual' ? aliases.map(String) : [...new Set([...(old.aliases || []), ...aliases.map(String)])];
         else if(!Array.isArray(meta.aliases)) meta.aliases = [];
         const src = { title: null, desc: null, tags: null, ...(old.source || {}) };
         for(const field of ['title','desc','tags']){
@@ -322,7 +324,7 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
         meta.wordNotes = notes;
         if(unplaced.length) meta.orphanNotes = unplaced.slice(0, 50); else delete meta.orphanNotes;
         const labels = incomingValue('labels');
-        if(labels && typeof labels === 'object' && !Array.isArray(labels)) meta.labels = { ...labels };
+        if(labels && typeof labels === 'object' && !Array.isArray(labels)) meta.labels = origin === 'manual' ? { ...labels } : { ...labels, ...(old.labels || {}) };
         else if(!meta.labels || typeof meta.labels !== 'object') delete meta.labels;
 
         await writeAtomic(codePath, code);
