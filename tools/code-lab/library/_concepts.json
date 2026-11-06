@@ -441,7 +441,7 @@
     {
       "id": "curated-query-031",
       "phrase": "разбить строку по разделителю",
-      "targetKey": "s.split(\",\")",
+      "targetKey": "split",
       "language": "python",
       "scope": "",
       "origin": "manual",
@@ -451,7 +451,7 @@
         "group": "JavaScript и Python",
         "index": 31
       },
-      "note": "Разделяет строку и возвращает список частей."
+      "note": "Разделение строки по разделителю; в Python проверяются только фрагменты Python."
     },
     {
       "id": "curated-query-032",
@@ -471,7 +471,7 @@
     {
       "id": "curated-query-033",
       "phrase": "соединить элементы массива в строку",
-      "targetKey": "\"\".join(it)",
+      "targetKey": "join",
       "language": "python",
       "scope": "",
       "origin": "manual",
@@ -481,7 +481,7 @@
         "group": "JavaScript и Python",
         "index": 33
       },
-      "note": "Метод строки Python соединяет элементы итерируемого объекта."
+      "note": "Соединение элементов итерируемого объекта в строку; только фрагменты Python."
     },
     {
       "id": "curated-query-034",
@@ -621,7 +621,7 @@
     {
       "id": "curated-query-044",
       "phrase": "записать файл",
-      "targetKey": "patch",
+      "targetKey": "write",
       "language": "python",
       "scope": "",
       "origin": "manual",
@@ -631,12 +631,12 @@
         "group": "DOM, сеть, файлы и тесты",
         "index": 44
       },
-      "note": "Подмена функции в тесте через unittest.mock.patch или patch.object."
+      "note": "Запись данных в файл; только фрагменты Python."
     },
     {
       "id": "curated-query-046",
       "phrase": "подменить функцию в тесте",
-      "targetKey": "mock.patch(\"module.name\")",
+      "targetKey": "patch",
       "language": "python",
       "scope": "",
       "origin": "manual",
@@ -646,7 +646,7 @@
         "group": "DOM, сеть, файлы и тесты",
         "index": 46
       },
-      "note": "Подмена объекта по пути через unittest.mock.patch."
+      "note": "Подмена функции через unittest.mock.patch или patch.object."
     },
     {
       "id": "curated-query-047",
@@ -664,24 +664,9 @@
       "note": "Метод подготовки unittest; pytest fixtures — отдельный механизм."
     },
     {
-      "id": "curated-query-049",
-      "phrase": "дисперсия доходности",
-      "targetKey": "np.corrcoef",
-      "language": "python",
-      "scope": "",
-      "origin": "manual",
-      "confidence": 0.98,
-      "source": {
-        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
-        "group": "Финансовые и статистические термины",
-        "index": 49
-      },
-      "note": "Матрица корреляций Пирсона для двух числовых рядов; не ковариация."
-    },
-    {
       "id": "curated-query-050",
       "phrase": "корреляция двух рядов",
-      "targetKey": "statistics.correlation(x, y)",
+      "targetKey": "np.corrcoef",
       "language": "python",
       "scope": "",
       "origin": "manual",
@@ -691,7 +676,22 @@
         "group": "Финансовые и статистические термины",
         "index": 50
       },
-      "note": "Корреляция измеряет стандартизованную связь; не ковариация."
+      "note": "Матрица корреляций Пирсона для двух числовых рядов; не ковариация."
+    },
+    {
+      "id": "curated-query-051",
+      "phrase": "очистка после теста",
+      "targetKey": "def teardown(self)",
+      "language": "python",
+      "scope": "",
+      "origin": "manual",
+      "confidence": 0.98,
+      "source": {
+        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
+        "group": "DOM, сеть, файлы и тесты",
+        "index": 51
+      },
+      "note": "Метод очистки unittest после теста."
     }
   ]
 }
