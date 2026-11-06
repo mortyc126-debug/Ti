@@ -8,7 +8,7 @@ import { tokenize } from '../lib/tokenizer.mjs';
 
 const DICT = { words: { print: 'print — вывод' }, cssProps: { 'font-weight': 'font-weight — жирность шрифта' } };
 const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'codelab-store-'));
-const mk = (root = path.join(tmp, 'lib')) => createLibraryStore({ root, getDict: async () => DICT });
+const mk = (root = path.join(tmp, 'lib'), options = {}) => createLibraryStore({ root, getDict: async () => DICT, ...options });
 const tt = t => (t.v != null ? String(t.v) : (t.k === 'sp' ? ' ' : ''));
 const codeOf = lines => lines.map(l => l.map(tt).join('')).join('\n');
 const tokenAt = (lines, text) => { for (const l of lines) for (const t of l) if (tt(t) === text) return t; return null; };
@@ -29,6 +29,44 @@ await test('новый кусок — обычный файл с родным р
   assert.equal(codeOf(t.lines), code);
   assert.equal(tokenAt(t.lines, 'база').k, 'name');   // кириллическое имя — одно слово
   assert.equal(tokenAt(t.lines, 'print').e, 'print — вывод');   // подпись из словаря при загрузке
+});
+
+await test('ошибка записи паспорта откатывает уже записанный код и сохраняет старую пару', async () => {
+  const root = path.join(tmp, 'rollback-existing');
+  const stable = mk(root); await stable.init();
+  await stable.save({ id: 'пара', lang: 'js', title: 'Старое', desc: 'Старое описание', lines: tokenize('const oldValue = 1;', 'js') });
+  let fail = true;
+  const faultStore = mk(root, { writeAtomicFile: async (p, content) => {
+    if(fail && p.endsWith('.meta.json')) { fail = false; throw new Error('simulated passport write failure'); }
+    await fs.mkdir(path.dirname(p), { recursive: true });
+    await fs.writeFile(p, content, 'utf8');
+  }});
+  await faultStore.init();
+  const changed = await faultStore.get('пара');
+  changed.title = 'Новое'; changed.desc = 'Новое описание';
+  changed.lines = tokenize('const newValue = 2;', 'js');
+  await assert.rejects(faultStore.save(changed), /simulated passport write failure/);
+  const check = mk(root); await check.init();
+  const restored = await check.get('пара');
+  assert.equal(codeOf(restored.lines), 'const oldValue = 1;');
+  assert.equal(restored.title, 'Старое');
+  assert.equal(restored.desc, 'Старое описание');
+});
+
+await test('ошибка паспорта при создании удаляет частично созданный код', async () => {
+  const root = path.join(tmp, 'rollback-new');
+  let fail = true;
+  const faultStore = mk(root, { writeAtomicFile: async (p, content) => {
+    if(fail && p.endsWith('.meta.json')) { fail = false; throw new Error('simulated new passport failure'); }
+    await fs.mkdir(path.dirname(p), { recursive: true });
+    await fs.writeFile(p, content, 'utf8');
+  }});
+  await faultStore.init();
+  await assert.rejects(faultStore.save({ id: 'новая-пара', lang: 'js', title: 'Новая', lines: tokenize('let x = 1;', 'js') }), /simulated new passport failure/);
+  assert.equal(await exists(path.join(root, 'js', 'новая-пара.js')), false);
+  assert.equal(await exists(path.join(root, 'js', 'новая-пара.js.meta.json')), false);
+  const check = mk(root); await check.init();
+  assert.equal(await check.has('новая-пара'), false);
 });
 
 await test('пояснение, вписанное вручную, переживает перезапуск', async () => {
