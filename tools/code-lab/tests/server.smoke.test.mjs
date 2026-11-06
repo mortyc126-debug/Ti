@@ -307,6 +307,7 @@ try {
     const linked = await post('/api/library/restore', { files: [{ name: 'library/js/linked/out.js', text: 'outside' }] });
     assert.equal(linked.ok, false, 'символические ссылки в пути назначения должны отклоняться');
     await assert.rejects(fs.access(path.join(outside, 'out.js')));
+    await fs.unlink(path.join(L, 'library', 'js', 'linked')); // тестовая ссылка не должна влиять на экспорт следующего сценария
   });
 
   await test('полный бэкап экспортирует хранилища и безопасно восстанавливает данные', async () => {
