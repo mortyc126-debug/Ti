@@ -80,6 +80,7 @@ for (const pair of manifest.pairs) {
     ...(source.passport.orphanNotes || []).filter(note => note && note.kind === 'concept').map(note => ({ ...note, sourceFile: source.file, collection: 'orphanNotes' }))
   ]);
   const fields = [...new Set([...Object.keys(canonical.passport), ...Object.keys(secondary.passport)])].filter(field => !['id', 'file', 'schema', 'lang'].includes(field)).sort();
+  const candidateConceptNotes = uniqueNotes(conceptNotes.map(({ sourceFile, collection, ...note }) => note));
   const fieldConflicts = fields.filter(field => JSON.stringify(orderedSources[0].passport[field] ?? null) !== JSON.stringify(orderedSources[1].passport[field] ?? null)).map(field => ({
     field,
     values: orderedSources.map(source => ({ file: source.file, value: source.passport[field] ?? null }))
@@ -99,7 +100,7 @@ for (const pair of manifest.pairs) {
     tags: uniqueList(orderedSources.map(source => source.passport.tags || [])),
     aliases: uniqueList(orderedSources.map(source => source.passport.aliases || [])),
     status: orderedSources.some(source => source.passport.status === 'described') ? 'described' : (canonical.passport.status || secondary.passport.status || 'needs_description'),
-    wordNotes: uniqueNotes(allWordNotes).map(({ _sourceFile, ...note }) => note),
+    wordNotes: [...uniqueNotes(allWordNotes).map(({ _sourceFile, ...note }) => note), ...candidateConceptNotes],
     orphanNotes: uniqueNotes(allOrphanNotes).map(({ _sourceFile, ...note }) => note),
     _mergePreviewOnly: true
   };
