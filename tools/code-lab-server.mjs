@@ -945,9 +945,24 @@ const server = http.createServer(async (req, res) => {
       const backupId = 'library-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
       const backupRoot = path.join(DATA, 'restore-backups', backupId);
       const backups = new Map(), written = [];
+      const lstatOrNull = async target => { try { return await fs.lstat(target); } catch(e){ if(e.code === 'ENOENT') return null; throw e; } };
+      const safeStat = async target => {
+        const rootStat = await lstatOrNull(LIBRARY);
+        if(rootStat?.isSymbolicLink()) throw new Error('Папка библиотеки не должна быть символической ссылкой');
+        let cur = LIBRARY;
+        const parts = path.relative(LIBRARY, target).split(path.sep).filter(Boolean);
+        for(const part of parts.slice(0, -1)){
+          cur = path.join(cur, part);
+          const st = await lstatOrNull(cur);
+          if(st && (st.isSymbolicLink() || !st.isDirectory())) throw new Error('Небезопасная папка назначения: ' + path.relative(LIBRARY, cur));
+        }
+        const st = await lstatOrNull(target);
+        if(st?.isSymbolicLink()) throw new Error('Файл назначения не должен быть символической ссылкой: ' + path.relative(LIBRARY, target));
+        return st;
+      };
       try {
         for(const op of writes){
-          const st = await fs.stat(op.abs).catch(() => null);
+          const st = await safeStat(op.abs);
           if(!st) continue;
           if(!st.isFile()) throw new Error('На месте файла архива уже существует папка: ' + op.rel);
           const backupPath = path.join(backupRoot, op.rel);
