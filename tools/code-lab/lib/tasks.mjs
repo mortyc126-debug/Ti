@@ -59,7 +59,7 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
     if(!okId(id)) return null;
     try { return JSON.parse(await fs.readFile(fileOf(id), 'utf8')); } catch(_){ return null; }
   }
-  async function remove(id){ if(!okId(id)) return false; await fs.unlink(fileOf(id)).catch(() => {}); return true; }
+  async function remove(id){ if(!okId(id)) return false; if((await usedBy(id)).length) return false; await fs.unlink(fileOf(id)).catch(() => {}); return true; }
 
   // ссылка «кусок: X» → id куска: id:…, точный id, точное название (свой язык первым), название без знаков
   function pieceResolver(all, lang){
