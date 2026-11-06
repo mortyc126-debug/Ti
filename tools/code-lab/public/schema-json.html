@@ -498,7 +498,7 @@ async function unzip(buf){
     if(method === 0) text = dec.decode(comp);
     else if(method === 8) text = await decomp(comp, 'deflate-raw');
     else { err.textContent += name + ': неизвестное сжатие\n'; continue; }
-    out.push({ name: name.split('/').pop(), text });
+    out.push({ name, text }); // сохраняем путь: одинаковые имена в разных папках не должны смешиваться
   }
   if(!out.length) throw new Error('в архиве нет .json');
   return out;
