@@ -7,8 +7,6 @@ function phraseScore(query, phrase) {
   if (query === phrase) return 100;
   if (phrase.startsWith(query)) return 85;
   if (phrase.includes(query)) return 75;
-  if (query.startsWith(phrase)) return 65;
-  if (query.includes(phrase)) return 55;
   return 0;
 }
 
