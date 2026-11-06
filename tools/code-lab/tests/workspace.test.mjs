@@ -86,19 +86,23 @@ try {
     // ведущий «/» считается началом пути внутри проекта, а не корнем диска
     assert.equal((await call('POST', '/api/ws/save', { path: '/etc/passwd', text: 'x' })).obj.path, 'etc/passwd');
     assert.equal((await call('POST', '/api/ws/save', { path: '.git/config', text: 'x' })).code, 403);
-    await fs.mkdir(path.join(tmp, 'outside')); 
-    try { await fs.symlink(path.join(tmp, 'outside'), path.join(proj, 'link')); } catch (_) { return; }   // на системах без прав на ссылки — пропуск
-    assert.equal((await call('POST', '/api/ws/save', { path: 'link/hack.txt', text: 'x' })).code, 403);
-    await assert.rejects(fs.access(path.join(tmp, 'outside', 'hack.txt')));
+    await fs.mkdir(path.join(tmp, 'outside'));
+    let symlinksAvailable = true;
+    try { await fs.symlink(path.join(tmp, 'outside'), path.join(proj, 'link'), 'dir'); }
+    catch (_) { symlinksAvailable = false; } // Windows runner без Developer Mode может запрещать создание ссылок
+    if(symlinksAvailable){
+      assert.equal((await call('POST', '/api/ws/save', { path: 'link/hack.txt', text: 'x' })).code, 403);
+      await assert.rejects(fs.access(path.join(tmp, 'outside', 'hack.txt')));
 
-    const victim = path.join(proj, 'trash-victim.txt');
-    await fs.writeFile(victim, 'keep inside project');
-    await fs.symlink(path.join(tmp, 'outside'), path.join(proj, '.codelab-trash'), 'dir');
-    const deleted = await call('POST', '/api/ws/delete', { path: 'trash-victim.txt' });
-    assert.equal(deleted.code, 403, 'корзина-ссылка наружу должна отклоняться');
-    assert.equal(await fs.readFile(victim, 'utf8'), 'keep inside project');
-    assert.deepEqual(await fs.readdir(path.join(tmp, 'outside')), []);
-    await fs.unlink(path.join(proj, '.codelab-trash'));
+      const victim = path.join(proj, 'trash-victim.txt');
+      await fs.writeFile(victim, 'keep inside project');
+      await fs.symlink(path.join(tmp, 'outside'), path.join(proj, '.codelab-trash'), 'dir');
+      const deleted = await call('POST', '/api/ws/delete', { path: 'trash-victim.txt' });
+      assert.equal(deleted.code, 403, 'корзина-ссылка наружу должна отклоняться');
+      assert.equal(await fs.readFile(victim, 'utf8'), 'keep inside project');
+      assert.deepEqual(await fs.readdir(path.join(tmp, 'outside')), []);
+      await fs.unlink(path.join(proj, '.codelab-trash'));
+    }
   });
 
   await test('создать / переименовать / удалить (в корзину)', async () => {
