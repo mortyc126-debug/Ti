@@ -334,21 +334,6 @@
       "note": "Цикл; точный вариант зависит от задачи и вида коллекции."
     },
     {
-      "id": "curated-query-023",
-      "phrase": "пройти по массиву",
-      "targetKey": "for...of",
-      "language": "js",
-      "scope": "",
-      "origin": "manual",
-      "confidence": 0.98,
-      "source": {
-        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
-        "group": "JavaScript и Python",
-        "index": 23
-      },
-      "note": "Перебор значений итерируемой коллекции."
-    },
-    {
       "id": "curated-query-024",
       "phrase": "пройти по массиву",
       "targetKey": "foreach",
