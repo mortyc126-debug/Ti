@@ -356,7 +356,7 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
         const incomingStatus = incomingValue('status');
         meta.status = incomingStatus && canUpdate('desc') ? String(incomingStatus) : (String(meta.desc || '').trim() ? 'described' : 'needs_description');
         meta.wordNotes = notes;
-        if(unplaced.length) meta.orphanNotes = unplaced.slice(0, 50); else delete meta.orphanNotes;
+        if(unplaced.length) meta.orphanNotes = unplaced; else delete meta.orphanNotes;
         const labels = incomingValue('labels');
         if(labels && typeof labels === 'object' && !Array.isArray(labels)) meta.labels = origin === 'manual' ? { ...labels } : { ...labels, ...(old.labels || {}) };
         else if(!meta.labels || typeof meta.labels !== 'object') delete meta.labels;
