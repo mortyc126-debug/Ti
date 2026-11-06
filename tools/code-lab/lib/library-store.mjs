@@ -361,6 +361,8 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
         // Теги и синонимы только дополняем: ничего из существующего не удаляется.
         const addList = (field, values, max) => {
           if (!Array.isArray(values)) return;
+          // Список, созданный вручную или импортированный с более высоким приоритетом, ИИ не дополняет.
+          if (rank[meta.source[field]] > rank[origin]) return;
           const cur = Array.isArray(meta[field]) ? meta[field] : [];
           const seen = new Set(cur.map(x => String(x).trim().toLowerCase()));
           const add = [];
