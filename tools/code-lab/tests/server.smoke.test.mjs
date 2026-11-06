@@ -122,6 +122,14 @@ try {
     const js = await post('/api/add', { title: 'Одинаковый текст JS', lang: 'js', code: source });
     const py = await post('/api/add', { title: 'Одинаковый текст Python', lang: 'python', code: source });
     assert.ok(js.id && py.id && js.id !== py.id, 'для разных языков создаются разные куски');
+    const alias = await post('/api/add', { title: 'Алиас JavaScript', lang: 'javascript', code: '\\r\\n' + source + '\\r\\n' });
+    assert.equal(alias.id, js.id, 'алиас языка и переводы строк не должны создавать дубль');
+    const whitespace = await post('/api/add', { title: 'Другие пробелы', lang: 'js', code: 'print( "одинаковый текст")' });
+    const caseChange = await post('/api/add', { title: 'Другой регистр', lang: 'js', code: 'Print("одинаковый текст")' });
+    const commentChange = await post('/api/add', { title: 'С комментарием', lang: 'js', code: '// comment\\n' + source });
+    assert.notEqual(whitespace.id, js.id, 'внутренние пробелы в коде значимы');
+    assert.notEqual(caseChange.id, js.id, 'регистр кода значим');
+    assert.notEqual(commentChange.id, js.id, 'комментарии не должны молча исчезать при сравнении');
     protectedId = js.id;
     assert.equal((await get('/api/template?id=' + encodeURIComponent(js.id))).lang, 'js');
     assert.equal((await get('/api/template?id=' + encodeURIComponent(py.id))).lang, 'python');
