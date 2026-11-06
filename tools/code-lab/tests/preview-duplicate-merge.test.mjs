@@ -1,0 +1,48 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'codelab-merge-preview-'));
+try {
+  const library = path.join(tmp, 'library');
+  await fs.mkdir(path.join(library, 'js'), { recursive: true });
+  const code = 'const value = 1;\n';
+  const hash = crypto.createHash('sha256').update(code.trim()).digest('hex');
+  const first = { id: 'legacy-piece-mvr123abc', title: 'Коротко', desc: 'Коротко.', tags: ['старый-тег'], aliases: ['старый-вариант'], component: { provides: ['a'] }, source: { desc: 'imported' }, wordNotes: [{ line: 0, col: 6, text: 'value', kind: 'name', note: 'Значение.', source: 'custom' }, { line: 0, col: 0, text: 'const', kind: 'concept', note: 'Понятие.', source: '' }] };
+  const second = { id: 'canonical-piece', title: 'Пример', desc: 'Подробное описание конструкции.', tags: ['канонический-тег'], aliases: ['пример'], component: { requires: ['b'] }, source: { desc: 'manual' }, wordNotes: [{ line: 0, col: 6, text: 'value', kind: 'name', note: 'Значение.', source: 'dict' }], extraField: { keep: true } };
+  await fs.writeFile(path.join(library, 'js', 'legacy-piece-mvr123abc.js'), code);
+  await fs.writeFile(path.join(library, 'js', 'legacy-piece-mvr123abc.js.meta.json'), JSON.stringify(first));
+  await fs.writeFile(path.join(library, 'js', 'canonical-piece.js'), code);
+  await fs.writeFile(path.join(library, 'js', 'canonical-piece.js.meta.json'), JSON.stringify(second));
+  const manifestPath = path.join(tmp, 'manifest.json'), outputPath = path.join(tmp, 'preview.json');
+  const manifest = { pairs: [{ pair: 1, codeIdentical: true, codeHash: hash, canonical: { file: 'js/canonical-piece.js', id: 'canonical-piece' }, legacyIds: [{ id: 'legacy-piece-mvr123abc', redirectTo: 'canonical-piece' }], files: [
+    { file: 'js/legacy-piece-mvr123abc.js', id: first.id }, { file: 'js/canonical-piece.js', id: second.id }
+  ], notes: { anchorConflicts: [] }, urls: { union: [] } }] };
+  await fs.writeFile(manifestPath, JSON.stringify(manifest));
+  const scriptPath = fileURLToPath(new URL('../scripts/preview-duplicate-merge.mjs', import.meta.url));
+  const run = spawnSync(process.execPath, [scriptPath, library, manifestPath, outputPath], { encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr || run.stdout);
+  const preview = JSON.parse(await fs.readFile(outputPath, 'utf8'));
+  const pair = preview.pairs[0];
+  assert.equal(preview.summary.verifiedCodePairs, 1);
+  assert.equal(pair.candidatePassport.id, 'canonical-piece');
+  assert.equal(pair.candidatePassport.desc, 'Подробное описание конструкции.');
+  assert.deepEqual(pair.candidatePassport.tags, ['канонический-тег', 'старый-тег']);
+  assert.deepEqual(pair.candidatePassport.aliases, ['пример', 'старый-вариант']);
+  assert.equal(pair.review.conceptNotes.length, 1);
+  assert.equal(pair.review.sourcePassports.length, 2);
+  assert.equal(pair.review.sourcePassports.find(x => x.id === 'canonical-piece').passport.extraField.keep, true);
+  assert.equal(pair.review.importable, false);
+  assert.equal(preview.summary.importablePairs, 0);
+  await fs.writeFile(path.join(library, 'js', 'canonical-piece.js'), 'const changed = 2;\n');
+  const changedRun = spawnSync(process.execPath, [scriptPath, library, manifestPath, outputPath], { encoding: 'utf8' });
+  assert.notEqual(changedRun.status, 0);
+  assert.match(changedRun.stderr + changedRun.stdout, /Код изменился после аудита/);
+  console.log('preview-duplicate-merge: 12 checks passed');
+} finally {
+  await fs.rm(tmp, { recursive: true, force: true });
+}
