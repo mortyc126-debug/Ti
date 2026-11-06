@@ -26,7 +26,7 @@ const norm = v => text(v).toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/
 export function migrateConceptStore(input){
   if(!input || typeof input !== 'object' || Array.isArray(input)) return input;
   if(input.schemaVersion === 1){
-    return { ...input, schemaVersion: CONCEPT_SCHEMA_VERSION, queryPhrases: [] };
+    return { ...input, schemaVersion: CONCEPT_SCHEMA_VERSION, queryPhrases: Array.isArray(input.queryPhrases) ? input.queryPhrases : [] };
   }
   if(input.schemaVersion === CONCEPT_SCHEMA_VERSION && !Array.isArray(input.queryPhrases)){
     return { ...input, queryPhrases: [] };
