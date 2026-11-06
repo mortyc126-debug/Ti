@@ -2003,7 +2003,39 @@ const server = http.createServer(async (req, res) => {
       else if(b && Array.isArray(b.recipes)) recs = b.recipes;
       else if(b && (b.title || b.pieces || b.items)) recs = [b];
       let created = 0, piecesAdded = 0, piecesReused = 0, itemsUnresolved = 0; const savedTitles = [];
+      const allowUnresolved = b && b.allowUnresolved === true;
       let rows = null; const rowsOf = async () => rows || (rows = await store.rows());
+      const previewUnresolved = [];
+      for(const rec of recs){
+        if(!rec || typeof rec !== 'object') continue;
+        const recipeTitle = String(rec.title || 'Рецепт').slice(0, 120);
+        const srcItems = Array.isArray(rec.pieces) ? rec.pieces : (Array.isArray(rec.items) ? rec.items : []);
+        for(const it of srcItems){
+          if(!it || typeof it !== 'object') continue;
+          if(it.id && await store.has(String(it.id))) continue;
+          const code = typeof it.code === 'string' ? it.code : '';
+          if(code.trim()) continue;
+          const itemTitle = String(it.title || '').trim();
+          if(!itemTitle){
+            previewUnresolved.push({ recipe: recipeTitle, item: '(без названия)', reason: 'нет ID, названия и кода', candidates: [] });
+            continue;
+          }
+          const matches = (await rowsOf()).filter(x => (x.title || '').trim().toLowerCase() === itemTitle.toLowerCase());
+          const lang = canonLang(it.lang || rec.lang || 'js');
+          const same = matches.filter(x => canonLang(x.lang) === lang);
+          const pool = same.length ? same : matches;
+          if(pool.length !== 1) previewUnresolved.push({
+            recipe: recipeTitle, item: itemTitle,
+            reason: pool.length ? 'неоднозначное название' : 'кусок не найден',
+            candidates: pool.map(x => ({ id: x.id, title: x.title, lang: x.lang }))
+          });
+        }
+      }
+      if(previewUnresolved.length && !allowUnresolved) return json(res, 409, {
+        ok: false, needsConfirmation: true, itemsUnresolved: previewUnresolved.length,
+        unresolved: previewUnresolved.slice(0, 100),
+        error: 'Некоторые пункты рецепта не удалось однозначно связать с кусками. Ничего не сохранено.'
+      });
       for(const rec of recs){
         if(!rec || typeof rec !== 'object') continue;
         const title = String(rec.title || 'Рецепт').slice(0, 120);
@@ -2028,7 +2060,7 @@ const server = http.createServer(async (req, res) => {
             }
             items.push({ id: pid, title: ptitle, note }); continue;
           }
-          if(it.title){ const hit = (await rowsOf()).find(x => (x.title || '').trim().toLowerCase() === String(it.title).trim().toLowerCase()); if(hit){ items.push({ id: hit.id, title: hit.title, note }); continue; } }
+          if(it.title){ const matches = (await rowsOf()).filter(x => (x.title || '').trim().toLowerCase() === String(it.title).trim().toLowerCase()); const lang = canonLang(it.lang || rec.lang || 'js'); const same = matches.filter(x => canonLang(x.lang) === lang); const pool = same.length ? same : matches; if(pool.length === 1){ const hit = pool[0]; items.push({ id: hit.id, title: hit.title, note }); continue; } }
           items.push({ id: '', title: String(it.title || 'кусок').slice(0, 120), note }); itemsUnresolved++;
         }
         const id = await uniqueFileId(RECIPES, title);
