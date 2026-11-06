@@ -117,6 +117,21 @@ try {
     const d = await post('/api/dedup', {}); assert.equal(d.ok, true);
   });
 
+  await test('дедупликация не смешивает одинаковый код разных языков', async () => {
+    const source = 'print("одинаковый текст")';
+    const js = await post('/api/add', { title: 'Одинаковый текст JS', lang: 'js', code: source });
+    const py = await post('/api/add', { title: 'Одинаковый текст Python', lang: 'python', code: source });
+    assert.ok(js.id && py.id && js.id !== py.id, 'для разных языков создаются разные куски');
+    assert.equal((await get('/api/template?id=' + encodeURIComponent(js.id))).lang, 'js');
+    assert.equal((await get('/api/template?id=' + encodeURIComponent(py.id))).lang, 'python');
+
+    const imported = await post('/api/import', { pieces: [{ title: 'Обновлённый Python', lang: 'python', code: source, desc: 'обновление того же языка' }] });
+    assert.equal(imported.created, 0);
+    assert.equal(imported.updated, 1);
+    assert.equal((await get('/api/template?id=' + encodeURIComponent(js.id))).lang, 'js', 'импорт Python не меняет язык JS-куска');
+    assert.equal((await get('/api/template?id=' + encodeURIComponent(py.id))).lang, 'python');
+  });
+
   await test('удаление убирает файлы', async () => {
     assert.ok((await post('/api/delete', { id: newId })).ok);
     await assert.rejects(fs.access(path.join(L, 'library', 'python', newId + '.py')));
