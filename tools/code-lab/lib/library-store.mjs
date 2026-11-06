@@ -35,7 +35,12 @@ function placeNotes(lines, notes, look, { onlyEmpty = true } = {}){
   const cols = lines.map(colsOf);
   for(const n of (notes || [])){
     if(!n || typeof n.text !== 'string' || typeof n.note !== 'string') continue;
-    const note = n.note;   // показываем сохранённое как есть; словарь подставляется только там, где пояснения нет
+    // В части старых паспортов поля kind и note были переставлены местами.
+    // Исправляем только однозначный случай: note — известный тип токена, kind — обычный текст.
+    const tokenKinds = new Set(['kw', 'fn', 'name', 'num', 'str', 'com', 'op', 'sp']);
+    const swapped = tokenKinds.has(n.note) && typeof n.kind === 'string' && !tokenKinds.has(n.kind);
+    const note = swapped ? n.kind : n.note;
+    const normalized = swapped ? { ...n, kind: n.note, note } : n;
     let tok = null;
     const tryLine = li => {
       const line = lines[li]; if(!line) return null;
@@ -61,7 +66,7 @@ function placeNotes(lines, notes, look, { onlyEmpty = true } = {}){
       const reach = lines.length + Math.abs(n.line || 0);   // заметка могла быть ниже, чем строк в новом коде
       for(let d = 1; d <= reach && !tok; d++){ tok = tryLine(n.line - d) || tryLine(n.line + d); }
     }
-    if(tok) tok.e = note; else if(n.source !== 'dict') unplaced.push(n);
+    if(tok) tok.e = note; else if(n.source !== 'dict') unplaced.push(normalized);
   }
   return unplaced;
 }
