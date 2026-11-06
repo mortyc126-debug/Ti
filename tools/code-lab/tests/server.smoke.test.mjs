@@ -219,6 +219,44 @@ try {
     await assert.rejects(fs.access(path.join(outside, 'out.js')));
   });
 
+  await test('полный бэкап экспортирует хранилища и безопасно восстанавливает данные', async () => {
+    await fs.mkdir(path.join(L, 'workspace'), { recursive: true });
+    await fs.mkdir(path.join(L, 'data'), { recursive: true });
+    await fs.writeFile(path.join(L, 'workspace', 'backup-sample.js'), 'const backupSample = true;');
+    await fs.writeFile(path.join(L, 'data', 'backup-check.json'), JSON.stringify({ value: 'old' }));
+
+    const response = await fetch(base + '/api/backup/export');
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type') || '', /application\\/zip/);
+    const zip = Buffer.from(await response.arrayBuffer());
+    assert.equal(zip.readUInt32LE(0), 0x04034b50, 'должен скачиваться ZIP-архив');
+    assert.ok(zip.includes(Buffer.from('backup-manifest.json')));
+    assert.ok(zip.includes(Buffer.from('library/js/shared.js')));
+    assert.ok(zip.includes(Buffer.from('workspace/backup-sample.js')));
+    assert.ok(zip.includes(Buffer.from('recipes/')));
+    assert.ok(zip.includes(Buffer.from('flows/')));
+    assert.ok(zip.includes(Buffer.from('public/dict/examples.json')));
+    assert.ok(!zip.includes(Buffer.from('restore-backups/')), 'в архив не должны попадать предыдущие резервные копии');
+
+    const restored = await post('/api/backup/restore', { files: [{ name: 'data/backup-check.json', text: JSON.stringify({ value: 'new' }) }] });
+    assert.equal(restored.ok, true);
+    assert.equal(restored.written, 1);
+    assert.equal(restored.overwritten, 1);
+    assert.equal(JSON.parse(await fs.readFile(path.join(L, 'data', 'backup-check.json'), 'utf8')).value, 'new');
+    assert.equal(JSON.parse(await fs.readFile(path.join(L, 'data', 'restore-backups', restored.backupId, 'data', 'backup-check.json'), 'utf8')).value, 'old');
+
+    const invalid = await post('/api/backup/restore', { files: [{ name: '../../outside.json', text: '{}' }] });
+    assert.equal(invalid.ok, false);
+    await assert.rejects(fs.access(path.join(tmp, 'outside.json')));
+
+    const outside = path.join(tmp, 'outside-full');
+    await fs.mkdir(outside, { recursive: true });
+    await fs.symlink(outside, path.join(L, 'workspace', 'linked'), 'dir');
+    const linked = await post('/api/backup/restore', { files: [{ name: 'workspace/linked/out.js', text: 'outside' }] });
+    assert.equal(linked.ok, false);
+    await assert.rejects(fs.access(path.join(outside, 'out.js')));
+  });
+
   await test('удаление убирает файлы', async () => {
     assert.ok((await post('/api/delete', { id: newId })).ok);
     await assert.rejects(fs.access(path.join(L, 'library', 'python', newId + '.py')));
