@@ -162,7 +162,7 @@ export function createAiAssist({ store, apiKey = process.env.MISTRAL_API_KEY, mo
       c.views.check = c.views.check || {};
       let origin = 'manual';
       if (section === 'desc') {
-        if (v.desc) { j.desc = v.desc; j.descAt = Date.now(); origin = 'ai'; }
+        if (v.desc) { j.desc = v.desc; j.descAt = Date.now(); origin = 'manual'; }
         if (v.output) { j.output = v.output; c.summary.output = v.output; }
       } else if (section === 'notes') {
         c.lineNotes = { ...(c.lineNotes || {}), ...v.lineNotes };
