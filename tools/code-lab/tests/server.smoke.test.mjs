@@ -145,7 +145,7 @@ try {
       { name: 'library/ts/shared.js', text: 'const restoredTs: number = 1;' }
     ];
     const restored = await post('/api/library/restore', { files });
-    assert.equal(restored.ok, true);
+    assert.equal(restored.ok, true, JSON.stringify(restored));
     assert.equal(restored.pairs, 2);
     assert.equal(restored.overwritten, 2);
     assert.ok(restored.backupId);
