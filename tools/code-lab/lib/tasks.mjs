@@ -90,7 +90,7 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
   async function pieceCandidates(ref, lang){
     if(!similarPieces || !String(ref || '').trim()) return [];
     try {
-      // одинаковые названия схлопываем: ссылка пишется названием, и выбор между двойниками ничего не меняет
+      // одинаковые названия в разных языках оставляем отдельными кандидатами
       const seen = new Set(), out = [];
       for(const r of await similarPieces(String(ref).replace(/^id\s*:\s*/i, ''), lang)){ const k = norm(r.title) + '|' + canonLang(r.lang); if(seen.has(k)) continue; seen.add(k); out.push({ id: r.id, title: r.title, lang: r.lang }); if(out.length === 3) break; }
       return out;
@@ -115,6 +115,9 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
       const idMatch = source.match(/^id\s*:\s*(.+)$/i);
       if(idMatch){ const hit = tById.get(idMatch[1].trim()); return { hit: hit || null, ambiguous: false, candidates: [] }; }
       const raw = source;
+      const arr = tByNorm.get(norm(raw)) || [];
+      const same = arr.filter(t => canonLang(t.lang) === canonLang(task.lang));
+      const pool = same.length ? same : arr;
       return pool.length === 1 ? { hit: pool[0], ambiguous: false, candidates: pool } : { hit: null, ambiguous: pool.length > 1, candidates: pool };
     };
     const report = { linked: 0, created: 0, unresolved: [] };
