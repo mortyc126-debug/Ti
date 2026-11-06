@@ -252,6 +252,12 @@ try {
     }));
     await new Promise(r => setTimeout(r, 1100));
     await get('/api/list');
+    const preview = await post('/api/dedup', { dry: true });
+    assert.equal(preview.ok, true);
+    assert.equal(preview.dry, true);
+    assert.equal(preview.removed, 0);
+    assert.ok(preview.blocked >= 1);
+    await fs.access(path.join(L, 'library', 'js', duplicateId + '.js'));
     const dedup = await post('/api/dedup', {});
     assert.equal(dedup.ok, true);
     assert.equal(dedup.removed, 0);
