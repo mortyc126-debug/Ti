@@ -25,7 +25,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   const ids=new Map(), problems=[], duplicateCodes=new Map(), missingIds=[], languageMismatches=[], rows=[];
   const emptyDescriptions=[], shortDescriptions=[], missingTitles=[], missingGroups=[], missingLangs=[], fileFieldMismatches=[];
   const missingSchema=[], legacyMetadataFiles=[], legacyWordMaps=[], embeddedCodeMismatches=[];
-  const unknownGroups=[], wordNoteProblems=[], malformedTagFields=[], malformedComponents=[];
+  const unknownGroups=[], wordNoteProblems=[], malformedTagFields=[], malformedComponents=[], replacementCharacterFields=[], codeReplacementFiles=[];
   const statusCounts={}, descriptionLengthBuckets={empty:0,short:0,medium:0,long:0};
   const sectionDoc=JSON.parse(await fs.readFile(path.join(LIBRARY,'_sections.json'),'utf8'));
   const validGroups=new Set();
@@ -49,6 +49,8 @@ test('библиотека: пары кода и паспортов, JSON и ID 
         const effectiveId=String(meta.id || codeBase);
         if(!meta.id) missingIds.push(path.relative(LIBRARY,file));
         const relativeFile=path.relative(LIBRARY,file), relativeCode=path.relative(LIBRARY,code);
+        const scanReplacement=(value,key='')=>{if(typeof value==='string'){if(value.includes('\uFFFD')) replacementCharacterFields.push({file:relativeFile,field:key});}else if(Array.isArray(value)){value.forEach((v,i)=>scanReplacement(v,key+'['+i+']'));}else if(value&&typeof value==='object'){for(const [k,v] of Object.entries(value)) scanReplacement(v,key?key+'.'+k:k);}};
+        scanReplacement(meta);
         const desc=typeof meta.desc==='string'?meta.desc.trim():'';
         const title=typeof meta.title==='string'?meta.title.trim():'';
         const group=typeof meta.group==='string'?meta.group.trim():'';
@@ -91,6 +93,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
         codeCount++;
         if(!set.has(file+'.meta.json')) problems.push('нет паспорта для кода: '+path.relative(LIBRARY,file));
         const code=(await fs.readFile(file,'utf8')).replace(/\r\n/g,'\n').trim();
+        if(code.includes('\uFFFD')) codeReplacementFiles.push(path.relative(LIBRARY,file));
         const key=canon(langDir)+'\0'+code;
         if(code){if(!duplicateCodes.has(key))duplicateCodes.set(key,[]);duplicateCodes.get(key).push(path.relative(LIBRARY,file));}
       }
@@ -110,7 +113,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
     folderLanguageMismatches:languageMismatches.length,duplicateCodeGroups:dupGroups.length,
     duplicateCodeSamples:dupGroups,duplicateIdGroups,missingIdFiles:missingIds,
     emptyDescriptions,shortDescriptionSamples:shortDescriptions.slice(0,60),descriptionLengthBuckets,statusCounts,
-    missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,embeddedCodeMismatches,unknownGroups,wordNoteProblems:wordNoteProblems.slice(0,80),wordNoteProblemCount:wordNoteProblems.length,malformedTagFields,malformedComponents,
+    missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,embeddedCodeMismatches,unknownGroups,wordNoteProblems:wordNoteProblems.slice(0,80),wordNoteProblemCount:wordNoteProblems.length,wordNoteProblemFiles:[...new Set(wordNoteProblems.map(x=>x.file))],malformedTagFields,malformedComponents,replacementCharacterFields,codeReplacementFiles,
     problems:problems.length,languageMismatchSamples:languageMismatches.slice(0,8)
   }));
   assert.deepEqual(problems,[]);
