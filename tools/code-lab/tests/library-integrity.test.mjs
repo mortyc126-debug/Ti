@@ -156,8 +156,8 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   const sectionConfig=JSON.parse(await fs.readFile(path.join(LIBRARY,'_sections.json'),'utf8'));
   const parsedSectionRules=parseRules(sectionConfig.rules||[]);
   const templateFiles=await walk(path.join(CODELAB_ROOT,'templates'));
-  const templateGroupPlan={total:0,withLines:0,withoutLines:0,changed:0,outsideAfter:[],moves:{},missingFromLibrary:[],nonMigratable:[],duplicateIds:[],codeDuplicateCount:0,missingTemplateCodeDuplicates:[]};
-  const libraryIdSet=new Set(rows.map(row=>row.id)), seenTemplateIds=new Set();
+  const templateGroupPlan={total:0,withLines:0,withoutLines:0,changed:0,outsideAfter:[],moves:{},missingFromLibrary:[],nonMigratable:[],duplicateIds:[],codeDuplicateCount:0,missingTemplateCodeDuplicates:[],sameIdCodeConflicts:[]};
+  const libraryIdSet=new Set(rows.map(row=>row.id)), rowsById=new Map(rows.map(row=>[row.id,row])), seenTemplateIds=new Set();
   for(const file of templateFiles.filter(file=>file.toLowerCase().endsWith('.json'))){
     try{
       const value=JSON.parse(await fs.readFile(file,'utf8'));
@@ -169,6 +169,13 @@ test('библиотека: пары кода и паспортов, JSON и ID 
         if(!libraryIdSet.has(templateId)) templateGroupPlan.missingFromLibrary.push({file:path.relative(CODELAB_ROOT,file).split(path.sep).join('/'),id:templateId});
         const lang=String(value.lang||'txt').toLowerCase(), code=codeFromLines(value.lines).replace(/\r\n/g,'\n').trim();
         const matches=duplicateCodes.get(lang+'\u0000'+code)||[];
+        const sameId=rowsById.get(templateId);
+        if(sameId&&!matches.includes(sameId.file)) templateGroupPlan.sameIdCodeConflicts.push({
+          file:path.relative(CODELAB_ROOT,file).split(path.sep).join('/'),id:templateId,
+          title:value.title||'',descLength:String(value.desc||'').trim().length,
+          libraryFile:sameId.file,libraryTitle:sameId.title,libraryDescLength:sameId.descLength,
+          templateCodeLength:code.length
+        });
         if(matches.length){
           templateGroupPlan.codeDuplicateCount++;
           if(!libraryIdSet.has(templateId)){
