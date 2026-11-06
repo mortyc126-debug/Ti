@@ -76,16 +76,21 @@ export function validateConceptStore(input, { pieceIds } = {}){
     if(c.origin != null && !['manual','import','inferred'].includes(c.origin)) fail(p + '.origin', 'Неизвестный источник понятия');
   });
   for(const [alias, owners] of aliasOwners) if(owners.length > 1) warnings.push({ path: 'aliases', message: 'Вариант «' + alias + '» используется несколькими понятиями: ' + owners.join(', ') });
-  const seenRelations = new Set();
+  const seenRelations = new Set(), relationIds = new Set();
   relations.forEach((r, i) => {
     const p = 'relations[' + i + ']';
     if(!r || typeof r !== 'object' || Array.isArray(r)){ fail(p, 'Связь должна быть объектом'); return; }
-    if(!text(r.id)) fail(p + '.id', 'Нужен ID связи');
+    const relationId = text(r.id);
+    if(!relationId) fail(p + '.id', 'Нужен ID связи');
+    else if(relationIds.has(relationId)) fail(p + '.id', 'ID связи уже используется');
+    else relationIds.add(relationId);
     if(!byId.has(r.from)) fail(p + '.from', 'Исходное понятие не найдено');
     if(!byId.has(r.to)) fail(p + '.to', 'Целевое понятие не найдено');
     if(r.from && r.from === r.to) fail(p, 'Связь понятия с самим собой запрещена');
     if(!Object.prototype.hasOwnProperty.call(CONCEPT_RELATIONS, r.type)) fail(p + '.type', 'Неизвестный тип связи');
-    const key = [r.from, r.type, r.to].join('|');
+    const relationType = CONCEPT_RELATIONS[r.type];
+    const endpoints = relationType && !relationType.directed ? [r.from, r.to].sort() : [r.from, r.to];
+    const key = [endpoints[0], r.type, endpoints[1]].join('|');
     if(seenRelations.has(key)) fail(p, 'Такая связь уже существует');
     seenRelations.add(key);
     if(r.origin != null && !['manual','import','inferred'].includes(r.origin)) fail(p + '.origin', 'Неизвестный источник связи');
