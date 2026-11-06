@@ -60,6 +60,9 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   const missingSchema=[], legacyMetadataFiles=[], legacyWordMaps=[], legacyWordMapsWithoutNotes=[], legacyMigrationProposals=[], embeddedCodeMismatches=[];
   const legacyWordMapStats={maps:0,keys:0,matchedKeys:0,matchedTokenOccurrences:0,unmatchedKeySamples:[]};
   const unknownGroups=[], wordNoteProblems=[], malformedTagFields=[], malformedComponents=[], replacementCharacterFields=[], codeReplacementFiles=[];
+  const wordNoteKindCounts={}, wordNoteInvalidKindSamples=[], wordNoteUniqueRelocationSamples=[];
+  const wordNoteRepairStats={concept:0,invalidKind:0,uniqueTokenMatches:0,ambiguousTokenMatches:0,textPresentButNotToken:0,missingFromCode:0};
+  const tokenKinds=new Set(['kw','fn','name','r','num','str','com','op','sp']);
   let wordNoteTotal=0, orphanNoteTotal=0;
   const statusCounts={}, descriptionLengthBuckets={empty:0,short:0,medium:0,long:0};
   const sectionDoc=JSON.parse(await fs.readFile(path.join(LIBRARY,'_sections.json'),'utf8'));
@@ -115,12 +118,26 @@ test('библиотека: пары кода и паспортов, JSON и ID 
         if(Array.isArray(meta.orphanNotes)) orphanNoteTotal+=meta.orphanNotes.length;
         if(Array.isArray(meta.wordNotes) && meta.wordNotes.length){
           if(sourceCode==null) sourceCode=(await fs.readFile(code,'utf8')).replace(/\r\n/g,'\n');
-          const tokenLines=tokenize(sourceCode,meta.lang||langDir);
+          const tokenLines=tokenize(sourceCode,meta.lang||langDir), allTokenOccurrences=new Map();
+          for(let lineIndex=0;lineIndex<tokenLines.length;lineIndex++){
+            let tokenCol=0;
+            for(const token of tokenLines[lineIndex]){
+              const tokenText=tokText(token);
+              if(!allTokenOccurrences.has(tokenText)) allTokenOccurrences.set(tokenText,[]);
+              allTokenOccurrences.get(tokenText).push({line:lineIndex,col:tokenCol,kind:token.k});
+              tokenCol+=tokenText.length;
+            }
+          }
           for(let i=0;i<meta.wordNotes.length;i++){
-            const note=meta.wordNotes[i], line=Number(note?.line), col=Number(note?.col||0), text=String(note?.text||'');
+            const note=meta.wordNotes[i], line=Number(note?.line), col=Number(note?.col||0), text=String(note?.text||''), kind=String(note?.kind||'(missing)');
+            wordNoteKindCounts[kind]=(wordNoteKindCounts[kind]||0)+1;
+            if(kind==='concept') wordNoteRepairStats.concept++;
+            if(kind!=='concept'&&!tokenKinds.has(kind)&&kind!=='(missing)'){
+              wordNoteRepairStats.invalidKind++;
+              if(wordNoteInvalidKindSamples.length<50) wordNoteInvalidKindSamples.push({file:relativeFile,index:i,line:note?.line,col:note?.col,text,note:note?.note,kind});
+            }
             const tokens=Number.isInteger(line)&&line>=0?tokenLines[line]:null;
             let found=!!(tokens&&text&&tokens.some(token=>tokText(token)===text));
-            // Повторяем fallback placeNotes: составной старый токен может начинаться в сохранённой позиции.
             if(!found&&tokens&&Number.isInteger(col)&&col>=0){
               let currentCol=0;
               for(const token of tokens){
@@ -129,7 +146,17 @@ test('библиотека: пары кода и паспортов, JSON и ID 
                 currentCol+=tokenText.length;
               }
             }
-            if(!found) wordNoteProblems.push({file:relativeFile,index:i,line:note?.line,col:note?.col,text:note?.text,kind:note?.kind});
+            if(!found){
+              const matches=allTokenOccurrences.get(text)||[];
+              const sourceContainsText=!!text&&sourceCode.includes(text);
+              if(matches.length===1){
+                wordNoteRepairStats.uniqueTokenMatches++;
+                if(wordNoteUniqueRelocationSamples.length<80) wordNoteUniqueRelocationSamples.push({file:relativeFile,index:i,text,kind,from:{line:note?.line,col:note?.col},to:matches[0],note:note?.note});
+              }else if(matches.length>1) wordNoteRepairStats.ambiguousTokenMatches++;
+              else if(sourceContainsText) wordNoteRepairStats.textPresentButNotToken++;
+              else wordNoteRepairStats.missingFromCode++;
+              wordNoteProblems.push({file:relativeFile,index:i,line:note?.line,col:note?.col,text:note?.text,kind:note?.kind,note:note?.note,allTokenMatches:matches.length,sourceContainsText});
+            }
           }
         }
         if(meta.words && typeof meta.words==='object' && !Array.isArray(meta.words)){
@@ -308,7 +335,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
     folderLanguageMismatches:languageMismatches.length,duplicateCodeGroups:dupGroups.length,
     duplicateCodeSamples:dupGroups,duplicateIdGroups,duplicatePairQuality,duplicatePairPattern,duplicatePairSamples,otherDataGroupIssues,templateGroupPlan,migrationDryRun:{created:migrationDryRun.created,skippedExisting:migrationDryRun.skippedExisting,skippedDuplicate:migrationDryRun.skippedDuplicate,codeConflicts:migrationDryRun.codeConflicts.length,errors:migrationDryRun.errors.length},duplicateReferenceScan:{filesScanned:referenceFiles.length,idsScanned:duplicateIds.size,hitCount:duplicateReferenceHits.length,hits:duplicateReferenceHits},templateReferenceScan:{idsScanned:missingTemplateIds.size,hitCount:templateReferenceHits.length,hits:templateReferenceHits},missingIdFiles:missingIds,
     emptyDescriptions,shortDescriptionSamples:shortDescriptions.slice(0,60),descriptionLengthBuckets,statusCounts,
-    missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,legacyWordMapsWithoutNotes,legacyMigrationProposals,legacyWordMapStats,embeddedCodeMismatches,unknownGroups,wordNoteProblems:wordNoteProblems.slice(0,80),wordNoteProblemCount:wordNoteProblems.length,wordNoteProblemFiles:[...new Set(wordNoteProblems.map(x=>x.file))],wordNoteProblemByKind,wordNoteProblemByLang,wordNoteTotal,orphanNoteTotal,malformedTagFields,malformedComponents,replacementCharacterFields,codeReplacementFiles,
+    missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,legacyWordMapsWithoutNotes,legacyMigrationProposals,legacyWordMapStats,embeddedCodeMismatches,unknownGroups,wordNoteProblems:wordNoteProblems.slice(0,80),wordNoteProblemCount:wordNoteProblems.length,wordNoteProblemFiles:[...new Set(wordNoteProblems.map(x=>x.file))],wordNoteProblemByKind,wordNoteProblemByLang,wordNoteTotal,orphanNoteTotal,wordNoteKindCounts,wordNoteInvalidKindSamples,wordNoteRepairStats,wordNoteUniqueRelocationSamples,malformedTagFields,malformedComponents,replacementCharacterFields,codeReplacementFiles,
     problems:problems.length,languageMismatchSamples:languageMismatches.slice(0,8)
   }));
   assert.deepEqual(problems,[]);
