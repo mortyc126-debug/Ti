@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { tokenize } from '../lib/tokenizer.mjs';
-import { tokText } from '../lib/migrate.mjs';
+import { tokText, codeFromLines } from '../lib/migrate.mjs';
 import { mapGroup, parseRules, placeInTree } from '../lib/sections.mjs';
 import { fileURLToPath } from 'node:url';
 
@@ -155,7 +155,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   const sectionConfig=JSON.parse(await fs.readFile(path.join(LIBRARY,'_sections.json'),'utf8'));
   const parsedSectionRules=parseRules(sectionConfig.rules||[]);
   const templateFiles=await walk(path.join(CODELAB_ROOT,'templates'));
-  const templateGroupPlan={total:0,changed:0,outsideAfter:[],moves:{},missingFromLibrary:[],duplicateIds:[]};
+  const templateGroupPlan={total:0,withLines:0,withoutLines:0,changed:0,outsideAfter:[],moves:{},missingFromLibrary:[],nonMigratable:[],duplicateIds:[],codeDuplicates:[]};
   const libraryIdSet=new Set(rows.map(row=>row.id)), seenTemplateIds=new Set();
   for(const file of templateFiles.filter(file=>file.toLowerCase().endsWith('.json'))){
     try{
@@ -163,7 +163,16 @@ test('библиотека: пары кода и паспортов, JSON и ID 
       if(typeof value.group!=='string'||!value.group.trim()) continue;
       templateGroupPlan.total++;
       const templateId=String(value.id||path.basename(file,'.json'));
-      if(!libraryIdSet.has(templateId)) templateGroupPlan.missingFromLibrary.push({file:path.relative(CODELAB_ROOT,file).split(path.sep).join('/'),id:templateId});
+      if(Array.isArray(value.lines)){
+        templateGroupPlan.withLines++;
+        if(!libraryIdSet.has(templateId)) templateGroupPlan.missingFromLibrary.push({file:path.relative(CODELAB_ROOT,file).split(path.sep).join('/'),id:templateId});
+        const lang=String(value.lang||'txt').toLowerCase(), code=codeFromLines(value.lines).replace(/\r\n/g,'\n').trim();
+        const matches=duplicateCodes.get(lang+'\u0000'+code)||[];
+        if(matches.length) templateGroupPlan.codeDuplicates.push({file:path.relative(CODELAB_ROOT,file).split(path.sep).join('/'),id:templateId,libraryFiles:matches});
+      }else{
+        templateGroupPlan.withoutLines++;
+        templateGroupPlan.nonMigratable.push({file:path.relative(CODELAB_ROOT,file).split(path.sep).join('/'),id:templateId});
+      }
       if(seenTemplateIds.has(templateId)) templateGroupPlan.duplicateIds.push(templateId); else seenTemplateIds.add(templateId);
       const mapped=mapGroup(value.group,parsedSectionRules.rules);
       if(mapped.to!==value.group) templateGroupPlan.changed++;
