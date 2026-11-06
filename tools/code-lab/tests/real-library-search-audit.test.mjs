@@ -76,6 +76,11 @@ async function main() {
         phrases: hit.phrases, sections: hit.sections, pieces
       });
     }
+    const shadowRankedTop10 = await Promise.all((shadow.rankedPieces || []).slice(0, 10).map(async hit => {
+      try { return { ...hit, fragment: await readTemplate(hit.id), legacyPosition: legacyPositions.get(hit.id) ?? null }; }
+      catch (error) { return { ...hit, fetchError: String(error), legacyPosition: legacyPositions.get(hit.id) ?? null }; }
+    }));
+    const shadowRankedIds = new Set(shadowRankedTop10.map(hit => hit.id));
     results.push({
       query, legacyTotal: legacy.total ?? legacyHits.length,
       legacyTop10: await Promise.all(legacyHits.map(async hit => {
@@ -85,8 +90,9 @@ async function main() {
       shadowTotal: shadow.total ?? shadow.hits.length,
       shadowAmbiguous: shadow.ambiguous,
       shadowTop20: shadowHits,
-      legacyOnlyTop10: legacyHits.filter(hit => !shadow.hits.some(candidate => (candidate.pieces || []).some(piece => piece.id === hit.id))),
-      shadowOnlyTop10: shadowHits.filter(hit => !hit.pieces.some(piece => legacyPositions.has(piece.id))),
+      shadowRankedTop10,
+      legacyOnlyTop10: legacyHits.filter(hit => !shadowRankedIds.has(hit.id)),
+      shadowOnlyTop10: shadowRankedTop10.filter(hit => hit.legacyPosition == null),
       productionSearchChanged: comparison.productionSearchChanged
     });
   }
@@ -96,8 +102,8 @@ async function main() {
     branch: 'audit/fixes-2026-11-06',
     commit: process.env.GITHUB_SHA || null,
     libraryMode: 'real repository checkout; no synthetic fixture',
-    shadowRanking: 'target-level; pieces inside each target are alphabetically ordered and do not have independent shadow scores',
-    comparisonNote: 'legacy positions are fragment ranks; shadow positions are target ranks, so they are not directly equivalent',
+    shadowRanking: 'fragment-level; phrase match score plus title/description/tags/aliases relevance; deterministic heuristic, not semantic model ranking',
+    comparisonNote: 'shadow and legacy now expose fragment positions; their scoring systems differ, so compare rank movement and content relevance rather than raw score values',
     queryCount: queries.length,
     phraseCount: (await get('/api/search/shadow?q=' + encodeURIComponent(queries[0]) + '&limit=1')).shadowPhraseCount,
     templateCount: templateCache.size,
