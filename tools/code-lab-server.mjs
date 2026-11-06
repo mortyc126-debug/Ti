@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { annotateLines } from './code-lab/lib/annotate.mjs';
 import { createLibraryStore } from './code-lab/lib/library-store.mjs';
-import { rollbackRestore } from './code-lab/lib/restore-transaction.mjs';
+import { rollbackRestore, prepareRestoreTransaction, markRestoreTransaction, recoverRestoreTransactions } from './code-lab/lib/restore-transaction.mjs';
 import { createSearchService } from './code-lab/lib/search.mjs';
 import { tokenize } from './code-lab/lib/tokenizer.mjs';   // токенайзер отдельно — его удобнее тестировать
 import { buildUsage, libraryFingerprint } from './code-lab/lib/dict-usage.mjs';   // dict-usage: связь «слово словаря ↔ куски»
@@ -1182,13 +1182,7 @@ const server = http.createServer(async (req, res) => {
           await fs.copyFile(op.abs, backupPath);
           backups.set(op.abs, backupPath);
         }
-        if(backups.size){
-          await fs.mkdir(backupRoot, { recursive: true });
-          await fs.writeFile(path.join(backupRoot, 'manifest.json'), JSON.stringify({
-            createdAt: new Date().toISOString(),
-            files: [...backups.entries()].map(([target, backup]) => ({ target: path.relative(LIBRARY, target), backup: path.relative(backupRoot, backup) }))
-          }, null, 2) + '\n', 'utf8');
-        }
+        await prepareRestoreTransaction({ fs, backupRoot, root: LIBRARY, rootName: 'library', writes, deletions, backups });
         for(const op of writes){
           // Записываем операцию в журнал ДО изменения файла: writeFile может частично
           // изменить существующий файл и завершиться ошибкой. Тогда откат обязан
@@ -1198,8 +1192,10 @@ const server = http.createServer(async (req, res) => {
           await fs.writeFile(op.abs, op.text, 'utf8');
         }
         for(const op of deletions){ deleted.push(op); await fs.unlink(op.abs); }
+        await markRestoreTransaction({ fs, backupRoot, state: 'COMMITTED' });
       } catch(e){
         const rollbackErrors = await rollbackRestore({ fs, written, deleted, backups });
+        if(!rollbackErrors.length) await markRestoreTransaction({ fs, backupRoot, state: 'ROLLED_BACK' }).catch(markError => rollbackErrors.push(String(markError?.message || markError)));
         return json(res, 500, { ok: false, error: String(e?.message || e), backupId: backups.size ? backupId : null, rollbackErrors });
       }
 
@@ -1407,13 +1403,7 @@ const server = http.createServer(async (req, res) => {
           await fs.copyFile(op.abs, backupPath);
           backups.set(op.abs, backupPath);
         }
-        if(backups.size){
-          await fs.mkdir(backupRoot, { recursive: true });
-          await fs.writeFile(path.join(backupRoot, 'manifest.json'), JSON.stringify({
-            createdAt: new Date().toISOString(),
-            files: [...backups.entries()].map(([target, backup]) => ({ target: path.relative(ROOT, target), backup: path.relative(backupRoot, backup) }))
-          }, null, 2) + '\n', 'utf8');
-        }
+        await prepareRestoreTransaction({ fs, backupRoot, root: ROOT, rootName: 'app', writes, deletions, backups });
         for(const op of writes){
           // Журнал до записи нужен для отката даже при частичной ошибке writeFile.
           written.push(op);
@@ -1421,8 +1411,10 @@ const server = http.createServer(async (req, res) => {
           await fs.writeFile(op.abs, op.text, 'utf8');
         }
         for(const op of deletions){ deleted.push(op); await fs.unlink(op.abs); }
+        await markRestoreTransaction({ fs, backupRoot, state: 'COMMITTED' });
       } catch(e){
         const rollbackErrors = await rollbackRestore({ fs, written, deleted, backups });
+        if(!rollbackErrors.length) await markRestoreTransaction({ fs, backupRoot, state: 'ROLLED_BACK' }).catch(markError => rollbackErrors.push(String(markError?.message || markError)));
         return json(res, 500, { ok: false, error: String(e?.message || e), backupId: backups.size ? backupId : null, rollbackErrors });
       }
       try { await store.refresh(); } catch(_){}
@@ -2215,6 +2207,12 @@ $('lab-mistral-test').addEventListener('click',async()=>{const k=input.value.tri
 });
 
 {
+  const recovered = await recoverRestoreTransactions({
+    fs,
+    backupDir: path.join(DATA, 'restore-backups'),
+    roots: { library: LIBRARY, app: ROOT }
+  });
+  if(recovered.length) console.warn('[code-lab] Незавершённые восстановления отменены:', recovered.join(', '));
   const r = await store.init();
   await aiRuntime.load();
   await describeQueue.init();
