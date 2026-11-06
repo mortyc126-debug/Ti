@@ -96,7 +96,14 @@ for(const file of files){
     group:meta.group||'',title:meta.title||'',emptyDesc:!String(meta.desc||'').trim(),
     status:meta.status||'',hasMeta:set.has(metaPath),metaError:invalidMeta.some(x=>x.file===path.relative(root,metaPath)),
     notes:notes.length,orphans:orphans.length,rawHash:exact,normalizedHash:formatted,
-    metaSummary:{title:meta.title||'',group:meta.group||'',desc:meta.desc||'',tags:meta.tags||[],aliases:meta.aliases||[],status:meta.status||'',component:meta.component||null}
+    metaSummary:{
+      title:meta.title||'',group:meta.group||'',desc:meta.desc||'',tags:meta.tags||[],
+      aliases:meta.aliases||[],status:meta.status||'',component:meta.component||null,
+      source:meta.source||null,externalLinks:meta.externalLinks||meta.links||meta.references||meta.reference||null,
+      wordNotes:notes,orphanNotes:orphans
+    },
+    codeUrls:[...new Set(code.match(/https?:\\/\\/[^\\s"'<>)}\\]]+/g)||[])],
+    metaUrls:[...new Set(JSON.stringify(meta).match(/https?:\\/\\/[^\\s"'<>)}\\]]+/g)||[])]
   });
 }
 const groups=map=>[...map.values()].filter(v=>v.length>1).map(files=>({count:files.length,files}));
