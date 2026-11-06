@@ -42,6 +42,31 @@ function pieceMatchesTarget(targetKey, phrase, piece, usage) {
   return true;
 }
 
+const words = value => new Set(normalize(value).match(/[\p{L}\p{N}_-]+/gu) || []);
+function overlap(text, phraseWords) {
+  if (!phraseWords.size) return 0;
+  const haystack = words(text);
+  let common = 0;
+  for (const word of phraseWords) if (haystack.has(word)) common++;
+  return common / phraseWords.size;
+}
+
+function pieceRelevanceScore(piece, phrases) {
+  const title = normalize(piece.title);
+  const desc = normalize(piece.desc);
+  const extra = normalize([piece.group, ...(piece.tags || []), ...(piece.aliases || [])].join(' '));
+  let best = 0;
+  for (const record of phrases) {
+    const phrase = normalize(record.phrase);
+    const phraseWords = words(phrase);
+    let score = title === phrase ? 150 : title.includes(phrase) ? 120 : Math.round(70 * overlap(title, phraseWords));
+    score += desc.includes(phrase) ? 40 : Math.round(25 * overlap(desc, phraseWords));
+    score += Math.round(15 * overlap(extra, phraseWords));
+    best = Math.max(best, score);
+  }
+  return best;
+}
+
 export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null } = {}) {
   const byPhrase = new Map();
   for (const item of queryPhrases) {
@@ -63,7 +88,7 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
 
   function search(query, { language = '', scope = '', limit = 60 } = {}) {
     const q = normalize(query);
-    if (!q) return { query: q, total: 0, hits: [], ambiguous: false };
+    if (!q) return { query: q, total: 0, hits: [], rankedPieces: [], ambiguous: false };
     const grouped = new Map();
 
     for (const [phrase, records] of byPhrase) {
@@ -97,23 +122,48 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
           );
           if (!relevant) continue;
           if (!hit.sections.includes(location.section)) hit.sections.push(location.section);
-          hit.pieces.push(piece);
+          hit.pieces.push({ ...piece, relevanceScore: pieceRelevanceScore(piece, hit.phrases) });
         }
       }
       hit.phrases.sort((a, b) => a.phrase.localeCompare(b.phrase, 'ru'));
       hit.sections.sort();
-      hit.pieces.sort((a, b) => String(a.title || a.id).localeCompare(String(b.title || b.id), 'ru'));
+      hit.pieces.sort((a, b) =>
+        b.relevanceScore - a.relevanceScore ||
+        String(a.title || a.id).localeCompare(String(b.title || b.id), 'ru')
+      );
     }
 
     // Цель без единого реального фрагмента не является результатом поиска по библиотеке.
     const hits = [...grouped.values()].filter(hit => hit.pieces.length > 0).sort((a, b) =>
       b.score - a.score || a.targetKey.localeCompare(b.targetKey, 'ru')
     );
+    const rankedById = new Map();
+    for (const [targetPosition, hit] of hits.entries()) {
+      for (const [piecePosition, piece] of hit.pieces.entries()) {
+        const candidate = {
+          ...piece, targetKey: hit.targetKey, targetScore: hit.score,
+          targetPosition: targetPosition + 1, piecePositionWithinTarget: piecePosition + 1,
+          combinedScore: hit.score * 1000 + piece.relevanceScore
+        };
+        const previous = rankedById.get(piece.id);
+        if (!previous || candidate.combinedScore > previous.combinedScore) {
+          rankedById.set(piece.id, { ...candidate, matchedTargets: [...(previous?.matchedTargets || []), hit.targetKey] });
+        } else if (!previous.matchedTargets.includes(hit.targetKey)) {
+          previous.matchedTargets.push(hit.targetKey);
+        }
+      }
+    }
+    const rankedPieces = [...rankedById.values()].sort((a, b) =>
+      b.combinedScore - a.combinedScore ||
+      String(a.title || a.id).localeCompare(String(b.title || b.id), 'ru')
+    ).map((piece, index) => ({ ...piece, position: index + 1 }));
+
     return {
       query: q,
       total: hits.length,
       ambiguous: hits.length > 1,
-      hits: hits.slice(0, Math.max(1, Math.min(200, Number(limit) || 60)))
+      hits: hits.slice(0, Math.max(1, Math.min(200, Number(limit) || 60))),
+      rankedPieces: rankedPieces.slice(0, Math.max(1, Math.min(200, Number(limit) || 60)))
     };
   }
 
