@@ -26,6 +26,7 @@ const context = {
     raw: { fields: [{k:'code'}] }
   },
   IDENTIFIER_RE: /^[\p{ID_Start}_$][\p{ID_Continue}_$]*$/u,
+  nodeLang(nd){ return nd.lang || 'js'; },
   blockContract(nd){
     return {
       array:{output:'array',outputField:'name'},
