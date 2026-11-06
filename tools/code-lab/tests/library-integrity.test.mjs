@@ -57,7 +57,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   const langs=(await fs.readdir(LIBRARY,{withFileTypes:true})).filter(x=>x.isDirectory()).map(x=>x.name);
   const ids=new Map(), problems=[], duplicateCodes=new Map(), missingIds=[], languageMismatches=[], rows=[];
   const emptyDescriptions=[], shortDescriptions=[], missingTitles=[], missingGroups=[], missingLangs=[], fileFieldMismatches=[];
-  const missingSchema=[], legacyMetadataFiles=[], legacyWordMaps=[], embeddedCodeMismatches=[];
+  const missingSchema=[], legacyMetadataFiles=[], legacyWordMaps=[], legacyWordMapsWithoutNotes=[], legacyMigrationProposals=[], embeddedCodeMismatches=[];
   const legacyWordMapStats={maps:0,keys:0,matchedKeys:0,matchedTokenOccurrences:0,unmatchedKeySamples:[]};
   const unknownGroups=[], wordNoteProblems=[], malformedTagFields=[], malformedComponents=[], replacementCharacterFields=[], codeReplacementFiles=[];
   let wordNoteTotal=0, orphanNoteTotal=0;
@@ -132,16 +132,33 @@ test('библиотека: пары кода и паспортов, JSON и ID 
             if(!found) wordNoteProblems.push({file:relativeFile,index:i,line:note?.line,col:note?.col,text:note?.text,kind:note?.kind});
           }
         }
-        if(meta.words && typeof meta.words==='object' && !Array.isArray(meta.words) && !Array.isArray(meta.wordNotes)){
+        if(meta.words && typeof meta.words==='object' && !Array.isArray(meta.words)){
           legacyWordMaps.push(relativeFile); legacyWordMapStats.maps++;
+          if(!Array.isArray(meta.wordNotes)) legacyWordMapsWithoutNotes.push(relativeFile);
           if(sourceCode==null) sourceCode=(await fs.readFile(code,'utf8')).replace(/\r\n/g,'\n');
-          const tokens=tokenize(sourceCode,meta.lang||langDir).flat().map(tokText);
+          const tokenLines=tokenize(sourceCode,meta.lang||langDir), occurrencesByWord=new Map(), proposedNotes=[];
+          for(let lineIndex=0;lineIndex<tokenLines.length;lineIndex++){
+            let col=0;
+            for(const token of tokenLines[lineIndex]){
+              const word=tokText(token);
+              if(Object.hasOwn(meta.words,word)){
+                occurrencesByWord.set(word,(occurrencesByWord.get(word)||0)+1);
+                if(!Array.isArray(meta.wordNotes)) proposedNotes.push({line:lineIndex,col,text:word,kind:token.k,note:String(meta.words[word]),source:'custom'});
+              }
+              col+=word.length;
+            }
+          }
           for(const [word,note] of Object.entries(meta.words)){
             legacyWordMapStats.keys++;
-            const occurrences=tokens.filter(token=>token===word).length;
+            const occurrences=occurrencesByWord.get(word)||0;
             if(occurrences){legacyWordMapStats.matchedKeys++;legacyWordMapStats.matchedTokenOccurrences+=occurrences;}
             else if(legacyWordMapStats.unmatchedKeySamples.length<30) legacyWordMapStats.unmatchedKeySamples.push({file:relativeFile,word,note});
           }
+          if(!Array.isArray(meta.wordNotes)&&!meta.schema) legacyMigrationProposals.push({
+            metaFile:relativeFile,id:meta.id||path.basename(code,path.extname(code)),file:path.basename(code),
+            status:desc?'active':'needs_description',wordNotes:proposedNotes,
+            unmatchedWords:Object.entries(meta.words).filter(([word])=>!occurrencesByWord.has(word)).map(([text,note])=>({text,note:String(note)}))
+          });
         }
         rows.push({ id:effectiveId, lang:canon(meta.lang || langDir), file:relativeCode, title, descLength:desc.length, tagsCount:Array.isArray(meta.tags)?meta.tags.length:0, aliasesCount:Array.isArray(meta.aliases)?meta.aliases.length:0, wordNotesCount:Array.isArray(meta.wordNotes)?meta.wordNotes.length:0, orphanNotesCount:Array.isArray(meta.orphanNotes)?meta.orphanNotes.length:0, componentProvidesCount:Array.isArray(meta.component?.provides)?meta.component.provides.length:0, componentRequiresCount:Array.isArray(meta.component?.requires)?meta.component.requires.length:0, status });
         if(meta.lang && canon(meta.lang)!==canon(langDir)) languageMismatches.push(relativeFile+' ('+meta.lang+')');
@@ -291,7 +308,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
     folderLanguageMismatches:languageMismatches.length,duplicateCodeGroups:dupGroups.length,
     duplicateCodeSamples:dupGroups,duplicateIdGroups,duplicatePairQuality,duplicatePairPattern,duplicatePairSamples,otherDataGroupIssues,templateGroupPlan,migrationDryRun:{created:migrationDryRun.created,skippedExisting:migrationDryRun.skippedExisting,skippedDuplicate:migrationDryRun.skippedDuplicate,codeConflicts:migrationDryRun.codeConflicts.length,errors:migrationDryRun.errors.length},duplicateReferenceScan:{filesScanned:referenceFiles.length,idsScanned:duplicateIds.size,hitCount:duplicateReferenceHits.length,hits:duplicateReferenceHits},templateReferenceScan:{idsScanned:missingTemplateIds.size,hitCount:templateReferenceHits.length,hits:templateReferenceHits},missingIdFiles:missingIds,
     emptyDescriptions,shortDescriptionSamples:shortDescriptions.slice(0,60),descriptionLengthBuckets,statusCounts,
-    missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,legacyWordMapStats,embeddedCodeMismatches,unknownGroups,wordNoteProblems:wordNoteProblems.slice(0,80),wordNoteProblemCount:wordNoteProblems.length,wordNoteProblemFiles:[...new Set(wordNoteProblems.map(x=>x.file))],wordNoteProblemByKind,wordNoteProblemByLang,wordNoteTotal,orphanNoteTotal,malformedTagFields,malformedComponents,replacementCharacterFields,codeReplacementFiles,
+    missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,legacyWordMapsWithoutNotes,legacyMigrationProposals,legacyWordMapStats,embeddedCodeMismatches,unknownGroups,wordNoteProblems:wordNoteProblems.slice(0,80),wordNoteProblemCount:wordNoteProblems.length,wordNoteProblemFiles:[...new Set(wordNoteProblems.map(x=>x.file))],wordNoteProblemByKind,wordNoteProblemByLang,wordNoteTotal,orphanNoteTotal,malformedTagFields,malformedComponents,replacementCharacterFields,codeReplacementFiles,
     problems:problems.length,languageMismatchSamples:languageMismatches.slice(0,8)
   }));
   assert.deepEqual(problems,[]);
