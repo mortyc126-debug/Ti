@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { annotateLines } from './code-lab/lib/annotate.mjs';
 import { createLibraryStore } from './code-lab/lib/library-store.mjs';
+import { rollbackRestore } from './code-lab/lib/restore-transaction.mjs';
 import { createSearchService } from './code-lab/lib/search.mjs';
 import { tokenize } from './code-lab/lib/tokenizer.mjs';   // токенайзер отдельно — его удобнее тестировать
 import { buildUsage, libraryFingerprint } from './code-lab/lib/dict-usage.mjs';   // dict-usage: связь «слово словаря ↔ куски»
@@ -1198,14 +1199,7 @@ const server = http.createServer(async (req, res) => {
         }
         for(const op of deletions){ deleted.push(op); await fs.unlink(op.abs); }
       } catch(e){
-        const rollbackErrors = [];
-        for(const op of [...written, ...deleted].reverse()){
-          try {
-            const backupPath = backups.get(op.abs);
-            if(backupPath){ await fs.mkdir(path.dirname(op.abs), { recursive: true }); await fs.copyFile(backupPath, op.abs); }
-            else if(written.includes(op)) await fs.unlink(op.abs).catch(() => {});
-          } catch(err){ rollbackErrors.push(String(err?.message || err)); }
-        }
+        const rollbackErrors = await rollbackRestore({ fs, written, deleted, backups });
         return json(res, 500, { ok: false, error: String(e?.message || e), backupId: backups.size ? backupId : null, rollbackErrors });
       }
 
@@ -1428,14 +1422,7 @@ const server = http.createServer(async (req, res) => {
         }
         for(const op of deletions){ deleted.push(op); await fs.unlink(op.abs); }
       } catch(e){
-        const rollbackErrors = [];
-        for(const op of [...written, ...deleted].reverse()){
-          try {
-            const backupPath = backups.get(op.abs);
-            if(backupPath){ await fs.mkdir(path.dirname(op.abs), { recursive: true }); await fs.copyFile(backupPath, op.abs); }
-            else if(written.includes(op)) await fs.unlink(op.abs).catch(() => {});
-          } catch(err){ rollbackErrors.push(String(err?.message || err)); }
-        }
+        const rollbackErrors = await rollbackRestore({ fs, written, deleted, backups });
         return json(res, 500, { ok: false, error: String(e?.message || e), backupId: backups.size ? backupId : null, rollbackErrors });
       }
       try { await store.refresh(); } catch(_){}
