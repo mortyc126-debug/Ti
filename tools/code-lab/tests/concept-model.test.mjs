@@ -54,7 +54,7 @@ assert.ok(validateConceptStore(duplicateRelationId).errors.some(e => e.path === 
 
 console.log('concept-model: 10 checks passed');
 
-const migratedV1 = migrateConceptStore({ schemaVersion: 1, concepts: [], relations: [] });
+const migratedV1 = migrateConceptStore({ schemaVersion: 2, concepts: [], relations: [] });
 assert.deepEqual(migratedV1, { schemaVersion: 2, concepts: [], relations: [], queryPhrases: [] });
 assert.equal(validateConceptStore(migratedV1).valid, true);
 
@@ -70,6 +70,34 @@ badPhrase.queryPhrases = [{ id: 'q1', phrase: '', targetConceptId: 'missing', la
 const badPhraseResult = validateConceptStore(badPhrase);
 assert.ok(badPhraseResult.errors.some(e => e.path === 'queryPhrases[0].phrase'));
 assert.ok(badPhraseResult.errors.some(e => e.path === 'queryPhrases[0].targetConceptId'));
+const duplicatePhrase = base();
+duplicatePhrase.queryPhrases = [
+  { id: 'q1', phrase: 'та же фраза', targetConceptId: 'debounce', language: 'js', scope: 'timer' },
+  { id: 'q2', phrase: 'ТА ЖЕ ФРАЗА', targetConceptId: 'debounce', language: 'JS', scope: 'timer' }
+];
+assert.ok(validateConceptStore(duplicatePhrase).errors.some(e => e.message.includes('Такая поисковая фраза уже связана')));
+console.log('concept-model: schema v2 and query phrase checks passed');
+
+const migratedV1 = migrateConceptStore({ schemaVersion: 1, concepts: [], relations: [] });
+assert.deepEqual(migratedV1, { schemaVersion: 2, concepts: [], relations: [], queryPhrases: [] });
+assert.equal(validateConceptStore(migratedV1).valid, true);
+
+const phraseStore = base();
+phraseStore.queryPhrases = [
+  { id: 'q1', phrase: 'запустить после паузы', targetConceptId: 'debounce', language: 'js', scope: 'timer', origin: 'manual', confidence: 0.9, source: { file: 'dict.json', key: 'debounce' } },
+  { id: 'q2', phrase: 'запустить после паузы', targetConceptId: 'timer', language: 'py', scope: 'asyncio', origin: 'import' },
+  { id: 'q3', phrase: 'запустить после паузы', targetKey: 'legacy-key', origin: 'import', source: { file: 'synonyms.json', key: 'legacy-key', index: 0 } }
+];
+assert.equal(validateConceptStore(phraseStore).valid, true);
+assert.ok(validateConceptStore(phraseStore).warnings.some(w => w.message.includes('неоднозначность сохранена')));
+const badPhrase = base();
+badPhrase.queryPhrases = [{ id: 'q1', phrase: '', targetConceptId: 'missing', language: '', scope: '', origin: 'manual' }];
+const badPhraseResult = validateConceptStore(badPhrase);
+assert.ok(badPhraseResult.errors.some(e => e.path === 'queryPhrases[0].phrase'));
+assert.ok(badPhraseResult.errors.some(e => e.path === 'queryPhrases[0].targetConceptId'));
+const invalidTarget = base();
+invalidTarget.queryPhrases = [{ id: 'q1', phrase: 'x', targetKey: 'k', targetConceptId: 'debounce' }];
+assert.ok(validateConceptStore(invalidTarget).errors.some(e => e.message.includes('ровно одну цель')));
 const duplicatePhrase = base();
 duplicatePhrase.queryPhrases = [
   { id: 'q1', phrase: 'та же фраза', targetConceptId: 'debounce', language: 'js', scope: 'timer' },
