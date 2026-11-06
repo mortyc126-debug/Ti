@@ -25,7 +25,18 @@ async function walk(dir){
   return out;
 }
 function hasIdentifier(text,id){
-  const escaped=String(id).replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\async function walkReferenceFiles(dir){');
+  const body=String(text), needle=String(id);
+  const isWord=ch=>!!ch&&/[\\p{L}\\p{N}_-]/u.test(ch);
+  let from=0, at=-1;
+  while((at=body.indexOf(needle,from))>=0){
+    const before=at>0?body[at-1]:'';
+    const after=body[at+needle.length]||'';
+    if(!isWord(before)&&!isWord(after)) return true;
+    from=at+1;
+  }
+  return false;
+}
+async function walkReferenceFiles(dir){');
   return new RegExp('(^|[^\\\\p{L}\\\\p{N}_-])'+escaped+'($|[^\\\\p{L}\\\\p{N}_-])','u').test(text);
 }
 async function walkReferenceFiles(dir){
