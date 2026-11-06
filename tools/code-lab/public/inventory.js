@@ -105,7 +105,7 @@ async function deletePiece(id){
   const t = PIECES.find(x => x.id === id); if(!t) return;
   if(!confirm('Удалить кусок «' + (t.title || id) + '»? Файл удалится без возврата.')) return;
   const result = await fetch('/api/delete', { method:'POST', body: JSON.stringify({ id }) }).then(r => r.json()).catch(() => null);
-  if(!result || !result.ok){ const refs = (result && result.references || []).map(x => x.type + ': ' + (x.title || x.term || x.id)).join('\\n'); alert((result && result.error) || 'Не удалось удалить кусок.' + (refs ? '\\n' + refs : '')); return; }
+  if(!result || !result.ok){ const refs = (result && result.references || []).map(x => x.type + ': ' + (x.title || x.term || x.id)).join('\n'); const message = (result && result.error) || 'Не удалось удалить кусок.'; alert(message + (refs ? '\n' + refs : '')); return; }
   try { PIECES = await fetch('/api/list?labels=1').then(r => r.json()); } catch(_){ PIECES = PIECES.filter(x => x.id !== id); }
   fillFilters(); renderPieces();
 }
