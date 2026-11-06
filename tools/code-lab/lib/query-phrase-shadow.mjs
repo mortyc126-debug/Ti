@@ -52,6 +52,7 @@ function pieceMatchesTarget(targetKey, phrase, piece, usage) {
   return true;
 }
 
+const conceptIdentity = targetKey => normalize(targetKey).replace(/\([^()]*\)$/, '');
 const words = value => new Set(normalize(value).match(/[\p{L}\p{N}_-]+/gu) || []);
 function overlap(text, phraseWords) {
   if (!phraseWords.size) return 0;
@@ -171,7 +172,7 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
     return {
       query: q,
       total: hits.length,
-      ambiguous: hits.length > 1,
+      ambiguous: new Set(hits.map(hit => conceptIdentity(hit.targetKey))).size > 1,
       hits: hits.slice(0, Math.max(1, Math.min(200, Number(limit) || 60))),
       rankedPieces: rankedPieces.slice(0, Math.max(1, Math.min(200, Number(limit) || 60)))
     };
