@@ -53,6 +53,32 @@ await test('ошибка записи паспорта откатывает уж
   assert.equal(restored.desc, 'Старое описание');
 });
 
+await test('частичная запись самого файла кода тоже откатывается вместе с паспортом', async () => {
+  const root = path.join(tmp, 'rollback-partial-code');
+  const stable = mk(root); await stable.init();
+  await stable.save({ id: 'частичная-пара', lang: 'js', title: 'До сбоя', desc: 'Описание до сбоя', lines: tokenize('const safeValue = 7;', 'js') });
+  let fail = true;
+  const faultStore = mk(root, { writeAtomicFile: async (p, content) => {
+    if(fail && p.endsWith('.js')) {
+      fail = false;
+      await fs.mkdir(path.dirname(p), { recursive: true });
+      await fs.writeFile(p, 'const broken = ', 'utf8');
+      throw new Error('simulated partial code write');
+    }
+    await fs.mkdir(path.dirname(p), { recursive: true });
+    await fs.writeFile(p, content, 'utf8');
+  }});
+  await faultStore.init();
+  const changed = await faultStore.get('частичная-пара');
+  changed.lines = tokenize('const unsafeValue = 99;', 'js');
+  changed.desc = 'Новое описание';
+  await assert.rejects(faultStore.save(changed), /simulated partial code write/);
+  const check = mk(root); await check.init();
+  const restored = await check.get('частичная-пара');
+  assert.equal(codeOf(restored.lines), 'const safeValue = 7;');
+  assert.equal(restored.desc, 'Описание до сбоя');
+});
+
 await test('ошибка паспорта при создании удаляет частично созданный код', async () => {
   const root = path.join(tmp, 'rollback-new');
   let fail = true;
