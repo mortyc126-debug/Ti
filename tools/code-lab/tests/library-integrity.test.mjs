@@ -155,12 +155,16 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   const sectionConfig=JSON.parse(await fs.readFile(path.join(LIBRARY,'_sections.json'),'utf8'));
   const parsedSectionRules=parseRules(sectionConfig.rules||[]);
   const templateFiles=await walk(path.join(CODELAB_ROOT,'templates'));
-  const templateGroupPlan={total:0,changed:0,outsideAfter:[],moves:{}};
+  const templateGroupPlan={total:0,changed:0,outsideAfter:[],moves:{},missingFromLibrary:[],duplicateIds:[]};
+  const libraryIdSet=new Set(rows.map(row=>row.id)), seenTemplateIds=new Set();
   for(const file of templateFiles.filter(file=>file.toLowerCase().endsWith('.json'))){
     try{
       const value=JSON.parse(await fs.readFile(file,'utf8'));
       if(typeof value.group!=='string'||!value.group.trim()) continue;
       templateGroupPlan.total++;
+      const templateId=String(value.id||path.basename(file,'.json'));
+      if(!libraryIdSet.has(templateId)) templateGroupPlan.missingFromLibrary.push({file:path.relative(CODELAB_ROOT,file).split(path.sep).join('/'),id:templateId});
+      if(seenTemplateIds.has(templateId)) templateGroupPlan.duplicateIds.push(templateId); else seenTemplateIds.add(templateId);
       const mapped=mapGroup(value.group,parsedSectionRules.rules);
       if(mapped.to!==value.group) templateGroupPlan.changed++;
       const move=value.group+' => '+mapped.to;
