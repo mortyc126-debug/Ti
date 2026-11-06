@@ -18,7 +18,7 @@ async function walk(dir, rel = '') {
   catch (error) { if (error.code === 'ENOENT') return; throw error; }
   for (const entry of entries) {
     if (entry.name.startsWith('.') || ['node_modules', 'vendor'].includes(entry.name)) continue;
-    const abs = path.join(dir, entry.name), childRel = rel ? path.join(rel, entry.name) : entry.name;
+    const abs = path.join(dir, entry.name), childRel = rel ? path.posix.join(rel, entry.name) : entry.name;
     if (entry.isDirectory()) await walk(abs, childRel);
     else if (entry.isFile() && allowed.has(path.extname(entry.name).toLowerCase())) files.push({ abs, rel: childRel });
   }
