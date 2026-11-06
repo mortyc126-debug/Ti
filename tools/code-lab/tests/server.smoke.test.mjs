@@ -54,7 +54,7 @@ try {
     assert.equal((await fetch(base + '/api/template?id=нет')).status, 404);
   });
 
-  let newId;
+  let newId, protectedId;
   await test('добавление: файл на диске, дубль не плодится', async () => {
     const r = await post('/api/add', { title: 'Моё', lang: 'js', code: 'const база = 1;\nconsole.log(база)', desc: 'тест', group: 'Мои' });
     newId = r.id; assert.ok(newId);
@@ -122,6 +122,7 @@ try {
     const js = await post('/api/add', { title: 'Одинаковый текст JS', lang: 'js', code: source });
     const py = await post('/api/add', { title: 'Одинаковый текст Python', lang: 'python', code: source });
     assert.ok(js.id && py.id && js.id !== py.id, 'для разных языков создаются разные куски');
+    protectedId = js.id;
     assert.equal((await get('/api/template?id=' + encodeURIComponent(js.id))).lang, 'js');
     assert.equal((await get('/api/template?id=' + encodeURIComponent(py.id))).lang, 'python');
 
@@ -130,6 +131,37 @@ try {
     assert.equal(imported.updated, 1);
     assert.equal((await get('/api/template?id=' + encodeURIComponent(js.id))).lang, 'js', 'импорт Python не меняет язык JS-куска');
     assert.equal((await get('/api/template?id=' + encodeURIComponent(py.id))).lang, 'python');
+  });
+
+  await test('удаление и дедупликация защищают куски со ссылками', async () => {
+    await fs.mkdir(path.join(L, 'recipes'), { recursive: true });
+    await fs.writeFile(path.join(L, 'recipes', 'uses-piece.json'), JSON.stringify({ id: 'uses-piece', title: 'Рецепт со ссылкой', items: [{ id: protectedId, title: 'Кусок' }] }));
+    await fs.mkdir(path.join(L, 'flows'), { recursive: true });
+    await fs.writeFile(path.join(L, 'flows', 'uses-piece.json'), JSON.stringify({ id: 'flow-uses-piece', name: 'Схема со ссылкой', graph: { nodes: [{ id: 'node-1', src: { id: protectedId, title: 'Кусок' } }], edges: [] } }));
+    await fs.mkdir(path.join(L, 'public', 'dict'), { recursive: true });
+    await fs.writeFile(path.join(L, 'public', 'dict', 'examples.json'), JSON.stringify({ print: { id: protectedId, title: 'Кусок' } }));
+
+    const deleted = await post('/api/delete', { id: protectedId });
+    assert.equal(deleted.ok, false);
+    const types = new Set((deleted.references || []).map(x => x.type));
+    assert.ok(types.has('recipe'));
+    assert.ok(types.has('flow'));
+    assert.ok(types.has('dictionary-example'));
+    await fs.access(path.join(L, 'library', 'js', protectedId + '.js'));
+
+    const duplicateId = 'duplicate-of-protected';
+    await fs.writeFile(path.join(L, 'library', 'js', duplicateId + '.js'), 'print("одинаковый текст")');
+    await fs.writeFile(path.join(L, 'library', 'js', duplicateId + '.js.meta.json'), JSON.stringify({
+      id: duplicateId, lang: 'js', title: 'Дубль защищённого куска', group: 'Тест', desc: 'Дубликат для проверки ссылок', tags: [], aliases: []
+    }));
+    await new Promise(r => setTimeout(r, 1100));
+    await get('/api/list');
+    const dedup = await post('/api/dedup', {});
+    assert.equal(dedup.ok, true);
+    assert.equal(dedup.removed, 0);
+    assert.ok(dedup.blocked >= 1);
+    assert.ok(dedup.blockedGroups.some(g => g.ids.includes(protectedId)));
+    await fs.access(path.join(L, 'library', 'js', duplicateId + '.js'));
   });
 
   await test('восстановление архива сохраняет пути и резервирует перезаписи', async () => {
