@@ -10,8 +10,12 @@ try {
   const root = path.join(tmp, 'tools', 'code-lab');
   await fs.mkdir(path.join(root, 'tasks'), { recursive: true });
   await fs.mkdir(path.join(root, 'recipes'), { recursive: true });
+  await fs.mkdir(path.join(root, 'library', 'js'), { recursive: true });
+  await fs.mkdir(path.join(root, 'public', 'dict'), { recursive: true });
   await fs.writeFile(path.join(root, 'tasks', 'task.json'), JSON.stringify({ id: 'task-1', steps: [{ id: 'legacy-piece', kind: 'piece' }, { id: 'legacy-piece' }] }));
   await fs.writeFile(path.join(root, 'recipes', 'readme.md'), 'Ссылка: legacy-piece\n');
+  await fs.writeFile(path.join(root, 'library', 'js', 'legacy-piece.js.meta.json'), JSON.stringify({ id: 'legacy-piece', component: { examples: [{ pieceId: 'legacy-piece' }] } }));
+  await fs.writeFile(path.join(root, 'public', 'dict', 'examples.json'), JSON.stringify({ other: { id: 'legacy-piece' } }));
   const manifestPath = path.join(tmp, 'manifest.json');
   const outputPath = path.join(tmp, 'report.json');
   await fs.writeFile(manifestPath, JSON.stringify({ pairs: [{ legacyIds: [{ id: 'legacy-piece', redirectTo: 'canonical-piece' }, { id: 'unused-piece', redirectTo: 'canonical-unused' }] }] }));
@@ -21,11 +25,13 @@ try {
   const report = JSON.parse(await fs.readFile(outputPath, 'utf8'));
   assert.equal(report.legacyIdsTotal, 2);
   assert.equal(report.referencedLegacyIds, 1);
-  assert.equal(report.referenceCount, 3);
+  assert.equal(report.referenceCount, 5);
   assert.deepEqual(report.unreferencedLegacyIds, ['unused-piece']);
   assert.equal(report.references.filter(x => x.file === 'tasks/task.json').length, 2);
+  assert.equal(report.references.filter(x => x.file === 'library/js/legacy-piece.js.meta.json').length, 1);
+  assert.equal(report.references.filter(x => x.file === 'public/dict/examples.json').length, 1);
   assert.equal(report.references.find(x => x.file === 'recipes/readme.md').count, 1);
-  console.log('audit-duplicate-id-references: 7 checks passed');
+  console.log('audit-duplicate-id-references: 9 checks passed');
 } finally {
   await fs.rm(tmp, { recursive: true, force: true });
 }
