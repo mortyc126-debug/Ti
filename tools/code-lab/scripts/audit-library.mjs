@@ -100,6 +100,8 @@ for(const file of files){
   });
 }
 const groups=map=>[...map.values()].filter(v=>v.length>1).map(files=>({count:files.length,files}));
+const recordByFile=new Map(records.map(x=>[x.file,x]));
+const duplicateReview=groups(rawHashes).map(g=>({count:g.count,files:g.files.map(f=>recordByFile.get(f))}));
 const report={
   generatedAt:new Date().toISOString(),root,
   totals:{codeFiles:records.length,passportFiles:files.filter(f=>f.endsWith('.meta.json')).length,
