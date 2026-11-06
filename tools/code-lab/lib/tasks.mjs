@@ -59,7 +59,7 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
     if(!okId(id)) return null;
     try { return JSON.parse(await fs.readFile(fileOf(id), 'utf8')); } catch(_){ return null; }
   }
-  async function remove(id){ if(!okId(id)) return false; if((await usedBy(id)).length) return false; await fs.unlink(fileOf(id)).catch(() => {}); return true; }
+  async function remove(id){ if(!okId(id)) return false; if((await usedBy(id, 'task')).length) return false; await fs.unlink(fileOf(id)).catch(() => {}); return true; }
 
   // ссылка «кусок: X» → id куска: id:…, точный id, точное название (свой язык первым), название без знаков
   function pieceResolver(all, lang){
@@ -218,11 +218,11 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
   }
 
   // где упоминается кусок/задача (для «используется в задачах»)
-  async function usedBy(id){
+  async function usedBy(id, kind = null){
     const out = [];
     for(const t of await list()){
       const full = await get(t.id); if(!full) continue;
-      let hit = false; TaskFormat.eachOption(full.steps, o => { if(o.kind === 'task' && o.id === id) hit = true; });
+      let hit = false; TaskFormat.eachOption(full.steps, o => { if((kind === null || o.kind === kind) && o.id === id) hit = true; });
       if(hit) out.push({ id: t.id, title: t.title });
     }
     return out;
