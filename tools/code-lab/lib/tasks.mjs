@@ -10,6 +10,7 @@ export const TaskFormat = require('../public/tasks-format.js');
 
 const MAX_DEPTH = 12, MAX_STEPS = 400;
 const norm = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+const canonLang = s => ({ javascript:'js', jsx:'js', typescript:'ts', tsx:'ts', py:'python', python3:'python', sh:'bash', shell:'bash', cplusplus:'cpp', cxx:'cpp', cs:'csharp', 'c#':'csharp', golang:'go', rb:'ruby' }[String(s || '').trim().toLowerCase()] || String(s || '').trim().toLowerCase());
 const str = (v, n) => String(v == null ? '' : v).slice(0, n);
 
 // чистим присланное дерево: только известные поля, ограничения по размеру и глубине
