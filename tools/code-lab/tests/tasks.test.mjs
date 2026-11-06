@@ -284,7 +284,7 @@ test('раскладка: смесь букв, русская и английс�
 test('правила структуры: разбор, HTML-вложенность, CSS «требует», JS/Python «внутри/после», шаблон', () => {
   const S = require('../public/structure-rules.js');
   const all = require('../public/dict/structure.json');
-  for(const l of Object.keys(all)) assert.equal(S.parse(all[l].join('\n')).bad.length, 0, 'правила ' + l + ' разбираются');
+  for(const l of Object.keys(all)) { const parsed = S.parse(all[l].join('\\n')); assert.equal(parsed.bad.length, 0, 'правила ' + l + ' разбираются: ' + JSON.stringify(parsed.bad)); }
   const p = S.parse('li: внутри ul, ol — пояснение\nкривая строка\nx: странно что-то');
   assert.equal(p.rules.length, 2); assert.equal(p.rules[0].note, 'пояснение'); assert.equal(p.bad.length, 1);
   assert.equal(p.rules[1].verb, 'заметка'); assert.ok(p.rules[1].guessed);   // «x: странно что-то» — не правило, а заметка
