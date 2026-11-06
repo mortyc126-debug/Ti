@@ -169,6 +169,10 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
     obj.aliases = Array.isArray(m.aliases) ? m.aliases : [];
     obj.source = m.source || {};
     obj.status = m.status || '';
+    obj.wordNotes = Array.isArray(m.wordNotes) ? m.wordNotes : [];
+    if(Array.isArray(m.orphanNotes)) obj.orphanNotes = m.orphanNotes;
+    if(m.labels && typeof m.labels === 'object') obj.labels = m.labels;
+    obj.passport = { ...m };
     return obj;
   }
 
@@ -245,10 +249,37 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
         }
         const metaPath = codePath + META_SUFFIX;
 
-        // прежние пояснения встают на новый код (если у токена нет своего)
+        // Паспорт может прийти из ZIP как целиком, так и отдельными полями.
+        // Неизвестные поля сохраняем, а авторитет ручных значений не понижаем импортом/ИИ.
+        const incomingMeta = obj.passport && typeof obj.passport === 'object' && !Array.isArray(obj.passport) ? obj.passport : {};
+        const incomingSource = { ...(incomingMeta.source || {}), ...(obj.source || {}) };
+        const rank = { ai: 1, imported: 2, manual: 3 };
+        const authority = field => rank[incomingSource[field] || origin] || 0;
+        const canUpdate = field => !e || authority(field) >= (rank[(old.source || {})[field]] || 0);
+        const incomingValue = key => obj[key] != null ? obj[key] : incomingMeta[key];
+        const choose = (key, field, fallback) => {
+          const value = incomingValue(key);
+          if(value != null && canUpdate(field)) return value;
+          if(old[key] != null) return old[key];
+          if(incomingMeta[key] != null) return incomingMeta[key];
+          return fallback;
+        };
+
         const look = makeLook(lang, dict);
         const oldNotes = [...(old.wordNotes || []).filter(n => n.source !== 'dict' && n.note), ...(old.orphanNotes || [])];
-        const unplaced = placeNotes(lines, oldNotes, look, { onlyEmpty: true });
+        const incomingNotes = [
+          ...(Array.isArray(obj.wordNotes) ? obj.wordNotes : []),
+          ...(Array.isArray(obj.orphanNotes) ? obj.orphanNotes : []),
+          ...(Array.isArray(incomingMeta.wordNotes) ? incomingMeta.wordNotes : []),
+          ...(Array.isArray(incomingMeta.orphanNotes) ? incomingMeta.orphanNotes : [])
+        ];
+        const noteMap = new Map();
+        for(const n of [...oldNotes, ...incomingNotes]){
+          if(!n || typeof n.text !== 'string' || typeof n.note !== 'string') continue;
+          const key = [n.line || 0, n.col || 0, n.text, n.note, n.source || 'custom'].join('|');
+          if(!noteMap.has(key)) noteMap.set(key, n);
+        }
+        const unplaced = placeNotes(lines, [...noteMap.values()], look, { onlyEmpty: true });
         const notes = [];
         lines.forEach((line, li) => {
           let col = 0;
@@ -259,23 +290,40 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
           }
         });
 
-        const meta = { ...old };
+        const meta = { ...old, ...incomingMeta };
         meta.schema = 1; meta.id = id; meta.file = path.basename(codePath); meta.lang = lang;
-        const nv = (k, def) => (obj[k] != null ? obj[k] : (old[k] != null ? old[k] : def));
-        meta.title = nv('title', id); meta.group = nv('group', ''); meta.desc = nv('desc', ''); meta.output = nv('output', '');
-        if(obj.descAt != null) meta.descAt = obj.descAt;
-        if('component' in obj && obj.component) meta.component = obj.component;
-        if(Array.isArray(obj.tags)) meta.tags = obj.tags.map(String); else if(!Array.isArray(meta.tags)) meta.tags = [];
-        if(Array.isArray(obj.aliases)) meta.aliases = obj.aliases.map(String); else if(!Array.isArray(meta.aliases)) meta.aliases = [];
+        meta.title = String(choose('title', 'title', id));
+        meta.group = String(incomingValue('group') != null ? incomingValue('group') : (old.group || ''));
+        meta.desc = String(choose('desc', 'desc', ''));
+        meta.output = String(incomingValue('output') != null ? incomingValue('output') : (old.output || ''));
+        const descAt = incomingValue('descAt');
+        if(descAt != null) meta.descAt = descAt;
+        if(obj.component && typeof obj.component === 'object') meta.component = { ...(meta.component || {}), ...obj.component };
+        else if(incomingMeta.component && typeof incomingMeta.component === 'object') meta.component = { ...(meta.component || {}), ...incomingMeta.component };
+        const tags = incomingValue('tags');
+        if(Array.isArray(tags) && canUpdate('tags')) meta.tags = tags.map(String);
+        else if(!Array.isArray(meta.tags)) meta.tags = [];
+        const aliases = incomingValue('aliases');
+        if(Array.isArray(aliases)) meta.aliases = aliases.map(String);
+        else if(!Array.isArray(meta.aliases)) meta.aliases = [];
         const src = { title: null, desc: null, tags: null, ...(old.source || {}) };
-        if(!e || meta.title !== (old.title || '')) src.title = origin;
-        if((meta.desc || '') !== (old.desc || '') && meta.desc) src.desc = origin;
-        if(JSON.stringify(meta.tags) !== JSON.stringify(old.tags || []) && meta.tags.length) src.tags = origin;
+        for(const field of ['title','desc','tags']){
+          const next = incomingSource[field];
+          if(next && (rank[next] || 0) >= (rank[src[field]] || 0)) src[field] = next;
+          else if((field === 'title' && meta.title !== (old.title || '')) ||
+                  (field === 'desc' && meta.desc !== (old.desc || '') && meta.desc) ||
+                  (field === 'tags' && JSON.stringify(meta.tags) !== JSON.stringify(old.tags || []) && meta.tags.length)){
+            if(canUpdate(field)) src[field] = origin;
+          }
+        }
         meta.source = src;
-        meta.status = String(meta.desc || '').trim() ? 'described' : 'needs_description';
+        const incomingStatus = incomingValue('status');
+        meta.status = incomingStatus && canUpdate('desc') ? String(incomingStatus) : (String(meta.desc || '').trim() ? 'described' : 'needs_description');
         meta.wordNotes = notes;
         if(unplaced.length) meta.orphanNotes = unplaced.slice(0, 50); else delete meta.orphanNotes;
-        if(obj.source && typeof obj.source === 'object' && !e) meta.source = { ...src, ...obj.source };
+        const labels = incomingValue('labels');
+        if(labels && typeof labels === 'object' && !Array.isArray(labels)) meta.labels = { ...labels };
+        else if(!meta.labels || typeof meta.labels !== 'object') delete meta.labels;
 
         await writeAtomic(codePath, code);
         await writeAtomic(metaPath, JSON.stringify(meta, null, 2) + '\n');
