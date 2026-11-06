@@ -91,7 +91,7 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
     try {
       // одинаковые названия схлопываем: ссылка пишется названием, и выбор между двойниками ничего не меняет
       const seen = new Set(), out = [];
-      for(const r of await similarPieces(String(ref).replace(/^id\s*:\s*/i, ''), lang)){ const k = String(r.title || '').trim().toLowerCase(); if(seen.has(k)) continue; seen.add(k); out.push({ id: r.id, title: r.title, lang: r.lang }); if(out.length === 3) break; }
+      for(const r of await similarPieces(String(ref).replace(/^id\s*:\s*/i, ''), lang)){ const k = norm(r.title) + '|' + canonLang(r.lang); if(seen.has(k)) continue; seen.add(k); out.push({ id: r.id, title: r.title, lang: r.lang }); if(out.length === 3) break; }
       return out;
     } catch(_){ return []; }
   }
@@ -110,10 +110,10 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
     const tById = new Map(tIndex.map(t => [t.id, t])), tByNorm = new Map();
     for(const t of tIndex){ const key = norm(t.title); if(!tByNorm.has(key)) tByNorm.set(key, []); tByNorm.get(key).push(t); }
     const pickTask = ref => {
-      const raw = String(ref || '').replace(/^id\s*:\s*/i, '').trim();
-      const arr = tByNorm.get(norm(raw)) || [];
-      const same = arr.filter(t => canonLang(t.lang) === canonLang(task.lang));
-      const pool = same.length ? same : arr;
+      const source = String(ref || '').trim();
+      const idMatch = source.match(/^id\s*:\s*(.+)$/i);
+      if(idMatch){ const hit = tById.get(idMatch[1].trim()); return { hit: hit || null, ambiguous: false, candidates: [] }; }
+      const raw = source;
       return pool.length === 1 ? { hit: pool[0], ambiguous: false, candidates: pool } : { hit: null, ambiguous: pool.length > 1, candidates: pool };
     };
     const report = { linked: 0, created: 0, unresolved: [] };
