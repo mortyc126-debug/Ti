@@ -134,6 +134,8 @@ ${String(entry.code).slice(0, 6000)}`;
       if (added || state.jobs.some(j => j.status === 'queued')) void runWorker();
       return { added, ...summary() };
     },
-    async get() { return summary(); }
+    async get() { return summary(); },
+    // Ожидание нужно для корректного завершения тестов и обслуживающих задач перед закрытием хранилища.
+    async waitForIdle() { if (workerPromise) await workerPromise; }
   };
 }
