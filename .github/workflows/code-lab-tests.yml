@@ -31,7 +31,7 @@ jobs:
         run: |
           set -uo pipefail
           shopt -s nullglob
-          tests=(tools/code-lab/tests/*.test.mjs tools/code-lab/tests/*.test.js)
+          tests=(tools/code-lab/tests/*.test.mjs tools/code-lab/tests/*.test.js tools/code-lab/lib/*.test.mjs)
           if (( ${#tests[@]} == 0 )); then
             echo "::error::Тестовые файлы не найдены"
             exit 1
