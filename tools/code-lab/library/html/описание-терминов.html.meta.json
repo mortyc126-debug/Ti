@@ -9,5 +9,94 @@
     "dl": "Контейнер списка описаний.",
     "dt": "Термин или название в списке описаний.",
     "dd": "Описание или определение соответствующего термина."
-  }
+  },
+  "schema": 1,
+  "id": "описание-терминов",
+  "file": "описание-терминов.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "dl",
+      "kind": "name",
+      "note": "Контейнер списка описаний.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 3,
+      "text": "dt",
+      "kind": "name",
+      "note": "Термин или название в списке описаний.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 12,
+      "text": "dt",
+      "kind": "name",
+      "note": "Термин или название в списке описаний.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "dd",
+      "kind": "name",
+      "note": "Описание или определение соответствующего термина.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 34,
+      "text": "dd",
+      "kind": "name",
+      "note": "Описание или определение соответствующего термина.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 3,
+      "text": "dt",
+      "kind": "name",
+      "note": "Термин или название в списке описаний.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 11,
+      "text": "dt",
+      "kind": "name",
+      "note": "Термин или название в списке описаний.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 3,
+      "text": "dd",
+      "kind": "name",
+      "note": "Описание или определение соответствующего термина.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 45,
+      "text": "dd",
+      "kind": "name",
+      "note": "Описание или определение соответствующего термина.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 2,
+      "text": "dl",
+      "kind": "name",
+      "note": "Контейнер списка описаний.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }

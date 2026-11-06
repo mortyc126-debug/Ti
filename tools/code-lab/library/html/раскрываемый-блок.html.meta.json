@@ -8,5 +8,46 @@
   "words": {
     "details": "Создаёт раскрываемый блок с дополнительным содержимым.",
     "summary": "Задаёт видимый заголовок и переключатель раскрытия details."
-  }
+  },
+  "schema": 1,
+  "id": "раскрываемый-блок",
+  "file": "раскрываемый-блок.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "details",
+      "kind": "name",
+      "note": "Создаёт раскрываемый блок с дополнительным содержимым.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 3,
+      "text": "summary",
+      "kind": "name",
+      "note": "Задаёт видимый заголовок и переключатель раскрытия details.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 33,
+      "text": "summary",
+      "kind": "name",
+      "note": "Задаёт видимый заголовок и переключатель раскрытия details.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "details",
+      "kind": "name",
+      "note": "Создаёт раскрываемый блок с дополнительным содержимым.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }

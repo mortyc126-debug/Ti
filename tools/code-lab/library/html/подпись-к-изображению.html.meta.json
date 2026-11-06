@@ -8,5 +8,46 @@
   "words": {
     "figure": "Самостоятельный иллюстративный или справочный блок.",
     "figcaption": "Добавляет подпись к содержимому figure."
-  }
+  },
+  "schema": 1,
+  "id": "подпись-к-изображению",
+  "file": "подпись-к-изображению.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "figure",
+      "kind": "name",
+      "note": "Самостоятельный иллюстративный или справочный блок.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "figcaption",
+      "kind": "name",
+      "note": "Добавляет подпись к содержимому figure.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 47,
+      "text": "figcaption",
+      "kind": "name",
+      "note": "Добавляет подпись к содержимому figure.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 2,
+      "text": "figure",
+      "kind": "name",
+      "note": "Самостоятельный иллюстративный или справочный блок.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }

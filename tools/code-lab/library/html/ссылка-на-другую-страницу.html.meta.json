@@ -8,5 +8,62 @@
   "words": {
     "a": "Создаёт гиперссылку.",
     "href": "Задаёт адрес назначения ссылки."
-  }
+  },
+  "schema": 1,
+  "id": "ссылка-на-другую-страницу",
+  "file": "ссылка-на-другую-страницу.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "a",
+      "kind": "name",
+      "note": "Создаёт гиперссылку.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 3,
+      "text": "href",
+      "kind": "name",
+      "note": "Задаёт адрес назначения ссылки.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 45,
+      "text": "a",
+      "kind": "name",
+      "note": "Создаёт гиперссылку.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 1,
+      "text": "a",
+      "kind": "name",
+      "note": "Создаёт гиперссылку.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 3,
+      "text": "href",
+      "kind": "name",
+      "note": "Задаёт адрес назначения ссылки.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 34,
+      "text": "a",
+      "kind": "name",
+      "note": "Создаёт гиперссылку.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }

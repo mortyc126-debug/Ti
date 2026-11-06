@@ -19,5 +19,126 @@
     "search": "Поле для ввода поискового запроса.",
     "button": "Создаёт кнопку.",
     "submit": "Отправляет форму."
-  }
+  },
+  "schema": 1,
+  "id": "простая-форма-с-полями",
+  "file": "простая-форма-с-полями.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "form",
+      "kind": "name",
+      "note": "Группирует элементы для отправки пользовательских данных.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 6,
+      "text": "action",
+      "kind": "name",
+      "note": "Задаёт адрес обработчика формы.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 23,
+      "text": "method",
+      "kind": "name",
+      "note": "Определяет HTTP-метод отправки формы.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 3,
+      "text": "label",
+      "kind": "name",
+      "note": "Создаёт подпись для элемента управления.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 9,
+      "text": "for",
+      "kind": "kw",
+      "note": "Связывает подпись с элементом по его id.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 39,
+      "text": "label",
+      "kind": "name",
+      "note": "Создаёт подпись для элемента управления.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "input",
+      "kind": "name",
+      "note": "Создаёт поле ввода.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 9,
+      "text": "id",
+      "kind": "name",
+      "note": "Задаёт уникальный идентификатор элемента.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 20,
+      "text": "name",
+      "kind": "name",
+      "note": "Задаёт имя поля, под которым отправляется его значение.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 29,
+      "text": "type",
+      "kind": "name",
+      "note": "Определяет тип поля или кнопки.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 3,
+      "text": "button",
+      "kind": "name",
+      "note": "Создаёт кнопку.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 10,
+      "text": "type",
+      "kind": "name",
+      "note": "Определяет тип поля или кнопки.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 31,
+      "text": "button",
+      "kind": "name",
+      "note": "Создаёт кнопку.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "form",
+      "kind": "name",
+      "note": "Группирует элементы для отправки пользовательских данных.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }

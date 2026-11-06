@@ -8,5 +8,38 @@
   "words": {
     "blockquote": "Обозначает цитируемый текст отдельным блоком.",
     "cite": "Указывает URL источника цитаты или справочной информации."
-  }
+  },
+  "schema": 1,
+  "id": "цитата-и-источник",
+  "file": "цитата-и-источник.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 3,
+      "text": "blockquote",
+      "kind": "name",
+      "note": "Обозначает цитируемый текст отдельным блоком.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 14,
+      "text": "cite",
+      "kind": "name",
+      "note": "Указывает URL источника цитаты или справочной информации.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "blockquote",
+      "kind": "name",
+      "note": "Обозначает цитируемый текст отдельным блоком.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }

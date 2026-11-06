@@ -14,5 +14,222 @@
     "td": "Обычная ячейка таблицы.",
     "scope": "Указывает, к каким ячейкам относится заголовок.",
     "col": "Обозначает, что заголовок относится к столбцу."
-  }
+  },
+  "schema": 1,
+  "id": "таблица-с-заголовками-столбцов",
+  "file": "таблица-с-заголовками-столбцов.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "table",
+      "kind": "name",
+      "note": "Создаёт таблицу.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 3,
+      "text": "thead",
+      "kind": "name",
+      "note": "Группирует строки заголовка таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 5,
+      "text": "tr",
+      "kind": "name",
+      "note": "Создаёт строку таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 9,
+      "text": "th",
+      "kind": "name",
+      "note": "Ячейка-заголовок таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 12,
+      "text": "scope",
+      "kind": "name",
+      "note": "Указывает, к каким ячейкам относится заголовок.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 36,
+      "text": "th",
+      "kind": "name",
+      "note": "Ячейка-заголовок таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 40,
+      "text": "th",
+      "kind": "name",
+      "note": "Ячейка-заголовок таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 43,
+      "text": "scope",
+      "kind": "name",
+      "note": "Указывает, к каким ячейкам относится заголовок.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 61,
+      "text": "th",
+      "kind": "name",
+      "note": "Ячейка-заголовок таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 66,
+      "text": "tr",
+      "kind": "name",
+      "note": "Создаёт строку таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 4,
+      "text": "thead",
+      "kind": "name",
+      "note": "Группирует строки заголовка таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 3,
+      "text": "tbody",
+      "kind": "name",
+      "note": "Группирует основные строки данных таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 5,
+      "text": "tr",
+      "kind": "name",
+      "note": "Создаёт строку таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 9,
+      "text": "td",
+      "kind": "name",
+      "note": "Обычная ячейка таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 21,
+      "text": "td",
+      "kind": "name",
+      "note": "Обычная ячейка таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 25,
+      "text": "td",
+      "kind": "name",
+      "note": "Обычная ячейка таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 33,
+      "text": "td",
+      "kind": "name",
+      "note": "Обычная ячейка таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 5,
+      "col": 38,
+      "text": "tr",
+      "kind": "name",
+      "note": "Создаёт строку таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 5,
+      "text": "tr",
+      "kind": "name",
+      "note": "Создаёт строку таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 9,
+      "text": "td",
+      "kind": "name",
+      "note": "Обычная ячейка таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 21,
+      "text": "td",
+      "kind": "name",
+      "note": "Обычная ячейка таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 25,
+      "text": "td",
+      "kind": "name",
+      "note": "Обычная ячейка таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 33,
+      "text": "td",
+      "kind": "name",
+      "note": "Обычная ячейка таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 6,
+      "col": 38,
+      "text": "tr",
+      "kind": "name",
+      "note": "Создаёт строку таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 7,
+      "col": 4,
+      "text": "tbody",
+      "kind": "name",
+      "note": "Группирует основные строки данных таблицы.",
+      "source": "custom"
+    },
+    {
+      "line": 8,
+      "col": 2,
+      "text": "table",
+      "kind": "name",
+      "note": "Создаёт таблицу.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }
