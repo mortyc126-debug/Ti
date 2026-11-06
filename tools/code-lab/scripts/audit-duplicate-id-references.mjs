@@ -9,7 +9,7 @@ const outputPath = path.resolve(process.argv[4] || 'duplicate-id-reference-repor
 const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
 const legacy = new Map();
 for (const pair of manifest.pairs || []) for (const item of pair.legacyIds || []) legacy.set(item.id, item.redirectTo);
-const roots = ['tasks', 'recipes', 'flows', 'data', 'workspace', 'templates'];
+const roots = ['tasks', 'recipes', 'flows', 'data', 'workspace', 'templates', 'library', 'public/dict'];
 const allowed = new Set(['.json', '.txt', '.md', '.js', '.mjs', '.html', '.yml', '.yaml']);
 const files = [];
 async function walk(dir, rel = '') {
@@ -20,7 +20,11 @@ async function walk(dir, rel = '') {
     if (entry.name.startsWith('.') || ['node_modules', 'vendor'].includes(entry.name)) continue;
     const abs = path.join(dir, entry.name), childRel = rel ? path.posix.join(rel, entry.name) : entry.name;
     if (entry.isDirectory()) await walk(abs, childRel);
-    else if (entry.isFile() && allowed.has(path.extname(entry.name).toLowerCase())) files.push({ abs, rel: childRel });
+    else if (entry.isFile() && allowed.has(path.extname(entry.name).toLowerCase())) {
+      if (childRel.startsWith('library/') && !entry.name.endsWith('.meta.json')) continue;
+      if (childRel.startsWith('public/dict/') && path.extname(entry.name).toLowerCase() !== '.json') continue;
+      files.push({ abs, rel: childRel });
+    }
   }
 }
 for (const name of roots) await walk(path.join(root, name), name);
@@ -34,7 +38,9 @@ for (const file of files) {
   }
   if (json !== null) {
     const visit = (value, jsonPath) => {
-      if (typeof value === 'string' && legacy.has(value)) references.push({ id: value, redirectTo: legacy.get(value), file: file.rel, jsonPath });
+      const selfId = file.rel.startsWith('library/') || file.rel.startsWith('templates/')
+        ? path.basename(file.rel).replace(/\.meta\.json$/i, '').replace(/\.json$/i, '').replace(/\.[^.]+$/i, '') : null;
+      if (typeof value === 'string' && legacy.has(value) && !(jsonPath === '$.id' && value === selfId)) references.push({ id: value, redirectTo: legacy.get(value), file: file.rel, jsonPath });
       else if (Array.isArray(value)) value.forEach((v, i) => visit(v, jsonPath + '[' + i + ']'));
       else if (value && typeof value === 'object') for (const [key, v] of Object.entries(value)) {
         if (legacy.has(key)) references.push({ id: key, redirectTo: legacy.get(key), file: file.rel, jsonPath: jsonPath + '.' + key, keyReference: true });
