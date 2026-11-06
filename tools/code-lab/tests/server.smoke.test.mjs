@@ -106,6 +106,7 @@ try {
       id: 'css-size', lang: 'css', title: 'Размер шрифта', group: 'CSS: шрифты',
       desc: 'Задаёт размер шрифта', tags: [], aliases: []
     }));
+    await new Promise(resolve => setTimeout(resolve, 1100)); // дождаться окна сканирования библиотеки
     await get('/api/list'); // обновить индекс после добавления карточки
     const query = 'толщина шрифта';
     const legacy = await get('/api/search?q=' + encodeURIComponent(query));
