@@ -127,7 +127,8 @@ function selectConcept(id) {
   $('concept-name').value = concept.name || '';
   $('concept-definition').value = concept.definition || '';
   $('concept-aliases').value = (concept.aliases || []).map(x => typeof x === 'string' ? x : x.value).join('\n');
-  $('concept-forms').value = formsToText(concept.forms);\n  $('concept-query-phrases').value = queryPhrasesToText(data.queryPhrases.filter(x => x.targetConceptId === id));
+  $('concept-forms').value = formsToText(concept.forms);
+  $('concept-query-phrases').value = queryPhrasesToText(data.queryPhrases.filter(x => x.targetConceptId === id));
   $('concept-tags').value = (concept.tags || []).join(', ');
   $('delete-concept').disabled = false;
   fillTargets(); renderExamples(); renderRelations(); searchList(); message('');
