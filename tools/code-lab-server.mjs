@@ -183,13 +183,26 @@ async function getUsage(){
 
 // Отдельный теневой индекс направленных фраз. Источник читается в памяти;
 // ни manifest, ни legacy-словарь не переписываются.
-let _queryPhraseShadow = null, _queryPhraseShadowUsage = null, _queryPhraseShadowStamp = -1;
+let _queryPhraseShadow = null, _queryPhraseShadowUsage = null, _queryPhraseShadowStamp = '';
 async function getQueryPhraseShadow(){
-  const stamp = await fs.stat(SYN_FILE).then(s => s.mtimeMs, () => 0);
+  const [synStamp, conceptStamp] = await Promise.all([
+    fs.stat(SYN_FILE).then(s => s.mtimeMs + ':' + s.size, () => 'missing'),
+    fs.stat(concepts.filePath).then(s => s.mtimeMs + ':' + s.size, () => 'missing')
+  ]);
+  const stamp = synStamp + '|' + conceptStamp;
   const usage = await getUsage();
   if(_queryPhraseShadow && _queryPhraseShadowStamp === stamp && _queryPhraseShadowUsage === usage) return _queryPhraseShadow;
-  const imported = buildLegacyQueryPhraseImport(await loadSynonyms(), { sourceFile: 'public/dict/synonyms.json' });
-  _queryPhraseShadow = createLegacyQueryPhraseShadow({ queryPhrases: imported.manifest.queryPhrases, usage });
+  const [imported, conceptData] = await Promise.all([
+    loadSynonyms().then(value => buildLegacyQueryPhraseImport(value, { sourceFile: 'tools/code-lab/public/dict/synonyms.json' })),
+    concepts.get()
+  ]);
+  // Пользовательские и курируемые фразы хранятся отдельно от legacy-синонимов.
+  // В shadow попадают только направленные записи с targetKey; обычные алиасы не смешиваются.
+  const curated = (conceptData.queryPhrases || []).filter(item => item && item.targetKey);
+  _queryPhraseShadow = createLegacyQueryPhraseShadow({
+    queryPhrases: [...imported.manifest.queryPhrases, ...curated],
+    usage
+  });
   _queryPhraseShadowUsage = usage;
   _queryPhraseShadowStamp = stamp;
   return _queryPhraseShadow;
