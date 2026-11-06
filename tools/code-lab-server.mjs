@@ -2091,7 +2091,7 @@ const server = http.createServer(async (req, res) => {
       await store.sync();
       if(_variantSnapshot.v !== store.version || _variantSnapshot.dict !== dict){
         const ents = await store.entries();
-        const rows = ents.map(e => ({ id:e.id, lang:e.lang, title:e.title, code:e.code, nlines:String(e.code || '').split('\\n').length }));
+        const rows = ents.map(e => ({ id:e.id, lang:e.lang, title:e.title, code:e.code, nlines:String(e.code || '').split('\n').length }));
         _variantSnapshot = { v:store.version, dict, rows, codes:ents.map(e => e.code) };
       }
       if(_caseMap.v !== store.version || _caseMap.dict !== dict)
