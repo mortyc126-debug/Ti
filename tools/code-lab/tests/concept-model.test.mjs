@@ -14,7 +14,7 @@ const base = () => ({
 assert.deepEqual(createEmptyConceptStore(), { schemaVersion: 2, concepts: [], relations: [], queryPhrases: [] });
 assert.equal(validateConceptStore(base(), { pieceIds: new Set(['js-debounce']) }).valid, true);
 assert.equal(CONCEPT_RELATIONS.depends.searchable, false);
-assert.deepEqual(migrateConceptStore({ schemaVersion: 1, concepts: [], relations: [], queryPhrases: [{ id: 'keep', phrase: 'сохранить', targetKey: 'key' }] }), { schemaVersion: 2, concepts: [], relations: [], queryPhrases: [] });
+assert.deepEqual(migrateConceptStore({ schemaVersion: 1, concepts: [], relations: [], queryPhrases: [{ id: 'keep', phrase: 'сохранить', targetKey: 'key' }] }), { schemaVersion: 2, concepts: [], relations: [], queryPhrases: [{ id: 'keep', phrase: 'сохранить', targetKey: 'key' }] });
 
 const missingPiece = base();
 missingPiece.concepts[0].examples[0].pieceId = 'missing';
