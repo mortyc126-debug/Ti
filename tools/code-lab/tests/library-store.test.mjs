@@ -199,5 +199,23 @@ await test('автомиграция: пустая library + templates/ → ку
   assert.equal(JSON.parse(await fs.readFile(path.join(legacy, 'старый.json'), 'utf8')).id, 'старый');
 });
 
+
+await test('больше пятидесяти непривязанных пояснений не теряются при сохранении', async () => {
+  const notes = Array.from({ length: 60 }, (_, i) => ({
+    line: 0, col: i, text: 'missingToken' + i, note: 'пояснение ' + i, source: 'custom'
+  }));
+  await store.save({
+    id: 'много-сирот', lang: 'js', title: 'Много заметок',
+    lines: tokenize('const present = 1;', 'js'), wordNotes: notes
+  });
+  const file = path.join(tmp, 'lib', 'js', 'много-сирот.js.meta.json');
+  let meta = JSON.parse(await fs.readFile(file, 'utf8'));
+  assert.equal(meta.orphanNotes.length, 60);
+  await store.save(await store.get('много-сирот'));
+  meta = JSON.parse(await fs.readFile(file, 'utf8'));
+  assert.equal(meta.orphanNotes.length, 60);
+  assert.equal(meta.orphanNotes[59].note, 'пояснение 59');
+});
+
 await fs.rm(tmp, { recursive: true, force: true });
 console.log(`library-store: ${n} проверок пройдено`);
