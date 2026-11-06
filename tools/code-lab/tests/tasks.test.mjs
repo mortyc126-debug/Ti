@@ -120,6 +120,20 @@ test('неоднозначные названия кусков и задач н�
   await fs.rm(root, { recursive: true, force: true });
 });
 
+test('хранилище не удаляет задачу, на которую ссылается другая задача', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tasks-'));
+  const store = createTaskStore({ root, rows: async () => [] });
+  await fs.writeFile(path.join(root, 'task-a.json'), JSON.stringify({ id: 'task-a', title: 'Первая', lang: 'js', steps: [] }));
+  await fs.writeFile(path.join(root, 'task-b.json'), JSON.stringify({
+    id: 'task-b', title: 'Вторая', lang: 'js',
+    steps: [{ q: 'Следующий шаг', options: [{ kind: 'task', id: 'task-a', ref: 'Первая', label: 'перейти' }] }]
+  }));
+  assert.equal((await store.usedBy('task-a')).length, 1);
+  assert.equal(await store.remove('task-a'), false);
+  assert.ok(await store.get('task-a'));
+  await fs.rm(root, { recursive: true, force: true });
+});
+
 test('что дальше: имя без источника → куски и задачи, которые его дают; HTML закрывает #id', () => {
   const contract = (code, lang) => lang === 'html' ? { provides: ['#box'], requires: [] } : { provides: ['run'], requires: ['btn', '#box', 'i'] };
   const rows = [{ id: 'p1', title: 'Кнопка', lang: 'js', nlines: 2, comp: { provides: ['btn'], requires: [] } }];
