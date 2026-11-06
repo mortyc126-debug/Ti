@@ -5,6 +5,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { extFor, safeName } from './lang.mjs';
+import { mapGroup, parseRules } from './sections.mjs';
 
 // Токен без поля v — одиночный пробел (так выглядит sp в части шаблонов).
 export const tokText = t => (t.v != null ? String(t.v) : (t.k === 'sp' ? ' ' : ''));
@@ -49,7 +50,9 @@ export async function migrateTemplates({ src, out, dictPath, dry = false, force 
   const dict = dictPath ? await fs.readFile(dictPath, 'utf8').then(JSON.parse).catch(() => null) : null;
   const inDict = buildDictLookup(dict);
 
-  const report = { src, out, dry, total: names.length, created: 0, skippedExisting: 0, errors: [], byLang: {}, notes: { dict: 0, custom: 0 }, emptyDesc: [], withComponent: 0 };
+  const report = { src, out, dry, total: names.length, created: 0, skippedExisting: 0, errors: [], byLang: {}, notes: { dict: 0, custom: 0 }, emptyDesc: [], withComponent: 0, groupsRemapped: 0, groupMoves: {} };
+  let groupRules = [];
+  try { const sections = JSON.parse(await fs.readFile(path.join(out, '_sections.json'), 'utf8')); groupRules = parseRules(sections.rules || []).rules; } catch(_) {}
   const usedPaths = new Map(); // нижний регистр пути → id (коллизии на Windows/macOS)
 
   for(const name of names){
@@ -74,6 +77,9 @@ export async function migrateTemplates({ src, out, dictPath, dry = false, force 
     const notes = wordNotes(j.lines, inDict);
     notes.forEach(n => { report.notes[n.source]++; });
     const hasDesc = !!(j.desc && String(j.desc).trim());
+    const originalGroup = j.group || '';
+    const group = groupRules.length ? mapGroup(originalGroup, groupRules).to : originalGroup;
+    if(group !== originalGroup){ report.groupsRemapped++; const move = originalGroup + ' => ' + group; report.groupMoves[move] = (report.groupMoves[move] || 0) + 1; }
     if(!hasDesc) report.emptyDesc.push(id);
     if(j.component) report.withComponent++;
     report.byLang[lang] = (report.byLang[lang] || 0) + 1;
@@ -84,7 +90,7 @@ export async function migrateTemplates({ src, out, dictPath, dry = false, force 
       file: base + '.' + ext,
       title: j.title || id,
       lang,
-      group: j.group || '',
+      group,
       desc: j.desc || '',
       output: j.output || '',
       tags: [],
