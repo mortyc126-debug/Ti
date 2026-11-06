@@ -1147,6 +1147,7 @@ const server = http.createServer(async (req, res) => {
       const backupId = 'library-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
       const backupRoot = path.join(DATA, 'restore-backups', backupId);
       const backups = new Map(), written = [], deleted = [];
+      let transactionPrepared = false;
       const lstatOrNull = async target => { try { return await fs.lstat(target); } catch(e){ if(e.code === 'ENOENT') return null; throw e; } };
       const safeStat = async target => {
         const rootStat = await lstatOrNull(LIBRARY);
@@ -1193,6 +1194,7 @@ const server = http.createServer(async (req, res) => {
           backups.set(op.abs, backupPath);
         }
         await prepareRestoreTransaction({ fs, backupRoot, root: LIBRARY, rootName: 'library', writes, deletions, backups });
+        transactionPrepared = true;
         for(const op of writes){
           // Записываем операцию в журнал ДО изменения файла: writeFile может частично
           // изменить существующий файл и завершиться ошибкой. Тогда откат обязан
@@ -1205,7 +1207,7 @@ const server = http.createServer(async (req, res) => {
         await markRestoreTransaction({ fs, backupRoot, state: 'COMMITTED' });
       } catch(e){
         const rollbackErrors = await rollbackRestore({ fs, written, deleted, backups });
-        if(!rollbackErrors.length) await markRestoreTransaction({ fs, backupRoot, state: 'ROLLED_BACK' }).catch(markError => rollbackErrors.push(String(markError?.message || markError)));
+        if(!rollbackErrors.length && transactionPrepared) await markRestoreTransaction({ fs, backupRoot, state: 'ROLLED_BACK' }).catch(markError => rollbackErrors.push(String(markError?.message || markError)));
         if(rollbackErrors.length) restoreRecoveryRequired = true;
         return json(res, 500, { ok: false, error: String(e?.message || e), backupId: backups.size ? backupId : null, rollbackErrors });
       }
@@ -1359,6 +1361,7 @@ const server = http.createServer(async (req, res) => {
       const backupId = 'full-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
       const backupRoot = path.join(DATA, 'restore-backups', backupId);
       const backups = new Map(), written = [], deleted = [];
+      let transactionPrepared = false;
       const lstatOrNull = async target => { try { return await fs.lstat(target); } catch(e){ if(e.code === 'ENOENT') return null; throw e; } };
       const safeStat = async target => {
         const rootStat = await lstatOrNull(ROOT);
@@ -1421,6 +1424,7 @@ const server = http.createServer(async (req, res) => {
           backups.set(op.abs, backupPath);
         }
         await prepareRestoreTransaction({ fs, backupRoot, root: ROOT, rootName: 'app', writes, deletions, backups });
+        transactionPrepared = true;
         for(const op of writes){
           // Журнал до записи нужен для отката даже при частичной ошибке writeFile.
           written.push(op);
@@ -1431,7 +1435,7 @@ const server = http.createServer(async (req, res) => {
         await markRestoreTransaction({ fs, backupRoot, state: 'COMMITTED' });
       } catch(e){
         const rollbackErrors = await rollbackRestore({ fs, written, deleted, backups });
-        if(!rollbackErrors.length) await markRestoreTransaction({ fs, backupRoot, state: 'ROLLED_BACK' }).catch(markError => rollbackErrors.push(String(markError?.message || markError)));
+        if(!rollbackErrors.length && transactionPrepared) await markRestoreTransaction({ fs, backupRoot, state: 'ROLLED_BACK' }).catch(markError => rollbackErrors.push(String(markError?.message || markError)));
         if(rollbackErrors.length) restoreRecoveryRequired = true;
         return json(res, 500, { ok: false, error: String(e?.message || e), backupId: backups.size ? backupId : null, rollbackErrors });
       }
