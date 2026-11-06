@@ -74,5 +74,6 @@ jobs:
             duplicate-merge-manifest.json
             duplicate-id-reference-report.json
             duplicate-merge-preview.json
+            query-phrase-audit.json
           if-no-files-found: warn
           retention-days: 7
