@@ -1189,11 +1189,14 @@ const server = http.createServer(async (req, res) => {
           }, null, 2) + '\n', 'utf8');
         }
         for(const op of writes){
+          // Записываем операцию в журнал ДО изменения файла: writeFile может частично
+          // изменить существующий файл и завершиться ошибкой. Тогда откат обязан
+          // восстановить исходную копию либо удалить частично созданный файл.
+          written.push(op);
           await fs.mkdir(path.dirname(op.abs), { recursive: true });
           await fs.writeFile(op.abs, op.text, 'utf8');
-          written.push(op);
         }
-        for(const op of deletions){ await fs.unlink(op.abs); deleted.push(op); }
+        for(const op of deletions){ deleted.push(op); await fs.unlink(op.abs); }
       } catch(e){
         const rollbackErrors = [];
         for(const op of [...written, ...deleted].reverse()){
@@ -1413,11 +1416,12 @@ const server = http.createServer(async (req, res) => {
           }, null, 2) + '\n', 'utf8');
         }
         for(const op of writes){
+          // Журнал до записи нужен для отката даже при частичной ошибке writeFile.
+          written.push(op);
           await fs.mkdir(path.dirname(op.abs), { recursive: true });
           await fs.writeFile(op.abs, op.text, 'utf8');
-          written.push(op);
         }
-        for(const op of deletions){ await fs.unlink(op.abs); deleted.push(op); }
+        for(const op of deletions){ deleted.push(op); await fs.unlink(op.abs); }
       } catch(e){
         const rollbackErrors = [];
         for(const op of [...written, ...deleted].reverse()){
