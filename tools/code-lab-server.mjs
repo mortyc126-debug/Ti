@@ -926,7 +926,7 @@ const server = http.createServer(async (req, res) => {
           const codeArchivePath = m.archivePath.replace(/\.meta\.json$/i, '');
           const lang = safeLang(canonLang(meta.lang || langOfName(codeArchivePath)));
           const code = codeByPath.get(codeArchivePath.toLowerCase());
-          addWrite(codeArchivePath, lang, String(m.text ?? '').endsWith('\n') ? String(m.text) : String(m.text ?? '') + '\n', 'meta');
+          addWrite(m.archivePath, lang, String(m.text ?? '').endsWith('\n') ? String(m.text) : String(m.text ?? '') + '\n', 'meta');
           if(code){
             addWrite(code.archivePath, lang, code.text, 'code');
             consumed.add(code.key); pairs++;
