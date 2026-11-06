@@ -26,5 +26,5 @@ test('индекс находит составные конструкции по
   const result = buildVariants({ q: 'query', lang: 'js', dict, rows: [], synonyms: {} });
   const root = result.roots.find(x => x.term === 'queryselector');
   assert.ok(root);
-  assert.equal(root.code, 'document.queryselector(selector)');
+  assert.ok(root.children.some(x => x.term === 'document.queryselector(selector)'));
 });
