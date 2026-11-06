@@ -45,10 +45,43 @@ function codeFor(term, lang, ex, cm){
   return recase(term, cm);
 }
 
+// Индексы словаря строятся один раз на объект dict и переиспользуются между запросами редактора.
+// Это убирает повторный полный обход ключей при каждом набранном символе.
+const DICT_INDEX_CACHE = new WeakMap();
+function dictIndexes(dict){
+  if(!dict || typeof dict !== 'object') return {};
+  const cached = DICT_INDEX_CACHE.get(dict); if(cached) return cached;
+  const result = {};
+  const add = (map, key, value) => {
+    if(!key) return;
+    if(!map.has(key)) map.set(key, []);
+    map.get(key).push(value);
+  };
+  for(const [lang, dictionary] of Object.entries(dict.langs || {})){
+    const keys = Object.keys(dictionary || {});
+    const idioms = keys.filter(key => isIdiom(key) && balanced(key));
+    const idiomsByToken = new Map(), prefixes = new Map(), memberPrefixes = new Map(), hyphenChildren = new Map();
+    for(const key of keys){
+      const lower = key.toLowerCase();
+      for(let i = 1; i <= Math.min(32, lower.length); i++) add(prefixes, lower.slice(0, i), key);
+      for(const part of lower.split('.')) for(let i = 1; i <= Math.min(32, part.length); i++) add(memberPrefixes, part.slice(0, i), key);
+      if(!isIdiom(key)){
+        const parts = lower.split('-');
+        for(let i = 1; i < parts.length; i++) add(hyphenChildren, parts.slice(0, i).join('-'), key);
+      }
+    }
+    for(const key of idioms) for(const token of words(key)) add(idiomsByToken, token, key);
+    result[lang] = { keys, idioms, idiomsByToken, prefixes, memberPrefixes, hyphenChildren };
+  }
+  DICT_INDEX_CACHE.set(dict, result);
+  return result;
+}
+
 export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, caseMap = null, concepts = [], queryPhrases = [] }){
   const qn = norm(q); if(!qn) return { q, lang, roots: [] };
   const qw = words(qn).map(stem);
   const langs = dict && dict.langs ? dict.langs : {};
+  const indexes = dictIndexes(dict);
   const want = lang && langs[lang] ? [lang] : Object.keys(langs);
   const hasQ = text => { const tw = words(text); return qw.every(w => tw.some(t => t.startsWith(w))); };
 
@@ -65,7 +98,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     if(D[t]) return { key: t, rank: 1 };
     if((L === 'js' || L === 'ts') && W[t]) return { key: t, rank: 1.5 };   // for, while — базовые слова языка
     if(t.length < 2 || /\s/.test(t)) return null;
-    const re = tokRe(t); for(const k of Object.keys(D)) if(isIdiom(k) && balanced(k) && re.test(k)) return { key: t, rank: 0.5 };
+    const re = tokRe(t); for(const k of (indexes[L] && indexes[L].idiomsByToken.get(t)) || []) if(re.test(k)) return { key: t, rank: 0.5 };
     return null;
   };
   for(const L of want){
@@ -79,7 +112,8 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     // латиницей пишут начало имени («quer») — совпадение по началу важнее смысла по синонимам
     const latin = /^[a-z]/.test(qn);
     if(D[qn]) add(qn, L, '', latin ? 9 : 4);
-    if(latin) for(const k of Object.keys(D)) if((k.startsWith(qn) || k.includes('.' + qn)) && !/[\s(=]/.test(k) && k !== qn && !roots.some(r => k.startsWith(r.term + '-'))) add(k, L, '', 8 - Math.min(3, k.length / 12));
+    if(latin){ const ix = indexes[L]; const candidates = ix ? [...new Set([...(ix.prefixes.get(qn) || []), ...(ix.memberPrefixes.get(qn) || [])])] : [];
+      for(const k of candidates) if(!/[\s(=]/.test(k) && k !== qn && !roots.some(r => k.startsWith(r.term + '-'))) add(k, L, '', 8 - Math.min(3, k.length / 12)); }
   }
   if(/^[a-z]/.test(qn) && roots.some(r => r.score >= 5)) for(let i = roots.length - 1; i >= 0; i--) if(roots[i].score < 5) roots.splice(i, 1);
   // если корень — разновидность другого корня (margin-top при margin), прячем его внутрь
@@ -157,7 +191,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     // сортируем по длине, чтобы родитель всегда шёл раньше детей. для каждого слова отрезаем хвост по дефису
     // (margin-inline-start → margin-inline → margin) и вешаем под первого найденного предка.
     // так margin-inline-start окажется внутри margin-inline, а не рядом с ним под margin.
-    const kin = Object.keys(D).filter(k => k.startsWith(r.term + '-') && !isIdiom(k)).sort((a, b) => a.length - b.length);
+    const kin = ((indexes[r.lang] && indexes[r.lang].hyphenChildren.get(r.term)) || []).slice().sort((a, b) => a.length - b.length);
     const byTerm = new Map([[r.term, root]]);
     for(const k of kin.slice(0, 60)){
       let parent = root; for(let p = k.lastIndexOf('-'); p > 0; p = k.lastIndexOf('-', p - 1)){ const pre = k.slice(0, p); if(byTerm.has(pre)){ parent = byTerm.get(pre); break; } }
@@ -166,7 +200,8 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     }
     // конструкции словаря, где термин стоит как отдельное слово («margin: 0 auto», «.queryselector(»)
     const re = new RegExp('(^|[^\\w-])' + r.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w-])');
-    const idioms = Object.keys(D).filter(k => k !== r.term && isIdiom(k) && balanced(k) && re.test(k)).sort((a, b) => a.length - b.length).slice(0, 6);
+    const idiomCandidates = /\s/.test(r.term) ? ((indexes[r.lang] && indexes[r.lang].idioms) || []) : ((indexes[r.lang] && indexes[r.lang].idiomsByToken.get(r.term)) || []);
+    const idioms = idiomCandidates.filter(k => k !== r.term && re.test(k)).sort((a, b) => a.length - b.length).slice(0, 6);
     idioms.forEach(k => root.children.push({ term: k, lang: r.lang, code: r.lang === 'css' ? k : recase(k, caseMap), note: splitNote(D[k]).note, label: '', children: [] }));
     // в коде (не CSS) верхняя строка вставляет готовый вызов «document.querySelector(selector)», а не голое имя
     if(r.lang !== 'css' && r.lang !== 'html'){ const call = idioms.find(k => k.startsWith(r.term + '(')); if(call){ root.code = recase(call, caseMap); root.children = root.children.filter(c => c.term !== call); } }
