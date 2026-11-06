@@ -108,6 +108,8 @@ export async function migrateTemplates({ src, out, dictPath, dry = false, force 
     const notes = wordNotes(j.lines, inDict);
     notes.forEach(n => { report.notes[n.source]++; });
     const hasDesc = !!(j.desc && String(j.desc).trim());
+    const tags = Array.isArray(j.tags) ? [...new Set(j.tags.map(x => String(x).trim()).filter(Boolean))] : [];
+    const aliases = Array.isArray(j.aliases) ? [...new Set(j.aliases.map(x => String(x).trim()).filter(Boolean))] : [];
     const originalGroup = j.group || '';
     const group = groupRules.length ? mapGroup(originalGroup, groupRules).to : originalGroup;
     if(group !== originalGroup){ report.groupsRemapped++; const move = originalGroup + ' => ' + group; report.groupMoves[move] = (report.groupMoves[move] || 0) + 1; }
@@ -124,11 +126,11 @@ export async function migrateTemplates({ src, out, dictPath, dry = false, force 
       group,
       desc: j.desc || '',
       output: j.output || '',
-      tags: [],
-      aliases: [],
+      tags,
+      aliases,
       // кто автор каждого поля: manual — вы, imported — из архива/старых шаблонов, ai — модель.
       // Правило: manual никогда не перезаписывается ИИ.
-      source: { title: 'imported', desc: hasDesc ? 'imported' : null, tags: null },
+      source: { title: 'imported', desc: hasDesc ? 'imported' : null, tags: tags.length ? 'imported' : null, aliases: aliases.length ? 'imported' : null },
       status: hasDesc ? 'described' : 'needs_description',
       wordNotes: notes,
       ...(j.component ? { component: j.component } : {}),
