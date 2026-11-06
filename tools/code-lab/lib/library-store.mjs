@@ -16,6 +16,7 @@
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { tokenize } from './tokenizer.mjs';
 import { annotateLines, makeLook } from './annotate.mjs';
 import { extFor, langForExt, CODE_EXTS, safeName } from './lang.mjs';
@@ -65,7 +66,7 @@ function placeNotes(lines, notes, look, { onlyEmpty = true } = {}){
   return unplaced;
 }
 
-export function createLibraryStore({ root, legacyDir = null, dictPath = null, getDict, coverage = () => ({}), contract = null }){
+export function createLibraryStore({ root, legacyDir = null, dictPath = null, getDict, coverage = () => ({}), contract = null, writeAtomicFile = writeAtomic }){
   const _CONTRACT_LANGS = new Set(['js', 'ts', 'html', 'svg', 'css', 'python', 'sql']);
   const byPath = new Map();   // путь кода → запись
   let byId = new Map();
@@ -178,8 +179,39 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
 
   async function writeAtomic(p, text){
     await fs.mkdir(path.dirname(p), { recursive: true });
-    const tmp = p + '.tmp-' + process.pid + '-' + Date.now().toString(36);
-    await fs.writeFile(tmp, text, 'utf8'); await fs.rename(tmp, p);
+    const tmp = p + '.tmp-' + process.pid + '-' + randomUUID();
+    try {
+      await fs.writeFile(tmp, text, 'utf8');
+      await fs.rename(tmp, p);
+    } finally {
+      await fs.unlink(tmp).catch(() => {});
+    }
+  }
+
+  // Два файла образуют одну логическую запись. Если второй файл не записался,
+  // возвращаем оба пути к прежнему состоянию (включая отсутствие новых файлов).
+  async function writePairAtomic(codePath, code, metaPath, metaText){
+    const snapshot = async p => {
+      try { return { exists: true, content: await fs.readFile(p, 'utf8') }; }
+      catch(err){ if(err.code === 'ENOENT') return { exists: false }; throw err; }
+    };
+    const [oldCode, oldMeta] = await Promise.all([snapshot(codePath), snapshot(metaPath)]);
+    try {
+      await writeAtomicFile(codePath, code);
+      await writeAtomicFile(metaPath, metaText);
+    } catch(error) {
+      const rollbackErrors = [];
+      for(const [p, old] of [[codePath, oldCode], [metaPath, oldMeta]]){
+        try {
+          if(old.exists) await writeAtomicFile(p, old.content);
+          else await fs.unlink(p).catch(err => { if(err.code !== 'ENOENT') throw err; });
+        } catch(rollbackError){ rollbackErrors.push(rollbackError); }
+      }
+      if(rollbackErrors.length){
+        throw new AggregateError([error, ...rollbackErrors], 'Не удалось полностью сохранить или откатить пару «код + паспорт»');
+      }
+      throw error;
+    }
   }
 
   const api = {
@@ -327,8 +359,7 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
         if(labels && typeof labels === 'object' && !Array.isArray(labels)) meta.labels = origin === 'manual' ? { ...labels } : { ...labels, ...(old.labels || {}) };
         else if(!meta.labels || typeof meta.labels !== 'object') delete meta.labels;
 
-        await writeAtomic(codePath, code);
-        await writeAtomic(metaPath, JSON.stringify(meta, null, 2) + '\n');
+        await writePairAtomic(codePath, code, metaPath, JSON.stringify(meta, null, 2) + '\n');
         if(e && e.codePath !== codePath){
           await fs.unlink(e.codePath).catch(() => {}); await fs.unlink(e.metaPath).catch(() => {});
           byPath.delete(e.codePath);
