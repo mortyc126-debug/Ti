@@ -868,7 +868,7 @@ const server = http.createServer(async (req, res) => {
       };
       const normalizeArchivePath = value => {
         const raw = String(value || '').replace(/\\/g, '/');
-        if(!raw || raw.startsWith('/') || /^[a-z]:/i.test(raw) || raw.includes('\\0')) return null;
+        if(!raw || raw.startsWith('/') || /^[a-z]:/i.test(raw) || raw.includes('\0')) return null;
         const parts = raw.split('/');
         if(parts.some(x => x === '..')) return null;
         const clean = parts.filter(x => x && x !== '.');
@@ -897,8 +897,8 @@ const server = http.createServer(async (req, res) => {
       }
       if(invalidPaths.length) return json(res, 400, { ok: false, error: 'В архиве есть недопустимые или повторяющиеся пути. Ничего не записано.', invalidPaths: invalidPaths.slice(0, 50) });
 
-      const metas = archiveFiles.filter(f => /\\.meta\\.json$/i.test(f.archivePath));
-      const codes = archiveFiles.filter(f => !/\\.meta\\.json$/i.test(f.archivePath));
+      const metas = archiveFiles.filter(f => /\.meta\.json$/i.test(f.archivePath));
+      const codes = archiveFiles.filter(f => !/\.meta\.json$/i.test(f.archivePath));
       const codeByPath = new Map(codes.map(c => [c.key, c]));
       let pairs = 0;
       const consumed = new Set(), destinations = new Set(), writes = [];
@@ -923,10 +923,10 @@ const server = http.createServer(async (req, res) => {
           try { meta = JSON.parse(String(m.text ?? '')); }
           catch(_){ badMeta.push(m.archivePath); continue; }
           if(!meta || typeof meta !== 'object' || Array.isArray(meta)){ badMeta.push(m.archivePath); continue; }
-          const codeArchivePath = m.archivePath.replace(/\\.meta\\.json$/i, '');
+          const codeArchivePath = m.archivePath.replace(/\.meta\.json$/i, '');
           const lang = safeLang(canonLang(meta.lang || langOfName(codeArchivePath)));
           const code = codeByPath.get(codeArchivePath.toLowerCase());
-          addWrite(codeArchivePath, lang, String(m.text ?? '').endsWith('\\n') ? String(m.text) : String(m.text ?? '') + '\\n', 'meta');
+          addWrite(codeArchivePath, lang, String(m.text ?? '').endsWith('\n') ? String(m.text) : String(m.text ?? '') + '\n', 'meta');
           if(code){
             addWrite(code.archivePath, lang, code.text, 'code');
             consumed.add(code.key); pairs++;
@@ -960,7 +960,7 @@ const server = http.createServer(async (req, res) => {
           await fs.writeFile(path.join(backupRoot, 'manifest.json'), JSON.stringify({
             createdAt: new Date().toISOString(),
             files: [...backups.entries()].map(([target, backup]) => ({ target: path.relative(LIBRARY, target), backup: path.relative(backupRoot, backup) }))
-          }, null, 2) + '\\n', 'utf8');
+          }, null, 2) + '\n', 'utf8');
         }
         for(const op of writes){
           await fs.mkdir(path.dirname(op.abs), { recursive: true });
