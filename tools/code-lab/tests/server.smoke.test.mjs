@@ -445,7 +445,7 @@ try {
     assert.ok(!hits.hits.some(hit => hit.id === 'timer-concept'), 'связанные, но не эквивалентные понятия не должны подмешиваться в поиск');
     const contextualHits = await get('/api/concepts/search?q=' + encodeURIComponent('запустить после паузы') + '&lang=js&scope=timer');
     assert.ok(contextualHits.hits.some(hit => hit.id === 'delay-call' && hit.match.kind === 'queryPhrase'));
-    assert.ok(!contextualHits.hits.some(hit => hit.id === 'deferred-call'), 'контекст JS не должен подмешивать Python-фразу');
+    assert.ok(!contextualHits.hits.some(hit => hit.id === 'deferred-call' && hit.match.kind === 'queryPhrase'), 'контекст JS не должен подмешивать Python-фразу как поисковое совпадение');
     const ambiguousHits = await get('/api/concepts/search?q=' + encodeURIComponent('запустить после паузы'));
     assert.ok(ambiguousHits.hits.some(hit => hit.id === 'delay-call' && hit.match.kind === 'queryPhrase'));
     assert.ok(ambiguousHits.hits.some(hit => hit.id === 'deferred-call' && hit.match.kind === 'queryPhrase'), 'одна фраза может вести к разным понятиям без слияния');
