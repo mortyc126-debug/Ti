@@ -426,6 +426,10 @@ try {
         { id: 'deferred-call', name: 'Отложенный вызов', definition: 'Равнозначное понятие.', aliases: [], forms: [], tags: [], examples: [], origin: 'manual' },
         { id: 'timer-concept', name: 'Таймер', definition: 'Механизм запуска по времени.', aliases: [], forms: [], tags: [], examples: [], origin: 'manual' }
       ],
+      queryPhrases: [
+        { id: 'phrase-js', phrase: 'запустить после паузы', targetConceptId: 'delay-call', language: 'js', scope: 'timer', origin: 'manual', confidence: 0.9 },
+        { id: 'phrase-py', phrase: 'запустить после паузы', targetConceptId: 'deferred-call', language: 'py', scope: 'asyncio', origin: 'manual', confidence: 0.8 }
+      ],
       relations: [
         { id: 'rel-equivalent', from: 'delay-call', to: 'deferred-call', type: 'equivalent', note: '', origin: 'manual' },
         { id: 'rel-depends', from: 'delay-call', to: 'timer-concept', type: 'depends', note: '', origin: 'manual' }
@@ -439,6 +443,12 @@ try {
     assert.ok(hits.hits.some(hit => hit.id === 'delay-call' && hit.match.kind === 'alias'));
     assert.ok(hits.hits.some(hit => hit.id === 'deferred-call' && hit.match.kind === 'equivalent'));
     assert.ok(!hits.hits.some(hit => hit.id === 'timer-concept'), 'связанные, но не эквивалентные понятия не должны подмешиваться в поиск');
+    const contextualHits = await get('/api/concepts/search?q=' + encodeURIComponent('запустить после паузы') + '&lang=js&scope=timer');
+    assert.ok(contextualHits.hits.some(hit => hit.id === 'delay-call' && hit.match.kind === 'queryPhrase'));
+    assert.ok(!contextualHits.hits.some(hit => hit.id === 'deferred-call'), 'контекст JS не должен подмешивать Python-фразу');
+    const ambiguousHits = await get('/api/concepts/search?q=' + encodeURIComponent('запустить после паузы'));
+    assert.ok(ambiguousHits.hits.some(hit => hit.id === 'delay-call' && hit.match.kind === 'queryPhrase'));
+    assert.ok(ambiguousHits.hits.some(hit => hit.id === 'deferred-call' && hit.match.kind === 'queryPhrase'), 'одна фраза может вести к разным понятиям без слияния');
     const exampleHits = await get('/api/concepts/search?q=цикл');
     assert.ok(exampleHits.hits.some(hit => hit.id === 'delay-call' && hit.match.kind === 'example'));
     const invalid = await fetch(base + '/api/concepts/save', { method: 'POST', body: JSON.stringify({
