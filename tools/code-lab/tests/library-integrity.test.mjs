@@ -60,7 +60,8 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   const missingSchema=[], legacyMetadataFiles=[], legacyWordMaps=[], legacyWordMapsWithoutNotes=[], legacyMigrationProposals=[], embeddedCodeMismatches=[];
   const legacyWordMapStats={maps:0,keys:0,matchedKeys:0,matchedTokenOccurrences:0,unmatchedKeySamples:[]};
   const unknownGroups=[], wordNoteProblems=[], malformedTagFields=[], malformedComponents=[], replacementCharacterFields=[], codeReplacementFiles=[];
-  const wordNoteKindCounts={}, wordNoteInvalidKindSamples=[], wordNoteUniqueRelocationSamples=[];
+  const wordNoteKindCounts={}, wordNoteInvalidKindSamples=[], wordNoteUniqueRelocationSamples=[], wordNoteSwapProposals=[];
+  const wordNoteSwapStats={total:0,swappable:0,nonSwappable:0,files:new Set()};
   const wordNoteRepairStats={concept:0,invalidKind:0,uniqueTokenMatches:0,ambiguousTokenMatches:0,textPresentButNotToken:0,missingFromCode:0};
   const tokenKinds=new Set(['kw','fn','name','r','num','str','com','op','sp']);
   let wordNoteTotal=0, orphanNoteTotal=0;
@@ -134,6 +135,12 @@ test('библиотека: пары кода и паспортов, JSON и ID 
             if(kind==='concept') wordNoteRepairStats.concept++;
             if(kind!=='concept'&&!tokenKinds.has(kind)&&kind!=='(missing)'){
               wordNoteRepairStats.invalidKind++;
+              wordNoteSwapStats.total++;
+              if(tokenKinds.has(String(note?.note||''))&&kind.trim()){
+                wordNoteSwapStats.swappable++;
+                wordNoteSwapStats.files.add(relativeFile);
+                wordNoteSwapProposals.push({file:relativeFile,index:i,newKind:String(note.note),newNote:kind});
+              }else wordNoteSwapStats.nonSwappable++;
               if(wordNoteInvalidKindSamples.length<50) wordNoteInvalidKindSamples.push({file:relativeFile,index:i,line:note?.line,col:note?.col,text,note:note?.note,kind});
             }
             const tokens=Number.isInteger(line)&&line>=0?tokenLines[line]:null;
@@ -335,7 +342,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
     folderLanguageMismatches:languageMismatches.length,duplicateCodeGroups:dupGroups.length,
     duplicateCodeSamples:dupGroups,duplicateIdGroups,duplicatePairQuality,duplicatePairPattern,duplicatePairSamples,otherDataGroupIssues,templateGroupPlan,migrationDryRun:{created:migrationDryRun.created,skippedExisting:migrationDryRun.skippedExisting,skippedDuplicate:migrationDryRun.skippedDuplicate,codeConflicts:migrationDryRun.codeConflicts.length,errors:migrationDryRun.errors.length},duplicateReferenceScan:{filesScanned:referenceFiles.length,idsScanned:duplicateIds.size,hitCount:duplicateReferenceHits.length,hits:duplicateReferenceHits},templateReferenceScan:{idsScanned:missingTemplateIds.size,hitCount:templateReferenceHits.length,hits:templateReferenceHits},missingIdFiles:missingIds,
     emptyDescriptions,shortDescriptionSamples:shortDescriptions.slice(0,60),descriptionLengthBuckets,statusCounts,
-    missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,legacyWordMapsWithoutNotes,legacyMigrationProposals,legacyWordMapStats,embeddedCodeMismatches,unknownGroups,wordNoteProblems:wordNoteProblems.slice(0,80),wordNoteProblemCount:wordNoteProblems.length,wordNoteProblemFiles:[...new Set(wordNoteProblems.map(x=>x.file))],wordNoteProblemByKind,wordNoteProblemByLang,wordNoteTotal,orphanNoteTotal,wordNoteKindCounts,wordNoteInvalidKindSamples,wordNoteRepairStats,wordNoteUniqueRelocationSamples,malformedTagFields,malformedComponents,replacementCharacterFields,codeReplacementFiles,
+    missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,legacyWordMapsWithoutNotes,legacyMigrationProposals,legacyWordMapStats,embeddedCodeMismatches,unknownGroups,wordNoteProblems:wordNoteProblems.slice(0,80),wordNoteProblemCount:wordNoteProblems.length,wordNoteProblemFiles:[...new Set(wordNoteProblems.map(x=>x.file))],wordNoteProblemByKind,wordNoteProblemByLang,wordNoteTotal,orphanNoteTotal,wordNoteKindCounts,wordNoteInvalidKindSamples,wordNoteRepairStats,wordNoteUniqueRelocationSamples,wordNoteSwapStats:{...wordNoteSwapStats,files:wordNoteSwapStats.files.size},wordNoteSwapProposals,malformedTagFields,malformedComponents,replacementCharacterFields,codeReplacementFiles,
     problems:problems.length,languageMismatchSamples:languageMismatches.slice(0,8)
   }));
   assert.deepEqual(problems,[]);
