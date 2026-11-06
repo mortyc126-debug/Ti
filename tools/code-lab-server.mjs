@@ -249,7 +249,7 @@ async function importBundle(b){
   const looksProse = _looksProse;
   for(const pc of pieces){
     if(!pc || typeof pc !== 'object'){ skipped++; continue; }
-    const lang = String(pc.lang || 'js').toLowerCase();
+    const lang = canonLang(pc.lang || 'js');
     const title = String(pc.title || 'Без названия').slice(0, 80);
     const hasLines = Array.isArray(pc.lines) && pc.lines.length > 0;
     const code = hasLines ? '' : String(pc.code || '');
@@ -257,7 +257,7 @@ async function importBundle(b){
     if(!hasLines && looksProse(code)){ skipped++; warnings.push({ title, reason: 'в коде русский текст без кода — похоже на словарь/синонимы, а не кусок' }); continue; }
     const codeForDup = hasLines ? pc.lines.map(ln => (ln || []).map(t => (t && t.v) || '').join('')).join('\n') : code;
     // дубль: сначала точное совпадение (название+код), иначе — тот же КОД под другим названием
-    const dup = (await findSameTemplate(title, codeForDup)) || (await findByCode(codeForDup));
+    const dup = (await findSameTemplate(title, codeForDup, lang)) || (await findByCode(codeForDup, lang));
     let obj;
     if(dup){ obj = await store.get(dup); obj.lang = lang; obj.title = title; if(pc.group) obj.group = String(pc.group).slice(0, 60); if(pc.desc) obj.desc = String(pc.desc).slice(0, 400); obj.lines = hasLines ? pc.lines : tokenize(code, lang); if(pc.output != null) obj.output = String(pc.output); updated++; }
     else { obj = { id: slug(title || lang), lang, group: (pc.group != null ? String(pc.group) : 'Мои куски').slice(0, 60), title, desc: String(pc.desc || '').slice(0, 400), lines: hasLines ? pc.lines : tokenize(code, lang), output: pc.output != null ? String(pc.output) : '', descAt: Date.now() }; if(pc.component && typeof pc.component === 'object') obj.component = pc.component; created++; }
@@ -451,15 +451,17 @@ const tasks = createTaskStore({ root: TASKS, rows: () => store.rows(), slug: s =
 // найти уже существующий кусок с таким же названием и кодом (для дедупа при добавлении) → id или null
 // нормализуем переводы строк (\r\n → \n), иначе «тот же» код из Windows-файла считается другим → дубли
 const _normCode = store.normCode;
-async function findSameTemplate(title, code){
-  const wantT = String(title || '').trim().toLowerCase(), wantC = _normCode(code);
-  for(const e of await store.entries()){ if((e.title || '').trim().toLowerCase() === wantT && _normCode(e.code) === wantC) return e.id; }
+async function findSameTemplate(title, code, lang){
+  const wantT = String(title || '').trim().toLowerCase(), wantC = _normCode(code), wantL = canonLang(lang);
+  for(const e of await store.entries()){
+    if(canonLang(e.lang) === wantL && (e.title || '').trim().toLowerCase() === wantT && _normCode(e.code) === wantC) return e.id;
+  }
   return null;
 }
-// дубль по коду, даже под другим названием: тот же код — тот же кусок (пустой код не считаем)
-async function findByCode(code){
-  const wantC = _normCode(code); if(!wantC) return null;
-  for(const e of await store.entries()){ if(_normCode(e.code) === wantC) return e.id; }
+// Дубль ищется только внутри того же языка: одинаковый текст в разных языках — разные куски.
+async function findByCode(code, lang){
+  const wantC = _normCode(code), wantL = canonLang(lang); if(!wantC) return null;
+  for(const e of await store.entries()){ if(canonLang(e.lang) === wantL && _normCode(e.code) === wantC) return e.id; }
   return null;
 }
 
@@ -587,7 +589,7 @@ const server = http.createServer(async (req, res) => {
         const lang = String(p.lang || '').toLowerCase(), title = String(p.title || '').trim().slice(0, 80), code = String(p.code || '').replace(/\u0000/g, '');
         if(!AI_LANGS[lang]){ skipped.push({ title, reason: 'неизвестный язык' }); continue; }
         if(!title || !code.trim() || code.length > 20000){ skipped.push({ title, reason: 'нет названия или кода (или код слишком длинный)' }); continue; }
-        const dup = await findByCode(code);
+        const dup = await findByCode(code, lang);
         if(dup){ skipped.push({ title, reason: 'такой код уже есть', id: dup }); continue; }
         let id = slug(title), n = 2; while(await store.has(id)) id = slug(title) + '-' + (n++);
         const group = String(p.group || 'Мои шаблоны').trim().slice(0, 60) || 'Мои шаблоны';
@@ -750,11 +752,11 @@ const server = http.createServer(async (req, res) => {
     // создать шаблон из вставленного кода
     if(u.pathname === '/api/add' && req.method === 'POST'){
       const b = await readBody(req);
-      const lang = String(b.lang || 'js').toLowerCase();
+      const lang = canonLang(b.lang || 'js');
       const code = String(b.code || '');
       const title = String(b.title || 'Без названия').slice(0, 80);
       // дедуп: тот же код (точное совпадение по названию+коду или просто тот же код) — обновляем, не плодим
-      const dupId = (await findSameTemplate(title, code)) || (await findByCode(code));
+      const dupId = (await findSameTemplate(title, code, lang)) || (await findByCode(code, lang));
       if(dupId){
         const j = await store.get(dupId);
         j.lang = lang; j.title = title;
@@ -827,7 +829,7 @@ const server = http.createServer(async (req, res) => {
       const dict = await kwDict();
       const items = []; let created = 0, duplicates = 0;
       for(const pc of pieces){
-        const dupId = await findByCode(pc.code);
+        const dupId = await findByCode(pc.code, pc.lang);
         const item = { title: pc.title, lang: pc.lang, group: pc.group || 'Мои куски', lines: pc.code.split('\n').length, status: dupId ? 'duplicate' : 'new', id: dupId || null };
         if(dupId) duplicates++;
         else {
@@ -1572,9 +1574,9 @@ const server = http.createServer(async (req, res) => {
           if(it.id && await store.has(String(it.id))){ const t = await store.get(String(it.id)); items.push({ id: String(it.id), title: String(it.title || (t && t.title) || it.id).slice(0, 120), note }); continue; }
           const code = typeof it.code === 'string' ? it.code : '';
           if(code.trim()){
-            const lang = String(it.lang || 'js').toLowerCase();
+            const lang = canonLang(it.lang || 'js');
             const ptitle = String(it.title || 'кусок').slice(0, 80);
-            const dup = (await findSameTemplate(ptitle, code)) || (await findByCode(code));
+            const dup = (await findSameTemplate(ptitle, code, lang)) || (await findByCode(code, lang));
             let pid;
             if(dup){ pid = dup; piecesReused++; }
             else {
