@@ -36,9 +36,6 @@ function hasIdentifier(text,id){
   }
   return false;
 }
-async function walkReferenceFiles(dir){');
-  return new RegExp('(^|[^\\\\p{L}\\\\p{N}_-])'+escaped+'($|[^\\\\p{L}\\\\p{N}_-])','u').test(text);
-}
 async function walkReferenceFiles(dir){
   const out=[], skip=new Set(['.git','node_modules','vendor','dist','build','coverage','.cache']);
   const allowed=new Set(['.json','.md','.txt','.js','.mjs','.cjs','.html','.htm','.css','.yml','.yaml','.py','.sql','.ts','.sh','.bash']);
