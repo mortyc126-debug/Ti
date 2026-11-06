@@ -66,10 +66,12 @@ for(const file of files){
   const orphans=Array.isArray(meta.orphanNotes)?meta.orphanNotes:[];
   noteStats.total+=notes.length;noteStats.orphanTotal+=orphans.length;
   const noteKey=n=>JSON.stringify([n?.text,n?.line,n?.col,n?.note,n?.kind,n?.source]);
-  const wordNoteKeys=new Set(notes.map(noteKey));\n  function inspect(note,isOrphan){
+  const wordNoteKeys=new Set(notes.map(noteKey));
+  function inspect(note,isOrphan){
     if(!note||typeof note!=='object'||typeof note.text!=='string'){noteStats.invalid++;return;}
     if(note.kind==='concept'){noteStats.concept++;conceptNotes.push({file:rel,id,text:note.text,explanation:note.note||'',source:note.source||''});return;}
-    if(isOrphan&&wordNoteKeys.has(noteKey(note))) noteStats.orphanAlreadyInWordNotes++;\n    const swapped=tokenKinds.has(note.note)&&typeof note.kind==='string'&&!tokenKinds.has(note.kind);
+    if(isOrphan&&wordNoteKeys.has(noteKey(note))) noteStats.orphanAlreadyInWordNotes++;
+    const swapped=tokenKinds.has(note.note)&&typeof note.kind==='string'&&!tokenKinds.has(note.kind);
     if(swapped) noteStats.swapped++;
     const explanation=swapped?note.kind:note.note;
     if(typeof explanation!=='string'||!explanation.trim()){noteStats.empty++;return;}
