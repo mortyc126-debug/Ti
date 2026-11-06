@@ -26,7 +26,7 @@ async function walk(dir){
 }
 function hasIdentifier(text,id){
   const body=String(text), needle=String(id);
-  const isWord=ch=>!!ch&&/[\\p{L}\\p{N}_-]/u.test(ch);
+  const isWord=ch=>!!ch&&/[\p{L}\p{N}_-]/u.test(ch);
   let from=0, at=-1;
   while((at=body.indexOf(needle,from))>=0){
     const before=at>0?body[at-1]:'';
