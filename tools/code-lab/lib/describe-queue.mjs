@@ -10,8 +10,13 @@ const isIncomplete = meta => {
   if (!meta) return true;
   if (meta.enriched) return false;               // уже обработано ИИ, повторно не трогаем
   const desc = String(meta.desc || '').trim();
-  return !desc || meta.status === 'needs_description' || desc.length < MIN_DESC
-    || (meta.tags || []).length < MIN_TAGS || (meta.aliases || []).length < MIN_ALIASES;
+  const source = meta.source || {};
+  // Поля, явно написанные вручную, не считаются недостающими только из-за краткости.
+  // ИИ может дополнять импортированные/автоматические данные, но не должен тратить запросы на ручные.
+  const needDesc = source.desc !== 'manual' && (!desc || meta.status === 'needs_description' || desc.length < MIN_DESC);
+  const needTags = source.tags !== 'manual' && (meta.tags || []).length < MIN_TAGS;
+  const needAliases = source.aliases !== 'manual' && (meta.aliases || []).length < MIN_ALIASES;
+  return needDesc || needTags || needAliases;
 };
 
 export function createDescriptionQueue({ store, statePath, apiKey = process.env.MISTRAL_API_KEY, model = process.env.MISTRAL_MODEL || 'mistral-small-latest', fetchImpl = fetch }) {
