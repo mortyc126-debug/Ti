@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { tokenize } from '../lib/tokenizer.mjs';
-import { tokText, codeFromLines } from '../lib/migrate.mjs';
+import { tokText, codeFromLines, migrateTemplates } from '../lib/migrate.mjs';
 import { mapGroup, parseRules, placeInTree } from '../lib/sections.mjs';
 import { fileURLToPath } from 'node:url';
 
@@ -244,6 +244,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
     for(const id of duplicateIds.keys()) if(body.includes(id)) duplicateReferenceHits.push({id,file:relative});
     if(!relative.startsWith('tools/code-lab/templates/')) for(const id of missingTemplateIds) if(body.includes(id)) templateReferenceHits.push({id,file:relative});
   }
+  const migrationDryRun=await migrateTemplates({src:path.join(CODELAB_ROOT,'templates'),out:LIBRARY,dictPath:null,dry:true});
   const wordNoteProblemByKind={}, wordNoteProblemByLang={};
   for(const problem of wordNoteProblems){
     const kind=String(problem.kind||'(missing)'), lang=problem.file.split('/')[0];
@@ -253,7 +254,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   console.log('library-integrity:',JSON.stringify({
     languages:langs,codeCount,metaCount,effectiveIds:ids.size,missingIds:missingIds.length,
     folderLanguageMismatches:languageMismatches.length,duplicateCodeGroups:dupGroups.length,
-    duplicateCodeSamples:dupGroups,duplicateIdGroups,duplicatePairQuality,duplicatePairSamples,otherDataGroupIssues,templateGroupPlan,duplicateReferenceScan:{filesScanned:referenceFiles.length,idsScanned:duplicateIds.size,hitCount:duplicateReferenceHits.length,hits:duplicateReferenceHits},templateReferenceScan:{idsScanned:missingTemplateIds.size,hitCount:templateReferenceHits.length,hits:templateReferenceHits},missingIdFiles:missingIds,
+    duplicateCodeSamples:dupGroups,duplicateIdGroups,duplicatePairQuality,duplicatePairSamples,otherDataGroupIssues,templateGroupPlan,migrationDryRun:{created:migrationDryRun.created,skippedExisting:migrationDryRun.skippedExisting,skippedDuplicate:migrationDryRun.skippedDuplicate,codeConflicts:migrationDryRun.codeConflicts.length,errors:migrationDryRun.errors.length},duplicateReferenceScan:{filesScanned:referenceFiles.length,idsScanned:duplicateIds.size,hitCount:duplicateReferenceHits.length,hits:duplicateReferenceHits},templateReferenceScan:{idsScanned:missingTemplateIds.size,hitCount:templateReferenceHits.length,hits:templateReferenceHits},missingIdFiles:missingIds,
     emptyDescriptions,shortDescriptionSamples:shortDescriptions.slice(0,60),descriptionLengthBuckets,statusCounts,
     missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,legacyWordMapStats,embeddedCodeMismatches,unknownGroups,wordNoteProblems:wordNoteProblems.slice(0,80),wordNoteProblemCount:wordNoteProblems.length,wordNoteProblemFiles:[...new Set(wordNoteProblems.map(x=>x.file))],wordNoteProblemByKind,wordNoteProblemByLang,wordNoteTotal,orphanNoteTotal,malformedTagFields,malformedComponents,replacementCharacterFields,codeReplacementFiles,
     problems:problems.length,languageMismatchSamples:languageMismatches.slice(0,8)
