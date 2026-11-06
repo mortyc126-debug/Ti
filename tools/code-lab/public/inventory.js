@@ -304,7 +304,7 @@ document.getElementById('pcopy').onclick = e => copy(piecesAsText(), e.target);
   const o = btn.textContent; btn.disabled = true; btn.textContent = 'чищу…';
   let r; try { r = await fetch('/api/dedup', { method:'POST' }).then(x => x.json()); } catch(_){ r = null; }
   btn.disabled = false;
-  if(r && r.ok){ btn.textContent = r.removed ? ('✓ удалено ' + r.removed + ' дублей') : 'дублей не нашлось'; try { PIECES = await fetch('/api/list?labels=1').then(x => x.json()); } catch(_){} fillFilters(); renderPieces(); setTimeout(() => { btn.textContent = o; }, 3000); }
+  if(r && r.ok){ const blocked = Number(r.blocked || 0); btn.textContent = r.removed ? ('✓ удалено ' + r.removed + ' дублей' + (blocked ? '; защищено групп: ' + blocked : '')) : (blocked ? ('не удалено: есть ссылки (' + blocked + ' групп)') : 'дублей не нашлось'); try { PIECES = await fetch('/api/list?labels=1').then(x => x.json()); } catch(_){} fillFilters(); renderPieces(); setTimeout(() => { btn.textContent = o; }, 5000); }
   else { btn.textContent = 'ошибка'; setTimeout(() => { btn.textContent = o; }, 2000); }
 }; })();
 document.getElementById('fcopy').onclick = e => copy(flowsAsText(), e.target);
