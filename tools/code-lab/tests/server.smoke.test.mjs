@@ -17,6 +17,7 @@ await fs.cp(path.join(TOOLS, 'code-lab', 'lib'), path.join(L, 'lib'), { recursiv
 await fs.writeFile(path.join(L, 'public', 'index.html'), '<!doctype html><title>t</title>');
 await fs.copyFile(path.join(TOOLS, 'code-lab', 'public', 'tasks-format.js'), path.join(L, 'public', 'tasks-format.js'));   // общий формат задач (сервер и браузер)
 for(const f of ['code-links.js', 'structure-rules.js']) await fs.copyFile(path.join(TOOLS, 'code-lab', 'public', f), path.join(L, 'public', f));   // связи и правила структуры — общие для сервера и страницы
+for(const f of ['concepts.html', 'concepts.js', 'style.css', 'shell.js']) await fs.copyFile(path.join(TOOLS, 'code-lab', 'public', f), path.join(L, 'public', f));   // страница пользовательских конструкций и её оболочка
 await fs.writeFile(path.join(L, 'public', 'keyword-dict.json'), JSON.stringify({ words: { print: 'print — вывод' }, cssProps: { 'font-weight': 'font-weight — жирность шрифта' } }));
 // две старые карточки: автомиграция должна перенести их в library/
 const card = (id, title, lang, code, desc, group) => ({ id, lang, group, title, desc, output: '', lines: code.split('\n').map(l => [{ k: 'name', v: l, r: l }]) });
