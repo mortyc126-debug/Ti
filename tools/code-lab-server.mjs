@@ -1250,6 +1250,7 @@ const server = http.createServer(async (req, res) => {
         archiveSeen.add(key);
         const parts = name.split('/');
         const allowed = ['tasks','recipes','flows','data','workspace','templates'].includes(parts[0])
+          || (parts[0] === 'library' && parts.length === 2 && parts[1].startsWith('_'))
           || (parts[0] === 'public' && (parts[1] === 'dict' || name === 'public/keyword-dict.json'));
         if(!allowed || parts.length < 2 || (parts[0] === 'data' && (parts[1] === 'restore-backups' || name === 'data/description-jobs.json'))){
           invalid.push(name + ' (путь не входит в полный бэкап)'); continue;
