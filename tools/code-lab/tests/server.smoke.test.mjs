@@ -158,6 +158,13 @@ try {
     const bad = await fetch(base + '/api/library/restore', { method: 'POST', body: JSON.stringify({ files: [{ name: '../../escape.js', text: 'bad' }] }) });
     assert.equal(bad.status, 400, 'путь за пределами архива должен отклоняться');
     await assert.rejects(fs.access(path.join(tmp, 'escape.js')));
+
+    const outside = path.join(tmp, 'outside');
+    await fs.mkdir(outside, { recursive: true });
+    await fs.symlink(outside, path.join(L, 'library', 'js', 'linked'), 'dir');
+    const linked = await post('/api/library/restore', { files: [{ name: 'library/js/linked/out.js', text: 'outside' }] });
+    assert.equal(linked.ok, false, 'символические ссылки в пути назначения должны отклоняться');
+    await assert.rejects(fs.access(path.join(outside, 'out.js')));
   });
 
   await test('удаление убирает файлы', async () => {
