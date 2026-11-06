@@ -42,6 +42,29 @@ export function wordNotes(lines, inDict){
 }
 
 const exists = p => fs.access(p).then(() => true, () => false);
+const normalizeCode = code => String(code || '').replace(/\r\n/g, '\n').trim();
+
+async function indexExistingCode(out){
+  const index = new Map();
+  let dirs = [];
+  try { dirs = await fs.readdir(out, { withFileTypes: true }); } catch(_) { return index; }
+  for(const dirent of dirs){
+    if(!dirent.isDirectory()) continue;
+    const dir = path.join(out, dirent.name);
+    let files = [];
+    try { files = await fs.readdir(dir, { withFileTypes: true }); } catch(_) { continue; }
+    for(const file of files){
+      if(!file.isFile() || file.name.endsWith('.meta.json')) continue;
+      const abs = path.join(dir, file.name);
+      let body = '';
+      try { body = await fs.readFile(abs, 'utf8'); } catch(_) { continue; }
+      const key = dirent.name + '\\u0000' + normalizeCode(body);
+      if(!index.has(key)) index.set(key, []);
+      index.get(key).push(path.relative(out, abs).split(path.sep).join('/'));
+    }
+  }
+  return index;
+}
 
 // src — папка templates, out — папка library
 export async function migrateTemplates({ src, out, dictPath, dry = false, force = false, log = () => {} }){
@@ -50,10 +73,11 @@ export async function migrateTemplates({ src, out, dictPath, dry = false, force 
   const dict = dictPath ? await fs.readFile(dictPath, 'utf8').then(JSON.parse).catch(() => null) : null;
   const inDict = buildDictLookup(dict);
 
-  const report = { src, out, dry, total: names.length, created: 0, skippedExisting: 0, errors: [], byLang: {}, notes: { dict: 0, custom: 0 }, emptyDesc: [], withComponent: 0, groupsRemapped: 0, groupMoves: {} };
+  const report = { src, out, dry, total: names.length, created: 0, skippedExisting: 0, skippedDuplicate: 0, duplicateContent: [], errors: [], byLang: {}, notes: { dict: 0, custom: 0 }, emptyDesc: [], withComponent: 0, groupsRemapped: 0, groupMoves: {} };
   let groupRules = [];
   try { const sections = JSON.parse(await fs.readFile(path.join(out, '_sections.json'), 'utf8')); groupRules = parseRules(sections.rules || []).rules; } catch(_) {}
   const usedPaths = new Map(); // нижний регистр пути → id (коллизии на Windows/macOS)
+  const existingCodes = await indexExistingCode(out);
 
   for(const name of names){
     let j;
@@ -74,6 +98,13 @@ export async function migrateTemplates({ src, out, dictPath, dry = false, force 
     if(!force && (await exists(codeFile) || await exists(metaFile))){ report.skippedExisting++; continue; }
 
     const code = codeFromLines(j.lines);
+    const codeKey = safeName(lang) + '\\u0000' + normalizeCode(code);
+    const duplicateFiles = existingCodes.get(codeKey) || [];
+    if(!force && duplicateFiles.length){
+      report.skippedDuplicate++;
+      report.duplicateContent.push({ file:name, id, lang, existingFiles:duplicateFiles });
+      continue;
+    }
     const notes = wordNotes(j.lines, inDict);
     notes.forEach(n => { report.notes[n.source]++; });
     const hasDesc = !!(j.desc && String(j.desc).trim());
@@ -114,9 +145,11 @@ export async function migrateTemplates({ src, out, dictPath, dry = false, force 
       await fs.writeFile(metaFile, JSON.stringify(meta, null, 2) + '\n', 'utf8');
     }
     report.created++;
+    if(!existingCodes.has(codeKey)) existingCodes.set(codeKey, []);
+    existingCodes.get(codeKey).push(rel.split(path.sep).join('/'));
   }
 
-  if(!dry && report.created){
+  if(!dry && (report.created || report.skippedDuplicate)){
     await fs.mkdir(out, { recursive: true });
     await fs.writeFile(path.join(out, '_migration-report.json'), JSON.stringify(report, null, 2) + '\n', 'utf8');
   }
