@@ -1424,13 +1424,20 @@ const server = http.createServer(async (req, res) => {
       let templates = 0;
       try { templates = await store.count(); } catch(_){}
       const root = await gitRoot();
-      let branch = '', dirty = 0;
+      let branch = '', dirty = 0, ahead = 0, behind = 0, hasUpstream = false;
       if(root){
         branch = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], root)).out;
         const paths = await labTargets();
         if(paths.length){ const st = await git(["status", "--porcelain", "--", ...paths], root); dirty = st.out ? st.out.split('\n').filter(Boolean).length : 0; }
+        const up = await git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'], root);
+        if(up.code === 0 && up.out){
+          hasUpstream = true;
+          const counts = await git(['rev-list', '--left-right', '--count', 'HEAD...@{u}'], root);
+          const m = counts.out.match(/^(\\d+)\\s+(\\d+)$/);
+          if(m){ ahead = Number(m[1]); behind = Number(m[2]); }
+        }
       }
-      return json(res, 200, { repo: !!root, branch, dirty, templates });
+      return json(res, 200, { repo: !!root, branch, dirty, ahead, behind, hasUpstream, templates });
     }
     if(u.pathname === '/api/git/sync' && req.method === 'POST'){
       await ensureLabDirs();
@@ -1452,7 +1459,7 @@ const server = http.createServer(async (req, res) => {
         const pull = await git(['pull', '--rebase', '--autostash'], root);
         if(pull.code !== 0){
           await git(['rebase', '--abort'], root);
-          return json(res, 200, { ok: false, stage: 'pull', committed: staged, message: 'С сервера пришли изменения, которые конфликтуют с твоими — автослияние не вышло. Я откатила, ничего не испорчено. Нужно слить вручную (git pull) и повторить. ' + (pull.err || pull.out || '').slice(0, 240) });
+          return json(res, 200, { ok: false, stage: 'pull', committed: staged, localCommitCreated: staged > 0, pushed: false, message: 'Локальный коммит создан, но отправка не завершена: на GitHub есть конфликтующие изменения. Коммит сохранён локально; нужно разрешить конфликт и повторить синхронизацию. ' + (pull.err || pull.out || '').slice(0, 240) });
         }
       }
       const curBr = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], root)).out;
@@ -1467,8 +1474,8 @@ const server = http.createServer(async (req, res) => {
         push = await git(['push', 'origin', 'HEAD:refs/heads/' + def], root);
         detNote = ' Важно: ты была НЕ на ветке (detached HEAD) — отправила на «' + def + '». Чтобы это не повторялось, один раз выполни в терминале: git checkout ' + def;
       }
-      if(push.code !== 0) return json(res, 200, { ok: false, stage: 'push', committed: staged, message: (push.err || push.out || 'push отклонён') + (curBr === 'HEAD' ? '  ·  Ты не на ветке (detached HEAD). В терминале проекта выполни: git checkout main — затем повтори отправку.' : '') });
-      return json(res, 200, { ok: true, committed: staged, message: (staged ? ('Отправлено на GitHub: ' + staged + ' файл(ов).') : 'На GitHub уже всё актуально.') + detNote });
+      if(push.code !== 0) return json(res, 200, { ok: false, stage: 'push', committed: staged, localCommitCreated: staged > 0, pushed: false, message: 'Локальный коммит создан, но GitHub не принял отправку. Коммит остался на компьютере. ' + (push.err || push.out || 'push отклонён') + (curBr === 'HEAD' ? '  ·  Ты не на ветке (detached HEAD). В терминале проекта выполни: git checkout main — затем повтори отправку.' : '') });
+      return json(res, 200, { ok: true, pushed: true, committed: staged, committedFiles: staged, message: (staged ? ('Отправлено на GitHub: ' + staged + ' файл(ов).') : 'На GitHub уже всё актуально.') + detNote });
     }
 
     // удалить шаблон
