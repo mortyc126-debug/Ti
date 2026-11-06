@@ -254,8 +254,8 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
         const incomingMeta = obj.passport && typeof obj.passport === 'object' && !Array.isArray(obj.passport) ? obj.passport : {};
         const incomingSource = { ...(incomingMeta.source || {}), ...(obj.source || {}) };
         const rank = { ai: 1, imported: 2, manual: 3 };
-        const authority = field => rank[incomingSource[field] || origin] || 0;
-        const canUpdate = field => !e || authority(field) >= (rank[(old.source || {})[field]] || 0);
+        const authority = rank[origin] || 0;
+        const canUpdate = field => !e || authority >= (rank[(old.source || {})[field]] || 0);
         const incomingValue = key => obj[key] != null ? obj[key] : incomingMeta[key];
         const choose = (key, field, fallback) => {
           const value = incomingValue(key);
