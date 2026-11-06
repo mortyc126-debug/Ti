@@ -465,6 +465,56 @@ async function findByCode(code, lang){
   return null;
 }
 
+// Индекс всех известных входящих ссылок на куски. Удаление и дедупликация используют один источник.
+async function pieceReferenceIndex(){
+  const index = new Map();
+  const add = (targetId, ref) => {
+    const id = String(targetId || '');
+    if(!id) return;
+    if(!index.has(id)) index.set(id, []);
+    const list = index.get(id);
+    const key = [ref.type, ref.id || '', ref.term || '', ref.file || ''].join(':');
+    if(!list.some(x => [x.type, x.id || '', x.term || '', x.file || ''].join(':') === key)) list.push(ref);
+  };
+
+  try {
+    for(const t of await tasks.list()){
+      const full = await tasks.get(t.id); if(!full) continue;
+      tasks.eachOption(full.steps, o => {
+        if(o && o.id) add(o.id, { type: 'task', id: t.id, title: t.title || t.id });
+      });
+    }
+  } catch(_){}
+
+  try {
+    const names = (await fs.readdir(RECIPES)).filter(n => n.endsWith('.json'));
+    for(const name of names){
+      let recipe; try { recipe = JSON.parse(await fs.readFile(path.join(RECIPES, name), 'utf8')); } catch(_){ continue; }
+      for(const item of Array.isArray(recipe.items) ? recipe.items : []){
+        if(item && item.id) add(item.id, { type: 'recipe', id: recipe.id || name.replace(/\\.json$/i, ''), title: recipe.title || name });
+      }
+    }
+  } catch(_){}
+
+  try {
+    for(const [term, example] of Object.entries(await loadExamples())){
+      if(example && example.id) add(example.id, { type: 'dictionary-example', term });
+    }
+  } catch(_){}
+
+  try {
+    const names = (await fs.readdir(FLOWS)).filter(n => n.endsWith('.json'));
+    for(const name of names){
+      let flow; try { flow = JSON.parse(await fs.readFile(path.join(FLOWS, name), 'utf8')); } catch(_){ continue; }
+      const nodes = flow.graph && Array.isArray(flow.graph.nodes) ? flow.graph.nodes : [];
+      for(const node of nodes){
+        if(node && node.src && node.src.id) add(node.src.id, { type: 'flow', id: flow.id || name.replace(/\\.json$/i, ''), title: flow.name || flow.title || name });
+      }
+    }
+  } catch(_){}
+  return index;
+}
+
 // ── запуск кода на установленных у пользователя языках ───────────────────────
 // Карта: язык → чем запускать (bin + аргументы) и расширение файла. Каждая запись
 // выполняет НАСТОЯЩИЙ код на машине пользователя — поэтому только локально.
