@@ -189,9 +189,11 @@ export async function handleWorkspace(req, res, u, { readBody, json, root: appRo
       const b = await readBody(req);
       const abs = await resolveIn(root, b.path, { mustExist: true });
       if(abs === root) throw new HttpError(400, 'нельзя удалить рабочую папку');
-      const trash = path.join(root, '.codelab-trash');
+      const trash = await resolveIn(root, '.codelab-trash');
       await fs.mkdir(trash, { recursive: true });
-      const dest = path.join(trash, Date.now().toString(36) + '-' + path.basename(abs));
+      const trashStat = await fs.lstat(trash);
+      if(trashStat.isSymbolicLink() || !trashStat.isDirectory()) throw new HttpError(403, 'корзина должна быть обычной папкой внутри рабочего проекта');
+      const dest = path.join(trash, Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10) + '-' + path.basename(abs));
       await fs.rename(abs, dest);
       return send(200, { ok: true, trash: toRel(root, dest) });
     }
