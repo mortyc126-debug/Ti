@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { tokenize } from '../lib/tokenizer.mjs';
 import { tokText } from '../lib/migrate.mjs';
+import { mapGroup, parseRules, placeInTree } from '../lib/sections.mjs';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -151,6 +152,23 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   const idGroups = new Map();
   for(const row of rows){ if(!idGroups.has(row.id)) idGroups.set(row.id,[]); idGroups.get(row.id).push(row.file); }
   const duplicateIdGroups = [...idGroups.values()].filter(group => group.length > 1);
+  const sectionConfig=JSON.parse(await fs.readFile(path.join(LIBRARY,'_sections.json'),'utf8'));
+  const parsedSectionRules=parseRules(sectionConfig.rules||[]);
+  const templateFiles=await walk(path.join(CODELAB_ROOT,'templates'));
+  const templateGroupPlan={total:0,changed:0,outsideAfter:[],moves:{}};
+  for(const file of templateFiles.filter(file=>file.toLowerCase().endsWith('.json'))){
+    try{
+      const value=JSON.parse(await fs.readFile(file,'utf8'));
+      if(typeof value.group!=='string'||!value.group.trim()) continue;
+      templateGroupPlan.total++;
+      const mapped=mapGroup(value.group,parsedSectionRules.rules);
+      if(mapped.to!==value.group) templateGroupPlan.changed++;
+      const move=value.group+' => '+mapped.to;
+      templateGroupPlan.moves[move]=(templateGroupPlan.moves[move]||0)+1;
+      const place=placeInTree(mapped.to,sectionConfig.tree||[]);
+      if(!place.top||!place.sub) templateGroupPlan.outsideAfter.push({file:path.relative(CODELAB_ROOT,file).split(path.sep).join('/'),from:value.group,to:mapped.to});
+    }catch(_){}
+  }
   const otherDataGroupIssues=[];
   for(const dirName of ['tasks','recipes','flows','templates']){
     const dir=path.join(CODELAB_ROOT,dirName);
@@ -184,7 +202,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   console.log('library-integrity:',JSON.stringify({
     languages:langs,codeCount,metaCount,effectiveIds:ids.size,missingIds:missingIds.length,
     folderLanguageMismatches:languageMismatches.length,duplicateCodeGroups:dupGroups.length,
-    duplicateCodeSamples:dupGroups,duplicateIdGroups,otherDataGroupIssues,duplicateReferenceScan:{filesScanned:referenceFiles.length,idsScanned:duplicateIds.size,hitCount:duplicateReferenceHits.length,hits:duplicateReferenceHits},missingIdFiles:missingIds,
+    duplicateCodeSamples:dupGroups,duplicateIdGroups,otherDataGroupIssues,templateGroupPlan,duplicateReferenceScan:{filesScanned:referenceFiles.length,idsScanned:duplicateIds.size,hitCount:duplicateReferenceHits.length,hits:duplicateReferenceHits},missingIdFiles:missingIds,
     emptyDescriptions,shortDescriptionSamples:shortDescriptions.slice(0,60),descriptionLengthBuckets,statusCounts,
     missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,legacyWordMapStats,embeddedCodeMismatches,unknownGroups,wordNoteProblems:wordNoteProblems.slice(0,80),wordNoteProblemCount:wordNoteProblems.length,wordNoteProblemFiles:[...new Set(wordNoteProblems.map(x=>x.file))],wordNoteProblemByKind,wordNoteProblemByLang,wordNoteTotal,orphanNoteTotal,malformedTagFields,malformedComponents,replacementCharacterFields,codeReplacementFiles,
     problems:problems.length,languageMismatchSamples:languageMismatches.slice(0,8)
