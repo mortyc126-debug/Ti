@@ -74,9 +74,7 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
     return {
       query: q,
       total: hits.length,
-      ambiguous: [...byPhrase].filter(([phrase, records]) =>
-        phraseScore(q, phrase) > 0 && new Set(records.map(record => record.targetKey)).size > 1
-      ).length,
+      ambiguous: hits.length > 1,
       hits: hits.slice(0, Math.max(1, Math.min(200, Number(limit) || 60)))
     };
   }
