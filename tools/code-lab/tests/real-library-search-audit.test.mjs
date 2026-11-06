@@ -78,7 +78,6 @@ async function main() {
     'разобрать JSON': ['parse', 'json.loads(s)'],
     'сериализовать в JSON': ['stringify', 'json.dumps(obj)'],
     'подписаться на клик': ['addeventlistener'],
-    'запросить данные по HTTP': ['fetch'],
     'записать файл': ['write'],
     'подменить функцию в тесте': ['monkeypatch.setattr(obj, "name", value)', 'mock.patch("module.name")'],
     'подготовка перед тестом': ['def setup(self)'],
