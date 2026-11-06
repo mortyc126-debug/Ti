@@ -138,6 +138,18 @@ async function main() {
     });
   }
 
+  const jsFunctionSearch = await get('/api/search/shadow?q=' + encodeURIComponent('функция с именем') + '&lang=js&limit=100');
+  const jsFunctionHits = jsFunctionSearch.shadow?.hits || [];
+  assert.ok(jsFunctionHits.some(hit => hit.targetKey === 'function'), 'JS-контекст должен оставить function');
+  assert.ok(!jsFunctionHits.some(hit => hit.targetKey === 'def'), 'JS-контекст не должен подмешивать Python def');
+  assert.ok(jsFunctionHits.flatMap(hit => hit.pieces || []).every(piece => piece.lang === 'js'), 'JS-контекст не должен возвращать фрагменты другого языка');
+
+  const pythonFunctionSearch = await get('/api/search/shadow?q=' + encodeURIComponent('функция с именем') + '&lang=python&limit=100');
+  const pythonFunctionHits = pythonFunctionSearch.shadow?.hits || [];
+  assert.ok(pythonFunctionHits.some(hit => hit.targetKey === 'def'), 'Python-контекст должен оставить def');
+  assert.ok(!pythonFunctionHits.some(hit => hit.targetKey === 'function'), 'Python-контекст не должен подмешивать JS function');
+  assert.ok(pythonFunctionHits.flatMap(hit => hit.pieces || []).every(piece => piece.lang === 'python'), 'Python-контекст не должен возвращать фрагменты другого языка');
+
   const report = {
     generatedAt: new Date().toISOString(),
     branch: 'audit/fixes-2026-11-06',
