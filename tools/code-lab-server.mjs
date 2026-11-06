@@ -551,6 +551,7 @@ function coverage(j){
 // к «даёт/нужно» — подписи по-человечески (своя из meta.labels побеждает автоматическую); кэш до правок библиотеки/словаря
 let _lblCache = { v: -1, dict: null, map: new Map() };
 let _caseMap = { v: -1, map: null };   // регистр имён из библиотеки (queryselector → querySelector) для дерева вариантов
+let _variantSnapshot = { v: -1, dict: null, rows: [], codes: [] }; // неизменяемый снимок для быстрых повторных подсказок
 async function labelsFor(entry, names){
   const dict = await kwDict();
   if(_lblCache.v !== store.version || _lblCache.dict !== dict) _lblCache = { v: store.version, dict, map: new Map() };
@@ -2085,12 +2086,17 @@ const server = http.createServer(async (req, res) => {
     // ── дерево вариантов: «отступ» → margin / padding → margin-top… → конструкции и куски ──
     if(u.pathname === '/api/variants'){
       const q = String(u.searchParams.get('q') || '').slice(0, 80), lang = String(u.searchParams.get('lang') || '').toLowerCase();
-      const dict = await kwDict(); const ents = await store.entries();
-      // регистр: из словаря (новые записи хранят его) и из кода библиотеки
-      if(_caseMap.v !== store.version || _caseMap.dict !== dict) _caseMap = { v: store.version, dict, map: caseMapFrom(ents.map(e => e.code).concat(_dictRawKeys)) };
-      const nl = new Map((await store.rows()).map(r => [r.id, r.nlines]));
-      const rows = ents.map(e => ({ id: e.id, lang: e.lang, title: e.title, code: e.code, nlines: nl.get(e.id) }));
-      return json(res, 200, buildVariants({ q, lang, dict, rows, synonyms: dict.synonyms || {}, caseMap: _caseMap.map }));
+      const dict = await kwDict();
+      // Один синхронный проход по библиотеке; неизменяемые строки и карта регистра переиспользуются между нажатиями.
+      await store.sync();
+      if(_variantSnapshot.v !== store.version || _variantSnapshot.dict !== dict){
+        const ents = await store.entries();
+        const rows = ents.map(e => ({ id:e.id, lang:e.lang, title:e.title, code:e.code, nlines:String(e.code || '').split('\\n').length }));
+        _variantSnapshot = { v:store.version, dict, rows, codes:ents.map(e => e.code) };
+      }
+      if(_caseMap.v !== store.version || _caseMap.dict !== dict)
+        _caseMap = { v:store.version, dict, map:caseMapFrom(_variantSnapshot.codes.concat(_dictRawKeys)) };
+      return json(res, 200, buildVariants({ q, lang, dict, rows:_variantSnapshot.rows, synonyms:dict.synonyms || {}, caseMap:_caseMap.map }));
     }
 
     // ── свои имена в коде песочницы: что внутри, где объявлено, похожие на опечатку ──
