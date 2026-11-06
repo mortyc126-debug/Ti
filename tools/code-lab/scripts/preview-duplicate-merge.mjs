@@ -91,6 +91,11 @@ for (const pair of manifest.pairs) {
     title: canonical.passport.title || secondary.passport.title || canonical.id,
     group: canonical.passport.group || secondary.passport.group || '',
     desc: descSource.passport.desc || '',
+    descAt: descSource.passport.descAt ?? canonical.passport.descAt ?? secondary.passport.descAt,
+    component: canonical.passport.component ?? secondary.passport.component ?? null,
+    output: canonical.passport.output || secondary.passport.output || '',
+    labels: { ...(secondary.passport.labels || {}), ...(canonical.passport.labels || {}) },
+    externalLinks: canonical.passport.externalLinks ?? secondary.passport.externalLinks ?? null,
     tags: uniqueList(orderedSources.map(source => source.passport.tags || [])),
     aliases: uniqueList(orderedSources.map(source => source.passport.aliases || [])),
     status: orderedSources.some(source => source.passport.status === 'described') ? 'described' : (canonical.passport.status || secondary.passport.status || 'needs_description'),
@@ -98,6 +103,9 @@ for (const pair of manifest.pairs) {
     orphanNotes: uniqueNotes(allOrphanNotes).map(({ _sourceFile, ...note }) => note),
     _mergePreviewOnly: true
   };
+  if (!candidatePassport.component) delete candidatePassport.component;
+  if (!Object.keys(candidatePassport.labels || {}).length) delete candidatePassport.labels;
+  if (candidatePassport.externalLinks == null) delete candidatePassport.externalLinks;
   previews.push({
     pair: pair.pair,
     code: { identical: true, hash: pair.codeHash, sourceFiles: orderedSources.map(source => source.file) },
