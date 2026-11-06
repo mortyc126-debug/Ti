@@ -939,8 +939,26 @@ const server = http.createServer(async (req, res) => {
         });
         if(matches.length) hits.push({ id: concept.id, name: concept.name, definition: concept.definition, match: matches[0] });
       }
-      hits.sort((a, b) => b.match.score - a.match.score || a.name.localeCompare(b.name, 'ru'));
-      return json(res, 200, { hits: hits.slice(0, 100), total: hits.length, query });
+      const hitMap = new Map(hits.map(hit => [hit.id, hit]));
+      if(query){
+        for(const sourceHit of hits){
+          for(const relation of data.relations){
+            if(!CONCEPT_RELATIONS[relation.type]?.searchable) continue;
+            const otherId = relation.from === sourceHit.id ? relation.to : relation.to === sourceHit.id ? relation.from : null;
+            if(!otherId || hitMap.has(otherId)) continue;
+            const other = data.concepts.find(concept => concept.id === otherId);
+            if(!other) continue;
+            hitMap.set(otherId, {
+              id: other.id, name: other.name, definition: other.definition,
+              match: { kind: 'equivalent', label: 'равнозначное понятие', value: sourceHit.name, score: Math.max(1, sourceHit.match.score - 10) },
+              via: { conceptId: sourceHit.id, relationId: relation.id, type: relation.type }
+            });
+          }
+        }
+      }
+      const results = [...hitMap.values()];
+      results.sort((a, b) => b.match.score - a.match.score || a.name.localeCompare(b.name, 'ru'));
+      return json(res, 200, { hits: results.slice(0, 100), total: results.length, query });
     }
 
     // поиск по всей библиотеке: ?q=слова&limit=60 → { hits:[{id, score, why:[…]}], total, terms }
