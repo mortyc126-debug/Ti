@@ -215,9 +215,20 @@ function openBulkModal(){
     if(t[0] === '[' || t[0] === '{'){ try { data = JSON.parse(t); } catch(e){ err.textContent = 'Похоже на JSON, но с ошибкой: ' + e.message; return; } }
     else { data = parseTemplatesMarkdown(t); if(!data.length){ err.textContent = 'Не нашла ни одного шаблона. Начни строку с «# Название».'; return; } }
     q('#bk-load').disabled = true; q('#bk-load').textContent = 'граблю…';
-    const r = await fetch('/api/recipes/import', { method: 'POST', body: JSON.stringify(data) }).then(x => x.json()).catch(() => null);
+    let r = await fetch('/api/recipes/import', { method: 'POST', body: JSON.stringify(data) }).then(x => x.json()).catch(() => null);
+    if(r && r.needsConfirmation){
+      const details = (r.unresolved || []).map(x => '• ' + x.recipe + ' → ' + x.item + ': ' + x.reason + ((x.candidates || []).length ? ' (' + x.candidates.map(c => c.title + ' [' + c.lang + ']').join(', ') + ')' : '')).join('\\n');
+      if(confirm('В рецепте есть пункты без однозначной связи. Если продолжить, они сохранятся без привязки к коду.\\n\\n' + details + '\\n\\nСохранить неполный рецепт?')){
+        const payload = Array.isArray(data) ? { recipes: data, allowUnresolved: true } : { ...data, allowUnresolved: true };
+        r = await fetch('/api/recipes/import', { method: 'POST', body: JSON.stringify(payload) }).then(x => x.json()).catch(() => null);
+      } else {
+        q('#bk-load').disabled = false; q('#bk-load').textContent = 'загрузить';
+        err.textContent = 'Загрузка отменена. Ничего не сохранено.';
+        return;
+      }
+    }
     q('#bk-load').disabled = false; q('#bk-load').textContent = 'загрузить';
-    if(!r || !r.ok){ err.textContent = 'Не вышло загрузить (сервер не ответил или формат не тот).'; return; }
+    if(!r || !r.ok){ err.textContent = (r && r.error) || 'Не вышло загрузить (сервер не ответил или формат не тот).'; return; }
     err.style.color = 'var(--str,#52F2C9)';
     err.textContent = '✓ Готово. Больших шаблонов: ' + r.recipes + ' · новых кусков в библиотеку: ' + r.piecesAdded + ' · переиспользовано: ' + r.piecesReused + (r.itemsUnresolved ? ' · без кода/не найдено: ' + r.itemsUnresolved : '');
     try { PIECES = await fetch('/api/list').then(x => x.json()); } catch(_){}
