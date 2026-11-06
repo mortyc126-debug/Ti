@@ -117,6 +117,8 @@ test('неоднозначные названия кусков и задач н�
   const explicit = await store.importText('=== Явный ID | js |\n? Q\n  - a -> задача: id:task-b', { dry: true });
   assert.equal(explicit.tasks[0].report.linked, 1);
   assert.equal(explicit.tasks[0].task.steps[0].options[0].id, 'task-b');
+  const serialized = await store.toText({ id: 'task-c', title: 'Ссылка', lang: 'js', steps: [{ q: 'Q', options: [{ kind: 'task', id: 'task-b', ref: 'Одинаковая задача', label: 'перейти' }] }] });
+  assert.match(serialized, /id:task-b/, 'экспорт должен сохранять ID, если название задачи неоднозначно');
   await fs.rm(root, { recursive: true, force: true });
 });
 
