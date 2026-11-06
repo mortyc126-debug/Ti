@@ -16,6 +16,17 @@ function safeRelative(value){
   return parts.every(part => part && part !== '.' && part !== '..');
 }
 
+function allowedTarget(rootName, relative){
+  if(rootName === 'library') return true;
+  if(rootName !== 'app') return false;
+  const value = relative.toLowerCase();
+  if(['tasks/', 'recipes/', 'flows/', 'data/', 'workspace/', 'templates/'].some(prefix => value.startsWith(prefix))) {
+    if(value.startsWith('data/restore-backups/') || value === 'data/description-jobs.json') return false;
+    return true;
+  }
+  return value.startsWith('public/dict/') || value === 'public/keyword-dict.json';
+}
+
 async function assertSafeTarget(fs, root, target){
   const rootStat = await fs.lstat(root).catch(error => isMissing(error) ? null : Promise.reject(error));
   if(rootStat?.isSymbolicLink() || (rootStat && !rootStat.isDirectory())) throw new Error('Корень восстановления небезопасен: ' + root);
@@ -84,7 +95,7 @@ export async function prepareRestoreTransaction({ fs = defaultFs, backupRoot, ro
   for(const [action, items] of [['write', writes], ['delete', deletions]]){
     for(const op of items){
       const target = path.relative(root, op.abs).split(path.sep).join('/');
-      if(!safeRelative(target)) throw new Error('Недопустимый путь в журнале восстановления: ' + target);
+      if(!safeRelative(target) || !allowedTarget(rootName, target)) throw new Error('Недопустимый путь в журнале восстановления: ' + target);
       const backupPath = backups.get(op.abs) || null;
       const backup = backupPath ? path.relative(backupRoot, backupPath).split(path.sep).join('/') : null;
       if(backup && !safeRelative(backup)) throw new Error('Недопустимый путь резервной копии: ' + backup);
@@ -138,7 +149,7 @@ export async function recoverRestoreTransactions({ fs = defaultFs, backupDir, ro
     if(!root || !Array.isArray(manifest.operations)) throw new Error('Журнал восстановления содержит неизвестный корень или список операций: ' + entry.name);
     const operations = manifest.operations;
     for(const op of [...operations].reverse()){
-      if(!op || !['write', 'delete'].includes(op.action) || !safeRelative(op.target) || typeof op.existed !== 'boolean') {
+      if(!op || !['write', 'delete'].includes(op.action) || !safeRelative(op.target) || !allowedTarget(manifest.root, op.target) || typeof op.existed !== 'boolean') {
         throw new Error('Повреждённая операция в журнале восстановления: ' + entry.name);
       }
       const target = path.resolve(root, ...op.target.split('/'));
