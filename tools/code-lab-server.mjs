@@ -15,6 +15,8 @@ import { execFile } from 'node:child_process';
 import { annotateLines } from './code-lab/lib/annotate.mjs';
 import { createLibraryStore } from './code-lab/lib/library-store.mjs';
 import { createConceptStore } from './code-lab/lib/concept-store.mjs';
+import { buildLegacyQueryPhraseImport } from './code-lab/lib/query-phrase-import.mjs';
+import { createLegacyQueryPhraseShadow } from './code-lab/lib/query-phrase-shadow.mjs';
 import { CONCEPT_RELATIONS } from './code-lab/lib/concept-model.mjs';
 import { rollbackRestore, prepareRestoreTransaction, markRestoreTransaction, recoverRestoreTransactions } from './code-lab/lib/restore-transaction.mjs';
 import { createSearchService } from './code-lab/lib/search.mjs';
@@ -177,6 +179,20 @@ async function getUsage(){
   const u = buildUsage(dict, entries.map(e => ({ id: e.id, lang: String(e.lang || (e.meta && e.meta.lang) || 'txt').toLowerCase(), title: e.title, group: e.group, code: String(e.code || '') })));
   u.__dict = dict; _usage = u; _usageKey = key;
   return u;
+}
+
+// Отдельный теневой индекс направленных фраз. Источник читается в памяти;
+// ни manifest, ни legacy-словарь не переписываются.
+let _queryPhraseShadow = null, _queryPhraseShadowUsage = null, _queryPhraseShadowStamp = -1;
+async function getQueryPhraseShadow(){
+  const stamp = await fs.stat(SYN_FILE).then(s => s.mtimeMs, () => 0);
+  const usage = await getUsage();
+  if(_queryPhraseShadow && _queryPhraseShadowStamp === stamp && _queryPhraseShadowUsage === usage) return _queryPhraseShadow;
+  const imported = buildLegacyQueryPhraseImport(await loadSynonyms(), { sourceFile: 'public/dict/synonyms.json' });
+  _queryPhraseShadow = createLegacyQueryPhraseShadow({ queryPhrases: imported.manifest.queryPhrases, usage });
+  _queryPhraseShadowUsage = usage;
+  _queryPhraseShadowStamp = stamp;
+  return _queryPhraseShadow;
 }
 // записать словарь языка в свой файл dict/langs/<lang>.json (мёрдж с существующим)
 async function saveLangDict(lang, pairs){
@@ -991,6 +1007,26 @@ const server = http.createServer(async (req, res) => {
       const results = [...hitMap.values()];
       results.sort((a, b) => b.match.score - a.match.score || a.name.localeCompare(b.name, 'ru'));
       return json(res, 200, { hits: results.slice(0, 100), total: results.length, query, language, scope });
+    }
+
+    // Теневое сравнение: действующая выдача + отдельные кандидаты из направленных фраз.
+    // /api/search и его индекс не меняются; targetKey не превращается в синоним.
+    if(u.pathname === '/api/search/shadow' && req.method === 'GET'){
+      const q = u.searchParams.get('q') || '';
+      const limit = Math.min(200, Number(u.searchParams.get('limit')) || 60);
+      const lang = String(u.searchParams.get('lang') || '').toLowerCase();
+      const scope = String(u.searchParams.get('scope') || '');
+      const [legacy, shadowIndex] = await Promise.all([
+        search.search(q, { limit, lang, boost: await searchBoost() }),
+        getQueryPhraseShadow()
+      ]);
+      return json(res, 200, {
+        query: q,
+        legacy,
+        shadow: shadowIndex.search(q, { limit, language: lang, scope }),
+        shadowPhraseCount: shadowIndex.phraseCount,
+        productionSearchChanged: false
+      });
     }
 
     // поиск по всей библиотеке: ?q=слова&limit=60 → { hits:[{id, score, why:[…]}], total, terms }
