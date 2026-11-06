@@ -1,0 +1,43 @@
+name: Code Lab tests
+
+on:
+  push:
+    branches:
+      - main
+      - "audit/fixes-2026-11-06"
+    paths:
+      - "tools/code-lab/**"
+      - "tools/code-lab-server.mjs"
+      - ".github/workflows/code-lab-tests.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "tools/code-lab/**"
+      - "tools/code-lab-server.mjs"
+      - ".github/workflows/code-lab-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run Code Lab regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          tests=(tools/code-lab/tests/*.test.mjs tools/code-lab/tests/*.test.js)
+          if (( ${#tests[@]} == 0 )); then
+            echo "::error::Тестовые файлы не найдены"
+            exit 1
+          fi
+          for test_file in "${tests[@]}"; do
+            echo "::group::${test_file}"
+            node "${test_file}"
+            echo "::endgroup::"
+          done
