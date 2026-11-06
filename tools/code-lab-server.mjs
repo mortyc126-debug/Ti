@@ -1033,6 +1033,7 @@ const server = http.createServer(async (req, res) => {
     if(u.pathname === '/api/library/restore' && req.method === 'POST'){
       const b = await readBody(req);
       const files = Array.isArray(b.files) ? b.files : [];
+      const mode = b.mode === 'replace' ? 'replace' : 'merge';
       const EXT2LANG = { js:'js', mjs:'js', cjs:'js', ts:'ts', tsx:'ts', jsx:'js', py:'python', rb:'ruby', php:'php', go:'go', rs:'rust', java:'java', c:'c', h:'c', cpp:'cpp', cs:'csharp', css:'css', html:'html', htm:'html', svg:'svg', sql:'sql', sh:'bash', json:'json' };
       const safeLang = l => (String(l || 'txt').toLowerCase().replace(/[^a-z0-9_+-]/g, '') || 'txt');
       const langOfName = n => {
@@ -1070,8 +1071,11 @@ const server = http.createServer(async (req, res) => {
       }
       if(invalidPaths.length) return json(res, 400, { ok: false, error: 'В архиве есть недопустимые или повторяющиеся пути. Ничего не записано.', invalidPaths: invalidPaths.slice(0, 50) });
 
+      const rootFiles = archiveFiles.filter(f => f.archivePath.split('/').length === 2 && f.archivePath.split('/')[0].toLowerCase() === 'library');
+      for(const f of rootFiles) if(!f.archivePath.split('/')[1].startsWith('_')) invalidPaths.push(f.archivePath + ' (неизвестный файл в корне библиотеки)');
+      if(invalidPaths.length) return json(res, 400, { ok: false, error: 'В архиве есть недопустимые пути. Ничего не записано.', invalidPaths: invalidPaths.slice(0, 50) });
       const metas = archiveFiles.filter(f => /\.meta\.json$/i.test(f.archivePath));
-      const codes = archiveFiles.filter(f => !/\.meta\.json$/i.test(f.archivePath));
+      const codes = archiveFiles.filter(f => !/\.meta\.json$/i.test(f.archivePath) && !rootFiles.includes(f));
       const codeByPath = new Map(codes.map(c => [c.key, c]));
       let pairs = 0;
       const consumed = new Set(), destinations = new Set(), writes = [];
@@ -1090,7 +1094,20 @@ const server = http.createServer(async (req, res) => {
         writes.push({ abs, rel: relFromLibrary, text: String(text ?? ''), kind });
       };
 
+      const addRootWrite = file => {
+        const rel = file.archivePath.split('/')[1];
+        if(!rel || !rel.startsWith('_')) throw new Error('Недопустимый файл в корне библиотеки: ' + file.archivePath);
+        if(/\.json$/i.test(rel)) JSON.parse(String(file.text ?? ''));
+        const abs = within(LIBRARY, rel);
+        if(!abs) throw new Error('Недопустимый путь служебного файла: ' + file.archivePath);
+        const key = rel.toLowerCase();
+        if(destinations.has(key)) throw new Error('Два файла архива ведут к одному месту: ' + rel);
+        destinations.add(key);
+        writes.push({ abs, rel, text: String(file.text ?? ''), kind: 'root' });
+      };
+
       try {
+        for(const file of rootFiles) addRootWrite(file);
         for(const m of metas){
           let meta;
           try { meta = JSON.parse(String(m.text ?? '')); }
@@ -1111,13 +1128,14 @@ const server = http.createServer(async (req, res) => {
           addWrite(c.archivePath, lang, c.text, 'code');
           codeOnlyList.push(c.archivePath);
         }
+        if(mode === 'replace' && (badMeta.length || metaOnlyList.length || codeOnlyList.length)) throw new Error('Полная замена требует корректные пары кода и паспортов для всех элементов');
       } catch(e){
         return json(res, 400, { ok: false, error: String(e?.message || e), invalidPaths: invalidPaths.slice(0, 50) });
       }
 
       const backupId = 'library-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
       const backupRoot = path.join(DATA, 'restore-backups', backupId);
-      const backups = new Map(), written = [];
+      const backups = new Map(), written = [], deleted = [];
       const lstatOrNull = async target => { try { return await fs.lstat(target); } catch(e){ if(e.code === 'ENOENT') return null; throw e; } };
       const safeStat = async target => {
         const rootStat = await lstatOrNull(LIBRARY);
@@ -1139,7 +1157,22 @@ const server = http.createServer(async (req, res) => {
         const backupDir = path.join(DATA, 'restore-backups');
         const backupDirStat = await lstatOrNull(backupDir);
         if(backupDirStat && (backupDirStat.isSymbolicLink() || !backupDirStat.isDirectory())) throw new Error('Папка резервных копий не должна быть ссылкой или обычным файлом');
-        for(const op of writes){
+        const deletions = [];
+        if(mode === 'replace'){
+          const walk = async dir => {
+            for(const entry of await fs.readdir(dir, { withFileTypes: true })){
+              const abs = path.join(dir, entry.name);
+              if(entry.isSymbolicLink()) throw new Error('Символическая ссылка в библиотеке: ' + path.relative(LIBRARY, abs));
+              if(entry.isDirectory()) await walk(abs);
+              else if(entry.isFile()){
+                const rel = path.relative(LIBRARY, abs);
+                if(!destinations.has(rel.toLowerCase())) deletions.push({ abs, rel });
+              }
+            }
+          };
+          await walk(LIBRARY);
+        }
+        for(const op of [...writes, ...deletions]){
           const st = await safeStat(op.abs);
           if(!st) continue;
           if(!st.isFile()) throw new Error('На месте файла архива уже существует папка: ' + op.rel);
@@ -1160,23 +1193,24 @@ const server = http.createServer(async (req, res) => {
           await fs.writeFile(op.abs, op.text, 'utf8');
           written.push(op);
         }
+        for(const op of deletions){ await fs.unlink(op.abs); deleted.push(op); }
       } catch(e){
         const rollbackErrors = [];
-        for(const op of written.reverse()){
+        for(const op of [...written, ...deleted].reverse()){
           try {
             const backupPath = backups.get(op.abs);
             if(backupPath){ await fs.mkdir(path.dirname(op.abs), { recursive: true }); await fs.copyFile(backupPath, op.abs); }
-            else await fs.unlink(op.abs).catch(() => {});
+            else if(written.includes(op)) await fs.unlink(op.abs).catch(() => {});
           } catch(err){ rollbackErrors.push(String(err?.message || err)); }
         }
         return json(res, 500, { ok: false, error: String(e?.message || e), backupId: backups.size ? backupId : null, rollbackErrors });
       }
 
-      let wroteCode = 0, wroteMeta = 0;
-      for(const op of writes){ if(op.kind === 'code') wroteCode++; else wroteMeta++; }
+      let wroteCode = 0, wroteMeta = 0, wroteRoot = 0;
+      for(const op of writes){ if(op.kind === 'code') wroteCode++; else if(op.kind === 'meta') wroteMeta++; else wroteRoot++; }
       try { await store.refresh(); } catch(_){}
-      return json(res, 200, { ok: true, pairs, metaOnly: metaOnlyList.length, codeOnly: codeOnlyList.length, wroteCode, wroteMeta,
-        overwritten: backups.size, backupId: backups.size ? backupId : null,
+      return json(res, 200, { ok: true, mode, pairs, metaOnly: metaOnlyList.length, codeOnly: codeOnlyList.length, wroteCode, wroteMeta, wroteRoot, deleted: deleted.length,
+        overwritten: writes.filter(op => backups.has(op.abs)).length, backedUp: backups.size, backupId: backups.size ? backupId : null,
         metaOnlyList: metaOnlyList.slice(0, 60), codeOnlyList: codeOnlyList.slice(0, 60), badMeta: badMeta.slice(0, 20) });
     }
 
