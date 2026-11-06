@@ -619,21 +619,6 @@
       "note": "Регистрация обработчика именно события click."
     },
     {
-      "id": "curated-query-043",
-      "phrase": "запросить данные по HTTP",
-      "targetKey": "write",
-      "language": "js",
-      "scope": "",
-      "origin": "manual",
-      "confidence": 0.98,
-      "source": {
-        "file": "tools/code-lab/SYNONYM-QUERY-TESTSET.md",
-        "group": "DOM, сеть, файлы и тесты",
-        "index": 43
-      },
-      "note": "Запись данных в файл; фрагменты ограничиваются языком Python."
-    },
-    {
       "id": "curated-query-044",
       "phrase": "записать файл",
       "targetKey": "patch",
