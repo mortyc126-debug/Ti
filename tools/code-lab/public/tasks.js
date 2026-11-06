@@ -260,6 +260,7 @@
       const msg = $('#teMsg');
       if(!r || !r.ok){ msg.className = 'tk-msg err'; msg.textContent = (r && r.error) || 'не сохранилось'; return; }
       await reload(r.id);
+      if(r.report && Array.isArray(r.report.unresolved) && r.report.unresolved.length){ const status = $('#teMsg'); status.className = 'tk-msg err'; status.textContent = 'Сохранено, но осталось неразрешённых ссылок: ' + r.report.unresolved.length + '. Они не привязаны автоматически к случайным элементам.'; }
     };
     // поиск куска/задачи → вставка «-> кусок: Название»
     let ps = 0, pt = null;
