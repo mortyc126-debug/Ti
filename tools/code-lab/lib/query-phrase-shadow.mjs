@@ -1,13 +1,45 @@
 // Теневой индекс направленных поисковых фраз legacy-словаря.
-// Не меняет ни словари, ни рабочий поиск: только строит кандидатов по targetKey.
+// Не меняет ни словари, ни рабочий поиск: строит кандидатов и связывает их с проверяемыми фрагментами.
 const normalize = value => String(value == null ? '' : value)
   .trim().toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\s+/g, ' ');
 
 function phraseScore(query, phrase) {
   if (query === phrase) return 100;
-  if (phrase.startsWith(query)) return 85;
-  if (phrase.includes(query)) return 75;
+  // Префиксное расширение полезно для уточнённых формулировок, но короткие
+  // однословные запросы не должны размножать десятки частных понятий.
+  if (query.includes(' ') && phrase.startsWith(query + ' ')) return 85;
   return 0;
+}
+
+const EXCLUDED_PHRASE_TARGETS = new Set([
+  'стрелочная функция\u0000lambda',
+  'стрелочная функция\u0000lambda x',
+  'найти элемент по id\u0000id'
+]);
+
+function pieceMatchesTarget(targetKey, phrase, piece, usage) {
+  const target = normalize(targetKey);
+  const q = normalize(phrase);
+  if (EXCLUDED_PHRASE_TARGETS.has(q + '\u0000' + target)) return false;
+
+  const code = typeof usage?.pieceText === 'function' ? String(usage.pieceText(piece.id) || '') : '';
+  if (!code) return true; // совместимость с изолированными тестовыми адаптерами
+
+  // Ключи вроде display/open/join встречаются в посторонних конструкциях.
+  // Здесь оставляем только тот синтаксический смысл, который описывает фраза.
+  if (target === 'display' && q === 'скрыть элемент') return /\bdisplay\s*:\s*none\b/i.test(code);
+  if (target === 'visibility' && q === 'скрыть но оставить место') return /\bvisibility\s*:\s*hidden\b/i.test(code);
+  if (target === 'max-width' && q === 'ограничить ширину') return /(?<!\()\bmax-width\s*:/i.test(code);
+  if (target === 'open' && q.startsWith('открыть файл')) {
+    return normalize(piece.lang) === 'python' && /\bopen\s*\(/i.test(code);
+  }
+  if (target === 'with' && q.includes('открыть файл')) {
+    return normalize(piece.lang) === 'python' && /\bwith\s+(?:aiofiles\.)?open\s*\(/i.test(code);
+  }
+  if (target === 'str.join(it)' && q.startsWith('join')) {
+    return normalize(piece.lang) === 'python' && /\.\s*join\s*\(\s*[^)\s]/i.test(code);
+  }
+  return true;
 }
 
 export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null } = {}) {
@@ -31,7 +63,7 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
 
   function search(query, { language = '', scope = '', limit = 60 } = {}) {
     const q = normalize(query);
-    if (!q) return { query: q, total: 0, hits: [], ambiguous: 0 };
+    if (!q) return { query: q, total: 0, hits: [], ambiguous: false };
     const grouped = new Map();
 
     for (const [phrase, records] of byPhrase) {
@@ -55,12 +87,17 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
 
     for (const hit of grouped.values()) {
       for (const location of termLocations.get(normalize(hit.targetKey)) || []) {
-        if (!hit.sections.includes(location.section)) hit.sections.push(location.section);
         const ids = usage.piecesOf(location.section, location.key);
         for (const id of ids) {
           if (hit.pieces.some(piece => piece.id === id)) continue;
           const piece = usage.pieceInfo(id);
-          if (piece) hit.pieces.push(piece);
+          if (!piece) continue;
+          const relevant = hit.phrases.some(record =>
+            pieceMatchesTarget(hit.targetKey, record.phrase, piece, usage)
+          );
+          if (!relevant) continue;
+          if (!hit.sections.includes(location.section)) hit.sections.push(location.section);
+          hit.pieces.push(piece);
         }
       }
       hit.phrases.sort((a, b) => a.phrase.localeCompare(b.phrase, 'ru'));
@@ -68,7 +105,8 @@ export function createLegacyQueryPhraseShadow({ queryPhrases = [], usage = null 
       hit.pieces.sort((a, b) => String(a.title || a.id).localeCompare(String(b.title || b.id), 'ru'));
     }
 
-    const hits = [...grouped.values()].sort((a, b) =>
+    // Цель без единого реального фрагмента не является результатом поиска по библиотеке.
+    const hits = [...grouped.values()].filter(hit => hit.pieces.length > 0).sort((a, b) =>
       b.score - a.score || a.targetKey.localeCompare(b.targetKey, 'ru')
     );
     return {
