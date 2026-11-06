@@ -105,14 +105,14 @@ export async function prepareRestoreTransaction({ fs = defaultFs, backupRoot, ro
     })),
     operations
   };
-  await writeAtomicNewFile(fs, path.join(backupRoot, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\\n');
+  await writeAtomicNewFile(fs, path.join(backupRoot, 'manifest.json'), JSON.stringify(manifest, null, 2) + String.fromCharCode(10));
   return manifest;
 }
 
 export async function markRestoreTransaction({ fs = defaultFs, backupRoot, state } = {}){
   if(!['COMMITTED', 'ROLLED_BACK'].includes(state)) throw new Error('Неизвестное состояние транзакции восстановления');
   const marker = path.join(backupRoot, state);
-  await writeAtomicNewFile(fs, marker, new Date().toISOString() + '\\n');
+  await writeAtomicNewFile(fs, marker, new Date().toISOString() + String.fromCharCode(10));
 }
 
 // Восстановление выполняется до загрузки хранилищ и запуска HTTP-сервера.
