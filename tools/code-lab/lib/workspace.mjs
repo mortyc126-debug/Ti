@@ -94,9 +94,16 @@ const encode = (text, eol, bom) => {
 
 async function writeAtomic(abs, data){
   await fs.mkdir(path.dirname(abs), { recursive: true });
-  const tmp = abs + '.' + process.pid + '.tmp';
-  await fs.writeFile(tmp, data, 'utf8');
-  await fs.rename(tmp, abs);
+  // У каждого параллельного сохранения свой временный файл: общий *.pid.tmp
+  // приводил к гонке двух writeFile/rename для одного пути.
+  const tmp = abs + '.' + process.pid + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10) + '.tmp';
+  try {
+    await fs.writeFile(tmp, data, 'utf8');
+    await fs.rename(tmp, abs);
+  } catch(e){
+    await fs.unlink(tmp).catch(() => {});
+    throw e;
+  }
 }
 
 const langOf = name => langForExt(path.extname(name)) || 'txt';
