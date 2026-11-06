@@ -95,7 +95,8 @@ for(const file of files){
     file:rel,id,hasOwnId,lang,expectedLang:expected||null,langMismatch:!!(expected&&lang!==expected),
     group:meta.group||'',title:meta.title||'',emptyDesc:!String(meta.desc||'').trim(),
     status:meta.status||'',hasMeta:set.has(metaPath),metaError:invalidMeta.some(x=>x.file===path.relative(root,metaPath)),
-    notes:notes.length,orphans:orphans.length,rawHash:exact,normalizedHash:formatted,\n    metaSummary:{title:meta.title||'',group:meta.group||'',desc:meta.desc||'',tags:meta.tags||[],aliases:meta.aliases||[],status:meta.status||'',component:meta.component||null}
+    notes:notes.length,orphans:orphans.length,rawHash:exact,normalizedHash:formatted,
+    metaSummary:{title:meta.title||'',group:meta.group||'',desc:meta.desc||'',tags:meta.tags||[],aliases:meta.aliases||[],status:meta.status||'',component:meta.component||null}
   });
 }
 const groups=map=>[...map.values()].filter(v=>v.length>1).map(files=>({count:files.length,files}));
