@@ -18,6 +18,23 @@ const exists = p => fs.access(p).then(() => true, () => false);
 
 let store = mk(); await store.init();
 
+await test('повреждённый паспорт не маскируется и не перезаписывается при сохранении', async () => {
+  const root = path.join(tmp, 'broken-meta');
+  const s = mk(root); await s.init();
+  await fs.mkdir(path.join(root, 'js'), { recursive: true });
+  const codePath = path.join(root, 'js', 'повреждённый.js');
+  const metaPath = codePath + '.meta.json';
+  await fs.writeFile(codePath, 'const safe = 1;', 'utf8');
+  const broken = '{ this is not valid json';
+  await fs.writeFile(metaPath, broken, 'utf8');
+  await s.refresh();
+  const row = (await s.rows()).find(x => x.id === 'повреждённый');
+  assert.ok(row);
+  await assert.rejects(s.save({ id: 'повреждённый', lang: 'js', lines: tokenize('const changed = 2;', 'js') }), /Паспорт повреждён/);
+  assert.equal(await fs.readFile(metaPath, 'utf8'), broken);
+  assert.equal(await fs.readFile(codePath, 'utf8'), 'const safe = 1;');
+});
+
 await test('новый кусок — обычный файл с родным расширением и метафайл рядом', async () => {
   const code = 'const база = 20;\nprint(база)';
   await store.save({ id: 'тест-1', lang: 'js', title: 'Тест', group: 'Основы', desc: 'описание', lines: tokenize(code, 'js') });
