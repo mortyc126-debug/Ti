@@ -14,6 +14,8 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { annotateLines } from './code-lab/lib/annotate.mjs';
 import { createLibraryStore } from './code-lab/lib/library-store.mjs';
+import { createConceptStore } from './code-lab/lib/concept-store.mjs';
+import { CONCEPT_RELATIONS } from './code-lab/lib/concept-model.mjs';
 import { rollbackRestore, prepareRestoreTransaction, markRestoreTransaction, recoverRestoreTransactions } from './code-lab/lib/restore-transaction.mjs';
 import { createSearchService } from './code-lab/lib/search.mjs';
 import { tokenize } from './code-lab/lib/tokenizer.mjs';   // токенайзер отдельно — его удобнее тестировать
@@ -52,6 +54,7 @@ const TASKS = path.join(ROOT, 'tasks');     // задачи: вопрос → в
 const PORT = Number(process.argv[2]) || 8788;
 // файловое хранилище библиотеки (код — обычные файлы; подсветка и пояснения строятся из текста при загрузке)
 const store = createLibraryStore({ root: LIBRARY, legacyDir: TEMPLATES, dictPath: path.join(PUBLIC, 'keyword-dict.json'), getDict: () => kwDict(), coverage: j => coverage(j), contract: (code, lang) => codeContract(code, lang) });
+const concepts = createConceptStore({ filePath: path.join(LIBRARY, '_concepts.json'), getPieceIds: async () => new Set((await store.entries()).map(entry => entry.id)) });
 // поиск: по названию, описанию, тегам, коду и пояснениям; синонимы лежат в library/_synonyms.json (это обычный файл, его можно править в любом редакторе)
 const search = createSearchService({ store, synonymsPath: path.join(LIBRARY, '_synonyms.json'), defaultSynonymsPath: path.join(ROOT, 'lib', 'default-synonyms.json') });
 const aiRuntime = createProviderRuntime({ configPath: path.join(ROOT, 'ai-config.json') });   // выбранный ИИ-сервис (ключей в файле нет)
@@ -885,6 +888,60 @@ const server = http.createServer(async (req, res) => {
     }
 
     if(u.pathname === '/api/list'){ return json(res, 200, await listTemplates(u.searchParams.get('labels') === '1')); }
+
+    // Пользовательские конструкции: отдельные понятия, формы, примеры и типизированные связи.
+    if(u.pathname === '/api/concepts' && req.method === 'GET'){
+      const data = await concepts.get();
+      return json(res, 200, { ...data, relationTypes: CONCEPT_RELATIONS });
+    }
+    if(u.pathname === '/api/concepts/save' && req.method === 'POST'){
+      const b = await readBody(req);
+      const data = b.store && typeof b.store === 'object' ? b.store : b;
+      try { return json(res, 200, await concepts.save(data)); }
+      catch(error){
+        if(error.validation) return json(res, 400, { error: error.message, ...error.validation });
+        throw error;
+      }
+    }
+    if(u.pathname === '/api/concepts/delete' && req.method === 'POST'){
+      const b = await readBody(req), id = String(b.id || '').trim();
+      if(!id) return json(res, 400, { error: 'Нужен ID понятия' });
+      const current = await concepts.get();
+      if(!current.concepts.some(concept => concept.id === id)) return json(res, 404, { error: 'Понятие не найдено' });
+      const relationsBefore = current.relations.length;
+      const next = {
+        ...current,
+        concepts: current.concepts.filter(concept => concept.id !== id),
+        relations: current.relations.filter(relation => relation.from !== id && relation.to !== id)
+      };
+      const saved = await concepts.save(next);
+      return json(res, 200, { ...saved, deleted: id, removedRelations: relationsBefore - next.relations.length });
+    }
+    if(u.pathname === '/api/concepts/search' && req.method === 'GET'){
+      const query = String(u.searchParams.get('q') || '').trim().toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\s+/g, ' ');
+      const data = await concepts.get();
+      const hits = [];
+      for(const concept of data.concepts){
+        const candidates = [
+          { kind: 'name', label: 'название', value: concept.name, score: 100 },
+          ...(concept.aliases || []).map(alias => ({ kind: 'alias', label: 'вариант названия', value: typeof alias === 'string' ? alias : alias.value, score: 90 })),
+          ...(concept.forms || []).map(form => ({ kind: 'form', label: 'вариант записи', value: form.value, score: 80 })),
+          { kind: 'definition', label: 'значение', value: concept.definition, score: 50 },
+          ...(concept.tags || []).map(tag => ({ kind: 'tag', label: 'тег', value: tag, score: 30 }))
+        ];
+        const matches = candidates.filter(item => {
+          const value = String(item.value || '').toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\s+/g, ' ');
+          return query ? value.includes(query) : true;
+        }).sort((a, b) => {
+          const aExact = String(a.value || '').toLocaleLowerCase('ru').replace(/ё/g, 'е').trim() === query;
+          const bExact = String(b.value || '').toLocaleLowerCase('ru').replace(/ё/g, 'е').trim() === query;
+          return Number(bExact) - Number(aExact) || b.score - a.score;
+        });
+        if(matches.length) hits.push({ id: concept.id, name: concept.name, definition: concept.definition, match: matches[0] });
+      }
+      hits.sort((a, b) => b.match.score - a.match.score || a.name.localeCompare(b.name, 'ru'));
+      return json(res, 200, { hits: hits.slice(0, 100), total: hits.length, query });
+    }
 
     // поиск по всей библиотеке: ?q=слова&limit=60 → { hits:[{id, score, why:[…]}], total, terms }
     if(u.pathname === '/api/search'){
