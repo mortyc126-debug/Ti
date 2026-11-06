@@ -243,6 +243,23 @@ test('библиотека: пары кода и паспортов, JSON и ID 
     if((a.orphanNotesCount>0)!==(b.orphanNotesCount>0)) duplicatePairQuality.orphanNotesOnlyOneSide++;
     if(duplicatePairSamples.length<20) duplicatePairSamples.push({a,b});
   }
+  const duplicatePairPattern={pairs:0,suffixedAndPlain:0,suffixedDescShorter:0,plainHasTagsOnly:0,plainHasAliasesOnly:0,suffixedComponentOnly:0,suffixedWordNotesMore:0,suffixedOrphanOnly:0};
+  for(const group of dupGroups){
+    const pair=group.map(file=>rowsByFile.get(file)).filter(Boolean);
+    if(pair.length!==2) continue;
+    const suffixed=pair.find(row=>/-[a-z0-9]{8}\.js$/i.test(row.file));
+    const plain=pair.find(row=>row!==suffixed);
+    duplicatePairPattern.pairs++;
+    if(suffixed&&plain){
+      duplicatePairPattern.suffixedAndPlain++;
+      if(suffixed.descLength<plain.descLength) duplicatePairPattern.suffixedDescShorter++;
+      if(!(suffixed.tagsCount>0)&&plain.tagsCount>0) duplicatePairPattern.plainHasTagsOnly++;
+      if(!(suffixed.aliasesCount>0)&&plain.aliasesCount>0) duplicatePairPattern.plainHasAliasesOnly++;
+      if(suffixed.componentProvidesCount+suffixed.componentRequiresCount>0&&plain.componentProvidesCount+plain.componentRequiresCount===0) duplicatePairPattern.suffixedComponentOnly++;
+      if(suffixed.wordNotesCount>plain.wordNotesCount) duplicatePairPattern.suffixedWordNotesMore++;
+      if(suffixed.orphanNotesCount>0&&plain.orphanNotesCount===0) duplicatePairPattern.suffixedOrphanOnly++;
+    }
+  }
   const duplicateIds=new Map();
   for(const group of dupGroups) for(const file of group){
     const row=rows.find(item=>item.file===file);
@@ -257,6 +274,12 @@ test('библиотека: пары кода и паспортов, JSON и ID 
     if(!relative.startsWith('tools/code-lab/templates/')) for(const id of missingTemplateIds) if(hasIdentifier(body,id)) templateReferenceHits.push({id,file:relative});
   }
   const migrationDryRun=await migrateTemplates({src:path.join(CODELAB_ROOT,'templates'),out:LIBRARY,dictPath:null,dry:true});
+  for(const group of dupGroups){
+    const pair=group.map(file=>rowsByFile.get(file)).filter(Boolean);
+    if(pair.length!==2) continue;
+    const hits=duplicateReferenceHits.filter(hit=>pair.some(row=>row.id===hit.id));
+    if(hits.length) duplicatePairQuality.referencedPairs.push({ids:pair.map(row=>row.id),hits});
+  }
   const wordNoteProblemByKind={}, wordNoteProblemByLang={};
   for(const problem of wordNoteProblems){
     const kind=String(problem.kind||'(missing)'), lang=problem.file.split('/')[0];
@@ -266,7 +289,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   console.log('library-integrity:',JSON.stringify({
     languages:langs,codeCount,metaCount,effectiveIds:ids.size,missingIds:missingIds.length,
     folderLanguageMismatches:languageMismatches.length,duplicateCodeGroups:dupGroups.length,
-    duplicateCodeSamples:dupGroups,duplicateIdGroups,duplicatePairQuality,duplicatePairSamples,otherDataGroupIssues,templateGroupPlan,migrationDryRun:{created:migrationDryRun.created,skippedExisting:migrationDryRun.skippedExisting,skippedDuplicate:migrationDryRun.skippedDuplicate,codeConflicts:migrationDryRun.codeConflicts.length,errors:migrationDryRun.errors.length},duplicateReferenceScan:{filesScanned:referenceFiles.length,idsScanned:duplicateIds.size,hitCount:duplicateReferenceHits.length,hits:duplicateReferenceHits},templateReferenceScan:{idsScanned:missingTemplateIds.size,hitCount:templateReferenceHits.length,hits:templateReferenceHits},missingIdFiles:missingIds,
+    duplicateCodeSamples:dupGroups,duplicateIdGroups,duplicatePairQuality,duplicatePairPattern,duplicatePairSamples,otherDataGroupIssues,templateGroupPlan,migrationDryRun:{created:migrationDryRun.created,skippedExisting:migrationDryRun.skippedExisting,skippedDuplicate:migrationDryRun.skippedDuplicate,codeConflicts:migrationDryRun.codeConflicts.length,errors:migrationDryRun.errors.length},duplicateReferenceScan:{filesScanned:referenceFiles.length,idsScanned:duplicateIds.size,hitCount:duplicateReferenceHits.length,hits:duplicateReferenceHits},templateReferenceScan:{idsScanned:missingTemplateIds.size,hitCount:templateReferenceHits.length,hits:templateReferenceHits},missingIdFiles:missingIds,
     emptyDescriptions,shortDescriptionSamples:shortDescriptions.slice(0,60),descriptionLengthBuckets,statusCounts,
     missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,legacyWordMapStats,embeddedCodeMismatches,unknownGroups,wordNoteProblems:wordNoteProblems.slice(0,80),wordNoteProblemCount:wordNoteProblems.length,wordNoteProblemFiles:[...new Set(wordNoteProblems.map(x=>x.file))],wordNoteProblemByKind,wordNoteProblemByLang,wordNoteTotal,orphanNoteTotal,malformedTagFields,malformedComponents,replacementCharacterFields,codeReplacementFiles,
     problems:problems.length,languageMismatchSamples:languageMismatches.slice(0,8)
