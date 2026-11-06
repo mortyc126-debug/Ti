@@ -1178,8 +1178,8 @@ function openDictViewModal(){
       const del = el2('button', 'btn', 'удалить все ' + r.prosePieces.length + ' куска');
       del.onclick = async () => { if(!confirm('Удалить ' + r.prosePieces.length + ' кусков, где код — русский текст?')) return;
         del.textContent = 'удаляю…'; del.disabled = true; let n = 0;
-        for(const p of r.prosePieces){ const a = await fetch('/api/delete', { method: 'POST', body: JSON.stringify({ id: p.id }) }).then(x => x.json()).catch(() => null); if(a) n++; }
-        r.prosePieces = []; del.replaceWith(mk('✓ удалено кусков: ' + n + '. Не забудь синхронизацию.', 'lp-ok'));
+        const remaining = []; for(const p of r.prosePieces){ const a = await fetch('/api/delete', { method: 'POST', body: JSON.stringify({ id: p.id }) }).then(x => x.json()).catch(() => null); if(a && a.ok) n++; else remaining.push(p); }
+        r.prosePieces = remaining; del.replaceWith(mk('Удалено: ' + n + '. Не удалено из-за ссылок/ошибок: ' + remaining.length + '.', 'lp-ok'));
       };
       row.appendChild(del); panel.appendChild(row);
     }
