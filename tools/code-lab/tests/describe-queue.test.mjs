@@ -6,6 +6,7 @@ import { createLibraryStore } from '../lib/library-store.mjs';
 import { createDescriptionQueue } from '../lib/describe-queue.mjs';
 
 const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'describe-queue-'));
+let queue = null;
 try {
   const root = path.join(tmp, 'library');
   await fs.mkdir(path.join(root, 'js'), { recursive: true });
@@ -21,7 +22,7 @@ try {
     assert.match(opts.headers.Authorization, /Bearer test-key/);
     return { ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify({ title: 'Сумма массива', desc: 'Считает сумму значений массива.', tags: ['массивы', 'reduce'], aliases: ['сумма элементов'] }) } }] }) };
   };
-  const queue = createDescriptionQueue({ store, statePath: path.join(tmp, 'jobs.json'), apiKey: 'test-key', fetchImpl: fakeFetch });
+  queue = createDescriptionQueue({ store, statePath: path.join(tmp, 'jobs.json'), apiKey: 'test-key', fetchImpl: fakeFetch });
   await queue.init();
   const started = await queue.start();
   assert.equal(started.added, 1, 'по умолчанию ставится только кусок без описания');
@@ -52,5 +53,6 @@ try {
   assert.equal(disk.jobs[0].status, 'completed', 'состояние очереди сохраняется на диск');
   console.log('describe-queue: очередь, сохранение прогресса и защита manual проверены');
 } finally {
-  await fs.rm(tmp, { recursive: true, force: true });
+  if (queue) await queue.waitForIdle();
+  await fs.rm(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
 }
