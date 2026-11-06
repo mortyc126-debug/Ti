@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-let data = { schemaVersion: 1, concepts: [], relations: [] };
+let data = { schemaVersion: 2, concepts: [], relations: [], queryPhrases: [] };
 let relationTypes = {}, pieces = [], selectedId = '', examples = [], relations = [];
 const now = () => new Date().toISOString();
 const norm = value => String(value || '').trim().toLocaleLowerCase('ru').replace(/ё/g, 'е').replace(/\s+/g, ' ');
@@ -32,6 +32,26 @@ function formsFromText(value) {
 }
 function formsToText(items) {
   return (items || []).map(x => [x.language || '', x.kind || 'syntax', x.value || '', x.note || ''].join(' | ')).join('\n');
+}
+function queryPhrasesToText(items) {
+  return (items || []).map(x => [x.language || '', x.scope || '', x.phrase || '', x.note || ''].join(' | ')).join('\n');
+}
+function queryPhrasesFromText(value, conceptId) {
+  const previous = data.queryPhrases.filter(x => x.targetConceptId === conceptId);
+  const used = new Set();
+  return lines(value).map(line => {
+    const p = line.split('|').map(x => x.trim());
+    const [language = '', scope = '', phrase = '', note = ''] = p.length === 1 ? ['', '', p[0], ''] : p;
+    if (!phrase) return null;
+    const key = [norm(language), norm(scope), norm(phrase)].join('|');
+    const old = previous.find(x => !used.has(x.id) && [norm(x.language), norm(x.scope), norm(x.phrase)].join('|') === key);
+    if (old) used.add(old.id);
+    return Object.assign({}, old || {}, {
+      id: old ? old.id : 'query-' + crypto.randomUUID().slice(0, 12),
+      phrase, targetConceptId: conceptId, language, scope, note,
+      origin: old && old.origin ? old.origin : 'manual'
+    });
+  }).filter(Boolean);
 }
 function fillPieces() {
   const select = $('example-piece');
@@ -107,7 +127,7 @@ function selectConcept(id) {
   $('concept-name').value = concept.name || '';
   $('concept-definition').value = concept.definition || '';
   $('concept-aliases').value = (concept.aliases || []).map(x => typeof x === 'string' ? x : x.value).join('\n');
-  $('concept-forms').value = formsToText(concept.forms);
+  $('concept-forms').value = formsToText(concept.forms);\n  $('concept-query-phrases').value = queryPhrasesToText(data.queryPhrases.filter(x => x.targetConceptId === id));
   $('concept-tags').value = (concept.tags || []).join(', ');
   $('delete-concept').disabled = false;
   fillTargets(); renderExamples(); renderRelations(); searchList(); message('');
@@ -119,7 +139,7 @@ function newConcept() {
   $('concept-mode').textContent = 'НОВАЯ КОНСТРУКЦИЯ';
   $('concept-heading').textContent = 'Новая конструкция';
   $('concept-name').value = ''; $('concept-definition').value = '';
-  $('concept-aliases').value = ''; $('concept-forms').value = ''; $('concept-tags').value = '';
+  $('concept-aliases').value = ''; $('concept-forms').value = ''; $('concept-query-phrases').value = ''; $('concept-tags').value = '';
   $('delete-concept').disabled = true;
   fillTargets(); renderExamples(); renderRelations(); message('');
   $('concept-name').focus();
@@ -138,9 +158,11 @@ async function saveConcept(event) {
     createdAt: previous && previous.createdAt ? previous.createdAt : stamp, updatedAt: stamp
   });
   const next = {
-    schemaVersion: 1,
+    ...data,
+    schemaVersion: 2,
     concepts: data.concepts.filter(x => x.id !== selectedId).concat([concept]),
-    relations
+    relations,
+    queryPhrases: data.queryPhrases.filter(x => x.targetConceptId !== selectedId).concat(queryPhrasesFromText($('concept-query-phrases').value, selectedId))
   };
   try {
     const result = await api('/api/concepts/save', { method: 'POST', body: JSON.stringify(next) });
@@ -179,7 +201,7 @@ function addRelation() {
 async function init() {
   try {
     const results = await Promise.all([api('/api/concepts'), api('/api/list')]);
-    data = { schemaVersion: results[0].schemaVersion || 1, concepts: results[0].concepts || [], relations: results[0].relations || [] };
+    data = { ...results[0], schemaVersion: results[0].schemaVersion || 2, concepts: results[0].concepts || [], relations: results[0].relations || [], queryPhrases: results[0].queryPhrases || [] };
     relationTypes = results[0].relationTypes || {};
     pieces = Array.isArray(results[1]) ? results[1] : [];
     fillPieces(); fillRelationTypes();
