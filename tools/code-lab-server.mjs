@@ -1253,7 +1253,9 @@ const server = http.createServer(async (req, res) => {
               if(entry.isDirectory()) await walk(abs);
               else if(entry.isFile()){
                 const rel = path.relative(LIBRARY, abs);
-                if(!destinations.has(rel.toLowerCase())) deletions.push({ abs, rel });
+                const rootFile = rel.split(path.sep).join('/').toLowerCase();
+                const protectedFiles = new Set(['_concepts.json', '_id-aliases.json']);
+                if(!destinations.has(rootFile) && !protectedFiles.has(rootFile)) deletions.push({ abs, rel });
               }
             }
           };
