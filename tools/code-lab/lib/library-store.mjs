@@ -75,6 +75,8 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
   const _CONTRACT_LANGS = new Set(['js', 'ts', 'html', 'svg', 'css', 'python', 'sql']);
   const byPath = new Map();   // путь кода → запись
   let byId = new Map();
+  let idAliases = new Map(), idAliasMtime = undefined;
+  const idAliasPath = path.join(root, '_id-aliases.json');
   let version = 0, lastScan = 0, dirty = true;
   let lock = Promise.resolve();
   const withLock = fn => { const p = lock.then(fn, fn); lock = p.catch(() => {}); return p; };
@@ -91,6 +93,56 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
   }
   const extOf = p => path.extname(p).replace(/^\./, '').toLowerCase();
   const mtime = p => fs.stat(p).then(s => s.mtimeMs, () => null);
+
+  async function idAliasStamp(){
+    const stat = await fs.lstat(idAliasPath).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
+    if(!stat) return null;
+    if(stat.isSymbolicLink() || !stat.isFile()) throw new Error('Файл алиасов ID должен быть обычным файлом: ' + idAliasPath);
+    return stat.mtimeMs;
+  }
+
+  async function loadIdAliases(stamp){
+    if(stamp === idAliasMtime) return false;
+    if(stamp === null){ idAliases = new Map(); idAliasMtime = null; return true; }
+    const parsed = JSON.parse(await fs.readFile(idAliasPath, 'utf8'));
+    if(!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || parsed.version !== 1 ||
+       !parsed.aliases || typeof parsed.aliases !== 'object' || Array.isArray(parsed.aliases)){
+      throw new Error('Некорректный формат файла алиасов ID: ' + idAliasPath);
+    }
+    const next = new Map();
+    for(const [alias, target] of Object.entries(parsed.aliases)){
+      if(!alias.trim() || typeof target !== 'string' || !target.trim() || alias === target){
+        throw new Error('Некорректная пара алиасов ID: ' + alias);
+      }
+      next.set(alias, target);
+    }
+    for(const start of next.keys()){
+      const seen = new Set();
+      let current = start;
+      while(next.has(current)){
+        if(seen.has(current)) throw new Error('Циклическая ссылка в алиасах ID: ' + start);
+        seen.add(current);
+        current = next.get(current);
+      }
+    }
+    idAliases = next;
+    idAliasMtime = stamp;
+    return true;
+  }
+
+  function resolveId(id){
+    let current = String(id == null ? '' : id).trim();
+    if(!current) return null;
+    if(byId.has(current)) return current;
+    const seen = new Set();
+    while(idAliases.has(current)){
+      if(seen.has(current)) return null;
+      seen.add(current);
+      current = idAliases.get(current);
+      if(byId.has(current)) return current;
+    }
+    return null;
+  }
 
   function defaultMeta(codePath, id){
     const rel = path.relative(root, path.dirname(codePath)).split(path.sep).filter(Boolean);
@@ -123,7 +175,8 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
   }
 
   async function scan(force){
-    if(!force && !dirty && Date.now() - lastScan < 1000) return;
+    const aliasStamp = await idAliasStamp();
+    if(!force && !dirty && aliasStamp === idAliasMtime && Date.now() - lastScan < 1000) return;
     const files = []; await walk(root, files);
     const set = new Set(files);
     const seen = new Set(); let changed = false;
@@ -160,8 +213,9 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
         m.set(id, e);
       }
       byId = m;
-      if(changed) version++;
     }
+    const aliasesChanged = await loadIdAliases(aliasStamp);
+    if(changed || aliasesChanged) version++;
     dirty = false; lastScan = Date.now();
   }
 
@@ -246,8 +300,8 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
     // то же, но не чаще раза в секунду (для частых запросов, например поиска)
     async sync(){ await scan(); },
     async rows(){ await scan(); return [...byId.values()].map(e => e.row).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)); },
-    async has(id){ await scan(); return byId.has(id); },
-    async get(id){ await scan(); const e = byId.get(id); return e ? toTemplate(e) : null; },
+    async has(id){ await scan(); return resolveId(id) != null; },
+    async get(id){ await scan(); const e = byId.get(resolveId(id)); return e ? toTemplate(e) : null; },
     // для дедупа и поиска: id, язык, название, код
     async entries(){ await scan(); return [...byId.values()].map(e => ({ id: e.id, lang: e.lang, title: e.meta.title || e.id, code: e.code, meta: e.meta })); },
     async count(){ await scan(); return byId.size; },
@@ -275,6 +329,10 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
       return withLock(async () => {
         await scan();
         const id = String(obj.id);
+        if(!byId.has(id) && idAliases.has(id)){
+          const target = resolveId(id);
+          throw new Error('ID «' + id + '» является алиасом; сохраняй запись по каноническому ID' + (target ? ': ' + target : ''));
+        }
         const e = byId.get(id) || null;
         if(e && e.metaError) throw new Error('Паспорт повреждён и не будет перезаписан автоматически: ' + e.metaPath);
         const dict = await dictOf();
