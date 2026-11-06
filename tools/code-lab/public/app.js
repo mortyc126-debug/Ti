@@ -62,18 +62,20 @@ async function loadList(openId){
 
   // отправить шаблоны на GitHub (чтобы не жили только локально)
   const gh = document.createElement('div'); gh.className = 'addbtn'; gh.style.borderColor = 'rgba(61,217,255,.4)'; gh.style.color = 'var(--name)';
-  gh.textContent = 'Сохранить шаблоны на GitHub';
+  gh.textContent = 'Синхронизировать библиотеку на GitHub';
+  gh.title = 'Git sync включает библиотеку, задачи, рецепты, схемы и словари. Наборы данных и рабочая область не отправляются. Для полного бэкапа открой «Данные» и скачай ZIP.';
   async function refreshGh(){
     try {
       const i = await fetch('/api/git/info').then(r => r.json());
       if(!i.repo){ gh.textContent = 'GitHub: нет git-репозитория (локально)'; return; }
-      gh.textContent = i.dirty ? ('Сохранить на GitHub (не сохранено: ' + i.dirty + ')') : ('На GitHub всё сохранено · ' + i.branch);
-    } catch(_){ gh.textContent = 'Сохранить шаблоны на GitHub'; }
+      if(i.ahead || i.behind) gh.textContent = 'Локально не синхронизировано · впереди: ' + i.ahead + ', позади: ' + i.behind;
+      else gh.textContent = i.dirty ? ('Синхронизировать на GitHub (изменено: ' + i.dirty + ')') : ('GitHub синхронизирован · ' + i.branch);
+    } catch(_){ gh.textContent = 'Синхронизировать библиотеку на GitHub'; }
   }
   gh.onclick = async () => {
-    gh.textContent = 'отправляю на GitHub…';
+    gh.textContent = 'синхронизирую с GitHub…';
     const r = await fetch('/api/git/sync', { method: 'POST' }).then(r => r.json()).catch(() => ({ ok: false, message: 'сервер недоступен' }));
-    gh.textContent = (r.ok ? '✓ ' : '') + (r.message || (r.ok ? 'готово' : 'не удалось'));
+    gh.textContent = r.ok ? ('✓ ' + (r.message || 'синхронизация завершена')) : (r.localCommitCreated ? ('Локальный коммит создан, push не завершён. ' + (r.message || '')) : (r.message || 'не удалось синхронизировать'));
     setTimeout(refreshGh, 3500);
   };
   nav.appendChild(gh); refreshGh();
