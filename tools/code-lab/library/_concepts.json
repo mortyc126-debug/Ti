@@ -621,7 +621,7 @@
     {
       "id": "curated-query-043",
       "phrase": "запросить данные по HTTP",
-      "targetKey": "fetch",
+      "targetKey": "write",
       "language": "js",
       "scope": "",
       "origin": "manual",
@@ -631,7 +631,7 @@
         "group": "DOM, сеть, файлы и тесты",
         "index": 43
       },
-      "note": "Fetch API отправляет сетевой запрос и возвращает Promise с Response."
+      "note": "Запись данных в файл; фрагменты ограничиваются языком Python."
     },
     {
       "id": "curated-query-044",
