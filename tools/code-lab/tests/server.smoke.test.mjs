@@ -19,6 +19,11 @@ await fs.copyFile(path.join(TOOLS, 'code-lab', 'public', 'tasks-format.js'), pat
 for(const f of ['code-links.js', 'structure-rules.js']) await fs.copyFile(path.join(TOOLS, 'code-lab', 'public', f), path.join(L, 'public', f));   // связи и правила структуры — общие для сервера и страницы
 for(const f of ['concepts.html', 'concepts.js', 'style.css', 'shell.js']) await fs.copyFile(path.join(TOOLS, 'code-lab', 'public', f), path.join(L, 'public', f));   // страница пользовательских конструкций и её оболочка
 await fs.writeFile(path.join(L, 'public', 'keyword-dict.json'), JSON.stringify({ words: { print: 'print — вывод' }, cssProps: { 'font-weight': 'font-weight — жирность шрифта' } }));
+await fs.mkdir(path.join(L, 'public', 'dict'), { recursive: true });
+await fs.writeFile(path.join(L, 'public', 'dict', 'synonyms.json'), JSON.stringify({
+  'font-weight': ['толщина шрифта'],
+  'font-size': ['толщина шрифта']
+}));
 // две старые карточки: автомиграция должна перенести их в library/
 const card = (id, title, lang, code, desc, group) => ({ id, lang, group, title, desc, output: '', lines: code.split('\n').map(l => [{ k: 'name', v: l, r: l }]) });
 await fs.writeFile(path.join(L, 'templates', 'a.json'), JSON.stringify(card('css-bold', 'жирный', 'css', 'p { font-weight: 700; }', 'Делает текст жирным', 'CSS: шрифты')));
@@ -92,6 +97,19 @@ try {
     await fs.access(path.join(L, 'library', '_synonyms.json'));
     const r = await get('/api/search?q=' + encodeURIComponent('толщина'));
     assert.ok(r.hits[0].why.length > 0 && r.terms.length === 1);
+  });
+
+  await test('теневой поиск сохраняет targetKey и не меняет действующую выдачу', async () => {
+    const query = 'толщина шрифта';
+    const legacy = await get('/api/search?q=' + encodeURIComponent(query));
+    const comparison = await get('/api/search/shadow?q=' + encodeURIComponent(query));
+    assert.deepEqual(comparison.legacy, legacy, 'теневой endpoint не должен менять действующий поиск');
+    assert.equal(comparison.productionSearchChanged, false);
+    assert.ok(comparison.shadow.hits.some(hit => hit.targetKey === 'font-weight'));
+    const weight = comparison.shadow.hits.find(hit => hit.targetKey === 'font-weight');
+    assert.ok(weight.pieces.some(piece => piece.id === 'css-bold'));
+    assert.ok(comparison.shadow.hits.some(hit => hit.targetKey === 'font-size'), 'неоднозначная фраза должна сохранить вторую цель');
+    assert.equal(comparison.shadow.ambiguous, 2);
   });
 
   await test('правка файла синонимов подхватывается без перезапуска', async () => {
