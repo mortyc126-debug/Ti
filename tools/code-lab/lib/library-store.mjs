@@ -223,7 +223,8 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
     const dict = await dictOf();
     const m = e.meta;
     const lines = tokenize(e.code, e.lang);
-    placeNotes(lines, m.wordNotes, makeLook(e.lang, dict), { onlyEmpty: true });
+    const tokenNotes = (Array.isArray(m.wordNotes) ? m.wordNotes : []).filter(note => note && note.kind !== 'concept');
+    placeNotes(lines, tokenNotes, makeLook(e.lang, dict), { onlyEmpty: true });
     annotateLines(lines, e.lang, dict, true);
     const obj = { id: e.id, lang: e.lang, group: m.group || '', title: m.title || e.id, desc: m.desc || '', lines, output: m.output || '' };
     const descAt = m.descAt != null ? m.descAt : (m.legacy && m.legacy.descAt);
@@ -313,6 +314,10 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
       for(const e of byId.values()){
         const t = await toTemplate(e);
         const notes = []; for(const l of t.lines) for(const k of l) if(k.e) notes.push(k.e);
+        const conceptNotes = [...(e.meta.wordNotes || []), ...(e.meta.orphanNotes || [])]
+          .filter(note => note && note.kind === 'concept' && typeof note.note === 'string')
+          .map(note => note.note);
+        for(const note of new Set(conceptNotes)) notes.push(note);
         const c = e.meta.component || {};
         out.push({
           id: e.id, lang: e.lang, title: t.title, desc: t.desc, group: t.group, output: t.output,
@@ -369,13 +374,24 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
         };
 
         const look = makeLook(lang, dict);
-        const oldNotes = [...(old.wordNotes || []).filter(n => n.source !== 'dict' && n.note), ...(old.orphanNotes || [])];
-        const incomingNotes = [
+        const incomingRecords = [
           ...(Array.isArray(obj.wordNotes) ? obj.wordNotes : []),
           ...(Array.isArray(obj.orphanNotes) ? obj.orphanNotes : []),
           ...(Array.isArray(incomingMeta.wordNotes) ? incomingMeta.wordNotes : []),
           ...(Array.isArray(incomingMeta.orphanNotes) ? incomingMeta.orphanNotes : [])
         ];
+        const oldConceptNotes = [...(old.wordNotes || []), ...(old.orphanNotes || [])].filter(note => note && note.kind === 'concept');
+        const conceptMap = new Map();
+        for(const note of [...oldConceptNotes, ...incomingRecords.filter(note => note && note.kind === 'concept')]){
+          if(typeof note.text !== 'string' || typeof note.note !== 'string') continue;
+          const key = [note.line || 0, note.col || 0, note.text, note.note, note.source || ''].join('|');
+          if(!conceptMap.has(key)) conceptMap.set(key, { ...note, kind: 'concept' });
+        }
+        const oldNotes = [
+          ...(old.wordNotes || []).filter(note => note && note.kind !== 'concept' && note.source !== 'dict' && note.note),
+          ...(old.orphanNotes || []).filter(note => note && note.kind !== 'concept')
+        ];
+        const incomingNotes = incomingRecords.filter(note => note && note.kind !== 'concept');
         const noteMap = new Map();
         for(const n of [...oldNotes, ...incomingNotes]){
           if(!n || typeof n.text !== 'string' || typeof n.note !== 'string') continue;
@@ -424,7 +440,7 @@ export function createLibraryStore({ root, legacyDir = null, dictPath = null, ge
         meta.source = src;
         const incomingStatus = incomingValue('status');
         meta.status = incomingStatus && canUpdate('desc') ? String(incomingStatus) : (String(meta.desc || '').trim() ? 'described' : 'needs_description');
-        meta.wordNotes = notes;
+        meta.wordNotes = [...notes, ...conceptMap.values()];
         if(unplaced.length) meta.orphanNotes = unplaced; else delete meta.orphanNotes;
         const labels = incomingValue('labels');
         if(labels && typeof labels === 'object' && !Array.isArray(labels)) meta.labels = origin === 'manual' ? { ...labels } : { ...labels, ...(old.labels || {}) };
