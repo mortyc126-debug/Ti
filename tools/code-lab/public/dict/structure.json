@@ -1388,7 +1388,6 @@
     "Promise.allSettled: заметка пишет Promise.allSettled(массивПромисов)",
     "Promise.race: заметка пишет Promise.race(массивПромисов)",
     "Promise.any: заметка пишет Promise.any(массивПромисов)",
-    "await: после async, async в асинхронной функции",
     "AbortController: заметка создаёт контроллер отмены операции",
     "AbortSignal: заметка передаётся в асинхронную операцию через signal",
     "signal: заметка свойство AbortController",
