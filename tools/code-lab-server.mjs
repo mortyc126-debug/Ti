@@ -1134,6 +1134,11 @@ const server = http.createServer(async (req, res) => {
         return st;
       };
       try {
+        const dataStat = await lstatOrNull(DATA);
+        if(dataStat && (dataStat.isSymbolicLink() || !dataStat.isDirectory())) throw new Error('Папка data не должна быть ссылкой или обычным файлом');
+        const backupDir = path.join(DATA, 'restore-backups');
+        const backupDirStat = await lstatOrNull(backupDir);
+        if(backupDirStat && (backupDirStat.isSymbolicLink() || !backupDirStat.isDirectory())) throw new Error('Папка резервных копий не должна быть ссылкой или обычным файлом');
         for(const op of writes){
           const st = await safeStat(op.abs);
           if(!st) continue;
