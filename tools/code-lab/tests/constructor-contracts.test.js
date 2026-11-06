@@ -4,7 +4,7 @@ const vm = require('vm');
 const path = require('path');
 
 const file = path.resolve(__dirname, '../public/constructor.js');
-const source = fs.readFileSync(file, 'utf8');
+const source = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
 const start = source.indexOf('const BLOCK_CONTRACTS = {');
 const runtimeStart = source.indexOf('const runtimeState = {');
 const end = source.indexOf('\n\nconst CATS =', start);
