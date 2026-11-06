@@ -248,6 +248,31 @@ await test('больше пятидесяти непривязанных поя�
   assert.equal(meta.orphanNotes[59].note, 'пояснение 59');
 });
 
+await test('concept-заметки сохраняются отдельно и попадают в поиск', async () => {
+  const root = path.join(tmp, 'concept-note-store');
+  const concepts = mk(root); await concepts.init();
+  const code = 'const address = 1;';
+  const first = { line: 0, col: 6, text: 'address', kind: 'concept', note: 'Адрес сетевого узла.', source: 'custom' };
+  const second = { line: 4, col: 0, text: 'missing', kind: 'concept', note: 'Понятие без токенной привязки.', source: 'custom' };
+  await concepts.save({ id: 'concept-piece', lang: 'js', lines: tokenize(code, 'js'), wordNotes: [first], orphanNotes: [second] });
+  let template = await concepts.get('concept-piece');
+  assert.equal(template.wordNotes.filter(note => note.kind === 'concept').length, 2);
+  assert.equal(tokenAt(template.lines, 'address').e, undefined);
+  let meta = JSON.parse(await fs.readFile(path.join(root, 'js', 'concept-piece.js.meta.json'), 'utf8'));
+  assert.equal(meta.wordNotes.filter(note => note.kind === 'concept').length, 2);
+  assert.equal((meta.orphanNotes || []).some(note => note.kind === 'concept'), false);
+  const doc = (await concepts.docs()).find(item => item.id === 'concept-piece');
+  assert.ok(doc.notes.includes('Адрес сетевого узла.'));
+  assert.ok(doc.notes.includes('Понятие без токенной привязки.'));
+  template.lines = tokenize('const host = 1;', 'js');
+  await concepts.save(template);
+  template = await concepts.get('concept-piece');
+  assert.equal(template.wordNotes.filter(note => note.kind === 'concept').length, 2);
+  assert.equal(tokenAt(template.lines, 'host').e, undefined);
+  meta = JSON.parse(await fs.readFile(path.join(root, 'js', 'concept-piece.js.meta.json'), 'utf8'));
+  assert.equal(meta.wordNotes.filter(note => note.kind === 'concept').length, 2);
+});
+
 await test('старый ID разрешается в канонический без появления второй записи', async () => {
   const root = path.join(tmp, 'id-aliases');
   const aliases = mk(root); await aliases.init();
