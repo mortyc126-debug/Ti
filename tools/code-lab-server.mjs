@@ -1433,7 +1433,7 @@ const server = http.createServer(async (req, res) => {
         if(up.code === 0 && up.out){
           hasUpstream = true;
           const counts = await git(['rev-list', '--left-right', '--count', 'HEAD...@{u}'], root);
-          const m = counts.out.match(/^(\\d+)\\s+(\\d+)$/);
+          const m = counts.out.match(/^(\d+)\s+(\d+)$/);
           if(m){ ahead = Number(m[1]); behind = Number(m[2]); }
         }
       }
