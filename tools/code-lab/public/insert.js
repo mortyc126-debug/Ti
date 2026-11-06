@@ -43,6 +43,10 @@
   document.head.appendChild(st);
 
   let acOn = true; try { acOn = localStorage.getItem('codelab_ac') !== 'off'; } catch(_){}
+  const DELAYS = { fast: 70, normal: 120, calm: 220 };
+  let acSpeed = 'normal'; try { acSpeed = localStorage.getItem('codelab_ac_speed') || 'normal'; } catch(_){}
+  if(!Object.prototype.hasOwnProperty.call(DELAYS, acSpeed)) acSpeed = 'normal';
+  const scheduleShow = ed => { clearTimeout(timer); timer = setTimeout(() => show(ed, false), DELAYS[acSpeed]); };
   let pop = null, ctx = null, seq = 0, timer = null, sel = 0;
   function hide(){ if(pop){ pop.remove(); pop = null; } ctx = null; }
 
@@ -235,17 +239,11 @@
     pop.style.top = (below ? c.y : Math.max(8, c.y - pop.offsetHeight - 28)) + 'px';
   }
 
-  // печатаешь — через паузу показываем подсказки; стрелки, shift и прочие служебные клавиши не в счёт
-  edsEl.addEventListener('keyup', e => {
-    if(!acOn || e.ctrlKey || e.metaKey || e.altKey) return;
-    if(['ArrowDown','ArrowUp','ArrowLeft','ArrowRight','Enter','Tab','Escape','Home','End','Shift','Control','Alt','Meta','PageUp','PageDown'].includes(e.key)) return;
-    const ed = e.target.closest && e.target.closest('.sb-ed'); if(!ed){ hide(); return; }
-    clearTimeout(timer); timer = setTimeout(() => show(ed, false), 200);
-  }, true);
-  // ввод через раскладку/IME/телефон может прийти без keyup — ловим и сам ввод текста (таймер общий, двойного запроса нет)
+  // Событие input покрывает печать, вставку, IME и экранную клавиатуру.
+  // Отдельный keyup не нужен: он дублировал запрос после каждого символа.
   edsEl.addEventListener('input', e => {
     if(!acOn) return; const ed = e.target.closest && e.target.closest('.sb-ed'); if(!ed) return;
-    clearTimeout(timer); timer = setTimeout(() => show(ed, false), 200);
+    scheduleShow(ed);
   }, true);
   edsEl.addEventListener('keydown', e => {
     if((e.ctrlKey || e.metaKey) && e.code === 'Space'){ e.preventDefault(); e.stopPropagation(); const ed = e.target.closest && e.target.closest('.sb-ed'); if(ed) show(ed, true); return; }
@@ -270,7 +268,13 @@
   const lab = document.createElement('label'); lab.className = 'sb-live'; lab.title = 'подсказки-деревья по мере набора (Ctrl+Пробел — всегда)';
   const cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = 'sbAc'; cb.checked = acOn;
   cb.onchange = () => { acOn = cb.checked; try { localStorage.setItem('codelab_ac', acOn ? 'on' : 'off'); } catch(_){} if(!acOn) hide(); };
-  lab.appendChild(cb); lab.appendChild(document.createTextNode(' подсказки при наборе'));
+  lab.appendChild(cb); lab.appendChild(document.createTextNode(' подсказки'));
   bar.appendChild(lab);
+  const speed = document.createElement('select'); speed.id = 'sbAcSpeed'; speed.title = 'Скорость появления подсказок';
+  speed.style.cssText = 'background:var(--bg);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:2px 5px;font-size:10.5px';
+  [['fast','быстро · 70 мс'],['normal','обычно · 120 мс'],['calm','спокойно · 220 мс']].forEach(([value,label]) => { const o=document.createElement('option'); o.value=value; o.textContent=label; speed.appendChild(o); });
+  speed.value = acSpeed;
+  speed.onchange = () => { acSpeed = speed.value; try { localStorage.setItem('codelab_ac_speed', acSpeed); } catch(_){} };
+  bar.appendChild(speed);
   window.codelabVariants = { open: () => { const ed = edFor(activeId()) || edsEl.firstElementChild; if(ed) show(ed, true); } };
 })();
