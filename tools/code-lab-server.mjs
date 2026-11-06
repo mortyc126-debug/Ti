@@ -1252,18 +1252,20 @@ const server = http.createServer(async (req, res) => {
       const files = [], skipped = [];
       const collect = async (dir, prefix, skip = () => false) => {
         const walk = async (current, relative = '') => {
-          let entries;
-          try { entries = await fs.readdir(current, { withFileTypes: true }); }
-          catch(e){ if(e.code === 'ENOENT') return; throw e; }
-          for(const entry of entries){
+          const currentStat = await fs.lstat(current).catch(e => e.code === 'ENOENT' ? null : Promise.reject(e));
+          if(!currentStat) return;
+          if(currentStat.isSymbolicLink() || !currentStat.isDirectory()) throw new Error('Небезопасная папка при создании бэкапа: ' + path.relative(ROOT, current));
+          for(const entry of await fs.readdir(current, { withFileTypes: true })){
             const rel = relative ? path.posix.join(relative, entry.name) : entry.name;
+            const abs = path.join(current, entry.name);
+            if(entry.isSymbolicLink()) throw new Error('Символическая ссылка в хранилище бэкапа: ' + path.relative(ROOT, abs));
             if(entry.isDirectory()){
               if(['.git','node_modules','vendor'].includes(entry.name)) continue;
-              await walk(path.join(current, entry.name), rel);
+              await walk(abs, rel);
             } else if(entry.isFile()){
               const archiveName = path.posix.join(prefix, rel);
               if(skip(rel) || skip(archiveName)) continue;
-              const bytes = await fs.readFile(path.join(current, entry.name));
+              const bytes = await fs.readFile(abs);
               try {
                 const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
                 if(text.includes('\0')){ skipped.push(archiveName); continue; }
@@ -1283,10 +1285,13 @@ const server = http.createServer(async (req, res) => {
       await collect(path.join(ROOT, 'workspace'), 'workspace');
       await collect(TEMPLATES, 'templates');
       const keywordPath = path.join(PUBLIC, 'keyword-dict.json');
-      try {
+      const keywordStat = await fs.lstat(keywordPath).catch(e => e.code === 'ENOENT' ? null : Promise.reject(e));
+      if(keywordStat?.isSymbolicLink()) throw new Error('Файл словаря не должен быть символической ссылкой при создании бэкапа');
+      if(keywordStat && !keywordStat.isFile()) throw new Error('Файл словаря должен быть обычным файлом');
+      if(keywordStat){
         const bytes = await fs.readFile(keywordPath);
         files.push({ name: 'public/keyword-dict.json', text: new TextDecoder('utf-8', { fatal: true }).decode(bytes) });
-      } catch(e){ if(e.code !== 'ENOENT') throw e; }
+      }
       files.sort((a,b) => a.name.localeCompare(b.name));
       const manifest = {
         format: 'code-lab-full-backup', version: 1, createdAt: new Date().toISOString(),
