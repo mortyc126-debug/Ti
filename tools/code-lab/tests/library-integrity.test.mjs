@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const LIBRARY = path.resolve(HERE, '..', 'library');
+const REPO_ROOT = path.resolve(HERE, '../../..');
 const CODE_EXT = new Set(['.js','.mjs','.cjs','.jsx','.ts','.tsx','.py','.rb','.php','.go','.rs','.java','.c','.h','.cpp','.cs','.lua','.sh','.bash','.ps1','.r','.sql','.css','.html','.htm','.svg','.json','.txt']);
 const ALIASES = { javascript:'js', typescript:'ts', py:'python', python3:'python', shell:'bash', sh:'bash', zsh:'bash', 'c++':'cpp', cplusplus:'cpp', cxx:'cpp', 'c#':'csharp', 'c-sharp':'csharp', cs:'csharp', golang:'go', rb:'ruby', kt:'kotlin', rs:'rust', jsx:'js', tsx:'ts', htm:'html', yml:'yaml' };
 const canon = value => { const v=String(value||'').trim().toLowerCase(); return ALIASES[v] || v.replace(/[^a-z0-9_+-]/g,'') || 'other'; };
@@ -21,12 +22,29 @@ async function walk(dir){
   }
   return out;
 }
+async function walkReferenceFiles(dir){
+  const out=[], skip=new Set(['.git','node_modules','vendor','dist','build','coverage','.cache']);
+  const allowed=new Set(['.json','.md','.txt','.js','.mjs','.cjs','.html','.htm','.css','.yml','.yaml','.py','.sql','.ts','.sh','.bash']);
+  for(const ent of await fs.readdir(dir,{withFileTypes:true})){
+    if(ent.isDirectory()&&skip.has(ent.name)) continue;
+    const abs=path.join(dir,ent.name);
+    if(ent.isDirectory()) out.push(...await walkReferenceFiles(abs));
+    else if(ent.isFile()&&allowed.has(path.extname(ent.name).toLowerCase())){
+      const rel=path.relative(REPO_ROOT,abs).split(path.sep).join('/');
+      if(rel.startsWith('tools/code-lab/library/')) continue;
+      const st=await fs.stat(abs);
+      if(st.size<=2*1024*1024) out.push(abs);
+    }
+  }
+  return out;
+}
 
 test('библиотека: пары кода и паспортов, JSON и ID целостны', async()=>{
   const langs=(await fs.readdir(LIBRARY,{withFileTypes:true})).filter(x=>x.isDirectory()).map(x=>x.name);
   const ids=new Map(), problems=[], duplicateCodes=new Map(), missingIds=[], languageMismatches=[], rows=[];
   const emptyDescriptions=[], shortDescriptions=[], missingTitles=[], missingGroups=[], missingLangs=[], fileFieldMismatches=[];
   const missingSchema=[], legacyMetadataFiles=[], legacyWordMaps=[], embeddedCodeMismatches=[];
+  const legacyWordMapStats={maps:0,keys:0,matchedKeys:0,matchedTokenOccurrences:0,unmatchedKeySamples:[]};
   const unknownGroups=[], wordNoteProblems=[], malformedTagFields=[], malformedComponents=[], replacementCharacterFields=[], codeReplacementFiles=[];
   let wordNoteTotal=0, orphanNoteTotal=0;
   const statusCounts={}, descriptionLengthBuckets={empty:0,short:0,medium:0,long:0};
@@ -100,7 +118,17 @@ test('библиотека: пары кода и паспортов, JSON и ID 
             if(!found) wordNoteProblems.push({file:relativeFile,index:i,line:note?.line,col:note?.col,text:note?.text,kind:note?.kind});
           }
         }
-        if(meta.words && typeof meta.words==='object' && !Array.isArray(meta.words) && !Array.isArray(meta.wordNotes)) legacyWordMaps.push(relativeFile);
+        if(meta.words && typeof meta.words==='object' && !Array.isArray(meta.words) && !Array.isArray(meta.wordNotes)){
+          legacyWordMaps.push(relativeFile); legacyWordMapStats.maps++;
+          if(sourceCode==null) sourceCode=(await fs.readFile(code,'utf8')).replace(/\r\n/g,'\n');
+          const tokens=tokenize(sourceCode,meta.lang||langDir).flat().map(tokText);
+          for(const [word,note] of Object.entries(meta.words)){
+            legacyWordMapStats.keys++;
+            const occurrences=tokens.filter(token=>token===word).length;
+            if(occurrences){legacyWordMapStats.matchedKeys++;legacyWordMapStats.matchedTokenOccurrences+=occurrences;}
+            else if(legacyWordMapStats.unmatchedKeySamples.length<30) legacyWordMapStats.unmatchedKeySamples.push({file:relativeFile,word,note});
+          }
+        }
         rows.push({ id:effectiveId, lang:canon(meta.lang || langDir), file:relativeCode });
         if(meta.lang && canon(meta.lang)!==canon(langDir)) languageMismatches.push(relativeFile+' ('+meta.lang+')');
       } else if(CODE_EXT.has(path.extname(file).toLowerCase())){
@@ -122,6 +150,16 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   const idGroups = new Map();
   for(const row of rows){ if(!idGroups.has(row.id)) idGroups.set(row.id,[]); idGroups.get(row.id).push(row.file); }
   const duplicateIdGroups = [...idGroups.values()].filter(group => group.length > 1);
+  const duplicateIds=new Map();
+  for(const group of dupGroups) for(const file of group){
+    const row=rows.find(item=>item.file===file);
+    if(row) duplicateIds.set(row.id,file);
+  }
+  const referenceFiles=await walkReferenceFiles(REPO_ROOT), duplicateReferenceHits=[];
+  for(const file of referenceFiles){
+    const body=await fs.readFile(file,'utf8');
+    for(const id of duplicateIds.keys()) if(body.includes(id)) duplicateReferenceHits.push({id,file:path.relative(REPO_ROOT,file).split(path.sep).join('/')});
+  }
   const wordNoteProblemByKind={}, wordNoteProblemByLang={};
   for(const problem of wordNoteProblems){
     const kind=String(problem.kind||'(missing)'), lang=problem.file.split('/')[0];
@@ -131,9 +169,9 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   console.log('library-integrity:',JSON.stringify({
     languages:langs,codeCount,metaCount,effectiveIds:ids.size,missingIds:missingIds.length,
     folderLanguageMismatches:languageMismatches.length,duplicateCodeGroups:dupGroups.length,
-    duplicateCodeSamples:dupGroups,duplicateIdGroups,missingIdFiles:missingIds,
+    duplicateCodeSamples:dupGroups,duplicateIdGroups,duplicateReferenceScan:{filesScanned:referenceFiles.length,idsScanned:duplicateIds.size,hitCount:duplicateReferenceHits.length,hits:duplicateReferenceHits},missingIdFiles:missingIds,
     emptyDescriptions,shortDescriptionSamples:shortDescriptions.slice(0,60),descriptionLengthBuckets,statusCounts,
-    missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,embeddedCodeMismatches,unknownGroups,wordNoteProblems:wordNoteProblems.slice(0,80),wordNoteProblemCount:wordNoteProblems.length,wordNoteProblemFiles:[...new Set(wordNoteProblems.map(x=>x.file))],wordNoteProblemByKind,wordNoteProblemByLang,wordNoteTotal,orphanNoteTotal,malformedTagFields,malformedComponents,replacementCharacterFields,codeReplacementFiles,
+    missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,legacyWordMapStats,embeddedCodeMismatches,unknownGroups,wordNoteProblems:wordNoteProblems.slice(0,80),wordNoteProblemCount:wordNoteProblems.length,wordNoteProblemFiles:[...new Set(wordNoteProblems.map(x=>x.file))],wordNoteProblemByKind,wordNoteProblemByLang,wordNoteTotal,orphanNoteTotal,malformedTagFields,malformedComponents,replacementCharacterFields,codeReplacementFiles,
     problems:problems.length,languageMismatchSamples:languageMismatches.slice(0,8)
   }));
   assert.deepEqual(problems,[]);
