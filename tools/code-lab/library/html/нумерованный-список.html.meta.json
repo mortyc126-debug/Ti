@@ -8,5 +8,78 @@
   "words": {
     "ol": "Создаёт упорядоченный список.",
     "li": "Обозначает отдельный пункт списка."
-  }
+  },
+  "schema": 1,
+  "id": "нумерованный-список",
+  "file": "нумерованный-список.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "ol",
+      "kind": "name",
+      "note": "Создаёт упорядоченный список.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 3,
+      "text": "li",
+      "kind": "name",
+      "note": "Обозначает отдельный пункт списка.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 21,
+      "text": "li",
+      "kind": "name",
+      "note": "Обозначает отдельный пункт списка.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "li",
+      "kind": "name",
+      "note": "Обозначает отдельный пункт списка.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 23,
+      "text": "li",
+      "kind": "name",
+      "note": "Обозначает отдельный пункт списка.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 3,
+      "text": "li",
+      "kind": "name",
+      "note": "Обозначает отдельный пункт списка.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 27,
+      "text": "li",
+      "kind": "name",
+      "note": "Обозначает отдельный пункт списка.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "ol",
+      "kind": "name",
+      "note": "Создаёт упорядоченный список.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }

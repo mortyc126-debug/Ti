@@ -8,5 +8,22 @@
   "words": {
     "type=email": "Проверяет формат адреса электронной почты.",
     "required": "Делает поле обязательным для заполнения."
-  }
+  },
+  "schema": 1,
+  "id": "обязательное-поле-ввода",
+  "file": "обязательное-поле-ввода.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 2,
+      "col": 46,
+      "text": "required",
+      "kind": "name",
+      "note": "Делает поле обязательным для заполнения.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }

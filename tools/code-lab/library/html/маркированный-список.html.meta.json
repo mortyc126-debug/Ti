@@ -8,5 +8,78 @@
   "words": {
     "ul": "Создаёт неупорядоченный список.",
     "li": "Обозначает отдельный пункт списка."
-  }
+  },
+  "schema": 1,
+  "id": "маркированный-список",
+  "file": "маркированный-список.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "ul",
+      "kind": "name",
+      "note": "Создаёт неупорядоченный список.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 3,
+      "text": "li",
+      "kind": "name",
+      "note": "Обозначает отдельный пункт списка.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 20,
+      "text": "li",
+      "kind": "name",
+      "note": "Обозначает отдельный пункт списка.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 3,
+      "text": "li",
+      "kind": "name",
+      "note": "Обозначает отдельный пункт списка.",
+      "source": "custom"
+    },
+    {
+      "line": 2,
+      "col": 20,
+      "text": "li",
+      "kind": "name",
+      "note": "Обозначает отдельный пункт списка.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 3,
+      "text": "li",
+      "kind": "name",
+      "note": "Обозначает отдельный пункт списка.",
+      "source": "custom"
+    },
+    {
+      "line": 3,
+      "col": 20,
+      "text": "li",
+      "kind": "name",
+      "note": "Обозначает отдельный пункт списка.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "ul",
+      "kind": "name",
+      "note": "Создаёт неупорядоченный список.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }

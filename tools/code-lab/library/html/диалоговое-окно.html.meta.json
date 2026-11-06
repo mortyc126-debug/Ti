@@ -9,5 +9,38 @@
     "dialog": "Создаёт диалоговое окно.",
     "open": "Указывает, что элемент отображается открытым.",
     "method=dialog": "Закрывает dialog при отправке формы внутри него."
-  }
+  },
+  "schema": 1,
+  "id": "диалоговое-окно",
+  "file": "диалоговое-окно.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 0,
+      "col": 1,
+      "text": "dialog",
+      "kind": "name",
+      "note": "Создаёт диалоговое окно.",
+      "source": "custom"
+    },
+    {
+      "line": 0,
+      "col": 8,
+      "text": "open",
+      "kind": "name",
+      "note": "Указывает, что элемент отображается открытым.",
+      "source": "custom"
+    },
+    {
+      "line": 4,
+      "col": 2,
+      "text": "dialog",
+      "kind": "name",
+      "note": "Создаёт диалоговое окно.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }

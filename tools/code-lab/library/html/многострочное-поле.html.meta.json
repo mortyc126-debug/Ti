@@ -9,5 +9,46 @@
     "textarea": "Создаёт многострочное поле ввода.",
     "rows": "Задаёт видимое количество строк.",
     "cols": "Задаёт примерную видимую ширину в символах."
-  }
+  },
+  "schema": 1,
+  "id": "многострочное-поле",
+  "file": "многострочное-поле.html",
+  "status": "active",
+  "tags": [],
+  "aliases": [],
+  "wordNotes": [
+    {
+      "line": 1,
+      "col": 1,
+      "text": "textarea",
+      "kind": "name",
+      "note": "Создаёт многострочное поле ввода.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 38,
+      "text": "rows",
+      "kind": "name",
+      "note": "Задаёт видимое количество строк.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 47,
+      "text": "cols",
+      "kind": "name",
+      "note": "Задаёт примерную видимую ширину в символах.",
+      "source": "custom"
+    },
+    {
+      "line": 1,
+      "col": 59,
+      "text": "textarea",
+      "kind": "name",
+      "note": "Создаёт многострочное поле ввода.",
+      "source": "custom"
+    }
+  ],
+  "legacyFormat": "html-words-map"
 }
