@@ -969,6 +969,7 @@ const server = http.createServer(async (req, res) => {
 
     // убрать дубли: куски с одинаковым кодом схлопнуть в один (оставить самый полный)
     if(u.pathname === '/api/dedup' && req.method === 'POST'){
+      const b = await readBody(req), dry = b && b.dry === true;
       const ents = await store.entries();
       const byCode = new Map();
       for(const e of ents){
@@ -980,16 +981,17 @@ const server = http.createServer(async (req, res) => {
       // оценка «полноты»: есть раздел, описание, пояснения к словам — такой оставляем
       const score = e => { let n = 0; if(String(e.meta.group || '').trim()) n += 3; if(String(e.meta.desc || '').trim()) n += 2; return n + Math.min((e.meta.wordNotes || []).filter(w => w.source === 'custom').length, 20); };
       const refIndex = await pieceReferenceIndex();
-      let removed = 0, groups = 0; const blockedGroups = [];
+      let removed = 0, groups = 0; const blockedGroups = [], plannedGroups = [];
       for(const [, arr] of byCode){
         if(arr.length < 2) continue;
         groups++;
         arr.sort((a, b) => score(b) - score(a));   // лучший — первым, его оставляем
         const references = arr.flatMap(e => (refIndex.get(e.id) || []).map(ref => ({ pieceId: e.id, ...ref })));
         if(references.length){ blockedGroups.push({ ids: arr.map(e => e.id), references }); continue; }
+        if(dry){ plannedGroups.push({ keep: arr[0].id, remove: arr.slice(1).map(e => e.id) }); continue; }
         for(let i = 1; i < arr.length; i++){ if(await store.remove(arr[i].id)) removed++; }
       }
-      return json(res, 200, { ok: true, groups, removed, total: ents.length, blocked: blockedGroups.length, blockedGroups: blockedGroups.slice(0, 50) });
+      return json(res, 200, { ok: true, dry, groups, removed, planned: plannedGroups.reduce((n,g) => n + g.remove.length, 0), plannedGroups: plannedGroups.slice(0, 50), total: ents.length, blocked: blockedGroups.length, blockedGroups: blockedGroups.slice(0, 50) });
     }
 
     // объединённый импорт: один код-файл, полноценный кусок JSON, массив кусков или сборник {dict,pieces}
