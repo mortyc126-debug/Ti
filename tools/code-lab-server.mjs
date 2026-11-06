@@ -176,7 +176,7 @@ async function getUsage(){
   const entries = await store.entries();
   const key = libraryFingerprint(entries);
   if(_usage && _usage.__dict === dict && _usageKey === key) return _usage;
-  const u = buildUsage(dict, entries.map(e => ({ id: e.id, lang: String(e.lang || (e.meta && e.meta.lang) || 'txt').toLowerCase(), title: e.title, group: e.group, code: String(e.code || '') })));
+  const u = buildUsage(dict, entries.map(e => ({ id: e.id, lang: String(e.lang || (e.meta && e.meta.lang) || 'txt').toLowerCase(), title: e.title, group: e.group, desc: e.meta?.desc || '', tags: e.meta?.tags || [], aliases: e.meta?.aliases || [], code: String(e.code || '') })));
   u.__dict = dict; _usage = u; _usageKey = key;
   return u;
 }
