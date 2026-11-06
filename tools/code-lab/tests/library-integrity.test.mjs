@@ -23,6 +23,8 @@ async function walk(dir){
 test('библиотека: пары кода и паспортов, JSON и ID целостны', async()=>{
   const langs=(await fs.readdir(LIBRARY,{withFileTypes:true})).filter(x=>x.isDirectory()).map(x=>x.name);
   const ids=new Map(), problems=[], duplicateCodes=new Map(), missingIds=[], languageMismatches=[], rows=[];
+  const emptyDescriptions=[], shortDescriptions=[], missingTitles=[], missingGroups=[], missingLangs=[], fileFieldMismatches=[];
+  const statusCounts={}, descriptionLengthBuckets={empty:0,short:0,medium:0,long:0};
   let codeCount=0, metaCount=0;
   for(const langDir of langs){
     const files=await walk(path.join(LIBRARY,langDir));
@@ -38,8 +40,22 @@ test('библиотека: пары кода и паспортов, JSON и ID 
         const codeBase=path.basename(code,path.extname(code));
         const effectiveId=String(meta.id || codeBase);
         if(!meta.id) missingIds.push(path.relative(LIBRARY,file));
-        rows.push({ id:effectiveId, lang:canon(meta.lang || langDir), file:path.relative(LIBRARY,code) });
-        if(meta.lang && canon(meta.lang)!==canon(langDir)) languageMismatches.push(path.relative(LIBRARY,file)+' ('+meta.lang+')');
+        const relativeFile=path.relative(LIBRARY,file), relativeCode=path.relative(LIBRARY,code);
+        const desc=typeof meta.desc==='string'?meta.desc.trim():'';
+        const title=typeof meta.title==='string'?meta.title.trim():'';
+        const group=typeof meta.group==='string'?meta.group.trim():'';
+        const status=String(meta.status||'(missing)');
+        statusCounts[status]=(statusCounts[status]||0)+1;
+        if(!desc){emptyDescriptions.push(relativeFile);descriptionLengthBuckets.empty++;}
+        else if(desc.length<45){shortDescriptions.push({file:relativeFile,desc});descriptionLengthBuckets.short++;}
+        else if(desc.length<160) descriptionLengthBuckets.medium++;
+        else descriptionLengthBuckets.long++;
+        if(!title) missingTitles.push(relativeFile);
+        if(!group) missingGroups.push(relativeFile);
+        if(!meta.lang) missingLangs.push(relativeFile);
+        if(meta.file && meta.file!==path.basename(code)) fileFieldMismatches.push({file:relativeFile,declared:meta.file,actual:path.basename(code)});
+        rows.push({ id:effectiveId, lang:canon(meta.lang || langDir), file:relativeCode });
+        if(meta.lang && canon(meta.lang)!==canon(langDir)) languageMismatches.push(relativeFile+' ('+meta.lang+')');
       } else if(CODE_EXT.has(path.extname(file).toLowerCase())){
         codeCount++;
         if(!set.has(file+'.meta.json')) problems.push('нет паспорта для кода: '+path.relative(LIBRARY,file));
@@ -61,7 +77,9 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   console.log('library-integrity:',JSON.stringify({
     languages:langs,codeCount,metaCount,effectiveIds:ids.size,missingIds:missingIds.length,
     folderLanguageMismatches:languageMismatches.length,duplicateCodeGroups:dupGroups.length,
-    duplicateCodeSamples:dupGroups.slice(0,40),duplicateIdGroups,missingIdFiles:missingIds,
+    duplicateCodeSamples:dupGroups,duplicateIdGroups,missingIdFiles:missingIds,
+    emptyDescriptions,shortDescriptionSamples:shortDescriptions.slice(0,60),descriptionLengthBuckets,statusCounts,
+    missingTitles,missingGroups,missingLangs,fileFieldMismatches,
     problems:problems.length,languageMismatchSamples:languageMismatches.slice(0,8)
   }));
   assert.deepEqual(problems,[]);
