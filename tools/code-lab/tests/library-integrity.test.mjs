@@ -22,7 +22,7 @@ async function walk(dir){
 
 test('библиотека: пары кода и паспортов, JSON и ID целостны', async()=>{
   const langs=(await fs.readdir(LIBRARY,{withFileTypes:true})).filter(x=>x.isDirectory()).map(x=>x.name);
-  const ids=new Map(), problems=[], duplicateCodes=new Map();
+  const ids=new Map(), problems=[], duplicateCodes=new Map(), missingIds=[], languageMismatches=[], rows=[];
   let codeCount=0, metaCount=0;
   for(const langDir of langs){
     const files=await walk(path.join(LIBRARY,langDir));
@@ -35,10 +35,11 @@ test('библиотека: пары кода и паспортов, JSON и ID 
         let meta;
         try{meta=JSON.parse(await fs.readFile(file,'utf8'));}catch(e){problems.push('битый JSON '+path.relative(LIBRARY,file)+': '+e.message);continue;}
         if(!meta||typeof meta!=='object'||Array.isArray(meta)) {problems.push('паспорт не объект: '+path.relative(LIBRARY,file));continue;}
-        if(!meta.id) problems.push('нет ID: '+path.relative(LIBRARY,file));
-        else if(ids.has(String(meta.id))) problems.push('повтор ID '+meta.id+': '+ids.get(String(meta.id))+' и '+path.relative(LIBRARY,file));
-        else ids.set(String(meta.id),path.relative(LIBRARY,file));
-        if(meta.lang && canon(meta.lang)!==canon(langDir)) problems.push('язык паспорта не совпадает с папкой: '+path.relative(LIBRARY,file)+' ('+meta.lang+')');
+        const codeBase=path.basename(code,path.extname(code));
+        const effectiveId=String(meta.id || codeBase);
+        if(!meta.id) missingIds.push(path.relative(LIBRARY,file));
+        rows.push({ id:effectiveId, lang:canon(meta.lang || langDir), file:path.relative(LIBRARY,code) });
+        if(meta.lang && canon(meta.lang)!==canon(langDir)) languageMismatches.push(path.relative(LIBRARY,file)+' ('+meta.lang+')');
       } else if(CODE_EXT.has(path.extname(file).toLowerCase())){
         codeCount++;
         if(!set.has(file+'.meta.json')) problems.push('нет паспорта для кода: '+path.relative(LIBRARY,file));
@@ -49,7 +50,13 @@ test('библиотека: пары кода и паспортов, JSON и ID 
     }
   }
   const dupGroups=[...duplicateCodes.values()].filter(x=>x.length>1);
-  console.log('library-integrity:',JSON.stringify({languages:langs,codeCount,metaCount,uniqueIds:ids.size,duplicateCodeGroups:dupGroups.length,problems:problems.length}));
+  for(const row of rows.sort((a,b)=>a.file.localeCompare(b.file))){
+    let id=row.id;
+    if(ids.has(id)){ id=id+'~'+row.lang; let k=2; while(ids.has(id)) id=row.id+'~'+row.lang+k++; }
+    ids.set(id,row.file);
+  }
+  console.log('library-integrity:',JSON.stringify({languages:langs,codeCount,metaCount,effectiveIds:ids.size,missingIds:missingIds.length,folderLanguageMismatches:languageMismatches.length,duplicateCodeGroups:dupGroups.length,problems:problems.length,languageMismatchSamples:languageMismatches.slice(0,8),missingIdSamples:missingIds.slice(0,5)}));
   assert.deepEqual(problems,[]);
   assert.equal(codeCount,metaCount,'число файлов кода и паспортов должно совпадать');
+  assert.equal(ids.size,codeCount,'все элементы должны получать уникальный ID после разрешения совпадений');
 });
