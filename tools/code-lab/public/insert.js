@@ -46,7 +46,7 @@
   const DELAYS = { instant: 0, fast: 45, normal: 100, calm: 200 };
   let acSpeed = 'fast'; try { acSpeed = localStorage.getItem('codelab_ac_speed') || 'fast'; } catch(_){}
   if(!Object.prototype.hasOwnProperty.call(DELAYS, acSpeed)) acSpeed = 'normal';
-  const scheduleShow = ed => { clearTimeout(timer); timer = setTimeout(() => show(ed, false), DELAYS[acSpeed]); };
+  const scheduleShow = ed => { clearTimeout(timer); seq++; cancelVariantRequest(); timer = setTimeout(() => show(ed, false), DELAYS[acSpeed]); };
   let pop = null, ctx = null, seq = 0, timer = null, sel = 0, requestController = null;
   function cancelVariantRequest(){ if(requestController){ requestController.abort(); requestController = null; } }
   function hide(){ clearTimeout(timer); seq++; cancelVariantRequest(); if(pop){ pop.remove(); pop = null; } ctx = null; }
@@ -224,7 +224,7 @@
     if(my !== seq) return;
     // в языке файла пусто (или файл без языка) — показываем другие языки, сгруппированно по языку
     // (только куски по названию — тоже «пусто»: термины другого языка ставим перед ними)
-    if(!roots.some(n => !n.group) && c.word && /[А-Яа-яЁё]/.test(c.word)){ const r = await fetch('/api/variants?q=' + encodeURIComponent(c.word)); if(my !== seq) return;
+    if(!roots.some(n => !n.group) && c.word && /[А-Яа-яЁё]/.test(c.word)){ const r = await fetchVariants('/api/variants?q=' + encodeURIComponent(c.word)); if(my !== seq) return;
       roots = ((r && r.roots) || []).filter(n => !n.group).concat(roots.length ? roots : ((r && r.roots) || []).filter(n => n.group)); }
     if(!roots.length && c.word && /^[\w$.-]+$/.test(c.word)){ const d = await (window.codelabKwDict ? window.codelabKwDict(c.lang) : Promise.resolve({})); if(my !== seq) return; roots = flatFallback(c.word, d || {}, c.lang); }
     if(!roots.length){ if(force){ ctx = c; render(c, [], true); } else hide(); return; }
