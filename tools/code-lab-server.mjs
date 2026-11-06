@@ -855,38 +855,135 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, await importBundle(await readBody(req)));
     }
 
-    // восстановление бэкапа библиотеки КАК ЕСТЬ: {files:[{name,text,lang?}]} — пишем код и паспорта
-    // .meta.json прямо в library/<язык>/ байт-в-байт, без токенизации/аннотации/дедупа. Паспорт
-    // (настоящее название, разделы, пояснения) сохраняется ровно как в бэкапе.
+    // Восстановление архива: пути сохраняются, пары кода и паспорта связываются по полному пути.
+    // Перед перезаписью существующих файлов создаётся локальная резервная копия в data/restore-backups/.
     if(u.pathname === '/api/library/restore' && req.method === 'POST'){
       const b = await readBody(req);
       const files = Array.isArray(b.files) ? b.files : [];
       const EXT2LANG = { js:'js', mjs:'js', cjs:'js', ts:'ts', tsx:'ts', jsx:'js', py:'python', rb:'ruby', php:'php', go:'go', rs:'rust', java:'java', c:'c', h:'c', cpp:'cpp', cs:'csharp', css:'css', html:'html', htm:'html', svg:'svg', sql:'sql', sh:'bash', json:'json' };
       const safeLang = l => (String(l || 'txt').toLowerCase().replace(/[^a-z0-9_+-]/g, '') || 'txt');
-      const langOfName = n => safeLang(EXT2LANG[String(n).split('.').pop().toLowerCase()] || 'txt');
-      const isMeta = n => /\.meta\.json$/i.test(n);
-      const metas = files.filter(f => f && isMeta(f.name));
-      const codes = files.filter(f => f && !isMeta(f.name));
-      const codeByBase = {}; codes.forEach(c => { codeByBase[path.basename(c.name)] = c; });
-      let wroteCode = 0, wroteMeta = 0, pairs = 0; const consumed = new Set();
+      const langOfName = n => {
+        const ext = path.posix.extname(String(n)).slice(1).toLowerCase();
+        return safeLang(EXT2LANG[ext] || 'txt');
+      };
+      const normalizeArchivePath = value => {
+        const raw = String(value || '').replace(/\\/g, '/');
+        if(!raw || raw.startsWith('/') || /^[a-z]:/i.test(raw) || raw.includes('\\0')) return null;
+        const parts = raw.split('/');
+        if(parts.some(x => x === '..')) return null;
+        const clean = parts.filter(x => x && x !== '.');
+        return clean.length ? clean.join('/') : null;
+      };
+      const targetName = (archivePath, lang) => {
+        const parts = archivePath.split('/');
+        const want = canonLang(lang);
+        let stripAfter = -1;
+        for(let i = 0; i < parts.length - 1; i++){
+          if(parts[i].toLowerCase() === 'library' && canonLang(parts[i + 1]) === want) stripAfter = i + 1;
+        }
+        if(stripAfter >= 0) return parts.slice(stripAfter + 1).join('/');
+        if(parts.length > 1 && canonLang(parts[0]) === want) return parts.slice(1).join('/');
+        return archivePath;
+      };
+      const archiveFiles = [], archiveSeen = new Set(), invalidPaths = [];
+      for(const f of files){
+        if(!f || typeof f !== 'object') continue;
+        const name = normalizeArchivePath(f.name);
+        if(!name){ invalidPaths.push(String(f.name || '(пустое имя)')); continue; }
+        const key = name.toLowerCase();
+        if(archiveSeen.has(key)){ invalidPaths.push(name + ' (повтор пути)'); continue; }
+        archiveSeen.add(key);
+        archiveFiles.push({ ...f, archivePath: name, key });
+      }
+      if(invalidPaths.length) return json(res, 400, { ok: false, error: 'В архиве есть недопустимые или повторяющиеся пути. Ничего не записано.', invalidPaths: invalidPaths.slice(0, 50) });
+
+      const metas = archiveFiles.filter(f => /\\.meta\\.json$/i.test(f.archivePath));
+      const codes = archiveFiles.filter(f => !/\\.meta\\.json$/i.test(f.archivePath));
+      const codeByPath = new Map(codes.map(c => [c.key, c]));
+      const consumed = new Set(), destinations = new Set(), writes = [];
       const metaOnlyList = [], codeOnlyList = [], badMeta = [];
-      for(const m of metas){
-        let meta; try { meta = JSON.parse(m.text); } catch(_){ badMeta.push(path.basename(m.name)); continue; }
-        const base = path.basename(m.name).replace(/\.meta\.json$/i, '');   // «arc-….js»
-        const lang = safeLang(meta.lang) || langOfName(base);
-        const dir = path.join(LIBRARY, lang); await fs.mkdir(dir, { recursive: true });
-        await fs.writeFile(path.join(dir, base + '.meta.json'), m.text.endsWith('\n') ? m.text : m.text + '\n', 'utf8'); wroteMeta++;
-        const code = codeByBase[base];
-        if(code){ await fs.writeFile(path.join(dir, base), String(code.text), 'utf8'); wroteCode++; pairs++; consumed.add(base); }
-        else metaOnlyList.push(base);
+      const addWrite = (archivePath, langValue, text, kind) => {
+        const lang = safeLang(canonLang(langValue || 'txt'));
+        const relName = targetName(archivePath, lang);
+        if(!relName) throw new Error('Пустой путь после определения языка: ' + archivePath);
+        const rel = path.join(lang, ...relName.split('/'));
+        const abs = within(LIBRARY, rel);
+        if(!abs) throw new Error('Недопустимый путь назначения: ' + archivePath);
+        const relFromLibrary = path.relative(LIBRARY, abs);
+        const key = relFromLibrary.toLowerCase();
+        if(destinations.has(key)) throw new Error('Два файла архива ведут к одному месту: ' + relFromLibrary);
+        destinations.add(key);
+        writes.push({ abs, rel: relFromLibrary, text: String(text ?? ''), kind });
+      };
+
+      try {
+        for(const m of metas){
+          let meta;
+          try { meta = JSON.parse(String(m.text ?? '')); }
+          catch(_){ badMeta.push(m.archivePath); continue; }
+          if(!meta || typeof meta !== 'object' || Array.isArray(meta)){ badMeta.push(m.archivePath); continue; }
+          const codeArchivePath = m.archivePath.replace(/\\.meta\\.json$/i, '');
+          const lang = safeLang(canonLang(meta.lang || langOfName(codeArchivePath)));
+          const code = codeByPath.get(codeArchivePath.toLowerCase());
+          addWrite(codeArchivePath, lang, String(m.text ?? '').endsWith('\\n') ? String(m.text) : String(m.text ?? '') + '\\n', 'meta');
+          if(code){
+            addWrite(code.archivePath, lang, code.text, 'code');
+            consumed.add(code.key); pairs++;
+          } else metaOnlyList.push(m.archivePath);
+        }
+        for(const c of codes){
+          if(consumed.has(c.key)) continue;
+          const lang = safeLang(canonLang(c.lang || langOfName(c.archivePath)));
+          addWrite(c.archivePath, lang, c.text, 'code');
+          codeOnlyList.push(c.archivePath);
+        }
+      } catch(e){
+        return json(res, 400, { ok: false, error: String(e?.message || e), invalidPaths: invalidPaths.slice(0, 50) });
       }
-      for(const c of codes){ const bn = path.basename(c.name); if(consumed.has(bn)) continue;
-        const lang = safeLang(c.lang) || langOfName(bn);
-        const dir = path.join(LIBRARY, lang); await fs.mkdir(dir, { recursive: true });
-        await fs.writeFile(path.join(dir, bn), String(c.text), 'utf8'); wroteCode++; codeOnlyList.push(bn);
+
+      const backupId = 'library-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+      const backupRoot = path.join(DATA, 'restore-backups', backupId);
+      const backups = new Map(), written = [];
+      try {
+        for(const op of writes){
+          const st = await fs.stat(op.abs).catch(() => null);
+          if(!st) continue;
+          if(!st.isFile()) throw new Error('На месте файла архива уже существует папка: ' + op.rel);
+          const backupPath = path.join(backupRoot, op.rel);
+          await fs.mkdir(path.dirname(backupPath), { recursive: true });
+          await fs.copyFile(op.abs, backupPath);
+          backups.set(op.abs, backupPath);
+        }
+        if(backups.size){
+          await fs.mkdir(backupRoot, { recursive: true });
+          await fs.writeFile(path.join(backupRoot, 'manifest.json'), JSON.stringify({
+            createdAt: new Date().toISOString(),
+            files: [...backups.entries()].map(([target, backup]) => ({ target: path.relative(LIBRARY, target), backup: path.relative(backupRoot, backup) }))
+          }, null, 2) + '\\n', 'utf8');
+        }
+        for(const op of writes){
+          await fs.mkdir(path.dirname(op.abs), { recursive: true });
+          await fs.writeFile(op.abs, op.text, 'utf8');
+          written.push(op);
+        }
+      } catch(e){
+        const rollbackErrors = [];
+        for(const op of written.reverse()){
+          try {
+            const backupPath = backups.get(op.abs);
+            if(backupPath){ await fs.mkdir(path.dirname(op.abs), { recursive: true }); await fs.copyFile(backupPath, op.abs); }
+            else await fs.unlink(op.abs).catch(() => {});
+          } catch(err){ rollbackErrors.push(String(err?.message || err)); }
+        }
+        return json(res, 500, { ok: false, error: String(e?.message || e), backupId: backups.size ? backupId : null, rollbackErrors });
       }
+
+      let pairs = 0, wroteCode = 0, wroteMeta = 0;
+      for(const op of writes){ if(op.kind === 'code') wroteCode++; else wroteMeta++; }
+      pairs = metas.length - metaOnlyList.length - badMeta.length;
       try { await store.refresh(); } catch(_){}
       return json(res, 200, { ok: true, pairs, metaOnly: metaOnlyList.length, codeOnly: codeOnlyList.length, wroteCode, wroteMeta,
+        overwritten: backups.size, backupId: backups.size ? backupId : null,
         metaOnlyList: metaOnlyList.slice(0, 60), codeOnlyList: codeOnlyList.slice(0, 60), badMeta: badMeta.slice(0, 20) });
     }
 
