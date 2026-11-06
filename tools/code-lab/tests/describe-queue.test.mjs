@@ -32,6 +32,7 @@ try {
   }
   const result = await queue.get();
   assert.equal(result.completed, 1);
+  await queue.waitForIdle(); // worker должен завершить финальное сохранение до удаления временной папки
   assert.equal(result.failed, 0);
   assert.equal(calls, 1, 'один поток — один одновременный запрос');
   const described = await store.get('needs');
