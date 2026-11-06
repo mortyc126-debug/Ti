@@ -9,7 +9,7 @@ const outputPath = path.resolve(process.argv[4] || 'duplicate-id-reference-repor
 const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
 const legacy = new Map();
 for (const pair of manifest.pairs || []) for (const item of pair.legacyIds || []) legacy.set(item.id, item.redirectTo);
-const roots = ['tasks', 'recipes', 'flows', 'data', 'workspace'];
+const roots = ['tasks', 'recipes', 'flows', 'data', 'workspace', 'templates'];
 const allowed = new Set(['.json', '.txt', '.md', '.js', '.mjs', '.html', '.yml', '.yaml']);
 const files = [];
 async function walk(dir, rel = '') {
