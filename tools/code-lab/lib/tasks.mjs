@@ -222,7 +222,7 @@ export function createTaskStore({ root, rows, slug, createPiece, similarPieces }
     const out = [];
     for(const t of await list()){
       const full = await get(t.id); if(!full) continue;
-      let hit = false; TaskFormat.eachOption(full.steps, o => { if(o.id === id) hit = true; });
+      let hit = false; TaskFormat.eachOption(full.steps, o => { if(o.kind === 'task' && o.id === id) hit = true; });
       if(hit) out.push({ id: t.id, title: t.title });
     }
     return out;
