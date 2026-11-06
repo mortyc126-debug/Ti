@@ -35,6 +35,7 @@ try {
   assert.deepEqual(pair.candidatePassport.tags, ['канонический-тег', 'старый-тег']);
   assert.deepEqual(pair.candidatePassport.aliases, ['пример', 'старый-вариант']);
   assert.equal(pair.review.conceptNotes.length, 1);
+  assert.equal(pair.candidatePassport.wordNotes.filter(note => note.kind === 'concept').length, 1);
   assert.equal(pair.review.sourcePassports.length, 2);
   assert.equal(pair.review.sourcePassports.find(x => x.id === 'canonical-piece').passport.extraField.keep, true);
   assert.equal(pair.review.importable, false);
@@ -45,7 +46,7 @@ try {
   const changedRun = spawnSync(process.execPath, [scriptPath, library, manifestPath, outputPath], { encoding: 'utf8' });
   assert.notEqual(changedRun.status, 0);
   assert.match(changedRun.stderr + changedRun.stdout, /Код изменился после аудита/);
-  console.log('preview-duplicate-merge: 15 checks passed');
+  console.log('preview-duplicate-merge: 16 checks passed');
 } finally {
   await fs.rm(tmp, { recursive: true, force: true });
 }
