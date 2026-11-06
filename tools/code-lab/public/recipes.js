@@ -217,8 +217,8 @@ function openBulkModal(){
     q('#bk-load').disabled = true; q('#bk-load').textContent = 'граблю…';
     let r = await fetch('/api/recipes/import', { method: 'POST', body: JSON.stringify(data) }).then(x => x.json()).catch(() => null);
     if(r && r.needsConfirmation){
-      const details = (r.unresolved || []).map(x => '• ' + x.recipe + ' → ' + x.item + ': ' + x.reason + ((x.candidates || []).length ? ' (' + x.candidates.map(c => c.title + ' [' + c.lang + ']').join(', ') + ')' : '')).join('\\n');
-      if(confirm('В рецепте есть пункты без однозначной связи. Если продолжить, они сохранятся без привязки к коду.\\n\\n' + details + '\\n\\nСохранить неполный рецепт?')){
+      const details = (r.unresolved || []).map(x => '• ' + x.recipe + ' → ' + x.item + ': ' + x.reason + ((x.candidates || []).length ? ' (' + x.candidates.map(c => c.title + ' [' + c.lang + ']').join(', ') + ')' : '')).join('\n');
+      if(confirm('В рецепте есть пункты без однозначной связи. Если продолжить, они сохранятся без привязки к коду.\n\n' + details + '\n\nСохранить неполный рецепт?')){
         const payload = Array.isArray(data) ? { recipes: data, allowUnresolved: true } : { ...data, allowUnresolved: true };
         r = await fetch('/api/recipes/import', { method: 'POST', body: JSON.stringify(payload) }).then(x => x.json()).catch(() => null);
       } else {
