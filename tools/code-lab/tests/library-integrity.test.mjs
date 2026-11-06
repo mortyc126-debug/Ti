@@ -24,6 +24,10 @@ async function walk(dir){
   }
   return out;
 }
+function hasIdentifier(text,id){
+  const escaped=String(id).replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\async function walkReferenceFiles(dir){');
+  return new RegExp('(^|[^\\\\p{L}\\\\p{N}_-])'+escaped+'($|[^\\\\p{L}\\\\p{N}_-])','u').test(text);
+}
 async function walkReferenceFiles(dir){
   const out=[], skip=new Set(['.git','node_modules','vendor','dist','build','coverage','.cache']);
   const allowed=new Set(['.json','.md','.txt','.js','.mjs','.cjs','.html','.htm','.css','.yml','.yaml','.py','.sql','.ts','.sh','.bash']);
@@ -241,8 +245,8 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   for(const file of referenceFiles){
     const body=await fs.readFile(file,'utf8');
     const relative=path.relative(REPO_ROOT,file).split(path.sep).join('/');
-    for(const id of duplicateIds.keys()) if(body.includes(id)) duplicateReferenceHits.push({id,file:relative});
-    if(!relative.startsWith('tools/code-lab/templates/')) for(const id of missingTemplateIds) if(body.includes(id)) templateReferenceHits.push({id,file:relative});
+    for(const id of duplicateIds.keys()) if(hasIdentifier(body,id)) duplicateReferenceHits.push({id,file:relative});
+    if(!relative.startsWith('tools/code-lab/templates/')) for(const id of missingTemplateIds) if(hasIdentifier(body,id)) templateReferenceHits.push({id,file:relative});
   }
   const migrationDryRun=await migrateTemplates({src:path.join(CODELAB_ROOT,'templates'),out:LIBRARY,dictPath:null,dry:true});
   const wordNoteProblemByKind={}, wordNoteProblemByLang={};
