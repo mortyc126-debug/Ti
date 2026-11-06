@@ -43,12 +43,20 @@
   document.head.appendChild(st);
 
   let acOn = true; try { acOn = localStorage.getItem('codelab_ac') !== 'off'; } catch(_){}
-  const DELAYS = { fast: 70, normal: 120, calm: 220 };
-  let acSpeed = 'normal'; try { acSpeed = localStorage.getItem('codelab_ac_speed') || 'normal'; } catch(_){}
+  const DELAYS = { instant: 0, fast: 45, normal: 100, calm: 200 };
+  let acSpeed = 'fast'; try { acSpeed = localStorage.getItem('codelab_ac_speed') || 'fast'; } catch(_){}
   if(!Object.prototype.hasOwnProperty.call(DELAYS, acSpeed)) acSpeed = 'normal';
   const scheduleShow = ed => { clearTimeout(timer); timer = setTimeout(() => show(ed, false), DELAYS[acSpeed]); };
-  let pop = null, ctx = null, seq = 0, timer = null, sel = 0;
-  function hide(){ if(pop){ pop.remove(); pop = null; } ctx = null; }
+  let pop = null, ctx = null, seq = 0, timer = null, sel = 0, requestController = null;
+  function cancelVariantRequest(){ if(requestController){ requestController.abort(); requestController = null; } }
+  function hide(){ clearTimeout(timer); seq++; cancelVariantRequest(); if(pop){ pop.remove(); pop = null; } ctx = null; }
+  async function fetchVariants(url){
+    cancelVariantRequest();
+    const controller = new AbortController(); requestController = controller;
+    try { return await fetch(url, { signal:controller.signal }).then(r => r.json()); }
+    catch(error){ if(error && error.name !== 'AbortError') return null; return null; }
+    finally { if(requestController === controller) requestController = null; }
+  }
 
   // слово (или русская фраза) у курсора и как его заменить
   function wordCtx(ed, force){
@@ -212,11 +220,11 @@
     if(!c || (!force && c.word.length < 2)){ hide(); return; }
     const my = ++seq;
     let roots = [];
-    if(c.word){ const r = await fetch('/api/variants?q=' + encodeURIComponent(c.word) + '&lang=' + encodeURIComponent(c.lang)).then(x => x.json()).catch(() => null); roots = (r && r.roots) || []; }
+    if(c.word){ const r = await fetchVariants('/api/variants?q=' + encodeURIComponent(c.word) + '&lang=' + encodeURIComponent(c.lang)); roots = (r && r.roots) || []; }
     if(my !== seq) return;
     // в языке файла пусто (или файл без языка) — показываем другие языки, сгруппированно по языку
     // (только куски по названию — тоже «пусто»: термины другого языка ставим перед ними)
-    if(!roots.some(n => !n.group) && c.word && /[А-Яа-яЁё]/.test(c.word)){ const r = await fetch('/api/variants?q=' + encodeURIComponent(c.word)).then(x => x.json()).catch(() => null); if(my !== seq) return;
+    if(!roots.some(n => !n.group) && c.word && /[А-Яа-яЁё]/.test(c.word)){ const r = await fetch('/api/variants?q=' + encodeURIComponent(c.word)); if(my !== seq) return;
       roots = ((r && r.roots) || []).filter(n => !n.group).concat(roots.length ? roots : ((r && r.roots) || []).filter(n => n.group)); }
     if(!roots.length && c.word && /^[\w$.-]+$/.test(c.word)){ const d = await (window.codelabKwDict ? window.codelabKwDict(c.lang) : Promise.resolve({})); if(my !== seq) return; roots = flatFallback(c.word, d || {}, c.lang); }
     if(!roots.length){ if(force){ ctx = c; render(c, [], true); } else hide(); return; }
@@ -272,7 +280,7 @@
   bar.appendChild(lab);
   const speed = document.createElement('select'); speed.id = 'sbAcSpeed'; speed.title = 'Скорость появления подсказок';
   speed.style.cssText = 'background:var(--bg);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:2px 5px;font-size:10.5px';
-  [['fast','быстро · 70 мс'],['normal','обычно · 120 мс'],['calm','спокойно · 220 мс']].forEach(([value,label]) => { const o=document.createElement('option'); o.value=value; o.textContent=label; speed.appendChild(o); });
+  [['instant','сразу'],['fast','быстро · 45 мс'],['normal','обычно · 100 мс'],['calm','спокойно · 200 мс']].forEach(([value,label]) => { const o=document.createElement('option'); o.value=value; o.textContent=label; speed.appendChild(o); });
   speed.value = acSpeed;
   speed.onchange = () => { acSpeed = speed.value; try { localStorage.setItem('codelab_ac_speed', acSpeed); } catch(_){} };
   bar.appendChild(speed);
