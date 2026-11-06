@@ -249,21 +249,53 @@ async function importBundle(b){
   const looksProse = _looksProse;
   for(const pc of pieces){
     if(!pc || typeof pc !== 'object'){ skipped++; continue; }
-    const lang = canonLang(pc.lang || 'js');
-    const title = String(pc.title || 'Без названия').slice(0, 80);
+    const passport = {
+      ...(pc.meta && typeof pc.meta === 'object' && !Array.isArray(pc.meta) ? pc.meta : {}),
+      ...(pc.passport && typeof pc.passport === 'object' && !Array.isArray(pc.passport) ? pc.passport : {})
+    };
+    const coreFields = new Set(['id','file','schema','lang','title','name','group','desc','code','text','lines','output','tags','aliases','words','component','source','wordNotes','orphanNotes','labels','descAt','status','meta','passport']);
+    for(const [key,value] of Object.entries(pc)) if(!coreFields.has(key) && !Object.prototype.hasOwnProperty.call(passport,key)) passport[key] = value;
+    const pick = key => pc[key] !== undefined ? pc[key] : passport[key];
+    const lang = canonLang(pick('lang') || 'js');
+    const title = String(pick('title') || pc.name || passport.name || 'Без названия').slice(0, 80);
     const hasLines = Array.isArray(pc.lines) && pc.lines.length > 0;
-    const code = hasLines ? '' : String(pc.code || '');
+    const code = hasLines ? '' : String(pc.code || pc.text || '');
     if(!hasLines && !code.trim()){ skipped++; continue; }
     if(!hasLines && looksProse(code)){ skipped++; warnings.push({ title, reason: 'в коде русский текст без кода — похоже на словарь/синонимы, а не кусок' }); continue; }
     const codeForDup = hasLines ? pc.lines.map(ln => (ln || []).map(t => (t && t.v) || '').join('')).join('\n') : code;
-    // дубль: сначала точное совпадение (название+код), иначе — тот же КОД под другим названием
+    // Дубль ищется только внутри канонического языка; межъязыковое совпадение не объединяется.
     const dup = (await findSameTemplate(title, codeForDup, lang)) || (await findByCode(codeForDup, lang));
     let obj;
-    if(dup){ obj = await store.get(dup); obj.lang = lang; obj.title = title; if(pc.group) obj.group = String(pc.group).slice(0, 60); if(pc.desc) obj.desc = String(pc.desc).slice(0, 400); obj.lines = hasLines ? pc.lines : tokenize(code, lang); if(pc.output != null) obj.output = String(pc.output); updated++; }
-    else { obj = { id: slug(title || lang), lang, group: (pc.group != null ? String(pc.group) : 'Мои куски').slice(0, 60), title, desc: String(pc.desc || '').slice(0, 400), lines: hasLines ? pc.lines : tokenize(code, lang), output: pc.output != null ? String(pc.output) : '', descAt: Date.now() }; if(pc.component && typeof pc.component === 'object') obj.component = pc.component; created++; }
-    if(_CONTRACT_LANGS.has(lang) && !hasLines){ const c = codeContract(code, lang); obj.component = obj.component || {}; obj.component.provides = c.provides; obj.component.requires = c.requires; }
-    annotateLines(obj.lines, lang, dict);   // автоподпись из словаря (уже с новыми словами); готовые e не трогает
-    if(pc.words && typeof pc.words === 'object'){   // ручные пояснения куска — поверх авто
+    if(dup){
+      obj = await store.get(dup);
+      obj.lang = lang; obj.title = title;
+      if(pick('group') != null) obj.group = String(pick('group')).slice(0, 60);
+      if(pick('desc') != null) obj.desc = String(pick('desc')).slice(0, 400);
+      obj.lines = hasLines ? pc.lines : tokenize(code, lang);
+      if(pick('output') != null) obj.output = String(pick('output'));
+      obj.passport = { ...(obj.passport || {}), ...passport };
+      updated++;
+    } else {
+      obj = {
+        id: slug(title || lang), lang,
+        group: (pick('group') != null ? String(pick('group')) : 'Мои куски').slice(0, 60),
+        title, desc: String(pick('desc') || '').slice(0, 400),
+        lines: hasLines ? pc.lines : tokenize(code, lang),
+        output: pick('output') != null ? String(pick('output')) : '',
+        descAt: pick('descAt') || Date.now(), passport
+      };
+      created++;
+    }
+    for(const field of ['tags','aliases','source','wordNotes','orphanNotes','labels','component','status','descAt']){
+      const value = pick(field);
+      if(value !== undefined) obj[field] = value;
+    }
+    if(_CONTRACT_LANGS.has(lang) && !hasLines){
+      const c = codeContract(code, lang);
+      obj.component = { ...(obj.component || {}), provides: c.provides, requires: c.requires };
+    }
+    annotateLines(obj.lines, lang, dict);   // автоподпись из словаря; готовые e не трогает
+    if(pc.words && typeof pc.words === 'object'){
       const low = {}; for(const [k, v] of Object.entries(pc.words)) low[k.toLowerCase()] = v;
       for(const line of obj.lines) for(const t of line){ if(!t || t.k === 'sp' || t.k === 'op') continue; const e = low[String(t.v).toLowerCase()]; if(e) t.e = String(e).slice(0, 600); }
     }
