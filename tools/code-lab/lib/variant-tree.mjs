@@ -93,19 +93,23 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     return lines.filter(x => x.toLowerCase().startsWith(pre)).map(x => x.slice(pre.length).split(' — ')[0].trim()); };
   // Связи продолжения и условия применения берём из существующих правил языка.
   // «else: после if» разворачивается в подсказку для if; это не синонимы и не варианты написания.
-  const langRules = ((dict && dict.structure && dict.structure[L]) || []).map(raw => {
-    const m = String(raw).match(/^(.+):\s*(после|можно|содержит|внутри|не внутри|требует|обязательно|заметка)\s+(.+)$/i);
-    if(!m) return null;
-    const term = m[1].trim(), verb = m[2].toLowerCase();
-    const cut = m[3].split(/\s+[—–]\s+/);
-    const body = cut.shift().trim(), note = cut.join(' — ').trim();
-    const args = ['требует','заметка'].includes(verb) ? [body] : body.split(/\s*[,|;]\s*|\s+или\s+/).map(x => x.trim()).filter(Boolean);
-    return { term, verb, args, note };
-  }).filter(Boolean);
-  const termExists = t => Object.prototype.hasOwnProperty.call(langs[L] || {}, String(t).toLowerCase())
-    || langRules.some(r => norm(r.term) === norm(t));
-  const relationGroups = term => {
-    const key = norm(term), after = [], inside = [], context = [];
+  const rulesCache = new Map();
+  const rulesFor = L => {
+    if(rulesCache.has(L)) return rulesCache.get(L);
+    const rules = ((dict && dict.structure && dict.structure[L]) || []).map(raw => {
+      const m = String(raw).match(/^(.+):\\s*(после|можно|содержит|внутри|не внутри|требует|обязательно|заметка)\\s+(.+)$/i);
+      if(!m) return null;
+      const term = m[1].trim(), verb = m[2].toLowerCase();
+      const cut = m[3].split(/\\s+[—–]\\s+/);
+      const body = cut.shift().trim(), note = cut.join(' — ').trim();
+      const args = ['требует','заметка'].includes(verb) ? [body] : body.split(/\\s*[,|;]\\s*|\\s+или\\s+/).map(x => x.trim()).filter(Boolean);
+      return { term, verb, args, note };
+    }).filter(Boolean);
+    rulesCache.set(L, rules); return rules;
+  };
+  const relationGroups = (term, L) => {
+    const langRules = rulesFor(L), key = norm(term), D = langs[L] || {}, after = [], inside = [], context = [];
+    const exists = t => Object.prototype.hasOwnProperty.call(D, String(t).toLowerCase()) || langRules.some(r => norm(r.term) === norm(t));
     for(const r of langRules){
       if(r.verb === 'после' && r.args.some(a => norm(a) === key)) after.push(r);
       if(norm(r.term) === key && ['можно','содержит'].includes(r.verb)) inside.push(r);
@@ -113,12 +117,12 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
     }
     const make = (r, relation) => {
       const child = node(r.term, L, relation);
-      const extra = r.note || (r.verb === 'после' ? 'Допустимо после: ' + r.args.join(', ') : 'Связано правилом языка: ' + r.verb + ' ' + r.args.join(', '));
+      const extra = r.note || (relation === 'после' ? 'Можно использовать после: ' + r.args.join(', ') : 'Можно разместить внутри конструкции «' + term + '»');
       child.note = [child.note, extra].filter(Boolean).join(' — ');
       return child;
     };
-    const validAfter = after.filter(r => termExists(r.term));
-    const validInside = inside.flatMap(r => r.args.filter(termExists).map(term => ({ term, verb: r.verb, args:[term], note:r.note })));
+    const validAfter = after.filter(r => exists(r.term));
+    const validInside = inside.flatMap(r => r.args.filter(exists).map(t => ({ term:t, args:[t], note:r.note })));
     const groups = [];
     if(validAfter.length) groups.push({ group:true, label:'Что может идти дальше', note:'Следующие конструкции по правилам языка', lang:L,
       children:[...new Map(validAfter.map(r => [norm(r.term), make(r, 'после')])).values()] });
@@ -141,7 +145,7 @@ export function buildVariants({ q, lang = '', dict, rows = [], synonyms = {}, ca
   };
   const out = top.map(r => {
     const D = langs[r.lang] || {}; const root = node(r.term, r.lang, r.label);
-    root.children.push(...relationGroups(r.term));
+    root.children.push(...relationGroups(r.term, r.lang));
     // разновидности по имени: каждая — под самым длинным уже существующим предком
     // разновидности по имени: margin → margin-inline → margin-inline-start.
     // сортируем по длине, чтобы родитель всегда шёл раньше детей. для каждого слова отрезаем хвост по дефису
