@@ -55,11 +55,16 @@ jobs:
       - name: Audit library metadata and notes (read-only)
         if: always()
         run: node tools/code-lab/scripts/audit-library.mjs
+      - name: Build duplicate merge manifest
+        if: always() && hashFiles('audit-library-report.json') != ''
+        run: node tools/code-lab/scripts/build-duplicate-merge-manifest.mjs audit-library-report.json duplicate-merge-manifest.json
       - name: Upload library audit report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: code-lab-library-audit-${{ matrix.os }}
-          path: audit-library-report.json
+          path: |
+            audit-library-report.json
+            duplicate-merge-manifest.json
           if-no-files-found: warn
           retention-days: 7
