@@ -350,6 +350,16 @@ try {
     const linked = await post('/api/backup/restore', { files: [{ name: 'workspace/linked/out.js', text: 'outside' }] });
     assert.equal(linked.ok, false);
     await assert.rejects(fs.access(path.join(outside, 'out.js')));
+    const backupDir = path.join(L, 'data', 'restore-backups');
+    await fs.rm(backupDir, { recursive: true, force: true });
+    const outsideBackup = path.join(tmp, 'outside-backup');
+    await fs.mkdir(outsideBackup, { recursive: true });
+    await fs.symlink(outsideBackup, backupDir, 'dir');
+    const unsafeBackup = await post('/api/backup/restore', { files: [{ name: 'data/backup-check.json', text: JSON.stringify({ value: 'must-not-write' }) }] });
+    assert.equal(unsafeBackup.ok, false);
+    assert.equal(JSON.parse(await fs.readFile(path.join(L, 'data', 'backup-check.json'), 'utf8')).value, 'new');
+    assert.deepEqual(await fs.readdir(outsideBackup), []);
+    await fs.unlink(backupDir);
   });
 
   await test('удаление убирает файлы', async () => {
