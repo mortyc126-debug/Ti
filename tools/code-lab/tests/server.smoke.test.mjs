@@ -417,7 +417,50 @@ try {
     const g = await get('/api/git/info'); assert.ok('templates' in g && g.templates >= 3);
   });
 
+  await test('пользовательские конструкции: сохранение, поиск эквивалентов, удаление и старые ID', async () => {
+    const saved = await post('/api/concepts/save', {
+      schemaVersion: 1,
+      concepts: [
+        { id: 'delay-call', name: 'Задержка вызова', definition: 'Откладывает запуск функции.', aliases: ['debounce-delay'], forms: [{ language: 'js', kind: 'syntax', value: 'debounce(fn, delay)', note: 'Функция и задержка' }], tags: ['таймеры'], examples: [{ pieceId: 'py-loop', note: 'пример из библиотеки' }], origin: 'manual' },
+        { id: 'deferred-call', name: 'Отложенный вызов', definition: 'Равнозначное понятие.', aliases: [], forms: [], tags: [], examples: [], origin: 'manual' },
+        { id: 'timer-concept', name: 'Таймер', definition: 'Механизм запуска по времени.', aliases: [], forms: [], tags: [], examples: [], origin: 'manual' }
+      ],
+      relations: [
+        { id: 'rel-equivalent', from: 'delay-call', to: 'deferred-call', type: 'equivalent', note: '', origin: 'manual' },
+        { id: 'rel-depends', from: 'delay-call', to: 'timer-concept', type: 'depends', note: '', origin: 'manual' }
+      ]
+    });
+    assert.equal(saved.ok, true);
+    const all = await get('/api/concepts');
+    assert.equal(all.concepts.length, 3);
+    assert.ok(all.relationTypes.equivalent);
+    const hits = await get('/api/concepts/search?q=debounce-delay');
+    assert.ok(hits.hits.some(hit => hit.id === 'delay-call' && hit.match.kind === 'alias'));
+    assert.ok(hits.hits.some(hit => hit.id === 'deferred-call' && hit.match.kind === 'equivalent'));
+    assert.ok(!hits.hits.some(hit => hit.id === 'timer-concept'), 'связанные, но не эквивалентные понятия не должны подмешиваться в поиск');
+    const invalid = await fetch(base + '/api/concepts/save', { method: 'POST', body: JSON.stringify({
+      schemaVersion: 1, concepts: [{ id: 'bad', name: 'Плохой пример', definition: '', aliases: [], forms: [], tags: [], examples: [{ pieceId: 'missing-piece' }] }], relations: []
+    }) });
+    assert.equal(invalid.status, 400);
+    const deleted = await post('/api/concepts/delete', { id: 'delay-call' });
+    assert.equal(deleted.deleted, 'delay-call');
+    assert.equal(deleted.removedRelations, 2);
+    const after = await get('/api/concepts');
+    assert.deepEqual(after.concepts.map(item => item.id).sort(), ['deferred-call', 'timer-concept']);
+    assert.equal(after.relations.length, 0);
+    await fs.writeFile(path.join(L, 'library', '_id-aliases.json'), JSON.stringify({ version: 1, aliases: { 'legacy-py-loop': 'py-loop' } }));
+    const legacy = await get('/api/template?id=legacy-py-loop');
+    assert.equal(legacy.id, 'py-loop');
+    const page = await fetch(base + '/concepts.html');
+    assert.equal(page.status, 200);
+    assert.ok((await page.text()).includes('Мои конструкции'));
+  });
+
   await test('полная замена библиотеки удаляет лишнее только после резервирования', async () => {
+    const conceptFile = path.join(L, 'library', '_concepts.json');
+    const aliasFile = path.join(L, 'library', '_id-aliases.json');
+    const conceptsBefore = await fs.readFile(conceptFile, 'utf8');
+    const aliasesBefore = await fs.readFile(aliasFile, 'utf8');
     const meta = JSON.stringify({ schema: 1, id: 'final-library-only', lang: 'js', title: 'Финальный кусок', group: 'Тест', desc: 'Проверка полной замены', tags: [], aliases: [] });
     const result = await post('/api/library/restore', { mode: 'replace', files: [
       { name: 'library/js/final-only.js', text: 'const finalOnly = true;' },
@@ -430,6 +473,8 @@ try {
     await assert.rejects(fs.access(path.join(L, 'library', 'css', 'css-bold.css')));
     assert.ok(result.backupId);
     assert.equal(await fs.readFile(path.join(L, 'data', 'restore-backups', result.backupId, 'css', 'css-bold.css'), 'utf8').then(() => true), true);
+    assert.equal(await fs.readFile(conceptFile, 'utf8'), conceptsBefore, 'пользовательские конструкции должны пережить замену библиотеки');
+    assert.equal(await fs.readFile(aliasFile, 'utf8'), aliasesBefore, 'таблица старых ID должна пережить замену библиотеки');
   });
 
   await test('полная замена остальных хранилищ сохраняет служебные данные и резервирует удалённое', async () => {
