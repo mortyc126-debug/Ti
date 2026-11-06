@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const LIBRARY = path.resolve(HERE, '..', 'library');
+const CODELAB_ROOT = path.resolve(HERE, '..');
 const REPO_ROOT = path.resolve(HERE, '../../..');
 const CODE_EXT = new Set(['.js','.mjs','.cjs','.jsx','.ts','.tsx','.py','.rb','.php','.go','.rs','.java','.c','.h','.cpp','.cs','.lua','.sh','.bash','.ps1','.r','.sql','.css','.html','.htm','.svg','.json','.txt']);
 const ALIASES = { javascript:'js', typescript:'ts', py:'python', python3:'python', shell:'bash', sh:'bash', zsh:'bash', 'c++':'cpp', cplusplus:'cpp', cxx:'cpp', 'c#':'csharp', 'c-sharp':'csharp', cs:'csharp', golang:'go', rb:'ruby', kt:'kotlin', rs:'rust', jsx:'js', tsx:'ts', htm:'html', yml:'yaml' };
@@ -150,6 +151,20 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   const idGroups = new Map();
   for(const row of rows){ if(!idGroups.has(row.id)) idGroups.set(row.id,[]); idGroups.get(row.id).push(row.file); }
   const duplicateIdGroups = [...idGroups.values()].filter(group => group.length > 1);
+  const otherDataGroupIssues=[];
+  for(const dirName of ['tasks','recipes','flows','templates']){
+    const dir=path.join(CODELAB_ROOT,dirName);
+    let dataFiles=[];
+    try{dataFiles=await walk(dir);}catch(_){continue;}
+    for(const file of dataFiles.filter(file=>file.toLowerCase().endsWith('.json'))){
+      try{
+        const value=JSON.parse(await fs.readFile(file,'utf8'));
+        if(value&&typeof value==='object'&&!Array.isArray(value)&&typeof value.group==='string'&&value.group.trim()&&!validGroups.has(value.group.trim())){
+          otherDataGroupIssues.push({file:path.relative(CODELAB_ROOT,file).split(path.sep).join('/'),group:value.group});
+        }
+      }catch(_){}
+    }
+  }
   const duplicateIds=new Map();
   for(const group of dupGroups) for(const file of group){
     const row=rows.find(item=>item.file===file);
@@ -169,7 +184,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   console.log('library-integrity:',JSON.stringify({
     languages:langs,codeCount,metaCount,effectiveIds:ids.size,missingIds:missingIds.length,
     folderLanguageMismatches:languageMismatches.length,duplicateCodeGroups:dupGroups.length,
-    duplicateCodeSamples:dupGroups,duplicateIdGroups,duplicateReferenceScan:{filesScanned:referenceFiles.length,idsScanned:duplicateIds.size,hitCount:duplicateReferenceHits.length,hits:duplicateReferenceHits},missingIdFiles:missingIds,
+    duplicateCodeSamples:dupGroups,duplicateIdGroups,otherDataGroupIssues,duplicateReferenceScan:{filesScanned:referenceFiles.length,idsScanned:duplicateIds.size,hitCount:duplicateReferenceHits.length,hits:duplicateReferenceHits},missingIdFiles:missingIds,
     emptyDescriptions,shortDescriptionSamples:shortDescriptions.slice(0,60),descriptionLengthBuckets,statusCounts,
     missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,legacyWordMapStats,embeddedCodeMismatches,unknownGroups,wordNoteProblems:wordNoteProblems.slice(0,80),wordNoteProblemCount:wordNoteProblems.length,wordNoteProblemFiles:[...new Set(wordNoteProblems.map(x=>x.file))],wordNoteProblemByKind,wordNoteProblemByLang,wordNoteTotal,orphanNoteTotal,malformedTagFields,malformedComponents,replacementCharacterFields,codeReplacementFiles,
     problems:problems.length,languageMismatchSamples:languageMismatches.slice(0,8)
