@@ -131,7 +131,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
             else if(legacyWordMapStats.unmatchedKeySamples.length<30) legacyWordMapStats.unmatchedKeySamples.push({file:relativeFile,word,note});
           }
         }
-        rows.push({ id:effectiveId, lang:canon(meta.lang || langDir), file:relativeCode });
+        rows.push({ id:effectiveId, lang:canon(meta.lang || langDir), file:relativeCode, title, descLength:desc.length, tagsCount:Array.isArray(meta.tags)?meta.tags.length:0, aliasesCount:Array.isArray(meta.aliases)?meta.aliases.length:0, wordNotesCount:Array.isArray(meta.wordNotes)?meta.wordNotes.length:0, orphanNotesCount:Array.isArray(meta.orphanNotes)?meta.orphanNotes.length:0, componentProvidesCount:Array.isArray(meta.component?.provides)?meta.component.provides.length:0, componentRequiresCount:Array.isArray(meta.component?.requires)?meta.component.requires.length:0, status });
         if(meta.lang && canon(meta.lang)!==canon(langDir)) languageMismatches.push(relativeFile+' ('+meta.lang+')');
       } else if(CODE_EXT.has(path.extname(file).toLowerCase())){
         codeCount++;
@@ -196,6 +196,22 @@ test('библиотека: пары кода и паспортов, JSON и ID 
       }catch(_){}
     }
   }
+  const rowsByFile=new Map(rows.map(row=>[row.file,row]));
+  const duplicatePairQuality={pairs:dupGroups.length,oneDescriptionEmpty:0,descriptionUnequal:0,tagsOnlyOneSide:0,aliasesOnlyOneSide:0,componentOnlyOneSide:0,wordNotesOnlyOneSide:0,orphanNotesOnlyOneSide:0,referencedPairs:[]};
+  const duplicatePairSamples=[];
+  for(const group of dupGroups){
+    const pair=group.map(file=>rowsByFile.get(file)).filter(Boolean);
+    if(pair.length!==2) continue;
+    const [a,b]=pair;
+    if(!a.descLength||!b.descLength) duplicatePairQuality.oneDescriptionEmpty++;
+    if(a.descLength!==b.descLength) duplicatePairQuality.descriptionUnequal++;
+    if((a.tagsCount>0)!==(b.tagsCount>0)) duplicatePairQuality.tagsOnlyOneSide++;
+    if((a.aliasesCount>0)!==(b.aliasesCount>0)) duplicatePairQuality.aliasesOnlyOneSide++;
+    if((a.componentProvidesCount+a.componentRequiresCount>0)!==(b.componentProvidesCount+b.componentRequiresCount>0)) duplicatePairQuality.componentOnlyOneSide++;
+    if((a.wordNotesCount>0)!==(b.wordNotesCount>0)) duplicatePairQuality.wordNotesOnlyOneSide++;
+    if((a.orphanNotesCount>0)!==(b.orphanNotesCount>0)) duplicatePairQuality.orphanNotesOnlyOneSide++;
+    if(duplicatePairSamples.length<20) duplicatePairSamples.push({a,b});
+  }
   const duplicateIds=new Map();
   for(const group of dupGroups) for(const file of group){
     const row=rows.find(item=>item.file===file);
@@ -215,7 +231,7 @@ test('библиотека: пары кода и паспортов, JSON и ID 
   console.log('library-integrity:',JSON.stringify({
     languages:langs,codeCount,metaCount,effectiveIds:ids.size,missingIds:missingIds.length,
     folderLanguageMismatches:languageMismatches.length,duplicateCodeGroups:dupGroups.length,
-    duplicateCodeSamples:dupGroups,duplicateIdGroups,otherDataGroupIssues,templateGroupPlan,duplicateReferenceScan:{filesScanned:referenceFiles.length,idsScanned:duplicateIds.size,hitCount:duplicateReferenceHits.length,hits:duplicateReferenceHits},missingIdFiles:missingIds,
+    duplicateCodeSamples:dupGroups,duplicateIdGroups,duplicatePairQuality,duplicatePairSamples,otherDataGroupIssues,templateGroupPlan,duplicateReferenceScan:{filesScanned:referenceFiles.length,idsScanned:duplicateIds.size,hitCount:duplicateReferenceHits.length,hits:duplicateReferenceHits},missingIdFiles:missingIds,
     emptyDescriptions,shortDescriptionSamples:shortDescriptions.slice(0,60),descriptionLengthBuckets,statusCounts,
     missingTitles,missingGroups,missingLangs,fileFieldMismatches,missingSchema,legacyMetadataFiles,legacyWordMaps,legacyWordMapStats,embeddedCodeMismatches,unknownGroups,wordNoteProblems:wordNoteProblems.slice(0,80),wordNoteProblemCount:wordNoteProblems.length,wordNoteProblemFiles:[...new Set(wordNoteProblems.map(x=>x.file))],wordNoteProblemByKind,wordNoteProblemByLang,wordNoteTotal,orphanNoteTotal,malformedTagFields,malformedComponents,replacementCharacterFields,codeReplacementFiles,
     problems:problems.length,languageMismatchSamples:languageMismatches.slice(0,8)
